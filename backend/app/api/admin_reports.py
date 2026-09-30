@@ -70,6 +70,9 @@ from backend.app.services.admin_report_workflow import (
 )
 from backend.app.services.admin_security import AdminSessionIdentity
 from backend.app.services.report_read_audit import persist_admin_operation_audit
+from backend.app.services.report_delivery_effective import (
+    uncorrected_delivery_event_clause,
+)
 
 
 ADMIN_REPORT_LIST_OPERATION = "admin.report.list"
@@ -587,6 +590,8 @@ def get_admin_report_detail(
                     ReportDeliveryPackage.content_revision
                     == report.content_revision
                 )
+                # S18-40: a corrected event is not the current delivery.
+                .where(uncorrected_delivery_event_clause())
                 .order_by(ReportInstitutionDeliveryEvent.revision.desc())
                 .limit(1)
             ).one_or_none()

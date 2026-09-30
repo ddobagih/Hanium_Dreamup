@@ -155,7 +155,8 @@ class ObjectTrackerBudgetContinuityTest {
             detections, true, target.capturedAtElapsedRealtimeMs))
         val depth = DepthFrameSnapshot(target.frameId, DepthImage16(100, 100, IntArray(10_000) { 1_000 }),
             ConfidenceImage8(100, 100, ByteArray(10_000) { 255.toByte() }), null,
-            rawDepthTimestampNs = target.cameraTimestampNs, cameraImageTimestampNs = target.cameraTimestampNs)
+            rawDepthTimestampNs = target.cameraTimestampNs, rawConfidenceTimestampNs = target.cameraTimestampNs,
+            cameraImageTimestampNs = target.cameraTimestampNs)
         return pipeline.processTrackedObservation(depth, observation, mapper, target.frameId, target.capturedAtElapsedRealtimeMs)
     }
 }

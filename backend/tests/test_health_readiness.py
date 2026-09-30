@@ -15,7 +15,7 @@ import backend.app.api.health as health_api
 import httpx
 from fastapi import FastAPI
 import pytest
-from backend.app.main import app, settings as app_settings
+from backend.app.main import app, settings as app_settings, report_storage_monitor as app_report_monitor, report_image_key_manager as app_key_manager
 from backend.app.services.report_storage import ReportStorageInventorySetMismatch
 from asgi_client import ASGITestClient
 
@@ -27,6 +27,12 @@ _REAL_REPORT_STORAGE_INVENTORY_READINESS = (
 
 @pytest.fixture(autouse=True)
 def isolate_report_storage_inventory_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Route tests isolate DB locking while retaining each test's upload result.
+    monkeypatch.setattr(
+        health_api,
+        "_locked_upload_readiness",
+        lambda settings: health_api._upload_readiness(settings.upload_dir),
+    )
     monkeypatch.setattr(
         health_api,
         "_report_storage_inventory_readiness",
@@ -43,8 +49,32 @@ def isolate_report_storage_inventory_probe(monkeypatch: pytest.MonkeyPatch) -> N
         lambda _settings: {"ready": True, "binding": "matched"},
     )
 
+    # These route tests intentionally omit lifespan/DB startup. Seed their
+    # isolated empty report domain explicitly; real monitor coverage has its own
+    # filesystem and PostgreSQL regressions. Preserve upload/encryption results.
+    app_report_monitor.restart()
+    app_report_monitor.seed(
+        {}, coverage_started=time.monotonic(),
+        upload=health_api._upload_readiness(app_settings.upload_dir),
+        encryption=health_api._report_image_encryption_readiness(app_settings, app_key_manager),
+    )
+    original_router = health_api.create_router
 
-async def _navigation_ready(_settings) -> dict[str, object]:
+    def router_with_checked_snapshot(settings, warmup, manager=None, **kwargs):
+        manager = manager or app_key_manager
+        snapshot = {
+            "upload_root": health_api._upload_readiness(settings.upload_dir),
+            "report_image_encryption": health_api._report_image_encryption_readiness(settings, manager),
+            "report_storage": health_api._report_storage_inventory_readiness(settings, manager),
+        }
+        # Evaluate the existing helper oracle before HTTP, then expose memory only.
+        return original_router(settings, warmup, manager,
+            report_storage_monitor=SimpleNamespace(checks=lambda: snapshot), **kwargs)
+
+    monkeypatch.setattr(health_api, "create_router", router_with_checked_snapshot)
+
+
+async def _navigation_ready(_settings, *, runtime_provider=None) -> dict[str, object]:
     return {"ready": True, "provider": "tmap_pedestrian", "evidence": "recent_success"}
 
 
@@ -248,6 +278,37 @@ def test_readiness_expected_migration_matches_the_single_alembic_head() -> None:
     assert heads == [health_api.EXPECTED_ALEMBIC_HEAD]
 
 
+@pytest.mark.parametrize(
+    ("revision", "expected"),
+    [
+        (health_api.EXPECTED_ALEMBIC_HEAD, True),
+        ("202608300004", None),
+        ("202608300003", False),
+        ("unknown-future-revision", False),
+    ],
+)
+def test_readiness_revision_uses_only_the_known_admin_integrity_boundary(
+    revision: str,
+    expected: bool | None,
+) -> None:
+    class BoundaryExecutor:
+        def execute(self, statement):
+            assert revision == health_api.EXPECTED_ALEMBIC_HEAD
+            assert "walksafe_admin_report_integrity_boundary" in str(statement)
+            assert "2b68a3968fa183f5c2682246c8048c9220ffa802ca55b97f782905bc08d26249" in str(statement)
+
+            class Result:
+                @staticmethod
+                def scalar_one() -> bool:
+                    return True
+
+            return Result()
+
+    assert health_api.admin_report_integrity_boundary_state(
+        BoundaryExecutor(), revision=revision
+    ) is expected
+
+
 def test_readiness_requires_database_migration_upload_and_detector(monkeypatch) -> None:
     source_commit = "a" * 40
     monkeypatch.setattr(app_settings, "walksafe_source_commit", source_commit)
@@ -267,6 +328,83 @@ def test_readiness_requires_database_migration_upload_and_detector(monkeypatch) 
     assert response.status_code == 200
     assert response.json()["status"] == "ready"
     assert response.json()["source_commit"] == source_commit
+
+
+@pytest.mark.parametrize("otp_mismatch", [True, False], ids=("otp_mismatch", "matched"))
+def test_s01_14_readiness_names_degraded_account_enrollment(
+    monkeypatch, otp_mismatch: bool,
+) -> None:
+    # S01-14-F2: OTP-only key mismatch keeps /ready ready (login works) but
+    # reports the degraded enrollment feature; a matched binding adds no key.
+    monkeypatch.setattr(app_settings, "tmap_app_key", "test-tmap-key")
+    monkeypatch.setattr(app_settings, "walking_route_provider", "tmap_pedestrian")
+    monkeypatch.setattr(health_api, "_database_readiness", lambda _url: {"ready": True})
+    monkeypatch.setattr(health_api, "_upload_readiness", lambda _path: {"ready": True})
+    monkeypatch.setattr(health_api, "_navigation_readiness", _navigation_ready)
+    monkeypatch.setattr(
+        health_api,
+        "detect_v2_health",
+        lambda _settings: {"status": "ready", "mode": "fake", "reason": None, "configured_runtime": None},
+    )
+    binding = {"ready": True, "binding": "matched"}
+    if otp_mismatch:
+        binding["otp_hmac_binding"] = "mismatch"
+    monkeypatch.setattr(
+        health_api,
+        "_account_crypto_binding_readiness",
+        lambda _settings: dict(binding),
+    )
+
+    response = ASGITestClient(app).get("/ready")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["checks"]["account_crypto_binding"] == binding
+    if otp_mismatch:
+        assert body["degraded_features"] == ["account_enrollment"]
+    else:
+        assert "degraded_features" not in body
+
+
+@pytest.mark.parametrize("failing_feature", ["navigation", "detector"])
+def test_s20_49_single_feature_failure_keeps_whole_backend_not_ready(
+    monkeypatch, failing_feature: str,
+) -> None:
+    # S20-49 / FP-043-DETAIL-01 interim (DEC-PERSISTENT-FAILURE-STOP-ALL): one
+    # supported feature failing still makes /ready not ready (all-checks AND),
+    # while per-check detail tells operators which feature failed.
+    monkeypatch.setattr(app_settings, "tmap_app_key", "test-tmap-key")
+    monkeypatch.setattr(app_settings, "walking_route_provider", "tmap_pedestrian")
+    monkeypatch.setattr(health_api, "_database_readiness", lambda _url: {"ready": True})
+    monkeypatch.setattr(health_api, "_upload_readiness", lambda _path: {"ready": True})
+    async def navigation_failed(_settings, *, runtime_provider=None) -> dict[str, object]:
+        return {"ready": False, "reason": "tmap_route_probe_failed"}
+
+    monkeypatch.setattr(
+        health_api,
+        "_navigation_readiness",
+        navigation_failed if failing_feature == "navigation" else _navigation_ready,
+    )
+    monkeypatch.setattr(
+        health_api,
+        "detect_v2_health",
+        (lambda _settings: {
+            "status": "unavailable", "mode": "yolo", "reason": "model_missing",
+            "configured_runtime": None,
+        }) if failing_feature == "detector" else (lambda _settings: {
+            "status": "ready", "mode": "fake", "reason": None, "configured_runtime": None,
+        }),
+    )
+
+    response = ASGITestClient(app).get("/ready")
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "not_ready"
+    not_ready = sorted(name for name, check in body["checks"].items() if check.get("ready") is not True)
+    assert not_ready == [failing_feature]
+    assert body["checks"]["database"]["ready"] is True
 
 
 def test_database_readiness_fails_when_enabled_replica_totp_binding_is_stale(
@@ -683,6 +821,54 @@ def test_navigation_readiness_opt_in_live_probe_is_bounded_and_mockable(monkeypa
     assert result["evidence"] == "live_probe"
 
 
+def test_readiness_route_passes_runtime_provider_to_live_navigation_probe(monkeypatch) -> None:
+    monkeypatch.setattr(app_settings, "walking_route_provider", "tmap_pedestrian")
+    monkeypatch.setattr(app_settings, "tmap_poi_provider", "live")
+    monkeypatch.setattr(app_settings, "tmap_app_key", "test-tmap-key")
+    monkeypatch.setattr(app_settings, "tmap_readiness_live_probe_enabled", True)
+    monkeypatch.setattr(app_settings, "tmap_readiness_probe_timeout_seconds", 1.0)
+    monkeypatch.setattr(
+        health_api,
+        "tmap_dependency_readiness",
+        lambda _max_age: {"ready": False, "provider": "tmap_pedestrian"},
+    )
+    monkeypatch.setattr(health_api, "_database_and_admin_readiness", lambda _settings: {"ready": True})
+    monkeypatch.setattr(health_api, "_upload_readiness", lambda _path: {"ready": True})
+    monkeypatch.setattr(health_api, "_raw_object_readiness", lambda _settings, _manager: {"ready": True})
+    monkeypatch.setattr(health_api, "_detector_readiness", lambda _settings, _warmup: {"ready": True})
+    monkeypatch.setattr(health_api, "_report_image_encryption_readiness", lambda _settings, _manager: {"ready": True})
+    monkeypatch.setattr(health_api, "_account_enrollment_config_readiness", lambda _settings: {"ready": True})
+    runtime = object()
+    provided: list[object] = []
+    probed: list[object] = []
+
+    def runtime_provider() -> object:
+        provided.append(runtime)
+        return runtime
+
+    async def fake_probe(_settings, *, runtime: object) -> dict[str, object]:
+        probed.append(runtime)
+        return {"ready": True, "provider": "tmap_pedestrian", "evidence": "live_probe"}
+
+    monkeypatch.setattr(health_api, "probe_tmap_dependencies", fake_probe)
+    isolated_app = FastAPI()
+    isolated_app.include_router(
+        health_api.create_router(
+            app_settings,
+            lambda: None,
+            object(),  # type: ignore[arg-type]
+            runtime_provider=runtime_provider,  # type: ignore[arg-type]
+        )
+    )
+
+    response = ASGITestClient(isolated_app).get("/ready")
+
+    assert response.status_code == 200
+    assert response.json()["checks"]["navigation"]["evidence"] == "live_probe"
+    assert provided == [runtime]
+    assert probed == [runtime]
+
+
 def test_upload_readiness_proves_file_and_directory_fsync(tmp_path: Path, monkeypatch) -> None:
     fsync_calls: list[int] = []
     real_fsync = health_api.os.fsync
@@ -852,6 +1038,7 @@ def test_readiness_returns_503_for_enabled_raw_root_drift(
         raw_object_dir=Path("/not/exposed"),
         upload_dir=Path("/unused"),
         walksafe_source_commit=None,
+        readiness_inventory_cache_seconds=0,
     )
     manager = SimpleNamespace(keyring=SimpleNamespace(slots=()))
     monkeypatch.setattr(
@@ -1004,16 +1191,32 @@ def test_readiness_rejects_post_start_report_storage_drift(
     response = ASGITestClient(isolated_app).get("/ready")
 
     assert response.status_code == 503
+    journal_unresolved = entry_name == ".report-write-journal"
     assert response.json()["checks"]["report_storage"] == {
         "ready": False,
-        "reason": "report_storage_inventory_invalid",
+        "reason": (
+            "report_storage_journal_unresolved"
+            if journal_unresolved
+            else "report_storage_inventory_invalid"
+        ),
+        "recovery": {
+            "action": "preserve_evidence_and_verify_storage_under_maintenance_lock",
+            "isolation": "readiness_blocked_evidence_retained_in_place",
+            "restart_required": None,
+            "restart_alone_repairs": False if journal_unresolved else None,
+        },
     }
-    assert len(lock_statements) == 1
-    assert "pg_advisory_xact_lock(" in lock_statements[0]
-    assert "pg_advisory_xact_lock_shared" not in lock_statements[0]
+    assert len(lock_statements) == (1 if journal_unresolved else 2)
+    assert all("pg_advisory_xact_lock(" in statement for statement in lock_statements)
+    assert all("pg_advisory_xact_lock_shared" not in statement for statement in lock_statements)
+    if entry_kind == "file":
+        assert entry.read_bytes() == b"post-start-drift"
+    else:
+        assert (entry / "pending.json").read_text(encoding="utf-8") == "{}"
 
 
 def test_report_storage_set_mismatch_retries_append_then_reuses_one_incident(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mismatch = ReportStorageInventorySetMismatch(
@@ -1024,6 +1227,9 @@ def test_report_storage_set_mismatch_retries_append_then_reuses_one_incident(
     recorded: list[dict[str, object]] = []
 
     class FakeDatabaseSession:
+        def execute(self, statement, _parameters) -> None:
+            assert "pg_advisory_xact_lock(" in str(statement)
+
         def get(self, _model, _incident_id):
             return state["existing"]
 
@@ -1060,7 +1266,11 @@ def test_report_storage_set_mismatch_retries_append_then_reuses_one_incident(
         detect_mismatch,
     )
     monkeypatch.setattr(health_api, "record_critical_incident", record)
-    settings = SimpleNamespace(upload_dir=Path("/not-read"))
+    settings = SimpleNamespace(
+        upload_dir=tmp_path,
+        maintenance_lock_path=None,
+        maintenance_lock_group_gid=None,
+    )
     manager = SimpleNamespace(keyring=SimpleNamespace(slots=()))
 
     failed = _REAL_REPORT_STORAGE_INVENTORY_READINESS(settings, manager)
@@ -1088,13 +1298,18 @@ def test_report_storage_set_mismatch_retries_append_then_reuses_one_incident(
 
 
 def test_report_storage_non_set_failure_is_not_recorded_as_incident(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     recorded = False
 
+    class FakeDatabaseSession:
+        def execute(self, statement, _parameters) -> None:
+            assert "pg_advisory_xact_lock(" in str(statement)
+
     class FakeTransaction:
-        def __enter__(self) -> object:
-            return object()
+        def __enter__(self) -> FakeDatabaseSession:
+            return FakeDatabaseSession()
 
         def __exit__(self, *_args) -> None:
             return None
@@ -1119,7 +1334,11 @@ def test_report_storage_non_set_failure_is_not_recorded_as_incident(
     monkeypatch.setattr(health_api, "record_critical_incident", record)
 
     result = _REAL_REPORT_STORAGE_INVENTORY_READINESS(
-        SimpleNamespace(upload_dir=Path("/not-read")),
+        SimpleNamespace(
+            upload_dir=tmp_path,
+            maintenance_lock_path=None,
+            maintenance_lock_group_gid=None,
+        ),
         SimpleNamespace(keyring=SimpleNamespace(slots=())),
     )
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import calendar
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from sqlalchemy import select, text, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -44,6 +44,10 @@ from backend.app.models import (
     SignupConsentReceipt,
     UserAccount,
 )
+from backend.app.services.account_password_policy import (
+    is_common_or_trivial_password,
+    new_account_password_length_is_valid,
+)
 from backend.app.services.actor_rate_limit import (
     ActorRateLimitStoreUnavailable,
     InMemoryActorRateLimiter,
@@ -53,6 +57,13 @@ from backend.app.services.privacy_lifecycle import (
     PrivacyLifecycleError,
     privacy_subject_hmac,
 )
+from backend.app.services.signup_documents import (
+    SIGNUP_OPTIONAL_DOCUMENT_KEYS,
+    SIGNUP_REQUIRED_DOCUMENT_KEYS,
+    signup_document_keys_are_exact,
+    signup_document_version_is_current,
+    signup_document_version_is_known_prior,
+)
 
 
 SEOUL = ZoneInfo("Asia/Seoul")
@@ -61,6 +72,24 @@ _SCRYPT_N = 1 << 14
 _SCRYPT_R = 8
 _SCRYPT_P = 1
 _SCRYPT_DKLEN = 32
+# Every cost ever issued stays verifiable so raising the current cost cannot lock
+# out existing accounts; stored hashes cannot choose any other (e.g. huge) cost.
+_ISSUED_LEGACY_SCRYPT_PARAMETERS = frozenset({(1 << 14, 8, 1)})
+
+
+def _password_hash_parameters(encoded: str) -> tuple[int, int, int] | None:
+    try:
+        prefix, raw_n, raw_r, raw_p, _raw_salt, _raw_digest = encoded.split("$")
+        n, r, p = int(raw_n), int(raw_r), int(raw_p)
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if prefix != _PASSWORD_PREFIX or (raw_n, raw_r, raw_p) != (str(n), str(r), str(p)):
+        return None
+    return n, r, p
+
+
+def _password_hash_is_current(encoded: str) -> bool:
+    return _password_hash_parameters(encoded) == (_SCRYPT_N, _SCRYPT_R, _SCRYPT_P)
 
 
 class AccountServiceError(RuntimeError):
@@ -145,7 +174,19 @@ def _b64decode(value: str) -> bytes:
     return decoded
 
 
+def validate_new_account_password(password: str) -> None:
+    """FP-010-DETAIL-02 screening for a password chosen at account creation."""
+    if not new_account_password_length_is_valid(password) or is_common_or_trivial_password(password):
+        raise AccountServiceError(
+            "account_password_too_common",
+            "The password is too common or too easy to guess.",
+            status_code=400,
+        )
+
+
 def hash_account_password(password: str) -> str:
+    # The 10..128 range is kept: successful legacy logins are re-hashed here with
+    # their existing password. New-password rules live in validate_new_account_password.
     if not 10 <= len(password) <= 128:
         raise ValueError("password must contain between 10 and 128 characters")
     salt = secrets.token_bytes(16)
@@ -177,7 +218,11 @@ def verify_account_password(password: str, encoded: str) -> bool:
         expected = _b64decode(raw_digest)
         if (
             prefix != _PASSWORD_PREFIX
-            or (n, r, p) != (_SCRYPT_N, _SCRYPT_R, _SCRYPT_P)
+            or (raw_n, raw_r, raw_p) != (str(n), str(r), str(p))
+            or (
+                (n, r, p) != (_SCRYPT_N, _SCRYPT_R, _SCRYPT_P)
+                and (n, r, p) not in _ISSUED_LEGACY_SCRYPT_PARAMETERS
+            )
             or len(salt) != 16
             or len(expected) != _SCRYPT_DKLEN
         ):
@@ -319,38 +364,139 @@ class AccountEmailCrypto:
             hashlib.sha256,
         ).hexdigest()
 
+    def creation_binding_hmac(
+        self,
+        *,
+        enrollment: AccountEnrollment,
+        payload: AccountCreateRequestV1,
+        account: UserAccount,
+        receipt: SignupConsentReceipt,
+    ) -> str:
+        # Only this keyed digest is stored, never the OTP or request plaintext.
+        # The password is represented by its existing salted scrypt hash.
+        canonical = json.dumps(
+            {
+                "key_version": self.key_version,
+                "enrollment": {
+                    "id": str(enrollment.id),
+                    "handle": enrollment.enrollment_handle,
+                    "email_lookup_hmac": enrollment.email_lookup_hmac,
+                },
+                "request": {
+                    "schema_version": payload.schema_version,
+                    "otp_code": payload.otp_code,
+                    "consent": payload.consent.model_dump(),
+                },
+                "account": {
+                    "id": str(account.id),
+                    "actor_id": account.actor_id,
+                    "email_lookup_hmac": account.email_lookup_hmac,
+                    "account_generation": account.account_generation,
+                    "auth_epoch": account.auth_epoch,
+                    "password_hash": account.password_hash,
+                },
+                "receipt": {
+                    "id": str(receipt.id),
+                    "account_id": str(receipt.account_id),
+                    "schema_version": receipt.schema_version,
+                    "document_versions": receipt.document_versions,
+                    "selections": receipt.selections,
+                    "receipt_sha256": receipt.receipt_sha256,
+                    "recorded_at": receipt.recorded_at.astimezone(UTC).isoformat(),
+                },
+                "response_schema_version": "walksafe.account.v1",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return hmac.new(
+            self._otp_key,
+            b"walksafe/account-creation-binding/v1\0" + canonical,
+            hashlib.sha256,
+        ).hexdigest()
+
+
+# S01-14: each operation verifies only the key purposes it actually uses, so an
+# OTP HMAC key change fails OTP issuance/verification closed without blocking
+# password login. The stored binding already keeps one fingerprint per purpose.
+ACCOUNT_KEY_PURPOSE_ENCRYPTION = "email_encryption"
+ACCOUNT_KEY_PURPOSE_LOOKUP_HMAC = "email_lookup_hmac"
+ACCOUNT_KEY_PURPOSE_OTP_HMAC = "otp_hmac"
+ACCOUNT_KEY_PURPOSES_ALL = frozenset(
+    {
+        ACCOUNT_KEY_PURPOSE_ENCRYPTION,
+        ACCOUNT_KEY_PURPOSE_LOOKUP_HMAC,
+        ACCOUNT_KEY_PURPOSE_OTP_HMAC,
+    }
+)
+# Password login reads the lookup index of rows written under the encryption
+# key version; it never uses the OTP HMAC key.
+ACCOUNT_KEY_PURPOSES_AUTHENTICATION = frozenset(
+    {ACCOUNT_KEY_PURPOSE_ENCRYPTION, ACCOUNT_KEY_PURPOSE_LOOKUP_HMAC}
+)
+# OTP issuance and account creation use all three keys (encrypted email,
+# lookup index, OTP/request/creation-binding HMACs).
+ACCOUNT_KEY_PURPOSES_ENROLLMENT = ACCOUNT_KEY_PURPOSES_ALL
+
 
 def _account_crypto_binding_matches(
     binding: AccountCryptoKeyBinding,
     crypto: AccountEmailCrypto,
+    purposes: frozenset[str] = ACCOUNT_KEY_PURPOSES_ALL,
 ) -> bool:
+    if not purposes or not purposes <= ACCOUNT_KEY_PURPOSES_ALL:
+        raise ValueError("account key purposes must be a non-empty known subset")
     encryption_fingerprint, lookup_fingerprint, otp_fingerprint = (
         crypto.key_fingerprints
     )
-    return (
-        binding.key_version == crypto.key_version
-        and secrets.compare_digest(
+    pairs = {
+        ACCOUNT_KEY_PURPOSE_ENCRYPTION: (
             binding.encryption_key_fingerprint,
             encryption_fingerprint,
-        )
-        and secrets.compare_digest(
+        ),
+        ACCOUNT_KEY_PURPOSE_LOOKUP_HMAC: (
             binding.lookup_hmac_key_fingerprint,
             lookup_fingerprint,
-        )
-        and secrets.compare_digest(
+        ),
+        ACCOUNT_KEY_PURPOSE_OTP_HMAC: (
             binding.otp_hmac_key_fingerprint,
             otp_fingerprint,
-        )
+        ),
+    }
+    # key_version names the encryption AAD and the creation-binding version,
+    # so it is part of every purpose set that includes encryption or OTP.
+    version_checked = bool(
+        purposes & {ACCOUNT_KEY_PURPOSE_ENCRYPTION, ACCOUNT_KEY_PURPOSE_OTP_HMAC}
+    )
+    matches = [
+        secrets.compare_digest(*pairs[purpose]) for purpose in sorted(purposes)
+    ]
+    return all(matches) and (
+        not version_checked or binding.key_version == crypto.key_version
+    )
+
+
+def account_crypto_binding_mismatched_purposes(
+    binding: AccountCryptoKeyBinding,
+    crypto: AccountEmailCrypto,
+) -> frozenset[str]:
+    """Non-secret purpose names whose configured key differs from the binding."""
+
+    return frozenset(
+        purpose
+        for purpose in ACCOUNT_KEY_PURPOSES_ALL
+        if not _account_crypto_binding_matches(binding, crypto, frozenset({purpose}))
     )
 
 
 def bind_or_verify_account_crypto_keys(
     db: Session,
     crypto: AccountEmailCrypto,
+    purposes: frozenset[str] = ACCOUNT_KEY_PURPOSES_ALL,
 ) -> AccountCryptoKeyBinding:
     binding = db.get(AccountCryptoKeyBinding, 1, populate_existing=True)
     if binding is not None:
-        if not _account_crypto_binding_matches(binding, crypto):
+        if not _account_crypto_binding_matches(binding, crypto, purposes):
             raise AccountServiceError(
                 "account_crypto_key_mismatch",
                 "The account service is temporarily unavailable.",
@@ -385,7 +531,7 @@ def bind_or_verify_account_crypto_keys(
         db.add(binding)
         db.flush()
         return binding
-    if not _account_crypto_binding_matches(binding, crypto):
+    if not _account_crypto_binding_matches(binding, crypto, purposes):
         raise AccountServiceError(
             "account_crypto_key_mismatch",
             "The account service is temporarily unavailable.",
@@ -397,9 +543,12 @@ def bind_or_verify_account_crypto_keys(
 def assert_account_crypto_keys_bound(
     db: Session,
     crypto: AccountEmailCrypto,
+    purposes: frozenset[str] = ACCOUNT_KEY_PURPOSES_ALL,
 ) -> AccountCryptoKeyBinding:
     binding = db.get(AccountCryptoKeyBinding, 1, populate_existing=True)
-    if binding is None or not _account_crypto_binding_matches(binding, crypto):
+    if binding is None or not _account_crypto_binding_matches(
+        binding, crypto, purposes
+    ):
         raise AccountServiceError(
             "account_crypto_key_mismatch",
             "The account service is temporarily unavailable.",
@@ -735,6 +884,7 @@ class AccountService:
         payload: EmailOtpEnrollmentRequestV1,
         *,
         now: datetime | None = None,
+        send_quota_check: Callable[[], None] | None = None,
     ) -> EnrollmentIssue:
         observed_at = (now or utc_now()).astimezone(UTC).replace(microsecond=0)
         require_minimum_age(
@@ -750,7 +900,11 @@ class AccountService:
                 status_code=422,
             ) from exc
         crypto = self._crypto()
-        bind_or_verify_account_crypto_keys(db, crypto)
+        bind_or_verify_account_crypto_keys(
+            db,
+            crypto,
+            ACCOUNT_KEY_PURPOSES_ENROLLMENT,
+        )
         lookup_hmac = crypto.email_lookup_hmac(email)
         request_hmac = crypto.request_hmac(
             email=email,
@@ -772,12 +926,21 @@ class AccountService:
             select(AccountEnrollment)
             .where(AccountEnrollment.request_id == payload.request_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if existing is not None:
             if not secrets.compare_digest(existing.request_hmac, request_hmac):
                 raise AccountServiceError(
                     "account_enrollment_idempotency_conflict",
                     "The enrollment request identifier is already bound.",
+                    status_code=409,
+                )
+            if existing.state in {"EXPIRED", "EXHAUSTED", "CONSUMED"} or (
+                existing.state == "ACTIVE" and existing.expires_at <= observed_at
+            ):
+                raise AccountServiceError(
+                    "account_enrollment_idempotency_conflict",
+                    "The enrollment request could not be accepted.",
                     status_code=409,
                 )
             if existing.state == "PENDING_DELIVERY":
@@ -799,44 +962,13 @@ class AccountService:
                             int((lease_until - observed_at).total_seconds()),
                         ),
                     )
-                prior_otp_hmac = existing.otp_hmac
-                code = ""
-                replacement_otp_hmac = prior_otp_hmac
-                for _ in range(8):
-                    code = f"{secrets.randbelow(1_000_000):06d}"
-                    replacement_otp_hmac = crypto.otp_hmac(
-                        handle=existing.enrollment_handle,
-                        email=email,
-                        code=code,
-                    )
-                    if replacement_otp_hmac != prior_otp_hmac:
-                        break
-                if replacement_otp_hmac == prior_otp_hmac:
-                    raise AccountServiceError(
-                        "account_enrollment_unavailable",
-                        "Account enrollment is temporarily unavailable.",
-                        status_code=503,
-                    )
-                existing.state_version += 1
-                existing.issue_count += 1
-                existing.attempt_count = 0
-                existing.otp_hmac = replacement_otp_hmac
-                existing.expires_at = observed_at + timedelta(
-                    seconds=self.settings.account_otp_ttl_seconds
+                # The send may have succeeded even when its DB acknowledgement did not.
+                # Never replace a possibly delivered code under the same request ID.
+                raise AccountServiceError(
+                    "account_enrollment_idempotency_conflict",
+                    "The enrollment request could not be accepted.",
+                    status_code=409,
                 )
-                existing.resend_not_before = observed_at + timedelta(
-                    seconds=self.settings.account_otp_resend_cooldown_seconds
-                )
-                existing.updated_at = observed_at
-                response = self._response(existing)
-                delivery = OtpDelivery(
-                    enrollment_id=existing.id,
-                    issue_count=existing.issue_count,
-                    email=email,
-                    code=code,
-                )
-                db.commit()
-                return EnrollmentIssue(response, delivery)
             if existing.state != "DELIVERY_FAILED":
                 response = self._response(existing)
                 db.commit()
@@ -852,32 +984,12 @@ class AccountService:
                     status_code=429,
                     retry_after=retry_after,
                 )
-            code = f"{secrets.randbelow(1_000_000):06d}"
-            existing.state = "PENDING_DELIVERY"
-            existing.state_version += 1
-            existing.issue_count += 1
-            existing.attempt_count = 0
-            existing.otp_hmac = crypto.otp_hmac(
-                handle=existing.enrollment_handle,
-                email=email,
-                code=code,
+            # A transport error is not proof that the provider rejected the message.
+            raise AccountServiceError(
+                "account_enrollment_idempotency_conflict",
+                "The enrollment request could not be accepted.",
+                status_code=409,
             )
-            existing.expires_at = observed_at + timedelta(
-                seconds=self.settings.account_otp_ttl_seconds
-            )
-            existing.resend_not_before = observed_at + timedelta(
-                seconds=self.settings.account_otp_resend_cooldown_seconds
-            )
-            existing.updated_at = observed_at
-            response = self._response(existing)
-            delivery = OtpDelivery(
-                enrollment_id=existing.id,
-                issue_count=existing.issue_count,
-                email=email,
-                code=code,
-            )
-            db.commit()
-            return EnrollmentIssue(response, delivery)
 
         latest = db.scalar(
             select(AccountEnrollment)
@@ -896,6 +1008,8 @@ class AccountService:
                     int((latest.resend_not_before - observed_at).total_seconds()),
                 ),
             )
+        if send_quota_check is not None:
+            send_quota_check()
 
         live_enrollments = db.scalars(
             select(AccountEnrollment)
@@ -1018,15 +1132,45 @@ class AccountService:
         self,
         payload: AccountCreateRequestV1,
     ) -> tuple[dict[str, str], dict[str, bool]]:
-        versions = payload.consent.document_versions.model_dump()
-        expected = dict(self.settings.account_signup_document_versions)
-        if versions != expected:
+        # S01-3 / FP-013: the receipt keeps the versions the app showed. A changed
+        # required document blocks only with a dedicated code (re-read or update);
+        # a changed optional document never blocks signup, but its old grant is not
+        # applied (prohibited_behaviors[0] and [2]). Integrated-consent bootstrap then
+        # reports RECONSENT_REQUIRED for the stale optional version.
+        # GWBE-04: a stale optional version is recorded only when the server lists it
+        # as a prior published version; an unknown (never published or future)
+        # version fails closed like a required mismatch.
+        if not signup_document_keys_are_exact(self.settings.account_signup_document_versions):
+            # GWBE-06: a document key outside the required + optional sets is never
+            # silently skipped.
             raise AccountServiceError(
-                "signup_consent_invalid",
-                "The signup consent documents are not current.",
-                status_code=400,
+                "account_enrollment_unavailable",
+                "Account enrollment is temporarily unavailable.",
+                status_code=503,
             )
+        versions = payload.consent.document_versions.model_dump()
         selections = payload.consent.selections.model_dump()
+        mismatched = [
+            key
+            for key in SIGNUP_REQUIRED_DOCUMENT_KEYS
+            if not signup_document_version_is_current(self.settings, key, versions[key])
+        ] + [
+            key
+            for key in SIGNUP_OPTIONAL_DOCUMENT_KEYS
+            if not signup_document_version_is_current(self.settings, key, versions[key])
+            and not signup_document_version_is_known_prior(self.settings, key, versions[key])
+        ]
+        if mismatched:
+            # GWBE-08: the app may be behind or ahead of the server configuration.
+            raise AccountServiceError(
+                "signup_consent_outdated",
+                "The signup document versions differ between the app and the server. "
+                "Try again later or update the app.",
+                status_code=409,
+            )
+        for key in SIGNUP_OPTIONAL_DOCUMENT_KEYS:
+            if not signup_document_version_is_current(self.settings, key, versions[key]):
+                selections[key] = False
         return versions, selections
 
     @staticmethod
@@ -1054,6 +1198,88 @@ class AccountService:
             b"walksafe/signup-consent-receipt/v1\0" + canonical
         ).hexdigest()
 
+    def _replay_created_account(
+        self,
+        db: Session,
+        payload: AccountCreateRequestV1,
+        enrollment: AccountEnrollment,
+        crypto: AccountEmailCrypto,
+    ) -> AccountResponseV1:
+        if (
+            enrollment.created_account_id is None
+            or enrollment.creation_binding_hmac is None
+            or enrollment.creation_binding_key_version is None
+        ):
+            raise AccountServiceError(
+                "account_enrollment_conflict",
+                "The enrollment cannot be used to create an account.",
+                status_code=409,
+            )
+        if enrollment.creation_binding_key_version != crypto.key_version:
+            raise AccountServiceError(
+                "account_crypto_key_mismatch",
+                "The account service is temporarily unavailable.",
+                status_code=503,
+            )
+        account = db.scalar(
+            select(UserAccount)
+            .where(UserAccount.id == enrollment.created_account_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if (
+            account is None
+            or account.status != "ACTIVE"
+            or account.email_lookup_hmac != enrollment.email_lookup_hmac
+        ):
+            raise AccountServiceError(
+                "account_enrollment_conflict",
+                "The enrollment cannot be used to create an account.",
+                status_code=409,
+            )
+        receipt = db.scalar(
+            select(SignupConsentReceipt)
+            .where(SignupConsentReceipt.account_id == account.id)
+            .execution_options(populate_existing=True)
+        )
+        if receipt is None:
+            raise AccountServiceError(
+                "account_enrollment_conflict",
+                "The enrollment cannot be used to create an account.",
+                status_code=409,
+            )
+        self._authentication_rate_limiter.check(
+            email_lookup_hmac=enrollment.email_lookup_hmac,
+        )
+        with self._password_verification_gate.slot():
+            password_matches = verify_account_password(
+                payload.password,
+                account.password_hash,
+            )
+            expected_binding = crypto.creation_binding_hmac(
+                enrollment=enrollment,
+                payload=payload,
+                account=account,
+                receipt=receipt,
+            )
+            binding_matches = secrets.compare_digest(
+                expected_binding,
+                enrollment.creation_binding_hmac,
+            )
+        if not (password_matches and binding_matches):
+            raise AccountServiceError(
+                "account_enrollment_conflict",
+                "The enrollment cannot be used to create an account.",
+                status_code=409,
+            )
+        # Read-only replay: no new receipt, consumption, or retention extension.
+        return AccountResponseV1(
+            schema_version="walksafe.account.v1",
+            actor_id=account.actor_id,
+            account_generation=account.account_generation,
+            signup_receipt_sha256=receipt.receipt_sha256,
+        )
+
     def create_account(
         self,
         db: Session,
@@ -1061,28 +1287,32 @@ class AccountService:
         *,
         now: datetime | None = None,
     ) -> AccountResponseV1:
-        versions, selections = self._validate_consent(payload)
         observed_at = (now or utc_now()).astimezone(UTC).replace(microsecond=0)
         crypto = self._crypto()
-        bind_or_verify_account_crypto_keys(db, crypto)
+        bind_or_verify_account_crypto_keys(
+            db,
+            crypto,
+            ACCOUNT_KEY_PURPOSES_ENROLLMENT,
+        )
         enrollment = db.scalar(
             select(AccountEnrollment)
             .where(
                 AccountEnrollment.enrollment_handle == payload.enrollment_handle
             )
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
+        if enrollment is not None and enrollment.state == "CONSUMED":
+            return self._replay_created_account(db, payload, enrollment, crypto)
+        # Current policy still governs new creation, not an exact prior result.
+        versions, selections = self._validate_consent(payload)
+        # S01-13: refuse common values before OTP attempts or scrypt are spent.
+        validate_new_account_password(payload.password)
         if enrollment is None:
             raise AccountServiceError(
                 "account_enrollment_verification_failed",
                 "The enrollment verification failed.",
                 status_code=401,
-            )
-        if enrollment.state == "CONSUMED":
-            raise AccountServiceError(
-                "account_enrollment_conflict",
-                "The enrollment cannot be used to create an account.",
-                status_code=409,
             )
         if enrollment.state != "ACTIVE":
             raise AccountServiceError(
@@ -1150,7 +1380,18 @@ class AccountService:
                 status_code=409,
             )
 
-        password_hash = hash_account_password(payload.password)
+        try:
+            with self._password_verification_gate.slot():
+                password_hash = hash_account_password(payload.password)
+        except AccountServiceError as exc:
+            if exc.code != "account_authentication_busy":
+                raise
+            raise AccountServiceError(
+                "account_enrollment_unavailable",
+                "Account enrollment is temporarily unavailable.",
+                status_code=503,
+                retry_after=exc.retry_after,
+            ) from exc
         account_id = uuid.uuid4()
         actor_id = str(uuid.uuid4())
         account_generation = 1
@@ -1198,6 +1439,14 @@ class AccountService:
             receipt_sha256=receipt_sha256,
             recorded_at=observed_at,
         )
+        enrollment.created_account_id = account.id
+        enrollment.creation_binding_key_version = crypto.key_version
+        enrollment.creation_binding_hmac = crypto.creation_binding_hmac(
+            enrollment=enrollment,
+            payload=payload,
+            account=account,
+            receipt=receipt,
+        )
         enrollment.state = "CONSUMED"
         enrollment.state_version += 1
         enrollment.otp_hmac = None
@@ -1210,6 +1459,14 @@ class AccountService:
             db.commit()
         except IntegrityError as exc:
             db.rollback()
+            diagnostic = getattr(exc.orig, "diag", None)
+            if (
+                getattr(exc.orig, "sqlstate", None) != "23505"
+                or getattr(diagnostic, "table_name", None) != "user_accounts"
+                or getattr(diagnostic, "constraint_name", None)
+                != "uq_user_accounts_email_lookup_hmac"
+            ):
+                raise
             db.execute(
                 update(AccountEnrollment)
                 .where(
@@ -1237,6 +1494,41 @@ class AccountService:
             signup_receipt_sha256=receipt_sha256,
         )
 
+    def _upgrade_password_hash(
+        self,
+        db: Session,
+        account: UserAccount,
+        password: str,
+        observed_auth_epoch: int,
+    ) -> None:
+        """Opportunistically re-hash an issued legacy cost after a verified login.
+
+        The login result never depends on this upgrade: a busy hash gate or a
+        store error leaves the still-verifiable legacy hash in place.
+        """
+        try:
+            with self._password_verification_gate.slot():
+                upgraded = hash_account_password(password)
+        except AccountServiceError:
+            return
+        try:
+            result = db.execute(
+                update(UserAccount)
+                .where(
+                    UserAccount.id == account.id,
+                    UserAccount.password_hash == account.password_hash,
+                    UserAccount.auth_epoch == observed_auth_epoch,
+                    UserAccount.status == "ACTIVE",
+                )
+                .values(password_hash=upgraded)
+            )
+            if result.rowcount == 1:
+                db.commit()
+            else:
+                db.rollback()
+        except SQLAlchemyError:
+            db.rollback()
+
     def authenticate(
         self,
         db: Session,
@@ -1245,7 +1537,11 @@ class AccountService:
         account: UserAccount | None = None
         email: str | None = None
         crypto = self._crypto()
-        bind_or_verify_account_crypto_keys(db, crypto)
+        bind_or_verify_account_crypto_keys(
+            db,
+            crypto,
+            ACCOUNT_KEY_PURPOSES_AUTHENTICATION,
+        )
         try:
             email = normalize_email(payload.email)
             lookup_hmac = crypto.email_lookup_hmac(email)
@@ -1296,6 +1592,8 @@ class AccountService:
                 "The email or password is invalid.",
                 status_code=401,
             )
+        if not _password_hash_is_current(account.password_hash):
+            self._upgrade_password_hash(db, account, payload.password, observed_auth_epoch)
         return AccountAuthenticationResponseV1(
             schema_version="walksafe.account-authentication.v1",
             actor_id=refreshed.actor_id,
@@ -1317,6 +1615,9 @@ __all__ = [
     "OtpSender",
     "SmtpOtpSender",
     "UnavailableOtpSender",
+    "ACCOUNT_KEY_PURPOSES_AUTHENTICATION",
+    "ACCOUNT_KEY_PURPOSES_ENROLLMENT",
+    "account_crypto_binding_mismatched_purposes",
     "assert_account_crypto_keys_bound",
     "bind_or_verify_account_crypto_keys",
     "create_otp_sender",
@@ -1324,5 +1625,6 @@ __all__ = [
     "minimum_birth_date_for_age",
     "normalize_email",
     "require_minimum_age",
+    "validate_new_account_password",
     "verify_account_password",
 ]

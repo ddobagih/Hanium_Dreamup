@@ -3,7 +3,6 @@ package kr.co.hanium.dreamup.walksafe.inference
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
-import java.security.MessageDigest
 
 /**
  * Validated model-selection contract loaded from assets. Parsing checks configuration shape; model
@@ -18,6 +17,25 @@ data class TwoModelRuntimeConfig(
     val customTactile: ModelRuntimeConfig?,
     val cocoGeneral: ModelRuntimeConfig?,
 ) {
+    init {
+        if (primaryModelKey == UNIFIED_MODEL_KEY) {
+            unifiedWalksafe?.takeIf { it.enabled }?.let(::requireOutputThresholdCoverage)
+        }
+        if (primaryModelKey == LEGACY_TWO_MODEL_KEY || fallbackModelKey == LEGACY_TWO_MODEL_KEY) {
+            // Legacy loading does not use the individual enabled flags to exclude either model.
+            listOfNotNull(customTactile, cocoGeneral).forEach(::requireOutputThresholdCoverage)
+        }
+    }
+
+    private fun requireOutputThresholdCoverage(model: ModelRuntimeConfig) {
+        val missing = model.classes.filter {
+            model.isAllowedClass(it) && model.thresholdForClassOrNull(it) == null
+        }
+        require(missing.isEmpty()) {
+            "Missing thresholds for output classes in model " + model.key + ": " + missing.joinToString()
+        }
+    }
+
     // Legacy pair loading can create its models even when their enabled flags are false.
     internal val requiresGpuThreadOwner: Boolean
         get() = listOfNotNull(unifiedWalksafe, customTactile, cocoGeneral)
@@ -55,7 +73,7 @@ data class TwoModelRuntimeConfig(
             "custom_tactile" -> customTactile
             else -> null
         } ?: return null
-        return config.thresholdForClass(className)
+        return config.thresholdForClassOrNull(className)
     }
 
     companion object {
@@ -68,7 +86,9 @@ data class TwoModelRuntimeConfig(
             val json = context.assets.open(CONFIG_ASSET).bufferedReader().use { it.readText() }
             val config = parse(json)
             val unified = config.unifiedWalksafe?.let { model ->
-                if (!model.enabled || assetMatches(context, model)) model else model.copy(enabled = false)
+                if (!model.enabled) model else assetIntegrityFailure(context, model)?.let { failure ->
+                    model.copy(enabled = false, integrityFailure = failure)
+                } ?: model
             }
             return config.copy(unifiedWalksafe = unified)
         }
@@ -187,22 +207,12 @@ data class TwoModelRuntimeConfig(
             }
         }
 
-        internal fun assetMatches(context: Context, model: ModelRuntimeConfig): Boolean {
-            val expectedSha256 = model.artifactSha256 ?: return false
-            return runCatching {
-                val actualSha256 = context.assets.open(model.asset).use { input ->
-                    val digest = MessageDigest.getInstance("SHA-256")
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        digest.update(buffer, 0, count)
-                    }
-                    digest.digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
-                }
-                actualSha256 == expectedSha256
-            }.getOrDefault(false)
-        }
+        internal fun assetMatches(context: Context, model: ModelRuntimeConfig): Boolean =
+            assetIntegrityFailure(context, model) == null
+
+        /** Null only when the asset bytes match; otherwise missing/unreadable/hash cause is kept. */
+        internal fun assetIntegrityFailure(context: Context, model: ModelRuntimeConfig): DetectorLoadFailureCode? =
+            ModelAssetIntegrity.check(model.artifactSha256) { context.assets.open(model.asset) }
 
         private fun parseRuntime(json: JSONObject?): ModelRuntimeOptions {
             if (json == null) return ModelRuntimeOptions()
@@ -274,6 +284,8 @@ data class ModelRuntimeConfig(
     val outputFormat: YoloOutputFormat = YoloOutputFormat.END_TO_END_XYXY,
     val nmsIouThreshold: Float = 0.7f,
     val maxDetections: Int = 300,
+    /** Set only by [TwoModelRuntimeConfig.load] when asset verification disabled this entry. */
+    val integrityFailure: DetectorLoadFailureCode? = null,
 ) {
     init {
         require(nmsIouThreshold.isFinite() && nmsIouThreshold in 0f..1f) { "nms_iou_threshold must be between 0 and 1" }
@@ -295,16 +307,18 @@ data class ModelRuntimeConfig(
         return allowlist.isEmpty() || className.lowercase() in allowlist
     }
 
-    /** Missing class/default thresholds fail closed so an unconfigured class cannot be emitted. */
-    fun thresholdForClass(className: String): Float {
+    /** Absence is distinct from an explicitly configured threshold of one. */
+    fun thresholdForClassOrNull(className: String): Float? {
         return thresholds[className]
             ?: thresholds[className.lowercase()]
             ?: thresholds["default"]
-            ?: FAIL_CLOSED_THRESHOLD
     }
 
-    private companion object {
-        const val FAIL_CLOSED_THRESHOLD = 1.0f
+    /** Parser callbacks require a configured threshold; missing values are configuration errors. */
+    fun thresholdForClass(className: String): Float {
+        return requireNotNull(thresholdForClassOrNull(className)) {
+            "Missing threshold for class " + className + " in model " + key
+        }
     }
 }
 

@@ -23,16 +23,119 @@ import org.junit.Test
 
 class ReportQueueDrainCoordinatorTest {
     @Test
-    fun activeWalkCreatesZeroTransportCallbacks() {
+    fun createdAndReplayedReturnDistinctMetadataOnlyAfterReceiptCommitAndDelete() {
+        listOf(ReportCreationOutcome.CREATED, ReportCreationOutcome.REPLAYED, null).forEach { creation ->
+            val fixture = fixture(ReportQueuePriority.AUTOMATIC)
+            var commits = 0
+            val result = requireNotNull(fixture.coordinator.startNextWithResult(
+                { context() }, outcomeTransport(creation),
+                beforeDeleteAfterReceipt = { commits++; true },
+            )).execute()
+            assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD, result.outcome)
+            assertEquals(creation, result.creationOutcome)
+            assertEquals(ReportQueuePriority.AUTOMATIC, result.reportPriority)
+            assertEquals(1, commits)
+            assertTrue(fixture.store.queuedReports().isEmpty())
+        }
+    }
+
+    @Test
+    fun statusRecoveryResultCarriesTheSelectedReportsActualPriority() {
+        ReportQueuePriority.entries.forEach { priority ->
+            val fixture = fixture(priority)
+            val transport = object : ReportQueueTransport {
+                override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> { receipt(report) }
+                override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> = error("status receipt must avoid post")
+            }
+            val result = requireNotNull(fixture.coordinator.startNextWithResult(
+                { context() }, transport, beforeDeleteAfterReceipt = { true },
+            )).execute()
+            assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_STATUS, result.outcome)
+            assertEquals(priority, result.reportPriority)
+            assertNull(result.creationOutcome)
+        }
+    }
+
+    @Test
+    fun failedCommitAndSuppressedSuccessCannotExposeCreatedOrDelete() {
+        listOf(ReportCreationOutcome.CREATED, ReportCreationOutcome.SUPPRESSED_BY_COOLDOWN).forEach { creation ->
+            val fixture = fixture(ReportQueuePriority.AUTOMATIC)
+            val result = requireNotNull(fixture.coordinator.startNextWithResult(
+                { context() }, outcomeTransport(creation), beforeDeleteAfterReceipt = { false },
+            )).execute()
+            assertEquals(
+                if (creation == ReportCreationOutcome.CREATED) ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED
+                else ReportQueueDrainOutcome.RECEIPT_REJECTED,
+                result.outcome,
+            )
+            assertNull(result.creationOutcome)
+            assertEquals(1, fixture.store.queuedReports().size)
+        }
+    }
+
+    @Test
+    fun authorityChangeAfterCreatedReceiptHidesOutcomeAndKeepsPayload() {
+        val fixture = fixture()
+        var current = context()
+        val result = requireNotNull(fixture.coordinator.startNextWithResult(
+            { current }, outcomeTransport(ReportCreationOutcome.CREATED) {
+                current = context(consentAllowed = false)
+            },
+        )).execute()
+        assertEquals(ReportQueueDrainOutcome.CANCELLED, result.outcome)
+        assertNull(result.creationOutcome)
+        assertEquals(1, fixture.store.queuedReports().size)
+    }
+
+    @Test
+    fun aWalkInProgressRefusalKeepsTheReportAndAsksForOneDelayedRetry() {
+        // transfer-F7: 409 report_walk_in_progress (the Gateway still holds this device's walk).
+        listOf(
+            """{"detail":{"code":"report_walk_in_progress","message":"later"}}""" to true,
+            """{"detail":{"code":"walk_owned_by_other_device","message":"other"}}""" to false,
+        ).forEach { (body, walkInProgress) ->
+            val fixture = fixture(ReportQueuePriority.AUTOMATIC)
+            val refusing = object : ReportQueueTransport {
+                override fun statusCall(report: QueuedReport) =
+                    CancellableNetworkCall.blocking<ReportQueueReceipt?> { null }
+                override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> =
+                    CancellableNetworkCall.blocking {
+                        throw ReportUploadHttpException(ReportUploadError(409, body))
+                    }
+            }
+            val result = requireNotNull(fixture.coordinator.startNextWithResult({ context() }, refusing)).execute()
+            assertEquals(ReportQueueDrainOutcome.RETRY_DEFERRED, result.outcome)
+            assertEquals(walkInProgress, result.walkInProgress)
+            assertEquals(1, fixture.store.queuedReports().size)
+        }
+    }
+
+    private fun outcomeTransport(
+        creationOutcome: ReportCreationOutcome?,
+        beforeReturn: () -> Unit = {},
+    ) = object : ReportQueueTransport {
+        override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> { null }
+        override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> =
+            error("coordinator must consume the typed upload result")
+        override fun uploadResultCall(report: QueuedReport) = CancellableNetworkCall.blocking {
+            beforeReturn()
+            ReportQueueUploadResult(receipt(report), creationOutcome)
+        }
+    }
+
+    @Test
+    fun activeOrPausedWalkCreatesZeroTransportCallbacks() {
+        // Owner decision 3(b): PAUSED is still the walk; queued reports wait for its end.
         val fixture = fixture()
         var callbacks = 0
-
-        assertNull(
-            fixture.coordinator.startNext(
-                contextProvider = { context(WalkSessionState.ACTIVE) },
-                transport = transport(fixture.report) { callbacks += 1 },
-            ),
-        )
+        for (state in listOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)) {
+            assertNull(
+                fixture.coordinator.startNext(
+                    contextProvider = { context(state) },
+                    transport = transport(fixture.report) { callbacks += 1 },
+                ),
+            )
+        }
         assertEquals(0, callbacks)
     }
 
@@ -46,25 +149,121 @@ class ReportQueueDrainCoordinatorTest {
             context(authorityAllowed = false),
         )
         blockedContexts.forEach { blocked ->
-            val fixture = fixture()
-            var callbacks = 0
-            assertNull(
-                fixture.coordinator.startNext(
-                    contextProvider = { blocked },
-                    transport = transport(fixture.report) { callbacks += 1 },
-                ),
-            )
-            assertEquals(0, callbacks)
+            ReportQueuePriority.entries.forEach { priority ->
+                val fixture = fixture(priority)
+                var callbacks = 0
+                assertNull(
+                    fixture.coordinator.startNext(
+                        contextProvider = { blocked.copy(automaticReportingAllowed = false) },
+                        transport = transport(fixture.report) { callbacks += 1 },
+                    ),
+                )
+                assertEquals(0, callbacks)
+            }
         }
-        val automaticFixture = fixture(ReportQueuePriority.AUTOMATIC)
-        var automaticCallbacks = 0
-        assertNull(
-            automaticFixture.coordinator.startNext(
-                contextProvider = { context(automaticReportingAllowed = false) },
-                transport = transport(automaticFixture.report) { automaticCallbacks += 1 },
-            ),
+        // Automatic OFF is tested separately: it admits only the status query under these gates.
+    }
+
+    @Test
+    fun automaticOptOutAllowsExactStatusReceiptDeletionWithoutPost() {
+        val fixture = fixture(ReportQueuePriority.AUTOMATIC)
+        var statusCalls = 0
+        var postFactories = 0
+        val recovering = object : ReportQueueTransport {
+            override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> {
+                statusCalls++
+                receipt(report)
+            }
+            override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> {
+                postFactories++
+                return CancellableNetworkCall.blocking { receipt(report) }
+            }
+        }
+        val call = fixture.coordinator.startNext(
+            { context(automaticReportingAllowed = false) }, recovering, beforeDeleteAfterReceipt = { true },
         )
-        assertEquals(0, automaticCallbacks)
+        assertTrue("fresh authority must admit status-only recovery", call != null)
+        assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_STATUS, requireNotNull(call).execute())
+        assertEquals(1, statusCalls)
+        assertEquals(0, postFactories)
+        assertTrue(fixture.store.queuedReports().isEmpty())
+    }
+
+    @Test
+    fun automaticOptOutMissingStatusKeepsExactQueuedPayloadWithoutConstructingPost() {
+        val fixture = fixture(ReportQueuePriority.AUTOMATIC)
+        var statusCalls = 0
+        var postFactories = 0
+        val absent = object : ReportQueueTransport {
+            override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> {
+                statusCalls++
+                null
+            }
+            override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> {
+                postFactories++
+                return CancellableNetworkCall.blocking { receipt(report) }
+            }
+        }
+        val call = fixture.coordinator.startNext(
+            { context(automaticReportingAllowed = false) }, absent,
+        )
+        assertTrue("fresh authority must admit status-only recovery", call != null)
+        assertEquals(ReportQueueDrainOutcome.RETRY_DEFERRED, requireNotNull(call).execute())
+        assertEquals(1, statusCalls)
+        assertEquals(0, postFactories)
+        val preserved = fixture.store.queuedReports().single()
+        assertEquals(fixture.report.payload.reportId, preserved.payload.reportId)
+        assertTrue(fixture.report.payload.contentEquals(preserved.payload))
+    }
+
+    @Test
+    fun automaticSelectionChangeDuringStatusCancelsInsteadOfCreatingAPostOrDeleting() {
+        listOf(false, true).forEach { initial ->
+            listOf(false, true).forEach { persisted ->
+                val fixture = fixture(ReportQueuePriority.AUTOMATIC)
+                var current = context(automaticReportingAllowed = initial)
+                var posts = 0
+                val changing = object : ReportQueueTransport {
+                    override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> {
+                        current = context(automaticReportingAllowed = !initial)
+                        if (persisted) receipt(report) else null
+                    }
+                    override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> {
+                        posts++
+                        return CancellableNetworkCall.blocking { receipt(report) }
+                    }
+                }
+                val result = requireNotNull(fixture.coordinator.startNext(
+                    { current }, changing, beforeDeleteAfterReceipt = { true },
+                )).execute()
+                assertEquals(ReportQueueDrainOutcome.CANCELLED, result)
+                assertEquals(0, posts)
+                assertTrue(fixture.report.payload.contentEquals(fixture.store.queuedReports().single().payload))
+            }
+        }
+    }
+
+    @Test
+    fun automaticWithdrawalWhileConstructingPostCancelsBeforeExecution() {
+        val fixture = fixture(ReportQueuePriority.AUTOMATIC)
+        var current = context()
+        var executions = 0
+        var cancellations = 0
+        val withdrawing = object : ReportQueueTransport {
+            override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> { null }
+            override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> {
+                current = context(automaticReportingAllowed = false)
+                return CancellableNetworkCall(
+                    executeBlock = { executions++; receipt(report) },
+                    cancelBlock = { cancellations++ },
+                )
+            }
+        }
+        val result = requireNotNull(fixture.coordinator.startNext({ current }, withdrawing)).execute()
+        assertEquals(ReportQueueDrainOutcome.CANCELLED, result)
+        assertEquals(0, executions)
+        assertEquals(1, cancellations)
+        assertTrue(fixture.report.payload.contentEquals(fixture.store.queuedReports().single().payload))
     }
 
     @Test
@@ -171,7 +370,7 @@ class ReportQueueDrainCoordinatorTest {
             ),
         ).execute()
 
-        assertEquals(ReportQueueDrainOutcome.RECEIPT_REJECTED, outcome)
+        assertEquals(ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED, outcome)
         assertEquals(1, commitCalls)
         assertEquals(1, fixture.store.queuedReports().size)
     }
@@ -209,7 +408,7 @@ class ReportQueueDrainCoordinatorTest {
         requireNotNull(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = ReportQueuePriority.AUTOMATIC),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -433,7 +632,7 @@ class ReportQueueDrainCoordinatorTest {
         val report = requireNotNull(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = priority),
                 jpeg(),
                 priority,
                 WALK_ID,
@@ -476,7 +675,7 @@ class ReportQueueDrainCoordinatorTest {
     )
 
     private fun context(
-        state: WalkSessionState = WalkSessionState.PAUSED,
+        state: WalkSessionState = WalkSessionState.ENDED,
         appForeground: Boolean = true,
         stationary: Boolean = true,
         networkAllowed: Boolean = true,
@@ -507,11 +706,17 @@ class ReportQueueDrainCoordinatorTest {
         persistenceMarker = PERSISTENCE_MARKER,
     )
 
-    private fun jpeg() =
-        byteArrayOf(0xff.toByte(), 0xd8.toByte(), 1, 0xff.toByte(), 0xd9.toByte())
+    private fun jpeg() = reportTestJpeg()
 
-    private fun metadata(actorId: String = ACTOR_ID) =
-        "{\"reporter_user_id\":\"$actorId\"}".toByteArray()
+    private fun metadata(
+        actorId: String = ACTOR_ID,
+        priority: ReportQueuePriority = ReportQueuePriority.EXPLICIT,
+    ): ByteArray {
+        val automatic = priority == ReportQueuePriority.AUTOMATIC
+        val trigger = if (automatic) "auto" else "voice"
+        return ("{\"reporter_user_id\":\"$actorId\",\"trigger\":\"$trigger\"," +
+            "\"auto_reported\":$automatic}").toByteArray()
+    }
 
     private data class Fixture(
         val store: AndroidReportQueueStore,

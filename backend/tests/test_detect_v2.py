@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from concurrent.futures import Future
 from datetime import datetime
 import io
 import json
@@ -37,8 +38,16 @@ PNG_BYTES = base64.b64decode(
 
 def test_detect_api_does_not_expose_worker_filesystem_errors() -> None:
     class LeakingRunner:
-        def run_v2(self, **_kwargs):  # noqa: ANN003
-            raise RuntimeError("RuntimeError: failed to load /srv/private/models/walksafe.pt")
+        queue_timeout_seconds = 2.0
+        startup_timeout_seconds = 30.0
+
+        def submit_inference(self, kind, **_kwargs):  # noqa: ANN003
+            assert kind == "v2"
+            future = Future()
+            future.set_exception(
+                RuntimeError("RuntimeError: failed to load /srv/private/models/walksafe.pt")
+            )
+            return future
 
     isolated_app = FastAPI()
     isolated_app.include_router(create_detect_router(app_settings, inference_runner=LeakingRunner()))  # type: ignore[arg-type]
@@ -301,13 +310,37 @@ def test_legacy_detect_also_rejects_a_stale_queued_frame(monkeypatch) -> None:
     assert queued_response.json()["detail"]["code"] == "detect_queue_timeout"
 
 
-def test_detect_v2_health_defaults_to_fake_ready(monkeypatch) -> None:
+@pytest.fixture
+def prepared_detect_health(monkeypatch):
+    """Complete the real health component before preserving route assertions."""
+    from backend.app.services import detect_v2_health as health_snapshots
+    from backend.app.services.detect_v2 import compute_detect_v2_health_candidate
+
+    managers = []
+
+    def prepare():
+        def compute(projection, _timeout_seconds, _stop_event):
+            # Keep parent model-load sentinels effective; child isolation has separate tests.
+            return compute_detect_v2_health_candidate(projection)
+
+        manager = health_snapshots.DetectV2HealthSnapshots(runner=compute)
+        managers.append(manager)
+        monkeypatch.setattr(health_snapshots, "health_snapshots", manager)
+        manager.start(app_settings)
+
+    yield prepare
+    for manager in reversed(managers):
+        assert manager.close(), "the health component must release its owned work"
+
+
+def test_detect_v2_health_defaults_to_fake_ready(monkeypatch, prepared_detect_health) -> None:
     monkeypatch.setattr(app_settings, "detect_v2_mode", "fake")
     monkeypatch.setattr(app_settings, "detect_v2_custom_tactile_model_path", None)
     monkeypatch.setattr(app_settings, "detect_v2_coco_model_path", None)
     monkeypatch.setattr(app_settings, "detect_v2_unified_model_path", None)
     monkeypatch.setattr(app_settings, "detect_v2_runtime_config_path", None)
     monkeypatch.setattr(app_settings, "detect_v2_image_size", 640)
+    prepared_detect_health()
     client = ASGITestClient(app)
 
     response = client.get("/detect/v2/health")
@@ -327,11 +360,12 @@ def test_detect_v2_health_defaults_to_fake_ready(monkeypatch) -> None:
     assert body["unified_model_path"] is None
 
 
-def test_detect_v2_yolo_mode_without_model_paths_returns_503(monkeypatch) -> None:
+def test_detect_v2_yolo_mode_without_model_paths_returns_503(monkeypatch, prepared_detect_health) -> None:
     monkeypatch.setattr(app_settings, "detect_v2_mode", "yolo")
     monkeypatch.setattr(app_settings, "detect_v2_custom_tactile_model_path", None)
     monkeypatch.setattr(app_settings, "detect_v2_coco_model_path", None)
     monkeypatch.setattr(app_settings, "detect_v2_unified_model_path", None)
+    prepared_detect_health()
     client = ASGITestClient(app)
 
     health_response = client.get("/detect/v2/health")
@@ -353,7 +387,7 @@ def test_detect_v2_yolo_mode_without_model_paths_returns_503(monkeypatch) -> Non
     assert detail["reason"] == "detect_v2_model_not_configured:custom_tactile,coco_general"
 
 
-def test_detect_v2_yolo_mode_with_model_paths_is_ready_without_loading_models(tmp_path, monkeypatch) -> None:
+def test_detect_v2_yolo_mode_with_model_paths_is_ready_without_loading_models(tmp_path, monkeypatch, prepared_detect_health) -> None:
     custom_model = tmp_path / "custom.pt"
     coco_model = tmp_path / "coco.pt"
     runtime_config = tmp_path / "runtime.json"
@@ -370,6 +404,7 @@ def test_detect_v2_yolo_mode_with_model_paths_is_ready_without_loading_models(tm
     monkeypatch.setattr(app_settings, "detect_v2_coco_model_path", coco_model)
     monkeypatch.setattr(app_settings, "detect_v2_unified_model_path", None)
     monkeypatch.setattr(app_settings, "detect_v2_runtime_config_path", runtime_config)
+    prepared_detect_health()
     client = ASGITestClient(app)
 
     response = client.get("/detect/v2/health")
@@ -386,7 +421,7 @@ def test_detect_v2_yolo_mode_with_model_paths_is_ready_without_loading_models(tm
 
 
 
-def test_detect_v2_yolo_mode_with_unified_model_path_is_ready_without_legacy_models(tmp_path, monkeypatch) -> None:
+def test_detect_v2_yolo_mode_with_unified_model_path_is_ready_without_legacy_models(tmp_path, monkeypatch, prepared_detect_health) -> None:
     unified_model = tmp_path / "unified.pt"
     runtime_config = tmp_path / "runtime.json"
     unified_model.write_bytes(b"placeholder")
@@ -402,6 +437,7 @@ def test_detect_v2_yolo_mode_with_unified_model_path_is_ready_without_legacy_mod
     monkeypatch.setattr(app_settings, "detect_v2_unified_model_path", unified_model)
     monkeypatch.setattr(app_settings, "detect_v2_runtime_config_path", runtime_config)
     monkeypatch.setattr(app_settings, "detect_v2_image_size", 768)
+    prepared_detect_health()
     client = ASGITestClient(app)
 
     response = client.get("/detect/v2/health")

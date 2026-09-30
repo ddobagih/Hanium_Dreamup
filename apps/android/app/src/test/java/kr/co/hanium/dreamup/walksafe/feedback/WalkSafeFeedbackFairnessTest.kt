@@ -11,7 +11,9 @@ import org.junit.Test
 class WalkSafeFeedbackFairnessTest {
     @Test
     fun everyContinuouslyVisibleEqualRiskReceivesATurnBeforeAnyRepeat() {
-        for (level in listOf(MessageLevel.CAUTION, MessageLevel.WARNING, MessageLevel.STOP)) {
+        // CAUTION is excluded: FP-020 forbids repeating the same continuously visible CAUTION
+        // (see continuouslyVisibleCautionsEachReceiveOneTurnAndAreNotRepeated).
+        for (level in listOf(MessageLevel.WARNING, MessageLevel.STOP)) {
             val policy = WalkSafeFeedbackPolicy()
             val ids = listOf("a", "b", "c", "d")
             val delivered = (1_000L..30_000L step 1_000L).map { now ->
@@ -22,6 +24,21 @@ class WalkSafeFeedbackFairnessTest {
             assertEquals(30, counts.sum())
             assertTrue("$level counts=$counts", counts.max() - counts.min() <= 1)
         }
+    }
+
+    @Test
+    fun continuouslyVisibleCautionsEachReceiveOneTurnAndAreNotRepeated() {
+        val policy = WalkSafeFeedbackPolicy()
+        val ids = listOf("a", "b", "c", "d")
+        val delivered = (1_000L..30_000L step 1_000L).mapNotNull { now ->
+            policy.evaluateCandidates(ids.map { candidate(it, now, MessageLevel.CAUTION) }, true, now)
+                ?.also { action ->
+                    assertTrue(policy.claimFeedbackDelivery(action.trackId, now, now))
+                    assertTrue(policy.confirmFeedbackDelivery(action.trackId, now, now))
+                }?.trackId
+        }
+
+        assertEquals(ids, delivered.sorted())
     }
 
     @Test
@@ -55,7 +72,7 @@ class WalkSafeFeedbackFairnessTest {
             val candidates = listOf(candidate("a", 1_000L), candidate("b", 1_000L))
             val first = requireNotNull(policy.evaluateCandidates(candidates, true, 1_000L))
             assertEquals("a", first.trackId)
-            assertTrue(policy.claimFeedbackDelivery(first.trackId, 1_000L))
+            assertTrue(policy.claimFeedbackDelivery(first.trackId, 1_000L, 1_000L))
             if (cancel) policy.cancelPendingFeedbackDeliveries()
             else policy.rejectUndeliveredFeedback(first.trackId, 1_000L)
             assertFalse(policy.confirmFeedbackDelivery(first.trackId, 1_000L, 1_010L))
@@ -100,7 +117,7 @@ class WalkSafeFeedbackFairnessTest {
 
     private fun deliver(policy: WalkSafeFeedbackPolicy, candidates: List<FeedbackCandidate>, now: Long): String {
         val action = requireNotNull(policy.evaluateCandidates(candidates, true, now)) { "No action at $now" }
-        assertTrue(policy.claimFeedbackDelivery(action.trackId, now))
+        assertTrue(policy.claimFeedbackDelivery(action.trackId, now, now))
         assertTrue(policy.confirmFeedbackDelivery(action.trackId, now, now))
         return action.trackId
     }

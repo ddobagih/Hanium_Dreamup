@@ -17,6 +17,7 @@ import re
 import socket
 import stat
 import struct
+from time import monotonic
 from typing import Any, Protocol
 
 from sqlalchemy import select, text
@@ -285,8 +286,10 @@ def _open_pinned_parent(
         | getattr(os, "O_NOFOLLOW", 0)
     )
     opened: list[_PinnedDirectory] = []
+    acquired_descriptors: list[int] = []
     try:
         root_descriptor = os.open("/", directory_flags)
+        acquired_descriptors.append(root_descriptor)
         root_metadata = os.fstat(root_descriptor)
         _validate_directory_authority(
             root_metadata,
@@ -304,6 +307,7 @@ def _open_pinned_parent(
         for index, component in enumerate(path.parts[1:-1]):
             parent_descriptor = opened[-1].descriptor
             descriptor = os.open(component, directory_flags, dir_fd=parent_descriptor)
+            acquired_descriptors.append(descriptor)
             metadata = os.fstat(descriptor)
             _validate_directory_authority(
                 metadata,
@@ -320,8 +324,9 @@ def _open_pinned_parent(
             )
         return opened
     except BaseException:
-        for directory in reversed(opened):
-            os.close(directory.descriptor)
+        # Validation can fail before a newly opened descriptor is pinned.
+        for descriptor in reversed(acquired_descriptors):
+            os.close(descriptor)
         raise
 
 
@@ -498,7 +503,15 @@ class KmsAgentReportImageKeyProvider:
             ):
                 raise ReportImageKeyringInvalid("report image KMS-agent endpoint is not a real socket")
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
-                client.settimeout(self._timeout_seconds)
+                deadline = monotonic() + self._timeout_seconds
+
+                def remaining_seconds() -> float:
+                    remaining = deadline - monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError("report image KMS-agent exchange timed out")
+                    return remaining
+
+                client.settimeout(remaining_seconds())
                 client.connect(f"/proc/self/fd/{endpoint_descriptor}")
                 if not hasattr(socket, "SO_PEERCRED"):
                     raise ReportImageKeyringInvalid("KMS-agent peer credentials are unsupported")
@@ -511,11 +524,14 @@ class KmsAgentReportImageKeyProvider:
                 if peer_uid != self._expected_peer_uid:
                     raise ReportImageKeyringInvalid("report image KMS-agent peer identity changed")
                 request = _canonical_json({"schema": KEYRING_REQUEST_SCHEMA}) + b"\n"
+                client.settimeout(remaining_seconds())
                 client.sendall(request)
                 chunks: list[bytes] = []
                 size = 0
                 while True:
+                    client.settimeout(remaining_seconds())
                     chunk = client.recv(min(8192, MAX_KEYRING_BYTES + 1 - size))
+                    remaining_seconds()
                     if not chunk:
                         break
                     chunks.append(chunk)
@@ -703,15 +719,32 @@ def synchronize_report_image_keyring(db: Session, keyring: ReportImageKeyring) -
 
     from backend.app.models import ReportImageKeyringEvent
 
-    db.execute(
-        text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
-        {"lock_key": REPORT_IMAGE_KEYRING_LOCK_KEY},
-    )
-    latest = db.execute(
+    latest_query = (
         select(ReportImageKeyringEvent)
         .order_by(ReportImageKeyringEvent.generation.desc())
         .limit(1)
-    ).scalar_one_or_none()
+    )
+    observed = db.execute(latest_query).scalar_one_or_none()
+    same_manifest = (
+        observed is not None
+        and observed.manifest_sha256 == keyring.manifest_sha256
+    )
+    # Readers of the current generation can coexist. A possible append takes
+    # the exclusive lock from the outset, never upgrading a shared lock.
+    lock_function = (
+        "pg_advisory_xact_lock_shared" if same_manifest else "pg_advisory_xact_lock"
+    )
+    db.execute(
+        text(f"SELECT {lock_function}(hashtextextended(:lock_key, 0))"),
+        {"lock_key": REPORT_IMAGE_KEYRING_LOCK_KEY},
+    )
+    latest = db.execute(latest_query).scalar_one_or_none()
+    if same_manifest and (
+        latest is None or latest.manifest_sha256 != keyring.manifest_sha256
+    ):
+        raise ReportImageKeyringInvalid(
+            "report image keyring changed while acquiring shared lock"
+        )
     _assert_normal_terminal_keys_unused(db, keyring)
     if latest is not None and latest.manifest_sha256 == keyring.manifest_sha256:
         if latest.generation != keyring.generation:

@@ -12,7 +12,15 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.MessageDigest
 
-/** Fixed public photos and real class/box annotations, no camera or account UI. */
+/**
+ * Fixed public photos and real class/box annotations, no camera or account UI.
+ *
+ * The fixed floors (22/110 matched, 1/63 person) are a regression floor against the original-model
+ * reference, not a product acceptance line or a safety figure (FP-038-DETAIL-02, FP-037). Product
+ * criteria (per-class recall, false alerts, distance bands) come from the independent evaluation and
+ * owner approval. The paired checks below fail when the current preprocessing is worse than the
+ * previous one on the same fixed images; they are asserted on the deterministic CPU delegate only.
+ */
 @RunWith(AndroidJUnit4::class)
 class KnownDetectionAccuracyDeviceTest {
     @Test fun referencePreprocessingPreservesFixedGroundTruthMatches() {
@@ -26,6 +34,9 @@ class KnownDetectionAccuracyDeviceTest {
             val detector = requireNotNull(load.detector) { load.reason }
             var total = 0; var matched = 0; var people = 0; var matchedPeople = 0
             var oldMatched = 0; var oldPeople = 0
+            var detections = 0; var oldDetections = 0
+            val unmatchedByClass = mutableMapOf<String, Int>()
+            val oldUnmatchedByClass = mutableMapOf<String, Int>()
             val previousPreprocessor = YuvImagePreprocessor()
             detector.use {
                 for (index in 0 until photos.length()) {
@@ -65,15 +76,38 @@ class KnownDetectionAccuracyDeviceTest {
                             oldUsed.add(oldBest.first); oldMatched++; if (name == "person") oldPeople++
                         }
                     }
+                    // Detections not used by any ground-truth match (S21-15); counted, not capped.
+                    detections += result.detections.size
+                    oldDetections += previous.detections.size
+                    result.detections.forEachIndexed { i, d ->
+                        if (i !in used) unmatchedByClass.merge(d.className, 1, Int::plus)
+                    }
+                    previous.detections.forEachIndexed { i, d ->
+                        if (i !in oldUsed) oldUnmatchedByClass.merge(d.className, 1, Int::plus)
+                    }
                     Log.i("KnownAccuracyTest", "$backend image=${photo.getInt("image_id")} predictions=${result.detections.size} inferenceMs=${result.timing.modelInferenceMs}")
                 }
             }
             Log.i("KnownAccuracyTest", "$backend matched=$matched/$total person=$matchedPeople/$people")
             Log.i("KnownAccuracyTest", "$backend paired nearest=$oldMatched/$total person=$oldPeople/$people bilinear=$matched/$total person=$matchedPeople/$people")
+            val unmatched = detections - matched
+            val oldUnmatched = oldDetections - oldMatched
+            Log.i("KnownAccuracyTest", "$backend unmatched detections current=$unmatched/$detections previous=$oldUnmatched/$oldDetections")
+            Log.i("KnownAccuracyTest", "$backend unmatched by class current=${unmatchedByClass.toSortedMap()} previous=${oldUnmatchedByClass.toSortedMap()}")
             assertEquals(110, total)
             assertEquals(63, people)
-            assertTrue("Regression against the same original-model reference: $backend matched=$matched", matched >= 22)
-            assertTrue("Person reference regression: $backend matchedPeople=$matchedPeople", matchedPeople >= 1)
+            assertTrue("Regression floor, not a product acceptance line (FP-038-DETAIL-02): $backend matched=$matched", matched >= 22)
+            assertTrue("Person regression floor, not a product acceptance line (FP-038-DETAIL-02): $backend matchedPeople=$matchedPeople", matchedPeople >= 1)
+            if (backend == "cpu") {
+                // S21-14: paired, same images and delegate, zero allowance fixed before the run.
+                assertTrue("Current preprocessing matched fewer than previous: cpu matched=$matched previous=$oldMatched", matched >= oldMatched)
+                assertTrue("Current preprocessing matched fewer people than previous: cpu matchedPeople=$matchedPeople previous=$oldPeople", matchedPeople >= oldPeople)
+                // S21-15: precision must not drop (integer cross-multiplication, no float rounding).
+                assertTrue(
+                    "Current preprocessing added unmatched detections: cpu matched=$matched/$detections previous=$oldMatched/$oldDetections",
+                    matched.toLong() * oldDetections.toLong() >= oldMatched.toLong() * detections.toLong(),
+                )
+            }
         }
     }
 

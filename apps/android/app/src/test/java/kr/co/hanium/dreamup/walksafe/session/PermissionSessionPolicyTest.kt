@@ -26,7 +26,7 @@ class PermissionSessionPolicyTest {
     }
 
     @Test
-    fun explicitLogoutEndsOnlyTheAccountSession() {
+    fun explicitLogoutClearsTheFormerAccountsEffectiveConsents() {
         val policy = PermissionSessionPolicy(
             PermissionSessionSnapshot(
                 actorId = "walksafe-user",
@@ -41,9 +41,120 @@ class PermissionSessionPolicyTest {
 
         assertNull(after.actorId)
         assertEquals(AuthenticationState.SIGNED_OUT, after.authentication)
-        assertTrue(after.rawCollectionConsentGranted)
-        assertTrue(after.automaticReportConsentGranted)
+        assertFalse(after.rawCollectionConsentGranted)
+        assertFalse(after.automaticReportConsentGranted)
         assertEquals(MobileNetworkPreference.ALLOW_CELLULAR, after.mobileNetworkPreference)
+    }
+
+    @Test
+    fun logoutThenAnotherActorDoesNotInheritAnyConsent() {
+        val policy = authenticatedPolicyWithAllConsents()
+
+        val loggedOut = policy.explicitLogout()
+
+        assertEquals(
+            PermissionSessionSnapshot(mobileNetworkPreference = MobileNetworkPreference.ALLOW_CELLULAR),
+            loggedOut,
+        )
+        assertEquals(loggedOut, policy.snapshot())
+        assertFalse(policy.isAuthenticatedFor("actor-A"))
+        assertFalse(loggedOut.mayUseProtectedServerFeature)
+        assertFalse(loggedOut.mayCreateAutomaticReport)
+        assertFalse(loggedOut.mayReuseForTraining(TrainingSourceKind.WALK_RAW_DIAGNOSTIC))
+        assertFalse(loggedOut.mayReuseForTraining(TrainingSourceKind.REPORT_ORIGINAL))
+
+        val authenticatedB = policy.authenticated("actor-B")
+
+        assertEquals(
+            PermissionSessionSnapshot(
+                actorId = "actor-B",
+                authentication = AuthenticationState.ACTIVE,
+                mobileNetworkPreference = MobileNetworkPreference.ALLOW_CELLULAR,
+            ),
+            authenticatedB,
+        )
+        assertEquals(authenticatedB, policy.snapshot())
+        assertFalse(policy.isAuthenticatedFor("actor-A"))
+        assertTrue(policy.isAuthenticatedFor("actor-B"))
+        assertTrue(authenticatedB.mayUseProtectedServerFeature)
+        assertFalse(authenticatedB.mayCreateAutomaticReport)
+        assertFalse(authenticatedB.mayReuseForTraining(TrainingSourceKind.WALK_RAW_DIAGNOSTIC))
+        assertFalse(authenticatedB.mayReuseForTraining(TrainingSourceKind.REPORT_ORIGINAL))
+    }
+
+    @Test
+    fun directAuthenticationOfAnotherActorResetsEveryConsent() {
+        val policy = authenticatedPolicyWithAllConsents()
+
+        val authenticatedB = policy.authenticated("actor-B")
+
+        assertEquals(
+            PermissionSessionSnapshot(
+                actorId = "actor-B",
+                authentication = AuthenticationState.ACTIVE,
+                mobileNetworkPreference = MobileNetworkPreference.ALLOW_CELLULAR,
+            ),
+            authenticatedB,
+        )
+        assertEquals(authenticatedB, policy.snapshot())
+        assertFalse(policy.isAuthenticatedFor("actor-A"))
+        assertTrue(policy.isAuthenticatedFor("actor-B"))
+        assertTrue(authenticatedB.mayUseProtectedServerFeature)
+        assertFalse(authenticatedB.mayCreateAutomaticReport)
+        assertFalse(authenticatedB.mayReuseForTraining(TrainingSourceKind.WALK_RAW_DIAGNOSTIC))
+        assertFalse(authenticatedB.mayReuseForTraining(TrainingSourceKind.REPORT_ORIGINAL))
+    }
+
+    @Test
+    fun rememberActorPreservesSameOwnerButResetsChangedOwner() {
+        val policy = authenticatedPolicyWithAllConsents()
+        val grantedA = policy.snapshot()
+
+        val rememberedA = policy.rememberActor(" actor-A ")
+
+        assertEquals(
+            grantedA.copy(authentication = AuthenticationState.REAUTHENTICATION_REQUIRED),
+            rememberedA,
+        )
+        assertEquals(rememberedA, policy.snapshot())
+        assertFalse(policy.isAuthenticatedFor("actor-A"))
+        assertFalse(rememberedA.mayUseProtectedServerFeature)
+
+        val rememberedB = policy.rememberActor(" actor-B ")
+
+        assertEquals(
+            PermissionSessionSnapshot(
+                actorId = "actor-B",
+                authentication = AuthenticationState.REAUTHENTICATION_REQUIRED,
+                mobileNetworkPreference = MobileNetworkPreference.ALLOW_CELLULAR,
+            ),
+            rememberedB,
+        )
+        assertEquals(rememberedB, policy.snapshot())
+        assertFalse(policy.isAuthenticatedFor("actor-A"))
+        assertFalse(policy.isAuthenticatedFor("actor-B"))
+        assertFalse(rememberedB.mayUseProtectedServerFeature)
+        assertFalse(rememberedB.mayCreateAutomaticReport)
+        assertFalse(rememberedB.mayReuseForTraining(TrainingSourceKind.WALK_RAW_DIAGNOSTIC))
+        assertFalse(rememberedB.mayReuseForTraining(TrainingSourceKind.REPORT_ORIGINAL))
+
+        val authenticatedB = policy.authenticated("actor-B")
+
+        assertEquals(
+            PermissionSessionSnapshot(
+                actorId = "actor-B",
+                authentication = AuthenticationState.ACTIVE,
+                mobileNetworkPreference = MobileNetworkPreference.ALLOW_CELLULAR,
+            ),
+            authenticatedB,
+        )
+        assertEquals(authenticatedB, policy.snapshot())
+        assertFalse(policy.isAuthenticatedFor("actor-A"))
+        assertTrue(policy.isAuthenticatedFor("actor-B"))
+        assertTrue(authenticatedB.mayUseProtectedServerFeature)
+        assertFalse(authenticatedB.mayCreateAutomaticReport)
+        assertFalse(authenticatedB.mayReuseForTraining(TrainingSourceKind.WALK_RAW_DIAGNOSTIC))
+        assertFalse(authenticatedB.mayReuseForTraining(TrainingSourceKind.REPORT_ORIGINAL))
     }
 
     @Test
@@ -72,6 +183,7 @@ class PermissionSessionPolicyTest {
     fun automaticReportConsentDoesNotDependOnRawDiagnosticConsent() {
         val policy = PermissionSessionPolicy()
 
+        policy.authenticated("actor-A")
         policy.setAutomaticReportConsent(true)
         assertTrue(policy.snapshot().automaticReportConsentGranted)
         assertTrue(policy.snapshot().mayCreateAutomaticReport)
@@ -83,6 +195,22 @@ class PermissionSessionPolicyTest {
         assertFalse(policy.snapshot().rawCollectionConsentGranted)
         assertTrue(policy.snapshot().automaticReportConsentGranted)
         assertTrue(policy.snapshot().mayCreateAutomaticReport)
+    }
+
+    @Test
+    fun automaticReportRequiresActiveAuthenticationEvenWithStoredConsent() {
+        val policy = PermissionSessionPolicy()
+
+        policy.setAutomaticReportConsent(true)
+        assertFalse(policy.snapshot().mayCreateAutomaticReport)
+
+        policy.authenticated("actor-A")
+        assertFalse(policy.snapshot().automaticReportConsentGranted)
+        policy.setAutomaticReportConsent(true)
+        assertTrue(policy.snapshot().mayCreateAutomaticReport)
+
+        policy.authenticationExpired()
+        assertFalse(policy.snapshot().mayCreateAutomaticReport)
     }
 
     @Test
@@ -145,6 +273,52 @@ class PermissionSessionPolicyTest {
         assertTrue(PermissionDependentFeature.CAMERA_HAZARD_GUIDANCE in decision.stoppedFeatures)
         assertTrue(PermissionDependentFeature.METRIC_DISTANCE in decision.stoppedFeatures)
         assertTrue(PermissionDependentFeature.REPORT_TRANSMISSION in decision.stoppedFeatures)
+    }
+
+    @Test
+    fun losingCameraAndPreciseLocationStopsWholeWalkEvenWithMicrophone() {
+        val decision = PermissionDependencyPolicy.evaluate(
+            ObservedPermissionSnapshot(
+                cameraGranted = false,
+                preciseLocationGranted = false,
+                microphoneGranted = true,
+                activityRecognitionGranted = true,
+            ),
+        )
+
+        assertTrue(decision.requiresWholeWalkSafetyStop)
+        assertTrue(PermissionDependentFeature.CAMERA_HAZARD_GUIDANCE in decision.stoppedFeatures)
+        assertTrue(PermissionDependentFeature.ROUTE_NAVIGATION in decision.stoppedFeatures)
+    }
+
+    @Test
+    fun losingEveryObservedPermissionStopsWholeWalk() {
+        val decision = PermissionDependencyPolicy.evaluate(
+            ObservedPermissionSnapshot(
+                cameraGranted = false,
+                preciseLocationGranted = false,
+                microphoneGranted = false,
+                activityRecognitionGranted = false,
+            ),
+        )
+
+        assertTrue(decision.requiresWholeWalkSafetyStop)
+    }
+
+    @Test
+    fun losingMicrophoneAndStepTrackingKeepsAvailableCoreGuidance() {
+        val decision = PermissionDependencyPolicy.evaluate(
+            ObservedPermissionSnapshot(
+                cameraGranted = true,
+                preciseLocationGranted = true,
+                microphoneGranted = false,
+                activityRecognitionGranted = false,
+            ),
+        )
+
+        assertFalse(decision.requiresWholeWalkSafetyStop)
+        assertTrue(PermissionDependentFeature.VOICE_COMMAND in decision.stoppedFeatures)
+        assertTrue(PermissionDependentFeature.STEP_TRACKING in decision.stoppedFeatures)
     }
 
     @Test
@@ -241,5 +415,45 @@ class PermissionSessionPolicyTest {
         assertFalse(microphone.requiresWholeWalkSafetyStop)
         assertFalse(camera.requiresWholeWalkSafetyStop)
         assertTrue(PermissionDependentFeature.REPORT_TRANSMISSION in camera.stoppedFeatures)
+    }
+
+    private fun authenticatedPolicyWithAllConsents(): PermissionSessionPolicy {
+        val policy = PermissionSessionPolicy()
+        val authenticatedA = policy.authenticated("actor-A")
+        assertEquals(
+            PermissionSessionSnapshot(
+                actorId = "actor-A",
+                authentication = AuthenticationState.ACTIVE,
+            ),
+            authenticatedA,
+        )
+        assertEquals(authenticatedA, policy.snapshot())
+        assertTrue(policy.isAuthenticatedFor("actor-A"))
+
+        val grantedA = policy.applyIntegratedConsentSelections(
+            IntegratedConsentSelections(
+                rawSourceCollection = true,
+                automaticReporting = true,
+                mobileNetworkTransfer = true,
+                trainingReuse = true,
+            ),
+        )
+        assertEquals(
+            PermissionSessionSnapshot(
+                actorId = "actor-A",
+                authentication = AuthenticationState.ACTIVE,
+                rawCollectionConsentGranted = true,
+                automaticReportConsentGranted = true,
+                mobileNetworkPreference = MobileNetworkPreference.ALLOW_CELLULAR,
+                trainingReuseConsentGranted = true,
+            ),
+            grantedA,
+        )
+        assertEquals(grantedA, policy.snapshot())
+        assertTrue(grantedA.mayUseProtectedServerFeature)
+        assertTrue(grantedA.mayCreateAutomaticReport)
+        assertTrue(grantedA.mayReuseForTraining(TrainingSourceKind.WALK_RAW_DIAGNOSTIC))
+        assertTrue(grantedA.mayReuseForTraining(TrainingSourceKind.REPORT_ORIGINAL))
+        return policy
     }
 }

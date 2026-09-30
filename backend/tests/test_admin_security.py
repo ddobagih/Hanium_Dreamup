@@ -41,6 +41,7 @@ from backend.app import field_test_security as field_test_security_api
 from backend.app.api import admin_security as admin_security_api
 from backend.app.api import reports as reports_api
 import backend.app.config as config_module
+import backend.app.services.admin_security as admin_security_service
 from backend.app.config import Settings
 from backend.app.field_test_security import (
     ADMIN_RECONFIRM_NONCE_HEADER_NAME,
@@ -347,7 +348,7 @@ def test_report_high_risk_endpoint_only_rechecks_protected_work(
 
 
 @pytest.mark.parametrize(
-    ("failure_code", "status_code", "action", "method", "path"),
+    ("failure_code", "status_code", "action", "method", "path", "route_template"),
     [
         (
             "report_not_found",
@@ -355,6 +356,7 @@ def test_report_high_risk_endpoint_only_rechecks_protected_work(
             "report.status.patch",
             "PATCH",
             "/reports/11111111-1111-4111-8111-111111111111/status",
+            "/reports/{report_id}/status",
         ),
         (
             "report_status_conflict",
@@ -362,12 +364,14 @@ def test_report_high_risk_endpoint_only_rechecks_protected_work(
             "report.status.patch",
             "PATCH",
             "/reports/11111111-1111-4111-8111-111111111111/status",
+            "/reports/{report_id}/status",
         ),
         (
             "report_export_validation_failed",
             422,
             "report.export",
             "GET",
+            "/reports/export",
             "/reports/export",
         ),
     ],
@@ -379,6 +383,7 @@ def test_failed_report_work_cannot_reuse_centrally_consumed_reconfirmation(
     action: str,
     method: str,
     path: str,
+    route_template: str,
 ) -> None:
     consumed_nonces: set[str] = set()
     successful_consumptions = 0
@@ -406,7 +411,7 @@ def test_failed_report_work_cannot_reuse_centrally_consumed_reconfirmation(
     settings = _settings()
     app = FastAPI()
 
-    @app.api_route(path, methods=[method])
+    @app.api_route(route_template, methods=[method])
     def failed_endpoint():
         nonlocal endpoint_calls
         endpoint_calls += 1
@@ -539,9 +544,27 @@ class FakeAdminSecurityService:
     def list_active_devices(self, identity):
         assert identity == _identity()
         return [
-            {"device_id": identity.device_id, "current": True},
-            {"device_id": "android-device-0002", "current": False},
+            {
+                "device_id": identity.device_id,
+                "current": True,
+                "device_label": identity.device_label,
+                "last_seen_at": "2026-07-22T12:00:00+00:00",
+                "key_version": 1,
+                "key_marker_prefix": "0123abcd",
+            },
+            {
+                "device_id": "android-device-0002",
+                "current": False,
+                "device_label": None,
+                "last_seen_at": None,
+                "key_version": 2,
+                "key_marker_prefix": "89abcdef",
+            },
         ]
+
+    def count_active_devices(self, identity):
+        assert identity == _identity()
+        return 2
 
     def revoke_session(self, identity, session_id):
         assert identity.session_id == session_id
@@ -639,6 +662,29 @@ def test_password_hash_uses_random_salt_and_constant_time_digest_verification() 
     assert verify_password("correct horse battery", first) is True
     assert verify_password("wrong password value", first) is False
     assert verify_password("correct horse battery", "malformed") is False
+
+
+def test_password_verification_keeps_issued_cost_after_current_cost_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    password = "correct horse battery"
+    issued = hash_password(password)
+    assert issued.split("$")[1:4] == ["16384", "8", "5"]
+
+    monkeypatch.setattr(admin_security_service, "_SCRYPT_N", 1 << 15)
+    assert verify_password(password, issued) is True
+    assert verify_password("wrong password value", issued) is False
+
+    current = hash_password(password)
+    assert current.split("$")[1:4] == ["32768", "8", "5"]
+    assert verify_password(password, current) is True
+
+    def reject_unlisted_cost(*args: object, **kwargs: object) -> bytes:
+        raise AssertionError("unlisted scrypt cost must be rejected before derivation")
+
+    monkeypatch.setattr(admin_security_service.hashlib, "scrypt", reject_unlisted_cost)
+    assert verify_password(password, issued.replace("$16384$8$5$", "$8192$8$5$", 1)) is False
+    assert verify_password(password, issued.replace("$16384$8$5$", "$1048576$8$5$", 1)) is False
 
 
 def test_totp_uses_pyotp_verified_timecode_and_rejects_reuse() -> None:
@@ -835,6 +881,66 @@ def test_custody_attestation_stores_only_digest_and_exact_state() -> None:
         "recovery_custody_state": "ATTESTED",
         "recovery_custody_attested_at": observed_at.isoformat(),
     }
+
+
+def test_custody_attestation_cas_preserves_newer_reference_and_same_reference_replay() -> None:
+    observed_at = datetime(2026, 7, 22, 12, 1, 0, tzinfo=timezone.utc)
+    newer_reference = ROTATED_CUSTODY_REFERENCE
+    older_reference = RECOVERY_CUSTODY_REFERENCE
+
+    def service_with_newer_reference():
+        control = _security_control(custody_state="ATTESTED")
+        control.recovery_custody_reference_sha256 = sha256_text(newer_reference)
+        db = _ServiceDatabase([_ServiceResult(one=control), _ServiceResult(one=_caller_session())])
+        service = AdminSecurityService(db, _settings())
+        service._audit = lambda *_args, **_kwargs: None
+        return service, db, control
+
+    service, db, control = service_with_newer_reference()
+    with pytest.raises(AdminSecurityError) as stale:
+        service.attest_recovery_custody(
+            _identity(), custody_reference=older_reference,
+            material_kind="RECOVERY_CODE", storage_location="OFF_PHONE",
+            separate_encrypted_backup_confirmed=True,
+            expected_state_version="6", now=observed_at,
+        )
+    assert (stale.value.status_code, stale.value.code) == (
+        409, "admin_recovery_custody_state_version_conflict"
+    )
+    assert (control.state_version, control.recovery_custody_reference_sha256) == (
+        7, sha256_text(newer_reference)
+    )
+    assert (db.commits, db.rollbacks) == (0, 1)
+
+    service, db, control = service_with_newer_reference()
+    replay = service.attest_recovery_custody(
+        _identity(), custody_reference=newer_reference,
+        material_kind="RECOVERY_CODE", storage_location="OFF_PHONE",
+        separate_encrypted_backup_confirmed=True,
+        expected_state_version="6", now=observed_at,
+    )
+    assert replay["state_version"] == "7"
+    assert (db.commits, control.state_version) == (1, 7)
+
+    service, db, control = service_with_newer_reference()
+    with pytest.raises(AdminSecurityError) as legacy_stale:
+        service.attest_recovery_custody(
+            _identity(), custody_reference=older_reference,
+            material_kind="RECOVERY_CODE", storage_location="OFF_PHONE",
+            separate_encrypted_backup_confirmed=True, now=observed_at,
+        )
+    assert legacy_stale.value.code == "admin_recovery_custody_state_version_conflict"
+    assert (db.commits, control.state_version) == (0, 7)
+
+    service, db, control = service_with_newer_reference()
+    updated = service.attest_recovery_custody(
+        _identity(), custody_reference=older_reference,
+        material_kind="RECOVERY_CODE", storage_location="OFF_PHONE",
+        separate_encrypted_backup_confirmed=True,
+        expected_state_version="7", now=observed_at,
+    )
+    assert updated["state_version"] == "8"
+    assert control.recovery_custody_reference_sha256 == sha256_text(older_reference)
 
 
 def test_report_lost_device_revokes_only_target_key_and_sessions_in_one_commit() -> None:
@@ -1109,15 +1215,18 @@ def test_admin_auth_denial_audit_failure_overrides_original_with_503(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     endpoint_calls: list[bool] = []
+    authorizer_calls: list[bool] = []
+    audit_calls: list[bool] = []
     settings = _settings()
     app = FastAPI()
 
-    @app.get("/protected")
+    @app.get("/admin/security/state")
     def protected():
         endpoint_calls.append(True)
         return {"unexpected": True}
 
     def deny(_settings_value, **_kwargs):
+        authorizer_calls.append(True)
         raise AdminSecurityError(
             "admin_session_invalid",
             "The administrator session is invalid or expired.",
@@ -1125,6 +1234,7 @@ def test_admin_auth_denial_audit_failure_overrides_original_with_503(
         )
 
     def audit_unavailable(**_kwargs):
+        audit_calls.append(True)
         raise AdminSecurityStoreUnavailable()
 
     monkeypatch.setattr(
@@ -1138,7 +1248,7 @@ def test_admin_auth_denial_audit_failure_overrides_original_with_503(
     )
 
     response = ASGITestClient(app).get(
-        "/protected",
+        "/admin/security/state",
         headers={
             **VALID_HEADERS,
             "X-WalkSafe-Admin-Token": "legacy-static-admin-token-for-tests",
@@ -1147,6 +1257,8 @@ def test_admin_auth_denial_audit_failure_overrides_original_with_503(
 
     assert response.status_code == 503
     assert response.json()["detail"]["code"] == "admin_security_store_unavailable"
+    assert authorizer_calls == [True]
+    assert audit_calls == [True]
     assert endpoint_calls == []
 
 
@@ -1181,10 +1293,48 @@ def test_valid_bearer_injects_identity_and_preserves_exact_session_contracts() -
             }
         ],
         "devices": [
-            {"device_id": DEVICE_ID, "current": True},
-            {"device_id": "android-device-0002", "current": False},
+            {
+                "device_id": DEVICE_ID,
+                "current": True,
+                "device_label": "관리자 휴대전화",
+                "last_seen_at": "2026-07-22T12:00:00Z",
+                "key_version": 1,
+                "key_marker_prefix": "0123abcd",
+            },
+            {
+                "device_id": "android-device-0002",
+                "current": False,
+                "device_label": None,
+                "last_seen_at": None,
+                "key_version": 2,
+                "key_marker_prefix": "89abcdef",
+            },
         ],
+        "device_total": 2,
+        "devices_complete": True,
     }
+
+
+def test_w20a_r6_count_older_than_listed_devices_is_not_a_server_error() -> None:
+    """A key revoked between the list and the count statements must not make
+    device_total smaller than the list (the response model would raise)."""
+
+    _ACTOR_RATE_LIMITER.reset()
+
+    class RacingCountService(FakeAdminSecurityService):
+        def count_active_devices(self, identity):
+            assert identity == _identity()
+            return 1
+
+    client = _api_client(RacingCountService(), [])
+    headers = {**VALID_HEADERS, "Authorization": "Bearer valid-bearer-token"}
+
+    sessions = client.get("/admin/security/sessions", headers=headers)
+
+    assert sessions.status_code == 200
+    body = sessions.json()
+    assert len(body["devices"]) == 2
+    assert (body["device_total"], body["devices_complete"]) == (2, True)
 
 
 def test_recovery_custody_and_lost_device_api_contracts_are_strict() -> None:
@@ -1245,6 +1395,33 @@ def test_recovery_custody_and_lost_device_api_contracts_are_strict() -> None:
     assert noncanonical.status_code == 422
     assert len(service.lost_device_calls) == 1
     assert len(service.custody_calls) == 1
+
+
+def test_recovery_custody_api_accepts_optional_canonical_state_version() -> None:
+    service = FakeAdminSecurityService()
+    client = _api_client(service, [])
+    headers = {**VALID_HEADERS, "Authorization": "Bearer valid-bearer-token"}
+    request = {
+        "custody_reference": RECOVERY_CUSTODY_REFERENCE,
+        "material_kind": "RECOVERY_CODE",
+        "storage_location": "OFF_PHONE",
+        "separate_encrypted_backup_confirmed": True,
+    }
+
+    accepted = client.post(
+        "/admin/security/recovery-custody/attest",
+        headers=headers,
+        json={**request, "expected_state_version": "7"},
+    )
+    invalid = client.post(
+        "/admin/security/recovery-custody/attest",
+        headers=headers,
+        json={**request, "expected_state_version": "07"},
+    )
+
+    assert accepted.status_code == 200
+    assert invalid.status_code == 422
+    assert service.custody_calls == [{**request, "expected_state_version": "7"}]
 
 
 def test_reauthentication_forwards_and_returns_exact_operation_binding() -> None:
@@ -1332,9 +1509,11 @@ def test_admin_operation_classifier_is_exact_and_unknown_writes_fail_closed() ->
         "STANDARD",
     )
     assert report_lost is not None
+    # S18-29: revoking another device's keys and sessions needs a fresh,
+    # exact-path reconfirmation (FP-047 recent re-check for sensitive work).
     assert (report_lost.action, report_lost.risk) == (
         "device.report_lost",
-        "STANDARD",
+        "HIGH",
     )
     for path, action in (
         ("/admin/operations/release-approvals", "release.approval"),
@@ -2106,6 +2285,7 @@ def test_postgres_session_and_active_device_lists_keep_current_beyond_limit() ->
     observed_at = datetime(2026, 7, 22, 14, 0, 0, tzinfo=timezone.utc)
     admin_id = f"pagination-{uuid.uuid4()}"
     current_session_id = uuid.uuid4()
+    old_active_session_id = uuid.uuid4()
     current_device_id = "zz-pagination-current"
     identity = AdminSessionIdentity(
         admin_id=admin_id,
@@ -2141,20 +2321,37 @@ def test_postgres_session_and_active_device_lists_keep_current_beyond_limit() ->
                     created_at=observed_at - timedelta(days=1),
                 )
             )
+            recent_ended_sessions = []
             for index in range(100):
                 device_id = f"pagination-device-{index:03d}"
-                db.add(
-                    AdminSecuritySession(
-                        admin_id=admin_id,
-                        device_id=device_id,
-                        device_label=f"기기 {index:03d}",
-                        token_sha256=sha256_text(f"{admin_id}-token-{index}"),
-                        issued_at=observed_at + timedelta(seconds=index),
-                        expires_at=observed_at + timedelta(hours=1, seconds=index),
-                        step_up_verified_at=observed_at,
-                        last_seen_at=observed_at,
-                    )
+                is_old_active = index == 0
+                session = AdminSecuritySession(
+                    id=old_active_session_id if is_old_active else uuid.uuid4(),
+                    admin_id=admin_id,
+                    device_id=device_id,
+                    device_label=f"기기 {index:03d}",
+                    token_sha256=sha256_text(f"{admin_id}-token-{index}"),
+                    issued_at=(
+                        observed_at - timedelta(days=2)
+                        if is_old_active
+                        else observed_at - timedelta(minutes=10) + timedelta(seconds=index)
+                    ),
+                    expires_at=(
+                        observed_at + timedelta(hours=1)
+                        if is_old_active or index % 2
+                        else observed_at - timedelta(seconds=1)
+                    ),
+                    step_up_verified_at=observed_at,
+                    last_seen_at=observed_at,
+                    revoked_at=(
+                        observed_at - timedelta(minutes=1)
+                        if not is_old_active and index % 2
+                        else None
+                    ),
                 )
+                db.add(session)
+                if not is_old_active:
+                    recent_ended_sessions.append(session)
                 db.add(
                     AdminDeviceKey(
                         admin_id=admin_id,
@@ -2178,13 +2375,92 @@ def test_postgres_session_and_active_device_lists_keep_current_beyond_limit() ->
             assert sum(item["current"] for item in sessions) == 1
             assert sessions[0]["session_id"] == str(current_session_id)
             assert sessions[0]["revoked"] is False
+            assert sessions[1]["session_id"] == str(old_active_session_id)
+            assert sessions[1]["revoked"] is False
+            assert sum(not item["revoked"] for item in sessions) == 2
             assert len(devices) == 100
             assert len({item["device_id"] for item in devices}) == 100
             assert sum(item["current"] for item in devices) == 1
             assert devices[0] == {
                 "device_id": current_device_id,
                 "current": True,
+                "device_label": "현재 기기",
+                "last_seen_at": observed_at.isoformat(),
+                "key_version": 1,
+                "key_marker_prefix": sha256_text(f"{admin_id}-current-key")[:8],
             }
+            assert service.count_active_devices(identity) == 101
+            assert len(recent_ended_sessions) == 99
+            # The session trigger forbids un-revoking or extending a row, so the
+            # all-active case uses a second administrator with fresh sessions.
+            active_admin_id = f"{admin_id}-active"
+            active_identity = AdminSessionIdentity(
+                admin_id=active_admin_id,
+                session_id=uuid.uuid4(),
+                device_id=current_device_id,
+                device_label="현재 기기",
+                expires_at=observed_at + timedelta(hours=1),
+                step_up_verified_at=observed_at,
+            )
+            db.add(
+                AdminSecuritySession(
+                    id=active_identity.session_id,
+                    admin_id=active_admin_id,
+                    device_id=current_device_id,
+                    device_label="현재 기기",
+                    token_sha256=sha256_text(f"{active_admin_id}-current-token"),
+                    issued_at=observed_at - timedelta(days=1),
+                    expires_at=observed_at + timedelta(hours=1),
+                    step_up_verified_at=observed_at,
+                    last_seen_at=observed_at,
+                )
+            )
+            active_old_session_id = uuid.uuid4()
+            for index in range(100):
+                db.add(
+                    AdminSecuritySession(
+                        id=active_old_session_id if index == 0 else uuid.uuid4(),
+                        admin_id=active_admin_id,
+                        device_id=f"pagination-active-{index:03d}",
+                        device_label=f"활성 기기 {index:03d}",
+                        token_sha256=sha256_text(f"{active_admin_id}-token-{index}"),
+                        issued_at=(
+                            observed_at - timedelta(days=2)
+                            if index == 0
+                            else observed_at - timedelta(minutes=10) + timedelta(seconds=index)
+                        ),
+                        expires_at=observed_at + timedelta(hours=1),
+                        step_up_verified_at=observed_at,
+                        last_seen_at=observed_at,
+                    )
+                )
+            db.flush()
+            identity = active_identity
+            current_session_id = active_identity.session_id
+            old_active_session_id = active_old_session_id
+            capped_sessions = service.list_sessions(identity, now=observed_at)
+            assert len(capped_sessions) == 100
+            assert capped_sessions[0]["session_id"] == str(current_session_id)
+            assert all(not item["revoked"] for item in capped_sessions)
+            first_page = service.list_sessions(identity, now=observed_at, paged=True)
+            second_page = service.list_sessions(
+                identity,
+                now=observed_at,
+                paged=True,
+                after=uuid.UUID(first_page[-1]["session_id"]),
+            )
+            assert len(first_page) == 100
+            assert len(second_page) == 2
+            assert first_page[0]["session_id"] == str(current_session_id)
+            assert second_page[0]["session_id"] == str(current_session_id)
+            paged_ids = [
+                item["session_id"]
+                for page in (first_page, second_page)
+                for item in page
+                if not item["current"]
+            ]
+            assert len(paged_ids) == len(set(paged_ids)) == 100
+            assert str(old_active_session_id) in paged_ids
             db.rollback()
     finally:
         engine.dispose()
@@ -2278,20 +2554,33 @@ def test_action_bound_audit_migration_preserves_append_only_constraints() -> Non
 
 
 @pytest.mark.parametrize(
-    ("method", "path", "expected_action"),
+    ("method", "path", "route_template", "expected_action"),
     [
-        ("GET", "/reports/export", "report.export"),
-        ("PATCH", "/reports/11111111-1111-4111-8111-111111111111/status", "report.status.patch"),
+        ("GET", "/reports/export", "/reports/export", "report.export"),
+        (
+            "PATCH",
+            "/reports/11111111-1111-4111-8111-111111111111/status",
+            "/reports/{report_id}/status",
+            "report.status.patch",
+        ),
         (
             "POST",
             "/reports/11111111-1111-4111-8111-111111111111/original-access-grants",
+            "/reports/{report_id}/original-access-grants",
             "report.original.grant",
+        ),
+        (
+            "POST",
+            "/admin/security/devices/android-device-0002/report-lost",
+            "/admin/security/devices/{device_id}/report-lost",
+            "device.report_lost",
         ),
     ],
 )
 def test_high_risk_routes_use_common_recent_step_up_authorizer(
     method: str,
     path: str,
+    route_template: str,
     expected_action: str,
 ) -> None:
     _ACTOR_RATE_LIMITER.reset()
@@ -2299,7 +2588,7 @@ def test_high_risk_routes_use_common_recent_step_up_authorizer(
     settings = _settings()
     app = FastAPI()
 
-    @app.api_route(path, methods=[method])
+    @app.api_route(route_template, methods=[method])
     def high_risk_endpoint(request: Request):
         return {"actor": request.headers["x-walksafe-actor-id"]}
 
@@ -2329,12 +2618,16 @@ def test_high_risk_routes_use_common_recent_step_up_authorizer(
 def test_admin_session_store_failure_fails_closed() -> None:
     settings = _settings()
     app = FastAPI()
+    endpoint_calls: list[bool] = []
+    authorizer_calls: list[bool] = []
 
-    @app.get("/protected")
+    @app.get("/admin/security/state")
     def protected():
+        endpoint_calls.append(True)
         return {"unexpected": True}
 
     def unavailable(_settings_value, **_kwargs):
+        authorizer_calls.append(True)
         raise AdminSecurityStoreUnavailable()
 
     app.add_middleware(
@@ -2343,12 +2636,14 @@ def test_admin_session_store_failure_fails_closed() -> None:
         admin_session_authorizer=unavailable,
     )
     response = ASGITestClient(app).get(
-        "/protected",
+        "/admin/security/state",
         headers={**VALID_HEADERS, "Authorization": "Bearer valid-bearer-token"},
     )
 
     assert response.status_code == 503
     assert response.json()["detail"]["code"] == "admin_security_store_unavailable"
+    assert authorizer_calls == [True]
+    assert endpoint_calls == []
 
 
 def test_enabled_openapi_documents_bearer_and_exact_admin_context() -> None:

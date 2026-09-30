@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import org.junit.Test;
 
 public final class AdminOperationsHttpClientTest {
@@ -294,6 +295,98 @@ public final class AdminOperationsHttpClientTest {
     }
 
     @Test
+    public void recentHistoryReadsLatestHundredTailWithCanonicalProofAndNoCursor() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        transport.reviewHistoryOverride = recentHistoryJson(true, 100, 76);
+        transport.deliveryHistoryOverride = recentHistoryJson(false, 100, 76);
+        AdminOperationsHttpClient client = client(transport, new CapturingSigner());
+
+        AdminOperationsApi.Result review = client.readRecentReviewDecisions(SESSION, REPORT_ID);
+        AdminOperationsApi.Result delivery = client.readRecentDeliveries(SESSION, REPORT_ID);
+
+        assertEquals(100L, review.snapshotRevision());
+        assertEquals(100L, review.totalCount());
+        assertEquals(25, review.reviewHistory().size());
+        assertEquals(76L, review.reviewHistory().get(0).revision());
+        assertEquals(100L, review.reviewHistory().get(24).revision());
+        assertNull(review.nextCursor());
+        assertEquals(25, delivery.deliveryHistory().size());
+        assertEquals(76L, delivery.deliveryHistory().get(0).revision());
+        assertEquals(100L, delivery.deliveryHistory().get(24).revision());
+        assertNull(delivery.nextCursor());
+        assertOperationPair(
+            transport.requests.get(0), transport.requests.get(1),
+            "GET", "/reports/" + REPORT_ID + "/review-decisions/history",
+            null, "report.review_decisions", "limit=25&position=last"
+        );
+        assertOperationPair(
+            transport.requests.get(2), transport.requests.get(3),
+            "GET", "/reports/" + REPORT_ID + "/deliveries/history",
+            null, "report.delivery_events", "limit=25&position=last"
+        );
+        assertEquals("no-store", transport.requests.get(1).headers.get("Cache-Control"));
+        assertEquals("no-store", transport.requests.get(3).headers.get("Cache-Control"));
+    }
+
+    @Test
+    public void recentHistoryAcceptsBudgetReducedSuffixButRejectsBrokenTailAndBindings()
+        throws Exception {
+        FakeTransport shortened = new FakeTransport();
+        shortened.reviewHistoryOverride = recentHistoryJson(true, 100, 91);
+        assertEquals(10, client(shortened, new CapturingSigner())
+            .readRecentReviewDecisions(SESSION, REPORT_ID).reviewHistory().size());
+
+        FakeTransport missingTail = new FakeTransport();
+        missingTail.reviewHistoryOverride = recentHistoryJson(true, 100, 76)
+            .replace("\"revision\":100", "\"revision\":101");
+        assertThrows(IOException.class, () -> client(missingTail, new CapturingSigner())
+            .readRecentReviewDecisions(SESSION, REPORT_ID));
+
+        FakeTransport missingMiddle = new FakeTransport();
+        JSONObject gap = new JSONObject(recentHistoryJson(true, 100, 76));
+        gap.getJSONArray("items").getJSONObject(12).put("revision", 90);
+        missingMiddle.reviewHistoryOverride = gap.toString();
+        assertThrows(IOException.class, () -> client(missingMiddle, new CapturingSigner())
+            .readRecentReviewDecisions(SESSION, REPORT_ID));
+
+        FakeTransport forgedReport = new FakeTransport();
+        forgedReport.deliveryHistoryOverride = recentHistoryJson(false, 100, 76)
+            .replace("\"report_id\":\"" + REPORT_ID + "\"",
+                "\"report_id\":\"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\"");
+        assertThrows(IOException.class, () -> client(forgedReport, new CapturingSigner())
+            .readRecentDeliveries(SESSION, REPORT_ID));
+
+        FakeTransport forgedCursor = new FakeTransport();
+        JSONObject withCursor = new JSONObject(recentHistoryJson(false, 100, 76));
+        withCursor.put("next_cursor", "unexpected_cursor");
+        forgedCursor.deliveryHistoryOverride = withCursor.toString();
+        assertThrows(IOException.class, () -> client(forgedCursor, new CapturingSigner())
+            .readRecentDeliveries(SESSION, REPORT_ID));
+    }
+
+    private static String recentHistoryJson(boolean review, int total, int first) throws Exception {
+        JSONObject page = new JSONObject(review
+            ? FakeTransport.reviewHistoryJson() : FakeTransport.deliveryHistoryJson());
+        JSONArray items = new JSONArray();
+        JSONObject template = page.getJSONArray("items").getJSONObject(0);
+        for (int revision = first; revision <= total; revision++) {
+            JSONObject item = new JSONObject(template.toString());
+            item.put("revision", revision);
+            item.put("id", String.format("aaaaaaaa-aaaa-4aaa-8aaa-%012x", revision));
+            if (!review) {
+                item.put("package_id", String.format("cccccccc-cccc-4ccc-8ccc-%012x", revision));
+                item.put("package_revision", revision);
+                item.put("expected_revision", revision - 1);
+            }
+            items.put(item);
+        }
+        page.put("snapshot_revision", total);
+        page.put("total_count", total);
+        page.put("items", items);
+        return page.toString();
+    }
+
+    @Test
     public void historyStatusAndPageIntegrityFailuresAreTypedOrRejected() {
         FakeTransport invalidCursor = new FakeTransport();
         invalidCursor.readStatus = 422;
@@ -518,6 +611,56 @@ public final class AdminOperationsHttpClientTest {
             "0".repeat(64)
         );
         assertThrows(IOException.class, () -> loadOriginal(client(wrongSha, new CapturingSigner())));
+    }
+
+    @Test
+    public void s20_54_lostImageAfterTheTokenIsSpentAsksForANewGrantAndNeverReusesTheToken()
+        throws Exception {
+        FakeTransport transport = new FakeTransport();
+        transport.binaryFailure = new java.net.SocketTimeoutException("image response lost");
+        AdminOperationsHttpClient client = client(transport, new CapturingSigner());
+
+        AdminOperationsApi.OriginalEvidenceNotReceivedException lost = assertThrows(
+            AdminOperationsApi.OriginalEvidenceNotReceivedException.class,
+            () -> loadOriginal(client)
+        );
+        assertTrue(lost.getCause() instanceof java.net.SocketTimeoutException);
+        assertEquals(2, transport.requests.size());
+        assertEquals(1, transport.binaryRequests.size());
+        assertEquals(
+            ORIGINAL_ACCESS_TOKEN,
+            transport.binaryRequests.get(0).headers.get(AdminOperationsHttpClient.ORIGINAL_ACCESS_GRANT_HEADER)
+        );
+
+        // Viewing again is a new challenge + new grant request before the next image read;
+        // no image request is ever sent without its own freshly issued grant.
+        transport.binaryFailure = null;
+        AdminOriginalEvidence evidence = loadOriginal(client);
+        assertEquals(4, transport.requests.size());
+        assertTrue(transport.requests.get(2).url.endsWith(AdminOperationsHttpClient.CHALLENGE_PATH));
+        assertTrue(transport.requests.get(3).url.endsWith("/original-access-grants"));
+        assertEquals(2, transport.binaryRequests.size());
+        evidence.close();
+
+        // A truncated or mismatching body after the token was used is the same case.
+        FakeTransport truncated = new FakeTransport();
+        truncated.binaryBody = java.util.Arrays.copyOf(PNG, PNG.length - 1);
+        assertThrows(
+            AdminOperationsApi.OriginalEvidenceNotReceivedException.class,
+            () -> loadOriginal(client(truncated, new CapturingSigner()))
+        );
+    }
+
+    @Test
+    public void s20_54_failureBeforeAnyGrantIsNotReportedAsASpentGrant() {
+        FakeTransport transport = new FakeTransport();
+        transport.businessStatus = 503;
+        IOException error = assertThrows(
+            IOException.class,
+            () -> loadOriginal(client(transport, new CapturingSigner()))
+        );
+        assertFalse(error instanceof AdminOperationsApi.OriginalEvidenceNotReceivedException);
+        assertTrue(transport.binaryRequests.isEmpty());
     }
 
     @Test
@@ -799,6 +942,7 @@ public final class AdminOperationsHttpClientTest {
         String binaryContentType = "image/png";
         long binaryDeclaredLength = PNG.length;
         byte[] binaryBody = PNG.clone();
+        IOException binaryFailure;
 
         @Override
         public AdminOperationsHttpClient.Response execute(
@@ -881,8 +1025,9 @@ public final class AdminOperationsHttpClientTest {
             String url,
             Map<String, String> headers,
             int expectedByteCount
-        ) {
+        ) throws IOException {
             binaryRequests.add(new Request(method, url, headers, null));
+            if (binaryFailure != null) throw binaryFailure;
             return new AdminOperationsHttpClient.BinaryResponse(
                 binaryStatus,
                 binaryContentType,
@@ -1005,7 +1150,8 @@ public final class AdminOperationsHttpClientTest {
                   "session_id":"33333333-3333-4333-8333-333333333333",
                   "device_id":"admin-device-12345678-1234-1234-1234-123456789abc",
                   "correlation_id":"77777777-7777-4777-8777-777777777777",
-                  "recorded_at":"2026-08-09T01:02:04Z"
+                  "recorded_at":"2026-08-09T01:02:04Z",
+                  "correction":null
                 }],"next_cursor":null}
                 """;
         }
@@ -1041,7 +1187,7 @@ public final class AdminOperationsHttpClientTest {
     private static final Set<String> EXACT_REVIEW_KEYS = Set.of(
         "decision", "reason", "user_visible_reason", "duplicate_of_report_id",
         "location_reviewed", "photo_reviewed", "privacy_reviewed", "content_revision",
-        "evidence_grant_id", "decision_id"
+        "evidence_grant_id", "decision_id", "expected_review_revision"
     );
     private static final String ORIGIN = "http://127.0.0.1:8000";
     private static final String REPORT_ID = "44444444-4444-4444-8444-444444444444";

@@ -9,11 +9,12 @@ import org.junit.Test
 class RouteNavigatorRetreatTest {
     @Test
     fun remainingDistanceTracksApproachRetreatAndReapproachWithoutFreezingOrJumpingForward() {
+        // Camera facing is supplied independently of the optional GPS movement heading.
         listOf(false, true).forEach { degraded ->
             val navigator = navigator(degraded)
             listOf(30.0, 80.0, 30.0, 91.0, 80.0, 30.0).forEachIndexed { index, progress ->
                 val now = 1_000L + index * 20_000L
-                val update = sample(navigator, progress, now)
+                val update = sample(navigator, progress, now, facingHeading = 90.0)
                 assertEquals("guide at $progress", 0, update.guideIndex)
                 assertTrue("at $progress: ${update.instruction}", update.instruction?.contains("${(100 - progress).toInt()}m 앞") == true)
                 assertTrue(navigator.reserveInstruction(update))
@@ -24,9 +25,10 @@ class RouteNavigatorRetreatTest {
 
     @Test
     fun oppositeGpsCourseOnSameCorridorRemainsPositionEvidence() {
+        // Camera facing is supplied independently of the optional GPS movement heading.
         val navigator = navigator()
-        sample(navigator, 80.0, 1_000, 90.0)
-        val retreat = sample(navigator, 70.0, 11_000, 270.0)
+        sample(navigator, 80.0, 1_000, 90.0, facingHeading = 90.0)
+        val retreat = sample(navigator, 70.0, 11_000, 270.0, facingHeading = 90.0)
         assertNotNull(retreat.instruction)
         assertTrue(navigator.currentRouteMatch()?.quality in setOf(RouteMatchQuality.HIGH, RouteMatchQuality.MEDIUM))
         assertNotNull(navigator.currentAcceptedRouteMatchFor(11_000))
@@ -44,18 +46,19 @@ class RouteNavigatorRetreatTest {
 
     @Test
     fun twoFreshPositionsBehindPassedGuideRestoreItAndOneOutlierDoesNot() {
+        // Camera facing is supplied independently of the optional GPS movement heading.
         val navigator = navigator()
-        sample(navigator, 90.0, 1_000, 90.0)
-        val passed = sample(navigator, 115.0, 11_000, 180.0)
+        sample(navigator, 90.0, 1_000, 90.0, facingHeading = 90.0)
+        val passed = sample(navigator, 115.0, 11_000, 180.0, facingHeading = 180.0)
         assertEquals(1, passed.guideIndex)
-        sample(navigator, 80.0, 21_000, 270.0)
-        val recoveredOutlier = sample(navigator, 115.0, 31_000, 180.0)
+        sample(navigator, 80.0, 21_000, 270.0, facingHeading = 90.0)
+        val recoveredOutlier = sample(navigator, 115.0, 31_000, 180.0, facingHeading = 180.0)
         assertEquals(1, recoveredOutlier.guideIndex)
-        sample(navigator, 80.0, 41_000, 270.0)
-        val restored = sample(navigator, 70.0, 42_000, 270.0)
+        sample(navigator, 80.0, 41_000, 270.0, facingHeading = 90.0)
+        val restored = sample(navigator, 70.0, 42_000, 270.0, facingHeading = 90.0)
         assertEquals(0, restored.guideIndex)
         assertTrue(restored.instruction?.contains("30m 앞, 오른쪽으로 꺾으세요.") == true)
-        val reapproach = sample(navigator, 71.0, 52_000, 90.0)
+        val reapproach = sample(navigator, 71.0, 52_000, 90.0, facingHeading = 90.0)
         assertEquals(0, reapproach.guideIndex)
         assertTrue(reapproach.instruction?.contains("29m 앞") == true)
     }
@@ -106,14 +109,15 @@ class RouteNavigatorRetreatTest {
     @Test
     fun rejectedArrivalDoesNotRecreateDecisionUntilUserLeavesThenReapproaches() {
         val navigator = navigator()
-        sample(navigator, 298.0, 1_000, 180.0)
-        assertTrue(sample(navigator, 298.0, 2_000, 180.0).arrivalCandidate)
+        // S07-32 (R6): the arrival question needs 3 s of consecutive near-destination evidence.
+        for (at in 1_000L..3_000L step 1_000L) assertFalse(sample(navigator, 298.0, at, 180.0).arrivalCandidate)
+        assertTrue(sample(navigator, 298.0, 4_000, 180.0).arrivalCandidate)
         navigator.rejectArrival()
-        repeat(5) { assertFalse(sample(navigator, 298.0, 3_000L + it * 1_000, 180.0).arrivalCandidate) }
+        repeat(5) { assertFalse(sample(navigator, 298.0, 5_000L + it * 1_000, 180.0).arrivalCandidate) }
         sample(navigator, 250.0, 20_000, 0.0)
         sample(navigator, 249.0, 21_000, 0.0)
-        assertFalse(sample(navigator, 298.0, 30_000, 180.0).arrivalCandidate)
-        assertTrue(sample(navigator, 298.0, 31_000, 180.0).arrivalCandidate)
+        for (at in 30_000L..32_000L step 1_000L) assertFalse(sample(navigator, 298.0, at, 180.0).arrivalCandidate)
+        assertTrue(sample(navigator, 298.0, 33_000, 180.0).arrivalCandidate)
     }
 
     private fun navigator(degraded: Boolean = false) = RouteNavigator(allowDegradedRouteGuidance = degraded).apply {
@@ -123,10 +127,12 @@ class RouteNavigatorRetreatTest {
                 WalkingRouteGuidePoint(1, point(100.0, -150.0), null, 250, 50, turnType = 11))))
     }
 
-    private fun sample(navigator: RouteNavigator, progress: Double, now: Long, heading: Double? = null): RouteNavigatorUpdate {
+    private fun sample(navigator: RouteNavigator, progress: Double, now: Long, heading: Double? = null,
+        facingHeading: Double? = null): RouteNavigatorUpdate {
         val raw = fix(progress, now)
-        return if (heading == null) navigator.update(raw, now, false) else navigator.update(raw, now, false,
-            FilteredRoutePosition(raw.point(), 3.0, now, heading = RouteHeadingEstimate(heading, 8.0)))
+        val facing = facingHeading?.let { RouteFacingObservation(it, 5.0, now) }
+        return if (heading == null) navigator.update(raw, now, false, facingObservation = facing) else navigator.update(raw, now, false,
+            FilteredRoutePosition(raw.point(), 3.0, now, heading = RouteHeadingEstimate(heading, 8.0)), facingObservation = facing)
     }
     private fun TrustedLocation.point() = RoutePoint(latitude, longitude)
     private fun fix(progress: Double, now: Long): TrustedLocation {

@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { configureTestStateEncryption } from "./state-encryption-fixture.js";
 
@@ -31,7 +32,7 @@ after(async () => {
 function runWorker(phase: string) {
   return spawnSync(
     process.execPath,
-    [path.join(process.cwd(), "dist/test/privacy-deletion-v2-crash-worker.js"), phase],
+    [fileURLToPath(new URL("./privacy-deletion-v2-crash-worker.js", import.meta.url)), phase],
     {
       encoding: "utf8",
       env: { ...process.env },

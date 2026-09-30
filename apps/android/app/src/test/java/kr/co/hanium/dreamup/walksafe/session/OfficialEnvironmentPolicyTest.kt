@@ -357,9 +357,12 @@ class OfficialEnvironmentPolicyTest {
         val assessment = assess(cameraQuality = null).copy(
             enabledMeasuredFactors = setOf(OfficialEnvironmentFactor.GPS_QUALITY),
         )
+        assertEquals(OfficialEnvironmentSupport.SUPPORTED, assessment.support)
+        assertEquals(EnvironmentEvidenceStatus.PASS, assessment.factorStatuses[OfficialEnvironmentFactor.GPS_QUALITY])
         assertTrue(assessment.canStartWalk)
         assertEquals(EnvironmentEvidenceStatus.UNKNOWN, assessment.factorStatuses[OfficialEnvironmentFactor.CAMERA_QUALITY])
         val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(assessment, NOW_MS)
+        assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, decision.action)
         assertTrue(decision.navigationOutputsAllowed)
         assertFalse(decision.cameraOutputsAllowed)
         assertFalse(decision.suppressAllWalkOutputs)
@@ -378,16 +381,33 @@ class OfficialEnvironmentPolicyTest {
     }
 
     @Test
-    fun disablingBothMeasuredFeaturesDoesNotForceAnUnrelatedApplicationStop() {
+    fun emptyMeasuredSetWithAcknowledgedUnknownConditionsCannotStartOrContinue() {
         val assessment = educatedAssessment(gpsQuality = null, cameraQuality = null).copy(
             enabledMeasuredFactors = emptySet(),
         )
-        assertTrue(assessment.canStartWalk)
+        assertEquals(PROFILE.profileId, assessment.profileId)
+        assertTrue(assessment.usageLimitsAcknowledged)
+        assertTrue(assessment.factorStatuses.values.all { it == EnvironmentEvidenceStatus.UNKNOWN })
+        assertFalse(assessment.canStartWalk)
         val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(assessment, NOW_MS)
-        assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, decision.action)
+        assertEquals(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY, decision.action)
+        assertTrue(decision.suppressAllWalkOutputs)
         assertFalse(decision.navigationOutputsAllowed)
         assertFalse(decision.cameraOutputsAllowed)
         assertFalse(assessment.copy(profileId = null).canStartWalk)
+    }
+
+    @Test
+    fun emptyMeasuredSetCannotStartOrContinueEvenWithPassingSharedConditions() {
+        val assessment = supportedAssessment().copy(enabledMeasuredFactors = emptySet())
+
+        assertEquals(OfficialEnvironmentSupport.SUPPORTED, assessment.support)
+        assertFalse(assessment.canStartWalk)
+        val decision = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE).onAssessment(assessment, NOW_MS)
+        assertEquals(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY, decision.action)
+        assertTrue(decision.suppressAllWalkOutputs)
+        assertFalse(decision.navigationOutputsAllowed)
+        assertFalse(decision.cameraOutputsAllowed)
     }
 
     @Test

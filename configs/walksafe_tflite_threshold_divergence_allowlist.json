@@ -1,0 +1,156 @@
+{
+  "schema": "walksafe.tflite-threshold-divergence-allowlist.v1",
+  "android_config": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+  "backend_config": "configs/walksafe_unified_epoch270_field_20260711.json",
+  "approval_status": "DECLARED_CURRENT_BUNDLE_NOT_SAFETY_APPROVED",
+  "notes": "S21-19: 목록 밖 차이와 값이 달라진(stale) 항목은 check_android_tflite_contract_20260531.py에서 오류. 값 변경은 이 파일을 함께 바꾸는 검토 대상 변경이다.",
+  "entries": [
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "linear_tactile_paving",
+      "android_threshold": 0.25,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "damaged_linear_tactile_paving",
+      "android_threshold": 0.3,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "dot_tactile_paving",
+      "android_threshold": 0.25,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "damaged_dot_tactile_paving",
+      "android_threshold": 0.3,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "passenger_car",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "bus",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "truck",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "motorcycle",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "bicycle",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "abandoned_e_scooter",
+      "android_threshold": 0.25,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "moving_e_scooter",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "traffic_light",
+      "android_threshold": 0.3,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "crosswalk",
+      "android_threshold": 0.25,
+      "backend_threshold": 0.3,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "construction_fence",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "barricade",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "traffic_cone",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "bollard",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "utility_or_streetlight_pole",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "trash_bin",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "portable_sign",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    },
+    {
+      "model_key": "unified_walksafe",
+      "class_name": "person",
+      "android_threshold": 0.15,
+      "backend_threshold": 0.2,
+      "reason": "현 출시 묶음 선언값: Android on-device 실시간 경고용 임계값과 Backend 서버 추론 설정의 기존 차이(검사기 기존 설명: on-device MVP latency/recall tuning). 차이를 그대로 기록한 것이며 안전 승인이 아님 — FP-037/FP-039 승인 묶음 검토 대상."
+    }
+  ]
+}

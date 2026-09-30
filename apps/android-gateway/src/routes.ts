@@ -1,3 +1,4 @@
+import path from "node:path";
 import { MIMEType } from "node:util";
 
 import {
@@ -10,8 +11,11 @@ import {
   gatewayFieldLongSessionBindingMatches,
   gatewaySessionActor,
   gatewaySessionAccountGeneration,
+  gatewaySessionAuthEpoch,
+  gatewaySessionAuthenticatedAtEpochMs,
   gatewaySessionScope,
   gatewaySessionStatus,
+  gatewayTrustedClientIp,
   gatewayUnauthorizedResponse,
   gatewayUnavailableResponse,
   isGatewayAccessConfigured,
@@ -19,7 +23,9 @@ import {
   isGatewaySessionAuthorized,
   listBackendDeviceGatewaySessionDevices,
   recordGatewayLoginAttempt,
+  recordGatewayLoginFailure,
   revokeBackendDeviceGatewaySession,
+  revokeShortFieldSessionsForActor,
   verifyGatewayCredential,
   withGatewayLoginLock
 } from "./auth.js";
@@ -31,49 +37,71 @@ import {
 } from "./account-relay.js";
 import {
   acquireImageUploadAdmission,
+  imageUploadRateLimitedResponse,
   authorizedProxyActor,
   authorizedProxyDeviceBinding,
   authorizeProxyRequest,
+  BACKEND_SESSION_GATE_TIMEOUT_MS,
   backendUrl,
+  checkBackendAccountSessionCurrent,
   fetchBackend,
+  guardWalkingBackendResponse,
   IMAGE_MULTIPART_LIMIT_BYTES,
   proxyRequestHeaders,
   readBoundedMultipartFormData,
   toBackendResponse,
-  type GatewayFetch
+  type GatewayFetch,
+  type ImageUploadAdmission
 } from "./backend.js";
-import { readBoundedJsonBody, readBoundedTextBody } from "./request-body.js";
-import { resolvePrivacyRightsRequestUrl } from "./config.js";
+import {
+  duplicateJsonObjectKeysError,
+  readBoundedJsonBody,
+  readBoundedTextBody
+} from "./request-body.js";
+import {
+  resolveFieldWalkV1CommandMode,
+  resolveGatewayStateDirectory,
+  resolvePrivacyRightsRequestUrl
+} from "./config.js";
+import { acquireSharedFileLock } from "./exclusive-file-lock.js";
 import {
   authorizeIntegratedConsentRequest,
   CONSENT_NETWORK_TRANSPORT_HEADER,
   handleIntegratedConsentBootstrapRequest,
   handleIntegratedConsentRequest,
-  INTEGRATED_CONSENT_BOOTSTRAP_CONTROL,
-  INTEGRATED_CONSENT_CONTROL
+  INTEGRATED_CONSENT_POLICY_VERSION
 } from "./integrated-consent.js";
 import {
   clearCurrentFieldLongSession,
   clearFieldLongSessionWithRefresh,
+  establishBackendFieldLongSession,
   establishFieldLongSession,
+  FieldLongSessionStorageUnavailableError,
+  fieldLongLivedSessionsUnavailableResponse,
   fieldLongSessionStatus,
+  fieldLongSessionStorageOutcomeUnknownResponse,
+  fieldLongSessionStorageUnavailableResponse,
   hasFieldLongSessionCookie,
+  isBackendFieldLongSessionCookie,
   isFieldLongSessionEnabled,
   listFieldLongSessionDevices,
-  refreshFieldLongSession,
+  refreshPublicFieldLongSession,
   revokeFieldLongSessionDevice,
   type FieldRefreshPayload
 } from "./field-long-session.js";
 import {
   commandFieldWalk,
+  endFieldWalkForRevokedSession,
+  FieldWalkLedgerStorageOutcomeUnknownError,
   getFieldWalk,
   parseFieldWalkCommand
 } from "./field-walk-ledger.js";
 import type { GatewayFieldLongSessionBinding } from "./auth.js";
+import { admitFieldSessionRefresh } from "./refresh-admission.js";
+import { GatewayStorageOutcomeUnknownError } from "./encrypted-json-store.js";
 import {
-  ACCOUNT_DELETION_CONTROL,
-  activateActorGeneration,
-  bindBackendActorGeneration,
+  activateActorGenerationAsync,
+  bindBackendActorGenerationAsync,
   abortPrivacyOperationsForAccountDeletion,
   beginPrivacyOperation,
   consentActorBindingId,
@@ -101,7 +129,9 @@ import {
   GATEWAY_ROUTE_TEMPLATES,
   gatewayCorrelationId,
   gatewayRouteTemplate,
-  recordGatewayRequestCompleted,
+  observeGatewayResponseDelivery,
+  recordGatewayRequestFinished,
+  recordGatewayRequestPrepared,
   withGatewayRequestId,
   writeGatewayTelemetry,
   type GatewayTelemetrySink
@@ -112,18 +142,7 @@ import {
 } from "./server-capacity.js";
 import { relaySpeechStt, relaySpeechTts } from "./speech-relay.js";
 import { relayRawCollection } from "./raw-collection-relay.js";
-
-const ALLOWED_METHODS = new Map<string, readonly string[]>([
-  ["/api/account-enrollments/email-otp", ["POST"]],
-  ["/api/accounts", ["POST"]],
-  ["/api/field-session", ["GET", "POST", "DELETE"]],
-  ["/api/field-walk", ["GET", "POST"]],
-  ["/api/speech/stt", ["POST"]],
-  ["/api/speech/tts", ["POST"]],
-  ["/api/navigation/walking", ["POST"]],
-  ["/api/navigation/destinations/search", ["GET"]],
-  ["/api/reports/v2", ["POST"]]
-]);
+import { matchGatewayRoute, type GatewayRouteMatch } from "./route-registry.js";
 
 export const PUBLIC_GATEWAY_ROUTES = Object.freeze([
   ...GATEWAY_ROUTE_TEMPLATES
@@ -138,9 +157,7 @@ export type GatewayDependencies = {
   ) => GatewayFieldLongSessionBinding | null;
 };
 
-const PRIVACY_RIGHTS_PATH = "/privacy/rights";
 const ACCOUNT_DELETION_PATH = "/privacy/account-deletions";
-const ACCOUNT_DELETION_REQUEST_ID = /^[A-Za-z0-9_-]{16,128}$/;
 export const REPORT_PURPOSE_HEADER = "x-walksafe-report-purpose";
 export const REPORT_ID_HEADER = "x-walksafe-report-id";
 export const REPORT_PAYLOAD_SHA256_HEADER = "x-walksafe-report-payload-sha256";
@@ -151,22 +168,6 @@ const CANONICAL_REPORT_UUID =
 const LOWER_SHA256 = /^[0-9a-f]{64}$/;
 const POSITIVE_DECIMAL = /^[1-9][0-9]{0,18}$/;
 const MAX_POSTGRES_BIGINT = 9_223_372_036_854_775_807n;
-const REPORT_TRANSPORT_STATUS_ROUTE =
-  /^\/api\/reports\/v2\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/status$/;
-const USER_REPORT_LIST_ROUTE = "/api/reports/mine";
-const USER_REPORT_REQUEST_HISTORY_ROUTE = "/api/reports/mine/requests/history";
-const USER_REPORT_DETAIL_ROUTE =
-  /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
-const USER_REPORT_REQUEST_ROUTE =
-  /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/requests$/;
-const USER_REPORT_REQUEST_DETAIL_ROUTE =
-  /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/requests\/(?<requestId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
-const USER_REPORT_CONTENT_ROUTE =
-  /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/content$/;
-const USER_REPORT_CORRECTION_ROUTE =
-  /^\/api\/reports\/mine\/(?<reportId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/corrections$/;
-const USER_REPORT_DELETION_ROUTE =
-  /^\/api\/reports\/mine\/deletions\/(?<requestId>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const USER_REPORT_BODY_LIMIT_BYTES = 4 * 1024;
 const USER_REPORT_RESPONSE_LIMIT_BYTES = 128 * 1024;
 const USER_REPORT_REQUEST_HISTORY_RESPONSE_LIMIT_BYTES = 48 * 1024;
@@ -207,6 +208,46 @@ function noStore(response: Response): Response {
   });
 }
 
+function clientClosedResponse(): Response {
+  return Response.json(
+    { detail: { code: "gateway_client_closed", message: "client request was cancelled" } },
+    { status: 499, headers: { "cache-control": "no-store" } }
+  );
+}
+
+async function backendAccountSessionGate(
+  request: Request,
+  fetchImpl?: GatewayFetch
+): Promise<Response | null> {
+  if (request.signal.aborted) return clientClosedResponse();
+  if (!isGatewaySessionAuthorized(request)) return null;
+  const actorId = gatewaySessionActor(request);
+  const accountGeneration = gatewaySessionAccountGeneration(request);
+  const authEpoch = gatewaySessionAuthEpoch(request);
+  if (accountGeneration === null && authEpoch === null) return null;
+  if (!actorId || accountGeneration === null || authEpoch === null) {
+    return noStore(gatewayUnauthorizedResponse());
+  }
+  try {
+    // gw-F6 (S19-59): its own short limit, counted in the adapter's request deadline.
+    const current = await checkBackendAccountSessionCurrent(
+      { actorId, accountGeneration, authEpoch },
+      fetchImpl,
+      BACKEND_SESSION_GATE_TIMEOUT_MS,
+      request.signal
+    );
+    if (request.signal.aborted) return clientClosedResponse();
+    if (current === "current") return null;
+    return noStore(current === "denied"
+      ? gatewayUnauthorizedResponse()
+      : gatewayUnavailableResponse());
+  } catch {
+    return request.signal.aborted
+      ? clientClosedResponse()
+      : noStore(gatewayUnavailableResponse());
+  }
+}
+
 function routeNotFound(): Response {
   return Response.json(
     { code: "gateway_route_not_found" },
@@ -225,6 +266,24 @@ function methodNotAllowed(methods: readonly string[]): Response {
       }
     }
   );
+}
+
+function privacyUnsupportedMethod(match: GatewayRouteMatch, method: string): Response | null {
+  if (match.methods.includes(method)) return null;
+  if (match.unsupportedMethod === "bootstrap-validation") {
+    return Response.json(
+      { detail: {
+        code: "integrated_consent_bootstrap_query_invalid",
+        message: "Consent bootstrap query is invalid.",
+        required_policy_version: INTEGRATED_CONSENT_POLICY_VERSION
+      } },
+      { status: 400, headers: { "cache-control": "no-store" } }
+    );
+  }
+  if (match.unsupportedMethod === "integrated-handler") {
+    return methodNotAllowed(match.methods);
+  }
+  return null;
 }
 
 function fieldSessionQueryInvalid(): Response {
@@ -251,6 +310,13 @@ function fieldWalkRequestInvalid(): Response {
   );
 }
 
+function navigationRequestInvalid(): Response {
+  return Response.json(
+    { code: "navigation_request_invalid" },
+    { status: 400, headers: { "cache-control": "no-store" } }
+  );
+}
+
 function fieldWalkLedgerUnavailable(): Response {
   return Response.json(
     {
@@ -259,6 +325,49 @@ function fieldWalkLedgerUnavailable(): Response {
     },
     { status: 503, headers: { "cache-control": "no-store" } }
   );
+}
+
+/**
+ * S19-27: storage failed after the atomic rename, so the command may be committed.
+ * Retrying the same request_id is safe (it replays the stored result); a new
+ * request_id is not.
+ */
+function fieldWalkLedgerOutcomeUnknown(): Response {
+  return Response.json(
+    {
+      schema_version: "walksafe.field-walk-response.v1",
+      code: "field_walk_ledger_outcome_unknown",
+      retry: "same_request_id"
+    },
+    { status: 503, headers: { "cache-control": "no-store", "retry-after": "1" } }
+  );
+}
+
+/** S19-17: v1 intake is an explicit opt-in; an unreadable setting fails closed. */
+function fieldWalkV1Accepted(): boolean {
+  try {
+    return resolveFieldWalkV1CommandMode() === "accept";
+  } catch {
+    return false;
+  }
+}
+
+/** S19-17: v1 commands (no issue time) are retired by default; nothing was executed. */
+function fieldWalkCommandVersionRetired(): Response {
+  return Response.json(
+    {
+      schema_version: "walksafe.field-walk-response.v1",
+      code: "walk_command_version_retired",
+      supported_schema_versions: ["walksafe.field-walk-command.v2"]
+    },
+    { status: 409, headers: { "cache-control": "no-store" } }
+  );
+}
+
+function fieldWalkLedgerFailure(error: unknown): Response {
+  return error instanceof FieldWalkLedgerStorageOutcomeUnknownError
+    ? fieldWalkLedgerOutcomeUnknown()
+    : fieldWalkLedgerUnavailable();
 }
 
 function fieldWalkUnauthorized(): Response {
@@ -290,15 +399,39 @@ function privacyOperationInactive(): Response {
   );
 }
 
+type GatewayPrivacyFaultPointForTests =
+  | "after_lease"
+  | "refresh_pre_operation"
+  | "refresh_before_commit"
+  | "refresh_post_operation";
+let privacyFaultPointForTests: GatewayPrivacyFaultPointForTests | null = null;
+
+export function setGatewayPrivacyFaultForTests(
+  point: GatewayPrivacyFaultPointForTests | null
+): void {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("gateway privacy fault injection is test-only");
+  }
+  privacyFaultPointForTests = point;
+}
+
+function injectGatewayPrivacyFaultForTests(point: GatewayPrivacyFaultPointForTests): void {
+  if (process.env.NODE_ENV !== "test" || privacyFaultPointForTests !== point) return;
+  privacyFaultPointForTests = null;
+  throw new Error(`injected gateway privacy ledger fault: ${point}`);
+}
+
 function startPrivacyOperation(
   actorId: string,
   expectedAccountGeneration: number | null = null
 ):
   | { lease: PrivacyOperationLease; error?: never }
   | { lease?: never; error: Response } {
+  let lease: PrivacyOperationLease | null = null;
   try {
-    const lease = beginPrivacyOperation(actorId);
+    lease = beginPrivacyOperation(actorId);
     if (!lease) return { error: privacyOperationInactive() };
+    injectGatewayPrivacyFaultForTests("after_lease");
     if (
       expectedAccountGeneration !== null &&
       lease.accountGeneration !== expectedAccountGeneration
@@ -312,17 +445,27 @@ function startPrivacyOperation(
     }
     return { lease };
   } catch {
+    if (lease) finishPrivacyOperation(lease);
     return { error: privacyLedgerUnavailable() };
   }
 }
 
-function privacyOperationIsCurrent(lease: PrivacyOperationLease): boolean {
+function privacyOperationState(
+  lease: PrivacyOperationLease,
+  faultPoint?: GatewayPrivacyFaultPointForTests
+): "current" | "inactive" | "unavailable" {
   try {
+    if (faultPoint) injectGatewayPrivacyFaultForTests(faultPoint);
     return revalidatePrivacyOperation(lease) &&
-      !isAccountGenerationFencedV2(lease.actorId, lease.accountGeneration);
+      !isAccountGenerationFencedV2(lease.actorId, lease.accountGeneration)
+      ? "current" : "inactive";
   } catch {
-    return false;
+    return "unavailable";
   }
+}
+
+function privacyOperationIsCurrent(lease: PrivacyOperationLease): boolean {
+  return privacyOperationState(lease) === "current";
 }
 
 function cancelUpstream(response: Response): void {
@@ -438,16 +581,32 @@ function responseWithPrivacyOperation(
 
 async function withFieldActorOperation(
   actorId: string,
-  operation: () => Response | Promise<Response>,
-  expectedAccountGeneration: number | null = null
+  operation: (lease: PrivacyOperationLease) => Response | Promise<Response>,
+  expectedAccountGeneration: number | null = null,
+  refreshRotationCommitted?: () => boolean
 ): Promise<Response> {
   const privacy = startPrivacyOperation(actorId, expectedAccountGeneration);
   if (privacy.error) return privacy.error;
   try {
-    if (!privacyOperationIsCurrent(privacy.lease)) return privacyOperationInactive();
-    const response = await operation();
-    if (!privacyOperationIsCurrent(privacy.lease)) {
+    const before = refreshRotationCommitted
+      ? privacyOperationState(privacy.lease, "refresh_pre_operation")
+      : privacyOperationIsCurrent(privacy.lease) ? "current" : "inactive";
+    if (before !== "current") {
+      return before === "unavailable"
+        ? privacyLedgerUnavailable() : privacyOperationInactive();
+    }
+    const response = await operation(privacy.lease);
+    const after = refreshRotationCommitted
+      ? privacyOperationState(privacy.lease, "refresh_post_operation")
+      : privacyOperationIsCurrent(privacy.lease) ? "current" : "inactive";
+    if (after !== "current") {
+      if (after === "unavailable" && response.status === 500) return response;
       cancelUpstream(response);
+      if (after === "unavailable") {
+        return refreshRotationCommitted?.()
+          ? fieldLongSessionStorageOutcomeUnknownResponse()
+          : privacyLedgerUnavailable();
+      }
       return privacyOperationInactive();
     }
     return response;
@@ -463,7 +622,7 @@ function objectPayload(value: unknown): Record<string, unknown> | null {
 }
 
 function reportTransportHeaders(request: Request):
-  | { value: ReportTransportHeaders | null; error?: never }
+  | { value: ReportTransportHeaders; error?: never }
   | { value?: never; error: Response } {
   const names = [
     REPORT_ID_HEADER,
@@ -471,7 +630,6 @@ function reportTransportHeaders(request: Request):
     REPORT_PAYLOAD_BYTES_HEADER
   ] as const;
   const present = names.filter(name => request.headers.has(name));
-  if (present.length === 0) return { value: null };
   if (present.length !== names.length) {
     return {
       error: Response.json(
@@ -509,9 +667,8 @@ function reportTransportHeaders(request: Request):
 
 function attachReportTransportHeaders(
   headers: Headers,
-  transport: ReportTransportHeaders | null
+  transport: ReportTransportHeaders
 ): void {
-  if (!transport) return;
   headers.set(REPORT_ID_HEADER, transport.reportId);
   headers.set(REPORT_PAYLOAD_SHA256_HEADER, transport.payloadSha256);
   headers.set(REPORT_PAYLOAD_BYTES_HEADER, transport.payloadBytes);
@@ -609,16 +766,60 @@ async function gatewayLoginAdmission(request: Request): Promise<Response | null>
   );
 }
 
+async function gatewayLoginFailure(request: Request): Promise<Response | null> {
+  return withGatewayLoginLock(
+    async () => {
+      await recordGatewayLoginFailure(request);
+      return null;
+    },
+    gatewayLoginBusyResponse
+  );
+}
+
+function currentWalkHolderBinding(request: Request): GatewayFieldLongSessionBinding | null {
+  try {
+    return gatewayFieldLongSessionBinding(request);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * FP-011/FP-012: a logged-out or remotely revoked session loses its walk lease at once.
+ * Best effort after the session revocation committed: a ledger failure cannot undo the
+ * logout, and the orphaned lease still expires because the revoked session cannot renew.
+ */
+async function endWalkAfterSessionRevocation(
+  response: Response | Promise<Response>,
+  holder: Parameters<typeof endFieldWalkForRevokedSession>[0] | null
+): Promise<Response> {
+  const settled = await response;
+  if (holder && settled.status === 204) {
+    try {
+      endFieldWalkForRevokedSession(holder);
+    } catch {
+      // Lease expiry remains the fallback; see above.
+    }
+  }
+  return settled;
+}
+
 async function fieldSession(
   request: Request,
+  match: GatewayRouteMatch,
   fetchImpl?: GatewayFetch
 ): Promise<Response> {
+  if (match.body !== "by-method" || match.query !== "session") {
+    return gatewayUnavailableResponse();
+  }
   const url = new URL(request.url);
   const queryEntries = [...url.searchParams.entries()];
   const recoveryScoped = gatewaySessionScope(request) === "account_deletion_recovery";
   if (request.method === "GET") {
     if (queryEntries.length === 0) {
       if (!isGatewayAccessConfigured()) return gatewaySessionStatus(request);
+      const backendGate = await backendAccountSessionGate(request, fetchImpl);
+      if (backendGate) return backendGate;
       const status = (): Response => {
         const longStatus = fieldLongSessionStatus(request);
         if (longStatus && !isGatewaySessionAuthorized(request)) {
@@ -651,6 +852,8 @@ async function fieldSession(
       if (recoveryScoped) return gatewayUnauthorizedResponse(true);
       if (!isGatewayAccessConfigured()) return gatewayUnavailableResponse();
       if (!isGatewaySessionAuthorized(request)) return gatewayUnauthorizedResponse();
+      const backendGate = await backendAccountSessionGate(request, fetchImpl);
+      if (backendGate) return backendGate;
       const actorId = gatewaySessionActor(request);
       return actorId
         ? withFieldActorOperation(
@@ -678,14 +881,37 @@ async function fieldSession(
       }
       if (!isGatewayAccessConfigured()) return gatewayUnavailableResponse();
       if (!isGatewaySessionAuthorized(request)) return gatewayUnauthorizedResponse();
+      const backendGate = await backendAccountSessionGate(request, fetchImpl);
+      if (backendGate) return backendGate;
       const actorId = gatewaySessionActor(request);
+      const requester = currentWalkHolderBinding(request);
+      const revokedDeviceId = queryEntries[0]![1];
+      // S19-4-F1 (FP-011): revoking another device's session is a sensitive account change,
+      // so it needs the same recent credential login as a new account deletion. Revoking the
+      // current device itself is a logout and stays ungated; sessions without a device
+      // binding keep their existing auth-required answer from the revoke helpers.
+      if (
+        actorId &&
+        requester !== null &&
+        requester.deviceId !== revokedDeviceId &&
+        !sessionRecentlyAuthenticated(request, Date.now(), "storage_error")
+      ) {
+        return fieldSessionReauthenticationRequired();
+      }
       return actorId
         ? withFieldActorOperation(
             actorId,
-            () => revokeBackendDeviceGatewaySession(
-              request,
-              queryEntries[0]![1]
-            ) ?? revokeFieldLongSessionDevice(request, queryEntries[0]![1]),
+            () => endWalkAfterSessionRevocation(
+              revokeBackendDeviceGatewaySession(request, revokedDeviceId) ??
+                revokeFieldLongSessionDevice(request, revokedDeviceId),
+              requester
+                ? {
+                    accountId: requester.accountId,
+                    actorId: requester.actorId,
+                    deviceId: revokedDeviceId
+                  }
+                : null
+            ),
             gatewaySessionAccountGeneration(request)
           )
         : gatewayUnauthorizedResponse();
@@ -703,15 +929,37 @@ async function fieldSession(
       return parsed
         ? withFieldActorOperation(
             parsed.actorId,
-            () => clearFieldLongSessionWithRefresh(request, parsed)
+            () => clearFieldLongSessionWithRefresh(request, parsed, Date.now(), () => {
+              try {
+                // Legacy long-session families use the actor id as walk account id.
+                endFieldWalkForRevokedSession({
+                  accountId: parsed.actorId,
+                  actorId: parsed.actorId,
+                  deviceId: parsed.deviceId,
+                  familyId: parsed.familyId
+                });
+              } catch {
+                // Lease expiry remains the fallback (see endWalkAfterSessionRevocation).
+              }
+            })
           )
         : fieldSessionRequestInvalid();
     }
     const actorId = gatewaySessionActor(request);
-    const clear = (): Response | Promise<Response> =>
-      hasFieldLongSessionCookie(request)
+    const holder = currentWalkHolderBinding(request);
+    const clear = (): Promise<Response> => endWalkAfterSessionRevocation(
+      hasFieldLongSessionCookie(request) || isBackendFieldLongSessionCookie(request)
         ? clearCurrentFieldLongSession(request)
-        : clearGatewaySession(request);
+        : clearGatewaySession(request),
+      holder
+        ? {
+            accountId: holder.accountId,
+            actorId: holder.actorId,
+            deviceId: holder.deviceId,
+            familyId: holder.familyId
+          }
+        : null
+    );
     return actorId
       ? withFieldActorOperation(
           actorId,
@@ -721,22 +969,113 @@ async function fieldSession(
       : clear();
   }
 
-  if (queryEntries.length > 0) return fieldSessionQueryInvalid();
+  if (queryEntries.length > 0) {
+    const admission = await gatewayLoginAdmission(request);
+    return admission ?? fieldSessionQueryInvalid();
+  }
   const bounded = await readBoundedJsonBody(request, 4 * 1024);
-  if (bounded.error) return bounded.error;
+  if (bounded.error) {
+    const admission = await gatewayLoginAdmission(request);
+    return admission ?? bounded.error;
+  }
   const payload = objectPayload(bounded.value);
-  if (!payload) return fieldSessionRequestInvalid();
+  if (!payload) {
+    const admission = await gatewayLoginAdmission(request);
+    return admission ?? fieldSessionRequestInvalid();
+  }
 
+  if (payload.grant_type === "refresh_token") {
+    if (!isGatewayAccessConfigured()) return gatewayUnavailableResponse();
+    if (recoveryScoped) return gatewayUnauthorizedResponse(true);
+    const parsed = refreshPayload(
+      payload,
+      ["grant_type", "actor_id", "device_id", "family_id", "rotation", "refresh_token"]
+    );
+    if (!parsed) return fieldSessionRequestInvalid();
+    // S19-10: bounded before any session state is read or locked; refusals are counted per
+    // claimed (actor, family) (R12).
+    const refreshAdmission = admitFieldSessionRefresh(
+      gatewayTrustedClientIp(request),
+      parsed.actorId,
+      parsed.familyId
+    );
+    if (!refreshAdmission.admitted) return refreshAdmission.response;
+    let refreshStatus = 500;
+    try {
+      const refreshed = await refreshPublicFieldLongSession(
+        request,
+        parsed,
+        isGatewayActorConfigured(parsed.actorId),
+        (binding) => checkBackendAccountSessionCurrent(binding, fetchImpl, undefined, request.signal),
+        (operation) => {
+          let rotationCommitted = false;
+          return withFieldActorOperation(
+            parsed.actorId,
+            (lease) => operation((commit) => {
+              // Deletion accepts under this ledger's exclusive lock, then releases it
+              // before revoking actor sessions. Hold a shared lock through the write.
+              let deletionLock;
+              try {
+                deletionLock = acquireSharedFileLock(path.join(
+                  resolveGatewayStateDirectory(), "privacy-deletion-v2", "ledger.lock"
+                ));
+              } catch {
+                return privacyLedgerUnavailable();
+              }
+              try {
+                const state = privacyOperationState(lease, "refresh_before_commit");
+                if (state === "unavailable") return privacyLedgerUnavailable();
+                if (state === "inactive") return privacyOperationInactive();
+                commit();
+                rotationCommitted = true;
+                return null;
+              } finally {
+                deletionLock.release();
+              }
+            }),
+            null,
+            () => rotationCommitted
+          );
+        },
+        // Decision 1: a reuse that revoked every long-session family ends short sessions too.
+        revokeShortFieldSessionsForActor
+      );
+      refreshStatus = refreshed.status;
+      return refreshed;
+    } finally {
+      refreshAdmission.finish(refreshStatus);
+    }
+  }
+
+  const admission = await gatewayLoginAdmission(request);
+  if (admission) return admission;
   if (!isGatewayAccessConfigured()) return gatewayUnavailableResponse();
   if (payload.grant_type === "password") {
-    const grant = parsePasswordGrant(payload);
+    // Owner decision 2 / S19-1: `session_mode: "long_lived"` opts a Backend email login into a
+    // device-bound rotating refresh family; without it the v7 short session stays unchanged.
+    const { session_mode: sessionMode, ...passwordPayload } = payload;
+    if ("session_mode" in payload && sessionMode !== "long_lived") return fieldSessionRequestInvalid();
+    const longLived = sessionMode === "long_lived";
+    const grant = parsePasswordGrant(passwordPayload);
     if (!grant) return fieldSessionRequestInvalid();
-    const admission = await gatewayLoginAdmission(request);
-    if (admission) return admission;
+    if (longLived && (grant.deviceId === null || !grant.rememberMe)) return fieldSessionRequestInvalid();
+    // login-F11: decide the disabled long-lived mode before any Backend credential check.
+    if (longLived && !isFieldLongSessionEnabled()) return fieldLongLivedSessionsUnavailableResponse();
     const authenticated = await authenticateBackendAccount(request, grant, fetchImpl);
-    if (authenticated.error) return authenticated.error;
+    if (authenticated.error) {
+      if (authenticated.error.status === 401) {
+        const failurePayload = objectPayload(await authenticated.error.clone().json());
+        const failureDetail = objectPayload(failurePayload?.detail);
+        if (failureDetail?.code === "invalid_account_credentials") {
+          const failure = await gatewayLoginFailure(request);
+          if (failure) return failure;
+        }
+      }
+      return authenticated.error;
+    }
     try {
-      const generation = bindBackendActorGeneration(
+      // S19-25: contention on the privacy ledger lock must not stall the event loop.
+      const generation = await bindBackendActorGenerationAsync(
         authenticated.value.actorId,
         authenticated.value.accountGeneration
       );
@@ -753,30 +1092,14 @@ async function fieldSession(
     }
     return withFieldActorOperation(
       authenticated.value.actorId,
-      () => establishBackendGatewaySession(
-        request,
-        { ...authenticated.value, deviceId: grant.deviceId },
-        grant.rememberMe
-      ),
+      () => longLived && grant.deviceId !== null
+        ? establishBackendFieldLongSession(request, { ...authenticated.value, deviceId: grant.deviceId })
+        : establishBackendGatewaySession(
+          request,
+          { ...authenticated.value, deviceId: grant.deviceId },
+          grant.rememberMe
+        ),
       authenticated.value.accountGeneration
-    );
-  }
-  if (payload.grant_type === "refresh_token") {
-    if (recoveryScoped) return gatewayUnauthorizedResponse(true);
-    const parsed = refreshPayload(
-      payload,
-      ["grant_type", "actor_id", "device_id", "family_id", "rotation", "refresh_token"]
-    );
-    if (!parsed) return fieldSessionRequestInvalid();
-    if (!isGatewayActorConfigured(parsed.actorId)) {
-      return Response.json(
-        { code: "invalid_refresh_token", reauthentication_required: true },
-        { status: 401, headers: { "cache-control": "no-store" } }
-      );
-    }
-    return withFieldActorOperation(
-      parsed.actorId,
-      () => refreshFieldLongSession(request, parsed)
     );
   }
   if ("grant_type" in payload) return fieldSessionRequestInvalid();
@@ -793,9 +1116,6 @@ async function fieldSession(
     return fieldSessionRequestInvalid();
   }
 
-  const admission = await gatewayLoginAdmission(request);
-  if (admission) return admission;
-
   const token = "token" in payload
     ? String(payload.token)
     : "";
@@ -806,6 +1126,8 @@ async function fieldSession(
     ? verifyGatewayCredential(actorId, token)
     : null;
   if (!verifiedActor) {
+    const failure = await gatewayLoginFailure(request);
+    if (failure) return failure;
     return Response.json(
       { code: "invalid_field_test_token" },
       { status: 401, headers: { "cache-control": "no-store" } }
@@ -813,7 +1135,7 @@ async function fieldSession(
   }
   let activatedGeneration: number;
   try {
-    activatedGeneration = activateActorGeneration(verifiedActor);
+    activatedGeneration = await activateActorGenerationAsync(verifiedActor);
     if (isAccountGenerationFencedV2(verifiedActor, activatedGeneration)) {
       return privacyOperationInactive();
     }
@@ -846,20 +1168,27 @@ async function fieldSession(
 
 async function fieldWalk(
   request: Request,
+  match: GatewayRouteMatch,
   resolveBinding: (
     request: Request
-  ) => GatewayFieldLongSessionBinding | null = gatewayFieldLongSessionBinding
+  ) => GatewayFieldLongSessionBinding | null = gatewayFieldLongSessionBinding,
+  fetchImpl?: GatewayFetch
 ): Promise<Response> {
+  if (match.body !== "by-method") return gatewayUnavailableResponse();
   const url = new URL(request.url);
-  if ([...url.searchParams].length > 0) return fieldWalkRequestInvalid();
+  if (match.query === "none" && [...url.searchParams].length > 0) {
+    return fieldWalkRequestInvalid();
+  }
   const binding = resolveBinding(request);
   if (!binding) return fieldWalkUnauthorized();
+  const backendGate = await backendAccountSessionGate(request, fetchImpl);
+  if (backendGate) return backendGate;
   const execute = (): Response => {
     try {
       const result = getFieldWalk(binding);
       return Response.json(result.body, { status: result.status });
-    } catch {
-      return fieldWalkLedgerUnavailable();
+    } catch (error) {
+      return fieldWalkLedgerFailure(error);
     }
   };
   if (request.method === "GET") {
@@ -887,21 +1216,189 @@ async function fieldWalk(
   if (!bindingIsCurrent) return fieldWalkUnauthorized();
   const command = parseFieldWalkCommand(bounded.value);
   if (!command) return fieldWalkRequestInvalid();
+  if (command.schema_version === "walksafe.field-walk-command.v1" && !fieldWalkV1Accepted()) {
+    return fieldWalkCommandVersionRetired();
+  }
   return withFieldActorOperation(binding.actorId, () => {
     try {
       const result = commandFieldWalk(binding, command);
       return Response.json(result.body, { status: result.status });
-    } catch {
-      return fieldWalkLedgerUnavailable();
+    } catch (error) {
+      return fieldWalkLedgerFailure(error);
     }
   }, binding.accountGeneration ?? null);
 }
 
-async function walkingRoute(request: Request, fetchImpl?: GatewayFetch): Promise<Response> {
+const NAVIGATION_PRIORITIES = new Set([
+  "RECOMMEND", "MAIN_STREET", "DISTANCE", "STAIR_AVOID"
+]);
+const DESTINATION_SEARCH_KEYS = new Set([
+  "query", "limit", "origin_lat", "origin_lng"
+]);
+
+function finiteNavigationNumber(value: unknown): number | null {
+  if (typeof value !== "number") {
+    if (typeof value !== "string" ||
+        !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value.trim())) {
+      return null;
+    }
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function navigationPointValid(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const point = value as Record<string, unknown>;
+  const latitude = finiteNavigationNumber(point.latitude);
+  const longitude = finiteNavigationNumber(point.longitude);
+  return latitude !== null && latitude >= -90 && latitude <= 90 &&
+    longitude !== null && longitude >= -180 && longitude <= 180;
+}
+
+function walkingRoutePayloadValid(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const route = value as Record<string, unknown>;
+  if (!navigationPointValid(route.origin) || !navigationPointValid(route.destination)) return false;
+  if (route.waypoints !== undefined &&
+      (!Array.isArray(route.waypoints) || route.waypoints.length > 5 ||
+       !route.waypoints.every(navigationPointValid))) return false;
+  if (route.priority !== undefined &&
+      (typeof route.priority !== "string" || !NAVIGATION_PRIORITIES.has(route.priority))) {
+    return false;
+  }
+  if (route.radius_m !== undefined) {
+    const radius = finiteNavigationNumber(route.radius_m);
+    if (radius === null || !Number.isInteger(radius) || radius < 1 || radius > 12000) return false;
+  }
+  if (route.default_speed !== undefined && route.default_speed !== null) {
+    const speed = finiteNavigationNumber(route.default_speed);
+    if (speed === null || speed <= 0 || speed > 20) return false;
+  }
+  return true;
+}
+
+function navigationJsonContentType(request: Request): boolean {
+  const contentType = request.headers.get("content-type");
+  if (!contentType) return false;
+  try {
+    return new MIMEType(contentType).essence === "application/json";
+  } catch {
+    return false;
+  }
+}
+
+function destinationSearchQueryValid(request: Request): boolean {
+  const params = new URL(request.url).searchParams;
+  const seen = new Set<string>();
+  for (const [key] of params) {
+    if (!DESTINATION_SEARCH_KEYS.has(key) || seen.has(key)) return false;
+    seen.add(key);
+  }
+  const query = params.get("query");
+  if (query === null || [...query].length < 1 || [...query].length > 80) return false;
+  const limitValue = params.get("limit");
+  if (limitValue !== null) {
+    const limit = finiteNavigationNumber(limitValue);
+    if (limit === null || !Number.isInteger(limit) || limit < 1 || limit > 10) return false;
+  }
+  const hasLatitude = params.has("origin_lat");
+  const hasLongitude = params.has("origin_lng");
+  if (hasLatitude !== hasLongitude) return false;
+  if (hasLatitude) {
+    const latitude = finiteNavigationNumber(params.get("origin_lat"));
+    const longitude = finiteNavigationNumber(params.get("origin_lng"));
+    if (latitude === null || latitude < -90 || latitude > 90 ||
+        longitude === null || longitude < -180 || longitude > 180) return false;
+  }
+  return true;
+}
+
+/**
+ * FP-012-DETAIL-02 interim: while one device holds the account's walk lease, route and
+ * report requests from any other session are refused; with no active walk nothing
+ * changes. Unreadable walk state fails closed (FP-012/FP-047: never skip the check).
+ * Owner decision 3(b) (2026-09-29): reports are sent only after the walk has ended, so
+ * `holderMayProceed: false` also refuses the holder's own session during its walk.
+ */
+function walkOwnershipGate(
+  request: Request,
+  { holderMayProceed }: { holderMayProceed: boolean } = { holderMayProceed: true }
+): Response | null {
+  const actorId = gatewaySessionActor(request);
+  if (!actorId) return null;
+  let binding: GatewayFieldLongSessionBinding | null;
+  try {
+    binding = gatewayFieldLongSessionBinding(request);
+  } catch {
+    return fieldWalkLedgerUnavailable();
+  }
+  const accountGeneration = gatewaySessionAccountGeneration(request);
+  // Sessions without a device binding (v5/v6) can never be the walk holder.
+  const probe: GatewayFieldLongSessionBinding = binding ?? {
+    actorId,
+    accountId: accountGeneration === null ? actorId : `${actorId}:generation:${accountGeneration}`,
+    deviceId: "",
+    familyId: "",
+    sessionRotation: 0,
+    accountGeneration
+  };
+  let result: ReturnType<typeof getFieldWalk>;
+  try {
+    result = getFieldWalk(probe);
+  } catch {
+    return fieldWalkLedgerUnavailable();
+  }
+  if (result.status !== 200) return fieldWalkLedgerUnavailable();
+  if (result.body.result !== "ACTIVE") return null;
+  if (result.body.held_by_current_device === true) {
+    if (holderMayProceed) return null;
+    return Response.json(
+      {
+        detail: {
+          code: "report_walk_in_progress",
+          message: "Reports are sent after this device's walk has ended."
+        }
+      },
+      { status: 409, headers: { "cache-control": "no-store" } }
+    );
+  }
+  return Response.json(
+    {
+      detail: {
+        code: "walk_owned_by_other_device",
+        message: "Another device holds this account's active walk."
+      }
+    },
+    { status: 409, headers: { "cache-control": "no-store" } }
+  );
+}
+
+// The Backend provider ends first (4 s); the complete upstream response has 5 s.
+// The navigation handler includes the account gate, body read, and upstream work.
+const NAVIGATION_PROXY_TIMEOUT_MS = 5_000;
+const NAVIGATION_WALKING_DEADLINE_MS = 7_500;
+const NAVIGATION_SEARCH_DEADLINE_MS = 6_500;
+const NAVIGATION_PROXY_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+
+function navigationDeadlineResponse(): Response {
+  return Response.json(
+    { detail: { code: "gateway_navigation_timeout", message: "navigation request exceeded its deadline" } },
+    { status: 504, headers: { "cache-control": "no-store" } }
+  );
+}
+
+async function walkingRoute(
+  request: Request,
+  match: GatewayRouteMatch,
+  fetchImpl?: GatewayFetch
+): Promise<Response> {
   const denied = authorizeProxyRequest(request);
   if (denied) return denied;
   const actorId = authorizedProxyActor(request);
   if (!actorId) return gatewayUnauthorizedResponse();
+  const walkOwned = walkOwnershipGate(request);
+  if (walkOwned) return walkOwned;
   const operation = startPrivacyOperation(
     actorId,
     gatewaySessionAccountGeneration(request)
@@ -909,9 +1406,22 @@ async function walkingRoute(request: Request, fetchImpl?: GatewayFetch): Promise
   if (operation.error) return operation.error;
   let responseOwnsOperation = false;
   try {
+    if (match.body !== "json") {
+      return gatewayUnavailableResponse();
+    }
+    if (!navigationJsonContentType(request)) return navigationRequestInvalid();
     const bounded = await readBoundedTextBody(request, 16 * 1024);
     if (bounded.error) return bounded.error;
     if (!privacyOperationIsCurrent(operation.lease)) return privacyOperationInactive();
+    let payload: unknown;
+    try {
+      payload = JSON.parse(bounded.text);
+    } catch {
+      return navigationRequestInvalid();
+    }
+    const duplicateError = duplicateJsonObjectKeysError(bounded.text);
+    if (duplicateError) return duplicateError;
+    if (!walkingRoutePayloadValid(payload)) return navigationRequestInvalid();
     const init: RequestInit = {
       method: "POST",
       headers: proxyRequestHeaders(request, {
@@ -921,9 +1431,12 @@ async function walkingRoute(request: Request, fetchImpl?: GatewayFetch): Promise
       cache: "no-store",
       signal: operation.lease.controller.signal
     };
-    const response = fetchImpl
-      ? await fetchBackend(request, backendUrl("/navigation/walking"), init, 15_000, fetchImpl)
-      : await fetchBackend(request, backendUrl("/navigation/walking"), init);
+    const fetched = await fetchBackend(
+      request, backendUrl("/navigation/walking"), init,
+      NAVIGATION_PROXY_TIMEOUT_MS, fetchImpl ?? globalThis.fetch,
+      NAVIGATION_PROXY_MAX_RESPONSE_BYTES
+    );
+    const response = await guardWalkingBackendResponse(fetched);
     if (!privacyOperationIsCurrent(operation.lease)) {
       cancelUpstream(response);
       return privacyOperationInactive();
@@ -940,7 +1453,11 @@ async function walkingRoute(request: Request, fetchImpl?: GatewayFetch): Promise
   }
 }
 
-async function destinationSearch(request: Request, fetchImpl?: GatewayFetch): Promise<Response> {
+async function destinationSearch(
+  request: Request,
+  match: GatewayRouteMatch,
+  fetchImpl?: GatewayFetch
+): Promise<Response> {
   const denied = authorizeProxyRequest(request);
   if (denied) return denied;
   const actorId = authorizedProxyActor(request);
@@ -953,20 +1470,18 @@ async function destinationSearch(request: Request, fetchImpl?: GatewayFetch): Pr
   let responseOwnsOperation = false;
   try {
     if (!privacyOperationIsCurrent(operation.lease)) return privacyOperationInactive();
+    if (match.query === "validated" &&
+        !destinationSearchQueryValid(request)) return navigationRequestInvalid();
     const init: RequestInit = {
       headers: proxyRequestHeaders(request, undefined, operation.lease.accountGeneration),
       cache: "no-store",
       signal: operation.lease.controller.signal
     };
-    const response = fetchImpl
-      ? await fetchBackend(
-          request,
-          backendUrl("/navigation/destinations/search", request),
-          init,
-          15_000,
-          fetchImpl
-        )
-      : await fetchBackend(request, backendUrl("/navigation/destinations/search", request), init);
+    const response = await fetchBackend(
+      request, backendUrl("/navigation/destinations/search", request), init,
+      NAVIGATION_PROXY_TIMEOUT_MS, fetchImpl ?? globalThis.fetch,
+      NAVIGATION_PROXY_MAX_RESPONSE_BYTES
+    );
     if (!privacyOperationIsCurrent(operation.lease)) {
       cancelUpstream(response);
       return privacyOperationInactive();
@@ -983,11 +1498,30 @@ async function destinationSearch(request: Request, fetchImpl?: GatewayFetch): Pr
   }
 }
 
-async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Response> {
+function reportTransportOutcomeUnknown(): Response {
+  return Response.json(
+    {
+      detail: {
+        code: "report_transport_outcome_unknown",
+        message: "The report result is unknown; verify its status before retrying.",
+        retry: "status_query_before_retry"
+      }
+    },
+    { status: 409, headers: { "cache-control": "no-store" } }
+  );
+}
+
+async function reportV2(
+  request: Request,
+  match: GatewayRouteMatch,
+  fetchImpl?: GatewayFetch
+): Promise<Response> {
   const denied = authorizeProxyRequest(request);
   if (denied) return denied;
   const fieldActorId = authorizedProxyActor(request);
   if (!fieldActorId) return gatewayUnauthorizedResponse();
+  const walkOwned = walkOwnershipGate(request, { holderMayProceed: false });
+  if (walkOwned) return walkOwned;
   const transport = reportTransportHeaders(request);
   if (transport.error) return transport.error;
   const operation = startPrivacyOperation(
@@ -1001,11 +1535,14 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
     operation.lease.accountGeneration
   );
   attachReportTransportHeaders(headers, transport.value);
-  const admission = acquireImageUploadAdmission(request, headers);
-  if (admission.error) {
+  // S19-32: rate limits first (no slot); the single global upload slot is taken only after
+  // the first consent check, and still before the body is opened.
+  const rateLimited = imageUploadRateLimitedResponse(request, headers);
+  if (rateLimited) {
     finishPrivacyOperation(operation.lease);
-    return admission.error;
+    return rateLimited;
   }
+  let admission: ImageUploadAdmission | null = null;
   let responseOwnsOperation = false;
   try {
     const networkTransport =
@@ -1048,6 +1585,12 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
     if (!privacyOperationIsCurrent(operation.lease)) return privacyOperationInactive();
     if (consent.error) return consent.error;
     if (!privacyOperationIsCurrent(operation.lease)) return privacyOperationInactive();
+    const acquired = acquireImageUploadAdmission(request, headers);
+    if (acquired.error) return acquired.error;
+    admission = acquired;
+    if (match.body !== "multipart") {
+      return gatewayUnavailableResponse();
+    }
     const multipart = await readBoundedMultipartFormData(request, IMAGE_MULTIPART_LIMIT_BYTES);
     if (!privacyOperationIsCurrent(operation.lease)) return privacyOperationInactive();
     if (multipart.error) return multipart.error;
@@ -1056,6 +1599,10 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
       const metadata = typeof metadataText === "string"
         ? objectPayload(JSON.parse(metadataText) as unknown)
         : null;
+      if (typeof metadataText === "string") {
+        const duplicateError = duplicateJsonObjectKeysError(metadataText);
+        if (duplicateError) return duplicateError;
+      }
       if (
         !metadata ||
         typeof metadata.auto_reported !== "boolean" ||
@@ -1094,9 +1641,14 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
     const response = fetchImpl
       ? await fetchBackend(request, backendUrl("/reports/v2"), init, 15_000, fetchImpl)
       : await fetchBackend(request, backendUrl("/reports/v2"), init);
+    // A 2xx report or a server-side failure can follow a durable commit. A later
+    // local consent check cannot roll that commit back; the queued report must use
+    // its stable ID and the existing status route before any retry.
+    const backendOutcomeUncertain = response.ok || response.status >= 500;
     if (!privacyOperationIsCurrent(operation.lease)) {
       cancelUpstream(response);
-      return privacyOperationInactive();
+      return backendOutcomeUncertain
+        ? reportTransportOutcomeUnknown() : privacyOperationInactive();
     }
     const finalConsent = await authorizeIntegratedConsentRequest(
       request,
@@ -1105,11 +1657,13 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
     );
     if (!privacyOperationIsCurrent(operation.lease)) {
       cancelUpstream(response);
-      return privacyOperationInactive();
+      return backendOutcomeUncertain
+        ? reportTransportOutcomeUnknown() : privacyOperationInactive();
     }
     if (finalConsent.error) {
       cancelUpstream(response);
-      return finalConsent.error;
+      return backendOutcomeUncertain
+        ? reportTransportOutcomeUnknown() : finalConsent.error;
     }
     const protectedResponse = responseWithPrivacyOperation(
       await toBackendResponse(response),
@@ -1120,7 +1674,7 @@ async function reportV2(request: Request, fetchImpl?: GatewayFetch): Promise<Res
     return protectedResponse;
   } finally {
     if (!responseOwnsOperation) finishPrivacyOperation(operation.lease);
-    admission.release();
+    admission?.release?.();
   }
 }
 
@@ -1244,6 +1798,9 @@ async function reportTransportStatus(
   }
   const actorId = authorizedProxyActor(request);
   if (!actorId) return reportTransportStatusNotFound();
+  const backendGate = await backendAccountSessionGate(request, fetchImpl);
+  if (backendGate) return backendGate.status === 401
+    ? reportTransportStatusNotFound() : backendGate;
   const operation = startPrivacyOperation(
     actorId,
     gatewaySessionAccountGeneration(request)
@@ -1301,41 +1858,25 @@ type UserReportRoute =
   | Readonly<{ kind: "request-detail"; reportId: string; requestId: string }>
   | Readonly<{ kind: "deletion"; requestId: string }>;
 
-function userReportRoute(pathname: string): UserReportRoute | null {
-  if (pathname === USER_REPORT_LIST_ROUTE) {
-    return { kind: "list" };
+function userReportRoute(matched: GatewayRouteMatch | null): UserReportRoute | null {
+  if (matched?.family !== "user-report") return null;
+  const { reportId, requestId } = matched.params;
+  switch (matched.template) {
+    case "/api/reports/mine": return { kind: "list" };
+    case "/api/reports/mine/requests/history": return { kind: "request-history" };
+    case "/api/reports/mine/deletions/{request_id}":
+      return { kind: "deletion", requestId: requestId! };
+    case "/api/reports/mine/{report_id}": return { kind: "detail", reportId: reportId! };
+    case "/api/reports/mine/{report_id}/content":
+      return { kind: "content", reportId: reportId! };
+    case "/api/reports/mine/{report_id}/corrections":
+      return { kind: "correction", reportId: reportId! };
+    case "/api/reports/mine/{report_id}/requests":
+      return { kind: "request", reportId: reportId! };
+    case "/api/reports/mine/{report_id}/requests/{request_id}":
+      return { kind: "request-detail", reportId: reportId!, requestId: requestId! };
+    default: return null;
   }
-  if (pathname === USER_REPORT_REQUEST_HISTORY_ROUTE) {
-    return { kind: "request-history" };
-  }
-  const deletion = USER_REPORT_DELETION_ROUTE.exec(pathname);
-  if (deletion?.groups?.requestId) {
-    return { kind: "deletion", requestId: deletion.groups.requestId };
-  }
-  const requestDetail = USER_REPORT_REQUEST_DETAIL_ROUTE.exec(pathname);
-  if (requestDetail?.groups?.reportId && requestDetail.groups.requestId) {
-    return {
-      kind: "request-detail",
-      reportId: requestDetail.groups.reportId,
-      requestId: requestDetail.groups.requestId
-    };
-  }
-  const request = USER_REPORT_REQUEST_ROUTE.exec(pathname);
-  if (request?.groups?.reportId) {
-    return { kind: "request", reportId: request.groups.reportId };
-  }
-  const correction = USER_REPORT_CORRECTION_ROUTE.exec(pathname);
-  if (correction?.groups?.reportId) {
-    return { kind: "correction", reportId: correction.groups.reportId };
-  }
-  const content = USER_REPORT_CONTENT_ROUTE.exec(pathname);
-  if (content?.groups?.reportId) {
-    return { kind: "content", reportId: content.groups.reportId };
-  }
-  const detail = USER_REPORT_DETAIL_ROUTE.exec(pathname);
-  return detail?.groups?.reportId
-    ? { kind: "detail", reportId: detail.groups.reportId }
-    : null;
 }
 
 function userReportNotFound(): Response {
@@ -1912,6 +2453,9 @@ async function userReportProxy(
     ? userReportNotFound() : denied;
   const binding = authorizedProxyDeviceBinding(request);
   if (!binding) return userReportNotFound();
+  const backendGate = await backendAccountSessionGate(request, fetchImpl);
+  if (backendGate) return backendGate.status === 401
+    ? userReportNotFound() : backendGate;
   const requestUrl = new URL(request.url);
   const expectedHistoryReportId = route.kind === "request-history"
     ? requestUrl.searchParams.get("report_id")
@@ -2121,7 +2665,19 @@ function deletionStatusResponse(status: AccountDeletionStatusV2, code: number): 
   });
 }
 
+/**
+ * S19-27: the deletion ledger may already hold the change. The exact retry of the same
+ * request (same request_id and capability) replays it; the status route re-reads it.
+ */
+function deletionOutcomeUnknown(): Response {
+  return Response.json(
+    { code: "privacy_deletion_outcome_unknown", retry: "same_request_id" },
+    { status: 503, headers: { "cache-control": "no-store", "retry-after": "1" } }
+  );
+}
+
 function deletionError(error: unknown): Response {
+  if (error instanceof GatewayStorageOutcomeUnknownError) return deletionOutcomeUnknown();
   if (!(error instanceof PrivacyDeletionV2Error)) return privacyLedgerUnavailable();
   if (error.code === "not_found") return deletionNotFound();
   if (error.code === "conflict" || error.code === "inactive") return deletionConflict();
@@ -2132,21 +2688,80 @@ type AccountDeletionRouteV2 =
   | { kind: "request" }
   | { kind: "status" | "evidence"; requestId: string };
 
-function accountDeletionRouteV2(pathname: string): AccountDeletionRouteV2 | null {
-  if (pathname === ACCOUNT_DELETION_PATH) return { kind: "request" };
-  const suffix = pathname.startsWith(`${ACCOUNT_DELETION_PATH}/`)
-    ? pathname.slice(ACCOUNT_DELETION_PATH.length + 1)
-    : "";
-  const parts = suffix.split("/");
-  if (
-    parts.length !== 2 ||
-    !ACCOUNT_DELETION_REQUEST_ID.test(parts[0] ?? "")
-  ) return null;
-  if (parts[1] === "status") return { kind: "status", requestId: parts[0]! };
-  if (parts[1] === "device-evidence") {
-    return { kind: "evidence", requestId: parts[0]! };
+function accountDeletionRouteV2(matched: GatewayRouteMatch | null): AccountDeletionRouteV2 | null {
+  if (matched?.family !== "account-deletion") return null;
+  if (matched.template === "/privacy/account-deletions") return { kind: "request" };
+  const requestId = matched.params.requestId!;
+  if (matched.template === "/privacy/account-deletions/{request_id}/status") {
+    return { kind: "status", requestId };
+  }
+  if (matched.template === "/privacy/account-deletions/{request_id}/device-evidence") {
+    return { kind: "evidence", requestId };
   }
   return null;
+}
+
+/** S19-44: a new account deletion needs a credential check within this window. */
+export const ACCOUNT_DELETION_REAUTHENTICATION_WINDOW_MS = 5 * 60 * 1000;
+const ACCOUNT_DELETION_AUTH_TIME_FUTURE_SKEW_MS = 60 * 1000;
+
+/**
+ * S19-44 / S19-4-F1: true when the credential login behind the session happened within the
+ * sensitive-operation window. `onStorageFailure` decides a failed auth-time read: account
+ * deletion counts it as "not recent" (GWBE-10), remote session revocation rethrows the
+ * long-session storage error so it is answered as a storage failure, never as a pass.
+ */
+function sessionRecentlyAuthenticated(
+  request: Request,
+  nowEpochMs: number,
+  onStorageFailure: "not_recent" | "storage_error"
+): boolean {
+  let authenticatedAt: number | null;
+  try {
+    authenticatedAt = gatewaySessionAuthenticatedAtEpochMs(request, nowEpochMs);
+  } catch (error) {
+    if (
+      onStorageFailure === "storage_error" &&
+      error instanceof FieldLongSessionStorageUnavailableError
+    ) throw error;
+    return false;
+  }
+  return authenticatedAt !== null &&
+    authenticatedAt <= nowEpochMs + ACCOUNT_DELETION_AUTH_TIME_FUTURE_SKEW_MS &&
+    nowEpochMs - authenticatedAt <= ACCOUNT_DELETION_REAUTHENTICATION_WINDOW_MS;
+}
+
+function accountDeletionSessionRecentlyAuthenticated(
+  request: Request,
+  nowEpochMs: number
+): boolean {
+  // GWBE-10: evaluated for every POST, replays included. A failed auth-time read
+  // counts as "not recent": a new acceptance gets 401 and a capability replay (which
+  // ignores this flag) is not turned into a storage error.
+  return sessionRecentlyAuthenticated(request, nowEpochMs, "not_recent");
+}
+
+/** S19-4-F1: registered S01-20 row (401, REAUTHENTICATE, reauthentication_required). */
+function fieldSessionReauthenticationRequired(): Response {
+  return Response.json(
+    {
+      code: "field_session_reauthentication_required",
+      message: "다른 기기의 세션을 해제하려면 비밀번호로 다시 로그인해야 합니다.",
+      reauthentication_required: true
+    },
+    { status: 401, headers: { "cache-control": "no-store" } }
+  );
+}
+
+function accountDeletionReauthenticationRequired(): Response {
+  return Response.json(
+    {
+      code: "account_deletion_reauthentication_required",
+      message: "계정 삭제를 접수하려면 비밀번호로 다시 로그인해야 합니다.",
+      reauthentication_required: true
+    },
+    { status: 401, headers: { "cache-control": "no-store" } }
+  );
 }
 
 async function accountDeletionRequestV2(
@@ -2171,12 +2786,18 @@ async function accountDeletionRequestV2(
     const accountGeneration = actorId
       ? gatewaySessionAccountGeneration(request) ?? currentActorGeneration(actorId)
       : null;
+    const nowEpochMs = Date.now();
     const accepted = acceptOrReplayAccountDeletionV2(
       actorId,
       accountGeneration,
       input,
-      accessSecret
+      accessSecret,
+      nowEpochMs,
+      actorId !== null && accountDeletionSessionRecentlyAuthenticated(request, nowEpochMs)
     );
+    if (accepted.kind === "reauthentication_required") {
+      return accountDeletionReauthenticationRequired();
+    }
     if (accepted.kind === "not_found") return deletionNotFound();
     if (accepted.kind === "conflict" || accepted.kind === "inactive") {
       return deletionConflict();
@@ -2296,30 +2917,41 @@ async function dispatchGatewayRequest(
 ): Promise<Response> {
   const requestUrl = new URL(request.url);
   const pathname = requestUrl.pathname;
+  const matched = matchGatewayRoute(requestUrl);
   if (pathname === "/api/raw-collections" || pathname.startsWith("/api/raw-collections/")) {
+    if (matched?.auth === "raw-consent-device" && isGatewaySessionAuthorized(request) &&
+        (gatewaySessionAccountGeneration(request) !== null ||
+          gatewaySessionAuthEpoch(request) !== null)) {
+      // The null resolver stops after route, method, framing and header validation.
+      const preflight = await relayRawCollection(request, {
+        bindingResolver: () => null
+      });
+      if (preflight.status !== 401) return noStore(preflight);
+      const backendGate = await backendAccountSessionGate(request, dependencies.fetchImpl);
+      if (backendGate) return backendGate;
+    }
     return noStore(await relayRawCollection(request, {
       ...(dependencies.fetchImpl ? { fetchImpl: dependencies.fetchImpl } : {}),
       bindingResolver: dependencies.fieldLongSessionBindingResolver
         ?? gatewayFieldLongSessionBinding
     }));
   }
-  const userReport = userReportRoute(pathname);
+  const userReport = userReportRoute(matched);
   if (userReport) {
-    const allowed = userReport.kind === "request" || userReport.kind === "correction"
-      ? ["POST"] as const
-      : ["GET"] as const;
-    if (!allowed.includes(request.method as never)) return methodNotAllowed(allowed);
-    if (gatewaySessionScope(request) === "account_deletion_recovery") {
+    const allowed = matched!.methods;
+    if (!allowed.includes(request.method)) return methodNotAllowed(allowed);
+    if (matched!.auth === "field-concealed" &&
+        gatewaySessionScope(request) === "account_deletion_recovery") {
       return userReportNotFound();
     }
-    if (userReport.kind === "request-history") {
+    if (matched!.query === "validated" && userReport.kind === "request-history") {
       if (!validUserReportRequestHistoryQuery(requestUrl) || requestHasEntityBody(request)) {
         return Response.json(
           { detail: { code: "report_request_history_query_invalid" } },
           { status: 422, headers: { "cache-control": "no-store" } }
         );
       }
-    } else if (userReport.kind === "list") {
+    } else if (matched!.query === "validated" && userReport.kind === "list") {
       if (!validUserReportQuery(requestUrl) || requestHasEntityBody(request)) {
         return Response.json(
           { detail: { code: "report_query_invalid" } },
@@ -2327,42 +2959,62 @@ async function dispatchGatewayRequest(
         );
       }
     } else if (
-      [...requestUrl.searchParams].length > 0 ||
-      (request.method === "GET" && requestHasEntityBody(request))
+      (matched!.query === "none" && [...requestUrl.searchParams].length > 0) ||
+      (request.method === "GET" && matched!.body === "none" && requestHasEntityBody(request))
     ) {
       return userReportNotFound();
     }
+    if (matched!.auth === "field-concealed") {
+      const denied = authorizeProxyRequest(request);
+      if (denied) return denied.status === 401 || denied.status === 403
+        ? userReportNotFound() : denied;
+    }
+    if (request.method === "POST" && matched!.body !== "json") {
+      return gatewayUnavailableResponse();
+    }
     return noStore(await userReportProxy(request, userReport, dependencies.fetchImpl));
   }
-  const reportStatusMatch = REPORT_TRANSPORT_STATUS_ROUTE.exec(pathname);
-  if (reportStatusMatch?.groups?.reportId) {
-    if ([...requestUrl.searchParams].length > 0) return reportTransportStatusNotFound();
-    if (request.method !== "GET") return methodNotAllowed(["GET"]);
-    if (requestHasEntityBody(request)) {
+  if (matched?.family === "report-status") {
+    if (matched.query === "none" && [...requestUrl.searchParams].length > 0) {
+      return reportTransportStatusNotFound();
+    }
+    if (!matched.methods.includes(request.method)) return methodNotAllowed(matched.methods);
+    if (matched.body === "none" && requestHasEntityBody(request)) {
       return Response.json(
         { detail: { code: "report_transport_status_request_invalid" } },
         { status: 400, headers: { "cache-control": "no-store" } }
       );
     }
-    if (gatewaySessionScope(request) === "account_deletion_recovery") {
+    if (matched.auth === "field-concealed" &&
+        gatewaySessionScope(request) === "account_deletion_recovery") {
       return reportTransportStatusNotFound();
+    }
+    if (matched.auth === "field-concealed") {
+      const denied = authorizeProxyRequest(request);
+      if (denied) return denied.status === 401 || denied.status === 403
+        ? reportTransportStatusNotFound() : denied;
     }
     return noStore(await reportTransportStatus(
       request,
-      reportStatusMatch.groups.reportId,
+      matched.params.reportId!,
       dependencies.fetchImpl
     ));
   }
-  const deletionRoute = accountDeletionRouteV2(pathname);
+  const deletionRoute = accountDeletionRouteV2(matched);
   if (deletionRoute) {
-    if ([...requestUrl.searchParams].length > 0) return deletionNotFound();
-    const allowed = deletionRoute.kind === "status" ? ["GET"] as const : ["POST"] as const;
-    if (!allowed.includes(request.method as never)) return methodNotAllowed(allowed);
-    if (deletionRoute.kind === "status" && requestHasEntityBody(request)) {
+    if (matched!.query === "none" && [...requestUrl.searchParams].length > 0) {
+      return deletionNotFound();
+    }
+    const allowed = matched!.methods;
+    if (!allowed.includes(request.method)) return methodNotAllowed(allowed);
+    if (matched!.body === "none" && requestHasEntityBody(request)) {
       return Response.json(
         { code: "account_deletion_status_request_invalid" },
         { status: 400, headers: { "cache-control": "no-store" } }
       );
+    }
+    if (request.method === "POST" && matched!.body !== "json") {
+      return gatewayUnavailableResponse();
     }
     if (deletionRoute.kind === "request") {
       return noStore(await accountDeletionRequestV2(request, dependencies.fetchImpl));
@@ -2380,11 +3032,12 @@ async function dispatchGatewayRequest(
       dependencies.fetchImpl
     ));
   }
-  if (pathname === PRIVACY_RIGHTS_PATH) {
+  if (matched?.family === "privacy") {
+    if (matched.query !== "privacy-control") return gatewayUnavailableResponse();
     if (gatewaySessionScope(request) === "account_deletion_recovery") {
       return noStore(gatewayUnauthorizedResponse(true));
     }
-    if (requestUrl.searchParams.get("control") === ACCOUNT_DELETION_CONTROL) {
+    if (matched.unsupportedMethod === "retired") {
       return Response.json(
         {
           code: "account_deletion_v1_retired",
@@ -2393,14 +3046,17 @@ async function dispatchGatewayRequest(
         { status: 410, headers: { "cache-control": "no-store" } }
       );
     }
-    if (
-      requestUrl.searchParams.get("control") ===
-      INTEGRATED_CONSENT_BOOTSTRAP_CONTROL
-    ) {
+    if (matched.auth === "field-session" || matched.auth === "consent-bound") {
       const denied = authorizeProxyRequest(request);
       if (denied) return noStore(denied);
+    }
+    if (matched.privacyVariant === "bootstrap") {
       const actorId = authorizedProxyActor(request);
       if (!actorId) return noStore(gatewayUnauthorizedResponse());
+      if (request.method === "GET") {
+        const backendGate = await backendAccountSessionGate(request, dependencies.fetchImpl);
+        if (backendGate) return backendGate;
+      }
       const operation = startPrivacyOperation(
         actorId,
         gatewaySessionAccountGeneration(request)
@@ -2410,6 +3066,9 @@ async function dispatchGatewayRequest(
         if (!privacyOperationIsCurrent(operation.lease)) {
           return noStore(privacyOperationInactive());
         }
+        const unsupported = privacyUnsupportedMethod(matched, request.method);
+        if (unsupported) return noStore(unsupported);
+        if (matched.body !== "none") return noStore(gatewayUnavailableResponse());
         const response = await handleIntegratedConsentBootstrapRequest(request, {
           accountGeneration: operation.lease.accountGeneration,
           fieldActorBindingId: consentActorBindingId(operation.lease),
@@ -2427,11 +3086,13 @@ async function dispatchGatewayRequest(
         finishPrivacyOperation(operation.lease);
       }
     }
-    if (requestUrl.searchParams.get("control") === INTEGRATED_CONSENT_CONTROL) {
-      const denied = authorizeProxyRequest(request);
-      if (denied) return noStore(denied);
+    if (matched.privacyVariant === "integrated") {
       const actorId = authorizedProxyActor(request);
       if (!actorId) return noStore(gatewayUnauthorizedResponse());
+      if (request.method === "GET" || request.method === "PUT") {
+        const backendGate = await backendAccountSessionGate(request, dependencies.fetchImpl);
+        if (backendGate) return backendGate;
+      }
       const operation = startPrivacyOperation(
         actorId,
         gatewaySessionAccountGeneration(request)
@@ -2441,10 +3102,15 @@ async function dispatchGatewayRequest(
         if (!privacyOperationIsCurrent(operation.lease)) {
           return noStore(privacyOperationInactive());
         }
+        const unsupported = privacyUnsupportedMethod(matched, request.method);
+        if (unsupported) return noStore(unsupported);
+        if (matched.body !== "by-method") return noStore(gatewayUnavailableResponse());
         const response = await handleIntegratedConsentRequest(request, {
           accountGeneration: operation.lease.accountGeneration,
           fieldActorBindingId: consentActorBindingId(operation.lease),
           signal: operation.lease.controller.signal,
+          isCurrent: () => authorizedProxyActor(request) === actorId &&
+            privacyOperationIsCurrent(operation.lease),
           ...(dependencies.fetchImpl
             ? { fetchImpl: dependencies.fetchImpl }
             : {})
@@ -2458,10 +3124,11 @@ async function dispatchGatewayRequest(
         finishPrivacyOperation(operation.lease);
       }
     }
-    const methods = ["GET", "HEAD"] as const;
-    if (!methods.includes(request.method as "GET" | "HEAD")) {
+    const methods = matched.methods;
+    if (!methods.includes(request.method)) {
       return methodNotAllowed(methods);
     }
+    if (matched.body !== "none") return gatewayUnavailableResponse();
     const privacyRightsRequestUrl = dependencies.privacyRightsRequestUrl
       ?? process.env.WALKSAFE_PRIVACY_RIGHTS_REQUEST_URL;
     if (!privacyRightsRequestUrl) {
@@ -2475,48 +3142,62 @@ async function dispatchGatewayRequest(
       request.method === "HEAD"
     );
   }
-  const methods = ALLOWED_METHODS.get(pathname);
-  if (!methods) return routeNotFound();
+  if (matched?.family !== "static") return routeNotFound();
+  const methods = matched.methods;
   if (!methods.includes(request.method)) return methodNotAllowed(methods);
   const accountRelayRoute = pathname === "/api/account-enrollments/email-otp" ||
     pathname === "/api/accounts";
   const exactNoQueryRoute = accountRelayRoute ||
     pathname === "/api/speech/stt" || pathname === "/api/speech/tts";
-  if (exactNoQueryRoute && [...requestUrl.searchParams].length > 0) {
+  if (exactNoQueryRoute && matched.query === "none" && [...requestUrl.searchParams].length > 0) {
     return Response.json(
       { detail: { code: "account_request_query_invalid" } },
       { status: 400, headers: { "cache-control": "no-store" } }
     );
   }
-  if (
-    pathname !== "/api/field-session" &&
-    !accountRelayRoute &&
-    gatewaySessionScope(request) === "account_deletion_recovery"
-  ) {
+  if (matched.auth !== "session-lifecycle" && matched.auth !== "public" &&
+      gatewaySessionScope(request) === "account_deletion_recovery") {
     return noStore(gatewayUnauthorizedResponse(true));
+  }
+  if (matched.auth !== "public" && matched.auth !== "session-lifecycle" &&
+      matched.auth !== "field-device") {
+    const backendGate = await backendAccountSessionGate(request, dependencies.fetchImpl);
+    if (backendGate) return backendGate;
+  }
+  if (matched.auth === "field-session" || matched.auth === "consent-bound") {
+    const denied = authorizeProxyRequest(request);
+    if (denied) return noStore(denied);
   }
 
   let response: Response;
   if (pathname === "/api/account-enrollments/email-otp") {
-    response = await relayAccountEnrollment(request, dependencies.fetchImpl);
+    response = matched.body === "json"
+      ? await relayAccountEnrollment(request, dependencies.fetchImpl)
+      : gatewayUnavailableResponse();
   }
   else if (pathname === "/api/accounts") {
-    response = await relayAccountCreation(request, dependencies.fetchImpl);
+    response = matched.body === "json"
+      ? await relayAccountCreation(request, dependencies.fetchImpl)
+      : gatewayUnavailableResponse();
   }
   else if (pathname === "/api/field-session") {
-    response = await fieldSession(request, dependencies.fetchImpl);
+    response = await fieldSession(request, matched, dependencies.fetchImpl);
   }
   else if (pathname === "/api/field-walk") {
     response = await fieldWalk(
       request,
+      matched,
       dependencies.fieldLongSessionBindingResolver
-        ?? gatewayFieldLongSessionBinding
+        ?? gatewayFieldLongSessionBinding,
+      dependencies.fetchImpl
     );
   }
   else if (pathname === "/api/speech/stt" || pathname === "/api/speech/tts") {
-    const relay = () => pathname === "/api/speech/stt"
+    const relay = () => matched.body === "stream"
       ? relaySpeechStt(request, correlationId, dependencies.fetchImpl)
-      : relaySpeechTts(request, correlationId, dependencies.fetchImpl);
+      : matched.body === "json"
+      ? relaySpeechTts(request, correlationId, dependencies.fetchImpl)
+      : gatewayUnavailableResponse();
     const actorId = gatewaySessionActor(request);
     const accountGeneration = gatewaySessionAccountGeneration(request);
     const deletionFence = (): Response | null => {
@@ -2540,13 +3221,54 @@ async function dispatchGatewayRequest(
     }
   }
   else if (pathname === "/api/navigation/walking") {
-    response = await walkingRoute(request, dependencies.fetchImpl);
+    response = await walkingRoute(request, matched, dependencies.fetchImpl);
   } else if (pathname === "/api/navigation/destinations/search") {
-    response = await destinationSearch(request, dependencies.fetchImpl);
+    response = await destinationSearch(request, matched, dependencies.fetchImpl);
   } else {
-    response = await reportV2(request, dependencies.fetchImpl);
+    response = await reportV2(request, matched, dependencies.fetchImpl);
   }
   return noStore(response);
+}
+
+async function dispatchNavigationWithinDeadline(
+  request: Request,
+  correlationId: string,
+  dependencies: GatewayDependencies,
+  deadlineMs: number
+): Promise<Response> {
+  const deadlineAbort = new AbortController();
+  const scopedRequest = new Request(request, {
+    signal: AbortSignal.any([request.signal, deadlineAbort.signal])
+  });
+  const handled = dispatchGatewayRequest(scopedRequest, correlationId, dependencies);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onClientAbort: (() => void) | undefined;
+  const deadline = new Promise<"deadline">((resolve) => {
+    timer = setTimeout(() => {
+      deadlineAbort.abort(new Error("navigation request deadline exceeded"));
+      resolve("deadline");
+    }, deadlineMs);
+  });
+  const clientClosed = new Promise<"client_closed">((resolve) => {
+    onClientAbort = () => resolve("client_closed");
+    if (request.signal.aborted) onClientAbort();
+    else request.signal.addEventListener("abort", onClientAbort, { once: true });
+  });
+  try {
+    const result = await Promise.race([handled, deadline, clientClosed]);
+    if (result instanceof Response) return result;
+    void handled.then(cancelUpstream, () => undefined);
+    // The normal cancellation path releases privacy leases in its finally block.
+    // Give it one event-loop turn to settle without trusting a stalled dependency.
+    await Promise.race([
+      handled.then(() => undefined, () => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, 50))
+    ]);
+    return result === "deadline" ? navigationDeadlineResponse() : clientClosedResponse();
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    if (onClientAbort) request.signal.removeEventListener("abort", onClientAbort);
+  }
 }
 
 export async function handleGatewayRequest(
@@ -2556,19 +3278,49 @@ export async function handleGatewayRequest(
   const startedAt = performance.now();
   const correlationId = gatewayCorrelationId(request);
   const routeTemplate = gatewayRouteTemplate(request);
-  const response = await dispatchGatewayRequest(request, correlationId, dependencies);
+  let response: Response;
+  try {
+    const route = matchGatewayRoute(new URL(request.url));
+    const navigationDeadlineMs =
+      request.method === "POST" && route?.deadline === "walking"
+        ? NAVIGATION_WALKING_DEADLINE_MS
+        : request.method === "GET" && route?.deadline === "search"
+          ? NAVIGATION_SEARCH_DEADLINE_MS
+          : null;
+    response = navigationDeadlineMs === null
+      ? await dispatchGatewayRequest(request, correlationId, dependencies)
+      : await dispatchNavigationWithinDeadline(
+          request, correlationId, dependencies, navigationDeadlineMs
+        );
+  } catch (error) {
+    if (!(error instanceof FieldLongSessionStorageUnavailableError)) throw error;
+    response = fieldLongSessionStorageUnavailableResponse();
+  }
   const responseWithRequestId = withGatewayRequestId(response, correlationId);
   const sink = dependencies.telemetrySink
     ?? (process.env.NODE_ENV === "test" ? undefined : writeGatewayTelemetry);
-  if (routeTemplate) {
-    recordGatewayRequestCompleted(
+  if (!routeTemplate || !sink) return responseWithRequestId;
+  const capacityLevel = currentServerCapacityLevelForTelemetry();
+  recordGatewayRequestPrepared(
+    correlationId,
+    routeTemplate,
+    responseWithRequestId,
+    performance.now() - startedAt,
+    capacityLevel,
+    sink
+  );
+  return observeGatewayResponseDelivery(
+    responseWithRequestId,
+    startedAt,
+    (outcome, elapsedMs, firstByteMs) => recordGatewayRequestFinished(
       correlationId,
       routeTemplate,
       responseWithRequestId,
-      performance.now() - startedAt,
-      currentServerCapacityLevelForTelemetry(),
+      outcome,
+      elapsedMs,
+      firstByteMs,
+      capacityLevel,
       sink
-    );
-  }
-  return responseWithRequestId;
+    )
+  );
 }

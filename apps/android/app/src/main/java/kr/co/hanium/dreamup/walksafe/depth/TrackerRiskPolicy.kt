@@ -364,16 +364,7 @@ class TrackingRiskPolicy(
             it.source.metric && it.confidence >= config.minMetricDistanceConfidence && it.distanceM > 0f && it.distanceM.isFinite()
         }?.distanceM
         val closeMetric = metricDistance != null && metricDistance <= config.closeDistanceM
-        if (closeMetric) {
-            return TrackingRiskDecision(
-                alertable = true,
-                riskType = TrackingRiskType.BLOCKING_OBJECT,
-                messageLevel = if (metricDistance <= config.stopDistanceM) MessageLevel.STOP else MessageLevel.WARNING,
-                reason = "metric depth marks a close object",
-            )
-        }
-
-        val ttcMs = signals.timeToCollision.milliseconds
+        val ttcMs = signals.timeToCollision.milliseconds?.takeIf { it >= 0L }
         val areaGrowthSignal = (signals.areaGrowthRatio ?: 0f) >= config.areaGrowthSignalRatio ||
             (signals.areaGrowthPerSecond ?: 0f) >= config.areaGrowthSignalPerSecond
         val collisionSignal = (ttcMs != null && ttcMs <= config.ttcAlertMs) || areaGrowthSignal
@@ -386,6 +377,14 @@ class TrackingRiskPolicy(
                 riskType = TrackingRiskType.APPROACHING_OBJECT,
                 messageLevel = if (high) MessageLevel.STOP else MessageLevel.WARNING,
                 reason = "stable tracking marks an approaching object",
+            )
+        }
+        if (closeMetric) {
+            return TrackingRiskDecision(
+                alertable = true,
+                riskType = TrackingRiskType.BLOCKING_OBJECT,
+                messageLevel = if (metricDistance <= config.stopDistanceM) MessageLevel.STOP else MessageLevel.WARNING,
+                reason = "metric depth marks a close object",
             )
         }
         if (signals.trend == Trend.APPROACHING && ttcMs != null && ttcMs <= config.awareTtcMs) {

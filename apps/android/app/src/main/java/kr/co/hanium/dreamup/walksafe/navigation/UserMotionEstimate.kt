@@ -8,6 +8,8 @@ data class UserMotionLocationEvidence(
     val observedAtElapsedRealtimeMs: Long,
     val horizontalAccuracyM: Double?,
     val isMock: Boolean,
+    /** Stable, monotonic identity of the original fix, preserved when it is repackaged. */
+    val observationId: Long = observedAtElapsedRealtimeMs,
 )
 
 /**

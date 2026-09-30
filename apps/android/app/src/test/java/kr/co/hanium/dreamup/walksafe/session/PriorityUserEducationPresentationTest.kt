@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.session
 
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,6 +22,40 @@ class PriorityUserEducationPresentationTest {
         )
         assertFalse(policy.snapshot().appUsageReviewed)
         assertFalse(policy.snapshot().trainingComplete)
+    }
+
+    @Test
+    fun usageEducationExplainsImmediateUserActionsAndAutomaticSafetyStopWithoutInventingACommand() {
+        val policy = adultPolicy()
+        completeSafetyConsent(policy)
+        val spoken = PriorityUserEducationPresentation.speechText(PriorityUserEducationPlayback.APP_USAGE)
+
+        assertTrue(spoken.contains("지금 멈춰야 하면 발걸음을 멈추고 주변을 확인한 뒤 보행 일시정지라고 말하세요"))
+        assertTrue(spoken.contains("보행을 아예 끝내려면 보행 종료라고 말하고 종료 확인 안내에 응답하세요"))
+        assertTrue(spoken.contains("보행 일시정지로 보행 전체를 잠시 멈추고"))
+        assertTrue(spoken.contains("보행 종료는 종료 확인 안내를 거쳐 전체 보행을 끝냅니다"))
+        assertTrue(spoken.contains("앱이 자동으로 안전정지한 경우 현재 보행 안내와 출력을 중단하며 자동으로 재개하지 않습니다"))
+        assertTrue(spoken.contains("실제 보행에서 안전정지를 직접 실행하는 버튼이나 음성 명령은 없습니다"))
+        assertFalse(spoken.contains("안전정지라고 말하세요"))
+        assertTrue(spoken.contains("안전정지 연습은 실제 보행의 안전정지를 실행하는 명령이 아닙니다"))
+        assertTrue(spoken.contains("실제 안전정지 후에는 보행 재개로 이어가지 않습니다"))
+        assertTrue(spoken.contains("안전한 곳에서 기기 상태를 확인한 뒤 새 보행을 준비하세요"))
+        assertTrue(spoken.contains("혼자 안전하게 이동할 수 없으면 먼저 멈추고 주변 사람에게 직접 도움을 요청하세요"))
+        assertEquals(spoken, PriorityUserEducationPresentation.screenText(policy.snapshot()))
+    }
+
+    @Test
+    fun automaticSafetyStopSummaryMatchesFullResourceCopy() {
+        val summary = File("src/main/res/values/strings.xml").readText()
+            .substringAfter("<string name=\"walk_safety_stopped\">")
+            .substringBefore("</string>")
+
+        assertEquals(
+            "자동 안전정지\\n현재 보행 안내와 출력을 중단했습니다. 자동으로 재개하지 않습니다. " +
+                "안전한 곳에서 기기 상태를 확인하고 새 보행을 준비하세요. " +
+                "혼자 이동하기 어렵다면 주변 사람에게 도움을 요청하세요.",
+            summary,
+        )
     }
 
     @Test

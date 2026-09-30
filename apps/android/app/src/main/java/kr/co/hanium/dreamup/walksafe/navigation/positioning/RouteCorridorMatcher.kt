@@ -45,7 +45,15 @@ enum class RouteMatchReason {
     ACTIVE_BRANCH_RETAINED,
     BRANCH_SWITCH_PENDING,
     CORRIDOR_OUTSIDE,
+
+    /** Order error: the sample is not newer than the previous sample of this matcher. */
     STALE_SAMPLE,
+
+    /** S09-50: the sample is older than the caller's maximum age at the evaluation time. */
+    EXPIRED_SAMPLE,
+
+    /** S09-50: the sample is measured after the evaluation time. */
+    FUTURE_SAMPLE,
     INVALID_INPUT,
     INVALID_ROUTE,
 }
@@ -80,6 +88,14 @@ data class RouteCorridorMatcherConfig(
     val branchSwitchMinimumCostAdvantage: Double = 1.5,
     val branchSwitchConfirmations: Int = 2,
     val allowReverseTravel: Boolean = false,
+    /** Pedestrian speed bound for visit-order reachability; same bound as the motion profile. */
+    val maximumTravelSpeedMps: Double = 3.0,
+    /**
+     * S07-15: widen the progress prior to what the pedestrian speed bound can cover since the
+     * previous sample plus twice the reported radius, with [progressSigmaM] as its floor. Off keeps
+     * one fixed per-update prior.
+     */
+    val timeScaledProgressPrior: Boolean = false,
 )
 
 /**
@@ -90,16 +106,23 @@ class RouteCorridorMatcher(
     private val config: RouteCorridorMatcherConfig = RouteCorridorMatcherConfig(),
 ) {
     private var activeRouteId: String? = null
+    private var activeRouteGeometry: List<Pair<Double, Double>>? = null
     private var activeCorridorIndex: Int? = null
     private var activeProgressM: Double? = null
+    private var activeProgressAtElapsedRealtimeMs: Long? = null
+    private var activeBearingDeg: Double? = null
     private var pendingCorridorIndex: Int? = null
     private var pendingSegmentCount = 0
     private var latestSampleElapsedRealtimeMs: Long? = null
 
+    @Synchronized
     fun reset() {
         activeRouteId = null
+        activeRouteGeometry = null
         activeCorridorIndex = null
         activeProgressM = null
+        activeProgressAtElapsedRealtimeMs = null
+        activeBearingDeg = null
         latestSampleElapsedRealtimeMs = null
         clearPendingSwitch()
     }
@@ -116,21 +139,46 @@ class RouteCorridorMatcher(
         polyline: List<RoutePoint>,
         position: FilteredRoutePosition,
         previousProgressM: Double? = null,
+        /** S07-15: measurement time of [previousProgressM], for the time-scaled progress prior. */
+        previousProgressAtElapsedRealtimeMs: Long? = null,
+        /**
+         * S09-50: evaluation time of the caller. With it a future sample is FUTURE_SAMPLE and, with
+         * [maximumSampleAgeMs], an old one is EXPIRED_SAMPLE, separately from the order error
+         * STALE_SAMPLE. Neither consumes the order watermark.
+         */
+        evaluatedAtElapsedRealtimeMs: Long? = null,
+        maximumSampleAgeMs: Long? = null,
     ): RouteCorridorMatchResult {
-        if (activeRouteId != routeId) {
-            reset()
-            activeRouteId = routeId
-        }
         if (!position.isValid()) {
+            clearPendingSwitch()
             return unmatched(routeId, position.point, RouteMatchReason.INVALID_INPUT)
         }
+        if (evaluatedAtElapsedRealtimeMs != null) {
+            if (position.elapsedRealtimeMs > evaluatedAtElapsedRealtimeMs) {
+                clearPendingSwitch()
+                return unmatched(routeId, position.point, RouteMatchReason.FUTURE_SAMPLE)
+            }
+            if (maximumSampleAgeMs != null && evaluatedAtElapsedRealtimeMs - position.elapsedRealtimeMs > maximumSampleAgeMs) {
+                clearPendingSwitch()
+                return unmatched(routeId, position.point, RouteMatchReason.EXPIRED_SAMPLE)
+            }
+        }
         if (polyline.size < 2 || polyline.any { !it.isValid() }) {
+            clearPendingSwitch()
             return unmatched(routeId, position.point, RouteMatchReason.INVALID_ROUTE)
+        }
+        // Copy coordinates, not the list reference: callers may replace points in place.
+        val geometry = polyline.map { it.latitude to it.longitude }
+        if (activeRouteId != routeId || activeRouteGeometry != geometry) {
+            reset()
+            activeRouteId = routeId
+            activeRouteGeometry = geometry
         }
         val latestSampleTime = latestSampleElapsedRealtimeMs
         if (latestSampleTime != null && position.elapsedRealtimeMs <= latestSampleTime) {
             return unmatched(routeId, position.point, RouteMatchReason.STALE_SAMPLE)
         }
+        val sampleGapMs = latestSampleTime?.let { position.elapsedRealtimeMs - it }
         latestSampleElapsedRealtimeMs = position.elapsedRealtimeMs
 
         val covariance = position.effectiveCovariance()
@@ -141,14 +189,20 @@ class RouteCorridorMatcher(
             .groupBy(Candidate::corridorIndex)
             .values.map { corridor -> corridor.minBy(Candidate::crossTrackDistanceM) }
         if (candidates.isEmpty()) {
+            clearPendingSwitch()
             return unmatched(routeId, position.point, RouteMatchReason.INVALID_ROUTE)
         }
 
-        val progressReference = previousProgressM
-            ?.takeIf { it.isFinite() && it >= 0.0 }
-            ?: activeProgressM
+        val suppliedReference = previousProgressM?.takeIf { it.isFinite() && it >= 0.0 }
+        val progressReference = suppliedReference ?: activeProgressM
+        // S07-15: the prior covers the time since the reference progress was measured, so samples
+        // that were not accepted in between do not shrink it back to one update.
+        val referenceAtMs = if (suppliedReference != null) previousProgressAtElapsedRealtimeMs else activeProgressAtElapsedRealtimeMs
+        val progressSigmaM = progressPriorSigmaM(
+            referenceAtMs?.let { position.elapsedRealtimeMs - it } ?: sampleGapMs, position,
+        )
         val scored = candidates.map { candidate ->
-            ScoredCandidate(candidate, score(candidate, position, progressReference))
+            ScoredCandidate(candidate, score(candidate, position, progressReference, progressSigmaM))
         }
         val eligible = scored.filter { scoredCandidate ->
             scoredCandidate.candidate.crossTrackDistanceM <= corridorWidth(scoredCandidate.candidate.crossTrackSigmaM)
@@ -165,7 +219,7 @@ class RouteCorridorMatcher(
         }
 
         val best = eligible.minByOrNull(ScoredCandidate::cost) ?: error("eligible candidates are non-empty")
-        val resolution = resolveBranch(best, eligible)
+        val resolution = resolveBranch(best, eligible, sampleGapMs, position.elapsedRealtimeMs)
         val selected = resolution.selected
         val normalConfidence = confidence(selected, eligible)
         val ambiguousReverseBranch = config.allowReverseTravel && eligible.any { other ->
@@ -173,7 +227,8 @@ class RouteCorridorMatcher(
                 abs(selected.candidate.bearingDeg - other.candidate.bearingDeg).let { min(it, 360f - it) } > 135f &&
                 other.candidate.crossTrackDistanceM <= max(
                     selected.candidate.crossTrackSigmaM, other.candidate.crossTrackSigmaM,
-                ) * 2.0
+                ) * 2.0 &&
+                !visitOrderExcludes(selected.candidate, other.candidate, position.elapsedRealtimeMs)
         }
         val confidence = if (resolution.forceLowConfidence || ambiguousReverseBranch) {
             min(normalConfidence, config.mediumConfidenceThreshold - 0.001)
@@ -198,6 +253,8 @@ class RouteCorridorMatcher(
         ) {
             activeCorridorIndex = selected.candidate.corridorIndex
             activeProgressM = selected.candidate.geometricProgressM
+            activeProgressAtElapsedRealtimeMs = position.elapsedRealtimeMs
+            activeBearingDeg = selected.candidate.bearingDeg.toDouble()
         }
 
         return RouteCorridorMatchResult(
@@ -218,15 +275,17 @@ class RouteCorridorMatcher(
     private fun resolveBranch(
         best: ScoredCandidate,
         eligible: List<ScoredCandidate>,
+        sampleGapMs: Long?,
+        nowElapsedRealtimeMs: Long,
     ): BranchResolution {
         val activeIndex = activeCorridorIndex ?: return BranchResolution(best)
-        if (abs(best.candidate.corridorIndex - activeIndex) <= 1) {
+        if (connectedToActive(best.candidate, activeIndex, nowElapsedRealtimeMs)) {
             clearPendingSwitch()
             return BranchResolution(best)
         }
 
         val activeBranch = eligible
-            .filter { abs(it.candidate.corridorIndex - activeIndex) <= 1 }
+            .filter { connectedToActive(it.candidate, activeIndex, nowElapsedRealtimeMs) }
             .minByOrNull(ScoredCandidate::cost)
         val advantage = (activeBranch?.cost ?: Double.POSITIVE_INFINITY) - best.cost
         if (advantage < config.branchSwitchMinimumCostAdvantage) {
@@ -246,7 +305,10 @@ class RouteCorridorMatcher(
             }
         }
 
-        if (pendingCorridorIndex == best.candidate.corridorIndex) {
+        if (
+            pendingCorridorIndex == best.candidate.corridorIndex &&
+            sampleGapMs != null && sampleGapMs <= MAXIMUM_BRANCH_CONFIRMATION_GAP_MS
+        ) {
             pendingSegmentCount += 1
         } else {
             pendingCorridorIndex = best.candidate.corridorIndex
@@ -263,10 +325,19 @@ class RouteCorridorMatcher(
         )
     }
 
+    /** S07-15: the progress change reachable in the measured time between samples, not per call. */
+    private fun progressPriorSigmaM(sampleGapMs: Long?, position: FilteredRoutePosition): Double {
+        if (!config.timeScaledProgressPrior || sampleGapMs == null || sampleGapMs <= 0L ||
+            !config.maximumTravelSpeedMps.isFinite() || config.maximumTravelSpeedMps <= 0.0
+        ) return config.progressSigmaM
+        return max(config.progressSigmaM, sampleGapMs / 1_000.0 * config.maximumTravelSpeedMps + 2.0 * position.horizontalAccuracyM)
+    }
+
     private fun score(
         candidate: Candidate,
         position: FilteredRoutePosition,
         progressReferenceM: Double?,
+        progressSigmaM: Double,
     ): Double {
         var cost = robustSquare(candidate.crossTrackDistanceM / candidate.crossTrackSigmaM)
         val heading = position.heading?.takeIf {
@@ -284,7 +355,7 @@ class RouteCorridorMatcher(
             cost += config.headingWeight * robustSquare(travelDifference / sigma)
         }
         if (progressReferenceM != null) {
-            val sigma = hypot(config.progressSigmaM, candidate.alongTrackSigmaM)
+            val sigma = hypot(progressSigmaM, candidate.alongTrackSigmaM)
             cost += config.progressWeight * robustSquare((candidate.geometricProgressM - progressReferenceM) / sigma)
         }
         return cost
@@ -318,11 +389,64 @@ class RouteCorridorMatcher(
     private fun competingBranch(selected: ScoredCandidate, other: ScoredCandidate): Boolean {
         val a = selected.candidate
         val b = other.candidate
-        if (abs(a.corridorIndex - b.corridorIndex) > 1) return true
+        if (a.corridorIndex == b.corridorIndex) return false
+        val farAlongRoute = abs(a.geometricProgressM - b.geometricProgressM) >
+            connectionDistanceM(a.alongTrackSigmaM, b.alongTrackSigmaM)
+        // Straight runs split at every 1 degree of bearing change, so a smooth curve becomes many
+        // short corridors. Pieces within the connection distance along the route are one branch
+        // however many corridor ids lie between them (S07-20); far-apart pieces still compete.
+        if (abs(a.corridorIndex - b.corridorIndex) > 1) {
+            return farAlongRoute || angleDifferenceDeg(a.bearingDeg.toDouble(), b.bearingDeg.toDouble()) > 135.0
+        }
         // Adjacent return legs can overlap physically while being far apart along the route.
-        return config.allowReverseTravel && a.corridorIndex != b.corridorIndex &&
+        return config.allowReverseTravel &&
             angleDifferenceDeg(a.bearingDeg.toDouble(), b.bearingDeg.toDouble()) > 135.0 &&
-            abs(a.geometricProgressM - b.geometricProgressM) > max(15.0, 3.0 * hypot(a.alongTrackSigmaM, b.alongTrackSigmaM))
+            farAlongRoute
+    }
+
+    /** Along-route distance within which two projections are the same place on the route. */
+    private fun connectionDistanceM(firstAlongSigmaM: Double, secondAlongSigmaM: Double): Double =
+        max(MINIMUM_CONNECTION_DISTANCE_M, 3.0 * hypot(firstAlongSigmaM, secondAlongSigmaM))
+
+    /**
+     * Continuing along the route from the last accepted match is not a branch change: the along-route
+     * distance may grow by the pedestrian speed bound over the confirmation cadence (capped at
+     * [MAXIMUM_BRANCH_CONFIRMATION_GAP_MS]) beyond the connection distance. Farther jumps still need
+     * branch confirmation, as before.
+     */
+    private fun connectedToActive(candidate: Candidate, activeIndex: Int, nowElapsedRealtimeMs: Long): Boolean {
+        if (abs(candidate.corridorIndex - activeIndex) <= 1) return true
+        val activeProgress = activeProgressM ?: return false
+        // A reversal through a short connector (U-turn across a crossing) is a real turn structure.
+        val activeBearing = activeBearingDeg ?: return false
+        if (angleDifferenceDeg(candidate.bearingDeg.toDouble(), activeBearing) > 135.0) return false
+        val elapsedMs = activeProgressAtElapsedRealtimeMs
+            ?.let { (nowElapsedRealtimeMs - it).coerceIn(0L, MAXIMUM_BRANCH_CONFIRMATION_GAP_MS) }
+            ?: 0L
+        val travelM = if (config.maximumTravelSpeedMps.isFinite() && config.maximumTravelSpeedMps > 0.0) {
+            elapsedMs / 1_000.0 * config.maximumTravelSpeedMps
+        } else {
+            0.0
+        }
+        return abs(candidate.geometricProgressM - activeProgress) <=
+            connectionDistanceM(candidate.alongTrackSigmaM, candidate.alongTrackSigmaM) + travelM
+    }
+
+    /**
+     * S07-21: [other] cannot be the leg being walked when, since the last accepted match, reaching
+     * it would need more than the pedestrian speed bound while [selected] is reachable. Without a
+     * last accepted match, or once enough time has passed for both, nothing is excluded.
+     */
+    private fun visitOrderExcludes(selected: Candidate, other: Candidate, nowElapsedRealtimeMs: Long): Boolean {
+        val reference = activeProgressM ?: return false
+        val referenceAt = activeProgressAtElapsedRealtimeMs ?: return false
+        if (nowElapsedRealtimeMs < referenceAt || !config.maximumTravelSpeedMps.isFinite() ||
+            config.maximumTravelSpeedMps <= 0.0
+        ) return false
+        val reachM = (nowElapsedRealtimeMs - referenceAt) / 1_000.0 * config.maximumTravelSpeedMps +
+            connectionDistanceM(selected.alongTrackSigmaM, other.alongTrackSigmaM)
+        return abs(selected.geometricProgressM - reference) <= reachM &&
+            abs(other.geometricProgressM - reference) > reachM
     }
 
     private fun buildCandidates(
@@ -352,14 +476,19 @@ class RouteCorridorMatcher(
                 val normalNorth = tangentEast
                 val crossVariance = projectedVariance(covariance, normalEast, normalNorth)
                 val alongVariance = projectedVariance(covariance, tangentEast, tangentNorth)
-                val accuracyFloor = max(position.horizontalAccuracyM, config.minimumPositionSigmaM)
+                // effectiveCovariance already provides the scalar fallback when needed.
+                // Reapplying it here would erase valid directional uncertainty.
+                val accuracyFloor = config.minimumPositionSigmaM
                 result += Candidate(
                     segmentIndex = index,
                     corridorIndex = corridorIndex,
                     fraction = projection.fraction,
                     matchedPoint = RoutePoint(
                         latitude = start.latitude + (end.latitude - start.latitude) * projection.fraction,
-                        longitude = start.longitude + (end.longitude - start.longitude) * projection.fraction,
+                        longitude = wrapLongitudeDegrees(
+                            start.longitude +
+                                wrapLongitudeDegrees(end.longitude - start.longitude) * projection.fraction,
+                        ),
                     ),
                     crossTrackDistanceM = projection.distanceM,
                     geometricProgressM = cumulativeM + segmentLengthM * projection.fraction,
@@ -421,6 +550,10 @@ class RouteCorridorMatcher(
         const val ZERO_LENGTH_M = 0.01
         // Geometry tolerance only; unrelated to the location uncertainty or match thresholds.
         const val STRAIGHT_BEARING_TOLERANCE_DEG = 1.0
+        // Existing adjacent-leg overlap distance, now used for any connected corridor pair.
+        const val MINIMUM_CONNECTION_DISTANCE_M = 15.0
+        // Match the 5 s high-confidence recovery cadence; slower observations start new evidence.
+        const val MAXIMUM_BRANCH_CONFIRMATION_GAP_MS = 5_000L
     }
 }
 
@@ -431,14 +564,19 @@ private data class SegmentProjection(
     val tangentNorth: Double,
 )
 
+// S09-52: the shared LocalGeodesy longitude wrap instead of a local copy.
+private fun wrapLongitudeDegrees(value: Double): Double = LocalGeodesy.wrapLongitudeDegrees(value)
+
 private fun projectToSegment(point: RoutePoint, start: RoutePoint, end: RoutePoint): SegmentProjection {
+    // S09-52 remaining: route projections keep their 111 320 m/deg scale (about 6 378 137 m) for now;
+    // moving it to LocalGeodesy.METERS_PER_DEGREE (0.11 % shorter) changes a matcher threshold case.
     val latitudeScale = 111_320.0
     val longitudeScale = latitudeScale * cos(Math.toRadians(point.latitude))
-    val startEast = (start.longitude - point.longitude) * longitudeScale
+    // The query and segment share the same wrapped longitude frame rooted at start.
+    val startEast = -wrapLongitudeDegrees(point.longitude - start.longitude) * longitudeScale
     val startNorth = (start.latitude - point.latitude) * latitudeScale
-    val endEast = (end.longitude - point.longitude) * longitudeScale
     val endNorth = (end.latitude - point.latitude) * latitudeScale
-    val segmentEast = endEast - startEast
+    val segmentEast = wrapLongitudeDegrees(end.longitude - start.longitude) * longitudeScale
     val segmentNorth = endNorth - startNorth
     val length = hypot(segmentEast, segmentNorth)
     val denominator = length * length
@@ -476,7 +614,8 @@ private fun FilteredRoutePosition.effectiveCovariance(): EnuPositionCovariance {
 }
 
 private fun FilteredRoutePosition.isValid(): Boolean {
-    return point.isValid() && horizontalAccuracyM.isFinite() && horizontalAccuracyM >= 0.0
+    return point.isValid() && horizontalAccuracyM.isFinite() && horizontalAccuracyM >= 0.0 &&
+        elapsedRealtimeMs >= 0L
 }
 
 private fun RoutePoint.isValid(): Boolean {
@@ -486,7 +625,7 @@ private fun RoutePoint.isValid(): Boolean {
 private fun bearingDegrees(start: RoutePoint, end: RoutePoint): Float {
     val startLatitude = Math.toRadians(start.latitude)
     val endLatitude = Math.toRadians(end.latitude)
-    val longitudeDelta = Math.toRadians(end.longitude - start.longitude)
+    val longitudeDelta = Math.toRadians(wrapLongitudeDegrees(end.longitude - start.longitude))
     val y = sin(longitudeDelta) * cos(endLatitude)
     val x = cos(startLatitude) * sin(endLatitude) -
         sin(startLatitude) * cos(endLatitude) * cos(longitudeDelta)
@@ -498,9 +637,9 @@ private fun angleDifferenceDeg(first: Double, second: Double): Double {
 }
 
 private fun haversineMeters(first: RoutePoint, second: RoutePoint): Double {
-    val earthRadiusM = 6_371_000.0
+    val earthRadiusM = LocalGeodesy.EARTH_RADIUS_M
     val latitudeDelta = Math.toRadians(second.latitude - first.latitude)
-    val longitudeDelta = Math.toRadians(second.longitude - first.longitude)
+    val longitudeDelta = Math.toRadians(wrapLongitudeDegrees(second.longitude - first.longitude))
     val firstLatitude = Math.toRadians(first.latitude)
     val secondLatitude = Math.toRadians(second.latitude)
     val a = sin(latitudeDelta / 2.0) * sin(latitudeDelta / 2.0) +

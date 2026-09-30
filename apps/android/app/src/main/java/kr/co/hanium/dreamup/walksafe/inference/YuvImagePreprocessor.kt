@@ -1,6 +1,10 @@
 package kr.co.hanium.dreamup.walksafe.inference
 
+import android.graphics.Rect
 import android.media.Image
+import kr.co.hanium.dreamup.walksafe.UprightCameraImage
+import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
+import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.max
@@ -23,6 +27,70 @@ data class ArgbImage(
     val pixels: IntArray,
 )
 
+/** Plane offsets stay in full-image coordinates; pixels outside this valid rect are never read. */
+internal data class YuvCropRect(val left: Int, val top: Int, val right: Int, val bottom: Int) {
+    init {
+        require(left >= 0 && top >= 0 && right > left && bottom > top)
+    }
+
+    fun requireWithin(width: Int, height: Int) {
+        require(right <= width && bottom <= height) { "YUV crop must fit the image" }
+    }
+
+    fun contains(x: Int, y: Int): Boolean = x >= left && x < right && y >= top && y < bottom
+
+    fun isFull(width: Int, height: Int): Boolean = left == 0 && top == 0 && right == width && bottom == height
+
+    /** Rotate the valid source rectangle with the image, retaining exact pixel boundaries. */
+    fun toUpright(width: Int, height: Int, quarterTurns: Int): YuvCropRect {
+        requireWithin(width, height)
+        require(quarterTurns in 0..3)
+        return when (quarterTurns) {
+            0 -> this
+            1 -> YuvCropRect(height - bottom, left, height - top, right)
+            2 -> YuvCropRect(width - right, height - bottom, width - left, height - top)
+            else -> YuvCropRect(top, width - right, bottom, width - left)
+        }
+    }
+
+    /** Results are returned in full sensor coordinates; crop padding is never detector evidence. */
+    fun toValidSensorDetection(
+        candidate: DetectionCandidate,
+        imageWidth: Int,
+        imageHeight: Int,
+        quarterTurns: Int = 0,
+    ): DetectionCandidate? {
+        val sensor = if (quarterTurns == 0) candidate else candidate.copy(
+            bboxNorm = UprightCameraImage.toSensor(candidate.bboxNorm, quarterTurns),
+        )
+        if (isFull(imageWidth, imageHeight)) return sensor
+        val box = sensor.bboxNorm
+        val boxRight = box.x + box.width
+        val boxBottom = box.y + box.height
+        if (!box.x.isFinite() || !box.y.isFinite() || !boxRight.isFinite() || !boxBottom.isFinite()) return null
+        val clippedLeft = maxOf(box.x, left.toFloat() / imageWidth)
+        val clippedTop = maxOf(box.y, top.toFloat() / imageHeight)
+        val clippedRight = minOf(boxRight, right.toFloat() / imageWidth)
+        val clippedBottom = minOf(boxBottom, bottom.toFloat() / imageHeight)
+        if (clippedRight <= clippedLeft || clippedBottom <= clippedTop) return null
+        return sensor.copy(bboxNorm = RectNorm(
+            clippedLeft, clippedTop, clippedRight - clippedLeft, clippedBottom - clippedTop,
+        ))
+    }
+
+    companion object {
+        fun full(width: Int, height: Int): YuvCropRect = YuvCropRect(0, 0, width, height)
+
+        fun fromImage(image: Image): YuvCropRect = fromRect(image.cropRect)
+
+        fun fromRect(rect: Rect): YuvCropRect = rect.let {
+            YuvCropRect(it.left, it.top, it.right, it.bottom)
+        }
+    }
+}
+
+private const val YUV_CROP_PAD_ARGB = -0x8d8d8e // Opaque RGB 114, matching tensor letterbox padding.
+
 data class LetterboxTransform(
     val imageWidth: Int,
     val imageHeight: Int,
@@ -34,7 +102,10 @@ data class LetterboxTransform(
     val resizedHeight: Int = (imageHeight * scale).roundToInt(),
 ) {
     /** Test before NMS in model pixels, without clipping the box used for suppression. */
-    internal fun intersectsImageContent(modelRect: kr.co.hanium.dreamup.walksafe.depth.RectNorm): Boolean {
+    internal fun intersectsImageContent(
+        modelRect: kr.co.hanium.dreamup.walksafe.depth.RectNorm,
+        validImageCrop: YuvCropRect? = null,
+    ): Boolean {
         val left = maxOf(modelRect.x * modelSize, padX, 0f)
         val top = maxOf(modelRect.y * modelSize, padY, 0f)
         // Integer resize rounding and inverse scaling can end at different subpixel positions.
@@ -44,8 +115,14 @@ data class LetterboxTransform(
             padY + minOf(resizedHeight.toFloat(), imageHeight * scale), modelSize.toFloat())
         // Comparing before division avoids a padding-edge contact becoming a tiny visible box
         // through floating-point round-off when undoing the scale.
-        return left.isFinite() && top.isFinite() && right.isFinite() && bottom.isFinite() &&
-            right > left && bottom > top
+        if (!left.isFinite() || !top.isFinite() || !right.isFinite() || !bottom.isFinite() ||
+            right <= left || bottom <= top) return false
+        if (validImageCrop == null) return true
+        validImageCrop.requireWithin(imageWidth, imageHeight)
+        return minOf(right, padX + validImageCrop.right * scale) >
+            maxOf(left, padX + validImageCrop.left * scale) &&
+            minOf(bottom, padY + validImageCrop.bottom * scale) >
+            maxOf(top, padY + validImageCrop.top * scale)
     }
 
     /** Drop padding-only and degenerate predictions before they become detector evidence. */
@@ -126,6 +203,7 @@ class YuvImagePreprocessor {
             uvRowStride = uPlane.rowStride,
             uvPixelStride = uPlane.pixelStride,
             modelSize = modelSize,
+            cropRect = YuvCropRect.fromImage(image),
         )
     }
 
@@ -149,6 +227,7 @@ class YuvImagePreprocessor {
                 yPixelStride = yPlane.pixelStride,
                 uvRowStride = uPlane.rowStride,
                 uvPixelStride = uPlane.pixelStride,
+                cropRect = YuvCropRect.fromImage(image),
             ),
         )
     }
@@ -210,12 +289,15 @@ class YuvImagePreprocessor {
         uvRowStride: Int,
         uvPixelStride: Int,
         modelSize: Int,
+        cropRect: YuvCropRect = YuvCropRect.full(width, height),
     ): PreprocessedImage {
         require(modelSize > 0) { "modelSize must be positive" }
-        // Check the complete source extent, even if downsampling never selects its last pixel.
+        cropRect.requireWithin(width, height)
+        // Check the complete valid crop extent, even if downsampling never selects its last pixel.
         // A camera plane need not contain row padding after the final pixel.
-        val lastYIndex = (height - 1).toLong() * yRowStride + (width - 1).toLong() * yPixelStride
-        val lastUvIndex = ((height - 1) / 2).toLong() * uvRowStride + ((width - 1) / 2).toLong() * uvPixelStride
+        val lastYIndex = (cropRect.bottom - 1).toLong() * yRowStride + (cropRect.right - 1).toLong() * yPixelStride
+        val lastUvIndex = ((cropRect.bottom - 1) / 2).toLong() * uvRowStride +
+            ((cropRect.right - 1) / 2).toLong() * uvPixelStride
         if (lastYIndex !in 0 until yBuffer.limit().toLong() ||
             lastUvIndex !in 0 until uBuffer.limit().toLong() ||
             lastUvIndex !in 0 until vBuffer.limit().toLong()
@@ -233,11 +315,12 @@ class YuvImagePreprocessor {
         val output = buffer.asFloatBuffer()
         val row = reusableRgbRows.getOrPut(modelSize) { FloatArray(modelSize * CHANNELS) }
         val padValue = LETTERBOX_PAD_VALUE / 255f
+        val isCropped = !cropRect.isFull(width, height)
         var previousSourceY = Int.MIN_VALUE
         for (sourceY in sourceYByRow) {
             // Upsampling can repeat a source row. Only the tensor copy is repeated in that case.
             if (sourceY != previousSourceY) {
-                if (sourceY !in 0 until height) {
+                if (sourceY !in 0 until height || (isCropped && (sourceY < cropRect.top || sourceY >= cropRect.bottom))) {
                     row.fill(padValue)
                 } else {
                     val yRow = sourceY * yRowStride
@@ -248,7 +331,7 @@ class YuvImagePreprocessor {
                     var blue = padValue
                     var rowOffset = 0
                     for (sourceX in sourceXByColumn) {
-                        if (sourceX !in 0 until width) {
+                        if (sourceX !in 0 until width || (isCropped && (sourceX < cropRect.left || sourceX >= cropRect.right))) {
                             red = padValue
                             green = padValue
                             blue = padValue
@@ -317,13 +400,20 @@ internal fun yuv420ToArgbPixels(
     yPixelStride: Int,
     uvRowStride: Int,
     uvPixelStride: Int,
+    cropRect: YuvCropRect = YuvCropRect.full(width, height),
 ): IntArray {
+    cropRect.requireWithin(width, height)
     val pixels = IntArray(width * height)
+    val isCropped = !cropRect.isFull(width, height)
     for (y in 0 until height) {
         val yRow = y * yRowStride
         val uvRow = (y / 2) * uvRowStride
         val pixelRow = y * width
         for (x in 0 until width) {
+            if (isCropped && !cropRect.contains(x, y)) {
+                pixels[pixelRow + x] = YUV_CROP_PAD_ARGB
+                continue
+            }
             val yValue = yBuffer.get(yRow + x * yPixelStride).toInt() and 0xff
             val uvOffset = uvRow + (x / 2) * uvPixelStride
             val uValue = (uBuffer.get(uvOffset).toInt() and 0xff) - 128

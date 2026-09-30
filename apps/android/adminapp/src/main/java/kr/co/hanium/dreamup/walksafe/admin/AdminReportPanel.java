@@ -74,7 +74,13 @@ public final class AdminReportPanel extends LinearLayout {
     }
 
     private static final String[] STATUS_VALUES = {"", "new", "reviewed", "resolved"};
-    private static final String[] STATUS_LABELS = {"모든 상태", "새 신고", "검토됨", "처리 완료"};
+    private static final String[] STATUS_LABELS = {
+        "모든 내부 처리 상태", "내부 처리: 새 신고", "내부 처리: 검토됨", "내부 처리: 완료"
+    };
+    private static final String NEW_DELIVERY_REQUIREMENTS =
+        "새 기관 수동 전달에는 현재 내용의 최신 검수 승인과 위치·사진·개인정보 확인, "
+            + "승인에 필요한 원본 확인과 재인증·제출본 확인이 필요합니다. 전달 증빙은 선택 항목입니다. "
+            + "이미 제출한 자료의 후속 접수·처리 기록은 별도로 이어갑니다.";
     private static final String[] CLASS_VALUES = {
         "",
         "damaged_tactile_block",
@@ -132,7 +138,8 @@ public final class AdminReportPanel extends LinearLayout {
         markAccessibilityHeading(heading);
         addView(heading, matchWrap());
         addView(text(
-            "먼저 '새 신고'를 확인하세요. 목록은 현재 불러온 범위만 요약하며, 상세에서 검수와 제출 준비로 이어갈 수 있습니다.",
+            "먼저 '내부 처리: 새 신고'를 확인하세요. 목록은 내부 처리 상태를 요약합니다. "
+                + "검수 결과와 기관 전달·접수 상태는 상세에서 각각 확인하세요.",
             15
         ), matchWrap());
 
@@ -147,7 +154,7 @@ public final class AdminReportPanel extends LinearLayout {
         reportIdInput = input("정확한 신고 UUID (선택)");
         reportIdInput.setContentDescription("신고 UUID 필터");
         addView(reportIdInput, matchWrap());
-        statusInput = spinner(STATUS_LABELS, "신고 상태 필터");
+        statusInput = spinner(STATUS_LABELS, "신고 내부 처리 상태 필터");
         classInput = spinner(CLASS_LABELS, "신고 유형 필터");
         addView(statusInput, matchWrap());
         addView(classInput, matchWrap());
@@ -304,14 +311,14 @@ public final class AdminReportPanel extends LinearLayout {
             cardParams.setMargins(0, dp(6), 0, dp(6));
             card.setBackground(cardBackground(statusColor(item.status())));
             TextView status = text(statusIcon(item.status()) + " " + statusLabel(item.status()), 18);
-            status.setContentDescription("상태: " + statusLabel(item.status()));
+            status.setContentDescription(statusLabel(item.status()));
             card.addView(status, matchWrap());
             card.addView(text(
                 classLabel(item.className())
                     + "\n위치 품질: " + locationLabel(item.locationQuality())
                     + " · 신뢰도 " + Math.round(item.confidence() * 100d) + "%"
                     + "\n중복 근거 " + item.duplicateCount() + "건"
-                    + "\n접수: " + item.createdAt(),
+                    + "\n신고 생성: " + item.createdAt(),
                 15
             ), matchWrap());
             Button detail = button(
@@ -347,10 +354,39 @@ public final class AdminReportPanel extends LinearLayout {
         LinearLayout card = verticalGroup();
         card.setPadding(dp(16), dp(14), dp(16), dp(14));
         card.setBackground(cardBackground(statusColor(summary.status())));
-        card.addView(text(
+        TextView reviewHeading = text("1. 검수 결과", 18);
+        reviewHeading.setId(View.generateViewId());
+        markAccessibilityHeading(reviewHeading);
+        card.addView(reviewHeading, matchWrap());
+        TextView reviewStatus = text(reviewText(detail.review()), 15);
+        reviewStatus.setId(View.generateViewId());
+        reviewStatus.setAccessibilityTraversalAfter(reviewHeading.getId());
+        card.addView(reviewStatus, matchWrap());
+        TextView internalHeading = text("2. 내부 처리 상태", 18);
+        internalHeading.setId(View.generateViewId());
+        internalHeading.setAccessibilityTraversalAfter(reviewStatus.getId());
+        markAccessibilityHeading(internalHeading);
+        card.addView(internalHeading, matchWrap());
+        TextView internalStatus = text(
             statusIcon(summary.status()) + " " + statusLabel(summary.status())
-                + " · 상태 version " + summary.statusVersion()
-                + "\n" + classLabel(summary.className())
+                + "\n내부 처리 기록 버전: " + summary.statusVersion()
+                + "\n내부 업무를 기록한 상태입니다. 검수 결정이나 기관 전달·접수 상태를 자동으로 바꾸지 않습니다.",
+            16
+        );
+        internalStatus.setId(View.generateViewId());
+        internalStatus.setAccessibilityTraversalAfter(internalHeading.getId());
+        card.addView(internalStatus, matchWrap());
+        TextView deliveryHeading = text("3. 기관 전달 상태", 18);
+        deliveryHeading.setId(View.generateViewId());
+        deliveryHeading.setAccessibilityTraversalAfter(internalStatus.getId());
+        markAccessibilityHeading(deliveryHeading);
+        card.addView(deliveryHeading, matchWrap());
+        TextView deliveryStatus = text(deliveryText(detail.delivery()), 15);
+        deliveryStatus.setId(View.generateViewId());
+        deliveryStatus.setAccessibilityTraversalAfter(deliveryHeading.getId());
+        card.addView(deliveryStatus, matchWrap());
+        card.addView(text(
+            "\n" + classLabel(summary.className())
                 + "\n신고 ID: " + summary.id()
                 + "\n위치 품질: " + locationLabel(summary.locationQuality())
                 + " · 신뢰도 " + Math.round(summary.confidence() * 100d) + "%"
@@ -358,12 +394,10 @@ public final class AdminReportPanel extends LinearLayout {
                 + "\n최근 갱신: " + summary.updatedAt(),
             16
         ), matchWrap());
-        card.addView(text(reviewText(detail.review()), 15), matchWrap());
-        card.addView(text(deliveryText(detail.delivery()), 15), matchWrap());
         for (String nextStatus : detail.allowedNextStatuses()) {
             Button statusButton = button(
-                "상태를 " + statusLabel(nextStatus) + "(으)로 변경",
-                "현재 version " + summary.statusVersion() + "에서 상태를 " + statusLabel(nextStatus) + "(으)로 변경"
+                statusLabel(nextStatus) + "(으)로 변경",
+                "선택 신고의 " + statusLabel(nextStatus) + "(으)로 변경"
             );
             statusButton.setOnClickListener(view -> prepareStatus(nextStatus));
             mutationButtons.add(statusButton);
@@ -426,7 +460,7 @@ public final class AdminReportPanel extends LinearLayout {
             case LOADING_DETAIL -> "선택한 신고 상세를 불러오는 중입니다…";
             case CONTENT -> "신고 " + state.items().size() + "건을 표시합니다."
                 + (state.detail() == null ? "" : " 선택 신고 상세도 표시합니다.");
-            case EMPTY -> "조건에 맞는 신고가 없습니다. 조건을 줄이거나 '모든 상태'로 다시 조회하세요.";
+            case EMPTY -> "조건에 맞는 신고가 없습니다. 조건을 줄이거나 '모든 내부 처리 상태'로 다시 조회하세요.";
             case ERROR -> "신고를 불러오지 못했습니다. 서버 상태를 확인한 뒤 '다시 시도'를 누르세요. "
                 + state.errorMessage();
         };
@@ -441,8 +475,8 @@ public final class AdminReportPanel extends LinearLayout {
             else if ("reviewed".equals(item.status())) reviewed += 1;
             else if ("resolved".equals(item.status())) resolved += 1;
         }
-        return "현재 불러온 목록 " + items.size() + "건 · 새 신고 " + fresh
-            + "건 · 검토됨 " + reviewed + "건 · 처리 완료 " + resolved + "건";
+        return "현재 불러온 목록 " + items.size() + "건 · 내부 처리 기준: 새 신고 " + fresh
+            + "건 · 검토됨 " + reviewed + "건 · 완료 " + resolved + "건";
     }
 
     private static String priorityMessage(List<AdminReportModels.Summary> items) {
@@ -453,7 +487,7 @@ public final class AdminReportPanel extends LinearLayout {
             else if ("reviewed".equals(item.status())) reviewed += 1;
         }
         if (fresh > 0) return "우선 업무: 새 신고 " + fresh + "건의 상세와 중복 가능성을 먼저 확인하세요.";
-        if (reviewed > 0) return "다음 업무: 검토된 신고 " + reviewed + "건의 수동 제출·접수 기록을 확인하세요.";
+        if (reviewed > 0) return "다음 업무: 내부 검토된 신고 " + reviewed + "건의 검수 결과와 수동 제출·접수 기록을 확인하세요.";
         if (items.isEmpty()) return "우선 업무: 신고를 조회하세요.";
         return "현재 불러온 목록에 새 검토 대상이 없습니다.";
     }
@@ -465,8 +499,24 @@ public final class AdminReportPanel extends LinearLayout {
     }
 
     private static String reviewText(AdminReportModels.ReviewSummary review) {
-        if (review == null) return "\n현재 검수: 아직 기록 없음";
-        return "\n현재 검수: " + review.decision() + " · revision " + review.revision()
+        if (review == null) return "검수 결과: 현재 내용의 기록 없음\n" + NEW_DELIVERY_REQUIREMENTS;
+        String decision = switch (review.decision()) {
+            case "APPROVED" -> "승인";
+            case "REJECTED" -> "기각";
+            case "DUPLICATE" -> "중복";
+            default -> "알 수 없음";
+        };
+        String meaning = switch (review.decision()) {
+            case "APPROVED" -> "신고 내용의 검수 승인입니다. 내부 처리 상태와 기관 전달·접수는 별도입니다. "
+                + "새 신고 상태에서도 검수 승인을 기록할 수 있습니다."
+                + (canCreatePackage(review) ? "" : " 확인 항목이 남아 있어 새 기관 수동 전달을 진행할 수 없습니다.");
+            case "REJECTED" -> "현재 내용은 기각되어 새 기관 수동 전달을 진행할 수 없습니다. 내부 처리 상태는 별도 기록입니다.";
+            case "DUPLICATE" -> "현재 내용은 중복으로 판단되어 새 기관 수동 전달을 진행할 수 없습니다. 내부 처리 상태는 별도 기록입니다.";
+            default -> "최신 검수 결과를 다시 확인하세요.";
+        };
+        return "검수 결과: " + decision + " (현재 신고 내용)"
+            + "\n검수 기록 버전: " + review.revision()
+            + "\n" + meaning + "\n" + NEW_DELIVERY_REQUIREMENTS
             + "\n사용자 공개 사유: "
             + (review.userVisibleReason() == null ? "없음" : review.userVisibleReason())
             + "\n위치 " + done(review.locationReviewed())
@@ -477,9 +527,20 @@ public final class AdminReportPanel extends LinearLayout {
     }
 
     private static String deliveryText(AdminReportModels.DeliverySummary delivery) {
-        if (delivery == null) return "\n현재 수동전달 기록: 아직 기록 없음";
-        return "\n현재 수동전달 기록: " + delivery.status() + " · revision " + delivery.revision()
-            + "\n제출본 revision: " + delivery.packageRevision()
+        if (delivery == null) return "기관 전달 상태: 현재 내용의 기록 없음"
+            + "\n전달·접수 여부 미확인입니다. 이전 내용의 전달 이력은 별도 확인하세요.";
+        String meaning = switch (delivery.status()) {
+            case "SUBMITTED" -> "수동 제출 기록됨\n기관 접수 확인 전입니다. 접수·처리 결과를 별도로 기록하세요.";
+            case "ACKNOWLEDGED" -> "기관 접수 확인 기록됨\n기관 처리 결과는 별도입니다.";
+            case "RESOLVED" -> "기관 처리 완료 기록됨\n기관에서 받은 처리 결과를 기록했습니다. 내부 처리 상태와 별도입니다.";
+            case "FAILED" -> "전달 실패 기록됨\n이번 실패 기록은 제출 성공·기관 접수 확인이 아닙니다. 실패 사유와 이전 전달 이력을 확인하세요.";
+            default -> "알 수 없음\n최신 전달 이력을 다시 확인하세요.";
+        };
+        return "기관 전달 상태: " + meaning
+            + "\n전달 기록 버전: " + delivery.revision()
+            + "\n제출본 버전: " + delivery.packageRevision()
+            + "\n관리자가 수동 기록한 전달 상태입니다. 기관의 응답이나 증거를 앱이 검증한 결과가 아닙니다."
+            + "\n앱 밖에서 수행한 수동 전달 사실의 기록입니다. 앱은 기관으로 자료를 전송하지 않습니다."
             + "\n외부 접수번호 " + present(delivery.externalReceiptPresent())
             + " · 증빙 " + present(delivery.evidencePresent())
             + "\n관찰시각: " + delivery.observedAt()
@@ -490,7 +551,7 @@ public final class AdminReportPanel extends LinearLayout {
         sessionBoundDraftsCleared = false;
         pendingStatus = nextStatus;
         pendingPackage = false;
-        workflowText.setText("선택 작업: 상태를 " + statusLabel(nextStatus) + "(으)로 변경 · 자동 재제출 없음");
+        workflowText.setText("선택 작업: " + statusLabel(nextStatus) + "(으)로 변경 · 자동 재제출 없음");
         workflowActions.setVisibility(VISIBLE);
         highRiskPassword.requestFocus();
     }
@@ -673,10 +734,10 @@ public final class AdminReportPanel extends LinearLayout {
 
     private static String statusLabel(String status) {
         return switch (status) {
-            case "new" -> "새 신고";
-            case "reviewed" -> "검토됨";
-            case "resolved" -> "처리 완료";
-            default -> "알 수 없는 상태";
+            case "new" -> "내부 처리: 새 신고";
+            case "reviewed" -> "내부 처리: 검토됨";
+            case "resolved" -> "내부 처리: 완료";
+            default -> "내부 처리: 알 수 없음";
         };
     }
 

@@ -7,11 +7,15 @@ public final class AdminSecurityApiException extends IOException {
         RECOVERY_EXPIRED("admin_recovery_expired"),
         RECOVERY_INVALID("admin_recovery_invalid"),
         RATE_LIMITED("admin_auth_rate_limited"),
+        TOTP_REPLAYED("admin_totp_replayed"),
+        REAUTHENTICATION_FAILED("admin_reauthentication_failed"),
         RECOVERY_IN_PROGRESS("admin_recovery_in_progress"),
         TOTP_SECRET_NOT_REPLACED("admin_totp_secret_not_replaced"),
         RECOVERY_VERIFICATION_FAILED("admin_recovery_verification_failed"),
         RECOVERY_DEVICE_KEY_REQUIRED("admin_recovery_device_key_required"),
-        DEVICE_KEY_NOT_ACTIVE("admin_device_key_not_active");
+        DEVICE_KEY_NOT_ACTIVE("admin_device_key_not_active"),
+        RECOVERY_CUSTODY_REQUIRED("admin_recovery_custody_required"),
+        CUSTODY_STATE_VERSION_CONFLICT("admin_recovery_custody_state_version_conflict");
 
         private final String wireValue;
 

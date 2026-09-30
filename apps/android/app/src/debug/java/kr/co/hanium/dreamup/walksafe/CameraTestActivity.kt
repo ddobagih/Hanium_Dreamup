@@ -369,7 +369,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                 val capturedMs = SystemClock.elapsedRealtime()
                 val tracking = frame.camera.trackingState.name
                 val trackingFailure = frame.camera.trackingFailureReason.name
-                val turns = UprightCameraImage.quarterTurns(view)
+                val turns = UprightCameraImage.quarterTurns(view) ?: return
                 val geometryId = "camera-test:$epoch:${ownedImage.width}x${ownedImage.height}:$turns"
                 val frozenTransform = FrozenImageToDepthTransform.create(frameId,
                     depth.toList().chunked(2).take(4).map { Point2(it[0], it[1]) }, Point2(depth[8], depth[9]))
@@ -408,7 +408,7 @@ class CameraTestActivity : Activity(), GLSurfaceView.Renderer {
                             primary.sourceGate.qualify(capturedSnapshot)?.let { qualified -> primaryPipeline.process(
                                 snapshot = qualified, frameId = frameId, timestampMs = frameId / 1_000_000L,
                                 detections = result.detections, detectionSequenceId = frameId,
-                                detectionCompleted = !result.partial, mapper = mapper,
+                                detectionCompleted = !result.partial, mapper = mapper, mapperFrameId = mapper.frameId,
                                 imageQuarterTurns = turns,
                             ) } ?: emptyList()
                         } else { primary.reset(); emptyList() }

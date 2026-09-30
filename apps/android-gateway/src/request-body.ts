@@ -7,6 +7,49 @@ function bodyError(status: number, code: string): Response {
   return Response.json({ code }, { status, headers: { "cache-control": "no-store" } });
 }
 
+function hasDuplicateJsonObjectKeys(text: string): boolean {
+  const objectKeys: Set<string>[] = [];
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === "{") {
+      objectKeys.push(new Set<string>());
+      continue;
+    }
+    if (text[index] === "}") {
+      objectKeys.pop();
+      continue;
+    }
+    if (text[index] !== '"') continue;
+
+    const start = index;
+    for (index += 1; index < text.length; index += 1) {
+      if (text[index] === "\\") {
+        index += 1;
+      } else if (text[index] === '"') {
+        break;
+      }
+    }
+    let next = index + 1;
+    while (
+      text[next] === " " || text[next] === "\t" ||
+      text[next] === "\r" || text[next] === "\n"
+    ) {
+      next += 1;
+    }
+    if (text[next] !== ":") continue;
+
+    const keys = objectKeys[objectKeys.length - 1];
+    if (!keys) continue;
+    const key = JSON.parse(text.slice(start, index + 1)) as string;
+    if (keys.has(key)) return true;
+    keys.add(key);
+  }
+  return false;
+}
+
+export function duplicateJsonObjectKeysError(text: string): Response | null {
+  return hasDuplicateJsonObjectKeys(text) ? bodyError(400, "invalid_json_body") : null;
+}
+
 export async function readBoundedTextBody(
   request: Request,
   maxBytes: number,
@@ -85,7 +128,10 @@ export async function readBoundedJsonBody(
   const bounded = await readBoundedTextBody(request, maxBytes, timeoutMs);
   if (bounded.error) return bounded;
   try {
-    return { value: JSON.parse(bounded.text) as unknown };
+    const value: unknown = JSON.parse(bounded.text);
+    const duplicateError = duplicateJsonObjectKeysError(bounded.text);
+    if (duplicateError) return { error: duplicateError };
+    return { value };
   } catch {
     return { error: bodyError(400, "invalid_json_body") };
   }

@@ -36,6 +36,9 @@ from backend.app.services.admin_security import (
 from backend.app.services.admin_report_integrity import (
     admin_report_integrity_boundary_state,
 )
+from backend.app.services.report_delivery_effective import (
+    uncorrected_delivery_event_clause,
+)
 from backend.app.services.report_content_corrections import (
     ReportContentCorrectionError,
     ReportContentState,
@@ -117,6 +120,25 @@ def _zip_entry(name: str) -> zipfile.ZipInfo:
     return info
 
 
+def _is_approved_review_for_content(
+    review: ReportReviewDecision | None,
+    *,
+    report_id: uuid.UUID,
+    content_revision: int,
+) -> bool:
+    return bool(
+        review is not None
+        and review.report_id == report_id
+        and int(review.content_revision or 0) == content_revision
+        and review.decision == "APPROVED"
+        and review.location_reviewed
+        and review.photo_reviewed
+        and review.privacy_reviewed
+        and review.duplicate_of_report_id is None
+        and getattr(review, "evidence_grant_id", None) is not None
+    )
+
+
 def _latest_approved_review_for_content(
     db: Session,
     *,
@@ -132,20 +154,9 @@ def _latest_approved_review_for_content(
         .order_by(ReportReviewDecision.revision.desc())
         .limit(1)
     ).scalar_one_or_none()
-    if review is None:
-        return None
-    if (
-        review.report_id != report_id
-        or int(review.content_revision or 0) != content_revision
-        or review.decision != "APPROVED"
-        or not review.location_reviewed
-        or not review.photo_reviewed
-        or not review.privacy_reviewed
-        or review.duplicate_of_report_id is not None
-        or getattr(review, "evidence_grant_id", None) is None
-    ):
-        return None
-    return review
+    return review if _is_approved_review_for_content(
+        review, report_id=report_id, content_revision=content_revision
+    ) else None
 
 
 def build_admin_report_delivery_package(
@@ -639,9 +650,13 @@ def get_admin_report_delivery_package_proof(
         report = db.execute(
             select(Report).where(Report.id == report_id).with_for_update()
         ).scalar_one_or_none()
+        # S18-40: the proof follows the latest effective (uncorrected) event.
         latest_event = db.execute(
             select(ReportInstitutionDeliveryEvent)
-            .where(ReportInstitutionDeliveryEvent.report_id == report_id)
+            .where(
+                ReportInstitutionDeliveryEvent.report_id == report_id,
+                uncorrected_delivery_event_clause(),
+            )
             .order_by(ReportInstitutionDeliveryEvent.revision.desc())
             .limit(1)
         ).scalar_one_or_none()
@@ -679,6 +694,52 @@ def get_admin_report_delivery_package_proof(
             "The delivery package store is temporarily unavailable.",
             status_code=503,
         ) from exc
+    proof_content_revision = content.revision
+    historical_submission = (
+        package is not None
+        and latest_event is not None
+        and latest_event.status in {"SUBMITTED", "ACKNOWLEDGED", "RESOLVED"}
+        and latest_event.package_id == package.id
+        and latest_event.package_revision == package.revision
+    )
+    if historical_submission and (
+        review is None
+        or review.id != package.review_decision_id
+        or content.revision != int(package.content_revision or 0)
+    ):
+        # A submitted package is immutable historical evidence. Later content
+        # corrections and reviews may block a new submission, but not recovery
+        # of the ZIP digest used by an existing delivery workflow.
+        try:
+            historical_review = db.execute(
+                select(ReportReviewDecision).where(
+                    ReportReviewDecision.id == package.review_decision_id,
+                    ReportReviewDecision.report_id == report_id,
+                )
+            ).scalar_one_or_none()
+        except SQLAlchemyError as exc:
+            db.rollback()
+            raise AdminReportWorkflowError(
+                "delivery_package_store_unavailable",
+                "The delivery package store is temporarily unavailable.",
+                status_code=503,
+            ) from exc
+        if (
+            latest_event.review_decision_id != package.review_decision_id
+            or not _is_approved_review_for_content(
+                historical_review,
+                report_id=report_id,
+                content_revision=int(package.content_revision or 0),
+            )
+        ):
+            db.rollback()
+            raise AdminReportWorkflowError(
+                "delivery_package_proof_ineligible",
+                "The requested package is not eligible for recovery proof.",
+                status_code=409,
+            )
+        review = historical_review
+        proof_content_revision = int(package.content_revision or 0)
     if review is None:
         db.rollback()
         raise AdminReportWorkflowError(
@@ -690,7 +751,7 @@ def get_admin_report_delivery_package_proof(
         package is None
         or int(package.package_version or 0) != 2
         or package.schema_version != DELIVERY_PACKAGE_SCHEMA_VERSION_V2
-        or int(package.content_revision or 0) != content.revision
+        or int(package.content_revision or 0) != proof_content_revision
         or package.review_decision_id != review.id
     ):
         db.rollback()

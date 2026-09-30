@@ -30,6 +30,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AndroidGatewaySessionCryptoLifecycleTest {
+    private val createdFixtures = mutableListOf<Fixture>()
+    @org.junit.After fun clearFixtureStorage() {
+        createdFixtures.forEach { it.store().resetInstallationAfterConfirmedAccountDeletion() }
+    }
+
     @Test
     fun passwordLoginSurvivesStoreRecreationWithoutGrantingUnverifiedAccess() {
         val fixture = Fixture("password-restart")
@@ -63,9 +68,9 @@ class AndroidGatewaySessionCryptoLifecycleTest {
             backendSession(deviceId), completed, GATEWAY_ORIGIN, NOW_EPOCH_MS,
         ))
         val restored = requireNotNull(fixture.store().restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS))
-        assertTrue(restored.firstRunSnapshot.isComplete)
+        assertFreshChecksPending(restored.firstRunSnapshot)
         assertEquals(completed.completedReceiptHashes, restored.firstRunSnapshot.completedReceiptHashes)
-        assertEquals(BACKEND_ACTOR_ID, restored.firstRunSnapshot.reporterActorBinding?.value)
+        assertEquals(BACKEND_ACTOR_ID, restored.firstRunSnapshot.verifiedActorBinding?.value)
         assertFalse(restored.session.isUsableFor(BACKEND_ACTOR_ID, NOW_EPOCH_MS))
     }
 
@@ -83,7 +88,7 @@ class AndroidGatewaySessionCryptoLifecycleTest {
         val completed = completedReturningEmailFirstRun(BACKEND_ACTOR_ID)
         assertEquals(GatewaySessionStoreResult.COMMITTED,
             store.updateBackendDeviceFirstRunSnapshot(version, completed))
-        assertTrue(store.restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS)?.firstRunSnapshot?.isComplete == true)
+        assertFreshChecksPending(requireNotNull(store.restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS)).firstRunSnapshot)
         assertEquals(GatewaySessionStoreResult.STALE,
             store.updateBackendDeviceFirstRunSnapshot(version, initial))
         assertEquals(GatewaySessionStoreResult.STALE,
@@ -351,7 +356,7 @@ class AndroidGatewaySessionCryptoLifecycleTest {
             fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS),
         )
         assertEquals(FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4, restored.firstRunSnapshot.flow)
-        assertTrue(restored.firstRunSnapshot.isComplete)
+        assertFreshChecksPending(restored.firstRunSnapshot)
         assertEquals(
             setOf(
                 FirstRunOnboardingStage.VERIFIED_LOGIN,
@@ -381,7 +386,145 @@ class AndroidGatewaySessionCryptoLifecycleTest {
         assertTrue(fixture.store().resetInstallationAfterConfirmedAccountDeletion())
     }
 
-    private class Fixture(suffix: String) {
+    @Test
+    fun completedEmailLongSessionRestoresHistoryAndRenewsBeforeFreshChecks() {
+        val fixture = Fixture("email-long-renew")
+        val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
+        val complete = completedReturningEmailFirstRun()
+        assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().saveInitialIfAbsent(
+            longSession(deviceId), complete, GATEWAY_ORIGIN))
+        val restored = requireNotNull(fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        assertFreshChecksPending(restored.firstRunSnapshot)
+        assertEquals(complete.completedReceiptHashes, restored.firstRunSnapshot.completedReceiptHashes)
+        assertNull(restored.firstRunSnapshot.reporterActorBinding)
+        assertFalse(restored.session.isUsableFor(ACTOR_ID, NOW_EPOCH_MS))
+        assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().reserveRenewal(restored.version, RENEW_OPERATION))
+        assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().commitRenewal(
+            restored.version, RENEW_OPERATION, longSession(deviceId, 1L), restored.firstRunSnapshot))
+        val renewed = requireNotNull(fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        assertEquals(1L, renewed.version.rotation)
+        assertFreshChecksPending(renewed.firstRunSnapshot)
+        val jit = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            renewed.firstRunSnapshot, renewed.firstRunSnapshot.epoch, renewed.firstRunSnapshot.revision).current
+        assertFalse(jit.mayEnterWalk)
+        val device = FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(jit, jit.epoch, jit.revision).current
+        assertTrue(device.mayEnterWalk)
+        assertEquals(complete.completedReceiptHashes, device.completedReceiptHashes)
+    }
+
+    @Test
+    fun emailLongRenewalRejectsStaleWrongActorAndAlteredHistoryWithoutLosingOriginal() {
+        val fixture = Fixture("email-long-cas")
+        val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
+        assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().saveInitialIfAbsent(
+            longSession(deviceId), completedReturningEmailFirstRun(), GATEWAY_ORIGIN))
+        val restored = requireNotNull(fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().reserveRenewal(restored.version, RENEW_OPERATION))
+        assertEquals(GatewaySessionStoreResult.STALE, fixture.store().commitRenewal(
+            restored.version, "stale_renewal_operation_0002", longSession(deviceId, 1L), restored.firstRunSnapshot))
+        assertEquals(GatewaySessionStoreResult.BLOCKED, fixture.store().commitRenewal(
+            restored.version, RENEW_OPERATION, longSession(deviceId, 1L),
+            completedReturningEmailFirstRun("actor_abcdef0123456789abcdef0123456789")))
+        val changed = restored.firstRunSnapshot.copy(completedReceiptHashes =
+            restored.firstRunSnapshot.completedReceiptHashes + (FirstRunOnboardingStage.FP004_TRAINING to receipt(99)))
+        assertEquals(GatewaySessionStoreResult.BLOCKED, fixture.store().commitRenewal(
+            restored.version, RENEW_OPERATION, longSession(deviceId, 1L), changed))
+        assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().commitRenewal(
+            restored.version, RENEW_OPERATION, longSession(deviceId, 1L), restored.firstRunSnapshot))
+        assertFreshChecksPending(requireNotNull(fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS)).firstRunSnapshot)
+    }
+
+    @Test
+    fun freshChecksPendingHistoryCannotCreateAnInitialLongLogin() {
+        val fixture = Fixture("email-long-initial")
+        val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
+        val initial = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+            epoch = 10L,
+            orderedEvidence = listOf(
+                FirstRunOnboardingEvidence.VerifiedLogin(FirstRunOpaqueActorBinding.fromProvider(ACTOR_ID), receipt(1)),
+                FirstRunOnboardingEvidence.PurposeAndSafety(receipt(2)),
+                FirstRunOnboardingEvidence.Fp004Training(receipt(3)),
+            ),
+            verifier = FirstRunOnboardingEvidenceVerifier { _, _ -> true },
+        ).snapshot
+        assertFreshChecksPending(initial)
+        assertEquals(ACTOR_ID, initial.verifiedActorBinding?.value)
+        assertEquals(GatewaySessionStoreResult.BLOCKED, fixture.store().saveInitialIfAbsent(
+            longSession(deviceId), initial, GATEWAY_ORIGIN))
+        assertFalse(fixture.preferences.contains(V4_STATE_PREF_KEY))
+    }
+
+    @Test
+    fun longHistoryWithAnAuthenticatedButWrongActorCannotRestore() {
+        val fixture = Fixture("email-long-wrong-actor")
+        val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
+        assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().saveInitialIfAbsent(
+            longSession(deviceId), completedReturningEmailFirstRun(), GATEWAY_ORIGIN))
+        fixture.rewriteLongPayload { it.getJSONObject("session").put("actor_id", "actor_abcdef0123456789abcdef0123456789") }
+        assertNull(fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        assertTrue(fixture.store().isStorageBlocked())
+    }
+
+    @Test
+    fun mainRestoresAuthenticationBindingWhileWalkGateStillRequiresFreshChecks() {
+        val source = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        val restore = source.substringAfter("private fun restoreGatewaySessionFromPrefs()")
+            .substringBefore("private fun retryPendingGatewayRenewal()")
+        assertTrue(restore.contains("restored.firstRunSnapshot.verifiedActorBinding?.value"))
+        val walkGate = source.substringAfter("private fun firstRunOnboardingComplete(): Boolean")
+            .substringBefore("private fun firstRunWaitingTextOrNull")
+        assertTrue(walkGate.contains("!firstRunOnboardingSnapshot.mayEnterWalk"))
+        assertTrue(walkGate.contains("!postLoginDeviceCheckPassesFeatureGate()"))
+        val publish = source.substringAfter("private fun onGatewayProcessSessionChanged(")
+            .substringBefore("private fun dispatchGatewayProcessSessionChanged(")
+        assertTrue(publish.contains("appliedFirstRun.isComplete &&"))
+        assertTrue(publish.contains("permissionSessionPolicy.authenticationExpired()"))
+    }
+
+    private fun assertFreshChecksPending(snapshot: FirstRunOnboardingSnapshot) {
+        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, snapshot.stage)
+        assertFalse(snapshot.isComplete)
+        assertFalse(snapshot.mayEnterWalk)
+        assertTrue(FirstRunOnboardingStage.FP004_TRAINING in snapshot.completedReceiptHashes)
+        assertNull(snapshot.reporterActorBinding)
+    }
+
+    @Test
+    fun unlimitedEmailLongSessionRestoresAfterYearsWithoutUse() {
+        // Owner decision 2 (2026-09-29): no idle or absolute expiry; a restart restores the login.
+        val fixture = Fixture("email-long-unlimited")
+        val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
+        val unlimited = GatewayFieldSession.longLivedSession(
+            GATEWAY_ORIGIN, ACTOR_ID, deviceId, "f".repeat(32), 0L,
+            "walksafe_field_session=access-token-unlimited-0", "u".repeat(64),
+            NOW_EPOCH_MS + 60_000L, GATEWAY_UNLIMITED_EXPIRY_EPOCH_MS, GATEWAY_UNLIMITED_EXPIRY_EPOCH_MS,
+        )
+        assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().saveInitialIfAbsent(
+            unlimited, completedReturningEmailFirstRun(), GATEWAY_ORIGIN))
+        val tenYearsLater = NOW_EPOCH_MS + 10L * 365L * 86_400_000L
+        val restored = requireNotNull(fixture.store().restoreActive(GATEWAY_ORIGIN, tenYearsLater))
+        assertEquals(GatewaySessionVerificationState.RESTORED_UNVERIFIED, restored.session.verificationState)
+        assertEquals(GATEWAY_UNLIMITED_EXPIRY_EPOCH_MS, restored.session.idleExpiresAtEpochMs)
+        assertEquals(GATEWAY_UNLIMITED_EXPIRY_EPOCH_MS, restored.session.absoluteExpiresAtEpochMs)
+        // The short access credential still expired: only a verified refresh makes it usable.
+        assertFalse(restored.session.isUsableFor(ACTOR_ID, tenYearsLater))
+        assertTrue(restored.session.isRenewableFor(ACTOR_ID, tenYearsLater))
+        assertNull(fixture.store().restorePendingRevocation(GATEWAY_ORIGIN))
+        // A finite long session of the same age still ends (the bound is not removed for it).
+        val finite = Fixture("email-long-finite-expired")
+        val finiteDevice = requireNotNull(finite.store().getOrCreateInstallDeviceId())
+        assertEquals(GatewaySessionStoreResult.COMMITTED, finite.store().saveInitialIfAbsent(
+            longSession(finiteDevice), completedReturningEmailFirstRun(), GATEWAY_ORIGIN))
+        assertNull(finite.store().restoreActive(GATEWAY_ORIGIN, tenYearsLater))
+    }
+
+    private fun longSession(deviceId: String, rotation: Long = 0L) = GatewayFieldSession.longLivedSession(
+        GATEWAY_ORIGIN, ACTOR_ID, deviceId, "f".repeat(32), rotation,
+        "walksafe_field_session=access-token-rotation-$rotation", (if (rotation == 0L) "r" else "s").repeat(64),
+        NOW_EPOCH_MS + 60_000L, NOW_EPOCH_MS + 120_000L, NOW_EPOCH_MS + 180_000L)
+
+    private inner class Fixture(suffix: String) {
+        init { createdFixtures += this }
         val preferences = FakeSharedPreferences()
         val provider = FakeKeyProvider()
         private val sessionPrefix = "walksafe.test.gateway.$suffix.session.v"
@@ -418,6 +561,18 @@ class AndroidGatewaySessionCryptoLifecycleTest {
             } finally {
                 plaintext.fill(0)
             }
+        }
+
+        fun rewriteLongPayload(mutate: (JSONObject) -> Unit) {
+            val envelope = requireNotNull(preferences.getString(V4_STATE_PREF_KEY, null))
+            val opened = sessionAead.open(envelope, STATE_AAD, STATE_LIMITS) as AeadOpenResult.Opened
+            val json = try { JSONObject(String(opened.plaintext, Charsets.UTF_8)) }
+                finally { opened.plaintext.fill(0) }
+            mutate(json)
+            val bytes = json.toString().toByteArray(Charsets.UTF_8)
+            val replaced = try { (sessionAead.seal(bytes, STATE_AAD, STATE_LIMITS) as AeadSealResult.Sealed).envelope }
+                finally { bytes.fill(0) }
+            assertTrue(preferences.edit().putString(V4_STATE_PREF_KEY, replaced).commit())
         }
 
         fun storeV3Active(deviceId: String, evidenceCount: Int) {
@@ -637,6 +792,7 @@ class AndroidGatewaySessionCryptoLifecycleTest {
         const val GATEWAY_ORIGIN = "https://gateway.example.test"
         const val ACTOR_ID = "actor_0123456789abcdef0123456789abcdef"
         const val BACKEND_ACTOR_ID = "123e4567-e89b-42d3-a456-426614174000"
+        const val RENEW_OPERATION = "renewal_operation_0001"
         const val NOW_EPOCH_MS = 1_000_000L
         val V3_STATE_AAD =
             "kr.co.hanium.dreamup.walksafe|USER|gateway-session|payload=3"

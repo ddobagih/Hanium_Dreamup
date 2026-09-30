@@ -107,7 +107,8 @@ class ObjectTrackerPartialAssociationTest {
             }
             return DepthFrameSnapshot(key.frameId, DepthImage16(192, 192, data),
                 ConfidenceImage8(192, 192, ByteArray(192 * 192) { 255.toByte() }), null,
-                rawDepthTimestampNs = key.cameraTimestampNs, cameraImageTimestampNs = key.cameraTimestampNs)
+                rawDepthTimestampNs = key.cameraTimestampNs, rawConfidenceTimestampNs = key.cameraTimestampNs,
+                cameraImageTimestampNs = key.cameraTimestampNs)
         }
         var warningCandidates = 0
         var actions = 0
@@ -116,7 +117,7 @@ class ObjectTrackerPartialAssociationTest {
             val source = key(1_000L + batch * 400L)
             offer(source)
             val frozenOutput = frozen.process(depth(source, batch), source.frameId,
-                source.capturedAtElapsedRealtimeMs, detections, mapper = mapper)
+                source.capturedAtElapsedRealtimeMs, detections, mapper = mapper, mapperFrameId = source.frameId)
             val priority = PrimaryTrackingPriorityPolicy.sourceIndices(detections, frozenOutput, source.frameId, 50L)
             repeat(7) { frame ->
                 val target = key(source.capturedAtElapsedRealtimeMs + 50L + frame * 50L)

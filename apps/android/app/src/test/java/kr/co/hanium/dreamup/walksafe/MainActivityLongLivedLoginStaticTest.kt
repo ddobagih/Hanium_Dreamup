@@ -26,7 +26,7 @@ class MainActivityLongLivedLoginStaticTest {
     ).readText()
 
     @Test
-    fun releaseForcesLongLivedLoginOffAndDebugRequiresOneExactOptInProperty() {
+    fun releaseKeepsLongLivedLoginOnAndDebugRequiresOneExactOptInProperty() {
         val debugProperty = sourceSection(
             buildSource,
             "val debugLongLivedLoginEnabled =",
@@ -54,7 +54,13 @@ class MainActivityLongLivedLoginStaticTest {
             "        release {",
             "            isMinifyEnabled",
         )
+        // Owner decision 2 (2026-09-29): release keeps the login until an explicit end.
         assertTrue(
+            release.contains(
+                "buildConfigField(\"boolean\", \"WALKSAFE_LONG_LIVED_LOGIN_ENABLED\", \"true\")",
+            ),
+        )
+        assertFalse(
             release.contains(
                 "buildConfigField(\"boolean\", \"WALKSAFE_LONG_LIVED_LOGIN_ENABLED\", \"false\")",
             ),

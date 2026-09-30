@@ -204,7 +204,7 @@ def test_openapi_expresses_runtime_role_and_actor_security() -> None:
     }
     assert consent_versions["additionalProperties"] is False
     assert consent_versions["properties"]["raw_source_collection"]["const"] == (
-        "FP-013-RAW-1.1.0"
+        "FP-013-RAW-1.2.0"
     )
     consent_request = schema["components"]["schemas"]["PrivacyConsentEventV2"]
     assert "expected_previous_backend_receipt_sha256" in consent_request["required"]
@@ -246,6 +246,18 @@ def test_openapi_expresses_runtime_role_and_actor_security() -> None:
             assert operation["responses"][error_status]["content"]["application/json"][
                 "schema"
             ] == {"$ref": "#/components/schemas/PrivacyErrorResponseV2"}
+
+
+def test_default_error_descriptions_are_stable_across_python_versions() -> None:
+    schema = app.openapi()
+    for path, method in (
+        ("/accounts", "post"),
+        ("/privacy/consent-events", "post"),
+        ("/raw-collections/{collection_id}/manifest", "put"),
+    ):
+        responses = schema["paths"][path][method]["responses"]
+        assert responses["413"]["description"] == "Request Entity Too Large"
+        assert responses["422"]["description"] == "Unprocessable Entity"
 
 
 def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
@@ -575,6 +587,7 @@ def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
     assert {
         "status_version",
         "latest_delivery_revision",
+        "latest_review_revision",
         "allowed_next_statuses",
     } <= set(detail_schema["required"])
     capabilities_schema = schema["components"]["schemas"]["AdminReportCapabilitiesV2"]
@@ -656,3 +669,74 @@ def test_walking_route_fixture_is_backend_model_output_with_numeric_tmap_codes()
     assert isinstance(response.steps[0].facility_type, int)
     assert isinstance(response.guide_points[0].turn_type, int)
     assert isinstance(response.guide_points[0].facility_type, int)
+
+
+def test_w20a_admin_review_revision_contract_matches_runtime_schema() -> None:
+    """W20A-R1/R9: the checked contract carries the report-wide review revision
+    and the bigint bounds exactly as the runtime schema renders them."""
+
+    checked = json.loads(CANONICAL_OPENAPI_PATH.read_text(encoding="utf-8"))
+    runtime = app.openapi()
+    for name in ("AdminReportDetailV2", "ReportReviewDecisionRequest"):
+        assert checked["components"]["schemas"][name] == runtime["components"][
+            "schemas"
+        ][name]
+    detail_schema = checked["components"]["schemas"]["AdminReportDetailV2"]
+    assert "latest_review_revision" in detail_schema["required"]
+    assert detail_schema["properties"]["latest_review_revision"] == {
+        "minimum": 0.0,
+        "title": "Latest Review Revision",
+        "type": "integer",
+    }
+    review_request = checked["components"]["schemas"]["ReportReviewDecisionRequest"]
+    for revision_field in ("content_revision", "expected_review_revision"):
+        assert review_request["properties"][revision_field]["maximum"] == float(
+            9_223_372_036_854_775_807
+        )
+
+
+def test_s1617_51_status_view_response_variant_is_in_contract() -> None:
+    """S1617-51-F1: the opt-in device-verification status view has a schema.
+
+    The default 200 response stays AccountDeletionStatusV2 (Gateway exactKeys);
+    the header-selected variant and its nested summary are registered as
+    components and referenced from the operation, in the checked contract and
+    in the runtime schema alike.
+    """
+
+    checked = json.loads(CANONICAL_OPENAPI_PATH.read_text(encoding="utf-8"))
+    runtime = app.openapi()
+    variant_name = "AccountDeletionStatusWithDeviceVerificationV2"
+    summary_name = "AccountDeletionDeviceVerificationV1"
+    for schema in (checked, runtime):
+        components = schema["components"]["schemas"]
+        operation = schema["paths"]["/privacy/account-deletions/{request_id}/status"]["get"]
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/AccountDeletionStatusV2"
+        }
+        assert operation["x-walksafe-response-variants"] == [
+            {
+                "status": "200",
+                "request_header": "x-walksafe-deletion-status-view",
+                "request_header_value": "device-verification.v1",
+                "schema": {"$ref": f"#/components/schemas/{variant_name}"},
+            }
+        ]
+        variant = components[variant_name]
+        base = components["AccountDeletionStatusV2"]
+        assert set(variant["properties"]) == set(base["properties"]) | {"device_verification"}
+        assert set(variant["required"]) == set(base["required"]) | {"device_verification"}
+        assert variant["properties"]["device_verification"] == {
+            "$ref": f"#/components/schemas/{summary_name}"
+        }
+        assert variant["additionalProperties"] is False
+        assert variant["allOf"] == base["allOf"]
+        summary = components[summary_name]
+        assert summary["additionalProperties"] is False
+        assert summary["properties"]["completion_view"]["enum"] == [
+            "COMPLETED",
+            "IN_PROGRESS",
+            "SERVER_COMPLETED_DEVICE_UNVERIFIED",
+        ]
+    for name in (variant_name, summary_name):
+        assert checked["components"]["schemas"][name] == runtime["components"]["schemas"][name]

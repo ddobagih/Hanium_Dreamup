@@ -308,7 +308,12 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
             runner,
         )
         assert function is not None
-        assert "-p no:cacheprovider" in function.group()
+        # Every layer runs pytest through the shared JUnit-reporting helper.
+        assert "run_python_tests " in function.group()
+    helper = re.search(r"(?ms)^run_python_tests\(\) \{.*?^\}", runner)
+    assert helper is not None
+    assert "-p no:cacheprovider" in helper.group()
+    assert '--junitxml="${REPORT_DIR}/${group}.xml"' in helper.group()
     assert "check_walksafe_node_toolchain_20260715.py" in runner
     assert 'export PATH="${LOCKED_NODE_BIN_DIR}:/usr/bin:/bin"' in runner
     assert '/usr/bin/env -i "${npm_environment[@]}" "${LOCKED_NODE_BIN_DIR}/npm" "$@"' in runner
@@ -370,7 +375,7 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
     run_unit_start = runner.index("run_unit() (")
     run_unit_end = runner.index("\n)\n\nrun_active_session_control", run_unit_start)
     run_unit = runner[run_unit_start:run_unit_end]
-    assert run_unit.index('"${PYTHON_BIN}" -m pytest') < run_unit.index(
+    assert run_unit.index('run_python_tests python-unit "${PYTHON_BIN}"') < run_unit.index(
         "./gradlew testDebugUnitTest"
     )
     assert (
@@ -388,7 +393,7 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
         'https://walksafe.invalid}" \\\n'
         '      WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-'
         'https://admin.walksafe.invalid}" \\\n'
-        "      ./gradlew lintRelease assembleRelease --no-daemon"
+        "      ./gradlew testReleaseUnitTest lintRelease assembleRelease --no-daemon"
     )
     assert release_block.count(release_command) == 1
 
@@ -399,6 +404,8 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
         "#!/bin/sh\n"
         "case \" $* \" in\n"
         "  *check_walksafe_node_toolchain_20260715.py*) exit 0 ;;\n"
+        # The EXIT-trap report summary must not overwrite the captured pytest argv.
+        "  *summarize_walksafe_test_reports.py*) exit 0 ;;\n"
         "esac\n"
         "printf '%s\\n' \"$@\" > \"$WALKSAFE_TEST_ARGV_CAPTURE\"\n"
         "printf 'PYTEST_ADDOPTS=%s\\nPYTEST_PLUGINS=%s\\n' "

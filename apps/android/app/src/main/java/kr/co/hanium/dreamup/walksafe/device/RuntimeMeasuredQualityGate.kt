@@ -16,20 +16,70 @@ class RuntimeMeasuredQualityGate(
     private var lastPass: MeasuredEnvironmentEvidence? = null
     private var failureStartedAtMs: Long? = null
     private var latestCandidate: MeasuredEnvironmentEvidence? = null
+    private var newestObservationAtMs: Long? = null
 
     @Synchronized
     fun observe(
         candidate: MeasuredEnvironmentEvidence,
         nowElapsedRealtimeMs: Long,
     ): MeasuredEnvironmentEvidence {
-        val previous = lastPass
+        val previous = latestCandidate
+        val previousEpoch = previous?.epoch
+        val candidateEpoch = candidate.epoch
+        if (previousEpoch != null && candidateEpoch != null &&
+            candidateEpoch.walkSessionId == previousEpoch.walkSessionId &&
+            candidateEpoch.recoveryGeneration < previousEpoch.recoveryGeneration
+        ) {
+            return requireNotNull(current(nowElapsedRealtimeMs))
+        }
         if (previous != null &&
             (previous.epoch != candidate.epoch ||
                 previous.factor != candidate.factor ||
                 previous.measurementProfileId != candidate.measurementProfileId)
         ) reset()
+        val observedAtMs = candidate.observedAtElapsedRealtimeMs
+        val newestAtMs = newestObservationAtMs
+        if (candidate.status != EnvironmentEvidenceStatus.PASS && observedAtMs != null &&
+            newestAtMs != null && observedAtMs < newestAtMs
+        ) {
+            // A delayed failure cannot replace a newer observation from this same source.
+            return requireNotNull(current(nowElapsedRealtimeMs))
+        }
+        if (candidate.status == EnvironmentEvidenceStatus.PASS && newestAtMs != null &&
+            (observedAtMs == null || observedAtMs <= newestAtMs)
+        ) {
+            // An older or duplicate PASS cannot replace the latest quality observation.
+            return requireNotNull(current(nowElapsedRealtimeMs))
+        }
+        if (candidate.status == EnvironmentEvidenceStatus.PASS &&
+            !candidate.isFresh(nowElapsedRealtimeMs)
+        ) {
+            val unavailable = candidate.copy(
+                status = EnvironmentEvidenceStatus.UNKNOWN,
+                detail = "STALE_OR_INVALID_TIMESTAMP",
+            )
+            // Invalid PASS cannot replace rejection evidence or become valid on a later clock tick.
+            clearPass()
+            if (latestCandidate == null ||
+                latestCandidate?.status == EnvironmentEvidenceStatus.PASS
+            ) {
+                latestCandidate = unavailable
+            }
+            return unavailable
+        }
         latestCandidate = candidate
+        if (observedAtMs != null && observedAtMs >= 0L && observedAtMs <= nowElapsedRealtimeMs &&
+            (newestAtMs == null || observedAtMs > newestAtMs)
+        ) {
+            newestObservationAtMs = observedAtMs
+        }
+        return evaluate(candidate, nowElapsedRealtimeMs)
+    }
 
+    private fun evaluate(
+        candidate: MeasuredEnvironmentEvidence,
+        nowElapsedRealtimeMs: Long,
+    ): MeasuredEnvironmentEvidence {
         if (candidate.status == EnvironmentEvidenceStatus.PASS &&
             candidate.isFresh(nowElapsedRealtimeMs)
         ) {
@@ -65,7 +115,7 @@ class RuntimeMeasuredQualityGate(
     /** Reassesses the original observation without pretending a new sample arrived. */
     @Synchronized
     fun current(nowElapsedRealtimeMs: Long): MeasuredEnvironmentEvidence? =
-        latestCandidate?.let { observe(it, nowElapsedRealtimeMs) }
+        latestCandidate?.let { evaluate(it, nowElapsedRealtimeMs) }
 
     @Synchronized
     fun pendingFailureDeadlineElapsedRealtimeMs(): Long? =
@@ -74,6 +124,7 @@ class RuntimeMeasuredQualityGate(
     @Synchronized
     fun reset() {
         latestCandidate = null
+        newestObservationAtMs = null
         clearPass()
     }
 

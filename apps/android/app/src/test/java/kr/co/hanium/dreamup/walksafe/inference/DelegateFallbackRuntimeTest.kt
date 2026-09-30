@@ -162,6 +162,64 @@ class DelegateFallbackRuntimeTest {
         session.close()
     }
 
+    /** S10-5 (originals/10.txt:74): a wrong model tensor contract is identical on CPU. */
+    @Test
+    fun tensorContractViolationAtInitializationIsNotRetriedOnCpu() {
+        val created = mutableListOf<String>()
+        val violation = DetectorTensorContractViolation(
+            DetectorLoadFailureCode.INPUT_CONTRACT_MISMATCH, "model input tensor must be [1,768,768,3]",
+        )
+        assertSame(violation, assertThrows(DetectorTensorContractViolation::class.java) {
+            DelegateFallbackRuntime(ModelRuntimeOptions("gpu", 4)) {
+                created += it
+                throw violation
+                @Suppress("UNREACHABLE_CODE")
+                FakeRuntime(it)
+            }
+        })
+        assertEquals(listOf("gpu"), created)
+    }
+
+    @Test
+    fun tensorContractViolationDuringInvokeKeepsTheDelegateAndCreatesNoCpu() {
+        val events = mutableListOf<String>()
+        val session = DelegateFallbackRuntime(ModelRuntimeOptions("gpu", 4)) {
+            events += "create:$it"
+            FakeRuntime(it) { events += "close:$it" }
+        }
+        assertThrows(DetectorTensorContractViolation::class.java) {
+            session.run<Unit> {
+                throw DetectorTensorContractViolation(DetectorLoadFailureCode.OUTPUT_CONTRACT_MISMATCH, "bad output")
+            }
+        }
+        assertEquals(listOf("create:gpu"), events)
+        assertEquals("gpu", session.runtime.activeDelegate)
+        assertFalse(session.runtime.fallbackUsed)
+        // A real delegate failure still falls back exactly once.
+        assertEquals("cpu", session.run {
+            if (it.delegate == "gpu") throw IllegalArgumentException("Internal error: Failed to apply delegate")
+            it.delegate
+        })
+        assertEquals(listOf("create:gpu", "close:gpu", "create:cpu"), events)
+        assertEquals("gpu_invoke_IllegalArgumentException", session.runtime.fallbackReason)
+        session.close()
+    }
+
+    @Test
+    fun gpuSerializationRetryDoesNotRepeatATensorContractViolation() {
+        var attempts = 0
+        val cache = GpuSerializationCache.prepare(true) {
+            GpuSerializationParameters(File("build/tmp/s10-gpu-cache"), "token")
+        }
+        assertThrows(DetectorTensorContractViolation::class.java) {
+            cache.create<Closeable> {
+                attempts += 1
+                throw DetectorTensorContractViolation(DetectorLoadFailureCode.OUTPUT_CONTRACT_MISMATCH, "bad output")
+            }
+        }
+        assertEquals(1, attempts)
+    }
+
     @Test
     fun nnapiUsesSameExplicitFallbackProvenance() {
         val session = DelegateFallbackRuntime(ModelRuntimeOptions("nnapi")) {

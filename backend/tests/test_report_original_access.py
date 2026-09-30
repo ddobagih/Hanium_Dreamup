@@ -1051,6 +1051,7 @@ def test_runtime_functions_issue_access_and_bind_one_approval(tmp_path: Path) ->
         privacy_reviewed=True,
         content_revision=0,
         evidence_grant_id=None,
+        expected_review_revision=1,
     )
     duplicate_payload = ReportReviewDecisionRequest(
         decision_id=uuid.uuid4(),
@@ -1063,6 +1064,7 @@ def test_runtime_functions_issue_access_and_bind_one_approval(tmp_path: Path) ->
         privacy_reviewed=True,
         content_revision=0,
         evidence_grant_id=None,
+        expected_review_revision=2,
     )
     engine = SessionLocal.kw["bind"]
 
@@ -1226,8 +1228,10 @@ def test_runtime_functions_issue_access_and_bind_one_approval(tmp_path: Path) ->
                 )
                 delivery_id = delivery.id
                 delivery_revision = delivery.revision
+            # S18-40 (202609300005): v3/v4 lost runtime EXECUTE; v5 is the
+            # runtime delivery function with the same replay/body binding.
             delivery_v3_sql = text(
-                "SELECT * FROM public.walksafe_append_report_delivery_event_v3("
+                "SELECT * FROM public.walksafe_append_report_delivery_event_v5("
                 "CAST(:event_id AS uuid), CAST(:report_id AS uuid), "
                 "CAST(:package_revision AS bigint), "
                 "CAST(:expected_revision AS bigint), "
@@ -2270,3 +2274,235 @@ def test_original_access_audit_and_keyring_history_are_append_only() -> None:
             with pytest.raises(Exception, match="append-only"):
                 db.execute(text(f"TRUNCATE TABLE {table_name}"))
             db.rollback()
+
+
+@pytest.mark.skipif(not TEST_DATABASE_CONFIGURED, reason="WALKSAFE_TEST_DATABASE_URL is not configured")
+def test_s18_35_postgres_review_revision_race_rejects_the_late_decision(
+    tmp_path: Path,
+) -> None:
+    """Two devices deciding against the same review revision: one wins, one 409."""
+
+    report_id = _store_encrypted_report(tmp_path)
+    identities = [
+        _identity("s18-35-review-race-first"),
+        _identity("s18-35-review-race-second"),
+    ]
+    now = datetime.now(timezone.utc)
+    for identity in identities:
+        _prepare_identity(identity, observed_at=now)
+    payloads = [
+        ReportReviewDecisionRequest(
+            decision_id=uuid.uuid4(),
+            decision="REJECTED",
+            reason=f"Review race decision {index}.",
+            user_visible_reason="검토 결과 이 신고를 처리할 수 없습니다.",
+            duplicate_of_report_id=None,
+            location_reviewed=True,
+            photo_reviewed=True,
+            privacy_reviewed=True,
+            content_revision=0,
+            evidence_grant_id=None,
+            expected_review_revision=0,
+        )
+        for index in range(2)
+    ]
+    engine = SessionLocal.kw["bind"]
+    outcomes: list[object] = []
+    for identity, payload in zip(identities, payloads):
+        body = payload.model_dump_json().encode("utf-8")
+        proof_challenge_id, correlation_id, _ = _record_consumed_action_proof(
+            identity=identity,
+            report_id=report_id,
+            action="report.review.decide",
+            request_body=body,
+        )
+        with engine.connect() as connection:
+            connection.execute(text("SET SESSION AUTHORIZATION walksafe_backend_runtime"))
+            connection.commit()
+            try:
+                with SessionLocal(bind=connection) as db:
+                    try:
+                        outcomes.append(
+                            append_report_review_decision(
+                                db,
+                                report_id=report_id,
+                                payload=payload,
+                                identity=identity,
+                                correlation_id=correlation_id,
+                                proof_challenge_id=proof_challenge_id,
+                                proof_request_body=body,
+                                runtime_totp_secret=TEST_TOTP_SECRET,
+                                credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
+                            ).revision
+                        )
+                    except AdminReportWorkflowError as exc:
+                        outcomes.append((exc.code, exc.status_code))
+            finally:
+                if connection.in_transaction():
+                    connection.rollback()
+                connection.execute(text("RESET SESSION AUTHORIZATION"))
+                connection.commit()
+    assert outcomes == [1, ("review_revision_conflict", 409)]
+    with SessionLocal() as db:
+        revisions = db.execute(
+            select(ReportReviewDecision.revision).where(
+                ReportReviewDecision.report_id == report_id
+            )
+        ).scalars().all()
+    assert revisions == [1]
+
+
+@pytest.mark.skipif(not TEST_DATABASE_CONFIGURED, reason="WALKSAFE_TEST_DATABASE_URL is not configured")
+def test_w20a_r1_postgres_corrected_report_rereview_binds_detail_latest_review_revision(
+    tmp_path: Path,
+) -> None:
+    """W20A-R1: after a content correction the detail's current_review is null,
+    but latest_review_revision carries the report-wide revision the review CAS
+    compares with, so a re-review bound to it is created (0 stays a 409)."""
+
+    from starlette.datastructures import QueryParams
+
+    from backend.app.api import admin_reports
+    from backend.app.models import ReportContentRevision
+    from backend.app.services.admin_device_proof import (
+        VerifiedAdminDeviceProof,
+        canonical_admin_query_sha256,
+    )
+    from backend.app.services.report_content_corrections import report_content_sha256
+
+    report_id = _store_encrypted_report(tmp_path)
+    identity = _identity("w20a-r1-rereview")
+    now = datetime.now(timezone.utc)
+    _prepare_identity(identity, observed_at=now)
+    engine = SessionLocal.kw["bind"]
+
+    def decide(content_revision: int, expected_review_revision: int) -> object:
+        payload = ReportReviewDecisionRequest(
+            decision_id=uuid.uuid4(),
+            decision="REJECTED",
+            reason="Re-review after the reporter corrected the description.",
+            user_visible_reason="검토 결과 이 신고를 처리할 수 없습니다.",
+            duplicate_of_report_id=None,
+            location_reviewed=True,
+            photo_reviewed=True,
+            privacy_reviewed=True,
+            content_revision=content_revision,
+            evidence_grant_id=None,
+            expected_review_revision=expected_review_revision,
+        )
+        body = payload.model_dump_json().encode("utf-8")
+        proof_challenge_id, correlation_id, _ = _record_consumed_action_proof(
+            identity=identity,
+            report_id=report_id,
+            action="report.review.decide",
+            request_body=body,
+        )
+        with engine.connect() as connection:
+            connection.execute(text("SET SESSION AUTHORIZATION walksafe_backend_runtime"))
+            connection.commit()
+            try:
+                with SessionLocal(bind=connection) as db:
+                    try:
+                        decision = append_report_review_decision(
+                            db,
+                            report_id=report_id,
+                            payload=payload,
+                            identity=identity,
+                            correlation_id=correlation_id,
+                            proof_challenge_id=proof_challenge_id,
+                            proof_request_body=body,
+                            runtime_totp_secret=TEST_TOTP_SECRET,
+                            credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
+                        )
+                        return (decision.revision, decision.content_revision)
+                    except AdminReportWorkflowError as exc:
+                        return (exc.code, exc.status_code)
+            finally:
+                if connection.in_transaction():
+                    connection.rollback()
+                connection.execute(text("RESET SESSION AUTHORIZATION"))
+                connection.commit()
+
+    def read_detail():
+        path = f"/admin/reports/{report_id}"
+        proof = VerifiedAdminDeviceProof(
+            admin_id=identity.admin_id,
+            device_id=identity.device_id,
+            session_id=identity.session_id,
+            challenge_id=uuid.uuid4(),
+            correlation_id=uuid.uuid4(),
+            action=None,
+            purpose="ACTION",
+            read_purpose="admin.report.detail",
+            method="GET",
+            path=path,
+            body_sha256="0" * 64,
+            query_sha256=canonical_admin_query_sha256(b""),
+            device_key_marker="b" * 64,
+            device_key_version=1,
+        )
+        request = SimpleNamespace(
+            method="GET",
+            url=SimpleNamespace(path=path),
+            query_params=QueryParams(""),
+            state=SimpleNamespace(
+                admin_security_identity=identity,
+                admin_device_proof=proof,
+            ),
+        )
+        with SessionLocal() as db:
+            return admin_reports.get_admin_report_detail(
+                request=request,  # type: ignore[arg-type]
+                response=SimpleNamespace(headers={}),  # type: ignore[arg-type]
+                report_id=str(report_id),
+                db=db,
+            )
+
+    assert decide(0, 0) == (1, 0)
+    before = read_detail()
+    assert before.current_review is not None
+    assert (before.current_review.revision, before.latest_review_revision) == (1, 1)
+
+    subject = "c" * 64
+    description = "정정한 신고 설명입니다"
+    with SessionLocal.begin() as db:
+        db.execute(
+            text(
+                "UPDATE public.reports SET privacy_subject_hmac = :subject, "
+                "account_generation = 1, content_revision = 1 WHERE id = :report_id"
+            ),
+            {"subject": subject, "report_id": report_id},
+        )
+        db.add(
+            ReportContentRevision(
+                id=uuid.uuid4(),
+                report_id=report_id,
+                revision=1,
+                expected_revision=0,
+                idempotency_key=uuid.uuid4(),
+                privacy_subject_hmac=subject,
+                account_generation=1,
+                user_description=description,
+                category_hint=None,
+                intent_sha256="a" * 64,
+                content_sha256=report_content_sha256(
+                    report_id=report_id,
+                    revision=1,
+                    user_description=description,
+                    category_hint=None,
+                ),
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+
+    corrected = read_detail()
+    assert corrected.content_revision == 1
+    assert corrected.current_review is None
+    assert corrected.latest_review_revision == 1
+    # The pre-fix app binding (current_review absent => 0) is always a 409.
+    assert decide(1, 0) == ("review_revision_conflict", 409)
+    # Binding the detail's report-wide value records the re-review.
+    assert decide(1, corrected.latest_review_revision) == (2, 1)
+    after = read_detail()
+    assert after.current_review is not None
+    assert (after.current_review.revision, after.latest_review_revision) == (2, 2)

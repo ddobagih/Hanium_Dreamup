@@ -11,6 +11,7 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.util.Base64
 import java.util.Comparator
 import java.util.UUID
+import kr.co.hanium.dreamup.walksafe.device.FeatureStorageAllowance
 import kr.co.hanium.dreamup.walksafe.network.GatewayCredentialPolicy
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
 import kr.co.hanium.dreamup.walksafe.security.AeadLimits
@@ -26,6 +27,7 @@ internal class AndroidReportQueueStore private constructor(
     private val aead: LocalAead,
     private val idFactory: () -> UUID,
     private val nowMillis: () -> Long,
+    private val allocatableBytes: () -> Long?,
 ) {
     private val storage by lazy(storageFactory)
 
@@ -36,12 +38,15 @@ internal class AndroidReportQueueStore private constructor(
         aead: LocalAead = AndroidKeyStoreAead(REPORT_QUEUE_KEY_POLICY),
         idFactory: () -> UUID = UUID::randomUUID,
         nowMillis: () -> Long = System::currentTimeMillis,
+        /** 14 #39: OS allocatable space of [rootDirectory]'s volume; null when unknown. */
+        allocatableBytes: () -> Long? = { rootDirectory.usableSpace },
     ) : this(
         capacityProfile,
         { FileReportQueueStorage(rootDirectory) },
         aead,
         idFactory,
         nowMillis,
+        allocatableBytes,
     )
 
     internal constructor(
@@ -51,7 +56,8 @@ internal class AndroidReportQueueStore private constructor(
         idFactory: () -> UUID,
         nowMillis: () -> Long,
         testOnly: Unit = Unit,
-    ) : this(capacityProfile, storageFactory, aead, idFactory, nowMillis)
+        allocatableBytes: () -> Long? = { Long.MAX_VALUE },
+    ) : this(capacityProfile, storageFactory, aead, idFactory, nowMillis, allocatableBytes)
 
     @Synchronized
     fun enqueue(
@@ -61,6 +67,7 @@ internal class AndroidReportQueueStore private constructor(
         priority: ReportQueuePriority,
         walkSessionId: String,
         consentReceiptSha256: String,
+        accountGeneration: Long? = null,
     ): QueuedReport? {
         val profile = capacityProfile ?: return null
         val now = nowMillis()
@@ -70,9 +77,12 @@ internal class AndroidReportQueueStore private constructor(
             expectedReporterActorId ||
             reporterActorId != expectedReporterActorId
         ) return null
+        // Priority drives reserve, withdrawal and transfer purpose; it must match the metadata.
+        if (reportQueuePriorityFromMetadataOrNull(metadataUtf8) != priority) return null
         val incomingPayloadBytes = metadataUtf8.size.toLong() + imageJpeg.size.toLong()
         if (
             now < 0L ||
+            (accountGeneration != null && accountGeneration <= 0L) ||
             !isCanonicalReportUuid(walkSessionId) ||
             !REPORT_SHA256_HEX.matches(consentReceiptSha256) ||
             incomingPayloadBytes > profile.maxPayloadBytes
@@ -116,6 +126,17 @@ internal class AndroidReportQueueStore private constructor(
         ) {
             return null
         }
+        // 14 #39: an automatic candidate is held quietly when the OS cannot allocate its largest
+        // stored entry plus the temp copy; explicit reports are never held for space here.
+        if (
+            priority == ReportQueuePriority.AUTOMATIC &&
+            FeatureStorageAllowance.holdReason(
+                runCatching(allocatableBytes).getOrNull(),
+                profile.maxStoredEntryBytes,
+            ) != null
+        ) {
+            return null
+        }
         val reportId = newCanonicalReportId(idFactory)
         val payload = FrozenReportPayload.freeze(reportId, metadataUtf8, imageJpeg) ?: return null
         val expiresAt = now + REPORT_QUEUE_TTL_MS
@@ -128,9 +149,10 @@ internal class AndroidReportQueueStore private constructor(
             consentReceiptSha256 = consentReceiptSha256,
             createdAtEpochMs = now,
             expiresAtEpochMs = expiresAt,
+            accountGeneration = accountGeneration,
         )
-        return report.takeIf {
-            storage.writeAtomicallyIfAllowed(
+        val outcome = run {
+            storage.writeAtomicallyWithOutcome(
                 reportId = reportId,
                 storedEntryByteLimit = profile.maxStoredEntryBytes,
                 entryLimit = entryLimit,
@@ -147,25 +169,50 @@ internal class AndroidReportQueueStore private constructor(
                 } else {
                     emptySet()
                 },
-                envelopeFactory = { sealReport(report) },
+                envelopeFactory = {
+                    // Recheck inside the final OS lock, without re-entering the lock.
+                    val duplicate = priority == ReportQueuePriority.AUTOMATIC &&
+                        hasRecentPendingAutomaticReport(
+                            metadataUtf8,
+                            now,
+                            storage.listReportIds().mapNotNull { id ->
+                                storage.read(id)?.let { openReport(it, id) }
+                            },
+                        )
+                    if (duplicate) null else sealReport(report)
+                },
             )
         }
+        // S15-36 / FP-032: a published file whose sync failed is not a plain failure. Confirm
+        // it under the same report ID and payload hash instead of letting a retry make a new ID.
+        return when (outcome) {
+            ReportQueueWriteOutcome.STORED -> report
+            ReportQueueWriteOutcome.FAILED -> null
+            ReportQueueWriteOutcome.UNCERTAIN -> report.takeIf { confirmStoredEntry(it) }
+        }
     }
+
+    private fun confirmStoredEntry(report: QueuedReport): Boolean = storage.withLockedAccess { access ->
+        val stored = readAllowedReport(access, report.payload.reportId)
+            ?: return@withLockedAccess false
+        stored.payload.contentEquals(report.payload) && stored.copy(payload = report.payload) == report
+    } == true
 
     private fun hasRecentPendingAutomaticReport(
         metadataUtf8: ByteArray,
         nowMs: Long,
+        reports: List<QueuedReport> = readAllLocked(),
     ): Boolean {
         val candidateScope = runCatching {
             automaticReportCooldownScopeOrNull(
                 JSONObject(String(metadataUtf8, Charsets.UTF_8)),
             )
         }.getOrNull() ?: return false
-        return readAllLocked().any { report ->
-            AndroidReportCooldownPolicy.automaticCooldownRemainingMs(
-                report.createdAtEpochMs,
-                nowMs,
-            ) > 0L &&
+        return reports.any { report ->
+            AndroidReportCooldownPolicy.pendingAutomaticDuplicateSuppressed(
+                queuedAtMs = report.createdAtEpochMs,
+                nowMs = nowMs,
+            ) &&
                 report.automaticCooldownScopeOrNull()?.let { pendingScope ->
                     AndroidReportCooldownPolicy.isSameCooldownArea(
                         candidateScope,
@@ -187,7 +234,7 @@ internal class AndroidReportQueueStore private constructor(
     }
 
     @Synchronized
-    fun nextForDrain(): QueuedReport? = queuedReports().firstOrNull()
+    fun nextForDrain(): QueuedReport? = queuedReports().firstOrNull(::isTransferReady)
 
     @Synchronized
     fun nextForDrain(
@@ -207,15 +254,51 @@ internal class AndroidReportQueueStore private constructor(
      * is re-authorized with the current server-confirmed receipt.
      */
     @Synchronized
-    fun nextForRecoveryDrain(reporterActorId: String): QueuedReport? =
-        reportsForRecoveryDrain(reporterActorId).firstOrNull()
+    fun nextForRecoveryDrain(
+        reporterActorId: String,
+        accountGeneration: Long? = null,
+        automaticReportingAllowed: Boolean = true,
+    ): QueuedReport? = reportsForRecoveryDrain(reporterActorId).firstOrNull {
+        it.accountGeneration == accountGeneration &&
+            (it.priority != ReportQueuePriority.AUTOMATIC || automaticReportingAllowed)
+    }
+
+    /** Keep failed payloads encrypted for TTL/privacy cleanup instead of deleting them. */
+    @Synchronized
+    fun recordUploadFailure(
+        report: QueuedReport,
+        permanent: Boolean,
+        retryAfterMs: Long? = null,
+    ): Boolean {
+        val profile = capacityProfile ?: return false
+        val now = nowMillis()
+        if (now < 0L) return false
+        return storage.withLockedAccess { access ->
+            if (access.hasGlobalReadBarrier()) return@withLockedAccess false
+            val current = readAllowedReport(access, report.payload.reportId)
+                ?: return@withLockedAccess false
+            if (!current.payload.contentEquals(report.payload) ||
+                current.copy(payload = report.payload) != report
+            ) return@withLockedAccess false
+            val delay = retryAfterMs?.coerceAtLeast(0L) ?: 0L
+            val notBefore = if (delay > Long.MAX_VALUE - now) Long.MAX_VALUE else now + delay
+            val envelope = sealReport(current.copy(
+                quarantined = current.quarantined || permanent,
+                retryNotBeforeEpochMs = maxOf(current.retryNotBeforeEpochMs, notBefore),
+            )) ?: return@withLockedAccess false
+            access.replace(
+                report.payload.reportId, envelope,
+                profile.maxStoredEntryBytes, profile.maxTotalBytes,
+            )
+        } == true
+    }
 
     @Synchronized
     fun countForRecoveryDrain(reporterActorId: String): Int =
         reportsForRecoveryDrain(reporterActorId).size
 
     @Synchronized
-    fun pruneExpired(): Int = if (capacityProfile == null) 0 else pruneExpiredLocked(nowMillis())
+    fun pruneExpired(): Int = pruneExpiredLocked(nowMillis())
 
     @Synchronized
     fun deleteAfterReceipt(
@@ -297,8 +380,18 @@ internal class AndroidReportQueueStore private constructor(
             if (access.measureUsage() == null || access.hasGlobalReadBarrier()) {
                 return@withLockedAccess 0
             }
-            var deleted = 0
+            // S15-35: temporary files are never published entries (every write holds this lock).
+            var deleted = access.deleteOrphanTemporaries()
             access.listReportIds().forEach { reportId ->
+                val envelope = access.read(reportId)
+                if (envelope != null && openReport(envelope, reportId) == null) {
+                    // Unreadable entries stay encrypted and are never sent. Their expiry cannot be
+                    // read, so the 30-day absolute cap runs from the last write, never earlier than
+                    // from creation (NPC-DATA-LIFECYCLE rules[6], FP-032 prohibited_behaviors[2]).
+                    val lastWrite = access.lastModifiedEpochMs(reportId) ?: return@forEach
+                    if (now - lastWrite >= REPORT_QUEUE_TTL_MS && access.delete(reportId)) deleted += 1
+                    return@forEach
+                }
                 val report = readAllowedReport(access, reportId) ?: return@forEach
                 if (now >= report.expiresAtEpochMs && access.delete(reportId)) deleted += 1
             }
@@ -325,7 +418,7 @@ internal class AndroidReportQueueStore private constructor(
         }
         return queuedReports().filter {
             it.walkSessionId == walkSessionId &&
-                it.consentReceiptSha256 == consentReceiptSha256
+                it.consentReceiptSha256 == consentReceiptSha256 && isTransferReady(it)
         }
     }
 
@@ -333,8 +426,13 @@ internal class AndroidReportQueueStore private constructor(
         if (GatewayCredentialPolicy.normalizedActorIdOrNull(reporterActorId) != reporterActorId) {
             return emptyList()
         }
-        return queuedReports().filter { it.reporterActorId == reporterActorId }
+        return queuedReports().filter {
+            it.reporterActorId == reporterActorId && isTransferReady(it)
+        }
     }
+
+    private fun isTransferReady(report: QueuedReport): Boolean =
+        !report.quarantined && nowMillis() >= report.retryNotBeforeEpochMs
 
     private fun readAllowedReport(
         access: LockedReportQueueStorage,
@@ -414,6 +512,9 @@ private fun encodeReport(report: QueuedReport): ByteArray = JSONObject()
     .put("consent_receipt_sha256", report.consentReceiptSha256)
     .put("created_at_epoch_ms", report.createdAtEpochMs)
     .put("expires_at_epoch_ms", report.expiresAtEpochMs)
+    .put("account_generation", report.accountGeneration ?: JSONObject.NULL)
+    .put("quarantined", report.quarantined)
+    .put("retry_not_before_epoch_ms", report.retryNotBeforeEpochMs)
     .put("payload_sha256", report.payload.payloadSha256)
     .put("payload_bytes", report.payload.payloadBytes)
     .put("metadata_base64", Base64.getEncoder().encodeToString(report.payload.metadataUtf8()))
@@ -423,7 +524,8 @@ private fun encodeReport(report: QueuedReport): ByteArray = JSONObject()
 
 private fun decodeReport(bytes: ByteArray): QueuedReport? = runCatching {
     val root = JSONObject(String(bytes, Charsets.UTF_8))
-    require(root.keysAsSet() == REPORT_QUEUE_FIELDS)
+    require(root.keysAsSet().containsAll(REPORT_QUEUE_FIELDS))
+    require((root.keysAsSet() - REPORT_QUEUE_FIELDS).all { it in REPORT_QUEUE_TRANSFER_FIELDS })
     require(root.getString("schema_version") == REPORT_QUEUE_SCHEMA)
     val reportId = root.getString("report_id")
     val reporterActorId = root.getString("reporter_actor_id")
@@ -433,15 +535,26 @@ private fun decodeReport(bytes: ByteArray): QueuedReport? = runCatching {
     val expiresAt = root.strictLong("expires_at_epoch_ms")
     val declaredSha = root.getString("payload_sha256")
     val declaredBytes = root.strictLong("payload_bytes")
+    val accountGeneration = if (root.isNull("account_generation")) null else {
+        root.strictLong("account_generation").also { require(it > 0L) }
+    }
+    val quarantined = if (root.has("quarantined")) {
+        root.get("quarantined") as? Boolean ?: error("quarantined must be boolean")
+    } else false
+    val notBefore = if (root.has("retry_not_before_epoch_ms")) {
+        root.strictLong("retry_not_before_epoch_ms").also { require(it >= 0L) }
+    } else 0L
     require(isCanonicalReportUuid(reportId))
     require(GatewayCredentialPolicy.normalizedActorIdOrNull(reporterActorId) == reporterActorId)
     require(isCanonicalReportUuid(walkSessionId))
     require(REPORT_SHA256_HEX.matches(consentReceipt))
     require(createdAt >= 0L && expiresAt - createdAt == REPORT_QUEUE_TTL_MS)
+    val priority = ReportQueuePriority.valueOf(root.getString("priority"))
     val metadata = Base64.getDecoder().decode(root.getString("metadata_base64"))
     val image = Base64.getDecoder().decode(root.getString("image_jpeg_base64"))
     val payload = try {
         require(reportActorIdFromMetadataOrNull(metadata) == reporterActorId)
+        require(reportQueuePriorityFromMetadataOrNull(metadata) == priority)
         FrozenReportPayload.freeze(reportId, metadata, image)
     } finally {
         metadata.fill(0)
@@ -452,12 +565,15 @@ private fun decodeReport(bytes: ByteArray): QueuedReport? = runCatching {
     require(payload.payloadBytes == declaredBytes)
     QueuedReport(
         payload = payload,
-        priority = ReportQueuePriority.valueOf(root.getString("priority")),
+        priority = priority,
         reporterActorId = reporterActorId,
         walkSessionId = walkSessionId,
         consentReceiptSha256 = consentReceipt,
         createdAtEpochMs = createdAt,
         expiresAtEpochMs = expiresAt,
+        accountGeneration = accountGeneration,
+        quarantined = quarantined,
+        retryNotBeforeEpochMs = notBefore,
     )
 }.getOrNull()
 
@@ -468,6 +584,9 @@ private fun JSONObject.strictLong(name: String): Long = when (val value = get(na
     is Long -> value
     else -> error("$name must be an integer")
 }
+
+/** S15-36: result of a create-only queue write. UNCERTAIN = published, durability unconfirmed. */
+internal enum class ReportQueueWriteOutcome { STORED, FAILED, UNCERTAIN }
 
 internal interface ReportQueueStorage {
     fun listReportIds(): Set<String>
@@ -481,6 +600,22 @@ internal interface ReportQueueStorage {
         storedEntryByteLimit: Long = REPORT_QUEUE_MAX_STORED_ENTRY_BYTES,
         envelopeFactory: () -> String?,
     ): Boolean
+    fun writeAtomicallyWithOutcome(
+        reportId: String,
+        entryLimit: Int,
+        storedByteLimit: Long,
+        blockingFences: Set<String>,
+        storedEntryByteLimit: Long = REPORT_QUEUE_MAX_STORED_ENTRY_BYTES,
+        envelopeFactory: () -> String?,
+    ): ReportQueueWriteOutcome = if (
+        writeAtomicallyIfAllowed(
+            reportId, entryLimit, storedByteLimit, blockingFences, storedEntryByteLimit, envelopeFactory,
+        )
+    ) {
+        ReportQueueWriteOutcome.STORED
+    } else {
+        ReportQueueWriteOutcome.FAILED
+    }
     fun delete(reportId: String): Boolean
     fun hasFence(name: String): Boolean
     fun purgeAllWithFence(
@@ -501,6 +636,18 @@ internal interface LockedReportQueueStorage {
     fun delete(reportId: String): Boolean
     fun hasFence(name: String): Boolean
     fun measureUsage(): ReportQueueStorageUsage?
+    fun replace(
+        reportId: String,
+        envelope: String,
+        storedEntryByteLimit: Long,
+        storedByteLimit: Long,
+    ): Boolean = false
+
+    /** Deletes crash-left temporary files; valid only while holding the storage lock. */
+    fun deleteOrphanTemporaries(): Int = 0
+
+    /** Last write time of a stored entry, for entries whose own expiry cannot be read. */
+    fun lastModifiedEpochMs(reportId: String): Long? = null
 }
 
 internal data class ReportQueuePurgeContext(
@@ -518,12 +665,44 @@ internal data class ReportQueueStorageUsage(
     }
 }
 
-internal class FileReportQueueStorage(rootDirectory: File) : ReportQueueStorage {
+internal class FileReportQueueStorage(
+    rootDirectory: File,
+    // Test-only: runs after the atomic move and before the post-move syncs.
+    private val publishedSyncFaultForTests: (() -> Unit)? = null,
+) : ReportQueueStorage {
     private val storageBase = rootDirectory.toPath().toAbsolutePath().normalize().toFile()
     private val root = File(storageBase, "report_queue_v1")
     private val reports = File(root, "reports")
     private val fences = File(root, "fences")
     private val lockedAccess = object : LockedReportQueueStorage {
+        override fun replace(
+            reportId: String,
+            envelope: String,
+            storedEntryByteLimit: Long,
+            storedByteLimit: Long,
+        ): Boolean {
+            val target = reportFile(reportId) ?: return false
+            val previous = read(reportId) ?: return false
+            val usage = measureUsage() ?: return false
+            val size = envelope.toByteArray(Charsets.UTF_8).size.toLong()
+            val previousSize = previous.toByteArray(Charsets.UTF_8).size.toLong()
+            if (size !in 1L..storedEntryByteLimit ||
+                size > storedByteLimit - (usage.totalBytes - previousSize)
+            ) return false
+            return atomicWrite(target, envelope, replaceExisting = true)
+        }
+        override fun deleteOrphanTemporaries(): Int = deleteOrphanTemporariesUnlocked()
+        override fun lastModifiedEpochMs(reportId: String): Long? = runCatching {
+            val file = reportFile(reportId) ?: return@runCatching null
+            if (!isSafeQueueDirectory(reports)) return@runCatching null
+            val metadata = Files.readAttributes(
+                file.toPath(),
+                BasicFileAttributes::class.java,
+                LinkOption.NOFOLLOW_LINKS,
+            )
+            metadata.lastModifiedTime().toMillis()
+                .takeIf { metadata.isRegularFile && !metadata.isSymbolicLink }
+        }.getOrNull()
         override fun listReportIds(): Set<String> = this@FileReportQueueStorage.listReportIds()
         override fun read(reportId: String): String? = this@FileReportQueueStorage.read(reportId)
         override fun delete(reportId: String): Boolean = deleteUnlocked(reportId)
@@ -596,27 +775,39 @@ internal class FileReportQueueStorage(rootDirectory: File) : ReportQueueStorage 
         blockingFences: Set<String>,
         storedEntryByteLimit: Long,
         envelopeFactory: () -> String?,
-    ): Boolean {
+    ): Boolean = writeAtomicallyWithOutcome(
+        reportId, entryLimit, storedByteLimit, blockingFences, storedEntryByteLimit, envelopeFactory,
+    ) == ReportQueueWriteOutcome.STORED
+
+    override fun writeAtomicallyWithOutcome(
+        reportId: String,
+        entryLimit: Int,
+        storedByteLimit: Long,
+        blockingFences: Set<String>,
+        storedEntryByteLimit: Long,
+        envelopeFactory: () -> String?,
+    ): ReportQueueWriteOutcome {
+        val failed = ReportQueueWriteOutcome.FAILED
         if (
             entryLimit <= 0 ||
             storedEntryByteLimit !in 1L..MAX_ENVELOPE_BYTES ||
             storedByteLimit <= 0L ||
             blockingFences.any { fenceFile(it) == null }
-        ) return false
-        val target = reportFile(reportId) ?: return false
+        ) return failed
+        val target = reportFile(reportId) ?: return failed
         return withStorageLock {
-            val usage = measureUsage() ?: return@withStorageLock false
+            val usage = measureUsage() ?: return@withStorageLock failed
             if (
                 blockingFences.any(::hasFence) ||
                 usage.reportFileCount >= entryLimit ||
                 usage.totalBytes >= storedByteLimit ||
                 Files.exists(target.toPath(), LinkOption.NOFOLLOW_LINKS)
             ) {
-                return@withStorageLock false
+                return@withStorageLock failed
             }
-            val envelope = envelopeFactory() ?: return@withStorageLock false
+            val envelope = envelopeFactory() ?: return@withStorageLock failed
             val envelopeBytes = envelope.toByteArray(Charsets.UTF_8).size.toLong()
-            val latestUsage = measureUsage() ?: return@withStorageLock false
+            val latestUsage = measureUsage() ?: return@withStorageLock failed
             if (
                 envelopeBytes !in 1L..MAX_ENVELOPE_BYTES ||
                 envelopeBytes > storedEntryByteLimit ||
@@ -625,9 +816,9 @@ internal class FileReportQueueStorage(rootDirectory: File) : ReportQueueStorage 
                 latestUsage.totalBytes >= storedByteLimit ||
                 envelopeBytes > storedByteLimit - latestUsage.totalBytes ||
                 Files.exists(target.toPath(), LinkOption.NOFOLLOW_LINKS)
-            ) return@withStorageLock false
-            atomicWrite(target, envelope, replaceExisting = false)
-        } == true
+            ) return@withStorageLock failed
+            atomicWriteOutcome(target, envelope, replaceExisting = false)
+        } ?: failed
     }
 
     override fun delete(reportId: String): Boolean {
@@ -905,6 +1096,32 @@ internal class FileReportQueueStorage(rootDirectory: File) : ReportQueueStorage 
         return entries.map(::deleteAndSync).all { it }
     }
 
+    /** Only names created by [atomicWrite] (".<target>.<random>.tmp"), regular files, no links. */
+    private fun deleteOrphanTemporariesUnlocked(): Int {
+        var deleted = 0
+        for (directory in listOf(reports, fences)) {
+            if (!isSafeQueueDirectory(directory)) continue
+            directoryEntries(directory).orEmpty().forEach { entry ->
+                val metadata = runCatching {
+                    Files.readAttributes(
+                        entry.toPath(),
+                        BasicFileAttributes::class.java,
+                        LinkOption.NOFOLLOW_LINKS,
+                    )
+                }.getOrNull() ?: return@forEach
+                if (
+                    ATOMIC_WRITE_TEMPORARY.matches(entry.name) &&
+                    metadata.isRegularFile &&
+                    !metadata.isSymbolicLink &&
+                    deleteAndSync(entry)
+                ) {
+                    deleted += 1
+                }
+            }
+        }
+        return deleted
+    }
+
     private fun deleteUnlocked(reportId: String): Boolean {
         val target = reportFile(reportId) ?: return false
         return isSafeQueueDirectory(reports) && deleteAndSync(target)
@@ -914,28 +1131,42 @@ internal class FileReportQueueStorage(rootDirectory: File) : ReportQueueStorage 
         target: File,
         value: String,
         replaceExisting: Boolean,
-    ): Boolean = runCatching {
-        val parent = target.parentFile ?: return@runCatching false
-        if (!ensureQueueDirectory(parent)) return@runCatching false
-        val temporary = File.createTempFile(".${target.name}.", ".tmp", parent)
-        try {
-            FileOutputStream(temporary, false).use { output ->
-                output.write(value.toByteArray(Charsets.UTF_8))
-                output.fd.sync()
+    ): Boolean = atomicWriteOutcome(target, value, replaceExisting) == ReportQueueWriteOutcome.STORED
+
+    /** S15-36: FAILED before the move; UNCERTAIN when the move succeeded but a later sync failed. */
+    private fun atomicWriteOutcome(
+        target: File,
+        value: String,
+        replaceExisting: Boolean,
+    ): ReportQueueWriteOutcome {
+        var published = false
+        return runCatching {
+            val parent = target.parentFile ?: return@runCatching ReportQueueWriteOutcome.FAILED
+            if (!ensureQueueDirectory(parent)) return@runCatching ReportQueueWriteOutcome.FAILED
+            val temporary = File.createTempFile(".${target.name}.", ".tmp", parent)
+            try {
+                FileOutputStream(temporary, false).use { output ->
+                    output.write(value.toByteArray(Charsets.UTF_8))
+                    output.fd.sync()
+                }
+                val moveOptions = if (replaceExisting) {
+                    arrayOf(StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                } else {
+                    arrayOf(StandardCopyOption.ATOMIC_MOVE)
+                }
+                Files.move(temporary.toPath(), target.toPath(), *moveOptions)
+                published = true
+                publishedSyncFaultForTests?.invoke()
+                FileOutputStream(target, true).use { it.fd.sync() }
+                syncDirectory(parent)
+                ReportQueueWriteOutcome.STORED
+            } finally {
+                if (temporary.exists()) temporary.delete()
             }
-            val moveOptions = if (replaceExisting) {
-                arrayOf(StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-            } else {
-                arrayOf(StandardCopyOption.ATOMIC_MOVE)
-            }
-            Files.move(temporary.toPath(), target.toPath(), *moveOptions)
-            FileOutputStream(target, true).use { it.fd.sync() }
-            syncDirectory(parent)
-            true
-        } finally {
-            if (temporary.exists()) temporary.delete()
+        }.getOrElse {
+            if (published) ReportQueueWriteOutcome.UNCERTAIN else ReportQueueWriteOutcome.FAILED
         }
-    }.getOrDefault(false)
+    }
 
     private fun deleteAndSync(file: File): Boolean = runCatching {
         if (!file.exists()) return@runCatching true
@@ -1012,6 +1243,7 @@ internal class FileReportQueueStorage(rootDirectory: File) : ReportQueueStorage 
         val CONSENT_FENCE = Regex("consent-revoked-[0-9a-f]{64}")
         val AUTOMATIC_CONSENT_FENCE =
             Regex("automatic-consent-revoked-[0-9a-f]{64}")
+        val ATOMIC_WRITE_TEMPORARY = Regex("^\\.[A-Za-z0-9._-]+\\.[0-9]+\\.tmp$")
     }
 }
 
@@ -1022,6 +1254,9 @@ internal val REPORT_QUEUE_KEY_POLICY = AeadKeyPolicy(
 )
 
 private const val REPORT_QUEUE_SCHEMA = "walksafe.android.report-queue-entry.v2"
+private val REPORT_QUEUE_TRANSFER_FIELDS = setOf(
+    "account_generation", "quarantined", "retry_not_before_epoch_ms",
+)
 private val REPORT_QUEUE_FIELDS = setOf(
     "schema_version",
     "report_id",

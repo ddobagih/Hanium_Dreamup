@@ -235,6 +235,51 @@ def build_bounded_history_page(
     )
 
 
+def build_bounded_history_tail(
+    rows: Sequence[_Row],
+    *,
+    snapshot_revision: int,
+    byte_budget: int,
+    revision_of: Callable[[_Row], int],
+    page_factory: Callable[[list[_Row], str | None], _Page],
+) -> _Page:
+    """Build the largest latest suffix that fits, preserving the newest item."""
+
+    if (
+        type(snapshot_revision) is not int
+        or not 0 <= snapshot_revision <= MAX_BIGINT
+        or type(byte_budget) is not int
+        or byte_budget < 1024
+    ):
+        raise AdminHistoryIntegrityError("administrator history snapshot is invalid")
+    candidates = list(rows)
+    if snapshot_revision == 0:
+        if candidates:
+            raise AdminHistoryIntegrityError("administrator history page exceeds its snapshot")
+        page = page_factory([], None)
+        if len(page.model_dump_json().encode("utf-8")) > byte_budget:
+            raise AdminHistoryIntegrityError("administrator history page exceeds its byte budget")
+        return page
+    if not candidates:
+        raise AdminHistoryIntegrityError("administrator history page is incomplete")
+    expected = snapshot_revision - len(candidates) + 1
+    for row in candidates:
+        revision = revision_of(row)
+        if type(revision) is not int or revision != expected:
+            raise AdminHistoryIntegrityError(
+                "administrator history revisions are not contiguous"
+            )
+        expected += 1
+
+    for start in range(len(candidates)):
+        page = page_factory(candidates[start:], None)
+        if len(page.model_dump_json().encode("utf-8")) <= byte_budget:
+            return page
+    raise AdminHistoryIntegrityError(
+        "one administrator history item exceeds the response byte budget"
+    )
+
+
 __all__ = [
     "AdminHistoryCursor",
     "AdminHistoryCursorError",
@@ -245,6 +290,7 @@ __all__ = [
     "MAX_BIGINT",
     "REPORT_HISTORY_RESPONSE_BUDGET_BYTES",
     "build_bounded_history_page",
+    "build_bounded_history_tail",
     "decode_admin_history_cursor",
     "encode_admin_history_cursor",
 ]

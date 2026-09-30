@@ -11,19 +11,27 @@ import base64
 from dataclasses import dataclass
 from enum import Enum
 import hashlib
+import heapq
 import hmac
 import json
 import re
 from secrets import compare_digest
+from secrets import token_bytes as secrets_token_bytes
+import threading
 from time import time
+from types import MappingProxyType
 from typing import Any, NoReturn
 
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.responses import JSONResponse
+from starlette.routing import Match, compile_path
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from backend.app.request_limits import (
+    _ACCOUNT_PATHS,
+    _RAW_NO_STORE_HEADERS,
     RequestBodyTooLarge,
+    _too_large_response,
     max_request_body_bytes,
     request_content_length,
 )
@@ -43,6 +51,7 @@ from backend.app.services.admin_security import (
     authorize_admin_bearer,
     authorize_high_risk_bearer,
     classify_admin_operation,
+    current_admin_request_body_sha256,
     load_admin_credential_issuer_key_for_settings,
     record_admin_security_denial,
 )
@@ -50,6 +59,7 @@ from backend.app.services.admin_device_proof import (
     ADMIN_DEVICE_PROOF_CHALLENGE_PATH,
     VerifiedAdminDeviceProof,
     is_admin_device_proof_workflow_request,
+    raw_body_sha256,
     verify_admin_device_proof,
 )
 
@@ -199,6 +209,7 @@ _ADMIN_REPORT_MUTATION_BODY_ACTIONS = frozenset(
         "report.review.decide",
         "admin.report.delivery_package.create",
         "report.delivery.create",
+        "report.delivery.correct",
         "report.external_copy_deletion.record",
     }
 )
@@ -208,6 +219,7 @@ ACCOUNT_GATEWAY_ROUTES = frozenset(
         ("POST", "/account-enrollments/email-otp"),
         ("POST", "/accounts"),
         ("POST", "/accounts/authenticate"),
+        ("POST", "/accounts/session-current"),
     }
 )
 
@@ -215,6 +227,130 @@ ACCOUNT_GATEWAY_ROUTES = frozenset(
 class FieldTestAccess(str, Enum):
     FIELD = "field"
     ADMIN = "admin"
+
+
+class _RoutePolicyFallback(Enum):
+    UNREGISTERED = "unregistered"
+    OPTIONS_METHOD_NOT_ALLOWED = "options_method_not_allowed"
+
+
+@dataclass(frozen=True, slots=True)
+class _ResolvedFieldRoutePolicy:
+    access: FieldTestAccess | None | _RoutePolicyFallback
+    template: str | None
+    allowed_methods: tuple[str, ...] = ()
+
+
+# Explicit approvals, not a runtime inventory-derived allowlist.
+# None denotes only the approved public authentication endpoints.
+FIELD_TEST_ROUTE_POLICIES = (
+    ("GET", "/openapi.json", FieldTestAccess.ADMIN),
+    ("HEAD", "/openapi.json", FieldTestAccess.ADMIN),
+    ("GET", "/docs", FieldTestAccess.ADMIN),
+    ("HEAD", "/docs", FieldTestAccess.ADMIN),
+    ("GET", "/docs/oauth2-redirect", FieldTestAccess.ADMIN),
+    ("HEAD", "/docs/oauth2-redirect", FieldTestAccess.ADMIN),
+    ("GET", "/redoc", FieldTestAccess.ADMIN),
+    ("HEAD", "/redoc", FieldTestAccess.ADMIN),
+    ("GET", "/health", FieldTestAccess.FIELD),
+    ("GET", "/ready", FieldTestAccess.FIELD),
+    ("GET", "/uploads/{filename}", FieldTestAccess.ADMIN),
+    ("GET", "/detect/health", FieldTestAccess.FIELD),
+    ("POST", "/detect", FieldTestAccess.FIELD),
+    ("GET", "/detect/v2/health", FieldTestAccess.ADMIN),
+    ("POST", "/detect/v2", FieldTestAccess.FIELD),
+    ("GET", "/navigation/walking/health", FieldTestAccess.FIELD),
+    ("GET", "/navigation/destinations/search", FieldTestAccess.FIELD),
+    ("GET", "/navigation/destinations/search/health", FieldTestAccess.FIELD),
+    ("POST", "/navigation/walking", FieldTestAccess.FIELD),
+    ("GET", "/privacy/consent-bootstrap", FieldTestAccess.FIELD),
+    ("POST", "/privacy/consent-events", FieldTestAccess.FIELD),
+    ("POST", "/privacy/account-deletions", FieldTestAccess.FIELD),
+    ("GET", "/privacy/account-deletions/{request_id}/status", FieldTestAccess.FIELD),
+    ("POST", "/privacy/account-deletions/{request_id}/device-evidence", FieldTestAccess.FIELD),
+    ("POST", "/account-enrollments/email-otp", FieldTestAccess.FIELD),
+    ("POST", "/accounts", FieldTestAccess.FIELD),
+    ("POST", "/accounts/authenticate", FieldTestAccess.FIELD),
+    ("POST", "/accounts/session-current", FieldTestAccess.FIELD),
+    ("HEAD", "/raw-collections/{collection_id}/manifest", FieldTestAccess.FIELD),
+    ("HEAD", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}", FieldTestAccess.FIELD),
+    ("HEAD", "/raw-collections/{collection_id}/commit", FieldTestAccess.FIELD),
+    ("PUT", "/raw-collections/{collection_id}/manifest", FieldTestAccess.FIELD),
+    ("PUT", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}", FieldTestAccess.FIELD),
+    ("GET", "/raw-collections/{collection_id}", FieldTestAccess.FIELD),
+    ("POST", "/raw-collections/{collection_id}/commit", FieldTestAccess.FIELD),
+    ("GET", "/reports/mine", FieldTestAccess.FIELD),
+    ("GET", "/reports/mine/requests/history", FieldTestAccess.FIELD),
+    ("GET", "/reports/mine/deletions/{request_id}", FieldTestAccess.FIELD),
+    ("GET", "/reports/mine/{report_id}", FieldTestAccess.FIELD),
+    ("POST", "/reports/mine/{report_id}/requests", FieldTestAccess.FIELD),
+    ("GET", "/reports/mine/{report_id}/requests/{request_id}", FieldTestAccess.FIELD),
+    ("GET", "/reports/mine/{report_id}/content", FieldTestAccess.FIELD),
+    ("POST", "/reports/mine/{report_id}/corrections", FieldTestAccess.FIELD),
+    ("GET", "/admin/report-deletions/external-copies", FieldTestAccess.ADMIN),
+    ("POST", "/admin/report-deletions/{request_id}/external-copies/{copy_id}/events", FieldTestAccess.ADMIN),
+    ("GET", "/admin/report-requests", FieldTestAccess.ADMIN),
+    ("GET", "/admin/report-requests/{request_id}", FieldTestAccess.ADMIN),
+    ("PATCH", "/admin/report-requests/{request_id}/status", FieldTestAccess.ADMIN),
+    ("POST", "/reports", FieldTestAccess.FIELD),
+    ("POST", "/reports/v2", FieldTestAccess.FIELD),
+    ("GET", "/reports/v2/{report_id}/status", FieldTestAccess.FIELD),
+    ("GET", "/reports", FieldTestAccess.ADMIN),
+    ("GET", "/reports/export", FieldTestAccess.ADMIN),
+    ("GET", "/reports/summary", FieldTestAccess.ADMIN),
+    ("GET", "/reports/duplicate-check", FieldTestAccess.ADMIN),
+    ("POST", "/reports/{report_id}/original-access-grants", FieldTestAccess.ADMIN),
+    ("POST", "/reports/{report_id}/review-decisions", FieldTestAccess.ADMIN),
+    ("GET", "/reports/{report_id}/review-decisions", FieldTestAccess.ADMIN),
+    ("GET", "/reports/{report_id}/review-decisions/history", FieldTestAccess.ADMIN),
+    ("GET", "/reports/{report_id}/review-decisions/{decision_id}", FieldTestAccess.ADMIN),
+    ("POST", "/reports/{report_id}/deliveries", FieldTestAccess.ADMIN),
+    ("GET", "/reports/{report_id}/deliveries", FieldTestAccess.ADMIN),
+    ("GET", "/reports/{report_id}/deliveries/history", FieldTestAccess.ADMIN),
+    ("POST", "/reports/{report_id}/delivery-corrections", FieldTestAccess.ADMIN),
+    ("GET", "/reports/{report_id}", FieldTestAccess.ADMIN),
+    ("PATCH", "/reports/{report_id}/status", FieldTestAccess.ADMIN),
+    ("GET", "/admin/reports", FieldTestAccess.ADMIN),
+    ("GET", "/admin/reports/audits", FieldTestAccess.ADMIN),
+    ("PATCH", "/admin/reports/{report_id}/status", FieldTestAccess.ADMIN),
+    ("POST", "/admin/reports/{report_id}/delivery-packages", FieldTestAccess.ADMIN),
+    ("GET", "/admin/reports/{report_id}/delivery-packages/{package_revision}/proof", FieldTestAccess.ADMIN),
+    ("GET", "/admin/reports/{report_id}", FieldTestAccess.ADMIN),
+    ("GET", "/admin/incidents", FieldTestAccess.ADMIN),
+    ("PATCH", "/admin/incidents/{incident_id}/status", FieldTestAccess.ADMIN),
+    ("GET", "/admin/incidents/{incident_id}/history", FieldTestAccess.ADMIN),
+    ("GET", "/admin/incidents/{incident_id}", FieldTestAccess.ADMIN),
+    ("GET", "/admin/raw-collections/quarantine", FieldTestAccess.ADMIN),
+    ("POST", "/admin/raw-collections/{collection_id}/decisions", FieldTestAccess.ADMIN),
+    ("POST", "/admin/raw-collections/{collection_id}/legal-holds", FieldTestAccess.ADMIN),
+    ("POST", "/android/debug/depth-logs", FieldTestAccess.ADMIN),
+    ("GET", "/android/debug/depth-logs/recent", FieldTestAccess.ADMIN),
+    ("POST", "/android/debug/frame-captures", FieldTestAccess.ADMIN),
+    ("GET", "/android/debug/frame-captures/recent", FieldTestAccess.ADMIN),
+    ("POST", "/admin/security/device-proof/challenges", None),
+    ("POST", "/admin/security/sessions", None),
+    ("GET", "/admin/security/state", FieldTestAccess.ADMIN),
+    ("GET", "/admin/security/sessions", FieldTestAccess.ADMIN),
+    ("POST", "/admin/security/sessions/{session_id}/revoke", FieldTestAccess.ADMIN),
+    ("POST", "/admin/security/recovery-custody/attest", FieldTestAccess.ADMIN),
+    ("POST", "/admin/security/devices/{device_id}/report-lost", FieldTestAccess.ADMIN),
+    ("POST", "/admin/security/device-keys/rotation/confirm", FieldTestAccess.ADMIN),
+    ("POST", "/admin/security/reauthenticate", FieldTestAccess.ADMIN),
+    ("POST", "/admin/security/recovery/start", None),
+    ("POST", "/admin/security/recovery/complete", None),
+    ("GET", "/internal/capacity", FieldTestAccess.FIELD),
+)
+_FIELD_ROUTE_ACCESS = MappingProxyType({
+    (method, template): access
+    for method, template, access in FIELD_TEST_ROUTE_POLICIES
+})
+if len(_FIELD_ROUTE_ACCESS) != len(FIELD_TEST_ROUTE_POLICIES):
+    raise RuntimeError("Duplicate HTTP route access policy.")
+_FIELD_ROUTE_PATTERNS = tuple(
+    (method, template, compile_path(template)[0], access)
+    for method, template, access in FIELD_TEST_ROUTE_POLICIES
+    if "{" in template
+)
 
 
 class RawCollectionOperation(str, Enum):
@@ -229,6 +365,7 @@ class VerifiedActorAssertion:
     actor_id: str
     account_generation: int | None
     access: FieldTestAccess
+    auth_epoch: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,33 +427,39 @@ def raw_collection_operation(
     return None
 
 
-def _rate_limit_group(path: str, method: str) -> str | None:
+def _rate_limit_group(
+    path: str,
+    method: str,
+    *,
+    route_template: str | None = None,
+) -> str | None:
+    policy_path = route_template or path
     normalized_method = method.upper()
-    if _raw_ingest_route(path) and normalized_method in {"GET", "POST", "PUT"}:
+    if _raw_ingest_route(policy_path) and normalized_method in {"GET", "POST", "PUT"}:
         return "raw_collection"
     if normalized_method == "HEAD" and _raw_ingest_write_route(
-        path,
+        policy_path,
         normalized_method,
     ):
         return "raw_collection"
     if (
-        (normalized_method == "POST" and path == "/privacy/consent-events")
-        or (normalized_method == "GET" and path == "/privacy/consent-bootstrap")
+        (normalized_method == "POST" and policy_path == "/privacy/consent-events")
+        or (normalized_method == "GET" and policy_path == "/privacy/consent-bootstrap")
     ):
         return "privacy"
-    if _privacy_deletion_route(path, normalized_method) is not None:
+    if _privacy_deletion_route(policy_path, normalized_method) is not None:
         return "privacy"
-    if normalized_method == "POST" and path in {"/reports", "/reports/v2"}:
+    if normalized_method == "POST" and policy_path in {"/reports", "/reports/v2"}:
         return "report"
-    if _user_report_route(path, normalized_method):
+    if _user_report_route(policy_path, normalized_method):
         return "report"
-    if normalized_method == "POST" and path in {"/detect", "/detect/v2"}:
+    if normalized_method == "POST" and policy_path in {"/detect", "/detect/v2"}:
         return "detect"
-    if path == "/navigation/walking" and normalized_method == "POST":
+    if policy_path == "/navigation/walking" and normalized_method == "POST":
         return "navigation"
-    if path == "/navigation/destinations/search" and normalized_method == "GET":
+    if policy_path == "/navigation/destinations/search" and normalized_method == "GET":
         return "navigation"
-    if path == "/reports/export" and normalized_method == "GET":
+    if policy_path == "/reports/export" and normalized_method == "GET":
         return "export"
     operation = classify_admin_operation(normalized_method, path)
     if (
@@ -326,55 +469,67 @@ def _rate_limit_group(path: str, method: str) -> str | None:
     ):
         return "admin_read"
     if normalized_method == "GET" and (
-        path == "/reports"
-        or path.startswith("/reports/")
-        or path == "/admin/reports"
-        or path.startswith("/admin/reports/")
-        or path == "/admin/report-requests"
-        or path.startswith("/admin/report-requests/")
-        or path == "/admin/report-deletions/external-copies"
-        or path.startswith("/admin/report-deletions/")
-        or path == "/admin/incidents"
-        or path.startswith("/admin/incidents/")
-        or path.startswith("/uploads/")
-        or path.startswith("/android/debug/")
+        policy_path == "/reports"
+        or policy_path.startswith("/reports/")
+        or policy_path == "/admin/reports"
+        or policy_path.startswith("/admin/reports/")
+        or policy_path == "/admin/report-requests"
+        or policy_path.startswith("/admin/report-requests/")
+        or policy_path == "/admin/report-deletions/external-copies"
+        or policy_path.startswith("/admin/report-deletions/")
+        or policy_path == "/admin/incidents"
+        or policy_path.startswith("/admin/incidents/")
+        or policy_path.startswith("/uploads/")
+        or policy_path.startswith("/android/debug/")
     ):
         return "admin_read"
-    if normalized_method == "GET" and path.startswith("/admin/security/"):
+    if normalized_method == "GET" and policy_path.startswith("/admin/security/"):
         return "admin_read"
     return None
 
 
-def requires_actor_identity(path: str, method: str) -> bool:
+def requires_actor_identity(
+    path: str,
+    method: str,
+    *,
+    route_template: str | None = None,
+) -> bool:
+    policy_path = route_template or path
     normalized_method = method.upper()
     return (
-        _rate_limit_group(path, normalized_method) is not None
-        or (normalized_method == "GET" and (path == "/reports" or path.startswith("/reports/")))
-        or (path.startswith("/reports/") and normalized_method == "PATCH")
-        or (path.startswith("/uploads/") and normalized_method == "GET")
-        or path.startswith("/android/debug/")
-        or _user_report_route(path, normalized_method)
+        _rate_limit_group(path, normalized_method, route_template=route_template) is not None
+        or (normalized_method == "GET" and (policy_path == "/reports" or policy_path.startswith("/reports/")))
+        or (policy_path.startswith("/reports/") and normalized_method == "PATCH")
+        or (policy_path.startswith("/uploads/") and normalized_method == "GET")
+        or policy_path.startswith("/android/debug/")
+        or _user_report_route(policy_path, normalized_method)
     )
 
 
-def requires_account_generation(path: str, method: str) -> bool:
+def requires_account_generation(
+    path: str,
+    method: str,
+    *,
+    route_template: str | None = None,
+) -> bool:
+    policy_path = route_template or path
     normalized_method = method.upper()
     return (
         (
-            (normalized_method == "POST" and path == "/privacy/consent-events")
+            (normalized_method == "POST" and policy_path == "/privacy/consent-events")
             or (
                 normalized_method == "GET"
-                and path == "/privacy/consent-bootstrap"
+                and policy_path == "/privacy/consent-bootstrap"
             )
         )
-        or _privacy_deletion_route(path, normalized_method) is not None
-        or (normalized_method == "POST" and path in {"/reports", "/reports/v2"})
+        or _privacy_deletion_route(policy_path, normalized_method) is not None
+        or (normalized_method == "POST" and policy_path in {"/reports", "/reports/v2"})
         or (
             normalized_method == "GET"
-            and _report_transport_status_path(path)
+            and _report_transport_status_path(policy_path)
         )
-        or _raw_ingest_route(path)
-        or _user_report_route(path, normalized_method)
+        or _raw_ingest_route(policy_path)
+        or _user_report_route(policy_path, normalized_method)
     )
 
 
@@ -419,10 +574,16 @@ def _user_report_not_found_response() -> JSONResponse:
     )
 
 
-def _concealed_report_response(path: str, method: str) -> JSONResponse | None:
-    if _report_transport_status_route(path, method):
+def _concealed_report_response(
+    path: str,
+    method: str,
+    *,
+    route_template: str | None = None,
+) -> JSONResponse | None:
+    policy_path = route_template or path
+    if _report_transport_status_route(policy_path, method):
         return _report_transport_status_not_found_response()
-    if _user_report_route(path, method):
+    if _user_report_route(policy_path, method):
         return _user_report_not_found_response()
     return None
 
@@ -437,7 +598,55 @@ _POSTGRES_ACTOR_RATE_LIMITER = PostgresActorRateLimiter(
 )
 
 
-def required_field_test_access(path: str, method: str) -> FieldTestAccess | None:
+def required_field_test_access(
+    path: str,
+    method: str,
+) -> FieldTestAccess | None | _RoutePolicyFallback:
+    """Classify a template or concrete path; middleware also resolves its route."""
+    normalized_method = method.upper()
+    access = _FIELD_ROUTE_ACCESS.get(
+        (normalized_method, path),
+        _RoutePolicyFallback.UNREGISTERED,
+    )
+    if access is not _RoutePolicyFallback.UNREGISTERED:
+        return access
+    for registered_method, _template, pattern, access in _FIELD_ROUTE_PATTERNS:
+        if registered_method == normalized_method and pattern.fullmatch(path):
+            return access
+    return _RoutePolicyFallback.UNREGISTERED
+
+
+def _resolve_field_route_policy(scope: Scope) -> _ResolvedFieldRoutePolicy:
+    method = scope.get("method", "GET").upper()
+    first_partial = None
+    for route in getattr(scope.get("app"), "routes", ()):
+        match, _child_scope = route.matches(scope)
+        if match is Match.FULL:
+            template = getattr(route, "path", None)
+            return _ResolvedFieldRoutePolicy(
+                _FIELD_ROUTE_ACCESS.get(
+                    (method, template),
+                    _RoutePolicyFallback.UNREGISTERED,
+                ),
+                template,
+            )
+        if match is Match.PARTIAL and first_partial is None:
+            first_partial = route
+    if method == "OPTIONS" and first_partial is not None:
+        template = getattr(first_partial, "path", None)
+        methods = tuple(sorted(getattr(first_partial, "methods", ()) or ()))
+        if methods and all((item, template) in _FIELD_ROUTE_ACCESS for item in methods):
+            # A terminal 405 is not an authorization fallback or handler dispatch.
+            return _ResolvedFieldRoutePolicy(
+                _RoutePolicyFallback.OPTIONS_METHOD_NOT_ALLOWED,
+                template,
+                methods,
+            )
+    return _ResolvedFieldRoutePolicy(_RoutePolicyFallback.UNREGISTERED, None)
+
+
+def _legacy_admin_denial_audit_access(path: str, method: str) -> FieldTestAccess | None:
+    # Compatibility for denial audit coverage only. Never authorizes a request.
     normalized_method = method.upper()
     if normalized_method == "OPTIONS":
         return None
@@ -498,19 +707,29 @@ def required_field_test_access(path: str, method: str) -> FieldTestAccess | None
         return FieldTestAccess.FIELD
     if path.startswith("/navigation/"):
         return FieldTestAccess.FIELD
-    # Enabled field-test mode fails closed for future or forgotten routes.
+    # Preserve the former ADMIN denial-audit boundary, not an access fallback.
     return FieldTestAccess.ADMIN
 
 
 def _header(scope: Scope, name: bytes) -> str:
     for header_name, value in scope.get("headers", []):
         if header_name.lower() == name:
-            return value.decode("utf-8", errors="ignore").strip()
+            try:
+                # Do not erase invalid bytes or non-ASCII token characters.
+                return value.decode("utf-8").strip(" \t")
+            except UnicodeDecodeError:
+                return ""
     return ""
 
 
 def _matches(candidate: str, expected: str) -> bool:
-    return bool(candidate and expected) and compare_digest(candidate, expected)
+    return (
+        bool(candidate and expected)
+        and len(candidate) == len(expected)
+        and candidate.isascii()
+        and expected.isascii()
+        and compare_digest(candidate, expected)
+    )
 
 
 def _bearer_token(scope: Scope) -> str:
@@ -717,8 +936,13 @@ def _public_auth_device_proof_identity(
     scope: Scope,
     settings: Any,
     raw_body: bytes,
+    *,
+    route_template: str | None = None,
 ) -> tuple[str, str, str]:
-    method_path = (scope.get("method", "GET").upper(), scope.get("path", ""))
+    method_path = (
+        scope.get("method", "GET").upper(),
+        route_template or scope.get("path", ""),
+    )
     purpose = ADMIN_DEVICE_PROOF_PUBLIC_AUTH_ROUTES[method_path]
     payload = _strict_json_object(raw_body)
     admin_id = (
@@ -856,10 +1080,24 @@ def create_actor_assertion(
     *,
     issued_at: int | None = None,
     account_generation: int | None = None,
+    auth_epoch: int | None = None,
 ) -> str:
     timestamp = int(time()) if issued_at is None else issued_at
     access_value = access.value if isinstance(access, FieldTestAccess) else str(access)
-    if account_generation is None:
+    if auth_epoch is not None:
+        if (
+            type(auth_epoch) is not int
+            or not 1 <= auth_epoch <= 9_007_199_254_740_991
+            or type(account_generation) is not int
+            or not 1 <= account_generation <= 9_007_199_254_740_991
+        ):
+            raise ValueError("a canonical account generation and auth_epoch are required")
+        version = "v3"
+        message = (
+            f"walksafe-backend-actor-v3:{access_value}:{actor_id}:"
+            f"{account_generation}:{auth_epoch}:{timestamp}"
+        ).encode()
+    elif account_generation is None:
         version = "v1"
         message = f"walksafe-backend-actor-v1:{access_value}:{actor_id}:{timestamp}".encode()
     else:
@@ -873,7 +1111,52 @@ def create_actor_assertion(
     signature = base64.urlsafe_b64encode(
         hmac.new(secret.encode(), message, hashlib.sha256).digest()
     ).decode().rstrip("=")
+    if auth_epoch is not None:
+        return f"{version}.{timestamp}.{auth_epoch}.{signature}"
     return f"{version}.{timestamp}.{signature}"
+
+
+def _actor_assertion_auth_epoch(assertion: str) -> int | None:
+    parts = assertion.split(".")
+    if (
+        len(parts) != 4
+        or parts[0] != "v3"
+        or re.fullmatch(r"[1-9][0-9]{0,15}", parts[2]) is None
+    ):
+        return None
+    value = int(parts[2])
+    return value if value <= 9_007_199_254_740_991 else None
+
+
+def _actor_account_session_is_current(
+    actor_id: str,
+    account_generation: int | None,
+    auth_epoch: int | None,
+) -> bool:
+    from sqlalchemy import select
+
+    from backend.app.database import SessionLocal
+    from backend.app.models import UserAccount
+
+    # Read current authority on every request; a process-local epoch cache would
+    # miss password/security changes performed by another Backend process.
+    with SessionLocal() as db:
+        account = db.execute(
+            select(
+                UserAccount.account_generation,
+                UserAccount.auth_epoch,
+                UserAccount.status,
+            ).where(UserAccount.actor_id == actor_id)
+        ).one_or_none()
+    if account is None:
+        # Legacy configured field actors have no Backend account or auth epoch.
+        return auth_epoch is None
+    return (
+        account.status == "ACTIVE"
+        and auth_epoch is not None
+        and account.account_generation == account_generation
+        and account.auth_epoch == auth_epoch
+    )
 
 
 def verify_actor_assertion(
@@ -884,13 +1167,26 @@ def verify_actor_assertion(
     secret: str,
     now: int | None = None,
     account_generation: int | None = None,
+    auth_epoch: int | None = None,
 ) -> bool:
     parts = assertion.split(".")
-    expected_version = "v2" if account_generation is not None else "v1"
+    if auth_epoch is not None:
+        if (
+            type(auth_epoch) is not int
+            or type(account_generation) is not int
+            or not 1 <= account_generation <= 9_007_199_254_740_991
+            or _actor_assertion_auth_epoch(assertion) != auth_epoch
+        ):
+            return False
+        parts = [parts[0], parts[1], parts[3]]
+    expected_version = "v3" if auth_epoch is not None else (
+        "v2" if account_generation is not None else "v1"
+    )
     if (
         len(parts) != 3
         or parts[0] != expected_version
-        or not parts[1].isdigit()
+        or re.fullmatch(r"[0-9]{1,12}", parts[1]) is None
+        or re.fullmatch(r"[A-Za-z0-9_-]{43}", parts[2]) is None
         or len(secret) < 32
     ):
         return False
@@ -904,8 +1200,417 @@ def verify_actor_assertion(
         secret,
         issued_at=issued_at,
         account_generation=account_generation,
+        auth_epoch=auth_epoch,
     )
     return compare_digest(assertion, expected)
+
+
+# S19-52/S20-41: v4 binds the general actor assertion to one exact request
+# (method, origin-form target, body digest), the Backend audience, the key ID,
+# a short expiry and a single-use identifier. v1-v3 remain a parallel-period
+# compatibility format governed by ``actor_assertion_v3_policy``.
+ACTOR_ASSERTION_V4_AUDIENCE = "walksafe-backend"
+ACTOR_ASSERTION_V4_CLOCK_SKEW_SECONDS = 5
+ACTOR_ASSERTION_V4_REPLAY_CACHE_MAX_ENTRIES = 100_000
+ACTOR_ASSERTION_V3_POLICIES = frozenset({"accept", "safe-methods", "reject"})
+_ACTOR_ASSERTION_SAFE_METHODS = frozenset({"GET", "HEAD"})
+_ACTOR_ASSERTION_KID_LABEL = b"walksafe-backend-actor-kid-v1"
+_V4_METHOD_PATTERN = re.compile(r"[A-Z]{3,7}")
+_V4_TARGET_PATTERN = re.compile(r"/[\x21-\x7e]{0,4095}")
+_V4_TIMESTAMP_PATTERN = re.compile(r"[1-9][0-9]{0,11}")
+_V4_EPOCH_PATTERN = re.compile(r"0|[1-9][0-9]{0,15}")
+_V4_KID_PATTERN = re.compile(r"[A-Za-z0-9_-]{16}")
+_V4_JTI_PATTERN = re.compile(r"[A-Za-z0-9_-]{22}")
+_V4_SIGNATURE_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}")
+_SHA256_HEX_PATTERN = re.compile(r"[0-9a-f]{64}")
+_MAX_SAFE_INTEGER = 9_007_199_254_740_991
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedActorAssertionV4:
+    issued_at: int
+    expires_at: int
+    auth_epoch: int | None
+    kid: str
+    jti: str
+
+
+def actor_assertion_key_id(secret: str) -> str:
+    """Non-secret identifier of the shared Gateway assertion key."""
+    digest = hmac.new(secret.encode(), _ACTOR_ASSERTION_KID_LABEL, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode().rstrip("=")[:16]
+
+
+def actor_assertion_version(assertion: str) -> str | None:
+    version = assertion.split(".", 1)[0]
+    return version if version in {"v1", "v2", "v3", "v4"} else None
+
+
+def legacy_actor_assertion_allowed(settings: Any, method: str) -> bool:
+    # S20-41 / owner decision 7: a settings object without the attribute gets the
+    # same default as config.Settings (writes require v4).
+    policy = getattr(settings, "actor_assertion_v3_policy", "safe-methods")
+    if policy == "accept":
+        return True
+    if policy == "safe-methods":
+        return method.upper() in _ACTOR_ASSERTION_SAFE_METHODS
+    return False
+
+
+def actor_assertion_request_target(scope: Scope) -> str | None:
+    """Origin-form target exactly as received: raw path plus raw query string."""
+    raw_path = scope.get("raw_path")
+    try:
+        path = (
+            raw_path.decode("ascii")
+            if isinstance(raw_path, bytes) and raw_path
+            else str(scope.get("path", "")).encode("ascii").decode("ascii")
+        )
+        query = scope.get("query_string", b"") or b""
+        query_text = query.decode("ascii") if isinstance(query, bytes) else ""
+    except UnicodeError:
+        return None
+    target = f"{path}?{query_text}" if query_text else path
+    return target if _V4_TARGET_PATTERN.fullmatch(target) is not None else None
+
+
+def _actor_assertion_v4_message(
+    *,
+    access_value: str,
+    actor_id: str,
+    account_generation: int,
+    auth_epoch: int,
+    issued_at: int,
+    expires_at: int,
+    kid: str,
+    jti: str,
+    method: str,
+    target: str,
+    body_sha256: str,
+) -> bytes:
+    return "\n".join([
+        "walksafe-backend-actor-v4",
+        f"aud:{ACTOR_ASSERTION_V4_AUDIENCE}",
+        f"kid:{kid}",
+        f"access:{access_value}",
+        f"actor:{actor_id}",
+        f"generation:{account_generation}",
+        f"epoch:{auth_epoch}",
+        f"iat:{issued_at}",
+        f"exp:{expires_at}",
+        f"jti:{jti}",
+        f"method:{method}",
+        f"target:{target}",
+        f"body-sha256:{body_sha256}",
+    ]).encode("utf-8")
+
+
+def create_actor_assertion_v4(
+    actor_id: str,
+    access: FieldTestAccess | str,
+    secret: str,
+    *,
+    account_generation: int,
+    auth_epoch: int | None,
+    method: str,
+    target: str,
+    body_sha256: str,
+    issued_at: int | None = None,
+    expires_at: int | None = None,
+    jti: str | None = None,
+) -> str:
+    timestamp = int(time()) if issued_at is None else issued_at
+    expiry = timestamp + ACTOR_ASSERTION_MAX_AGE_SECONDS if expires_at is None else expires_at
+    identifier = (
+        base64.urlsafe_b64encode(secrets_token_bytes(16)).decode().rstrip("=")
+        if jti is None
+        else jti
+    )
+    epoch = 0 if auth_epoch is None else auth_epoch
+    access_value = access.value if isinstance(access, FieldTestAccess) else str(access)
+    if (
+        ACTOR_ID_PATTERN.fullmatch(actor_id) is None
+        or len(secret) < 32
+        or type(account_generation) is not int
+        or not 1 <= account_generation <= _MAX_SAFE_INTEGER
+        or type(epoch) is not int
+        or not 0 <= epoch <= _MAX_SAFE_INTEGER
+        or (auth_epoch is not None and epoch < 1)
+        or type(timestamp) is not int
+        or _V4_TIMESTAMP_PATTERN.fullmatch(str(timestamp)) is None
+        or type(expiry) is not int
+        or not timestamp < expiry <= timestamp + ACTOR_ASSERTION_MAX_AGE_SECONDS
+        or _V4_JTI_PATTERN.fullmatch(identifier) is None
+        or _V4_METHOD_PATTERN.fullmatch(method) is None
+        or _V4_TARGET_PATTERN.fullmatch(target) is None
+        or _SHA256_HEX_PATTERN.fullmatch(body_sha256) is None
+    ):
+        raise ValueError("a canonical v4 actor assertion binding is required")
+    kid = actor_assertion_key_id(secret)
+    message = _actor_assertion_v4_message(
+        access_value=access_value,
+        actor_id=actor_id,
+        account_generation=account_generation,
+        auth_epoch=epoch,
+        issued_at=timestamp,
+        expires_at=expiry,
+        kid=kid,
+        jti=identifier,
+        method=method,
+        target=target,
+        body_sha256=body_sha256,
+    )
+    signature = base64.urlsafe_b64encode(
+        hmac.new(secret.encode(), message, hashlib.sha256).digest()
+    ).decode().rstrip("=")
+    return f"v4.{timestamp}.{expiry}.{epoch}.{kid}.{identifier}.{signature}"
+
+
+def _actor_assertion_v4_unsigned_fields(
+    assertion: str,
+    *,
+    actor_id: str,
+    secret: str,
+    account_generation: int | None,
+    method: str,
+    target: str | None,
+    now: int | None,
+) -> tuple[list[str], int, int, int] | None:
+    """Every v4 check that does not need the body digest or the signature."""
+    parts = assertion.split(".")
+    if (
+        len(parts) != 7
+        or parts[0] != "v4"
+        or _V4_TIMESTAMP_PATTERN.fullmatch(parts[1]) is None
+        or _V4_TIMESTAMP_PATTERN.fullmatch(parts[2]) is None
+        or _V4_EPOCH_PATTERN.fullmatch(parts[3]) is None
+        or _V4_KID_PATTERN.fullmatch(parts[4]) is None
+        or _V4_JTI_PATTERN.fullmatch(parts[5]) is None
+        or _V4_SIGNATURE_PATTERN.fullmatch(parts[6]) is None
+        or len(secret) < 32
+        or type(account_generation) is not int
+        or not 1 <= account_generation <= _MAX_SAFE_INTEGER
+        or target is None
+        or _V4_TARGET_PATTERN.fullmatch(target) is None
+        or _V4_METHOD_PATTERN.fullmatch(method.upper()) is None
+        or ACTOR_ID_PATTERN.fullmatch(actor_id) is None
+    ):
+        return None
+    issued_at = int(parts[1])
+    expires_at = int(parts[2])
+    epoch = int(parts[3])
+    current = int(time()) if now is None else now
+    if (
+        epoch > _MAX_SAFE_INTEGER
+        or not issued_at < expires_at <= issued_at + ACTOR_ASSERTION_MAX_AGE_SECONDS
+        or issued_at > current + ACTOR_ASSERTION_V4_CLOCK_SKEW_SECONDS
+        or current > expires_at
+        or not compare_digest(parts[4], actor_assertion_key_id(secret))
+    ):
+        return None
+    return parts, issued_at, expires_at, epoch
+
+
+def precheck_actor_assertion_v4(
+    assertion: str,
+    *,
+    actor_id: str,
+    secret: str,
+    account_generation: int | None,
+    method: str,
+    target: str | None,
+    now: int | None = None,
+) -> bool:
+    """S20-41-F1: structure, iat/exp window, kid, actor, generation, method and
+    target shape, checked before the request body is read. Passing is necessary,
+    never sufficient: ``verify_actor_assertion_v4`` still checks the body digest
+    and the signature."""
+    return _actor_assertion_v4_unsigned_fields(
+        assertion,
+        actor_id=actor_id,
+        secret=secret,
+        account_generation=account_generation,
+        method=method,
+        target=target,
+        now=now,
+    ) is not None
+
+
+def verify_actor_assertion_v4(
+    assertion: str,
+    *,
+    actor_id: str,
+    access: FieldTestAccess,
+    secret: str,
+    account_generation: int | None,
+    method: str,
+    target: str | None,
+    body_sha256: str,
+    now: int | None = None,
+) -> VerifiedActorAssertionV4 | None:
+    if _SHA256_HEX_PATTERN.fullmatch(body_sha256) is None:
+        return None
+    unsigned = _actor_assertion_v4_unsigned_fields(
+        assertion,
+        actor_id=actor_id,
+        secret=secret,
+        account_generation=account_generation,
+        method=method,
+        target=target,
+        now=now,
+    )
+    if unsigned is None:
+        return None
+    parts, issued_at, expires_at, epoch = unsigned
+    try:
+        expected = create_actor_assertion_v4(
+            actor_id,
+            access,
+            secret,
+            account_generation=account_generation,
+            auth_epoch=epoch or None,
+            method=method.upper(),
+            target=target,
+            body_sha256=body_sha256,
+            issued_at=issued_at,
+            expires_at=expires_at,
+            jti=parts[5],
+        )
+    except ValueError:
+        return None
+    if not compare_digest(assertion, expected):
+        return None
+    return VerifiedActorAssertionV4(
+        issued_at=issued_at,
+        expires_at=expires_at,
+        auth_epoch=epoch or None,
+        kid=parts[4],
+        jti=parts[5],
+    )
+
+
+class ActorAssertionReplayCacheFull(Exception):
+    pass
+
+
+class ActorAssertionReplayCache:
+    """Process-local, bounded single-use register for verified v4 identifiers.
+
+    Entries live for the assertion window plus clock skew. The register is per
+    Backend process; multiple workers or replicas do not share it, and a process
+    restart empties it (a verbatim resend inside the 30 s window is then not
+    detected).
+
+    S20-41-F3: expiry is tracked in a ``retained_until`` min-heap, so every
+    expired identifier is released before the capacity check even when
+    expiries are not in insertion order.
+    """
+
+    def __init__(self, max_entries: int = ACTOR_ASSERTION_V4_REPLAY_CACHE_MAX_ENTRIES) -> None:
+        self._max_entries = max_entries
+        self._entries: dict[str, int] = {}
+        self._expiry_heap: list[tuple[int, str]] = []
+        self._lock = threading.Lock()
+
+    def claim(self, jti: str, *, expires_at: int, now: int | None = None) -> bool:
+        current = int(time()) if now is None else now
+        with self._lock:
+            while self._expiry_heap and self._expiry_heap[0][0] < current:
+                retained_until, expired = heapq.heappop(self._expiry_heap)
+                if self._entries.get(expired) == retained_until:
+                    del self._entries[expired]
+            if jti in self._entries:
+                return False
+            if len(self._entries) >= self._max_entries:
+                raise ActorAssertionReplayCacheFull
+            retained_until = expires_at + ACTOR_ASSERTION_V4_CLOCK_SKEW_SECONDS
+            self._entries[jti] = retained_until
+            heapq.heappush(self._expiry_heap, (retained_until, jti))
+            return True
+
+
+_ACTOR_ASSERTION_REPLAY_CACHE = ActorAssertionReplayCache()
+
+
+def claim_actor_assertion_v4(verified: VerifiedActorAssertionV4) -> bool:
+    return _ACTOR_ASSERTION_REPLAY_CACHE.claim(verified.jti, expires_at=verified.expires_at)
+
+
+async def _capture_request_body_sha256(
+    scope: Scope,
+    receive: Receive,
+    *,
+    max_bytes: int,
+) -> tuple[str, Receive]:
+    """Hash the whole body once and replay the same ASGI messages downstream."""
+    content_length = request_content_length(scope)
+    if content_length is not None and content_length > max_bytes:
+        raise RequestBodyTooLarge
+    messages: list[Message] = []
+    digest = hashlib.sha256()
+    total = 0
+    while True:
+        message = await receive()
+        if message["type"] != "http.request":
+            raise _RequestBodyIncomplete
+        chunk = message.get("body", b"")
+        if not isinstance(chunk, bytes):
+            raise _RequestBodyIncomplete
+        total += len(chunk)
+        if total > max_bytes:
+            raise RequestBodyTooLarge
+        digest.update(chunk)
+        messages.append(dict(message))
+        if not message.get("more_body", False):
+            break
+    if content_length is not None and total != content_length:
+        raise _RequestBodyIncomplete
+    replay_index = 0
+
+    async def replay_receive() -> Message:
+        nonlocal replay_index
+        if replay_index >= len(messages):
+            return {"type": "http.disconnect"}
+        message = messages[replay_index]
+        replay_index += 1
+        return dict(message)
+
+    return digest.hexdigest(), replay_receive
+
+
+def _actor_request_body_error_response(
+    error: RequestBodyTooLarge | _RequestBodyIncomplete,
+    *,
+    path: str,
+    max_bytes: int,
+) -> JSONResponse:
+    """Body errors of the general-actor v4 capture (S20-41-F1).
+
+    Too large: exactly the response of the Backend body-limit middleware for the
+    same path, so RAW keeps ``raw_collection_request_body_too_large``.
+    Incomplete: a general-actor code instead of the administrator proof code.
+    """
+    raw_collection = path.startswith("/raw-collections/")
+    if isinstance(error, RequestBodyTooLarge):
+        return _too_large_response(
+            max_bytes,
+            privacy=path.startswith("/privacy/"),
+            raw_collection=raw_collection,
+            account=path in _ACCOUNT_PATHS,
+            report_correction=(
+                path.startswith("/reports/mine/") and path.endswith("/corrections")
+            ),
+        )
+    return JSONResponse(
+        status_code=400,
+        headers=dict(_RAW_NO_STORE_HEADERS) if raw_collection else None,
+        content={
+            "detail": {
+                "code": "actor_assertion_body_incomplete",
+                "message": "The request body ended before the signed body was complete.",
+            }
+        },
+    )
 
 
 def raw_collection_request_proof_payload(
@@ -1077,7 +1782,8 @@ def verify_raw_collection_request_proof(
     if (
         len(parts) != 3
         or parts[0] != "v1"
-        or not parts[1].isdigit()
+        or re.fullmatch(r"[0-9]{1,12}", parts[1]) is None
+        or re.fullmatch(r"[A-Za-z0-9_-]{43}", parts[2]) is None
         or len(secret) < 32
     ):
         return False
@@ -1171,7 +1877,13 @@ def verify_privacy_deletion_assertion(
     now: int | None = None,
 ) -> bool:
     parts = assertion.split(".")
-    if len(parts) != 3 or parts[0] != "v2" or not parts[1].isdigit() or len(secret) < 32:
+    if (
+        len(parts) != 3
+        or parts[0] != "v2"
+        or re.fullmatch(r"[0-9]{1,12}", parts[1]) is None
+        or re.fullmatch(r"[A-Za-z0-9_-]{43}", parts[2]) is None
+        or len(secret) < 32
+    ):
         return False
     issued_at = int(parts[1])
     current = int(time()) if now is None else now
@@ -1280,7 +1992,15 @@ class FieldTestSecurityMiddleware:
         admin_device_proof_enabled = bool(
             getattr(self.settings, "admin_device_proof_enabled", False)
         )
-        if (method.upper(), path) in PUBLIC_ADMIN_SECURITY_ROUTES and admin_security_enabled:
+        resolved_policy = _resolve_field_route_policy(scope)
+        required = resolved_policy.access
+        policy_path = resolved_policy.template or path
+        public_route_key = (method.upper(), policy_path)
+        if (
+            required is None
+            and public_route_key in PUBLIC_ADMIN_SECURITY_ROUTES
+            and admin_security_enabled
+        ):
             public_headers_valid = (
                 _header(scope, ADMIN_APP_KIND_HEADER) == ADMIN_APP_KIND
                 and _header(scope, ADMIN_ROLE_HEADER) == ADMIN_ROLE
@@ -1300,9 +2020,10 @@ class FieldTestSecurityMiddleware:
                 await response(scope, receive, send)
                 return
         if (
-            admin_security_enabled
+            required is None
+            and admin_security_enabled
             and admin_device_proof_enabled
-            and (method.upper(), path) in ADMIN_DEVICE_PROOF_PUBLIC_AUTH_ROUTES
+            and public_route_key in ADMIN_DEVICE_PROOF_PUBLIC_AUTH_ROUTES
         ):
             try:
                 challenge_id, signature, correlation_id = _device_proof_headers(scope)
@@ -1316,6 +2037,7 @@ class FieldTestSecurityMiddleware:
                     scope,
                     self.settings,
                     raw_body,
+                    route_template=resolved_policy.template,
                 )
                 proof = await asyncio.to_thread(
                     self.admin_device_proof_verifier,
@@ -1346,12 +2068,26 @@ class FieldTestSecurityMiddleware:
             state = dict(scope.get("state") or {})
             state["admin_device_proof"] = proof
             scope["state"] = state
-        required = required_field_test_access(path, method)
+        if required is _RoutePolicyFallback.OPTIONS_METHOD_NOT_ALLOWED:
+            response = JSONResponse(
+                status_code=405,
+                headers={"Allow": ", ".join(resolved_policy.allowed_methods)},
+                content={"detail": "Method Not Allowed"},
+            )
+            await response(scope, receive, send)
+            return
         if required is None:
             await self.app(scope, receive, send)
             return
         if (
-            required is FieldTestAccess.ADMIN
+            (
+                required is FieldTestAccess.ADMIN
+                or (
+                    required is _RoutePolicyFallback.UNREGISTERED
+                    and _legacy_admin_denial_audit_access(path, method)
+                    is FieldTestAccess.ADMIN
+                )
+            )
             and admin_security_enabled
             and method.upper() in ADMIN_UNSAFE_METHODS
             and classify_admin_operation(method, path) is None
@@ -1386,9 +2122,44 @@ class FieldTestSecurityMiddleware:
             await response(scope, receive, send)
             return
 
+        if required is _RoutePolicyFallback.UNREGISTERED and (
+            self.settings.field_test_security_enabled or admin_security_enabled
+        ):
+            response = JSONResponse(
+                status_code=403,
+                headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+                content={"detail": {
+                    "code": "route_policy_not_registered",
+                    "message": "This request route has no approved access policy.",
+                }},
+            )
+            await response(scope, receive, send)
+            return
+
         admin_identity: AdminSessionIdentity | None = None
         if required is FieldTestAccess.ADMIN and admin_security_enabled:
             high_risk_action = _high_risk_action(path, method)
+            body_digest_token = None
+            if high_risk_action is not None:
+                # S18-7: a body-bound reconfirmation is consumed only by the
+                # exact body it approved, so hash the body before authorizing.
+                # High-risk administrator bodies are small JSON documents.
+                try:
+                    high_risk_body, receive = await _capture_request_body(
+                        scope,
+                        receive,
+                        max_bytes=ADMIN_REPORT_MUTATION_MAX_BODY_BYTES,
+                    )
+                except (RequestBodyTooLarge, _RequestBodyIncomplete) as exc:
+                    response = _request_body_error_response(
+                        exc,
+                        max_bytes=ADMIN_REPORT_MUTATION_MAX_BODY_BYTES,
+                    )
+                    await response(scope, receive, send)
+                    return
+                body_digest_token = current_admin_request_body_sha256.set(
+                    raw_body_sha256(high_risk_body)
+                )
             try:
                 admin_identity = await asyncio.to_thread(
                     self.admin_session_authorizer,
@@ -1425,6 +2196,9 @@ class FieldTestSecurityMiddleware:
                 )
                 await response(scope, receive, send)
                 return
+            finally:
+                if body_digest_token is not None:
+                    current_admin_request_body_sha256.reset(body_digest_token)
 
             headers = [
                 (name, value)
@@ -1437,9 +2211,14 @@ class FieldTestSecurityMiddleware:
             state = dict(scope.get("state") or {})
             state["admin_security_identity"] = admin_identity
             scope["state"] = state
-            if admin_device_proof_enabled and requires_admin_device_proof(
-                path,
-                method,
+            is_self_revoke = (
+                policy_path == "/admin/security/sessions/{session_id}/revoke"
+                and path.split("/")[-2].lower() == str(admin_identity.session_id)
+            )
+            if (
+                admin_device_proof_enabled
+                and requires_admin_device_proof(path, method)
+                and not is_self_revoke
             ):
                 try:
                     challenge_id, signature, correlation_id = _device_proof_headers(
@@ -1521,13 +2300,16 @@ class FieldTestSecurityMiddleware:
                         method=method,
                         path=path,
                     )
+                    if policy_path == "/admin/security/sessions/{session_id}/revoke":
+                        response.headers["Cache-Control"] = "no-store"
+                        response.headers["Pragma"] = "no-cache"
                     await response(scope, receive, send)
                     return
                 state = dict(scope.get("state") or {})
                 state["admin_device_proof"] = proof
                 scope["state"] = state
         elif not self.settings.field_test_security_enabled:
-            if _raw_ingest_route(path):
+            if _raw_ingest_route(path) or _raw_ingest_route(policy_path):
                 response = JSONResponse(
                     status_code=401,
                     headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
@@ -1558,13 +2340,16 @@ class FieldTestSecurityMiddleware:
             rate_limit_group = _rate_limit_group(
                 path,
                 method,
+                route_template=resolved_policy.template,
             )
             actor_id = ""
-            if requires_actor_identity(path, method):
+            if requires_actor_identity(
+                path, method, route_template=resolved_policy.template,
+            ):
                 actor_id = _header(scope, ACTOR_ID_HEADER)
                 if ACTOR_ID_PATTERN.fullmatch(actor_id) is None:
                     response = _concealed_report_response(
-                        path, method
+                        path, method, route_template=resolved_policy.template,
                     ) or JSONResponse(
                             status_code=422,
                             content={
@@ -1576,7 +2361,13 @@ class FieldTestSecurityMiddleware:
                         )
                     await response(scope, receive, send)
                     return
-                privacy_route = _privacy_deletion_route(path, method)
+                privacy_route = _privacy_deletion_route(policy_path, method)
+                if privacy_route is not None and privacy_route[0] != "request":
+                    actual_privacy_route = _privacy_deletion_route(path, method)
+                    privacy_route = (
+                        privacy_route[0],
+                        actual_privacy_route[1] if actual_privacy_route is not None else None,
+                    )
                 if privacy_route is not None:
                     account_generation = _positive_account_generation(scope)
                     access_pre_digest = _header(
@@ -1629,10 +2420,10 @@ class FieldTestSecurityMiddleware:
                             await response(scope, receive, send)
                             return
                         privacy_payload = _privacy_json_object(raw_body)
-                    request_id = privacy_route[1] or (
+                    request_id = (
                         _privacy_request_id_from_body(privacy_payload)
-                        if privacy_payload is not None
-                        else None
+                        if privacy_route[0] == "request" and privacy_payload is not None
+                        else privacy_route[1]
                     )
                     if method.upper() == "POST" and privacy_payload is None:
                         request_id = None
@@ -1692,9 +2483,11 @@ class FieldTestSecurityMiddleware:
                     scope["state"] = state
                 else:
                     account_generation = _positive_account_generation(scope)
-                    if requires_account_generation(path, method) and account_generation is None:
+                    if requires_account_generation(
+                        path, method, route_template=resolved_policy.template,
+                    ) and account_generation is None:
                         response = _concealed_report_response(
-                            path, method
+                            path, method, route_template=resolved_policy.template,
                         ) or JSONResponse(
                                 status_code=422,
                                 content={
@@ -1716,20 +2509,89 @@ class FieldTestSecurityMiddleware:
                     and not insecure_local_actor_bypass
                 ):
                     assertion = _header(scope, ACTOR_ASSERTION_HEADER)
-                    if not verify_actor_assertion(
-                        assertion,
-                        actor_id=actor_id,
-                        access=required,
-                        secret=getattr(self.settings, "gateway_session_secret", ""),
-                        account_generation=account_generation,
-                    ):
+                    assertion_secret = getattr(self.settings, "gateway_session_secret", "")
+                    verified_v4: VerifiedActorAssertionV4 | None = None
+                    if actor_assertion_version(assertion) == "v4":
+                        # S19-52/S20-41: bind the assertion to this exact request.
+                        # S20-41-F1: reject a token that fails any check not needing
+                        # the body before reading a single body byte.
+                        assertion_target = actor_assertion_request_target(scope)
+                        if precheck_actor_assertion_v4(
+                            assertion,
+                            actor_id=actor_id,
+                            secret=assertion_secret,
+                            account_generation=account_generation,
+                            method=method,
+                            target=assertion_target,
+                        ):
+                            body_limit = max_request_body_bytes(self.settings, path=path)
+                            try:
+                                body_sha256, receive = await _capture_request_body_sha256(
+                                    scope,
+                                    receive,
+                                    max_bytes=body_limit,
+                                )
+                            except (RequestBodyTooLarge, _RequestBodyIncomplete) as exc:
+                                response = _actor_request_body_error_response(
+                                    exc, path=path, max_bytes=body_limit,
+                                )
+                                await response(scope, receive, send)
+                                return
+                            verified_v4 = verify_actor_assertion_v4(
+                                assertion,
+                                actor_id=actor_id,
+                                access=required,
+                                secret=assertion_secret,
+                                account_generation=account_generation,
+                                method=method,
+                                target=assertion_target,
+                                body_sha256=body_sha256,
+                            )
+                        auth_epoch = verified_v4.auth_epoch if verified_v4 is not None else None
+                        assertion_valid = verified_v4 is not None
+                    else:
+                        auth_epoch = _actor_assertion_auth_epoch(assertion)
+                        assertion_valid = legacy_actor_assertion_allowed(
+                            self.settings, method,
+                        ) and verify_actor_assertion(
+                            assertion,
+                            actor_id=actor_id,
+                            access=required,
+                            secret=assertion_secret,
+                            account_generation=account_generation,
+                            auth_epoch=auth_epoch,
+                        )
+                    assertion_failure_code = (
+                        "actor_assertion_invalid" if assertion else "actor_assertion_required"
+                    )
+                    if assertion_valid and verified_v4 is not None:
+                        try:
+                            if not claim_actor_assertion_v4(verified_v4):
+                                assertion_valid = False
+                                assertion_failure_code = "actor_assertion_replayed"
+                        except ActorAssertionReplayCacheFull:
+                            # S20-41-F3: the Gateway forwards 503 bodies unchanged
+                            # (toBackendResponse), so use the code already registered
+                            # in the Gateway/Android tables (503, RETRY_SAFE) and
+                            # returned by session-current for the same condition.
+                            response = JSONResponse(
+                                status_code=503,
+                                headers={"Cache-Control": "no-store", "Retry-After": "1"},
+                                content={"detail": {
+                                    "code": "account_authentication_unavailable",
+                                    "message": "Account authentication is temporarily unavailable.",
+                                }},
+                            )
+                            await response(scope, receive, send)
+                            return
+                    if not assertion_valid:
                         response = _concealed_report_response(
-                            path, method
+                            path, method, route_template=resolved_policy.template,
                         ) or JSONResponse(
                                 status_code=401,
                                 content={
                                     "detail": {
-                                        "code": "actor_assertion_invalid" if assertion else "actor_assertion_required",
+                                        "code": assertion_failure_code,
                                         "message": "The actor identity must be bound to the authenticated gateway session.",
                                     }
                                 },
@@ -1738,13 +2600,46 @@ class FieldTestSecurityMiddleware:
                         return
                     scope = dict(scope)
                     state = dict(scope.get("state") or {})
+                    if required is FieldTestAccess.FIELD:
+                        try:
+                            current = await asyncio.to_thread(
+                                _actor_account_session_is_current,
+                                actor_id,
+                                account_generation,
+                                auth_epoch,
+                            )
+                        except SQLAlchemyError:
+                            response = JSONResponse(
+                                status_code=503,
+                                headers={"Cache-Control": "no-store"},
+                                content={"detail": {
+                                    "code": "account_authentication_unavailable",
+                                    "message": "Account authentication is temporarily unavailable.",
+                                }},
+                            )
+                            await response(scope, receive, send)
+                            return
+                        if not current:
+                            response = _concealed_report_response(
+                                path, method, route_template=resolved_policy.template,
+                            ) or JSONResponse(
+                                status_code=401,
+                                headers={"Cache-Control": "no-store"},
+                                content={"detail": {
+                                    "code": "account_authentication_stale",
+                                    "message": "The account session is no longer current.",
+                                }},
+                            )
+                            await response(scope, receive, send)
+                            return
                     state["verified_actor_assertion"] = VerifiedActorAssertion(
                         actor_id=actor_id,
                         account_generation=account_generation,
                         access=required,
+                        auth_epoch=auth_epoch,
                     )
                     scope["state"] = state
-            if _raw_ingest_write_route(path, method) and not bool(
+            if _raw_ingest_write_route(policy_path, method) and not bool(
                 getattr(self.settings, "raw_ingest_enabled", False)
             ):
                 response = JSONResponse(
@@ -1759,8 +2654,8 @@ class FieldTestSecurityMiddleware:
                 )
                 await response(scope, receive, send)
                 return
-            if _raw_ingest_route(path):
-                operation = raw_collection_operation(path, method)
+            if _raw_ingest_route(policy_path):
+                operation = raw_collection_operation(policy_path, method)
                 purpose = _header(scope, RAW_PURPOSE_HEADER)
                 walk_id = _header(scope, RAW_WALK_ID_HEADER)
                 manifest_sha256 = _header(scope, RAW_MANIFEST_SHA256_HEADER)
@@ -1845,11 +2740,14 @@ class FieldTestSecurityMiddleware:
                     else _ACTOR_RATE_LIMITER
                 )
                 try:
-                    retry_after = await asyncio.to_thread(
-                        limiter.check,
-                        actor_id,
-                        rate_limit_group,
-                    )
+                    if isinstance(limiter, PostgresActorRateLimiter):
+                        retry_after = await limiter.check_async(actor_id, rate_limit_group)
+                    else:
+                        retry_after = await asyncio.to_thread(
+                            limiter.check,
+                            actor_id,
+                            rate_limit_group,
+                        )
                 except ActorRateLimitStoreUnavailable:
                     response = JSONResponse(
                         status_code=503,
@@ -1876,6 +2774,20 @@ class FieldTestSecurityMiddleware:
                     await response(scope, receive, send)
                     return
             await self.app(scope, receive, send)
+            return
+
+        if public_route_key == ("POST", "/accounts/session-current"):
+            response = JSONResponse(
+                status_code=401,
+                headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+                content={
+                    "detail": {
+                        "code": "account_authentication_failed",
+                        "message": "The account session is not authenticated.",
+                    }
+                },
+            )
+            await response(scope, receive, send)
             return
 
         wrong_role = (field_valid and required is FieldTestAccess.ADMIN) or (
@@ -1909,6 +2821,7 @@ __all__ = [
     "ADMIN_TOKEN_HEADER",
     "AUTHORIZATION_HEADER",
     "FIELD_TOKEN_HEADER",
+    "FIELD_TEST_ROUTE_POLICIES",
     "DELETION_ACCESS_PRE_DIGEST_HEADER",
     "DELETION_TOMBSTONE_ID_HEADER",
     "RAW_CHUNK_SHA256_HEADER",
@@ -1921,7 +2834,19 @@ __all__ = [
     "FieldTestAccess",
     "FieldTestSecurityMiddleware",
     "RawCollectionOperation",
+    "ACTOR_ASSERTION_V3_POLICIES",
+    "ActorAssertionReplayCache",
+    "ActorAssertionReplayCacheFull",
     "VerifiedActorAssertion",
+    "VerifiedActorAssertionV4",
+    "actor_assertion_key_id",
+    "actor_assertion_request_target",
+    "actor_assertion_version",
+    "claim_actor_assertion_v4",
+    "create_actor_assertion_v4",
+    "legacy_actor_assertion_allowed",
+    "precheck_actor_assertion_v4",
+    "verify_actor_assertion_v4",
     "VerifiedPrivacyDeletionAssertion",
     "VerifiedRawCollectionRequestProof",
     "create_actor_assertion",

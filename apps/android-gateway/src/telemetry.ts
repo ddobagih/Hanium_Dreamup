@@ -4,49 +4,35 @@ import {
   SERVER_CAPACITY_LEVELS,
   type ServerCapacityTelemetryLevel
 } from "./server-capacity.js";
+import {
+  GATEWAY_PUBLIC_ROUTE_TEMPLATES, matchGatewayRoute,
+  type GatewayRouteTemplate
+} from "./route-registry.js";
 
-export const GATEWAY_TELEMETRY_SCHEMA = "walksafe.gateway-telemetry.v2";
+export const GATEWAY_TELEMETRY_SCHEMA = "walksafe.gateway-telemetry.v3";
 export const GATEWAY_REQUEST_ID_HEADER = "x-request-id";
-export const GATEWAY_TELEMETRY_MAX_LATENCY_MS = 60_000;
+// Above the longest relay deadline (TTS 65 s) so slow responses are not clipped.
+export const GATEWAY_TELEMETRY_MAX_LATENCY_MS = 180_000;
 
-export const GATEWAY_ROUTE_TEMPLATES = Object.freeze([
-  "/api/account-enrollments/email-otp",
-  "/api/accounts",
-  "/api/field-session",
-  "/api/field-walk",
-  "/api/speech/stt",
-  "/api/speech/tts",
-  "/api/navigation/walking",
-  "/api/navigation/destinations/search",
-  "/api/reports/v2",
-  "/api/reports/v2/{report_id}/status",
-  "/api/reports/mine",
-  "/api/reports/mine/requests/history",
-  "/api/reports/mine/deletions/{request_id}",
-  "/api/reports/mine/{report_id}",
-  "/api/reports/mine/{report_id}/content",
-  "/api/reports/mine/{report_id}/corrections",
-  "/api/reports/mine/{report_id}/requests",
-  "/api/reports/mine/{report_id}/requests/{request_id}",
-  "/api/raw-collections/{collection_id}/manifest",
-  "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}",
-  "/api/raw-collections/{collection_id}",
-  "/api/raw-collections/{collection_id}/commit",
-  "/privacy/rights",
-  "/privacy/account-deletions",
-  "/privacy/account-deletions/{request_id}/status",
-  "/privacy/account-deletions/{request_id}/device-evidence"
-] as const);
+export const GATEWAY_ROUTE_TEMPLATES = GATEWAY_PUBLIC_ROUTE_TEMPLATES;
+export type { GatewayRouteTemplate };
 
-export type GatewayRouteTemplate = typeof GATEWAY_ROUTE_TEMPLATES[number];
+/**
+ * S19-56: "prepared" is recorded when the Response object exists; "finished" only
+ * when its body was fully handed to the transport (completed), the consumer
+ * cancelled it (aborted, e.g. client socket closed), or the body failed (stream_error).
+ */
+export type GatewayRequestOutcome = "prepared" | "completed" | "aborted" | "stream_error";
 
 export type GatewayTelemetryEvent = Readonly<{
   schema_version: typeof GATEWAY_TELEMETRY_SCHEMA;
-  event_name: "walksafe.gateway.request.completed";
+  event_name: "walksafe.gateway.request.prepared" | "walksafe.gateway.request.finished";
+  outcome: GatewayRequestOutcome;
   correlation_id: string;
   route_template: GatewayRouteTemplate;
   http_status: number;
   latency_ms: number;
+  first_byte_ms: number | null;
   is_5xx: boolean;
   capacity_level: ServerCapacityTelemetryLevel;
 }>;
@@ -55,81 +41,8 @@ export type GatewayTelemetrySink = (event: GatewayTelemetryEvent) => void;
 
 const CANONICAL_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const ACCOUNT_DELETION_STATUS_ROUTE =
-  /^\/privacy\/account-deletions\/[A-Za-z0-9_-]{16,128}\/status$/;
-const ACCOUNT_DELETION_EVIDENCE_ROUTE =
-  /^\/privacy\/account-deletions\/[A-Za-z0-9_-]{16,128}\/device-evidence$/;
-const REPORT_TRANSPORT_STATUS_ROUTE =
-  /^\/api\/reports\/v2\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/status$/;
-const USER_REPORT_DETAIL_ROUTE =
-  /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const USER_REPORT_REQUEST_ROUTE =
-  /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/requests$/;
-const USER_REPORT_REQUEST_DETAIL_ROUTE =
-  /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/requests\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const USER_REPORT_CONTENT_ROUTE =
-  /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/;
-const USER_REPORT_CORRECTION_ROUTE =
-  /^\/api\/reports\/mine\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/corrections$/;
-const USER_REPORT_DELETION_ROUTE =
-  /^\/api\/reports\/mine\/deletions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const RAW_COLLECTION_MANIFEST_ROUTE =
-  /^\/api\/raw-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/manifest$/;
-const RAW_COLLECTION_CHUNK_ROUTE =
-  /^\/api\/raw-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/objects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/chunks\/(?:0|[1-9][0-9]{0,3})$/;
-const RAW_COLLECTION_STATUS_ROUTE =
-  /^\/api\/raw-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const RAW_COLLECTION_COMMIT_ROUTE =
-  /^\/api\/raw-collections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/commit$/;
-const STATIC_ROUTE_TEMPLATES = new Set<GatewayRouteTemplate>(
-  GATEWAY_ROUTE_TEMPLATES.filter(route => !route.includes("{"))
-);
-
 export function gatewayRouteTemplate(request: Request): GatewayRouteTemplate | null {
-  const pathname = new URL(request.url).pathname;
-  if (STATIC_ROUTE_TEMPLATES.has(pathname as GatewayRouteTemplate)) {
-    return pathname as GatewayRouteTemplate;
-  }
-  if (ACCOUNT_DELETION_STATUS_ROUTE.test(pathname)) {
-    return "/privacy/account-deletions/{request_id}/status";
-  }
-  if (ACCOUNT_DELETION_EVIDENCE_ROUTE.test(pathname)) {
-    return "/privacy/account-deletions/{request_id}/device-evidence";
-  }
-  if (REPORT_TRANSPORT_STATUS_ROUTE.test(pathname)) {
-    return "/api/reports/v2/{report_id}/status";
-  }
-  if (USER_REPORT_DELETION_ROUTE.test(pathname)) {
-    return "/api/reports/mine/deletions/{request_id}";
-  }
-  if (USER_REPORT_DETAIL_ROUTE.test(pathname)) {
-    return "/api/reports/mine/{report_id}";
-  }
-  if (USER_REPORT_CONTENT_ROUTE.test(pathname)) {
-    return "/api/reports/mine/{report_id}/content";
-  }
-  if (USER_REPORT_CORRECTION_ROUTE.test(pathname)) {
-    return "/api/reports/mine/{report_id}/corrections";
-  }
-  if (USER_REPORT_REQUEST_DETAIL_ROUTE.test(pathname)) {
-    return "/api/reports/mine/{report_id}/requests/{request_id}";
-  }
-  if (USER_REPORT_REQUEST_ROUTE.test(pathname)) {
-    return "/api/reports/mine/{report_id}/requests";
-  }
-  if (RAW_COLLECTION_MANIFEST_ROUTE.test(pathname)) {
-    return "/api/raw-collections/{collection_id}/manifest";
-  }
-  if (RAW_COLLECTION_CHUNK_ROUTE.test(pathname)) {
-    return "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}";
-  }
-  if (RAW_COLLECTION_STATUS_ROUTE.test(pathname)) {
-    return "/api/raw-collections/{collection_id}";
-  }
-  if (RAW_COLLECTION_COMMIT_ROUTE.test(pathname)) {
-    return "/api/raw-collections/{collection_id}/commit";
-  }
-  return null;
+  return matchGatewayRoute(new URL(request.url))?.template ?? null;
 }
 
 export function gatewayCorrelationId(request: Request): string {
@@ -164,7 +77,36 @@ function boundedCapacityLevel(
     : "UNKNOWN";
 }
 
-export function recordGatewayRequestCompleted(
+function emit(
+  sink: GatewayTelemetrySink | undefined,
+  event: Omit<GatewayTelemetryEvent, "schema_version" | "is_5xx" | "capacity_level" | "latency_ms" | "first_byte_ms"> & {
+    elapsedMs: number;
+    firstByteMs: number | null;
+    capacityLevel: ServerCapacityTelemetryLevel;
+  }
+): void {
+  if (!sink) return;
+  const { elapsedMs, firstByteMs, capacityLevel, ...fields } = event;
+  const frozen: GatewayTelemetryEvent = Object.freeze({
+    schema_version: GATEWAY_TELEMETRY_SCHEMA,
+    event_name: fields.event_name,
+    outcome: fields.outcome,
+    correlation_id: fields.correlation_id,
+    route_template: fields.route_template,
+    http_status: fields.http_status,
+    latency_ms: boundedLatencyMs(elapsedMs),
+    first_byte_ms: firstByteMs === null ? null : boundedLatencyMs(firstByteMs),
+    is_5xx: fields.http_status >= 500 && fields.http_status <= 599,
+    capacity_level: boundedCapacityLevel(capacityLevel)
+  });
+  try {
+    sink(frozen);
+  } catch {
+    // Telemetry must never change the gateway response.
+  }
+}
+
+export function recordGatewayRequestPrepared(
   correlationId: string,
   routeTemplate: GatewayRouteTemplate,
   response: Response,
@@ -172,25 +114,148 @@ export function recordGatewayRequestCompleted(
   capacityLevel: ServerCapacityTelemetryLevel,
   sink: GatewayTelemetrySink | undefined
 ): void {
-  if (!sink) return;
-  const httpStatus = response.status;
-  const event: GatewayTelemetryEvent = Object.freeze({
-    schema_version: GATEWAY_TELEMETRY_SCHEMA,
-    event_name: "walksafe.gateway.request.completed",
+  emit(sink, {
+    event_name: "walksafe.gateway.request.prepared",
+    outcome: "prepared",
     correlation_id: correlationId,
     route_template: routeTemplate,
-    http_status: httpStatus,
-    latency_ms: boundedLatencyMs(elapsedMs),
-    is_5xx: httpStatus >= 500 && httpStatus <= 599,
-    capacity_level: boundedCapacityLevel(capacityLevel)
+    http_status: response.status,
+    elapsedMs,
+    firstByteMs: null,
+    capacityLevel
   });
-  try {
-    sink(event);
-  } catch {
-    // Telemetry must never change the gateway response.
+}
+
+export function recordGatewayRequestFinished(
+  correlationId: string,
+  routeTemplate: GatewayRouteTemplate,
+  response: Response,
+  outcome: Exclude<GatewayRequestOutcome, "prepared">,
+  elapsedMs: number,
+  firstByteMs: number | null,
+  capacityLevel: ServerCapacityTelemetryLevel,
+  sink: GatewayTelemetrySink | undefined
+): void {
+  emit(sink, {
+    event_name: "walksafe.gateway.request.finished",
+    outcome,
+    correlation_id: correlationId,
+    route_template: routeTemplate,
+    http_status: response.status,
+    elapsedMs,
+    firstByteMs,
+    capacityLevel
+  });
+}
+
+/**
+ * Returns an equivalent Response whose body reports how delivery ended. The wrapper
+ * pulls on demand (no extra buffering) and forwards cancellation to the source.
+ */
+export function observeGatewayResponseDelivery(
+  response: Response,
+  startedAt: number,
+  onFinished: (
+    outcome: Exclude<GatewayRequestOutcome, "prepared">,
+    elapsedMs: number,
+    firstByteMs: number | null
+  ) => void,
+  now: () => number = () => performance.now()
+): Response {
+  let settled = false;
+  let firstByteMs: number | null = null;
+  const settle = (outcome: Exclude<GatewayRequestOutcome, "prepared">): void => {
+    if (settled) return;
+    settled = true;
+    try {
+      onFinished(outcome, now() - startedAt, firstByteMs);
+    } catch {
+      // Telemetry must never change the gateway response.
+    }
+  };
+  if (!response.body) {
+    settle("completed");
+    return response;
   }
+  const reader = response.body.getReader();
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch (error) {
+        settle("stream_error");
+        controller.error(error);
+        return;
+      }
+      if (chunk.done) {
+        settle("completed");
+        controller.close();
+        return;
+      }
+      if (firstByteMs === null && chunk.value.byteLength > 0) firstByteMs = now() - startedAt;
+      controller.enqueue(chunk.value);
+    },
+    async cancel(reason) {
+      settle("aborted");
+      await reader.cancel(reason);
+    }
+  }, { highWaterMark: 0 });
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers
+  });
 }
 
 export function writeGatewayTelemetry(event: GatewayTelemetryEvent): void {
   console.error(JSON.stringify(event));
+}
+
+/**
+ * S19-20 (w22 review): state events that are not tied to one request. They carry only
+ * clock arithmetic (no account, device, or request identifiers).
+ */
+export const GATEWAY_STATE_TELEMETRY_SCHEMA = "walksafe.gateway-state-telemetry.v1";
+
+export type GatewayClockTelemetryMode =
+  | "reanchor_after_window"
+  | "slew_after_window"
+  | "reanchor_clamp_after_window";
+
+export type GatewayStateTelemetryEvent = Readonly<{
+  schema_version: typeof GATEWAY_STATE_TELEMETRY_SCHEMA;
+  event_name:
+    | "walksafe.gateway.clock.step_detected"
+    | "walksafe.gateway.clock.lease_clamped";
+  /** Signed wall-clock step (ms) against the monotonic clock; null for a lease clamp. */
+  step_ms: number | null;
+  /** Absorbed skew (wall - server, ms) right after the event. */
+  skew_ms: number;
+  mode: GatewayClockTelemetryMode | null;
+  detected_at: "runtime" | "restart";
+}>;
+
+export type GatewayStateTelemetrySink = (event: GatewayStateTelemetryEvent) => void;
+
+let stateTelemetrySinkForTests: GatewayStateTelemetrySink | null = null;
+
+export function setGatewayStateTelemetrySinkForTests(sink: GatewayStateTelemetrySink | null): void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("gateway state telemetry sink override is unavailable in production");
+  }
+  stateTelemetrySinkForTests = sink;
+}
+
+export function recordGatewayStateEvent(
+  fields: Omit<GatewayStateTelemetryEvent, "schema_version">
+): void {
+  const sink: GatewayStateTelemetrySink | null = stateTelemetrySinkForTests ??
+    (process.env.NODE_ENV === "test" ? null : (event) => console.error(JSON.stringify(event)));
+  if (!sink) return;
+  try {
+    sink(Object.freeze({ schema_version: GATEWAY_STATE_TELEMETRY_SCHEMA, ...fields }));
+  } catch {
+    // Telemetry must never change ledger behavior.
+  }
 }

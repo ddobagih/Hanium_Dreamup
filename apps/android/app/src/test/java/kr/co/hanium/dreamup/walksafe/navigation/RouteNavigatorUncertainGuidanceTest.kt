@@ -15,9 +15,9 @@ class RouteNavigatorUncertainGuidanceTest {
         assertEquals(RouteMatchQuality.LOW, navigator.currentRouteMatch()?.quality)
         assertEquals(confident.guideIndex, uncertain.guideIndex)
         assertEquals(confident.speechCueToken?.distanceBand, uncertain.speechCueToken?.distanceBand)
-        assertTrue(confident.instruction?.contains("현재 바라보는 방향을 확인할 수 없습니다") == true)
+        assertTrue(confident.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
         assertNotNull(uncertain.routeAlignmentDiagnostic?.bearingDegreesTrueNorth)
-        assertTrue(uncertain.instruction?.contains("현재 바라보는 방향을 확인할 수 없습니다") == true)
+        assertTrue(uncertain.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
         assertFalse(confident.instruction?.contains("추정") == true)
         assertTrue(uncertain.instruction?.contains("추정") == true)
         assertNotEquals(confident.speechCueToken, uncertain.speechCueToken)
@@ -114,8 +114,9 @@ class RouteNavigatorUncertainGuidanceTest {
     private fun candidate(): RouteNavigator = RouteNavigator().apply {
         setRoute(WalkingRoute("TEST", WalkingRouteSummary(300, 300),
             listOf(point(0.0), point(100.0), point(100.0, -200.0)), emptyList()))
-        update(location(100.0, -198.0, 1_000), 1_000, false)
-        assertTrue(update(location(100.0, -198.0, 2_000), 2_000, false).arrivalCandidate)
+        // S07-32 (R6): the arrival question needs 3 s of consecutive near-destination evidence.
+        for (at in 1_000L..3_000L step 1_000L) assertFalse(update(location(100.0, -198.0, at), at, false).arrivalCandidate)
+        assertTrue(update(location(100.0, -198.0, 4_000), 4_000, false).arrivalCandidate)
     }
     private fun nearbyBranches() = RouteNavigator(allowDegradedRouteGuidance = true).apply {
         setRoute(WalkingRoute("TEST", WalkingRouteSummary(125, 300),

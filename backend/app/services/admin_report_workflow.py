@@ -6,14 +6,15 @@ from datetime import UTC, datetime
 from typing import Any, NoReturn
 import uuid
 
-from sqlalchemy import func, select, text
+from sqlalchemy import desc, func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from backend.app.models import (
     AdminOperationAudit,
     Report,
     ReportDeliveryPackage,
+    ReportInstitutionDeliveryCorrection,
     ReportInstitutionDeliveryEvent,
     ReportOriginalAccessAudit,
     ReportOriginalAccessGrant,
@@ -22,8 +23,11 @@ from backend.app.models import (
 )
 from backend.app.schemas import (
     AdminReportStatusUpdateV1,
+    ReportInstitutionDeliveryCorrectionRequest,
+    ReportInstitutionDeliveryCorrectionV1,
     ReportInstitutionDeliveryPageV1,
     ReportInstitutionDeliveryRequest,
+    ReportInstitutionDeliveryResponse,
     ReportReviewDecisionPageV1,
     ReportReviewDecisionRequest,
 )
@@ -33,6 +37,7 @@ from backend.app.services.admin_history_pagination import (
     HISTORY_PAGE_MAX_LIMIT,
     REPORT_HISTORY_RESPONSE_BUDGET_BYTES,
     build_bounded_history_page,
+    build_bounded_history_tail,
     decode_admin_history_cursor,
 )
 from backend.app.services.admin_security import (
@@ -43,6 +48,9 @@ from backend.app.services.admin_security import (
 )
 from backend.app.services.admin_report_integrity import (
     admin_report_integrity_boundary_state,
+)
+from backend.app.services.report_delivery_effective import (
+    uncorrected_delivery_event_clause,
 )
 
 
@@ -240,10 +248,77 @@ def _latest_review_decision(
         _raise_database_unavailable(db, exc)
 
 
+def _duplicate_report_cycle_exists(
+    db: Session,
+    *,
+    report_id: uuid.UUID,
+    target_id: uuid.UUID,
+) -> bool:
+    visited: set[uuid.UUID] = set()
+    current_id: uuid.UUID | None = target_id
+    while current_id is not None and current_id not in visited:
+        if current_id == report_id:
+            return True
+        visited.add(current_id)
+        latest = _latest_review_decision(db, current_id)
+        if latest is None or latest.decision != "DUPLICATE":
+            return False
+        current_id = latest.duplicate_of_report_id
+    return False
+
+
+def _active_duplicate_dependents_exist(db: Session, report_id: uuid.UUID) -> bool:
+    """Whether a current duplicate decision already points at this report."""
+
+    decision = ReportReviewDecision
+    newer = aliased(ReportReviewDecision)
+    try:
+        return bool(
+            db.execute(
+                select(decision.id)
+                .where(
+                    decision.duplicate_of_report_id == report_id,
+                    decision.decision == "DUPLICATE",
+                    ~select(newer.id)
+                    .where(
+                        newer.report_id == decision.report_id,
+                        newer.revision > decision.revision,
+                    )
+                    .exists(),
+                )
+                .limit(1)
+            ).first()
+        )
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+
+
 def _latest_delivery_event(
     db: Session,
     report_id: uuid.UUID,
 ) -> ReportInstitutionDeliveryEvent | None:
+    """Latest effective event: corrected events carry no state (S18-40)."""
+
+    try:
+        return db.execute(
+            select(ReportInstitutionDeliveryEvent)
+            .where(
+                ReportInstitutionDeliveryEvent.report_id == report_id,
+                uncorrected_delivery_event_clause(),
+            )
+            .order_by(ReportInstitutionDeliveryEvent.revision.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+
+
+def _latest_recorded_delivery_event(
+    db: Session,
+    report_id: uuid.UUID,
+) -> ReportInstitutionDeliveryEvent | None:
+    """Highest-revision event, corrected or not: its revision is the CAS revision."""
+
     try:
         return db.execute(
             select(ReportInstitutionDeliveryEvent)
@@ -253,6 +328,24 @@ def _latest_delivery_event(
         ).scalar_one_or_none()
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
+
+
+def delivery_event_correction(
+    db: Session,
+    event_id: uuid.UUID,
+) -> ReportInstitutionDeliveryCorrection | None:
+    """S18-40: the correction naming ``event_id`` (the correction key), if any."""
+
+    try:
+        correction = db.get(ReportInstitutionDeliveryCorrection, event_id)
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    return correction if isinstance(correction, ReportInstitutionDeliveryCorrection) else None
+
+
+def _current_delivery_revision(db: Session, report_id: uuid.UUID) -> int:
+    latest = _latest_recorded_delivery_event(db, report_id)
+    return 0 if latest is None else int(latest.revision)
 
 
 def allowed_delivery_statuses_for_package(
@@ -335,6 +428,7 @@ def _review_decision_intent_matches(
     return bool(
         existing.report_id == report_id
         and int(existing.content_revision) == payload.content_revision
+        and int(existing.revision) == payload.expected_review_revision + 1
         and existing.decision == payload.decision
         and existing.reason == payload.reason
         and existing.user_visible_reason == payload.user_visible_reason
@@ -501,6 +595,37 @@ def append_report_review_decision(
                 "The duplicate target report was not found.",
                 status_code=422,
             )
+        if (
+            not secured_dml
+            and payload.duplicate_of_report_id is not None
+            and _duplicate_report_cycle_exists(
+                db,
+                report_id=report_id,
+                target_id=payload.duplicate_of_report_id,
+            )
+        ):
+            _rollback_or_database_unavailable(db)
+            raise AdminReportWorkflowError(
+                "duplicate_report_cycle",
+                "A duplicate report link cannot create a cycle.",
+                status_code=422,
+            )
+        if not secured_dml and payload.duplicate_of_report_id is not None:
+            target_decision = _latest_review_decision(db, payload.duplicate_of_report_id)
+            if target_decision is not None and target_decision.decision == "DUPLICATE":
+                _rollback_or_database_unavailable(db)
+                raise AdminReportWorkflowError(
+                    "duplicate_report_target_not_representative",
+                    "Select the representative report as the duplicate target.",
+                    status_code=422,
+                )
+            if _active_duplicate_dependents_exist(db, report_id):
+                _rollback_or_database_unavailable(db)
+                raise AdminReportWorkflowError(
+                    "duplicate_report_cycle",
+                    "A report with active duplicates cannot become a duplicate.",
+                    status_code=422,
+                )
 
     decided_at = _as_utc(now or datetime.now(UTC))
     if secured_dml:
@@ -518,9 +643,11 @@ def append_report_review_decision(
             )
             stored = db.execute(
                 text(
-                    "SELECT * FROM public.walksafe_append_report_review_decision_v3("
+                    "SELECT * FROM public.walksafe_append_report_review_decision_v4("
                     "CAST(:decision_id AS uuid), CAST(:report_id AS uuid), "
-                    "CAST(:content_revision AS bigint), CAST(:decision AS text), "
+                    "CAST(:content_revision AS bigint), "
+                    "CAST(:expected_review_revision AS bigint), "
+                    "CAST(:decision AS text), "
                     "CAST(:reason AS text), CAST(:user_visible_reason AS text), "
                     "CAST(:duplicate_of_report_id AS uuid), "
                     "CAST(:location_reviewed AS boolean), "
@@ -538,6 +665,7 @@ def append_report_review_decision(
                     "decision_id": payload.decision_id,
                     "report_id": report_id,
                     "content_revision": payload.content_revision,
+                    "expected_review_revision": payload.expected_review_revision,
                     "decision": payload.decision,
                     "reason": payload.reason,
                     "user_visible_reason": payload.user_visible_reason,
@@ -558,6 +686,19 @@ def append_report_review_decision(
             ).mappings().one()
         except (AdminSecurityError, SQLAlchemyError) as exc:
             sqlstate = _database_sqlstate(exc)
+            if sqlstate in {"P1837", "P1838"}:
+                _rollback_or_database_unavailable(db)
+                if sqlstate == "P1837":
+                    raise AdminReportWorkflowError(
+                        "duplicate_report_target_not_representative",
+                        "Select the representative report as the duplicate target.",
+                        status_code=422,
+                    ) from exc
+                raise AdminReportWorkflowError(
+                    "duplicate_report_cycle",
+                    "A report with active duplicates cannot become a duplicate.",
+                    status_code=422,
+                ) from exc
             if sqlstate in {"40001", "42501"}:
                 try:
                     db.rollback()
@@ -583,10 +724,30 @@ def append_report_review_decision(
                     "The report content changed before this review was recorded.",
                     409,
                 ),
+                "REVIEW_REVISION_CONFLICT": (
+                    "review_revision_conflict",
+                    "Another review decision was recorded before this one.",
+                    409,
+                ),
                 "DUPLICATE_NOT_FOUND": (
                     "duplicate_report_not_found",
                     "The duplicate target report was not found.",
                     422,
+                ),
+                "DUPLICATE_CYCLE": (
+                    "duplicate_report_cycle",
+                    "A duplicate report link cannot create a cycle.",
+                    422,
+                ),
+                "DUPLICATE_TARGET_NOT_REPRESENTATIVE": (
+                    "duplicate_report_target_not_representative",
+                    "Select the representative report as the duplicate target.",
+                    422,
+                ),
+                "DUPLICATE_ISOLATION_UNSUPPORTED": (
+                    "admin_report_workflow_unavailable",
+                    "Duplicate review requires a read-committed transaction.",
+                    503,
                 ),
                 "EVIDENCE_INVALID": (
                     "review_evidence_grant_invalid",
@@ -698,6 +859,16 @@ def append_report_review_decision(
             )
 
     previous = _latest_review_decision(db, report_id)
+    # The report row is locked, so this CAS is atomic with the append.
+    if payload.expected_review_revision != (
+        0 if previous is None else int(previous.revision)
+    ):
+        _rollback_or_database_unavailable(db)
+        raise AdminReportWorkflowError(
+            "review_revision_conflict",
+            "Another review decision was recorded before this one.",
+            status_code=409,
+        )
     decision_id = payload.decision_id
     decision = ReportReviewDecision(
         id=decision_id,
@@ -767,6 +938,47 @@ def list_report_review_decisions(
         _raise_database_unavailable(db, exc)
 
 
+def get_report_review_decision(
+    db: Session,
+    *,
+    report_id: uuid.UUID,
+    decision_id: uuid.UUID,
+    admin_id: str,
+) -> ReportReviewDecision:
+    """S18-36: resolve one earlier attempt's outcome by its decision_id.
+
+    An app whose response was lost asks this first instead of minting a new
+    decision_id. A decision of another report or administrator is concealed as
+    not found.
+    """
+
+    try:
+        report = db.get(Report, report_id)
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    if report is None:
+        raise AdminReportWorkflowError(
+            "report_not_found",
+            "Report was not found.",
+            status_code=404,
+        )
+    try:
+        decision = db.get(ReportReviewDecision, decision_id)
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    if (
+        decision is None
+        or decision.report_id != report_id
+        or decision.admin_id != admin_id
+    ):
+        raise AdminReportWorkflowError(
+            "review_decision_not_found",
+            "No review decision with this decision_id was recorded for the report.",
+            status_code=404,
+        )
+    return decision
+
+
 def _report_history_snapshot(
     db: Session,
     *,
@@ -809,8 +1021,14 @@ def list_report_review_decision_history_page(
     report_id: uuid.UUID,
     limit: int,
     cursor: str | None,
+    position: str | None = None,
 ) -> ReportReviewDecisionPageV1:
-    if type(limit) is not int or not 1 <= limit <= HISTORY_PAGE_MAX_LIMIT:
+    if (
+        type(limit) is not int
+        or not 1 <= limit <= HISTORY_PAGE_MAX_LIMIT
+        or position not in (None, "last")
+        or (position == "last" and cursor is not None)
+    ):
         raise AdminReportWorkflowError(
             "report_review_history_query_invalid",
             "The report review history query is invalid.",
@@ -848,6 +1066,33 @@ def list_report_review_decision_history_page(
     )
     after_revision = decoded.after_revision if decoded is not None else 0
     try:
+        if position == "last":
+            rows = list(
+                db.scalars(
+                    select(ReportReviewDecision)
+                    .where(
+                        ReportReviewDecision.report_id == report_id,
+                        ReportReviewDecision.revision <= page_snapshot,
+                    )
+                    .order_by(desc(ReportReviewDecision.revision))
+                    .limit(limit)
+                ).all()
+            )
+            rows.reverse()
+            return build_bounded_history_tail(
+                rows,
+                snapshot_revision=page_snapshot,
+                byte_budget=REPORT_HISTORY_RESPONSE_BUDGET_BYTES,
+                revision_of=lambda item: item.revision,
+                page_factory=lambda items, next_cursor: ReportReviewDecisionPageV1(
+                    schema_version="walksafe.report-review-decision-page.v1",
+                    report_id=report_id,
+                    snapshot_revision=page_snapshot,
+                    total_count=page_snapshot,
+                    items=items,
+                    next_cursor=next_cursor,
+                ),
+            )
         rows = list(
             db.scalars(
                 select(ReportReviewDecision)
@@ -954,6 +1199,20 @@ def _require_latest_approval(
     return decision
 
 
+def _is_delivery_follow_up(
+    previous: ReportInstitutionDeliveryEvent | None,
+    payload: ReportInstitutionDeliveryRequest,
+) -> bool:
+    """True for an observation that continues the latest submission's package."""
+
+    return (
+        previous is not None
+        and previous.status in {"SUBMITTED", "ACKNOWLEDGED"}
+        and previous.package_revision == payload.package_revision
+        and payload.status != "SUBMITTED"
+    )
+
+
 def append_report_institution_delivery_event(
     db: Session,
     *,
@@ -1009,8 +1268,12 @@ def append_report_institution_delivery_event(
             status_code=409,
         )
 
-    previous = _latest_delivery_event(db, report_id)
-    current_revision = 0 if previous is None else previous.revision
+    recorded = _latest_recorded_delivery_event(db, report_id)
+    current_revision = 0 if recorded is None else recorded.revision
+    # S18-40: the transition base is the latest uncorrected event.
+    previous = recorded
+    if recorded is not None and delivery_event_correction(db, recorded.id) is not None:
+        previous = _latest_delivery_event(db, report_id)
     if payload.expected_revision != current_revision:
         _rollback_or_database_unavailable(db)
         raise AdminReportWorkflowError(
@@ -1019,16 +1282,22 @@ def append_report_institution_delivery_event(
             status_code=409,
         )
 
-    try:
-        approval = _require_latest_approval(
-            db,
-            report_id,
-            content_revision=int(report.content_revision or 0),
-        )
-    except AdminReportWorkflowError as exc:
-        if exc.code != "admin_report_workflow_unavailable":
-            _rollback_or_database_unavailable(db)
-        raise
+    # A follow-up observation (institution reply to an existing submission)
+    # stays bound to that submission's review decision and package, so a later
+    # re-review or content change cannot block recording it. A new SUBMITTED
+    # (or a first/retry attempt) still needs the latest approval.
+    follow_up = _is_delivery_follow_up(previous, payload)
+    if not follow_up:
+        try:
+            approval = _require_latest_approval(
+                db,
+                report_id,
+                content_revision=int(report.content_revision or 0),
+            )
+        except AdminReportWorkflowError as exc:
+            if exc.code != "admin_report_workflow_unavailable":
+                _rollback_or_database_unavailable(db)
+            raise
     try:
         package = db.execute(
             select(ReportDeliveryPackage).where(
@@ -1038,16 +1307,32 @@ def append_report_institution_delivery_event(
         ).scalar_one_or_none()
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
-    if (
-        package is None
-        or package.review_decision_id != approval.id
-        or int(package.content_revision or 0) != int(report.content_revision or 0)
-        or int(package.package_version or 0) != 2
-    ):
+    if follow_up:
+        assert previous is not None
+        package_invalid = (
+            package is None
+            or package.id != previous.package_id
+            or package.review_decision_id != previous.review_decision_id
+            or int(package.package_version or 0) != 2
+        )
+        review_decision_id = previous.review_decision_id
+    else:
+        package_invalid = (
+            package is None
+            or package.review_decision_id != approval.id
+            or int(package.content_revision or 0) != int(report.content_revision or 0)
+            or int(package.package_version or 0) != 2
+        )
+        review_decision_id = approval.id
+    if package_invalid:
         _rollback_or_database_unavailable(db)
         raise AdminReportWorkflowError(
             "delivery_package_invalid",
-            "Manual delivery requires a package for the latest approved review.",
+            (
+                "A follow-up observation must use the package of the submission it continues."
+                if follow_up
+                else "Manual delivery requires a package for the latest approved review."
+            ),
             status_code=409,
         )
     allowed_statuses = allowed_delivery_statuses_for_package(
@@ -1064,6 +1349,22 @@ def append_report_institution_delivery_event(
             f"Delivery transition {transition}->{payload.status} is not allowed.",
             status_code=409,
         )
+    # An observation that continues a submission (ACKNOWLEDGED/RESOLVED/FAILED
+    # after SUBMITTED or ACKNOWLEDGED) must name that submission's institution;
+    # the expected_revision CAS keeps this comparison atomic with the append.
+    if (
+        previous is not None
+        and previous.status in {"SUBMITTED", "ACKNOWLEDGED"}
+        and previous.package_id == package.id
+        and previous.package_revision == package.revision
+        and payload.institution != previous.institution
+    ):
+        _rollback_or_database_unavailable(db)
+        raise AdminReportWorkflowError(
+            "delivery_institution_mismatch",
+            "A delivery observation must name the institution of the submission it continues.",
+            status_code=409,
+        )
     event_id = uuid.uuid4()
     if secured_dml:
         try:
@@ -1074,7 +1375,7 @@ def append_report_institution_delivery_event(
             stored = db.execute(
                 text(
                     "SELECT * FROM public."
-                    "walksafe_append_report_delivery_event_v3("
+                    "walksafe_append_report_delivery_event_v5("
                     "CAST(:event_id AS uuid), CAST(:report_id AS uuid), "
                     "CAST(:package_revision AS bigint), "
                     "CAST(:expected_revision AS bigint), "
@@ -1224,7 +1525,7 @@ def append_report_institution_delivery_event(
     event = ReportInstitutionDeliveryEvent(
         id=event_id,
         report_id=report_id,
-        review_decision_id=approval.id,
+        review_decision_id=review_decision_id,
         package_id=package.id,
         package_revision=package.revision,
         revision=current_revision + 1,
@@ -1253,6 +1554,328 @@ def append_report_institution_delivery_event(
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
     return event
+
+
+_CORRECTION_RESULT_ERRORS: dict[str, tuple[str, str, int]] = {
+    "REPORT_NOT_FOUND": ("report_not_found", "Report was not found.", 404),
+    "IDEMPOTENCY_CONFLICT": (
+        "delivery_correction_idempotency_conflict",
+        "The correction ID was already used for a different correction.",
+        409,
+    ),
+    "REVISION_CONFLICT": (
+        "delivery_revision_conflict",
+        "The delivery event revision changed before this request was applied.",
+        409,
+    ),
+    "TARGET_NOT_FOUND": (
+        "delivery_correction_target_not_found",
+        "The corrected delivery event does not belong to this report.",
+        404,
+    ),
+    "ALREADY_CORRECTED": (
+        "delivery_event_already_corrected",
+        "The delivery event was already corrected.",
+        409,
+    ),
+    "TARGET_NOT_LATEST": (
+        "delivery_correction_target_not_latest",
+        "Only the latest effective delivery event can be corrected.",
+        409,
+    ),
+    "REASON_INVALID": (
+        "delivery_correction_reason_invalid",
+        "A correction requires a supported reason code and a memo.",
+        422,
+    ),
+    "AUTH_INVALID": (
+        "admin_device_proof_invalid",
+        "The administrator device proof is not valid for this correction.",
+        403,
+    ),
+}
+
+
+def _raise_correction_result(db: Session, result_status: str) -> NoReturn:
+    code, message, status_code = _CORRECTION_RESULT_ERRORS.get(
+        result_status,
+        (
+            "admin_report_workflow_unavailable",
+            "The administrator report workflow is temporarily unavailable.",
+            503,
+        ),
+    )
+    _rollback_or_database_unavailable(db)
+    raise AdminReportWorkflowError(code, message, status_code=status_code)
+
+
+def _correction_intent_matches(
+    existing: ReportInstitutionDeliveryCorrection,
+    *,
+    report_id: uuid.UUID,
+    payload: ReportInstitutionDeliveryCorrectionRequest,
+    identity: AdminSessionIdentity,
+) -> bool:
+    return bool(
+        existing.report_id == report_id
+        and existing.corrects_event_id == payload.corrects_event_id
+        and int(existing.expected_revision) == payload.expected_revision
+        and existing.reason_code == payload.reason_code
+        and existing.memo == payload.memo
+        and existing.admin_id == identity.admin_id
+    )
+
+
+_EMPTY_QUERY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+
+def _delivery_correction_success_audit(
+    *,
+    correction_id: uuid.UUID,
+    identity: AdminSessionIdentity,
+    correlation_id: uuid.UUID,
+) -> AdminOperationAudit:
+    """S18-40-F1: success operation audit committed with a new correction.
+
+    Like package creation, the success is recorded in the same transaction as
+    the correction; an exact replay (EXISTING) changes nothing and adds none.
+    """
+
+    return AdminOperationAudit(
+        actor_id=identity.admin_id,
+        session_id=identity.session_id,
+        device_id=identity.device_id,
+        correlation_id=correlation_id,
+        operation="report.delivery.correct",
+        outcome="SUCCEEDED",
+        resource_type="delivery_correction",
+        resource_id=str(correction_id),
+        query_sha256=_EMPTY_QUERY_SHA256,
+        result_count=1,
+        error_code=None,
+        created_at=datetime.now(UTC),
+    )
+
+
+def _correction_by_id(
+    db: Session,
+    correction_id: uuid.UUID,
+) -> ReportInstitutionDeliveryCorrection | None:
+    try:
+        return db.execute(
+            select(ReportInstitutionDeliveryCorrection).where(
+                ReportInstitutionDeliveryCorrection.id == correction_id
+            )
+        ).scalar_one_or_none()
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+
+
+def _correction_result_status(
+    db: Session,
+    *,
+    report_id: uuid.UUID,
+    payload: ReportInstitutionDeliveryCorrectionRequest,
+    identity: AdminSessionIdentity,
+) -> str | None:
+    """ORM mirror of walksafe_correct_report_delivery_event's checks."""
+
+    existing = _correction_by_id(db, payload.correction_id)
+    if existing is not None:
+        if _correction_intent_matches(
+            existing, report_id=report_id, payload=payload, identity=identity
+        ):
+            return "EXISTING"
+        return "IDEMPOTENCY_CONFLICT"
+    if payload.expected_revision != _current_delivery_revision(db, report_id):
+        return "REVISION_CONFLICT"
+    try:
+        target = db.get(ReportInstitutionDeliveryEvent, payload.corrects_event_id)
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    if target is None or target.report_id != report_id:
+        return "TARGET_NOT_FOUND"
+    if delivery_event_correction(db, target.id) is not None:
+        return "ALREADY_CORRECTED"
+    latest = _latest_delivery_event(db, report_id)
+    if latest is None or latest.id != target.id:
+        return "TARGET_NOT_LATEST"
+    return None
+
+
+def correct_report_institution_delivery_event(
+    db: Session,
+    *,
+    report_id: uuid.UUID,
+    payload: ReportInstitutionDeliveryCorrectionRequest,
+    identity: AdminSessionIdentity,
+    correlation_id: uuid.UUID,
+    proof_challenge_id: uuid.UUID | None = None,
+    proof_request_body: bytes | None = None,
+    reconfirmation_nonce_sha256: str | None = None,
+    runtime_totp_secret: str | None = None,
+    credential_issuer_key: str | None = None,
+) -> ReportInstitutionDeliveryCorrectionV1:
+    """S18-40: append a correction of the latest effective delivery event.
+
+    The corrected event is kept byte-for-byte; the correction only records
+    which event was wrong, why, and who recorded that.
+    """
+
+    try:
+        secured_dml = _secured_delivery_event_dml_required(db)
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    if secured_dml:
+        try:
+            resolved_issuer_key = _resolve_admin_credential_issuer_key(
+                db,
+                credential_issuer_key,
+            )
+            stored = db.execute(
+                text(
+                    "SELECT * FROM public.walksafe_correct_report_delivery_event("
+                    "CAST(:correction_id AS uuid), CAST(:report_id AS uuid), "
+                    "CAST(:corrects_event_id AS uuid), "
+                    "CAST(:expected_revision AS bigint), "
+                    "CAST(:reason_code AS text), CAST(:memo AS text), "
+                    "CAST(:admin_id AS text), CAST(:session_id AS uuid), "
+                    "CAST(:device_id AS text), CAST(:correlation_id AS uuid), "
+                    "CAST(:proof_challenge_id AS uuid), "
+                    "CAST(:proof_request_body AS bytea), "
+                    "CAST(:reconfirmation_nonce_sha256 AS text), "
+                    "CAST(:runtime_totp_secret AS text), "
+                    "CAST(:credential_issuer_key AS text))"
+                ),
+                {
+                    "correction_id": payload.correction_id,
+                    "report_id": report_id,
+                    "corrects_event_id": payload.corrects_event_id,
+                    "expected_revision": payload.expected_revision,
+                    "reason_code": payload.reason_code,
+                    "memo": payload.memo,
+                    "admin_id": identity.admin_id,
+                    "session_id": identity.session_id,
+                    "device_id": identity.device_id,
+                    "correlation_id": correlation_id,
+                    "proof_challenge_id": proof_challenge_id,
+                    "proof_request_body": proof_request_body,
+                    "reconfirmation_nonce_sha256": reconfirmation_nonce_sha256,
+                    "runtime_totp_secret": runtime_totp_secret,
+                    "credential_issuer_key": resolved_issuer_key,
+                },
+            ).mappings().one()
+        except IntegrityError as exc:
+            _rollback_or_database_unavailable(db)
+            raise AdminReportWorkflowError(
+                "delivery_correction_conflict",
+                "The delivery correction changed concurrently.",
+                status_code=409,
+            ) from exc
+        except (AdminSecurityError, SQLAlchemyError) as exc:
+            try:
+                db.rollback()
+            except SQLAlchemyError:
+                pass
+            if _database_sqlstate(exc) == "42501":
+                raise AdminReportWorkflowError(
+                    "admin_device_proof_invalid",
+                    "The administrator device proof is not valid for this correction.",
+                    status_code=403,
+                ) from exc
+            raise AdminReportWorkflowError(
+                "admin_report_workflow_unavailable",
+                "The administrator report workflow is temporarily unavailable.",
+                status_code=503,
+            ) from exc
+        if stored["result_status"] not in {"CREATED", "EXISTING"}:
+            _raise_correction_result(db, stored["result_status"])
+        if stored["result_status"] == "CREATED":
+            try:
+                db.add(_delivery_correction_success_audit(
+                    correction_id=stored["correction_id"],
+                    identity=identity,
+                    correlation_id=correlation_id,
+                ))
+            except SQLAlchemyError as exc:
+                _raise_database_unavailable(db, exc)
+        _commit_append(db, conflict_code="delivery_correction_conflict")
+        correction = delivery_event_correction(db, stored["corrected_event_id"])
+        if correction is None or correction.id != stored["correction_id"]:
+            raise AdminReportWorkflowError(
+                "admin_report_workflow_unavailable",
+                "The administrator report workflow is temporarily unavailable.",
+                status_code=503,
+            )
+        return ReportInstitutionDeliveryCorrectionV1.model_validate(correction)
+
+    _locked_report(db, report_id)
+    result_status = _correction_result_status(
+        db, report_id=report_id, payload=payload, identity=identity
+    )
+    if result_status == "EXISTING":
+        existing = _correction_by_id(db, payload.correction_id)
+        response = ReportInstitutionDeliveryCorrectionV1.model_validate(existing)
+        _rollback_or_database_unavailable(db)
+        return response
+    if result_status is not None:
+        _raise_correction_result(db, result_status)
+    target = db.get(ReportInstitutionDeliveryEvent, payload.corrects_event_id)
+    correction = ReportInstitutionDeliveryCorrection(
+        id=payload.correction_id,
+        report_id=report_id,
+        corrects_event_id=payload.corrects_event_id,
+        corrected_revision=int(target.revision),
+        expected_revision=payload.expected_revision,
+        reason_code=payload.reason_code,
+        memo=payload.memo,
+        admin_id=identity.admin_id,
+        session_id=identity.session_id,
+        device_id=identity.device_id,
+        correlation_id=correlation_id,
+        proof_challenge_id=proof_challenge_id,
+        created_at=datetime.now(UTC),
+    )
+    try:
+        db.add(correction)
+        db.add(_delivery_correction_success_audit(
+            correction_id=payload.correction_id,
+            identity=identity,
+            correlation_id=correlation_id,
+        ))
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    _commit_append(db, conflict_code="delivery_correction_conflict")
+    try:
+        db.refresh(correction)
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    return ReportInstitutionDeliveryCorrectionV1.model_validate(correction)
+
+
+def delivery_items_with_corrections(
+    db: Session,
+    events: list[ReportInstitutionDeliveryEvent],
+) -> list[ReportInstitutionDeliveryResponse]:
+    """S18-40: response items that carry the correction naming each event."""
+
+    items: list[ReportInstitutionDeliveryResponse] = []
+    for event in events:
+        correction = delivery_event_correction(db, event.id)
+        items.append(
+            ReportInstitutionDeliveryResponse.model_validate(event).model_copy(
+                update={
+                    "correction": (
+                        None
+                        if correction is None
+                        else ReportInstitutionDeliveryCorrectionV1.model_validate(
+                            correction
+                        )
+                    )
+                }
+            )
+        )
+    return items
 
 
 def list_report_institution_delivery_events(
@@ -1288,8 +1911,14 @@ def list_report_institution_delivery_history_page(
     report_id: uuid.UUID,
     limit: int,
     cursor: str | None,
+    position: str | None = None,
 ) -> ReportInstitutionDeliveryPageV1:
-    if type(limit) is not int or not 1 <= limit <= HISTORY_PAGE_MAX_LIMIT:
+    if (
+        type(limit) is not int
+        or not 1 <= limit <= HISTORY_PAGE_MAX_LIMIT
+        or position not in (None, "last")
+        or (position == "last" and cursor is not None)
+    ):
         raise AdminReportWorkflowError(
             "report_delivery_history_query_invalid",
             "The report delivery history query is invalid.",
@@ -1327,6 +1956,34 @@ def list_report_institution_delivery_history_page(
     )
     after_revision = decoded.after_revision if decoded is not None else 0
     try:
+        if position == "last":
+            rows = list(
+                db.scalars(
+                    select(ReportInstitutionDeliveryEvent)
+                    .where(
+                        ReportInstitutionDeliveryEvent.report_id == report_id,
+                        ReportInstitutionDeliveryEvent.revision <= page_snapshot,
+                    )
+                    .order_by(desc(ReportInstitutionDeliveryEvent.revision))
+                    .limit(limit)
+                ).all()
+            )
+            rows.reverse()
+            rows = delivery_items_with_corrections(db, rows)
+            return build_bounded_history_tail(
+                rows,
+                snapshot_revision=page_snapshot,
+                byte_budget=REPORT_HISTORY_RESPONSE_BUDGET_BYTES,
+                revision_of=lambda item: item.revision,
+                page_factory=lambda items, next_cursor: ReportInstitutionDeliveryPageV1(
+                    schema_version="walksafe.report-delivery-event-page.v1",
+                    report_id=report_id,
+                    snapshot_revision=page_snapshot,
+                    total_count=page_snapshot,
+                    items=items,
+                    next_cursor=next_cursor,
+                ),
+            )
         rows = list(
             db.scalars(
                 select(ReportInstitutionDeliveryEvent)
@@ -1339,6 +1996,8 @@ def list_report_institution_delivery_history_page(
                 .limit(limit)
             ).all()
         )
+        # S18-40: each item carries its correction (read at request time).
+        rows = delivery_items_with_corrections(db, rows)
         return build_bounded_history_page(
             rows,
             stream="report_delivery_events",
@@ -1370,8 +2029,12 @@ __all__ = [
     "AdminReportWorkflowError",
     "allowed_delivery_statuses_for_package",
     "append_report_institution_delivery_event",
+    "correct_report_institution_delivery_event",
+    "delivery_event_correction",
+    "delivery_items_with_corrections",
     "append_report_review_decision",
     "allowed_next_statuses",
+    "get_report_review_decision",
     "list_report_institution_delivery_events",
     "list_report_institution_delivery_history_page",
     "list_report_review_decision_history_page",

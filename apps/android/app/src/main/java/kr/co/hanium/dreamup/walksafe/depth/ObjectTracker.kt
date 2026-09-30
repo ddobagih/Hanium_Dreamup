@@ -14,6 +14,11 @@ data class DistanceObservation(
     val cameraPoseEvidence: CameraPoseEvidence? = null,
     val objectPositionInAnchor: Vec3? = null,
     val depthObservationTimestampNs: Long? = null,
+    /**
+     * S11-24: this observation's own distance error proxy (sample IQR / 1.349, the normal-sigma
+     * equivalent of the same capture's depth spread). Null or non-positive = unknown.
+     */
+    val distanceSigmaM: Float? = null,
 )
 
 data class IndexedObjectGeometry(
@@ -22,6 +27,9 @@ data class IndexedObjectGeometry(
     val association: MaskAssociationEvidence? = null,
 )
 data class IndexedTrackAssignment(val sourceDetectionIndex: Int, val track: TrackState)
+
+/** One observed visual box with its capture time, used only for the qualitative trend. */
+internal data class VisualTrendSample(val timestampMs: Long, val bboxNorm: RectNorm, val polygonNorm: List<Point2>)
 
 data class ApproachKinematics(
     val trend: Trend,
@@ -70,6 +78,19 @@ class TrackState(
         private set
     private var maskAssociationUncertain = false
     private val visualGeometryHistory = mutableListOf<Pair<Long, ObjectGeometry>>()
+    private val classEvidence = LinkedHashMap<String, Float>()
+
+    /**
+     * S11-21: detector class with the largest accumulated confidence. Only classes of one compatible
+     * group ever reach one track, so this never mixes risk or report meanings.
+     */
+    val accumulatedClassName: String
+        get() = classEvidence.maxByOrNull { it.value }?.key ?: className
+
+    private fun accumulateClassEvidence(geometry: ObjectGeometry) {
+        val confidence = geometry.detectionConfidence.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
+        classEvidence[geometry.className] = (classEvidence[geometry.className] ?: 0f) + confidence
+    }
 
     internal fun visualGeometryAtOrBefore(timestampMs: Long): ObjectGeometry? =
         visualGeometryHistory.lastOrNull { it.first <= timestampMs }?.second
@@ -93,6 +114,8 @@ class TrackState(
     val bboxHistory: MutableList<RectNorm> = mutableListOf()
     val centerHistory: MutableList<Point2> = mutableListOf()
     val polygonHistory: MutableList<List<Point2>> = mutableListOf()
+    /** Timed visual boxes for the qualitative trend, pruned by age instead of sample count. */
+    internal val visualTrendHistory: MutableList<VisualTrendSample> = mutableListOf()
     val distanceHistory: MutableList<DistanceObservation> = mutableListOf()
     val confidenceHistory: MutableList<Float> = mutableListOf()
 
@@ -105,6 +128,7 @@ class TrackState(
             }
         }
         clearImageHistoryOnRotationChange(geometry)
+        accumulateClassEvidence(geometry)
         latestGeometry = geometry
         latestDetectionGeometry = geometry
         rememberVisualGeometry(geometry, timestampMs)
@@ -117,6 +141,7 @@ class TrackState(
         bboxHistory.addCapped(geometry.bboxNorm, 12)
         centerHistory.addCapped(geometry.centerNorm, 12)
         polygonHistory.addCapped(geometry.polygonNorm, 8)
+        rememberTrendSample(geometry, timestampMs)
         if (resolvingMaskAmbiguity) {
             resetMetricAndSpatialHistoryPreservingTrackId(timestampMs)
             maskAssociationUncertain = false
@@ -125,6 +150,7 @@ class TrackState(
 
     /** A completed detector capture confirms identity even when flow was not budgeted for it. */
     internal fun markSourceSeen(geometry: ObjectGeometry, timestampMs: Long, minStableAgeFrames: Int) {
+        accumulateClassEvidence(geometry)
         latestDetectionGeometry = geometry
         lastDetectionAtMs = timestampMs
         missedFrames = 0
@@ -140,6 +166,7 @@ class TrackState(
             bboxHistory.addCapped(geometry.bboxNorm, 12)
             centerHistory.addCapped(geometry.centerNorm, 12)
             polygonHistory.addCapped(geometry.polygonNorm, 8)
+            rememberTrendSample(geometry, timestampMs)
         }
     }
 
@@ -164,7 +191,14 @@ class TrackState(
             bboxHistory.clear()
             centerHistory.clear()
             polygonHistory.clear()
+            visualTrendHistory.clear()
         }
+    }
+
+    private fun rememberTrendSample(geometry: ObjectGeometry, timestampMs: Long) {
+        visualTrendHistory.add(VisualTrendSample(timestampMs, geometry.bboxNorm, geometry.polygonNorm))
+        visualTrendHistory.removeAll { timestampMs - it.timestampMs > VISUAL_TREND_RETENTION_MS }
+        while (visualTrendHistory.size > MAX_VISUAL_TREND_SAMPLES) visualTrendHistory.removeAt(0)
     }
 
     internal fun acceptMaskAssociation(evidence: MaskAssociationEvidence) {
@@ -174,6 +208,9 @@ class TrackState(
         }
         latestMaskAssociationEvidence = evidence
     }
+
+    /** A mask track whose correspondence was lost (absent or ambiguous) since its last confirmation. */
+    internal val maskAssociationHeld: Boolean get() = maskAssociationUncertain
 
     internal fun holdMaskAssociation(timestampMs: Long) {
         depthGap.clear()
@@ -193,7 +230,8 @@ class TrackState(
 
     /** Updates a current image observation without manufacturing a new semantic confirmation. */
     fun markTracked(geometry: ObjectGeometry, timestampMs: Long): Boolean {
-        if (maskAssociationUncertain || missedFrames != 0 || geometry.className != className || timestampMs < lastSeenAtMs) return false
+        if (maskAssociationUncertain || missedFrames != 0 || !sameAssociationClass(geometry.className, className) ||
+            timestampMs < lastSeenAtMs) return false
         if (timestampMs == lastSeenAtMs) {
             val matches = latestGeometry == geometry
             if (matches) hasCurrentVisualGeometry = true
@@ -208,6 +246,7 @@ class TrackState(
         bboxHistory.addCapped(geometry.bboxNorm, 12)
         centerHistory.addCapped(geometry.centerNorm, 12)
         polygonHistory.addCapped(geometry.polygonNorm, 8)
+        rememberTrendSample(geometry, timestampMs)
         return true
     }
 
@@ -234,12 +273,20 @@ class TrackState(
         return true
     }
 
+    /**
+     * S11-28: the last recorded distance was held for jump confirmation and was nearer than the
+     * accepted history by more than the jump tolerance. It is never a trend or TTC sample.
+     */
+    internal var lastDistancePendingNearerJump: Boolean = false
+        private set
+
     fun recordDistance(
         observation: DistanceObservation,
         maxDepthJumpM: Float,
         requireIndependentDepthObservation: Boolean = false,
         proximityOnly: Boolean = false,
     ): Boolean {
+        lastDistancePendingNearerJump = false
         currentDistanceIsProximityOnly = proximityOnly
         if (maskAssociationUncertain) {
             metricDistanceReliable = false
@@ -271,6 +318,8 @@ class TrackState(
         }
         val decision = distanceContinuity.evaluate(observation, distanceHistory, maxDepthJumpM)
         metricDistanceReliable = decision.accepted
+        lastDistancePendingNearerJump = !decision.accepted &&
+            distanceHistory.lastOrNull()?.let { it.distanceM - observation.distanceM > maxDepthJumpM } == true
         if (decision.resetHistory) {
             depthGap.clear()
             distanceHistory.clear()
@@ -415,8 +464,9 @@ class ObjectTracker(
         }
         val eligibleTrackIndicesByClass = tracks.indices
             .filter { tracks[it].missedFrames == 0 && it !in maskTrackIndices }
-            .groupBy { tracks[it].className }
-        val geometryIndicesByClass = geometries.indices.filter { it !in maskGeometryIndices }.groupBy { geometries[it].className }
+            .groupBy { associationClassKey(tracks[it].className) }
+        val geometryIndicesByClass = geometries.indices.filter { it !in maskGeometryIndices }
+            .groupBy { associationClassKey(geometries[it].className) }
         val matchedTracks = BooleanArray(tracks.size)
         val matchedGeometries = BooleanArray(geometries.size)
         val mutuallyUniqueAnchoredMatches = mutualUniqueMatches(
@@ -425,7 +475,7 @@ class ObjectTracker(
             geometryCount = geometries.size,
         )
         val anchoredMatchesByClass = mutuallyUniqueAnchoredMatches.groupBy { candidate ->
-            tracks[candidate.trackIndex].className
+            associationClassKey(tracks[candidate.trackIndex].className)
         }
         val completeAnchoredClasses =
             (eligibleTrackIndicesByClass.keys + geometryIndicesByClass.keys).filter { className ->
@@ -444,7 +494,8 @@ class ObjectTracker(
             geometryCount = geometries.size,
         ).filter { it.iou >= MIN_PARTIAL_ANCHOR_IOU }.toSet()
         val anchoredMatches = mutuallyUniqueAnchoredMatches.filter { candidate ->
-            tracks[candidate.trackIndex].className in completeAnchoredClasses || candidate in partialAnchoredMatches
+            associationClassKey(tracks[candidate.trackIndex].className) in completeAnchoredClasses ||
+                candidate in partialAnchoredMatches
         }
         val remainingMatches = mutualUniqueMatches(
             // Reserving an anchor must not turn an ambiguous center-only alternative into a match.
@@ -474,18 +525,36 @@ class ObjectTracker(
             matchedGeometries[candidate.geometryIndex] = true
         }
 
+        // S11-19 / FP-019 design_rules[3]: a mask that was missing or crossed (held) and is seen again
+        // starts a new observation number; its count, stability and distance history start over.
+        val reappearedMaskTracks = mutableListOf<TrackState>()
         maskResult.matches.forEach { match ->
             val track = tracks[match.trackIndex]
-            track.markSeen(geometries[match.geometryIndex], timestampMs, minStableAgeFrames)
-            track.acceptMaskAssociation(requireNotNull(associations[match.geometryIndex]))
             matchedTracks[match.trackIndex] = true
             matchedGeometries[match.geometryIndex] = true
+            val geometry = geometries[match.geometryIndex]
+            val association = requireNotNull(associations[match.geometryIndex])
+            if (track.maskAssociationHeld) {
+                reappearedMaskTracks += track
+                tracks += TrackState(
+                    trackId = "$trackIdPrefix${nextTrackNumber++}",
+                    className = geometry.className,
+                    createdAtMs = timestampMs,
+                ).also {
+                    it.markSeen(geometry, timestampMs, minStableAgeFrames)
+                    it.acceptMaskAssociation(association)
+                }
+                return@forEach
+            }
+            track.markSeen(geometry, timestampMs, minStableAgeFrames)
+            track.acceptMaskAssociation(association)
         }
         tracks.forEachIndexed { index, track ->
-            if (!matchedTracks[index]) {
+            if (index < matchedTracks.size && !matchedTracks[index]) {
                 if (index in maskTrackIndices) track.holdMaskAssociation(timestampMs) else track.markMissed()
             }
         }
+        tracks.removeAll { track -> reappearedMaskTracks.any { it === track } }
         geometries.forEachIndexed { index, geometry ->
             if (matchedGeometries[index] || index in maskAmbiguousIndices) return@forEachIndexed
             val track = TrackState(
@@ -621,6 +690,7 @@ class ObjectTracker(
         depthObservationTimestampNs: Long? = null,
         requireIndependentDepthObservation: Boolean = false,
         proximityOnly: Boolean = false,
+        distanceSigmaM: Float? = null,
     ): Boolean {
         if (distanceM == null || !distanceM.isFinite() || distanceM <= 0f || !source.metric) return false
         return track.recordDistance(
@@ -632,6 +702,7 @@ class ObjectTracker(
                 cameraPoseEvidence = cameraPoseEvidence,
                 objectPositionInAnchor = objectPositionInAnchor,
                 depthObservationTimestampNs = depthObservationTimestampNs,
+                distanceSigmaM = distanceSigmaM,
             ),
             maxDepthJumpM = maxDepthJumpM,
             requireIndependentDepthObservation = requireIndependentDepthObservation,
@@ -654,19 +725,25 @@ class ObjectTracker(
         if (rotationOnlyMakesAxialTrendAmbiguous(track)) {
             return ApproachKinematics(Trend.UNKNOWN, 0f, null, null)
         }
-        val slopeMps = linearSlopeMps(usable) ?: return ApproachKinematics(Trend.UNKNOWN, 0f, null, null)
+        val fit = linearDistanceTrend(usable) ?: return ApproachKinematics(Trend.UNKNOWN, 0f, null, null)
+        val slopeMps = fit.slopeMps
         val approachSpeed = max(0f, -slopeMps)
         val trend = when {
             slopeMps < -0.10f -> Trend.APPROACHING
             slopeMps > 0.10f -> Trend.RECEDING
             else -> Trend.STABLE
         }
-        val ttcMs = if (approachSpeed >= 0.25f) ((currentDistanceM / approachSpeed) * 1000f).toLong() else null
+        // S11-24: speed and TTC need an approach that stands out from the history's own residual
+        // scatter (about two standard errors). One in-tolerance outlier or alternating surfaces
+        // can tilt the fitted line, but then the slope is not distinguishable from zero.
+        val speedSupported = approachSpeed >= 0.25f &&
+            fit.slopeStdErrMps?.let { approachSpeed >= TTC_MIN_SPEED_TO_STD_ERR * it } == true
+        val ttcMs = if (speedSupported) ((currentDistanceM / approachSpeed) * 1000f).toLong() else null
         val motionEstimate = ObjectMotionPolicy.estimate(track)
         return ApproachKinematics(
             trend = trend,
             approachScore = (approachSpeed / 1.5f).coerceIn(0f, 1f),
-            approachSpeedMps = if (approachSpeed >= 0.25f) approachSpeed else null,
+            approachSpeedMps = if (speedSupported) approachSpeed else null,
             timeToCollisionMs = ttcMs,
             objectMotion = ObjectMotionPolicy.classify(track, motionEstimate),
             motionEstimate = motionEstimate,
@@ -732,7 +809,7 @@ class ObjectTracker(
         for (first in indices.indices) for (second in first + 1 until indices.size) {
             val a = indices[first]
             val b = indices[second]
-            if (source[a].className != source[b].className) continue
+            if (!sameAssociationClass(source[a].className, source[b].className)) continue
             val trackA = matchedTracks[a]
             val trackB = matchedTracks[b]
             // Later published observations can already establish a path around another
@@ -801,7 +878,7 @@ class ObjectTracker(
     private fun plausibleMatchIoU(
         track: TrackState, geometry: ObjectGeometry, previous: ObjectGeometry? = track.latestGeometry,
     ): Float? {
-        if (track.className != geometry.className || track.missedFrames > 0 || previous == null) return null
+        if (!sameAssociationClass(track.className, geometry.className) || track.missedFrames > 0 || previous == null) return null
         if (continuityIsUncertain(previous, geometry)) return null
         val iou = bboxIoU(previous.bboxNorm, geometry.bboxNorm)
         val centerMove = centerDistance(previous.centerNorm, geometry.centerNorm)
@@ -834,6 +911,22 @@ class ObjectTracker(
 
 private const val MIN_PARTIAL_ANCHOR_IOU = 0.75f
 
+/**
+ * S11-21 (originals/11.txt:202-205): spatial identity is kept across a class change only inside this
+ * compatible group: the vehicle classes that share the spoken label and risk meaning ("차량",
+ * [kr.co.hanium.dreamup.walksafe.inference.ObstacleLabels]). Motorcycles (size and speed differ),
+ * tactile, e-scooter, crosswalk and report classes never join another class.
+ */
+private val COMPATIBLE_VEHICLE_CLASSES = setOf("car", "passenger_car", "bus", "truck")
+private const val VEHICLE_ASSOCIATION_KEY = "vehicle"
+
+internal fun associationClassKey(className: String): String =
+    if (className.lowercase() in COMPATIBLE_VEHICLE_CLASSES) VEHICLE_ASSOCIATION_KEY else className
+
+internal fun sameAssociationClass(first: String, second: String): Boolean =
+    first == second || associationClassKey(first) == associationClassKey(second)
+private const val TTC_MIN_SPEED_TO_STD_ERR = 2f
+
 private fun continuityIsUncertain(
     previous: ObjectGeometry,
     current: ObjectGeometry,
@@ -861,22 +954,54 @@ fun centerDistance(a: Point2, b: Point2): Float {
     return sqrt((a.x - b.x).pow(2) + (a.y - b.y).pow(2))
 }
 
-private fun linearSlopeMps(observations: List<DistanceObservation>): Float? {
+/** Least-squares distance slope and its residual standard error (null below three samples). */
+private data class LinearDistanceTrend(val slopeMps: Float, val slopeStdErrMps: Float?)
+
+/**
+ * S11-24 (originals/11.txt:226-230): weighted least squares with each observation's own error
+ * proxy (weight 1/sigma^2) when every sample carries one, so one noisy capture tilts the line less.
+ * The residual scale still sets the slope standard error. With no or unequal knowledge (any sample
+ * without a positive sigma) all weights are equal, which is exactly the ordinary fit.
+ */
+private fun linearDistanceTrend(observations: List<DistanceObservation>): LinearDistanceTrend? {
     if (observations.size < 2) return null
     val t0 = observations.first().timestampMs
     val xs = observations.map { (it.timestampMs - t0) / 1000f }
     val ys = observations.map { it.distanceM }
-    val meanX = xs.average().toFloat()
-    val meanY = ys.average().toFloat()
+    val sigmas = observations.map { it.distanceSigmaM }
+    val weights = if (sigmas.all { it != null && it.isFinite() && it > 0f }) {
+        val raw = sigmas.map { sigma -> 1f / (sigma!! * sigma) }
+        // Relative weights only (mean 1): the regression scale comes from the residuals.
+        val mean = raw.average().toFloat()
+        if (mean.isFinite() && mean > 0f) raw.map { it / mean } else List(observations.size) { 1f }
+    } else List(observations.size) { 1f }
+    val weightSum = weights.sum()
+    var meanX = 0f
+    var meanY = 0f
+    for (index in observations.indices) {
+        meanX += weights[index] * xs[index]
+        meanY += weights[index] * ys[index]
+    }
+    meanX /= weightSum
+    meanY /= weightSum
     var numerator = 0f
     var denominator = 0f
     for (index in observations.indices) {
         val dx = xs[index] - meanX
-        numerator += dx * (ys[index] - meanY)
-        denominator += dx * dx
+        numerator += weights[index] * dx * (ys[index] - meanY)
+        denominator += weights[index] * dx * dx
     }
     if (denominator <= 1e-6f) return null
-    return numerator / denominator
+    val slope = numerator / denominator
+    val stdErr = if (observations.size >= 3) {
+        var residualSquares = 0f
+        for (index in observations.indices) {
+            val residual = ys[index] - (meanY + slope * (xs[index] - meanX))
+            residualSquares += weights[index] * residual * residual
+        }
+        sqrt(residualSquares / (observations.size - 2) / denominator)
+    } else null
+    return LinearDistanceTrend(slope, stdErr)
 }
 
 private fun <T> MutableList<T>.addCapped(value: T, maxSize: Int) {
@@ -884,6 +1009,8 @@ private fun <T> MutableList<T>.addCapped(value: T, maxSize: Int) {
     while (size > maxSize) removeAt(0)
 }
 
+internal const val VISUAL_TREND_RETENTION_MS = 1_500L
+private const val MAX_VISUAL_TREND_SAMPLES = 96
 private const val MAX_CONTINUOUS_CENTER_MOVE_NORM = 0.35f
 private const val MAX_CONTINUOUS_AREA_RATIO = 4f
 private const val MIN_COMPARABLE_AREA_NORM = 0.0001f

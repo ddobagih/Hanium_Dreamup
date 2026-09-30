@@ -44,6 +44,7 @@ class UnifiedTfliteDeviceSmokeTest {
     }
 
     private fun invokeNeutralInput(context: Context, model: ModelRuntimeConfig) {
+        assertTrue("asset hash must match the selected model", TwoModelRuntimeConfig.assetMatches(context, model))
         val mappedModel = context.assets.openFd(model.asset).use { descriptor ->
             FileInputStream(descriptor.fileDescriptor).channel.use { channel ->
                 channel.map(
@@ -57,7 +58,10 @@ class UnifiedTfliteDeviceSmokeTest {
             val inputTensor = interpreter.getInputTensor(0)
             val outputTensor = interpreter.getOutputTensor(0)
             assertArrayEquals(intArrayOf(1, model.inputSize, model.inputSize, 3), inputTensor.shape())
-            assertArrayEquals(intArrayOf(1, 300, 6), outputTensor.shape())
+            val outputShape = outputTensor.shape()
+            // Same config-derived [1, 4 + classes, anchors] or [1, 300, 6] contract that the
+            // production detector enforces before inference; no fixed 768-only anchor count.
+            assertArrayEquals(model.outputTensorShape(), outputShape)
             assertTrue(inputTensor.dataType() == DataType.FLOAT32)
             assertTrue(outputTensor.dataType() == DataType.FLOAT32)
 
@@ -65,13 +69,19 @@ class UnifiedTfliteDeviceSmokeTest {
             val input = ByteBuffer.allocateDirect(valueCount * Float.SIZE_BYTES).order(ByteOrder.nativeOrder())
             repeat(valueCount) { input.putFloat(114f / 255f) }
             input.rewind()
-            val output = Array(1) { Array(300) { FloatArray(6) } }
+            val output = Array(1) { Array(outputShape[1]) { FloatArray(outputShape[2]) } }
             interpreter.run(input, output)
 
             assertTrue(output[0].all { row -> row.all(Float::isFinite) })
-            output[0].filter { row -> row[4] > 0f }.forEach { row ->
-                assertTrue(row[4] in 0f..1f)
-                assertTrue(row[5] % 1f == 0f && row[5].toInt() in model.classes.indices)
+            if (model.outputFormat.isRaw) {
+                output[0].drop(4).forEach { scores -> assertTrue(scores.all { it in 0f..1f }) }
+                assertTrue(output[0][2].all { it >= 0f })
+                assertTrue(output[0][3].all { it >= 0f })
+            } else {
+                output[0].filter { row -> row[4] > 0f }.forEach { row ->
+                    assertTrue(row[4] in 0f..1f)
+                    assertTrue(row[5] % 1f == 0f && row[5].toInt() in model.classes.indices)
+                }
             }
         }
     }

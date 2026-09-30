@@ -12,6 +12,7 @@ import {
   fsyncSync,
   lstatSync,
   mkdirSync,
+  opendirSync,
   openSync,
   readFileSync,
   realpathSync,
@@ -30,15 +31,23 @@ import {
 } from "./backend.js";
 import { resolveGatewayStateDirectory } from "./config.js";
 import {
+  createDeletionCapabilityHmac,
   decryptGatewayStateJson,
   encryptGatewayStateJson,
-  maxGatewayStateEnvelopeBytes
+  GatewayStateEncryptionError,
+  gatewayDeletionCapabilityKeyId,
+  maxGatewayStateEnvelopeBytes,
+  syncGatewayStateDirectoryAfterRename
 } from "./encrypted-json-store.js";
 import {
   ExclusiveFileLockBusyError,
   ExclusiveFileLockIntegrityError,
   withExclusiveFileLock
 } from "./exclusive-file-lock.js";
+import {
+  registerRequiredGatewayStateFile,
+  requiredGatewayStateFileWasLost
+} from "./state-init-marker.js";
 
 export const ACCOUNT_DELETION_REQUEST_SCHEMA_V2 =
   "walksafe.account-deletion-request.v2" as const;
@@ -49,17 +58,88 @@ export const DEVICE_DELETION_EVIDENCE_SCHEMA_V2 =
 export const DELETION_ACCESS_SECRET_HEADER =
   "x-walksafe-deletion-access-secret" as const;
 export const PRIVACY_DELETION_V2_MAX_BYTES = 4 * 1024 * 1024;
+export const ACCOUNT_DELETION_OUTBOX_OPERATION_TIMEOUT_MS = 20_000;
 
 const LEDGER_SCHEMA = "walksafe.gateway-account-deletion-ledger.v2" as const;
+const ARCHIVE_VERSION = 1 as const;
+export const ARCHIVE_ACTOR_MAX_BYTES = 16 * 1024;
+/**
+ * S19-36: once the active ledger plaintext passes half of its 4 MiB ceiling, COMPLETED
+ * requests (no outbox work, no pending evidence) move to the per-request archive together
+ * with their actor fence, so finished deletions stop consuming the active budget.
+ */
+const ARCHIVE_TRIGGER_BYTES = Math.floor(PRIVACY_DELETION_V2_MAX_BYTES / 2);
+let archiveTriggerBytesForTests: number | null = null;
+let archiveFaultForTests: "after_archive_write" | null = null;
+
+export function setPrivacyDeletionV2ArchiveForTests(options: {
+  triggerBytes: number | null;
+  fault?: "after_archive_write" | null;
+}): void {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("privacy deletion archive test controls are test-only");
+  }
+  archiveTriggerBytesForTests = options.triggerBytes;
+  archiveFaultForTests = options.fault ?? null;
+}
+const ARCHIVE_FILE = /^[0-9a-f]{64}\.json$/;
 const REQUEST_ID = /^[A-Za-z0-9_-]{16,128}$/;
 const OPAQUE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
 const ACTOR_ID = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const CAPABILITY = /^[A-Za-z0-9_-]{43}$/;
 const BACKEND_CONFLICT_CODE = /^[a-z][a-z0-9_]{2,95}$/;
+const PAUSE_ID = /^[0-9a-f]{32}$/;
+const KNOWN_CONTRACT_422_CODES = new Set([
+  "account_deletion_request_invalid",
+  "account_deletion_binding_invalid",
+  "account_deletion_request_mismatch",
+  "device_deletion_evidence_digest_invalid"
+]);
 const MAX_BACKEND_RESPONSE_BYTES = 128 * 1024;
 const MAX_OUTBOX_OPERATIONS_PER_REQUEST = 16;
+/** Evidence that can still change the Backend (PENDING, ACKNOWLEDGED, TERMINAL_CONFLICT). */
 const MAX_EVIDENCE_OPERATIONS_PER_REQUEST = 64;
+/**
+ * S19-41: revision-superseded evidence is replay-only history kept outside the 64 budget,
+ * so repeated revision-conflict recovery cannot exhaust it. The oldest are evicted first;
+ * a replay of an evicted id finds no entry and its stale expected revision is refused as
+ * a conflict, so it is never queued again.
+ */
+const MAX_SUPERSEDED_EVIDENCE_OPERATIONS_PER_REQUEST = 256;
+
+type BudgetOperation = { status: unknown; sequence?: unknown; installation_id?: unknown };
+/**
+ * S19-41 (w25): replay-only history is revision-superseded evidence plus acknowledged
+ * evidence that a newer acknowledged evidence of the same installation replaced. Only the
+ * newest acknowledged evidence per installation (and pending or terminal-conflict work)
+ * counts toward the 64 budget, so repeated FAILED -> resubmit -> ACK cycles on one device
+ * never exhaust it. Operations written without `installation_id` keep counting as active.
+ */
+function replayOnlyEvidenceIds(operations: Record<string, BudgetOperation>): string[] {
+  const newestAck = new Map<string, number>();
+  for (const operation of Object.values(operations)) {
+    if (operation.status === "ACKNOWLEDGED" && typeof operation.installation_id === "string") {
+      newestAck.set(
+        operation.installation_id,
+        Math.max(newestAck.get(operation.installation_id) ?? 0, Number(operation.sequence ?? 0))
+      );
+    }
+  }
+  return Object.keys(operations).filter((id) => {
+    const operation = operations[id]!;
+    if (operation.status === "SUPERSEDED_REVISION") return true;
+    return operation.status === "ACKNOWLEDGED" &&
+      typeof operation.installation_id === "string" &&
+      Number(operation.sequence ?? 0) < (newestAck.get(operation.installation_id) ?? 0);
+  });
+}
+function evidenceBudgetCounts(
+  operations: Record<string, BudgetOperation>
+): { active: number; superseded: number } {
+  const superseded = replayOnlyEvidenceIds(operations).length;
+  return { active: Object.keys(operations).length - superseded, superseded };
+}
 const INITIAL_RETRY_DELAY_MS = 5_000;
 const MAX_RETRY_DELAY_MS = 60 * 60 * 1_000;
 const MAX_UNRECOGNIZED_CONFLICT_ATTEMPTS = 3;
@@ -177,15 +257,62 @@ type OutboxOperation = {
   body_sha256: string;
   attempts: number;
   next_attempt_at: string;
+  paused?: OutboxPause;
   terminal_conflict_code?: string;
   terminal_at?: string;
 };
+
+type OutboxPause = {
+  pause_id: string;
+  reason: "credentials" | "contract";
+  http_status: number | null;
+  cause_code: string;
+  paused_at: string;
+};
+
+export type PausedAccountDeletionOutboxOperationV2 = Readonly<{
+  request_ref: string;
+  operation_ref: string;
+  operation_kind: OutboxOperation["kind"];
+  pause_id: string;
+  reason: OutboxPause["reason"];
+  http_status: number | null;
+  cause_code: string;
+  paused_at: string;
+}>;
 
 type EvidenceOperation = {
   body_sha256: string;
   evidence_sha256: string;
   status: "PENDING" | "ACKNOWLEDGED" | "SUPERSEDED_REVISION" | "TERMINAL_CONFLICT";
+  /**
+   * S19-41-F1 (w22 review): per-request submission order. Object key order is not
+   * submission order after a JSON round trip (all-digit ids sort first), so eviction of the
+   * oldest superseded ids uses this. Absent on operations written before it existed.
+   */
+  sequence?: number;
+  /** S19-41 (w25): the submitting installation; absent on operations written before it. */
+  installation_id?: string;
 };
+/** Evicts the oldest replay-only history (by submission sequence) beyond its cap. */
+function trimReplayOnlyEvidence(
+  record: { evidence_operations: Record<string, EvidenceOperation> },
+  protectedId: string | null
+): void {
+  const history = replayOnlyEvidenceIds(record.evidence_operations).sort((left, right) =>
+    (record.evidence_operations[left]?.sequence ?? 0) -
+    (record.evidence_operations[right]?.sequence ?? 0)
+  );
+  for (
+    let excess = history.length - MAX_SUPERSEDED_EVIDENCE_OPERATIONS_PER_REQUEST;
+    excess > 0;
+    excess -= 1
+  ) {
+    const oldest = history.shift();
+    if (oldest === undefined || oldest === protectedId) break;
+    delete record.evidence_operations[oldest];
+  }
+}
 
 type DeletionRecord = {
   request_id: string;
@@ -196,8 +323,10 @@ type DeletionRecord = {
   request_body: string;
   request_body_sha256: string;
   gateway_fence_id: string;
+  // Immutable Backend receipt binding, including after legacy capability upgrade.
   access_pre_digest: string;
   access_bound_digest: string | null;
+  capability_key?: { version: 1; key_id: string; verifier_sha256: string };
   tombstone_id: string | null;
   accepted_at: string | null;
   request_receipt_sha256: string | null;
@@ -212,11 +341,39 @@ type ActorFence = {
   gateway_fence_id: string;
 };
 
+/**
+ * S19-36 (w22 review): what the active ledger keeps about archived requests. Present only
+ * once something was archived, so a ledger that never archived keeps its earlier bytes.
+ */
+type ArchiveIndex = {
+  /**
+   * S19-36-F2: registration of every archived actor fence file, as the sorted concatenation
+   * of the first 16 hex digits of each actor digest (8 bytes per archived deletion, so the
+   * active ledger stays small and cheap to read). A listed actor whose archive file is
+   * missing fails closed; an unlisted actor has no archived fence and needs no file read.
+   */
+  actor_prefixes: string;
+  /**
+   * S19-36-F1: request digests of archived records that still hold outbox operations
+   * (normally empty). The outbox drain and the paused list read only these archive files.
+   * It is a superset: a digest is added before the archive write and removed after it.
+   */
+  outbox_request_refs: string[];
+};
+
 type DeletionLedger = {
   schema_version: typeof LEDGER_SCHEMA;
   revision: number;
   actors: Record<string, ActorFence>;
   requests: Record<string, DeletionRecord>;
+  archive_index?: ArchiveIndex;
+};
+
+type ArchivedRequest = { version: typeof ARCHIVE_VERSION; record: DeletionRecord };
+type ArchivedActor = {
+  version: typeof ARCHIVE_VERSION;
+  actor_sha256: string;
+  fence: ActorFence;
 };
 
 export class PrivacyDeletionV2Error extends Error {
@@ -281,6 +438,14 @@ function actorDigest(actorId: string): string {
   return sha256(`walksafe/deletion-actor/v2\0${actorId}`);
 }
 
+function requestDigest(requestId: string): string {
+  return sha256(`walksafe/deletion-archive-request/v1\0${requestId}`);
+}
+
+function operationDigest(operationId: string): string {
+  return sha256(`walksafe/deletion-outbox-operation/v1\0${operationId}`);
+}
+
 function capabilityBytes(secret: string): Buffer | null {
   if (!CAPABILITY.test(secret)) return null;
   const decoded = Buffer.from(secret, "base64url");
@@ -304,12 +469,16 @@ function preAccessDigest(
   actorSha256: string,
   accountGeneration: number,
   requestId: string,
-  secret: string
+  secret: string,
+  keyId?: string
 ): string | null {
   const bytes = capabilityBytes(secret);
   if (!bytes) return null;
   try {
-    return createHmac("sha256", capabilityHmacKey())
+    const hmac = keyId === undefined
+      ? createHmac("sha256", capabilityHmacKey())
+      : createDeletionCapabilityHmac(keyId);
+    return hmac
       .update("walksafe/delete-access/pre/v2\0", "utf8")
       .update(actorSha256, "utf8")
       .update("\0", "utf8")
@@ -326,7 +495,10 @@ function preAccessDigest(
 
 function boundAccessDigest(record: DeletionRecord, preDigest: string): string | null {
   if (record.tombstone_id === null) return null;
-  return createHmac("sha256", capabilityHmacKey())
+  const hmac = record.capability_key === undefined
+    ? createHmac("sha256", capabilityHmacKey())
+    : createDeletionCapabilityHmac(record.capability_key.key_id);
+  return hmac
     .update("walksafe/delete-access/bound/v2\0", "utf8")
     .update(record.actor_sha256, "utf8")
     .update("\0", "utf8")
@@ -352,14 +524,42 @@ function capabilityMatches(record: DeletionRecord, secret: string): boolean {
     record.actor_sha256,
     record.account_generation,
     record.request_id,
-    secret
+    secret,
+    record.capability_key?.key_id
   );
   if (!pre) return false;
-  if (record.access_bound_digest === null) {
-    return equalHex(record.access_pre_digest, pre);
-  }
-  const bound = boundAccessDigest(record, pre);
+  const verifier = record.capability_key?.verifier_sha256 ?? record.access_pre_digest;
+  if (!equalHex(verifier, pre)) return false;
+  if (record.access_bound_digest === null) return true;
+  const bound = boundAccessDigest(record, record.access_pre_digest);
   return bound !== null && equalHex(record.access_bound_digest, bound);
+}
+
+/** Only call after authenticating the presented capability with its recorded key. */
+function refreshCapabilityKey(record: DeletionRecord, secret: string): boolean {
+  const keyId = gatewayDeletionCapabilityKeyId();
+  if (record.capability_key?.key_id === keyId) return false;
+  const verifier = preAccessDigest(
+    record.actor_sha256, record.account_generation, record.request_id, secret, keyId
+  );
+  if (!verifier) throw new PrivacyDeletionV2Error("integrity", "capability upgrade failed");
+  record.capability_key = { version: 1, key_id: keyId, verifier_sha256: verifier };
+  record.access_bound_digest = boundAccessDigest(record, record.access_pre_digest);
+  return true;
+}
+
+function validCapabilityKey(value: unknown): boolean {
+  const key = objectValue(value);
+  if (!key || !exactKeys(key, ["version", "key_id", "verifier_sha256"]) ||
+      key.version !== 1 || typeof key.key_id !== "string" ||
+      typeof key.verifier_sha256 !== "string" || !SHA256.test(key.verifier_sha256)) {
+    return false;
+  }
+  try {
+    return gatewayDeletionCapabilityKeyId(key.key_id) === key.key_id;
+  } catch {
+    return false;
+  }
 }
 
 export function validDeletionAccessSecretV2(secret: string): boolean {
@@ -659,6 +859,415 @@ function readSecureLedgerFile(): string {
   }
 }
 
+function archiveDirectory(kind: "requests" | "actors", create: boolean): string | null {
+  const root = path.join(stateDirectory(), "archive");
+  const directory = path.join(root, kind);
+  for (const current of [root, directory]) {
+    try {
+      if (create) {
+        try {
+          mkdirSync(current, { mode: 0o700 });
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        }
+      }
+      const metadata = lstatSync(current);
+      if (
+        !metadata.isDirectory() || metadata.isSymbolicLink() ||
+        realpathSync(current) !== current ||
+        !ownedByCurrentProcess(metadata.uid) ||
+        (metadata.mode & 0o077) !== 0
+      ) throw new Error();
+    } catch (error) {
+      if (!create && (error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw new PrivacyDeletionV2Error("integrity", "privacy deletion archive directory is unsafe");
+    }
+  }
+  return directory;
+}
+
+let archiveReadsForTests = 0;
+
+/** S19-36-F1: number of archive file reads so far (test-only regression bound). */
+export function privacyDeletionV2ArchiveReadCountForTests(): number {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("privacy deletion archive read count is test-only");
+  }
+  return archiveReadsForTests;
+}
+
+function readArchiveJson(
+  kind: "requests" | "actors",
+  digest: string,
+  maxPlaintextBytes: number
+): unknown | null {
+  archiveReadsForTests += 1;
+  const directory = archiveDirectory(kind, false);
+  if (directory === null) return null;
+  const basename = `${digest}.json`;
+  let descriptor: number | null = null;
+  try {
+    descriptor = openSync(path.join(directory, basename), fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+    const metadata = fstatSync(descriptor);
+    if (
+      !metadata.isFile() || metadata.nlink !== 1 ||
+      !ownedByCurrentProcess(metadata.uid) ||
+      (metadata.mode & 0o777) !== 0o600 ||
+      metadata.size < 2 ||
+      metadata.size > maxGatewayStateEnvelopeBytes(maxPlaintextBytes)
+    ) throw new Error();
+    const raw = readFileSync(descriptor, "utf8");
+    if (Buffer.byteLength(raw, "utf8") !== metadata.size) throw new Error();
+    return decryptGatewayStateJson(
+      { kind: "privacy-deletion-v2", recordId: basename }, raw, maxPlaintextBytes
+    ).value;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw new PrivacyDeletionV2Error("integrity", "privacy deletion archive cannot be read");
+  } finally {
+    if (descriptor !== null) closeSync(descriptor);
+  }
+}
+
+function readArchivedActor(digest: string): ActorFence | null {
+  const value = readArchiveJson("actors", digest, ARCHIVE_ACTOR_MAX_BYTES);
+  if (value === null) return null;
+  const actor = objectValue(value);
+  const fence = objectValue(actor?.fence);
+  if (
+    !actor || !exactKeys(actor, ["version", "actor_sha256", "fence"]) ||
+    actor.version !== ARCHIVE_VERSION || actor.actor_sha256 !== digest ||
+    !SHA256.test(digest) || !fence ||
+    !exactKeys(fence, ["account_generation", "request_id", "gateway_fence_id"]) ||
+    !safePositiveInteger(fence.account_generation) ||
+    typeof fence.request_id !== "string" || !REQUEST_ID.test(fence.request_id) ||
+    typeof fence.gateway_fence_id !== "string" || !OPAQUE_ID.test(fence.gateway_fence_id)
+  ) throw new PrivacyDeletionV2Error("integrity", "privacy deletion archive actor is invalid");
+  return fence as ActorFence;
+}
+
+function sameFence(left: ActorFence, right: ActorFence): boolean {
+  return left.account_generation === right.account_generation &&
+    left.request_id === right.request_id &&
+    left.gateway_fence_id === right.gateway_fence_id;
+}
+
+function assertArchiveFence(record: DeletionRecord, fence: ActorFence | null): asserts fence is ActorFence {
+  if (
+    fence === null || fence.account_generation !== record.account_generation ||
+    fence.request_id !== record.request_id || fence.gateway_fence_id !== record.gateway_fence_id
+  ) throw new PrivacyDeletionV2Error("integrity", "privacy deletion archive fence is missing or mismatched");
+}
+
+function readArchivedRequestByDigest(digest: string): DeletionRecord | null {
+  const value = readArchiveJson("requests", digest, PRIVACY_DELETION_V2_MAX_BYTES);
+  if (value === null) return null;
+  const archive = objectValue(value);
+  const record = objectValue(archive?.record);
+  if (
+    !archive || !exactKeys(archive, ["version", "record"]) ||
+    archive.version !== ARCHIVE_VERSION || !record ||
+    typeof record.request_id !== "string" ||
+    requestDigest(record.request_id) !== digest ||
+    !validRecord(record, record.request_id)
+  ) throw new PrivacyDeletionV2Error("integrity", "privacy deletion archive request is invalid");
+  assertArchiveFence(record, readArchivedActor(record.actor_sha256));
+  return record;
+}
+
+function assertSameImmutableRequest(active: DeletionRecord, archived: DeletionRecord): void {
+  if (
+    active.request_id !== archived.request_id ||
+    active.actor_id !== archived.actor_id ||
+    active.actor_sha256 !== archived.actor_sha256 ||
+    active.account_generation !== archived.account_generation ||
+    active.client_revision !== archived.client_revision ||
+    active.request_body !== archived.request_body ||
+    active.request_body_sha256 !== archived.request_body_sha256 ||
+    active.gateway_fence_id !== archived.gateway_fence_id ||
+    active.access_pre_digest !== archived.access_pre_digest
+  ) throw new PrivacyDeletionV2Error("integrity", "active and archived deletion identities differ");
+}
+
+function recordFromStores(ledger: DeletionLedger, requestId: string): DeletionRecord | undefined {
+  const active = ledger.requests[requestId];
+  const archived = readArchivedRequestByDigest(requestDigest(requestId));
+  if (archived) {
+    const activeFence = ledger.actors[archived.actor_sha256];
+    if (activeFence) {
+      assertArchiveFence(archived, activeFence);
+    }
+    if (active) assertSameImmutableRequest(active, archived);
+  }
+  return active ?? archived ?? undefined;
+}
+
+function fenceFromStores(ledger: DeletionLedger, digest: string): ActorFence | undefined {
+  const active = ledger.actors[digest];
+  const registered = ledger.archive_index
+    ? findArchiveActorPrefix(ledger.archive_index.actor_prefixes, digest).found
+    : null;
+  if (registered === false) {
+    // With an index every archived fence is registered; an unlisted digest has no archived
+    // fence (a crash between the archive write and the ledger write keeps it active).
+    return active;
+  }
+  const archived = readArchivedActor(digest);
+  if (archived) {
+    const record = readArchivedRequestByDigest(requestDigest(archived.request_id));
+    if (!record || record.actor_sha256 !== digest) {
+      throw new PrivacyDeletionV2Error("integrity", "privacy deletion archive actor has no request");
+    }
+    assertArchiveFence(record, archived);
+    if (active && !sameFence(active, archived)) {
+      throw new PrivacyDeletionV2Error("integrity", "active and archived deletion fences differ");
+    }
+  } else if (registered === true && !active) {
+    // S19-36-F2: a registered archived fence file is lost (deleted directory, partial
+    // restore). Never read that as "no deletion": fail closed until it is restored.
+    throw new PrivacyDeletionV2Error("integrity", "archived deletion fence is missing");
+  }
+  return active ?? archived ?? undefined;
+}
+
+function archiveIndex(ledger: DeletionLedger): ArchiveIndex {
+  ledger.archive_index ??= { actor_prefixes: "", outbox_request_refs: [] };
+  return ledger.archive_index;
+}
+
+function registerArchivedActor(ledger: DeletionLedger, digest: string): void {
+  const index = archiveIndex(ledger);
+  const { found, slot } = findArchiveActorPrefix(index.actor_prefixes, digest);
+  if (found) return;
+  const offset = slot * ARCHIVE_ACTOR_PREFIX_HEX;
+  index.actor_prefixes = index.actor_prefixes.slice(0, offset) + archiveActorPrefix(digest) +
+    index.actor_prefixes.slice(offset);
+}
+
+function setOutboxRef(ledger: DeletionLedger, ref: string, present: boolean): boolean {
+  const index = archiveIndex(ledger);
+  const listed = index.outbox_request_refs.includes(ref);
+  if (listed === present) return false;
+  index.outbox_request_refs = present
+    ? [...index.outbox_request_refs, ref].sort()
+    : index.outbox_request_refs.filter((candidate) => candidate !== ref);
+  return true;
+}
+
+function archiveEntryDigests(kind: "requests" | "actors"): string[] {
+  const directoryPath = archiveDirectory(kind, false);
+  if (directoryPath === null) return [];
+  const digests: string[] = [];
+  const directory = opendirSync(directoryPath);
+  try {
+    let entry;
+    while ((entry = directory.readSync()) !== null) {
+      if (entry.name.startsWith(".") && entry.name.endsWith(".tmp")) continue;
+      if (!ARCHIVE_FILE.test(entry.name) || !entry.isFile()) {
+        throw new PrivacyDeletionV2Error("integrity", "privacy deletion archive entry is invalid");
+      }
+      digests.push(entry.name.slice(0, -5));
+    }
+  } finally {
+    directory.closeSync();
+  }
+  return digests.sort();
+}
+
+/**
+ * S19-36 (w22 review): one-time migration for an archive written before the index existed.
+ * Under the ledger lock it lists every archived fence and every archived record that still
+ * has outbox work. Returns true when the index was created and must be written.
+ */
+function ensureArchiveIndex(ledger: DeletionLedger): boolean {
+  if (ledger.archive_index !== undefined) return false;
+  const actorDigests = archiveEntryDigests("actors");
+  const requestDigests = archiveEntryDigests("requests");
+  if (actorDigests.length === 0 && requestDigests.length === 0) return false;
+  const index: ArchiveIndex = { actor_prefixes: "", outbox_request_refs: [] };
+  for (const digest of actorDigests) {
+    if (ledger.actors[digest]) continue;
+    // Verifies the archived fence against its archived request before registering it.
+    if (!fenceFromStores(ledger, digest)) continue;
+    const { found, slot } = findArchiveActorPrefix(index.actor_prefixes, digest);
+    if (found) continue;
+    const offset = slot * ARCHIVE_ACTOR_PREFIX_HEX;
+    index.actor_prefixes = index.actor_prefixes.slice(0, offset) + archiveActorPrefix(digest) +
+      index.actor_prefixes.slice(offset);
+  }
+  for (const digest of requestDigests) {
+    const record = readArchivedRequestByDigest(digest);
+    if (!record) {
+      throw new PrivacyDeletionV2Error("integrity", "privacy deletion archive entry disappeared");
+    }
+    if (!ledger.requests[record.request_id] && record.outbox.length > 0) {
+      index.outbox_request_refs.push(digest);
+    }
+  }
+  // Archive files of requests that are still active are crash residue of an unfinished
+  // move; the index is created by the move itself.
+  if (index.actor_prefixes === "" && index.outbox_request_refs.length === 0) return false;
+  ledger.archive_index = index;
+  return true;
+}
+
+function writeArchivedRequest(record: DeletionRecord): void {
+  if (!validRecord(record, record.request_id)) {
+    throw new PrivacyDeletionV2Error("integrity", "next archived deletion request is invalid");
+  }
+  const archive: ArchivedRequest = { version: ARCHIVE_VERSION, record };
+  writeArchiveFile(
+    "requests",
+    `${requestDigest(record.request_id)}.json`,
+    archive,
+    PRIVACY_DELETION_V2_MAX_BYTES
+  );
+}
+
+function writeArchivedActor(digest: string, fence: ActorFence): void {
+  const archive: ArchivedActor = { version: ARCHIVE_VERSION, actor_sha256: digest, fence };
+  writeArchiveFile("actors", `${digest}.json`, archive, ARCHIVE_ACTOR_MAX_BYTES);
+}
+
+function writeArchiveFile(
+  kind: "requests" | "actors",
+  basename: string,
+  value: unknown,
+  maxPlaintextBytes: number
+): void {
+  const directory = archiveDirectory(kind, true);
+  if (directory === null) throw new PrivacyDeletionV2Error("integrity", "archive directory is missing");
+  const encoded = encryptGatewayStateJson(
+    { kind: "privacy-deletion-v2", recordId: basename },
+    value,
+    maxPlaintextBytes
+  );
+  const temporary = path.join(directory, `.${basename}.${process.pid}.${randomBytes(12).toString("hex")}.tmp`);
+  let descriptor: number | null = null;
+  try {
+    descriptor = openSync(
+      temporary,
+      fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY | fsConstants.O_NOFOLLOW,
+      0o600
+    );
+    writeFileSync(descriptor, encoded, "utf8");
+    fsyncSync(descriptor);
+    closeSync(descriptor);
+    descriptor = null;
+    renameSync(temporary, path.join(directory, basename));
+    // S19-27: after the rename a failure is outcome unknown, not "not written".
+    syncGatewayStateDirectoryAfterRename("privacy-deletion-v2", directory);
+  } finally {
+    if (descriptor !== null) closeSync(descriptor);
+    rmSync(temporary, { force: true });
+  }
+}
+
+function archivableRequest(record: DeletionRecord): boolean {
+  return record.backend_status?.overall_status === "COMPLETED" &&
+    record.outbox.length === 0 &&
+    Object.values(record.evidence_operations).every(
+      (operation) => operation.status === "ACKNOWLEDGED" ||
+        operation.status === "SUPERSEDED_REVISION"
+    );
+}
+
+/**
+ * S19-36: crash-safe move inside the ledger lock. Order: archive request + actor fence
+ * (each temp fsync, rename, directory fsync) -> re-read and compare -> drop them from the
+ * in-memory active ledger -> the caller's writeLedger. A crash before the ledger write leaves
+ * both copies; readers prefer the active copy after checking the immutable identity and the
+ * fence, and the next write re-archives. The actor fence (re-signup block) is never dropped.
+ */
+function archiveCompletedRequests(ledger: DeletionLedger): void {
+  const threshold = archiveTriggerBytesForTests ?? ARCHIVE_TRIGGER_BYTES;
+  if (Buffer.byteLength(JSON.stringify(ledger), "utf8") <= threshold) return;
+  const moved: string[] = [];
+  for (const [requestId, record] of Object.entries(ledger.requests)) {
+    if (!archivableRequest(record)) continue;
+    const fence = ledger.actors[record.actor_sha256];
+    if (!fence || fence.request_id !== requestId) continue;
+    writeArchivedRequest(record);
+    writeArchivedActor(record.actor_sha256, fence);
+    const archived = readArchivedRequestByDigest(requestDigest(requestId));
+    if (!archived || JSON.stringify(archived) !== JSON.stringify(record)) {
+      throw new PrivacyDeletionV2Error("integrity", "archived deletion request did not verify");
+    }
+    const archivedFence = readArchivedActor(record.actor_sha256);
+    if (!archivedFence || !sameFence(archivedFence, fence)) {
+      throw new PrivacyDeletionV2Error("integrity", "archived deletion fence did not verify");
+    }
+    moved.push(requestId);
+  }
+  if (moved.length > 0 && archiveFaultForTests === "after_archive_write") {
+    throw new Error("injected privacy deletion archive fault before the active ledger write");
+  }
+  for (const requestId of moved) {
+    const record = ledger.requests[requestId]!;
+    // S19-36-F2: the archived fence file is registered in the same ledger write.
+    registerArchivedActor(ledger, record.actor_sha256);
+    delete ledger.actors[record.actor_sha256];
+    delete ledger.requests[requestId];
+  }
+}
+
+export function validPrivacyDeletionV2ArchiveRequestForMaintenance(
+  value: unknown,
+  recordId: string
+): boolean {
+  const archive = objectValue(value);
+  const record = objectValue(archive?.record);
+  return !!archive && exactKeys(archive, ["version", "record"]) &&
+    archive.version === ARCHIVE_VERSION && !!record &&
+    typeof record.request_id === "string" &&
+    recordId === `${requestDigest(record.request_id)}.json` &&
+    validRecord(record, record.request_id);
+}
+
+export function validPrivacyDeletionV2ArchiveActorForMaintenance(
+  value: unknown,
+  recordId: string
+): boolean {
+  const actor = objectValue(value);
+  const fence = objectValue(actor?.fence);
+  return !!actor && exactKeys(actor, ["version", "actor_sha256", "fence"]) &&
+    actor.version === ARCHIVE_VERSION &&
+    typeof actor.actor_sha256 === "string" && SHA256.test(actor.actor_sha256) &&
+    recordId === `${actor.actor_sha256}.json` && !!fence &&
+    exactKeys(fence, ["account_generation", "request_id", "gateway_fence_id"]) &&
+    safePositiveInteger(fence.account_generation) &&
+    typeof fence.request_id === "string" && REQUEST_ID.test(fence.request_id) &&
+    typeof fence.gateway_fence_id === "string" && OPAQUE_ID.test(fence.gateway_fence_id);
+}
+
+function validOutboxPause(value: unknown): value is OutboxPause {
+  const pause = objectValue(value);
+  if (
+    !pause || !exactKeys(pause, [
+      "pause_id", "reason", "http_status", "cause_code", "paused_at"
+    ]) ||
+    typeof pause.pause_id !== "string" || !PAUSE_ID.test(pause.pause_id) ||
+    !validInstant(pause.paused_at)
+  ) return false;
+  if (pause.reason === "credentials") {
+    return (
+      (pause.http_status === null && pause.cause_code === "backend_assertion_unavailable") ||
+      (pause.http_status === 401 && pause.cause_code === "backend_http_401") ||
+      (pause.http_status === 403 && pause.cause_code === "backend_http_403")
+    );
+  }
+  if (pause.reason === "contract") {
+    return (
+      (pause.http_status === 400 && pause.cause_code === "backend_http_400") ||
+      (pause.http_status === 422 && typeof pause.cause_code === "string" &&
+        KNOWN_CONTRACT_422_CODES.has(pause.cause_code)) ||
+      ((pause.http_status === 200 || pause.http_status === 202) &&
+        pause.cause_code === "invalid_success_payload")
+    );
+  }
+  return false;
+}
+
 function validOutboxOperation(value: unknown): value is OutboxOperation {
   const operation = objectValue(value);
   if (!operation) return false;
@@ -669,7 +1278,11 @@ function validOutboxOperation(value: unknown): value is OutboxOperation {
     "operation_id", "kind", "body", "body_sha256", "attempts", "next_attempt_at",
     "terminal_conflict_code", "terminal_at"
   ]);
-  return (pending || terminal) &&
+  const paused = exactKeys(operation, [
+    "operation_id", "kind", "body", "body_sha256", "attempts", "next_attempt_at",
+    "paused"
+  ]);
+  return (pending || terminal || paused) &&
     typeof operation.operation_id === "string" && OPAQUE_ID.test(operation.operation_id) &&
     (operation.kind === "REQUEST" || operation.kind === "DEVICE_EVIDENCE") &&
     typeof operation.body === "string" && operation.body.length > 1 && operation.body.length <= 16_384 &&
@@ -677,6 +1290,7 @@ function validOutboxOperation(value: unknown): value is OutboxOperation {
     sha256(operation.body) === operation.body_sha256 &&
     Number.isSafeInteger(operation.attempts) && (operation.attempts as number) >= 0 &&
     validInstant(operation.next_attempt_at) &&
+    (!paused || validOutboxPause(operation.paused)) &&
     (!terminal || (
       typeof operation.terminal_conflict_code === "string" &&
       ACCOUNT_DELETION_TERMINAL_CONFLICT_CODE_SET.has(
@@ -700,8 +1314,10 @@ function validRecord(value: unknown, requestId: string): value is DeletionRecord
       "request_id", "actor_id", "actor_sha256", "account_generation", "client_revision",
       "request_body", "request_body_sha256", "gateway_fence_id", "access_pre_digest",
       "access_bound_digest", "tombstone_id", "accepted_at", "request_receipt_sha256",
-      "backend_status", "outbox", "evidence_operations"
+      "backend_status", "outbox", "evidence_operations",
+      ...(Object.hasOwn(record, "capability_key") ? ["capability_key"] : [])
     ]) ||
+    (Object.hasOwn(record, "capability_key") && !validCapabilityKey(record.capability_key)) ||
     record.request_id !== requestId || !REQUEST_ID.test(requestId) ||
     typeof record.actor_id !== "string" || !ACTOR_ID.test(record.actor_id) ||
     typeof record.actor_sha256 !== "string" || actorDigest(record.actor_id) !== record.actor_sha256 ||
@@ -719,8 +1335,18 @@ function validRecord(value: unknown, requestId: string): value is DeletionRecord
     !Array.isArray(record.outbox) || record.outbox.length > MAX_OUTBOX_OPERATIONS_PER_REQUEST ||
     !record.outbox.every(validOutboxOperation) ||
     !objectValue(record.evidence_operations) ||
-    Object.keys(record.evidence_operations as object).length > MAX_EVIDENCE_OPERATIONS_PER_REQUEST
+    Object.keys(record.evidence_operations as object).length >
+      MAX_EVIDENCE_OPERATIONS_PER_REQUEST + MAX_SUPERSEDED_EVIDENCE_OPERATIONS_PER_REQUEST
   ) return false;
+  {
+    const counts = evidenceBudgetCounts(
+      record.evidence_operations as Record<string, { status: unknown }>
+    );
+    if (
+      counts.active > MAX_EVIDENCE_OPERATIONS_PER_REQUEST ||
+      counts.superseded > MAX_SUPERSEDED_EVIDENCE_OPERATIONS_PER_REQUEST
+    ) return false;
+  }
   let parsedBody: unknown;
   try { parsedBody = JSON.parse(record.request_body); } catch { return false; }
   const request = parseAccountDeletionRequestV2(parsedBody);
@@ -745,9 +1371,21 @@ function validRecord(value: unknown, requestId: string): value is DeletionRecord
     record.evidence_operations as Record<string, unknown>
   )) {
     const operation = objectValue(rawOperation);
+    const sequenced = !!operation && Object.prototype.hasOwnProperty.call(operation, "sequence");
+    const installed = !!operation && Object.prototype.hasOwnProperty.call(operation, "installation_id");
     if (
       !OPAQUE_ID.test(evidenceId) || !operation ||
-      !exactKeys(operation, ["body_sha256", "evidence_sha256", "status"]) ||
+      !exactKeys(
+        operation,
+        [
+          "body_sha256", "evidence_sha256", "status",
+          ...(sequenced ? ["sequence"] : []),
+          ...(installed ? ["installation_id"] : [])
+        ]
+      ) ||
+      (sequenced && !safePositiveInteger(operation.sequence)) ||
+      (installed && (!sequenced || typeof operation.installation_id !== "string" ||
+        !OPAQUE_ID.test(operation.installation_id))) ||
       typeof operation.body_sha256 !== "string" || !SHA256.test(operation.body_sha256) ||
       typeof operation.evidence_sha256 !== "string" || !SHA256.test(operation.evidence_sha256) ||
       !["PENDING", "ACKNOWLEDGED", "SUPERSEDED_REVISION", "TERMINAL_CONFLICT"].includes(
@@ -775,8 +1413,15 @@ export function validPrivacyDeletionV2StateForMaintenance(
   value: unknown
 ): value is DeletionLedger {
   const ledger = objectValue(value);
+  const hasArchiveIndex = !!ledger && Object.prototype.hasOwnProperty.call(ledger, "archive_index");
   if (
-    !ledger || !exactKeys(ledger, ["schema_version", "revision", "actors", "requests"]) ||
+    !ledger ||
+    !exactKeys(
+      ledger,
+      hasArchiveIndex
+        ? ["schema_version", "revision", "actors", "requests", "archive_index"]
+        : ["schema_version", "revision", "actors", "requests"]
+    ) ||
     ledger.schema_version !== LEDGER_SCHEMA ||
     !Number.isSafeInteger(ledger.revision) || (ledger.revision as number) < 0 ||
     !objectValue(ledger.actors) || !objectValue(ledger.requests)
@@ -802,7 +1447,61 @@ export function validPrivacyDeletionV2StateForMaintenance(
       request.gateway_fence_id !== fence.gateway_fence_id
     ) return false;
   }
+  if (hasArchiveIndex && !validArchiveIndex(ledger.archive_index, actors)) return false;
   return Object.keys(actors).length === Object.keys(requests).length;
+}
+
+const ARCHIVE_ACTOR_PREFIX_HEX = 16;
+const ARCHIVE_ACTOR_PREFIXES = /^(?:[0-9a-f]{16})*$/;
+
+function archiveActorPrefix(digest: string): string {
+  return digest.slice(0, ARCHIVE_ACTOR_PREFIX_HEX);
+}
+
+/** Binary search in the sorted fixed-width prefix list; returns the insertion slot on a miss. */
+function findArchiveActorPrefix(prefixes: string, digest: string): { found: boolean; slot: number } {
+  const target = archiveActorPrefix(digest);
+  let low = 0;
+  let high = prefixes.length / ARCHIVE_ACTOR_PREFIX_HEX - 1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const value = prefixes.slice(
+      middle * ARCHIVE_ACTOR_PREFIX_HEX,
+      (middle + 1) * ARCHIVE_ACTOR_PREFIX_HEX
+    );
+    if (value === target) return { found: true, slot: middle };
+    if (value < target) low = middle + 1;
+    else high = middle - 1;
+  }
+  return { found: false, slot: low };
+}
+
+function validArchiveIndex(
+  value: unknown,
+  activeActors: Record<string, unknown>
+): value is ArchiveIndex {
+  const index = objectValue(value);
+  const prefixes = index?.actor_prefixes;
+  const refs = index?.outbox_request_refs;
+  if (
+    !index || !exactKeys(index, ["actor_prefixes", "outbox_request_refs"]) ||
+    typeof prefixes !== "string" || !ARCHIVE_ACTOR_PREFIXES.test(prefixes) ||
+    !Array.isArray(refs)
+  ) return false;
+  for (let offset = ARCHIVE_ACTOR_PREFIX_HEX; offset < prefixes.length; offset += ARCHIVE_ACTOR_PREFIX_HEX) {
+    if (
+      prefixes.slice(offset - ARCHIVE_ACTOR_PREFIX_HEX, offset) >=
+        prefixes.slice(offset, offset + ARCHIVE_ACTOR_PREFIX_HEX)
+    ) return false;
+  }
+  // An archived actor never has an active fence at the same time (acceptance is blocked).
+  if (Object.keys(activeActors).some((digest) => findArchiveActorPrefix(prefixes, digest).found)) {
+    return false;
+  }
+  return refs.every((ref, position) =>
+    typeof ref === "string" && SHA256.test(ref) &&
+    (position === 0 || String(refs[position - 1]) < ref)
+  );
 }
 
 function readLedger(): DeletionLedger {
@@ -818,7 +1517,13 @@ function readLedger(): DeletionLedger {
     }
     return decoded;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return emptyLedger();
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      // S19-26: a lost ledger must not silently drop deletion fences and receipts.
+      if (requiredGatewayStateFileWasLost(ledgerPath())) {
+        throw new PrivacyDeletionV2Error("integrity", "privacy deletion v2 ledger is missing");
+      }
+      return emptyLedger();
+    }
     if (error instanceof PrivacyDeletionV2Error) throw error;
     throw new PrivacyDeletionV2Error("integrity", "privacy deletion v2 ledger cannot be read");
   }
@@ -839,7 +1544,6 @@ function writeLedger(ledger: DeletionLedger): void {
     `.ledger-${process.pid}-${randomBytes(12).toString("hex")}.tmp`
   );
   let descriptor: number | null = null;
-  let directoryDescriptor: number | null = null;
   try {
     descriptor = openSync(
       temporary,
@@ -851,26 +1555,78 @@ function writeLedger(ledger: DeletionLedger): void {
     closeSync(descriptor);
     descriptor = null;
     renameSync(temporary, ledgerPath());
-    directoryDescriptor = openSync(
-      stateDirectory(),
-      fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
-    );
-    fsyncSync(directoryDescriptor);
+    // S19-27: after the rename a failure is outcome unknown, not "not written".
+    syncGatewayStateDirectoryAfterRename("privacy-deletion-v2", stateDirectory());
+    registerRequiredGatewayStateFile(ledgerPath());
   } finally {
     if (descriptor !== null) closeSync(descriptor);
-    if (directoryDescriptor !== null) closeSync(directoryDescriptor);
     rmSync(temporary, { force: true });
   }
 }
 
-function mutateLedger<T>(action: (ledger: DeletionLedger) => { value: T; changed: boolean }): T {
+function mutateLedger<T>(
+  action: (ledger: DeletionLedger) => { value: T; changed: boolean },
+  requestId?: string,
+  actorSha256?: string
+): T {
   ensureStateDirectory();
   try {
     const criticalSection = (): unknown => {
       const ledger = readLedger();
+      const indexCreated = ensureArchiveIndex(ledger);
+      let archivedOnly = false;
+      let actorOverlay: string | null = null;
+      if (requestId !== undefined) {
+        const active = ledger.requests[requestId];
+        const record = recordFromStores(ledger, requestId);
+        if (record && !active) {
+          const fence = fenceFromStores(ledger, record.actor_sha256) ?? null;
+          assertArchiveFence(record, fence);
+          ledger.requests[requestId] = record;
+          ledger.actors[record.actor_sha256] = fence;
+          archivedOnly = true;
+        }
+      }
+      if (actorSha256 !== undefined && !ledger.actors[actorSha256]) {
+        const fence = fenceFromStores(ledger, actorSha256);
+        if (fence) {
+          ledger.actors[actorSha256] = fence;
+          actorOverlay = actorSha256;
+        }
+      }
       const result = action(ledger);
-      if (result.changed) {
+      if (archivedOnly) {
+        // The archived record and its fence were only overlaid for `action`; the active
+        // ledger is written (without them) only to keep the outbox index a superset.
+        const record = ledger.requests[requestId!]!;
+        delete ledger.requests[requestId!];
+        delete ledger.actors[record.actor_sha256];
+        if (actorOverlay !== null) delete ledger.actors[actorOverlay];
+        const ref = requestDigest(record.request_id);
+        let indexChanged = indexCreated;
+        if (result.changed && record.outbox.length > 0) {
+          indexChanged = setOutboxRef(ledger, ref, true) || indexChanged;
+        }
+        if (indexChanged) {
+          ledger.revision += 1;
+          writeLedger(ledger);
+        }
+        if (result.changed) {
+          writeArchivedRequest(record);
+          if (record.outbox.length === 0 && setOutboxRef(ledger, ref, false)) {
+            ledger.revision += 1;
+            writeLedger(ledger);
+          }
+        }
+        return result.value;
+      }
+      if (result.changed && actorOverlay !== null) {
+        throw new PrivacyDeletionV2Error("integrity", "archived actor cannot enter active ledger");
+      }
+      if (actorOverlay !== null) delete ledger.actors[actorOverlay];
+      if (result.changed || indexCreated) {
         ledger.revision += 1;
+        if (result.changed) archiveCompletedRequests(ledger);
         writeLedger(ledger);
       }
       return result.value;
@@ -892,8 +1648,8 @@ function mutateLedger<T>(action: (ledger: DeletionLedger) => { value: T; changed
 
 export function isAccountGenerationFencedV2(actorId: string, generation: number): boolean {
   if (!ACTOR_ID.test(actorId) || !safePositiveInteger(generation)) return true;
-  const fence = readLedger().actors[actorDigest(actorId)];
-  return !!fence && fence.account_generation === generation;
+  const fence = fenceFromStores(readLedger(), actorDigest(actorId));
+  return !!fence && generation <= fence.account_generation;
 }
 
 export type AcceptDeletionResultV2 =
@@ -907,14 +1663,20 @@ export type AcceptDeletionResultV2 =
     }
   | { kind: "not_found" }
   | { kind: "conflict" }
-  | { kind: "inactive" };
+  | { kind: "inactive" }
+  | { kind: "reauthentication_required" };
 
+/**
+ * S19-44: `newAcceptanceAllowed` gates only the creation of a new request. An existing
+ * request is replayed with its capability alone, so status and evidence stay reachable.
+ */
 export function acceptOrReplayAccountDeletionV2(
   actorId: string | null,
   accountGeneration: number | null,
   input: AccountDeletionRequestV2,
   accessSecret: string,
-  nowEpochMs = Date.now()
+  nowEpochMs = Date.now(),
+  newAcceptanceAllowed = true
 ): AcceptDeletionResultV2 {
   if (!parseAccountDeletionRequestV2(input) || !validDeletionAccessSecretV2(accessSecret)) {
     throw new PrivacyDeletionV2Error("conflict", "account deletion v2 input is invalid");
@@ -942,7 +1704,7 @@ export function acceptOrReplayAccountDeletionV2(
           accountGeneration: existing.account_generation,
           status: existing.backend_status
         } as const,
-        changed: false
+        changed: refreshCapabilityKey(existing, accessSecret)
       };
     }
     if (
@@ -956,7 +1718,11 @@ export function acceptOrReplayAccountDeletionV2(
     if (ledger.actors[digest]) {
       return { value: { kind: "inactive" } as const, changed: false };
     }
-    const pre = preAccessDigest(digest, accountGeneration, input.request_id, accessSecret);
+    if (!newAcceptanceAllowed) {
+      return { value: { kind: "reauthentication_required" } as const, changed: false };
+    }
+    const keyId = gatewayDeletionCapabilityKeyId();
+    const pre = preAccessDigest(digest, accountGeneration, input.request_id, accessSecret, keyId);
     if (!pre) throw new PrivacyDeletionV2Error("integrity", "capability digest failed");
     const gatewayFenceId = `gateway_fence_${randomBytes(24).toString("base64url")}`;
     const operationId = `request_${randomBytes(24).toString("base64url")}`;
@@ -971,6 +1737,7 @@ export function acceptOrReplayAccountDeletionV2(
       gateway_fence_id: gatewayFenceId,
       access_pre_digest: pre,
       access_bound_digest: null,
+      capability_key: { version: 1, key_id: keyId, verifier_sha256: pre },
       tombstone_id: null,
       accepted_at: null,
       request_receipt_sha256: null,
@@ -1000,7 +1767,7 @@ export function acceptOrReplayAccountDeletionV2(
       } as const,
       changed: true
     };
-  });
+  }, input.request_id, actorId !== null && ACTOR_ID.test(actorId) ? actorDigest(actorId) : undefined);
 }
 
 export function authorizedAccountDeletionStatusV2(
@@ -1008,9 +1775,16 @@ export function authorizedAccountDeletionStatusV2(
   accessSecret: string
 ): AccountDeletionStatusV2 | null | undefined {
   if (!REQUEST_ID.test(requestId) || !validDeletionAccessSecretV2(accessSecret)) return undefined;
-  const record = readLedger().requests[requestId];
-  if (!record || !capabilityMatches(record, accessSecret)) return undefined;
-  return record.backend_status;
+  return mutateLedger<AccountDeletionStatusV2 | null | undefined>((ledger) => {
+    const record = ledger.requests[requestId];
+    if (!record || !capabilityMatches(record, accessSecret)) {
+      return { value: undefined, changed: false };
+    }
+    return {
+      value: record.backend_status,
+      changed: refreshCapabilityKey(record, accessSecret)
+    };
+  }, requestId);
 }
 
 export type QueueEvidenceResultV2 =
@@ -1026,6 +1800,9 @@ export function queueDeviceDeletionEvidenceV2(
 ): QueueEvidenceResultV2 {
   if (!parseDeviceDeletionEvidenceV2(evidence) || !validDeletionAccessSecretV2(accessSecret)) {
     throw new PrivacyDeletionV2Error("conflict", "device deletion evidence v2 is invalid");
+  }
+  if (authorizedAccountDeletionStatusV2(evidence.request_id, accessSecret) === undefined) {
+    return { kind: "not_found" };
   }
   const body = deviceDeletionEvidenceBodyV2(evidence);
   const bodySha256 = sha256(body);
@@ -1069,17 +1846,26 @@ export function queueDeviceDeletionEvidenceV2(
     if (record.backend_status.revision !== evidence.expected_status_revision) {
       return { value: { kind: "conflict" } as const, changed: false };
     }
-    if (Object.keys(record.evidence_operations).length >= MAX_EVIDENCE_OPERATIONS_PER_REQUEST) {
+    if (
+      evidenceBudgetCounts(record.evidence_operations).active >=
+        MAX_EVIDENCE_OPERATIONS_PER_REQUEST
+    ) {
       throw new PrivacyDeletionV2Error("integrity", "device evidence operation ceiling exceeded");
     }
     if (record.outbox.length >= MAX_OUTBOX_OPERATIONS_PER_REQUEST) {
       throw new PrivacyDeletionV2Error("busy", "device evidence outbox is full");
     }
     const operationId = evidence.evidence_id;
+    const sequence = Object.values(record.evidence_operations).reduce(
+      (latest, operation) => Math.max(latest, operation.sequence ?? 0),
+      0
+    ) + 1;
     record.evidence_operations[evidence.evidence_id] = {
       body_sha256: bodySha256,
       evidence_sha256: evidence.evidence_sha256,
-      status: "PENDING"
+      status: "PENDING",
+      sequence,
+      installation_id: evidence.installation_id
     };
     record.outbox.push({
       operation_id: operationId,
@@ -1093,7 +1879,7 @@ export function queueDeviceDeletionEvidenceV2(
       value: { kind: "queued", operationId, status: record.backend_status } as const,
       changed: true
     };
-  });
+  }, evidence.request_id);
 }
 
 type ForwardResult =
@@ -1155,14 +1941,70 @@ function markOperationRetry(requestId: string, operationId: string, nowEpochMs: 
       (candidate) => candidate.operation_id === operationId
     );
     if (!operation) return { value: 1, changed: false };
-    if (operationTerminalConflictCode(operation) !== null) {
+    if (operationTerminalConflictCode(operation) !== null || operation.paused !== undefined) {
       return { value: 1, changed: false };
     }
     operation.attempts += 1;
     const delay = retryDelayMs(operation.attempts);
     operation.next_attempt_at = new Date(nowEpochMs + delay).toISOString();
     return { value: Math.max(1, Math.ceil(delay / 1_000)), changed: true };
-  });
+  }, requestId);
+}
+
+function pausedOperationView(
+  record: DeletionRecord,
+  operation: OutboxOperation
+): PausedAccountDeletionOutboxOperationV2 {
+  const pause = operation.paused!;
+  return {
+    request_ref: requestDigest(record.request_id),
+    operation_ref: operationDigest(operation.operation_id),
+    operation_kind: operation.kind,
+    pause_id: pause.pause_id,
+    reason: pause.reason,
+    http_status: pause.http_status,
+    cause_code: pause.cause_code,
+    paused_at: pause.paused_at
+  };
+}
+
+function pauseOperation(
+  requestId: string,
+  operationId: string,
+  reason: OutboxPause["reason"],
+  httpStatus: number | null,
+  causeCode: string,
+  nowEpochMs: number
+): void {
+  const transitioned = mutateLedger<PausedAccountDeletionOutboxOperationV2 | null>((ledger) => {
+    const record = ledger.requests[requestId];
+    const operation = record?.outbox.find((candidate) => candidate.operation_id === operationId);
+    if (!record || !operation) {
+      throw new PrivacyDeletionV2Error("integrity", "deletion operation disappeared before pause");
+    }
+    if (operation.paused !== undefined || operationTerminalConflictCode(operation) !== null) {
+      return { value: null, changed: false };
+    }
+    operation.paused = {
+      pause_id: randomBytes(16).toString("hex"),
+      reason,
+      http_status: httpStatus,
+      cause_code: causeCode,
+      paused_at: new Date(nowEpochMs).toISOString()
+    };
+    return { value: pausedOperationView(record, operation), changed: true };
+  }, requestId);
+  if (transitioned !== null) {
+    try {
+      console.error(JSON.stringify({
+        schema_version: "walksafe.gateway-deletion-operator-alert.v1",
+        event_name: "walksafe.gateway.account_deletion_outbox.paused",
+        ...transitioned
+      }));
+    } catch {
+      // The encrypted pause remains visible to the local operator CLI.
+    }
+  }
 }
 
 function retryDelayMs(attempts: number): number {
@@ -1228,7 +2070,7 @@ function retryOrQuarantineUnrecognizedConflict(
       },
       changed: true
     };
-  });
+  }, requestId);
 }
 
 function quarantineOperationConflict(
@@ -1275,7 +2117,7 @@ function quarantineOperationConflict(
       value: { code, status: record.backend_status },
       changed: true
     };
-  });
+  }, requestId);
 }
 
 function mergeBackendStatus(
@@ -1305,6 +2147,7 @@ function mergeBackendStatus(
       const evidence = record.evidence_operations[operationId];
       const evidenceChanged = evidence !== undefined && evidence.status !== "ACKNOWLEDGED";
       if (evidence) evidence.status = "ACKNOWLEDGED";
+      if (evidenceChanged) trimReplayOnlyEvidence(record, operationId);
       return {
         value: current,
         changed: record.outbox.length !== before || evidenceChanged
@@ -1324,10 +2167,13 @@ function mergeBackendStatus(
     if (operationId !== null) {
       record.outbox = record.outbox.filter((operation) => operation.operation_id !== operationId);
       const evidence = record.evidence_operations[operationId];
-      if (evidence) evidence.status = "ACKNOWLEDGED";
+      if (evidence) {
+        evidence.status = "ACKNOWLEDGED";
+        trimReplayOnlyEvidence(record, operationId);
+      }
     }
     return { value: status, changed: true };
-  });
+  }, requestId);
 }
 
 function supersedeEvidenceOperation(
@@ -1355,11 +2201,15 @@ function supersedeEvidenceOperation(
     record.outbox = record.outbox.filter(
       (operation) => operation.operation_id !== operationId
     );
+    // S19-41: keep the newest replay-only ids; evict the oldest beyond the cap.
+    // S19-41-F1: oldest by submission sequence (operations without one are older still, in
+    // key order; the sort is stable), never by object key order.
+    trimReplayOnlyEvidence(record, operationId);
     return {
       value: { status: record.backend_status, superseded: true },
       changed: before !== record.outbox.length || statusChanged
     };
-  });
+  }, requestId);
 }
 
 async function forwardOperation(
@@ -1369,56 +2219,71 @@ async function forwardOperation(
   fetchImpl?: GatewayFetch,
   nowEpochMs = Date.now()
 ): Promise<ForwardResult> {
-  const inFlightKey = `${requestId}\0${operationId}`;
+  // The supplied wall-clock anchor precedes preflight I/O as well as the fetch.
+  const attemptStarted = performance.now();
+  const retryNow = (): number => nowEpochMs + Math.max(0, performance.now() - attemptStarted);
+  const inFlightKey = requestId;
   if (forwardingOperations.has(inFlightKey)) {
     return { kind: "pending", retryAfterSeconds: 1 };
   }
   const ledger = readLedger();
-  const record = ledger.requests[requestId];
+  const record = recordFromStores(ledger, requestId);
   const operation = record?.outbox.find((candidate) => candidate.operation_id === operationId);
   if (!record || !operation) {
     return record?.backend_status
       ? { kind: "ok", status: record.backend_status, upstreamStatus: 200 }
       : { kind: "not_found" };
   }
-  if (operation.kind === "REQUEST") {
-    try {
-      await revokeFieldSessionsForSecurityEvent(
-        record.actor_id,
-        "security_incident",
-        nowEpochMs
-      );
-    } catch {
-      return { kind: "pending", retryAfterSeconds: 5 };
-    }
-    if (forwardingOperations.has(inFlightKey)) {
-      return { kind: "pending", retryAfterSeconds: 1 };
-    }
-  }
   const terminalConflictCode = operationTerminalConflictCode(operation);
   if (terminalConflictCode !== null) {
-    return {
-      kind: "terminal_conflict",
-      code: terminalConflictCode,
-      status: record.backend_status
-    };
+    return { kind: "terminal_conflict", code: terminalConflictCode, status: record.backend_status };
   }
-  const backendPath = operation.kind === "REQUEST"
-    ? "/privacy/account-deletions"
-    : `/privacy/account-deletions/${requestId}/device-evidence`;
-  const headers = deletionBackendHeaders({
-    actorId: record.actor_id,
-    accountGeneration: record.account_generation,
-    requestId: record.request_id,
-    tombstoneId: operation.kind === "REQUEST" ? null : record.tombstone_id,
-    accessPreDigest: record.access_pre_digest,
-    method: "POST",
-    path: backendPath,
-    bodySha256: operation.body_sha256
-  }, { "content-type": "application/json", accept: "application/json" });
-  if (!headers) throw new PrivacyDeletionV2Error("integrity", "backend deletion assertion failed");
+  if (record.outbox.some((candidate) => candidate.paused !== undefined)) {
+    return { kind: "pending", retryAfterSeconds: 3_600 };
+  }
+  const remaining = Date.parse(operation.next_attempt_at) - nowEpochMs;
+  if (remaining > 0) {
+    return { kind: "pending", retryAfterSeconds: Math.max(1, Math.ceil(remaining / 1_000)) };
+  }
+  if (clientRequest.signal.aborted) return { kind: "pending", retryAfterSeconds: 1 };
   forwardingOperations.add(inFlightKey);
   try {
+    if (operation.kind === "REQUEST") {
+      try {
+        await revokeFieldSessionsForSecurityEvent(
+          record.actor_id, "security_incident", nowEpochMs
+        );
+      } catch {
+        return {
+          kind: "pending",
+          retryAfterSeconds: markOperationRetry(requestId, operationId, retryNow())
+        };
+      }
+    }
+    const backendPath = operation.kind === "REQUEST"
+      ? "/privacy/account-deletions"
+      : `/privacy/account-deletions/${requestId}/device-evidence`;
+    let headers: Headers | null;
+    try {
+      headers = deletionBackendHeaders({
+        actorId: record.actor_id,
+        accountGeneration: record.account_generation,
+        requestId: record.request_id,
+        tombstoneId: operation.kind === "REQUEST" ? null : record.tombstone_id,
+        accessPreDigest: record.access_pre_digest,
+        method: "POST",
+        path: backendPath,
+        bodySha256: operation.body_sha256
+      }, { "content-type": "application/json", accept: "application/json" });
+    } catch {
+      headers = null;
+    }
+    if (!headers) {
+      pauseOperation(
+        requestId, operationId, "credentials", null, "backend_assertion_unavailable", retryNow()
+      );
+      return { kind: "pending", retryAfterSeconds: 3_600 };
+    }
     const response = fetchImpl
       ? await fetchBackend(clientRequest, backendUrl(backendPath), {
           method: "POST", headers, body: operation.body, cache: "no-store"
@@ -1430,9 +2295,12 @@ async function forwardOperation(
       const decoded = await boundedResponseJson(response);
       const status = parseAccountDeletionStatusV2(decoded, requestId);
       if (!status) {
+        pauseOperation(
+          requestId, operationId, "contract", response.status, "invalid_success_payload", retryNow()
+        );
         return {
           kind: "pending",
-          retryAfterSeconds: markOperationRetry(requestId, operationId, nowEpochMs)
+          retryAfterSeconds: 3_600
         };
       }
       const merged = mergeBackendStatus(requestId, operationId, status);
@@ -1477,7 +2345,7 @@ async function forwardOperation(
         if (refreshed.kind === "terminal_conflict") return refreshed;
         return {
           kind: "pending",
-          retryAfterSeconds: markOperationRetry(requestId, operationId, nowEpochMs)
+          retryAfterSeconds: markOperationRetry(requestId, operationId, retryNow())
         };
       }
       const backendConflictCode = backendPrivacyErrorCode(decoded);
@@ -1488,14 +2356,14 @@ async function forwardOperation(
         return retryOrQuarantineUnrecognizedConflict(
           requestId,
           operationId,
-          nowEpochMs
+          retryNow()
         );
       }
       const concluded = quarantineOperationConflict(
         requestId,
         operationId,
         backendConflictCode,
-        nowEpochMs
+        retryNow()
       );
       return {
         kind: "terminal_conflict",
@@ -1503,10 +2371,33 @@ async function forwardOperation(
         status: concluded.status
       };
     }
+    if (response.status === 400 || response.status === 401 || response.status === 403) {
+      void response.body?.cancel("account deletion upstream response not exposed").catch(() => undefined);
+      const credentials = response.status === 401 || response.status === 403;
+      pauseOperation(
+        requestId, operationId,
+        credentials ? "credentials" : "contract",
+        response.status,
+        `backend_http_${response.status}`,
+        retryNow()
+      );
+      return { kind: "pending", retryAfterSeconds: 3_600 };
+    }
+    if (response.status === 422) {
+      const code = backendPrivacyErrorCode(await boundedResponseJson(response));
+      if (code !== null && KNOWN_CONTRACT_422_CODES.has(code)) {
+        pauseOperation(requestId, operationId, "contract", 422, code, retryNow());
+        return { kind: "pending", retryAfterSeconds: 3_600 };
+      }
+      return {
+        kind: "pending",
+        retryAfterSeconds: markOperationRetry(requestId, operationId, retryNow())
+      };
+    }
     void response.body?.cancel("account deletion upstream response not exposed").catch(() => undefined);
     return {
       kind: "pending",
-      retryAfterSeconds: markOperationRetry(requestId, operationId, nowEpochMs)
+      retryAfterSeconds: markOperationRetry(requestId, operationId, retryNow())
     };
   } finally {
     forwardingOperations.delete(inFlightKey);
@@ -1522,7 +2413,7 @@ export async function forwardAccountDeletionRequestV2(
   clientRequest: Request,
   fetchImpl?: GatewayFetch
 ): Promise<ForwardResult> {
-  const record = readLedger().requests[requestId];
+  const record = recordFromStores(readLedger(), requestId);
   if (!record) return { kind: "not_found" };
   const operation = pendingOperation(record, "REQUEST");
   if (!operation) {
@@ -1548,8 +2439,9 @@ export async function refreshBackendAccountDeletionStatusV2(
   clientRequest: Request,
   fetchImpl?: GatewayFetch
 ): Promise<ForwardResult> {
-  const record = readLedger().requests[requestId];
-  if (!record || !capabilityMatches(record, accessSecret)) return { kind: "not_found" };
+  if (authorizedAccountDeletionStatusV2(requestId, accessSecret) === undefined) {
+    return { kind: "not_found" };
+  }
   return refreshCanonicalBackendAccountDeletionStatusV2(
     requestId,
     clientRequest,
@@ -1562,7 +2454,7 @@ async function refreshCanonicalBackendAccountDeletionStatusV2(
   clientRequest: Request,
   fetchImpl?: GatewayFetch
 ): Promise<ForwardResult> {
-  const record = readLedger().requests[requestId];
+  const record = recordFromStores(readLedger(), requestId);
   if (!record) return { kind: "not_found" };
   if (record.backend_status === null || record.tombstone_id === null) {
     return forwardAccountDeletionRequestV2(requestId, clientRequest, fetchImpl);
@@ -1595,37 +2487,200 @@ async function refreshCanonicalBackendAccountDeletionStatusV2(
   return { kind: "pending", retryAfterSeconds: 5 };
 }
 
+// Best-effort fairness within this process only; restarts and other workers do not share it.
+/**
+ * S19-36-F1: archived records that may still hold outbox operations. With the archive index
+ * only the listed files are read (normally none), so a drain tick no longer decrypts the
+ * whole archive. A ledger without an index (archive written before it existed and no write
+ * since) falls back to the full scan until its next write creates the index.
+ */
+function archivedRecordsWithOutbox(snapshot: DeletionLedger): DeletionRecord[] {
+  const digests = snapshot.archive_index
+    ? snapshot.archive_index.outbox_request_refs
+    : archiveEntryDigests("requests");
+  const records: DeletionRecord[] = [];
+  for (const digest of digests) {
+    const record = readArchivedRequestByDigest(digest);
+    if (!record) {
+      throw new PrivacyDeletionV2Error("integrity", "privacy deletion archive entry disappeared");
+    }
+    const active = snapshot.requests[record.request_id];
+    if (active) {
+      assertSameImmutableRequest(active, record);
+      continue;
+    }
+    const fence = snapshot.actors[record.actor_sha256];
+    if (fence) assertArchiveFence(record, fence);
+    records.push(record);
+  }
+  return records;
+}
+
+let nextOutboxDueIndex = 0;
+let outboxDrainTail: Promise<void> = Promise.resolve();
+let outboxHasPausedOperations = false;
+
+export function accountDeletionOutboxHasPausedOperations(): boolean {
+  return outboxHasPausedOperations;
+}
+
 export async function drainAccountDeletionOutboxV2(
   fetchImpl?: GatewayFetch,
-  nowEpochMs = Date.now()
+  nowEpochMs = Date.now(),
+  signal?: AbortSignal
 ): Promise<{ attempted: number; succeeded: number }> {
-  const snapshot = readLedger();
-  const due: Array<{ requestId: string; operationId: string }> = [];
-  for (const record of Object.values(snapshot.requests)) {
+  const started = performance.now();
+  const previousDrain = outboxDrainTail;
+  let releaseDrain!: () => void;
+  outboxDrainTail = new Promise<void>((resolve) => { releaseDrain = resolve; });
+  await previousDrain;
+  try {
+  if (signal?.aborted) return { attempted: 0, succeeded: 0 };
+  const dueNow = nowEpochMs + Math.floor(Math.max(0, performance.now() - started));
+  let snapshot = readLedger();
+  if (snapshot.archive_index === undefined && archiveEntryDigests("requests").length > 0) {
+    // S19-36-F1: create the archive index once instead of scanning the archive every tick.
+    mutateLedger(() => ({ value: null, changed: false }));
+    snapshot = readLedger();
+  }
+  type DueOperation = { requestId: string; operationId: string };
+  const dueRequests: Array<{ nextAttemptAt: number; operations: DueOperation[] }> = [];
+  let pausedOperations = 0;
+  const collectDue = (record: DeletionRecord): void => {
+    pausedOperations += record.outbox.filter((operation) => operation.paused !== undefined).length;
+    const operations: DueOperation[] = [];
+    let firstDueAt: number | null = null;
     for (const operation of record.outbox) {
-      if (
-        operationTerminalConflictCode(operation) === null &&
-        Date.parse(operation.next_attempt_at) <= nowEpochMs
-      ) {
-        due.push({ requestId: record.request_id, operationId: operation.operation_id });
+      const nextAttemptAt = Date.parse(operation.next_attempt_at);
+      if (operationTerminalConflictCode(operation) !== null) {
+        // Failed evidence cannot advance the Backend revision; a failed request still gates evidence.
+        if (operation.kind === "REQUEST") break;
+        continue;
+      }
+      if (operation.paused !== undefined || nextAttemptAt > dueNow) break;
+      if (firstDueAt === null) firstDueAt = nextAttemptAt;
+      operations.push({ requestId: record.request_id, operationId: operation.operation_id });
+    }
+    if (firstDueAt !== null) {
+      dueRequests.push({
+        nextAttemptAt: firstDueAt, operations
+      });
+    }
+  };
+  for (const record of Object.values(snapshot.requests)) collectDue(record);
+  for (const record of archivedRecordsWithOutbox(snapshot)) collectDue(record);
+  outboxHasPausedOperations = pausedOperations > 0;
+  dueRequests.sort((left, right) => left.nextAttemptAt - right.nextAttemptAt);
+  const selected: DueOperation[] = [];
+  for (let round = 0; selected.length < 16; round += 1) {
+    let added = false;
+    for (let index = 0; index < dueRequests.length && selected.length < 16; index += 1) {
+      const request = dueRequests[(nextOutboxDueIndex + index) % dueRequests.length]!;
+      const operation = request.operations[round];
+      if (!operation) continue;
+      selected.push(operation);
+      added = true;
+    }
+    if (!added) break;
+  }
+  const pending = selected.slice();
+  const activeRequests = new Set<string>();
+  const blockedRequests = new Set<string>();
+  let attempted = 0;
+  let succeeded = 0;
+  let fatalError: Error | undefined;
+  const run = async (): Promise<void> => {
+    while (!signal?.aborted && fatalError === undefined) {
+      const index = pending.findIndex((operation) =>
+        !activeRequests.has(operation.requestId) && !blockedRequests.has(operation.requestId));
+      if (index < 0) return;
+      const [operation] = pending.splice(index, 1);
+      if (!operation) return;
+      activeRequests.add(operation.requestId);
+      nextOutboxDueIndex = (nextOutboxDueIndex + 1) % dueRequests.length;
+      const timeout = AbortSignal.timeout(ACCOUNT_DELETION_OUTBOX_OPERATION_TIMEOUT_MS);
+      const synthetic = new Request("http://127.0.0.1/privacy-deletion-outbox", {
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout
+      });
+      attempted += 1;
+      try {
+        const result = await forwardOperation(
+          operation.requestId,
+          operation.operationId,
+          synthetic,
+          fetchImpl,
+          nowEpochMs + Math.floor(Math.max(0, performance.now() - started))
+        );
+        if (result.kind === "ok") succeeded += 1;
+        else blockedRequests.add(operation.requestId);
+      } catch (error) {
+        blockedRequests.add(operation.requestId);
+        if (
+          (error instanceof PrivacyDeletionV2Error && error.code === "integrity") ||
+          error instanceof ExclusiveFileLockIntegrityError ||
+          error instanceof GatewayStateEncryptionError
+        ) {
+          fatalError = error;
+        } else if (!(error instanceof PrivacyDeletionV2Error && error.code === "busy")) {
+          process.stderr.write("walksafe account deletion outbox operation failed unexpectedly\n");
+        }
+      } finally {
+        activeRequests.delete(operation.requestId);
       }
     }
+  };
+  await Promise.all(Array.from({ length: Math.min(3, selected.length) }, () => run()));
+  if (fatalError !== undefined) throw fatalError;
+  return { attempted, succeeded };
+  } finally {
+    releaseDrain();
   }
-  let succeeded = 0;
-  for (const operation of due.slice(0, 16)) {
-    const synthetic = new Request("http://127.0.0.1/privacy-deletion-outbox", {
-      signal: AbortSignal.timeout(20_000)
-    });
-    const result = await forwardOperation(
-      operation.requestId,
-      operation.operationId,
-      synthetic,
-      fetchImpl,
-      nowEpochMs
+}
+
+export function listPausedAccountDeletionOutboxV2(): PausedAccountDeletionOutboxOperationV2[] {
+  const ledger = readLedger();
+  const paused: PausedAccountDeletionOutboxOperationV2[] = [];
+  const collect = (record: DeletionRecord): void => {
+    for (const operation of record.outbox) {
+      if (operation.paused !== undefined) paused.push(pausedOperationView(record, operation));
+    }
+  };
+  for (const record of Object.values(ledger.requests)) collect(record);
+  for (const record of archivedRecordsWithOutbox(ledger)) collect(record);
+  return paused.sort((left, right) =>
+    left.paused_at.localeCompare(right.paused_at) ||
+    left.request_ref.localeCompare(right.request_ref) ||
+    left.operation_ref.localeCompare(right.operation_ref)
+  );
+}
+
+export function resumePausedAccountDeletionOutboxV2(
+  requestRef: string,
+  operationRef: string,
+  pauseId: string,
+  nowEpochMs = Date.now()
+): "resumed" | "stale" | "not_found" {
+  if (!SHA256.test(requestRef) || !SHA256.test(operationRef) || !PAUSE_ID.test(pauseId)) {
+    throw new PrivacyDeletionV2Error("conflict", "invalid deletion outbox lookup reference");
+  }
+  const ledger = readLedger();
+  const record = Object.values(ledger.requests).find(
+    (candidate) => requestDigest(candidate.request_id) === requestRef
+  ) ?? readArchivedRequestByDigest(requestRef);
+  if (!record) return "not_found";
+  return mutateLedger<"resumed" | "stale">((current) => {
+    const live = current.requests[record.request_id];
+    const operation = live?.outbox.find(
+      (candidate) => operationDigest(candidate.operation_id) === operationRef
     );
-    if (result.kind === "ok") succeeded += 1;
-  }
-  return { attempted: Math.min(due.length, 16), succeeded };
+    if (!operation || operation.paused?.pause_id !== pauseId) {
+      return { value: "stale", changed: false };
+    }
+    delete operation.paused;
+    operation.attempts = 0;
+    operation.next_attempt_at = new Date(nowEpochMs).toISOString();
+    return { value: "resumed", changed: true };
+  }, record.request_id);
 }
 
 export function privacyDeletionV2LedgerPathForTests(): string {

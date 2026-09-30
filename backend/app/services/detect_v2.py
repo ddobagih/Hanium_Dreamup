@@ -16,6 +16,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Mapping, Protocol, Sequence
 
+from backend.app.detector import InvalidDetectionImage
 from backend.app.schemas import DetectContext, DetectV2Detection, DetectV2Response
 from backend.app.services.yolo_inference_adapter import load_yolo_model, ultralytics_result_to_raw_detections
 from model.two_model_runtime import (
@@ -40,6 +41,15 @@ DETECT_V2_RUNTIME_CONFIG_NOT_CONFIGURED_REASON = "detect_v2_runtime_config_not_c
 DETECT_V2_RUNTIME_CONFIG_INVALID_REASON = "detect_v2_runtime_config_invalid"
 DETECT_V2_ARTIFACT_BINDING_INVALID_REASON = "detect_v2_artifact_binding_invalid"
 DETECT_V2_MODEL_CLASS_ORDER_MISMATCH_REASON = "detect_v2_model_class_order_mismatch"
+_PROVIDER_PRECONDITION_REASONS = frozenset({
+    DETECT_V2_MODEL_NOT_CONFIGURED_REASON,
+    DETECT_V2_RUNTIME_CONFIG_NOT_CONFIGURED_REASON,
+    DETECT_V2_RUNTIME_CONFIG_INVALID_REASON,
+})
+_PROVIDER_PRECONDITION_PREFIXES = (
+    f"{DETECT_V2_UNSUPPORTED_MODE_REASON}:",
+    f"{DETECT_V2_MODEL_NOT_CONFIGURED_REASON}:",
+)
 CUSTOM_TACTILE_INFERENCE_CONF = 0.15
 CUSTOM_TACTILE_INFERENCE_IMGSZ = 960
 COCO_GENERAL_INFERENCE_CONF = 0.10
@@ -80,6 +90,14 @@ class DetectV2ProviderState:
     provider: DetectV2Provider | None
     status: str
     reason: str | None = None
+
+
+class DetectV2ProviderUnavailable(RuntimeError):
+    """A v2 provider is unavailable; only the precondition subtype is recoverable."""
+
+
+class _DetectV2ProviderPreconditionUnavailable(DetectV2ProviderUnavailable):
+    """The explicit missing-provider precondition did not run provider code."""
 
 
 class FakeDetectV2Provider:
@@ -348,10 +366,11 @@ def _runtime_config_reason(settings: Any) -> str | None:
 
 def _cached_yolo_provider(settings: Any) -> "YoloDetectV2Provider":
     paths = _configured_paths(settings)
-    existing_paths = tuple(path for path in paths if path is not None)
+    environment = getattr(settings, "walksafe_environment", "development")
     stat_key = (
-        *(item for path in existing_paths for item in _file_stat_key(path)),
+        tuple(_file_stat_key(path) if path is not None else None for path in paths),
         getattr(settings, "detect_v2_image_size", DEFAULT_UNIFIED_WALKSAFE_INFERENCE_IMGSZ),
+        environment,
     )
 
     global _PROVIDER_CACHE_STAT_KEY, _PROVIDER_CACHE_KEY, _PROVIDER_CACHE
@@ -359,7 +378,7 @@ def _cached_yolo_provider(settings: Any) -> "YoloDetectV2Provider":
         if _PROVIDER_CACHE_STAT_KEY == stat_key and _PROVIDER_CACHE is not None:
             return _PROVIDER_CACHE
 
-    if getattr(settings, "walksafe_environment", "development") in {"field", "staging", "production"}:
+    if environment in {"field", "staging", "production"}:
         from backend.app.config import _validate_runtime_artifact_bindings
 
         unified_path = getattr(settings, "detect_v2_unified_model_path", None)
@@ -377,8 +396,9 @@ def _cached_yolo_provider(settings: Any) -> "YoloDetectV2Provider":
     # the cache identity, while the cheap stat key keeps normal inference from
     # re-reading large checkpoints on every frame.
     cache_key = (
-        *(_file_identity(path) for path in existing_paths),
+        tuple(_file_identity(path) if path is not None else None for path in paths),
         getattr(settings, "detect_v2_image_size", DEFAULT_UNIFIED_WALKSAFE_INFERENCE_IMGSZ),
+        environment,
     )
     provider = YoloDetectV2Provider(
         custom_tactile_model_path=getattr(settings, "detect_v2_custom_tactile_model_path", None),
@@ -446,20 +466,64 @@ def get_detect_v2_provider_state(settings: Any) -> DetectV2ProviderState:
 
 
 def detect_v2_health(settings: Any) -> dict[str, Any]:
-    provider_state = get_detect_v2_provider_state(settings)
+    """Return a detached health snapshot without filesystem or provider work."""
+    from backend.app.services.detect_v2_health import detect_v2_health_snapshot
+
+    return detect_v2_health_snapshot(settings)
+
+
+def compute_detect_v2_health_candidate(settings: Any) -> dict[str, Any]:
+    """Validate a candidate off the request path without publishing a provider."""
+    mode = getattr(settings, "detect_v2_mode", DETECT_V2_MODE_FAKE)
+    reason = None
+    if mode in DETECT_V2_REAL_MODES:
+        reason = _missing_model_reason(settings) or _runtime_config_reason(settings)
+        if reason is None:
+            try:
+                if getattr(settings, "walksafe_environment", "development") in {
+                    "field", "staging", "production",
+                }:
+                    from backend.app.config import _validate_runtime_artifact_bindings
+
+                    unified_path = getattr(settings, "detect_v2_unified_model_path", None)
+                    legacy_ready = _path_exists(
+                        getattr(settings, "detect_v2_custom_tactile_model_path", None)
+                    ) and _path_exists(getattr(settings, "detect_v2_coco_model_path", None))
+                    _validate_runtime_artifact_bindings(
+                        getattr(settings, "detect_v2_runtime_config_path"),
+                        unified_model_path=unified_path if _path_exists(unified_path) else None,
+                        custom_model_path=(
+                            getattr(settings, "detect_v2_custom_tactile_model_path", None)
+                            if legacy_ready else None
+                        ),
+                        coco_model_path=(
+                            getattr(settings, "detect_v2_coco_model_path", None)
+                            if legacy_ready else None
+                        ),
+                    )
+                # Retain artifact validation without constructing or caching a provider.
+                for path in _configured_paths(settings):
+                    if path is not None:
+                        _file_identity(path)
+            except Exception:
+                reason = DETECT_V2_ARTIFACT_BINDING_INVALID_REASON
+    elif mode != DETECT_V2_MODE_FAKE:
+        reason = f"{DETECT_V2_UNSUPPORTED_MODE_REASON}:{mode}"
+
+    status = DETECT_V2_READY_STATUS if reason is None else DETECT_V2_UNAVAILABLE_STATUS
     runtime_config_path = getattr(settings, "detect_v2_runtime_config_path", None)
-    if getattr(settings, "detect_v2_mode", DETECT_V2_MODE_FAKE) == DETECT_V2_MODE_FAKE:
+    if mode == DETECT_V2_MODE_FAKE:
         runtime_config = load_detect_v2_runtime_config(runtime_config_path, allow_default=True)
-    elif provider_state.status == DETECT_V2_READY_STATUS:
+    elif status == DETECT_V2_READY_STATUS:
         runtime_config = load_detect_v2_runtime_config(runtime_config_path)
     else:
         runtime_config = {}
     configured_runtime = _configured_runtime(settings)
     return {
         "schema_version": "detect.v2",
-        "mode": getattr(settings, "detect_v2_mode", DETECT_V2_MODE_FAKE),
-        "status": provider_state.status,
-        "reason": provider_state.reason,
+        "mode": mode,
+        "status": status,
+        "reason": reason,
         "runtime_primary_model": runtime_config.get("primary_model"),
         "runtime_fallback_model": runtime_config.get("fallback_model"),
         "configured_runtime": configured_runtime,
@@ -500,8 +564,15 @@ def _configured_runtime(settings: Any) -> str | None:
 def run_detect_v2(image_bytes: bytes, content_type: str, context: DetectContext, settings: Any) -> DetectV2Response:
     provider_state = get_detect_v2_provider_state(settings)
     if provider_state.provider is None:
-        raise RuntimeError(provider_state.reason or DETECT_V2_MODEL_NOT_CONFIGURED_REASON)
-    return provider_state.provider.detect(image_bytes=image_bytes, content_type=content_type, context=context)
+        reason = provider_state.reason or DETECT_V2_MODEL_NOT_CONFIGURED_REASON
+        if reason in _PROVIDER_PRECONDITION_REASONS or reason.startswith(_PROVIDER_PRECONDITION_PREFIXES):
+            raise _DetectV2ProviderPreconditionUnavailable(reason)
+        raise RuntimeError(reason)
+    try:
+        return provider_state.provider.detect(image_bytes=image_bytes, content_type=content_type, context=context)
+    except _DetectV2ProviderPreconditionUnavailable as exc:
+        # A provider-raised error did run provider code, so it is not a recoverable precondition.
+        raise DetectV2ProviderUnavailable(str(exc)) from exc
 
 
 def warm_detect_v2(settings: Any) -> None:
@@ -641,7 +712,12 @@ def _open_image(image_bytes: bytes) -> Any:
         from PIL import Image  # type: ignore[import-not-found]
     except ImportError as exc:  # pragma: no cover - depends on runtime env
         raise RuntimeError("Pillow is required to run YOLO detect v2 inference") from exc
-    return Image.open(BytesIO(image_bytes))
+    try:
+        image = Image.open(BytesIO(image_bytes))
+        image.load()
+    except OSError as exc:
+        raise InvalidDetectionImage() from exc
+    return image
 
 
 def _results_to_raw_detections(

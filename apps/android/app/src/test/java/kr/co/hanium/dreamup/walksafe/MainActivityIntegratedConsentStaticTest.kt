@@ -10,6 +10,47 @@ class MainActivityIntegratedConsentStaticTest {
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
 
     @Test
+    fun cachedConsentIsHeldUntilFreshBackendAuthorityAndLateSessionResultsAreFenced() {
+        val restore = ReportStaticSourceInspector.functionBlock(
+            source, "private fun restorePrivacyControlStateFromPrefs",
+        )
+        val refresh = ReportStaticSourceInspector.functionBlock(
+            source, "private fun refreshIntegratedConsentFromServer",
+        )
+        val hold = ReportStaticSourceInspector.functionBlock(
+            source, "private fun holdIntegratedConsentAuthorityForRefresh",
+        )
+        val request = ReportStaticSourceInspector.functionBlock(
+            source, "private fun startIntegratedConsentRequest",
+        )
+        val bootstrap = ReportStaticSourceInspector.functionBlock(
+            source, "private fun startIntegratedConsentBootstrap",
+        )
+        assertTrue(restore.contains("reportPrivacyConsentSession.withdraw()"))
+        assertTrue(restore.contains("integratedConsentBootstrapReady = false"))
+        assertFalse(restore.contains("reportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent()"))
+        assertTrue(refresh.contains("holdIntegratedConsentAuthorityForRefresh()"))
+        assertTrue(hold.contains("integratedConsentSession.invalidateBackendAuthority()"))
+        assertTrue(hold.contains("reportPrivacyConsentSession.withdraw()"))
+        assertTrue(request.contains("isCurrentIntegratedConsentSession(expectedSession, processGeneration)"))
+        assertTrue(request.contains("GatewaySessionProcessCoordinator.withCurrentGeneralSession("))
+        assertTrue(request.contains("synchronized(integratedConsentLock)"))
+        assertTrue(bootstrap.contains("isCurrentIntegratedConsentSession(gatewaySession, processGeneration)"))
+        val dispatch = ReportStaticSourceInspector.functionBlock(
+            source, "private fun dispatchGatewayProcessSessionChanged",
+        )
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            dispatch,
+            "integratedConsentSession.invalidateBackendAuthority()",
+            "reportPrivacyConsentSession.withdraw()",
+            "val deliver = Runnable",
+        ))
+        assertTrue(dispatch.contains("previous.generation != snapshot.generation"))
+        assertTrue(dispatch.contains("previous.session !== snapshot.session"))
+        assertTrue(dispatch.contains("if (consentAuthorityChanged)"))
+    }
+
+    @Test
     fun v11BootstrapAndCasAreBoundAcrossInitialSaveAndExactRetry() {
         val refresh = ReportStaticSourceInspector.functionBlock(
             source,
@@ -79,10 +120,58 @@ class MainActivityIntegratedConsentStaticTest {
 
         assertTrue(migration.contains("PREVIOUS_INTEGRATED_CONSENT_POLICY_VERSION"))
         assertTrue(migration.contains("PREF_RAW_SOURCE_FIELD_LOG_BLOCKED"))
-        assertTrue(migration.contains("resetForPolicyReconsent()"))
+        val reset = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun resetIntegratedConsentForReconsent",
+        )
+        val unsettledMarker = "private fun hasUnsettledIntegratedConsentControl(): Boolean ="
+        assertTrue(source.contains(unsettledMarker))
+        val unsettled = source.substringAfter(unsettledMarker)
+            .substringBefore("private fun resetIntegratedConsentForReconsent")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            migration,
+            "if (hasUnsettledIntegratedConsentControl())",
+            "if (!resetIntegratedConsentForReconsent()) return false",
+            "val migrated = sensitivePrefs.edit()",
+        ))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            reset,
+            "if (hasUnsettledIntegratedConsentControl()) return false",
+            "val changed = integratedConsentSession.resetForPolicyReconsent()",
+            "return changed || (",
+        ))
+        assertTrue(reset.contains("integratedConsentSession.currentConfirmationOrNull() == null"))
+        assertTrue(reset.contains("integratedConsentSession.pendingMutationOrNull() == null"))
+        assertTrue(reset.contains("IntegratedConsentItem.entries.all"))
+        assertTrue(reset.contains("integratedConsentSession.status(it) == PurposeConsentSyncState.UNCONFIRMED"))
+        listOf(
+            "sensitivePrefs.isBlocked()",
+            "pendingIntegratedConsentMutation != null",
+            "integratedConsentSession.pendingMutationOrNull() != null",
+            "sensitivePrefs.contains(PREF_PENDING_INTEGRATED_CONSENT_MUTATION)",
+            "sensitivePrefs.contains(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED)",
+            "PurposeConsentSyncState.WITHDRAWAL_PENDING",
+            "PurposeConsentSyncState.WITHDRAWAL_RETRY",
+        ).forEach { guard -> assertTrue("Missing unsettled consent guard: $guard", unsettled.contains(guard)) }
+        assertFalse(migration.contains(".remove(PREF_PENDING_INTEGRATED_CONSENT_MUTATION)"))
+        assertFalse(migration.contains(".remove(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED)"))
         assertTrue(migration.contains(".remove(PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION)"))
         assertFalse(migration.contains(".remove(PREF_INTEGRATED_CONSENT_CONTROL_SECRET)"))
         assertFalse(migration.contains(".remove(PREF_INTEGRATED_CONSENT_CLIENT_REVISION)"))
+    }
+
+    @Test
+    fun theIntegratedConsentDocumentDescribesTheAfterWalkTransfer() {
+        // S15-30 / owner decision 3(b): the consent document states the same timing as the signup text.
+        val document = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+        ).readText().substringAfter("const val INTEGRATED_CONSENT_DISCLOSURE_KO =")
+            .substringBefore("enum class IntegratedConsentItem")
+        assertTrue(document.contains("보행을 끝낸"))
+        assertTrue(document.contains("충전 중일 때만"))
+        assertTrue(document.contains("보행 중에는 보내지 않고"))
+        assertFalse(document.contains("PAUSED"))
+        assertFalse(document.contains("END"))
     }
 
     @Test
@@ -93,8 +182,12 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(controls.contains("14일"))
         assertTrue(controls.contains("30일"))
         assertTrue(controls.contains("3년"))
-        assertTrue(controls.contains("PAUSED"))
-        assertTrue(controls.contains("END는 자동 전송"))
+        // S15-30 / owner decision 3(b): transfers start only after the walk (RAW also on Wi-Fi while charging).
+        assertTrue(controls.contains("보행을 끝낸 뒤"))
+        assertTrue(controls.contains("충전 중일 때만"))
+        assertTrue(controls.contains("보행 중·일시정지 중에는"))
+        assertTrue(controls.contains("후보별 취소는 없으며"))
+        assertFalse(controls.contains("PAUSED"))
         assertTrue(controls.contains("영상·음성·이미지·정확한 위치"))
         assertTrue(controls.contains("본인인증이나 공적 연령 인증이 아니"))
         assertTrue(controls.contains("거부하면"))

@@ -57,9 +57,12 @@ internal class DelegateFallbackRuntime<T : Closeable>(
         resource.close()
     }
 
+    // Delegate/native failures stay broad (TFLite reports delegate application as runtime errors),
+    // but a model/input tensor contract violation is identical on CPU and is never retried.
     private fun canFallback(error: Throwable): Boolean =
         activeDelegate != "cpu" && options.fallbackToCpu &&
             error !is DetectorNativeCleanupFailure &&
+            error !is DetectorTensorContractViolation &&
             (error is RuntimeException || error is LinkageError)
 
     private fun activateCpu(phase: String, cause: Throwable): T {

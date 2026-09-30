@@ -448,10 +448,22 @@ internal fun accountDeletionHttpFailureDisposition(
         AccountDeletionHttpFailureDisposition.TerminalConflict(
             terminalConflictCode,
         )
+    } else if (statusCode == 401 && accountDeletionReauthenticationRequired(body)) {
+        // S19-44: nothing was recorded; the same request ID is retried after a password login.
+        AccountDeletionHttpFailureDisposition.Retry(ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE)
     } else {
         AccountDeletionHttpFailureDisposition.Retry("http_$statusCode")
     }
 }
+
+/** S19-44: Gateway refuses a new deletion whose session login is older than 5 minutes. */
+internal const val ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE = "reauthentication_required"
+
+private fun accountDeletionReauthenticationRequired(body: String): Boolean = runCatching {
+    val root = JSONObject(body)
+    root.opt("code") == "account_deletion_reauthentication_required" &&
+        root.opt("reauthentication_required") == true
+}.getOrDefault(false)
 
 open class AccountDeletionHttpException(
     val statusCode: Int,

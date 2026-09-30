@@ -52,10 +52,9 @@ class RouteNavigatorOrderedAlignmentTest {
         val before = navigator.update(fix(18.0), 1_000, false, facingObservation = facing(90.0))
         assertClock(12, before)
         assertEquals(0, before.routeAlignmentDiagnostic?.segmentIndex)
-        val vertex = navigator.update(fix(20.0, time = 2_000), 2_000, false,
-            facingObservation = facing(180.0, 2_000))
-        assertClock(12, vertex)
-        assertEquals(1, vertex.routeAlignmentDiagnostic?.segmentIndex)
+        // S08-18: the vertex and passage expectations (held at the unpassed vertex, the outgoing
+        // leg after passage) run in RouteAlignmentTurnPassagePhaseTest
+        // .theCornerKeepsTheIncomingLegThenHoldsAtTheVertexThenUsesTheOutgoingLegAfterPassage.
     }
 
     @Test fun realOpposingOutbackRemainsAmbiguousEvenWithADepartureRequest() {
@@ -106,7 +105,7 @@ class RouteNavigatorOrderedAlignmentTest {
         val update = navigator.update(fix(0.0), 1_000, false, facingObservation = facing(90.0, 499))
         assertNoClock(update)
         assertNotNull(update.routeAlignmentDiagnostic?.bearingDegreesTrueNorth)
-        assertTrue(update.instruction?.contains("현재 바라보는 방향을 확인할 수 없습니다") == true)
+        assertTrue(update.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
     }
 
     @Test fun replacementAndInterruptionDoNotReviveThePreviousDepartureAnchor() {
@@ -128,7 +127,11 @@ class RouteNavigatorOrderedAlignmentTest {
         navigator.update(fix(0.0), 1_000, false, facingObservation = facing(90.0))
         val nearEnd = navigator.update(fix(100.0, time = 2_000), 2_000, false, facingObservation = facing(90.0, 2_000))
         assertNoClock(nearEnd)
-        val arrived = navigator.update(fix(100.0, time = 3_000), 3_000, false, facingObservation = facing(90.0, 3_000))
+        // S07-32 (R6): the arrival question needs 3 s of consecutive near-destination evidence.
+        for (at in listOf(3_000L, 4_000L)) {
+            assertFalse(navigator.update(fix(100.0, time = at), at, false, facingObservation = facing(90.0, at)).arrivalCandidate)
+        }
+        val arrived = navigator.update(fix(100.0, time = 5_000), 5_000, false, facingObservation = facing(90.0, 5_000))
         assertTrue(arrived.arrivalCandidate)
         assertEquals(RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION, arrived.pendingUserDecision)
     }
@@ -167,7 +170,9 @@ class RouteNavigatorOrderedAlignmentTest {
         val route = route(point(0.0), point(100.0))
         val offset = fix(5.0, 15.0)
         val update = navigator(route, offset).update(offset, 1_000, false, facingObservation = facing(180.0))
-        assertClock(1, update)
+        // The unchanged angular-error envelope crosses a clock bin edge: only coarse FRONT is supported.
+        assertNoClock(update)
+        assertTrue(update.instruction?.contains("휴대전화 후면 카메라 기준 앞쪽") == true)
         assertEquals(RouteAlignmentReason.DEPARTURE_CONNECTOR, update.routeAlignmentDiagnostic?.reason)
         assertFalse(update.instruction?.contains("왼쪽으로") == true)
         val uncertain = offset.copy(accuracyM = 20f)

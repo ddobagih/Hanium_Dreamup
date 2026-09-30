@@ -37,6 +37,8 @@ public final class AdminReportHttpClient implements AdminReportRepository {
 
     interface Clock {
         long nowEpochMs();
+
+        default long monotonicNanos() { return System.nanoTime(); }
     }
 
     interface Transport {
@@ -561,11 +563,12 @@ public final class AdminReportHttpClient implements AdminReportRepository {
             challengeHeaders,
             intent.challengeRequestBytes()
         );
+        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
         requireStatus(challenge, 200);
         AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
             jsonBody(challenge),
             intent,
-            clock.nowEpochMs(),
+            challengeTime.estimatedNowEpochMs(clock.monotonicNanos()),
             signer
         );
         Map<String, String> headers = new LinkedHashMap<>(

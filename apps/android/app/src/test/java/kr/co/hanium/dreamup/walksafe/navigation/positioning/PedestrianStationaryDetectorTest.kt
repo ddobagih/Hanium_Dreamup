@@ -17,6 +17,7 @@ class PedestrianStationaryDetectorTest {
         val detector = PedestrianStationaryDetector(config)
 
         val candidate = detector.observe(quietSample(1_000L))
+        for (at in 1_200L..1_800L step 200L) detector.observe(quietSample(at))
         val beforeDwell = detector.observe(quietSample(1_999L))
         val stationary = detector.observe(quietSample(2_000L))
 
@@ -74,7 +75,7 @@ class PedestrianStationaryDetectorTest {
         detector.observe(PedestrianMotionSample(elapsedRealtimeMs = 1_000L))
         val muchLater = detector.observe(PedestrianMotionSample(elapsedRealtimeMs = 10_000L))
 
-        assertEquals(PedestrianStationaryState.MOVING, muchLater.state)
+        assertEquals(PedestrianStationaryState.UNKNOWN, muchLater.state)
         assertFalse(muchLater.shouldApplyZeroVelocityUpdate)
     }
 
@@ -83,7 +84,9 @@ class PedestrianStationaryDetectorTest {
         val detector = PedestrianStationaryDetector(config)
 
         detector.observe(quietSample(1_000L, includeGyroscope = false))
+        for (at in 1_200L..1_800L step 200L) detector.observe(quietSample(at, includeGyroscope = false))
         val normalDwellElapsed = detector.observe(quietSample(2_000L, includeGyroscope = false))
+        for (at in 2_200L..2_800L step 200L) detector.observe(quietSample(at, includeGyroscope = false))
         val extendedDwellElapsed = detector.observe(quietSample(3_000L, includeGyroscope = false))
 
         assertEquals(PedestrianStationaryState.CANDIDATE, normalDwellElapsed.state)
@@ -98,6 +101,7 @@ class PedestrianStationaryDetectorTest {
         detector.observe(quietSample(1_000L))
 
         val rejected = detector.observe(movingSample(900L, stepDetected = true))
+        for (at in 1_200L..1_800L step 200L) detector.observe(quietSample(at))
         val completed = detector.observe(quietSample(2_000L))
 
         assertFalse(rejected.accepted)
@@ -111,17 +115,16 @@ class PedestrianStationaryDetectorTest {
         val detector = stationaryDetector()
 
         detector.reset()
-        val restarted = detector.observe(quietSample(100L))
+        val restarted = detector.observe(quietSample(1_000L))
 
         assertEquals(PedestrianStationaryState.CANDIDATE, restarted.state)
-        assertEquals(100L, restarted.candidateSinceElapsedRealtimeMs)
+        assertEquals(1_000L, restarted.candidateSinceElapsedRealtimeMs)
         assertNull(restarted.rejectionReason)
         assertFalse(restarted.shouldApplyZeroVelocityUpdate)
     }
 
     private fun stationaryDetector() = PedestrianStationaryDetector(config).also { detector ->
-        detector.observe(quietSample(1_000L))
-        detector.observe(quietSample(2_000L))
+        for (at in 1_000L..2_000L step 200L) detector.observe(quietSample(at))
         assertEquals(PedestrianStationaryState.STATIONARY, detector.currentState())
     }
 
@@ -134,6 +137,8 @@ class PedestrianStationaryDetectorTest {
         accelerationMagnitudeVarianceMps4 = 0.02,
         gyroscopeRmsRadPerSecond = if (includeGyroscope) 0.02 else null,
         gyroscopePeakRadPerSecond = if (includeGyroscope) 0.05 else null,
+        accelerationWindow = PedestrianMotionWindowCoverage(5, elapsedRealtimeMs - 200L, elapsedRealtimeMs, 50L),
+        gyroscopeWindow = if (includeGyroscope) PedestrianMotionWindowCoverage(5, elapsedRealtimeMs - 200L, elapsedRealtimeMs, 50L) else null,
     )
 
     private fun movingSample(
@@ -143,7 +148,7 @@ class PedestrianStationaryDetectorTest {
         elapsedRealtimeMs = elapsedRealtimeMs,
         stepDetected = stepDetected,
         accelerationMagnitudeMeanMps2 = 9.81,
-        accelerationMagnitudeVarianceMps4 = 0.15,
+        accelerationMagnitudeVarianceMps4 = 0.30,
         gyroscopeRmsRadPerSecond = 0.10,
         gyroscopePeakRadPerSecond = 0.22,
     )

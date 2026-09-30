@@ -10,6 +10,7 @@ import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class UprightTactileRouteGuidanceTest {
@@ -18,8 +19,7 @@ class UprightTactileRouteGuidanceTest {
         for (turns in 0..3) {
             val output = output(RectNorm(.4f, .55f, .2f, .3f), turns)
             assertContact(output, Point2(.5f, .82f), turns)
-            val decision = guidance(output, turns)
-            assertEquals("rotation=$turns", TactileSteering.STRAIGHT, decision.decision.steering)
+            val decision = assertObservedWithoutMovement(output, turns, .5f)
             assertEquals(.5f, requireNotNull(decision.observation).centerXNormalized, EPSILON)
         }
     }
@@ -29,16 +29,18 @@ class UprightTactileRouteGuidanceTest {
         for (turns in 0..3) {
             val output = output(RectNorm(.4f, .55f, .2f, .3f), turns, tracked = true)
             assertContact(output, Point2(.5f, .82f), turns)
-            assertEquals("rotation=$turns", TactileSteering.STRAIGHT, guidance(output, turns).decision.steering)
+            assertObservedWithoutMovement(output, turns, .5f)
         }
     }
 
     @Test
     fun leftAndRightPavingKeepUserRelativeDirectionsAtEveryRotation() {
-        for (turns in 0..3) for ((centerX, steering) in listOf(.2f to TactileSteering.LEFT, .8f to TactileSteering.RIGHT)) {
+        // The former LEFT/RIGHT expectations described image side only. Rotating the phone
+        // cannot establish the user's walking axis (see the independent phone-only yaw test).
+        for (turns in 0..3) for (centerX in listOf(.2f, .8f)) {
             val output = output(RectNorm(centerX - .1f, .55f, .2f, .3f), turns)
             assertContact(output, Point2(centerX, .82f), turns)
-            assertEquals("rotation=$turns center=$centerX", steering, guidance(output, turns).decision.steering)
+            assertObservedWithoutMovement(output, turns, centerX)
         }
     }
 
@@ -49,7 +51,7 @@ class UprightTactileRouteGuidanceTest {
             val output = output(RectNorm(.35f, .5f, .3f, .32f), turns, uprightPolygon)
             assertEquals(uprightPolygon.map { sensorPoint(it, turns) }, output.polygonNorm)
             assertContact(output, Point2(.5f, .82f), turns)
-            assertEquals(TactileSteering.STRAIGHT, guidance(output, turns).decision.steering)
+            assertObservedWithoutMovement(output, turns, .5f)
         }
     }
 
@@ -79,7 +81,7 @@ class UprightTactileRouteGuidanceTest {
         for (turns in 0..3) {
             val output = output(RectNorm(0f, .55f, .2f, .3f), turns)
             assertContact(output, Point2(.1f, .82f), turns)
-            assertEquals(TactileSteering.LEFT, guidance(output, turns).decision.steering)
+            assertObservedWithoutMovement(output, turns, .1f)
         }
     }
 
@@ -122,7 +124,8 @@ class UprightTactileRouteGuidanceTest {
             val snapshot = DepthFrameSnapshot(frameId,
                 rawDepth = if (metric) DepthImage16(100, 100, IntArray(10_000) { 2_000 }) else null,
                 rawConfidence = if (metric) ConfidenceImage8(100, 100, ByteArray(10_000) { 255.toByte() }) else null,
-                fullDepth = null, rawDepthTimestampNs = frameId, cameraImageTimestampNs = frameId)
+                fullDepth = null, rawDepthTimestampNs = frameId,
+                rawConfidenceTimestampNs = if (metric) frameId else null, cameraImageTimestampNs = frameId)
             if (tracked) {
                 val key = VisualFrameKey(1L, frameId, frameId, at, 1L)
                 val observation = requireNotNull(CurrentTrackedFrameObservation.fromTrackingResult(
@@ -134,13 +137,50 @@ class UprightTactileRouteGuidanceTest {
                     )), VisualTrackingMetrics(0L, 1, 0L, false, 1, 0)), listOf(detection), true, at))
                 pipeline.processTrackedObservation(snapshot, observation, mapper, frameId, at, imageQuarterTurns = turns).single()
             } else {
-                pipeline.process(snapshot, frameId, at, listOf(detection), mapper = mapper, imageQuarterTurns = turns).single()
+                pipeline.process(snapshot, frameId, at, listOf(detection), mapper = mapper, mapperFrameId = frameId, imageQuarterTurns = turns).single()
             }
         }.last()
     }
 
     private fun guidance(output: TrackedObjectDepth, turns: Int): TactileRouteGuidanceResult =
         AndroidTactileRouteGuidance().apply(listOf(output), context(turns), true, true)
+
+    private fun assertObservedWithoutMovement(
+        output: TrackedObjectDepth,
+        turns: Int,
+        expectedCenterX: Float,
+    ): TactileRouteGuidanceResult {
+        val result = guidance(output, turns)
+        val observation = requireNotNull(result.observation) { "rotation=$turns center=$expectedCenterX" }
+        assertEquals(output.trackId, observation.candidateId)
+        assertEquals("route-1", observation.routeId)
+        assertEquals(0, observation.routeSegmentIndex)
+        assertEquals(TmapCorridorProjectionEvidence.OVERLAPS, observation.tmapCorridorProjection)
+        assertEquals(expectedCenterX, observation.centerXNormalized, EPSILON)
+        assertEquals(0f, requireNotNull(observation.routeHeadingDeltaDeg), EPSILON)
+        assertEquals(LocalRouteMode.TMAP, result.decision.mode)
+        assertEquals("tactile_motion_evidence_unavailable", result.decision.reason)
+        assertNull(result.decision.steering)
+        assertNull(result.decision.instruction)
+        val guided = result.outputs.single()
+        assertEquals(output.copy(userFacing = guided.userFacing), guided)
+        assertEquals(MessageLevel.NONE, guided.userFacing.messageLevel)
+        assertNull(guided.userFacing.message)
+        assertNull(guided.userFacing.stepsAhead)
+
+        // Suppressing unproved tactile movement must not suppress an ordinary hazard, even
+        // with the same raw sensor rotation, metric depth and geometry.
+        val hazard = output.copy(
+            trackId = "person-control",
+            className = "person",
+            userFacing = output.userFacing.copy(messageLevel = MessageLevel.WARNING, message = "앞에 사람 후보가 있습니다."),
+        )
+        val mixed = AndroidTactileRouteGuidance().apply(listOf(output, hazard), context(turns), true, true)
+        assertSame(hazard, mixed.outputs.last())
+        assertEquals(result.decision, mixed.decision)
+        assertEquals(result.observation, mixed.observation)
+        return result
+    }
 
     private fun assertContact(output: TrackedObjectDepth, upright: Point2, turns: Int) {
         assertEquals(DepthSource.ARCORE_RAW_DEPTH, output.source)
@@ -151,7 +191,8 @@ class UprightTactileRouteGuidanceTest {
         assertEquals("sensor x rotation=$turns", expected.x, contact.x, EPSILON)
         assertEquals("sensor y rotation=$turns", expected.y, contact.y, EPSILON)
         // Fixed camera mounting, independently varied device-to-Earth roll. The same upright
-        // contact must project to the same Earth point, not merely the same guidance string.
+        // representative-depth ray must project to the same Earth point. This preserves
+        // observation geometry, not proof of contact-pixel depth or the user's walking axis.
         val earth = earthRotation(turns).rotate(Vec3((contact.x - .5f) * 4f, -(contact.y - .5f) * 4f, -2f))
         assertEquals((upright.x - .5f) * 4f, earth.x, EPSILON)
         assertEquals(2f, earth.y, EPSILON)

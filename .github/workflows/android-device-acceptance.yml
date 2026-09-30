@@ -169,41 +169,14 @@ jobs:
             -Pandroid.testInstrumentationRunnerArguments.class=kr.co.hanium.dreamup.walksafe.inference.UnifiedTfliteDeviceSmokeTest \
             --no-daemon
 
-      - name: Verify exactly two smoke test results
+      - name: Verify approved smoke test results
         run: |
           set -euo pipefail
-          if [[ ! -d "$CONNECTED_RESULT_ROOT" ]]; then
-            echo "::error::Connected Android test result directory is missing"
-            exit 1
-          fi
-          mapfile -d '' -t result_xml < <(find "$CONNECTED_RESULT_ROOT" -maxdepth 1 -type f -name 'TEST-*.xml' -print0)
-          if (( ${#result_xml[@]} != 1 )); then
-            echo "::error::Expected exactly one connected-test XML result; found ${#result_xml[@]}"
-            exit 1
-          fi
-          suite_line="$(grep -F -m1 '<testsuite name="kr.co.hanium.dreamup.walksafe.inference.UnifiedTfliteDeviceSmokeTest"' "${result_xml[0]}" || true)"
-          if [[ -z "$suite_line" ]]; then
-            echo "::error::UnifiedTfliteDeviceSmokeTest suite is missing"
-            exit 1
-          fi
-          for expected_attribute in 'tests="2"' 'failures="0"' 'errors="0"' 'skipped="0"'; do
-            if [[ "$suite_line" != *"$expected_attribute"* ]]; then
-              echo "::error::Unexpected smoke suite result; required $expected_attribute"
-              exit 1
-            fi
-          done
-          if [[ "$(grep -c '<testcase ' "${result_xml[0]}" || true)" -ne 2 ]]; then
-            echo "::error::Expected exactly two smoke test cases"
-            exit 1
-          fi
-          for test_name in \
-            unifiedAssetLoadsAndInvokesOnTheAndroidRuntime \
-            declaredLegacyFallbackAssetsPassHashAndInterpreterLoadContracts; do
-            if [[ "$(grep -c "name=\"$test_name\"" "${result_xml[0]}" || true)" -ne 1 ]]; then
-              echo "::error::Required smoke test result is missing or duplicated: $test_name"
-              exit 1
-            fi
-          done
+          python3 scripts/check_android_device_results.py \
+            --results "$CONNECTED_RESULT_ROOT" \
+            --suite kr.co.hanium.dreamup.walksafe.inference.UnifiedTfliteDeviceSmokeTest \
+            --expected-test unifiedAssetLoadsAndInvokesOnTheAndroidRuntime \
+            --expected-test declaredLegacyFallbackAssetsPassHashAndInterpreterLoadContracts
           if [[ ! -d "$CONNECTED_REPORT_ROOT" || ! -f "$CONNECTED_REPORT_ROOT/index.html" ]]; then
             echo "::error::Connected Android HTML report is missing"
             exit 1

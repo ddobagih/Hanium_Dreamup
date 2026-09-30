@@ -15,11 +15,21 @@ internal enum class VoskStreamingError {
     MODEL_LOAD_FAILED,
     AUDIO_START_FAILED,
     AUDIO_READ_FAILED,
+    /** S04-27: the system silenced this capture; not a user who stayed quiet. */
+    AUDIO_SILENCED,
     INFERENCE_FAILED,
 }
 
+internal fun voskAudioInputFailure(code: Int): VoskStreamingError =
+    if (code == PCM_INPUT_SILENCED_CODE) VoskStreamingError.AUDIO_SILENCED else VoskStreamingError.AUDIO_READ_FAILED
+
 internal interface VoskStreamingListener {
     fun onReady(runId: Long)
+    /** Decoder utterance endpoint, not physical microphone release. */
+    fun onAudioEnd(runId: Long) = Unit
+    fun onAudioEnd(runId: Long, inputGeneration: Long?) {
+        onAudioEnd(runId)
+    }
     fun onTranscript(runId: Long, transcript: VoskTranscript)
     fun onTranscript(runId: Long, transcript: VoskTranscript, inputGeneration: Long?) {
         onTranscript(runId, transcript)
@@ -37,12 +47,30 @@ internal fun submitReservedVoskStreamingRun(
     executor.execute(task)
 }
 
+/** The same single worker must finish release before it can run the next start. */
+internal fun requestVoskResourceRelease(executor: ExecutorService, release: () -> Unit) {
+    executor.execute(release)
+}
+
+/** Only microphone start/release is shared; model loading stays per instance. */
+internal object VoskStreamingWorker {
+    val process: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "walksafe-vosk-microphone").apply { isDaemon = true }
+    }
+}
+
+internal data class VoskPreparedRun(
+    val audioSource: VoskPcmSource,
+    val recognizer: Recognizer?,
+    val model: Model?,
+)
+
 /**
  * Runs one Korean Vosk model for both wake-phrase and command transcripts.
  * PCM remains in RAM and is never written to disk.
  */
 internal class VoskStreamingTranscriber(
-    private val context: Context,
+    private val context: Context?,
     private val modelDirectory: File,
     private val isInputSuppressed: () -> Boolean,
     private val listener: VoskStreamingListener,
@@ -51,6 +79,8 @@ internal class VoskStreamingTranscriber(
     },
     private val homeWakeEndpointing: Boolean = false,
     private val inputGeneration: () -> Long? = { null },
+    private val preparedRunFactory: (((Int) -> Unit) -> VoskPreparedRun)? = null,
+    private val onRuntimeResourcesDetached: () -> Unit = {},
 ) : Closeable {
     private enum class State {
         STOPPED,
@@ -60,13 +90,15 @@ internal class VoskStreamingTranscriber(
     }
 
     private val stateLock = Any()
+    private val requestLock = Any()
     private val decoderLock = Any()
     private var state = State.STOPPED
     private var generation = 0L
     private var model: Model? = null
     private var recognizer: Recognizer? = null
-    private var audioSource: AndroidPcmAudioSource? = null
+    private var audioSource: VoskPcmSource? = null
     private var failureReportedGeneration: Long? = null
+    private var startupReadError: VoskStreamingError? = null
 
     @Volatile
     private var decoderSuppressed = false
@@ -74,11 +106,12 @@ internal class VoskStreamingTranscriber(
     private var lastPartial = ""
     private var lastPartialEmittedAtNanos = 0L
 
-    fun start(onRunReserved: (Long) -> Unit = {}): Long? {
+    fun start(onRunReserved: (Long) -> Unit = {}): Long? = synchronized(requestLock) {
         val startGeneration = synchronized(stateLock) {
             if (state != State.STOPPED) return null
             state = State.STARTING
             generation += 1L
+            startupReadError = null
             generation
         }
         try {
@@ -95,35 +128,56 @@ internal class VoskStreamingTranscriber(
     }
 
     fun stop() {
-        val resources = synchronized(stateLock) {
-            if (state == State.STOPPED || state == State.CLOSED) return
-            generation += 1L
-            state = State.STOPPED
-            detachResourcesLocked()
+        synchronized(requestLock) {
+            synchronized(stateLock) {
+                if (state == State.STOPPED || state == State.CLOSED) return
+                generation += 1L
+                state = State.STOPPED
+                val resources = detachResourcesLocked()
+                requestVoskResourceRelease(VoskStreamingWorker.process) { releaseResources(resources) }
+            }
         }
-        releaseResources(resources)
     }
 
     fun isRunning(): Boolean = synchronized(stateLock) { state == State.RUNNING }
 
     override fun close() {
-        val resources = synchronized(stateLock) {
-            if (state == State.CLOSED) return
-            generation += 1L
-            state = State.CLOSED
-            detachResourcesLocked()
+        synchronized(requestLock) {
+            synchronized(stateLock) {
+                if (state == State.CLOSED) return
+                generation += 1L
+                state = State.CLOSED
+                val resources = detachResourcesLocked()
+                requestVoskResourceRelease(VoskStreamingWorker.process) { releaseResources(resources) }
+            }
+            // shutdownNow would discard the queued release and allow a new owner too early.
+            if (loader !== VoskStreamingWorker.process) loader.shutdown()
         }
-        releaseResources(resources)
-        loader.shutdownNow()
     }
 
     private fun loadAndStart(startGeneration: Long) {
-        if (!hasRequiredModelFiles(modelDirectory)) {
+        preparedRunFactory?.let { factory ->
+            val prepared = try {
+                factory { code -> handleRuntimeFailure(startGeneration, voskAudioInputFailure(code)) }
+            } catch (_: Exception) {
+                failStart(startGeneration, VoskStreamingError.MODEL_LOAD_FAILED)
+                return
+            }
+            enqueuePrepared(startGeneration, prepared)
+            return
+        }
+        val verifiedDirectory = try {
+            BundledVoskModelInstaller.verifyOrRepairInstalledModel(checkNotNull(context), modelDirectory)
+        } catch (_: Exception) {
+            failStart(startGeneration, VoskStreamingError.MODEL_LOAD_FAILED)
+            return
+        }
+        if (!hasRequiredModelFiles(verifiedDirectory)) {
             failStart(startGeneration, VoskStreamingError.MODEL_UNAVAILABLE)
             return
         }
         val openedModel = try {
-            Model(modelDirectory.absolutePath)
+            Model(verifiedDirectory.absolutePath)
         } catch (_: Exception) {
             failStart(startGeneration, VoskStreamingError.MODEL_LOAD_FAILED)
             return
@@ -141,48 +195,80 @@ internal class VoskStreamingTranscriber(
                 }
             }
         } catch (_: Exception) {
-            openedModel.close()
+            runCatching { openedModel.close() }
             failStart(startGeneration, VoskStreamingError.MODEL_LOAD_FAILED)
             return
         }
         val source = AndroidPcmAudioSource(
-            context = context,
+            context = checkNotNull(context),
             onPcm16 = { samples -> processPcm(startGeneration, openedRecognizer, samples) },
-            onReadError = { handleRuntimeFailure(startGeneration, VoskStreamingError.AUDIO_READ_FAILED) },
+            onReadError = { code -> handleRuntimeFailure(startGeneration, voskAudioInputFailure(code)) },
         )
+        enqueuePrepared(startGeneration, VoskPreparedRun(source, openedRecognizer, openedModel))
+    }
 
+    private fun enqueuePrepared(startGeneration: Long, prepared: VoskPreparedRun) {
+        try {
+            VoskStreamingWorker.process.execute { startPrepared(startGeneration, prepared) }
+        } catch (_: RejectedExecutionException) {
+            cleanupThenNotifyVoskFailure(
+                cleanup = { releaseResources(Resources(prepared.audioSource, prepared.recognizer, prepared.model)) },
+                notify = { failStart(startGeneration, VoskStreamingError.AUDIO_START_FAILED) },
+            )
+        }
+    }
+
+    private fun startPrepared(startGeneration: Long, prepared: VoskPreparedRun) {
+        val source = prepared.audioSource
+        // AudioRecord.startRecording may block. Never hold the UI-facing state lock over it.
+        val stillStarting = synchronized(stateLock) {
+            state == State.STARTING && generation == startGeneration
+        }
         var audioStartFailed = false
-        val accepted = synchronized(stateLock) {
-            if (state != State.STARTING || generation != startGeneration) {
+        val audioStarted = if (stillStarting) {
+            try {
+                source.start()
+                true
+            } catch (_: Throwable) {
+                audioStartFailed = true
                 false
-            } else {
-                model = openedModel
-                recognizer = openedRecognizer
-                audioSource = source
-                try {
-                    source.start()
-                    decoderSuppressed = false
-                    decoderInputGeneration = null
-                    lastPartial = ""
-                    lastPartialEmittedAtNanos = 0L
-                    state = State.RUNNING
-                    true
-                } catch (_: Throwable) {
-                    detachResourcesLocked()
+            }
+        } else {
+            false
+        }
+        var startupError: VoskStreamingError? = null
+        val accepted = synchronized(stateLock) {
+            if (state == State.STARTING && generation == startGeneration) {
+                if (!audioStarted || startupReadError != null) {
+                    startupError = if (audioStartFailed) {
+                        VoskStreamingError.AUDIO_START_FAILED
+                    } else {
+                        startupReadError
+                    }
                     state = State.STOPPED
                     generation += 1L
-                    audioStartFailed = true
+                    startupReadError = null
                     false
+                } else {
+                model = prepared.model
+                recognizer = prepared.recognizer
+                audioSource = source
+                decoderSuppressed = false
+                decoderInputGeneration = null
+                lastPartial = ""
+                lastPartialEmittedAtNanos = 0L
+                state = State.RUNNING
+                true
                 }
+            } else {
+                false
             }
         }
         if (!accepted) {
-            source.stop()
-            openedRecognizer.close()
-            openedModel.close()
-            if (audioStartFailed) {
-                listener.onError(startGeneration, VoskStreamingError.AUDIO_START_FAILED)
-            }
+            cleanupThenNotifyVoskFailure(
+                cleanup = { releaseResources(Resources(source, prepared.recognizer, prepared.model)) },
+                notify = { startupError?.let { listener.onError(startGeneration, it) } },
+            )
             return
         }
         listener.onReady(startGeneration)
@@ -195,6 +281,7 @@ internal class VoskStreamingTranscriber(
     ) {
         synchronized(decoderLock) {
             if (!isCurrentRunning(callbackGeneration, activeRecognizer)) return
+            try {
             val capturedInputGeneration = runCatching(inputGeneration).getOrNull()
             if (runCatching(isInputSuppressed).getOrDefault(true)) {
                 if (!decoderSuppressed) {
@@ -210,8 +297,8 @@ internal class VoskStreamingTranscriber(
                 lastPartial = ""
             }
             decoderInputGeneration = capturedInputGeneration
-            try {
                 if (activeRecognizer.acceptWaveForm(samples, samples.size)) {
+                    listener.onAudioEnd(callbackGeneration, capturedInputGeneration)
                     emitTranscript(
                         callbackGeneration,
                         activeRecognizer.result,
@@ -222,7 +309,7 @@ internal class VoskStreamingTranscriber(
                 } else {
                     maybeEmitPartial(callbackGeneration, activeRecognizer, capturedInputGeneration)
                 }
-            } catch (_: Throwable) {
+            } catch (_: Exception) {
                 handleRuntimeFailure(callbackGeneration, VoskStreamingError.INFERENCE_FAILED)
             }
         }
@@ -257,35 +344,32 @@ internal class VoskStreamingTranscriber(
         callbackGeneration: Long,
         error: VoskStreamingError,
     ) {
-        val shouldStop = synchronized(stateLock) {
-            if (
+        val shouldReport = synchronized(stateLock) {
+            if (state == State.STARTING && generation == callbackGeneration) {
+                if (startupReadError == null) startupReadError = error
+                false
+            } else if (
                 state == State.RUNNING &&
                 generation == callbackGeneration &&
                 failureReportedGeneration != callbackGeneration
             ) {
                 failureReportedGeneration = callbackGeneration
+                generation += 1L
+                state = State.STOPPED
+                val resources = detachResourcesLocked()
+                try {
+                    onRuntimeResourcesDetached()
+                } catch (_: Exception) {
+                    // An observer failure must not skip audio release or the original terminal error.
+                }
+                requestVoskResourceRelease(VoskStreamingWorker.process) { releaseResources(resources) }
                 true
             } else {
                 false
             }
         }
-        if (!shouldStop) return
+        if (!shouldReport) return
         listener.onError(callbackGeneration, error)
-        try {
-            loader.execute { stopGeneration(callbackGeneration) }
-        } catch (_: RejectedExecutionException) {
-            stopGeneration(callbackGeneration)
-        }
-    }
-
-    private fun stopGeneration(callbackGeneration: Long) {
-        val resources = synchronized(stateLock) {
-            if (state != State.RUNNING || generation != callbackGeneration) return
-            generation += 1L
-            state = State.STOPPED
-            detachResourcesLocked()
-        }
-        releaseResources(resources)
     }
 
     private fun failStart(
@@ -319,23 +403,27 @@ internal class VoskStreamingTranscriber(
         recognizer = null
         model = null
         failureReportedGeneration = null
+        startupReadError = null
         return resources
     }
 
     private fun releaseResources(resources: Resources) {
-        resources.audioSource?.stop()
-        synchronized(decoderLock) {
-            runCatching { resources.recognizer?.close() }
-            runCatching { resources.model?.close() }
-            decoderSuppressed = false
-            decoderInputGeneration = null
-            lastPartial = ""
-            lastPartialEmittedAtNanos = 0L
-        }
+        releaseVoskResources(
+            decoderLock = decoderLock,
+            stopAudio = { resources.audioSource?.stop() },
+            closeRecognizer = { resources.recognizer?.close() },
+            closeModel = { resources.model?.close() },
+            resetDecoderState = {
+                decoderSuppressed = false
+                decoderInputGeneration = null
+                lastPartial = ""
+                lastPartialEmittedAtNanos = 0L
+            },
+        )
     }
 
     private data class Resources(
-        val audioSource: AndroidPcmAudioSource?,
+        val audioSource: VoskPcmSource?,
         val recognizer: Recognizer?,
         val model: Model?,
     )
@@ -352,6 +440,82 @@ internal class VoskStreamingTranscriber(
                     "conf/model.conf",
                     "graph/Gr.fst",
                     "graph/HCLr.fst",
-                ).all { relative -> File(directory, relative).isFile }
+                ).all { relative -> File(directory, relative).let { it.isFile && it.length() > 0L } }
+    }
+}
+
+/**
+ * The production cleanup composition: stop capture before taking the decoder lock, then
+ * close native decoder resources and reset state under that same lock. Ordinary cleanup
+ * exceptions retain their existing handling. A fatal signal escaping an action is deferred
+ * until all independent actions and the state reset have been attempted, then rethrown.
+ */
+internal fun releaseVoskResources(
+    decoderLock: Any,
+    stopAudio: () -> Unit,
+    closeRecognizer: () -> Unit,
+    closeModel: () -> Unit,
+    resetDecoderState: () -> Unit,
+) {
+    var firstFatal: Throwable? = null
+
+    fun retainFailure(failure: Throwable) {
+        val first = firstFatal
+        if (first == null) {
+            firstFatal = failure
+        } else if (first !== failure) {
+            // Keep the original object. Later failures are suppressed when supported;
+            // disabled/failed suppression must not replace it or skip another cleanup.
+            runCatching { first.addSuppressed(failure) }
+        }
+    }
+
+    fun attempt(action: () -> Unit) {
+        try {
+            attemptVoskCleanup(action)
+        } catch (failure: Throwable) {
+            retainFailure(failure)
+        }
+    }
+
+    attempt(stopAudio)
+    synchronized(decoderLock) {
+        attempt(closeRecognizer)
+        attempt(closeModel)
+        try {
+            resetDecoderState()
+        } catch (failure: Throwable) {
+            // Reset was not an exception-swallowing cleanup action before this composition.
+            // Preserve its propagation unless an earlier fatal signal already owns the exit.
+            if (firstFatal == null) throw failure
+            retainFailure(failure)
+        }
+    }
+    firstFatal?.let { throw it }
+}
+
+/** Attempt the failure callback even when cleanup throws, without replacing its original failure. */
+internal fun cleanupThenNotifyVoskFailure(cleanup: () -> Unit, notify: () -> Unit) {
+    var cleanupFailure: Throwable? = null
+    try {
+        cleanup()
+    } catch (failure: Throwable) {
+        cleanupFailure = failure
+    }
+    try {
+        notify()
+    } catch (notificationFailure: Throwable) {
+        val original = cleanupFailure ?: throw notificationFailure
+        if (original !== notificationFailure) runCatching { original.addSuppressed(notificationFailure) }
+    }
+    cleanupFailure?.let { throw it }
+}
+
+/** Preserve ordinary cleanup-exception handling; fatal signals escape to the composition. */
+internal fun attemptVoskCleanup(action: () -> Unit) {
+    try {
+        action()
+    } catch (_: Exception) {
+        // Ownership was already revoked; there is no safe resource to return to a caller.
     }
 }

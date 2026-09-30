@@ -1,7 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.navigation.positioning
 
 import kotlin.math.abs
-import kotlin.math.min
 import kotlin.math.sqrt
 
 data class WalkingCalibrationSample(
@@ -26,6 +25,22 @@ enum class MotionCalibrationRejectionReason {
     IMPLAUSIBLE_WALKING_SPEED,
 }
 
+/**
+ * S09-43: non-personal usage condition of a calibration, as enum names only (FP-046 minimum
+ * collection): the step input that produced the steps and the confirmed phone mounting method.
+ * Null fields mean the condition was not known.
+ */
+data class PedestrianCalibrationCondition(
+    val stepInput: String?,
+    val mounting: String?,
+) {
+    fun isValid(): Boolean = listOfNotNull(stepInput, mounting).all { CONDITION_NAME.matches(it) }
+
+    private companion object {
+        val CONDITION_NAME = Regex("[A-Z][A-Z0-9_]{0,39}")
+    }
+}
+
 data class PedestrianMotionProfileSnapshot(
     val stepLengthM: Double,
     val meanWalkingSpeedMps: Double,
@@ -34,6 +49,13 @@ data class PedestrianMotionProfileSnapshot(
     val rejectedSampleCount: Long,
     val walkingProcessAccelerationSigmaMps2: Double,
     val isCalibrated: Boolean,
+    /**
+     * False while the effective calibration is a restored record whose calibration time is unknown
+     * (migrated v1); an accepted calibration sample in this session makes it known again.
+     */
+    val calibrationConditionKnown: Boolean = true,
+    /** S09-43: usage condition of the effective calibration; null when unknown or uncalibrated. */
+    val calibrationCondition: PedestrianCalibrationCondition? = null,
 ) {
     /** Compatibility alias used by positioning dynamics. */
     val averageWalkingSpeedMps: Double
@@ -45,6 +67,10 @@ data class PersistedPedestrianMotionProfile(
     val meanWalkingSpeedMps: Double,
     val speedVarianceMps2: Double,
     val acceptedSampleCount: Long,
+    /** False when the stored record cannot tell when (under which model/conditions) it was calibrated. */
+    val calibrationConditionKnown: Boolean = true,
+    /** S09-43: usage condition of the calibration; null when it was not recorded. */
+    val calibrationCondition: PedestrianCalibrationCondition? = null,
 )
 
 data class PedestrianMotionCalibrationResult(
@@ -124,8 +150,14 @@ class PedestrianMotionProfile(
     private var calibratedSpeedVarianceMps2 = config.defaultSpeedVarianceMps2
     private var acceptedSampleCount = 0L
     private var rejectedSampleCount = 0L
+    private var calibrationConditionKnown = true
+    private var calibrationCondition: PedestrianCalibrationCondition? = null
 
-    fun calibrate(sample: WalkingCalibrationSample): PedestrianMotionCalibrationResult {
+    fun calibrate(
+        sample: WalkingCalibrationSample,
+        /** S09-43: usage condition under which this sample was walked; recorded on UPDATED. */
+        condition: PedestrianCalibrationCondition? = null,
+    ): PedestrianMotionCalibrationResult {
         val rejection = validate(sample)
         if (rejection != null) {
             rejectedSampleCount = saturatedIncrement(rejectedSampleCount)
@@ -142,10 +174,14 @@ class PedestrianMotionProfile(
         appendRecent(recentWalkingSpeedsMps, walkingSpeedMps)
         acceptedSampleCount = saturatedIncrement(acceptedSampleCount)
 
-        val status = if (acceptedSampleCount < config.minimumAcceptedSamples) {
+        // A restored aggregate is a prior, not a window of independent new samples.
+        val status = if (recentWalkingSpeedsMps.size < config.minimumAcceptedSamples) {
             MotionCalibrationStatus.ACCEPTED_WARMUP
         } else {
             updateCalibratedValues()
+            // Values now include samples walked in this session, not only a restored record.
+            calibrationConditionKnown = true
+            calibrationCondition = condition?.takeIf { it.isValid() }
             MotionCalibrationStatus.UPDATED
         }
         return PedestrianMotionCalibrationResult(status = status, snapshot = currentSnapshot())
@@ -164,6 +200,8 @@ class PedestrianMotionProfile(
             rejectedSampleCount = rejectedSampleCount,
             walkingProcessAccelerationSigmaMps2 = processAccelerationSigma(speedVarianceMps2),
             isCalibrated = calibrated,
+            calibrationConditionKnown = !calibrated || calibrationConditionKnown,
+            calibrationCondition = calibrationCondition.takeIf { calibrated },
         )
     }
 
@@ -174,6 +212,8 @@ class PedestrianMotionProfile(
             meanWalkingSpeedMps = calibratedWalkingSpeedMps,
             speedVarianceMps2 = calibratedSpeedVarianceMps2,
             acceptedSampleCount = acceptedSampleCount,
+            calibrationConditionKnown = calibrationConditionKnown,
+            calibrationCondition = calibrationCondition,
         )
     }
 
@@ -185,12 +225,10 @@ class PedestrianMotionProfile(
         calibratedWalkingSpeedMps = persisted.meanWalkingSpeedMps
         calibratedSpeedVarianceMps2 = persisted.speedVarianceMps2
         acceptedSampleCount = persisted.acceptedSampleCount
+        calibrationConditionKnown = persisted.calibrationConditionKnown
+        calibrationCondition = persisted.calibrationCondition
         recentStepLengthsM.clear()
         recentWalkingSpeedsMps.clear()
-        repeat(min(config.minimumAcceptedSamples, config.recentSampleWindowSize)) {
-            recentStepLengthsM += persisted.stepLengthM
-            recentWalkingSpeedsMps += persisted.meanWalkingSpeedMps
-        }
         return true
     }
 
@@ -260,7 +298,8 @@ class PedestrianMotionProfile(
             profile.meanWalkingSpeedMps in config.minimumWalkingSpeedMps..config.maximumWalkingSpeedMps &&
             profile.speedVarianceMps2.isFinite() &&
             profile.speedVarianceMps2 in config.minimumSpeedVarianceMps2..config.maximumSpeedVarianceMps2 &&
-            profile.acceptedSampleCount >= config.minimumAcceptedSamples
+            profile.acceptedSampleCount >= config.minimumAcceptedSamples &&
+            profile.calibrationCondition?.isValid() != false
 
     private fun appendRecent(values: MutableList<Double>, value: Double) {
         if (values.size == config.recentSampleWindowSize) values.removeAt(0)

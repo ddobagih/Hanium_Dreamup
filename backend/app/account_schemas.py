@@ -90,7 +90,15 @@ EnrollmentHandle = Annotated[
     ),
 ]
 OtpCode = Annotated[str, StringConstraints(pattern=r"^[0-9]{6}$")]
+# Login accepts the existing 10..128 range so accounts created before the
+# FP-010-DETAIL-02 minimum keep working; new passwords use NewAccountPassword.
 AccountPassword = Annotated[str, StringConstraints(min_length=10, max_length=128)]
+# FP-010-DETAIL-02: 12..128 code points (same unit as Gateway/Android), no NUL.
+# Common/leaked values are refused by the account service (account_password_too_common).
+NewAccountPassword = Annotated[
+    str,
+    StringConstraints(min_length=12, max_length=128, pattern=r"^[^\x00]*$"),
+]
 DocumentVersion = Annotated[
     str,
     StringConstraints(
@@ -187,7 +195,7 @@ class AccountCreateRequestV1(_StrictModel):
     schema_version: Literal["walksafe.account-create.v1"]
     enrollment_handle: EnrollmentHandle
     otp_code: OtpCode
-    password: AccountPassword
+    password: NewAccountPassword
     consent: SignupConsentV1
 
 

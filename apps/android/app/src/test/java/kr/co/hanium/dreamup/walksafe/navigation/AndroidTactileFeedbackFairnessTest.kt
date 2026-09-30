@@ -8,6 +8,7 @@ import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.depth.Trend
 import kr.co.hanium.dreamup.walksafe.depth.UnknownObjectFeedbackBatch
+import kr.co.hanium.dreamup.walksafe.depth.UnknownObjectFeedbackPolicy
 import kr.co.hanium.dreamup.walksafe.depth.UserFacingDepth
 import kr.co.hanium.dreamup.walksafe.feedback.WalkSafeFeedbackPolicy
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
@@ -46,8 +47,37 @@ class AndroidTactileFeedbackFairnessTest {
             nowMs = now, independentFreshOutputs = listOf(batch(now, listOf(output("unknown-4", now)))))
         assertEquals("unknown-4", requireNotNull(fresh.action).trackId)
         assertEquals(setOf("unknown-4"), fresh.activeRiskTrackIds)
-        assertTrue(policy.claimFeedbackDelivery("unknown-4", now))
+        assertTrue(policy.claimFeedbackDelivery("unknown-4", now, now))
         assertTrue(policy.confirmFeedbackDelivery("unknown-4", now, now))
+    }
+
+    @Test
+    fun dispatchKeepsTheLiveWarningWhenConflictingStopLeaseHasExpired() {
+        val now = START + 100L
+        val coordinator = AndroidTactileFrameCoordinator(
+            AndroidTactileRouteGuidance(), WalkSafeFeedbackPolicy(), TactileFrameFeedbackActuator { },
+        )
+        val expiredStop = output("scooter-stop", now).copy(
+            className = "moving_e_scooter",
+            userFacing = UserFacingDepth(null, MessageLevel.STOP, "이동하는 킥보드. 멈추세요."),
+            sourceValidUntilElapsedRealtimeMs = now - 1L,
+        )
+        val liveWarning = output("scooter-warning", now).copy(
+            className = "abandoned_e_scooter",
+            userFacing = UserFacingDepth(null, MessageLevel.WARNING, "정지한 킥보드. 주의하세요."),
+            sourceValidUntilElapsedRealtimeMs = now + 800L,
+        )
+
+        val dispatch = coordinator.dispatchFeedback(
+            frame(listOf(expiredStop, liveWarning)), stale = false,
+            deviceGateAllowsAlerts = true, nowMs = now,
+        )
+        val action = requireNotNull(dispatch.action)
+        assertEquals(liveWarning.trackId, action.trackId)
+        assertEquals(MessageLevel.WARNING, action.level)
+        assertEquals(liveWarning.sourceValidUntilElapsedRealtimeMs, action.validUntilMs)
+        assertTrue(action.message.contains("상태가 불확실"))
+        assertEquals(setOf(liveWarning.trackId), dispatch.activeRiskTrackIds)
     }
 
     private fun assertFairDispatch(unknownFourth: Boolean) {
@@ -68,8 +98,8 @@ class AndroidTactileFeedbackFairnessTest {
             dispatch.action?.let { action ->
                 assertEquals("위험 ${action.trackId} @$now", action.message)
                 if (action.trackId == "unknown-4") assertEquals(now + 800L, action.validUntilMs)
-                assertTrue(policy.claimFeedbackDelivery(action.trackId, now))
-                assertFalse(policy.claimFeedbackDelivery(action.trackId, now))
+                assertTrue(policy.claimFeedbackDelivery(action.trackId, now, now))
+                assertFalse(policy.claimFeedbackDelivery(action.trackId, now, now))
                 val whileClaimed = coordinator.dispatchFeedback(currentFrame, false, true, now,
                     independentFreshOutputs = unknown)
                 assertNull(whileClaimed.action)
@@ -110,6 +140,7 @@ class AndroidTactileFeedbackFairnessTest {
             confidence = DepthConfidenceBreakdown(0.95f, 1f, 1f, 1f, 1f, 1f, 1f, 1f),
             userFacing = UserFacingDepth(null, MessageLevel.WARNING, "위험 $id @$now"),
             trackAgeFrames = 20, trackStableMs = 1_900L,
+            sourceValidUntilElapsedRealtimeMs = now + UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS,
         )
     }
 

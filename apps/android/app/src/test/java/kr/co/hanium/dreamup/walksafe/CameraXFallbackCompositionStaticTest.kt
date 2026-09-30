@@ -34,7 +34,8 @@ class CameraXFallbackCompositionStaticTest {
         assertTrue(analyzer.contains("finally"))
         assertTrue(analyzer.contains("imageProxy.close()"))
         assertTrue(analyzer.contains("var detectorSucceeded = false"))
-        assertTrue(analyzer.contains("detectorRuntimeSupervisor.onSuccess()"))
+        // S14-36: outcomes reach the supervisor only through its ticket-checked entry point.
+        assertTrue(analyzer.contains("detectorRuntimeSupervisor.onDetectorOutput("))
         assertTrue(analyzer.contains("detectorSucceeded = true"))
         assertTrue(analyzer.contains("if (detectorSucceeded)"))
         assertTrue(analyzer.contains("recordCameraFallbackFrameAnalyzedOnce("))
@@ -309,8 +310,9 @@ class CameraXFallbackCompositionStaticTest {
         assertTrue(dispatch.contains("isAdvisory && synchronized(pendingUtterances) { pendingUtterances.isNotEmpty() }"))
         assertTrue(dispatch.contains("SpeechPriority.ADVISORY -> TextToSpeech.QUEUE_ADD"))
         assertTrue(dispatch.contains("return NavigationSpeechDispatchResult.SUPPRESSED"))
-        assertTrue(startValidation.contains("SystemClock.elapsedRealtime() <= deadlineAndValidator.first"))
-        assertTrue(startValidation.contains("runCatching(deadlineAndValidator.second).getOrDefault(false)"))
-        assertTrue(startValidation.contains("markUtteranceFinished(utteranceId, completed = false)"))
+        assertTrue(startValidation.contains("speechStartIsCurrent("))
+        assertTrue(startValidation.contains("deadlineAndValidator.first, deadlineAndValidator.second"))
+        assertTrue(actuator.contains("nowMs <= deadlineMs && runCatching(validator).getOrDefault(false)"))
+        assertTrue(startValidation.contains("markUtteranceFinished(utteranceId, completed = false, cancelled = true)"))
     }
 }

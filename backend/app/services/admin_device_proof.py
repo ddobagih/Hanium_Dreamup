@@ -24,8 +24,10 @@ from sqlalchemy.orm import Session
 from backend.app.models import (
     AdminDeviceKey,
     AdminDeviceProofChallenge,
+    AdminSecurityAuthAttempt,
     AdminSecurityControl,
     AdminSecurityRecoveryTransaction,
+    AdminSecuritySession,
 )
 from backend.app.services.admin_security import (
     ACTION_PATTERN,
@@ -34,9 +36,11 @@ from backend.app.services.admin_security import (
     AdminSecurityError,
     AdminSecurityStoreUnavailable,
     AdminSessionIdentity,
+    _append_admin_security_audit,
     classify_admin_operation,
     load_admin_credential_issuer_key_for_settings,
     normalize_admin_operation_path,
+    sha256_text,
 )
 
 
@@ -44,10 +48,26 @@ ADMIN_DEVICE_PROOF_SCHEMA_VERSION = "walksafe.admin-device-proof.v2"
 ADMIN_DEVICE_PROOF_TTL_MILLISECONDS = 120_000
 ADMIN_DEVICE_PROOF_NONCE_BYTES = 32
 ADMIN_DEVICE_PROOF_MAX_OUTSTANDING_CHALLENGES = 8
+# S18-5: one source may take at most half of the shared session-less pool per
+# challenge lifetime, so a requester that knows the public device identifiers
+# cannot fill it alone (subsumes the "10 per minute per source" choice).
+ADMIN_DEVICE_PROOF_MAX_SESSIONLESS_PER_SOURCE = (
+    ADMIN_DEVICE_PROOF_MAX_OUTSTANDING_CHALLENGES // 2
+)
+_SESSIONLESS_ATTEMPT_ACTIONS = {
+    "LOGIN": "challenge_login",
+    "RECOVERY_COMPLETE": "challenge_recovery",
+}
 ADMIN_DEVICE_PROOF_CHALLENGE_PATH = "/admin/security/device-proof/challenges"
 ADMIN_DEVICE_PROOF_CHALLENGE_TYPES = frozenset(
     {"LOGIN", "ACTION", "RECOVERY_COMPLETE"}
 )
+# Pre-authentication issuance must not consume session-bound ACTION capacity.
+ADMIN_DEVICE_PROOF_QUOTA_POOLS: dict[str, frozenset[str]] = {
+    "LOGIN": frozenset({"LOGIN", "RECOVERY_COMPLETE"}),
+    "RECOVERY_COMPLETE": frozenset({"LOGIN", "RECOVERY_COMPLETE"}),
+    "ACTION": frozenset({"ACTION"}),
+}
 ADMIN_DEVICE_PROOF_SIGNED_FIELDS = (
     "action",
     "admin_id",
@@ -143,12 +163,25 @@ _REPORT_WORKFLOW_CANONICAL_HISTORY_PATH_PATTERN = re.compile(
     r"[89ab][0-9a-f]{3}-[0-9a-f]{12}/"
     r"(?:review-decisions|deliveries)/history$"
 )
+# S18-36: one earlier review attempt's outcome, looked up by its decision_id.
+_REPORT_REVIEW_DECISION_LOOKUP_PATH_PATTERN = re.compile(
+    r"^/reports/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
+    r"[89ab][0-9a-f]{3}-[0-9a-f]{12}/review-decisions/"
+    # S18-36-F1: same canonical v1-5 pattern as the route's decision_id parameter.
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
+# S18-40: POST-only correction of the latest effective delivery event.
+_REPORT_DELIVERY_CORRECTION_PATH_PATTERN = re.compile(
+    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
+    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/delivery-corrections$"
+)
 _REPORT_ORIGINAL_ACCESS_GRANT_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/original-access-grants$"
 )
 _ADMIN_WRITE_WORKFLOW_PATH_PATTERN = re.compile(
     r"^(?:/admin/security/recovery-custody/attest|"
+    r"/admin/security/device-keys/rotation/confirm|"
     r"/admin/security/devices/[A-Za-z0-9][A-Za-z0-9._:-]{7,127}/report-lost)$"
 )
 _CANONICAL_UUID_PATTERN = re.compile(
@@ -191,6 +224,89 @@ class ProvisionedAdminDeviceKey:
     key_marker: str
     status: str
     idempotent: bool
+    security_level: str | None = None
+
+
+# S18-2: the policy requires keys in the device's protected area; a software-only
+# KeyStore key is never registered. StrongBox is allowed but not required.
+ADMIN_DEVICE_KEY_SECURITY_LEVELS = frozenset({"TRUSTED_ENVIRONMENT", "STRONGBOX"})
+# S18-3: the new key signs this exact payload so the server proves possession of
+# the PENDING key before it revokes the ACTIVE one.
+ADMIN_DEVICE_KEY_ROTATION_SCHEMA_VERSION = "walksafe.admin-device-key-rotation.v1"
+_ADMIN_DEVICE_KEY_ROTATION_FIELDS = (
+    "admin_id",
+    "correlation_id",
+    "device_id",
+    "key_marker",
+    "key_version",
+    "previous_key_marker",
+    "previous_key_version",
+    "schema_version",
+    "session_id",
+)
+
+
+def admin_device_key_rotation_payload(
+    *,
+    admin_id: str,
+    device_id: str,
+    session_id: uuid.UUID,
+    correlation_id: uuid.UUID,
+    previous_key_version: int,
+    previous_key_marker: str,
+    key_version: int,
+    key_marker: str,
+) -> str:
+    """Return the canonical JSON the PENDING key signs for rotation confirmation."""
+
+    value: dict[str, Any] = {
+        "admin_id": admin_id,
+        "correlation_id": str(correlation_id),
+        "device_id": device_id,
+        "key_marker": _require_sha256(key_marker, field="key_marker"),
+        "key_version": key_version,
+        "previous_key_marker": _require_sha256(
+            previous_key_marker, field="previous_key_marker"
+        ),
+        "previous_key_version": previous_key_version,
+        "schema_version": ADMIN_DEVICE_KEY_ROTATION_SCHEMA_VERSION,
+        "session_id": str(session_id),
+    }
+    assert tuple(sorted(value)) == _ADMIN_DEVICE_KEY_ROTATION_FIELDS
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def verify_admin_device_key_rotation_signature(
+    public_key_spki_der: bytes,
+    payload: str,
+    signature: str,
+) -> None:
+    """Verify one DER ECDSA P-256/SHA-256 signature by the PENDING key."""
+
+    try:
+        if not isinstance(signature, str) or not 80 <= len(signature) <= 104:
+            raise ValueError("signature length is invalid")
+        signature_bytes = _decode_base64url(signature, field="rotation_signature")
+        if not 64 <= len(signature_bytes) <= 80:
+            raise ValueError("signature DER length is invalid")
+        public_key = load_p256_spki_public_key(public_key_spki_der)
+        public_key.verify(
+            signature_bytes,
+            payload.encode("utf-8"),
+            ec.ECDSA(hashes.SHA256()),
+        )
+    except (InvalidSignature, ValueError) as exc:
+        raise AdminSecurityError(
+            "admin_device_key_rotation_signature_invalid",
+            "The new administrator device key did not prove possession.",
+            status_code=403,
+        ) from exc
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -396,8 +512,19 @@ def is_admin_device_proof_workflow_request(method: str, path: str) -> bool:
         return normalized_method in {"GET", "POST"}
     if _REPORT_WORKFLOW_HISTORY_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method == "GET"
+    if _REPORT_REVIEW_DECISION_LOOKUP_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "GET"
     if _REPORT_ORIGINAL_ACCESS_GRANT_PATH_PATTERN.fullmatch(path) is not None:
         return normalized_method == "POST"
+    if _REPORT_DELIVERY_CORRECTION_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method == "POST"
+    if (
+        normalized_method == "POST"
+        and path.startswith("/admin/security/sessions/")
+        and path.endswith("/revoke")
+    ):
+        operation = classify_admin_operation(normalized_method, path)
+        return operation is not None and operation.action == "session.revoke"
     return (
         normalized_method == "POST"
         and _ADMIN_WRITE_WORKFLOW_PATH_PATTERN.fullmatch(path) is not None
@@ -758,6 +885,7 @@ class AdminDeviceProofService:
         session_id: str | None,
         identity: AdminSessionIdentity | None,
         now: datetime | None = None,
+        source: str | None = None,
     ) -> dict[str, Any]:
         try:
             parsed_session_id = validate_device_proof_challenge_binding(
@@ -774,6 +902,11 @@ class AdminDeviceProofService:
             _require_sha256(body_sha256, field="body_sha256")
             _require_sha256(query_sha256, field="query_sha256")
             _require_sha256(device_key_marker, field="device_key_marker")
+            if action == "session.revoke" and (
+                body_sha256 != raw_body_sha256(b"")
+                or query_sha256 != canonical_admin_query_sha256(b"")
+            ):
+                raise ValueError("session revoke challenges require an empty body and query")
             parsed_correlation_id = _canonical_uuid(
                 correlation_id, field="correlation_id"
             )
@@ -829,6 +962,14 @@ class AdminDeviceProofService:
                 raise AdminSecurityStoreUnavailable() from exc
             if not secrets.compare_digest(actual_marker, device_key_marker):
                 raise AdminSecurityStoreUnavailable()
+            if identity is None and source is not None:
+                self._admit_sessionless_source(
+                    source=source,
+                    admin_id=admin_id,
+                    device_id=device_id,
+                    purpose=purpose,
+                    observed_at=issued_at,
+                )
 
             outstanding_expiries = self.db.execute(
                 select(AdminDeviceProofChallenge.expires_at).where(
@@ -840,6 +981,9 @@ class AdminDeviceProofService:
                     == device_key_marker,
                     AdminDeviceProofChallenge.consumed_at.is_(None),
                     AdminDeviceProofChallenge.expires_at > issued_at,
+                    AdminDeviceProofChallenge.challenge_type.in_(
+                        sorted(ADMIN_DEVICE_PROOF_QUOTA_POOLS[purpose])
+                    ),
                 )
             ).scalars().all()
             if (
@@ -895,6 +1039,61 @@ class AdminDeviceProofService:
         except SQLAlchemyError as exc:
             self.db.rollback()
             raise AdminSecurityStoreUnavailable() from exc
+
+    def _admit_sessionless_source(
+        self,
+        *,
+        source: str,
+        admin_id: str,
+        device_id: str,
+        purpose: str,
+        observed_at: datetime,
+    ) -> None:
+        """S18-5: per-source admission, recorded in the issuing transaction."""
+
+        attempt_action = _SESSIONLESS_ATTEMPT_ACTIONS.get(purpose)
+        if attempt_action is None:
+            raise AdminSecurityStoreUnavailable()
+        source_digest = sha256_text(source or "unknown")
+        if _postgresql_session(self.db):
+            self.db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+                {"lock_key": f"walksafe-admin-challenge-source-v1\n{source_digest}"},
+            )
+        lifetime = timedelta(milliseconds=ADMIN_DEVICE_PROOF_TTL_MILLISECONDS)
+        recent = self.db.execute(
+            select(AdminSecurityAuthAttempt.observed_at)
+            .where(
+                AdminSecurityAuthAttempt.action.in_(
+                    sorted(_SESSIONLESS_ATTEMPT_ACTIONS.values())
+                ),
+                AdminSecurityAuthAttempt.source_sha256 == source_digest,
+                AdminSecurityAuthAttempt.observed_at > observed_at - lifetime,
+            )
+            .order_by(AdminSecurityAuthAttempt.observed_at)
+        ).scalars().all()
+        if len(recent) >= ADMIN_DEVICE_PROOF_MAX_SESSIONLESS_PER_SOURCE:
+            retry_after = max(
+                1,
+                math.ceil(
+                    (_as_utc(recent[0]) + lifetime - observed_at).total_seconds()
+                ),
+            )
+            raise AdminSecurityError(
+                "admin_device_proof_challenge_rate_limited",
+                "Too many unconsumed administrator device proof challenges are active.",
+                status_code=429,
+                retry_after=retry_after,
+            )
+        self.db.add(
+            AdminSecurityAuthAttempt(
+                action=attempt_action,
+                principal_sha256=sha256_text(f"{admin_id}\n{device_id}"),
+                source_sha256=source_digest,
+                success=True,
+                observed_at=observed_at,
+            )
+        )
 
 
 def verify_admin_device_proof(
@@ -1071,9 +1270,17 @@ def provision_admin_device_key(
     device_id: str,
     key_version: int,
     public_key_spki_der: bytes,
+    security_level: str | None = None,
+    replace_active: bool = False,
     now: datetime | None = None,
 ) -> ProvisionedAdminDeviceKey:
-    """Register or rotate a device key from a trusted local provisioning process."""
+    """Register or rotate a device key from a trusted local provisioning process.
+
+    S18-3: when the device already has an ACTIVE key in NORMAL state, a higher
+    version is registered as PENDING and the ACTIVE key stays usable until the
+    device confirms possession of the new key. ``replace_active`` is the
+    explicit emergency path for a device whose old private key is gone.
+    """
 
     if _ADMIN_ID_PATTERN.fullmatch(admin_id) is None:
         raise ValueError("admin_id is invalid")
@@ -1081,6 +1288,13 @@ def provision_admin_device_key(
         raise ValueError("device_id is invalid")
     if not isinstance(key_version, int) or isinstance(key_version, bool) or key_version < 1:
         raise ValueError("key_version must be a positive integer")
+    if security_level is not None and security_level not in ADMIN_DEVICE_KEY_SECURITY_LEVELS:
+        raise ValueError(
+            "security_level must be TRUSTED_ENVIRONMENT or STRONGBOX; "
+            "software-only keys are not registered"
+        )
+    if not isinstance(replace_active, bool):
+        raise ValueError("replace_active must be a boolean")
     marker = admin_device_key_marker(public_key_spki_der)
     observed_at = _as_utc(now or datetime.now(timezone.utc))
     try:
@@ -1152,11 +1366,15 @@ def provision_admin_device_key(
         )
         if same_version is not None:
             if (
-                same_version.status == "ACTIVE"
+                same_version.status in {"ACTIVE", "PENDING"}
                 and same_version.revoked_at is None
                 and secrets.compare_digest(same_version.key_marker, marker)
                 and secrets.compare_digest(
                     bytes(same_version.public_key_spki_der), public_key_spki_der
+                )
+                and (
+                    security_level is None
+                    or same_version.security_level == security_level
                 )
             ):
                 db.commit()
@@ -1166,26 +1384,92 @@ def provision_admin_device_key(
                     device_id=device_id,
                     key_version=key_version,
                     key_marker=marker,
-                    status="ACTIVE",
+                    status=same_version.status,
                     idempotent=True,
+                    security_level=same_version.security_level,
                 )
             raise ValueError("key_version is already registered with different key state")
         if existing and key_version <= max(item.key_version for item in existing):
             raise ValueError("key_version must increase monotonically")
+        if security_level is None:
+            # S18-2-F1: only rows registered before 202609290001 may lack a
+            # recorded level; every newly inserted key version must carry one.
+            raise ValueError(
+                "security_level is required for a new device key version"
+            )
+        has_active_key = any(
+            item.status == "ACTIVE" and item.revoked_at is None for item in existing
+        )
+        stage_as_pending = (
+            has_active_key
+            and not replace_active
+            and controls[0].security_state == "NORMAL"
+        )
+        # S18-3-F2(b): replace_active changes the outcome only when a usable
+        # ACTIVE key exists in NORMAL state; that emergency replacement ends the
+        # device's sessions, bumps state_version and is audited.
+        emergency_replacement = (
+            replace_active
+            and has_active_key
+            and controls[0].security_state == "NORMAL"
+        )
+        revoked_active_key_count = 0
+        revoked_pending_key_count = 0
         for item in existing:
-            if item.status == "ACTIVE":
+            # A superseded PENDING key never became usable; an ACTIVE key is
+            # revoked here only on the explicit replacement/recovery paths.
+            if item.status == "PENDING" or (
+                item.status == "ACTIVE" and not stage_as_pending
+            ):
+                if item.status == "PENDING":
+                    revoked_pending_key_count += 1
+                else:
+                    revoked_active_key_count += 1
                 item.status = "REVOKED"
                 item.revoked_at = observed_at
+        db.flush()
+        new_status = "PENDING" if stage_as_pending else "ACTIVE"
         device_key = AdminDeviceKey(
             admin_id=admin_id,
             device_id=device_id,
             key_version=key_version,
             public_key_spki_der=public_key_spki_der,
             key_marker=marker,
-            status="ACTIVE",
+            status=new_status,
             created_at=observed_at,
+            security_level=security_level,
         )
         db.add(device_key)
+        if emergency_replacement:
+            device_sessions = db.execute(
+                select(AdminSecuritySession)
+                .where(
+                    AdminSecuritySession.admin_id == admin_id,
+                    AdminSecuritySession.device_id == device_id,
+                    AdminSecuritySession.revoked_at.is_(None),
+                )
+                .with_for_update()
+            ).scalars().all()
+            for device_session in device_sessions:
+                device_session.revoked_at = observed_at
+                device_session.revoked_reason = "administrator_revoked"
+            controls[0].state_version += 1
+            db.flush()
+            _append_admin_security_audit(
+                db,
+                action="device_key.replace_active",
+                outcome="SUCCESS",
+                admin_id=admin_id,
+                device_id=device_id,
+                details={
+                    "key_version": key_version,
+                    "revoked_active_key_count": revoked_active_key_count,
+                    "revoked_pending_key_count": revoked_pending_key_count,
+                    "revoked_session_count": len(device_sessions),
+                    "security_level": security_level,
+                },
+                created_at=observed_at,
+            )
         db.commit()
         return ProvisionedAdminDeviceKey(
             key_id=device_key.id,
@@ -1193,8 +1477,9 @@ def provision_admin_device_key(
             device_id=device_id,
             key_version=key_version,
             key_marker=marker,
-            status="ACTIVE",
+            status=new_status,
             idempotent=False,
+            security_level=security_level,
         )
     except (AdminSecurityError, ValueError):
         db.rollback()
@@ -1205,6 +1490,8 @@ def provision_admin_device_key(
 
 
 __all__ = [
+    "ADMIN_DEVICE_KEY_ROTATION_SCHEMA_VERSION",
+    "ADMIN_DEVICE_KEY_SECURITY_LEVELS",
     "ADMIN_DEVICE_PROOF_CHALLENGE_PATH",
     "ADMIN_DEVICE_PROOF_MAX_OUTSTANDING_CHALLENGES",
     "ADMIN_DEVICE_PROOF_NONCE_BYTES",
@@ -1215,6 +1502,8 @@ __all__ = [
     "ProvisionedAdminDeviceKey",
     "VerifiedAdminDeviceProof",
     "admin_device_key_marker",
+    "admin_device_key_rotation_payload",
+    "verify_admin_device_key_rotation_signature",
     "canonical_admin_query",
     "canonical_admin_query_sha256",
     "canonical_device_proof_json",

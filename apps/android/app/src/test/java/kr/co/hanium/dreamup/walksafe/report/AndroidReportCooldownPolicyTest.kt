@@ -10,6 +10,17 @@ import org.json.JSONObject
 
 class AndroidReportCooldownPolicyTest {
     @Test
+    fun pendingDuplicateWindowIsItsOwnRuleWithTodaysTenMinuteValue() {
+        val window = AndroidReportCooldownPolicy.PENDING_AUTOMATIC_DUPLICATE_WINDOW_MS
+        assertEquals(10L * 60L * 1_000L, window)
+        assertEquals(true, AndroidReportCooldownPolicy.pendingAutomaticDuplicateSuppressed(1_000L, 1_000L))
+        assertEquals(true, AndroidReportCooldownPolicy.pendingAutomaticDuplicateSuppressed(1_000L, 1_000L + window - 1L))
+        assertEquals(false, AndroidReportCooldownPolicy.pendingAutomaticDuplicateSuppressed(1_000L, 1_000L + window))
+        assertEquals(true, AndroidReportCooldownPolicy.pendingAutomaticDuplicateSuppressed(1_000L, 999L))
+        assertEquals(false, AndroidReportCooldownPolicy.pendingAutomaticDuplicateSuppressed(0L, 1_000L))
+    }
+
+    @Test
     fun realDistanceMatchClosesRoundedCellBoundaryBypass() {
         val leftOfCellBoundary = scope(longitude = 127.000049)
         val rightOfCellBoundary = scope(longitude = 127.000051)
@@ -59,6 +70,55 @@ class AndroidReportCooldownPolicyTest {
             bypassAutomaticCooldown = false,
         )
         assertTrue(afterBoundary is AndroidReportAttemptResult.Allowed)
+    }
+
+    @Test
+    fun wallClockRollbackDoesNotExtendSameBootAutomaticCooldown() {
+        val tenAmMs = 10L * 60L * 60L * 1_000L
+        val nineAmMs = 9L * 60L * 60L * 1_000L
+        var elapsedRealtimeMs = 1_000L
+        val store = AndroidReportAttemptStore(monotonicNowMs = { elapsedRealtimeMs })
+        val first = store.acquire(scope(), tenAmMs, false) as AndroidReportAttemptResult.Allowed
+        store.markSucceeded(first.lease, tenAmMs)
+        store.release(first.lease)
+
+        elapsedRealtimeMs += 9L * 60L * 1_000L
+        val blocked = store.acquire(scope(longitude = 127.000051), nineAmMs + 9L * 60L * 1_000L, false)
+            as AndroidReportAttemptResult.Blocked
+        assertEquals(AndroidReportAttemptBlockReason.AUTOMATIC_COOLDOWN, blocked.reason)
+        assertEquals(60_000L, blocked.remainingMs)
+
+        val manual = store.acquire(scope(), nineAmMs + 9L * 60L * 1_000L, true)
+        assertTrue(manual is AndroidReportAttemptResult.Allowed)
+        store.release((manual as AndroidReportAttemptResult.Allowed).lease)
+
+        elapsedRealtimeMs += 2L * 60L * 1_000L
+        val afterCooldown = store.acquire(scope(), nineAmMs + 11L * 60L * 1_000L, false)
+        assertTrue(afterCooldown is AndroidReportAttemptResult.Allowed)
+        assertTrue(store.successfulCooldowns(nineAmMs + 11L * 60L * 1_000L).isEmpty())
+    }
+
+    @Test
+    fun restoredWallClockCooldownStartsConservativeMonotonicFallback() {
+        val tenAmMs = 10L * 60L * 60L * 1_000L
+        val nineAmMs = 9L * 60L * 60L * 1_000L
+        val saved = listOf(AndroidReportSuccessfulCooldown(scope(), tenAmMs))
+        var elapsedRealtimeMs = 1_000L
+        val restored = AndroidReportAttemptStore(monotonicNowMs = { elapsedRealtimeMs })
+        restored.restoreSuccessfulCooldowns(saved, nineAmMs)
+
+        val initial = restored.acquire(scope(), nineAmMs, false) as AndroidReportAttemptResult.Blocked
+        assertEquals(AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS, initial.remainingMs)
+
+        elapsedRealtimeMs += 9L * 60L * 1_000L
+        val blocked = restored.acquire(scope(), nineAmMs - 51L * 60L * 1_000L, false)
+            as AndroidReportAttemptResult.Blocked
+        assertEquals(AndroidReportAttemptBlockReason.AUTOMATIC_COOLDOWN, blocked.reason)
+        assertEquals(60_000L, blocked.remainingMs)
+
+        elapsedRealtimeMs += 2L * 60L * 1_000L
+        val allowed = restored.acquire(scope(), nineAmMs - 49L * 60L * 1_000L, false)
+        assertTrue(allowed is AndroidReportAttemptResult.Allowed)
     }
 
     @Test
@@ -160,7 +220,7 @@ class AndroidReportCooldownPolicyTest {
             FrozenReportPayload.freeze(
                 "123e4567-e89b-42d3-a456-426614174000",
                 metadata.toString().toByteArray(),
-                byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xd9.toByte()),
+                reportTestJpeg(),
             ),
         )
         val report = QueuedReport(
@@ -183,6 +243,278 @@ class AndroidReportCooldownPolicyTest {
                 automaticMetadata().put("trigger", AndroidReportCandidatePolicy.TRIGGER_VOICE),
             ),
         )
+    }
+
+    @Test
+    fun wallClockJumpsDoNotReleaseOrExtendLiveCooldownOrRemoveItsSnapshot() {
+        for (jumpMs in wallClockJumps()) {
+            val uploadedAtMs = 10L * 24L * 60L * 60L * 1_000L
+            var monotonicMs = 1_000L
+            val store = AndroidReportAttemptStore(monotonicNowMs = { monotonicMs })
+            val lease = (store.acquire(scope(), uploadedAtMs, false) as AndroidReportAttemptResult.Allowed).lease
+            store.markSucceeded(lease, uploadedAtMs)
+            store.release(lease)
+
+            monotonicMs += 60_000L
+            val changedWallMs = uploadedAtMs + jumpMs + 60_000L
+            assertEquals(1, store.successfulCooldowns(changedWallMs).size)
+            val blocked = store.acquire(scope(longitude = 127.000051), changedWallMs, false)
+                as AndroidReportAttemptResult.Blocked
+            assertEquals(AndroidReportAttemptBlockReason.AUTOMATIC_COOLDOWN, blocked.reason)
+            assertEquals(540_000L, blocked.remainingMs)
+
+            val manual = store.acquire(scope(), changedWallMs, true) as AndroidReportAttemptResult.Allowed
+            store.release(manual.lease)
+            val otherActor = store.acquire(scope(actorId = "field-user-2"), changedWallMs, false)
+                as AndroidReportAttemptResult.Allowed
+            store.release(otherActor.lease)
+            val outsideRadius = store.acquire(scope(latitude = 37.0003), changedWallMs, false)
+                as AndroidReportAttemptResult.Allowed
+            store.release(outsideRadius.lease)
+            assertTrue(!AndroidReportCooldownPolicy.isSameCooldownArea(scope(), scope().copy(className = "other")))
+
+            monotonicMs = 1_000L + AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS
+            assertTrue(store.successfulCooldowns(changedWallMs).isEmpty())
+            assertTrue(store.acquire(scope(), changedWallMs, false) is AndroidReportAttemptResult.Allowed)
+        }
+    }
+
+    @Test
+    fun sameBootJsonRecreationPreservesRemainingTimeAcrossJumpsBeforeOrAfterSaving() {
+        for (jumpMs in wallClockJumps()) {
+            for (jumpBeforeSave in listOf(false, true)) {
+                val uploadedAtMs = 10L * 24L * 60L * 60L * 1_000L
+                var monotonicMs = 1_000L
+                fun freshStore() = AndroidReportAttemptStore(
+                    monotonicNowMs = { monotonicMs },
+                    bootCountProvider = { 42 },
+                )
+                val original = freshStore()
+                val lease = (original.acquire(scope(), uploadedAtMs, false) as AndroidReportAttemptResult.Allowed).lease
+                original.markSucceeded(lease, uploadedAtMs)
+                original.release(lease)
+                monotonicMs += 30_000L
+                val savedWallMs = uploadedAtMs + 30_000L + if (jumpBeforeSave) jumpMs else 0L
+                val saved = roundTrip(original.successfulCooldowns(savedWallMs))
+                assertEquals(1, saved.size)
+                assertEquals(42, saved.single().bootCount)
+                assertEquals(570_000L, saved.single().cooldownRemainingAtMarkMs)
+
+                monotonicMs = 181_000L
+                val changedWallMs = uploadedAtMs + jumpMs + 180_000L
+                val restored = freshStore()
+                restored.restoreSuccessfulCooldowns(saved, changedWallMs)
+                val blocked = restored.acquire(scope(), changedWallMs, false) as AndroidReportAttemptResult.Blocked
+                assertEquals(420_000L, blocked.remainingMs)
+
+                // A second save and fresh store must not restart the ten-minute interval.
+                val secondSave = roundTrip(restored.successfulCooldowns(changedWallMs))
+                monotonicMs = 600_999L
+                val secondRestore = freshStore()
+                secondRestore.restoreSuccessfulCooldowns(secondSave, changedWallMs)
+                val boundary = secondRestore.acquire(scope(), changedWallMs, false) as AndroidReportAttemptResult.Blocked
+                assertEquals(1L, boundary.remainingMs)
+                monotonicMs += 1L
+                assertTrue(secondRestore.acquire(scope(), changedWallMs, false) is AndroidReportAttemptResult.Allowed)
+                assertTrue(secondRestore.successfulCooldowns(changedWallMs).isEmpty())
+                val expiredRestore = freshStore()
+                expiredRestore.restoreSuccessfulCooldowns(secondSave, changedWallMs)
+                assertEquals(0, expiredRestore.trackedStateCount())
+            }
+        }
+    }
+
+    @Test
+    fun capacityCannotEvictActiveCooldownAndExpiresByMonotonicTimeAfterClockJumps() {
+        for (jumpMs in wallClockJumps()) {
+            var monotonicMs = 1_000L
+            val wallMs = 10L * 24L * 60L * 60L * 1_000L
+            val store = AndroidReportAttemptStore(maxTrackedStates = 2, monotonicNowMs = { monotonicMs })
+            repeat(2) { index ->
+                val lease = (store.acquire(scope(latitude = 37.0 + index * 0.001), wallMs, false)
+                    as AndroidReportAttemptResult.Allowed).lease
+                store.markSucceeded(lease, wallMs)
+                store.release(lease)
+            }
+            monotonicMs += 60_000L
+            val newScope = scope(latitude = 37.002)
+            val atCapacity = store.acquire(newScope, wallMs + jumpMs, false) as AndroidReportAttemptResult.Blocked
+            assertEquals(AndroidReportAttemptBlockReason.STATE_CAPACITY, atCapacity.reason)
+            assertEquals(2, store.successfulCooldowns(wallMs + jumpMs).size)
+
+            monotonicMs = 601_000L
+            assertTrue(store.acquire(newScope, wallMs + jumpMs, false) is AndroidReportAttemptResult.Allowed)
+            assertEquals(1, store.trackedStateCount())
+        }
+    }
+
+    @Test
+    fun restoreCapacityAndOrderingUseRemainingCooldownRatherThanWallTimestamps() {
+        val wallMs = 10L * 24L * 60L * 60L * 1_000L
+        val monotonicMs = 100_000L
+        val records = listOf(
+            AndroidReportSuccessfulCooldown(scope(), wallMs + 3_600_000L, 0L, 60_000L, 42),
+            AndroidReportSuccessfulCooldown(scope(latitude = 37.001), wallMs + 1_000L, monotonicMs, 120_000L, 42),
+            AndroidReportSuccessfulCooldown(scope(latitude = 37.002), wallMs - 3_600_000L, monotonicMs, 500_000L, 42),
+            AndroidReportSuccessfulCooldown(scope(latitude = 37.003), wallMs - 7_200_000L, monotonicMs, 400_000L, 42),
+        )
+        val store = AndroidReportAttemptStore(2, { monotonicMs }, { 42 })
+        store.restoreSuccessfulCooldowns(roundTrip(records), wallMs)
+        val saved = store.successfulCooldowns(wallMs)
+        assertEquals(listOf(scope(latitude = 37.002), scope(latitude = 37.003)), saved.map { it.scope })
+        assertEquals(listOf(500_000L, 400_000L), saved.map { it.cooldownRemainingAtMarkMs })
+        assertEquals(2, store.trackedStateCount())
+    }
+
+    @Test
+    fun restoringOverLiveStateKeepsLongestRemainingCooldownRegardlessOfWallTimestamp() {
+        val wallMs = 10L * 24L * 60L * 60L * 1_000L
+        var monotonicMs = 1_000L
+        val store = AndroidReportAttemptStore(monotonicNowMs = { monotonicMs }, bootCountProvider = { 42 })
+        val lease = (store.acquire(scope(), wallMs, false) as AndroidReportAttemptResult.Allowed).lease
+        store.markSucceeded(lease, wallMs)
+        store.release(lease)
+        monotonicMs += 60_000L
+        store.restoreSuccessfulCooldowns(
+            listOf(AndroidReportSuccessfulCooldown(scope(), wallMs + 3_600_000L, monotonicMs, 120_000L, 42)),
+            wallMs + 3_600_000L,
+        )
+        val blocked = store.acquire(scope(), wallMs + 3_600_000L, false) as AndroidReportAttemptResult.Blocked
+        assertEquals(540_000L, blocked.remainingMs)
+        store.restoreSuccessfulCooldowns(
+            listOf(AndroidReportSuccessfulCooldown(scope(), wallMs - 3_600_000L, monotonicMs, 590_000L, 42)),
+            wallMs + 3_600_000L,
+        )
+        val afterLongerRestore = store.acquire(scope(), wallMs + 3_600_000L, false) as AndroidReportAttemptResult.Blocked
+        assertEquals(590_000L, afterLongerRestore.remainingMs)
+    }
+
+    @Test
+    fun changedUnknownOrUnreadableBootUsesBoundedWallFallbackRatherThanStoredElapsedTime() {
+        val wallMs = 10L * 24L * 60L * 60L * 1_000L
+        val saved = roundTrip(listOf(AndroidReportSuccessfulCooldown(scope(), wallMs, 1_000L, 600_000L, 42)))
+        val bootProviders: List<() -> Int?> = listOf({ 43 }, { null }, { -1 }, { error("boot count unavailable") })
+        for (bootProvider in bootProviders) {
+            var monotonicMs = 2_000L
+            val restored = AndroidReportAttemptStore(monotonicNowMs = { monotonicMs }, bootCountProvider = bootProvider)
+            restored.restoreSuccessfulCooldowns(saved, wallMs + 120_000L)
+            val blocked = restored.acquire(scope(), wallMs + 120_000L, false) as AndroidReportAttemptResult.Blocked
+            assertEquals(480_000L, blocked.remainingMs)
+            monotonicMs += 480_000L
+            assertTrue(restored.acquire(scope(), wallMs + 120_000L, false) is AndroidReportAttemptResult.Allowed)
+
+            val forwardJump = AndroidReportAttemptStore(monotonicNowMs = { 2_000L }, bootCountProvider = bootProvider)
+            forwardJump.restoreSuccessfulCooldowns(saved, wallMs + 3_600_000L)
+            assertEquals(0, forwardJump.trackedStateCount())
+            val backwardJump = AndroidReportAttemptStore(monotonicNowMs = { 2_000L }, bootCountProvider = bootProvider)
+            backwardJump.restoreSuccessfulCooldowns(saved, wallMs - 3_600_000L)
+            assertEquals(600_000L, (backwardJump.acquire(scope(), wallMs - 3_600_000L, false)
+                as AndroidReportAttemptResult.Blocked).remainingMs)
+        }
+    }
+
+    @Test
+    fun legacyOrInvalidMonotonicMetadataAndElapsedResetUseWallFallback() {
+        val wallMs = 1_000_000L
+        val valid = AndroidReportSuccessfulCooldown(scope(), wallMs, 2_000L, 600_000L, 42)
+        val records = listOf(
+            AndroidReportSuccessfulCooldown(scope(), wallMs),
+            valid.copy(bootCount = null),
+            valid.copy(cooldownMonotonicMarkMs = null),
+            valid.copy(cooldownRemainingAtMarkMs = null),
+            valid.copy(cooldownRemainingAtMarkMs = 600_001L),
+            valid.copy(cooldownMonotonicMarkMs = -1L),
+            valid, // Current elapsed time below the saved mark cannot establish continuity.
+        )
+        for (record in records) {
+            val restored = AndroidReportAttemptStore(monotonicNowMs = { 1_000L }, bootCountProvider = { 42 })
+            restored.restoreSuccessfulCooldowns(roundTrip(listOf(record)), wallMs + 120_000L)
+            assertEquals(480_000L, (restored.acquire(scope(), wallMs + 120_000L, false)
+                as AndroidReportAttemptResult.Blocked).remainingMs)
+        }
+        val legacy = roundTrip(listOf(records.first())).single()
+        assertNull(legacy.bootCount)
+        assertNull(legacy.cooldownMonotonicMarkMs)
+        assertNull(legacy.cooldownRemainingAtMarkMs)
+    }
+
+    @Test
+    fun fractionalPersistedDurationFallsBackToWallTimeWithoutReleasingCooldown() {
+        val wallMs = 1_000_000L
+        val encoded = AndroidReportSuccessfulCooldown(scope(), wallMs, 1_000L, 600_000L, 42)
+            .toJson().put("cooldown_remaining_at_mark_ms", -0.5)
+        val decoded = requireNotNull(AndroidReportSuccessfulCooldown.fromJson(JSONObject(encoded.toString())))
+        val restored = AndroidReportAttemptStore(monotonicNowMs = { 2_000L }, bootCountProvider = { 42 })
+        restored.restoreSuccessfulCooldowns(listOf(decoded), wallMs + 120_000L)
+
+        val blocked = restored.acquire(scope(), wallMs + 120_000L, false) as AndroidReportAttemptResult.Blocked
+        assertEquals(AndroidReportAttemptBlockReason.AUTOMATIC_COOLDOWN, blocked.reason)
+        assertEquals(480_000L, blocked.remainingMs)
+        assertNull(decoded.cooldownRemainingAtMarkMs)
+    }
+
+    @Test
+    fun overflowingPersistedBootCountCannotWrapToCurrentBootAndReleaseCooldown() {
+        val wallMs = 1_000_000L
+        val encoded = AndroidReportSuccessfulCooldown(scope(), wallMs, 1_000L, 60_000L, 42)
+            .toJson().put("boot_count", 4_294_967_338L)
+        val decoded = requireNotNull(AndroidReportSuccessfulCooldown.fromJson(JSONObject(encoded.toString())))
+        val restored = AndroidReportAttemptStore(monotonicNowMs = { 100_000L }, bootCountProvider = { 42 })
+        restored.restoreSuccessfulCooldowns(listOf(decoded), wallMs + 120_000L)
+
+        val blocked = restored.acquire(scope(), wallMs + 120_000L, false) as AndroidReportAttemptResult.Blocked
+        assertEquals(AndroidReportAttemptBlockReason.AUTOMATIC_COOLDOWN, blocked.reason)
+        assertEquals(480_000L, blocked.remainingMs)
+        assertNull(decoded.bootCount)
+    }
+
+    @Test
+    fun optionalClockMetadataRejectsCoercionAndOverflowWithoutChangingRequiredFields() {
+        val valid = AndroidReportSuccessfulCooldown(scope(), 1_000_000L, 1_000L, 600_000L, 42)
+        val keys = listOf("cooldown_monotonic_mark_ms", "cooldown_remaining_at_mark_ms", "boot_count")
+        val invalidValues = listOf(-1L, 0.5f, 0.5, "42", true, JSONObject.NULL, java.math.BigInteger("9223372036854775808"))
+        for (key in keys) {
+            for (invalid in invalidValues) {
+                val decoded = requireNotNull(AndroidReportSuccessfulCooldown.fromJson(valid.toJson().put(key, invalid)))
+                assertEquals(valid.scope, decoded.scope)
+                assertEquals(valid.lastUploadedAtMs, decoded.lastUploadedAtMs)
+                when (key) {
+                    "cooldown_monotonic_mark_ms" -> assertNull(decoded.cooldownMonotonicMarkMs)
+                    "cooldown_remaining_at_mark_ms" -> assertNull(decoded.cooldownRemainingAtMarkMs)
+                    "boot_count" -> assertNull(decoded.bootCount)
+                }
+            }
+        }
+        assertNull(AndroidReportSuccessfulCooldown.fromJson(valid.toJson().put("boot_count", 2_147_483_648L))!!.bootCount)
+        assertNull(AndroidReportSuccessfulCooldown.fromJson(valid.toJson().put("cooldown_remaining_at_mark_ms", 600_001L))!!
+            .cooldownRemainingAtMarkMs)
+    }
+
+    @Test
+    fun integralClockMetadataRoundTripPreservesLongMarksAndMaximumBootCount() {
+        val wallMs = 1_000_000L
+        val markMs = 5_000_000_000L
+        val valid = AndroidReportSuccessfulCooldown(scope(), wallMs, markMs, 600_000L, Int.MAX_VALUE)
+        val saved = roundTrip(listOf(valid))
+        assertEquals(valid, saved.single())
+        val restored = AndroidReportAttemptStore(
+            monotonicNowMs = { markMs + 1_000L },
+            bootCountProvider = { Int.MAX_VALUE },
+        )
+        restored.restoreSuccessfulCooldowns(saved, wallMs + 3_600_000L)
+        val blocked = restored.acquire(scope(), wallMs + 3_600_000L, false) as AndroidReportAttemptResult.Blocked
+        assertEquals(599_000L, blocked.remainingMs)
+    }
+
+    private fun wallClockJumps(): List<Long> = listOf(-72L, -1L, 1L, 72L).map { it * 60L * 60L * 1_000L }
+
+    private fun roundTrip(cooldowns: List<AndroidReportSuccessfulCooldown>): List<AndroidReportSuccessfulCooldown> {
+        val json = org.json.JSONArray()
+        cooldowns.forEach { json.put(it.toJson()) }
+        val restored = org.json.JSONArray(json.toString())
+        return (0 until restored.length()).map { index ->
+            requireNotNull(AndroidReportSuccessfulCooldown.fromJson(restored.getJSONObject(index)))
+        }
     }
 
     private fun scope(

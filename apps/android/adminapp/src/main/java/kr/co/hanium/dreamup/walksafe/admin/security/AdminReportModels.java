@@ -221,6 +221,7 @@ public final class AdminReportModels {
         private final Summary summary;
         private final int contentRevision;
         private final int latestDeliveryRevision;
+        private final int latestReviewRevision;
         private final ReviewSummary review;
         private final DeliverySummary currentContentDelivery;
         private final List<String> allowedNextStatuses;
@@ -234,6 +235,7 @@ public final class AdminReportModels {
             Summary summary,
             int contentRevision,
             int latestDeliveryRevision,
+            int latestReviewRevision,
             ReviewSummary review,
             DeliverySummary currentContentDelivery,
             List<String> allowedNextStatuses,
@@ -246,6 +248,7 @@ public final class AdminReportModels {
             this.summary = summary;
             this.contentRevision = contentRevision;
             this.latestDeliveryRevision = latestDeliveryRevision;
+            this.latestReviewRevision = latestReviewRevision;
             this.review = review;
             this.currentContentDelivery = currentContentDelivery;
             this.allowedNextStatuses = AdminJava8Collections.copyList(allowedNextStatuses);
@@ -259,6 +262,13 @@ public final class AdminReportModels {
         public Summary summary() { return summary; }
         public int contentRevision() { return contentRevision; }
         public int latestDeliveryRevision() { return latestDeliveryRevision; }
+        /**
+         * Report-wide latest review revision across every content revision (0 = none).
+         * current_review is scoped to the current content and is null after a content
+         * correction, while the server review CAS is report-wide, so the next review
+         * decision must bind this value as expected_review_revision (W20A-R1).
+         */
+        public int latestReviewRevision() { return latestReviewRevision; }
         public ReviewSummary review() { return review; }
         public DeliverySummary currentContentDelivery() { return currentContentDelivery; }
         public DeliverySummary delivery() { return currentContentDelivery; }
@@ -268,6 +278,114 @@ public final class AdminReportModels {
         public String originalGrantsPath() { return originalGrantsPath; }
         public String statusPath() { return statusPath; }
         public String deliveryPackagesPath() { return deliveryPackagesPath; }
+    }
+
+    /** The latest submitted package may receive later observations after content or review changes. */
+    public static final class DeliveryFollowUp {
+        private final String reportId;
+        private final int latestDeliveryRevision;
+        private final String packageId;
+        private final long packageRevision;
+        private final AdminInstitutionDelivery.Status previousStatus;
+
+        private DeliveryFollowUp(
+            String reportId,
+            int latestDeliveryRevision,
+            String packageId,
+            long packageRevision,
+            AdminInstitutionDelivery.Status previousStatus
+        ) {
+            this.reportId = reportId;
+            this.latestDeliveryRevision = latestDeliveryRevision;
+            this.packageId = packageId;
+            this.packageRevision = packageRevision;
+            this.previousStatus = previousStatus;
+        }
+
+        public static DeliveryFollowUp fromLatest(
+            Detail detail,
+            AdminOperationsApi.DeliveryHistoryItem latestEffective
+        ) {
+            if (detail == null || latestEffective == null || latestEffective.corrected()
+                || latestEffective.packageId() == null
+                || latestEffective.packageRevision() == null
+                || latestEffective.packageRevision() < 1L
+                || latestEffective.revision() > detail.latestDeliveryRevision()
+                || (latestEffective.status() != AdminInstitutionDelivery.Status.SUBMITTED
+                    && latestEffective.status() != AdminInstitutionDelivery.Status.ACKNOWLEDGED)) {
+                return null;
+            }
+            return new DeliveryFollowUp(
+                detail.summary().id(), detail.latestDeliveryRevision(),
+                latestEffective.packageId(), latestEffective.packageRevision(),
+                latestEffective.status()
+            );
+        }
+
+        public String reportId() { return reportId; }
+        public String packageId() { return packageId; }
+        public long packageRevision() { return packageRevision; }
+
+        public boolean matchesDetail(Detail detail) {
+            return detail != null
+                && reportId.equals(detail.summary().id())
+                && latestDeliveryRevision == detail.latestDeliveryRevision();
+        }
+
+        public boolean matchesLatest(
+            Detail detail,
+            AdminOperationsApi.DeliveryHistoryItem latestEffective
+        ) {
+            DeliveryFollowUp current = fromLatest(detail, latestEffective);
+            return current != null
+                && matchesDetail(detail)
+                && packageId.equals(current.packageId)
+                && packageRevision == current.packageRevision
+                && previousStatus == current.previousStatus;
+        }
+
+        public boolean matchesPackage(String reportId, String packageId, long packageRevision) {
+            return this.reportId.equals(reportId)
+                && this.packageId.equals(packageId)
+                && this.packageRevision == packageRevision;
+        }
+
+        public boolean matchesSavedPackage(AdminDeliveryPackageSaver.Saved saved) {
+            return saved != null
+                && reportId.equals(saved.reportId())
+                && packageRevision == saved.revision()
+                && (saved.packageId() == null || packageId.equals(saved.packageId()));
+        }
+
+        public boolean allows(AdminInstitutionDelivery.Status next) {
+            return previousStatus == AdminInstitutionDelivery.Status.SUBMITTED
+                    ? next == AdminInstitutionDelivery.Status.ACKNOWLEDGED
+                        || next == AdminInstitutionDelivery.Status.FAILED
+                    : next == AdminInstitutionDelivery.Status.RESOLVED;
+        }
+    }
+
+    public enum DeliveryPackageUse { NEW_SUBMISSION, FOLLOW_UP }
+
+    /** Choose the workflow from the selected ZIP's report/revision, never from approval alone. */
+    public static DeliveryPackageUse deliveryPackageUse(
+        AdminDeliveryPackage.Eligibility current,
+        DeliveryFollowUp followUp,
+        String selectedReportId,
+        long selectedPackageRevision
+    ) {
+        if (selectedPackageRevision < 1L) {
+            throw new IllegalArgumentException("selected package revision is invalid");
+        }
+        if (followUp != null
+            && followUp.reportId().equals(selectedReportId)
+            && followUp.packageRevision() == selectedPackageRevision) {
+            return DeliveryPackageUse.FOLLOW_UP;
+        }
+        if (current != null && current.reportId().equals(selectedReportId)) {
+            return DeliveryPackageUse.NEW_SUBMISSION;
+        }
+        throw new IllegalArgumentException("selected package does not match an available workflow");
     }
 
     public static Page parsePage(String body) throws IOException {
@@ -297,7 +415,7 @@ public final class AdminReportModels {
         Map<String, Object> root = AdminStrictJson.parseObject(body);
         exactKeys(root, AdminJava8Collections.set(
             "schema_version", "id", "status", "status_version", "allowed_next_statuses",
-            "content_revision", "latest_delivery_revision",
+            "content_revision", "latest_delivery_revision", "latest_review_revision",
             "class_name", "confidence", "location_quality",
             "captured_at", "created_at", "updated_at", "current_review", "current_delivery",
             "capabilities"
@@ -317,9 +435,15 @@ public final class AdminReportModels {
         int latestDeliveryRevision = integer(
             root, "latest_delivery_revision", 0, Integer.MAX_VALUE
         );
+        int latestReviewRevision = integer(
+            root, "latest_review_revision", 0, Integer.MAX_VALUE
+        );
         List<String> allowedNextStatuses = statusList(root, "allowed_next_statuses", summary.status());
         ReviewSummary review = nullableObject(root, "current_review") == null
             ? null : new ReviewSummary(nullableObject(root, "current_review"));
+        if (review != null && review.revision() > latestReviewRevision) {
+            throw new IOException("administrator latest review revision binding is invalid");
+        }
         DeliverySummary delivery = nullableObject(root, "current_delivery") == null
             ? null : new DeliverySummary(nullableObject(root, "current_delivery"));
         if (delivery != null
@@ -351,6 +475,7 @@ public final class AdminReportModels {
             summary,
             contentRevision,
             latestDeliveryRevision,
+            latestReviewRevision,
             review,
             delivery,
             allowedNextStatuses,

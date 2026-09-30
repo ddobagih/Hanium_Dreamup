@@ -14,6 +14,9 @@ data class PedestrianStationaryDetectorConfig(
     val movingGyroscopePeakRadPerSecond: Double = 0.45,
     val stationaryDwellMs: Long = 1_500L,
     val missingGyroscopeDwellMs: Long = 3_000L,
+    val maximumSampleGapMs: Long = 250L,
+    val minimumWindowSamples: Int = 5,
+    val minimumWindowDurationMs: Long = 200L,
 ) {
     init {
         require(expectedGravityMps2 > 0.0)
@@ -27,7 +30,29 @@ data class PedestrianStationaryDetectorConfig(
         require(movingGyroscopePeakRadPerSecond > maximumStationaryGyroscopePeakRadPerSecond)
         require(stationaryDwellMs > 0L)
         require(missingGyroscopeDwellMs >= stationaryDwellMs)
+        require(maximumSampleGapMs > 0L)
+        require(minimumWindowSamples >= 2)
+        require(minimumWindowDurationMs > 0L)
     }
+}
+
+/** Coverage is measured from actual samples, never from callback or evaluation time. */
+data class PedestrianMotionWindowCoverage(
+    val sampleCount: Int,
+    val startedAtElapsedRealtimeMs: Long,
+    val endedAtElapsedRealtimeMs: Long,
+    val maximumGapMs: Long,
+) {
+    fun isSufficient(
+        nowMs: Long,
+        minimumSamples: Int,
+        minimumDurationMs: Long,
+        maximumAllowedGapMs: Long,
+    ): Boolean = sampleCount >= minimumSamples && startedAtElapsedRealtimeMs >= 0L &&
+        endedAtElapsedRealtimeMs >= startedAtElapsedRealtimeMs &&
+        endedAtElapsedRealtimeMs - startedAtElapsedRealtimeMs >= minimumDurationMs &&
+        maximumGapMs in 0L..maximumAllowedGapMs && nowMs >= endedAtElapsedRealtimeMs &&
+        nowMs - endedAtElapsedRealtimeMs <= maximumAllowedGapMs
 }
 
 /** Motion statistics calculated over a window ending at [elapsedRealtimeMs]. */
@@ -38,9 +63,12 @@ data class PedestrianMotionSample(
     val accelerationMagnitudeVarianceMps4: Double? = null,
     val gyroscopeRmsRadPerSecond: Double? = null,
     val gyroscopePeakRadPerSecond: Double? = null,
+    val accelerationWindow: PedestrianMotionWindowCoverage? = null,
+    val gyroscopeWindow: PedestrianMotionWindowCoverage? = null,
 )
 
 enum class PedestrianStationaryState {
+    UNKNOWN,
     MOVING,
     CANDIDATE,
     STATIONARY,
@@ -58,6 +86,7 @@ data class PedestrianStationaryDecision(
     val accepted: Boolean,
     val candidateSinceElapsedRealtimeMs: Long? = null,
     val rejectionReason: PedestrianMotionSampleRejectionReason? = null,
+    val sample: PedestrianMotionSample? = null,
 ) {
     val stateChanged: Boolean
         get() = state != previousState
@@ -75,17 +104,29 @@ data class PedestrianStationaryDecision(
 class PedestrianStationaryDetector(
     private val config: PedestrianStationaryDetectorConfig = PedestrianStationaryDetectorConfig(),
 ) {
-    private var state = PedestrianStationaryState.MOVING
+    private var state = PedestrianStationaryState.UNKNOWN
     private var lastSampleAtMs: Long? = null
     private var candidateSinceMs: Long? = null
+    private var lastAccelerationAtMs: Long? = null
 
     fun reset() {
-        state = PedestrianStationaryState.MOVING
+        state = PedestrianStationaryState.UNKNOWN
         lastSampleAtMs = null
         candidateSinceMs = null
+        lastAccelerationAtMs = null
     }
 
     fun currentState(): PedestrianStationaryState = state
+
+    fun expire(nowElapsedRealtimeMs: Long): PedestrianStationaryState {
+        if (lastSampleAtMs?.let { nowElapsedRealtimeMs >= it &&
+                nowElapsedRealtimeMs - it > config.maximumSampleGapMs } == true
+        ) {
+            state = PedestrianStationaryState.UNKNOWN
+            candidateSinceMs = null
+        }
+        return state
+    }
 
     fun observe(sample: PedestrianMotionSample): PedestrianStationaryDecision {
         val previousState = state
@@ -99,36 +140,53 @@ class PedestrianStationaryDetector(
                 rejectionReason = rejectionReason,
             )
         }
+        if (lastSampleAtMs?.let { sample.elapsedRealtimeMs - it > config.maximumSampleGapMs } == true) {
+            state = PedestrianStationaryState.UNKNOWN
+            candidateSinceMs = null
+        }
         lastSampleAtMs = sample.elapsedRealtimeMs
 
         if (sample.stepDetected || hasMovementEvidence(sample)) {
             moveToMoving()
-            return decision(previousState)
+            return decision(previousState, sample)
         }
 
         val requiredDwellMs = stillnessDwellMs(sample)
         if (requiredDwellMs == null) {
-            moveToMoving()
-            return decision(previousState)
+            state = PedestrianStationaryState.UNKNOWN
+            candidateSinceMs = null
+            return decision(previousState, sample)
         }
 
+        val independentAt = requireNotNull(sample.accelerationWindow).endedAtElapsedRealtimeMs
+        val previousAccelerationAt = lastAccelerationAtMs
+        if (previousAccelerationAt != null && independentAt <= previousAccelerationAt) {
+            return decision(previousState, sample)
+        }
+        if (previousAccelerationAt != null && independentAt - previousAccelerationAt > config.maximumSampleGapMs) {
+            state = PedestrianStationaryState.UNKNOWN
+            candidateSinceMs = null
+        }
+        lastAccelerationAtMs = independentAt
+
         when (state) {
-            PedestrianStationaryState.MOVING -> {
+            PedestrianStationaryState.UNKNOWN, PedestrianStationaryState.MOVING -> {
                 state = PedestrianStationaryState.CANDIDATE
-                candidateSinceMs = sample.elapsedRealtimeMs
+                candidateSinceMs = independentAt
             }
             PedestrianStationaryState.CANDIDATE -> {
                 val candidateStart = requireNotNull(candidateSinceMs)
-                if (sample.elapsedRealtimeMs - candidateStart >= requiredDwellMs) {
+                if (independentAt - candidateStart >= requiredDwellMs) {
                     state = PedestrianStationaryState.STATIONARY
                 }
             }
             PedestrianStationaryState.STATIONARY -> Unit
         }
-        return decision(previousState)
+        return decision(previousState, sample)
     }
 
     private fun stillnessDwellMs(sample: PedestrianMotionSample): Long? {
+        if (!sufficientWindow(sample.accelerationWindow, sample.elapsedRealtimeMs)) return null
         val accelerationMean = sample.accelerationMagnitudeMeanMps2 ?: return null
         val accelerationVariance = sample.accelerationMagnitudeVarianceMps4 ?: return null
         val accelerationQuiet =
@@ -142,6 +200,7 @@ class PedestrianStationaryDetector(
             sample.gyroscopePeakRadPerSecond,
         )
         if (gyroscopeValues.isEmpty()) return config.missingGyroscopeDwellMs
+        if (!sufficientWindow(sample.gyroscopeWindow, sample.elapsedRealtimeMs)) return null
 
         val gyroscopeQuiet =
             (sample.gyroscopeRmsRadPerSecond ?: 0.0) <=
@@ -150,6 +209,14 @@ class PedestrianStationaryDetector(
                 config.maximumStationaryGyroscopePeakRadPerSecond
         return if (gyroscopeQuiet) config.stationaryDwellMs else null
     }
+
+    private fun sufficientWindow(coverage: PedestrianMotionWindowCoverage?, nowMs: Long): Boolean =
+        coverage?.isSufficient(
+            nowMs,
+            config.minimumWindowSamples,
+            config.minimumWindowDurationMs,
+            config.maximumSampleGapMs,
+        ) == true
 
     private fun hasMovementEvidence(sample: PedestrianMotionSample): Boolean {
         val meanDeviation = sample.accelerationMagnitudeMeanMps2?.let {
@@ -191,10 +258,14 @@ class PedestrianStationaryDetector(
         candidateSinceMs = null
     }
 
-    private fun decision(previousState: PedestrianStationaryState) = PedestrianStationaryDecision(
+    private fun decision(
+        previousState: PedestrianStationaryState,
+        sample: PedestrianMotionSample,
+    ) = PedestrianStationaryDecision(
         state = state,
         previousState = previousState,
         accepted = true,
         candidateSinceElapsedRealtimeMs = candidateSinceMs,
+        sample = sample,
     )
 }

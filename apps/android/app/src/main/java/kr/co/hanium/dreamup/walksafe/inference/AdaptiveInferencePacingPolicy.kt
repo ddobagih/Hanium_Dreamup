@@ -106,6 +106,8 @@ class AdaptiveInferencePacingPolicy(
     private val lastComponentObservationAtMs = LongArray(4) { -1L }
     private var observedLoadPressure = 0.0
     private var loadRecoverySamples = 0
+    /** Earliest start an early re-detection request may use: MINIMUM_INTERVAL_MS after the last start and the measured cooldown. */
+    private var earliestEarlyStartAtElapsedRealtimeMs = 0L
 
     @Synchronized
     fun isDue(nowElapsedRealtimeMs: Long): Boolean =
@@ -117,7 +119,26 @@ class AdaptiveInferencePacingPolicy(
         return InferencePacingTicket(nowElapsedRealtimeMs, generation).also {
             activeTicket = it
             nextEligibleAtElapsedRealtimeMs = addSaturated(nowElapsedRealtimeMs, targetIntervalMs)
+            earliestEarlyStartAtElapsedRealtimeMs = addSaturated(nowElapsedRealtimeMs, MINIMUM_INTERVAL_MS)
         }
+    }
+
+    /**
+     * Moves the next start earlier after a tracking-quality signal (lost, competing, entering or untracked
+     * objects). It never admits work by itself, never bypasses an in-flight ticket, a known thermal hold,
+     * an observed load backoff (other pipeline stages over budget) or a sample over the freshness budget,
+     * and never starts earlier than [MINIMUM_INTERVAL_MS] after the previous start or the measured
+     * completion cooldown. Returns true only when the next eligible time actually moved earlier.
+     */
+    @Synchronized
+    fun requestEarlyStart(nowElapsedRealtimeMs: Long): Boolean {
+        if (nowElapsedRealtimeMs < 0L || activeTicket != null || thermalHoldActive) return false
+        // S10-22-F1: while depth/tracking/UI dispatch are late, more detector work would starve them.
+        if (observedLoadPressure > 0.0 || overFreshnessBudget == true) return false
+        val earliest = earliestEarlyStartAtElapsedRealtimeMs
+        if (earliest >= nextEligibleAtElapsedRealtimeMs) return false
+        nextEligibleAtElapsedRealtimeMs = earliest
+        return true
     }
 
     /** Returns false for an obsolete/duplicate ticket or an invalid monotonic timing sample. */
@@ -141,6 +162,8 @@ class AdaptiveInferencePacingPolicy(
             loadRecoverySamples = 0
             componentRecoverySamples.fill(0)
             reason = InferencePacingReason.INVALID_TIMING
+            // An unmeasured completion leaves no cooldown evidence, so it cannot earn an early start.
+            earliestEarlyStartAtElapsedRealtimeMs = nextEligibleAtElapsedRealtimeMs
             return false
         }
 
@@ -195,8 +218,17 @@ class AdaptiveInferencePacingPolicy(
             addSaturated(ticket.startedAtElapsedRealtimeMs, targetIntervalMs),
             addSaturated(completedAtElapsedRealtimeMs, cooldownMs),
         )
+        earliestEarlyStartAtElapsedRealtimeMs = max(
+            addSaturated(ticket.startedAtElapsedRealtimeMs, MINIMUM_INTERVAL_MS),
+            addSaturated(completedAtElapsedRealtimeMs, cooldownMs),
+        )
         return true
     }
+
+    /** S14-36: [ticket] still owns the single detector slot of the current pacing generation. */
+    @Synchronized
+    fun ownsSlot(ticket: InferencePacingTicket): Boolean =
+        activeTicket === ticket && ticket.generation == generation
 
     /** Releases an acquisition, admission or executor failure without treating it as a fast run. */
     @Synchronized
@@ -220,6 +252,7 @@ class AdaptiveInferencePacingPolicy(
         targetIntervalMs = if (thermalHoldActive) THERMAL_MINIMUM_INTERVAL_MS else INITIAL_INTERVAL_MS
         cooldownMs = MINIMUM_COOLDOWN_MS
         nextEligibleAtElapsedRealtimeMs = 0L
+        earliestEarlyStartAtElapsedRealtimeMs = 0L
         completedSamples = 0L
         staleSamples = 0L
         invalidSamples = 0L

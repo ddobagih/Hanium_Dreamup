@@ -6,6 +6,7 @@ import re
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -13,9 +14,12 @@ from backend.app.config import Settings
 from backend.app.database import get_db
 from backend.app.field_test_security import VerifiedPrivacyDeletionAssertion
 from backend.app.schemas import (
+    ACCOUNT_DELETION_DEVICE_VERIFICATION_VIEW,
+    ACCOUNT_DELETION_STATUS_VIEW_HEADER,
     AccountDeletionRequestId,
     AccountDeletionRequestV2,
     AccountDeletionStatusV2,
+    AccountDeletionStatusWithDeviceVerificationV2,
     DeviceDeletionEvidenceV2,
     PrivacyConsentBootstrapV1,
     PrivacyConsentEventV2,
@@ -31,6 +35,7 @@ from backend.app.services.privacy_lifecycle import (
     record_consent_event,
     record_device_deletion_evidence,
 )
+from backend.app.services.signup_documents import signup_equivalent_document_versions
 
 
 _ACTOR_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
@@ -132,7 +137,7 @@ def create_router(settings: Settings) -> APIRouter:
     def consent_bootstrap(
         response: Response,
         installation_id: PrivacyEvidenceId,
-        policy_version: Literal["FP-013-1.1.0"],
+        policy_version: Literal["FP-013-1.2.0"],
         x_walksafe_actor_id: str = Header(alias="x-walksafe-actor-id"),
         x_walksafe_account_generation: str = Header(
             alias="x-walksafe-account-generation"
@@ -163,6 +168,9 @@ def create_router(settings: Settings) -> APIRouter:
                 signup_document_versions=settings.account_signup_document_versions,
                 secret=settings.privacy_hmac_secret,
                 key_version=settings.privacy_hmac_key_version,
+                signup_equivalent_document_versions=signup_equivalent_document_versions(
+                    settings
+                ),
             )
         except PrivacyLifecycleError as exc:
             _raise_privacy_error(db, exc)
@@ -308,6 +316,23 @@ def create_router(settings: Settings) -> APIRouter:
         "/account-deletions/{request_id}/status",
         response_model=AccountDeletionStatusV2,
         responses=_PRIVACY_ERROR_RESPONSES,
+        # S1617-51-F1: the default 200 stays AccountDeletionStatusV2; the
+        # header-selected view is a named component (openapi_contract).
+        openapi_extra={
+            "x-walksafe-response-variants": [
+                {
+                    "status": "200",
+                    "request_header": ACCOUNT_DELETION_STATUS_VIEW_HEADER,
+                    "request_header_value": ACCOUNT_DELETION_DEVICE_VERIFICATION_VIEW,
+                    "schema": {
+                        "$ref": (
+                            "#/components/schemas/"
+                            "AccountDeletionStatusWithDeviceVerificationV2"
+                        )
+                    },
+                }
+            ]
+        },
     )
     def account_deletion_status(
         request_id: AccountDeletionRequestId,
@@ -327,8 +352,26 @@ def create_router(settings: Settings) -> APIRouter:
             default=None,
             alias="x-walksafe-actor-assertion",
         ),
+        x_walksafe_deletion_status_view: str | None = Header(
+            default=None,
+            alias=ACCOUNT_DELETION_STATUS_VIEW_HEADER,
+            description=(
+                "Opt-in `device-verification.v1` adds `device_verification` "
+                "(AccountDeletionStatusWithDeviceVerificationV2); absent keeps "
+                "the base AccountDeletionStatusV2 bytes."
+            ),
+        ),
         db: Session = Depends(get_db),
     ) -> AccountDeletionStatusV2:
+        if x_walksafe_deletion_status_view not in (
+            None,
+            ACCOUNT_DELETION_DEVICE_VERIFICATION_VIEW,
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "account_deletion_status_view_invalid"},
+                headers=_NO_STORE_HEADERS,
+            )
         actor_id, generation = _binding(
             request,
             settings,
@@ -348,11 +391,20 @@ def create_router(settings: Settings) -> APIRouter:
                 tombstone_id=x_walksafe_deletion_tombstone_id,
                 secret=settings.privacy_hmac_secret,
                 key_version=settings.privacy_hmac_key_version,
+                include_device_verification=(
+                    x_walksafe_deletion_status_view
+                    == ACCOUNT_DELETION_DEVICE_VERIFICATION_VIEW
+                ),
             )
         except PrivacyLifecycleError as exc:
             _raise_privacy_error(db, exc)
         except SQLAlchemyError as exc:
             _raise_store_error(db, exc)
+        if isinstance(result, AccountDeletionStatusWithDeviceVerificationV2):
+            return JSONResponse(
+                content=result.model_dump(mode="json"),
+                headers=_NO_STORE_HEADERS,
+            )
         response.headers.update(_NO_STORE_HEADERS)
         return result
 

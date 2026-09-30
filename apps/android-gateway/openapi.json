@@ -3,7 +3,7 @@
   "info": {
     "title": "WalkSafe Android Gateway API",
     "version": "0.11.0",
-    "description": "Single-process Android gateway contract, including bounded email signup relays, Backend-bound password sessions, bounded authenticated STT/TTS relays, fixed report transport receipts, v7 actor/generation-bound report content rights, authenticated integrated-consent bootstrap with Backend CAS, and durable account-deletion v2 fencing with capability recovery. Every response is Cache-Control: no-store."
+    "description": "Single-process Android gateway contract, including bounded email signup relays, Backend-bound password sessions, bounded authenticated STT/TTS relays, fixed report transport receipts, v7 actor/generation-bound report content rights, authenticated integrated-consent bootstrap with Backend CAS, and durable account-deletion v2 fencing with capability recovery. Every response is Cache-Control: no-store. Any public route may also answer 503 gateway_trusted_client_ip_unavailable in production when the reverse proxy did not set the trusted client IP header to exactly one valid address (S19-53), and 504 gateway_request_deadline_exceeded when its Node handler passed the outer whole-request deadline. Outside navigation, S19-59 sets the deadline to limits a request can meet in sequence plus 5 seconds (35 seconds for an ordinary route); navigation uses separate 8-second walking and 7-second search outer deadlines and shorter inner deadlines. The outcome of an outer deadline answer is unknown, so a client repeats only an idempotent request with the same request ID."
   },
   "paths": {
     "/api/account-enrollments/email-otp": {
@@ -67,7 +67,7 @@
     "/api/accounts": {
       "post": {
         "operationId": "createAccount",
-        "description": "Public bounded relay. The JSON body is limited to 16384 bytes and requires exact consent document-version and selection keys. Password, OTP, email, and enrollment handles are never included in Gateway telemetry.",
+        "description": "Public bounded relay. The JSON body is limited to 16384 bytes and requires exact consent document-version and selection keys. The new password needs 12..128 code points (422 account_create_request_invalid otherwise); a common or easily guessed password is refused with 400 account_password_too_common. A required signup document version that is not current, or an optional one that is neither current nor a server-known prior version, is refused with 409 signup_consent_outdated (S01-3, GWBE-04); a known prior optional version never blocks creation and its grant is recorded as not given. Password, OTP, email, and enrollment handles are never included in Gateway telemetry.",
         "x-max-body-bytes": 16384,
         "requestBody": {
           "required": true,
@@ -161,22 +161,31 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "401": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "403": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "409": {
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "499": {
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "500": {
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "503": {
-            "$ref": "#/components/responses/GatewayUnavailable"
+            "$ref": "#/components/responses/FieldSessionError"
           }
         }
       },
       "post": {
         "operationId": "createFieldSession",
-        "description": "Body limit 4096 bytes; body-read timeout 10 seconds. Login purpose defaults to general for legacy request compatibility. Short login returns its exact session_scope; account_deletion_recovery is always short-lived and cannot include device_id. An enabled general device login or one-time refresh returns split access-cookie and refresh-token credentials. A consumed refresh-token reuse revokes only that family.",
+        "description": "Body limit 4096 bytes; body-read timeout 10 seconds. Login purpose defaults to general for legacy request compatibility. Short login returns its exact session_scope; account_deletion_recovery is always short-lived and cannot include device_id. An enabled general device login or one-time refresh returns split access-cookie and refresh-token credentials. A consumed refresh-token reuse revokes every long-lived family of the account (owner decision 1). S19-10: before any session state is read, a refresh is limited per trusted client address (60 per minute) and per claimed actor and refresh family (30 refused refresh verdicts, 400/401/403/409, per minute; client cancellation and deadline answers do not count) with 429 field_session_refresh_rate_limited (retryable, Retry-After), and to 16 in progress with 503 field_session_storage_busy (retryable). S19-11: 503 field_session_storage_unavailable (retryable) means nothing was committed and the presented refresh proof is still valid; a failure after the commit is 500 field_session_storage_outcome_unknown.",
         "requestBody": {
           "required": true,
           "content": {
@@ -227,34 +236,52 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "401": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "403": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "408": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "409": {
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "413": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "415": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "422": {
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "429": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "499": {
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "500": {
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "502": {
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "503": {
-            "$ref": "#/components/responses/GatewayUnavailable"
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "504": {
+            "$ref": "#/components/responses/FieldSessionError"
           }
         }
       },
       "delete": {
         "operationId": "deleteFieldSession",
-        "description": "With device_id, requires a current long-lived access cookie and idempotently revokes that actor's device. Without a query, revokes the current family by access cookie or by the optional JSON refresh proof. Refresh proof values never belong in the URL or headers. A valid, mismatched, or already-revoked well-formed proof returns the same 204 to avoid a token oracle.",
+        "description": "With device_id, requires a current long-lived access cookie and idempotently revokes that actor's device. S19-4-F1 (FP-011): revoking a device other than the requester's own is a sensitive account change and needs a credential login within the account-deletion window (5 minutes); otherwise 401 field_session_reauthentication_required (reauthentication_required: true) and nothing is revoked. Revoking the requester's own device and the plain logout are not gated. Without a query, revokes the current family by access cookie or by the optional JSON refresh proof. Refresh proof values never belong in the URL or headers. A valid, mismatched, or already-revoked well-formed proof returns the same 204 to avoid a token oracle.",
         "parameters": [
           {
             "name": "device_id",
@@ -293,25 +320,34 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "401": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "403": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "408": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "409": {
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "413": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "415": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "499": {
+            "$ref": "#/components/responses/FieldSessionError"
+          },
+          "500": {
+            "$ref": "#/components/responses/FieldSessionError"
           },
           "503": {
-            "$ref": "#/components/responses/GatewayUnavailable"
+            "$ref": "#/components/responses/FieldSessionError"
           }
         }
       }
@@ -348,13 +384,13 @@
             "$ref": "#/components/responses/GatewayError"
           },
           "503": {
-            "$ref": "#/components/responses/GatewayUnavailable"
+            "$ref": "#/components/responses/FieldWalkUnavailable"
           }
         }
       },
       "post": {
         "operationId": "commandFieldWalk",
-        "description": "Acquires, takes over, renews, or ends the account live walk with a 90 second server-time lease.",
+        "description": "Acquires, takes over, renews, or ends the account live walk with a 90 second server-time lease.\n\n503 field_walk_ledger_unavailable means the ledger was not changed. 503 field_walk_ledger_outcome_unknown (retry: same_request_id, Retry-After: 1) means storage failed after the atomic rename, so the command may already be committed: retry with the same request_id, which replays the stored result; a new request_id is not safe.\n\nS19-17: commands are walksafe.field-walk-command.v2 (v1 plus issued_at_epoch_ms, fixed per request_id). v1 carries no issue time and is refused by default with 409 walk_command_version_retired (nothing executed); an explicit Gateway legacy setting can accept v1. Idempotency guarantee: a cached request_id replays its stored result; an uncached v2 request issued more than 24 hours before or after both the ledger server time and the wall clock, or not newer than an evicted request of the same device (per-account cache of 4096), and an evicted v1 start, return 409 idempotency_expired without executing.\n\nS01-31: while the account remembers an explicitly ended walk_id (end, logout, remote revoke; 30 days, at most 256 walks) it keeps the issue time of the ending command (issued_at_epoch_ms of a v2 end, otherwise the server time). A start or takeover of that walk_id issued at or before it is a replay and returns 409 walk_already_ended, independent of the request cache; one issued later runs as a new command. A v1 start or takeover (no issue time) is refused.\n\nS19-20: lease time follows the server monotonic clock inside the process. After a wall-clock step above 2 seconds, start and takeover return 503 field_walk_clock_unavailable for 90 seconds; renew and end continue. The absorbed step is persisted, so a restart keeps the same server time; after the window server time returns to the wall clock (immediately for a forward step, leases from before it keep their remaining time; at most 10% slower for a backward step up to 10 minutes; immediately for larger backward steps). A lease whose remaining time exceeds 90 seconds is cut to 90 seconds, never extended. Clients should stamp issued_at_epoch_ms from the returned server_time_epoch_ms.",
         "security": [
           {
             "fieldSession": []
@@ -396,7 +432,7 @@
             "$ref": "#/components/responses/GatewayError"
           },
           "409": {
-            "description": "Lease or request id conflict",
+            "description": "Lease or request id conflict, or idempotency_expired, walk_already_ended, or walk_command_version_retired (not executed)",
             "headers": {
               "Cache-Control": {
                 "$ref": "#/components/headers/NoStore"
@@ -411,7 +447,7 @@
             }
           },
           "503": {
-            "$ref": "#/components/responses/GatewayUnavailable"
+            "$ref": "#/components/responses/FieldWalkUnavailable"
           }
         }
       }
@@ -532,7 +568,8 @@
     "/api/navigation/walking": {
       "post": {
         "operationId": "createWalkingRoute",
-        "description": "Field session required. Body limit 16384 bytes; body-read timeout 10 seconds; upstream timeout 15 seconds.",
+        "description": "Field session required. Body limit 16384 bytes; the body reader's own timeout is 10 seconds, but the navigation handler includes account-session gate, request body, Backend call, and complete response body in one 7.5-second deadline (Node outer deadline 8 seconds). The Backend fetch and full response body have a 5-second limit and a 2097152-byte maximum. Android limits the whole call to 10 seconds (connect 2 seconds, read 9 seconds). A navigation handler deadline returns 504 gateway_navigation_timeout; an upstream deadline returns 504 gateway_upstream_timeout; a response above the byte limit returns 502 gateway_upstream_response_too_large. Cancellation ends body reads and upstream work.\n\nWalk ownership gate: while another device or session of the same account holds the active field walk, the Gateway returns 409 walk_owned_by_other_device before any Backend call. With no active walk, or when the caller's own session holds it, nothing changes. An unreadable or busy field walk ledger fails closed with 503 field_walk_ledger_unavailable.",
+        "x-max-response-bytes": 2097152,
         "security": [
           {
             "fieldSession": []
@@ -565,6 +602,9 @@
           "408": {
             "$ref": "#/components/responses/GatewayError"
           },
+          "409": {
+            "$ref": "#/components/responses/WalkOwnedByOtherDevice"
+          },
           "413": {
             "$ref": "#/components/responses/GatewayError"
           },
@@ -577,6 +617,9 @@
           "502": {
             "$ref": "#/components/responses/GatewayError"
           },
+          "503": {
+            "$ref": "#/components/responses/FieldWalkLedgerUnavailable"
+          },
           "504": {
             "$ref": "#/components/responses/GatewayError"
           }
@@ -586,7 +629,8 @@
     "/api/navigation/destinations/search": {
       "get": {
         "operationId": "searchDestinations",
-        "description": "Field session required; upstream timeout 15 seconds.",
+        "description": "Field session required. Account-session gate, Backend call, and complete response body share one 6.5-second navigation handler deadline (Node outer deadline 7 seconds). The Backend fetch and full response body have a 5-second limit and a 2097152-byte maximum. Android limits the whole call to 10 seconds (connect 2 seconds, read 9 seconds). A navigation handler deadline returns 504 gateway_navigation_timeout; an upstream deadline returns 504 gateway_upstream_timeout; a response above the byte limit returns 502 gateway_upstream_response_too_large. Cancellation ends upstream work. Destination search does not run the walk ownership gate.",
+        "x-max-response-bytes": 2097152,
         "security": [
           {
             "fieldSession": []
@@ -663,8 +707,8 @@
     "/api/reports/v2": {
       "post": {
         "operationId": "createReportV2",
-        "description": "Field session required. Total multipart limit 9437184 bytes; body and upstream timeouts are each 15 seconds; one upload may be in flight.\n\nThe three optional report transport headers are all-or-none. When present, the gateway validates their canonical form and forwards only their exact parsed values with the server-derived FIELD actor binding. Their absence preserves the legacy request contract.\n\nThe header purpose must match multipart metadata.auto_reported before any backend fetch.\n\nx-walksafe-report-purpose is an authenticated first-party Android declaration inside the gateway trust boundary, not cryptographic client attestation. The gateway fail-closes when it disagrees with multipart metadata.auto_reported. A tampered but otherwise authenticated client is NOT_COVERED.",
-        "x-walksafe-report-transport-headers": "all-or-none",
+        "description": "Field session required. Total multipart limit 9437184 bytes; body and upstream timeouts are each 15 seconds; one upload may be in flight.\n\nWalk ownership gate: after field authentication and before the body is read or any Backend call, a request from another device or session of an account whose active field walk is held elsewhere returns 409 walk_owned_by_other_device, and an unreadable or busy field walk ledger fails closed with 503 field_walk_ledger_unavailable. Owner decision 3(b) (2026-09-29): queued reports are sent only after the walk has ended, so while the caller's own device session holds the account's active field walk the Gateway returns 409 report_walk_in_progress at the same point (no body read, no Backend call); the client keeps the report queued and retries after the walk ends.\n\nThe three report transport headers are required. If any is missing, the gateway returns 422 report_transport_headers_incomplete before reading the body or calling Backend. The gateway validates their canonical form and forwards only their exact parsed values with the server-derived FIELD actor binding.\n\nThe header purpose must match multipart metadata.auto_reported before any backend fetch.\n\nx-walksafe-report-purpose is an authenticated first-party Android declaration inside the gateway trust boundary, not cryptographic client attestation. The gateway fail-closes when it disagrees with multipart metadata.auto_reported. A tampered but otherwise authenticated client is NOT_COVERED.",
+        "x-walksafe-report-transport-headers": "required",
         "security": [
           {
             "fieldSession": []
@@ -729,7 +773,29 @@
             "$ref": "#/components/responses/GatewayError"
           },
           "409": {
-            "description": "Consent receipt, actor generation, or processing epoch is stale."
+            "description": "Consent receipt, actor generation, or processing epoch is stale; or walk_owned_by_other_device when another device or session of the same account holds the active field walk, or report_walk_in_progress while the caller's own device session holds it (both returned before any Backend call).",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/WalkOwnedByOtherDeviceError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ReportWalkInProgressError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/GatewayError"
+                    }
+                  ]
+                }
+              }
+            }
           },
           "413": {
             "$ref": "#/components/responses/GatewayError"
@@ -753,7 +819,7 @@
             "$ref": "#/components/responses/GatewayError"
           },
           "503": {
-            "$ref": "#/components/responses/GatewayError"
+            "$ref": "#/components/responses/FieldWalkLedgerUnavailable"
           },
           "504": {
             "$ref": "#/components/responses/GatewayError"
@@ -837,7 +903,7 @@
           {
             "name": "x-walksafe-report-id",
             "in": "header",
-            "required": false,
+            "required": true,
             "description": "Canonical lowercase client report UUID. Must occur with both payload headers.",
             "schema": {
               "type": "string",
@@ -848,7 +914,7 @@
           {
             "name": "x-walksafe-report-payload-sha256",
             "in": "header",
-            "required": false,
+            "required": true,
             "description": "Lowercase full transport payload SHA-256. Must occur with report id and payload bytes.",
             "schema": {
               "type": "string",
@@ -858,7 +924,7 @@
           {
             "name": "x-walksafe-report-payload-bytes",
             "in": "header",
-            "required": false,
+            "required": true,
             "description": "Positive metadata-plus-image byte count. Must occur with report id and payload SHA-256.",
             "schema": {
               "type": "integer",
@@ -1305,7 +1371,7 @@
     "/api/raw-collections/{collection_id}/manifest": {
       "put": {
         "operationId": "putRawCollectionManifest",
-        "description": "Accepts one canonical raw manifest only from a current v7 Backend-account device session bound to the same active field walk and account generation. The Gateway performs a same-path HEAD admission check before reading the body and revalidates the session, walk, privacy generation, and authoritative Backend consent receipt after each I/O boundary.",
+        "description": "Accepts one canonical raw manifest only from a current v7 Backend-account device session of the same account generation, for a walk that has ended. Owner decision 3(b) (2026-09-29): every raw write (manifest, chunk, commit) names the walk's original id in x-walksafe-raw-walk-id and is admitted only when that walk was held by this account and device and ended (explicit end, logout or remote revoke, lease expiry, or takeover) within the last 30 days, and no walk of the account is active. Otherwise the Gateway returns 409 raw_collection_walk_in_progress (a walk of the account is active; retry after it ends) or 409 raw_collection_walk_not_uploadable (unknown walk, another account's or device's walk, older than 30 days, or dropped from the bounded 256-walk per-account history; entries past 30 days are pruned whenever the account's walk ledger is read), before the body is read. The Gateway performs a same-path HEAD admission check before reading the body and revalidates the session, ended walk, privacy generation, and authoritative Backend consent receipt after each I/O boundary.",
         "x-max-body-bytes": 524288,
         "security": [{ "fieldSession": [], "consentControlSecret": [] }],
         "parameters": [
@@ -1347,7 +1413,7 @@
     "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}": {
       "put": {
         "operationId": "putRawCollectionChunk",
-        "description": "Streams exactly one digest-bound chunk through the bounded Gateway relay. Content-Length is mandatory and the Gateway holds at most one 8 MiB chunk while hashing it.",
+        "description": "Streams exactly one digest-bound chunk through the bounded Gateway relay. Content-Length is mandatory and the Gateway holds at most one 8 MiB chunk while hashing it. Owner decision 3(b): the same ended-walk gate as the manifest applies before the body is read and after consent validation, returning 409 raw_collection_walk_in_progress (a walk of the account is active; retry after it ends) or 409 raw_collection_walk_not_uploadable (not a walk this account and device ended within the last 30 days or still in the bounded 256-walk history).",
         "x-max-body-bytes": 8388608,
         "security": [{ "fieldSession": [], "consentControlSecret": [] }],
         "parameters": [
@@ -1415,7 +1481,7 @@
     "/api/raw-collections/{collection_id}/commit": {
       "post": {
         "operationId": "commitRawCollection",
-        "description": "Commits one complete collection into the 14-day quarantine lifecycle and returns a strict receipt v2. Legacy receipt v1 remains readable only from status recovery for collections committed before the v2 rollout.",
+        "description": "Commits one complete collection into the 14-day quarantine lifecycle and returns a strict receipt v2. Legacy receipt v1 remains readable only from status recovery for collections committed before the v2 rollout. Owner decision 3(b): the same ended-walk gate as the manifest applies before the body is read and after consent validation, returning 409 raw_collection_walk_in_progress (a walk of the account is active; retry after it ends) or 409 raw_collection_walk_not_uploadable (not a walk this account and device ended within the last 30 days or still in the bounded 256-walk history).",
         "x-max-body-bytes": 16384,
         "security": [{ "fieldSession": [], "consentControlSecret": [] }],
         "parameters": [
@@ -1457,7 +1523,7 @@
     "/privacy/rights": {
       "get": {
         "operationId": "getIntegratedConsentControl",
-        "description": "Returns either the authenticated actor/generation- and installation-secret-bound current consent record for control=integrated-consent or the authenticated actor/generation-bound Backend bootstrap projection for control=integrated-consent-bootstrap. Both forms require exactly control, installation_id, and policy_version. An actor-binding mismatch returns integrated_consent_actor_reconsent_required without exposing another actor's selections. A GET without control parameters serves the separate public privacy-rights HTML page.",
+        "description": "Returns either the authenticated actor/generation- and installation-secret-bound current consent record for control=integrated-consent or the authenticated actor/generation-bound Backend bootstrap projection for control=integrated-consent-bootstrap. Both forms require exactly control, installation_id, and policy_version. An actor-binding mismatch returns integrated_consent_actor_reconsent_required without exposing another actor's selections. S19-31: control=integrated-consent returns the local confirmation (current: true) only after the Backend bootstrap reports READY/CURRENT_CONSENT with the same selections and item versions as the confirmation; a newer receipt from another installation of the account that re-recorded the same selections stays current (S19-31-F1), while different selections or RECONSENT_REQUIRED return 409 integrated_consent_reconsent_required, and a Backend failure fails closed with the Backend or gateway error. A GET without control parameters serves the separate public privacy-rights HTML page.",
         "security": [
           {
             "fieldSession": [],
@@ -1501,7 +1567,7 @@
             "required": true,
             "schema": {
               "type": "string",
-              "const": "FP-013-1.1.0"
+              "const": "FP-013-1.2.0"
             }
           }
         ],
@@ -1534,7 +1600,7 @@
       },
       "put": {
         "operationId": "putIntegratedConsent",
-        "description": "Records four independent consent selections only after a live field session and exact backend consent receipt confirm the mutation. The query contains exactly control=integrated-consent.",
+        "description": "Records four independent consent selections only after a live field session and exact backend consent receipt confirm the mutation. The query contains exactly control=integrated-consent. S19-27: 503 integrated_consent_outcome_unknown (detail.retry: same_request_id, Retry-After: 1) means the local write may already be durable; resend the same request_id, which replays the stored confirmation or adopts the Backend idempotent receipt.",
         "security": [
           {
             "fieldSession": [],
@@ -1605,7 +1671,7 @@
     "/privacy/account-deletions": {
       "post": {
         "operationId": "acceptAccountDeletionV2",
-        "description": "Durably fences the authenticated actor generation before forwarding the exact v2 request. The first request accepts a general or account_deletion_recovery field session and requires a 32-byte client capability; exact retries require only that capability. A 503 means the gateway fence and outbox remain durable but no canonical backend status has been returned.",
+        "description": "Durably fences the authenticated actor generation before forwarding the exact v2 request. The first request accepts a general or account_deletion_recovery field session and requires a 32-byte client capability; exact retries require only that capability. S19-44: a new request whose last credential login (password or field token, including an account_deletion_recovery login; a refresh does not count) is older than 5 minutes, or whose login time cannot be read, is refused with 401 account_deletion_reauthentication_required (reauthentication_required: true) and nothing is recorded; replay, status and device evidence stay capability-only. A 503 means the gateway fence and outbox remain durable but no canonical backend status has been returned.",
         "security": [
           {
             "fieldSession": [],
@@ -1641,6 +1707,9 @@
             "$ref": "#/components/responses/AccountDeletionStatus"
           },
           "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
             "$ref": "#/components/responses/GatewayError"
           },
           "404": {
@@ -1853,7 +1922,7 @@
         "name": "x-walksafe-consent-policy-version",
         "in": "header",
         "required": true,
-        "schema": { "type": "string", "const": "FP-013-1.1.0" }
+        "schema": { "type": "string", "const": "FP-013-1.2.0" }
       },
       "ConsentRevision": {
         "name": "x-walksafe-consent-revision",
@@ -1885,6 +1954,598 @@
       }
     },
     "schemas": {
+      "FieldSessionError": {
+        "type": "object",
+        "description": "S01-20 public /api/field-session error contract. The code is at `code` or `detail.code`; clients map the listed code, HTTP status and flags to x-walksafe-error-contract.next_action and treat any other code as REAUTHENTICATE. gateway_method_not_allowed (405, Allow header) answers methods the path does not declare.",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "account_authentication_busy",
+              "account_authentication_rate_limited",
+              "account_authentication_request_invalid",
+              "account_authentication_stale",
+              "account_authentication_unavailable",
+              "account_crypto_key_binding_missing",
+              "account_crypto_key_mismatch",
+              "account_generation_inactive",
+              "backend_account_binding_denied",
+              "backend_account_check_unavailable",
+              "field_long_lived_sessions_unavailable",
+              "field_session_device_capacity_unavailable",
+              "field_session_query_invalid",
+              "field_session_reauthentication_required",
+              "field_session_refresh_rate_limited",
+              "field_session_request_invalid",
+              "field_session_revoked",
+              "field_session_revoked_reuse_detected",
+              "field_session_storage_busy",
+              "field_session_storage_outcome_unknown",
+              "field_session_storage_unavailable",
+              "gateway_account_service_not_configured",
+              "gateway_account_upstream_invalid",
+              "gateway_auth_required",
+              "gateway_client_closed",
+              "gateway_forbidden",
+              "gateway_internal_error",
+              "gateway_invalid_request",
+              "gateway_login_busy",
+              "gateway_login_capacity_unavailable",
+              "gateway_login_global_rate_limited",
+              "gateway_login_rate_limited",
+              "gateway_login_total_rate_limited",
+              "gateway_method_not_allowed",
+              "gateway_request_deadline_exceeded",
+              "gateway_security_not_configured",
+              "gateway_trusted_client_ip_required",
+              "gateway_trusted_client_ip_unavailable",
+              "gateway_upstream_response_timeout",
+              "gateway_upstream_timeout",
+              "gateway_upstream_unavailable",
+              "invalid_account_credentials",
+              "invalid_content_length",
+              "invalid_field_test_token",
+              "invalid_json_body",
+              "invalid_refresh_token",
+              "json_content_type_required",
+              "privacy_ledger_unavailable",
+              "refresh_rotation_limit_reached",
+              "refresh_token_absolute_expired",
+              "refresh_token_idle_expired",
+              "refresh_token_reuse_detected",
+              "request_body_invalid_utf8",
+              "request_body_read_failed",
+              "request_body_read_timeout",
+              "request_body_required",
+              "request_body_too_large"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "reauthentication_required": {
+            "type": "boolean"
+          }
+        },
+        "x-walksafe-error-contract": [
+          {
+            "code": "account_authentication_busy",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "account_authentication_rate_limited",
+            "statuses": [
+              429
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "account_authentication_request_invalid",
+            "statuses": [
+              422
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "account_authentication_stale",
+            "statuses": [
+              409
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "account_authentication_unavailable",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "account_crypto_key_binding_missing",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "account_crypto_key_mismatch",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "account_generation_inactive",
+            "statuses": [
+              409
+            ],
+            "next_action": "SESSION_REVOKED",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "backend_account_binding_denied",
+            "statuses": [
+              401
+            ],
+            "next_action": "SESSION_REVOKED",
+            "retryable": null,
+            "reauthentication_required": true
+          },
+          {
+            "code": "backend_account_check_unavailable",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": true,
+            "reauthentication_required": null
+          },
+          {
+            "code": "field_long_lived_sessions_unavailable",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "field_session_device_capacity_unavailable",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "field_session_query_invalid",
+            "statuses": [
+              400
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "field_session_reauthentication_required",
+            "statuses": [
+              401
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": true
+          },
+          {
+            "code": "field_session_refresh_rate_limited",
+            "statuses": [
+              429
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": true,
+            "reauthentication_required": null
+          },
+          {
+            "code": "field_session_request_invalid",
+            "statuses": [
+              400
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "field_session_revoked",
+            "statuses": [
+              401
+            ],
+            "next_action": "SESSION_REVOKED",
+            "retryable": null,
+            "reauthentication_required": true
+          },
+          {
+            "code": "field_session_revoked_reuse_detected",
+            "statuses": [
+              401
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": true
+          },
+          {
+            "code": "field_session_storage_busy",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": true,
+            "reauthentication_required": null
+          },
+          {
+            "code": "field_session_storage_outcome_unknown",
+            "statuses": [
+              500
+            ],
+            "next_action": "OUTCOME_UNKNOWN",
+            "retryable": false,
+            "reauthentication_required": true
+          },
+          {
+            "code": "field_session_storage_unavailable",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": true,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_account_service_not_configured",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_account_upstream_invalid",
+            "statuses": [
+              502
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_auth_required",
+            "statuses": [
+              401
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_client_closed",
+            "statuses": [
+              499
+            ],
+            "next_action": "OUTCOME_UNKNOWN",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_forbidden",
+            "statuses": [
+              403
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_internal_error",
+            "statuses": [
+              500
+            ],
+            "next_action": "OUTCOME_UNKNOWN",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_invalid_request",
+            "statuses": [
+              400
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_login_busy",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_login_capacity_unavailable",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_login_global_rate_limited",
+            "statuses": [
+              429
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_login_rate_limited",
+            "statuses": [
+              429
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_login_total_rate_limited",
+            "statuses": [
+              429
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_method_not_allowed",
+            "statuses": [
+              405
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_request_deadline_exceeded",
+            "statuses": [
+              504
+            ],
+            "next_action": "OUTCOME_UNKNOWN",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_security_not_configured",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_trusted_client_ip_required",
+            "statuses": [
+              400
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_trusted_client_ip_unavailable",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_upstream_response_timeout",
+            "statuses": [
+              504
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_upstream_timeout",
+            "statuses": [
+              504
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "gateway_upstream_unavailable",
+            "statuses": [
+              502
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "invalid_account_credentials",
+            "statuses": [
+              401
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "invalid_content_length",
+            "statuses": [
+              400
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "invalid_field_test_token",
+            "statuses": [
+              401
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "invalid_json_body",
+            "statuses": [
+              400
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "invalid_refresh_token",
+            "statuses": [
+              401
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": true
+          },
+          {
+            "code": "json_content_type_required",
+            "statuses": [
+              415
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "privacy_ledger_unavailable",
+            "statuses": [
+              503
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "refresh_rotation_limit_reached",
+            "statuses": [
+              401
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": true
+          },
+          {
+            "code": "refresh_token_absolute_expired",
+            "statuses": [
+              401
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": true
+          },
+          {
+            "code": "refresh_token_idle_expired",
+            "statuses": [
+              401
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": true
+          },
+          {
+            "code": "refresh_token_reuse_detected",
+            "statuses": [
+              401
+            ],
+            "next_action": "SESSION_REVOKED",
+            "retryable": null,
+            "reauthentication_required": true
+          },
+          {
+            "code": "request_body_invalid_utf8",
+            "statuses": [
+              400
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "request_body_read_failed",
+            "statuses": [
+              400
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "request_body_read_timeout",
+            "statuses": [
+              408
+            ],
+            "next_action": "RETRY_SAFE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "request_body_required",
+            "statuses": [
+              400
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          },
+          {
+            "code": "request_body_too_large",
+            "statuses": [
+              413
+            ],
+            "next_action": "REAUTHENTICATE",
+            "retryable": null,
+            "reauthentication_required": null
+          }
+        ]
+      },
       "AccountEnrollmentEmailOtpRequest": {
         "type": "object",
         "required": ["schema_version", "email", "date_of_birth", "request_id"],
@@ -2029,9 +2690,10 @@
           },
           "password": {
             "type": "string",
-            "minLength": 10,
+            "minLength": 12,
             "maxLength": 128,
-            "format": "password"
+            "format": "password",
+            "description": "New account password: 12..128 Unicode code points without NUL (login keeps accepting 10..128 for existing accounts). The Gateway rejects other lengths with 422 account_create_request_invalid before any Backend call; the Backend refuses common or easily guessed values with 400 account_password_too_common, which the Gateway relays without echoing the password."
           },
           "consent": {
             "$ref": "#/components/schemas/SignupConsent"
@@ -2099,7 +2761,12 @@
             "minLength": 1,
             "maxLength": 128,
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
-            "description": "Optional canonical device binding. When present, the fixed 12-hour Backend account session is issued as device-bound v7 and may authorize field-walk; it is not a refresh-token session."
+            "description": "Optional canonical per-install identifier. When present, the fixed 12-hour Backend account session is issued as device-bound v7 and may authorize field-walk; it is not a refresh-token session. The value is an installation identifier, not a per-request proof that the caller holds a registered device key; the cookie remains a bearer credential."
+          },
+          "session_mode": {
+            "type": "string",
+            "const": "long_lived",
+            "description": "Owner decision 2 (2026-09-29) / S19-1: opt-in Backend email long-lived login. Requires device_id and remember_me=true and an enabled long-lived Gateway (otherwise 503 field_long_lived_sessions_unavailable). The 200 body is FieldLongSession: a short access cookie plus a rotating refresh token for a family bound to the account generation, auth epoch and device; Backend account currency is still checked on every request and refresh. Without this field the v7 short session is unchanged."
           }
         },
         "additionalProperties": false
@@ -2125,7 +2792,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128,
-            "description": "Stable per-install identifier; starts a long-lived device family only when that mode is explicitly enabled and fully configured. Forbidden with account_deletion_recovery purpose."
+            "description": "Stable per-install identifier; starts a long-lived device family only when that mode is explicitly enabled and fully configured. It is not a per-request device-key proof: access cookies and refresh tokens are bearer credentials. Forbidden with account_deletion_recovery purpose."
           },
           "purpose": {
             "type": "string",
@@ -2205,7 +2872,7 @@
           "rotation": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 4096
+            "maximum": 2147483647
           },
           "refresh_token": {
             "type": "string",
@@ -2258,7 +2925,7 @@
           "rotation": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 4096
+            "maximum": 2147483647
           },
           "refresh_token": {
             "type": "string"
@@ -2267,10 +2934,10 @@
             "$ref": "#/components/schemas/EpochMilliseconds"
           },
           "idle_expires_at_epoch_ms": {
-            "$ref": "#/components/schemas/EpochMilliseconds"
+            "$ref": "#/components/schemas/EpochMillisecondsOrUnlimited"
           },
           "absolute_expires_at_epoch_ms": {
-            "$ref": "#/components/schemas/EpochMilliseconds"
+            "$ref": "#/components/schemas/EpochMillisecondsOrUnlimited"
           }
         },
         "additionalProperties": false
@@ -2408,16 +3075,16 @@
           "rotation": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 4096
+            "maximum": 2147483647
           },
           "access_expires_at_epoch_ms": {
             "$ref": "#/components/schemas/EpochMilliseconds"
           },
           "idle_expires_at_epoch_ms": {
-            "$ref": "#/components/schemas/EpochMilliseconds"
+            "$ref": "#/components/schemas/EpochMillisecondsOrUnlimited"
           },
           "absolute_expires_at_epoch_ms": {
-            "$ref": "#/components/schemas/EpochMilliseconds"
+            "$ref": "#/components/schemas/EpochMillisecondsOrUnlimited"
           },
           "capacity": {
             "$ref": "#/components/schemas/CapacitySnapshot"
@@ -2470,7 +3137,7 @@
           "rotation": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 4096
+            "maximum": 2147483647
           },
           "created_at_epoch_ms": {
             "$ref": "#/components/schemas/EpochMilliseconds"
@@ -2479,10 +3146,10 @@
             "$ref": "#/components/schemas/EpochMilliseconds"
           },
           "idle_expires_at_epoch_ms": {
-            "$ref": "#/components/schemas/EpochMilliseconds"
+            "$ref": "#/components/schemas/EpochMillisecondsOrUnlimited"
           },
           "absolute_expires_at_epoch_ms": {
-            "$ref": "#/components/schemas/EpochMilliseconds"
+            "$ref": "#/components/schemas/EpochMillisecondsOrUnlimited"
           }
         },
         "additionalProperties": false
@@ -2491,6 +3158,17 @@
         "type": "integer",
         "format": "int64",
         "minimum": 1
+      },
+      "EpochMillisecondsOrUnlimited": {
+        "description": "Owner decision 2 (2026-09-29): null when the Gateway is configured with an unlimited refresh idle or absolute lifetime; the login then never expires by idle time or age and ends only by logout, revocation or re-authentication. An unlimited idle expiry implies an unlimited absolute expiry.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "ReportTransportReceipt": {
         "type": "object",
@@ -3531,6 +4209,251 @@
         },
         "additionalProperties": false
       },
+      "FieldWalkStartCommandV2": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "action",
+          "walk_id",
+          "issued_at_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-command.v2"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "action": {
+            "type": "string",
+            "const": "start"
+          },
+          "walk_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "issued_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds",
+            "description": "S19-17: client time fixed when request_id is created and resent unchanged on every retry of that request_id."
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkTakeoverCommandV2": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "action",
+          "walk_id",
+          "expected_active_walk_id",
+          "expected_fencing_token",
+          "confirmation",
+          "issued_at_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-command.v2"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "action": {
+            "type": "string",
+            "const": "takeover"
+          },
+          "walk_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "expected_active_walk_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "expected_fencing_token": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "confirmation": {
+            "type": "string",
+            "const": "voice_confirmed"
+          },
+          "issued_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds",
+            "description": "S19-17: client time fixed when request_id is created and resent unchanged on every retry of that request_id."
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkLeaseCommandV2": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "action",
+          "walk_id",
+          "lease_id",
+          "fencing_token",
+          "issued_at_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-command.v2"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "renew",
+              "end"
+            ]
+          },
+          "walk_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "lease_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "fencing_token": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "issued_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds",
+            "description": "S19-17: client time fixed when request_id is created and resent unchanged on every retry of that request_id."
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkIdempotencyExpired": {
+        "type": "object",
+        "description": "S19-17: the request_id is not in the idempotency cache and is outside its guarantee (a v2 issued_at_epoch_ms more than 24 hours from server time or not newer than an evicted request of the same device, or an evicted v1 start). The command was not executed; re-read GET /api/field-walk instead of retrying the same request_id.",
+        "required": [
+          "schema_version",
+          "code",
+          "server_time_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "code": {
+            "type": "string",
+            "const": "idempotency_expired"
+          },
+          "server_time_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkAlreadyEnded": {
+        "type": "object",
+        "description": "S01-31: the walk_id was explicitly ended for this account (retained 30 days, at most 256 walks) and this start or takeover was issued at or before the ending command (or carries no issue time), so it is treated as a replay; nothing was executed and no fencing token was consumed. A command issued after the end runs normally.",
+        "required": [
+          "schema_version",
+          "code",
+          "walk_id",
+          "server_time_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "code": {
+            "type": "string",
+            "const": "walk_already_ended"
+          },
+          "walk_id": {
+            "type": "string"
+          },
+          "server_time_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkCommandVersionRetired": {
+        "type": "object",
+        "description": "S19-17: a walksafe.field-walk-command.v1 command was refused because v1 has no issue time for the idempotency window (default; an explicit Gateway legacy setting can accept v1). Nothing was executed; resend as v2.",
+        "required": [
+          "schema_version",
+          "code",
+          "supported_schema_versions"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "code": {
+            "type": "string",
+            "const": "walk_command_version_retired"
+          },
+          "supported_schema_versions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "const": "walksafe.field-walk-command.v2"
+            },
+            "minItems": 1,
+            "maxItems": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkClockUnavailableError": {
+        "type": "object",
+        "description": "S19-20: a server wall-clock step above 2 seconds was detected within the last lease TTL (90 s of monotonic time). New activation (start/takeover) fails closed; the current holder can still renew or end.",
+        "required": [
+          "schema_version",
+          "code",
+          "server_time_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "code": {
+            "type": "string",
+            "const": "field_walk_clock_unavailable"
+          },
+          "server_time_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
       "FieldWalkCommand": {
         "oneOf": [
           {
@@ -3541,6 +4464,15 @@
           },
           {
             "$ref": "#/components/schemas/FieldWalkLeaseCommand"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkStartCommandV2"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkTakeoverCommandV2"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkLeaseCommandV2"
           }
         ]
       },
@@ -3821,8 +4753,114 @@
           },
           {
             "$ref": "#/components/schemas/FieldWalkRequestIdConflict"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkIdempotencyExpired"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkAlreadyEnded"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkCommandVersionRetired"
           }
         ]
+      },
+      "ReportWalkInProgressError": {
+        "type": "object",
+        "description": "Owner decision 3(b) (2026-09-29): report v2 is refused while the caller's own device session holds the account's active field walk; queued reports are sent after the walk ends. No body is read and no Backend call is made.",
+        "required": [
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "report_walk_in_progress"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "WalkOwnedByOtherDeviceError": {
+        "type": "object",
+        "description": "Walk ownership gate refusal on walking routes and report v2 while another device or session of the same account holds the active field walk. Takeover goes through POST /api/field-walk.",
+        "required": [
+          "detail"
+        ],
+        "properties": {
+          "detail": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "walk_owned_by_other_device"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkLedgerUnavailableError": {
+        "type": "object",
+        "description": "The field walk ledger could not be read or locked; the request fails closed and the ledger is unchanged.",
+        "required": [
+          "schema_version",
+          "code"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "code": {
+            "type": "string",
+            "const": "field_walk_ledger_unavailable"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkLedgerOutcomeUnknownError": {
+        "type": "object",
+        "description": "Storage failed after the atomic rename, so the command may be committed. Retry with the same request_id (replays the stored result); a new request_id is not safe.",
+        "required": [
+          "schema_version",
+          "code",
+          "retry"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "code": {
+            "type": "string",
+            "const": "field_walk_ledger_outcome_unknown"
+          },
+          "retry": {
+            "type": "string",
+            "const": "same_request_id"
+          }
+        },
+        "additionalProperties": false
       },
       "IntegratedConsentItemVersions": {
         "type": "object",
@@ -3835,11 +4873,11 @@
         "properties": {
           "raw_source_collection": {
             "type": "string",
-            "const": "FP-013-RAW-1.1.0"
+            "const": "FP-013-RAW-1.2.0"
           },
           "automatic_reporting": {
             "type": "string",
-            "const": "FP-013-AUTO-1.1.0"
+            "const": "FP-013-AUTO-1.2.0"
           },
           "mobile_network_transfer": {
             "type": "string",
@@ -3907,7 +4945,7 @@
           },
           "policy_version": {
             "type": "string",
-            "const": "FP-013-1.1.0"
+            "const": "FP-013-1.2.0"
           },
           "item_versions": {
             "$ref": "#/components/schemas/IntegratedConsentItemVersions"
@@ -3963,7 +5001,7 @@
           },
           "policy_version": {
             "type": "string",
-            "const": "FP-013-1.1.0"
+            "const": "FP-013-1.2.0"
           },
           "item_versions": {
             "$ref": "#/components/schemas/IntegratedConsentItemVersions"
@@ -4029,7 +5067,7 @@
           },
           "policy_version": {
             "type": "string",
-            "const": "FP-013-1.1.0"
+            "const": "FP-013-1.2.0"
           },
           "item_versions": {
             "$ref": "#/components/schemas/IntegratedConsentItemVersions"
@@ -4329,6 +5367,21 @@
       }
     },
     "responses": {
+      "FieldSessionError": {
+        "description": "Registered /api/field-session error (S01-20). The code, HTTP status and retryable / reauthentication_required flags follow components.schemas.FieldSessionError x-walksafe-error-contract; any other code means REAUTHENTICATE.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/FieldSessionError"
+            }
+          }
+        }
+      },
       "AccountEnrollmentEmailOtp": {
         "description": "Opaque email OTP enrollment handle metadata",
         "headers": {
@@ -4563,6 +5616,78 @@
           }
         }
       },
+      "WalkOwnedByOtherDevice": {
+        "description": "walk_owned_by_other_device: another device or session of the same account holds the active field walk; no Backend call was made",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/WalkOwnedByOtherDeviceError"
+            }
+          }
+        }
+      },
+      "FieldWalkLedgerUnavailable": {
+        "description": "Fail-closed dependency failure: field_walk_ledger_unavailable when the walk ownership gate cannot read or lock the field walk ledger (no Backend call was made), or another bounded Gateway storage/security unavailability",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FieldWalkLedgerUnavailableError"
+                },
+                {
+                  "$ref": "#/components/schemas/GatewayError"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "FieldWalkUnavailable": {
+        "description": "Gateway security is not configured, field_walk_ledger_unavailable (ledger unchanged), field_walk_ledger_outcome_unknown (command may be committed; Retry-After: 1 and retry the same request_id), or field_walk_clock_unavailable (start/takeover only, ledger unchanged)",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "Retry-After": {
+            "description": "Present with field_walk_ledger_outcome_unknown.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FieldWalkLedgerUnavailableError"
+                },
+                {
+                  "$ref": "#/components/schemas/FieldWalkLedgerOutcomeUnknownError"
+                },
+                {
+                  "$ref": "#/components/schemas/FieldWalkClockUnavailableError"
+                },
+                {
+                  "$ref": "#/components/schemas/GatewayError"
+                }
+              ]
+            }
+          }
+        }
+      },
       "BackendJson": {
         "description": "Validated backend contract response",
         "headers": {
@@ -4650,7 +5775,7 @@
         }
       },
       "AccountDeletionPending": {
-        "description": "The durable gateway fence or outbox exists, but canonical backend processing is unavailable. Retry with the same request id, body, revision, and capability.",
+        "description": "The durable gateway fence or outbox exists, but canonical backend processing is unavailable. Retry with the same request id, body, revision, and capability. S19-27: code privacy_deletion_outcome_unknown (retry: same_request_id, Retry-After: 1) means the deletion ledger write may already be durable; the same exact retry replays it and the status route re-reads it.",
         "headers": {
           "Cache-Control": {
             "$ref": "#/components/headers/NoStore"

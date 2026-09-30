@@ -8,7 +8,6 @@ import kr.co.hanium.dreamup.walksafe.navigation.CrosswalkReferencePolicy
 data class MessagePolicyConfig(
     val metricSourceMinConfidence: Map<DepthSource, Float> = defaultMetricSourceMinConfidence(),
     val weakMetricMinConfidence: Float = 0.35f,
-    val pseudoApproachMinConfidence: Float = 0.35f,
     val pathGuidanceMinConfidence: Float = 0.45f,
     val stopDistanceM: Float = 1.2f,
     val warningDistanceM: Float = 2.5f,
@@ -77,6 +76,20 @@ class MessagePolicy(
         return evaluate(result, nowMs).userFacing
     }
 
+    /**
+     * S11-6-F1: a spatially limited metric distance is admitted only where it can raise a warning
+     * for an obstacle class: within the warning distance (with the active-level hysteresis). A
+     * farther one-sided distance may be background, so it must not judge the object far.
+     */
+    internal fun admitsSpatiallyLimitedDistance(className: String, distanceM: Float?, trackKey: String): Boolean {
+        if (distanceM == null || !distanceM.isFinite() || distanceM <= 0f) return false
+        if (CrosswalkReferencePolicy.isCrosswalkDetectorClass(className) ||
+            WalkMateClassPolicy.isTrafficLightClass(className) || isTactileClass(className)
+        ) return false
+        val marginM = if (activeObstacleLevelByKey.containsKey(trackKey)) config.hysteresis.distanceMarginM else 0f
+        return distanceM <= config.warningDistanceM + marginM
+    }
+
     fun evaluate(result: MetricDepthDecision, nowMs: Long = System.currentTimeMillis()): MessagePolicyDecision {
         val candidate = when {
             CrosswalkReferencePolicy.isCrosswalkDetectorClass(result.className) -> crosswalkGuidanceMessage(result)
@@ -109,7 +122,7 @@ class MessagePolicy(
             )
         }
         val target = labelForClass(result.className)
-        val phrase = "전방 $target"
+        val phrase = "${cameraScreenPositionPrefix(result.cameraScreenLateralPosition)}$target"
         val currentMotion = result.motionEstimate.takeIf { it.isCurrentMeasuredMotion(frameTimestampMs) }
         val motionPhrase = when {
             result.trend == Trend.APPROACHING && result.objectMotion == ObjectMotion.USER_APPROACHING_STATIONARY &&
@@ -136,7 +149,11 @@ class MessagePolicy(
         return MessagePolicyDecision(
             userFacing = UserFacingDepth(stepsAhead = null, messageLevel = level, message = "$phrase.$motionPhrase $action"),
             purpose = MessagePurpose.OBSTACLE_WARNING,
-            reason = if (level == MessageLevel.STOP) "near metric obstacle" else "metric obstacle warning",
+            reason = when {
+                level == MessageLevel.STOP -> "near metric obstacle"
+                result.spatiallyLimited -> "spatially limited metric obstacle warning"
+                else -> "metric obstacle warning"
+            },
         )
     }
 
@@ -178,12 +195,19 @@ class MessagePolicy(
 
     private fun pseudoOrWeakMessage(result: MetricDepthDecision): MessagePolicyDecision {
         val target = labelForClass(result.className)
-        if (!result.source.metric && result.trend == Trend.APPROACHING && result.confidenceFinal >= config.pseudoApproachMinConfidence) {
+        val positionPrefix = cameraScreenPositionPrefix(result.cameraScreenLateralPosition)
+        // Pseudo depth has no depth/sample score and cannot reach a metric confidence threshold.
+        // Its positive score only proves that the estimator did not close the hard gate; the
+        // estimator's stable visual-growth trend and the delivery gate provide the other checks.
+        if (result.source == DepthSource.POLYGON_TREND_PSEUDO_DEPTH &&
+            result.trend == Trend.APPROACHING && result.confidenceFinal.isFinite() &&
+            result.confidenceFinal > 0f
+        ) {
             return MessagePolicyDecision(
                 userFacing = UserFacingDepth(
                     stepsAhead = null,
                     messageLevel = MessageLevel.CAUTION,
-                    message = "전방 ${target}와의 거리가 줄어드는 것 같습니다. 속도를 늦추고 주변을 확인하세요.",
+                    message = "${positionPrefix}${target}와의 거리가 줄어드는 것 같습니다. 속도를 늦추고 주변을 확인하세요.",
                 ),
                 purpose = MessagePurpose.APPROACH_CAUTION,
                 reason = "pseudo-depth approaching",
@@ -194,7 +218,7 @@ class MessagePolicy(
                 userFacing = UserFacingDepth(
                     stepsAhead = null,
                     messageLevel = MessageLevel.CAUTION,
-                    message = "전방 가까운 $target 가능성. 속도를 늦추고 주변을 확인하세요.",
+                    message = "${positionPrefix}가까운 $target 가능성. 속도를 늦추고 주변을 확인하세요.",
                 ),
                 purpose = MessagePurpose.APPROACH_CAUTION,
                 reason = "metric source confidence below warning threshold",
@@ -222,19 +246,25 @@ class MessagePolicy(
         val warningDistance = config.warningDistanceM + distanceMargin
         val approachingDistance = config.approachingWarningDistanceM + distanceMargin
 
-        return when {
+        val distanceLevel = when {
             distance <= stopDistance -> MessageLevel.STOP
             distance <= warningDistance && result.confidenceFinal >= config.stopConfidence -> MessageLevel.STOP
             distance <= warningDistance -> MessageLevel.WARNING
-            result.trend == Trend.APPROACHING && result.timeToCollisionMs != null &&
-                result.timeToCollisionMs <= config.ttcStopMs -> MessageLevel.STOP
-            result.trend == Trend.APPROACHING && result.timeToCollisionMs != null &&
-                result.timeToCollisionMs <= config.ttcWarningMs -> MessageLevel.WARNING
-            result.trend == Trend.APPROACHING && result.timeToCollisionMs != null &&
-                result.timeToCollisionMs <= config.ttcAwareMs -> MessageLevel.AWARE
             result.trend == Trend.APPROACHING && distance <= approachingDistance -> MessageLevel.WARNING
             else -> MessageLevel.NONE
         }
+        val ttc = result.timeToCollisionMs?.takeIf { it >= 0L && result.trend == Trend.APPROACHING }
+        val ttcLevel = when {
+            ttc == null -> MessageLevel.NONE
+            ttc <= config.ttcStopMs -> MessageLevel.STOP
+            ttc <= config.ttcWarningMs -> MessageLevel.WARNING
+            ttc <= config.ttcAwareMs -> MessageLevel.AWARE
+            else -> MessageLevel.NONE
+        }
+        // Both paths already share the metric/confidence gate. Nearer evidence cannot hide TTC.
+        val level = maxOf(distanceLevel, ttcLevel)
+        // S11-6-F1: low spatial coverage is low certainty; it warns but never commands a stop.
+        return if (result.spatiallyLimited) minOf(level, MessageLevel.WARNING) else level
     }
 
     private fun isWeakMetricCandidate(result: MetricDepthDecision): Boolean {
@@ -294,8 +324,18 @@ class MessagePolicy(
         return WalkMateClassPolicy.isTactileClass(className) || isTactileBlockClass(className)
     }
 
+    private fun cameraScreenPositionPrefix(position: CameraScreenLateralPosition): String = when (position) {
+        CameraScreenLateralPosition.LEFT -> "카메라 화면 왼쪽에 있는 "
+        CameraScreenLateralPosition.CENTER -> "카메라 화면 중앙에 있는 "
+        CameraScreenLateralPosition.RIGHT -> "카메라 화면 오른쪽에 있는 "
+        CameraScreenLateralPosition.UNKNOWN -> ""
+    }
+
     private fun labelForClass(className: String): String = ObstacleLabels.labelFor(className)
 }
+
+/** Current upright camera-screen position, not motion direction or walking-space overlap. */
+enum class CameraScreenLateralPosition { UNKNOWN, LEFT, CENTER, RIGHT }
 
 data class MetricDepthDecision(
     val className: String,
@@ -307,7 +347,28 @@ data class MetricDepthDecision(
     val timeToCollisionMs: Long? = null,
     val objectMotion: ObjectMotion = ObjectMotion.UNKNOWN,
     val motionEstimate: ObjectMotionEstimate = ObjectMotionEstimate(),
+    val cameraScreenLateralPosition: CameraScreenLateralPosition = CameraScreenLateralPosition.UNKNOWN,
+    /**
+     * S11-6-F1: the distance is escalation-only proximity evidence from low spatial coverage.
+     * It may raise the obstacle level up to WARNING, never to STOP (FP-021: a low-certainty result
+     * is not used for a stop command).
+     */
+    val spatiallyLimited: Boolean = false,
 )
+
+/** Only a current, leased visual trend may open the ARCore per-object qualitative gate. */
+fun TrackedObjectDepth.isCurrentQualitativeCaution(nowElapsedRealtimeMs: Long): Boolean {
+    val validUntil = sourceValidUntilElapsedRealtimeMs ?: return false
+    return source == DepthSource.POLYGON_TREND_PSEUDO_DEPTH &&
+        frameId > 0L && timestampMs == frameId / 1_000_000L &&
+        nowElapsedRealtimeMs in 0L..validUntil &&
+        trend == Trend.APPROACHING && userFacing.messageLevel == MessageLevel.CAUTION &&
+        !userFacing.message.isNullOrBlank() && userFacing.stepsAhead == null &&
+        zDistanceM == null && rayDistanceM == null && groundDistanceM == null &&
+        riskDistanceM == null && timeToCollisionMs == null && approachSpeedMps == null &&
+        confidence.hardGate.isFinite() && confidence.hardGate > 0f &&
+        confidence.finalScore.isFinite() && confidence.finalScore > 0f
+}
 
 fun defaultMetricSourceMinConfidence(): Map<DepthSource, Float> {
     return mapOf(

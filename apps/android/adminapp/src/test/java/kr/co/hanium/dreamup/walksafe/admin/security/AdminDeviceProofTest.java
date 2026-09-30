@@ -19,6 +19,38 @@ import org.junit.Test;
 
 public final class AdminDeviceProofTest {
     @Test
+    public void sessionRevokeActionSignsTheCurrentIdentityAndExactEmptyBodyTarget() throws Exception {
+        String target = "55555555-5555-4555-8555-555555555555";
+        AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
+            "session.revoke", "admin-001", EMPTY_SHA, CORRELATION_ID, DEVICE_ID,
+            MARKER, 1, "POST", "/admin/security/sessions/" + target + "/revoke",
+            AdminDeviceProof.Purpose.ACTION, EMPTY_SHA, null, SESSION_ID
+        );
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
+        generator.initialize(new ECGenParameterSpec("secp256r1"));
+        KeyPair keyPair = generator.generateKeyPair();
+        AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
+            challengeResponse(intent, ISSUED_AT, null), intent, ISSUED_AT + 1,
+            payload -> {
+                Signature signature = Signature.getInstance("SHA256withECDSA");
+                signature.initSign(keyPair.getPrivate());
+                signature.update(payload);
+                return signature.sign();
+            }
+        );
+        JSONObject signed = new JSONObject(proof.signingPayload());
+        assertEquals("session.revoke", signed.getString("action"));
+        assertEquals(SESSION_ID, signed.getString("session_id"));
+        assertEquals("/admin/security/sessions/" + target + "/revoke", signed.getString("path"));
+        assertEquals(EMPTY_SHA, signed.getString("body_sha256"));
+        assertEquals(EMPTY_SHA, signed.getString("query_sha256"));
+        Signature verifier = Signature.getInstance("SHA256withECDSA");
+        verifier.initVerify(keyPair.getPublic());
+        verifier.update(proof.signingPayload().getBytes(StandardCharsets.UTF_8));
+        assertTrue(verifier.verify(Base64.getUrlDecoder().decode(proof.encodedSignature())));
+    }
+
+    @Test
     public void exact19BecomesCanonicalExact18AndSignsUtf8AsDerBase64Url() throws Exception {
         AdminDeviceProof.Intent intent = readIntent();
         KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
@@ -97,11 +129,29 @@ public final class AdminDeviceProofTest {
             intent,
             ISSUED_AT + 1
         ));
-        assertThrows(IOException.class, () -> parse(challengeResponse(intent, ISSUED_AT, null), intent, ISSUED_AT - 1));
+        assertThrows(IOException.class, () -> parse(
+            challengeResponse(intent, ISSUED_AT, Map.of("expires_at_epoch_ms", ISSUED_AT + 120_001L)),
+            intent,
+            ISSUED_AT + 1
+        ));
         assertThrows(IOException.class, () -> parse(
             challengeResponse(intent, ISSUED_AT, null),
             intent,
             ISSUED_AT + AdminDeviceProof.CHALLENGE_TTL_MS
+        ));
+    }
+
+    @Test
+    public void boundedFutureIssuedClockSkewIsAcceptedWithoutExtendingExpiry() throws Exception {
+        AdminDeviceProof.Intent intent = readIntent();
+        String challenge = challengeResponse(intent, ISSUED_AT, null);
+
+        assertEquals(CHALLENGE_ID, parse(challenge, intent, ISSUED_AT - 900L).challengeId());
+        assertEquals(CHALLENGE_ID, parse(challenge, intent, ISSUED_AT - 5_000L).challengeId());
+        assertThrows(AdminDeviceProof.ChallengeTimeException.class,
+            () -> parse(challenge, intent, ISSUED_AT - 5_001L));
+        assertThrows(AdminDeviceProof.ChallengeTimeException.class, () -> parse(
+            challenge, intent, ISSUED_AT + AdminDeviceProof.CHALLENGE_TTL_MS
         ));
     }
 

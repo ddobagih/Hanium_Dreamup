@@ -90,7 +90,7 @@ internal class AndroidGatewaySessionStore(
         if (
             version.gatewayBaseUrl != expectedGatewayBaseUrl ||
             version.deviceId != installDeviceId ||
-            firstRun.reporterActorBinding?.value != version.actorId
+            firstRun.verifiedActorBinding?.value != version.actorId
         ) {
             markFailClosedLocked()
             return null
@@ -112,7 +112,7 @@ internal class AndroidGatewaySessionStore(
         val restored = GatewayFieldSession.restore(
             snapshot = bundle.session,
             expectedGatewayBaseUrl = expectedGatewayBaseUrl,
-            expectedActorId = firstRun.reporterActorBinding?.value ?: return null,
+            expectedActorId = firstRun.verifiedActorBinding?.value ?: return null,
             expectedDeviceId = installDeviceId,
             nowEpochMs = nowEpochMs,
         ) ?: run {
@@ -155,6 +155,7 @@ internal class AndroidGatewaySessionStore(
             firstRunSnapshot = firstRunSnapshot,
             expectedGatewayBaseUrl = expectedVersion.gatewayBaseUrl,
             installDeviceId = installDeviceId,
+            allowFreshChecksPending = true,
         ) ?: return GatewaySessionStoreResult.BLOCKED
         val current = loadStateOrBlockedLocked()
             ?: return GatewaySessionStoreResult.BLOCKED
@@ -166,6 +167,27 @@ internal class AndroidGatewaySessionStore(
                 renewedBundle = renewedBundle,
             ),
         )
+    }
+
+    fun rollbackRenewalForRetry(
+        expectedVersion: GatewaySessionVersion,
+        operationId: String,
+        reservation: GatewayRefreshRetryReservation,
+    ): GatewaySessionStoreResult = synchronized(PROCESS_LOCK) {
+        if (!reservation.matches(expectedVersion) || !reservation.isCurrent()) {
+            return GatewaySessionStoreResult.STALE
+        }
+        val current = loadStateOrBlockedLocked() ?: return GatewaySessionStoreResult.BLOCKED
+        val result = applyTransitionLocked(
+            GatewayPersistedLoginStatePolicy.rollbackRenewalForRetry(
+                current.state, expectedVersion, operationId,
+            ),
+        )
+        if (result == GatewaySessionStoreResult.COMMITTED && !reservation.releaseAfterDurableRollback()) {
+            markFailClosedLocked()
+            return GatewaySessionStoreResult.BLOCKED
+        }
+        result
     }
 
     fun abandonRenewal(
@@ -496,10 +518,11 @@ internal class AndroidGatewaySessionStore(
         firstRunSnapshot: FirstRunOnboardingSnapshot,
         expectedGatewayBaseUrl: String,
         installDeviceId: String,
+        allowFreshChecksPending: Boolean = false,
     ): GatewayPersistedLoginBundle? {
         val persisted = session.persistenceSnapshotOrNull() ?: return null
-        val evidence = completeOrderedEvidenceOrNull(firstRunSnapshot) ?: return null
-        val actorId = firstRunSnapshot.reporterActorBinding?.value ?: return null
+        val evidence = completeOrderedEvidenceOrNull(firstRunSnapshot, allowFreshChecksPending) ?: return null
+        val actorId = firstRunSnapshot.verifiedActorBinding?.value ?: return null
         if (
             persisted.gatewayBaseUrl != expectedGatewayBaseUrl ||
             persisted.actorId != actorId ||
@@ -517,10 +540,11 @@ internal class AndroidGatewaySessionStore(
 
     private fun completeOrderedEvidenceOrNull(
         snapshot: FirstRunOnboardingSnapshot,
+        allowFreshChecksPending: Boolean = false,
     ): List<FirstRunOnboardingEvidence>? {
-        if (!snapshot.isComplete || !snapshot.mayEnterWalk || snapshot.pendingAttempt != null) {
-            return null
-        }
+        val historyAccepted = if (allowFreshChecksPending) hasCompletedFirstRunHistory(snapshot)
+            else snapshot.isComplete && snapshot.mayEnterWalk
+        if (!historyAccepted || snapshot.pendingAttempt != null) return null
         val ageBand = snapshot.ageBand ?: return null
         if (ageBand == FirstRunAgeBand.UNDER_14) return null
         val receipts = snapshot.completedReceiptHashes
@@ -633,6 +657,17 @@ internal class AndroidGatewaySessionStore(
         }.getOrNull()
     }
 
+    /** Authenticated receipt history is durable; permission/device observations are not. */
+    private fun hasCompletedFirstRunHistory(snapshot: FirstRunOnboardingSnapshot): Boolean =
+        (snapshot.isComplete && snapshot.mayEnterWalk) ||
+            (snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 &&
+                snapshot.stage in setOf(
+                    FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
+                    FirstRunOnboardingStage.DEVICE_CHECK,
+                ) &&
+                snapshot.verifiedActorBinding != null &&
+                FirstRunOnboardingStage.FP004_TRAINING in snapshot.completedReceiptHashes)
+
     private fun restoreAuthenticatedFirstRun(
         bundle: GatewayPersistedLoginBundle,
     ): FirstRunOnboardingSnapshot? {
@@ -653,9 +688,8 @@ internal class AndroidGatewaySessionStore(
         return restored.snapshot.takeIf {
             restored.fullyRestored &&
                 restored.restoredEvidenceCount == bundle.orderedEvidence.size &&
-                it.isComplete &&
-                it.mayEnterWalk &&
-                it.reporterActorBinding?.value == bundle.session.actorId
+                hasCompletedFirstRunHistory(it) &&
+                it.verifiedActorBinding?.value == bundle.session.actorId
         }
     }
 
@@ -1112,9 +1146,15 @@ internal class AndroidGatewaySessionStore(
             .put("access_expires_at_epoch_ms", session.accessExpiresAtEpochMs)
             .put("idle_expires_at_epoch_ms", session.idleExpiresAtEpochMs)
             .put("absolute_expires_at_epoch_ms", session.absoluteExpiresAtEpochMs)
+            .apply {
+                session.serverAccessExpiresAtEpochMs?.let {
+                    put("server_access_expires_at_epoch_ms", it)
+                }
+            }
 
     private fun decodeSession(session: JSONObject): GatewayFieldSessionPersistence {
-        require(session.jsonKeys() == SESSION_FIELDS)
+        val keys = session.jsonKeys()
+        require(keys == SESSION_FIELDS || keys == SESSION_FIELDS_WITH_SERVER_EXPIRY)
         val persistence = GatewayFieldSessionPersistence(
             gatewayBaseUrl = session.getString("gateway_base_url"),
             actorId = session.getString("actor_id"),
@@ -1126,6 +1166,11 @@ internal class AndroidGatewaySessionStore(
             accessExpiresAtEpochMs = session.getLong("access_expires_at_epoch_ms"),
             idleExpiresAtEpochMs = session.getLong("idle_expires_at_epoch_ms"),
             absoluteExpiresAtEpochMs = session.getLong("absolute_expires_at_epoch_ms"),
+            serverAccessExpiresAtEpochMs = if (session.has("server_access_expires_at_epoch_ms")) {
+                session.getLong("server_access_expires_at_epoch_ms")
+            } else {
+                null
+            },
         )
         require(GatewayCredentialPolicy.normalizedActorIdOrNull(persistence.actorId) != null)
         require(
@@ -1143,6 +1188,10 @@ internal class AndroidGatewaySessionStore(
         require(persistence.rotation >= 0L)
         require(persistence.accessExpiresAtEpochMs <= persistence.idleExpiresAtEpochMs)
         require(persistence.idleExpiresAtEpochMs <= persistence.absoluteExpiresAtEpochMs)
+        persistence.serverAccessExpiresAtEpochMs?.let {
+            require(it >= persistence.accessExpiresAtEpochMs)
+            require(it <= persistence.idleExpiresAtEpochMs)
+        }
         return persistence
     }
 
@@ -1432,6 +1481,7 @@ internal class AndroidGatewaySessionStore(
             "idle_expires_at_epoch_ms",
             "absolute_expires_at_epoch_ms",
         )
+        val SESSION_FIELDS_WITH_SERVER_EXPIRY = SESSION_FIELDS + "server_access_expires_at_epoch_ms"
         val INSTALL_ID_FIELDS = setOf("payload_version", "device_id")
         val OPERATION_ID_PATTERN = Regex("^[A-Za-z0-9_-]{16,128}$")
 

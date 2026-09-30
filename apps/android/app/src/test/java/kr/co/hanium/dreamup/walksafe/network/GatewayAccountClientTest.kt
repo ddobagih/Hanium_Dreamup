@@ -11,6 +11,9 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+// S01-9: fixtures expire at 2026-08-29T10:10:00Z; the client now checks them against a clock.
+private const val OTP_FIXTURE_NOW_MS = 1_787_997_600_000L // 2026-08-29T10:00:00Z
+
 class GatewayAccountClientTest {
     @Test
     fun restoredPasswordLoginRetainsProofAcrossOfflineAndTemporaryServerFailures() {
@@ -80,7 +83,7 @@ class GatewayAccountClientTest {
             ),
         )
 
-        val result = GatewayAccountClient(transport).requestEmailOtp(
+        val result = GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS }).requestEmailOtp(
             gatewayBaseUrl = "https://gateway.example",
             email = "person@example.com",
             dateOfBirth = "2000-02-29",
@@ -107,7 +110,7 @@ class GatewayAccountClientTest {
         )
 
         val error = assertThrows(GatewayAccountHttpException::class.java) {
-            GatewayAccountClient(transport).requestEmailOtp(
+            GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS }).requestEmailOtp(
                 "https://gateway.example",
                 "secret-person@example.com",
                 "2000-01-01",
@@ -474,6 +477,60 @@ class GatewayAccountClientTest {
         }
         assertEquals("invalid_account_credentials", rejected.serverCode)
         assertFalse(rejected.message.orEmpty().contains("person@example.com"))
+    }
+
+    @Test
+    fun releaseAccountRequestsRejectOtherHttpsBeforeTransport() {
+        val transport = AccountTransport(GatewayHttpResponse(500, "{}"))
+        val accountClient = GatewayAccountClient(
+            transport,
+            approvedReleaseOrigin = "https://approved.example",
+            allowDebugOrigin = false,
+        )
+        val otpError = assertThrows(GatewayAccountHttpException::class.java) {
+            accountClient.requestEmailOtp(
+                "https://other.example", "person@example.com", "2000-01-01", "request_1234567890",
+            )
+        }
+        assertEquals("invalid_gateway_url", otpError.reason)
+        val createError = assertThrows(GatewayAccountHttpException::class.java) {
+            accountClient.createAccount(
+                "https://other.example", HANDLE, "012345", "correct horse battery",
+                SignupConsentSelections(true, true, true),
+            )
+        }
+        assertEquals("invalid_gateway_url", createError.reason)
+        val loginError = assertThrows(GatewaySessionHttpException::class.java) {
+            GatewayFieldSessionClient(
+                transport,
+                approvedAccountOrigin = "https://approved.example",
+                allowDebugAccountOrigin = false,
+            ).loginWithPassword(
+                "https://other.example", "person@example.com", "correct horse battery", false,
+            )
+        }
+        assertEquals("invalid_gateway_url", loginError.reason)
+        assertEquals("", transport.url)
+        assertEquals(0, transport.getCount)
+    }
+
+    @Test
+    fun debugAccountClientKeepsLoopbackRequestPath() {
+        val transport = AccountTransport(
+            GatewayHttpResponse(
+                202,
+                """{"schema_version":"walksafe.account-enrollment-email-otp-response.v1","enrollment_handle":"$HANDLE","expires_at":"2026-08-29T10:10:00Z","resend_available_at":"2026-08-29T10:01:00Z"}""",
+            ),
+        )
+        GatewayAccountClient(
+            transport,
+            approvedReleaseOrigin = "https://approved.example",
+            allowDebugOrigin = true,
+            clockEpochMs = { OTP_FIXTURE_NOW_MS },
+        ).requestEmailOtp(
+            "http://127.0.0.1:8081", "person@example.com", "2000-01-01", "request_1234567890",
+        )
+        assertEquals("http://127.0.0.1:8081/api/account-enrollments/email-otp", transport.url)
     }
 
     private class AccountTransport(

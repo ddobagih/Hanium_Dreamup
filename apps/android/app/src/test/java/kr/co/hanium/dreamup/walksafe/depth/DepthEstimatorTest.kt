@@ -194,7 +194,7 @@ class DepthEstimatorTest {
     }
 
     @Test
-    fun reprojectedRawDepthRemainsMetricButIsSoftDownweighted() {
+    fun reprojectedRawBelowMetricConfidenceFallsBackWithoutRecordingDistance() {
         val geometry = MaskPolygonExtractor().extract(
             DetectionCandidate(
                 className = "person",
@@ -232,8 +232,10 @@ class DepthEstimatorTest {
             ),
         )
 
-        assertEquals(DepthSource.ARCORE_RAW_DEPTH, reprojected.source)
-        assertEquals(fresh.riskDistanceM!!, reprojected.riskDistanceM!!, 0f)
+        assertEquals(DepthSource.ARCORE_RAW_DEPTH, fresh.source)
+        assertEquals(DepthSource.POLYGON_TREND_PSEUDO_DEPTH, reprojected.source)
+        assertNull(reprojected.riskDistanceM)
+        assertTrue(staleTrack.distanceHistory.isEmpty())
         assertTrue(reprojected.confidence.finalScore < fresh.confidence.finalScore)
     }
 

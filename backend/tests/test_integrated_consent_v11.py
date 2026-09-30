@@ -33,8 +33,8 @@ SIGNUP_VERSIONS = {
     "terms_of_service": "walksafe.terms-of-service.v1",
     "privacy_notice": "walksafe.privacy-notice.v1",
     "location_terms": "walksafe.location-terms.v1",
-    "raw_original": "FP-013-RAW-1.1.0",
-    "automatic_reporting": "FP-013-AUTO-1.1.0",
+    "raw_original": "FP-013-RAW-1.2.0",
+    "automatic_reporting": "FP-013-AUTO-1.2.0",
     "training_reuse": "FP-013-TRAINING-1.1.0",
 }
 
@@ -149,7 +149,7 @@ def test_v11_request_is_required_nullable_and_strict() -> None:
         "expected_previous_backend_receipt_sha256": None,
     }
     assert PrivacyConsentEventV2.model_validate(payload).policy_version == (
-        "FP-013-1.1.0"
+        "FP-013-1.2.0"
     )
     for invalid in (
         {key: value for key, value in payload.items() if key != "expected_previous_backend_receipt_sha256"},
@@ -308,6 +308,46 @@ def test_bootstrap_uses_exact_current_signup_only_with_zero_events(
     assert stale_response.source == "NONE"
 
 
+def test_s01_3_bootstrap_accepts_only_declared_equivalent_signup_versions(
+    isolated_consent_service: None,
+) -> None:
+    account = SimpleNamespace(id=uuid.uuid4())
+    shown = SimpleNamespace(
+        document_versions={**SIGNUP_VERSIONS, "raw_original": "FP-013-RAW-1.0.9"},
+        selections={
+            "terms_of_service": True,
+            "privacy_notice": True,
+            "location_terms": True,
+            "raw_original": True,
+            "automatic_reporting": False,
+            "training_reuse": False,
+        },
+        receipt_sha256="f" * 64,
+    )
+
+    def bootstrap(equivalents):
+        return privacy_lifecycle.get_consent_bootstrap(
+            FakeSession([None, None, account, shown]),  # type: ignore[arg-type]
+            actor_id="field.actor",
+            account_generation=1,
+            installation_id="installation_0001",
+            policy_version=PRIVACY_CONSENT_POLICY_VERSION,
+            signup_document_versions=SIGNUP_VERSIONS,
+            secret=PRIVACY_SECRET,
+            signup_equivalent_document_versions=equivalents,
+        )
+
+    assert bootstrap(None).status == "RECONSENT_REQUIRED"
+    assert bootstrap({"training_reuse": {"FP-013-RAW-1.0.9"}}).status == (
+        "RECONSENT_REQUIRED"
+    )
+    ready = bootstrap({"raw_original": frozenset({"FP-013-RAW-1.0.9"})})
+    assert ready.status == "READY"
+    assert ready.source == "SIGNUP_CONSENT"
+    assert ready.selections is not None
+    assert ready.selections.raw_source_collection is True
+
+
 def test_record_cas_runs_before_installation_revision_validation(
     isolated_consent_service: None,
 ) -> None:
@@ -414,6 +454,7 @@ def test_legacy_event_is_evidence_only_for_report_and_training_admission(
         FakeSession([None, legacy]),  # type: ignore[arg-type]
         privacy_subject="a" * 64,
         account_generation=1,
+        source_kind="REPORT_ORIGINAL",
     ) is False
 
     collection = SimpleNamespace(

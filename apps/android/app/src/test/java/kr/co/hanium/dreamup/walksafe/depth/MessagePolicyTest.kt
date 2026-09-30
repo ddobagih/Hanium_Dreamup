@@ -10,6 +10,104 @@ import org.junit.Test
 
 class MessagePolicyTest {
     @Test
+    fun crossedScreenPositionAndMeasuredMotionRemainSeparate() {
+        val base = MetricDepthDecision(
+            className = "person", source = DepthSource.ARCORE_RAW_DEPTH, riskDistanceM = 1f,
+            trend = Trend.STABLE, confidenceFinal = 0.9f,
+        )
+        val leftMovingRight = MessagePolicy().buildUserFacing(base.copy(
+            cameraScreenLateralPosition = CameraScreenLateralPosition.LEFT,
+            motionEstimate = measuredMotion(ObjectMovementDirection.RIGHT),
+        ), nowMs = 0L).message!!
+        val rightMovingLeft = MessagePolicy().buildUserFacing(base.copy(
+            cameraScreenLateralPosition = CameraScreenLateralPosition.RIGHT,
+            motionEstimate = measuredMotion(ObjectMovementDirection.LEFT),
+        ), nowMs = 0L).message!!
+
+        assertTrue(leftMovingRight.contains("카메라 화면 왼쪽에 있는"))
+        assertTrue(leftMovingRight.contains("카메라 기준 오른쪽으로 이동"))
+        assertTrue(rightMovingLeft.contains("카메라 화면 오른쪽에 있는"))
+        assertTrue(rightMovingLeft.contains("카메라 기준 왼쪽으로 이동"))
+        for (message in listOf(leftMovingRight, rightMovingLeft)) {
+            assertFalse(message.contains("전방"))
+            assertFalse(message.contains("다가오"))
+        }
+    }
+
+    @Test
+    fun metricPseudoAndWeakMessagesOmitPositionWhenUnknown() {
+        val metric = MetricDepthDecision(
+            className = "person", source = DepthSource.ARCORE_RAW_DEPTH, riskDistanceM = 1f,
+            trend = Trend.APPROACHING, confidenceFinal = 0.9f,
+        )
+        val pseudo = metric.copy(
+            source = DepthSource.POLYGON_TREND_PSEUDO_DEPTH, riskDistanceM = null,
+        )
+        val weak = metric.copy(
+            source = DepthSource.WEBXR_DEPTH, trend = Trend.STABLE, confidenceFinal = 0.58f,
+        )
+        for (decision in listOf(metric, pseudo, weak)) {
+            val message = MessagePolicy().buildUserFacing(decision, nowMs = 0L).message!!
+            assertFalse(message.contains("카메라 화면"))
+            assertFalse(message.contains("전방"))
+            assertFalse(message.contains("이 물체가 사용자 쪽으로 다가오"))
+        }
+    }
+
+    @Test
+    fun pseudoAndWeakMessagesUseOnlySupportedCameraScreenSide() {
+        val pseudo = MetricDepthDecision(
+            className = "person", source = DepthSource.POLYGON_TREND_PSEUDO_DEPTH,
+            riskDistanceM = null, trend = Trend.APPROACHING, confidenceFinal = 0.8f,
+            cameraScreenLateralPosition = CameraScreenLateralPosition.LEFT,
+        )
+        val weak = pseudo.copy(
+            source = DepthSource.WEBXR_DEPTH, riskDistanceM = 1f,
+            trend = Trend.STABLE, confidenceFinal = 0.58f,
+            cameraScreenLateralPosition = CameraScreenLateralPosition.RIGHT,
+        )
+        val pseudoMessage = MessagePolicy().buildUserFacing(pseudo, nowMs = 0L).message!!
+        val weakMessage = MessagePolicy().buildUserFacing(weak, nowMs = 0L).message!!
+
+        assertTrue(pseudoMessage.contains("카메라 화면 왼쪽에 있는"))
+        assertTrue(weakMessage.contains("카메라 화면 오른쪽에 있는"))
+        assertFalse(pseudoMessage.contains("전방"))
+        assertFalse(weakMessage.contains("전방"))
+        assertFalse(pseudoMessage.contains("이 물체가 사용자 쪽으로 다가오"))
+    }
+
+    @Test
+    fun screenSideRequiresValidRotationAndBothNormalizedCoordinates() {
+        val cases = listOf(
+            Point2(0.2f, 0.5f) to CameraScreenLateralPosition.LEFT,
+            Point2(0.5f, 0.5f) to CameraScreenLateralPosition.CENTER,
+            Point2(0.8f, 0.5f) to CameraScreenLateralPosition.RIGHT,
+        )
+        for ((uprightCenter, expected) in cases) for (turns in 0..3) {
+            val sensorCenter = uprightPointToSensor(uprightCenter, turns)!!
+            assertEquals(expected, geometryAt(sensorCenter, turns).cameraScreenLateralPosition())
+        }
+        for (turns in listOf(null, -1, 4)) {
+            assertEquals(CameraScreenLateralPosition.UNKNOWN,
+                geometryAt(Point2(0.2f, 0.5f), turns).cameraScreenLateralPosition())
+        }
+        for (center in listOf(
+            Point2(Float.NaN, 0.5f), Point2(0.5f, Float.POSITIVE_INFINITY),
+            Point2(-0.1f, 0.5f), Point2(0.5f, 1.1f),
+        )) {
+            assertEquals(CameraScreenLateralPosition.UNKNOWN,
+                geometryAt(center, 0).cameraScreenLateralPosition())
+        }
+    }
+
+    private fun geometryAt(center: Point2, turns: Int?): ObjectGeometry = ObjectGeometry(
+        className = "person", detectionConfidence = 0.9f,
+        bboxNorm = RectNorm(0f, 0f, 1f, 1f), polygonNorm = emptyList(),
+        maskAreaNorm = 0.1f, centerNorm = center, bottomContactNorm = null,
+        imageQuarterTurns = turns,
+    )
+
+    @Test
     fun oldSpatialMotionCannotDescribeANewFrameAsAnApproachingObject() {
         val result = MetricDepthDecision(
             className = "person", source = DepthSource.ARCORE_RAW_DEPTH, riskDistanceM = 1f,

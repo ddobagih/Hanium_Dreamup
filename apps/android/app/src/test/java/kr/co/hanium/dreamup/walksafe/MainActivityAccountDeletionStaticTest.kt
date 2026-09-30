@@ -146,9 +146,19 @@ class MainActivityAccountDeletionStaticTest {
         )
         assertTrue(
             safetyStop.contains(
-                "if (persistInterruptionMarker) persistWalkSessionInterruptionMarker()",
+                "performWalkSessionSafetyStopCleanup(reason, persistInterruptionMarker, null, null)",
             ),
         )
+        val cleanup = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun performWalkSessionSafetyStopCleanup",
+        )
+        val markerGuard = ReportStaticSourceInspector.blockAfter(
+            cleanup,
+            "if (persistInterruptionMarker && ::walkSessionLifecycle.isInitialized)",
+        )
+        assertTrue(markerGuard.contains("persistWalkSessionInterruptionMarker()"))
+        assertEquals(1, Regex(Regex.escape("persistWalkSessionInterruptionMarker()")).findAll(cleanup).count())
 
         val durableCleanup = ReportStaticSourceInspector.functionBlock(
             source,
@@ -159,6 +169,37 @@ class MainActivityAccountDeletionStaticTest {
                 durableCleanup,
                 "fieldSessionLog.blockForAccountDeletion()",
                 "fieldSessionLog.purgeAll()",
+            ),
+        )
+        // DELETED evidence for device-unsent data must include the report queue and RAW
+        // store purge results; a failure in either one keeps the evidence at FAILED.
+        assertTrue(
+            appearsInOrder(
+                durableCleanup,
+                "purgeLegacyPendingReportQueueOnCleanupThread()",
+                "val reportQueuePurged = retryAccountDeletionPurgeOnCleanupThread {",
+                "reportQueueDrainCoordinator.onAccountDeleted()",
+                "::rawCollectionRuntimeCoordinator.isInitialized &&",
+                "retryAccountDeletionPurgeOnCleanupThread {\n",
+                "rawCollectionRuntimeCoordinator.onAccountDeleted()",
+                "return routeSnapshotPurged && legacyQueuePurged && reportQueuePurged && rawCollectionsPurged &&",
+                "preferencesPurged && fieldSessionsPurged",
+            ),
+        )
+        // A transient failure is retried a bounded number of times, never forever.
+        val retry = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun retryAccountDeletionPurgeOnCleanupThread",
+        )
+        assertTrue(
+            appearsInOrder(
+                retry,
+                "for (attempt in 0 until LEGACY_REPORT_CLEANUP_MAX_ATTEMPTS)",
+                "Thread.sleep(",
+                "Thread.currentThread().interrupt()",
+                "return false\n                }",
+                "if (runCatching(purge).getOrDefault(false)) return true",
+                "return false\n    }",
             ),
         )
     }
@@ -1414,7 +1455,7 @@ class MainActivityAccountDeletionStaticTest {
         assertTrue(source.contains("view.contentDescription = details"))
         assertTrue(source.contains("fieldSessionLog.purgeAll()"))
         assertTrue(source.contains("invalidateFrameStateForPause()"))
-        assertTrue(source.contains("reportAttemptStore = AndroidReportAttemptStore()"))
+        assertTrue(source.contains("reportAttemptStore = AndroidReportAttemptStore(bootCountProvider = ::reportCooldownBootCount)"))
     }
 
     @Test

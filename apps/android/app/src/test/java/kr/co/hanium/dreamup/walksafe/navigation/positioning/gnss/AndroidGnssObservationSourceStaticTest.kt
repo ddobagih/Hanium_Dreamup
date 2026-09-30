@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.navigation.positioning.gnss
 
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -46,10 +47,32 @@ class AndroidGnssObservationSourceStaticTest {
     @Test
     fun convertsCallbacksToSessionOnlyPrimitiveObservations() {
         assertTrue(source.contains("GnssSatelliteSignal("))
-        assertTrue(source.contains("GnssSignalEpoch(elapsedRealtimeNanos(), signals)"))
+        assertTrue(source.contains("gnssSignalEpochOrNull("))
+        assertTrue(source.contains("receivedAtElapsedRealtimeNanos = receivedAtNanos"))
         assertTrue(source.contains("usedInFix = status.usedInFix(index)"))
         assertTrue(source.contains("usedInFix = false"))
         assertTrue(source.contains("usedInFixKnown = true"))
         assertTrue(source.contains("usedInFixKnown = false"))
+    }
+
+    @Test
+    fun rawElapsedClockAccessIsVersionAndAvailabilityGated() {
+        val callbackMarker = "override fun onGnssMeasurementsReceived("
+        assertTrue(source.contains(callbackMarker))
+        val raw = source.substringAfter(callbackMarker)
+        val receipt = raw.indexOf("val receivedAtNanos = elapsedRealtimeNanos()")
+        val apiGuard = raw.indexOf("Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q")
+        val clockGuard = raw.indexOf("clock.hasElapsedRealtimeNanos()")
+        val clockRead = raw.indexOf("clock.elapsedRealtimeNanos")
+        val uncertaintyGuard = raw.indexOf("clock.hasElapsedRealtimeUncertaintyNanos()")
+        val uncertaintyRead = raw.indexOf("clock.elapsedRealtimeUncertaintyNanos")
+        assertTrue(listOf(receipt, apiGuard, clockGuard, clockRead, uncertaintyGuard, uncertaintyRead).all { it >= 0 })
+        assertTrue(receipt < apiGuard)
+        assertTrue(apiGuard < clockRead)
+        assertTrue(clockGuard < clockRead)
+        assertTrue(uncertaintyGuard < uncertaintyRead)
+        assertTrue(raw.contains("measuredAtElapsedRealtimeNanos = measuredAtNanos"))
+        assertTrue(raw.contains("timestampUncertaintyNanos = uncertaintyNanos"))
+        assertFalse(source.contains("clock.timeNanos"))
     }
 }

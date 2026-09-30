@@ -10,6 +10,12 @@ public final class AdminHighRiskActionGate {
         String reauthenticationAction();
         String method();
         String path();
+
+        /**
+         * S18-7: SHA-256 of the exact request body the reconfirmation approves, or null when
+         * this operation's body is not known before reauthentication.
+         */
+        default String intentSha256() { return null; }
     }
 
     public enum Action implements Operation {
@@ -126,6 +132,16 @@ public final class AdminHighRiskActionGate {
         );
     }
 
+    /** S18-40: append-only correction of the latest effective delivery event. */
+    public static Operation deliveryCorrection(String reportId) {
+        String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
+        return operation(
+            "report.delivery.correct",
+            "POST",
+            "/reports/" + safeId + "/delivery-corrections"
+        );
+    }
+
     public static Operation originalEvidence(String reportId) {
         String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
         return operation(
@@ -182,6 +198,30 @@ public final class AdminHighRiskActionGate {
             "/admin/raw-collections/" + safeId + "/legal-holds"
         );
     }
+
+    /**
+     * S18-29: reporting another device lost revokes its keys and sessions, so it needs a
+     * fresh password + TOTP reconfirmation bound to that exact device path.
+     */
+    public static Operation deviceReportLost(String deviceId) {
+        if (deviceId == null || !deviceId.matches("[A-Za-z0-9][A-Za-z0-9._:-]{7,127}")) {
+            throw new IllegalArgumentException("device_id is invalid");
+        }
+        String path = "/admin/security/devices/" + deviceId + "/report-lost";
+        // The request body is always "{}", so the reconfirmation can bind to it (S18-7).
+        String intent = AdminCanonicalEncoding.sha256Hex(
+            REPORT_LOST_BODY.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        return new Operation() {
+            @Override public String reauthenticationAction() { return "device.report_lost"; }
+            @Override public String method() { return "POST"; }
+            @Override public String path() { return path; }
+            @Override public String intentSha256() { return intent; }
+        };
+    }
+
+    /** Exact JSON body of POST /admin/security/devices/{device_id}/report-lost. */
+    public static final String REPORT_LOST_BODY = "{}";
 
     private static Operation operation(String action, String method, String path) {
         return new Operation() {

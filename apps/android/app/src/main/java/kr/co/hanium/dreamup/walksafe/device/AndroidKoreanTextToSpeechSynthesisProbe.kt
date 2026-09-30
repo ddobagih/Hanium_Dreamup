@@ -12,11 +12,19 @@ import java.util.Locale
 import java.util.UUID
 import kr.co.hanium.dreamup.walksafe.voice.selectInstalledOfflineKoreanVoice
 import kr.co.hanium.dreamup.walksafe.voice.KoreanOfflineVoiceSelection
+import kr.co.hanium.dreamup.walksafe.voice.OfflineKoreanSpeechGuidancePolicy
+import kr.co.hanium.dreamup.walksafe.voice.OfflineKoreanSpeechUnavailableCause
 
 enum class KoreanTextToSpeechSynthesisProbeResult {
     AVAILABLE,
     INITIALIZATION_FAILED,
     KOREAN_LANGUAGE_UNAVAILABLE,
+    /** Korean is known to the preferred engine, but no installed network-free Korean voice exists. */
+    KOREAN_VOICE_DATA_MISSING,
+    /** The preferred engine does not support Korean while another engine is installed. */
+    KOREAN_PREFERRED_ENGINE_UNSUPPORTED,
+    /** The only installed engine does not support Korean. */
+    KOREAN_ENGINE_UNAVAILABLE,
     OUTPUT_FILE_UNAVAILABLE,
     LISTENER_REGISTRATION_FAILED,
     SYNTHESIS_REJECTED,
@@ -32,6 +40,15 @@ enum class KoreanTextToSpeechSynthesisProbeResult {
 
     val available: Boolean
         get() = this == AVAILABLE
+
+    /** Guidance input only; synthesis and lifecycle failures keep the generic voice-data guidance. */
+    val unavailableCause: OfflineKoreanSpeechUnavailableCause?
+        get() = when (this) {
+            KOREAN_VOICE_DATA_MISSING -> OfflineKoreanSpeechUnavailableCause.KOREAN_VOICE_DATA_MISSING
+            KOREAN_PREFERRED_ENGINE_UNSUPPORTED -> OfflineKoreanSpeechUnavailableCause.PREFERRED_ENGINE_LACKS_KOREAN
+            KOREAN_ENGINE_UNAVAILABLE -> OfflineKoreanSpeechUnavailableCause.NO_KOREAN_CAPABLE_ENGINE
+            else -> null
+        }
 }
 
 /**
@@ -83,6 +100,9 @@ internal interface KoreanTextToSpeechProbeEngine : Closeable {
     fun setInitializationListener(listener: (Boolean) -> Unit)
 
     fun selectKoreanLanguage(): Boolean
+
+    /** Why the last [selectKoreanLanguage] returned false, when the engine can tell; null otherwise. */
+    fun koreanLanguageUnavailableCause(): OfflineKoreanSpeechUnavailableCause? = null
 
     fun setProgressListener(listener: KoreanTextToSpeechProbeProgressListener): Boolean
 
@@ -195,7 +215,18 @@ internal class KoreanTextToSpeechSynthesisProbeSession(
             return
         }
         if (!runCatching { initializedEngine.selectKoreanLanguage() }.getOrDefault(false)) {
-            finish(KoreanTextToSpeechSynthesisProbeResult.KOREAN_LANGUAGE_UNAVAILABLE)
+            val cause = runCatching { initializedEngine.koreanLanguageUnavailableCause() }.getOrNull()
+            finish(
+                when (cause) {
+                    OfflineKoreanSpeechUnavailableCause.KOREAN_VOICE_DATA_MISSING ->
+                        KoreanTextToSpeechSynthesisProbeResult.KOREAN_VOICE_DATA_MISSING
+                    OfflineKoreanSpeechUnavailableCause.PREFERRED_ENGINE_LACKS_KOREAN ->
+                        KoreanTextToSpeechSynthesisProbeResult.KOREAN_PREFERRED_ENGINE_UNSUPPORTED
+                    OfflineKoreanSpeechUnavailableCause.NO_KOREAN_CAPABLE_ENGINE ->
+                        KoreanTextToSpeechSynthesisProbeResult.KOREAN_ENGINE_UNAVAILABLE
+                    null -> KoreanTextToSpeechSynthesisProbeResult.KOREAN_LANGUAGE_UNAVAILABLE
+                },
+            )
             return
         }
 
@@ -366,13 +397,30 @@ private class AndroidKoreanTextToSpeechProbeEngine(
         callback?.invoke(initialized)
     }
 
+    @Volatile
+    private var unavailableCause: OfflineKoreanSpeechUnavailableCause? = null
+
+    override fun koreanLanguageUnavailableCause(): OfflineKoreanSpeechUnavailableCause? = unavailableCause
+
     override fun selectKoreanLanguage(): Boolean {
         if (isClosed()) return false
+        unavailableCause = null
         return runCatching {
-            if (textToSpeech.setLanguage(Locale.KOREAN) < TextToSpeech.LANG_AVAILABLE) {
+            val languageStatus = textToSpeech.setLanguage(Locale.KOREAN)
+            if (languageStatus < TextToSpeech.LANG_AVAILABLE) {
+                // Only the engine count is read; the app never switches to another engine by itself.
+                unavailableCause = OfflineKoreanSpeechGuidancePolicy.classifyLanguageStatus(
+                    languageStatus,
+                    runCatching { textToSpeech.engines.size }.getOrDefault(0),
+                )
                 return@runCatching false
             }
-            selectInstalledOfflineKoreanVoice(textToSpeech) == KoreanOfflineVoiceSelection.SELECTED
+            if (selectInstalledOfflineKoreanVoice(textToSpeech) == KoreanOfflineVoiceSelection.SELECTED) {
+                return@runCatching true
+            }
+            // Korean is known, but no installed network-free Korean voice was selectable (network voices never count).
+            unavailableCause = OfflineKoreanSpeechUnavailableCause.KOREAN_VOICE_DATA_MISSING
+            false
         }.getOrDefault(false)
     }
 

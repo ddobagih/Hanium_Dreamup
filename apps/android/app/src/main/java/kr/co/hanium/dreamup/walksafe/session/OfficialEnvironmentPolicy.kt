@@ -127,7 +127,8 @@ data class OfficialEnvironmentAssessment(
         }
 
     val canStartWalk: Boolean
-        get() = profileId != null && (support == OfficialEnvironmentSupport.SUPPORTED ||
+        get() = profileId != null && enabledMeasuredFactors.isNotEmpty() &&
+            (support == OfficialEnvironmentSupport.SUPPORTED ||
             (usageLimitsAcknowledged &&
                 applicableStatuses.values.none { it == EnvironmentEvidenceStatus.FAIL } &&
                 enabledMeasuredFactors.all { factorStatuses[it] == EnvironmentEvidenceStatus.PASS }))
@@ -411,8 +412,7 @@ class OfficialEnvironmentRuntimeGuard(
             commonStatuses.none { it == EnvironmentEvidenceStatus.FAIL } &&
             (assessment.usageLimitsAcknowledged ||
                 commonStatuses.all { it == EnvironmentEvidenceStatus.PASS })
-        val anyMeasuredFeatureAvailable = enabledMeasuredFactors.isEmpty() ||
-            enabledMeasuredFactors.any { it !in unavailableFactors }
+        val anyMeasuredFeatureAvailable = enabledMeasuredFactors.any { it !in unavailableFactors }
         if (commonConditionsAllowed && anyMeasuredFeatureAvailable) {
             consecutiveDegradations = 0
             lastDegradationCountedAtMs = null

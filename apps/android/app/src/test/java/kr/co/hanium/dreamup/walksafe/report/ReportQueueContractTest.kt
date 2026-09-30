@@ -69,28 +69,30 @@ class ReportQueueContractTest {
     @Test
     fun payloadHashUsesTheExactDomainUuidLengthsAndFrozenBytes() {
         val metadata = "{\"kind\":\"hazard\"}".toByteArray(Charsets.UTF_8)
-        val image = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 1, 2, 0xff.toByte(), 0xd9.toByte())
+        // The digest contract is independent of JPEG validation: same golden bytes as before.
+        val hashedImage = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 1, 2, 0xff.toByte(), 0xd9.toByte())
+        assertEquals(
+            "5cb52b328e68d2aa0ca279709bca137a3e886dd45efa98567ccf0eeb5877d5ef",
+            reportPayloadSha256(REPORT_ID, metadata, hashedImage),
+        )
+        val image = reportTestJpeg()
 
         val payload = requireNotNull(FrozenReportPayload.freeze(REPORT_ID, metadata, image))
 
-        assertEquals(23L, payload.payloadBytes)
-        assertEquals(
-            "5cb52b328e68d2aa0ca279709bca137a3e886dd45efa98567ccf0eeb5877d5ef",
-            payload.payloadSha256,
-        )
+        assertEquals(17L + image.size, payload.payloadBytes)
+        assertEquals(reportPayloadSha256(REPORT_ID, metadata, image), payload.payloadSha256)
         metadata.fill('x'.code.toByte())
         image.fill(0)
         assertArrayEquals("{\"kind\":\"hazard\"}".toByteArray(), payload.metadataUtf8())
-        assertArrayEquals(
-            byteArrayOf(0xff.toByte(), 0xd8.toByte(), 1, 2, 0xff.toByte(), 0xd9.toByte()),
-            payload.imageJpeg(),
-        )
+        assertArrayEquals(reportTestJpeg(), payload.imageJpeg())
     }
 
     @Test
     fun malformedUtf8AndNonJpegInputsFailClosed() {
-        val jpeg = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xd9.toByte())
+        val jpeg = reportTestJpeg()
 
+        assertNotNull(FrozenReportPayload.freeze(REPORT_ID, "{}".toByteArray(), jpeg))
+        assertNull(FrozenReportPayload.freeze(REPORT_ID, "{}".toByteArray(), byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xd9.toByte())))
         assertNull(FrozenReportPayload.freeze(REPORT_ID, byteArrayOf(0xc3.toByte(), 0x28), jpeg))
         assertNull(FrozenReportPayload.freeze(REPORT_ID, "{}".toByteArray(), byteArrayOf(1, 2)))
         assertNull(FrozenReportPayload.freeze("not-a-uuid", "{}".toByteArray(), jpeg))

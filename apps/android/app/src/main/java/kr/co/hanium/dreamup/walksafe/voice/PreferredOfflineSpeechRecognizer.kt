@@ -9,7 +9,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
@@ -18,21 +17,146 @@ import android.speech.SpeechRecognizer
 import java.io.File
 import java.util.Locale
 
+internal interface OfflineSpeechInput
+
+internal interface OneShotSpeechBackend {
+    fun setRecognitionListener(listener: RecognitionListener)
+    fun startListening(input: OfflineSpeechInput)
+    fun destroy()
+}
+
+internal interface PlatformSpeechBackend : OneShotSpeechBackend {
+    fun checkRecognitionSupport(
+        input: OfflineSpeechInput,
+        onInstalledLanguages: (languages: () -> List<String>) -> Unit,
+        onError: (Int) -> Unit,
+    )
+    fun cancel()
+}
+
+internal interface PreferredSpeechPlatform {
+    fun canQueryOnDeviceSupport(): Boolean
+    fun isOnDeviceRecognitionAvailable(): Boolean
+    fun hasMicrophonePermission(): Boolean
+    fun createPlatform(): PlatformSpeechBackend
+    fun createVosk(directory: File): OneShotSpeechBackend
+}
+
+internal class PreferredPlatformCooldown(var retryAfterMs: Long = 0L)
+
+internal data class PreferredSpeechDependencies(
+    val runtime: VoiceCallbackRuntime,
+    val platform: PreferredSpeechPlatform,
+    val requests: PreferredOfflineSpeechRequest,
+    val cooldown: PreferredPlatformCooldown,
+    val emitDiagnostic: (action: () -> Unit) -> Unit,
+    val annotateResult: (Bundle?, OfflineSpeechEngine) -> Bundle? =
+        { results, engine -> withOfflineSpeechResultEngine(results, engine) },
+)
+
+private class AndroidOfflineSpeechInput(val intent: Intent) : OfflineSpeechInput
+
+private fun OfflineSpeechInput.androidIntent(): Intent =
+    (this as AndroidOfflineSpeechInput).intent
+
+private class AndroidPreferredSpeechPlatform(
+    private val context: Context,
+) : PreferredSpeechPlatform {
+    override fun canQueryOnDeviceSupport(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+    override fun isOnDeviceRecognitionAvailable(): Boolean =
+        SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+
+    override fun hasMicrophonePermission(): Boolean =
+        context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    @TargetApi(Build.VERSION_CODES.TIRAMISU)
+    override fun createPlatform(): PlatformSpeechBackend =
+        AndroidPlatformSpeechBackend(context, SpeechRecognizer.createOnDeviceSpeechRecognizer(context))
+
+    override fun createVosk(directory: File): OneShotSpeechBackend =
+        AndroidVoskSpeechBackend(VoskSpeechRecognizer(context, directory))
+}
+
+private class AndroidPlatformSpeechBackend(
+    private val context: Context,
+    private val delegate: SpeechRecognizer,
+) : PlatformSpeechBackend {
+    @TargetApi(Build.VERSION_CODES.TIRAMISU)
+    override fun checkRecognitionSupport(
+        input: OfflineSpeechInput,
+        onInstalledLanguages: (languages: () -> List<String>) -> Unit,
+        onError: (Int) -> Unit,
+    ) {
+        delegate.checkRecognitionSupport(
+            input.androidIntent(),
+            context.mainExecutor,
+            object : RecognitionSupportCallback {
+                override fun onSupportResult(recognitionSupport: RecognitionSupport) {
+                    // The adapter must reject a stale callback before reading its metadata.
+                    onInstalledLanguages { recognitionSupport.installedOnDeviceLanguages }
+                }
+
+                override fun onError(error: Int) {
+                    onError(error)
+                }
+            },
+        )
+    }
+
+    override fun setRecognitionListener(listener: RecognitionListener) {
+        delegate.setRecognitionListener(listener)
+    }
+
+    override fun startListening(input: OfflineSpeechInput) {
+        delegate.startListening(input.androidIntent())
+    }
+
+    override fun cancel() {
+        delegate.cancel()
+    }
+
+    override fun destroy() {
+        delegate.destroy()
+    }
+}
+
+private class AndroidVoskSpeechBackend(
+    private val delegate: VoskSpeechRecognizer,
+) : OneShotSpeechBackend {
+    override fun setRecognitionListener(listener: RecognitionListener) {
+        delegate.setRecognitionListener(listener)
+    }
+
+    override fun startListening(input: OfflineSpeechInput) {
+        delegate.startListening(input.androidIntent())
+    }
+
+    override fun destroy() {
+        delegate.destroy()
+    }
+}
+
 /**
  * HOME one-shot adapter. Only an installed Korean on-device service may precede Vosk.
  * Never uses createSpeechRecognizer, downloads models, or replays a failed recording.
  */
-internal class PreferredOfflineSpeechRecognizer(
-    context: Context,
+internal class PreferredOfflineSpeechRecognizer internal constructor(
     private val modelDirectory: () -> File?,
+    private val dependencies: PreferredSpeechDependencies,
 ) {
-    private val context = context.applicationContext
-    private val handler = Handler(Looper.getMainLooper())
-    private val requests = PreferredOfflineSpeechRequest()
+    constructor(context: Context, modelDirectory: () -> File?) : this(
+        modelDirectory = modelDirectory,
+        dependencies = androidDependencies(context),
+    )
+
+    private val runtime = dependencies.runtime
+    private val requests = dependencies.requests
     private var listener: RecognitionListener? = null
     private var request: Request? = null
-    private var platform: SpeechRecognizer? = null
-    private var fallback: VoskSpeechRecognizer? = null
+    private var platform: PlatformSpeechBackend? = null
+    private var fallback: OneShotSpeechBackend? = null
     private var timeout: Runnable? = null
     private var destroyed = false
 
@@ -46,6 +170,23 @@ internal class PreferredOfflineSpeechRecognizer(
         preferPlatform: Boolean = false,
         isRequestCurrent: () -> Boolean = { true },
     ) {
+        startPreparedRequest(
+            prepareInput = {
+                AndroidOfflineSpeechInput(Intent(intent).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                })
+            },
+            preferPlatform = preferPlatform,
+            isRequestCurrent = isRequestCurrent,
+        )
+    }
+
+    internal fun startPreparedRequest(
+        prepareInput: () -> OfflineSpeechInput,
+        preferPlatform: Boolean = false,
+        isRequestCurrent: () -> Boolean = { true },
+    ) {
         checkMainThread()
         val callback = listener ?: return
         if (destroyed) {
@@ -53,37 +194,35 @@ internal class PreferredOfflineSpeechRecognizer(
             return
         }
         if (request != null) {
-            cancel()
-            callback.onError(SpeechRecognizer.ERROR_RECOGNIZER_BUSY)
+            // Repeated UI input is not a cancellation of the request already using this listener.
             return
         }
         val id = requests.begin() ?: return
-        val current = Request(id, callback, Intent(intent).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-        }, isRequestCurrent)
+        val current = Request(id, callback, prepareInput(), isRequestCurrent)
         request = current
-        logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.ONE_SHOT_REQUESTED)
+        diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.ONE_SHOT_REQUESTED) }
         if (!accepts(current)) return
         if (!hasMicrophonePermission()) {
             fail(current, SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS)
             return
         }
-        val platformCoolingDown = SystemClock.elapsedRealtime() < platformRetryAfterMs
-        if (preferPlatform && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        val platformCoolingDown = runtime.nowMs() < dependencies.cooldown.retryAfterMs
+        if (preferPlatform && dependencies.platform.canQueryOnDeviceSupport() &&
             !platformCoolingDown &&
-            runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(context) }.getOrDefault(false)
+            runCatching { dependencies.platform.isOnDeviceRecognitionAvailable() }.getOrDefault(false)
         ) {
             queryPlatform(current)
         } else {
-            logVoiceInputDiagnostic(
-                when {
-                    !preferPlatform -> VoiceInputDiagnosticEvent.VOSK_ONLY_REQUESTED
-                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> VoiceInputDiagnosticEvent.PLATFORM_UNAVAILABLE
-                    platformCoolingDown -> VoiceInputDiagnosticEvent.PLATFORM_COOLDOWN
-                    else -> VoiceInputDiagnosticEvent.PLATFORM_UNAVAILABLE
-                },
-            )
+            diagnose {
+                logVoiceInputDiagnostic(
+                    when {
+                        !preferPlatform -> VoiceInputDiagnosticEvent.VOSK_ONLY_REQUESTED
+                        !dependencies.platform.canQueryOnDeviceSupport() -> VoiceInputDiagnosticEvent.PLATFORM_UNAVAILABLE
+                        platformCoolingDown -> VoiceInputDiagnosticEvent.PLATFORM_COOLDOWN
+                        else -> VoiceInputDiagnosticEvent.PLATFORM_UNAVAILABLE
+                    },
+                )
+            }
             select(current, platformReady = false)
         }
     }
@@ -91,47 +230,47 @@ internal class PreferredOfflineSpeechRecognizer(
     @TargetApi(Build.VERSION_CODES.TIRAMISU)
     private fun queryPlatform(current: Request) {
         val recognizer = runCatching {
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            dependencies.platform.createPlatform()
         }.getOrNull()
         if (recognizer == null) {
-            logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.PLATFORM_SUPPORT_ERROR)
+            diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.PLATFORM_SUPPORT_ERROR) }
             select(current, platformReady = false)
             return
         }
         platform = recognizer
         armTimeout(current, SUPPORT_TIMEOUT_MS) {
-            logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.PLATFORM_SUPPORT_TIMEOUT)
+            diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.PLATFORM_SUPPORT_TIMEOUT) }
             select(current, platformReady = false)
         }
         runCatching {
             recognizer.checkRecognitionSupport(
-                current.intent,
-                context.mainExecutor,
-                object : RecognitionSupportCallback {
-                    override fun onSupportResult(recognitionSupport: RecognitionSupport) {
-                        if (!accepts(current) || current.selected) return
-                        val installed = recognitionSupport.installedOnDeviceLanguages.any {
-                            val tag = it.lowercase(Locale.ROOT).replace('_', '-')
-                            tag == "ko" || tag.startsWith("ko-")
-                        }
+                current.input,
+                onInstalledLanguages = support@ { installedLanguages ->
+                    if (!accepts(current) || current.selected) return@support
+                    val installed = installedLanguages().any {
+                        val tag = it.lowercase(Locale.ROOT).replace('_', '-')
+                        tag == "ko" || tag.startsWith("ko-")
+                    }
+                    diagnose {
                         logVoiceInputDiagnostic(
                             if (installed) VoiceInputDiagnosticEvent.PLATFORM_SUPPORT_READY
                             else VoiceInputDiagnosticEvent.PLATFORM_SUPPORT_NOT_INSTALLED,
                         )
-                        select(current, installed)
                     }
-
-                    override fun onError(error: Int) {
-                        if (accepts(current) && !current.selected) {
+                    select(current, installed)
+                },
+                onError = { error ->
+                    if (accepts(current) && !current.selected) {
+                        diagnose {
                             logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.PLATFORM_SUPPORT_ERROR, errorCode = error)
-                            select(current, platformReady = false)
                         }
+                        select(current, platformReady = false)
                     }
                 },
             )
         }.onFailure {
             if (accepts(current) && !current.selected) {
-                logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.PLATFORM_SUPPORT_ERROR)
+                diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.PLATFORM_SUPPORT_ERROR) }
                 select(current, platformReady = false)
             }
         }
@@ -148,23 +287,23 @@ internal class PreferredOfflineSpeechRecognizer(
             microphoneGranted = hasMicrophonePermission(),
         )
         current.selected = true
-        logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.ENGINE_SELECTED, selection = selection)
+        diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.ENGINE_SELECTED, selection = selection) }
         when (selection) {
             OfflineSpeechSelection.PLATFORM -> {
-                armTimeout(current, START_TIMEOUT_MS) { fail(current, SpeechRecognizer.ERROR_CLIENT) }
+                armTimeout(current, START_TIMEOUT_MS) { failPlatformStart(current) }
                 runCatching {
                     checkNotNull(platform).setRecognitionListener(callbacks(current, OfflineSpeechEngine.PLATFORM))
-                    checkNotNull(platform).startListening(current.intent)
-                }.onFailure { fail(current, SpeechRecognizer.ERROR_CLIENT) }
+                    checkNotNull(platform).startListening(current.input)
+                }.onFailure { failPlatformStart(current) }
             }
             OfflineSpeechSelection.VOSK -> {
                 disposePlatform()
                 armTimeout(current, START_TIMEOUT_MS) { fail(current, SpeechRecognizer.ERROR_CLIENT) }
                 runCatching {
-                    val recognizer = VoskSpeechRecognizer(context, checkNotNull(directory))
+                    val recognizer = dependencies.platform.createVosk(checkNotNull(directory))
                     fallback = recognizer
                     recognizer.setRecognitionListener(callbacks(current, OfflineSpeechEngine.VOSK))
-                    recognizer.startListening(current.intent)
+                    recognizer.startListening(current.input)
                 }.onFailure { fail(current, SpeechRecognizer.ERROR_CLIENT) }
             }
             OfflineSpeechSelection.BUSY -> fail(current, SpeechRecognizer.ERROR_RECOGNIZER_BUSY)
@@ -179,15 +318,21 @@ internal class PreferredOfflineSpeechRecognizer(
             override fun onReadyForSpeech(params: Bundle?) {
                 if (!accepts(current, engine) || current.ready) return
                 current.ready = true
-                logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.READY, backend = engine)
-                armTimeout(current, LISTEN_TIMEOUT_MS) {
-                    fail(current, SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
+                diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.READY, backend = engine) }
+                if (current.phase == null) {
+                    current.phase = SpeechPhase.WAITING_FOR_SPEECH
+                    current.phaseStartedAtMs = runtime.nowMs()
                 }
+                armSpeechPhaseTimeout(current)
                 current.listener.onReadyForSpeech(params)
             }
 
             override fun onBeginningOfSpeech() {
-                if (accepts(current, engine)) current.listener.onBeginningOfSpeech()
+                if (!accepts(current, engine)) return
+                if (current.phase == null || current.phase == SpeechPhase.WAITING_FOR_SPEECH) {
+                    enterSpeechPhase(current, SpeechPhase.SPEAKING)
+                }
+                current.listener.onBeginningOfSpeech()
             }
 
             override fun onRmsChanged(rmsdB: Float) {
@@ -199,12 +344,16 @@ internal class PreferredOfflineSpeechRecognizer(
             }
 
             override fun onEndOfSpeech() {
-                if (accepts(current, engine)) current.listener.onEndOfSpeech()
+                if (!accepts(current, engine)) return
+                if (current.phase != SpeechPhase.WAITING_FOR_FINAL) {
+                    enterSpeechPhase(current, SpeechPhase.WAITING_FOR_FINAL)
+                }
+                current.listener.onEndOfSpeech()
             }
 
             override fun onError(error: Int) {
                 if (!accepts(current, engine)) return
-                logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.ERROR, backend = engine, errorCode = error)
+                diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.ERROR, backend = engine, errorCode = error) }
                 if (engine == OfflineSpeechEngine.PLATFORM && error in setOf(
                         SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
                         SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,
@@ -214,21 +363,23 @@ internal class PreferredOfflineSpeechRecognizer(
                     )
                 ) {
                     // Next explicit request may choose Vosk; never re-record this request.
-                    platformRetryAfterMs = SystemClock.elapsedRealtime() + PLATFORM_RETRY_DELAY_MS
+                    dependencies.cooldown.retryAfterMs = runtime.nowMs() + PLATFORM_RETRY_DELAY_MS
                 }
                 fail(current, error)
             }
 
             override fun onResults(results: Bundle?) {
                 if (!accepts(current, engine)) return
-                logVoiceInputDiagnostic(
-                    VoiceInputDiagnosticEvent.FINAL_RECEIVED,
-                    backend = engine,
-                    confidence = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)?.getOrNull(0),
-                    resultCount = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.size ?: 0,
-                )
+                diagnose {
+                    logVoiceInputDiagnostic(
+                        VoiceInputDiagnosticEvent.FINAL_RECEIVED,
+                        backend = engine,
+                        confidence = results?.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)?.getOrNull(0),
+                        resultCount = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.size ?: 0,
+                    )
+                }
                 if (retire(current)) {
-                    current.listener.onResults(withOfflineSpeechResultEngine(results, engine))
+                    current.listener.onResults(dependencies.annotateResult(results, engine))
                 }
             }
 
@@ -239,7 +390,7 @@ internal class PreferredOfflineSpeechRecognizer(
                         .orEmpty().any { it.isNotBlank() }
                 ) {
                     current.partialObserved = true
-                    logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.PARTIAL_NONEMPTY, backend = engine)
+                    diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.PARTIAL_NONEMPTY, backend = engine) }
                 }
                 current.listener.onPartialResults(partialResults)
             }
@@ -251,8 +402,10 @@ internal class PreferredOfflineSpeechRecognizer(
 
     private fun accepts(current: Request, engine: OfflineSpeechEngine? = null): Boolean {
         if (destroyed || request !== current || !requests.accepts(current.id, engine)) return false
-        if (!runCatching(current.isCurrent).getOrDefault(false)) {
-            logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.REQUEST_STALE)
+        val requestCurrent = runCatching(current.isCurrent).getOrDefault(false)
+        if (destroyed || request !== current || !requests.accepts(current.id, engine)) return false
+        if (!requestCurrent) {
+            diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.REQUEST_STALE) }
             cancel()
             return false
         }
@@ -264,6 +417,12 @@ internal class PreferredOfflineSpeechRecognizer(
         if (retire(current)) current.listener.onError(error)
     }
 
+    private fun failPlatformStart(current: Request) {
+        if (!accepts(current, OfflineSpeechEngine.PLATFORM)) return
+        dependencies.cooldown.retryAfterMs = runtime.nowMs() + PLATFORM_RETRY_DELAY_MS
+        fail(current, SpeechRecognizer.ERROR_CLIENT)
+    }
+
     private fun retire(current: Request): Boolean {
         if (request !== current) return false
         request = null
@@ -272,7 +431,7 @@ internal class PreferredOfflineSpeechRecognizer(
 
     fun cancel() {
         checkMainThread()
-        if (request != null) logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.CANCELLED)
+        if (request != null) diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.CANCELLED) }
         request = null
         requests.cancel(::cleanup)
     }
@@ -280,12 +439,12 @@ internal class PreferredOfflineSpeechRecognizer(
     fun destroy() {
         checkMainThread()
         if (destroyed) return
-        if (request != null) logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.CLOSED)
+        if (request != null) diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.CLOSED) }
         destroyed = true
         request = null
         listener = null
         requests.close(::cleanup)
-        handler.removeCallbacksAndMessages(null)
+        runtime.removeAllCallbacks()
     }
 
     private fun cleanup() {
@@ -303,47 +462,88 @@ internal class PreferredOfflineSpeechRecognizer(
         runCatching { oldPlatform?.destroy() }
     }
 
+    private fun enterSpeechPhase(current: Request, phase: SpeechPhase) {
+        current.phase = phase
+        current.phaseStartedAtMs = runtime.nowMs()
+        // Early speech callbacks do not replace the existing startup watchdog.
+        if (current.ready) armSpeechPhaseTimeout(current)
+    }
+
+    private fun armSpeechPhaseTimeout(current: Request) {
+        val budgetMs = when (current.phase ?: return) {
+            SpeechPhase.WAITING_FOR_SPEECH,
+            SpeechPhase.WAITING_FOR_FINAL,
+            -> LISTEN_TIMEOUT_MS
+            SpeechPhase.SPEAKING -> SPEAKING_TIMEOUT_MS
+        }
+        val elapsedMs = (runtime.nowMs() - current.phaseStartedAtMs).coerceAtLeast(0L)
+        armTimeout(current, (budgetMs - elapsedMs).coerceAtLeast(0L)) {
+            fail(current, SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
+        }
+    }
+
     private fun armTimeout(current: Request, delayMs: Long, action: () -> Unit) {
         clearTimeout()
-        val callback = Runnable {
-            if (accepts(current)) {
-                logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.WATCHDOG)
-                action()
-            }
+        lateinit var callback: Runnable
+        callback = Runnable {
+            if (timeout !== callback || !accepts(current)) return@Runnable
+            // isCurrent is external code: it must not let this task clear a replacement.
+            if (timeout !== callback) return@Runnable
+            timeout = null
+            diagnose { logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.WATCHDOG) }
+            action()
         }
         timeout = callback
-        handler.postDelayed(callback, delayMs)
+        runtime.postDelayed(callback, delayMs)
     }
 
     private fun clearTimeout() {
-        timeout?.let(handler::removeCallbacks)
+        timeout?.let(runtime::removeCallbacks)
         timeout = null
     }
 
     private fun hasMicrophonePermission(): Boolean =
-        context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        dependencies.platform.hasMicrophonePermission()
 
     private fun checkMainThread() {
-        check(Looper.myLooper() == Looper.getMainLooper()) {
-            "PreferredOfflineSpeechRecognizer must be called on the main thread"
-        }
+        runtime.checkMainThread("PreferredOfflineSpeechRecognizer")
     }
+
+    private fun diagnose(action: () -> Unit) {
+        dependencies.emitDiagnostic(action)
+    }
+
+    private enum class SpeechPhase { WAITING_FOR_SPEECH, SPEAKING, WAITING_FOR_FINAL }
 
     private class Request(
         val id: Long,
         val listener: RecognitionListener,
-        val intent: Intent,
+        val input: OfflineSpeechInput,
         val isCurrent: () -> Boolean,
         var selected: Boolean = false,
         var ready: Boolean = false,
         var partialObserved: Boolean = false,
+        var phase: SpeechPhase? = null,
+        var phaseStartedAtMs: Long = 0L,
     )
 
     private companion object {
         const val SUPPORT_TIMEOUT_MS = 3_000L
         const val START_TIMEOUT_MS = 20_000L
         const val LISTEN_TIMEOUT_MS = 10_000L
+        const val SPEAKING_TIMEOUT_MS = 20_000L
         const val PLATFORM_RETRY_DELAY_MS = 30_000L
-        var platformRetryAfterMs = 0L
+        val processCooldown = PreferredPlatformCooldown()
+
+        fun androidDependencies(context: Context): PreferredSpeechDependencies {
+            val appContext = context.applicationContext
+            return PreferredSpeechDependencies(
+                runtime = HandlerVoiceCallbackRuntime(Handler(Looper.getMainLooper())),
+                platform = AndroidPreferredSpeechPlatform(appContext),
+                requests = PreferredOfflineSpeechRequest(),
+                cooldown = processCooldown,
+                emitDiagnostic = { action -> action() },
+            )
+        }
     }
 }

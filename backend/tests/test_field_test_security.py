@@ -9,7 +9,9 @@ import stat
 import sys
 import threading
 import time
+from types import SimpleNamespace
 
+from fastapi import FastAPI
 import httpx
 import pytest
 from starlette.middleware.cors import CORSMiddleware
@@ -20,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 os.environ.setdefault("UPLOAD_DIR", str(ROOT / "backend" / "uploads" / "test"))
 
 import backend.app.config as config_module  # noqa: E402
+import backend.app.field_test_security as field_security  # noqa: E402
 from backend.app.config import Settings, migration_database_url  # noqa: E402
 from backend.app.field_test_security import (  # noqa: E402
     ACTOR_RATE_LIMITS,
@@ -30,6 +33,7 @@ from backend.app.field_test_security import (  # noqa: E402
     _request_body_error_response,
     _strict_json_object,
     create_actor_assertion,
+    create_actor_assertion_v4,
     required_field_test_access,
     requires_account_generation,
     requires_actor_identity,
@@ -72,6 +76,12 @@ def test_admin_report_mutation_json_rejects_noncanonical_database_input(
 
 @pytest.fixture
 def secured_client(monkeypatch: pytest.MonkeyPatch) -> ASGITestClient:
+    # This module tests transport authorization for legacy configured actors.
+    # Account authority and store failures have dedicated auth-epoch tests.
+    monkeypatch.setattr(
+        "backend.app.field_test_security._actor_account_session_is_current",
+        lambda _actor, _generation, epoch: epoch is None,
+    )
     monkeypatch.setattr(app_settings, "field_test_security_enabled", True)
     monkeypatch.setattr(app_settings, "field_test_token", FIELD_TOKEN)
     monkeypatch.setattr(app_settings, "admin_token", ADMIN_TOKEN)
@@ -133,15 +143,428 @@ def test_route_access_matrix_separates_field_and_admin_operations() -> None:
         )
         is FieldTestAccess.FIELD
     )
-    assert required_field_test_access("/privacy/malformed", "GET") is FieldTestAccess.FIELD
+    assert required_field_test_access("/privacy/malformed", "GET") is field_security._RoutePolicyFallback.UNREGISTERED
     assert required_field_test_access("/reports/duplicate-check", "GET") is FieldTestAccess.ADMIN
     assert required_field_test_access("/reports", "GET") is FieldTestAccess.ADMIN
     assert required_field_test_access("/reports/export", "GET") is FieldTestAccess.ADMIN
     assert required_field_test_access("/uploads/example.jpg", "GET") is FieldTestAccess.ADMIN
     assert required_field_test_access("/reports/example/status", "PATCH") is FieldTestAccess.ADMIN
     assert required_field_test_access("/docs", "GET") is FieldTestAccess.ADMIN
-    assert required_field_test_access("/detect/v2", "OPTIONS") is None
-    assert required_field_test_access("/unknown", "GET") is FieldTestAccess.ADMIN
+    assert required_field_test_access("/detect/v2", "OPTIONS") is field_security._RoutePolicyFallback.UNREGISTERED
+    assert required_field_test_access("/unknown", "GET") is field_security._RoutePolicyFallback.UNREGISTERED
+
+
+
+def test_s20_40_every_registered_http_route_has_one_explicit_policy() -> None:
+    registered = []
+    for route in app.routes:
+        assert route.methods, "A new routing type needs an explicit HTTP policy decision."
+        registered.extend((method, route.path) for method in route.methods)
+    declared = [(method, template) for method, template, _ in field_security.FIELD_TEST_ROUTE_POLICIES]
+    assert len(registered) == len(set(registered))
+    assert len(declared) == len(set(declared))
+    assert set(registered) == set(declared)
+    for method, template, access in field_security.FIELD_TEST_ROUTE_POLICIES:
+        assert required_field_test_access(template, method.lower()) is access
+
+
+def test_s20_40_explicit_roles_preserve_field_and_public_boundaries() -> None:
+    expected_field = {
+        ("GET", "/health"),
+        ("GET", "/ready"),
+        ("GET", "/detect/health"),
+        ("POST", "/detect"),
+        ("POST", "/detect/v2"),
+        ("GET", "/navigation/walking/health"),
+        ("GET", "/navigation/destinations/search"),
+        ("GET", "/navigation/destinations/search/health"),
+        ("POST", "/navigation/walking"),
+        ("GET", "/privacy/consent-bootstrap"),
+        ("POST", "/privacy/consent-events"),
+        ("POST", "/privacy/account-deletions"),
+        ("GET", "/privacy/account-deletions/{request_id}/status"),
+        ("POST", "/privacy/account-deletions/{request_id}/device-evidence"),
+        ("POST", "/account-enrollments/email-otp"),
+        ("POST", "/accounts"),
+        ("POST", "/accounts/authenticate"),
+        ("POST", "/accounts/session-current"),
+        ("HEAD", "/raw-collections/{collection_id}/manifest"),
+        ("HEAD", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
+        ("HEAD", "/raw-collections/{collection_id}/commit"),
+        ("PUT", "/raw-collections/{collection_id}/manifest"),
+        ("PUT", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
+        ("GET", "/raw-collections/{collection_id}"),
+        ("POST", "/raw-collections/{collection_id}/commit"),
+        ("GET", "/reports/mine"),
+        ("GET", "/reports/mine/requests/history"),
+        ("GET", "/reports/mine/deletions/{request_id}"),
+        ("GET", "/reports/mine/{report_id}"),
+        ("POST", "/reports/mine/{report_id}/requests"),
+        ("GET", "/reports/mine/{report_id}/requests/{request_id}"),
+        ("GET", "/reports/mine/{report_id}/content"),
+        ("POST", "/reports/mine/{report_id}/corrections"),
+        ("POST", "/reports"),
+        ("POST", "/reports/v2"),
+        ("GET", "/reports/v2/{report_id}/status"),
+        ("GET", "/internal/capacity"),
+    }
+    expected_public = {
+        ("POST", "/admin/security/device-proof/challenges"),
+        ("POST", "/admin/security/sessions"),
+        ("POST", "/admin/security/recovery/start"),
+        ("POST", "/admin/security/recovery/complete"),
+    }
+    entries = field_security.FIELD_TEST_ROUTE_POLICIES
+    assert {(method, path) for method, path, role in entries if role is FieldTestAccess.FIELD} == expected_field
+    assert {(method, path) for method, path, role in entries if role is None} == expected_public
+    assert all(
+        role is FieldTestAccess.ADMIN
+        for method, path, role in entries
+        if (method, path) not in expected_field | expected_public
+    )
+    probe = _RoutePolicyProbe((("HEAD", "/docs"), ("GET", "/health")))
+    assert probe.request("HEAD", "/docs", role="admin").status_code == 204
+    assert probe.request("HEAD", "/health", role="field").status_code == 403
+    assert probe.events["downstream"] == 1
+
+
+@pytest.mark.parametrize("role", ("field", "admin"))
+@pytest.mark.parametrize(("method", "path"), (
+    ("GET", "/future"),
+    ("GET", "/navigation/future"),
+    ("POST", "/detect/future"),
+    ("GET", "/privacy/future"),
+    ("GET", "/admin/future"),
+    ("GET", "/docs/future"),
+    ("GET", "/detect/v2"),
+    ("GET", "/raw-collections/future/extra"),
+))
+def test_s20_40_registered_but_unapproved_routes_reject_valid_credentials(
+    method: str, path: str, role: str,
+) -> None:
+    probe = _RoutePolicyProbe(((method, path), ("GET", "/health"), ("GET", "/detect/v2/health")))
+    denied = probe.request(method, path, role=role)
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "route_policy_not_registered"
+    assert probe.events == {"downstream": 0, "receive": 0, "authorize": 0, "audit": 0, "proof": 0}
+    positive = "/health" if role == "field" else "/detect/v2/health"
+    assert probe.request("GET", positive, role=role).status_code == 204
+    assert probe.events["downstream"] == 1
+    assert probe.events["receive"] == 0
+
+
+@pytest.mark.parametrize(("template", "shadow", "ordinary", "role", "access"), (
+    (
+        "/reports/{report_id}", "/reports/new-read",
+        "/reports/00000000-0000-4000-8000-000000000001", "admin", FieldTestAccess.ADMIN,
+    ),
+    (
+        "/reports/mine/{report_id}",
+        "/reports/mine/00000000-0000-4000-8000-000000000002",
+        "/reports/mine/00000000-0000-4000-8000-000000000001", "field", FieldTestAccess.FIELD,
+    ),
+))
+def test_s20_40_first_selected_route_cannot_inherit_a_later_dynamic_policy(
+    template: str, shadow: str, ordinary: str, role: str, access: FieldTestAccess,
+) -> None:
+    assert required_field_test_access(shadow, "GET") is access
+    probe = _RoutePolicyProbe((("GET", shadow), ("GET", template)))
+    denied = probe.request("GET", shadow, role=role, identity=True)
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "route_policy_not_registered"
+    assert probe.events["downstream"] == probe.events["receive"] == 0
+    assert probe.request("GET", ordinary, role=role, identity=True).status_code == 204
+    assert probe.events["downstream"] == 1
+    # The router's real order also wins when the unapproved static route is hidden.
+    reversed_probe = _RoutePolicyProbe((("GET", template), ("GET", shadow)))
+    assert reversed_probe.request("GET", shadow, role=role, identity=True).status_code == 204
+    assert reversed_probe.events["downstream"] == 1
+
+
+def test_s20_40_modern_admin_read_denies_before_authorizer_but_known_read_passes() -> None:
+    probe = _RoutePolicyProbe(
+        (("GET", "/admin/future"), ("GET", "/detect/v2/health")),
+        secured=False, modern=True,
+    )
+    denied = probe.request("GET", "/admin/future", role="admin")
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "route_policy_not_registered"
+    assert probe.events == {"downstream": 0, "receive": 0, "authorize": 0, "audit": 0, "proof": 0}
+    assert probe.request("GET", "/detect/v2/health", role="admin").status_code == 204
+    assert probe.events["authorize"] == probe.events["downstream"] == 1
+
+
+@pytest.mark.parametrize("audit_unavailable", (False, True))
+def test_s20_40_unregistered_admin_write_keeps_its_existing_denial_audit(
+    audit_unavailable: bool,
+) -> None:
+    probe = _RoutePolicyProbe(
+        (("POST", "/admin/future"), ("POST", "/detect/future")),
+        modern=True, audit_unavailable=audit_unavailable,
+    )
+    denied = probe.request("POST", "/admin/future", role="admin")
+    assert denied.status_code == (503 if audit_unavailable else 403)
+    assert denied.json()["detail"]["code"] == (
+        "audit_unavailable" if audit_unavailable else "admin_operation_not_registered"
+    )
+    assert probe.events == {"downstream": 0, "receive": 0, "authorize": 0, "audit": 1, "proof": 0}
+    assert probe.audit_rows[0]["action"] == "admin.write.unregistered"
+    assert probe.audit_rows[0]["path"] == "/admin/future"
+    # A former FIELD-prefix denial must not become a new admin audit policy.
+    field_denial = probe.request("POST", "/detect/future", role="field")
+    assert field_denial.status_code == 403
+    assert field_denial.json()["detail"]["code"] == "route_policy_not_registered"
+    assert probe.events["audit"] == 1
+    assert probe.events["downstream"] == probe.events["receive"] == probe.events["authorize"] == 0
+
+
+def test_s20_40_disabled_local_access_does_not_remove_the_raw_bypass_prohibition() -> None:
+    probe = _RoutePolicyProbe(
+        (("GET", "/local/future"), ("PUT", "/raw-collections/{collection_id}/manifest")),
+        secured=False,
+    )
+    assert probe.request("GET", "/local/future", include_app=False).status_code == 204
+    raw = probe.request("PUT", "/raw-collections/collection/manifest")
+    assert raw.status_code == 401
+    assert raw.json()["detail"]["code"] == "raw_gateway_assertion_required"
+    assert raw.headers["cache-control"] == "no-store"
+    assert raw.headers["pragma"] == "no-cache"
+    assert probe.events["downstream"] == 1
+    assert probe.events["receive"] == 0
+
+
+def test_s20_40_options_405_and_cors_are_not_authorized_handler_fallbacks() -> None:
+    probe = _RoutePolicyProbe((("GET", "/health"),))
+    response = probe.request("OPTIONS", "/health")
+    assert response.status_code == 405
+    assert response.json() == {"detail": "Method Not Allowed"}
+    assert response.headers["allow"] == "GET"
+    assert probe.events["downstream"] == probe.events["receive"] == 0
+    assert probe.request("OPTIONS", "/future").status_code == 403
+    explicit_options = _RoutePolicyProbe((("GET", "/health"), ("OPTIONS", "/health")))
+    assert explicit_options.request("OPTIONS", "/health", role="field").status_code == 403
+    assert explicit_options.events["downstream"] == 0
+    cors = _RoutePolicyProbe((("POST", "/future"),), cors=True)
+    preflight = cors.request("OPTIONS", "/future", headers=[
+        (b"origin", b"https://client.invalid"),
+        (b"access-control-request-method", b"POST"),
+    ])
+    assert preflight.status_code == 200
+    assert cors.events["downstream"] == cors.events["receive"] == 0
+    assert cors.request("POST", "/future", role="field").status_code == 403
+    assert cors.events["downstream"] == 0
+
+
+def test_s20_40_missing_router_context_cannot_authorize_a_secured_scope() -> None:
+    probe = _RoutePolicyProbe((("GET", "/health"),))
+    response = probe.request("GET", "/health", role="field", include_app=False)
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "route_policy_not_registered"
+    assert probe.events["downstream"] == probe.events["receive"] == 0
+    assert probe.request("GET", "/health", role="field").status_code == 204
+
+
+@pytest.mark.parametrize(("template", "path", "status"), (
+    ("/reports/mine/{report_id}", "/reports/mine/not-a-uuid", 404),
+    ("/reports/v2/{report_id}/status", "/reports/v2/not-a-uuid/status", 404),
+    ("/privacy/account-deletions/{request_id}/status", "/privacy/account-deletions/short/status", 422),
+))
+def test_s20_40_selected_field_template_keeps_generation_required_for_malformed_ids(
+    template: str, path: str, status: int,
+) -> None:
+    assert requires_actor_identity(path, "GET", route_template=template)
+    assert requires_account_generation(path, "GET", route_template=template)
+    probe = _RoutePolicyProbe((("GET", template),))
+    response = probe.request("GET", path, role="field", headers=[
+        (b"x-walksafe-actor-id", b"probe.actor"),
+    ])
+    assert response.status_code == status
+    assert response.json()["detail"]["code"] != "route_policy_not_registered"
+    assert probe.events["downstream"] == probe.events["receive"] == 0
+
+
+@pytest.mark.parametrize("path", (
+    "/admin/security/device-proof/challenges",
+    "/admin/security/sessions",
+    "/admin/security/recovery/start",
+    "/admin/security/recovery/complete",
+))
+def test_s20_40_public_routes_still_require_the_existing_admin_client_contract(path: str) -> None:
+    probe = _RoutePolicyProbe((("POST", path),), modern=True)
+    missing = probe.request("POST", path)
+    assert missing.status_code == 403
+    assert missing.json()["detail"]["code"] == "admin_client_contract_invalid"
+    assert probe.events["downstream"] == 0
+    accepted = probe.request("POST", path, headers=probe.public_headers())
+    assert accepted.status_code == 204
+    assert probe.events == {"downstream": 1, "receive": 0, "authorize": 0, "audit": 0, "proof": 0}
+
+
+def test_s20_40_selected_privacy_workflow_does_not_take_a_missing_url_id_from_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(field_security, "time", lambda: 1)
+    verified = []
+    original = field_security.verify_privacy_deletion_assertion
+    def observe(assertion, **kwargs):
+        verified.append((kwargs["request_id"], kwargs["path"]))
+        return original(assertion, **kwargs)
+    monkeypatch.setattr(field_security, "verify_privacy_deletion_assertion", observe)
+    probe = _RoutePolicyProbe((
+        ("POST", "/privacy/account-deletions/{request_id}/device-evidence"),
+        ("GET", "/privacy/account-deletions/{request_id}/status"),
+    ))
+    binding_headers = [
+        (b"x-walksafe-deletion-access-pre-digest", b"a" * 64),
+        (b"x-walksafe-deletion-tombstone-id", b"tombstone_0001"),
+    ]
+    rejected = probe.request(
+        "POST", "/privacy/account-deletions/short/device-evidence",
+        role="field", identity=True, headers=binding_headers,
+        body=b'{"request_id":"delete_request_0001"}',
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["detail"]["code"] == "account_deletion_request_invalid"
+    assert verified == []
+    request_id = "delete_request_0001"
+    path = f"/privacy/account-deletions/{request_id}/status"
+    proof = field_security.create_privacy_deletion_assertion(
+        actor_id="probe.actor", account_generation=1, request_id=request_id,
+        tombstone_id="tombstone_0001", access_pre_digest="a" * 64,
+        method="GET", path=path, body_sha256=hashlib.sha256(b"").hexdigest(),
+        secret="s" * 32, issued_at=1,
+    )
+    accepted = probe.request(
+        "GET", path, role="field", identity=True,
+        headers=[*binding_headers, (b"x-walksafe-actor-assertion", proof.encode("ascii"))],
+    )
+    assert accepted.status_code == 204
+    assert verified == [(request_id, path)]
+    assert probe.events["downstream"] == 1
+
+
+def test_s20_40_public_proof_classification_keeps_the_actual_signed_path_and_body() -> None:
+    probe = _RoutePolicyProbe((("POST", "/admin/security/sessions"),), modern=True, device_proof=True)
+    body = b'{"admin_id":"administrator","device_id":"device-test-1234"}'
+    path = "/gateway/admin/security/sessions"
+    response = probe.request(
+        "POST", path, root_path="/gateway", body=body, query=b"mode=login",
+        headers=[
+            *probe.public_headers(),
+            (b"x-walksafe-device-challenge-id", b"00000000-0000-4000-8000-000000000001"),
+            (b"x-walksafe-device-signature", b"A" * 86),
+            (b"x-walksafe-correlation-id", b"00000000-0000-4000-8000-000000000002"),
+        ],
+    )
+    assert response.status_code == 204
+    assert probe.events == {"downstream": 1, "receive": 1, "authorize": 0, "audit": 0, "proof": 1}
+    proof_call = probe.proof_rows[0]
+    assert proof_call["expected_purpose"] == "LOGIN"
+    assert proof_call["expected_path"] == path
+    assert proof_call["expected_method"] == "POST"
+    assert proof_call["raw_body"] == body
+    assert proof_call["raw_query_string"] == b"mode=login"
+    assert probe.last_scope["path"] == path
+    assert "path_params" not in probe.last_scope
+
+
+class _RoutePolicyProbe:
+    """Real route matching and middleware; observe only external boundaries."""
+
+    def __init__(
+        self, routes, *, secured=True, modern=False, audit_unavailable=False,
+        device_proof=False, cors=False,
+    ):
+        self.router = FastAPI(openapi_url=None, docs_url=None, redoc_url=None)
+        async def endpoint():
+            return None
+        for method, path in routes:
+            self.router.add_api_route(path, endpoint, methods=[method])
+        class SettingsOverride(SimpleNamespace):
+            def __getattr__(self, name):
+                return getattr(app_settings, name)
+
+        self.settings = SettingsOverride(
+            field_test_security_enabled=secured,
+            field_test_token=FIELD_TOKEN, admin_token=ADMIN_TOKEN,
+            admin_security_enabled=modern, admin_device_proof_enabled=device_proof,
+            walksafe_environment="development", allow_insecure_local_dev=True,
+            actor_rate_limit_store="memory", gateway_session_secret="s" * 32,
+            raw_ingest_enabled=True,
+        )
+        self.events = {"downstream": 0, "receive": 0, "authorize": 0, "audit": 0, "proof": 0}
+        self.audit_rows = []
+        self.proof_rows = []
+        self.last_scope = None
+        async def downstream(scope, receive, send):
+            self.events["downstream"] += 1
+            await send({"type": "http.response.start", "status": 204, "headers": []})
+            await send({"type": "http.response.body", "body": b""})
+        def authorize(_settings, **kwargs):
+            self.events["authorize"] += 1
+            return SimpleNamespace(admin_id="probe.admin", device_id="device-test-1234", session_id="session-1")
+        def audit(**kwargs):
+            self.events["audit"] += 1
+            self.audit_rows.append(kwargs)
+            if audit_unavailable:
+                raise AdminSecurityError("audit_unavailable", "Audit is unavailable.", status_code=503)
+        def proof(_settings, **kwargs):
+            self.events["proof"] += 1
+            self.proof_rows.append(kwargs)
+            return SimpleNamespace(verified=True)
+        self.target = field_security.FieldTestSecurityMiddleware(
+            downstream, self.settings, admin_session_authorizer=authorize,
+            admin_security_denial_recorder=audit, admin_device_proof_verifier=proof,
+        )
+        if cors:
+            self.target = CORSMiddleware(
+                self.target, allow_origins=["https://client.invalid"],
+                allow_methods=["GET", "POST"], allow_headers=["*"],
+            )
+
+    @staticmethod
+    def public_headers():
+        return [
+            (field_security.ADMIN_APP_KIND_HEADER, field_security.ADMIN_APP_KIND.encode("ascii")),
+            (field_security.ADMIN_ROLE_HEADER, field_security.ADMIN_ROLE.encode("ascii")),
+            (field_security.ADMIN_AUDIENCE_HEADER, field_security.ADMIN_AUDIENCE.encode("ascii")),
+            (field_security.ADMIN_DEVICE_ID_HEADER, b"device-test-1234"),
+        ]
+
+    def request(
+        self, method, path, *, role=None, identity=False, headers=(),
+        body=b"{}", include_app=True, root_path="", query=b"",
+    ):
+        request_headers = list(headers)
+        if role == "field":
+            request_headers.append((field_security.FIELD_TOKEN_HEADER, FIELD_TOKEN.encode("ascii")))
+        elif role == "admin":
+            request_headers.append((field_security.ADMIN_TOKEN_HEADER, ADMIN_TOKEN.encode("ascii")))
+            request_headers.append((b"authorization", b"Bearer probe-access-token"))
+        if identity:
+            request_headers.extend([
+                (field_security.ACTOR_ID_HEADER, b"probe.actor"),
+                (field_security.ACCOUNT_GENERATION_HEADER, b"1"),
+            ])
+        scope = {
+            "type": "http", "http_version": "1.1", "method": method, "path": path,
+            "raw_path": path.encode("utf-8"), "root_path": root_path,
+            "query_string": query, "headers": request_headers, "scheme": "http",
+            "server": ("testserver", 80), "client": ("127.0.0.1", 1234),
+        }
+        if include_app:
+            scope["app"] = self.router
+        self.last_scope = scope
+        messages = []
+        async def receive():
+            self.events["receive"] += 1
+            return {"type": "http.request", "body": body, "more_body": False}
+        async def send(message):
+            messages.append(message)
+        asyncio.run(self.target(scope, receive, send))
+        start = next(item for item in messages if item["type"] == "http.response.start")
+        content = b"".join(item.get("body", b"") for item in messages if item["type"] == "http.response.body")
+        return httpx.Response(start["status"], headers=start.get("headers", []), content=content)
 
 
 def test_privacy_early_errors_are_field_scoped_and_never_cacheable(
@@ -156,8 +579,9 @@ def test_privacy_early_errors_are_field_scoped_and_never_cacheable(
         "/privacy/malformed",
         headers={"x-walksafe-field-test-token": FIELD_TOKEN},
     )
-    assert (missing.status_code, admin.status_code, field.status_code) == (401, 403, 404)
+    assert (missing.status_code, admin.status_code, field.status_code) == (403, 403, 403)
     for response in (missing, admin, field):
+        assert response.json()["detail"]["code"] == "route_policy_not_registered"
         assert response.headers["cache-control"] == "no-store"
         assert response.headers["pragma"] == "no-cache"
 
@@ -344,7 +768,7 @@ def test_readiness_is_available_to_field_role_without_sensitive_details(
         "backend.app.api.health._account_crypto_binding_readiness",
         lambda _settings: {"ready": True, "binding": "matched"},
     )
-    async def navigation_ready(_settings):
+    async def navigation_ready(_settings, *, runtime_provider=None):
         return {"ready": True, "provider": "tmap_pedestrian", "evidence": "recent_success"}
 
     monkeypatch.setattr("backend.app.api.health._navigation_readiness", navigation_ready)
@@ -454,7 +878,8 @@ def test_deployment_rejects_unbound_actor_but_accepts_gateway_assertion(
             ),
         },
     )
-    bound = secured_client.post(
+    # w24 S20-41 / owner decision 7: an unbound v1 write is refused by default.
+    legacy_write = secured_client.post(
         "/detect/v2",
         headers={
             "x-walksafe-field-test-token": FIELD_TOKEN,
@@ -466,11 +891,31 @@ def test_deployment_rejects_unbound_actor_but_accepts_gateway_assertion(
             ),
         },
     )
+    bound = secured_client.post(
+        "/detect/v2",
+        headers={
+            "x-walksafe-field-test-token": FIELD_TOKEN,
+            "x-walksafe-actor-id": actor_id,
+            "x-walksafe-account-generation": "1",
+            "x-walksafe-actor-assertion": create_actor_assertion_v4(
+                actor_id,
+                FieldTestAccess.FIELD,
+                secret,
+                account_generation=1,
+                auth_epoch=None,
+                method="POST",
+                target="/detect/v2",
+                body_sha256=hashlib.sha256(b"").hexdigest(),
+            ),
+        },
+    )
 
     assert unbound.status_code == 401
     assert unbound.json()["detail"]["code"] == "actor_assertion_required"
     assert spoofed.status_code == 401
     assert spoofed.json()["detail"]["code"] == "actor_assertion_invalid"
+    assert legacy_write.status_code == 401
+    assert legacy_write.json()["detail"]["code"] == "actor_assertion_invalid"
     assert bound.status_code == 422
     assert bound.json()["detail"][0]["type"] == "missing"
 
@@ -938,7 +1383,7 @@ def test_rate_limit_store_failure_fails_closed(
     def unavailable(*_args, **_kwargs):
         raise ActorRateLimitStoreUnavailable
 
-    monkeypatch.setattr(_POSTGRES_ACTOR_RATE_LIMITER, "check", unavailable)
+    monkeypatch.setattr(_POSTGRES_ACTOR_RATE_LIMITER, "_check_in_db", unavailable)
 
     response = secured_client.get(
         "/uploads/missing.jpg",
@@ -966,7 +1411,7 @@ def test_slow_shared_rate_limit_store_does_not_block_liveness(
         assert release.wait(timeout=2), "rate-limit store was not released"
         return None
 
-    monkeypatch.setattr(_POSTGRES_ACTOR_RATE_LIMITER, "check", blocking_check)
+    monkeypatch.setattr(_POSTGRES_ACTOR_RATE_LIMITER, "_check_in_db", blocking_check)
 
     async def exercise() -> tuple[httpx.Response, httpx.Response, float]:
         transport = httpx.ASGITransport(app=app)
@@ -998,6 +1443,78 @@ def test_slow_shared_rate_limit_store_does_not_block_liveness(
     assert limited.status_code == 422
     assert health.status_code == 200
     assert health_elapsed < 0.1
+
+
+
+def test_rate_deadline_and_saturation_keep_liveness_and_real_429_recovery(
+    secured_client: ASGITestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from backend.app.services.actor_rate_limit import ActorRateLimitExecution, PostgresActorRateLimiter
+
+    del secured_client
+    started, release, closed = threading.Event(), threading.Event(), threading.Event()
+    entries = []
+    execution = ActorRateLimitExecution(1, 50, 50)
+
+    @contextmanager
+    def begin():
+        entries.append(True)
+        if not release.is_set():
+            started.set()
+            if not release.wait(2):
+                raise RuntimeError("HTTP rate worker was not released")
+        try:
+            yield SimpleNamespace(execute=lambda *_args, **_kwargs: SimpleNamespace(
+                mappings=lambda: SimpleNamespace(one=lambda: {
+                    "event_count": 1000, "retry_after": 7,
+                }),
+            ))
+        finally:
+            closed.set()
+
+    monkeypatch.setattr(app_settings, "actor_rate_limit_store", "postgresql")
+    monkeypatch.setattr(
+        "backend.app.field_test_security._POSTGRES_ACTOR_RATE_LIMITER",
+        PostgresActorRateLimiter(ACTOR_RATE_LIMITS, session_factory=SimpleNamespace(begin=begin),
+                                 execution=execution),
+    )
+
+    async def exercise():
+        transport = httpx.ASGITransport(app=app)
+        headers = {
+            "x-walksafe-field-test-token": FIELD_TOKEN,
+            "x-walksafe-actor-id": "field.user@example.com",
+        }
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            pending = asyncio.create_task(client.post("/detect/v2", headers=headers))
+            assert await asyncio.to_thread(started.wait, 1)
+            health = await client.get("/health", headers={"x-walksafe-field-test-token": FIELD_TOKEN})
+            assert health.status_code == 200
+            expired = await asyncio.wait_for(pending, 1)
+            assert expired.status_code == 503
+            assert expired.json()["detail"]["code"] == "actor_rate_limit_store_unavailable"
+            assert not closed.is_set()
+            saturated = await client.post("/detect/v2", headers=headers)
+            assert saturated.status_code == 503
+            assert len(entries) == 1
+            release.set()
+            assert await asyncio.to_thread(closed.wait, 1)
+            deadline = time.monotonic() + 1
+            while True:
+                recovered = await client.post("/detect/v2", headers=headers)
+                if recovered.status_code != 503 or time.monotonic() >= deadline:
+                    break
+                await asyncio.sleep(0.001)
+            assert recovered.status_code == 429
+            assert recovered.headers["retry-after"] == "7"
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        release.set()
+        execution.shutdown()
 
 
 @pytest.mark.parametrize("sslmode", [None, "require", "verify-ca"])
@@ -1143,7 +1660,7 @@ def test_production_database_rejects_ambient_libpq_transport(
         ("MAX_REPORT_METADATA_BYTES", "1048577", "at most 1048576"),
         ("ALLOWED_IMAGE_CONTENT_TYPES", "application/octet-stream", "supported image MIME"),
         ("TMAP_POI_PROVIDER", "kakao", "TMAP_POI_PROVIDER"),
-        ("TMAP_TIMEOUT_SECONDS", "31", "at most 30"),
+        ("TMAP_TIMEOUT_SECONDS", "4.001", "at most 4"),
         ("TMAP_PEDESTRIAN_SPEED_KMH", "21", "at most 20"),
     ],
 )
@@ -1157,6 +1674,16 @@ def test_settings_reject_unbounded_or_non_tmap_navigation_configuration(
 
     with pytest.raises(ValueError, match=message):
         Settings()
+
+
+@pytest.mark.parametrize("value", ["0.1", "4.0"])
+def test_tmap_timeout_stays_within_navigation_upstream_budget(
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+) -> None:
+    monkeypatch.setenv("TMAP_TIMEOUT_SECONDS", value)
+
+    assert Settings().tmap_timeout_seconds == float(value)
 
 
 @pytest.mark.parametrize(
@@ -1420,3 +1947,348 @@ def test_shared_maintenance_lock_metadata_contract_is_exact(tmp_path: Path) -> N
             os.stat_result(changed),
             expected_gid,
         )
+
+
+# --- S21-43 / S21-41: route-by-route negative HTTP sweeps --------------------
+# The literal role table above (test_s20_40_explicit_roles_...) is the reviewed
+# expectation. These sweeps send real unauthorized HTTP requests for every
+# registered method+path, so a new route that is published (or given the wrong
+# role) fails here instead of relying on the policy function alone.
+
+_S21_PATH_VALUES = {
+    "{report_id}": "00000000-0000-4000-8000-000000000001",
+    "{request_id}": "00000000-0000-4000-8000-000000000002",
+    "{collection_id}": "00000000-0000-4000-8000-000000000003",
+    "{object_id}": "00000000-0000-4000-8000-000000000004",
+    "{index}": "0",
+    "{copy_id}": "00000000-0000-4000-8000-000000000005",
+    "{decision_id}": "00000000-0000-4000-8000-000000000006",
+    "{device_id}": "device-test-1234",
+    "{filename}": "example.jpg",
+    "{incident_id}": "00000000-0000-4000-8000-000000000007",
+    "{package_revision}": "1",
+    "{session_id}": "00000000-0000-4000-8000-000000000008",
+}
+_S21_MIDDLEWARE_DENIALS = {
+    "field_test_auth_required", "field_test_forbidden", "account_authentication_failed",
+}
+
+
+def _s21_concrete_path(template: str) -> str:
+    path = template
+    for placeholder, value in _S21_PATH_VALUES.items():
+        path = path.replace(placeholder, value)
+    assert "{" not in path, f"add a sample value for a new path parameter in {template}"
+    return path
+
+
+def _s21_literal_role(method: str, template: str) -> str:
+    if (method, template) in _S21_LITERAL_PUBLIC:
+        return "public"
+    if (method, template) in _S21_LITERAL_FIELD:
+        return "field"
+    return "admin"
+
+
+# Same reviewed literals as test_s20_40_explicit_roles_preserve_field_and_public_boundaries.
+_S21_LITERAL_PUBLIC = frozenset({
+    ("POST", "/admin/security/device-proof/challenges"),
+    ("POST", "/admin/security/sessions"),
+    ("POST", "/admin/security/recovery/start"),
+    ("POST", "/admin/security/recovery/complete"),
+})
+_S21_LITERAL_FIELD = frozenset({
+    ("GET", "/health"), ("GET", "/ready"), ("GET", "/detect/health"),
+    ("POST", "/detect"), ("POST", "/detect/v2"),
+    ("GET", "/navigation/walking/health"), ("GET", "/navigation/destinations/search"),
+    ("GET", "/navigation/destinations/search/health"), ("POST", "/navigation/walking"),
+    ("GET", "/privacy/consent-bootstrap"), ("POST", "/privacy/consent-events"),
+    ("POST", "/privacy/account-deletions"),
+    ("GET", "/privacy/account-deletions/{request_id}/status"),
+    ("POST", "/privacy/account-deletions/{request_id}/device-evidence"),
+    ("POST", "/account-enrollments/email-otp"), ("POST", "/accounts"),
+    ("POST", "/accounts/authenticate"), ("POST", "/accounts/session-current"),
+    ("HEAD", "/raw-collections/{collection_id}/manifest"),
+    ("HEAD", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
+    ("HEAD", "/raw-collections/{collection_id}/commit"),
+    ("PUT", "/raw-collections/{collection_id}/manifest"),
+    ("PUT", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
+    ("GET", "/raw-collections/{collection_id}"),
+    ("POST", "/raw-collections/{collection_id}/commit"),
+    ("GET", "/reports/mine"), ("GET", "/reports/mine/requests/history"),
+    ("GET", "/reports/mine/deletions/{request_id}"), ("GET", "/reports/mine/{report_id}"),
+    ("POST", "/reports/mine/{report_id}/requests"),
+    ("GET", "/reports/mine/{report_id}/requests/{request_id}"),
+    ("GET", "/reports/mine/{report_id}/content"),
+    ("POST", "/reports/mine/{report_id}/corrections"),
+    ("POST", "/reports"), ("POST", "/reports/v2"),
+    ("GET", "/reports/v2/{report_id}/status"), ("GET", "/internal/capacity"),
+})
+
+
+def _s21_registered_routes() -> list[tuple[str, str]]:
+    return sorted(
+        (method, route.path) for route in app.routes for method in route.methods
+    )
+
+
+def test_s21_43_literal_role_table_covers_every_registered_route() -> None:
+    policies = {
+        (method, template): access
+        for method, template, access in field_security.FIELD_TEST_ROUTE_POLICIES
+    }
+    assert set(_s21_registered_routes()) == set(policies)
+    for key, access in policies.items():
+        expected = _s21_literal_role(*key)
+        actual = {None: "public", FieldTestAccess.FIELD: "field", FieldTestAccess.ADMIN: "admin"}[access]
+        assert actual == expected, key
+
+
+def test_s21_43_every_protected_route_rejects_unauthorized_http(
+    secured_client: ASGITestClient,
+) -> None:
+    checked = {"field": 0, "admin": 0}
+    for method, template in _s21_registered_routes():
+        role = _s21_literal_role(method, template)
+        if role == "public":
+            continue
+        path = _s21_concrete_path(template)
+        wrong = (
+            {"x-walksafe-admin-token": ADMIN_TOKEN}
+            if role == "field"
+            else {"x-walksafe-field-test-token": FIELD_TOKEN}
+        )
+        for headers, allowed in (({}, {401}), (wrong, {403})):
+            if (method, template) == ("POST", "/accounts/session-current"):
+                # The account session check answers every non-field caller the same.
+                allowed = {401}
+            response = secured_client.request(method, path, headers=headers)
+            assert response.status_code in allowed, (method, template, headers, response.status_code)
+            if method != "HEAD":
+                assert response.json()["detail"]["code"] in _S21_MIDDLEWARE_DENIALS, (
+                    method, template, response.text,
+                )
+        checked[role] += 1
+    assert checked["field"] == len(_S21_LITERAL_FIELD)
+    assert checked["field"] + checked["admin"] + len(_S21_LITERAL_PUBLIC) == len(
+        _s21_registered_routes()
+    )
+
+
+def test_s21_43_public_routes_pass_the_field_boundary_without_tokens() -> None:
+    probe = _RoutePolicyProbe(tuple(_s21_registered_routes()))
+    for method, template in sorted(_S21_LITERAL_PUBLIC):
+        before = probe.events["downstream"]
+        response = probe.request(method, template, headers=_RoutePolicyProbe.public_headers())
+        assert response.status_code == 204, (method, template, response.text)
+        assert probe.events["downstream"] == before + 1
+
+
+def test_s21_43_production_admin_mode_keeps_every_protected_route_closed() -> None:
+    """be-F7: the same literal table with admin_security_enabled=true (DB session path)."""
+    routes = tuple(_s21_registered_routes())
+    probe = _RoutePolicyProbe(routes, modern=True)
+    authorized: list[str] = []
+
+    def db_session_authorizer(_settings, *, raw_token, **_kwargs):
+        # Stands in for the DB session check: only the probe's bearer is a live session.
+        if raw_token != "probe-access-token":
+            raise AdminSecurityError(
+                "admin_authentication_required", "Administrator session is required.",
+                status_code=401,
+            )
+        authorized.append(raw_token)
+        return SimpleNamespace(
+            admin_id="probe.admin", device_id="device-test-1234", session_id="session-1",
+        )
+
+    probe.target.admin_session_authorizer = db_session_authorizer
+    checked = {"field": 0, "admin": 0}
+    for method, template in routes:
+        role = _s21_literal_role(method, template)
+        if role == "public":
+            continue
+        path = _s21_concrete_path(template)
+        # A live administrator session must not open a FIELD route either.
+        wrong = "admin" if role == "field" else "field"
+        for credentials in ({}, {"role": wrong}):
+            reached = probe.events["downstream"]
+            response = probe.request(method, path, **credentials)
+            assert response.status_code in {401, 403}, (
+                method, template, credentials, response.status_code,
+            )
+            assert probe.events["downstream"] == reached, (method, template, credentials)
+        checked[role] += 1
+    assert checked["field"] == len(_S21_LITERAL_FIELD)
+    assert checked["field"] + checked["admin"] + len(_S21_LITERAL_PUBLIC) == len(routes)
+    # Positive controls: a live administrator session reaches an admin read,
+    # and a public route passes without credentials.
+    admin_read = next(
+        (method, template) for method, template in routes
+        if method == "GET" and _s21_literal_role(method, template) == "admin"
+    )
+    reached = probe.events["downstream"]
+    response = probe.request(admin_read[0], _s21_concrete_path(admin_read[1]), role="admin")
+    assert response.status_code == 204, (admin_read, response.text)
+    assert probe.events["downstream"] == reached + 1
+    public_method, public_template = sorted(_S21_LITERAL_PUBLIC)[0]
+    response = probe.request(
+        public_method, public_template, headers=_RoutePolicyProbe.public_headers(),
+    )
+    assert response.status_code == 204, response.text
+    assert probe.events["downstream"] == reached + 2
+
+
+def _s21_actor_headers(actor: str, *, assertion: str | None) -> list[tuple[bytes, bytes]]:
+    headers = [
+        (field_security.FIELD_TOKEN_HEADER, FIELD_TOKEN.encode("ascii")),
+        (field_security.ACTOR_ID_HEADER, actor.encode("ascii")),
+        (field_security.ACCOUNT_GENERATION_HEADER, b"1"),
+    ]
+    if assertion is not None:
+        headers.append((field_security.ACTOR_ASSERTION_HEADER, assertion.encode("ascii")))
+    return headers
+
+
+def _s21_field_actor_routes() -> list[tuple[str, str]]:
+    routes = []
+    for method, template in _s21_registered_routes():
+        if _s21_literal_role(method, template) != "field":
+            continue
+        path = _s21_concrete_path(template)
+        if field_security.requires_actor_identity(path, method):
+            routes.append((method, template))
+    return routes
+
+
+# Privacy deletion routes use their own request-bound deletion assertion and
+# check the tombstone/session in the handler, not the actor-session lookup.
+_S21_PRIVACY_DELETION_ROUTES = frozenset({
+    ("POST", "/privacy/account-deletions"),
+    ("GET", "/privacy/account-deletions/{request_id}/status"),
+    ("POST", "/privacy/account-deletions/{request_id}/device-evidence"),
+})
+
+
+def test_s21_41_every_field_actor_route_rejects_missing_and_revoked_sessions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    routes = _s21_field_actor_routes()
+    assert routes, "field actor routes must exist"
+    probe = _RoutePolicyProbe(tuple(_s21_registered_routes()))
+    # Production-like: no insecure local actor bypass; assertions are verified.
+    probe.settings.walksafe_environment = "test"
+    probe.settings.allow_insecure_local_dev = False
+    secret = probe.settings.gateway_session_secret
+    session_current = {"value": False}
+    monkeypatch.setattr(
+        field_security, "_actor_account_session_is_current",
+        lambda _actor, _generation, _epoch: session_current["value"],
+    )
+    concealed = {"report_not_found", "report_transport_status_not_found"}
+    session_checked = 0
+    for index, (method, template) in enumerate(routes):
+        path = _s21_concrete_path(template)
+        actor = f"s21.actor.{index}"
+        body = b"{}" if method in {"POST", "PUT"} else b""
+
+        # (1) No credentials at all.
+        start = dict(probe.events)
+        missing = probe.request(method, path, body=body)
+        assert missing.status_code == 401, (method, template, missing.status_code)
+        assert probe.events["downstream"] == start["downstream"]
+
+        if (method, template) in _S21_PRIVACY_DELETION_ROUTES:
+            # Missing deletion binding is rejected before any handler.
+            unbound = probe.request(method, path, body=body,
+                                    headers=_s21_actor_headers(actor, assertion=None))
+            assert unbound.status_code == 422, (method, template, unbound.status_code)
+            assert unbound.json()["detail"]["code"] == "account_deletion_binding_invalid"
+            assert probe.events["downstream"] == start["downstream"]
+            continue
+
+        # (2) Field token and actor headers, but no Gateway-bound assertion.
+        unsigned = probe.request(method, path, body=body,
+                                 headers=_s21_actor_headers(actor, assertion=None))
+        assert unsigned.status_code in {401, 404}, (method, template, unsigned.status_code)
+        if method != "HEAD":
+            assert unsigned.json()["detail"]["code"] in {"actor_assertion_required"} | concealed
+        assert probe.events["downstream"] == start["downstream"]
+
+        def signed() -> list[tuple[bytes, bytes]]:
+            assertion = field_security.create_actor_assertion_v4(
+                actor, FieldTestAccess.FIELD, secret, account_generation=1,
+                auth_epoch=3, method=method, target=path,
+                body_sha256=hashlib.sha256(body).hexdigest(),
+            )
+            return _s21_actor_headers(actor, assertion=assertion)
+
+        # (3) A validly signed assertion whose account session was revoked
+        # (logout, generation or auth-epoch change) is rejected.
+        session_current["value"] = False
+        revoked = probe.request(method, path, body=body, headers=signed())
+        assert revoked.status_code in {401, 404}, (method, template, revoked.status_code)
+        if method != "HEAD":
+            assert revoked.json()["detail"]["code"] in {"account_authentication_stale"} | concealed
+        assert probe.events["downstream"] == start["downstream"]
+
+        # Positive control: the same signed request with a current session
+        # passes the session boundary (raw routes then need their raw proof).
+        session_current["value"] = True
+        current = probe.request(method, path, body=body, headers=signed())
+        if template.startswith("/raw-collections/"):
+            assert current.status_code == 401, (method, template, current.status_code)
+            if method != "HEAD":
+                assert current.json()["detail"]["code"] == "raw_request_proof_required"
+            assert probe.events["downstream"] == start["downstream"]
+        else:
+            assert current.status_code == 204, (method, template, current.status_code, current.text)
+            assert probe.events["downstream"] == start["downstream"] + 1
+        session_checked += 1
+    assert session_checked == len(routes) - len(_S21_PRIVACY_DELETION_ROUTES & set(routes))
+
+
+# S21-41 other-user coverage. Every owner-scoped FIELD route (a path with a
+# resource ID) must be listed with the direct test that proves another actor's
+# resource is concealed, or be one of the recorded gaps below. A new resource
+# route therefore fails until someone makes that decision explicitly.
+_S21_OWNER_SCOPED_ROUTE_TESTS = {
+    ("GET", "/reports/mine/{report_id}"):
+        ("test_report_user_requests", "test_foreign_generation_and_tombstone_are_concealed_as_not_found"),
+    ("GET", "/reports/mine/{report_id}/requests/{request_id}"):
+        ("test_report_user_requests", "test_user_request_lookup_conceals_owner_generation_report_and_id_mismatch"),
+    ("GET", "/reports/mine/{report_id}/content"):
+        ("test_report_content_corrections", "test_foreign_actor_and_deletion_fence_are_concealed_before_mutation"),
+    ("GET", "/reports/mine/deletions/{request_id}"):
+        ("test_report_physical_deletion", "test_user_deletion_status_route_is_no_store_and_owner_bound"),
+}
+_S21_OWNER_SCOPED_ROUTE_GAPS = frozenset({
+    ("POST", "/reports/mine/{report_id}/requests"),
+    ("POST", "/reports/mine/{report_id}/corrections"),
+    ("GET", "/reports/v2/{report_id}/status"),
+    ("GET", "/privacy/account-deletions/{request_id}/status"),
+    ("POST", "/privacy/account-deletions/{request_id}/device-evidence"),
+    ("HEAD", "/raw-collections/{collection_id}/manifest"),
+    ("HEAD", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
+    ("HEAD", "/raw-collections/{collection_id}/commit"),
+    ("PUT", "/raw-collections/{collection_id}/manifest"),
+    ("PUT", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
+    ("GET", "/raw-collections/{collection_id}"),
+    ("POST", "/raw-collections/{collection_id}/commit"),
+})
+
+
+def test_s21_41_owner_scoped_field_routes_have_other_user_decisions() -> None:
+    import importlib
+
+    owner_scoped = {
+        (method, template)
+        for method, template in _s21_field_actor_routes()
+        if "{" in template
+    }
+    listed = set(_S21_OWNER_SCOPED_ROUTE_TESTS) | _S21_OWNER_SCOPED_ROUTE_GAPS
+    assert not set(_S21_OWNER_SCOPED_ROUTE_TESTS) & _S21_OWNER_SCOPED_ROUTE_GAPS
+    assert owner_scoped == listed
+    for module_name, test_name in _S21_OWNER_SCOPED_ROUTE_TESTS.values():
+        module = importlib.import_module(module_name)
+        assert callable(getattr(module, test_name, None)), (module_name, test_name)

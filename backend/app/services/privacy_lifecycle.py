@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import hashlib
@@ -9,10 +11,10 @@ import hmac
 import json
 import re
 from secrets import compare_digest
-from typing import Mapping
+from typing import Collection, Mapping
 import uuid
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
@@ -23,7 +25,10 @@ from backend.app.models import (
     AccountDeletionRequest,
     AccountDeletionTombstone,
     PrivacyHmacKeyBinding,
+    PrivacyHmacKeyringEntry,
+    PrivacyInstallationEvidenceKey,
     PrivacyConsentEvent,
+    RawCollection,
     Report,
     SignupConsentReceipt,
     UserAccount,
@@ -31,11 +36,13 @@ from backend.app.models import (
 from backend.app.schemas import (
     AccountDeletionRequestV2,
     AccountDeletionStatusV2,
+    AccountDeletionStatusWithDeviceVerificationV2,
     DeviceDeletionEvidenceV2,
     PRIVACY_CONSENT_ITEM_VERSIONS,
     PRIVACY_CONSENT_POLICY_VERSION,
     PrivacyConsentBootstrapV1,
 )
+from backend.app.services.signup_documents import signup_document_version_matches
 
 
 DELETION_ITEM_KEYS = (
@@ -120,6 +127,23 @@ class DeletionAcceptance:
 class ConsentRecording:
     event: PrivacyConsentEvent
     created: bool
+
+
+@dataclass(frozen=True)
+class ResolvedPrivacySubject:
+    """S1617-50: the one pseudonymous subject that owns an actor generation.
+
+    ``secret``/``key_version`` belong to the key that derived ``subject``;
+    derived HMACs (installation, deletion access) use that same key so rows
+    written before a rotation stay addressable without re-keying.
+    ``candidates`` is every subject of the actor generation under the ACTIVE
+    and LOOKUP_ONLY keys (sorted); fences and tombstone checks use all of them.
+    """
+
+    subject: str
+    secret: str
+    key_version: int | None
+    candidates: tuple[str, ...]
 
 
 def _same_optional_digest(left: str | None, right: str | None) -> bool:
@@ -234,11 +258,182 @@ def privacy_hmac_secret_fingerprint(secret: str) -> str:
     ).hexdigest()
 
 
+# S1617-50: lookup-only privacy HMAC keys (older keys kept to identify rows that
+# were written before a rotation). Configured once per process from settings.
+_CONFIGURED_LOOKUP_KEYS: tuple[tuple[int, str], ...] = ()
+
+
+def configure_privacy_hmac_lookup_keys(keys: Mapping[int, str] | None) -> None:
+    global _CONFIGURED_LOOKUP_KEYS
+    normalized = tuple(sorted((int(version), secret) for version, secret in (keys or {}).items()))
+    for version, secret in normalized:
+        if version < 1:
+            raise ValueError("privacy HMAC lookup key versions must be positive")
+        _require_hmac_secret(secret)
+    _CONFIGURED_LOOKUP_KEYS = normalized
+
+
+def configured_privacy_hmac_lookup_keys() -> tuple[tuple[int, str], ...]:
+    return _CONFIGURED_LOOKUP_KEYS
+
+
+def _lookup_keys(
+    lookup_keys: Mapping[int, str] | None,
+) -> tuple[tuple[int, str], ...]:
+    if lookup_keys is None:
+        return _CONFIGURED_LOOKUP_KEYS
+    return tuple(sorted((int(version), secret) for version, secret in lookup_keys.items()))
+
+
+def _privacy_key_mismatch() -> PrivacyLifecycleError:
+    return PrivacyLifecycleError(
+        "privacy_hmac_key_mismatch",
+        "The configured privacy HMAC key does not match the database binding.",
+        status_code=503,
+    )
+
+
+def _verify_privacy_keyring(
+    db: Session,
+    *,
+    fingerprint: str,
+    key_version: int,
+    lookup: tuple[tuple[int, str], ...],
+) -> bool:
+    """Return False for a legacy store without a keyring; raise on any mismatch."""
+
+    # A predecessor schema (before 202609300002) has no keyring and cannot have
+    # been rotated, so it keeps the legacy singleton binding path.
+    if (
+        db.scalar(select(func.to_regclass("public.privacy_hmac_keyring"))) is None
+        or db.scalar(select(PrivacyHmacKeyringEntry.key_version).limit(1)) is None
+    ):
+        if lookup:
+            # Lookup keys cannot be verified without a bound keyring.
+            raise _privacy_key_mismatch()
+        return False
+    entries = db.scalars(
+        select(PrivacyHmacKeyringEntry)
+        .order_by(PrivacyHmacKeyringEntry.key_version)
+        .execution_options(populate_existing=True)
+    ).all()
+    if not entries:
+        if lookup:
+            # Lookup keys cannot be verified without a bound keyring.
+            raise _privacy_key_mismatch()
+        return False
+    active = [entry for entry in entries if entry.state == "ACTIVE"]
+    if (
+        len(active) != 1
+        or active[0].key_version != key_version
+        or not compare_digest(active[0].secret_fingerprint, fingerprint)
+    ):
+        raise _privacy_key_mismatch()
+    bound_lookup = {
+        entry.key_version: entry.secret_fingerprint
+        for entry in entries
+        if entry.state == "LOOKUP_ONLY"
+    }
+    configured_lookup = {
+        version: privacy_hmac_secret_fingerprint(secret) for version, secret in lookup
+    }
+    if set(bound_lookup) != set(configured_lookup) or not all(
+        compare_digest(bound_lookup[version], configured_lookup[version])
+        for version in bound_lookup
+    ):
+        # A missing old key would silently stop finding its tombstones; an
+        # unknown extra key is not bound. Both fail closed.
+        raise _privacy_key_mismatch()
+    return True
+
+
+def privacy_subject_lookup_candidates(
+    actor_id: str,
+    account_generation: int,
+    lookup_keys: Mapping[int, str] | None = None,
+) -> tuple[str, ...]:
+    """Pseudonymous subjects of the same actor under every lookup-only key."""
+
+    return tuple(
+        privacy_subject_hmac(actor_id, account_generation, secret)
+        for _version, secret in _lookup_keys(lookup_keys)
+    )
+
+
+def rotate_privacy_hmac_key(
+    db: Session,
+    *,
+    current_secret: str,
+    current_key_version: int,
+    new_secret: str,
+    new_key_version: int,
+    lookup_keys: Mapping[int, str] | None = None,
+) -> None:
+    """Owner operation: retire the ACTIVE key to LOOKUP_ONLY and bind a new one.
+
+    Nothing is re-keyed. The runtime role can only read the keyring, so this
+    runs with the migration/owner connection as part of a reviewed procedure.
+    """
+
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+        {"lock_key": "walksafe/privacy-hmac-key-binding/v1"},
+    )
+    current_fingerprint = privacy_hmac_secret_fingerprint(current_secret)
+    new_fingerprint = privacy_hmac_secret_fingerprint(new_secret)
+    lookup = _lookup_keys(lookup_keys)
+    if not _verify_privacy_keyring(
+        db,
+        fingerprint=current_fingerprint,
+        key_version=current_key_version,
+        lookup=lookup,
+    ):
+        if lookup:
+            raise _privacy_key_mismatch()
+        assert_privacy_hmac_key_bound(
+            db,
+            secret=current_secret,
+            key_version=current_key_version,
+            lookup_keys={},
+        )
+        db.add(
+            PrivacyHmacKeyringEntry(
+                key_version=current_key_version,
+                secret_fingerprint=current_fingerprint,
+                state="ACTIVE",
+            )
+        )
+        db.flush()
+    known_versions = {current_key_version, *(version for version, _secret in lookup)}
+    if new_key_version <= max(known_versions) or new_fingerprint in {
+        current_fingerprint,
+        *(privacy_hmac_secret_fingerprint(secret) for _version, secret in lookup),
+    }:
+        raise PrivacyLifecycleError(
+            "privacy_hmac_rotation_invalid",
+            "The new privacy HMAC key must use a new version and new secret.",
+            status_code=409,
+        )
+    active = db.get(PrivacyHmacKeyringEntry, current_key_version, populate_existing=True)
+    assert active is not None
+    active.state = "LOOKUP_ONLY"
+    db.flush([active])
+    db.add(
+        PrivacyHmacKeyringEntry(
+            key_version=new_key_version,
+            secret_fingerprint=new_fingerprint,
+            state="ACTIVE",
+        )
+    )
+    db.flush()
+
+
 def bind_or_verify_privacy_hmac_key(
     db: Session,
     *,
     secret: str,
     key_version: int = 1,
+    lookup_keys: Mapping[int, str] | None = None,
 ) -> PrivacyHmacKeyBinding:
     """Create the singleton binding only for an empty privacy store, then verify it."""
 
@@ -249,6 +444,16 @@ def bind_or_verify_privacy_hmac_key(
             status_code=503,
         )
     fingerprint = privacy_hmac_secret_fingerprint(secret)
+    if _verify_privacy_keyring(
+        db,
+        fingerprint=fingerprint,
+        key_version=key_version,
+        lookup=_lookup_keys(lookup_keys),
+    ):
+        binding = db.get(PrivacyHmacKeyBinding, 1, populate_existing=True)
+        if binding is None:
+            raise _privacy_key_mismatch()
+        return binding
     binding = db.get(PrivacyHmacKeyBinding, 1, populate_existing=True)
     if binding is not None:
         if binding.key_version != key_version or not compare_digest(
@@ -268,12 +473,13 @@ def bind_or_verify_privacy_hmac_key(
     )
     binding = db.get(PrivacyHmacKeyBinding, 1, populate_existing=True)
     if binding is None:
+        # Existence probes select only keys so predecessor schemas stay readable.
         privacy_rows_exist = any(
-            db.scalar(select(model).limit(1)) is not None
-            for model in (
-                PrivacyConsentEvent,
-                AccountDeletionTombstone,
-                AccountDeletionReceipt,
+            db.scalar(select(column).limit(1)) is not None
+            for column in (
+                PrivacyConsentEvent.id,
+                AccountDeletionTombstone.tombstone_id,
+                AccountDeletionReceipt.id,
             )
         ) or db.scalar(
             select(Report.id).where(Report.privacy_subject_hmac.is_not(None)).limit(1)
@@ -309,8 +515,16 @@ def assert_privacy_hmac_key_bound(
     *,
     secret: str,
     key_version: int = 1,
+    lookup_keys: Mapping[int, str] | None = None,
 ) -> None:
     fingerprint = privacy_hmac_secret_fingerprint(secret)
+    if _verify_privacy_keyring(
+        db,
+        fingerprint=fingerprint,
+        key_version=key_version,
+        lookup=_lookup_keys(lookup_keys),
+    ):
+        return
     binding = db.get(PrivacyHmacKeyBinding, 1, populate_existing=True)
     if (
         binding is None
@@ -516,6 +730,21 @@ def assert_account_deletion_worker_database_role(db: Session) -> None:
             "AS can_delete_account_enrollments, "
             "has_column_privilege(current_user, 'public.signup_consent_receipts', "
             "'account_id', 'SELECT') AS can_read_signup_receipt_inventory, "
+            # S1617-59: delivered institution copies are counted by identity only.
+            "(has_column_privilege(current_user, "
+            "'public.report_institution_delivery_events', 'id', 'SELECT') "
+            "AND has_column_privilege(current_user, "
+            "'public.report_institution_delivery_events', 'report_id', 'SELECT') "
+            "AND has_column_privilege(current_user, "
+            "'public.report_institution_delivery_events', 'package_id', 'SELECT')) "
+            "AS can_read_delivery_copy_inventory, "
+            "(has_column_privilege(current_user, "
+            "'public.report_institution_delivery_events', 'recipient', 'SELECT') "
+            "OR has_column_privilege(current_user, "
+            "'public.report_institution_delivery_events', 'reason', 'SELECT') "
+            "OR has_column_privilege(current_user, "
+            "'public.report_institution_delivery_events', 'evidence_sha256', 'SELECT')) "
+            "AS can_read_delivery_details, "
             "has_table_privilege(current_user, 'public.signup_consent_receipts', "
             "'SELECT') AS can_read_all_signup_receipts, "
             "has_table_privilege(current_user, 'public.account_deletion_items', 'UPDATE') "
@@ -600,6 +829,12 @@ def assert_account_deletion_worker_database_role(db: Session) -> None:
             "ON function_namespace.oid = security_definer_function.pronamespace "
             "WHERE function_namespace.nspname = 'public' "
             "AND security_definer_function.prosecdef "
+            # S1617-52-F1: the worker may complete a request with the server
+            # manifest, so it may run exactly the installation key purge,
+            # which deletes keys only of COMPLETED subject generations.
+            "AND security_definer_function.oid IS DISTINCT FROM "
+            "to_regprocedure('public.walksafe_purge_privacy_installation_evidence_keys"
+            "(text, bigint)')::oid "
             "AND has_function_privilege(current_user, "
             "security_definer_function.oid, 'EXECUTE')) "
             "AS can_execute_security_definer, "
@@ -691,6 +926,8 @@ def assert_account_deletion_worker_database_role(db: Session) -> None:
         or not role["can_delete_account_enrollments"]
         or not role["can_read_signup_receipt_inventory"]
         or role["can_read_all_signup_receipts"]
+        or not role["can_read_delivery_copy_inventory"]
+        or role["can_read_delivery_details"]
         or not role["can_update_items"]
         or not role["can_insert_events"]
         or not role["can_read_device_targets"]
@@ -839,21 +1076,52 @@ def _tombstone(
     db: Session,
     privacy_subject: str,
     account_generation: int,
+    lookup_subjects: Collection[str] = (),
 ) -> AccountDeletionTombstone | None:
+    subjects = sorted({privacy_subject, *lookup_subjects})
+    if len(subjects) == 1:
+        return db.scalar(
+            select(AccountDeletionTombstone).where(
+                AccountDeletionTombstone.privacy_subject_hmac == privacy_subject,
+                AccountDeletionTombstone.account_generation == account_generation,
+            )
+        )
     return db.scalar(
-        select(AccountDeletionTombstone).where(
-            AccountDeletionTombstone.privacy_subject_hmac == privacy_subject,
+        select(AccountDeletionTombstone)
+        .where(
+            AccountDeletionTombstone.privacy_subject_hmac.in_(subjects),
             AccountDeletionTombstone.account_generation == account_generation,
         )
+        .order_by(AccountDeletionTombstone.tombstoned_at)
+        .limit(1)
     )
+
+
+def _require_lookup_subjects(
+    lookup_subjects: Collection[str] | None,
+) -> Collection[str]:
+    if lookup_subjects is None:
+        if _CONFIGURED_LOOKUP_KEYS:
+            # S1617-50: after a rotation every tombstone check must also search
+            # the lookup-only subjects; a caller that cannot supply them fails
+            # closed instead of missing a tombstone written under an older key.
+            raise PrivacyLifecycleError(
+                "privacy_hmac_lookup_candidates_required",
+                "The privacy lifecycle is temporarily unavailable.",
+                status_code=503,
+            )
+        return ()
+    return lookup_subjects
 
 
 def assert_report_ingest_active(
     db: Session,
     privacy_subject: str,
     account_generation: int,
+    lookup_subjects: Collection[str] | None = None,
 ) -> None:
-    if _tombstone(db, privacy_subject, account_generation) is not None:
+    candidates = _require_lookup_subjects(lookup_subjects)
+    if _tombstone(db, privacy_subject, account_generation, candidates) is not None:
         raise PrivacyLifecycleError(
             "account_generation_tombstoned",
             "This account generation no longer accepts report data.",
@@ -905,11 +1173,19 @@ def lock_report_ingest_transaction(
     *,
     automatic_reporting: bool = False,
     enforce_consent: bool = True,
+    lookup_subjects: Collection[str] | None = None,
 ) -> None:
     """Acquire the shared actor-generation fence and perform the pre-ingest check."""
 
-    lock_privacy_subject_shared(db, privacy_subject, account_generation)
-    assert_report_ingest_active(db, privacy_subject, account_generation)
+    candidates = _require_lookup_subjects(lookup_subjects)
+    # Lock every candidate subject in a stable order so an instance still on the
+    # older key and one on the new key serialize on the same fences.
+    for subject in sorted({privacy_subject, *candidates}):
+        lock_privacy_subject_shared(db, subject, account_generation)
+    assert_report_ingest_active(db, privacy_subject, account_generation, candidates)
+    # S1617-50: under the fences, the resolved subject must still be the only
+    # owner; otherwise new rows would split the actor generation's scope.
+    _require_rotation_continuity(db, privacy_subject, candidates, account_generation)
     if enforce_consent:
         assert_report_consent_active(
             db,
@@ -917,6 +1193,153 @@ def lock_report_ingest_transaction(
             account_generation,
             automatic_reporting=automatic_reporting,
         )
+
+
+# S1617-50: tables whose rows name the owning (subject, generation). A subject
+# "owns" an actor generation when any of these rows exists under it.
+_SUBJECT_OWNER_COLUMNS = (
+    (PrivacyConsentEvent.privacy_subject_hmac, PrivacyConsentEvent.account_generation),
+    (Report.privacy_subject_hmac, Report.account_generation),
+    (UserAccount.privacy_subject_hmac, UserAccount.account_generation),
+    (AccountDeletionRequest.privacy_subject_hmac, AccountDeletionRequest.account_generation),
+    (AccountDeletionTombstone.privacy_subject_hmac, AccountDeletionTombstone.account_generation),
+    (RawCollection.privacy_subject_hmac, RawCollection.account_generation),
+    # S1617-50-F2: an installation key bound under an older subject.
+    (
+        PrivacyInstallationEvidenceKey.privacy_subject_hmac,
+        PrivacyInstallationEvidenceKey.account_generation,
+    ),
+)
+
+
+def _rotation_continuity_incomplete() -> PrivacyLifecycleError:
+    return PrivacyLifecycleError(
+        "privacy_hmac_rotation_continuity_incomplete",
+        "The privacy lifecycle is temporarily unavailable.",
+        status_code=503,
+    )
+
+
+def _subjects_with_rows(
+    db: Session,
+    subjects: Collection[str],
+    account_generation: int,
+) -> set[str]:
+    ordered = sorted(set(subjects))
+    owners: set[str] = set()
+    for subject_column, generation_column in _SUBJECT_OWNER_COLUMNS:
+        owners.update(
+            db.scalars(
+                select(subject_column)
+                .where(
+                    subject_column.in_(ordered),
+                    generation_column == account_generation,
+                )
+                .distinct()
+            ).all()
+        )
+    return owners
+
+
+def _subject_keys(
+    actor_id: str,
+    account_generation: int,
+    secret: str,
+    key_version: int | None,
+    lookup_keys: Mapping[int, str] | None,
+) -> tuple[tuple[int | None, str, str], ...]:
+    """(key version, secret, subject) for the ACTIVE key then each lookup key."""
+
+    return (
+        (key_version, secret, privacy_subject_hmac(actor_id, account_generation, secret)),
+        *(
+            (version, lookup_secret, privacy_subject_hmac(actor_id, account_generation, lookup_secret))
+            for version, lookup_secret in _lookup_keys(lookup_keys)
+        ),
+    )
+
+
+def privacy_subject_candidates(
+    actor_id: str,
+    account_generation: int,
+    secret: str,
+    lookup_keys: Mapping[int, str] | None = None,
+) -> tuple[str, ...]:
+    """Every subject of the actor generation (ACTIVE + LOOKUP_ONLY), sorted."""
+
+    return tuple(
+        sorted(
+            {
+                subject
+                for _version, _secret, subject in _subject_keys(
+                    actor_id, account_generation, secret, None, lookup_keys
+                )
+            }
+        )
+    )
+
+
+def resolve_privacy_subject(
+    db: Session,
+    actor_id: str,
+    account_generation: int,
+    *,
+    secret: str,
+    key_version: int | None = None,
+    lookup_keys: Mapping[int, str] | None = None,
+) -> ResolvedPrivacySubject:
+    """S1617-50: pick the subject that already owns rows, else the ACTIVE one.
+
+    Without lookup keys this is the ACTIVE subject and touches no table. After
+    a rotation an actor whose rows were written under an older key keeps that
+    subject (no re-keying); rows under two different subjects of the same
+    actor generation fail closed instead of splitting its deletion scope.
+    Callers that write must hold the candidate fences before resolving.
+    """
+
+    keys = _subject_keys(actor_id, account_generation, secret, key_version, lookup_keys)
+    candidates = tuple(sorted({subject for _version, _secret, subject in keys}))
+    if len(keys) == 1:
+        return ResolvedPrivacySubject(keys[0][2], secret, key_version, candidates)
+    owners = _subjects_with_rows(db, candidates, account_generation)
+    if len(owners) > 1:
+        raise _rotation_continuity_incomplete()
+    chosen = next((key for key in keys if key[2] in owners), keys[0])
+    return ResolvedPrivacySubject(chosen[2], chosen[1], chosen[0], candidates)
+
+
+def resolve_stored_privacy_subject(
+    actor_id: str,
+    account_generation: int,
+    stored_subject: str | None,
+    *,
+    secret: str,
+    key_version: int | None = None,
+    lookup_keys: Mapping[int, str] | None = None,
+) -> ResolvedPrivacySubject | None:
+    """Match a row's stored subject to the configured key that derived it."""
+
+    if stored_subject is None:
+        return None
+    keys = _subject_keys(actor_id, account_generation, secret, key_version, lookup_keys)
+    candidates = tuple(sorted({subject for _version, _secret, subject in keys}))
+    for version, key_secret, subject in keys:
+        if compare_digest(subject, stored_subject):
+            return ResolvedPrivacySubject(subject, key_secret, version, candidates)
+    return None
+
+
+def _require_rotation_continuity(
+    db: Session,
+    privacy_subject: str,
+    candidates: Collection[str],
+    account_generation: int,
+) -> None:
+    """Fail closed when another candidate subject owns rows (split subject)."""
+
+    others = set(candidates) - {privacy_subject}
+    if others and _subjects_with_rows(db, others, account_generation):
+        raise _rotation_continuity_incomplete()
 
 
 def lock_report_deletion_transaction(
@@ -1120,11 +1543,24 @@ def accept_account_deletion(
     key_version: int = 1,
 ) -> DeletionAcceptance:
     bind_or_verify_privacy_hmac_key(db, secret=secret, key_version=key_version)
-    privacy_subject = privacy_subject_hmac(actor_id, account_generation, secret)
+    candidates = privacy_subject_candidates(actor_id, account_generation, secret)
     body_sha256 = deletion_request_body_sha256(payload)
     _lock_deletion_request_id(db, payload.request_id)
-    lock_privacy_subject_exclusive(db, privacy_subject, account_generation)
+    for subject in candidates:
+        lock_privacy_subject_exclusive(db, subject, account_generation)
     db.expire_all()
+    # S1617-50: after a rotation an actor keeps the subject (and key) its rows
+    # were written under, so targets, report scope and the tombstone stay one set.
+    resolved = resolve_privacy_subject(
+        db,
+        actor_id,
+        account_generation,
+        secret=secret,
+        key_version=key_version,
+    )
+    privacy_subject = resolved.subject
+    subject_secret = resolved.secret
+    lookup_subjects = resolved.candidates
     existing = db.get(AccountDeletionRequest, payload.request_id)
     if existing is not None:
         authorized = _authorize_request(
@@ -1133,7 +1569,7 @@ def accept_account_deletion(
             account_generation=account_generation,
             access_pre_digest=access_pre_digest,
             tombstone_id=tombstone_id,
-            secret=secret,
+            secret=subject_secret,
         )
         if (
             authorized.request_body_sha256 != body_sha256
@@ -1166,12 +1602,14 @@ def accept_account_deletion(
             "The first deletion request revision must be 1.",
             status_code=409,
         )
-    if _tombstone(db, privacy_subject, account_generation) is not None:
+    if _tombstone(db, privacy_subject, account_generation, lookup_subjects) is not None:
         raise PrivacyLifecycleError(
             "account_generation_tombstoned",
             "This account generation is already tombstoned.",
             status_code=409,
         )
+    # S1617-50: installation targets and report scope below are read under the
+    # resolved subject, which resolve_privacy_subject proved is the only owner.
 
     credential_account = db.scalar(
         select(UserAccount)
@@ -1217,7 +1655,7 @@ def accept_account_deletion(
         request_id=payload.request_id,
         tombstone_id=canonical_tombstone_id,
         access_pre_digest=access_pre_digest,
-        secret=secret,
+        secret=subject_secret,
     )
     credential_account_id = (
         credential_account.id if credential_account is not None else None
@@ -1250,6 +1688,7 @@ def accept_account_deletion(
         account_generation=account_generation,
         request_receipt_sha256=receipt_sha256,
         tombstoned_at=accepted_at,
+        hmac_key_version=resolved.key_version,
     )
     request = AccountDeletionRequest(
         request_id=payload.request_id,
@@ -1332,6 +1771,100 @@ def accept_account_deletion(
     return DeletionAcceptance(status=response, created=True)
 
 
+def _device_verification_now(db: Session) -> datetime:
+    """Database clock used to evaluate the device deadline (patchable in tests)."""
+
+    return db.execute(text("SELECT clock_timestamp()")).scalar_one()
+
+
+def device_verification_summary(
+    *,
+    overall_status: str,
+    item_states: Mapping[str, str],
+    device_due_at: datetime,
+    target_states: Collection[str],
+    now: datetime,
+    device_clock_anomaly_count: int = 0,
+) -> dict[str, object]:
+    """Project frozen target states into the S1617-51 verification view.
+
+    A PENDING target past the 24-hour device deadline is reported as
+    unverifiable (SLA_ELAPSED_NO_CONTACT). Nothing is written: the target keeps
+    its PENDING duty, so later evidence from the same installation still lands
+    through the normal evidence path and no NOT_FOUND is ever synthesized.
+    """
+
+    deleted = sum(1 for state in target_states if state == "COMPLETED")
+    not_found = sum(1 for state in target_states if state == "NOT_APPLICABLE")
+    failed = sum(1 for state in target_states if state == "FAILED")
+    open_targets = sum(1 for state in target_states if state == "PENDING")
+    elapsed = now >= device_due_at
+    unverifiable = open_targets if elapsed else 0
+    pending = open_targets - unverifiable
+    server_side_terminal = all(
+        item_states[key] in TERMINAL_ITEM_STATES
+        for key in DELETION_ITEM_KEYS
+        if key != "device_untransmitted_data"
+    )
+    if overall_status == "COMPLETED":
+        completion_view = "COMPLETED"
+    elif server_side_terminal and unverifiable and not pending and not failed:
+        completion_view = "SERVER_COMPLETED_DEVICE_UNVERIFIED"
+    else:
+        completion_view = "IN_PROGRESS"
+    return {
+        "schema_version": "walksafe.account-deletion-device-verification.v1",
+        "completion_view": completion_view,
+        "target_count": len(target_states),
+        "deleted_count": deleted,
+        "not_found_count": not_found,
+        "failed_count": failed,
+        "pending_count": pending,
+        "unverifiable_count": unverifiable,
+        "unverifiable_reason": "SLA_ELAPSED_NO_CONTACT" if unverifiable else None,
+        "follow_up": "DELETE_ON_NEXT_CONTACT_OR_REMOVE_APP" if unverifiable else None,
+        "device_clock_anomaly_count": device_clock_anomaly_count,
+        "device_due_at": device_due_at,
+        "evaluated_at": now,
+    }
+
+
+def _device_clock_anomaly_count(db: Session, request_id: str) -> int:
+    return len(
+        db.scalars(
+            select(AccountDeletionEvent.id).where(
+                AccountDeletionEvent.request_id == request_id,
+                AccountDeletionEvent.event_type == "DEVICE_EVIDENCE",
+                AccountDeletionEvent.device_clock_anomaly.is_(True),
+            )
+        ).all()
+    )
+
+
+def _status_with_device_verification(
+    db: Session,
+    request: AccountDeletionRequest,
+    status: AccountDeletionStatusV2,
+) -> AccountDeletionStatusWithDeviceVerificationV2:
+    target_states = db.scalars(
+        select(AccountDeletionDeviceTarget.state).where(
+            AccountDeletionDeviceTarget.request_id == request.request_id
+        )
+    ).all()
+    device_item = status.items[0]
+    summary = device_verification_summary(
+        overall_status=status.overall_status,
+        item_states={item.key: item.status for item in status.items},
+        device_due_at=device_item.due_at,
+        target_states=tuple(target_states),
+        now=_device_verification_now(db),
+        device_clock_anomaly_count=_device_clock_anomaly_count(db, request.request_id),
+    )
+    return AccountDeletionStatusWithDeviceVerificationV2.model_validate(
+        {**status.model_dump(), "device_verification": summary}
+    )
+
+
 def get_account_deletion_status(
     db: Session,
     *,
@@ -1342,12 +1875,22 @@ def get_account_deletion_status(
     tombstone_id: str,
     secret: str,
     key_version: int = 1,
+    include_device_verification: bool = False,
 ) -> AccountDeletionStatusV2:
     bind_or_verify_privacy_hmac_key(db, secret=secret, key_version=key_version)
-    privacy_subject = privacy_subject_hmac(actor_id, account_generation, secret)
     request = db.get(AccountDeletionRequest, request_id)
-    if request is None or not compare_digest(request.privacy_subject_hmac, privacy_subject):
+    # S1617-50: a request accepted before a rotation keeps its subject; the
+    # key that derived it also verifies the bound access digest.
+    resolved = resolve_stored_privacy_subject(
+        actor_id,
+        account_generation,
+        None if request is None else request.privacy_subject_hmac,
+        secret=secret,
+        key_version=key_version,
+    )
+    if request is None or resolved is None:
         raise _not_found()
+    privacy_subject = resolved.subject
     lock_privacy_subject_shared(db, privacy_subject, account_generation)
     db.expire_all()
     request = _authorize_request(
@@ -1356,9 +1899,11 @@ def get_account_deletion_status(
         account_generation=account_generation,
         access_pre_digest=access_pre_digest,
         tombstone_id=tombstone_id,
-        secret=secret,
+        secret=resolved.secret,
     )
     response = _status(db, request)
+    if include_device_verification:
+        response = _status_with_device_verification(db, request, response)
     db.commit()
     return response
 
@@ -1610,9 +2155,210 @@ def _apply_item_transition(
     db.flush([item, request])
     db.add(event)
     db.flush([event])
+    if request.overall_status == "COMPLETED":
+        _purge_installation_evidence_keys(db, request)
     response = _status(db, request)
     db.commit()
     return response
+
+
+_INSTALLATION_EVIDENCE_SIGNATURE_DOMAIN = b"walksafe/device-deletion-evidence-signature/v1\0"
+
+
+def installation_evidence_signature_message(evidence_sha256: str) -> bytes:
+    if _SHA256.fullmatch(evidence_sha256) is None:
+        raise ValueError("evidence_sha256 must be lowercase SHA-256 hex")
+    return _INSTALLATION_EVIDENCE_SIGNATURE_DOMAIN + evidence_sha256.encode("ascii")
+
+
+# Named-curve (prime256v1 OID) SubjectPublicKeyInfo header for a 33-byte
+# compressed P-256 point.
+_P256_COMPRESSED_SPKI_PREFIX = bytes.fromhex(
+    "3039301306072a8648ce3d020106082a8648ce3d030107032200"
+)
+
+
+def _installation_public_key_invalid() -> PrivacyLifecycleError:
+    return PrivacyLifecycleError(
+        "installation_evidence_key_invalid",
+        "The installation evidence key must be a P-256 public key.",
+        status_code=422,
+    )
+
+
+def _load_installation_public_key(public_key_der: bytes):
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PublicFormat,
+        load_der_public_key,
+    )
+
+    submitted = bytes(public_key_der)
+    try:
+        key = load_der_public_key(submitted)
+    except (ValueError, TypeError) as exc:
+        raise _installation_public_key_invalid() from exc
+    if not isinstance(key, ec.EllipticCurvePublicKey) or not isinstance(
+        key.curve, ec.SECP256R1
+    ):
+        raise _installation_public_key_invalid()
+    # S1617-52-F2: only named-curve SPKI with an uncompressed or compressed
+    # point is accepted. Explicit curve parameters or any other encoding of the
+    # same key is refused, so one key has exactly one stored form.
+    if submitted not in (
+        _canonical_installation_public_key_der(key),
+        _P256_COMPRESSED_SPKI_PREFIX
+        + key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint),
+    ):
+        raise _installation_public_key_invalid()
+    return key
+
+
+def _canonical_installation_public_key_der(key) -> bytes:
+    """Uncompressed named-curve SubjectPublicKeyInfo (91 bytes for P-256)."""
+
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    return key.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+
+
+def register_installation_evidence_key(
+    db: Session,
+    *,
+    actor_id: str,
+    account_generation: int,
+    installation_id: str,
+    public_key_der: bytes,
+    secret: str,
+    key_version: int = 1,
+) -> PrivacyInstallationEvidenceKey:
+    """Bind one evidence-signing key to an authenticated installation (S1617-52).
+
+    The caller must have authenticated this installation (for example the
+    consent path of the same session). First registration wins; a different
+    key for the same installation is a conflict, never a silent replacement.
+    """
+
+    bind_or_verify_privacy_hmac_key(db, secret=secret, key_version=key_version)
+    # S1617-52-F2: hash and store the canonical encoding, never the submitted
+    # bytes, so a compressed re-registration of the same key is idempotent.
+    public_key_der = _canonical_installation_public_key_der(
+        _load_installation_public_key(public_key_der)
+    )
+    lookup_subjects = privacy_subject_candidates(actor_id, account_generation, secret)
+    for subject in lookup_subjects:
+        lock_privacy_subject_exclusive(db, subject, account_generation)
+    # S1617-50-F2 / S1617-50: an older-key subject that already holds this
+    # installation keeps it, so "first registered key wins" is checked on the
+    # resolved subject; rows under two subjects fail closed.
+    resolved = resolve_privacy_subject(
+        db,
+        actor_id,
+        account_generation,
+        secret=secret,
+        key_version=key_version,
+    )
+    privacy_subject = resolved.subject
+    installation_hmac = installation_subject_hmac(
+        installation_id, privacy_subject, resolved.secret
+    )
+    assert_report_ingest_active(db, privacy_subject, account_generation, lookup_subjects)
+    public_key_sha256 = hashlib.sha256(public_key_der).hexdigest()
+    existing = db.get(
+        PrivacyInstallationEvidenceKey,
+        (privacy_subject, account_generation, installation_hmac),
+    )
+    if existing is not None:
+        if not compare_digest(existing.public_key_sha256, public_key_sha256):
+            raise PrivacyLifecycleError(
+                "installation_evidence_key_conflict",
+                "A different evidence key is already registered for this installation.",
+                status_code=409,
+            )
+        db.commit()
+        return existing
+    row = PrivacyInstallationEvidenceKey(
+        privacy_subject_hmac=privacy_subject,
+        account_generation=account_generation,
+        installation_subject_hmac=installation_hmac,
+        public_key_der=public_key_der,
+        public_key_sha256=public_key_sha256,
+    )
+    db.add(row)
+    db.flush()
+    db.commit()
+    return row
+
+
+def _require_installation_evidence_signature(
+    db: Session,
+    *,
+    request: AccountDeletionRequest,
+    installation_hmac: str,
+    payload: DeviceDeletionEvidenceV2,
+) -> str | None:
+    """Evidence for a key-registered installation must be signed by that key.
+
+    Returns the verified key fingerprint (None for a key-less installation).
+    """
+
+    registered = db.get(
+        PrivacyInstallationEvidenceKey,
+        (request.privacy_subject_hmac, request.account_generation, installation_hmac),
+    )
+    if registered is None:
+        # Legacy installations without a registered key keep the digest-only
+        # contract until key registration is rolled out end to end.
+        return None
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    signature_text = payload.installation_signature
+    rejected = PrivacyLifecycleError(
+        "device_deletion_evidence_signature_invalid",
+        "The deletion evidence is not signed by the reporting installation.",
+        status_code=403,
+    )
+    if signature_text is None:
+        raise rejected
+    try:
+        signature = base64.urlsafe_b64decode(
+            signature_text + "=" * (-len(signature_text) % 4)
+        )
+        _load_installation_public_key(bytes(registered.public_key_der)).verify(
+            signature,
+            installation_evidence_signature_message(payload.evidence_sha256),
+            ec.ECDSA(hashes.SHA256()),
+        )
+    except (InvalidSignature, ValueError, binascii.Error) as exc:
+        raise rejected from exc
+    return registered.public_key_sha256
+
+
+def _purge_installation_evidence_keys(
+    db: Session,
+    request: AccountDeletionRequest,
+) -> None:
+    """S1617-52-F1: installation evidence keys are deletion-scope data.
+
+    Called in the transaction that made the request COMPLETED, after the
+    request row is flushed. The database function deletes the subject
+    generation's keys only when that request is COMPLETED; the verification
+    fact stays on DEVICE_EVIDENCE events as installation_evidence_key_sha256.
+    """
+
+    db.execute(
+        text(
+            "SELECT walksafe_purge_privacy_installation_evidence_keys("
+            ":privacy_subject_hmac, :account_generation)"
+        ),
+        {
+            "privacy_subject_hmac": request.privacy_subject_hmac,
+            "account_generation": request.account_generation,
+        },
+    ).scalar_one()
 
 
 def record_device_deletion_evidence(
@@ -1627,10 +2373,20 @@ def record_device_deletion_evidence(
     key_version: int = 1,
 ) -> AccountDeletionStatusV2:
     bind_or_verify_privacy_hmac_key(db, secret=secret, key_version=key_version)
-    privacy_subject = privacy_subject_hmac(actor_id, account_generation, secret)
     request = db.get(AccountDeletionRequest, payload.request_id)
-    if request is None or not compare_digest(request.privacy_subject_hmac, privacy_subject):
+    # S1617-50: the request's stored subject selects the key for the access
+    # digest and the installation HMAC of the frozen target set.
+    resolved = resolve_stored_privacy_subject(
+        actor_id,
+        account_generation,
+        None if request is None else request.privacy_subject_hmac,
+        secret=secret,
+        key_version=key_version,
+    )
+    if request is None or resolved is None:
         raise _not_found()
+    privacy_subject = resolved.subject
+    subject_secret = resolved.secret
     lock_privacy_subject_exclusive(db, privacy_subject, account_generation)
     db.expire_all()
     request = _authorize_request(
@@ -1639,7 +2395,7 @@ def record_device_deletion_evidence(
         account_generation=account_generation,
         access_pre_digest=access_pre_digest,
         tombstone_id=tombstone_id,
-        secret=secret,
+        secret=subject_secret,
     )
     if (
         payload.tombstone_id != str(request.tombstone_id)
@@ -1657,7 +2413,7 @@ def record_device_deletion_evidence(
     installation_hmac = installation_subject_hmac(
         payload.installation_id,
         privacy_subject,
-        secret,
+        subject_secret,
     )
     target = db.get(
         AccountDeletionDeviceTarget,
@@ -1669,6 +2425,12 @@ def record_device_deletion_evidence(
             "The installation was not in the frozen deletion target set.",
             status_code=409,
         )
+    evidence_key_sha256 = _require_installation_evidence_signature(
+        db,
+        request=request,
+        installation_hmac=installation_hmac,
+        payload=payload,
+    )
     item = db.get(
         AccountDeletionItem,
         (payload.request_id, "device_untransmitted_data"),
@@ -1725,12 +2487,13 @@ def record_device_deletion_evidence(
         )
 
     now = db.execute(text("SELECT clock_timestamp()")).scalar_one()
-    _require_time_window(
-        payload.completed_at,
-        lower=request.accepted_at,
-        upper=now,
-        code="device_deletion_completed_time_out_of_range",
-        message="The device completion time must be between acceptance and the database clock.",
+    # S1617-53: the server receipt time is authoritative for deadlines and the
+    # terminal record. The device clock is kept as an observation; a value
+    # outside [acceptance, server now] is flagged instead of rejecting evidence
+    # of a deletion the device already performed.
+    device_observed_completed_at = payload.completed_at
+    device_clock_anomaly = not (
+        request.accepted_at <= device_observed_completed_at <= now
     )
     targets = db.scalars(
         select(AccountDeletionDeviceTarget)
@@ -1754,9 +2517,7 @@ def record_device_deletion_evidence(
     target.evidence_sha256 = (
         payload.evidence_sha256 if target.state in TERMINAL_ITEM_STATES else None
     )
-    target.terminal_at = (
-        payload.completed_at if target.state in TERMINAL_ITEM_STATES else None
-    )
+    target.terminal_at = now if target.state in TERMINAL_ITEM_STATES else None
     previous_state = item.state
     if all(candidate.state in TERMINAL_ITEM_STATES for candidate in targets):
         next_state = "COMPLETED"
@@ -1800,11 +2561,14 @@ def record_device_deletion_evidence(
             failure_reason=(
                 "device_reported_failure" if payload.result == "FAILED" else None
             ),
-            terminal_at=payload.completed_at,
+            terminal_at=now,
             installation_subject_hmac=installation_hmac,
             result=payload.result,
             target_state=target.state,
             recorded_at=now,
+            device_observed_completed_at=device_observed_completed_at,
+            device_clock_anomaly=device_clock_anomaly,
+            installation_evidence_key_sha256=evidence_key_sha256,
         )
     states = {
         candidate.item_key: candidate.state
@@ -1816,6 +2580,8 @@ def record_device_deletion_evidence(
     db.flush([target, item, request])
     db.add(event)
     db.flush([event])
+    if request.overall_status == "COMPLETED":
+        _purge_installation_evidence_keys(db, request)
     response = _status(db, request)
     db.commit()
     return response
@@ -1910,17 +2676,76 @@ def transition_deletion_item(
     )
 
 
+_LEGACY_QUARANTINE_BASIS = (
+    "isolated worker inventory has no separate server quarantine location"
+)
+_LEGACY_COPIES_BASIS = "isolated worker inventory has no separate server copy location"
+_NO_QUARANTINE_BASIS = (
+    "no quarantined RAW collection at worker preparation; post-commit "
+    "re-query found no subject row or object in server quarantine locations"
+)
+_NO_COPIES_BASIS = (
+    "no institution delivery recorded for the subject's reports at worker preparation"
+)
+
+
+def _server_manifest_transitions(
+    *,
+    quarantined_raw_collection_count: int | None,
+    external_copy_count: int | None,
+) -> tuple[tuple[str, str, str | None], ...]:
+    for name, value in (
+        ("quarantined_raw_collection_count", quarantined_raw_collection_count),
+        ("external_copy_count", external_copy_count),
+    ):
+        if value is not None and (type(value) is not int or not 0 <= value <= 10_000):
+            raise ValueError(f"{name} must be an integer between 0 and 10000")
+    if quarantined_raw_collection_count is None:
+        quarantine = ("server_quarantine", "NOT_APPLICABLE", _LEGACY_QUARANTINE_BASIS)
+    elif quarantined_raw_collection_count:
+        quarantine = ("server_quarantine", "COMPLETED", None)
+    else:
+        quarantine = ("server_quarantine", "NOT_APPLICABLE", _NO_QUARANTINE_BASIS)
+    if external_copy_count is None:
+        copies = ("server_copies", "NOT_APPLICABLE", _LEGACY_COPIES_BASIS)
+    elif external_copy_count:
+        # S1617-59: a delivered copy is deleted by its institution, not by the
+        # worker; the item stays open until that deletion is confirmed.
+        copies = ("server_copies", "EXTERNAL_PENDING", None)
+    else:
+        copies = ("server_copies", "NOT_APPLICABLE", _NO_COPIES_BASIS)
+    return (
+        ("server_originals", "COMPLETED", None),
+        quarantine,
+        copies,
+        ("report_records", "COMPLETED", None),
+    )
+
+
 def complete_server_deletion_inventory_from_manifest(
     db: Session,
     *,
     request_id: str,
     manifest_sha256: str,
     terminal_at: datetime,
+    quarantined_raw_collection_count: int | None,
+    external_copy_count: int | None,
 ) -> AccountDeletionStatusV2:
-    """Atomically bind the four server-owned terminal states to one manifest."""
+    """Atomically bind the server-owned deletion states to one manifest.
+
+    S1617-55/59: ``server_quarantine`` and ``server_copies`` follow the worker's
+    re-queried inventory instead of a fixed NOT_APPLICABLE. A delivered
+    institution copy keeps ``server_copies`` EXTERNAL_PENDING, so the request
+    cannot reach COMPLETED on internal evidence alone. ``None`` is only for a
+    journal prepared before this inventory existed (legacy fixed basis).
+    """
 
     if _SHA256.fullmatch(manifest_sha256) is None:
         raise ValueError("manifest_sha256 must be one lowercase SHA-256 digest")
+    transitions = _server_manifest_transitions(
+        quarantined_raw_collection_count=quarantined_raw_collection_count,
+        external_copy_count=external_copy_count,
+    )
     assert_account_deletion_worker_database_role(db)
     request = db.get(AccountDeletionRequest, request_id)
     if request is None:
@@ -1951,19 +2776,10 @@ def complete_server_deletion_inventory_from_manifest(
             "The deletion request does not contain the canonical nine-item inventory.",
             status_code=503,
         )
-    transitions: tuple[tuple[str, str, str | None], ...] = (
-        ("server_originals", "COMPLETED", None),
-        (
-            "server_quarantine",
-            "NOT_APPLICABLE",
-            "isolated worker inventory has no separate server quarantine location",
-        ),
-        (
-            "server_copies",
-            "NOT_APPLICABLE",
-            "isolated worker inventory has no separate server copy location",
-        ),
-        ("report_records", "COMPLETED", None),
+    terminal_transitions = tuple(
+        transition
+        for transition in transitions
+        if transition[1] in TERMINAL_ITEM_STATES
     )
     terminal_items = [
         by_key[key]
@@ -1971,15 +2787,13 @@ def complete_server_deletion_inventory_from_manifest(
         if by_key[key].state in TERMINAL_ITEM_STATES
     ]
     if terminal_items:
+        # Replay: every terminal state this manifest sets must already match.
+        # An EXTERNAL_PENDING copy item may have moved on by another path.
         exact = all(
-            item.state == next_state
-            and compare_digest(item.evidence_sha256 or "", manifest_sha256)
-            and item.disposition_basis == basis
-            for item, (_key, next_state, basis) in zip(
-                [by_key[key] for key, _state, _basis in transitions],
-                transitions,
-                strict=True,
-            )
+            by_key[key].state == next_state
+            and compare_digest(by_key[key].evidence_sha256 or "", manifest_sha256)
+            and by_key[key].disposition_basis == basis
+            for key, next_state, basis in terminal_transitions
         )
         if not exact:
             raise PrivacyLifecycleError(
@@ -2001,6 +2815,9 @@ def complete_server_deletion_inventory_from_manifest(
     )
     for item_key, next_state, disposition_basis in transitions:
         item = by_key[item_key]
+        terminal = next_state in TERMINAL_ITEM_STATES
+        if not terminal and item.state == next_state:
+            continue
         operation_id = f"server-delete-{manifest_sha256}-{item_key}"
         operation_sha256 = hashlib.sha256(
             b"walksafe/account-deletion-server-manifest-transition/v1\0"
@@ -2017,16 +2834,20 @@ def complete_server_deletion_inventory_from_manifest(
             )
         ).hexdigest()
         previous_state = item.state
+        # A non-terminal state (EXTERNAL_PENDING copies) carries no evidence
+        # or terminal time; the manifest binding stays in operation_sha256.
+        item_evidence = manifest_sha256 if terminal else None
+        item_terminal_at = terminal_at if terminal else None
         item.state = next_state
         item.item_revision += 1
         item.updated_at = now
-        item.evidence_sha256 = manifest_sha256
+        item.evidence_sha256 = item_evidence
         item.disposition_basis = disposition_basis
         item.retry_after = None
         item.restriction_reason = None
         item.legal_hold_review_at = None
         item.legal_hold_contact = None
-        item.terminal_at = terminal_at
+        item.terminal_at = item_terminal_at
         request.status_revision += 1
         request.updated_at = now
         next_overall_status = overall_deletion_status(
@@ -2044,19 +2865,21 @@ def complete_server_deletion_inventory_from_manifest(
             next_state=next_state,
             status_revision=request.status_revision,
             operation_sha256=operation_sha256,
-            evidence_sha256=manifest_sha256,
+            evidence_sha256=item_evidence,
             disposition_basis=disposition_basis,
             failure_reason=None,
             retry_after=None,
             restriction_reason=None,
             legal_hold_review_at=None,
             legal_hold_contact=None,
-            terminal_at=terminal_at,
+            terminal_at=item_terminal_at,
             recorded_at=now,
         )
         db.flush([item, request])
         db.add(event)
         db.flush([event])
+    if request.overall_status == "COMPLETED":
+        _purge_installation_evidence_keys(db, request)
     response = _status(db, request)
     db.commit()
     return response
@@ -2072,6 +2895,7 @@ def get_consent_bootstrap(
     signup_document_versions: Mapping[str, str],
     secret: str,
     key_version: int = 1,
+    signup_equivalent_document_versions: Mapping[str, Collection[str]] | None = None,
 ) -> PrivacyConsentBootstrapV1:
     if policy_version != PRIVACY_CONSENT_POLICY_VERSION:
         raise PrivacyLifecycleError(
@@ -2080,14 +2904,24 @@ def get_consent_bootstrap(
             status_code=422,
         )
     bind_or_verify_privacy_hmac_key(db, secret=secret, key_version=key_version)
-    privacy_subject = privacy_subject_hmac(actor_id, account_generation, secret)
+    lookup_subjects = privacy_subject_candidates(actor_id, account_generation, secret)
+    for subject in lookup_subjects:
+        lock_privacy_subject_shared(db, subject, account_generation)
+    # S1617-50: consent written before a rotation stays under its subject/key.
+    resolved = resolve_privacy_subject(
+        db,
+        actor_id,
+        account_generation,
+        secret=secret,
+        key_version=key_version,
+    )
+    privacy_subject = resolved.subject
     installation_hmac = installation_subject_hmac(
         installation_id,
         privacy_subject,
-        secret,
+        resolved.secret,
     )
-    lock_privacy_subject_shared(db, privacy_subject, account_generation)
-    assert_report_ingest_active(db, privacy_subject, account_generation)
+    assert_report_ingest_active(db, privacy_subject, account_generation, lookup_subjects)
     latest_subject = db.scalar(
         select(PrivacyConsentEvent)
         .where(
@@ -2150,10 +2984,16 @@ def get_consent_bootstrap(
                 SignupConsentReceipt.account_id == account.id
             )
         )
+    # S01-3: a declared non-substantive revision keeps the signup grant current.
     signup_current = (
         signup_receipt is not None
         and all(
-            signup_receipt.document_versions[key] == signup_document_versions[key]
+            signup_document_version_matches(
+                signup_document_versions,
+                signup_equivalent_document_versions or {},
+                key,
+                signup_receipt.document_versions[key],
+            )
             for key in (
                 "raw_original",
                 "automatic_reporting",
@@ -2216,14 +3056,25 @@ def record_consent_event(
             status_code=422,
         )
     bind_or_verify_privacy_hmac_key(db, secret=secret, key_version=key_version)
-    privacy_subject = privacy_subject_hmac(actor_id, account_generation, secret)
+    lookup_subjects = privacy_subject_candidates(actor_id, account_generation, secret)
+    for subject in lookup_subjects:
+        lock_privacy_subject_exclusive(db, subject, account_generation)
+    # S1617-50: a consent change after a rotation extends the existing chain
+    # under the subject/key that owns it instead of starting a second chain.
+    resolved = resolve_privacy_subject(
+        db,
+        actor_id,
+        account_generation,
+        secret=secret,
+        key_version=key_version,
+    )
+    privacy_subject = resolved.subject
     installation_hmac = installation_subject_hmac(
         installation_id,
         privacy_subject,
-        secret,
+        resolved.secret,
     )
-    lock_privacy_subject_exclusive(db, privacy_subject, account_generation)
-    assert_report_ingest_active(db, privacy_subject, account_generation)
+    assert_report_ingest_active(db, privacy_subject, account_generation, lookup_subjects)
     existing = db.scalar(
         select(PrivacyConsentEvent).where(
             PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
@@ -2345,14 +3196,40 @@ def record_consent_event(
     return ConsentRecording(event=event, created=True)
 
 
+# S02-22: per-source-kind training consent rule, the Backend twin of Android
+# TrainingReuseConsentRule. Training consent is always required; walk RAW /
+# diagnostic material also needs raw source collection consent, a report
+# original does not. Every Backend training source today is a RAW collection.
+TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC = "WALK_RAW_DIAGNOSTIC"
+TRAINING_SOURCE_REPORT_ORIGINAL = "REPORT_ORIGINAL"
+TRAINING_SOURCE_KINDS = frozenset(
+    {TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC, TRAINING_SOURCE_REPORT_ORIGINAL}
+)
+
+
+def training_consent_allows(event: PrivacyConsentEvent, source_kind: str) -> bool:
+    """Consent values only; callers still check currency and receipt binding."""
+
+    if source_kind not in TRAINING_SOURCE_KINDS:
+        raise ValueError("unsupported training source kind")
+    if event.training_reuse is not True:
+        return False
+    if source_kind == TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC:
+        return event.raw_source_collection is True
+    return True
+
+
 def training_ingest_allowed(
     db: Session,
     *,
     privacy_subject: str,
     account_generation: int,
+    source_kind: str,
 ) -> bool:
     """Fail closed for training only; ordinary service routes never call this gate."""
 
+    if source_kind not in TRAINING_SOURCE_KINDS:
+        raise ValueError("unsupported training source kind")
     lock_privacy_subject_shared(db, privacy_subject, account_generation)
     if _tombstone(db, privacy_subject, account_generation) is not None:
         return False
@@ -2368,7 +3245,7 @@ def training_ingest_allowed(
     return (
         latest is not None
         and consent_event_is_current(latest)
-        and latest.training_reuse is True
+        and training_consent_allows(latest, source_kind)
     )
 
 
@@ -2381,6 +3258,9 @@ __all__ = [
     "EXTERNAL_ITEM_KEYS",
     "ITEM_SLA",
     "PrivacyLifecycleError",
+    "TRAINING_SOURCE_KINDS",
+    "TRAINING_SOURCE_REPORT_ORIGINAL",
+    "TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC",
     "accept_account_deletion",
     "assert_privacy_hmac_key_bound",
     "assert_report_consent_active",
@@ -2397,11 +3277,23 @@ __all__ = [
     "lock_privacy_subject_shared",
     "lock_report_deletion_transaction",
     "lock_report_ingest_transaction",
+    "configure_privacy_hmac_lookup_keys",
+    "configured_privacy_hmac_lookup_keys",
+    "privacy_subject_candidates",
+    "privacy_subject_lookup_candidates",
+    "resolve_privacy_subject",
+    "resolve_stored_privacy_subject",
+    "ResolvedPrivacySubject",
+    "rotate_privacy_hmac_key",
+    "register_installation_evidence_key",
+    "installation_evidence_signature_message",
+    "device_verification_summary",
     "overall_deletion_status",
     "privacy_subject_hmac",
     "privacy_hmac_secret_fingerprint",
     "record_consent_event",
     "record_device_deletion_evidence",
+    "training_consent_allows",
     "training_ingest_allowed",
     "transition_deletion_item",
 ]

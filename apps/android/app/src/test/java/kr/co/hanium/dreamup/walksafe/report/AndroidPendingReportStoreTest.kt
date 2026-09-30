@@ -270,6 +270,83 @@ class AndroidPendingReportStoreTest {
             assertFalse(markerFile.exists())
         }
 
+    @Test
+    fun aliasRemainingAfterDeleteKeepsPurgeMarkerUntilVerifiedRetry() = withStoreRoot { root ->
+        val queueDirectory = File(root, "pending_reports_v1").apply { mkdirs() }
+        File(queueDirectory, "queue.enc").writeBytes(byteArrayOf(0x61))
+        val lockFile = File(root, "pending_reports_v1.lock")
+        val marker = markerFile(root)
+        var aliasPresent = true
+        var deleteCalls = 0
+
+        assertFalse(AndroidPendingReportStore.purgeAllWithoutLoading(
+            queueDirectory = queueDirectory,
+            lockFile = lockFile,
+            destroyKey = {
+                AndroidPendingReportStore.destroyLegacyKey(
+                    containsAlias = { assertTrue(marker.isFile); aliasPresent },
+                    deleteAlias = { deleteCalls++ },
+                )
+            },
+        ))
+        assertTrue(aliasPresent)
+        assertEquals(1, deleteCalls)
+        assertFalse(queueDirectory.exists())
+        assertTrue(marker.isFile)
+
+        assertTrue(AndroidPendingReportStore.purgeAllWithoutLoading(
+            queueDirectory = queueDirectory,
+            lockFile = lockFile,
+            destroyKey = {
+                AndroidPendingReportStore.destroyLegacyKey(
+                    containsAlias = { assertTrue(marker.isFile); aliasPresent },
+                    deleteAlias = { deleteCalls++; aliasPresent = false },
+                )
+            },
+        ))
+        assertFalse(aliasPresent)
+        assertEquals(2, deleteCalls)
+        assertFalse(marker.exists())
+    }
+
+    @Test
+    fun alreadyAbsentLegacyAliasDoesNotRequireDeletion() {
+        var probes = 0
+        var deletes = 0
+        AndroidPendingReportStore.destroyLegacyKey(
+            containsAlias = { probes++; false },
+            deleteAlias = { deletes++ },
+        )
+        assertEquals(2, probes)
+        assertEquals(0, deletes)
+    }
+
+    @Test
+    fun aliasPostconditionReadFailureKeepsPurgeMarker() = withStoreRoot { root ->
+        val queueDirectory = File(root, "pending_reports_v1").apply { mkdirs() }
+        File(queueDirectory, "queue.enc").writeBytes(byteArrayOf(0x62))
+        var probes = 0
+        var deletes = 0
+        assertFalse(AndroidPendingReportStore.purgeAllWithoutLoading(
+            queueDirectory = queueDirectory,
+            lockFile = File(root, "pending_reports_v1.lock"),
+            destroyKey = {
+                AndroidPendingReportStore.destroyLegacyKey(
+                    containsAlias = {
+                        probes++
+                        if (probes > 1) throw IllegalStateException("alias state unavailable")
+                        true
+                    },
+                    deleteAlias = { deletes++ },
+                )
+            },
+        ))
+        assertEquals(2, probes)
+        assertEquals(1, deletes)
+        assertFalse(queueDirectory.exists())
+        assertTrue(markerFile(root).isFile)
+    }
+
     private fun markerFile(root: File): File =
         File(
             root,

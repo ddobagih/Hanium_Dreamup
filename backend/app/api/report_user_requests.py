@@ -57,8 +57,9 @@ from backend.app.services.report_external_copy_deletions import (
 from backend.app.services.admin_device_proof import VerifiedAdminDeviceProof
 from backend.app.services.admin_security import AdminSessionIdentity
 from backend.app.services.privacy_lifecycle import (
+    PrivacyLifecycleError,
     lock_privacy_subject_shared,
-    privacy_subject_hmac,
+    resolve_privacy_subject,
 )
 from backend.app.services.report_read_audit import persist_admin_operation_audit
 from backend.app.services.report_user_requests import (
@@ -142,6 +143,7 @@ def _field_binding(
     *,
     actor_id: str,
     account_generation: str,
+    db: Session,
 ) -> tuple[str, int, str]:
     if _ACTOR_ID.fullmatch(actor_id) is None or _GENERATION.fullmatch(
         account_generation
@@ -158,11 +160,22 @@ def _field_binding(
         or assertion.account_generation != generation
     ):
         _not_found()
-    subject = privacy_subject_hmac(
-        actor_id,
-        generation,
-        settings.privacy_hmac_secret,
-    )
+    # S1617-50: reports written before a privacy HMAC rotation stay under the
+    # subject that owns the actor generation (no DB access without lookup keys).
+    try:
+        subject = resolve_privacy_subject(
+            db,
+            actor_id,
+            generation,
+            secret=settings.privacy_hmac_secret,
+        ).subject
+    except PrivacyLifecycleError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.message},
+            headers=_NO_STORE,
+        ) from exc
     return actor_id, generation, subject
 
 
@@ -430,6 +443,7 @@ def create_router(settings: Settings) -> APIRouter:
             settings,
             actor_id=x_walksafe_actor_id,
             account_generation=x_walksafe_account_generation,
+            db=db,
         )
         del actor_id
         digest = user_report_filter_digest(
@@ -540,6 +554,7 @@ def create_router(settings: Settings) -> APIRouter:
             settings,
             actor_id=x_walksafe_actor_id,
             account_generation=x_walksafe_account_generation,
+            db=db,
         )
         if not _query_shape(request, _USER_REQUEST_HISTORY_QUERY_FIELDS):
             raise HTTPException(
@@ -605,6 +620,7 @@ def create_router(settings: Settings) -> APIRouter:
             settings,
             actor_id=x_walksafe_actor_id,
             account_generation=x_walksafe_account_generation,
+            db=db,
         )
         try:
             state = get_owned_report_deletion_status(
@@ -662,6 +678,7 @@ def create_router(settings: Settings) -> APIRouter:
             settings,
             actor_id=x_walksafe_actor_id,
             account_generation=x_walksafe_account_generation,
+            db=db,
         )
         try:
             return get_owned_user_report(
@@ -705,6 +722,7 @@ def create_router(settings: Settings) -> APIRouter:
             settings,
             actor_id=x_walksafe_actor_id,
             account_generation=x_walksafe_account_generation,
+            db=db,
         )
         try:
             item, created = create_report_user_request(
@@ -759,6 +777,7 @@ def create_router(settings: Settings) -> APIRouter:
             settings,
             actor_id=x_walksafe_actor_id,
             account_generation=x_walksafe_account_generation,
+            db=db,
         )
         try:
             item = get_owned_report_user_request(
@@ -811,6 +830,7 @@ def create_router(settings: Settings) -> APIRouter:
             settings,
             actor_id=x_walksafe_actor_id,
             account_generation=x_walksafe_account_generation,
+            db=db,
         )
         try:
             state = get_owned_report_content(
@@ -858,6 +878,7 @@ def create_router(settings: Settings) -> APIRouter:
             settings,
             actor_id=x_walksafe_actor_id,
             account_generation=x_walksafe_account_generation,
+            db=db,
         )
         try:
             state, created = apply_owned_report_correction(

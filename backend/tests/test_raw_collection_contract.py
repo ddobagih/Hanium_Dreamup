@@ -15,6 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 import pytest
+from sqlalchemy.dialects import postgresql
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -73,6 +74,7 @@ from backend.app.services.raw_collection_ingest import (  # noqa: E402
     RawCollectionAdmission,
     RawCollectionStorageError,
     authorize_raw_collection_write,
+    first_raw_collection_consent_interruption,
     validate_raw_collection_consent_chain,
 )
 from scripts.generate_walksafe_openapi import (  # noqa: E402
@@ -80,6 +82,7 @@ from scripts.generate_walksafe_openapi import (  # noqa: E402
 )
 from scripts.account_deletion_worker import _maintenance_lock  # noqa: E402
 from asgi_client import ASGITestClient  # noqa: E402
+from actor_assertion_v4_signing import GatewayV4Signer, V4_SIGN_AT_SEND  # noqa: E402
 
 
 FIELD_TOKEN = "raw-field-token-for-tests-123456"
@@ -173,8 +176,15 @@ def _settings(
     enabled: bool,
     security_enabled: bool = True,
     maintenance_lock_path: Path | None = None,
+    actor_assertion_v3_policy: str | None = None,
 ) -> SimpleNamespace:
+    extra = (
+        {}
+        if actor_assertion_v3_policy is None
+        else {"actor_assertion_v3_policy": actor_assertion_v3_policy}
+    )
     return SimpleNamespace(
+        **extra,
         raw_ingest_enabled=enabled,
         field_test_security_enabled=security_enabled,
         field_test_token=FIELD_TOKEN,
@@ -205,6 +215,7 @@ def _headers(
     chunk_sha256: str | None = None,
     commit_sha256: str | None = None,
     include_raw_proof: bool = True,
+    legacy_write_assertion: bool = False,
 ) -> dict[str, str]:
     bound_manifest_sha256 = manifest_sha256 or str(
         _manifest_payload()["manifest_sha256"]
@@ -228,11 +239,18 @@ def _headers(
         "x-walksafe-field-test-token": FIELD_TOKEN,
         "x-walksafe-actor-id": actor_id,
         "x-walksafe-account-generation": str(account_generation),
-        "x-walksafe-actor-assertion": create_actor_assertion(
-            actor_id,
-            FieldTestAccess.FIELD,
-            GATEWAY_SECRET,
-            account_generation=account_generation,
+        # w24 S20-41: writes need a request-bound v4 (signed from the exact bytes
+        # by GatewayV4Signer in _app); GET/HEAD keep the legacy v2 that the
+        # safe-methods default still accepts.
+        "x-walksafe-actor-assertion": (
+            create_actor_assertion(
+                actor_id,
+                FieldTestAccess.FIELD,
+                GATEWAY_SECRET,
+                account_generation=account_generation,
+            )
+            if legacy_write_assertion or method.upper() in {"GET", "HEAD"}
+            else V4_SIGN_AT_SEND
         ),
         "x-walksafe-raw-purpose": purpose,
         "x-walksafe-raw-walk-id": walk_id,
@@ -273,11 +291,13 @@ def _app(
     admission_gate=None,
     storage_handler=None,
     maintenance_lock_path: Path | None = None,
+    actor_assertion_v3_policy: str | None = None,
 ) -> FastAPI:
     settings = _settings(
         enabled=enabled,
         security_enabled=security_enabled,
         maintenance_lock_path=maintenance_lock_path,
+        actor_assertion_v3_policy=actor_assertion_v3_policy,
     )
     app = FastAPI()
     app.include_router(
@@ -306,7 +326,7 @@ def _app(
     )
     app.add_middleware(RawCollectionExceptionMiddleware)
     app.add_middleware(RawCollectionNoStoreMiddleware)
-    return app
+    return GatewayV4Signer(app, GATEWAY_SECRET)
 
 
 def test_manifest_accepts_only_the_eight_approved_object_kinds() -> None:
@@ -983,12 +1003,14 @@ def test_head_classification_is_limited_to_the_three_write_paths() -> None:
     assert raw_collection_operation(status_path, "HEAD") is None
     assert not field_test_security._raw_ingest_write_route(status_path, "HEAD")
     assert field_test_security._rate_limit_group(status_path, "HEAD") is None
+    assert required_field_test_access(status_path, "GET") is FieldTestAccess.FIELD
+    assert required_field_test_access(status_path, "HEAD").value == "unregistered"
     rejected = ASGITestClient(_app(enabled=True)).request(
         "HEAD",
         status_path,
         headers=_headers(method="HEAD", path=status_path),
     )
-    assert rejected.status_code == 401
+    assert rejected.status_code == 403
 
 
 def test_default_off_allows_authenticated_status_to_reach_read_boundary() -> None:
@@ -1385,6 +1407,72 @@ def test_chunk_actual_hash_and_length_fail_before_storage_handler(
     assert wrong_hash.status_code == 400
     assert wrong_hash.json()["detail"]["code"] == "raw_chunk_sha256_mismatch"
     assert wrong_length.status_code == 400
+    # w24 S20-41: a v4 write is authenticated over the exact body, so the
+    # middleware's body capture sees the Content-Length lie first (still 400 and
+    # still before the gate, lock and storage handler).
+    assert wrong_length.json()["detail"]["code"] == "actor_assertion_body_incomplete"
+    assert lock_calls == []
+    assert gate_calls == []
+    assert handler_calls == []
+
+
+def test_route_chunk_length_check_still_fires_when_the_middleware_does_not_capture(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # w24 misc-F4: under v4 the middleware stops a Content-Length lie first, so the
+    # route's own raw_chunk_length_mismatch defense is reached only when no body
+    # capture precedes it. The legacy-compatibility "accept" policy with a v2
+    # write assertion is that path; the route still rejects before gate, lock and
+    # storage.
+    gate_calls: list[str] = []
+    handler_calls: list[str] = []
+    lock_calls: list[str] = []
+
+    @contextmanager
+    def maintenance_lock(*_args, **_kwargs):
+        lock_calls.append("entered")
+        yield
+
+    monkeypatch.setattr(
+        raw_collections_api,
+        "shared_maintenance_write_lock",
+        maintenance_lock,
+    )
+
+    def gate(_db, **_kwargs):
+        gate_calls.append("consent")
+        raise AssertionError("a length lie reached the consent gate")
+
+    class RejectingHandler:
+        def put_chunk(self, *_args, **_kwargs):
+            handler_calls.append("put_chunk")
+            raise AssertionError("invalid bytes reached storage")
+
+    client = ASGITestClient(
+        _app(
+            enabled=True,
+            admission_gate=gate,
+            storage_handler=RejectingHandler(),
+            actor_assertion_v3_policy="accept",
+        )
+    )
+    path = f"/raw-collections/{COLLECTION_ID}/objects/{OBJECT_ID}/chunks/0"
+    wrong_length = client.request(
+        "PUT",
+        path,
+        headers={
+            **_headers(
+                method="PUT",
+                path=path,
+                chunk_sha256=hashlib.sha256(b"abcd").hexdigest(),
+                legacy_write_assertion=True,
+            ),
+            "content-type": "application/octet-stream",
+            "content-length": "5",
+        },
+        content=b"abcd",
+    )
+    assert wrong_length.status_code == 400
     assert wrong_length.json()["detail"]["code"] == "raw_chunk_length_mismatch"
     assert lock_calls == []
     assert gate_calls == []
@@ -1640,10 +1728,23 @@ def test_raw_validation_oversize_and_unhandled_errors_are_no_store() -> None:
         "PUT",
         path,
         headers={**valid_headers, "content-type": "application/json"},
-        content=oversized_body,
+        json=payload,
     )
     assert disabled.status_code == 503
     assert disabled.json()["detail"]["code"] == "raw_ingest_disabled"
+    # w24 S20-41: a v4 write is verified over its body, so an oversized body is
+    # refused by the body limit before the disabled check (never reaches consent).
+    disabled_oversized = ASGITestClient(_app(enabled=False)).request(
+        "PUT",
+        path,
+        headers={**valid_headers, "content-type": "application/json"},
+        content=oversized_body,
+    )
+    assert disabled_oversized.status_code == 413
+    assert disabled_oversized.json()["detail"]["code"] == (
+        "raw_collection_request_body_too_large"
+    )
+    assert disabled_oversized.headers["cache-control"] == "no-store"
 
     oversized = validation_client.request(
         "PUT",
@@ -1822,6 +1923,77 @@ def test_legacy_consent_receipt_cannot_authorize_raw_collection() -> None:
     assert stale.value.code == "raw_consent_policy_not_current"
 
 
+def test_later_policy_mismatch_still_rejects_after_regrant() -> None:
+    bound = _consent_event(
+        1, receipt_sha256=CONSENT_RECEIPT, raw=True, automatic=True
+    )
+    stale = _consent_event(
+        2, receipt_sha256="b" * 64, raw=True, automatic=True
+    )
+    stale.policy_version = "FP-013-1.0.0"
+    regranted = _consent_event(
+        3, receipt_sha256="c" * 64, raw=True, automatic=True
+    )
+    with pytest.raises(PrivacyLifecycleError) as error:
+        validate_raw_collection_consent_chain(
+            (bound, stale, regranted),
+            purpose="GENERAL_RAW",
+            bound_receipt_sha256=CONSENT_RECEIPT,
+        )
+    assert error.value.code == "raw_consent_policy_not_current"
+
+
+def test_consent_interruption_query_is_scoped_and_bounded() -> None:
+    class Probe:
+        def __init__(self, results):
+            self.results = iter(results)
+            self.statements = []
+
+        def scalar(self, statement):
+            self.statements.append(statement)
+            return next(self.results)
+
+    for purpose in ("GENERAL_RAW", "AUTO_REPORT"):
+        probe = Probe((False,))
+        assert first_raw_collection_consent_interruption(
+            probe,
+            privacy_subject="f" * 64,
+            account_generation=2,
+            bound_revision=5,
+            purpose=purpose,
+        ) is None
+        assert len(probe.statements) == 1
+        compiled = probe.statements[0].compile(dialect=postgresql.dialect())
+        sql = str(compiled)
+        assert "EXISTS" in sql
+        assert "privacy_consent_events.subject_revision >" in sql
+        assert "privacy_consent_events.policy_version IS DISTINCT FROM" in sql
+        assert "privacy_consent_events.item_versions IS DISTINCT FROM" in sql
+        assert "privacy_consent_events.raw_source_collection IS NOT true" in sql
+        assert ("privacy_consent_events.automatic_reporting IS NOT true" in sql) == (
+            purpose == "AUTO_REPORT"
+        )
+        assert "f" * 64 in compiled.params.values()
+        assert 2 in compiled.params.values()
+        assert 5 in compiled.params.values()
+
+    interrupted = _consent_event(
+        6, receipt_sha256="b" * 64, raw=False, automatic=True
+    )
+    probe = Probe((True, interrupted))
+    assert first_raw_collection_consent_interruption(
+        probe,
+        privacy_subject="f" * 64,
+        account_generation=2,
+        bound_revision=5,
+        purpose="GENERAL_RAW",
+    ) is interrupted
+    assert len(probe.statements) == 2
+    sql = str(probe.statements[1].compile(dialect=postgresql.dialect()))
+    assert "ORDER BY privacy_consent_events.subject_revision ASC" in sql
+    assert "LIMIT" in sql
+
+
 def test_actual_admission_locks_tombstone_before_checking_consent_chain(monkeypatch) -> None:
     calls: list[dict[str, object]] = []
     monkeypatch.setattr(
@@ -1853,6 +2025,10 @@ def test_actual_admission_locks_tombstone_before_checking_consent_chain(monkeypa
                 ),
             )
         ),
+    )
+    monkeypatch.setattr(
+        "backend.app.services.raw_collection_ingest.first_raw_collection_consent_interruption",
+        lambda *_args, **_kwargs: None,
     )
     settings = SimpleNamespace(
         privacy_hmac_secret="synthetic-privacy-secret",

@@ -12,6 +12,8 @@ enum class RouteAlignmentReason {
     DEPARTURE_SEGMENT, DEPARTURE_CONNECTOR, CURRENT_SEGMENT, AGREED_CANDIDATES,
     POSITION_INVALID, POSITION_TOO_COARSE, ROUTE_TOO_FAR, ROUTE_INVALID,
     BRANCH_AMBIGUOUS, BRANCH_CHANGE_PENDING, NEAR_ROUTE_END, NO_ROUTE_BEARING,
+    /** S08-18: at or past the vertex of a guide the navigator has not yet passed. */
+    TURN_PASSAGE_PENDING,
 }
 
 data class RouteAlignmentDiagnostic(
@@ -23,9 +25,34 @@ data class RouteAlignmentDiagnostic(
 internal data class RouteAlignmentSelection(
     val diagnostic: RouteAlignmentDiagnostic,
     val target: RoutePoint? = null,
+    /** Largest angle from the selected bearing to another plausible candidate segment. */
+    val bearingUncertaintyDegrees: Double = 0.0,
+    /**
+     * S08-18-F2: the position is at or beyond the vertex of the navigator's still unpassed guide,
+     * whether the bearing is held (near the vertex) or already the outgoing leg (past the zone).
+     */
+    val beyondPendingTurnVertex: Boolean = false,
+    /**
+     * S08-20: the position lies beside the selected leg by more than its reported radius and the
+     * 8 m search floor. The leg's progress bearing is then not a walkable heading from there.
+     */
+    val lateralOffsetBeyondUncertainty: Boolean = false,
 ) {
     val bearingDegrees: Double? get() = diagnostic.bearingDegreesTrueNorth
 }
+
+/**
+ * S08-18: the navigator's next unpassed guide, in this selector's geometric route progress.
+ * [vertexToleranceM] is the navigator's accepted guide-to-shape timing bound.
+ * [passageMarginM] (S08-18-F2) is the navigator's own passage margin for that guide: the bearing is
+ * held only this far past the vertex, so a passage that is not yet confirmed cannot withhold it
+ * along the following legs.
+ */
+internal data class PendingRouteGuide(
+    val geometricProgressM: Double,
+    val vertexToleranceM: Double,
+    val passageMarginM: Double = MINIMUM_GUIDE_PASSAGE_MARGIN_M,
+)
 
 /** Selects a route-ordered target for speech without changing the position match or arrival state. */
 internal class RouteAlignmentSelector {
@@ -45,6 +72,7 @@ internal class RouteAlignmentSelector {
         match: RouteCorridorMatchResult,
         nowMs: Long,
         maximumDistanceToRouteM: Double,
+        pendingGuide: PendingRouteGuide? = null,
     ): RouteAlignmentSelection {
         if (!position.point.valid() || !position.horizontalAccuracyM.isFinite() || position.horizontalAccuracyM < 0.0 ||
             position.elapsedRealtimeMs < 0L || nowMs < position.elapsedRealtimeMs ||
@@ -126,6 +154,14 @@ internal class RouteAlignmentSelector {
                 return selected(first, RouteAlignmentReason.DEPARTURE_CONNECTOR, position.point, first.start)
             }
             // Describe the planned departure leg, not certainty that the user is at its first point.
+            if (first.lengthM < DEPARTURE_MINIMUM_BEARING_BASELINE_M) {
+                // A sub-metre first leg is below positioning/walking resolution: it may be
+                // coordinate noise or a real micro-entry. Look along continuing segments only;
+                // never aim across a following corner, and do not guess when one follows.
+                val target = continuingDepartureTarget(segments)
+                    ?: return unavailable(RouteAlignmentReason.NO_ROUTE_BEARING)
+                return selected(first, RouteAlignmentReason.DEPARTURE_SEGMENT, first.start, target)
+            }
             val target = first.pointAt(minOf(15.0, first.lengthM) / first.lengthM)
             return selected(first, RouteAlignmentReason.DEPARTURE_SEGMENT, first.start, target)
         }
@@ -135,6 +171,7 @@ internal class RouteAlignmentSelector {
         }
         var current = accepted
         var reason = RouteAlignmentReason.CURRENT_SEGMENT
+        var candidateSpreadDegrees = 0.0
         if (current == null) {
             // Dense collinear samples can be a low-quality position match but share one direction.
             if (local.any { angleDistance(it.bearing, nearest.bearing) > 15.0 }) {
@@ -142,22 +179,116 @@ internal class RouteAlignmentSelector {
             }
             current = nearest
             reason = RouteAlignmentReason.AGREED_CANDIDATES
+            // Similar is not identical: the speech decision must cover every candidate bearing.
+            candidateSpreadDegrees = local.maxOf { angleDistance(it.bearing, nearest.bearing) }
         }
         // Advance only when the current projection reaches the vertex; do not aim across a turn
         // merely because its outgoing segment falls inside the position uncertainty area.
         if (current.projection.fraction >= 1.0 && current != segments.last()) {
             current = segments[segments.indexOf(current) + 1]
         }
+        // S08-18: bearing selection and turn speech share one phase. Before the navigator passes
+        // the guide at this vertex (with its accuracy margin), a leg beyond that vertex may not
+        // supply the bearing: the turn sentence still describes the vertex. At or past the vertex
+        // the turn is near, so the bearing is withheld rather than replaced by the incoming leg.
+        // S08-18-F2: "near" is the navigator's passage margin past the vertex, the same bound it
+        // uses to pass the guide, so the hold cannot outlast it along later legs.
+        val here = current
+        val heldIncoming = pendingGuide?.let { heldIncomingSegment(segments, it) }?.takeIf {
+            segments.indexOf(here) > segments.indexOf(it) && angleDistance(here.bearing, it.bearing) > SAME_DIRECTION_DEGREES
+        }
+        val beyondPendingVertex = heldIncoming != null
+        if (heldIncoming != null && pendingGuide != null) {
+            val nearVertexM = pendingGuide.passageMarginM.takeIf { it.isFinite() && it >= 0.0 }
+                ?: MINIMUM_GUIDE_PASSAGE_MARGIN_M
+            if (here.progressM - (heldIncoming.startProgressM + heldIncoming.lengthM) <= nearVertexM) {
+                return unavailable(RouteAlignmentReason.TURN_PASSAGE_PENDING).copy(beyondPendingTurnVertex = true)
+            }
+        }
         val remainingM = current.lengthM * (1.0 - current.projection.fraction)
-        if (current == segments.last() && remainingM <= 1.0) return unavailable(RouteAlignmentReason.NEAR_ROUTE_END)
+        if (current == segments.last() && remainingM <= 1.0) {
+            return unavailable(RouteAlignmentReason.NEAR_ROUTE_END).copy(beyondPendingTurnVertex = beyondPendingVertex)
+        }
         val from = current.pointAt(current.projection.fraction)
-        val target = current.pointAt((current.projection.fraction + minOf(15.0, remainingM) / current.lengthM).coerceAtMost(1.0))
-        return selected(current, reason, from, target)
+        // S08-17: a sub-metre leg (coordinate noise or a micro vertex) cannot define a walkable
+        // direction, and its own 15 m look-ahead would end within it. Look along the legs that
+        // continue it instead; never across a corner, and give no bearing when one follows.
+        val target = if (current.lengthM < DEPARTURE_MINIMUM_BEARING_BASELINE_M) {
+            microLegTarget(segments, current)
+                ?: return unavailable(RouteAlignmentReason.NO_ROUTE_BEARING).copy(beyondPendingTurnVertex = beyondPendingVertex)
+        } else {
+            current.pointAt((current.projection.fraction + minOf(15.0, remainingM) / current.lengthM).coerceAtMost(1.0))
+        }
+        // S08-20: an accepted leg can lie farther away than the 8 m search floor when the reported
+        // radius is large. An offset beyond both is not explained by the position uncertainty, so
+        // the user is beside the leg and its progress bearing is not a way onto it.
+        val lateralOffset = current.projection.distanceM > maxOf(8.0, position.horizontalAccuracyM)
+        return selected(current, reason, from, target, candidateSpreadDegrees)
+            .copy(beyondPendingTurnVertex = beyondPendingVertex, lateralOffsetBeyondUncertainty = lateralOffset)
     }
 
-    private fun selected(segment: Segment, reason: RouteAlignmentReason, from: RoutePoint, target: RoutePoint): RouteAlignmentSelection {
+    private fun selected(
+        segment: Segment,
+        reason: RouteAlignmentReason,
+        from: RoutePoint,
+        target: RoutePoint,
+        bearingUncertaintyDegrees: Double = 0.0,
+    ): RouteAlignmentSelection {
         if (distance(from, target) <= 0.01) return unavailable(RouteAlignmentReason.NO_ROUTE_BEARING)
-        return RouteAlignmentSelection(RouteAlignmentDiagnostic(reason, segment.index, bearing(from, target)), target)
+        return RouteAlignmentSelection(
+            RouteAlignmentDiagnostic(reason, segment.index, bearing(from, target)), target, bearingUncertaintyDegrees,
+        )
+    }
+
+    /** The leg ending at the interior vertex closest to the pending guide, within its tolerance. */
+    private fun heldIncomingSegment(segments: List<Segment>, guide: PendingRouteGuide): Segment? {
+        if (!guide.geometricProgressM.isFinite() || !guide.vertexToleranceM.isFinite() || guide.vertexToleranceM < 0.0) {
+            return null
+        }
+        return segments.dropLast(1)
+            .filter { abs(it.startProgressM + it.lengthM - guide.geometricProgressM) <= guide.vertexToleranceM }
+            .minByOrNull { abs(it.startProgressM + it.lengthM - guide.geometricProgressM) }
+    }
+
+    private fun continuingDepartureTarget(segments: List<Segment>): RoutePoint? {
+        val first = segments.first()
+        var remainingM = DEPARTURE_LOOKAHEAD_M
+        var target = first.start
+        for (segment in segments) {
+            if (angleDistance(segment.bearing, first.bearing) > DEPARTURE_CONTINUATION_DEGREES) break
+            if (segment.lengthM >= remainingM) return segment.pointAt(remainingM / segment.lengthM)
+            remainingM -= segment.lengthM
+            target = segment.end
+        }
+        return target.takeIf { DEPARTURE_LOOKAHEAD_M - remainingM >= DEPARTURE_MINIMUM_BEARING_BASELINE_M }
+    }
+
+    /**
+     * S08-17: the look-ahead target for a sub-metre current leg. A kink between legs that continue
+     * the preceding (>= 1 m) leg is coordinate noise, so the following legs within the continuation
+     * angle of that leg give the direction. Otherwise the micro leg's own direction must continue
+     * for at least the minimum baseline (a micro vertex into a real turn), else there is no bearing.
+     */
+    private fun microLegTarget(segments: List<Segment>, current: Segment): RoutePoint? {
+        val index = segments.indexOf(current)
+        val previous = segments.getOrNull(index - 1)?.takeIf {
+            it.lengthM >= DEPARTURE_MINIMUM_BEARING_BASELINE_M && distance(it.end, current.start) <= 0.05
+        }
+        val references = listOfNotNull(previous?.let { it.bearing to 0.0 },
+            current.bearing to current.lengthM * (1.0 - current.projection.fraction))
+        for ((reference, initialM) in references) {
+            var consistentM = initialM
+            var target: RoutePoint? = null
+            for (segment in segments.drop(index + 1)) {
+                if (angleDistance(segment.bearing, reference) > DEPARTURE_CONTINUATION_DEGREES) break
+                val neededM = DEPARTURE_LOOKAHEAD_M - consistentM
+                if (segment.lengthM >= neededM) return segment.pointAt(neededM / segment.lengthM)
+                consistentM += segment.lengthM
+                target = segment.end
+            }
+            if (target != null && consistentM >= DEPARTURE_MINIMUM_BEARING_BASELINE_M) return target
+        }
+        return null
     }
 
     private fun unavailable(reason: RouteAlignmentReason) = RouteAlignmentSelection(RouteAlignmentDiagnostic(reason))
@@ -175,17 +306,28 @@ internal class RouteAlignmentSelector {
     }
 
     private companion object {
+        const val DEPARTURE_LOOKAHEAD_M = 15.0
+        // Engineering defaults pending provider fixtures (08.txt #17): legs shorter than this do
+        // not define a walkable direction; continuing legs within this angle are one direction.
+        const val DEPARTURE_MINIMUM_BEARING_BASELINE_M = 1.0
+        const val DEPARTURE_CONTINUATION_DEGREES = 30.0
+        // S08-18: legs within the same 15 degrees used for AGREED_CANDIDATES share one direction,
+        // so holding the bearing at such a vertex would only remove guidance.
+        const val SAME_DIRECTION_DEGREES = 15.0
         fun TrustedLocation.point() = RoutePoint(latitude, longitude)
         fun RoutePoint.valid() = latitude.isFinite() && latitude in -90.0..90.0 && longitude.isFinite() && longitude in -180.0..180.0
         fun distance(a: RoutePoint, b: RoutePoint) = haversineMeters(a.latitude, a.longitude, b.latitude, b.longitude)
         fun bearing(a: RoutePoint, b: RoutePoint) = bearingDegrees(a.latitude, a.longitude, b.latitude, b.longitude).toDouble() % 360.0
         fun angleDistance(a: Double, b: Double) = abs((a - b + 540.0) % 360.0 - 180.0)
         fun project(point: RoutePoint, start: RoutePoint, end: RoutePoint): Projection {
+            // S09-52: wrapped longitude differences (shared convention); the route projection scale is unchanged.
+            val latScale = 111_320.0
             val lonScale = 111_320.0 * cos(Math.toRadians(point.latitude))
-            val ax = (start.longitude - point.longitude) * lonScale
-            val ay = (start.latitude - point.latitude) * 111_320.0
-            val dx = (end.longitude - start.longitude) * lonScale
-            val dy = (end.latitude - start.latitude) * 111_320.0
+            val wrap = kr.co.hanium.dreamup.walksafe.navigation.positioning.LocalGeodesy::wrapLongitudeDegrees
+            val ax = wrap(start.longitude - point.longitude) * lonScale
+            val ay = (start.latitude - point.latitude) * latScale
+            val dx = wrap(end.longitude - start.longitude) * lonScale
+            val dy = (end.latitude - start.latitude) * latScale
             val denominator = dx * dx + dy * dy
             val fraction = if (denominator <= 0.000001) 0.0 else (-(ax * dx + ay * dy) / denominator).coerceIn(0.0, 1.0)
             return Projection(fraction, hypot(ax + fraction * dx, ay + fraction * dy))

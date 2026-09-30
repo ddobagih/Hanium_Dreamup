@@ -3,6 +3,10 @@ package kr.co.hanium.dreamup.walksafe.rawcollection
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.CancellationException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckSnapshot
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckState
 import kr.co.hanium.dreamup.walksafe.network.ActiveNetworkTransport
@@ -39,11 +43,12 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class RawCollectionRuntimeCoordinatorTest {
     @Test
-    fun captureNeedsV7DeviceConsentAndActiveWalkThenSealsOnlyDuringRecheck() {
+    fun captureNeedsV7DeviceConsentAndActiveWalkThenSealsOnlyAfterTheWalk() {
         val fixture = fixture()
         val sample = detectionSample()
 
@@ -77,17 +82,22 @@ class RawCollectionRuntimeCoordinatorTest {
             RawSegmentSealResult.GATE_BLOCKED,
             fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.ACTIVE)),
         )
+        // Owner decision 3(b): PAUSED is still the walk.
         assertEquals(
-            RawSegmentSealResult.SEALED,
+            RawSegmentSealResult.GATE_BLOCKED,
             fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.PAUSED)),
         )
-        assertEquals(1, fixture.coordinator.readyCount(fixture.context(WalkSessionState.PAUSED)))
+        assertEquals(
+            RawSegmentSealResult.SEALED,
+            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.ENDED)),
+        )
+        assertEquals(RawReadyStatus.Count(1), fixture.coordinator.readyStatus(fixture.context(WalkSessionState.ENDED)))
         assertNull(fixture.coordinator.startNextUpload { fixture.context(WalkSessionState.ACTIVE) })
-        assertNull(fixture.coordinator.startNextUpload { fixture.context(WalkSessionState.ENDED) })
+        assertNull(fixture.coordinator.startNextUpload { fixture.context(WalkSessionState.PAUSED) })
     }
 
     @Test
-    fun pausedWifiUploadIsSingleFlightAndDeletesOnlyAfterExactReceipt() {
+    fun postWalkWifiUploadIsSingleFlightAndDeletesOnlyAfterExactReceipt() {
         val fixture = fixture()
         assertEquals(
             RawMetadataCaptureResult.CAPTURED,
@@ -99,23 +109,23 @@ class RawCollectionRuntimeCoordinatorTest {
         )
         assertEquals(
             RawSegmentSealResult.SEALED,
-            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.PAUSED)),
+            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.ENDED)),
         )
         assertNull(
             fixture.coordinator.startNextUpload {
-                fixture.context(WalkSessionState.PAUSED).copy(
+                fixture.context(WalkSessionState.ENDED).copy(
                     networkTransport = ActiveNetworkTransport.CELLULAR,
                 )
             },
         )
 
         val call = fixture.coordinator.startNextUpload {
-            fixture.context(WalkSessionState.PAUSED)
+            fixture.context(WalkSessionState.ENDED)
         }
         assertNotNull(call)
         assertNull(
             fixture.coordinator.startNextUpload {
-                fixture.context(WalkSessionState.PAUSED)
+                fixture.context(WalkSessionState.ENDED)
             },
         )
         assertEquals(
@@ -150,11 +160,11 @@ class RawCollectionRuntimeCoordinatorTest {
                 plaintext.all { it == 0.toByte() }
             },
         )
-        assertEquals(0, fixture.coordinator.readyCount(fixture.context(WalkSessionState.PAUSED)))
+        assertEquals(RawReadyStatus.Count(0), fixture.coordinator.readyStatus(fixture.context(WalkSessionState.ENDED)))
     }
 
     @Test
-    fun invalidationCancelsSingleFlightAndEndedPartialNeedsExplicitDiscard() {
+    fun walkEndKeepsTheSegmentForThePostWalkUploadAndANewActiveWalkCancelsIt() {
         val fixture = fixture()
         assertEquals(
             RawMetadataCaptureResult.CAPTURED,
@@ -164,9 +174,14 @@ class RawCollectionRuntimeCoordinatorTest {
                 performanceSample(),
             ),
         )
-        assertTrue(fixture.coordinator.onWalkEnded(fixture.context(WalkSessionState.ENDED)))
-        assertNull(fixture.coordinator.startNextUpload { fixture.context(WalkSessionState.ENDED) })
-        assertEquals(1, fixture.coordinator.discardEndedPartials(fixture.context(WalkSessionState.ENDED)))
+        // S1617-13 / owner decision 3(b): the ended walk's segment is sealed, not discarded.
+        assertEquals(
+            RawSegmentSealResult.SEALED,
+            fixture.coordinator.onWalkEnded(fixture.context(WalkSessionState.ENDED)),
+        )
+        assertEquals(0, fixture.coordinator.discardEndedPartials(fixture.context(WalkSessionState.ENDED)))
+        assertEquals(RawReadyStatus.Count(1), fixture.coordinator.readyStatus(fixture.context(WalkSessionState.ENDED)))
+        assertNotNull(fixture.coordinator.startNextUpload { fixture.context(WalkSessionState.ENDED) })
 
         val uploadFixture = fixture()
         assertEquals(
@@ -180,12 +195,12 @@ class RawCollectionRuntimeCoordinatorTest {
         assertEquals(
             RawSegmentSealResult.SEALED,
             uploadFixture.coordinator.sealActiveSegment(
-                uploadFixture.context(WalkSessionState.PAUSED),
+                uploadFixture.context(WalkSessionState.ENDED),
             ),
         )
         val call = requireNotNull(
             uploadFixture.coordinator.startNextUpload {
-                uploadFixture.context(WalkSessionState.PAUSED)
+                uploadFixture.context(WalkSessionState.ENDED)
             },
         )
         assertFalse(
@@ -194,7 +209,7 @@ class RawCollectionRuntimeCoordinatorTest {
             ),
         )
         assertTrue(call.isCancelled())
-        assertEquals(1, uploadFixture.coordinator.readyCount(uploadFixture.context(WalkSessionState.PAUSED)))
+        assertEquals(RawReadyStatus.Count(1), uploadFixture.coordinator.readyStatus(uploadFixture.context(WalkSessionState.ENDED)))
     }
 
     @Test
@@ -229,7 +244,7 @@ class RawCollectionRuntimeCoordinatorTest {
         val fixture = fixture()
 
         assertEquals(
-            RawMetadataCaptureResult.STORAGE_FAILURE,
+            RawMetadataCaptureResult.INVALID_WINDOW,
             fixture.coordinator.captureMetadataBatch(
                 fixture.context(WalkSessionState.ACTIVE),
                 detectionSample(),
@@ -254,7 +269,7 @@ class RawCollectionRuntimeCoordinatorTest {
         )
         assertEquals(
             RawSegmentSealResult.SEALED,
-            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.PAUSED)),
+            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.ENDED)),
         )
         val ready = requireNotNull(fixture.store.readyManifests(OWNER).singleOrNull())
         assertEquals(
@@ -293,7 +308,7 @@ class RawCollectionRuntimeCoordinatorTest {
     }
 
     @Test
-    fun pausedSealDiscardsAnIncompletePartialCollection() {
+    fun walkEndSealDiscardsAnIncompletePartialCollection() {
         val fixture = fixture()
         assertTrue(
             fixture.store.open(
@@ -309,20 +324,20 @@ class RawCollectionRuntimeCoordinatorTest {
 
         assertEquals(
             RawSegmentSealResult.STORAGE_FAILURE,
-            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.PAUSED)),
+            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.ENDED)),
         )
         assertNull(fixture.storage.activeCollectionId)
         assertEquals(0, fixture.storage.collectionCount)
     }
 
     @Test
-    fun pausedSealDiscardsALegacySingleChunkPartialCollection() {
+    fun walkEndSealDiscardsALegacySingleChunkPartialCollection() {
         val fixture = fixture()
         seedLegacySingleChunkPartial(fixture)
 
         assertEquals(
             RawSegmentSealResult.STORAGE_FAILURE,
-            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.PAUSED)),
+            fixture.coordinator.sealActiveSegment(fixture.context(WalkSessionState.ENDED)),
         )
         assertNull(fixture.storage.activeCollectionId)
         assertEquals(0, fixture.storage.collectionCount)
@@ -395,10 +410,162 @@ class RawCollectionRuntimeCoordinatorTest {
         assertTrue(fixture.storage.writeActiveCollectionIdAtomically(collectionId))
     }
 
-    private fun fixture(storeNowEpochMs: Long = NOW_EPOCH_MS): RuntimeFixture {
+    @Test
+    fun unstartedCancellationReleasesSlotWithoutReadingPlaintext() {
+        val f = fixture()
+        prepareUpload(f)
+        val call = requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        call.cancel()
+        assertThrows(CancellationException::class.java) { call.execute() }
+        assertEquals(0, f.client.calls)
+        requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).cancel()
+    }
+
+    @Test
+    fun executingCancellationRetainsSlotAndLateReceiptCannotDelete() {
+        val f = fixture()
+        prepareUpload(f)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        f.client.beforeReturn = {
+            entered.countDown()
+            check(release.await(3, TimeUnit.SECONDS))
+        }
+        val call = requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val result = executor.submit<RawCollectionUploadOutcome> { call.execute() }
+            assertTrue(entered.await(3, TimeUnit.SECONDS))
+            call.cancel()
+            assertNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+            release.countDown()
+            assertEquals(RawCollectionUploadOutcome.CANCELLED, result.get(3, TimeUnit.SECONDS))
+            assertEquals(1, f.store.readyManifests(OWNER).size)
+            assertTrue(f.client.lastPlaintexts.all { bytes -> bytes.all { it == 0.toByte() } })
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).cancel()
+        } finally {
+            release.countDown()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun exactReceiptWithDeletionFailureRetriesOnlyLocalPurge() {
+        val f = fixture()
+        prepareUpload(f)
+        f.storage.failDelete = true
+        assertEquals(RawCollectionUploadOutcome.ACKNOWLEDGED_PURGE_PENDING,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(RawUploadDisposition.ACKNOWLEDGED, f.store.readyManifests(OWNER).single().uploadDisposition)
+        f.storage.failDelete = false
+        assertEquals(RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(1, f.client.calls)
+        assertEquals(0, f.storage.collectionCount)
+    }
+
+    @Test
+    fun permanentFailureKeepsBytesButRemovesHeadFromUploadCandidates() {
+        val f = fixture()
+        prepareUpload(f)
+        f.client.httpFailure = 422
+        assertEquals(RawCollectionUploadOutcome.QUARANTINED,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(1, f.storage.collectionCount)
+        assertEquals(0, f.store.readyManifests(OWNER).size)
+        assertNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+    }
+
+    @Test
+    fun authorityFailurePreservesRetryableRawSegment() {
+        val f = fixture()
+        prepareUpload(f)
+        f.client.httpFailure = 403
+        assertEquals(RawCollectionUploadOutcome.AUTHORITY_BLOCKED,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(1, f.store.readyManifests(OWNER).size)
+    }
+
+    @Test
+    fun expiredFullPartialDoesNotPermanentlyBlockFutureCapture() {
+        var now = NOW_EPOCH_MS
+        val f = fixture(clock = { now })
+        assertEquals(RawMetadataCaptureResult.CAPTURED,
+            f.coordinator.captureMetadataBatch(f.context(WalkSessionState.ACTIVE), detectionSample(), performanceSample()))
+        now += RAW_COLLECTION_TTL_MS + 1L
+        assertEquals(RawMetadataCaptureResult.CAPTURED,
+            f.coordinator.captureMetadataBatch(
+                f.context(WalkSessionState.ACTIVE),
+                detectionSample().copy(windowStartedAtEpochMs = now - 30_000L, capturedAtEpochMs = now),
+                performanceSample().copy(windowStartedAtEpochMs = now - 30_000L, capturedAtEpochMs = now),
+                // The monotonic clock advances with the wall clock in this scenario.
+                observedAtElapsedRealtimeMs = NOW_ELAPSED_MS + RAW_COLLECTION_TTL_MS + 1L,
+            ))
+    }
+
+    @Test
+    fun unrelatedWalkEndAndConsentRevocationCannotCancelCurrentUpload() {
+        val f = fixture()
+        prepareUpload(f)
+        val call = requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        val ended = f.context(WalkSessionState.ENDED)
+        f.coordinator.onWalkEnded(ended.copy(walk = ended.walk.copy(
+            epoch = WalkRuntimeEpoch(LEGACY_COLLECTION_ID, 0L),
+        )))
+        f.coordinator.onConsentRevoked("d".repeat(64))
+        assertFalse(call.isCancelled())
+        assertEquals(RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT, call.execute())
+    }
+
+    @Test
+    fun sessionGenerationChangeBeforeExecuteNeverOpensRawClient() {
+        val f = fixture()
+        prepareUpload(f)
+        var current = f.context(WalkSessionState.ENDED)
+        val call = requireNotNull(f.coordinator.startNextUpload { current })
+        current = current.copy(sessionGeneration = current.sessionGeneration + 1L)
+        assertEquals(RawCollectionUploadOutcome.CANCELLED, call.execute())
+        assertEquals(0, f.client.calls)
+        assertEquals(1, f.store.readyManifests(OWNER).size)
+    }
+
+    private fun prepareUpload(f: RuntimeFixture) {
+        assertEquals(RawMetadataCaptureResult.CAPTURED,
+            f.coordinator.captureMetadataBatch(f.context(WalkSessionState.ACTIVE), detectionSample(), performanceSample()))
+        assertEquals(RawSegmentSealResult.SEALED, f.coordinator.sealActiveSegment(f.context(WalkSessionState.ENDED)))
+    }
+
+    @Test
+    fun unreadableListingIsNotReportedAsAnEmptyUploadQueue() {
+        val f = fixture()
+        prepareUpload(f)
+        f.storage.failListing = true
+        assertEquals(RawCollectionUploadOutcome.LOCAL_READ_FAILED,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(0, f.client.calls)
+        // 16-17 #12: an unreadable store is ReadFailed, not an exception or an empty count.
+        assertEquals(
+            RawReadyStatus.ReadFailed,
+            f.coordinator.readyStatus(f.context(WalkSessionState.ENDED)),
+        )
+    }
+
+    @Test
+    fun captureListingFailureIsAStorageFailureNotAnEmptyNewSegment() {
+        val f = fixture()
+        f.storage.failListing = true
+        assertEquals(RawMetadataCaptureResult.STORAGE_FAILURE,
+            f.coordinator.captureMetadataBatch(f.context(WalkSessionState.ACTIVE), detectionSample(), performanceSample()))
+        assertEquals(0, f.storage.collectionCount)
+    }
+
+    private fun fixture(
+        storeNowEpochMs: Long = NOW_EPOCH_MS,
+        clock: () -> Long = { storeNowEpochMs },
+    ): RuntimeFixture {
         val storage = RuntimeFakeStorage()
         val aead = RuntimeFakeAead()
-        val store = RawCollectionStore(storage, aead, { storeNowEpochMs }, testOnly = Unit)
+        val store = RawCollectionStore(storage, aead, clock, testOnly = Unit)
         val client = RuntimeFakeClient()
         val coordinator = RawCollectionRuntimeCoordinator(
             store = store,
@@ -423,6 +590,13 @@ class RawCollectionRuntimeCoordinatorTest {
     }
 
     private fun detectionSample() = RawDetectionMetadataSample(
+        runtimeIdentity = RawDetectorRuntimeIdentity(
+            modelArtifactSha256 = "1".repeat(64),
+            runtimeConfigSha256 = "2".repeat(64),
+            classListSha256 = "3".repeat(64),
+            activeDelegate = "cpu",
+            delegateFallbackUsed = false,
+        ),
         windowStartedAtEpochMs = NOW_EPOCH_MS - 30_000L,
         capturedAtEpochMs = NOW_EPOCH_MS,
         processedFrameCount = 30,
@@ -473,7 +647,7 @@ class RawCollectionRuntimeCoordinatorTest {
         clientRevision = 1L,
         revision = 1L,
         selections = IntegratedConsentSelections(rawSourceCollection = true),
-        confirmedAt = "2026-08-29T00:00:00Z",
+        confirmedAt = "2026-08-29T00:00:00.000Z",
         gatewayAuditRecordSha256 = "a".repeat(64),
         backendConsentReceiptSha256 = CONSENT_SHA,
         controlSecret = "b".repeat(64),
@@ -524,7 +698,8 @@ private class RuntimeFixture(
             deviceCheck = deviceCheck,
             consentSession = consentSession,
             walk = walk,
-            gatewayWalkLease = GatewayWalkLease(
+            // Owner decision 3(b): after the walk (ENDED) this device holds no Gateway walk lease.
+            gatewayWalkLease = if (state == WalkSessionState.ENDED) null else GatewayWalkLease(
                 result = "ACQUIRED",
                 actorId = session.actorId,
                 deviceId = session.deviceId,
@@ -538,6 +713,7 @@ private class RuntimeFixture(
             ),
             networkTransport = ActiveNetworkTransport.WIFI,
             networkBinding = networkBinding,
+            charging = true,
         )
     }
 }
@@ -585,6 +761,8 @@ private fun endedWalkSnapshot(epoch: WalkRuntimeEpoch): WalkSessionSnapshot = Wa
 
 private class RuntimeFakeClient : RawCollectionNetworkClient {
     var calls = 0
+    var beforeReturn: (() -> Unit)? = null
+    var httpFailure: Int? = null
     var lastPlaintexts: List<ByteArray> = emptyList()
     var lastPayloadSnapshots: List<ByteArray> = emptyList()
     var lastChunkMetadata: List<RawChunkMetadata> = emptyList()
@@ -604,6 +782,8 @@ private class RuntimeFakeClient : RawCollectionNetworkClient {
         lastChunkMetadata = chunks.map(RawPlaintextChunk::metadata)
         return CancellableNetworkCall.blocking {
             check(isCurrent())
+            beforeReturn?.invoke()
+            httpFailure?.let { throw RawCollectionHttpException(it) }
             exactRuntimeReceipt(backendManifest)
         }
     }
@@ -638,6 +818,8 @@ private class RuntimeFakeStorage : RawCollectionStorage {
     private val chunks = mutableMapOf<Pair<String, Int>, String>()
     private val fences = mutableMapOf<String, String>()
     var failChunkOrdinal: Int? = null
+    var failDelete = false
+    var failListing = false
     val activeCollectionId: String?
         get() = activeId
     val collectionCount: Int
@@ -665,8 +847,12 @@ private class RuntimeFakeStorage : RawCollectionStorage {
     }
     override fun deleteChunk(collectionId: String, ordinal: Int): Boolean =
         chunks.remove(collectionId to ordinal) != null
-    override fun listCollectionIds(): Set<String> = manifests.keys.toSet()
+    override fun listCollectionIds(): Set<String> {
+        if (failListing) throw RawCollectionStorageReadException("test listing")
+        return manifests.keys.toSet()
+    }
     override fun deleteCollection(collectionId: String): Boolean {
+        if (failDelete) return false
         manifests.remove(collectionId)
         chunks.keys.removeAll { it.first == collectionId }
         return true

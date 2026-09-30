@@ -16,6 +16,22 @@ enum class VisualTrackingFailure {
     OUT_OF_FRAME, OBJECT_COMPETITION, NATIVE_INITIALIZATION_FAILED, NATIVE_TRACKING_FAILED,
 }
 
+/**
+ * Why a tracking output asks the detector scheduler for an earlier fresh detection. The request
+ * never changes identities: tracked objects keep their detector source index, and only a new
+ * detector batch can start new observations (FP-019: crossing/occlusion restarts observation).
+ */
+enum class VisualRedetectReason {
+    /** An admitted object failed visual tracking (occluded, out of frame, weak or inconsistent motion). */
+    TRACK_LOST,
+    /** Two admitted objects converged on one image region; both are LOST and their positions uncertain. */
+    OCCLUSION_OR_COMPETITION,
+    /** A tracked object moved into the central lower walking region after this batch's priority was fixed. */
+    WALKING_ZONE_ENTRY,
+    /** Valid detector candidates were left untracked by the object budget of this batch. */
+    UNTRACKED_CANDIDATES,
+}
+
 data class VisualTrackingObservation(
     /** Index into the authoritative detector batch, including entries not admitted for tracking. */
     val sourceIndex: Int,
@@ -55,7 +71,12 @@ data class VisualTrackingResult(
     /** Oversized batches are rejected in O(1), without allocating one LOST entry per input. */
     val batchFailure: VisualTrackingFailure? = null,
     val rejectedInputCount: Int = 0,
-)
+    /** Scheduling hint only; it carries no geometry and cannot keep an unobserved position alive. */
+    val redetectReasons: Set<VisualRedetectReason> = emptySet(),
+) {
+    val redetectRequested: Boolean
+        get() = redetectReasons.isNotEmpty()
+}
 
 data class TrackingFrameAdmission(
     val accepted: Boolean,

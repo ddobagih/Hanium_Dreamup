@@ -8,7 +8,7 @@ operations only; this module does not submit reports to a public agency.
 from __future__ import annotations
 
 import csv
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 import errno
 import fcntl
@@ -16,6 +16,7 @@ import hashlib
 import io
 import json
 import logging
+import math
 import os
 import re
 import stat
@@ -23,16 +24,18 @@ import uuid
 import zipfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Annotated, Any, Callable, Iterable, List, Literal, NoReturn, Optional
 
 from anyio import to_thread
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Path as ApiPath, Query, Request, Response, UploadFile, status
 from geoalchemy2.elements import WKTElement
 from pydantic import AwareDatetime, ValidationError
-from sqlalchemy import func, not_, or_, select, text
+from sqlalchemy import Text, case, func, not_, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.app.api.request_validation import public_request_validation_detail
 from backend.app.config import Settings
 from backend.app.database import get_db
 from backend.app.field_test_security import (
@@ -40,12 +43,22 @@ from backend.app.field_test_security import (
     FieldTestAccess,
     VerifiedActorAssertion,
 )
-from backend.app.models import Report, ReportExportAudit, ReportImageObject, ReportStatusAudit
+from backend.app.models import (
+    Report,
+    ReportExportAudit,
+    ReportImageObject,
+    ReportInstitutionDeliveryEvent,
+    ReportStatusAudit,
+)
 from backend.app.schemas import (
     ClassName,
     DetectorSource,
     DuplicateCheckResponse,
+    ReportCreationOutcome,
+    ReportCreationResponse,
     ReportInstitutionDeliveryPageV1,
+    ReportInstitutionDeliveryCorrectionRequest,
+    ReportInstitutionDeliveryCorrectionV1,
     ReportInstitutionDeliveryRequest,
     ReportInstitutionDeliveryResponse,
     ReportMetadata,
@@ -72,22 +85,44 @@ from backend.app.services.duplicates import (
     lock_auto_report_cooldown,
     lock_duplicate_candidate_window,
 )
+from backend.app.services.android_release_allowlist import approved_android_release
 from backend.app.services.report_policy import ensure_report_v2_allowed, report_v2_source
 from backend.app.services.report_policy import HIGH_LOCATION_ACCURACY_M, LOW_CONFIDENCE_THRESHOLD
 from backend.app.services.report_read_audit import persist_report_read_audit, resolve_read_audit_identity
 from backend.app.services.report_serialization import location_quality, report_to_response
+from backend.app.services.report_summary_aggregation import (
+    REPORT_SUMMARY_MAX_GRID_SIZE_DEGREES,
+    REPORT_SUMMARY_MIN_GRID_SIZE_DEGREES,
+    aggregate_report_summary,
+)
+from backend.app.services.report_export_limits import (
+    MAX_REPORT_EXPORT_BYTES,
+    BoundedBytesIO,
+    BoundedUtf8TextBuffer,
+    ExportCapacityLimit,
+    ExportSizeLimit,
+    ExportWorkGate,
+    bounded_json_bytes,
+    iter_bounded_json_bytes,
+)
+from backend.app.services.storage_readiness_state import StorageReadinessState
 from backend.app.services.report_storage import (
+    ReportImageCommitMetadata,
     complete_report_image_write,
     lock_report_storage_write_transaction,
     stage_report_image,
+    validate_report_image_write,
 )
 from backend.app.services.privacy_lifecycle import (
     PrivacyLifecycleError,
     assert_privacy_hmac_key_bound,
     assert_report_ingest_active,
     bind_or_verify_privacy_hmac_key,
+    configured_privacy_hmac_lookup_keys,
     lock_report_ingest_transaction,
+    privacy_subject_candidates,
     privacy_subject_hmac,
+    resolve_privacy_subject,
 )
 from backend.app.services.report_image_crypto import encrypt_report_image
 from backend.app.services.report_image_keys import ReportImageKeyError, ReportImageKeyManager
@@ -106,7 +141,10 @@ from backend.app.services.admin_device_proof import VerifiedAdminDeviceProof
 from backend.app.services.admin_report_workflow import (
     AdminReportWorkflowError,
     append_report_institution_delivery_event,
+    correct_report_institution_delivery_event,
+    delivery_items_with_corrections,
     append_report_review_decision,
+    get_report_review_decision,
     list_report_institution_delivery_events,
     list_report_institution_delivery_history_page,
     list_report_review_decision_history_page,
@@ -135,7 +173,9 @@ _ADMIN_RECONFIRMATION_OPENAPI_PARAMETER = {
     },
 }
 
-_ADMIN_HISTORY_QUERY_FIELDS = frozenset({"limit", "cursor"})
+_REPORT_EXPORT_GATE = ExportWorkGate()
+
+_ADMIN_HISTORY_QUERY_FIELDS = frozenset({"limit", "cursor", "position"})
 _ADMIN_HISTORY_NO_STORE_HEADERS = {
     "Cache-Control": "no-store",
     "Pragma": "no-cache",
@@ -153,6 +193,12 @@ def _admin_history_query_shape_allowed(request: Request) -> bool:
             return False
         seen.add(key)
     return True
+
+
+def _report_history_limit(limit: int | None, position: str | None) -> int:
+    if limit is not None:
+        return limit
+    return HISTORY_PAGE_MAX_LIMIT if position == "last" else HISTORY_PAGE_DEFAULT_LIMIT
 
 
 def _with_admin_history_no_store(exc: HTTPException) -> HTTPException:
@@ -332,6 +378,7 @@ REPORT_EXPORT_FIELDS = [
     "image_path",
 ]
 MAX_REPORT_EXPORT_ROWS = 10_000
+MAX_REPORT_AGENCY_EXPORT_SCAN_ROWS = 20_000
 MAX_REPORT_SUMMARY_ROWS = 10_000
 AUTO_REPORT_MAX_AGE = timedelta(minutes=5)
 AUTO_REPORT_MAX_FUTURE_SKEW = timedelta(seconds=30)
@@ -383,6 +430,7 @@ REPORT_V2_METADATA_ALLOWLIST = {
     "fallback_used",
     "loaded_model_key",
     "model_load_reason",
+    "location_kind",
 }
 
 ACTOR_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
@@ -485,6 +533,26 @@ def _validate_report_transport_payload(
             detail={"code": "report_transport_payload_mismatch"},
         )
 
+
+def _reject_oriented_report_bbox(original: bytes) -> None:
+    # Pillow opens the bounded upload header without decoding its pixels. The
+    # shared sanitizer later applies this orientation but discards the EXIF.
+    from PIL import Image
+
+    try:
+        with Image.open(io.BytesIO(original)) as image:
+            orientation = image.getexif().get(274, 1)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_image_content", "message": "image must be decodable and sanitizable"},
+        ) from exc
+    if orientation in (2, 3, 4, 5, 6, 7, 8):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "report_bbox_exif_orientation_unsupported"},
+        )
+
 ALLOWED_STATUS_TRANSITIONS: dict[ReportStatus, set[ReportStatus]] = {
     "new": {"new", "reviewed", "resolved"},
     "reviewed": {"new", "reviewed", "resolved"},
@@ -568,6 +636,21 @@ def _json_sha256(value: object) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _report_list_fingerprint(reports: Iterable[Report]) -> str:
+    """SHA-256 of v1 domain + compact UTF-8 JSON [id, content_revision, status_version] rows sorted by ID.
+
+    Hash only the returned page, not the full matching set. Sorting makes the
+    fingerprint independent of incidental row order; versions capture edits
+    without storing report IDs or content in the read audit.
+    """
+    rows = sorted(
+        ([str(report.id), report.content_revision, report.status_version] for report in reports),
+        key=lambda row: row[0],
+    )
+    payload = json.dumps(rows, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(b"walksafe-report-list-fingerprint-v1\0" + payload).hexdigest()
+
+
 def _bytes_sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
@@ -635,19 +718,41 @@ def _privacy_report_binding(
             secret=settings.privacy_hmac_secret,
             key_version=settings.privacy_hmac_key_version,
         )
-        return (
-            privacy_subject_hmac(
-                actor_id,
-                account_generation,
-                settings.privacy_hmac_secret,
-            ),
+        # S1617-50: after a rotation the report joins the subject that already
+        # owns the actor generation; every candidate is fenced and checked.
+        resolved = resolve_privacy_subject(
+            db,
+            actor_id,
             account_generation,
+            secret=settings.privacy_hmac_secret,
+            key_version=settings.privacy_hmac_key_version,
         )
+        return resolved.subject, account_generation
     except PrivacyLifecycleError as exc:
         raise HTTPException(
             status_code=exc.status_code,
             detail={"code": exc.code, "message": exc.message},
         ) from exc
+
+
+def _privacy_report_candidates(
+    *,
+    privacy_subject: str | None,
+    actor_id: str,
+    account_generation: int | None,
+    settings: Settings,
+) -> tuple[str, ...]:
+    """S1617-50: every subject to fence/check once lookup-only keys exist."""
+
+    if (
+        privacy_subject is None
+        or account_generation is None
+        or not configured_privacy_hmac_lookup_keys()
+    ):
+        return ()
+    return privacy_subject_candidates(
+        actor_id, account_generation, settings.privacy_hmac_secret
+    )
 
 
 def _assert_report_precommit_active(
@@ -656,13 +761,16 @@ def _assert_report_precommit_active(
     privacy_subject: str,
     account_generation: int,
     settings: Settings,
+    lookup_subjects: tuple[str, ...] = (),
 ) -> None:
     assert_privacy_hmac_key_bound(
         db,
         secret=settings.privacy_hmac_secret,
         key_version=settings.privacy_hmac_key_version,
     )
-    assert_report_ingest_active(db, privacy_subject, account_generation)
+    assert_report_ingest_active(
+        db, privacy_subject, account_generation, lookup_subjects or None
+    )
 
 
 def _enforce_metadata_size(raw_metadata: str, settings: Settings) -> None:
@@ -777,6 +885,7 @@ def _enforce_secured_auto_report_gate(
     settings: Settings,
     *,
     actor_id: str,
+    allow_stale_persisted_replay: bool = False,
 ) -> None:
     if not settings.field_test_security_enabled or not parsed.auto_reported:
         return
@@ -798,7 +907,8 @@ def _enforce_secured_auto_report_gate(
         captured_at = captured_at.replace(tzinfo=UTC)
     now = datetime.now(UTC)
     if captured_at < now - AUTO_REPORT_MAX_AGE:
-        failures.append("captured_at_stale")
+        if not allow_stale_persisted_replay:
+            failures.append("captured_at_stale")
     elif captured_at > now + AUTO_REPORT_MAX_FUTURE_SKEW:
         failures.append("captured_at_in_future")
 
@@ -815,14 +925,19 @@ def _enforce_secured_auto_report_gate(
 def _enforce_secured_android_provenance(parsed: ReportV2Metadata, settings: Settings) -> None:
     if not settings.field_test_security_enabled or parsed.source != "android":
         return
-    source_commit = (parsed.source_commit or "").lower()
-    expected_commit = settings.walksafe_source_commit.lower()
-    if not expected_commit or source_commit != expected_commit:
+    # S20-7: approved release-bundle table (default: the current release only).
+    # The report keeps source_commit as its audit field either way.
+    if not approved_android_release(
+        settings,
+        source_commit=parsed.source_commit,
+        apk_sha256=getattr(parsed, "apk_sha256", None),
+        model_config_sha256=getattr(parsed, "model_config_sha256", None),
+    ):
         raise HTTPException(
             status_code=422,
             detail={
                 "code": "android_provenance_gate_failed",
-                "message": "Android reports must identify the same full source commit as the secured backend release.",
+                "message": "Android reports must come from an approved release bundle of the secured backend.",
             },
         )
 
@@ -871,17 +986,46 @@ def _with_duplicate_candidate_payload(payload: dict[str, Any], candidates: list[
 def _field_creation_response(
     report: Report,
     duplicate_report_ids: list[str] | None = None,
-) -> ReportResponse:
+    *,
+    creation_outcome: ReportCreationOutcome,
+) -> ReportCreationResponse:
     internal = report_to_response(report, duplicate_report_ids)
     sanitized_metadata = dict(internal.metadata)
     sanitized_metadata.pop("duplicate_report_ids", None)
-    return internal.model_copy(
-        update={
+    return ReportCreationResponse.model_validate(
+        {
+            **internal.model_dump(),
             "metadata": sanitized_metadata,
             "duplicate_report_ids": [],
             "transport_receipt": _report_transport_receipt(report),
+            "creation_outcome": creation_outcome,
         }
     )
+
+
+def _postcommit_field_creation_response(
+    report: Report,
+    duplicate_report_ids: list[str],
+    *,
+    report_id: uuid.UUID,
+) -> ReportCreationResponse:
+    # Only call after the storage helper returns from a confirmed commit.
+    # The caller's UUID remains usable even if response conversion expires ORM fields.
+    try:
+        return _field_creation_response(report, duplicate_report_ids, creation_outcome="CREATED")
+    except Exception as exc:
+        try:
+            logging.getLogger(__name__).warning("report_postcommit_response_failed")
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "report_postcommit_response_failed",
+                "message": "The report was stored, but its confirmation response is unavailable.",
+                "report_id": str(report_id),
+            },
+        ) from exc
 
 
 def _report_transport_receipt(
@@ -1014,7 +1158,7 @@ def _report_export_row(report: Report) -> dict[str, object]:
     return {
         "id": str(report.id),
         "status": report.status,
-        "class_name": _csv_safe(report.class_name),
+        "class_name": report.class_name,
         "confidence": report.confidence,
         "source": report.source,
         "latitude": report.latitude,
@@ -1028,29 +1172,59 @@ def _report_export_row(report: Report) -> dict[str, object]:
         "captured_at": _isoformat(report.captured_at),
         "created_at": _isoformat(report.created_at),
         "model_key": _csv_metadata_value(metadata.get("model_key")),
-        "source_model": _csv_safe(_csv_metadata_value(metadata.get("source_model"))),
+        "source_model": _csv_metadata_value(metadata.get("source_model")),
         "threshold_used": _csv_metadata_value(metadata.get("threshold_used")),
         "trigger": _csv_metadata_value(metadata.get("trigger")),
         "auto_reported": _csv_metadata_value(metadata.get("auto_reported")),
-        "reporter_user_id": _csv_safe(_csv_metadata_value(metadata.get("reporter_user_id"))),
+        "reporter_user_id": _csv_metadata_value(metadata.get("reporter_user_id")),
         "distance_m": _csv_metadata_value(metadata.get("distance_m")),
-        "trace_id": _csv_safe(_csv_metadata_value(metadata.get("trace_id"))),
-        "payload_sha256": _csv_safe(_csv_metadata_value(metadata.get("payload_sha256"))),
-        "image_sha256": _csv_safe(_csv_metadata_value(metadata.get("image_sha256"))),
-        "data_origin": _csv_safe(_csv_metadata_value(metadata.get("data_origin"))),
-        "runtime_mode": _csv_safe(_csv_metadata_value(metadata.get("runtime_mode"))),
+        "trace_id": _csv_metadata_value(metadata.get("trace_id")),
+        "payload_sha256": _csv_metadata_value(metadata.get("payload_sha256")),
+        "image_sha256": _csv_metadata_value(metadata.get("image_sha256")),
+        "data_origin": _csv_metadata_value(metadata.get("data_origin")),
+        "runtime_mode": _csv_metadata_value(metadata.get("runtime_mode")),
         "performance_excluded": _csv_metadata_value(metadata.get("performance_excluded")),
-        "performance_exclusion_reason": _csv_safe(_csv_metadata_value(metadata.get("performance_exclusion_reason"))),
+        "performance_exclusion_reason": _csv_metadata_value(metadata.get("performance_exclusion_reason")),
         "location_quality": response.location_quality,
-        "review_flags": _csv_safe(",".join(response.review_flags)),
-        "duplicate_report_ids": _csv_safe(
-            ",".join(str(value) for value in metadata.get("duplicate_report_ids", []) if value)
-        ),
+        "review_flags": ",".join(response.review_flags),
+        "duplicate_report_ids": ",".join(str(value) for value in metadata.get("duplicate_report_ids", []) if value),
         "status_history_count": len(status_history),
-        "review_note": _csv_safe(_csv_metadata_value(metadata.get("review_note"))),
-        "resolution_reason": _csv_safe(_csv_metadata_value(metadata.get("resolution_reason"))),
-        "image_path": _csv_safe(report.image_path),
+        "review_note": _csv_metadata_value(metadata.get("review_note")),
+        "resolution_reason": _csv_metadata_value(metadata.get("resolution_reason")),
+        "image_path": report.image_path,
     }
+
+
+def _iter_bounded_export_reports(db: Session, statement) -> Iterable[Report]:
+    # Project only columns used by export/summary. The CASE prevents an
+    # oversized JSONB value from reaching the driver before Python can reject
+    # it; yield_per keeps the remaining result out of the ORM identity map.
+    payload_bytes = func.octet_length(Report.payload.cast(Text))
+    bounded_payload = case(
+        (payload_bytes <= MAX_REPORT_EXPORT_BYTES, Report.payload),
+        else_=None,
+    ).label("payload")
+    projected = statement.with_only_columns(
+        Report.id, Report.status, Report.class_id, Report.class_name,
+        Report.confidence, Report.source, Report.latitude, Report.longitude,
+        Report.accuracy_m, Report.heading, Report.bbox_x, Report.bbox_y,
+        Report.bbox_width, Report.bbox_height, Report.captured_at,
+        Report.created_at, Report.updated_at, Report.image_path,
+        Report.image_content_type, bounded_payload,
+    ).execution_options(yield_per=1)
+    # Existing route test doubles expose only scalars(). Real Sessions always
+    # use the projected, server-streamed path above.
+    if not hasattr(db, "execute"):
+        yield from db.scalars(statement).all()
+        return
+    result = db.execute(projected)
+    try:
+        for record in result.mappings():
+            if record["payload"] is None:
+                raise ExportSizeLimit()
+            yield SimpleNamespace(**record)
+    finally:
+        result.close()
 
 
 def _reports_geojson(rows: list[dict[str, object]]) -> dict[str, object]:
@@ -1196,6 +1370,8 @@ def _export_filename(
     aggregate_part = "-grid" if aggregate == "grid" else ""
     profile_part = "" if profile == "internal" else f"-{profile}"
     extension = "geojson" if export_format == "geojson" else export_format
+    if profile == "minimum":
+        return f"walksafe-reports-minimum.{extension}"
     return f"walksafe-reports-{_demo_filename_part(demo_filter)}{profile_part}{aggregate_part}.{extension}"
 
 
@@ -1203,17 +1379,35 @@ def _export_manifest(
     rows: list[dict[str, object]],
     *,
     filters: dict[str, object],
+    export_format: str,
     generated_at: datetime,
     actor_id: str,
     audit_id: str,
 ) -> dict[str, object]:
+    if filters.get("profile") == "minimum":
+        return {
+            "schema_version": "walksafe.reports.export_manifest.v1",
+            "profile": "minimum",
+            "format": export_format,
+            "count": len(rows),
+            "rows": rows,
+        }
     rows_sha256 = _export_rows_sha256(rows)
+    manifest_filters = dict(filters)
+    if filters.get("profile") == "minimum" or filters.get("redacted"):
+        location_filter_applied = all(
+            filters.get(field) is not None for field in ("lat", "lng", "radius_m")
+        )
+        for field in ("lat", "lng", "radius_m"):
+            manifest_filters.pop(field, None)
+        manifest_filters["location_filter_applied"] = location_filter_applied
+        manifest_filters["location_filter_type"] = "radius" if location_filter_applied else None
     return {
         "schema_version": "walksafe.reports.export_manifest.v1",
         "generated_at": generated_at.isoformat().replace("+00:00", "Z"),
         "audit_id": audit_id,
         "actor_id": actor_id,
-        "filters": filters,
+        "filters": manifest_filters,
         "count": len(rows),
         "rows_sha256": rows_sha256,
         "rows": rows,
@@ -1221,17 +1415,32 @@ def _export_manifest(
 
 
 def _export_rows_sha256(rows: list[dict[str, object]]) -> str:
-    rows_json = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
-    return hashlib.sha256(rows_json.encode("utf-8")).hexdigest()
+    """Hash UTF-8, compact, key-sorted JSON in the supplied row order.
+
+    Exports select created_at DESC, id DESC; profile projection/filtering keeps
+    that relative order. JSON uses ensure_ascii=False and default=str. This
+    hashes the projected rows, not CSV/ZIP bytes or per-request manifest metadata.
+    """
+    digest = hashlib.sha256()
+    for chunk in iter_bounded_json_bytes(
+        rows, max_bytes=MAX_REPORT_EXPORT_BYTES, ensure_ascii=False,
+        sort_keys=True, separators=(",", ":"), default=str,
+    ):
+        digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _csv_export_text(rows: list[dict[str, object]], *, bom: bool) -> str:
-    output = io.StringIO()
+    output = BoundedUtf8TextBuffer(MAX_REPORT_EXPORT_BYTES)
+    if bom:
+        output.write("\ufeff")
     writer = csv.DictWriter(output, fieldnames=REPORT_EXPORT_FIELDS)
     writer.writeheader()
-    writer.writerows(rows)
-    csv_text = output.getvalue()
-    return f"\ufeff{csv_text}" if bom else csv_text
+    writer.writerows(
+        {field: _csv_safe(value) for field, value in row.items()}
+        for row in rows
+    )
+    return output.getvalue()
 
 
 def _persist_export_audit(
@@ -1321,6 +1530,13 @@ def _bounded_summary_reports(reports: Iterable[Report]) -> list[Report]:
     return bounded
 
 
+class _ReportWriteLockExitError(HTTPException):
+    """The acquired write lock failed its exit-time integrity check."""
+
+    def __init__(self) -> None:
+        super().__init__(status_code=503, detail={"code": "maintenance_lock_unavailable"})
+
+
 def _commit_new_report_with_image(
     db: Session,
     report: Report,
@@ -1332,27 +1548,32 @@ def _commit_new_report_with_image(
     maintenance_lock_path: Path | None = None,
     maintenance_lock_group_gid: int | None = None,
     precommit_check: Callable[[], None] | None = None,
+    storage_readiness: StorageReadinessState | None = None,
 ) -> None:
-    with _shared_report_write_lock(
-        maintenance_lock_path,
-        expected_group_gid=maintenance_lock_group_gid,
-    ):
-        lock_report_storage_write_transaction(db)
-        try:
-            key_manager.synchronize(db)
-            active_key = key_manager.encryption_slot()
-            assert active_key.material is not None
-            encrypted = encrypt_report_image(
-                content,
-                report_id=report.id,
-                content_type=content_type,
-                key_id=active_key.key_id,
-                key=active_key.material,
-            )
-            pending = stage_report_image(destination, encrypted)
-            db.add(report)
-            db.add(
-                ReportImageObject(
+    token = storage_readiness.begin_commit("report", str(report.id)) if storage_readiness is not None else None
+    staged = cleanup_complete = completed = False
+    committed_report_id: str | None = None
+    try:
+        with _shared_report_write_lock(
+            maintenance_lock_path,
+            expected_group_gid=maintenance_lock_group_gid,
+        ):
+            lock_report_storage_write_transaction(db)
+            try:
+                key_manager.synchronize(db)
+                active_key = key_manager.encryption_slot()
+                assert active_key.material is not None
+                encrypted = encrypt_report_image(
+                    content,
+                    report_id=report.id,
+                    content_type=content_type,
+                    key_id=active_key.key_id,
+                    key=active_key.material,
+                )
+                staged = True
+                pending = stage_report_image(destination, encrypted)
+                db.add(report)
+                image_object = ReportImageObject(
                     report_id=report.id,
                     storage_name=destination.name,
                     envelope_version=1,
@@ -1366,30 +1587,116 @@ def _commit_new_report_with_image(
                     envelope_size=len(encrypted.envelope),
                     content_type=content_type,
                 )
-            )
-            if precommit_check is not None:
-                precommit_check()
-            db.commit()
-        except ReportImageKeyError as exc:
-            db.rollback()
-            raise HTTPException(
+                db.add(image_object)
+                if precommit_check is not None:
+                    precommit_check()
+                if (
+                    pending.report_id != report.id
+                    or pending.destination != destination
+                    or image_object.report_id != report.id
+                    or destination.name != f"{report.id}.wse"
+                    or report.image_content_type != content_type
+                    or report.image_path != f"/uploads/{report.id}{image_suffix(content_type)}"
+                ):
+                    raise RuntimeError("report logical image path and encrypted object metadata disagree")
+                validate_report_image_write(
+                    pending,
+                    ReportImageCommitMetadata(
+                        storage_name=image_object.storage_name,
+                        envelope_version=image_object.envelope_version,
+                        algorithm=image_object.algorithm,
+                        aad_version=image_object.aad_version,
+                        key_id=image_object.key_id,
+                        nonce=image_object.nonce,
+                        envelope_sha256=image_object.envelope_sha256,
+                        envelope_size=image_object.envelope_size,
+                        plaintext_sha256=image_object.plaintext_sha256,
+                        plaintext_size=image_object.plaintext_size,
+                        content_type=image_object.content_type,
+                    ),
+                )
+                report_id_snapshot = str(report.id)
+                db.commit()
+                committed_report_id = report_id_snapshot
+            except ReportImageKeyError as exc:
+                db.rollback()
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "report_image_encryption_unavailable",
+                        "message": "The report was not stored because image encryption is unavailable.",
+                    },
+                ) from exc
+            except PrivacyLifecycleError as exc:
+                db.rollback()
+                raise HTTPException(
+                    status_code=exc.status_code,
+                    detail={"code": exc.code, "message": exc.message},
+                ) from exc
+            except BaseException:
+                db.rollback()
+                raise
+            try:
+                db.refresh(report)
+            except Exception as exc:
+                try:
+                    logging.getLogger(__name__).warning("report_postcommit_refresh_failed")
+                except Exception:
+                    pass
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "report_postcommit_refresh_failed",
+                        "message": "The report was stored, but its confirmation response is unavailable.",
+                        "report_id": report_id_snapshot,
+                    },
+                ) from exc
+            try:
+                complete_report_image_write(pending)
+                cleanup_complete = True
+            except OSError:
+                try:
+                    logging.getLogger(__name__).warning("report_postcommit_journal_cleanup_deferred")
+                except Exception:
+                    pass
+            except Exception as exc:
+                try:
+                    logging.getLogger(__name__).warning("report_postcommit_journal_cleanup_failed")
+                except Exception:
+                    pass
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "report_postcommit_journal_cleanup_failed",
+                        "message": "The report was stored, but its storage cleanup could not be completed.",
+                        "report_id": report_id_snapshot,
+                    },
+                ) from exc
+    except _ReportWriteLockExitError as exc:
+        if committed_report_id is None:
+            raise
+        try:
+            logging.getLogger(__name__).warning("report_postcommit_lock_exit_failed")
+        except Exception:
+            pass
+        raise HTTPException(
                 status_code=503,
                 detail={
-                    "code": "report_image_encryption_unavailable",
-                    "message": "The report was not stored because image encryption is unavailable.",
+                    "code": "report_postcommit_lock_exit_failed",
+                    "message": "The report was stored, but the maintenance lock could not be verified after the write.",
+                    "report_id": committed_report_id,
                 },
             ) from exc
-        except PrivacyLifecycleError as exc:
-            db.rollback()
-            raise HTTPException(
-                status_code=exc.status_code,
-                detail={"code": exc.code, "message": exc.message},
-            ) from exc
-        except BaseException:
-            db.rollback()
-            raise
-        db.refresh(report)
-        complete_report_image_write(pending)
+    else:
+        completed = True
+    finally:
+        if token is not None:
+            if completed and cleanup_complete:
+                storage_readiness.publish_success(token)
+            elif staged:
+                storage_readiness.publish_failure(token, "report_storage_recovery_pending")
+            else:
+                storage_readiness.publish_clean_abort(token)
 
 
 def _descriptor_acl_is_absent(descriptor: int) -> bool:
@@ -1643,11 +1950,12 @@ def _shared_report_write_lock(
                     yield
                 finally:
                     try:
-                        if verified_file_state() != file_state:
-                            raise HTTPException(
-                                status_code=503,
-                                detail={"code": "maintenance_lock_unavailable"},
-                            )
+                        try:
+                            exit_state_matches = verified_file_state() == file_state
+                        except HTTPException as exc:
+                            raise _ReportWriteLockExitError() from exc
+                        if not exit_state_matches:
+                            raise _ReportWriteLockExitError()
                     finally:
                         fcntl.flock(descriptor, fcntl.LOCK_UN)
             finally:
@@ -1670,6 +1978,7 @@ def _idempotent_report_replay(
     class_name: str,
     captured_at: datetime,
     image_sha256: str,
+    payload_sha256: str,
 ) -> Report | None:
     if actor_id == UNKNOWN_ACTOR_ID:
         return None
@@ -1686,16 +1995,32 @@ def _idempotent_report_replay(
         text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
         {"lock_key": lock_key},
     )
-    return db.scalar(
+    existing = db.scalar(
         select(Report)
         .where(Report.class_name == class_name)
         .where(Report.captured_at == captured_at)
         .where(Report.privacy_subject_hmac == privacy_subject)
         .where(Report.account_generation == account_generation)
-        .where(Report.payload.contains({"image_sha256": image_sha256}))
+        .where(Report.payload.contains({
+            "image_sha256": image_sha256,
+        }))
         .order_by(Report.created_at.desc())
         .limit(1)
     )
+
+    if existing is None:
+        return None
+    stored_payload = existing.payload
+    if (
+        not isinstance(stored_payload, dict)
+        or stored_payload.get("payload_sha256") != payload_sha256
+    ):
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "report_idempotency_conflict"},
+        )
+    return existing
 
 
 def _report_transport_replay(
@@ -1724,6 +2049,37 @@ def _report_transport_replay(
     raise HTTPException(
         status_code=409,
         detail={"code": "report_transport_id_conflict"},
+    )
+
+
+_REPORT_SUMMARY_GRID_DESCRIPTION = (
+    "Display grid size in degrees (0.0001 to 1). A coordinate x belongs to "
+    "cell floor(x / size) computed in float64 when the returned float bounds "
+    "satisfy lower <= x < upper; otherwise the exact rational value of the "
+    "input floats decides the cell. Returned bounds are rounded display "
+    "values, so x may equal max_* only in that exact fallback."
+)
+
+
+def _report_grid_cell(coordinate: float, grid_size_degrees: float) -> tuple[int, float, float]:
+    # S20-38 contract: float half-open [lower, upper) when representable;
+    # on a rounding contradiction the exact rational floor decides.
+    quotient = coordinate / grid_size_degrees
+    if math.isfinite(quotient):
+        cell = math.floor(quotient)
+        lower = cell * grid_size_degrees
+        upper = (cell + 1) * grid_size_degrees
+        if not (lower < upper and (coordinate < lower or coordinate >= upper)):
+            return cell, lower, upper
+
+    numerator, denominator = coordinate.as_integer_ratio()
+    grid_numerator, grid_denominator = grid_size_degrees.as_integer_ratio()
+    cell = (numerator * grid_denominator) // (denominator * grid_numerator)
+    # Tiny cells may still have equal float bounds; do not widen the grid.
+    return (
+        cell,
+        (cell * grid_numerator) / grid_denominator,
+        ((cell + 1) * grid_numerator) / grid_denominator,
     )
 
 
@@ -1766,8 +2122,12 @@ def _reports_summary(
             location_bounds["max_latitude"] = max(location_bounds["max_latitude"], report.latitude)
             location_bounds["min_longitude"] = min(location_bounds["min_longitude"], report.longitude)
             location_bounds["max_longitude"] = max(location_bounds["max_longitude"], report.longitude)
-        lat_cell = int(report.latitude / grid_size_degrees)
-        lng_cell = int(report.longitude / grid_size_degrees)
+        lat_cell, min_latitude, max_latitude = _report_grid_cell(
+            report.latitude, grid_size_degrees,
+        )
+        lng_cell, min_longitude, max_longitude = _report_grid_cell(
+            report.longitude, grid_size_degrees,
+        )
         key = f"{lat_cell}:{lng_cell}"
         cluster = clusters.setdefault(
             key,
@@ -1779,10 +2139,10 @@ def _reports_summary(
                 "latitude_sum": 0.0,
                 "longitude_sum": 0.0,
                 "bounds": {
-                    "min_latitude": lat_cell * grid_size_degrees,
-                    "max_latitude": (lat_cell + 1) * grid_size_degrees,
-                    "min_longitude": lng_cell * grid_size_degrees,
-                    "max_longitude": (lng_cell + 1) * grid_size_degrees,
+                    "min_latitude": min_latitude,
+                    "max_latitude": max_latitude,
+                    "min_longitude": min_longitude,
+                    "max_longitude": max_longitude,
                 },
                 "status_counts": {"new": 0, "reviewed": 0, "resolved": 0},
                 "source_counts": {"fake": 0, "onnx": 0, "server": 0, "android": 0},
@@ -1836,11 +2196,18 @@ def _persist_legacy_report(
     account_generation: int | None,
     settings: Settings,
     key_manager: ReportImageKeyManager,
-) -> ReportResponse:
+    storage_readiness: StorageReadinessState | None = None,
+) -> ReportCreationResponse:
     privacy_subject, bound_generation = _privacy_report_binding(
         db=db,
         actor_id=actor_id,
         account_generation=account_generation,
+        settings=settings,
+    )
+    subject_candidates = _privacy_report_candidates(
+        privacy_subject=privacy_subject,
+        actor_id=actor_id,
+        account_generation=bound_generation,
         settings=settings,
     )
     if privacy_subject is not None and bound_generation is not None:
@@ -1851,6 +2218,7 @@ def _persist_legacy_report(
                 bound_generation,
                 automatic_reporting=False,
                 enforce_consent=settings.field_test_security_enabled,
+                lookup_subjects=subject_candidates,
             )
         except PrivacyLifecycleError as exc:
             db.rollback()
@@ -1865,21 +2233,11 @@ def _persist_legacy_report(
     latitude = gps.latitude if gps else None
     longitude = gps.longitude if gps else None
     location = WKTElement(f"POINT({longitude} {latitude})", srid=4326) if gps else None
-    lock_duplicate_candidate_window(
-        db,
-        class_name=parsed.class_name,
-        captured_at=parsed.captured_at,
-        is_fake=parsed.source == "fake",
-    )
-    duplicate_candidates = find_duplicate_candidates(db, parsed)
-    stored_payload = _with_duplicate_candidate_payload(
-        _enrich_legacy_payload(
-            parsed.model_dump(mode="json"),
-            source=parsed.source,
-            content=content,
-            actor_id=actor_id,
-        ),
-        duplicate_candidates,
+    stored_payload = _enrich_legacy_payload(
+        parsed.model_dump(mode="json"),
+        source=parsed.source,
+        content=content,
+        actor_id=actor_id,
     )
     replay = _idempotent_report_replay(
         db,
@@ -1889,10 +2247,21 @@ def _persist_legacy_report(
         class_name=parsed.class_name,
         captured_at=parsed.captured_at,
         image_sha256=str(stored_payload["image_sha256"]),
+        payload_sha256=str(stored_payload["payload_sha256"]),
     )
     if replay is not None:
         db.rollback()
-        return _field_creation_response(replay)
+        return _field_creation_response(replay, creation_outcome="REPLAYED")
+    lock_duplicate_candidate_window(
+        db,
+        class_name=parsed.class_name,
+        captured_at=parsed.captured_at,
+        is_fake=parsed.source == "fake",
+        latitude=latitude,
+        longitude=longitude,
+    )
+    duplicate_candidates = find_duplicate_candidates(db, parsed)
+    stored_payload = _with_duplicate_candidate_payload(stored_payload, duplicate_candidates)
     report = Report(
         id=report_id,
         class_id=parsed.class_id,
@@ -1915,6 +2284,7 @@ def _persist_legacy_report(
         privacy_subject_hmac=privacy_subject,
         account_generation=bound_generation,
     )
+    duplicate_candidate_ids = [str(candidate.id) for candidate in duplicate_candidates]
     _commit_new_report_with_image(
         db,
         report,
@@ -1922,6 +2292,7 @@ def _persist_legacy_report(
         content=content,
         content_type=content_type,
         key_manager=key_manager,
+        storage_readiness=storage_readiness,
         maintenance_lock_path=settings.maintenance_lock_path,
         maintenance_lock_group_gid=settings.maintenance_lock_group_gid,
         precommit_check=(
@@ -1930,12 +2301,15 @@ def _persist_legacy_report(
                 privacy_subject=privacy_subject,
                 account_generation=bound_generation,
                 settings=settings,
+                lookup_subjects=subject_candidates,
             )
             if privacy_subject is not None and bound_generation is not None
             else None
         ),
     )
-    return _field_creation_response(report, [str(candidate.id) for candidate in duplicate_candidates])
+    return _postcommit_field_creation_response(
+        report, duplicate_candidate_ids, report_id=report_id,
+    )
 
 
 def _persist_v2_report(
@@ -1949,11 +2323,18 @@ def _persist_v2_report(
     settings: Settings,
     key_manager: ReportImageKeyManager,
     transport_contract: ReportTransportContract | None = None,
-) -> ReportResponse:
+    storage_readiness: StorageReadinessState | None = None,
+) -> ReportCreationResponse:
     privacy_subject, bound_generation = _privacy_report_binding(
         db=db,
         actor_id=actor_id,
         account_generation=account_generation,
+        settings=settings,
+    )
+    subject_candidates = _privacy_report_candidates(
+        privacy_subject=privacy_subject,
+        actor_id=actor_id,
+        account_generation=bound_generation,
         settings=settings,
     )
     if privacy_subject is not None and bound_generation is not None:
@@ -1964,6 +2345,7 @@ def _persist_v2_report(
                 bound_generation,
                 automatic_reporting=parsed.auto_reported,
                 enforce_consent=settings.field_test_security_enabled,
+                lookup_subjects=subject_candidates,
             )
         except PrivacyLifecycleError as exc:
             db.rollback()
@@ -1988,7 +2370,30 @@ def _persist_v2_report(
         )
         if replay is not None:
             db.rollback()
-            return _field_creation_response(replay)
+            return _field_creation_response(replay, creation_outcome="REPLAYED")
+    else:
+        # A content conflict must not be hidden by a cooldown receipt.
+        replay = _idempotent_report_replay(
+            db,
+            actor_id=actor_id,
+            privacy_subject=privacy_subject,
+            account_generation=bound_generation,
+            class_name=parsed.class_name,
+            captured_at=parsed.captured_at,
+            image_sha256=str(stored_payload["image_sha256"]),
+            payload_sha256=str(stored_payload["payload_sha256"]),
+        )
+    # Only a persisted exact replay may outlive capture freshness; all other
+    # auto-report security checks still run after account/consent locking.
+    _enforce_secured_auto_report_gate(
+        parsed,
+        settings,
+        actor_id=actor_id,
+        allow_stale_persisted_replay=transport_contract is None and replay is not None,
+    )
+    if transport_contract is None and replay is not None:
+        db.rollback()
+        return _field_creation_response(replay, creation_outcome="REPLAYED")
     report_id = (
         transport_contract.report_id
         if transport_contract is not None
@@ -2002,8 +2407,7 @@ def _persist_v2_report(
     location = WKTElement(f"POINT({longitude} {latitude})", srid=4326) if gps else None
     is_fake = _is_fake_payload(stored_payload, report_source)
     if (
-        transport_contract is None
-        and settings.field_test_security_enabled
+        settings.field_test_security_enabled
         and parsed.auto_reported
     ):
         assert gps is not None
@@ -2013,43 +2417,43 @@ def _persist_v2_report(
             privacy_subject=privacy_subject,
             account_generation=bound_generation,
             class_name=parsed.class_name,
+            is_fake=is_fake,
         )
         active_cooldown = find_active_auto_report_cooldown(
             db,
             privacy_subject=privacy_subject,
             account_generation=bound_generation,
             class_name=parsed.class_name,
+            is_fake=is_fake,
             lat=gps.latitude,
             lng=gps.longitude,
             now=datetime.now(UTC),
         )
         if active_cooldown is not None:
-            # Treat the authoritative cooldown as an idempotent success. Both
-            # clients then arm their local cooldown without retry storms, and
-            # no second row or image is written.
+            if transport_contract is not None:
+                db.rollback()
+                raise HTTPException(
+                    status_code=429,
+                    detail={
+                        "code": "automatic_report_cooldown_active",
+                        "creation_outcome": "SUPPRESSED_BY_COOLDOWN",
+                    },
+                    headers={"Retry-After": "600"},
+                )
+            # Preserve the legacy success status while identifying that no
+            # second row or image was created.
             db.rollback()
-            return _field_creation_response(active_cooldown)
+            return _field_creation_response(active_cooldown, creation_outcome="SUPPRESSED_BY_COOLDOWN")
     lock_duplicate_candidate_window(
         db,
         class_name=parsed.class_name,
         captured_at=parsed.captured_at,
         is_fake=is_fake,
+        latitude=latitude,
+        longitude=longitude,
     )
     duplicate_candidates = find_duplicate_candidates_v2(db, parsed, is_fake=is_fake)
     stored_payload = _with_duplicate_candidate_payload(stored_payload, duplicate_candidates)
-    if transport_contract is None:
-        replay = _idempotent_report_replay(
-            db,
-            actor_id=actor_id,
-            privacy_subject=privacy_subject,
-            account_generation=bound_generation,
-            class_name=parsed.class_name,
-            captured_at=parsed.captured_at,
-            image_sha256=str(stored_payload["image_sha256"]),
-        )
-        if replay is not None:
-            db.rollback()
-            return _field_creation_response(replay)
     report = Report(
         id=report_id,
         status="new",
@@ -2084,6 +2488,7 @@ def _persist_v2_report(
         ),
         persistence_marker=(uuid.uuid4() if transport_contract is not None else None),
     )
+    duplicate_candidate_ids = [str(candidate.id) for candidate in duplicate_candidates]
     _commit_new_report_with_image(
         db,
         report,
@@ -2091,6 +2496,7 @@ def _persist_v2_report(
         content=content,
         content_type=content_type,
         key_manager=key_manager,
+        storage_readiness=storage_readiness,
         maintenance_lock_path=settings.maintenance_lock_path,
         maintenance_lock_group_gid=settings.maintenance_lock_group_gid,
         precommit_check=(
@@ -2099,15 +2505,21 @@ def _persist_v2_report(
                 privacy_subject=privacy_subject,
                 account_generation=bound_generation,
                 settings=settings,
+                lookup_subjects=subject_candidates,
             )
             if privacy_subject is not None and bound_generation is not None
             else None
         ),
     )
-    return _field_creation_response(report, [str(candidate.id) for candidate in duplicate_candidates])
+    return _postcommit_field_creation_response(
+        report, duplicate_candidate_ids, report_id=report_id,
+    )
 
 
-def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> APIRouter:
+def create_router(
+    settings: Settings, key_manager: ReportImageKeyManager, *,
+    storage_readiness: StorageReadinessState | None = None,
+) -> APIRouter:
     router = APIRouter()
     admin_reconfirmation_openapi_extra = (
         {"parameters": [_ADMIN_RECONFIRMATION_OPENAPI_PARAMETER]}
@@ -2115,7 +2527,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         else None
     )
 
-    @router.post("/reports", response_model=ReportResponse, status_code=status.HTTP_201_CREATED)
+    @router.post("/reports", response_model=ReportCreationResponse, status_code=status.HTTP_201_CREATED)
     async def create_report(
         metadata: str = Form(...),
         image: UploadFile = File(...),
@@ -2125,7 +2537,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             alias="x-walksafe-account-generation",
         ),
         db: Session = Depends(get_db),
-    ) -> ReportResponse:
+    ) -> ReportCreationResponse:
         actor_id = _resolved_actor_id(x_walksafe_actor_id, required=settings.field_test_security_enabled)
         account_generation = _resolved_account_generation(
             x_walksafe_account_generation,
@@ -2136,11 +2548,30 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         try:
             parsed = ReportMetadata.model_validate_json(metadata)
         except (ValidationError, json.JSONDecodeError) as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=422,
+                detail=public_request_validation_detail(
+                    exc, model=ReportMetadata, field="metadata", code="report_metadata_invalid",
+                ),
+            ) from None
+        if settings.field_test_security_enabled and parsed.source == "android":
+            # S20-7 (be-F5): secured Android reports use /reports/v2 and its
+            # approved-release gate; the legacy endpoint must not bypass it.
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "android_provenance_gate_failed",
+                    "message": "Android reports must use /reports/v2 on the secured backend.",
+                },
+            )
         if parsed.gps is None:
             raise HTTPException(status_code=422, detail="legacy reports require gps; use reports/v2 when available")
 
-        content, content_type = await read_image_upload(image, settings)
+        content, content_type = await read_image_upload(
+            image,
+            settings,
+            validate_original=_reject_oriented_report_bbox,
+        )
         return await to_thread.run_sync(
             lambda: _persist_legacy_report(
                 db,
@@ -2151,10 +2582,11 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 account_generation=account_generation,
                 settings=settings,
                 key_manager=key_manager,
+                storage_readiness=storage_readiness,
             )
         )
 
-    @router.post("/reports/v2", response_model=ReportResponse, status_code=status.HTTP_201_CREATED)
+    @router.post("/reports/v2", response_model=ReportCreationResponse, status_code=status.HTTP_201_CREATED)
     async def create_report_v2(
         metadata: str = Form(...),
         image: UploadFile = File(...),
@@ -2176,7 +2608,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             alias="x-walksafe-report-payload-bytes",
         ),
         db: Session = Depends(get_db),
-    ) -> ReportResponse:
+    ) -> ReportCreationResponse:
         transport_contract = _resolve_report_transport_contract(
             x_walksafe_report_id,
             x_walksafe_report_payload_sha256,
@@ -2197,7 +2629,12 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             raw_payload = json.loads(metadata)
             parsed = ReportV2Metadata.model_validate(raw_payload)
         except (ValidationError, json.JSONDecodeError) as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=422,
+                detail=public_request_validation_detail(
+                    exc, model=ReportV2Metadata, field="metadata", code="report_metadata_invalid",
+                ),
+            ) from None
 
         if not isinstance(raw_payload, dict) or _json_size_bytes(raw_payload) > settings.max_report_metadata_bytes:
             raise HTTPException(
@@ -2210,14 +2647,22 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
 
         ensure_report_v2_allowed(parsed)
         _enforce_secured_android_provenance(parsed, settings)
-        _enforce_secured_auto_report_gate(parsed, settings, actor_id=actor_id)
-        content, content_type = await read_image_upload(image, settings)
-        if transport_contract is not None:
-            _validate_report_transport_payload(
-                transport_contract,
-                metadata_bytes=metadata.encode("utf-8"),
-                image_bytes=content,
-            )
+
+        def validate_original(original: bytes) -> None:
+            if transport_contract is not None:
+                _validate_report_transport_payload(
+                    transport_contract,
+                    metadata_bytes=metadata.encode("utf-8"),
+                    image_bytes=original,
+                )
+            if "bbox" in raw_payload:
+                _reject_oriented_report_bbox(original)
+
+        content, content_type = await read_image_upload(
+            image,
+            settings,
+            validate_original=validate_original,
+        )
         return await to_thread.run_sync(
             lambda: _persist_v2_report(
                 db,
@@ -2228,6 +2673,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 account_generation=account_generation,
                 settings=settings,
                 key_manager=key_manager,
+                storage_readiness=storage_readiness,
                 transport_contract=transport_contract,
             )
         )
@@ -2259,11 +2705,19 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             account_generation_header=x_walksafe_account_generation,
             security_enabled=settings.field_test_security_enabled,
         )
-        subject = privacy_subject_hmac(
-            actor_id,
-            account_generation,
-            settings.privacy_hmac_secret,
-        )
+        # S1617-50: a report accepted before a rotation stays under its subject.
+        try:
+            subject = resolve_privacy_subject(
+                db,
+                actor_id,
+                account_generation,
+                secret=settings.privacy_hmac_secret,
+            ).subject
+        except PrivacyLifecycleError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
         row = db.execute(
             _report_transport_status_statement(
                 parsed_report_id,
@@ -2317,6 +2771,8 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             radius_m=radius_m,
         ).order_by(Report.created_at.desc(), Report.id.desc()).offset(offset).limit(limit)
         reports = db.scalars(statement).all()
+        result_fingerprint = _report_list_fingerprint(reports)
+        response_snapshot = [report_to_response(report) for report in reports]
         if settings.field_test_security_enabled:
             persist_report_read_audit(
                 db,
@@ -2327,11 +2783,12 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 details={
                     "limit": limit,
                     "offset": offset,
-                    "result_count": len(reports),
+                    "result_count": len(response_snapshot),
+                    "result_fingerprint_sha256": result_fingerprint,
                     "exact_location_filter_applied": lat is not None or lng is not None,
                 },
             )
-        return [report_to_response(report) for report in reports]
+        return response_snapshot
 
     @router.get(
         "/reports/export",
@@ -2355,7 +2812,13 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         lng: Optional[float] = Query(default=None, ge=-180, le=180),
         radius_m: Optional[float] = Query(default=None, gt=0),
         redacted: bool = Query(default=False),
-        profile: Literal["internal", "minimum", "agency"] = Query(default="internal"),
+        profile: Literal["internal", "minimum", "agency"] = Query(
+            default="internal",
+            description=(
+                "internal is an admin export; redacted=true only rounds coordinates and clears image paths. "
+                "minimum is a minimized public export, not an anonymized export."
+            ),
+        ),
         bom: bool = Query(default=False),
         manifest: bool = Query(default=False),
         bundle: bool = Query(default=False),
@@ -2426,199 +2889,275 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             location_precision = "rounded"
         else:
             location_precision = "exact-internal"
-        statement = _filtered_reports_statement(
-            status=status,
-            class_name=class_name,
-            source=source,
-            demo_filter=demo_filter,
-            model_key=model_key,
-            trigger=trigger,
-            auto_reported=auto_reported,
-            performance_excluded=performance_excluded,
-            created_from=created_from,
-            created_to=created_to,
-            lat=lat,
-            lng=lng,
-            radius_m=radius_m,
-        )
-        if profile == "agency":
-            reviewer_actor = Report.payload["agency_reviewed_by_actor_id"].astext
-            normalized_reviewer_actor = func.lower(reviewer_actor)
-            statement = statement.where(
-                Report.payload.contains({"agency_review_verified": True}),
-                func.jsonb_typeof(Report.payload["agency_reviewed_by_actor_id"]) == "string",
-                reviewer_actor.op("~")(ACTOR_ID_PATTERN.pattern),
-                normalized_reviewer_actor.notin_([UNKNOWN_ACTOR_ID, "system", "anonymous"]),
-                not_(normalized_reviewer_actor.like("%-shared")),
-            )
-        statement = statement.order_by(Report.created_at.desc()).limit(MAX_REPORT_EXPORT_ROWS + 1)
-        reports = list(db.scalars(statement).all())
-        if profile == "agency":
-            reports = [report for report in reports if _agency_review_was_named(dict(report.payload or {}))]
-        if len(reports) > MAX_REPORT_EXPORT_ROWS:
+        try:
+            with _REPORT_EXPORT_GATE.slot():
+                statement = _filtered_reports_statement(
+                    status=status,
+                    class_name=class_name,
+                    source=source,
+                    demo_filter=demo_filter,
+                    model_key=model_key,
+                    trigger=trigger,
+                    auto_reported=auto_reported,
+                    performance_excluded=performance_excluded,
+                    created_from=created_from,
+                    created_to=created_to,
+                    lat=lat,
+                    lng=lng,
+                    radius_m=radius_m,
+                )
+                if profile == "agency":
+                    reviewer_actor = Report.payload["agency_reviewed_by_actor_id"].astext
+                    normalized_reviewer_actor = func.lower(reviewer_actor)
+                    statement = statement.where(
+                        Report.payload.contains({"agency_review_verified": True}),
+                        func.jsonb_typeof(Report.payload["agency_reviewed_by_actor_id"]) == "string",
+                        reviewer_actor.op("~")(ACTOR_ID_PATTERN.pattern),
+                        normalized_reviewer_actor.notin_([UNKNOWN_ACTOR_ID, "system", "anonymous"]),
+                        not_(normalized_reviewer_actor.like("%-shared")),
+                    )
+                statement = statement.order_by(Report.created_at.desc(), Report.id.desc())
+                statement = statement.limit(
+                    (MAX_REPORT_AGENCY_EXPORT_SCAN_ROWS if profile == "agency" else MAX_REPORT_EXPORT_ROWS) + 1
+                )
+                rows: list[dict[str, object]] = []
+                serialized_rows_bytes = 2  # JSON array brackets in the existing audit hash.
+                selected_count = 0
+                scanned_count = 0
+
+                def selected_reports() -> Iterable[Report]:
+                    nonlocal selected_count, scanned_count, serialized_rows_bytes
+                    for report in report_stream:
+                        if profile == "agency":
+                            scanned_count += 1
+                            if scanned_count > MAX_REPORT_AGENCY_EXPORT_SCAN_ROWS:
+                                raise HTTPException(
+                                    status_code=413,
+                                    detail={
+                                        "code": "report_export_too_large",
+                                        "message": "narrow the export filters before downloading",
+                                        "max_scanned_rows": MAX_REPORT_AGENCY_EXPORT_SCAN_ROWS,
+                                    },
+                                )
+                            if not _agency_review_was_named(dict(report.payload or {})):
+                                continue
+                        row = _report_export_row(report)
+                        if profile == "agency":
+                            if (
+                                not isinstance(row.get("latitude"), (int, float))
+                                or not isinstance(row.get("longitude"), (int, float))
+                                or row.get("location_quality") != "high"
+                            ):
+                                continue
+                            row = _agency_export_row(row)
+                        elif profile == "minimum":
+                            row = _minimum_export_row(row)
+                        elif redacted:
+                            row = _redact_export_row(row)
+                        selected_count += 1
+                        if selected_count > MAX_REPORT_EXPORT_ROWS:
+                            raise HTTPException(
+                                status_code=413,
+                                detail={
+                                    "code": "report_export_too_large",
+                                    "message": "narrow the export filters before downloading",
+                                    "max_rows": MAX_REPORT_EXPORT_ROWS,
+                                },
+                            )
+                        remaining = MAX_REPORT_EXPORT_BYTES - serialized_rows_bytes - (1 if rows else 0)
+                        if remaining < 1:
+                            raise ExportSizeLimit()
+                        row_bytes = sum(len(chunk) for chunk in iter_bounded_json_bytes(
+                            row, max_bytes=remaining, ensure_ascii=False,
+                            sort_keys=True, separators=(",", ":"), default=str,
+                        ))
+                        serialized_rows_bytes += row_bytes + (1 if rows else 0)
+                        rows.append(row)
+                        yield report
+
+                with closing(_iter_bounded_export_reports(db, statement)) as report_stream:
+                    if aggregate == "grid":
+                        grid_summary = _reports_summary(selected_reports())
+                    else:
+                        for _ in selected_reports():
+                            pass
+
+                export_filters: dict[str, object] = {
+                    "status": status,
+                    "class_name": class_name,
+                    "source": source,
+                    "demo_filter": demo_filter,
+                    "model_key": model_key,
+                    "trigger": trigger,
+                    "auto_reported": auto_reported,
+                    "performance_excluded": performance_excluded,
+                    "created_from": created_from,
+                    "created_to": created_to,
+                    "lat": lat,
+                    "lng": lng,
+                    "radius_m": radius_m,
+                    "redacted": redacted,
+                    "profile": profile,
+                    "agency_review_verified": True if profile == "agency" else None,
+                    "bundle": bundle,
+                }
+                filename = _export_filename(export_format, demo_filter, aggregate=aggregate, profile=profile)
+                content_disposition = f'attachment; filename="{filename}"'
+                rows_sha256 = _export_rows_sha256(rows)
+                private_export_headers = {} if profile == "minimum" else {
+                    "X-WalkSafe-Audit-Id": audit_id,
+                    "X-WalkSafe-Actor-Id": actor_id,
+                    "X-WalkSafe-Demo-Filter": demo_filter,
+                }
+                if bundle:
+                    csv_text = _csv_export_text(rows, bom=bom)
+                    manifest_payload = _export_manifest(
+                        rows,
+                        filters=export_filters,
+                        export_format=export_format,
+                        generated_at=datetime.now(UTC),
+                        actor_id=actor_id,
+                        audit_id=audit_id,
+                    )
+                    csv_bytes = csv_text.encode("utf-8")
+                    manifest_bytes = bounded_json_bytes(
+                        manifest_payload, max_bytes=MAX_REPORT_EXPORT_BYTES,
+                        ensure_ascii=False, default=str, indent=2,
+                    )
+                    if len(csv_bytes) + len(manifest_bytes) > MAX_REPORT_EXPORT_BYTES:
+                        raise ExportSizeLimit()
+                    archive_output = BoundedBytesIO(MAX_REPORT_EXPORT_BYTES)
+                    with zipfile.ZipFile(archive_output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                        for member_name, content in (("reports.csv", csv_bytes), ("manifest.json", manifest_bytes)):
+                            if profile == "minimum":
+                                member = zipfile.ZipInfo(member_name, date_time=(1980, 1, 1, 0, 0, 0))
+                                member.compress_type = zipfile.ZIP_DEFLATED
+                                archive.writestr(member, content)
+                            else:
+                                archive.writestr(member_name, content)
+                    bundle_filename = filename.removesuffix(".csv") + ".bundle.zip"
+                    response = Response(
+                        content=archive_output.getvalue(),
+                        media_type="application/zip",
+                        headers={
+                            "Content-Disposition": f'attachment; filename="{bundle_filename}"',
+                            "Cache-Control": "no-store",
+                            "X-WalkSafe-Export-Profile": profile,
+                            **private_export_headers,
+                            "X-WalkSafe-Location-Precision": location_precision,
+                            "X-WalkSafe-Export-Bundle": "csv+manifest",
+                        },
+                    )
+                elif export_format == "json":
+                    content: object = rows
+                    if manifest:
+                        content = _export_manifest(
+                            rows,
+                            filters=export_filters,
+                            export_format=export_format,
+                            generated_at=datetime.now(UTC),
+                            actor_id=actor_id,
+                            audit_id=audit_id,
+                        )
+                    response = Response(
+                        content=bounded_json_bytes(
+                            content, max_bytes=MAX_REPORT_EXPORT_BYTES, ensure_ascii=False, default=str,
+                        ),
+                        media_type="application/json",
+                        headers={
+                            "Content-Disposition": content_disposition,
+                            "Cache-Control": "no-store",
+                            "X-WalkSafe-Export-Profile": profile,
+                            **private_export_headers,
+                            "X-WalkSafe-Location-Precision": location_precision,
+                        },
+                    )
+                elif export_format == "geojson":
+                    body = (
+                        _reports_cluster_geojson(grid_summary)
+                        if aggregate == "grid"
+                        else _reports_geojson(rows)
+                    )
+                    properties = body.setdefault("properties", {})
+                    if isinstance(properties, dict):
+                        if profile != "minimum":
+                            properties["audit_id"] = audit_id
+                            properties["actor_id"] = actor_id
+                        properties["location_precision"] = location_precision
+                    response = Response(
+                        content=bounded_json_bytes(
+                            body, max_bytes=MAX_REPORT_EXPORT_BYTES, ensure_ascii=False, default=str,
+                        ),
+                        media_type="application/geo+json",
+                        headers={
+                            "Content-Disposition": content_disposition,
+                            "Cache-Control": "no-store",
+                            "X-WalkSafe-Export-Profile": profile,
+                            "X-WalkSafe-Location-Precision": location_precision,
+                            **private_export_headers,
+                        },
+                    )
+                else:
+                    csv_text = _csv_export_text(rows, bom=bom)
+                    response = Response(
+                        content=csv_text,
+                        media_type="text/csv",
+                        headers={
+                            "Content-Disposition": content_disposition,
+                            "Cache-Control": "no-store",
+                            "X-WalkSafe-Export-Profile": profile,
+                            **private_export_headers,
+                            "X-WalkSafe-Location-Precision": location_precision,
+                        },
+                    )
+                # Finish every representation and response byte check before
+                # consuming the durable audit ID. An audit failure still
+                # withholds the already prepared response.
+                _persist_export_audit(
+                    db,
+                    audit_id=audit_id,
+                    requested_audit_id=str(requested_audit_id) if requested_audit_id else None,
+                    actor_id=actor_id,
+                    export_format=export_format,
+                    profile=profile,
+                    aggregate=aggregate,
+                    row_count=len(rows),
+                    location_precision=location_precision,
+                    rows_sha256=rows_sha256,
+                    filters=export_filters,
+                )
+                logger.info(
+                    "report_export",
+                    extra={
+                        "walksafe_audit": {
+                            "audit_id": audit_id,
+                            "actor_id": actor_id,
+                            "format": export_format,
+                            "profile": profile,
+                            "aggregate": aggregate,
+                            "row_count": len(rows),
+                            "rows_sha256": rows_sha256,
+                        }
+                    },
+                )
+                return response
+        except ExportCapacityLimit:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "report_export_capacity_exceeded",
+                    "message": "Report export capacity is temporarily unavailable.",
+                },
+            ) from None
+        except ExportSizeLimit:
             raise HTTPException(
                 status_code=413,
                 detail={
                     "code": "report_export_too_large",
-                    "message": "narrow the export filters before downloading",
-                    "max_rows": MAX_REPORT_EXPORT_ROWS,
+                    "message": "Narrow the export filters before downloading.",
+                    "max_bytes": MAX_REPORT_EXPORT_BYTES,
                 },
-            )
-        rows = [_report_export_row(report) for report in reports]
-        if profile == "agency":
-            rows = [
-                _agency_export_row(row)
-                for row in rows
-                if isinstance(row.get("latitude"), (int, float))
-                and isinstance(row.get("longitude"), (int, float))
-                and row.get("location_quality") == "high"
-            ]
-        elif profile == "minimum":
-            rows = [_minimum_export_row(row) for row in rows]
-        elif redacted:
-            rows = [_redact_export_row(row) for row in rows]
-
-        export_filters: dict[str, object] = {
-            "status": status,
-            "class_name": class_name,
-            "source": source,
-            "demo_filter": demo_filter,
-            "model_key": model_key,
-            "trigger": trigger,
-            "auto_reported": auto_reported,
-            "performance_excluded": performance_excluded,
-            "created_from": created_from,
-            "created_to": created_to,
-            "lat": lat,
-            "lng": lng,
-            "radius_m": radius_m,
-            "redacted": redacted,
-            "profile": profile,
-            "agency_review_verified": True if profile == "agency" else None,
-            "bundle": bundle,
-        }
-        filename = _export_filename(export_format, demo_filter, aggregate=aggregate, profile=profile)
-        content_disposition = f'attachment; filename="{filename}"'
-        rows_sha256 = _export_rows_sha256(rows)
-        _persist_export_audit(
-            db,
-            audit_id=audit_id,
-            requested_audit_id=str(requested_audit_id) if requested_audit_id else None,
-            actor_id=actor_id,
-            export_format=export_format,
-            profile=profile,
-            aggregate=aggregate,
-            row_count=len(rows),
-            location_precision=location_precision,
-            rows_sha256=rows_sha256,
-            filters=export_filters,
-        )
-        logger.info(
-            "report_export",
-            extra={
-                "walksafe_audit": {
-                    "audit_id": audit_id,
-                    "actor_id": actor_id,
-                    "format": export_format,
-                    "profile": profile,
-                    "aggregate": aggregate,
-                    "row_count": len(rows),
-                    "rows_sha256": rows_sha256,
-                }
-            },
-        )
-        if bundle:
-            csv_text = _csv_export_text(rows, bom=bom)
-            manifest_payload = _export_manifest(
-                rows,
-                filters=export_filters,
-                generated_at=datetime.now(UTC),
-                actor_id=actor_id,
-                audit_id=audit_id,
-            )
-            archive_output = io.BytesIO()
-            with zipfile.ZipFile(archive_output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-                archive.writestr("reports.csv", csv_text.encode("utf-8"))
-                archive.writestr(
-                    "manifest.json",
-                    json.dumps(manifest_payload, ensure_ascii=False, default=str, indent=2).encode("utf-8"),
-                )
-            bundle_filename = filename.removesuffix(".csv") + ".bundle.zip"
-            return Response(
-                content=archive_output.getvalue(),
-                media_type="application/zip",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{bundle_filename}"',
-                    "Cache-Control": "no-store",
-                    "X-WalkSafe-Demo-Filter": demo_filter,
-                    "X-WalkSafe-Export-Profile": profile,
-                    "X-WalkSafe-Audit-Id": audit_id,
-                    "X-WalkSafe-Actor-Id": actor_id,
-                    "X-WalkSafe-Location-Precision": location_precision,
-                    "X-WalkSafe-Export-Bundle": "csv+manifest",
-                },
-            )
-        if export_format == "json":
-            content: object = rows
-            if manifest:
-                content = _export_manifest(
-                    rows,
-                    filters=export_filters,
-                    generated_at=datetime.now(UTC),
-                    actor_id=actor_id,
-                    audit_id=audit_id,
-                )
-            return Response(
-                content=json.dumps(content, ensure_ascii=False, default=str),
-                media_type="application/json",
-                headers={
-                    "Content-Disposition": content_disposition,
-                    "Cache-Control": "no-store",
-                    "X-WalkSafe-Demo-Filter": demo_filter,
-                    "X-WalkSafe-Export-Profile": profile,
-                    "X-WalkSafe-Audit-Id": audit_id,
-                    "X-WalkSafe-Actor-Id": actor_id,
-                    "X-WalkSafe-Location-Precision": location_precision,
-                },
-            )
-        if export_format == "geojson":
-            body = (
-                _reports_cluster_geojson(_reports_summary(reports))
-                if aggregate == "grid"
-                else _reports_geojson(rows)
-            )
-            properties = body.setdefault("properties", {})
-            if isinstance(properties, dict):
-                properties["audit_id"] = audit_id
-                properties["actor_id"] = actor_id
-                properties["location_precision"] = location_precision
-            return Response(
-                content=json.dumps(body, ensure_ascii=False, default=str),
-                media_type="application/geo+json",
-                headers={
-                    "Content-Disposition": content_disposition,
-                    "Cache-Control": "no-store",
-                    "X-WalkSafe-Demo-Filter": demo_filter,
-                    "X-WalkSafe-Export-Profile": profile,
-                    "X-WalkSafe-Location-Precision": location_precision,
-                    "X-WalkSafe-Audit-Id": audit_id,
-                    "X-WalkSafe-Actor-Id": actor_id,
-                },
-            )
-        csv_text = _csv_export_text(rows, bom=bom)
-        return Response(
-            content=csv_text,
-            media_type="text/csv",
-            headers={
-                "Content-Disposition": content_disposition,
-                "Cache-Control": "no-store",
-                "X-WalkSafe-Demo-Filter": demo_filter,
-                "X-WalkSafe-Export-Profile": profile,
-                "X-WalkSafe-Audit-Id": audit_id,
-                "X-WalkSafe-Actor-Id": actor_id,
-                "X-WalkSafe-Location-Precision": location_precision,
-            },
-        )
+            ) from None
 
     @router.get("/reports/summary")
     def summarize_reports(
@@ -2636,7 +3175,12 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         lat: Optional[float] = Query(default=None, ge=-90, le=90),
         lng: Optional[float] = Query(default=None, ge=-180, le=180),
         radius_m: Optional[float] = Query(default=None, gt=0),
-        grid_size_degrees: float = Query(default=0.001, gt=0, le=1),
+        grid_size_degrees: float = Query(
+            default=0.001,
+            ge=REPORT_SUMMARY_MIN_GRID_SIZE_DEGREES,
+            le=REPORT_SUMMARY_MAX_GRID_SIZE_DEGREES,
+            description=_REPORT_SUMMARY_GRID_DESCRIPTION,
+        ),
         top_limit: int = Query(default=5, ge=0, le=50),
         x_walksafe_actor_id: Optional[str] = Header(default=None, alias="x-walksafe-actor-id"),
         x_walksafe_read_purpose: Optional[str] = Header(default=None, alias="x-walksafe-read-purpose"),
@@ -2661,14 +3205,12 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             lng=lng,
             radius_m=radius_m,
         )
-        summary = _reports_summary(
-            _bounded_summary_reports(
-                db.scalars(
-                    statement.limit(MAX_REPORT_SUMMARY_ROWS + 1).execution_options(yield_per=500)
-                )
-            ),
+        summary = aggregate_report_summary(
+            db,
+            statement,
             grid_size_degrees=grid_size_degrees,
             top_limit=top_limit,
+            grid_cell=_report_grid_cell,
         )
         if settings.field_test_security_enabled:
             persist_report_read_audit(
@@ -2943,10 +3485,11 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         )],
         request: Request,
         response: Response,
-        limit: int = Query(
-            default=HISTORY_PAGE_DEFAULT_LIMIT,
+        limit: int | None = Query(
+            default=None,
             ge=1,
             le=HISTORY_PAGE_MAX_LIMIT,
+            description="Defaults to 10 for full history, or 25 with position=last.",
         ),
         cursor: str | None = Query(
             default=None,
@@ -2954,6 +3497,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             max_length=1024,
             pattern=r"^[A-Za-z0-9_-]+$",
         ),
+        position: str | None = Query(default=None),
         db: Session = Depends(get_db),
     ) -> ReportReviewDecisionPageV1:
         response.headers["Cache-Control"] = "no-store"
@@ -2967,7 +3511,11 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         except HTTPException as exc:
             raise _with_admin_history_no_store(exc) from exc
         parsed_report_id = uuid.UUID(report_id)
-        if not _admin_history_query_shape_allowed(request):
+        if (
+            not _admin_history_query_shape_allowed(request)
+            or position not in (None, "last")
+            or (position == "last" and cursor is not None)
+        ):
             _raise_admin_report_workflow_error(
                 AdminReportWorkflowError(
                     "report_review_history_query_invalid",
@@ -2984,8 +3532,9 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             page = list_report_review_decision_history_page(
                 db,
                 report_id=parsed_report_id,
-                limit=limit,
+                limit=_report_history_limit(limit, position),
                 cursor=cursor,
+                position=position,
             )
         except AdminReportWorkflowError as exc:
             _raise_admin_report_workflow_error(
@@ -3008,6 +3557,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                     "result_count": len(page.items),
                     "total_count": page.total_count,
                     "snapshot_revision": page.snapshot_revision,
+                    "position": position,
                     "session_id": str(identity.session_id),
                     "device_id": identity.device_id,
                     "correlation_id": str(proof.correlation_id),
@@ -3016,6 +3566,73 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         except HTTPException as exc:
             raise _with_admin_history_no_store(exc) from exc
         return page
+
+    # S18-36: declared after /history so that literal segment keeps its route.
+    @router.get(
+        "/reports/{report_id}/review-decisions/{decision_id}",
+        response_model=ReportReviewDecisionResponse,
+        responses={
+            status.HTTP_404_NOT_FOUND: {
+                "description": (
+                    "report_not_found, or review_decision_not_found when no "
+                    "decision with this decision_id was recorded for the report "
+                    "by this administrator."
+                )
+            },
+        },
+    )
+    def get_report_review_decision_by_id(
+        report_id: Annotated[str, ApiPath(
+            min_length=36,
+            max_length=36,
+            pattern=_CANONICAL_HISTORY_UUID_PATTERN,
+        )],
+        decision_id: Annotated[str, ApiPath(
+            min_length=36,
+            max_length=36,
+            pattern=_CANONICAL_HISTORY_UUID_PATTERN,
+        )],
+        request: Request,
+        response: Response,
+        db: Session = Depends(get_db),
+    ) -> ReportReviewDecisionResponse:
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        identity, proof = _require_admin_report_workflow_context(
+            request,
+            expected_action=None,
+            expected_read_purpose="report.review_decisions",
+        )
+        try:
+            decision = get_report_review_decision(
+                db,
+                report_id=uuid.UUID(report_id),
+                decision_id=uuid.UUID(decision_id),
+                admin_id=identity.admin_id,
+            )
+        except AdminReportWorkflowError as exc:
+            _raise_admin_report_workflow_error(
+                exc,
+                request=request,
+                identity=identity,
+                proof=proof,
+                audit_action="report.review_decisions.read",
+            )
+        persist_report_read_audit(
+            db,
+            actor_id=identity.admin_id,
+            purpose="report.review_decisions",
+            resource_type="report_detail",
+            resource_id=report_id,
+            details={
+                "view": "review_decision_lookup",
+                "decision_id": decision_id,
+                "session_id": str(identity.session_id),
+                "device_id": identity.device_id,
+                "correlation_id": str(proof.correlation_id),
+            },
+        )
+        return decision
 
     @router.post(
         "/reports/{report_id}/deliveries",
@@ -3037,7 +3654,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             expected_read_purpose=None,
         )
         try:
-            return append_report_institution_delivery_event(
+            event = append_report_institution_delivery_event(
                 db,
                 report_id=report_id,
                 payload=payload,
@@ -3047,6 +3664,11 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 proof_request_body=proof.request_body,
                 runtime_totp_secret=getattr(settings, "admin_totp_secret", None),
             )
+            # S18-40-F7: an idempotent replay (EXISTING) may name an event that
+            # was corrected since; the response carries that correction.
+            if isinstance(event, ReportInstitutionDeliveryEvent):
+                return delivery_items_with_corrections(db, [event])[0]
+            return event
         except AdminReportWorkflowError as exc:
             _raise_admin_report_workflow_error(
                 exc,
@@ -3054,6 +3676,54 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 identity=identity,
                 proof=proof,
                 audit_action="report.delivery.create",
+            )
+
+    @router.post(
+        "/reports/{report_id}/delivery-corrections",
+        response_model=ReportInstitutionDeliveryCorrectionV1,
+        status_code=status.HTTP_201_CREATED,
+        openapi_extra=admin_reconfirmation_openapi_extra,
+    )
+    def create_report_institution_delivery_correction(
+        report_id: uuid.UUID,
+        payload: ReportInstitutionDeliveryCorrectionRequest,
+        request: Request,
+        response: Response,
+        db: Session = Depends(get_db),
+    ) -> ReportInstitutionDeliveryCorrectionV1:
+        """S18-40: HIGH-risk append-only correction of a delivery event."""
+
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        identity, proof = _require_admin_report_workflow_context(
+            request,
+            expected_action="report.delivery.correct",
+            expected_read_purpose=None,
+        )
+        nonce = request.headers.get(ADMIN_RECONFIRM_NONCE_HEADER_NAME, "").strip()
+        try:
+            return correct_report_institution_delivery_event(
+                db,
+                report_id=report_id,
+                payload=payload,
+                identity=identity,
+                correlation_id=proof.correlation_id,
+                proof_challenge_id=proof.challenge_id,
+                proof_request_body=proof.request_body,
+                reconfirmation_nonce_sha256=(
+                    hashlib.sha256(nonce.encode("ascii", "replace")).hexdigest()
+                    if nonce
+                    else None
+                ),
+                runtime_totp_secret=getattr(settings, "admin_totp_secret", None),
+            )
+        except AdminReportWorkflowError as exc:
+            _raise_admin_report_workflow_error(
+                exc,
+                request=request,
+                identity=identity,
+                proof=proof,
+                audit_action="report.delivery.correct",
             )
 
     @router.get(
@@ -3097,7 +3767,8 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                 "correlation_id": str(proof.correlation_id),
             },
         )
-        return events
+        # S18-40: each event carries the correction that names it, if any.
+        return delivery_items_with_corrections(db, events)
 
     @router.get(
         "/reports/{report_id}/deliveries/history",
@@ -3111,10 +3782,11 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         )],
         request: Request,
         response: Response,
-        limit: int = Query(
-            default=HISTORY_PAGE_DEFAULT_LIMIT,
+        limit: int | None = Query(
+            default=None,
             ge=1,
             le=HISTORY_PAGE_MAX_LIMIT,
+            description="Defaults to 10 for full history, or 25 with position=last.",
         ),
         cursor: str | None = Query(
             default=None,
@@ -3122,6 +3794,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             max_length=1024,
             pattern=r"^[A-Za-z0-9_-]+$",
         ),
+        position: str | None = Query(default=None),
         db: Session = Depends(get_db),
     ) -> ReportInstitutionDeliveryPageV1:
         response.headers["Cache-Control"] = "no-store"
@@ -3135,7 +3808,11 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
         except HTTPException as exc:
             raise _with_admin_history_no_store(exc) from exc
         parsed_report_id = uuid.UUID(report_id)
-        if not _admin_history_query_shape_allowed(request):
+        if (
+            not _admin_history_query_shape_allowed(request)
+            or position not in (None, "last")
+            or (position == "last" and cursor is not None)
+        ):
             _raise_admin_report_workflow_error(
                 AdminReportWorkflowError(
                     "report_delivery_history_query_invalid",
@@ -3152,8 +3829,9 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
             page = list_report_institution_delivery_history_page(
                 db,
                 report_id=parsed_report_id,
-                limit=limit,
+                limit=_report_history_limit(limit, position),
                 cursor=cursor,
+                position=position,
             )
         except AdminReportWorkflowError as exc:
             _raise_admin_report_workflow_error(
@@ -3176,6 +3854,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                     "result_count": len(page.items),
                     "total_count": page.total_count,
                     "snapshot_revision": page.snapshot_revision,
+                    "position": position,
                     "session_id": str(identity.session_id),
                     "device_id": identity.device_id,
                     "correlation_id": str(proof.correlation_id),

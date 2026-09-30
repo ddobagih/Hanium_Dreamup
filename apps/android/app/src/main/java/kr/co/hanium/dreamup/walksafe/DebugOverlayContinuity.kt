@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe
 
 import kotlin.math.sqrt
+import kr.co.hanium.dreamup.walksafe.depth.CurrentTrackedFrameObservation
 
 /**
  * Presentation-only interpolation between already mapped detector rectangles. It neither tracks
@@ -72,16 +73,24 @@ internal class DebugOverlayContinuity(
                 }
             }
         }
+        // A pairing is trusted only when it is unique in both directions (or both carry the same
+        // stable object key). Crossing same-class boxes snap rather than borrow another object.
+        val candidatesByIndex = validBoxes.indices.associateWith { index ->
+            if (!animate || index in unchangedByIndex) return@associateWith emptyList()
+            val box = validBoxes[index]
+            visiblePrevious.filter { (_, rendered) ->
+                rendered.box.matchesRole(box) && rendered.box.sameIdentityAs(box) &&
+                    rendered.box.rect.canInterpolateTo(box.rect)
+            }
+        }
         val transitions = validBoxes.mapIndexed { index, box ->
             unchangedByIndex[index]?.let { return@mapIndexed it.copy(target = box) }
-            val match = if (animate) {
-                visiblePrevious
-                    .filter { (_, rendered) ->
-                        rendered.box.matchesRole(box) && rendered.box.rect.canInterpolateTo(box.rect)
-                    }
-                    .minByOrNull { (_, rendered) -> rendered.box.rect.centerDistance(box.rect) }
-            } else {
-                null
+            val candidates = candidatesByIndex[index].orEmpty()
+            val keyed = candidates.singleOrNull { (_, rendered) ->
+                box.trackKey != null && rendered.box.trackKey == box.trackKey
+            }
+            val match = keyed ?: candidates.singleOrNull()?.takeIf { only ->
+                candidatesByIndex.none { (otherIndex, other) -> otherIndex != index && only in other }
             }
             if (match != null) visiblePrevious.remove(match)
             Transition(
@@ -123,6 +132,7 @@ internal class DebugOverlayContinuity(
                 sourceFrameId = current.sourceFrameId,
                 sourceCapturedAtElapsedRealtimeMs = current.sourceCapturedAtMs,
                 sourceAgeMs = ageMs,
+                stale = ageMs > STALE_AFTER_MS,
             )
         }
         return RenderedFrame(
@@ -176,9 +186,13 @@ internal class DebugOverlayContinuity(
         val className: String? = null,
         val held: Boolean = false,
         val smoothed: Boolean = false,
+        /** Stable object identity when the producer has one (for example a depth track id). */
+        val trackKey: String? = null,
     ) {
         fun matchesRole(other: Box): Boolean = best == other.best &&
             (className ?: label) == (other.className ?: other.label)
+        fun sameIdentityAs(other: Box): Boolean =
+            trackKey == null || other.trackKey == null || trackKey == other.trackKey
     }
 
     data class RenderedBox(
@@ -187,6 +201,8 @@ internal class DebugOverlayContinuity(
         val sourceFrameId: Long,
         val sourceCapturedAtElapsedRealtimeMs: Long,
         val sourceAgeMs: Long,
+        /** Older than current visual tracking accepts; drawn with its age, not as a live box. */
+        val stale: Boolean = false,
     )
 
     data class RenderedFrame(val boxes: List<RenderedBox>, val nextRedrawDelayMs: Long?) {
@@ -196,6 +212,9 @@ internal class DebugOverlayContinuity(
     }
 
     private data class Transition(val from: Rect, val target: Box, val startedAtMs: Long)
+    private companion object {
+        const val STALE_AFTER_MS = CurrentTrackedFrameObservation.MAX_SOURCE_AGE_MS
+    }
     private data class Frame(
         val sourceFrameId: Long,
         val sourceCapturedAtMs: Long,

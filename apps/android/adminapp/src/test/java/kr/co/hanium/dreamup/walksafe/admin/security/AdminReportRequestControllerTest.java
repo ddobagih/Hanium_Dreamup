@@ -229,6 +229,45 @@ public final class AdminReportRequestControllerTest {
         assertEquals(0, loader.statusUpdates);
     }
 
+    @Test
+    public void rejectedReauthenticationExplainsFreshTotpWithoutReplayingStatus() throws Exception {
+        AdminSecurityApiException.Code[] codes = {
+            AdminSecurityApiException.Code.REAUTHENTICATION_FAILED,
+            AdminSecurityApiException.Code.TOTP_REPLAYED,
+        };
+        String[] expectedMessages = {
+            "비밀번호와 추가 인증 코드를 확인해 주세요. 로그인이나 직전 재인증에 사용한 코드는 이미 사용된 코드이므로 새 코드가 표시된 뒤 입력하세요.",
+            "이 추가 인증 코드는 이미 사용되었습니다. 새 코드가 표시된 뒤 입력하세요.",
+        };
+        for (int index = 0; index < codes.length; index++) {
+            CountingLoader loader = new CountingLoader();
+            loader.authenticationFailure = codes[index];
+            AdminReportRequestController controller = selectedController(loader);
+            var request = controller.beginStatusUpdate(
+                AdminReportRequestModelsTest.REQUEST_ID,
+                "ACKNOWLEDGED",
+                1,
+                null,
+                null,
+                "long-test-password".toCharArray(),
+                "123456".toCharArray()
+            );
+
+            assertTrue(controller.execute(request));
+            assertEquals(AdminReportRequestController.Phase.ERROR, controller.snapshot().phase());
+            assertEquals(expectedMessages[index], controller.snapshot().message());
+            assertEquals(1, loader.statusUpdates);
+            assertTrue(credentialsCleared(request));
+            assertArrayEquals(new char[loader.lastPassword.length], loader.lastPassword);
+            assertArrayEquals(new char[loader.lastTotp.length], loader.lastTotp);
+
+            assertTrue(controller.execute(controller.beginRetry()));
+            assertEquals(1, loader.statusUpdates);
+            assertEquals(AdminReportRequestController.Phase.CONTENT, controller.snapshot().phase());
+            assertEquals(1, controller.snapshot().detail().summary().statusVersion());
+        }
+    }
+
     private static AdminReportRequestController selectedController(CountingLoader loader)
         throws Exception {
         AdminReportRequestController controller = new AdminReportRequestController(loader);
@@ -252,6 +291,7 @@ public final class AdminReportRequestControllerTest {
         int statusUpdates;
         boolean conflict;
         boolean failDetailAfterPatch;
+        AdminSecurityApiException.Code authenticationFailure;
         String detailRequestType = "CORRECTION";
         String detailStatus = "RECEIVED";
         int detailStatusVersion = 1;
@@ -281,7 +321,7 @@ public final class AdminReportRequestControllerTest {
                 .replace("\"request_type\":\"CORRECTION\"", "\"request_type\":\"" + detailRequestType + "\"")
                 .replace("\"status\":\"RECEIVED\"", "\"status\":\"" + detailStatus + "\"")
                 .replace("\"status_version\":1", "\"status_version\":" + detailStatusVersion);
-            if (statusUpdates > 0) {
+            if (statusUpdates > 0 && authenticationFailure == null) {
                 body = body.replace("\"status\":\"" + detailStatus + "\"", "\"status\":\"ACKNOWLEDGED\"")
                     .replace("\"status_version\":" + detailStatusVersion, "\"status_version\":2");
             }
@@ -313,6 +353,9 @@ public final class AdminReportRequestControllerTest {
                         requestType
                     )
                 );
+            }
+            if (authenticationFailure != null) {
+                throw new AdminSecurityApiException(authenticationFailure, null);
             }
             return AdminReportRequestModels.parseStatus(
                 AdminReportRequestModelsTest.statusFixture(),

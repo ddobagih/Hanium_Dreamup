@@ -1,4 +1,12 @@
+import com.android.build.api.artifact.SingleArtifact
+import groovy.json.JsonSlurper
 import java.net.URI
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
+import java.util.Comparator
 
 plugins {
     id("com.android.application")
@@ -155,12 +163,19 @@ val reportQueueBuildAutomaticMaxTotalBytes =
     if (reportQueueEnabled) reportQueueAutomaticMaxTotalBytes!! else 0L
 val reportQueueBuildTestOrigin =
     if (reportQueueEnabled) verifiedReportQueueTestOrigin!! else "disabled"
+// S1617-18: RAW phone-queue limits are a measured device value (GATE-PHONE-QUEUE-BYTE-LIMIT).
+// No default is written here; without both values the app keeps at most one retained segment.
+val rawQueueBuildMaxSegments = configuredPositiveInt("WALKSAFE_RAW_QUEUE_MAX_SEGMENTS") ?: 0
+val rawQueueBuildMaxTotalBytes = configuredPositiveLong("WALKSAFE_RAW_QUEUE_MAX_TOTAL_BYTES") ?: 0L
 val debugLongLivedLoginEnabled =
     providers.gradleProperty("walksafe.longLivedLoginEnabled").orNull == "true"
 val debugPostLoginDeviceCheckRequired =
     providers.gradleProperty("walksafe.postLoginDeviceCheckRequired").orNull != "false"
 val debugGuidanceStartBypass =
-    providers.gradleProperty("walksafe.guidanceStartBypass").orNull != "false"
+    providers.gradleProperty("walksafe.guidanceStartBypass").orNull == "true"
+val debugGuidanceBuildMarker =
+    if (debugGuidanceStartBypass) "walksafe-debug-v1-bypass-on" else "walksafe-debug-v1"
+val debugGuidanceArtifactLabel = if (debugGuidanceStartBypass) "on" else "off"
 val validateWalkSafeSourceCommit by tasks.registering {
     doLast {
         check(verifiedSourceCommit != null) {
@@ -174,34 +189,221 @@ val validateWalkSafeSourceCommit by tasks.registering {
 
 val bundledVoskModelAssetDirectory =
     file("src/main/assets/voice-models/vosk-model-small-ko-0.22")
+private fun verifyBundledVoskModelDirectory(bundledVoskModelAssetDirectory: File) {
+    val manifest = bundledVoskModelAssetDirectory.resolve("MODEL_FILES.sha256")
+    check(manifest.isFile) {
+        "Bundled Korean Vosk model is missing. Run " +
+            "python3 scripts/prepare_vosk_ko_small_model.py from the repository root."
+    }
+    fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    }
+    check(!Files.isSymbolicLink(manifest.toPath())) {
+        "Bundled Korean Vosk manifest contains a symbolic link."
+    }
+    val manifestLines = manifest.readLines().filter(String::isNotBlank)
+    check(manifestLines.isNotEmpty()) { "Bundled Korean Vosk manifest is empty." }
+    // Same pinned manifest as prepare_vosk_ko_small_model.py; no asset contract change.
+    check(sha256(manifest) == "8396458f1990e174b88c531f7db14587a4b52273443a1b39dfd6b75552e135c3") {
+        "Bundled Korean Vosk manifest SHA-256 mismatch. Re-run the model preparation script."
+    }
+    val expectedFiles = mutableSetOf("MODEL_FILES.sha256")
+    manifestLines.forEach { line ->
+            val separator = line.indexOf("  ")
+            check(
+                separator == 64 &&
+                    line.take(64).matches(Regex("[0-9a-f]{64}")),
+            ) { "Bundled Korean Vosk manifest is malformed." }
+            val relative = line.substring(separator + 2).also { relative ->
+                check(
+                    relative.isNotBlank() &&
+                        !relative.startsWith('/') &&
+                        '\\' !in relative &&
+                        relative.split('/').none { it.isBlank() || it == "." || it == ".." },
+                ) { "Bundled Korean Vosk manifest contains an unsafe path." }
+            }
+            check(expectedFiles.add(relative)) { "Bundled Korean Vosk manifest repeats a path." }
+            val payload = bundledVoskModelAssetDirectory.resolve(relative)
+            check(payload.isFile && !Files.isSymbolicLink(payload.toPath()) &&
+                payload.canonicalFile.toPath().startsWith(bundledVoskModelAssetDirectory.canonicalFile.toPath())) {
+                "Bundled Korean Vosk model is incomplete or contains an unsafe file: $relative"
+            }
+            check(sha256(payload) == line.take(64)) {
+                "Bundled Korean Vosk model SHA-256 mismatch: $relative"
+            }
+        }
+    val actualFiles = mutableSetOf<String>()
+    Files.walk(bundledVoskModelAssetDirectory.toPath()).use { paths ->
+        paths.forEach { path ->
+            check(!Files.isSymbolicLink(path)) { "Bundled Korean Vosk model contains a symbolic link." }
+            if (Files.isRegularFile(path)) {
+                actualFiles.add(bundledVoskModelAssetDirectory.toPath().relativize(path).toString().replace('\\', '/'))
+            }
+        }
+    }
+    check(actualFiles == expectedFiles) {
+        "Bundled Korean Vosk file set differs from its pinned manifest."
+    }
+}
+
 val verifyBundledVoskModelAssets by tasks.registering {
     doLast {
-        val manifest = bundledVoskModelAssetDirectory.resolve("MODEL_FILES.sha256")
-        check(manifest.isFile) {
-            "Bundled Korean Vosk model is missing. Run " +
-                "python3 scripts/prepare_vosk_ko_small_model.py from the repository root."
+        verifyBundledVoskModelDirectory(bundledVoskModelAssetDirectory)
+    }
+}
+
+val verifyBundledVoskModelAssetsRegression by tasks.registering {
+    dependsOn(verifyBundledVoskModelAssets)
+    doLast {
+        val sourceRoot = bundledVoskModelAssetDirectory.canonicalFile.toPath()
+        val fixtureParent = File(System.getProperty("java.io.tmpdir")).canonicalFile.toPath()
+        check(!fixtureParent.startsWith(sourceRoot)) {
+            "S0237 temporary fixture parent must be outside the bundled model."
         }
-        val missing = manifest.readLines()
-            .filter(String::isNotBlank)
-            .map { line ->
-                val separator = line.indexOf("  ")
-                check(
-                    separator == 64 &&
-                        line.take(64).matches(Regex("[0-9a-f]{64}")),
-                ) { "Bundled Korean Vosk manifest is malformed." }
-                line.substring(separator + 2).also { relative ->
-                    check(
-                        relative.isNotBlank() &&
-                            !relative.startsWith('/') &&
-                            '\\' !in relative &&
-                            relative.split('/').none { it.isBlank() || it == "." || it == ".." },
-                    ) { "Bundled Korean Vosk manifest contains an unsafe path." }
+        val fixtureRoot = Files.createTempDirectory(fixtureParent, "walksafe-s0237-vosk-")
+        logger.lifecycle("S0237_FIXTURE_ROOT ${fixtureRoot.toAbsolutePath()}")
+
+        fun copyModelFixture(directory: File) {
+            val destination = directory.canonicalFile.toPath()
+            check(destination.startsWith(fixtureRoot) && destination != fixtureRoot &&
+                !destination.startsWith(sourceRoot) && !sourceRoot.startsWith(destination)) {
+                "S0237 fixture destination must be isolated from the bundled model."
+            }
+            Files.createDirectory(destination)
+            Files.walk(sourceRoot).use { paths ->
+                paths.forEach { source ->
+                    check(!Files.isSymbolicLink(source)) {
+                        "S0237 fixture copy refuses symbolic links."
+                    }
+                    val target = destination.resolve(sourceRoot.relativize(source))
+                    if (Files.isDirectory(source, LinkOption.NOFOLLOW_LINKS)) {
+                        if (source != sourceRoot) Files.createDirectory(target)
+                    } else {
+                        check(Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS)) {
+                            "S0237 fixture copy requires regular files."
+                        }
+                        Files.newInputStream(
+                            source,
+                            StandardOpenOption.READ,
+                            LinkOption.NOFOLLOW_LINKS,
+                        ).use { input ->
+                            Files.newOutputStream(
+                                target,
+                                StandardOpenOption.CREATE_NEW,
+                                StandardOpenOption.WRITE,
+                                LinkOption.NOFOLLOW_LINKS,
+                            ).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    }
                 }
             }
-            .filterNot { relative -> bundledVoskModelAssetDirectory.resolve(relative).isFile }
-        check(missing.isEmpty()) {
-            "Bundled Korean Vosk model is incomplete. Re-run the model preparation script."
         }
+
+        fun expectValidationFailure(directory: File, expectedMessage: String) {
+            val failure = try {
+                verifyBundledVoskModelDirectory(directory)
+                null
+            } catch (failure: Exception) {
+                failure
+            }
+            check(failure != null &&
+                failure.javaClass == IllegalStateException::class.java &&
+                failure.message == expectedMessage) {
+                "S0237 expected IllegalStateException: $expectedMessage; actual " +
+                    "${failure?.javaClass?.name}: ${failure?.message}"
+            }
+        }
+
+        try {
+            val firstPayloadRelative = bundledVoskModelAssetDirectory
+                .resolve("MODEL_FILES.sha256")
+                .readLines()
+                .first(String::isNotBlank)
+                .substring(66)
+
+            val emptyManifestFixture = fixtureRoot.resolve("empty-manifest").toFile()
+            copyModelFixture(emptyManifestFixture)
+            Files.write(
+                emptyManifestFixture.resolve("MODEL_FILES.sha256").toPath(),
+                ByteArray(0),
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                LinkOption.NOFOLLOW_LINKS,
+            )
+            expectValidationFailure(
+                emptyManifestFixture,
+                "Bundled Korean Vosk manifest is empty.",
+            )
+            logger.lifecycle("S0237_CASE_PASS empty_manifest")
+
+            val mutatedPayloadFixture = fixtureRoot.resolve("mutated-payload").toFile()
+            copyModelFixture(mutatedPayloadFixture)
+            val payload = mutatedPayloadFixture.resolve(firstPayloadRelative)
+            val payloadPath = payload.toPath()
+            check(payload.canonicalFile.toPath()
+                .startsWith(mutatedPayloadFixture.canonicalFile.toPath()) &&
+                Files.isRegularFile(payloadPath, LinkOption.NOFOLLOW_LINKS)) {
+                "S0237 mutation target must be one regular fixture payload."
+            }
+            val originalFirstByte = Files.newInputStream(
+                payloadPath,
+                StandardOpenOption.READ,
+                LinkOption.NOFOLLOW_LINKS,
+            ).use { it.read() }
+            val wrongByte = if (originalFirstByte < 0) 1 else originalFirstByte xor 1
+            Files.newOutputStream(
+                payloadPath,
+                StandardOpenOption.WRITE,
+                LinkOption.NOFOLLOW_LINKS,
+            ).use { it.write(wrongByte) }
+            expectValidationFailure(
+                mutatedPayloadFixture,
+                "Bundled Korean Vosk model SHA-256 mismatch: $firstPayloadRelative",
+            )
+            logger.lifecycle("S0237_CASE_PASS mutated_payload")
+
+            val missingPayloadFixture = fixtureRoot.resolve("missing-payload").toFile()
+            copyModelFixture(missingPayloadFixture)
+            val missingPayload = missingPayloadFixture.resolve(firstPayloadRelative)
+            val missingPayloadPath = missingPayload.toPath()
+            check(missingPayload.canonicalFile.toPath()
+                .startsWith(missingPayloadFixture.canonicalFile.toPath()) &&
+                Files.isRegularFile(missingPayloadPath, LinkOption.NOFOLLOW_LINKS)) {
+                "S0237 deletion target must be one regular fixture payload."
+            }
+            Files.delete(missingPayloadPath)
+            expectValidationFailure(
+                missingPayloadFixture,
+                "Bundled Korean Vosk model is incomplete or contains an unsafe file: $firstPayloadRelative",
+            )
+            logger.lifecycle("S0237_CASE_PASS missing_payload")
+        } catch (failure: Exception) {
+            logger.error("S0237_FIXTURE_PRESERVED ${fixtureRoot.toAbsolutePath()}")
+            throw failure
+        }
+
+        try {
+            Files.walk(fixtureRoot).use { paths ->
+                paths.sorted(Comparator.reverseOrder()).forEach { path ->
+                    Files.delete(path)
+                }
+            }
+        } catch (failure: Exception) {
+            logger.error("S0237_FIXTURE_CLEANUP_FAILED ${fixtureRoot.toAbsolutePath()}")
+            throw failure
+        }
+        logger.lifecycle("S0237_NEGATIVE_CASES_PASS 3")
     }
 }
 
@@ -257,6 +459,8 @@ android {
             "WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES",
             "${reportQueueBuildAutomaticMaxTotalBytes}L",
         )
+        buildConfigField("int", "WALKSAFE_RAW_QUEUE_MAX_SEGMENTS", "$rawQueueBuildMaxSegments")
+        buildConfigField("long", "WALKSAFE_RAW_QUEUE_MAX_TOTAL_BYTES", "${rawQueueBuildMaxTotalBytes}L")
     }
 
     buildTypes {
@@ -286,7 +490,11 @@ android {
             }
             buildConfigField("String", "WALKSAFE_SOURCE_COMMIT", "\"${verifiedSourceCommit ?: "unverified"}\"")
             buildConfigField("String", "WALKSAFE_GATEWAY_ORIGIN", "\"$debugGatewayOrigin\"")
-            buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walksafe-debug-v1\"")
+            buildConfigField(
+                "String",
+                "WALKSAFE_BUILD_MARKER",
+                buildConfigString(debugGuidanceBuildMarker),
+            )
             buildConfigField("boolean", "WALKSAFE_LONG_LIVED_LOGIN_ENABLED", "$debugLongLivedLoginEnabled")
             buildConfigField(
                 "boolean",
@@ -299,10 +507,24 @@ android {
             buildConfigField("String", "DEVELOPMENT_QUICK_START_PASSWORD", buildConfigString(developmentQuickStartPassword))
         }
         release {
+            // The development report queue is DEBUG-gated at runtime; keep its build-time
+            // enablement, loopback test origin and limits out of release BuildConfig too.
+            buildConfigField("boolean", "WALKSAFE_REPORT_QUEUE_ENABLED", "false")
+            buildConfigField("String", "WALKSAFE_REPORT_QUEUE_TEST_ORIGIN", "\"disabled\"")
+            buildConfigField("int", "WALKSAFE_REPORT_QUEUE_MAX_ENTRIES", "0")
+            buildConfigField("int", "WALKSAFE_REPORT_QUEUE_MAX_PAYLOAD_BYTES", "0")
+            buildConfigField("long", "WALKSAFE_REPORT_QUEUE_MAX_STORED_ENTRY_BYTES", "0L")
+            buildConfigField("long", "WALKSAFE_REPORT_QUEUE_MAX_TOTAL_BYTES", "0L")
+            buildConfigField("int", "WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_ENTRIES", "0")
+            buildConfigField("long", "WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES", "0L")
+            // Release has no injected RAW queue profile: single retained segment only.
+            buildConfigField("int", "WALKSAFE_RAW_QUEUE_MAX_SEGMENTS", "0")
+            buildConfigField("long", "WALKSAFE_RAW_QUEUE_MAX_TOTAL_BYTES", "0L")
             buildConfigField("String", "WALKSAFE_SOURCE_COMMIT", "\"${verifiedSourceCommit ?: "unverified"}\"")
             buildConfigField("String", "WALKSAFE_GATEWAY_ORIGIN", "\"${verifiedReleaseGatewayOrigin ?: "invalid-release-origin"}\"")
             buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walksafe-release-v1\"")
-            buildConfigField("boolean", "WALKSAFE_LONG_LIVED_LOGIN_ENABLED", "false")
+            // Owner decision 2 (2026-09-29): release keeps the login until an explicit end.
+            buildConfigField("boolean", "WALKSAFE_LONG_LIVED_LOGIN_ENABLED", "true")
             buildConfigField("boolean", "WALKSAFE_POST_LOGIN_DEVICE_CHECK_REQUIRED", "true")
             buildConfigField("boolean", "WALKSAFE_DEBUG_GUIDANCE_START_BYPASS", "false")
             buildConfigField("boolean", "DEVELOPMENT_QUICK_START", "false")
@@ -332,6 +554,160 @@ android {
     kotlin {
         jvmToolchain(21)
     }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        val apkDirectory = variant.artifacts.get(SingleArtifact.APK)
+        val apkLoader = variant.artifacts.getBuiltArtifactsLoader()
+        val outputDirectory = layout.buildDirectory.dir("outputs/walksafe-guidance-start/debug")
+        val apkFileName = "walksafe-debug-guidance-start-bypass-$debugGuidanceArtifactLabel.apk"
+        val receiptFileName = "walksafe-debug-guidance-start-bypass-$debugGuidanceArtifactLabel.json"
+        val assembleDebugTasks = tasks.matching { it.name == "assembleDebug" }
+        val exportTask = tasks.register("exportGuidanceStartDebugApk") {
+            group = "build"
+            description = "Export the labeled debug APK and its guidance bypass build receipt."
+            onlyIf("assembleDebug completed successfully") {
+                assembleDebugTasks.singleOrNull()?.state?.let { state ->
+                    state.executed && state.failure == null &&
+                        (!state.skipped || state.upToDate)
+                } == true
+            }
+            inputs.dir(apkDirectory)
+            inputs.property("guidanceStartBypass", debugGuidanceStartBypass)
+            inputs.property("buildMarker", debugGuidanceBuildMarker)
+            outputs.file(outputDirectory.map { it.file(apkFileName) })
+            outputs.file(outputDirectory.map { it.file(receiptFileName) })
+            doLast {
+                val builtApks = apkLoader.load(apkDirectory.get())
+                    ?: error("Debug APK metadata is missing")
+                check(builtApks.elements.size == 1) {
+                    "Labeled debug export requires exactly one APK; found ${builtApks.elements.size}"
+                }
+                val sourceApk = File(builtApks.elements.single().outputFile)
+                check(sourceApk.isFile) { "Debug APK is missing: $sourceApk" }
+                val directory = outputDirectory.get().asFile
+                check(directory.isDirectory || directory.mkdirs()) {
+                    "Cannot create labeled debug output directory: $directory"
+                }
+                val exportedApk = sourceApk.copyTo(File(directory, apkFileName), overwrite = true)
+                val digest = MessageDigest.getInstance("SHA-256")
+                exportedApk.inputStream().use { input ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        digest.update(buffer, 0, count)
+                    }
+                }
+                val sha256 = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                val receipt = File(directory, receiptFileName)
+                receipt.writeText(
+                    "{\"schema_version\":1,\"variant\":\"debug\"," +
+                        "\"guidance_start_bypass_enabled\":$debugGuidanceStartBypass," +
+                        "\"build_marker\":\"$debugGuidanceBuildMarker\"," +
+                        "\"apk_file\":\"$apkFileName\",\"apk_sha256\":\"$sha256\"}\n",
+                )
+                logger.lifecycle("Labeled debug APK: ${exportedApk.absolutePath}")
+                logger.lifecycle("Labeled debug APK receipt: ${receipt.absolutePath}")
+            }
+        }
+        assembleDebugTasks.configureEach {
+            finalizedBy(exportTask)
+        }
+    }
+}
+
+// S10-36 (FP-037, FP-039, FP-016-DETAIL-03): release packages only the models of the approved
+// runtime bundle. Fail-closed allowlist: every other file under models/ is dropped from the
+// release assets, and a missing allowlisted model fails the build. Debug and androidTest keep
+// every asset (the androidTest suites use the candidate and legacy models).
+// S10-36-F1: the filter also derives the models the packaged configs load (primary and non-null
+// fallback of two_model_runtime.json, the FastSAM contract asset) and fails the release build
+// when this list drifts from them, instead of silently shipping without a configured model.
+val releaseModelAssetAllowlist = setOf(
+    "models/walkmate_yolo11n_21cls_768_float32.tflite",
+    "models/fastsam_s_768_float32.tflite",
+)
+
+abstract class FilterReleaseModelAssetsTask : DefaultTask() {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val mergedAssets: DirectoryProperty
+
+    @get:Input
+    abstract val allowedModelAssets: SetProperty<String>
+
+    @get:OutputDirectory
+    abstract val filteredAssets: DirectoryProperty
+
+    @TaskAction
+    fun filter() {
+        val source = mergedAssets.get().asFile
+        val target = filteredAssets.get().asFile
+        val allowed = allowedModelAssets.get()
+        val configured = configuredReleaseModelAssets(source)
+        check(configured == allowed.toSortedSet()) {
+            "Release model allowlist ${allowed.toSortedSet()} does not match the packaged model configs $configured"
+        }
+        check(!target.exists() || target.deleteRecursively()) { "Cannot reset $target" }
+        check(target.mkdirs()) { "Cannot create $target" }
+        val kept = sortedSetOf<String>()
+        source.walkTopDown().filter { it.isFile }.forEach { file ->
+            val relative = file.relativeTo(source).invariantSeparatorsPath
+            if (relative.startsWith("models/") && relative !in allowed) return@forEach
+            if (relative in allowed) kept += relative
+            file.copyTo(target.resolve(relative), overwrite = false)
+        }
+        check(kept == allowed.toSortedSet()) { "Release model assets missing: ${allowed - kept}" }
+        logger.lifecycle("WALKSAFE_RELEASE_MODEL_ASSETS ${kept.joinToString(",")}")
+    }
+
+    /**
+     * Model assets the packaged configs load: `primary_model` and a non-null `fallback_model` of
+     * model-config/two_model_runtime.json, and the FastSAM contract `asset`. A missing or
+     * malformed entry fails the build.
+     */
+    private fun configuredReleaseModelAssets(assets: File): java.util.SortedSet<String> {
+        fun jsonObject(path: String): Map<*, *> =
+            JsonSlurper().parse(File(assets, path)) as? Map<*, *> ?: error("$path is not a JSON object")
+        val runtime = jsonObject("model-config/two_model_runtime.json")
+        val models = runtime["models"] as? Map<*, *> ?: error("two_model_runtime.json has no models")
+        fun assetOf(name: Any): String =
+            ((models[name] as? Map<*, *>)?.get("asset") as? String)?.takeIf { it.startsWith("models/") }
+                ?: error("two_model_runtime.json model $name has no models/ asset")
+        val loaded = listOfNotNull(
+            runtime["primary_model"] ?: error("two_model_runtime.json has no primary_model"),
+            runtime["fallback_model"],
+        ).map(::assetOf)
+        val fastSam = (jsonObject("model-config/fastsam_s_768_contract.json")["asset"] as? String)
+            ?.takeIf { it.startsWith("models/") }
+            ?: error("fastsam_s_768_contract.json has no models/ asset")
+        return (loaded + fastSam).toSortedSet()
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        val filter = tasks.register<FilterReleaseModelAssetsTask>(
+            "filter${variant.name.replaceFirstChar(Char::uppercaseChar)}ModelAssets",
+        ) {
+            allowedModelAssets.set(releaseModelAssetAllowlist)
+        }
+        variant.artifacts.use(filter)
+            .wiredWithDirectories(
+                FilterReleaseModelAssetsTask::mergedAssets,
+                FilterReleaseModelAssetsTask::filteredAssets,
+            )
+            .toTransform(SingleArtifact.ASSETS)
+    }
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty(
+        "walksafe.guidanceStartBypass",
+        providers.gradleProperty("walksafe.guidanceStartBypass").orNull.orEmpty(),
+    )
 }
 
 dependencies {

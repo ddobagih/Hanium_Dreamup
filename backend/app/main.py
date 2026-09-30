@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 import logging
+import time
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
+from starlette.types import Receive, Scope, Send
 from backend.app.api import accounts, admin_incidents, admin_raw_collections, admin_reports, admin_security, android_debug, capacity, detect, health, navigation, privacy, raw_collections, report_user_requests, reports, uploads
 from backend.app.config import DEPLOYMENT_ENVIRONMENTS, get_settings
 from backend.app.field_test_security import FieldTestSecurityMiddleware
@@ -31,6 +33,11 @@ from backend.app.models import (
     ReportImageObject,
 )
 from backend.app.services.detect_v2 import warm_detect_v2
+from backend.app.services.tmap_runtime import TmapRuntime
+from backend.app.services.detect_v2_health import (
+    start_detect_v2_health,
+    stop_detect_v2_health,
+)
 from backend.app.services.capacity_state import (
     CapacityMeasurementError,
     FilesystemCapacityMonitor,
@@ -38,12 +45,15 @@ from backend.app.services.capacity_state import (
     require_same_capacity_filesystem,
 )
 from backend.app.services.accounts import (
+    ACCOUNT_KEY_PURPOSES_AUTHENTICATION,
+    account_crypto_binding_mismatched_purposes,
     account_email_crypto_for_settings,
     bind_or_verify_account_crypto_keys,
 )
 from backend.app.services.privacy_lifecycle import (
     assert_privacy_runtime_database_role,
     bind_or_verify_privacy_hmac_key,
+    configure_privacy_hmac_lookup_keys,
 )
 from backend.app.services.report_image_keys import create_report_image_key_manager
 from backend.app.services.raw_collection_storage import (
@@ -55,12 +65,16 @@ from backend.app.services.raw_collection_storage import (
     reconcile_pending_raw_chunk_writes,
     validate_raw_storage_database_inventory,
 )
+from backend.app.services.storage_readiness_state import StorageReadinessState
+from backend.app.services.report_storage_monitor import ReportStorageMonitor
 from backend.app.services.report_storage import (
-    ReportImageCommitMetadata,
-    ReportStorageCommitState,
     lock_report_storage_reconciliation_transaction,
     reconcile_pending_report_writes,
     validate_report_storage_database_inventory,
+)
+from backend.app.services.report_storage_recovery import (
+    locked_report_storage_session,
+    recover_pending_report_writes,
 )
 
 
@@ -79,6 +93,8 @@ def _is_admin_report_history_path(path: str) -> bool:
 
 
 settings = get_settings()
+# S1617-50: lookup-only privacy HMAC keys are verified against the DB keyring.
+configure_privacy_hmac_lookup_keys(getattr(settings, "privacy_hmac_lookup_keys", {}))
 capacity_monitor_enabled = settings.capacity_measurement_interval_seconds is not None
 capacity_state = capacity_state_from_environment(
     settings.walksafe_environment,
@@ -112,6 +128,22 @@ raw_collection_storage = RawCollectionStorage(
 inference_runner = detect.create_inference_runner(settings)
 
 
+report_storage_state = StorageReadinessState()
+report_storage_monitor = ReportStorageMonitor(
+    upload_root=settings.upload_dir, state=report_storage_state,
+    session=lambda: locked_report_storage_session(
+        SessionLocal, reports._shared_report_write_lock,
+        settings.maintenance_lock_path, settings.maintenance_lock_group_gid,
+    ),
+    known_key_states=lambda: {slot.key_id: slot.state for slot in report_image_key_manager.keyring.slots},
+    upload_check=lambda: health._upload_readiness(settings.upload_dir),
+    encryption_check=lambda: health._report_image_encryption_readiness(settings, report_image_key_manager),
+    record_incident=health._record_report_storage_inventory_incident,
+    refresh_seconds=settings.report_storage_refresh_seconds,
+    max_age_seconds=settings.report_storage_max_age_seconds,
+)
+
+
 def bind_privacy_hmac_key() -> None:
     with SessionLocal.begin() as db:
         if (
@@ -138,7 +170,23 @@ def bind_account_crypto_keys() -> None:
         return
     crypto = account_email_crypto_for_settings(settings)
     with SessionLocal.begin() as db:
-        bind_or_verify_account_crypto_keys(db, crypto)
+        # S01-14: startup verifies the purposes password login needs. An empty
+        # store still binds all three fingerprints; an OTP-only mismatch keeps
+        # login available while OTP issuance and account creation fail closed
+        # per request (ACCOUNT_KEY_PURPOSES_ENROLLMENT).
+        binding = bind_or_verify_account_crypto_keys(
+            db,
+            crypto,
+            ACCOUNT_KEY_PURPOSES_AUTHENTICATION,
+        )
+        mismatched = account_crypto_binding_mismatched_purposes(binding, crypto)
+    if mismatched:
+        # Purpose names only; no key, fingerprint, or version value is logged.
+        logger.warning(
+            "account crypto key binding mismatch for purposes %s; "
+            "account enrollment stays unavailable",
+            ",".join(sorted(mismatched)),
+        )
 
 
 def validate_admin_credential_issuer_binding() -> None:
@@ -146,53 +194,35 @@ def validate_admin_credential_issuer_binding() -> None:
 
 
 def reconcile_report_storage() -> None:
-    with reports._shared_report_write_lock(
+    report_storage_monitor.restart()
+    revision = report_storage_state.report_inventory_revision()
+    started = time.monotonic()
+    with locked_report_storage_session(
+        SessionLocal,
+        reports._shared_report_write_lock,
         settings.maintenance_lock_path,
-        expected_group_gid=settings.maintenance_lock_group_gid,
-    ):
-        with SessionLocal.begin() as db:
-            lock_report_storage_reconciliation_transaction(db)
-            report_image_key_manager.synchronize(db)
-
-            def image_metadata(image_object: ReportImageObject) -> ReportImageCommitMetadata:
-                return ReportImageCommitMetadata(
-                    storage_name=image_object.storage_name,
-                    envelope_version=image_object.envelope_version,
-                    algorithm=image_object.algorithm,
-                    aad_version=image_object.aad_version,
-                    key_id=image_object.key_id,
-                    nonce=image_object.nonce,
-                    envelope_sha256=image_object.envelope_sha256,
-                    envelope_size=image_object.envelope_size,
-                    plaintext_sha256=image_object.plaintext_sha256,
-                    plaintext_size=image_object.plaintext_size,
-                    content_type=image_object.content_type,
-                )
-
-            def commit_state(report_id):
-                report = db.get(Report, report_id)
-                image_object = db.get(ReportImageObject, report_id)
-                return ReportStorageCommitState(
-                    report_exists=report is not None,
-                    image_object=(
-                        image_metadata(image_object)
-                        if image_object is not None
-                        else None
-                    ),
-                )
-
-            reconcile_pending_report_writes(
-                settings.upload_dir,
-                commit_state,
-            )
-            validate_report_storage_database_inventory(
-                db,
-                settings.upload_dir,
-                known_key_states={
-                    slot.key_id: slot.state
-                    for slot in report_image_key_manager.keyring.slots
-                },
-            )
+        settings.maintenance_lock_group_gid,
+        transaction_lock=lock_report_storage_reconciliation_transaction,
+    ) as db:
+        report_image_key_manager.synchronize(db)
+        recover_pending_report_writes(
+            db,
+            settings.upload_dir,
+            reconcile=reconcile_pending_report_writes,
+        )
+        verified = validate_report_storage_database_inventory(
+            db,
+            settings.upload_dir,
+            known_key_states={
+                slot.key_id: slot.state
+                for slot in report_image_key_manager.keyring.slots
+            },
+        )
+        upload = health._upload_readiness(settings.upload_dir)
+        encryption = health._report_image_encryption_readiness(settings, report_image_key_manager)
+        if upload.get("ready") is not True or encryption.get("ready") is not True:
+            raise RuntimeError("report storage startup prerequisites unavailable")
+    report_storage_monitor.seed(verified, coverage_started=started, upload=upload, encryption=encryption, revision=revision)
 
 
 def reconcile_raw_collection_storage() -> None:
@@ -260,7 +290,10 @@ async def run_capacity_monitor(stop_requested: asyncio.Event) -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    tmap_runtime: TmapRuntime | None = None
     capacity_task: asyncio.Task[None] | None = None
+    storage_task: asyncio.Task[None] | None = None
+    storage_stop_requested = asyncio.Event()
     capacity_stop_requested = asyncio.Event()
     try:
         await asyncio.to_thread(validate_admin_credential_issuer_binding)
@@ -268,24 +301,57 @@ async def lifespan(_app: FastAPI):
         await asyncio.to_thread(bind_account_crypto_keys)
         await asyncio.to_thread(reconcile_report_storage)
         await asyncio.to_thread(reconcile_raw_collection_storage)
+        storage_task = asyncio.create_task(report_storage_monitor.run(storage_stop_requested), name="walksafe-report-storage-monitor")
         if capacity_monitor is not None:
             await asyncio.to_thread(measure_capacity_once)
             capacity_task = asyncio.create_task(
                 run_capacity_monitor(capacity_stop_requested),
                 name="walksafe-capacity-monitor",
             )
+        tmap_runtime = TmapRuntime(timeout_seconds=settings.tmap_timeout_seconds)
+        await tmap_runtime.start()
+        _app.state.tmap_runtime = tmap_runtime
+        await asyncio.to_thread(start_detect_v2_health, settings)
         yield
     finally:
-        if capacity_task is not None:
-            capacity_stop_requested.set()
-            await capacity_task
-        if inference_runner is not None:
-            inference_runner.close()
+        report_storage_monitor.stop()
+        storage_stop_requested.set()
+        try:
+            if storage_task is not None:
+                await storage_task
+        finally:
+            try:
+                if tmap_runtime is not None:
+                    try:
+                        tmap_runtime.stop_admission()
+                    finally:
+                        await tmap_runtime.aclose()
+            finally:
+                _app.state.tmap_runtime = None
+                try:
+                    await asyncio.to_thread(stop_detect_v2_health)
+                finally:
+                    if capacity_task is not None:
+                        capacity_stop_requested.set()
+                        await capacity_task
+                    try:
+                        if inference_runner is not None:
+                            inference_runner.close()
+                    finally:
+                        await asyncio.to_thread(detect.close_detection_preprocessing)
 
 
-app = FastAPI(title="WalkSafe Assist API", version="0.1.0", lifespan=lifespan)
+class _PrivacyNoStoreFastAPI(FastAPI):
+    """Apply the existing cache policy outside framework-generated error responses."""
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await PrivacyNoStoreMiddleware(super().__call__)(scope, receive, send)
+
+
+app = _PrivacyNoStoreFastAPI(title="WalkSafe Assist API", version="0.1.0", lifespan=lifespan)
 app.state.capacity_state = capacity_state
 app.state.capacity_monitor = capacity_monitor
+app.state.tmap_runtime = None
 
 
 @app.exception_handler(RequestValidationError)
@@ -474,10 +540,19 @@ def warm_detector() -> None:
         warm_detect_v2(settings)
 
 
-app.include_router(health.create_router(settings, warm_detector, report_image_key_manager))
+app.include_router(health.create_router(
+    settings,
+    warm_detector,
+    report_image_key_manager,
+    runtime_provider=lambda: app.state.tmap_runtime,
+    report_storage_monitor=report_storage_monitor,
+))
 app.include_router(uploads.create_router(settings, report_image_key_manager))
 app.include_router(detect.create_router(settings, inference_runner=inference_runner))
-app.include_router(navigation.create_router(settings))
+app.include_router(navigation.create_router(
+    settings,
+    runtime_provider=lambda: app.state.tmap_runtime,
+))
 app.include_router(privacy.create_router(settings))
 app.include_router(accounts.create_router(settings))
 app.include_router(
@@ -487,7 +562,7 @@ app.include_router(
     )
 )
 app.include_router(report_user_requests.create_router(settings))
-app.include_router(reports.create_router(settings, report_image_key_manager))
+app.include_router(reports.create_router(settings, report_image_key_manager, storage_readiness=report_storage_state))
 app.include_router(admin_reports.create_router(settings))
 app.include_router(admin_incidents.create_router())
 app.include_router(admin_raw_collections.create_router())

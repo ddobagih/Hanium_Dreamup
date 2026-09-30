@@ -132,8 +132,8 @@ class MainActivityNavigationTestModeTest {
                 activity,
                 "applyPositionConfidenceDecision",
                 Boolean::class.javaPrimitiveType!!,
-                listOf(PositioningSnapshot::class.java),
-                listOf(snapshot),
+                listOf(PositioningSnapshot::class.java, Boolean::class.javaPrimitiveType!!),
+                listOf(snapshot, true),
             ) as Boolean
 
             assertFalse(interrupted)

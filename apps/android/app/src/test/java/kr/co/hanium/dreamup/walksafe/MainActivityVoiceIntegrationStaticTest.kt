@@ -101,7 +101,7 @@ class MainActivityVoiceIntegrationStaticTest {
         assertFalse(retryable.contains("showNativeUiPage("))
     }
 
-    @Test fun rejectedDestinationSelectionsKeepThePageAndUseShortRetryWithoutStartingARoute() {
+    @Test fun rejectedDestinationSelectionsKeepThePageAndReplayCandidatesWithoutStartingARoute() {
         val retry = method("retryHomeDestinationVoiceDialog")
         val nullContext = retry.substringAfter("if (state == null) {", missingDelimiterValue = "")
             .substringBefore("\n        }", missingDelimiterValue = "")
@@ -113,13 +113,14 @@ class MainActivityVoiceIntegrationStaticTest {
                 "if (state == null)",
                 "return false",
                 "speakHomeDestinationVoicePrompt(",
-                "인식하지 못하였습니다. 다시 듣기 또는 해당 번호를 말해주세요.",
+                "message,",
                 "return true",
             ),
         )
         assertTrue(retry.contains("speakHomeDestinationVoicePrompt("))
         assertFalse(retry.contains("state.voicePrompt()"))
-        assertTrue(retry.contains("인식하지 못하였습니다. 다시 듣기 또는 해당 번호를 말해주세요."))
+        // Preserve the caller's specific retry guidance instead of substituting fixed text.
+        assertFalse(retry.contains("인식하지 못하였습니다. 다시 듣기 또는 해당 번호를 말해주세요."))
         assertTrue(retry.contains("return true"))
         assertFalse(retry.contains("state.copy("))
         assertFalse(retry.contains("clearNativeDestinationSearchState("))
@@ -152,6 +153,54 @@ class MainActivityVoiceIntegrationStaticTest {
         assertFalse(more.contains("DestinationSearchVoiceCommand.RepeatPage"))
     }
 
+    @Test fun routeInstructionChecksLatestFacingAtTheActualSpeechStart() {
+        val dispatch = method("tryDispatchRouteInstruction")
+        val validator = dispatch.substringAfter("isInstructionStillCurrent = {")
+            .substringBefore("onCompleted = {")
+        assertTrue(validator.contains("val nowMs = SystemClock.elapsedRealtime()"))
+        assertTrue(validator.contains(
+            "routeNavigator.isInstructionCurrent(update, nowMs, currentRouteFacingObservation(nowMs))",
+        ))
+        val speech = method("dispatchNavigationSpeech")
+        assertTrue(speech.contains(
+            "isStillValidAtStart = { outputCurrent() && isInstructionStillCurrent() }",
+        ))
+        val fallback = speech.substringAfter("fallBackToTalkBack = { text, _ ->")
+        assertTrue(fallback.contains("!isInstructionStillCurrent()"))
+        assertTrue(fallback.contains(
+            "isStillValid = { outputCurrent() && isInstructionStillCurrent() }",
+        ))
+        val completion = speech.substringAfter("speakWithTts = { text, completed, failed ->")
+            .substringAfter("onCompleted = {").substringBefore("onFailed = {")
+        assertFalse(completion.contains("isInstructionStillCurrent()"))
+        val dispatchCompletion = speech.substringAfter("onCompleted = {")
+            .substringBefore("isStillValid = ::outputCurrent")
+        assertFalse(dispatchCompletion.contains("isInstructionStillCurrent()"))
+        assertTrue(speech.contains("onCancelled = {"))
+        assertTrue(dispatch.contains("routeNavigator.releaseInstruction(update, SystemClock.elapsedRealtime())"))
+    }
+
+    @Test fun candidatePageAuthorityComesFromTheCompletedFullPromptAndIsRevokedOnClear() {
+        val manual = method("ensureVoicePermissionThenListen")
+        assertTrue(manual.contains("speakHomeDestinationVoicePrompt(dialogState, listenAfterPrompt = true)"))
+        val prompt = method("speakHomeDestinationVoicePrompt")
+        assertTrue(prompt.contains("val candidatePrompt = state.voicePrompt()"))
+        assertTrue(prompt.contains("message = completePrompt"))
+        assertTrue(prompt.contains("preparingInput = listenAfterPrompt"))
+        assertTrue(prompt.contains("val attempt = state.beginVoicePrompt()"))
+        val completed = prompt.substringAfter("onCompleted = {").substringBefore("onFailed = {")
+        assertTrue(completed.contains("pageCurrent()"))
+        assertTrue(completed.contains("if (listenAfterPrompt &&"))
+        assertTrue(completed.contains("startVoiceCommandRecognition()"))
+        assertTrue(completed.contains("state.completeVoicePrompt(attempt)"))
+        assertTrue(prompt.substringAfter("onFailed = {").contains("state.failVoicePrompt(attempt)"))
+        assertFalse(prompt.substringAfter("onFailed = {").contains("homeDestinationVoiceDialogLease = null"))
+        assertTrue(method("cancelCommandSpeechResponse").contains("destinationSearchVoiceState?.invalidateVoicePrompt()"))
+        assertTrue(source.substringAfter("private fun clearHomeDestinationVoiceDialog(reason:")
+            .substringBefore("private fun currentVoiceDestinationDialogState")
+            .contains("destinationSearchVoiceState?.invalidateVoicePrompt()"))
+    }
+
     @Test fun candidateFollowUpKeepsDestinationResultsAndRetryControlsVisible() {
         val start = method("startVoiceCommandRecognition")
         val handsFree = method("handleHandsFreeVoiceCommandListeningStarted")
@@ -160,7 +209,7 @@ class MainActivityVoiceIntegrationStaticTest {
         assertTrue(source.contains(
             "if (featureVisible && nativeUiPage.isVoiceInteractionPage()) View.VISIBLE else View.GONE",
         ))
-        assertTrue(method("speakHomeDestinationVoicePrompt").contains("!nativeUiPage.isVoiceInteractionPage()"))
+        assertTrue(method("speakHomeDestinationVoicePrompt").contains("nativeUiPage.isVoiceInteractionPage()"))
     }
 
     @Test fun bareCandidateSelectionRequiresCurrentSearchContext() {
@@ -186,8 +235,9 @@ class MainActivityVoiceIntegrationStaticTest {
         )
 
         val liveContext = method("currentVoiceDestinationDialogState")
+        assertTrue(liveContext.contains("val lease = homeDestinationVoiceDialogLease ?: return null"))
         listOf(
-            "homeDestinationVoiceDialogLease?.currentState(",
+            "lease.currentState(",
             "actorId = reporterUserId,",
             "sessionGeneration = GatewaySessionProcessCoordinator.snapshot().generation,",
             "searchGeneration = destinationSearchGeneration,",

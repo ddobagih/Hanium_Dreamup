@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe
 
 import kr.co.hanium.dreamup.walksafe.account.SignupConsentSelections
+import kr.co.hanium.dreamup.walksafe.network.GatewayAccountInputPolicy
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -80,6 +81,49 @@ class EmailAccountFormPolicyTest {
         assertTrue(invalidOtp.canLogin)
         assertTrue(invalidOtp.canRequestOtp)
         assertFalse(invalidOtp.canCreateAccount)
+    }
+
+    @Test
+    fun s0113NewPasswordNeedsTwelveCodePointsWhileLoginKeepsLegacyRange() {
+        // Same vectors as backend/tests/test_accounts.py and the Gateway relay test.
+        listOf(
+            "x".repeat(12),
+            "우리집강아지산책좋아해요",
+            "🐶🐱🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮",
+            "e\u0301".repeat(6),
+        ).forEach { password ->
+            assertTrue(GatewayAccountInputPolicy.validNewPassword(password))
+            assertTrue(validForm(requiredConsents, password = password).canCreateAccount)
+        }
+        listOf(
+            "x".repeat(11),
+            "가".repeat(11),
+            "🐶".repeat(11),
+            "x".repeat(129),
+            "twelve\u0000chars",
+        ).forEach { password ->
+            assertFalse(GatewayAccountInputPolicy.validNewPassword(password))
+            assertFalse(validForm(requiredConsents, password = password).canCreateAccount)
+        }
+        val legacy = validForm(requiredConsents, password = "tenletters")
+        assertTrue(legacy.canLogin)
+        assertFalse(legacy.canCreateAccount)
+    }
+
+    @Test
+    fun reservedDomainHyphensMatchGatewayBeforeOtpAndLogin() {
+        listOf("a@ab--cd.example", "a@AB--CD.example").forEach { email ->
+            assertFalse(GatewayAccountInputPolicy.validEmail(email))
+            val validity = validForm(requiredConsents, email = email)
+            assertFalse(validity.emailValid)
+            assertFalse(validity.canLogin)
+            assertFalse(validity.canRequestOtp)
+            assertFalse(validity.canCreateAccount)
+        }
+        listOf("a@ab-cd.example", "a@xn--bcher-kva.example").forEach { email ->
+            assertTrue(GatewayAccountInputPolicy.validEmail(email))
+            assertTrue(validForm(requiredConsents, email = email).canRequestOtp)
+        }
     }
 
     private fun validForm(

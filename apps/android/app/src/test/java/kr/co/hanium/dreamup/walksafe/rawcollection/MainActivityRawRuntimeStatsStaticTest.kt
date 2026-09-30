@@ -1,0 +1,47 @@
+package kr.co.hanium.dreamup.walksafe.rawcollection
+
+import java.io.File
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** 16-17 #2, #4, #8, #12 wiring in MainActivity (the JVM behaviour lives in the rawcollection tests). */
+class MainActivityRawRuntimeStatsStaticTest {
+    private val source =
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val capture = source.substringAfter(
+        "private fun recordRawCollectionDetectionMetadata(",
+    ).substringBefore("private fun revalidateRawCollectionRuntime()")
+
+    @Test
+    fun frameDurationIsNotTheInferenceAverageAndWindowsUseTheSharedAccumulator() {
+        assertFalse(capture.contains("averageFrameDurationMs = averageProcessingFrameMs"))
+        assertTrue(capture.contains("rawRuntimeWindow.recordCompletedInference("))
+        assertTrue(capture.contains("rawRuntimeWindow.detectionSample("))
+        assertTrue(capture.contains("rawRuntimeWindow.performanceSample("))
+        assertTrue(capture.contains("rawRuntimeWindow.resetWindow()"))
+        assertTrue(capture.contains("busyDroppedSincePrevious = dueButInFlightDropCount"))
+    }
+
+    @Test
+    fun theMinimumCaptureIntervalUsesTheMonotonicObservationTime() {
+        assertTrue(capture.contains("val observedAtElapsedMs = SystemClock.elapsedRealtime()"))
+        assertTrue(capture.contains("observedAtElapsedRealtimeMs = observedAtElapsedMs"))
+    }
+
+    @Test
+    fun outcomeCountersAreOnlyWrittenToTheDebugFieldLogAtWalkEnd() {
+        val transition = source.substringAfter("private fun handleRawCollectionTransition(")
+            .substringBefore("private fun handleWalkSessionForegroundReturn()")
+        val ended = transition.substringAfter("transition.current.state == WalkSessionState.ENDED ||")
+            .substringBefore("transition.current.state != WalkSessionState.PAUSED ->")
+        assertTrue(ended.contains("\"raw_collection_outcomes\""))
+        assertTrue(ended.contains("outcomeCountersSnapshot()"))
+        val rawFunctions = capture + transition + source.substringAfter(
+            "private fun scheduleRawCollectionPostWalkUpload()",
+        ).substringBefore("private fun handleRawCollectionTransition(")
+        listOf("speakInteraction(", "updateStatus(", "Toast.", "announceFor").forEach { userOutput ->
+            assertFalse(userOutput, rawFunctions.contains(userOutput))
+        }
+    }
+}

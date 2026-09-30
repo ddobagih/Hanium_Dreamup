@@ -108,4 +108,21 @@ class BuildProvenanceStaticTest {
         assertTrue(buildScript.contains("com.google.ai.edge.litert:litert:1.4.0"))
         assertFalse(buildScript.contains("org.tensorflow:tensorflow-lite:2.17.0"))
     }
+    @Test
+    fun releaseBuildConfigCannotInheritDevelopmentReportQueueSettings() {
+        val release = buildScript.substringAfter("        release {").substringBefore("isMinifyEnabled")
+        for (field in listOf(
+            "\"boolean\", \"WALKSAFE_REPORT_QUEUE_ENABLED\", \"false\"",
+            "\"String\", \"WALKSAFE_REPORT_QUEUE_TEST_ORIGIN\", \"\\\"disabled\\\"\"",
+            "\"int\", \"WALKSAFE_REPORT_QUEUE_MAX_ENTRIES\", \"0\"",
+            "\"int\", \"WALKSAFE_REPORT_QUEUE_MAX_PAYLOAD_BYTES\", \"0\"",
+            "\"long\", \"WALKSAFE_REPORT_QUEUE_MAX_STORED_ENTRY_BYTES\", \"0L\"",
+            "\"long\", \"WALKSAFE_REPORT_QUEUE_MAX_TOTAL_BYTES\", \"0L\"",
+            "\"int\", \"WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_ENTRIES\", \"0\"",
+            "\"long\", \"WALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES\", \"0L\"",
+        )) {
+            assertTrue("release must override $field", release.contains("buildConfigField($field)"))
+        }
+        assertFalse(release.contains("127.0.0.1"))
+    }
 }

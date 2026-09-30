@@ -125,7 +125,7 @@ class TrackedObjectDepthRuntimePipelineTest {
         val reportPipeline = ObjectDepthRuntimePipeline(tracker = reportTracker)
         val visualPipeline = ObjectDepthRuntimePipeline(tracker = visualTracker)
         val source = key(1_000L)
-        val report = reportPipeline.process(depth(source), source.frameId, 1_000L, listOf(detection)).single()
+        val report = reportPipeline.processPrealignedForTest(depth(source), source.frameId, 1_000L, listOf(detection)).single()
         val current = process(visualPipeline, observation(source, key(1_040L))).single()
         process(visualPipeline, observation(source, key(1_140L)))
         assertEquals("track-1", report.trackId)
@@ -146,9 +146,11 @@ class TrackedObjectDepthRuntimePipelineTest {
                 val source = key(1_000L + (index / 5) * 500L)
                 val observation = observation(source, target, centered, sourceDetection = centered, quality = 0.70f)
                 val zMm = 4_000 - index * 100
+                val depthTimestampNs = if (reprojectLastDepth && index == 12) key(2_140L).cameraTimestampNs else target.cameraTimestampNs
                 val snapshot = depth(target).copy(
                     rawDepth = DepthImage16(100, 100, IntArray(10_000) { zMm }),
-                    rawDepthTimestampNs = if (reprojectLastDepth && index == 12) key(2_140L).cameraTimestampNs else target.cameraTimestampNs,
+                    rawDepthTimestampNs = depthTimestampNs,
+                    rawConfidenceTimestampNs = depthTimestampNs,
                     cameraPoseEvidence = CameraPoseEvidence(
                         referenceId = 7L, timestampMs = target.frameId / 1_000_000L,
                         positionX = 0f, positionY = 0f, positionZ = -cameraSpeedMps * index * 0.1f,
@@ -201,6 +203,7 @@ class TrackedObjectDepthRuntimePipelineTest {
         rawConfidence = ConfidenceImage8(100, 100, ByteArray(10_000) { 255.toByte() }),
         fullDepth = null,
         rawDepthTimestampNs = key.cameraTimestampNs,
+        rawConfidenceTimestampNs = key.cameraTimestampNs,
         cameraImageTimestampNs = key.cameraTimestampNs,
     )
 

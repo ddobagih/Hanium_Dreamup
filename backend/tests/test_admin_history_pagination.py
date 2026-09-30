@@ -11,6 +11,7 @@ from backend.app.services.admin_history_pagination import (
     AdminHistoryCursorError,
     AdminHistoryIntegrityError,
     build_bounded_history_page,
+    build_bounded_history_tail,
     decode_admin_history_cursor,
     encode_admin_history_cursor,
 )
@@ -169,3 +170,50 @@ def test_bounded_page_rejects_gap_and_one_oversize_item() -> None:
             revision_of=lambda row: row.revision,
             page_factory=_page,
         )
+
+
+def test_bounded_tail_keeps_latest_contiguous_suffix_with_utf8_budget() -> None:
+    rows = [_Row(index, "가" * 400) for index in range(2, 8)]
+    page = build_bounded_history_tail(
+        rows,
+        snapshot_revision=7,
+        byte_budget=3_000,
+        revision_of=lambda row: row.revision,
+        page_factory=_page,
+    )
+
+    revisions = [item.revision for item in page.items]
+    assert 0 < len(revisions) < len(rows)
+    assert revisions == list(range(8 - len(revisions), 8))
+    assert page.next_cursor is None
+    assert len(page.model_dump_json().encode("utf-8")) <= 3_000
+
+
+def test_bounded_tail_rejects_gap_missing_latest_and_oversize_latest() -> None:
+    for rows in ([_Row(2, "ok"), _Row(4, "gap")], [_Row(2, "old")]):
+        with pytest.raises(AdminHistoryIntegrityError):
+            build_bounded_history_tail(
+                rows,
+                snapshot_revision=4,
+                byte_budget=2_000,
+                revision_of=lambda row: row.revision,
+                page_factory=_page,
+            )
+
+    with pytest.raises(AdminHistoryIntegrityError, match="one administrator"):
+        build_bounded_history_tail(
+            [_Row(4, "가" * 1_000)],
+            snapshot_revision=4,
+            byte_budget=1_024,
+            revision_of=lambda row: row.revision,
+            page_factory=_page,
+        )
+
+    empty = build_bounded_history_tail(
+        [],
+        snapshot_revision=0,
+        byte_budget=1_024,
+        revision_of=lambda row: row.revision,
+        page_factory=_page,
+    )
+    assert empty.items == [] and empty.next_cursor is None

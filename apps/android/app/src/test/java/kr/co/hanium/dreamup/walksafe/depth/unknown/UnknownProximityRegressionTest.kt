@@ -163,7 +163,7 @@ class UnknownProximityRegressionTest {
         val batch = requireNotNull(admit(result))
         val candidates = batch.outputs.mapNotNull { it.toFeedbackCandidate() }
         val first = requireNotNull(queue.evaluateCandidates(candidates, true, now))
-        assertTrue(queue.claimFeedbackDelivery(first.trackId, now))
+        assertTrue(queue.claimFeedbackDelivery(first.trackId, now, now))
         assertTrue(queue.confirmFeedbackDelivery(first.trackId, now, now + 10))
         val next = requireNotNull(admit(run(p, 5, mixed = true)))
         assertNull(queue.evaluateCandidates(next.outputs.mapNotNull { it.toFeedbackCandidate() }, true, now))

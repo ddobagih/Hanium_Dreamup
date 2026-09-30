@@ -18,12 +18,28 @@ if [[ "${PYTHON_BIN}" != */* ]]; then
   fi
 fi
 [[ -n "${PYTHON_BIN}" && -x "${PYTHON_BIN}" ]] || { echo "Python is not executable: ${PYTHON_BIN:-not found}" >&2; exit 2; }
+PYTHON_BIN="$(cd "$(dirname "${PYTHON_BIN}")" && pwd)/$(basename "${PYTHON_BIN}")"
+cd "${REPO_ROOT}"
+REPORT_BASE="${WALKSAFE_TEST_REPORT_BASE:-${REPO_ROOT}/artifacts/test-results}"
+mkdir -p "${REPORT_BASE}"
+REPORT_BASE="$(cd "${REPORT_BASE}" && pwd)"
+REPORT_DIR="$(mktemp -d "${REPORT_BASE}/${LAYER}.XXXXXX")"
+export WALKSAFE_TEST_REPORT_DIR="${REPORT_DIR}"
 
 LOCKED_NODE_BIN_DIR=""
 LOCKED_NODE_ROOT=""
 LOCKED_NODE_PRIVATE_HOME="$(/usr/bin/mktemp -d /tmp/walksafe-test-node.XXXXXX)"
 /usr/bin/chmod 0700 "${LOCKED_NODE_PRIVATE_HOME}"
-trap '/usr/bin/rm -rf -- "${LOCKED_NODE_PRIVATE_HOME}"' EXIT
+finish_run() {
+  local status=$?
+  local summary_status=0
+  "${PYTHON_BIN}" -B "${REPO_ROOT}/scripts/summarize_walksafe_test_reports.py" \
+    --report-dir "${REPORT_DIR}" --exit-code "${status}" || summary_status=$?
+  /usr/bin/rm -rf -- "${LOCKED_NODE_PRIVATE_HOME}"
+  if (( status != 0 )); then return "${status}"; fi
+  return "${summary_status}"
+}
+trap finish_run EXIT
 NODE_TOOLCHAIN_CHECKER="${REPO_ROOT}/scripts/check_walksafe_node_toolchain_20260715.py"
 NODE_TOOLCHAIN_LOCK="${REPO_ROOT}/configs/walksafe_node_toolchain_lock_20260715.json"
 
@@ -41,18 +57,18 @@ activate_locked_node_path() {
     echo "WALKSAFE_NODE_BIN_DIR must name a required absolute directory." >&2
     return 2
   }
-  LOCKED_NODE_BIN_DIR="$(cd "${requested}" && pwd -P)"
-  LOCKED_NODE_ROOT="$(dirname "${LOCKED_NODE_BIN_DIR}")"
-  attest_locked_node
+  LOCKED_NODE_BIN_DIR="$(cd "${requested}" && pwd -P)" || return "$?"
+  LOCKED_NODE_ROOT="$(dirname "${LOCKED_NODE_BIN_DIR}")" || return "$?"
+  attest_locked_node || return "$?"
   export PATH="${LOCKED_NODE_BIN_DIR}:/usr/bin:/bin"
 }
 
 run_locked_npm_in() {
   local package_path="$1"
   shift
-  activate_locked_node_path
-  attest_locked_node
-  local command_status=0
+  activate_locked_node_path || return "$?"
+  attest_locked_node || return "$?"
+  local command_status=0 post_attestation_status=0
   local -a npm_environment=(
     "HOME=${LOCKED_NODE_PRIVATE_HOME}"
     "PATH=${LOCKED_NODE_BIN_DIR}:/usr/bin:/bin"
@@ -69,17 +85,20 @@ run_locked_npm_in() {
     NEXT_PUBLIC_WALKSAFE_PWA_ENABLED \
     NEXT_PUBLIC_WALKSAFE_SUPERVISED_TACTILE_LOCAL_STEERING \
     WALKSAFE_NEXT_DIST_DIR \
+    WALKSAFE_TEST_REPORT_DIR \
+    WALKSAFE_NODE_TEST_TIMEOUT_MS \
     WALKSAFE_SOURCE_COMMIT; do
     if [[ -v "${allowed_name}" ]]; then
       npm_environment+=("${allowed_name}=${!allowed_name}")
     fi
   done
   (
-    cd "${REPO_ROOT}/${package_path}"
+    cd "${REPO_ROOT}/${package_path}" || exit "$?"
     /usr/bin/env -i "${npm_environment[@]}" "${LOCKED_NODE_BIN_DIR}/npm" "$@"
   ) || command_status=$?
-  attest_locked_node
-  return "${command_status}"
+  attest_locked_node || post_attestation_status=$?
+  if (( command_status != 0 )); then return "${command_status}"; fi
+  return "${post_attestation_status}"
 }
 
 run_locked_npm() {
@@ -91,6 +110,26 @@ run_locked_gateway_npm() {
 }
 
 UNIT_PYTHON_TESTS=(
+  backend/tests/test_admin_audit_detail_validation.py
+  backend/tests/test_account_enrollment_purge.py
+  backend/tests/test_admin_history_pagination.py
+  backend/tests/test_admin_incidents.py
+  backend/tests/test_admin_report_integrity_boundary.py
+  backend/tests/test_integrated_consent_v11.py
+  backend/tests/test_integrated_consent_v12.py
+  backend/tests/test_raw_quarantine_training_lifecycle.py
+  backend/tests/test_report_content_corrections.py
+  backend/tests/test_report_external_copy_deletions.py
+  backend/tests/test_report_physical_deletion.py
+  backend/tests/test_report_restore_handoff.py
+  backend/tests/test_report_restore_postgres.py
+  backend/tests/test_report_restore_tombstones.py
+  backend/tests/test_report_user_request_history.py
+  backend/tests/test_tmap_poi_candidate_identity.py
+  backend/tests/test_report_location_kind.py
+  tests/test_android_positioning_offline.py
+  backend/tests/test_actor_auth_epoch.py
+  backend/tests/test_actor_assertion_v4.py
   tests/test_voice_intents.py
   tests/test_voice_model_integrity.py
   tests/test_voice_stt_policy.py
@@ -196,9 +235,13 @@ UNIT_PYTHON_TESTS=(
   tests/test_walksafe_fp048_r002_goal_start_gate_r003_20260826.py
   tests/test_walksafe_fp048_r002_goal_start_gate_r004_20260826.py
   model/test_two_model_runtime.py
+  model/test_android_tflite_contract.py
   backend/tests/test_admin_credential_issuer_binding.py
+  backend/tests/test_review_server_regressions.py
+  backend/tests/test_readiness_snapshot.py
   backend/tests/test_admin_credential_issuer_key.py
   backend/tests/test_accounts.py
+  backend/tests/test_account_key_purpose_binding.py
   backend/tests/test_account_deletion_worker.py
   backend/tests/test_capacity_state.py
   backend/tests/test_field_test_security.py
@@ -217,17 +260,91 @@ UNIT_PYTHON_TESTS=(
   backend/tests/test_report_user_requests.py
   backend/tests/test_report_retention.py
   backend/tests/test_inference_process.py
+  backend/tests/test_account_signup_hash_budget.py
+  backend/tests/test_actor_rate_limit_execution.py
+  backend/tests/test_actor_rate_limit_retention.py
+  backend/tests/test_admin_reconfirmation_nonce_schema.py
+  backend/tests/test_admin_security_revoke_body.py
+  backend/tests/test_detect_preprocessing_capacity.py
+  backend/tests/test_detect_preprocessing_executor_backlog.py
+  backend/tests/test_detect_preprocessing_process.py
+  backend/tests/test_detect_preprocessing_resources.py
+  backend/tests/test_detect_v2_cache_role.py
+  backend/tests/test_detect_v2_health_snapshots.py
+  backend/tests/test_image_upload_metadata.py
+  backend/tests/test_inference_http_admission.py
+  backend/tests/test_inference_ipc_http_deadline.py
+  backend/tests/test_inference_provider_exception_boundary.py
+  backend/tests/test_inference_response_contract.py
+  backend/tests/test_inference_restart_admission.py
+  backend/tests/test_inference_restart_real_child.py
+  backend/tests/test_inference_start_deadline.py
+  backend/tests/test_raw_collection_keyring.py
+  backend/tests/test_report_creation_outcome.py
+  backend/tests/test_report_export_input_memory.py
+  backend/tests/test_report_export_limits.py
+  backend/tests/test_report_image_keyring_descriptors.py
+  backend/tests/test_report_image_keyring_locking.py
+  backend/tests/test_report_image_key_rotation_lifecycle.py
+  backend/tests/test_report_image_orientation_legacy_direct.py
+  backend/tests/test_report_list_audit_fingerprint_isolated.py
+  backend/tests/test_report_storage_incremental_write.py
+  backend/tests/test_report_storage_monitor.py
+  backend/tests/test_report_storage_readiness_io.py
+  backend/tests/test_report_storage_runtime_recovery.py
+  backend/tests/test_report_summary_db_aggregation.py
+  backend/tests/test_report_summary_grid_contract.py
+  backend/tests/test_s18_10_admin_password_rehash.py
+  backend/tests/test_s18_13_reconfirmation_nonce_contract.py
+  backend/tests/test_s20_postcommit_candidate_snapshot.py
+  backend/tests/test_s20_postcommit_lock_outcome.py
+  backend/tests/test_s20_postcommit_refresh_outcome.py
+  backend/tests/test_storage_readiness_state.py
+  backend/tests/test_tmap_app_runtime.py
+  backend/tests/test_tmap_call_budget.py
+  backend/tests/test_tmap_geometry_distance_contract.py
+  backend/tests/test_tmap_guide_prefix_consistency.py
+  backend/tests/test_tmap_poi_addresses.py
+  backend/tests/test_tmap_poi_field_types.py
+  backend/tests/test_tmap_poi_response_shape.py
+  backend/tests/test_tmap_poi_search_metadata.py
+  backend/tests/test_tmap_readiness_worker_isolation.py
+  backend/tests/test_tmap_route_distance_consistency.py
+  backend/tests/test_destination_query_android_parity.py
 )
 
 FUNCTIONAL_PYTHON_TESTS=(
+  backend/tests/test_admin_report_integrity_postgres_integration.py
+  backend/tests/test_report_external_copy_deletions_postgres_integration.py
+  backend/tests/test_report_physical_deletion_postgres_integration.py
+  backend/tests/test_report_restore_migration_postgres_integration.py
+  backend/tests/test_account_deletion_worker_multi_inventory.py
+  backend/tests/test_actor_auth_epoch_postgres.py
   backend/tests/test_admin_device_proof.py
   backend/tests/test_admin_report_detail.py
   backend/tests/test_admin_report_wave5.py
   backend/tests/test_admin_reports.py
   backend/tests/test_admin_report_workflow.py
   backend/tests/test_admin_security.py
+  backend/tests/test_admin_sweep_w20.py
+  backend/tests/test_admin_sweep_w22.py
+  backend/tests/test_privacy_sweep_w23_postgres_integration.py
+  backend/tests/test_privacy_hmac_rotation_continuity_postgres.py
+  backend/tests/test_account_deletion_server_inventory_postgres.py
+  backend/tests/test_account_deletion_receipt_purge_postgres.py
+  backend/tests/test_account_tombstone_ledger_postgres.py
+  backend/tests/test_training_model_lineage_postgres.py
+  backend/tests/test_actor_lifecycle_postgres_integration.py
+  backend/tests/test_account_key_rotation_coexistence_postgres.py
+  backend/tests/test_admin_reconfirmation_allowlist_postgres.py
+  backend/tests/test_admin_report_lost_reauth_postgres.py
+  backend/tests/test_admin_runtime_role_postgres_integration.py
+  backend/tests/test_admin_delivery_correction_w23.py
+  backend/tests/test_admin_delivery_correction_http_w24.py
+  backend/tests/test_walking_route_endpoint_gaps.py
   backend/tests/test_admin_runtime_acl_hardening.py
   backend/tests/test_actor_rate_limit_store.py
+  backend/tests/test_actor_rate_limit_retention_postgres.py
   backend/tests/test_android_debug_logs.py
   backend/tests/test_backup_source.py
   backend/tests/test_detect.py
@@ -240,6 +357,7 @@ FUNCTIONAL_PYTHON_TESTS=(
   backend/tests/test_uploads.py
   backend/tests/test_yolo_inference_adapter.py
   backend/tests/test_accounts_postgres_integration.py
+  backend/tests/test_account_password_rehash_postgres.py
   backend/tests/test_fp008_postgres_integration.py
   backend/tests/test_fp046_postgres_integration.py
   backend/tests/test_raw_collection_postgres_integration.py
@@ -257,9 +375,24 @@ FUNCTIONAL_PYTHON_TESTS=(
   tests/test_walksafe_backup_prune.py
   tests/test_walksafe_environment_identity.py
   tests/test_walksafe_admin_high_risk_data_delete_gate.py
+  backend/tests/test_admin_report_duplicate_cycle_guard.py
+  backend/tests/test_gateway_session_current_postgres.py
+  backend/tests/test_report_duplicate_lock_spatial.py
+  backend/tests/test_report_image_keyring_locking_postgres.py
+  backend/tests/test_report_postcommit_postgres_integration.py
+  backend/tests/test_report_storage_runtime_postgres_integration.py
+  backend/tests/test_report_summary_large_postgres_integration.py
+  backend/tests/test_report_summary_migrated_integration.py
+  backend/tests/test_report_summary_postgres_integration.py
+  backend/tests/test_s18_10_admin_password_rehash_postgres.py
+  backend/tests/test_s18_5_device_proof_quota_pools.py
+  backend/tests/test_s18_5_device_proof_source_admission.py
+  backend/tests/test_supported_predecessor_upgrade_postgres.py
 )
 
 INTEGRATION_PYTHON_TESTS=(
+  backend/tests/test_account_smtp_integration.py
+  backend/tests/test_report_restore_postgres_integration.py
   tests/test_runtime_model_integration.py
   tests/test_local_model_registry.py
   tests/test_submission_visual_privacy.py
@@ -499,12 +632,35 @@ require_backup_integrity_python() {
     }
 }
 
+run_python_tests() {
+  local group="$1" interpreter="$2" status=0
+  shift 2
+  : > "${REPORT_DIR}/${group}.started"
+  PYTHONPATH="${REPO_ROOT}" "${interpreter}" -m pytest -p no:cacheprovider -q \
+    --junitxml="${REPORT_DIR}/${group}.xml" "$@" || status=$?
+  printf '%s\n' "${status}" > "${REPORT_DIR}/${group}.exit"
+  return "${status}"
+}
+
+record_scope() {
+  local group="$1" selector="$2" selection=excluded
+  shift 2
+  if [[ "${LAYER}" == "${selector}" || ( "${LAYER}" == all && "${selector}" =~ ^(unit|functional|integration)$ ) ]]; then
+    selection=selected
+  fi
+  printf '%s\t%s\t%s\n' "${group}" "${selection}" "$*" >> "${REPORT_DIR}/scope.tsv"
+}
+
 run_unit() (
   activate_locked_node_path
   unset WALKSAFE_TEST_DATABASE_URL DATABASE_URL
-  PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" -m pytest -p no:cacheprovider -q "${UNIT_PYTHON_TESTS[@]}"
+  run_python_tests python-unit "${PYTHON_BIN}" "${UNIT_PYTHON_TESTS[@]}"
   run_locked_npm test
-  run_locked_gateway_npm test
+  : > "${REPORT_DIR}/node-gateway.started"
+  gateway_status=0
+  run_locked_gateway_npm test || gateway_status=$?
+  printf '%s\n' "${gateway_status}" > "${REPORT_DIR}/node-gateway.exit"
+  if (( gateway_status != 0 )); then exit "${gateway_status}"; fi
   (cd "${REPO_ROOT}/apps/android" && ./gradlew testDebugUnitTest --no-daemon --rerun-tasks)
 )
 
@@ -512,14 +668,12 @@ run_active_session_control() (
   unset WALKSAFE_TEST_DATABASE_URL DATABASE_URL
   PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" -B \
     "${REPO_ROOT}/scripts/check_walksafe_project_continuation_v2_4.py"
-  PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" -m pytest -p no:cacheprovider -q \
-    "${ACTIVE_SESSION_CONTROL_PYTHON_TESTS[@]}"
+  run_python_tests python-active-session-control "${PYTHON_BIN}" "${ACTIVE_SESSION_CONTROL_PYTHON_TESTS[@]}"
 )
 
 run_model_audit() (
   unset WALKSAFE_TEST_DATABASE_URL DATABASE_URL
-  PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" -m pytest -p no:cacheprovider -q \
-    "${MODEL_AUDIT_PYTHON_TESTS[@]}"
+  run_python_tests python-model-audit "${PYTHON_BIN}" "${MODEL_AUDIT_PYTHON_TESTS[@]}"
 )
 
 require_test_database() {
@@ -540,8 +694,7 @@ require_test_database() {
 run_functional() {
   require_test_database
   activate_locked_node_path
-  PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" -m pytest -p no:cacheprovider -q \
-    "${FUNCTIONAL_PYTHON_TESTS[@]}"
+  run_python_tests python-functional "${PYTHON_BIN}" "${FUNCTIONAL_PYTHON_TESTS[@]}"
   run_locked_npm run lint
   run_locked_npm run typecheck
   run_locked_gateway_npm run typecheck
@@ -551,18 +704,19 @@ run_functional() {
 run_integration() {
   require_test_database
   require_backup_integrity_python
-  PYTHONPATH="${REPO_ROOT}" "${BACKUP_PYTHON_BIN}" -m pytest -p no:cacheprovider -q \
-    "${BACKUP_INTEGRITY_PYTHON_TESTS[@]}"
+  run_python_tests python-backup-integrity "${BACKUP_PYTHON_BIN}" "${BACKUP_INTEGRITY_PYTHON_TESTS[@]}"
   activate_locked_node_path
   "${PYTHON_BIN}" "${REPO_ROOT}/scripts/manage_local_model_registry.py" verify-runtime
   "${PYTHON_BIN}" "${REPO_ROOT}/scripts/check_android_tflite_contract_20260531.py"
   PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" "${REPO_ROOT}/scripts/smoke_backend_768_runtime_20260711.py"
+  local tflite_smoke_args=()
   if [[ -n "${WALKSAFE_TFLITE_SMOKE_IMAGE:-}" ]]; then
-    "${WALKSAFE_TFLITE_PYTHON:-${PYTHON_BIN}}" \
-      "${REPO_ROOT}/scripts/smoke_android_tflite_runtime_20260711.py" \
-      --image "${WALKSAFE_TFLITE_SMOKE_IMAGE}"
+    tflite_smoke_args+=(--image "${WALKSAFE_TFLITE_SMOKE_IMAGE}")
   fi
-  PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" -m pytest -p no:cacheprovider -q "${INTEGRATION_PYTHON_TESTS[@]}"
+  "${WALKSAFE_TFLITE_PYTHON:-${PYTHON_BIN}}" \
+    "${REPO_ROOT}/scripts/smoke_android_tflite_runtime_20260711.py" \
+    "${tflite_smoke_args[@]}"
+  run_python_tests python-integration "${PYTHON_BIN}" "${INTEGRATION_PYTHON_TESTS[@]}"
   local web_dist_dir=".next-test-layers"
   local web_dist_path="${REPO_ROOT}/apps/web/${web_dist_dir}"
   local next_env="${REPO_ROOT}/apps/web/next-env.d.ts"
@@ -595,7 +749,7 @@ run_integration() {
       WALKSAFE_SOURCE_COMMIT="${source_commit}" \
       WALKSAFE_GATEWAY_ORIGIN="${WALKSAFE_RELEASE_TEST_GATEWAY_ORIGIN:-https://walksafe.invalid}" \
       WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-https://admin.walksafe.invalid}" \
-      ./gradlew lintRelease assembleRelease --no-daemon
+      ./gradlew testReleaseUnitTest lintRelease assembleRelease --no-daemon
   )
   "${PYTHON_BIN}" "${REPO_ROOT}/scripts/check_android_apk_model_asset_20260713.py" \
     --apk "${REPO_ROOT}/apps/android/app/build/outputs/apk/release/app-release-unsigned.apk"
@@ -603,6 +757,15 @@ run_integration() {
     (cd "${REPO_ROOT}/apps/android" && ./gradlew connectedDebugAndroidTest --no-daemon)
   fi
 }
+
+record_scope python-unit unit "${UNIT_PYTHON_TESTS[@]}"
+record_scope node-gateway unit apps/android-gateway/dist/test
+record_scope python-functional functional "${FUNCTIONAL_PYTHON_TESTS[@]}"
+record_scope python-integration integration "${INTEGRATION_PYTHON_TESTS[@]}"
+record_scope python-backup-integrity integration "${BACKUP_INTEGRITY_PYTHON_TESTS[@]}"
+record_scope python-model-audit model-audit "${MODEL_AUDIT_PYTHON_TESTS[@]}"
+record_scope python-active-session-control active-session-control "${ACTIVE_SESSION_CONTROL_PYTHON_TESTS[@]}"
+record_scope python-historical-control historical-replay-only "${HISTORICAL_CONTROL_PYTHON_TESTS[@]}"
 
 validate_layer_configuration
 

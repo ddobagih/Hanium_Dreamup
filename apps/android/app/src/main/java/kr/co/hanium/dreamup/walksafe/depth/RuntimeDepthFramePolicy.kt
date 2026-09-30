@@ -4,6 +4,8 @@ data class RuntimeDepthFrameAssessment(
     val isNewFrame: Boolean,
     val outputAllowed: Boolean,
     val shouldHandleLoss: Boolean,
+    /** Set when a fatal acquisition failure, not the stale timeout, forced the loss. */
+    val fatalAcquisitionFailure: DepthAcquisitionFailureReason? = null,
 ) {
     val refreshesLastValidTime: Boolean get() = isNewFrame && outputAllowed
 }
@@ -16,17 +18,22 @@ fun assessRuntimeDepthFrame(
     lastValidFrameAtElapsedRealtimeMs: Long,
     samplesAreValid: Boolean,
     staleTimeoutMs: Long,
+    /** S14-25: most severe acquisition failure since the previous frame, or null. */
+    acquisitionFailure: DepthAcquisitionFailureReason? = null,
 ): RuntimeDepthFrameAssessment {
     val isNewFrame = frameTimestampNanos > previousFrameTimestampNanos
     val regressed = frameTimestampNanos < previousFrameTimestampNanos
     val lastValidAgeMs = observedAtElapsedRealtimeMs - lastValidFrameAtElapsedRealtimeMs
     val previousEvidenceFresh = lastValidAgeMs in 0L until staleTimeoutMs
-    val outputAllowed = frameTimestampNanos > 0L && !regressed && lastValidAgeMs >= 0L && samplesAreValid &&
-        (isNewFrame || previousEvidenceFresh)
+    // Transient and tracking failures keep the stale-timeout budget; fatal ones never wait for it.
+    val fatal = acquisitionFailure?.takeIf { it.stopsImmediately }
+    val outputAllowed = fatal == null && frameTimestampNanos > 0L && !regressed && lastValidAgeMs >= 0L &&
+        samplesAreValid && (isNewFrame || previousEvidenceFresh)
     return RuntimeDepthFrameAssessment(
         isNewFrame = isNewFrame,
         outputAllowed = outputAllowed,
-        shouldHandleLoss = regressed || (!outputAllowed && !previousEvidenceFresh),
+        shouldHandleLoss = fatal != null || regressed || (!outputAllowed && !previousEvidenceFresh),
+        fatalAcquisitionFailure = fatal,
     )
 }
 

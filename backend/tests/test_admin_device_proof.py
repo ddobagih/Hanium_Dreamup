@@ -1118,6 +1118,7 @@ def test_postgres_expired_recovery_proof_reaches_real_cleanup_route(
                 device_id=device_id,
                 key_version=1,
                 public_key_spki_der=public_key_der,
+                security_level="TRUSTED_ENVIRONMENT",
                 now=started_at,
             )
         with runtime_sessions() as db:
@@ -1333,6 +1334,7 @@ def test_provision_register_rotate_and_idempotent_releases_row_lock() -> None:
         device_id=DEVICE_ID,
         key_version=1,
         public_key_spki_der=first_der,
+        security_level="TRUSTED_ENVIRONMENT",
     )
     registered = register_db.added[0]
 
@@ -1354,22 +1356,35 @@ def test_provision_register_rotate_and_idempotent_releases_row_lock() -> None:
     assert idempotent_db.commits == 1
 
     second_der = _spki_der(_private_key())
+    rotate_control = _recovery_control(state="NORMAL")
+    rotate_control.state_version = 1
     rotate_db = _FakeSession(
         [
-            _Result(values=[_recovery_control(state="NORMAL")]),
+            _Result(values=[rotate_control]),
             _Result(values=[registered]),
+            # S18-3-F2(b): the emergency path also revokes the device's
+            # sessions and appends a hash-chained audit row.
+            _Result(values=[]),
+            _Result(values=[]),
         ]
     )
+    # S18-3: normal rotation stages the new key as PENDING (see
+    # test_admin_sweep_w22); the explicit emergency path still replaces at once.
     rotated = provision_admin_device_key(
         rotate_db,
         admin_id=ADMIN_ID,
         device_id=DEVICE_ID,
         key_version=2,
         public_key_spki_der=second_der,
+        security_level="TRUSTED_ENVIRONMENT",
+        replace_active=True,
     )
     assert rotated.key_version == 2
     assert registered.status == "REVOKED" and registered.revoked_at is not None
     assert rotate_db.added[0].status == "ACTIVE"
+    assert rotate_control.state_version == 2
+    assert rotate_db.added[1].action == "device_key.replace_active"
+    assert rotate_db.results == []
 
 
 def test_provision_during_recovery_only_allows_active_recovery_device() -> None:
@@ -1390,6 +1405,7 @@ def test_provision_during_recovery_only_allows_active_recovery_device() -> None:
         device_id=DEVICE_ID,
         key_version=1,
         public_key_spki_der=_spki_der(_private_key()),
+        security_level="TRUSTED_ENVIRONMENT",
         now=now,
     )
 
@@ -1430,6 +1446,7 @@ def test_provision_allows_trusted_recovery_required_bootstrap() -> None:
         device_id=DEVICE_ID,
         key_version=1,
         public_key_spki_der=_spki_der(_private_key()),
+        security_level="TRUSTED_ENVIRONMENT",
     )
 
     assert provisioned.status == "ACTIVE"
@@ -1452,6 +1469,8 @@ def test_local_cli_accepts_android_canonical_base64url_without_private_material(
             DEVICE_ID,
             "--key-version",
             "1",
+            "--security-level",
+            "TRUSTED_ENVIRONMENT",
             "--expected-key-marker",
             hashlib.sha256(der).hexdigest(),
             "--public-key-spki-base64url",
@@ -1504,6 +1523,8 @@ def test_local_cli_rejects_key_marker_mismatch_before_service_or_database(
                 DEVICE_ID,
                 "--key-version",
                 "1",
+                "--security-level",
+                "TRUSTED_ENVIRONMENT",
                 "--expected-key-marker",
                 "0" * 64,
                 "--public-key-spki-base64url",
@@ -1532,6 +1553,8 @@ def test_local_cli_requires_expected_key_marker_before_database(
                 DEVICE_ID,
                 "--key-version",
                 "1",
+                "--security-level",
+                "TRUSTED_ENVIRONMENT",
                 "--public-key-spki-base64url",
                 _base64url(der),
             ],
@@ -1557,6 +1580,8 @@ def test_local_cli_sanitizes_device_key_policy_denial(
                 "android-device-9999",
                 "--key-version",
                 "1",
+                "--security-level",
+                "TRUSTED_ENVIRONMENT",
                 "--expected-key-marker",
                 hashlib.sha256(der).hexdigest(),
                 "--public-key-spki-base64url",
@@ -1697,6 +1722,30 @@ def _run_middleware(
     async def send(message: dict[str, Any]) -> None:
         sent.append(message)
 
+    route_app = FastAPI()
+
+    def registered_route() -> None:
+        return None
+
+    for route_method, route_template in (
+        ("POST", "/reports/{report_id}/original-access-grants"),
+        ("POST", "/reports/{report_id}/review-decisions"),
+        ("GET", "/reports/{report_id}/review-decisions"),
+        ("GET", "/reports/{report_id}/review-decisions/history"),
+        ("POST", "/reports/{report_id}/deliveries"),
+        ("GET", "/reports/{report_id}/deliveries"),
+        ("GET", "/reports/{report_id}/deliveries/history"),
+        ("POST", "/admin/reports/{report_id}/delivery-packages"),
+        ("GET", "/admin/incidents/{incident_id}/history"),
+        ("GET", "/admin/security/state"),
+        ("POST", "/admin/security/device-proof/challenges"),
+        ("POST", "/admin/security/sessions"),
+        ("POST", "/admin/security/recovery/complete"),
+    ):
+        route_app.add_api_route(
+            route_template, registered_route, methods=[route_method]
+        )
+
     middleware = FieldTestSecurityMiddleware(
         downstream,
         settings or _settings(),
@@ -1704,14 +1753,32 @@ def _run_middleware(
         admin_device_proof_verifier=verify,
         admin_security_denial_recorder=lambda **_kwargs: None,
     )
+    scope = _scope(method, path, headers=headers, query=query)
+    scope["app"] = route_app
     asyncio.run(
         middleware(
-            _scope(method, path, headers=headers, query=query),
+            scope,
             receive,
             send,
         )
     )
     return verifier_calls, downstream_calls, sent
+
+
+def test_unregistered_route_fails_closed_before_device_proof() -> None:
+    verifier, downstream, sent = _run_middleware(
+        method="GET",
+        path="/protected",
+        messages=[{"type": "http.request", "body": b"", "more_body": False}],
+        headers=_headers(),
+    )
+
+    assert verifier == []
+    assert downstream == []
+    assert sent[0]["status"] == 403
+    assert json.loads(sent[1]["body"])["detail"]["code"] == (
+        "route_policy_not_registered"
+    )
 
 
 @pytest.mark.parametrize(

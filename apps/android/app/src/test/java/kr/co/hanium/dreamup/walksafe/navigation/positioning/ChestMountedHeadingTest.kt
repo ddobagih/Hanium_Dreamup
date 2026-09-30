@@ -183,9 +183,11 @@ class ChestMountedHeadingTest {
             assertInvalid(recovering, ChestMountedHeadingGateReason.FIELD_RECOVERING)
         }
         val fifthNormal = evaluateAt(core, observedAtMs = 600L, fieldStrengthMicrotesla = 50.0)
+        val continuing = evaluateAt(core, observedAtMs = 900L, fieldStrengthMicrotesla = 50.0)
         val recovered = evaluateAt(core, observedAtMs = 1_200L, fieldStrengthMicrotesla = 50.0)
 
         assertInvalid(fifthNormal, ChestMountedHeadingGateReason.FIELD_RECOVERING)
+        assertInvalid(continuing, ChestMountedHeadingGateReason.FIELD_RECOVERING)
         assertTrue(recovered.isValid)
     }
 
@@ -197,11 +199,55 @@ class ChestMountedHeadingTest {
         val oneSecondLater = evaluateAt(core, observedAtMs = 1_200L, fieldStrengthMicrotesla = 50.0)
         evaluateAt(core, observedAtMs = 1_300L, fieldStrengthMicrotesla = 50.0)
         evaluateAt(core, observedAtMs = 1_400L, fieldStrengthMicrotesla = 50.0)
-        val recovered = evaluateAt(core, observedAtMs = 1_500L, fieldStrengthMicrotesla = 50.0)
+        val stillRecovering = evaluateAt(core, observedAtMs = 1_500L, fieldStrengthMicrotesla = 50.0)
+        evaluateAt(core, observedAtMs = 1_750L, fieldStrengthMicrotesla = 50.0)
+        evaluateAt(core, observedAtMs = 2_000L, fieldStrengthMicrotesla = 50.0)
+        val recovered = evaluateAt(core, observedAtMs = 2_200L, fieldStrengthMicrotesla = 50.0)
 
         assertInvalid(firstNormal, ChestMountedHeadingGateReason.FIELD_RECOVERING)
         assertInvalid(oneSecondLater, ChestMountedHeadingGateReason.FIELD_RECOVERING)
+        assertInvalid(stillRecovering, ChestMountedHeadingGateReason.FIELD_RECOVERING)
         assertTrue(recovered.isValid)
+    }
+
+    @Test
+    fun recoveryContinuityUsesTheExistingSampleFreshnessLimit() {
+        for (gapMs in listOf(500L, 501L, 10_000L)) {
+            val core = ChestMountedHeading()
+            evaluateAt(core, observedAtMs = 100L, fieldStrengthMicrotesla = 70.1)
+            for (time in listOf(200L, 400L, 600L, 800L)) {
+                assertInvalid(
+                    evaluateAt(core, time, 50.0),
+                    ChestMountedHeadingGateReason.FIELD_RECOVERING,
+                )
+            }
+            val result = evaluateAt(core, 800L + gapMs, 50.0)
+            if (gapMs == 500L) {
+                assertTrue(result.isValid)
+            } else {
+                assertInvalid(result, ChestMountedHeadingGateReason.FIELD_RECOVERING)
+            }
+        }
+    }
+
+    @Test
+    fun invalidObservationBreaksRecoveryBeforeTheNextNormalSample() {
+        for (missingRotation in listOf(false, true)) {
+            val core = ChestMountedHeading()
+            evaluateAt(core, observedAtMs = 100L, fieldStrengthMicrotesla = 70.1)
+            for (time in listOf(200L, 400L, 600L, 800L)) evaluateAt(core, time, 50.0)
+            val invalid = core.evaluate(
+                nowElapsedRealtimeMs = 1_000L,
+                rotation = if (missingRotation) null else rotation(
+                    observedAtMs = 1_000L,
+                    matrix = RotationMatrix3(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f),
+                ),
+                magneticField = magneticField(observedAtMs = 1_000L),
+                geomagneticReference = reference(),
+            )
+            assertFalse(invalid.isValid)
+            assertInvalid(evaluateAt(core, 1_200L, 50.0), ChestMountedHeadingGateReason.FIELD_RECOVERING)
+        }
     }
 
     @Test

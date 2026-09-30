@@ -63,7 +63,8 @@ class UnknownObjectSpeechDeviceTest {
                 ))
                 // The now-missing source withdraws the unclaimed reservation.
                 assertNull(fixture.policy.evaluate(null, true, SystemClock.elapsedRealtime()))
-                assertFalse(fixture.policy.claimFeedbackDelivery(fixture.action.trackId, fixture.evaluatedAtMs))
+                assertFalse(fixture.policy.claimFeedbackDelivery(
+                    fixture.action.trackId, fixture.evaluatedAtMs, SystemClock.elapsedRealtime()))
                 val result = actuator.emit(
                     action = fixture.action,
                     onSpeechCompleted = terminal::onCompleted,
@@ -192,7 +193,7 @@ class UnknownObjectSpeechDeviceTest {
         start: StartValidation,
     ) {
         assertTrue("UNKNOWN_OBJECT_DELIVERY_CLAIM_REJECTED", fixture.policy.claimFeedbackDelivery(
-            fixture.action.trackId, fixture.evaluatedAtMs,
+            fixture.action.trackId, fixture.evaluatedAtMs, SystemClock.elapsedRealtime(),
         ))
         val result = actuator.emit(
             action = fixture.action,

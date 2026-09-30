@@ -194,6 +194,27 @@ class DepthFrameSnapshotTest {
     }
 
     @Test
+    fun publicMetricGateRequiresMatchingRawPairClocksAndDimensions() {
+        val valid = snapshot(100L)
+        assertTrue(valid.rawConfidenceMatchesRawDepth)
+        assertTrue(valid.hasMetricRawDepth)
+        assertTrue(valid.hasFreshMetricRawDepth)
+        assertEquals(4, valid.validMetricSampleCount(0.35, 0.2, 8.0, requireFreshRaw = true))
+
+        listOf(
+            valid.copy(rawDepthTimestampNs = null),
+            valid.copy(rawConfidenceTimestampNs = null),
+            valid.copy(rawConfidenceTimestampNs = 101L),
+            valid.copy(rawConfidence = ConfidenceImage8(1, 1, byteArrayOf(-1))),
+        ).forEach { invalid ->
+            assertFalse(invalid.rawConfidenceMatchesRawDepth)
+            assertFalse(invalid.hasMetricRawDepth)
+            assertFalse(invalid.hasFreshMetricRawDepth)
+            assertEquals(0, invalid.validMetricSampleCount(0.35, 0.2, 8.0))
+        }
+    }
+
+    @Test
     fun differentConfidenceObservationBlocksRawMetricEvidenceWithoutChangingRawFreshness() {
         val mismatched = snapshot(100L).copy(rawConfidenceTimestampNs = 99L)
 
@@ -207,12 +228,13 @@ class DepthFrameSnapshotTest {
     }
 
     @Test
-    fun unknownConfidenceClockPreservesLegacyShapeButCannotClaimStrictPairVerification() {
-        val legacy = snapshot(100L)
+    fun unknownConfidenceClockCannotClaimMetricRawDepth() {
+        val unknown = snapshot(100L).copy(rawConfidenceTimestampNs = null)
 
-        assertTrue(legacy.hasMetricRawDepth)
-        assertFalse(legacy.rawConfidenceMatchesRawDepth)
-        assertEquals(4, legacy.validMetricSampleCount(0.35, 0.2, 8.0))
+        assertFalse(unknown.hasMetricRawDepth)
+        assertFalse(unknown.hasFreshMetricRawDepth)
+        assertFalse(unknown.rawConfidenceMatchesRawDepth)
+        assertEquals(0, unknown.validMetricSampleCount(0.35, 0.2, 8.0))
     }
 
     @Test
@@ -280,5 +302,6 @@ class DepthFrameSnapshotTest {
         fullDepth = null,
         rawDepthTimestampNs = rawTimestampNs,
         cameraImageTimestampNs = 100L,
+        rawConfidenceTimestampNs = rawTimestampNs,
     )
 }

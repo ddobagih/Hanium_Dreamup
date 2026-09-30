@@ -12,10 +12,11 @@ import os
 from pathlib import Path
 import re
 import stat
+import time
 from typing import Callable, Iterable, Iterator, Mapping
 import uuid
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, union
 from sqlalchemy.orm import Session
 
 from backend.app.services.report_image_crypto import (
@@ -32,6 +33,7 @@ from backend.app.uploads import (
     upload_file_metadata_is_safe,
     validate_upload_directory_descriptor,
     write_image_file,
+    write_private_journal_file,
 )
 
 
@@ -92,6 +94,14 @@ class ReportStorageInventorySetMismatch(RuntimeError):
         super().__init__("report database and encrypted object inventory differ")
 
 
+class ReportStorageJournalUnresolved(RuntimeError):
+    """A journal or committed object cannot be safely resolved automatically."""
+
+
+class ReportStorageRecoveryDeferred(RuntimeError):
+    """A bounded runtime pass left journals for a later readiness check."""
+
+
 @dataclass(frozen=True)
 class PendingReportWrite:
     report_id: uuid.UUID
@@ -140,6 +150,12 @@ class ReportStorageInventoryEntry:
     logical_image_path: str | None
     report_content_type: str | None
     image_object: ReportImageCommitMetadata | None
+
+
+@dataclass(frozen=True)
+class VerifiedReportStorageObject:
+    entry: ReportStorageInventoryEntry
+    fingerprint: tuple[int, ...]
 
 
 def lock_report_storage_write_transaction(db: Session) -> None:
@@ -205,7 +221,7 @@ def stage_report_image(destination: Path, encrypted: EncryptedReportImage) -> Pe
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
-    write_image_file(journal_path, payload)
+    write_private_journal_file(journal_path, payload)
     # Keep the journal even if the durable rename fails. Reconciliation can
     # distinguish an absent DB row from an ambiguous commit safely.
     write_image_file(destination, encrypted.envelope)
@@ -340,8 +356,24 @@ def _read_pending_write(upload_root: Path, journal_path: Path) -> PendingReportW
         raise RuntimeError(f"invalid report write journal: {journal_path.name}") from exc
 
 
-def _read_committed_envelope(pending: PendingReportWrite) -> bytes:
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+def _object_fingerprint(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev, metadata.st_ino, metadata.st_mode, metadata.st_nlink,
+        metadata.st_uid, metadata.st_gid, metadata.st_size,
+        metadata.st_mtime_ns, metadata.st_ctime_ns,
+    )
+
+
+@contextmanager
+def _opened_committed_envelope(pending: PendingReportWrite) -> Iterator[tuple[int, os.stat_result]]:
+    # Avoid waiting on a FIFO swap before the existing metadata checks reject it.
+    # O_NONBLOCK does not bound regular-file I/O.
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         descriptor = os.open(pending.destination, flags)
         try:
@@ -357,24 +389,44 @@ def _read_committed_envelope(pending: PendingReportWrite) -> bytes:
                 or metadata.st_size > MAX_ENVELOPE_BYTES
             ):
                 raise RuntimeError("committed report image file metadata changed")
-            chunks: list[bytes] = []
-            remaining = metadata.st_size
-            while remaining:
-                chunk = os.read(descriptor, min(1024 * 1024, remaining))
-                if not chunk:
-                    raise RuntimeError("committed report image is truncated")
-                chunks.append(chunk)
-                remaining -= len(chunk)
-            if not descriptor_acl_is_absent(descriptor):
-                raise RuntimeError("committed report image ACL changed")
-            return b"".join(chunks)
+            yield descriptor, metadata
         finally:
             os.close(descriptor)
     except OSError as exc:
         raise RuntimeError("committed report image is missing during reconciliation") from exc
 
 
-def _validate_committed(pending: PendingReportWrite, metadata: ReportImageCommitMetadata) -> None:
+def report_storage_object_fingerprint(pending: PendingReportWrite) -> tuple[int, ...]:
+    """Capture a validated file identity without reading its image contents."""
+    with _opened_committed_envelope(pending) as (_descriptor, metadata):
+        return _object_fingerprint(metadata)
+
+
+def _read_committed_envelope(pending: PendingReportWrite) -> bytes:
+    with _opened_committed_envelope(pending) as (descriptor, metadata):
+        chunks: list[bytes] = []
+        remaining = metadata.st_size
+        while remaining:
+            chunk = os.read(descriptor, min(1024 * 1024, remaining))
+            if not chunk:
+                raise RuntimeError("committed report image is truncated")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        path_after = pending.destination.stat(follow_symlinks=False)
+        if (
+            _object_fingerprint(after) != _object_fingerprint(metadata)
+            or _object_fingerprint(path_after) != _object_fingerprint(after)
+            or not descriptor_acl_is_absent(descriptor)
+        ):
+            raise RuntimeError("committed report image changed during validation")
+        return b"".join(chunks)
+
+
+def validate_report_image_write(
+    pending: PendingReportWrite, metadata: ReportImageCommitMetadata
+) -> None:
+    """Validate one staged or committed object against its row and journal."""
     expected = (
         pending.destination.name,
         1,
@@ -423,7 +475,12 @@ def _validate_committed(pending: PendingReportWrite, metadata: ReportImageCommit
 def reconcile_pending_report_writes(
     upload_root: Path,
     commit_state: Callable[[uuid.UUID], ReportStorageCommitState],
+    *,
+    max_items: int | None = None,
+    deadline: float | None = None,
 ) -> ReportStorageReconciliation:
+    if max_items is not None and max_items < 1:
+        raise ValueError("report journal recovery item budget must be positive")
     root_flags = (
         os.O_RDONLY
         | getattr(os, "O_CLOEXEC", 0)
@@ -442,34 +499,53 @@ def reconcile_pending_report_writes(
         ) from exc
 
     journal_dir = pending_journal_directory(upload_root)
-    if not journal_dir.exists():
+    if not os.path.lexists(journal_dir):
         return ReportStorageReconciliation(retained_committed=0, removed_orphans=0)
     try:
         _validate_journal_directory(journal_dir)
     except FileNotFoundError:
         return ReportStorageReconciliation(retained_committed=0, removed_orphans=0)
+    except RuntimeError as exc:
+        raise ReportStorageJournalUnresolved(str(exc)) from exc
     journal_paths = sorted(journal_dir.glob("*.json"))
     if len(journal_paths) > MAX_PENDING_REPORT_WRITES:
         raise RuntimeError("too many pending report write journals")
 
     retained_committed = 0
     removed_orphans = 0
-    for journal_path in journal_paths:
-        pending = _read_pending_write(upload_root, journal_path)
-        state = commit_state(pending.report_id)
+    for index, journal_path in enumerate(journal_paths):
+        if (
+            (max_items is not None and index >= max_items)
+            or (deadline is not None and time.monotonic() >= deadline)
+        ):
+            raise ReportStorageRecoveryDeferred("report journal recovery budget exhausted")
+        try:
+            pending = _read_pending_write(upload_root, journal_path)
+        except RuntimeError as exc:
+            raise ReportStorageJournalUnresolved(str(exc)) from exc
         if pending.schema_version == LEGACY_JOURNAL_SCHEMA:
-            raise RuntimeError(
+            raise ReportStorageJournalUnresolved(
                 "legacy plaintext report image requires an offline migration"
             )
+        state = commit_state(pending.report_id)
         if not state.report_exists:
+            if state.image_object is not None:
+                raise ReportStorageJournalUnresolved(
+                    "report image metadata exists without its report row"
+                )
             remove_image_file(pending.destination)
             _remove_interrupted_temporary_files(pending.destination)
             removed_orphans += 1
             complete_report_image_write(pending)
             continue
         if state.image_object is None:
-            raise RuntimeError("committed report has no encrypted image metadata")
-        _validate_committed(pending, state.image_object)
+            raise ReportStorageJournalUnresolved(
+                "committed report has no encrypted image metadata"
+            )
+        try:
+            validate_report_image_write(pending, state.image_object)
+        except RuntimeError as exc:
+            raise ReportStorageJournalUnresolved(str(exc)) from exc
         retained_committed += 1
         complete_report_image_write(pending)
 
@@ -537,8 +613,26 @@ def _validate_empty_private_directory_at(
         os.close(descriptor)
 
 
-@contextmanager
-def _opened_flat_upload_inventory(upload_root: Path) -> Iterator[dict[str, Path]]:
+def validate_report_storage_root(upload_root: Path, descriptor: int) -> os.stat_result:
+    before = os.fstat(descriptor)
+    path_before = upload_root.stat(follow_symlinks=False)
+    if (
+        _directory_identity(before) != _directory_identity(path_before)
+        or not stat.S_ISDIR(before.st_mode)
+        or before.st_uid != os.geteuid()
+        or not descriptor_acl_is_absent(descriptor)
+    ):
+        raise RuntimeError("report upload root is not a private real directory")
+    try:
+        expected_upload_file_mode(before)
+    except ValueError as exc:
+        raise RuntimeError(
+            "report upload root does not satisfy the private/read-only-backup contract"
+        ) from exc
+    return before
+
+
+def open_report_storage_root(upload_root: Path) -> int:
     flags = (
         os.O_RDONLY
         | getattr(os, "O_CLOEXEC", 0)
@@ -547,67 +641,56 @@ def _opened_flat_upload_inventory(upload_root: Path) -> Iterator[dict[str, Path]
     )
     descriptor = os.open(upload_root, flags)
     try:
-        before = os.fstat(descriptor)
-        path_before = upload_root.stat(follow_symlinks=False)
+        validate_report_storage_root(upload_root, descriptor)
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def validate_report_storage_namespace_entry(
+    descriptor: int, name: str, directory_metadata: os.stat_result,
+) -> bool:
+    """Validate one namespace entry; return whether it is an image object."""
+    special = {
+        JOURNAL_DIRECTORY_NAME: "report write journal",
+        RETENTION_QUARANTINE_DIRECTORY_NAME: "report retention quarantine",
+        REPORT_DELETION_QUARANTINE_DIRECTORY_NAME: "report deletion quarantine",
+    }
+    if name in special:
+        _validate_empty_private_directory_at(descriptor, name, label=special[name])
+        return False
+    metadata = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+    object_descriptor = os.open(
+        name, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+        dir_fd=descriptor,
+    )
+    try:
+        opened_object = os.fstat(object_descriptor)
         if (
-            _directory_identity(before) != _directory_identity(path_before)
-            or not stat.S_ISDIR(before.st_mode)
-            or before.st_uid != os.geteuid()
-            or not descriptor_acl_is_absent(descriptor)
+            not upload_file_metadata_is_safe(opened_object, directory_metadata)
+            or (opened_object.st_dev, opened_object.st_ino) != (metadata.st_dev, metadata.st_ino)
+            or not descriptor_acl_is_absent(object_descriptor)
+            or _ENCRYPTED_IMAGE_NAME_PATTERN.fullmatch(name) is None
         ):
-            raise RuntimeError("report upload root is not a private real directory")
-        try:
-            expected_upload_file_mode(before)
-        except ValueError as exc:
             raise RuntimeError(
-                "report upload root does not satisfy the private/read-only-backup contract"
-            ) from exc
+                "report upload root contains a legacy or unknown entry, or an ACL-bearing object"
+            )
+    finally:
+        os.close(object_descriptor)
+    return True
+
+
+@contextmanager
+def _opened_flat_upload_inventory(upload_root: Path) -> Iterator[dict[str, Path]]:
+    descriptor = open_report_storage_root(upload_root)
+    try:
+        before = os.fstat(descriptor)
         actual_objects: dict[str, Path] = {}
         for name in sorted(os.listdir(descriptor)):
-            if name == JOURNAL_DIRECTORY_NAME:
-                _validate_empty_private_directory_at(
-                    descriptor,
-                    name,
-                    label="report write journal",
-                )
+            if not validate_report_storage_namespace_entry(descriptor, name, before):
                 continue
-            if name == RETENTION_QUARANTINE_DIRECTORY_NAME:
-                _validate_empty_private_directory_at(
-                    descriptor,
-                    name,
-                    label="report retention quarantine",
-                )
-                continue
-            if name == REPORT_DELETION_QUARANTINE_DIRECTORY_NAME:
-                _validate_empty_private_directory_at(
-                    descriptor,
-                    name,
-                    label="report deletion quarantine",
-                )
-                continue
-            metadata = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
-            object_descriptor = os.open(
-                name,
-                os.O_RDONLY
-                | getattr(os, "O_CLOEXEC", 0)
-                | getattr(os, "O_NOFOLLOW", 0)
-                | getattr(os, "O_NONBLOCK", 0),
-                dir_fd=descriptor,
-            )
-            try:
-                opened_object = os.fstat(object_descriptor)
-                if (
-                    not upload_file_metadata_is_safe(opened_object, before)
-                    or (opened_object.st_dev, opened_object.st_ino)
-                    != (metadata.st_dev, metadata.st_ino)
-                    or not descriptor_acl_is_absent(object_descriptor)
-                    or _ENCRYPTED_IMAGE_NAME_PATTERN.fullmatch(name) is None
-                ):
-                    raise RuntimeError(
-                        "report upload root contains a legacy or unknown entry, or an ACL-bearing object"
-                    )
-            finally:
-                os.close(object_descriptor)
             actual_objects[name] = Path(f"/proc/self/fd/{descriptor}") / name
         yield actual_objects
         after = os.fstat(descriptor)
@@ -622,76 +705,128 @@ def _opened_flat_upload_inventory(upload_root: Path) -> Iterator[dict[str, Path]
         os.close(descriptor)
 
 
+def report_storage_inventory_pending(
+    upload_root: Path, entry: ReportStorageInventoryEntry, *,
+    known_key_states: Mapping[str, str], destination_root: Path | None = None,
+) -> PendingReportWrite:
+    """Validate the shared row/path/key contract without reading ciphertext."""
+    image_object = entry.image_object
+    if (
+        entry.logical_image_path is None
+        or entry.report_content_type not in _CONTENT_TYPE_SUFFIXES
+        or image_object is None
+    ):
+        raise RuntimeError("report storage inventory contains a legacy or orphan database row")
+    logical_match = _LOGICAL_IMAGE_PATH_PATTERN.fullmatch(entry.logical_image_path)
+    if (
+        logical_match is None
+        or logical_match.group("report_id") != str(entry.report_id)
+        or logical_match.group("suffix")
+        != _CONTENT_TYPE_SUFFIXES[entry.report_content_type]
+        or image_object.storage_name != f"{entry.report_id}.wse"
+        or image_object.content_type != entry.report_content_type
+    ):
+        raise RuntimeError("report logical image path and encrypted object metadata disagree")
+    key_state = known_key_states.get(image_object.key_id)
+    if key_state is None or key_state in {
+        "retired",
+        "destroyed",
+        "compromised",
+    }:
+        raise RuntimeError(
+            "report storage inventory references an unavailable key lifecycle state"
+        )
+    return PendingReportWrite(
+        report_id=entry.report_id,
+        destination=(destination_root or upload_root) / image_object.storage_name,
+        journal_path=upload_root / JOURNAL_DIRECTORY_NAME / f"{entry.report_id}.json",
+        schema_version=JOURNAL_SCHEMA,
+        key_id=image_object.key_id, nonce=image_object.nonce,
+        envelope_sha256=image_object.envelope_sha256,
+        envelope_size=image_object.envelope_size,
+        plaintext_sha256=image_object.plaintext_sha256,
+        plaintext_size=image_object.plaintext_size,
+        content_type=image_object.content_type,
+    )
+
+
 def validate_report_storage_inventory(
     upload_root: Path,
     entries: Iterable[ReportStorageInventoryEntry],
     *,
     known_key_states: Mapping[str, str],
-) -> None:
-    """Fail startup unless database rows and encrypted flat objects agree exactly."""
-
+) -> dict[uuid.UUID, VerifiedReportStorageObject]:
+    """Fully validate startup and return verified identities for incremental checks."""
+    verified = {}
     with _opened_flat_upload_inventory(upload_root) as actual_objects:
-        expected_objects: dict[str, ReportStorageInventoryEntry] = {}
-        seen_report_ids: set[uuid.UUID] = set()
+        expected_objects = {}
         for entry in entries:
-            if entry.report_id in seen_report_ids:
+            if entry.report_id in verified or entry.report_id in expected_objects:
                 raise RuntimeError("report storage inventory contains duplicate database identities")
-            seen_report_ids.add(entry.report_id)
-            image_object = entry.image_object
-            if (
-                entry.logical_image_path is None
-                or entry.report_content_type not in _CONTENT_TYPE_SUFFIXES
-                or image_object is None
-            ):
-                raise RuntimeError("report storage inventory contains a legacy or orphan database row")
-            logical_match = _LOGICAL_IMAGE_PATH_PATTERN.fullmatch(entry.logical_image_path)
-            if (
-                logical_match is None
-                or logical_match.group("report_id") != str(entry.report_id)
-                or logical_match.group("suffix")
-                != _CONTENT_TYPE_SUFFIXES[entry.report_content_type]
-                or image_object.storage_name != f"{entry.report_id}.wse"
-                or image_object.content_type != entry.report_content_type
-            ):
-                raise RuntimeError("report logical image path and encrypted object metadata disagree")
-            key_state = known_key_states.get(image_object.key_id)
-            if key_state is None or key_state in {
-                "retired",
-                "destroyed",
-                "compromised",
-            }:
-                raise RuntimeError(
-                    "report storage inventory references an unavailable key lifecycle state"
-                )
-            if image_object.storage_name in expected_objects:
-                raise RuntimeError("report storage inventory reuses an encrypted storage name")
-            expected_objects[image_object.storage_name] = entry
-
-        if set(actual_objects) != set(expected_objects):
+            report_storage_inventory_pending(upload_root, entry, known_key_states=known_key_states)
+            expected_objects[entry.report_id] = entry
+        expected_names = {entry.image_object.storage_name for entry in expected_objects.values()}
+        if len(expected_names) != len(expected_objects):
+            raise RuntimeError("report storage inventory reuses an encrypted storage name")
+        if set(actual_objects) != expected_names:
             raise ReportStorageInventorySetMismatch(
-                expected_storage_names=expected_objects,
-                actual_storage_names=actual_objects,
+                expected_storage_names=expected_names, actual_storage_names=actual_objects,
             )
+        for entry in expected_objects.values():
+            pending = report_storage_inventory_pending(
+                upload_root, entry, known_key_states=known_key_states,
+                destination_root=actual_objects[entry.image_object.storage_name].parent,
+            )
+            before = report_storage_object_fingerprint(pending)
+            validate_report_image_write(pending, entry.image_object)
+            if report_storage_object_fingerprint(pending) != before:
+                raise RuntimeError("committed report image changed during validation")
+            verified[entry.report_id] = VerifiedReportStorageObject(entry, before)
+    return verified
 
-        for storage_name, entry in expected_objects.items():
-            image_object = entry.image_object
-            assert image_object is not None
-            pending = PendingReportWrite(
-                report_id=entry.report_id,
-                destination=actual_objects[storage_name],
-                journal_path=(
-                    upload_root / JOURNAL_DIRECTORY_NAME / f"{entry.report_id}.json"
-                ),
-                schema_version=JOURNAL_SCHEMA,
-                key_id=image_object.key_id,
-                nonce=image_object.nonce,
-                envelope_sha256=image_object.envelope_sha256,
-                envelope_size=image_object.envelope_size,
-                plaintext_sha256=image_object.plaintext_sha256,
-                plaintext_size=image_object.plaintext_size,
-                content_type=image_object.content_type,
-            )
-            _validate_committed(pending, image_object)
+
+def read_report_storage_inventory_page(
+    db: Session, *, after: uuid.UUID | None = None, limit: int = 16,
+    report_ids: Iterable[uuid.UUID] | None = None,
+) -> list[ReportStorageInventoryEntry]:
+    """Read only bounded identity/envelope metadata, including orphan rows."""
+    from backend.app.models import Report, ReportImageObject
+
+    selected_ids = tuple(report_ids) if report_ids is not None else None
+
+    def page_identities(column):
+        # Each side is a primary-key keyset page, so one batch never sorts or
+        # joins every stored report (a FULL JOIN on COALESCE cannot use them).
+        candidates = select(column.label("identity"))
+        if after is not None:
+            candidates = candidates.where(column > after)
+        if selected_ids is not None:
+            candidates = candidates.where(column.in_(selected_ids))
+        return select(candidates.order_by(column).limit(limit).subquery().c.identity)
+
+    # The first `limit` identities of either side are enough for the first
+    # `limit` of their union, so orphan rows on both sides are still listed.
+    identities = union(
+        page_identities(Report.id), page_identities(ReportImageObject.report_id),
+    ).subquery("identities")
+    identity = identities.c.identity
+    fields = tuple(ReportImageCommitMetadata.__dataclass_fields__)
+    statement = select(
+        identity, Report.image_path, Report.image_content_type,
+        ReportImageObject.report_id,
+        *(getattr(ReportImageObject, name) for name in fields),
+    ).select_from(identities).outerjoin(
+        Report, Report.id == identity,
+    ).outerjoin(
+        ReportImageObject, ReportImageObject.report_id == identity,
+    ).order_by(identity).limit(limit)
+    return [
+        ReportStorageInventoryEntry(
+            report_id=row[0], logical_image_path=row[1], report_content_type=row[2],
+            image_object=(ReportImageCommitMetadata(**dict(zip(fields, row[4:])))
+                          if row[3] is not None else None),
+        ) for row in db.execute(statement).all()
+    ]
 
 
 def validate_report_storage_database_inventory(
@@ -699,7 +834,7 @@ def validate_report_storage_database_inventory(
     upload_root: Path,
     *,
     known_key_states: Mapping[str, str],
-) -> None:
+) -> dict[uuid.UUID, VerifiedReportStorageObject]:
     """Validate one locked database/filesystem inventory snapshot."""
 
     from backend.app.models import Report, ReportImageObject
@@ -712,7 +847,7 @@ def validate_report_storage_database_inventory(
         image_object.report_id: image_object
         for image_object in db.scalars(select(ReportImageObject)).all()
     }
-    validate_report_storage_inventory(
+    return validate_report_storage_inventory(
         upload_root,
         (
             ReportStorageInventoryEntry(

@@ -3379,3 +3379,112 @@ def test_raw_b1b_chunk_body_completes_before_admission_lock(
         assert len(list(root.iterdir())) == 1
     finally:
         engine.dispose()
+
+
+def test_raw_admission_consent_continuity_check_is_bounded_and_survives_regrant() -> None:
+    """RAW admission must not load the post-receipt consent history into memory.
+
+    A long run of unrelated later changes keeps the bound receipt admissible while every
+    consent read returns at most one row and the continuity probe is index-backed. A later
+    withdrawal still breaks the old receipt even after RAW consent is granted again.
+    """
+
+    from sqlalchemy import event as sqlalchemy_event
+
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex
+    actor_id = f"raw.consent-history.{suffix}"
+    installation_id = f"install_{suffix}"
+    admission = _record_admission(
+        SessionFactory,
+        actor_id=actor_id,
+        installation_id=installation_id,
+    )
+    client_revision = 1
+    previous_receipt = admission.consent_receipt_sha256
+
+    def record(*, raw: bool, automatic: bool, mobile: bool, label: str) -> str:
+        nonlocal client_revision, previous_receipt
+        client_revision += 1
+        with SessionFactory() as db:
+            recording = record_consent_event(
+                db,
+                actor_id=actor_id,
+                account_generation=1,
+                installation_id=installation_id,
+                request_id=f"raw_history_{label}_{suffix}",
+                client_revision=client_revision,
+                policy_version=PRIVACY_CONSENT_POLICY_VERSION,
+                item_versions=PRIVACY_CONSENT_ITEM_VERSIONS,
+                raw_source_collection=raw,
+                automatic_reporting=automatic,
+                mobile_network_transfer=mobile,
+                training_reuse=False,
+                secret=PRIVACY_SECRET,
+                expected_previous_backend_receipt_sha256=previous_receipt,
+            )
+        assert recording.created is True
+        previous_receipt = recording.event.receipt_sha256
+        return previous_receipt
+
+    history_length = 40
+    for index in range(history_length):
+        record(raw=True, automatic=True, mobile=index % 2 == 0, label=f"mobile_{index}")
+
+    consent_reads: list[tuple[str, int]] = []
+    continuity_plans: list[str] = []
+    capturing = False
+
+    def observe(conn, cursor, statement, parameters, _context, _executemany) -> None:
+        if not capturing or "privacy_consent_events" not in statement:
+            return
+        consent_reads.append((statement, cursor.rowcount))
+        if "subject_revision >" in statement and not continuity_plans:
+            explain = conn.connection.cursor()
+            try:
+                explain.execute("SET LOCAL enable_seqscan = off")
+                explain.execute("EXPLAIN " + statement, parameters)
+                continuity_plans.append(
+                    "\n".join(str(row[0]) for row in explain.fetchall())
+                )
+                explain.execute("SET LOCAL enable_seqscan = on")
+            finally:
+                explain.close()
+
+    sqlalchemy_event.listen(engine, "after_cursor_execute", observe)
+    try:
+        capturing = True
+        with SessionFactory() as db:
+            authorized = _authorize_raw_write(db, admission)
+            db.rollback()
+        capturing = False
+        assert authorized.consent_receipt_sha256 == admission.consent_receipt_sha256
+        assert consent_reads, "admission must read the bound consent receipt"
+        assert len(consent_reads) <= 3
+        assert all(rowcount <= 1 for _statement, rowcount in consent_reads), consent_reads
+        assert len(continuity_plans) == 1
+        assert "Seq Scan on privacy_consent_events" not in continuity_plans[0]
+        assert "privacy_consent_events" in continuity_plans[0]
+
+        record(raw=False, automatic=False, mobile=False, label="withdraw")
+        regranted_receipt = record(raw=True, automatic=True, mobile=False, label="regrant")
+        with pytest.raises(PrivacyLifecycleError) as interrupted:
+            with SessionFactory() as db:
+                _authorize_raw_write(db, admission)
+        assert interrupted.value.code == "raw_source_collection_consent_interrupted"
+        regranted = RawCollectionAdmission(
+            actor_id=admission.actor_id,
+            account_generation=admission.account_generation,
+            privacy_subject_hmac=admission.privacy_subject_hmac,
+            purpose=admission.purpose,
+            consent_receipt_sha256=regranted_receipt,
+        )
+        with SessionFactory() as db:
+            assert _authorize_raw_write(db, regranted).consent_receipt_sha256 == (
+                regranted_receipt
+            )
+            db.rollback()
+    finally:
+        capturing = False
+        sqlalchemy_event.remove(engine, "after_cursor_execute", observe)
+        engine.dispose()

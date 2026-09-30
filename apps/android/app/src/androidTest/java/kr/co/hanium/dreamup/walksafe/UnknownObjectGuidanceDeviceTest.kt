@@ -154,7 +154,8 @@ class UnknownObjectGuidanceDeviceTest {
                         TactileFrameFeedbackActuator { selected ->
                             val action = checkNotNull(selected.action) { "Main did not select $scenario" }
                             assertTrue(action.validUntilMs <= deadlineMs)
-                            assertTrue(sharedPolicy.claimFeedbackDelivery(action.trackId, selected.policyEvaluatedAtMs))
+                            assertTrue(sharedPolicy.claimFeedbackDelivery(
+                                action.trackId, selected.policyEvaluatedAtMs, SystemClock.elapsedRealtime()))
                             val emitted = actualActuator.emit(action,
                                 onSpeechCompleted = {
                                     completedDelivery.set(sharedPolicy.confirmFeedbackDelivery(

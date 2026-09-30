@@ -5,6 +5,7 @@
   "status_version": 1,
   "content_revision": 0,
   "latest_delivery_revision": 3,
+  "latest_review_revision": 2,
   "allowed_next_statuses": [
     "new",
     "resolved"

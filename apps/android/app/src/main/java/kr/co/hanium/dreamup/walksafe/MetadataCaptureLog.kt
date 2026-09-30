@@ -12,9 +12,10 @@ class MetadataCaptureLog(
         require(maxEntries > 0) { "maxEntries must be positive" }
     }
 
+    /** Stores a copy whose text and list fields are capped, so 30 entries stay a byte bound too. */
     @Synchronized
     fun append(entry: MetadataCaptureLogEntry) {
-        entries.addLast(entry)
+        entries.addLast(entry.boundedForLog())
         while (entries.size > maxEntries) {
             entries.removeFirst()
         }
@@ -41,7 +42,47 @@ class MetadataCaptureLog(
     companion object {
         const val DEFAULT_MAX_ENTRIES = 30
         private const val SUMMARY_LIMIT = 3
+
+        /** Matches the backend `model_load_reason` limit; ordinary values are far shorter. */
+        const val MAX_TEXT_CHARS = 160
+        const val MAX_LIST_ITEMS = 8
+        const val MAX_LIST_ITEM_CHARS = 64
     }
+}
+
+/** Returns this entry unchanged when every text/list field is already within the log caps. */
+fun MetadataCaptureLogEntry.boundedForLog(): MetadataCaptureLogEntry {
+    val text = MetadataCaptureLog.MAX_TEXT_CHARS
+    fun String?.capped(): String? = this?.let { capChars(it, text) }
+    fun List<String>.capped(): List<String> =
+        take(MetadataCaptureLog.MAX_LIST_ITEMS)
+            .map { capChars(it, MetadataCaptureLog.MAX_LIST_ITEM_CHARS) }
+    val bounded = copy(
+        detectorModelKey = detectorModelKey.capped(),
+        detectorLoadedModelKey = detectorLoadedModelKey.capped(),
+        detectorModelLoadReason = detectorModelLoadReason.capped(),
+        detectorCompletedModels = detectorCompletedModels.capped(),
+        detectorSkippedModels = detectorSkippedModels.capped(),
+        overlaySelection = overlaySelection.capped(),
+        overlayStaleReason = overlayStaleReason.capped(),
+        staleReason = staleReason.capped(),
+        topDetectionClassName = topDetectionClassName.capped(),
+        bestDepthClassName = bestDepthClassName.capped(),
+        bestDepthTrackId = bestDepthTrackId.capped(),
+        bestDepthSource = bestDepthSource.capped(),
+        overlayTransformPath = overlayTransformPath.capped(),
+        depthTransformPath = depthTransformPath.capped(),
+        transformPath = transformPath.capped(),
+        fallbackReason = fallbackReason.capped(),
+    )
+    return if (bounded == this) this else bounded
+}
+
+/** Cuts at [maxChars] without leaving half of a surrogate pair at the end. */
+private fun capChars(value: String, maxChars: Int): String {
+    if (value.length <= maxChars) return value
+    val end = if (Character.isHighSurrogate(value[maxChars - 1])) maxChars - 1 else maxChars
+    return value.substring(0, end)
 }
 
 data class MetadataCaptureLogEntry(

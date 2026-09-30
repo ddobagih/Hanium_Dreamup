@@ -8,7 +8,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 
 import {
   ACCOUNT_UPSTREAM_RESPONSE_LIMIT_BYTES,
-  SIGNUP_CONSENT_DOCUMENT_KEYS
+  SIGNUP_CONSENT_DOCUMENT_KEYS,
+  parsePasswordGrant,
+  relayAccountCreation,
+  relayAccountEnrollment
 } from "../src/account-relay.js";
 import {
   ACCOUNT_GENERATION_HEADER,
@@ -17,6 +20,7 @@ import {
   type GatewayFetch
 } from "../src/backend.js";
 import { withExclusiveFileLockAsync } from "../src/exclusive-file-lock.js";
+import { setFieldWalkLedgerTestFault } from "../src/field-walk-ledger.js";
 import { handleGatewayRequest } from "../src/routes.js";
 import {
   clearGatewaySession,
@@ -37,6 +41,16 @@ import {
   decryptTestStateFile,
   encryptTestStateFile
 } from "./state-encryption-fixture.js";
+// S19-17 (gw-F7): the walk route is driven with v2 commands, as the Android client sends
+// them. issued_at_epoch_ms is fixed at the first send of a request id, so a re-sent request
+// stays byte-identical. v1 intake (explicit legacy opt-in) has one dedicated test below.
+const walkIssuedAtByRequestId = new Map<string, number>();
+function walkV2(command: Record<string, unknown>): Record<string, unknown> {
+  const requestId = String(command.request_id);
+  const issuedAt = walkIssuedAtByRequestId.get(requestId) ?? Date.now();
+  walkIssuedAtByRequestId.set(requestId, issuedAt);
+  return { schema_version: "walksafe.field-walk-command.v2", ...command, issued_at_epoch_ms: issuedAt };
+}
 
 const INTERNAL_TOKEN = "account-relay-internal-token-12345678901234567890";
 const SESSION_SECRET = "account-relay-session-secret-123456789012345678901234567890";
@@ -44,6 +58,23 @@ const LEGACY_ACTOR = "legacy-account-relay-actor";
 const LEGACY_TOKEN = "legacy-account-relay-token-12345678901234567890";
 const ENROLLMENT_HANDLE = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE";
 const BACKEND_ACCOUNT_CLIENT_IP_HEADER = "x-walksafe-client-ip";
+const WALKING_ROUTE_REPLY = {
+  schema_version: "walksafe.walking_route.v1",
+  provider: "tmap_pedestrian",
+  priority: "STAIR_AVOID",
+  summary: { distance_m: 12, duration_s: 10 },
+  polyline: [
+    { latitude: 37.5, longitude: 127.0 },
+    { latitude: 37.6, longitude: 127.1 }
+  ],
+  steps: [{ index: 0, distance_m: 12, duration_s: 10, points: [
+    { latitude: 37.5, longitude: 127.0 },
+    { latitude: 37.6, longitude: 127.1 }
+  ] }],
+  guide_points: [{ index: 0, point: { latitude: 37.6, longitude: 127.1 }, instruction: "도착" }],
+  provider_result_code: 0,
+  provider_result_message: "OK"
+};
 
 let stateDirectory = "";
 let ipSuffix = 10;
@@ -214,6 +245,43 @@ test("email OTP enrollment validates the body before service auth and relays onl
     JSON.stringify(events),
     new RegExp(`${clientIp.replaceAll(".", "\\.")}|person@example\\.org|198\\.51\\.100\\.4[56]`, "i")
   );
+});
+
+test("email OTP enrollment rejects percent-encoded domains before Backend fetch", async () => {
+  let calls = 0;
+  const fetchImpl: GatewayFetch = async (_input, init) => {
+    calls += 1;
+    assert.equal(JSON.parse(String(init?.body)).email, "a@example.org");
+    return Response.json({
+      schema_version: "walksafe.account-enrollment-email-otp-response.v1",
+      enrollment_handle: ENROLLMENT_HANDLE,
+      expires_at: "2026-08-29T12:10:00Z",
+      resend_available_at: "2026-08-29T12:01:00Z"
+    }, { status: 202 });
+  };
+  const headers = { "cf-connecting-ip": nextClientIp() };
+  const rejected = await handleGatewayRequest(
+    postJson("/api/account-enrollments/email-otp", enrollmentBody({
+      email: "a@exam%70le.org",
+      request_id: "account_percent_domain_0001"
+    }), headers),
+    { fetchImpl }
+  );
+  assert.equal(rejected.status, 422);
+  assert.deepEqual(await rejected.json(), {
+    detail: { code: "account_enrollment_request_invalid" }
+  });
+  assert.equal(calls, 0);
+
+  const accepted = await handleGatewayRequest(
+    postJson("/api/account-enrollments/email-otp", enrollmentBody({
+      email: "a@example.org",
+      request_id: "account_percent_domain_0002"
+    }), headers),
+    { fetchImpl }
+  );
+  assert.equal(accepted.status, 202);
+  assert.equal(calls, 1);
 });
 
 test("email OTP enrollment requires one trusted canonical client IP before Backend fetch", async () => {
@@ -397,6 +465,66 @@ test("account creation requires the exact six consent keys and projects the succ
   assert.doesNotMatch(JSON.stringify(events), /123456|do-not-log-this-password/i);
 });
 
+test("S01-13 account creation requires 12 code points and relays the common-password refusal", async () => {
+  let calls = 0;
+  for (const password of ["x".repeat(11), "가".repeat(11), "🐶".repeat(11), "x".repeat(129), "twelve\0chars"]) {
+    const rejected = await handleGatewayRequest(
+      postJson("/api/accounts", { ...accountCreateBody(), password }),
+      { fetchImpl: async () => { calls += 1; return Response.json({}); } }
+    );
+    assert.equal(rejected.status, 422);
+    assert.deepEqual(await rejected.json(), { detail: { code: "account_create_request_invalid" } });
+  }
+  assert.equal(calls, 0);
+  for (const password of ["x".repeat(12), "우리집강아지산책좋아해요", "🐶🐱🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮", "e\u0301".repeat(6)]) {
+    const refused = await handleGatewayRequest(
+      postJson("/api/accounts", { ...accountCreateBody(), password }),
+      {
+        fetchImpl: async (_input, init) => {
+          calls += 1;
+          const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          assert.equal(body.password, password);
+          return Response.json({
+            detail: {
+              code: "account_password_too_common",
+              message: "The password is too common or too easy to guess."
+            }
+          }, { status: 400 });
+        }
+      }
+    );
+    assert.equal(refused.status, 400);
+    const text = await refused.text();
+    assert.deepEqual(JSON.parse(text), { detail: { code: "account_password_too_common" } });
+    assert.equal(text.includes(password), false);
+  }
+  assert.equal(calls, 4);
+  // Login keeps accepting the pre-policy 10..11 code point range.
+  assert.notEqual(parsePasswordGrant({
+    grant_type: "password",
+    email: "person@example.org",
+    password: "tenletters",
+    remember_me: false
+  }), null);
+});
+
+test("S01-3 account creation relays the dedicated outdated-document code without its message", async () => {
+  const outdated = await handleGatewayRequest(
+    postJson("/api/accounts", accountCreateBody()),
+    {
+      fetchImpl: async () => Response.json({
+        detail: {
+          code: "signup_consent_outdated",
+          message: "The required signup documents changed. Review the current documents."
+        }
+      }, { status: 409 })
+    }
+  );
+  assert.equal(outdated.status, 409);
+  assert.equal(outdated.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await outdated.json(), { detail: { code: "signup_consent_outdated" } });
+});
+
 test("account relays bound malformed and oversized upstream bodies and redact errors", async () => {
   const request = (): Request => postJson(
     "/api/account-enrollments/email-otp",
@@ -569,13 +697,19 @@ test("password login creates a v6 Backend account session without static account
   const cookie = setCookie.split(";", 1)[0]!;
 
   const walking = await handleGatewayRequest(
-    postJson("/api/navigation/walking", {}, { cookie }),
+    postJson("/api/navigation/walking", {
+      origin: { latitude: 37.5, longitude: 127.0 },
+      destination: { latitude: 37.6, longitude: 127.1 }
+    }, { cookie }),
     {
-      fetchImpl: async (_input, init) => {
+      fetchImpl: async (input, init) => {
         const headers = new Headers(init?.headers);
         assert.equal(headers.get(ACTOR_ID_HEADER), actorId);
         assert.equal(headers.get(ACCOUNT_GENERATION_HEADER), "7");
-        return Response.json({ ok: true });
+        if (new URL(String(input)).pathname === "/accounts/session-current") {
+          return new Response(null, { status: 204 });
+        }
+        return Response.json(WALKING_ROUTE_REPLY);
       }
     }
   );
@@ -636,12 +770,17 @@ test("device-bound password login creates v7 and supports field-walk without pro
     password: "device-password-must-not-leak",
     remember_me: false
   };
-  const fetchImpl: GatewayFetch = async () => Response.json({
-    schema_version: "walksafe.account-authentication.v1",
-    actor_id: actorId,
-    account_generation: 11,
-    auth_epoch: 5
-  });
+  const fetchImpl: GatewayFetch = async (input) => {
+    if (new URL(String(input)).pathname === "/accounts/session-current") {
+      return new Response(null, { status: 204 });
+    }
+    return Response.json({
+      schema_version: "walksafe.account-authentication.v1",
+      actor_id: actorId,
+      account_generation: 11,
+      auth_epoch: 5
+    });
+  };
   const invalidDevice = await handleGatewayRequest(
     postJson("/api/field-session", {
       ...credentials,
@@ -661,12 +800,11 @@ test("device-bound password login creates v7 and supports field-walk without pro
   assert.match(v6Cookie, /^walksafe_field_session=v6\./);
   const legacyWalk = await handleGatewayRequest(postJson(
     "/api/field-walk",
-    {
-      schema_version: "walksafe.field-walk-command.v1",
+    walkV2({
       request_id: "v6-walk-request-0001",
       action: "start",
       walk_id: "v6-walk-0001"
-    },
+    }),
     { cookie: v6Cookie }
   ));
   assert.equal(legacyWalk.status, 401);
@@ -742,14 +880,13 @@ test("device-bound password login creates v7 and supports field-walk without pro
 
   const start = await handleGatewayRequest(postJson(
     "/api/field-walk",
-    {
-      schema_version: "walksafe.field-walk-command.v1",
+    walkV2({
       request_id: "v7-walk-start-0001",
       action: "start",
       walk_id: "v7-walk-0001"
-    },
+    }),
     { cookie }
-  ));
+  ), { fetchImpl });
   assert.equal(start.status, 200);
   const active = await start.json() as {
     result: string;
@@ -761,7 +898,7 @@ test("device-bound password login creates v7 and supports field-walk without pro
   const get = await handleGatewayRequest(new Request(
     "https://gateway.invalid/api/field-walk",
     { headers: { cookie } }
-  ));
+  ), { fetchImpl });
   assert.equal(get.status, 200);
   assert.equal((await get.json() as { held_by_current_device: boolean })
     .held_by_current_device, true);
@@ -769,16 +906,15 @@ test("device-bound password login creates v7 and supports field-walk without pro
   const leaseCommand = async (action: "renew" | "end", requestId: string) =>
     handleGatewayRequest(postJson(
       "/api/field-walk",
-      {
-        schema_version: "walksafe.field-walk-command.v1",
+      walkV2({
         request_id: requestId,
         action,
         walk_id: "v7-walk-0001",
         lease_id: active.lease_id,
         fencing_token: active.fencing_token
-      },
+      }),
       { cookie }
-    ));
+    ), { fetchImpl });
   const renewed = await leaseCommand("renew", "v7-walk-renew-0001");
   assert.equal((await renewed.json() as { result: string }).result, "RENEWED");
   const ended = await leaseCommand("end", "v7-walk-end-0001");
@@ -795,7 +931,7 @@ test("device-bound password login creates v7 and supports field-walk without pro
   const retainedDevice = await handleGatewayRequest(new Request(
     "https://gateway.invalid/api/field-walk",
     { headers: { cookie } }
-  ));
+  ), { fetchImpl });
   assert.equal(retainedDevice.status, 200);
   const otherDeviceCookie = (otherDevice.headers.get("set-cookie") ?? "")
     .split(";", 1)[0]!;
@@ -812,7 +948,7 @@ test("device-bound password login creates v7 and supports field-walk without pro
   const tombstoned = await handleGatewayRequest(new Request(
     "https://gateway.invalid/api/field-walk",
     { headers: { cookie: otherDeviceCookie } }
-  ));
+  ), { fetchImpl });
   assert.equal(tombstoned.status, 409);
 
   const otherGeneration = await handleGatewayRequest(
@@ -841,12 +977,17 @@ test("v7 device sessions coexist, replace only the same device, and selectively 
     password: "multi-device-password-must-not-leak",
     remember_me: false
   };
-  const fetchImpl: GatewayFetch = async () => Response.json({
-    schema_version: "walksafe.account-authentication.v1",
-    actor_id: actorId,
-    account_generation: 21,
-    auth_epoch: 9
-  });
+  const fetchImpl: GatewayFetch = async (input) => {
+    if (new URL(String(input)).pathname === "/accounts/session-current") {
+      return new Response(null, { status: 204 });
+    }
+    return Response.json({
+      schema_version: "walksafe.account-authentication.v1",
+      actor_id: actorId,
+      account_generation: 21,
+      auth_epoch: 9
+    });
+  };
   const login = async (deviceId: string): Promise<string> => {
     const response = await handleGatewayRequest(
       postJson("/api/field-session", {
@@ -877,7 +1018,7 @@ test("v7 device sessions coexist, replace only the same device, and selectively 
   const listed = await handleGatewayRequest(new Request(
     "https://gateway.invalid/api/field-session?devices=true",
     { headers: { cookie: currentDeviceA } }
-  ));
+  ), { fetchImpl });
   assert.equal(listed.status, 200);
   const listBody = await listed.json() as {
     actor_id: string;
@@ -919,7 +1060,7 @@ test("v7 device sessions coexist, replace only the same device, and selectively 
     const revoked = await handleGatewayRequest(new Request(
       "https://gateway.invalid/api/field-session?device_id=short-device-b",
       { method: "DELETE", headers: { cookie: currentDeviceA } }
-    ));
+    ), { fetchImpl });
     assert.equal(revoked.status, 204);
     assert.equal(revoked.headers.get("set-cookie"), null);
   }
@@ -929,10 +1070,374 @@ test("v7 device sessions coexist, replace only the same device, and selectively 
   const selfRevoked = await handleGatewayRequest(new Request(
     "https://gateway.invalid/api/field-session?device_id=short-device-a",
     { method: "DELETE", headers: { cookie: currentDeviceA } }
-  ));
+  ), { fetchImpl });
   assert.equal(selfRevoked.status, 204);
   assert.match(selfRevoked.headers.get("set-cookie") ?? "", /Max-Age=0/);
   assert.equal(await authenticated(currentDeviceA), false);
+});
+
+test("S19-1 password remember_me stays a 12 h session without a refresh family", async () => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  // FP-011-DETAIL-01 / FP-047-DETAIL-02 interim: no formal long login for password
+  // accounts. remember_me only adds Max-Age; it never issues a refresh family.
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3041";
+  const fetchImpl: GatewayFetch = async (input) => {
+    if (new URL(String(input)).pathname === "/accounts/session-current") {
+      return new Response(null, { status: 204 });
+    }
+    return Response.json({
+      schema_version: "walksafe.account-authentication.v1",
+      actor_id: actorId,
+      account_generation: 41,
+      auth_epoch: 2
+    });
+  };
+  const authenticatedAt = async (cookie: string, offsetMs: number): Promise<boolean> => {
+    const originalNow = Date.now;
+    const base = originalNow();
+    Date.now = () => base + offsetMs;
+    try {
+      const response = await handleGatewayRequest(new Request(
+        "https://gateway.invalid/api/field-session", { headers: { cookie } }
+      ), { fetchImpl });
+      return (await response.json() as { authenticated: boolean }).authenticated;
+    } finally {
+      Date.now = originalNow;
+    }
+  };
+  for (const deviceId of [undefined, "s19-1-device-a"]) {
+    const loggedInAt = Date.now();
+    const login = await handleGatewayRequest(
+      postJson("/api/field-session", {
+        grant_type: "password",
+        email: "s19-1-user@example.org",
+        password: "s19-1-password-must-not-leak",
+        remember_me: true,
+        ...(deviceId === undefined ? {} : { device_id: deviceId })
+      }, { "cf-connecting-ip": nextClientIp() }),
+      { fetchImpl }
+    );
+    assert.equal(login.status, 200, String(deviceId));
+    const body = await login.json() as Record<string, unknown>;
+    assert.deepEqual(body, { session_scope: "general" }, String(deviceId));
+    for (const field of ["refresh_token", "family_id", "rotation", "absolute_expires_at_epoch_ms"]) {
+      assert.equal(field in body, false, `${String(deviceId)} ${field}`);
+    }
+    const setCookie = login.headers.get("set-cookie") ?? "";
+    assert.match(setCookie, deviceId === undefined ? /=v6\./ : /=v7\./);
+    const maxAge = Number(/Max-Age=(\d+)/.exec(setCookie)?.[1]);
+    assert.equal(maxAge, 12 * 60 * 60, String(deviceId));
+    const cookie = setCookie.split(";", 1)[0]!;
+    const elapsed = Date.now() - loggedInAt;
+    assert.equal(await authenticatedAt(cookie, 12 * 60 * 60 * 1000 - 5_000 - elapsed), true);
+    assert.equal(await authenticatedAt(cookie, 12 * 60 * 60 * 1000 + 1_000), false);
+  }
+});
+
+test("S19-19 route and report relays serve only the active walk device while a walk is held", async (t) => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3051";
+  const credentials = {
+    grant_type: "password",
+    email: "walk-scope-user@example.org",
+    password: "walk-scope-password-must-not-leak",
+    remember_me: false
+  };
+  const upstreamPaths: string[] = [];
+  const fetchImpl: GatewayFetch = async (input) => {
+    const pathname = new URL(String(input)).pathname;
+    if (pathname === "/accounts/session-current") return new Response(null, { status: 204 });
+    if (pathname === "/accounts/authenticate") {
+      return Response.json({
+        schema_version: "walksafe.account-authentication.v1",
+        actor_id: actorId,
+        account_generation: 51,
+        auth_epoch: 1
+      });
+    }
+    upstreamPaths.push(pathname);
+    if (pathname === "/navigation/walking") return Response.json(WALKING_ROUTE_REPLY);
+    return Response.json({ ok: true });
+  };
+  const login = async (deviceId?: string): Promise<string> => {
+    const response = await handleGatewayRequest(
+      postJson("/api/field-session", {
+        ...credentials, ...(deviceId === undefined ? {} : { device_id: deviceId })
+      }, { "cf-connecting-ip": nextClientIp() }),
+      { fetchImpl }
+    );
+    assert.equal(response.status, 200);
+    return (response.headers.get("set-cookie") ?? "").split(";", 1)[0]!;
+  };
+  const route = (cookie: string) => handleGatewayRequest(new Request(
+    "https://gateway.invalid/api/navigation/walking",
+    {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        origin: { latitude: 37.5, longitude: 127.0 },
+        destination: { latitude: 37.6, longitude: 127.1 }
+      })
+    }
+  ), { fetchImpl });
+  const report = (cookie: string) => handleGatewayRequest(new Request(
+    "https://gateway.invalid/api/reports/v2",
+    { method: "POST", headers: { cookie } }
+  ), { fetchImpl });
+  const walking = await login("s19-19-device-a");
+  const secondDevice = await login("s19-19-device-b");
+  const noDeviceSession = await login();
+
+  // No active walk: every session of the account keeps the existing behavior.
+  assert.equal((await route(secondDevice)).status, 200);
+  const started = await handleGatewayRequest(postJson("/api/field-walk", walkV2({
+    request_id: "s19-19-start-0001", action: "start", walk_id: "s19-19-walk-0001"
+  }), { cookie: walking }), { fetchImpl });
+  const lease = await started.json() as { result: string; lease_id: string; fencing_token: number };
+  assert.equal(lease.result, "ACQUIRED");
+
+  upstreamPaths.length = 0;
+  for (const cookie of [secondDevice, noDeviceSession]) {
+    for (const response of [await route(cookie), await report(cookie)]) {
+      assert.equal(response.status, 409);
+      assert.equal(
+        (await response.json() as { detail: { code: string } }).detail.code,
+        "walk_owned_by_other_device"
+      );
+    }
+  }
+  assert.deepEqual(upstreamPaths, [], "blocked requests never reach the Backend");
+  assert.equal((await route(walking)).status, 200);
+  assert.deepEqual(upstreamPaths, ["/navigation/walking"]);
+
+  // Walk state that cannot be read fails closed instead of skipping the check.
+  const previousLedgerPath = process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH;
+  t.after(() => {
+    if (previousLedgerPath === undefined) delete process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH;
+    else process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH = previousLedgerPath;
+  });
+  process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH = "relative-ledger-path.json";
+  const unavailable = await route(secondDevice);
+  assert.equal(unavailable.status, 503);
+  process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH = previousLedgerPath;
+
+  const ended = await handleGatewayRequest(postJson("/api/field-walk", walkV2({
+    request_id: "s19-19-end-0001", action: "end", walk_id: "s19-19-walk-0001",
+    lease_id: lease.lease_id, fencing_token: lease.fencing_token
+  }), { cookie: walking }), { fetchImpl });
+  assert.equal((await ended.json() as { result: string }).result, "ENDED");
+  assert.equal((await route(secondDevice)).status, 200);
+  assert.equal((await route(noDeviceSession)).status, 200);
+});
+
+test("S19-27 walk route separates not-committed storage failures from outcome-unknown commits", async () => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3061";
+  const fetchImpl: GatewayFetch = async (input) => {
+    if (new URL(String(input)).pathname === "/accounts/session-current") {
+      return new Response(null, { status: 204 });
+    }
+    return Response.json({
+      schema_version: "walksafe.account-authentication.v1",
+      actor_id: actorId,
+      account_generation: 61,
+      auth_epoch: 1
+    });
+  };
+  const login = await handleGatewayRequest(postJson("/api/field-session", {
+    grant_type: "password", email: "s19-27-user@example.org",
+    password: "s19-27-password-must-not-leak", remember_me: false, device_id: "s19-27-device-a"
+  }, { "cf-connecting-ip": nextClientIp() }), { fetchImpl });
+  assert.equal(login.status, 200);
+  const cookie = (login.headers.get("set-cookie") ?? "").split(";", 1)[0]!;
+  const post = (command: Record<string, unknown>) => handleGatewayRequest(postJson("/api/field-walk",
+    walkV2(command), { cookie }), { fetchImpl });
+  try {
+    // Failure before rename: nothing committed, a plain retry is safe.
+    setFieldWalkLedgerTestFault("rename");
+    const notCommitted = await post({ request_id: "s19-27-request-1", action: "start", walk_id: "s19-27-walk-1" });
+    assert.equal(notCommitted.status, 503);
+    assert.equal((await notCommitted.json() as { code: string }).code, "field_walk_ledger_unavailable");
+    setFieldWalkLedgerTestFault(null);
+    const retried = await post({ request_id: "s19-27-request-1", action: "start", walk_id: "s19-27-walk-1" });
+    const acquired = await retried.json() as { result: string; lease_id: string; fencing_token: number };
+    assert.equal(acquired.result, "ACQUIRED");
+
+    // Failure after rename: the command may be committed; re-send the same request id.
+    setFieldWalkLedgerTestFault("directory_fsync");
+    const endCommand = {
+      request_id: "s19-27-request-2", action: "end", walk_id: "s19-27-walk-1",
+      lease_id: acquired.lease_id, fencing_token: acquired.fencing_token
+    };
+    const unknown = await post(endCommand);
+    assert.equal(unknown.status, 503);
+    assert.equal(unknown.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await unknown.json(), {
+      schema_version: "walksafe.field-walk-response.v1",
+      code: "field_walk_ledger_outcome_unknown",
+      retry: "same_request_id"
+    });
+    setFieldWalkLedgerTestFault(null);
+    const reconciled = await post(endCommand);
+    assert.equal(reconciled.status, 200);
+    assert.equal((await reconciled.json() as { result: string }).result, "ENDED");
+  } finally {
+    setFieldWalkLedgerTestFault(null);
+  }
+});
+
+test("gw-F7 S19-17 a v1 walk command on a v7 account session runs only under the explicit legacy setting", async () => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3071";
+  const fetchImpl: GatewayFetch = async (input) => {
+    if (new URL(String(input)).pathname === "/accounts/session-current") {
+      return new Response(null, { status: 204 });
+    }
+    return Response.json({
+      schema_version: "walksafe.account-authentication.v1",
+      actor_id: actorId,
+      account_generation: 71,
+      auth_epoch: 1
+    });
+  };
+  const login = await handleGatewayRequest(postJson("/api/field-session", {
+    grant_type: "password", email: "gw-f7-user@example.org",
+    password: "gw-f7-password-must-not-leak", remember_me: false, device_id: "gw-f7-device-a"
+  }, { "cf-connecting-ip": nextClientIp() }), { fetchImpl });
+  assert.equal(login.status, 200);
+  const cookie = (login.headers.get("set-cookie") ?? "").split(";", 1)[0]!;
+  assert.match(cookie, /^walksafe_field_session=v7\./);
+  const v1 = (command: Record<string, unknown>) => handleGatewayRequest(postJson("/api/field-walk", {
+    schema_version: "walksafe.field-walk-command.v1", ...command
+  }, { cookie }), { fetchImpl });
+  const previous = process.env.WALKSAFE_FIELD_WALK_V1_COMMANDS;
+  try {
+    // Product default: v1 carries no issue time and is refused without running.
+    delete process.env.WALKSAFE_FIELD_WALK_V1_COMMANDS;
+    const refused = await v1({ request_id: "gw-f7-v1-start-0001", action: "start", walk_id: "gw-f7-walk-0001" });
+    assert.equal(refused.status, 409);
+    assert.equal((await refused.json() as { code: string }).code, "walk_command_version_retired");
+    // Explicit legacy setting: the same v7 account session runs v1 start and end.
+    process.env.WALKSAFE_FIELD_WALK_V1_COMMANDS = "accept";
+    const started = await v1({ request_id: "gw-f7-v1-start-0001", action: "start", walk_id: "gw-f7-walk-0001" });
+    const lease = await started.json() as { result: string; lease_id: string; fencing_token: number };
+    assert.equal(lease.result, "ACQUIRED");
+    const ended = await v1({
+      request_id: "gw-f7-v1-end-0001", action: "end", walk_id: "gw-f7-walk-0001",
+      lease_id: lease.lease_id, fencing_token: lease.fencing_token
+    });
+    assert.equal((await ended.json() as { result: string }).result, "ENDED");
+  } finally {
+    if (previous === undefined) delete process.env.WALKSAFE_FIELD_WALK_V1_COMMANDS;
+    else process.env.WALKSAFE_FIELD_WALK_V1_COMMANDS = previous;
+  }
+});
+
+test("S19-18 logout and device revoke end the held walk lease while re-login never inherits it", async () => {
+  delete process.env.WALKSAFE_FIELD_ACCOUNTS_JSON;
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3031";
+  const credentials = {
+    grant_type: "password",
+    email: "walk-relogin-user@example.org",
+    password: "walk-relogin-password-must-not-leak",
+    remember_me: false
+  };
+  const fetchImpl: GatewayFetch = async (input) => {
+    if (new URL(String(input)).pathname === "/accounts/session-current") {
+      return new Response(null, { status: 204 });
+    }
+    return Response.json({
+      schema_version: "walksafe.account-authentication.v1",
+      actor_id: actorId,
+      account_generation: 31,
+      auth_epoch: 4
+    });
+  };
+  const login = async (deviceId: string): Promise<string> => {
+    const response = await handleGatewayRequest(
+      postJson("/api/field-session", { ...credentials, device_id: deviceId },
+        { "cf-connecting-ip": nextClientIp() }),
+      { fetchImpl }
+    );
+    assert.equal(response.status, 200);
+    return (response.headers.get("set-cookie") ?? "").split(";", 1)[0]!;
+  };
+  type WalkBody = {
+    result?: string; code?: string; walk_id?: string; lease_id: string;
+    fencing_token: number; held_by_current_device?: boolean; active_walk_id?: string;
+  };
+  const walk = async (cookie: string, command: Record<string, unknown>) => {
+    const response = await handleGatewayRequest(postJson("/api/field-walk",
+      walkV2(command), { cookie }), { fetchImpl });
+    return { status: response.status, body: await response.json() as WalkBody };
+  };
+  const walkStatus = async (cookie: string): Promise<WalkBody> => {
+    const response = await handleGatewayRequest(new Request(
+      "https://gateway.invalid/api/field-walk", { headers: { cookie } }
+    ), { fetchImpl });
+    assert.equal(response.status, 200);
+    return await response.json() as WalkBody;
+  };
+
+  const firstSession = await login("s19-18-device-a");
+  const started = await walk(firstSession, {
+    request_id: "s19-18-start-0001", action: "start", walk_id: "s19-18-walk-0001"
+  });
+  assert.equal(started.body.result, "ACQUIRED");
+
+  // Same device re-login is a new session: no automatic succession by device id.
+  const reloginSession = await login("s19-18-device-a");
+  const renewByRelogin = await walk(reloginSession, {
+    request_id: "s19-18-renew-0001", action: "renew", walk_id: "s19-18-walk-0001",
+    lease_id: started.body.lease_id, fencing_token: started.body.fencing_token
+  });
+  assert.equal(renewByRelogin.status, 409);
+  assert.equal(renewByRelogin.body.code, "walk_lease_conflict");
+  const restartByRelogin = await walk(reloginSession, {
+    request_id: "s19-18-start-0002", action: "start", walk_id: "s19-18-walk-0001"
+  });
+  assert.equal(restartByRelogin.status, 409);
+  assert.equal((await walkStatus(reloginSession)).held_by_current_device, false);
+  // Only the explicit user-confirmed takeover transfers the walk.
+  const takenOver = await walk(reloginSession, {
+    request_id: "s19-18-takeover-0001", action: "takeover", walk_id: "s19-18-walk-0002",
+    expected_active_walk_id: "s19-18-walk-0001",
+    expected_fencing_token: started.body.fencing_token, confirmation: "voice_confirmed"
+  });
+  assert.equal(takenOver.body.result, "TAKEN_OVER");
+
+  // Logging out the holder session ends its lease immediately.
+  const logout = await handleGatewayRequest(new Request(
+    "https://gateway.invalid/api/field-session",
+    { method: "DELETE", headers: { cookie: reloginSession } }
+  ), { fetchImpl });
+  assert.equal(logout.status, 204);
+  const afterLogout = await login("s19-18-device-a");
+  assert.equal((await walkStatus(afterLogout)).result, "NONE");
+  const replayedRenew = await walk(afterLogout, {
+    request_id: "s19-18-renew-0002", action: "renew", walk_id: "s19-18-walk-0002",
+    lease_id: takenOver.body.lease_id, fencing_token: takenOver.body.fencing_token
+  });
+  assert.equal(replayedRenew.status, 409);
+  const restarted = await walk(afterLogout, {
+    request_id: "s19-18-start-0003", action: "start", walk_id: "s19-18-walk-0003"
+  });
+  assert.equal(restarted.body.result, "ACQUIRED");
+  assert.ok(restarted.body.fencing_token > takenOver.body.fencing_token);
+
+  // Remote revocation of the holder device from another device ends its lease too.
+  const otherDevice = await login("s19-18-device-b");
+  assert.equal((await walkStatus(otherDevice)).active_walk_id, "s19-18-walk-0003");
+  const revoked = await handleGatewayRequest(new Request(
+    "https://gateway.invalid/api/field-session?device_id=s19-18-device-a",
+    { method: "DELETE", headers: { cookie: otherDevice } }
+  ), { fetchImpl });
+  assert.equal(revoked.status, 204);
+  assert.equal((await walkStatus(otherDevice)).result, "NONE");
+  const acquiredByOther = await walk(otherDevice, {
+    request_id: "s19-18-start-0004", action: "start", walk_id: "s19-18-walk-0004"
+  });
+  assert.equal(acquiredByOther.body.result, "ACQUIRED");
 });
 
 test("v7 rejects generation or authentication epoch rollback without changing active devices", async () => {
@@ -1080,6 +1585,10 @@ test("v7 device list and selective revoke preserve the long-session storage-busy
     .digest("hex")}.json`;
   const statePath = path.join(stateDirectory, "sessions", recordId);
   const before = await readFile(statePath, "utf8");
+  const currentSessionFetch: GatewayFetch = async (input) => {
+    assert.equal(new URL(String(input)).pathname, "/accounts/session-current");
+    return new Response(null, { status: 204 });
+  };
   const releaseLock = await holdExclusiveLock(`${statePath}.lock`);
   try {
     for (const request of [
@@ -1091,7 +1600,7 @@ test("v7 device list and selective revoke preserve the long-session storage-busy
         headers: { cookie: sessionCookie }
       })
     ]) {
-      const blocked = await handleGatewayRequest(request);
+      const blocked = await handleGatewayRequest(request, { fetchImpl: currentSessionFetch });
       assert.equal(blocked.status, 503);
       assert.equal(blocked.headers.get("cache-control"), "no-store");
       assert.equal(blocked.headers.get("retry-after"), "1");
@@ -1373,4 +1882,80 @@ test("auth remains Backend-agnostic and no auth/backend import cycle is introduc
   ]);
   assert.doesNotMatch(authSource, /from\s+["']\.\/backend\.js["']/);
   assert.match(backendSource, /from\s+["']\.\/auth\.js["']/);
+});
+
+test("S19-51 signup relays allow only the bounded backend validation 422", async () => {
+  const requests = [
+    {
+      name: "enrollment",
+      relay: relayAccountEnrollment,
+      request: () => postJson("/api/account-enrollments/email-otp", {
+        schema_version: "walksafe.account-enrollment-email-otp.v1",
+        email: "validation@example.org",
+        date_of_birth: "2000-01-02",
+        request_id: "s19_51_request_1234"
+      }, { "cf-connecting-ip": nextClientIp() })
+    },
+    {
+      name: "creation",
+      relay: relayAccountCreation,
+      request: () => postJson("/api/accounts", {
+        schema_version: "walksafe.account-create.v1",
+        enrollment_handle: ENROLLMENT_HANDLE,
+        otp_code: "123456",
+        password: "safe-password-123",
+        consent: {
+          schema_version: "walksafe.signup-consent.v1",
+          document_versions: Object.fromEntries(
+            SIGNUP_CONSENT_DOCUMENT_KEYS.map((key) => [key, "v1"])
+          ),
+          selections: Object.fromEntries(
+            SIGNUP_CONSENT_DOCUMENT_KEYS.map((key) => [key, true])
+          )
+        }
+      })
+    }
+  ];
+  for (const { name, relay, request } of requests) {
+    const accepted = await relay(request(), async () => Response.json({
+      detail: {
+        code: "account_request_validation_failed",
+        message: "upstream-private-message"
+      }
+    }, {
+      status: 422,
+      headers: {
+        "retry-after": "42",
+        "x-upstream-secret": "upstream-private-header"
+      }
+    }));
+    assert.equal(accepted.status, 422, name);
+    assert.equal(accepted.headers.get("cache-control"), "no-store", name);
+    assert.equal(accepted.headers.get("retry-after"), null, name);
+    assert.equal(accepted.headers.get("x-upstream-secret"), null, name);
+    assert.deepEqual(await accepted.json(), {
+      detail: { code: "account_request_validation_failed" }
+    }, name);
+
+    for (const malformed of [
+      { detail: { code: "unknown_validation_failure", message: "private" } },
+      { detail: { code: "account_request_validation_failed" } },
+      { code: "account_request_validation_failed" },
+      { detail: {
+        code: "account_request_validation_failed",
+        message: "private",
+        internal_detail: "private"
+      } }
+    ]) {
+      const rejected = await relay(request(), async () => Response.json(malformed, {
+        status: 422,
+        headers: { "x-upstream-secret": "upstream-private-header" }
+      }));
+      assert.equal(rejected.status, 502, name);
+      assert.equal(rejected.headers.get("x-upstream-secret"), null, name);
+      assert.deepEqual(await rejected.json(), {
+        detail: { code: "gateway_account_upstream_invalid" }
+      }, name);
+    }
+  }
 });

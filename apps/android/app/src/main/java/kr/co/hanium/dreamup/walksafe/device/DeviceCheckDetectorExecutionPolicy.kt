@@ -6,6 +6,8 @@ import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorTiming
 /** Accepts an empty detection list, but only after a real final model invocation completed. */
 object DeviceCheckDetectorExecutionPolicy {
     fun passes(result: AndroidDetectionResult): Boolean {
+        // An unavailable detector or failed call is never a completed empty inference.
+        if (!result.inferenceCompleted) return false
         if (result.partial) return false
         val timing = result.timing
         if (timing.completedModels.isEmpty()) return false

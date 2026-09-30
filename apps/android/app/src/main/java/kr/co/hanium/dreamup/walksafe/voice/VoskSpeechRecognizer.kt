@@ -9,15 +9,34 @@ import android.os.Handler
 import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.SpeechRecognizer
+import java.io.Closeable
 import java.io.File
 
+internal interface VoskRequestStream : Closeable {
+    fun start(onRunReserved: (Long) -> Unit): Long?
+    fun stop()
+}
+
+internal data class VoskSpeechDependencies(
+    val runtime: VoiceCallbackRuntime,
+    val microphoneGranted: () -> Boolean,
+    val createStream: (listener: VoskStreamingListener) -> VoskRequestStream,
+    val readyBundle: () -> Bundle?,
+    val transcriptResults: (VoskTranscript) -> Bundle? =
+        { transcript -> transcript.toSpeechRecognitionResults() },
+    /** S04-32: typed stage summary per request; no transcript or audio is ever passed. */
+    val stageSummarySink: (VoiceRequestStageSummary) -> Unit = {},
+)
+
 /** A bounded button request over the same offline decoder used by hands-free listening. */
-internal class VoskSpeechRecognizer(
-    context: Context,
-    modelDirectory: File,
+internal class VoskSpeechRecognizer internal constructor(
+    private val dependencies: VoskSpeechDependencies,
 ) {
-    private val appContext = context.applicationContext
-    private val handler = Handler(Looper.getMainLooper())
+    constructor(context: Context, modelDirectory: File) : this(
+        dependencies = androidDependencies(context, modelDirectory),
+    )
+
+    private val runtime = dependencies.runtime
     private val requests = VoskSpeechRequestFence()
     private var listener: RecognitionListener? = null
     private var requestListener: RecognitionListener? = null
@@ -25,32 +44,58 @@ internal class VoskSpeechRecognizer(
     private var activeRunId: Long? = null
     private var timeout: Runnable? = null
     private var speechBegan = false
+    private var readyDelivered = false
+    private var firstTranscriptAtMs: Long? = null
+    private var audioEnded = false
     private var destroyed = false
-    private val transcriber = VoskStreamingTranscriber(
-        context = appContext,
-        modelDirectory = modelDirectory,
-        isInputSuppressed = { false },
-        listener = object : VoskStreamingListener {
+    private val stages = VoiceRequestStageTracker(runtime::nowMs)
+    private val transcriber = dependencies.createStream(
+        object : VoskStreamingListener {
             override fun onReady(runId: Long) {
-                handler.post {
-                    if (!accepts(runId)) return@post
-                    armTimeout(checkNotNull(requestId), LISTEN_TIMEOUT_MS, SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
-                    requestListener?.onReadyForSpeech(Bundle())
+                runtime.post {
+                    if (!accepts(runId) || readyDelivered) return@post
+                    readyDelivered = true
+                    stages.ready()
+                    if (audioEnded) {
+                        // The endpoint already owns the final-result deadline.
+                    } else if (speechBegan) {
+                        armTranscriptTimeout()
+                    } else {
+                        armTimeout(checkNotNull(requestId), LISTEN_TIMEOUT_MS, SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
+                    }
+                    requestListener?.onReadyForSpeech(dependencies.readyBundle())
+                }
+            }
+
+            override fun onAudioEnd(runId: Long) {
+                runtime.post {
+                    if (!accepts(runId) || audioEnded) return@post
+                    audioEnded = true
+                    stages.audioEnded()
+                    armTimeout(checkNotNull(requestId), FINAL_WAIT_TIMEOUT_MS, SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
+                    requestListener?.onEndOfSpeech()
                 }
             }
 
             override fun onTranscript(runId: Long, transcript: VoskTranscript) {
-                handler.post {
+                runtime.post {
                     if (!accepts(runId)) return@post
                     if (!speechBegan) {
                         speechBegan = true
+                        firstTranscriptAtMs = runtime.nowMs()
+                        stages.speechStarted()
+                        // A transcript is the existing speech-start signal, even when empty.
+                        // Before ready, leave the original model-load watchdog in place.
+                        if (readyDelivered && !audioEnded) armTranscriptTimeout()
                         requestListener?.onBeginningOfSpeech()
                         if (!accepts(runId)) return@post
                     }
-                    val results = transcript.toSpeechRecognitionResults()
+                    val results = dependencies.transcriptResults(transcript)
                     if (transcript.isFinal) {
+                        val endStillPending = !audioEnded
                         val completedListener = retireRequest() ?: return@post
-                        completedListener.onEndOfSpeech()
+                        if (endStillPending) completedListener.onEndOfSpeech()
+                        dependencies.stageSummarySink(stages.finish(errorCode = null, finalConfidence = transcript.confidence))
                         completedListener.onResults(results)
                     } else {
                         requestListener?.onPartialResults(results)
@@ -59,8 +104,9 @@ internal class VoskSpeechRecognizer(
             }
 
             override fun onError(runId: Long, error: VoskStreamingError) {
-                handler.post {
+                runtime.post {
                     if (!accepts(runId)) return@post
+                    stages.streamingError(error)
                     finishWithError(
                         when (error) {
                             VoskStreamingError.MODEL_UNAVAILABLE,
@@ -69,6 +115,7 @@ internal class VoskSpeechRecognizer(
                             -> SpeechRecognizer.ERROR_CLIENT
                             VoskStreamingError.AUDIO_START_FAILED,
                             VoskStreamingError.AUDIO_READ_FAILED,
+                            VoskStreamingError.AUDIO_SILENCED,
                             -> SpeechRecognizer.ERROR_AUDIO
                         },
                     )
@@ -84,6 +131,10 @@ internal class VoskSpeechRecognizer(
 
     @Suppress("UNUSED_PARAMETER")
     fun startListening(intent: Intent) {
+        startRequest()
+    }
+
+    internal fun startRequest() {
         checkMainThread()
         val currentListener = listener ?: return
         if (destroyed) {
@@ -91,10 +142,9 @@ internal class VoskSpeechRecognizer(
             return
         }
         if (requestId != null) {
-            finishWithError(SpeechRecognizer.ERROR_RECOGNIZER_BUSY)
             return
         }
-        if (appContext.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (!dependencies.microphoneGranted()) {
             currentListener.onError(SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS)
             return
         }
@@ -102,6 +152,10 @@ internal class VoskSpeechRecognizer(
         requestId = id
         requestListener = currentListener
         speechBegan = false
+        readyDelivered = false
+        firstTranscriptAtMs = null
+        audioEnded = false
+        stages.begin()
         armTimeout(id, LOAD_TIMEOUT_MS, SpeechRecognizer.ERROR_CLIENT)
         if (transcriber.start { activeRunId = it } == null) {
             finishWithError(SpeechRecognizer.ERROR_RECOGNIZER_BUSY)
@@ -110,12 +164,14 @@ internal class VoskSpeechRecognizer(
 
     fun cancel() {
         checkMainThread()
+        if (requestId != null) dependencies.stageSummarySink(stages.cancel())
         requests.cancel()
         requestId = null
         requestListener = null
         activeRunId = null
-        timeout?.let(handler::removeCallbacks)
+        timeout?.let(runtime::removeCallbacks)
         timeout = null
+        audioEnded = false
         transcriber.stop()
     }
 
@@ -125,7 +181,7 @@ internal class VoskSpeechRecognizer(
         cancel()
         destroyed = true
         listener = null
-        handler.removeCallbacksAndMessages(null)
+        runtime.removeAllCallbacks()
         transcriber.close()
     }
 
@@ -139,34 +195,81 @@ internal class VoskSpeechRecognizer(
         requestId = null
         requestListener = null
         activeRunId = null
-        timeout?.let(handler::removeCallbacks)
+        timeout?.let(runtime::removeCallbacks)
         timeout = null
+        audioEnded = false
         transcriber.stop()
         return completedListener
     }
 
     private fun finishWithError(error: Int) {
-        retireRequest()?.onError(error)
+        val completedListener = retireRequest() ?: return
+        dependencies.stageSummarySink(stages.finish(errorCode = error))
+        completedListener.onError(error)
+    }
+
+    private fun armTranscriptTimeout() {
+        val elapsedMs = (runtime.nowMs() - checkNotNull(firstTranscriptAtMs)).coerceAtLeast(0L)
+        armTimeout(
+            checkNotNull(requestId),
+            (TRANSCRIPT_TIMEOUT_MS - elapsedMs).coerceAtLeast(0L),
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
+        )
     }
 
     private fun armTimeout(id: Long, durationMs: Long, error: Int) {
-        timeout?.let(handler::removeCallbacks)
-        val watchdog = Runnable {
-            if (requests.accepts(id)) finishWithError(error)
+        timeout?.let(runtime::removeCallbacks)
+        lateinit var watchdog: Runnable
+        watchdog = Runnable {
+            if (timeout !== watchdog || !requests.accepts(id)) return@Runnable
+            timeout = null
+            finishWithError(error)
         }
         timeout = watchdog
-        handler.postDelayed(watchdog, durationMs)
+        runtime.postDelayed(watchdog, durationMs)
     }
 
     private fun checkMainThread() {
-        check(Looper.myLooper() == Looper.getMainLooper()) {
-            "VoskSpeechRecognizer must be called on the main thread"
-        }
+        runtime.checkMainThread("VoskSpeechRecognizer")
     }
 
     private companion object {
         const val LOAD_TIMEOUT_MS = 20_000L
         const val LISTEN_TIMEOUT_MS = 10_000L
+        const val TRANSCRIPT_TIMEOUT_MS = 20_000L
+        const val FINAL_WAIT_TIMEOUT_MS = 10_000L
+
+        fun androidDependencies(context: Context, modelDirectory: File): VoskSpeechDependencies {
+            val appContext = context.applicationContext
+            return VoskSpeechDependencies(
+                runtime = HandlerVoiceCallbackRuntime(Handler(Looper.getMainLooper())),
+                microphoneGranted = {
+                    appContext.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                },
+                createStream = { listener ->
+                    val delegate = VoskStreamingTranscriber(
+                        context = appContext,
+                        modelDirectory = modelDirectory,
+                        isInputSuppressed = { false },
+                        listener = listener,
+                    )
+                    object : VoskRequestStream {
+                        override fun start(onRunReserved: (Long) -> Unit): Long? =
+                            delegate.start { runId -> onRunReserved(runId) }
+
+                        override fun stop() {
+                            delegate.stop()
+                        }
+
+                        override fun close() {
+                            delegate.close()
+                        }
+                    }
+                },
+                readyBundle = { Bundle() },
+                stageSummarySink = ::logVoiceRequestStageSummary,
+            )
+        }
     }
 }
 

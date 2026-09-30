@@ -22,6 +22,27 @@ internal enum class SignalEnvironmentRisk {
     HIGH,
 }
 
+/**
+ * S09-6: separates "never observed" from "observed, then lost". A loss keeps the previously
+ * assessed risk only for the estimator's stale window and then expires; it never stays bad forever.
+ */
+internal enum class GnssSignalAvailability {
+    /** No C/N0-bearing epoch has been observed at or before the evaluation time (neutral weight). */
+    UNSUPPORTED,
+
+    /** The latest fresh epoch carries C/N0 signals. */
+    OBSERVING,
+
+    /** Signals were observed but disappeared; the last assessed risk is held for a bounded time. */
+    LOST_HOLDING,
+
+    /**
+     * Signals were observed but no assessed risk is held: the hold expired, all epochs went stale, or no
+     * risk had been assessed before the loss (w25 review pos-F5). Weight is neutral.
+     */
+    LOST_EXPIRED,
+}
+
 internal data class GnssSatelliteSignal(
     val constellation: Int,
     val svid: Int,
@@ -55,6 +76,16 @@ internal data class GnssQualitySnapshot(
     val signalEnvironmentRiskScore: Double?,
     val measurementNoiseMultiplier: Double,
     val isStale: Boolean,
+    /** Clock provenance of [latestEpochAtNanos]; null when no epoch was used or it was unspecified. */
+    val latestEpochTimeSource: GnssSignalTimeSource? = null,
+    val latestEpochTimestampUncertaintyNanos: Double? = null,
+    /**
+     * True when the C/N0 fields and risk come from satellite-status callbacks because the raw
+     * measurement feed is unavailable; the two feeds are never aggregated together.
+     */
+    val cn0FromSatelliteStatus: Boolean = false,
+    /** S09-6: unsupported vs. observed-then-lost state derived from the same window (values unchanged). */
+    val signalAvailability: GnssSignalAvailability = GnssSignalAvailability.UNSUPPORTED,
 )
 
 internal object GnssFrequencyClassifier {

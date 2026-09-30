@@ -185,6 +185,7 @@ def test_fp008_postgres_schema_device_key_and_single_use_proof(tmp_path: Path) -
             device_id=device_id,
             key_version=1,
             public_key_spki_der=spki,
+            security_level="TRUSTED_ENVIRONMENT",
         )
 
     report_id = uuid.uuid4()
@@ -569,6 +570,7 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history(
         location_reviewed=True,
         photo_reviewed=True,
         privacy_reviewed=True,
+        expected_review_revision=1,
     )
     with SessionFactory() as db:
         append_report_review_decision(
@@ -578,17 +580,44 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history(
             identity=identity,
             correlation_id=uuid.uuid4(),
         )
-    blocked_request = ReportInstitutionDeliveryRequest(
+    # S18-41 (FP-033-DETAIL-02): the institution's reply to the submission
+    # that was actually made is still recorded after the approval is
+    # withdrawn, bound to the approval and package of that submission.
+    follow_up_request = ReportInstitutionDeliveryRequest(
         institution="보행환경 담당 기관",
         channel="official_document",
         recipient="안전관리 담당자",
         status="RESOLVED",
         external_receipt_id="receipt-fp008-001",
-        reason="최신 승인 철회 후에는 전달 이력을 추가할 수 없음",
+        reason="철회 전에 제출한 건에 대한 기관 해결 회신을 기록함",
         evidence_sha256=None,
         observed_at=_rfc3339_utc(captured_at + timedelta(seconds=4)),
         package_revision=created_package.record.revision,
         expected_revision=2,
+        idempotency_key=uuid.uuid4(),
+    )
+    with SessionFactory() as db:
+        resolved = append_report_institution_delivery_event(
+            db,
+            report_id=report_id,
+            payload=follow_up_request,
+            identity=identity,
+            correlation_id=uuid.uuid4(),
+        )
+    assert resolved.revision == 3
+    assert resolved.review_decision_id == approved.id
+    # A new delivery start still needs the latest approval.
+    blocked_request = ReportInstitutionDeliveryRequest(
+        institution="보행환경 담당 기관",
+        channel="official_document",
+        recipient="안전관리 담당자",
+        status="SUBMITTED",
+        external_receipt_id=None,
+        reason="최신 승인 철회 후에는 새 전달을 시작할 수 없음",
+        evidence_sha256=None,
+        observed_at=_rfc3339_utc(captured_at + timedelta(seconds=5)),
+        package_revision=created_package.record.revision,
+        expected_revision=3,
         idempotency_key=uuid.uuid4(),
     )
     with pytest.raises(AdminReportWorkflowError) as blocked:
@@ -627,7 +656,7 @@ def test_fp008_postgres_review_delivery_authority_and_append_only_history(
         deliveries = list_report_institution_delivery_events(db, report_id=report_id)
     assert [item.revision for item in decisions] == [1, 2]
     assert decisions[0].reason == approved_request.reason
-    assert [item.status for item in deliveries] == ["SUBMITTED", "ACKNOWLEDGED"]
+    assert [item.status for item in deliveries] == ["SUBMITTED", "ACKNOWLEDGED", "RESOLVED"]
 
     failure_correlation_id = uuid.uuid4()
     record_admin_security_failure(

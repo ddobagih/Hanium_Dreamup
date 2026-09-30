@@ -21,13 +21,17 @@ internal class DetectorThreadOwner(
     }
     private var closeTask: FutureTask<Unit>? = null
 
+    @Volatile
+    private var releaseStarted = false
+
     /** Runs synchronously on the owner thread. Calls accepted before close finish before release. */
     fun <T> call(block: () -> T): T {
         val task = synchronized(stateLock) {
-            if (closeTask != null) {
+            val fromOwner = Thread.currentThread() === ownerThread
+            if (closeTask != null && (!fromOwner || releaseStarted)) {
                 throw RejectedExecutionException("Detector thread owner is closed")
             }
-            if (Thread.currentThread() === ownerThread) {
+            if (fromOwner) {
                 null
             } else {
                 FutureTask(Callable { block() }).also(executor::execute)
@@ -48,7 +52,10 @@ internal class DetectorThreadOwner(
         val task = synchronized(stateLock) {
             closeTask ?: run {
                 check(!fromOwner) { "Detector thread owner cannot initiate close from its own task" }
-                FutureTask(Callable { release() }).also { closing ->
+                FutureTask(Callable {
+                    releaseStarted = true
+                    release()
+                }).also { closing ->
                     closeTask = closing
                     executor.execute(closing)
                     executor.shutdown()

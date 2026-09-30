@@ -14,6 +14,7 @@ class MainActivityInitialPermissionStaticTest {
     fun firstEntryRequestsEveryMissingRuntimePermissionInOneBatchOnlyOnce() {
         val resume = functionBlock("private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()")
         val request = functionBlock("private fun requestInitialAppEntryPermissionsIfNeeded()")
+        val launch = functionBlock("private fun launchInitialAppEntryPermissionRequest(")
         val required = functionBlock("private fun requiredPostLoginDeviceCheckPermissions()")
 
         assertTrue(resume.contains("requestInitialAppEntryPermissionsIfNeeded()"))
@@ -23,11 +24,21 @@ class MainActivityInitialPermissionStaticTest {
             request.indexOf("permissionRequestLeases.values.any") <
                 request.indexOf("PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED"),
         )
-        assertTrue(request.contains("if (requestCode == null)"))
+        assertTrue(request.contains("launchInitialAppEntryPermissionRequest(missing)"))
+        assertTrue(launch.contains("if (requestCode == null)"))
         assertTrue(request.contains(".remove(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED)"))
+        assertTrue(launch.contains(".remove(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED)"))
         assertTrue(request.contains("requiredPostLoginDeviceCheckPermissions()"))
-        assertTrue(request.contains("missing.toTypedArray()"))
-        assertTrue(request.contains("PermissionRequestPurpose.INITIAL_APP_ENTRY"))
+        assertTrue(launch.contains("missing.toTypedArray()"))
+        assertTrue(launch.contains("PermissionRequestPurpose.INITIAL_APP_ENTRY"))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            launch,
+            ".putBoolean(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED, true)",
+            "if (!attemptSaved)",
+            "requestPermissionsWithLease(",
+            "if (requestCode == null)",
+            ".remove(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED)",
+        ))
         assertTrue(required.contains("Manifest.permission.CAMERA"))
         assertTrue(required.contains("Manifest.permission.ACCESS_FINE_LOCATION"))
         assertTrue(required.contains("Manifest.permission.ACCESS_COARSE_LOCATION"))
@@ -51,7 +62,9 @@ class MainActivityInitialPermissionStaticTest {
         assertTrue(exit.contains("initialAppPermissionExitRequired = true"))
         assertTrue(exit.contains("cancelNativePrewalkPreparation(cancelFeatureEntry = true)"))
         assertTrue(exit.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
-        assertTrue(exit.contains("필수 권한이 부족하여 앱을 실행할 수 없습니다"))
+        assertTrue(exit.contains("필수 권한이 없어 보행을 시작할 수 없습니다. 설정에서 "))
+        assertTrue(exit.contains("missing.joinToString { it.permissionLabelKo() }"))
+        assertTrue(exit.contains("setOnClickListener { openAppSettings() }"))
         assertTrue(exit.contains(".setCancelable(false)"))
         assertTrue(exit.contains("finishAndRemoveTask()"))
         assertTrue(postLoginRequest.contains("emptyList()"))

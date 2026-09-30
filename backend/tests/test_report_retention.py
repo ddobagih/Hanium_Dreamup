@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta, timezone
+from functools import wraps
 import hashlib
 import importlib.util
 import json
@@ -10,6 +12,7 @@ import signal
 import stat
 import subprocess
 import sys
+import threading
 import uuid
 
 import pytest
@@ -34,6 +37,89 @@ TEST_DATABASE_URL = (
     "postgresql+psycopg://walksafe_test:test-only@127.0.0.1:5432/"
     "walksafe_test?sslmode=disable&gssencmode=disable"
 )
+
+
+def single_thread_retention_test(test: Callable[..., None]) -> Callable[..., None]:
+    """Run signal-sensitive unit tests in a fresh process if other tests left threads."""
+
+    @wraps(test)
+    def run(**fixtures: object) -> None:
+        if threading.current_thread() is threading.main_thread() and threading.active_count() == 1:
+            test(**fixtures)
+            return
+        if os.environ.get("WALKSAFE_RETENTION_TEST_CHILD") == "1":
+            raise AssertionError("retention test subprocess is not single-threaded")
+
+        environment = os.environ.copy()
+        environment.pop("WALKSAFE_TEST_DATABASE_URL", None)
+        environment["WALKSAFE_RETENTION_TEST_CHILD"] = "1"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                "-m",
+                "pytest",
+                f"{Path(__file__).resolve()}::{test.__name__}",
+                "-q",
+                "--tb=short",
+                "-p",
+                "no:cacheprovider",
+            ],
+            cwd=ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert completed.returncode == 0, completed.stdout + completed.stderr
+
+    return run
+
+
+def test_signal_guard_rejects_ambient_python_thread() -> None:
+    stop = threading.Event()
+    background = threading.Thread(target=stop.wait, daemon=True)
+    background.start()
+    try:
+        with pytest.raises(RuntimeError, match="requires one main Python thread"):
+            retention.RetentionSignalGuard().install()
+    finally:
+        stop.set()
+        background.join()
+
+
+def test_signal_sensitive_retention_test_isolates_ambient_python_thread() -> None:
+    probe = f"""
+import sys
+import threading
+import pytest
+stop = threading.Event()
+background = threading.Thread(target=stop.wait, daemon=True)
+background.start()
+try:
+    assert threading.current_thread() is threading.main_thread()
+    assert threading.active_count() > 1
+    result = pytest.main([
+        {str(Path(__file__).resolve()) + '::test_manifest_exchange_fsync_failure_restores_previous_canonical_manifest'!r},
+        '-q', '--tb=short', '-p', 'no:cacheprovider',
+    ])
+finally:
+    stop.set()
+    background.join()
+sys.exit(result)
+"""
+    environment = os.environ.copy()
+    environment.pop("WALKSAFE_TEST_DATABASE_URL", None)
+    environment.pop("WALKSAFE_RETENTION_TEST_CHILD", None)
+    completed = subprocess.run(
+        [sys.executable, "-B", "-c", probe],
+        cwd=ROOT,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
 def encrypted_report_fixture(
@@ -816,6 +902,7 @@ def test_manifest_publisher_rejects_non_private_parent(tmp_path: Path) -> None:
         )
 
 
+@single_thread_retention_test
 def test_manifest_exchange_fsync_failure_restores_previous_canonical_manifest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -865,6 +952,7 @@ def test_manifest_exchange_fsync_failure_restores_previous_canonical_manifest(
         guard.close()
 
 
+@single_thread_retention_test
 def test_manifest_initial_descriptor_stat_failure_removes_owned_temporary_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1101,6 +1189,7 @@ def test_production_retention_database_url_is_exact_and_tls_verified(
         retention.validated_retention_database_url(database_url)
 
 
+@single_thread_retention_test
 def test_apply_quarantines_image_commits_database_and_writes_manifest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1230,6 +1319,7 @@ def test_apply_quarantines_image_commits_database_and_writes_manifest(
     ]
 
 
+@single_thread_retention_test
 def test_apply_preserves_original_image_when_database_commit_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1414,6 +1504,7 @@ def _run_apply_with_commit_hook(
     return result, source, upload_dir, manifest_path, error
 
 
+@single_thread_retention_test
 def test_apply_rejects_manifest_path_that_aliases_selected_upload_image(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1439,6 +1530,7 @@ def test_apply_rejects_manifest_path_that_aliases_selected_upload_image(
     assert not (upload_dir / ".retention-quarantine").exists()
 
 
+@single_thread_retention_test
 def test_apply_rejects_restore_receipt_that_reuses_source_upload_identity(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1457,6 +1549,7 @@ def test_apply_rejects_restore_receipt_that_reuses_source_upload_identity(
     assert not (upload_dir / ".retention-quarantine").exists()
 
 
+@single_thread_retention_test
 def test_postcommit_source_replacement_is_not_deleted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1479,6 +1572,7 @@ def test_postcommit_source_replacement_is_not_deleted(
     assert list((upload_dir / ".retention-quarantine").rglob("*.wse.recovery"))
 
 
+@single_thread_retention_test
 def test_postcommit_quarantine_replacement_preserves_source_and_replacement(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1508,6 +1602,7 @@ def test_postcommit_quarantine_replacement_preserves_source_and_replacement(
     ).read_bytes().startswith(b"WSRI")
 
 
+@single_thread_retention_test
 def test_rollback_quarantine_replacement_is_not_deleted_and_is_a_restore_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1539,6 +1634,7 @@ def test_rollback_quarantine_replacement_is_not_deleted_and_is_a_restore_error(
     assert failed_manifest["restore_errors"]
 
 
+@single_thread_retention_test
 def test_termination_after_commit_is_recorded_as_failed_after_database_commit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1603,6 +1699,7 @@ def test_termination_after_commit_is_recorded_as_failed_after_database_commit(
     assert second_delivered is True
 
 
+@single_thread_retention_test
 def test_signal_guard_restores_all_handlers_while_termination_is_blocked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1643,6 +1740,7 @@ def test_signal_guard_restores_all_handlers_while_termination_is_blocked(
     assert masked is False
 
 
+@single_thread_retention_test
 def test_recovery_manifest_error_then_termination_preserves_error_and_completes_rollback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1709,6 +1807,7 @@ def test_recovery_manifest_error_then_termination_preserves_error_and_completes_
     assert manifest["restore_errors"] == []
 
 
+@single_thread_retention_test
 def test_non_signal_failure_then_two_termination_signals_do_not_interrupt_rollback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

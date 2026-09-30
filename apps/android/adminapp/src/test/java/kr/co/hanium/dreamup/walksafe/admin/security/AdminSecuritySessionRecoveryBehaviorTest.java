@@ -146,6 +146,35 @@ public final class AdminSecuritySessionRecoveryBehaviorTest {
     }
 
     @Test
+    public void admF6LogoutFailureTextFollowsWhetherTheControllerStillRetainsTheSession() throws Exception {
+        // The server revoke failed after it was sent: the controller cleared the session.
+        Fixture uncertain = new Fixture();
+        uncertain.login();
+        String session = uncertain.controller.snapshot().currentSessionId();
+        uncertain.transport.revokeFailure = new SocketTimeoutException("synthetic timeout");
+        IOException sent = assertThrows(IOException.class, () -> uncertain.controller.revokeSession(session));
+        assertFalse(uncertain.controller.hasRetainedSession());
+        assertEquals(AdminRecoveryMessagePolicy.LOGOUT_SERVER_REVOKE_UNCONFIRMED,
+            AdminRecoveryMessagePolicy.failureMessage(AdminRecoveryMessagePolicy.Phase.CURRENT_SESSION_LOGOUT,
+                sent, uncertain.controller.hasRetainedSession()));
+
+        // A failure before the revoke (locally locked) keeps the session: no deletion is claimed.
+        Fixture locked = new Fixture();
+        locked.login();
+        String lockedSession = locked.controller.snapshot().currentSessionId();
+        int requests = locked.transport.requestCount;
+        locked.controller.suspendForBackground(false);
+        IllegalStateException early = assertThrows(IllegalStateException.class,
+            () -> locked.controller.revokeSession(lockedSession));
+        assertEquals(requests, locked.transport.requestCount);
+        assertTrue(locked.controller.hasRetainedSession());
+        String shown = AdminRecoveryMessagePolicy.failureMessage(
+            AdminRecoveryMessagePolicy.Phase.CURRENT_SESSION_LOGOUT, early, locked.controller.hasRetainedSession());
+        assertNotEquals(AdminRecoveryMessagePolicy.LOGOUT_SERVER_REVOKE_UNCONFIRMED, shown);
+        assertFalse(shown.contains("세션 값을 지웠습니다"));
+    }
+
+    @Test
     public void failedReloginCannotReuseThePreviouslyBoundAccessToken() throws Exception {
         Fixture fixture = new Fixture();
         fixture.login();
@@ -395,7 +424,10 @@ public final class AdminSecuritySessionRecoveryBehaviorTest {
                 stateFailure = null;
                 return failure == null ? state() : respond(failure);
             }
-            if ("GET".equals(method) && url.endsWith("/admin/security/sessions")) {
+            // The controller reads the complete paged inventory (first page ?paged=true, the
+            // backend SessionsResponse contract). A single current-only page ends the traversal,
+            // so any ?after= continuation here would be an unexpected route (S18-15).
+            if ("GET".equals(method) && url.endsWith("/admin/security/sessions?paged=true")) {
                 Object failure = inventoryFailure;
                 inventoryFailure = null;
                 if (failure != null) return respond(failure);
@@ -403,7 +435,11 @@ public final class AdminSecuritySessionRecoveryBehaviorTest {
                     "{\"sessions\":[{\"session_id\":\"" + sessionId + "\","
                         + "\"device_id\":\"" + DEVICE_ID + "\",\"device_label\":\"synthetic phone\","
                         + "\"current\":true,\"revoked\":false,\"last_seen_at\":\"2026-09-06T02:00:00Z\"}],"
-                        + "\"devices\":[{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true}]}");
+                        + "\"devices\":[{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true,"
+                        + "\"device_label\":\"synthetic phone\",\"last_seen_at\":\"2026-09-06T02:00:00Z\","
+                        + "\"key_version\":1,\"key_marker_prefix\":\""
+                        + AdminDeviceProofTest.MARKER.substring(0, 8) + "\"}],"
+                        + "\"device_total\":1,\"devices_complete\":true}");
             }
             if (url.endsWith("/revoke")) {
                 Object failure = revokeFailure;

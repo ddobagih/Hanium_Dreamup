@@ -96,10 +96,43 @@ class YoloRawPaddingSuppressionTest {
         // These boxes have the same visible intersection, but their unclipped model IoU is 1/3.
         add(values, 0, RectNorm(-.5f, .25f, .75f, .25f), .9f, true)
         add(values, 1, RectNorm(0f, .25f, .25f, .25f), .8f, true)
-        val result = visible(parser(true), values, transform(0))
-        assertEquals(2, result.size)
-        assertBox(result[0].bboxNorm, result[1].bboxNorm)
-        assertEquals(listOf(.9f, .8f), result.map { it.detectionConfidence })
+        val parser = parser(true)
+        val transform = transform(0)
+        val modelResults = parser.parse(values)
+        assertEquals(2, modelResults.size)
+        assertEquals(listOf(.9f, .8f), modelResults.map { it.detectionConfidence })
+        val mappedWithoutImageDeduplication = modelResults.mapNotNull(transform::modelDetectionToImageDetection)
+        assertEquals(2, mappedWithoutImageDeduplication.size)
+        assertBox(mappedWithoutImageDeduplication[0].bboxNorm, mappedWithoutImageDeduplication[1].bboxNorm)
+
+        // S10-10 changes only the final exact-image-duplicate contract, not model-space NMS.
+        val result = visible(parser, values, transform)
+        assertEquals(1, result.size)
+        assertEquals(listOf(mappedWithoutImageDeduplication.first()), result)
+    }
+
+    @Test fun nonidenticalImageIntersectionsStillUseUnclippedModelCoordinatesForNms() {
+        for (turns in 0..3) for (normalized in listOf(true, false)) {
+            val values = tensor()
+            // Raw IoU is .3125; clipping to the model square would raise it to .9375.
+            // Their image intersections differ, so exact-image deduplication must keep both.
+            add(values, 0, rotate(RectNorm(-.5f, .25f, .75f, .25f), turns), .9f, normalized)
+            add(values, 1, rotate(RectNorm(0f, .25f, .234375f, .25f), turns), .8f, normalized)
+            val parser = parser(normalized)
+            val transform = transform(turns)
+            val mappedWithoutImageDeduplication = parser.parse(values)
+                .mapNotNull(transform::modelDetectionToImageDetection)
+            val result = visible(parser, values, transform)
+
+            assertEquals(2, mappedWithoutImageDeduplication.size)
+            assertEquals(2, result.size)
+            assertEquals(mappedWithoutImageDeduplication, result)
+            assertEquals(listOf(.9f, .8f), result.map { it.detectionConfidence })
+            val first = result[0].bboxNorm
+            val second = result[1].bboxNorm
+            assertTrue(first.x != second.x || first.y != second.y ||
+                first.width != second.width || first.height != second.height)
+        }
     }
 
     @Test fun sameClassSuppressionDifferentClassOverlapAndEqualScoreOrderArePreserved() {

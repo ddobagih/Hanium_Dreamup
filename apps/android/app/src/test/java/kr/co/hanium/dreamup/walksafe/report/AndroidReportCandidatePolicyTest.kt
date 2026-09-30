@@ -6,6 +6,7 @@ import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
 import kr.co.hanium.dreamup.walksafe.depth.Point2
 import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
+import kr.co.hanium.dreamup.walksafe.depth.DepthAvailability
 import kr.co.hanium.dreamup.walksafe.depth.Trend
 import kr.co.hanium.dreamup.walksafe.depth.UserFacingDepth
 import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
@@ -37,6 +38,15 @@ class AndroidReportCandidatePolicyTest {
         assertEquals("legacy_two_model", metadata.getString("loaded_model_key"))
         assertEquals("legacy_loaded", metadata.getString("model_load_reason"))
         assertEquals("0123456789abcdef0123456789abcdef01234567", metadata.getString("source_commit"))
+    }
+
+    @Test
+    fun gpsIsLabelledAsTheCaptureDevicePositionWithItsAccuracy() {
+        val metadata = requireNotNull(policy.prepare(input())).metadata
+        assertEquals("CAPTURE_DEVICE", metadata.getString("location_kind"))
+        val gps = metadata.getJSONObject("gps")
+        assertEquals(setOf("latitude", "longitude", "accuracy_m"), gps.keys().asSequence().toSet())
+        assertEquals(false, metadata.has("facility_location"))
     }
 
     @Test
@@ -133,6 +143,176 @@ class AndroidReportCandidatePolicyTest {
         assertEquals(false, candidate.metadata.getBoolean("auto_reported"))
     }
 
+    @Test
+    fun requiresExplicitPassingCoordinateGate() {
+        for (gate in listOf(null, "", "fail", "unknown", "PASS")) {
+            org.junit.Assert.assertNull(policy.prepare(input().copy(coordinateGateStatus = gate)))
+        }
+        org.junit.Assert.assertNotNull(policy.prepare(input().copy(coordinateGateStatus = "pass")))
+    }
+
+    @Test
+    fun inferredAndNonAndroidSourcesCannotBeLabelledSensorDepth() {
+        for (source in listOf(
+            DepthSource.UNKNOWN,
+            DepthSource.OBJECT_SIZE_PRIOR,
+            DepthSource.POLYGON_TREND_PSEUDO_DEPTH,
+            DepthSource.MONOCULAR_METRIC_DEPTH,
+            DepthSource.WEBXR_DEPTH,
+        )) {
+            org.junit.Assert.assertNull(policy.prepare(input(depth = depth().copy(source = source))))
+        }
+        for (source in listOf(DepthSource.ARCORE_RAW_DEPTH, DepthSource.ARCORE_FULL_DEPTH)) {
+            org.junit.Assert.assertNotNull(policy.prepare(input(depth = depth().copy(source = source))))
+        }
+    }
+
+    @Test
+    fun requiresMeasuredFinitePositiveDistance() {
+        for (availability in DepthAvailability.values().filter { it != DepthAvailability.MEASURED }) {
+            org.junit.Assert.assertNull(policy.prepare(input(
+                depth = depth().copy(depthAvailability = availability),
+            )))
+        }
+        for (distance in listOf(null, 0f, -1f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            org.junit.Assert.assertNull(policy.prepare(input(
+                depth = depth().copy(riskDistanceM = distance),
+            )))
+        }
+    }
+
+    @Test
+    fun respectsExplicitDepthExpiryWithoutInventingANewFreshnessWindow() {
+        val valid = input()
+        org.junit.Assert.assertNull(policy.prepare(valid.copy(
+            depth = valid.depth.copy(sourceValidUntilElapsedRealtimeMs = valid.requestElapsedRealtimeMs - 1L),
+        )))
+        org.junit.Assert.assertNotNull(policy.prepare(valid.copy(
+            depth = valid.depth.copy(sourceValidUntilElapsedRealtimeMs = valid.requestElapsedRealtimeMs + 1L),
+        )))
+        org.junit.Assert.assertNotNull(policy.prepare(valid))
+    }
+
+    @Test
+    fun nonFiniteReportNumbersAreRejectedBeforeJsonConstructionForEveryTrigger() {
+        for (trigger in listOf("auto", "voice", "on_screen")) {
+            val valid = input(trigger = trigger)
+            for (number in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+                org.junit.Assert.assertNull(policy.prepare(valid.copy(threshold = number)))
+                org.junit.Assert.assertNull(policy.prepare(valid.copy(heading = number)))
+                org.junit.Assert.assertNull(policy.prepare(valid.copy(depthValidSampleRatio = number)))
+                org.junit.Assert.assertNull(policy.prepare(valid.copy(
+                    depth = valid.depth.copy(detectionConfidence = number),
+                )))
+                org.junit.Assert.assertNull(policy.prepare(valid.copy(
+                    depth = valid.depth.copy(validSampleRatio = number),
+                )))
+                org.junit.Assert.assertNull(policy.prepare(valid.copy(
+                    depth = valid.depth.copy(confidence = valid.depth.confidence.copy(sampleQuality = number)),
+                )))
+            }
+        }
+    }
+
+    @Test
+    fun outOfRangeNumbersCannotBeClampedIntoValidEvidence() {
+        val valid = input(trigger = "voice")
+        for (number in listOf(-0.01f, 1.01f)) {
+            org.junit.Assert.assertNull(policy.prepare(valid.copy(threshold = number)))
+            org.junit.Assert.assertNull(policy.prepare(valid.copy(depthValidSampleRatio = number)))
+            org.junit.Assert.assertNull(policy.prepare(valid.copy(
+                depth = valid.depth.copy(detectionConfidence = number),
+            )))
+            org.junit.Assert.assertNull(policy.prepare(valid.copy(
+                depth = valid.depth.copy(validSampleRatio = number),
+            )))
+            val confidence = valid.depth.confidence
+            for (invalid in listOf(
+                confidence.copy(sourceQuality = number),
+                confidence.copy(sampleQuality = number),
+                confidence.copy(depthQuality = number),
+                confidence.copy(detectionQuality = number),
+                confidence.copy(trackingQuality = number),
+                confidence.copy(motionQuality = number),
+                confidence.copy(freshnessQuality = number),
+                confidence.copy(corridorQuality = number),
+                confidence.copy(hardGate = number),
+            )) {
+                org.junit.Assert.assertNull(policy.prepare(valid.copy(
+                    depth = valid.depth.copy(confidence = invalid),
+                )))
+            }
+        }
+        org.junit.Assert.assertNull(policy.prepare(valid.copy(depthSampleCount = -1)))
+        org.junit.Assert.assertNull(policy.prepare(valid.copy(
+            depth = valid.depth.copy(validSampleCount = -1),
+        )))
+    }
+
+    @Test
+    fun rejectsNonFiniteNonPositiveAndOutOfImageBoxes() {
+        val valid = input()
+        val box = valid.depth.bboxNorm
+        val malformed = mutableListOf(
+            box.copy(x = -0.01f), box.copy(y = -0.01f),
+            box.copy(width = 0f), box.copy(height = 0f),
+            box.copy(width = -0.1f), box.copy(height = -0.1f),
+            box.copy(x = 0.9f, width = 0.2f), box.copy(y = 0.9f, height = 0.2f),
+        )
+        for (number in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            malformed += listOf(box.copy(x = number), box.copy(y = number),
+                box.copy(width = number), box.copy(height = number))
+        }
+        for (invalid in malformed) {
+            org.junit.Assert.assertNull(policy.prepare(valid.copy(
+                depth = valid.depth.copy(bboxNorm = invalid),
+            )))
+        }
+    }
+
+    @Test
+    fun rejectsTinyPositiveExtentsBeyondRightAndBottomEdges() {
+        val valid = input()
+        val box = valid.depth.bboxNorm
+        for (overflow in listOf(
+            box.copy(x = 1f, width = 1e-8f),
+            box.copy(y = 1f, height = 1e-8f),
+        )) {
+            org.junit.Assert.assertNull(policy.prepare(valid.copy(
+                depth = valid.depth.copy(bboxNorm = overflow),
+            )))
+        }
+    }
+
+    @Test
+    fun acceptsExactBinaryImageBoundaries() {
+        val valid = input()
+        val box = valid.depth.bboxNorm
+        for (boundary in listOf(
+            box.copy(x = 0f, y = 0f, width = 1f, height = 1f),
+            box.copy(x = 0.5f, y = 0.5f, width = 0.5f, height = 0.5f),
+        )) {
+            org.junit.Assert.assertNotNull(policy.prepare(valid.copy(
+                depth = valid.depth.copy(bboxNorm = boundary),
+            )))
+        }
+    }
+
+    @Test
+    fun preservesExistingUnitIntervalBoundariesWithoutAddingQualityThresholds() {
+        val valid = input(trigger = "voice")
+        for (boundary in listOf(0f, 1f)) {
+            org.junit.Assert.assertNotNull(policy.prepare(valid.copy(
+                threshold = boundary,
+                depthValidSampleRatio = boundary,
+                depth = valid.depth.copy(
+                    detectionConfidence = boundary,
+                    bboxNorm = valid.depth.bboxNorm.copy(x = 0f, y = 0f, width = 1f, height = 1f),
+                ),
+            )))
+        }
+    }
+
     private fun input(
         depth: TrackedObjectDepth = depth(),
         location: TrustedLocation? = TrustedLocation(37.0, 127.0, 8f, 1_000L),
@@ -161,6 +341,7 @@ class AndroidReportCandidatePolicyTest {
             traceId = "trace-1",
             deviceGateAllowsReports = deviceGateAllowsReports,
             detectionAgeMs = detectionAgeMs,
+            coordinateGateStatus = "pass",
             heading = heading,
             fallbackUsed = false,
             loadedModelKey = "legacy_two_model",

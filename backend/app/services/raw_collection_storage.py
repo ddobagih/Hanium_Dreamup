@@ -42,7 +42,11 @@ from backend.app.services.capacity_state import (
     CapacityState,
     CapacityStateUnavailable,
 )
-from backend.app.services.privacy_lifecycle import privacy_subject_hmac
+from backend.app.services.privacy_lifecycle import (
+    configured_privacy_hmac_lookup_keys,
+    privacy_subject_hmac,
+    resolve_stored_privacy_subject,
+)
 from backend.app.services.raw_collection_crypto import (
     AAD_VERSION,
     ENVELOPE_VERSION,
@@ -2839,6 +2843,7 @@ class RawCollectionStorage:
             )
         binding = self._binding(collection, item, chunk)
         try:
+            self._key_manager.synchronize(db)
             slot = self._key_manager.encryption_slot()
             if slot.material is None:
                 raise ReportImageKeyError("active report key material is unavailable")
@@ -2974,6 +2979,17 @@ class RawCollectionStorage:
         if rows is None:
             raise _not_found()
         collection, inventory = rows
+        if configured_privacy_hmac_lookup_keys():
+            # S1617-50: a collection written before a rotation keeps the
+            # subject derived by its (now lookup-only) key.
+            resolved = resolve_stored_privacy_subject(
+                actor_id,
+                account_generation,
+                collection.privacy_subject_hmac,
+                secret=self._privacy_hmac_secret,
+            )
+            if resolved is not None:
+                privacy_subject = resolved.subject
         if (
             not self._owned(
                 collection,

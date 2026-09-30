@@ -23,7 +23,14 @@ internal object WakePhraseCommandExtractor {
     ): WakePhraseCommandExtraction {
         val tokens = normalizedTokens(transcript)
             ?: return WakePhraseCommandExtraction.NotAddressed
-        val wakePhraseEnd = wakePhraseEnd(tokens)
+        val wakePhraseEnd = if (mode == WakePhraseCommandMode.COMMAND_AWAITED) {
+            when {
+                tokens.firstOrNull() == WAKE_PHRASE -> 1
+                tokens.firstOrNull() == WAKE_PHRASE_FIRST_PART &&
+                    tokens.getOrNull(1) == WAKE_PHRASE_SECOND_PART -> 2
+                else -> null
+            }
+        } else wakePhraseEnd(tokens)
 
         if (
             mode == WakePhraseCommandMode.WAKE_PHRASE_REQUIRED &&
@@ -42,16 +49,12 @@ internal object WakePhraseCommandExtractor {
     }
 
     private fun wakePhraseEnd(tokens: List<String>): Int? {
-        tokens.indices.forEach { index ->
-            if (tokens[index] == WAKE_PHRASE) return index + 1
-            if (
-                tokens[index] == WAKE_PHRASE_FIRST_PART &&
-                tokens.getOrNull(index + 1) == WAKE_PHRASE_SECOND_PART
-            ) {
-                return index + 2
-            }
+        return when {
+            tokens.firstOrNull() == WAKE_PHRASE -> 1
+            tokens.firstOrNull() == WAKE_PHRASE_FIRST_PART &&
+                tokens.getOrNull(1) == WAKE_PHRASE_SECOND_PART -> 2
+            else -> null
         }
-        return null
     }
 
     private fun normalizedTokens(value: String): List<String>? {

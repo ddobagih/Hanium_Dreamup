@@ -23,6 +23,11 @@ internal class GnssQualityObserver(
     private val source: GnssObservationSource,
     private val estimator: GnssQualityEstimator = GnssQualityEstimator(),
     private val statusStaleAfterNanos: Long = 5_000_000_000L,
+    /**
+     * Status C/N0 window, used only while the raw-measurement feed is not registered. Android
+     * reports both GnssStatus and GnssMeasurement C/N0 at the antenna, so the same thresholds apply.
+     */
+    private val statusCn0Estimator: GnssQualityEstimator = GnssQualityEstimator(),
     private val onSnapshot: (GnssQualitySnapshot) -> Unit,
 ) : AutoCloseable {
     private var generation = 0L
@@ -148,17 +153,32 @@ internal class GnssQualityObserver(
 
     @Synchronized
     private fun handleStatus(callbackGeneration: Long, epoch: GnssSignalEpoch) {
-        if (!isCurrent(callbackGeneration)) return
+        if (!isCurrent(callbackGeneration) || epoch.elapsedRealtimeNanos < 0L ||
+            latestStatusAtNanos?.let { epoch.elapsedRealtimeNanos <= it } == true
+        ) return
         latestStatusSummary = summarizeGnssFrequencies(epoch.signals)
         latestStatusAtNanos = epoch.elapsedRealtimeNanos
-        val rawSnapshot = latestRawSnapshot ?: unknownSnapshot(epoch.elapsedRealtimeNanos)
+        statusCn0Estimator.addEpoch(
+            epoch.elapsedRealtimeNanos,
+            epoch.signals,
+            epoch.timeSource,
+            epoch.timestampUncertaintyNanos,
+        )
+        val rawSnapshot = estimator.snapshot(epoch.elapsedRealtimeNanos)
         onSnapshot(mergeStatus(rawSnapshot, epoch.elapsedRealtimeNanos))
     }
 
     @Synchronized
     private fun handleMeasurements(callbackGeneration: Long, epoch: GnssSignalEpoch) {
-        if (!isCurrent(callbackGeneration)) return
-        val rawSnapshot = estimator.addEpoch(epoch.elapsedRealtimeNanos, epoch.signals)
+        if (!isCurrent(callbackGeneration) || epoch.elapsedRealtimeNanos < 0L ||
+            latestRawSnapshot?.latestEpochAtNanos?.let { epoch.elapsedRealtimeNanos <= it } == true
+        ) return
+        val rawSnapshot = estimator.addEpoch(
+            epoch.elapsedRealtimeNanos,
+            epoch.signals,
+            epoch.timeSource,
+            epoch.timestampUncertaintyNanos,
+        )
         latestRawSnapshot = rawSnapshot
         onSnapshot(mergeStatus(rawSnapshot, epoch.elapsedRealtimeNanos))
     }
@@ -167,6 +187,16 @@ internal class GnssQualityObserver(
         rawSnapshot: GnssQualitySnapshot,
         evaluatedAtNanos: Long,
     ): GnssQualitySnapshot {
+        // S09-5: without a raw-measurement subscription the status C/N0 window is the only signal
+        // quality evidence. With raw registered, status C/N0 is ignored (no double counting).
+        val signalSnapshot = if (measurementSubscription == null && statusSubscription != null) {
+            statusCn0Estimator.snapshot(evaluatedAtNanos)
+                .takeIf { it.latestEpochAtNanos != null }
+                ?.copy(cn0FromSatelliteStatus = true)
+                ?: rawSnapshot
+        } else {
+            rawSnapshot
+        }
         val statusAtNanos = latestStatusAtNanos
         val statusSummary = latestStatusSummary?.takeIf {
             statusAtNanos != null &&
@@ -182,8 +212,8 @@ internal class GnssQualityObserver(
                 usedInFixKnown = statusSummary.usedInFixKnown,
             )
         }
-        return rawSnapshot.copy(
-            evaluatedAtNanos = evaluatedAtNanos.coerceAtLeast(rawSnapshot.evaluatedAtNanos),
+        return signalSnapshot.copy(
+            evaluatedAtNanos = evaluatedAtNanos.coerceAtLeast(signalSnapshot.evaluatedAtNanos),
             frequencySummary = mergedFrequencySummary,
         )
     }
@@ -206,6 +236,7 @@ internal class GnssQualityObserver(
         latestRawSnapshot = null
         lastStartResult = null
         estimator.clear()
+        statusCn0Estimator.clear()
     }
 
     private fun cancelOrRetain(subscription: GnssObservationSubscription?) {

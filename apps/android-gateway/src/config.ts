@@ -133,19 +133,29 @@ export function resolveVoiceServiceConfig(
 
 export type BindAddress = { host: string; port: number };
 
+/**
+ * `refreshIdleTtlSeconds` / `refreshAbsoluteTtlSeconds` are null when the operator set the
+ * explicit value `unlimited` (owner decision 2, 2026-09-29: login stays until logout, app
+ * removal, remote revoke, password change, lock, reuse, incident, admin action or account
+ * deletion). The access TTL is always finite and refresh tokens keep rotating.
+ */
 export type FieldLongSessionConfig = {
   accessTtlSeconds: number;
-  refreshIdleTtlSeconds: number;
-  refreshAbsoluteTtlSeconds: number;
+  refreshIdleTtlSeconds: number | null;
+  refreshAbsoluteTtlSeconds: number | null;
 };
+
+const UNLIMITED_TTL = "unlimited";
 
 function explicitTtlSeconds(
   environment: NodeJS.ProcessEnv,
   name: string,
   minimum: number,
-  maximum: number
-): number | null {
+  maximum: number,
+  allowUnlimited = false
+): number | typeof UNLIMITED_TTL | null {
   const value = environment[name]?.trim() ?? "";
+  if (allowUnlimited && value === UNLIMITED_TTL) return UNLIMITED_TTL;
   if (!/^\d+$/.test(value)) return null;
   const seconds = Number(value);
   return Number.isSafeInteger(seconds) && seconds >= minimum && seconds <= maximum
@@ -156,7 +166,13 @@ function explicitTtlSeconds(
 export function resolveFieldLongSessionConfig(
   environment: NodeJS.ProcessEnv = process.env
 ): FieldLongSessionConfig | null {
-  if (environment.WALKSAFE_FIELD_LONG_LIVED_SESSIONS_ENABLED?.trim() !== "true") return null;
+  // login-F12: only an exact `true` enables and only empty/`false` disables; any other value
+  // (`True`, `1`, `yes`, ...) is a configuration error at startup instead of a silent off.
+  const enabled = environment.WALKSAFE_FIELD_LONG_LIVED_SESSIONS_ENABLED?.trim() ?? "";
+  if (enabled === "" || enabled === "false") return null;
+  if (enabled !== "true") {
+    throw new Error("WALKSAFE_FIELD_LONG_LIVED_SESSIONS_ENABLED must be true or false");
+  }
   const accessTtlSeconds = explicitTtlSeconds(
     environment,
     "WALKSAFE_FIELD_ACCESS_TTL_SECONDS",
@@ -167,24 +183,77 @@ export function resolveFieldLongSessionConfig(
     environment,
     "WALKSAFE_FIELD_REFRESH_IDLE_TTL_SECONDS",
     MIN_FIELD_REFRESH_IDLE_TTL_SECONDS,
-    MAX_FIELD_REFRESH_IDLE_TTL_SECONDS
+    MAX_FIELD_REFRESH_IDLE_TTL_SECONDS,
+    true
   );
   const refreshAbsoluteTtlSeconds = explicitTtlSeconds(
     environment,
     "WALKSAFE_FIELD_REFRESH_ABSOLUTE_TTL_SECONDS",
     MIN_FIELD_REFRESH_ABSOLUTE_TTL_SECONDS,
-    MAX_FIELD_REFRESH_ABSOLUTE_TTL_SECONDS
+    MAX_FIELD_REFRESH_ABSOLUTE_TTL_SECONDS,
+    true
   );
+  // Ordering with `unlimited` as infinity: access <= idle <= absolute. An unlimited idle
+  // window under a finite absolute cap is rejected like any other inverted pair.
   if (
-    accessTtlSeconds === null ||
+    typeof accessTtlSeconds !== "number" ||
     refreshIdleTtlSeconds === null ||
     refreshAbsoluteTtlSeconds === null ||
-    refreshIdleTtlSeconds < accessTtlSeconds ||
-    refreshAbsoluteTtlSeconds < refreshIdleTtlSeconds
+    (typeof refreshIdleTtlSeconds === "number" && refreshIdleTtlSeconds < accessTtlSeconds) ||
+    (typeof refreshAbsoluteTtlSeconds === "number" && (
+      refreshIdleTtlSeconds === UNLIMITED_TTL || refreshAbsoluteTtlSeconds < refreshIdleTtlSeconds
+    ))
   ) {
-    return null;
+    throw new Error("field long-lived session TTL configuration is invalid");
   }
-  return { accessTtlSeconds, refreshIdleTtlSeconds, refreshAbsoluteTtlSeconds };
+  return {
+    accessTtlSeconds,
+    refreshIdleTtlSeconds: refreshIdleTtlSeconds === UNLIMITED_TTL ? null : refreshIdleTtlSeconds,
+    refreshAbsoluteTtlSeconds: refreshAbsoluteTtlSeconds === UNLIMITED_TTL
+      ? null
+      : refreshAbsoluteTtlSeconds
+  };
+}
+
+export function assertFieldLongSessionConfiguration(
+  environment: NodeJS.ProcessEnv = process.env
+): void {
+  resolveFieldLongSessionConfig(environment);
+  // S19-17: validated with the other field settings before listen.
+  resolveFieldWalkV1CommandMode(environment);
+  // S19-53: field login, refresh, and upload limits are keyed by this header.
+  assertTrustedClientIpConfiguration(environment);
+}
+/**
+ * S19-53: production (the field deployment template also runs with NODE_ENV=production)
+ * must name the header its reverse proxy overwrites on every request. Without it every
+ * client address would be unknown, so startup fails instead of serving with merged limits.
+ */
+export function assertTrustedClientIpConfiguration(
+  environment: NodeJS.ProcessEnv = process.env
+): void {
+  if (environment.NODE_ENV !== "production") return;
+  const value = environment.WALKSAFE_GATEWAY_TRUSTED_IP_HEADER?.trim().toLowerCase() ?? "";
+  if (value !== "cf-connecting-ip" && value !== "x-real-ip") {
+    throw new Error(
+      "WALKSAFE_GATEWAY_TRUSTED_IP_HEADER must be cf-connecting-ip or x-real-ip in production"
+    );
+  }
+}
+export type FieldWalkV1CommandMode = "accept" | "reject";
+/**
+ * S19-17: `walksafe.field-walk-command.v1` carries no issue time, so an evicted v1 request
+ * cannot be bounded by the idempotency window. Android sends only v2, so v1 is refused by
+ * default (409 walk_command_version_retired, nothing executed); `accept` is an explicit
+ * opt-in for a legacy client. Any other value is a startup error.
+ */
+export function resolveFieldWalkV1CommandMode(
+  environment: NodeJS.ProcessEnv = process.env
+): FieldWalkV1CommandMode {
+  const value = environment.WALKSAFE_FIELD_WALK_V1_COMMANDS?.trim() ?? "";
+  if (value === "" || value === "reject") return "reject";
+  if (value === "accept") return "accept";
+  throw new Error("WALKSAFE_FIELD_WALK_V1_COMMANDS must be accept or reject");
 }
 
 export function resolveBindAddress(

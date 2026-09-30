@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.network
 
+import kr.co.hanium.dreamup.walksafe.session.WalkSessionState
+
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -238,32 +240,6 @@ class AndroidNetworkTransferPolicyTest {
     }
 
     @Test
-    fun stationarySnapshotRequiresActiveSessionRealSampleAndExistingThreshold() {
-        val controller = ActivityOriginalUploadAdmissionController(
-            stationaryConfirmationMs = 5_000L,
-        )
-        assertNull(controller.stationarySnapshot(10_000L))
-
-        controller.onSessionActiveChanged(active = true, observedAtMs = 0L) {}
-        controller.onTrackingStarted(observedAtMs = 0L) {}
-        assertNull(controller.stationarySnapshot(10_000L))
-
-        controller.onSensorSample(stepCount = 7, observedAtMs = 10_000L) {}
-        assertNull(controller.stationarySnapshot(-1L))
-        assertNull(controller.stationarySnapshot(9_999L))
-        assertNull(controller.stationarySnapshot(14_999L))
-        assertEquals(
-            ActivityOriginalStationarySnapshot(stepCount = 7, observedAtMs = 15_000L),
-            controller.stationarySnapshot(15_000L),
-        )
-
-        controller.onSensorSample(stepCount = 8, observedAtMs = 15_001L) {}
-        assertNull(controller.stationarySnapshot(15_001L))
-        controller.onSessionActiveChanged(active = false, observedAtMs = 20_001L) {}
-        assertNull(controller.stationarySnapshot(30_000L))
-    }
-
-    @Test
     fun unknownMotionFailsClosedEvenOnWifi() {
         assertEquals(
             ActivityOriginalUploadDecision.FAIL_CLOSED,
@@ -277,7 +253,7 @@ class AndroidNetworkTransferPolicyTest {
 
     @Test
     fun admissionCheckAndEnqueueCompleteBeforeConcurrentCloseAndCancel() {
-        val controller = stationaryController()
+        val controller = ActivityOriginalUploadAdmissionController()
         val actionStarted = CountDownLatch(1)
         val closeAttempted = CountDownLatch(1)
         val releaseAction = CountDownLatch(1)
@@ -286,10 +262,11 @@ class AndroidNetworkTransferPolicyTest {
         try {
             val admitted = executor.submit<Boolean> {
                 controller.admit(
+                    walkState = WalkSessionState.ENDED,
                     consentAllowed = true,
+                    charging = { true },
                     preference = MobileNetworkPreference.WIFI_ONLY,
                     transport = ActiveNetworkTransport.WIFI,
-                    observedAtMs = 5_000L,
                 ) {
                     order.add("enqueue-start")
                     actionStarted.countDown()
@@ -300,10 +277,8 @@ class AndroidNetworkTransferPolicyTest {
             assertTrue(actionStarted.await(2, TimeUnit.SECONDS))
             val closed = executor.submit {
                 closeAttempted.countDown()
-                controller.onSensorSample(
-                    stepCount = 1,
-                    observedAtMs = 5_001L,
-                ) {
+                // Owner decision 3(b): a new walk that becomes ACTIVE closes and cancels.
+                controller.onWalkStateChanged(WalkSessionState.ACTIVE) {
                     order.add("cancel")
                 }
             }
@@ -318,11 +293,12 @@ class AndroidNetworkTransferPolicyTest {
             )
             assertFalse(
                 controller.admit(
+                    walkState = WalkSessionState.ACTIVE,
                     consentAllowed = true,
+                    charging = { true },
                     preference = MobileNetworkPreference.WIFI_ONLY,
                     transport = ActiveNetworkTransport.WIFI,
-                    observedAtMs = 5_001L,
-                    action = { error("closed admission must not re-enter") },
+                    action = { error("an active walk must not re-enter") },
                 ),
             )
         } finally {
@@ -332,188 +308,111 @@ class AndroidNetworkTransferPolicyTest {
     }
 
     @Test
-    fun closeAndCancelBeforeAdmissionPreventsCheckAndEnqueue() {
-        val controller = stationaryController()
+    fun aWalkThatBecomesActiveOrPausedClosesAndCancelsAndOnlyThePostWalkStateAdmits() {
+        val controller = ActivityOriginalUploadAdmissionController()
         val actionRan = AtomicBoolean(false)
         var cancellations = 0
-
-        controller.onSensorSample(
-            stepCount = 1,
-            observedAtMs = 5_001L,
-        ) {
-            cancellations += 1
-        }
-        val admitted = controller.admit(
-            consentAllowed = true,
-            preference = MobileNetworkPreference.WIFI_ONLY,
-            transport = ActiveNetworkTransport.WIFI,
-            observedAtMs = 5_001L,
-        ) {
-            actionRan.set(true)
-        }
-
-        assertEquals(1, cancellations)
-        assertFalse(admitted)
+        controller.onWalkStateChanged(WalkSessionState.PAUSED) { cancellations += 1 }
+        assertFalse(
+            controller.admit(
+                walkState = WalkSessionState.PAUSED,
+                consentAllowed = true,
+                charging = { true },
+                preference = MobileNetworkPreference.ALLOW_CELLULAR,
+                transport = ActiveNetworkTransport.WIFI,
+            ) { actionRan.set(true) },
+        )
         assertFalse(actionRan.get())
-    }
-
-    @Test
-    fun inactiveTransitionClosesAndCancelsEvenFromConfirmedStationary() {
-        val controller = stationaryController()
-        var cancellations = 0
-
-        controller.onSessionActiveChanged(
-            active = false,
-            observedAtMs = 5_000L,
-        ) {
-            cancellations += 1
-        }
-
+        controller.onWalkStateChanged(WalkSessionState.ENDED) { cancellations += 1 }
         assertEquals(1, cancellations)
-        assertTrue(
-            AndroidActivityOriginalUploadPolicy.shouldCancelInFlight(
-                ActivityOriginalMotionState.STATIONARY,
-                ActivityOriginalMotionState.UNKNOWN,
-            ),
-        )
-        assertTrue(
-            AndroidActivityOriginalUploadPolicy.shouldCancelInFlight(
-                ActivityOriginalMotionState.UNKNOWN,
-                ActivityOriginalMotionState.UNKNOWN,
-            ),
-        )
+        // R4: a system SAFE_STOP is not an explicit end; it admits nothing.
         assertFalse(
             controller.admit(
+                walkState = WalkSessionState.SAFE_STOP,
                 consentAllowed = true,
+                charging = { true },
                 preference = MobileNetworkPreference.WIFI_ONLY,
                 transport = ActiveNetworkTransport.WIFI,
-                observedAtMs = 20_000L,
-                action = { error("inactive admission must stay closed") },
-            ),
-        )
-    }
-
-    @Test
-    fun firstSensorSampleClosesAdmissionAndStartsStationaryWindow() {
-        val controller = ActivityOriginalUploadAdmissionController(
-            stationaryConfirmationMs = 5_000L,
-        )
-        var cancellations = 0
-        controller.onSessionActiveChanged(
-            active = true,
-            observedAtMs = 0L,
-        ) {
-            cancellations += 1
-        }
-        controller.onTrackingStarted(observedAtMs = 0L) {
-            cancellations += 1
-        }
-
-        assertFalse(
-            controller.admit(
-                consentAllowed = true,
-                preference = MobileNetworkPreference.WIFI_ONLY,
-                transport = ActiveNetworkTransport.WIFI,
-                observedAtMs = 50_000L,
-                action = { error("tracking start is not a stationary sample") },
-            ),
-        )
-
-        controller.onSensorSample(stepCount = 0, observedAtMs = 50_001L) {
-            cancellations += 1
-        }
-        assertEquals(3, cancellations)
-        assertFalse(
-            controller.admit(
-                consentAllowed = true,
-                preference = MobileNetworkPreference.WIFI_ONLY,
-                transport = ActiveNetworkTransport.WIFI,
-                observedAtMs = 55_000L,
-                action = { error("stationary window is not complete") },
-            ),
-        )
-        assertTrue(
-            controller.admit(
-                consentAllowed = true,
-                preference = MobileNetworkPreference.WIFI_ONLY,
-                transport = ActiveNetworkTransport.WIFI,
-                observedAtMs = 55_001L,
                 action = {},
             ),
         )
+        for (after in listOf(WalkSessionState.ENDED, WalkSessionState.READY)) {
+            assertTrue(
+                controller.admit(
+                    walkState = after,
+                    consentAllowed = true,
+                    charging = { true },
+                    preference = MobileNetworkPreference.WIFI_ONLY,
+                    transport = ActiveNetworkTransport.WIFI,
+                    action = {},
+                ),
+            )
+        }
     }
 
     @Test
-    fun trackingStopClosesAdmissionResetsMotionAndCancelsBothUploaders() {
-        val controller = stationaryController()
-        var metadataCancels = 0
-        var frameCancels = 0
-
-        controller.onTrackingStopped {
-            metadataCancels += 1
-            frameCancels += 1
+    fun postWalkAdmissionNeedsConsentChargingAndTheNetworkSettingButNoStillness() {
+        val decide = { state: WalkSessionState, consent: Boolean, charging: Boolean,
+            preference: MobileNetworkPreference, transport: ActiveNetworkTransport ->
+            AndroidActivityOriginalUploadPolicy.decideAfterWalk(state, consent, { charging }, preference, transport)
         }
-
-        assertEquals(1, metadataCancels)
-        assertEquals(1, frameCancels)
-        assertFalse(
-            controller.admit(
-                consentAllowed = true,
-                preference = MobileNetworkPreference.WIFI_ONLY,
-                transport = ActiveNetworkTransport.WIFI,
-                observedAtMs = 60_000L,
-                action = { error("tracking stop must remain fail-closed") },
-            ),
+        assertEquals(
+            ActivityOriginalUploadDecision.BLOCKED_WHILE_WALKING,
+            decide(WalkSessionState.ACTIVE, true, true, MobileNetworkPreference.WIFI_ONLY, ActiveNetworkTransport.WIFI),
+        )
+        assertEquals(
+            ActivityOriginalUploadDecision.FAIL_CLOSED,
+            decide(WalkSessionState.ENDED, false, true, MobileNetworkPreference.WIFI_ONLY, ActiveNetworkTransport.WIFI),
+        )
+        assertEquals(
+            ActivityOriginalUploadDecision.QUEUED_UNTIL_CHARGING,
+            decide(WalkSessionState.ENDED, true, false, MobileNetworkPreference.WIFI_ONLY, ActiveNetworkTransport.WIFI),
+        )
+        assertEquals(
+            ActivityOriginalUploadDecision.WIFI_ALLOWED,
+            decide(WalkSessionState.ENDED, true, true, MobileNetworkPreference.WIFI_ONLY, ActiveNetworkTransport.WIFI),
+        )
+        assertEquals(
+            ActivityOriginalUploadDecision.QUEUED_UNTIL_WIFI,
+            decide(WalkSessionState.ENDED, true, true, MobileNetworkPreference.WIFI_ONLY, ActiveNetworkTransport.CELLULAR),
+        )
+        // transfer-F4: after the walk originals follow the RAW rule (Wi-Fi only) even with mobile data allowed.
+        assertEquals(
+            ActivityOriginalUploadDecision.QUEUED_UNTIL_WIFI,
+            decide(WalkSessionState.READY, true, true, MobileNetworkPreference.ALLOW_CELLULAR, ActiveNetworkTransport.CELLULAR),
+        )
+        assertEquals(
+            ActivityOriginalUploadDecision.WIFI_ALLOWED,
+            decide(WalkSessionState.READY, true, true, MobileNetworkPreference.ALLOW_CELLULAR, ActiveNetworkTransport.WIFI),
+        )
+        assertEquals(
+            ActivityOriginalUploadDecision.FAIL_CLOSED,
+            decide(WalkSessionState.ENDED, true, true, MobileNetworkPreference.ALLOW_CELLULAR, ActiveNetworkTransport.OFFLINE),
         )
     }
 
     @Test
-    fun trackingRestartRequiresANewFirstSensorSampleBeforeStationary() {
-        val controller = stationaryController()
-        controller.onTrackingStopped {}
-        controller.onTrackingStarted(observedAtMs = 10_000L) {}
-
+    fun chargingIsReadOnlyAfterTheWalkAndConsentGatesAndAFailingReadIsNotCharging() {
+        var reads = 0
+        val controller = ActivityOriginalUploadAdmissionController()
         assertFalse(
-            controller.admit(
+            controller.isAllowed(
+                walkState = WalkSessionState.ACTIVE,
                 consentAllowed = true,
+                charging = { reads += 1; true },
                 preference = MobileNetworkPreference.WIFI_ONLY,
                 transport = ActiveNetworkTransport.WIFI,
-                observedAtMs = 60_000L,
-                action = { error("restart without a sample must stay unknown") },
             ),
         )
-
-        controller.onSensorSample(stepCount = 7, observedAtMs = 60_001L) {}
+        assertEquals(0, reads)
         assertFalse(
-            controller.admit(
+            controller.isAllowed(
+                walkState = WalkSessionState.ENDED,
                 consentAllowed = true,
+                charging = { error("battery state unreadable") },
                 preference = MobileNetworkPreference.WIFI_ONLY,
                 transport = ActiveNetworkTransport.WIFI,
-                observedAtMs = 65_000L,
-                action = { error("new first-sample window is not complete") },
             ),
         )
-        assertTrue(
-            controller.admit(
-                consentAllowed = true,
-                preference = MobileNetworkPreference.WIFI_ONLY,
-                transport = ActiveNetworkTransport.WIFI,
-                observedAtMs = 65_001L,
-                action = {},
-            ),
-        )
-    }
-
-    private fun stationaryController(): ActivityOriginalUploadAdmissionController {
-        return ActivityOriginalUploadAdmissionController(
-            stationaryConfirmationMs = 5_000L,
-        ).also { controller ->
-            controller.onSessionActiveChanged(
-                active = true,
-                observedAtMs = 0L,
-            ) {}
-            controller.onTrackingStarted(observedAtMs = 0L) {}
-            controller.onSensorSample(stepCount = 0, observedAtMs = 0L) {}
-        }
     }
 }

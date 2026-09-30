@@ -76,7 +76,13 @@ class PedestrianHeadingSelectorTest {
         assertNull(selector.select(input(now = 1_000L, speedMps = 0.2, gps = 90.0, magnetic = 10.0, magneticAt = 499L)))
         assertNull(selector.select(input(now = 1_000L, speedMps = 0.2, gps = 90.0, magnetic = 10.0, magneticAccuracy = 31.0)))
         assertNull(selector.select(input(now = 1_000L, speedMps = 0.2, gps = 90.0, magnetic = 10.0, mounted = false)))
-        assertNull(selector.select(input(now = 1_000L, speedMps = 0.8, gps = 90.0, magnetic = 10.0, gpsAccuracy = null)))
+        // S09-27: a valid mounted magnetic heading now replaces a missing GPS course, so this
+        // rejection case needs both sources to be invalid.
+        assertNull(
+            selector.select(
+                input(now = 1_000L, speedMps = 0.8, gps = 90.0, magnetic = 10.0, gpsAccuracy = null, mounted = false),
+            ),
+        )
         assertNull(
             selector.select(
                 input(now = 1_000L, speedMps = 0.8, gps = 90.0, magnetic = 10.0).copy(speed = null),
@@ -89,32 +95,111 @@ class PedestrianHeadingSelectorTest {
         val selector = selector(requiredConsecutive = 2)
         selector.select(input(now = 0L, speedMps = 0.2, gps = 90.0, magnetic = 10.0))
 
-        val unavailable = selector.select(
-            input(now = 100L, speedMps = 1.0, gps = 90.0, magnetic = 10.0).copy(
-                magneticTrueHeading = null,
+        // S09-27: the lost magnetic source is replaced by the fresh GPS course, never by the last 10°.
+        val replaced = requireNotNull(
+            selector.select(
+                input(now = 100L, speedMps = 1.0, gps = 90.0, magnetic = 10.0).copy(
+                    magneticTrueHeading = null,
+                ),
             ),
         )
+        val unavailable = selector.select(
+            input(now = 200L, speedMps = 1.0, gps = null, magnetic = null),
+        )
 
+        assertEquals(PedestrianHeadingSource.GPS_COURSE, replaced.source)
+        assertEquals(90.0, replaced.headingDegreesTrueNorth, 1e-9)
         assertNull(unavailable)
+    }
+
+    @Test
+    fun speedMissingKeepsHeadingUnavailableEvenWithValidMountedMagnetic() {
+        // S09-25: without a trusted GNSS speed the pedestrian heading stays unavailable (policy
+        // NPC-NAVIGATION-ROUTE-DIRECTION: steps never replace untrusted location/direction).
+        val selector = selector()
+        selector.select(input(now = 0L, speedMps = 0.2, gps = 90.0, magnetic = 10.0))
+
+        assertNull(selector.select(input(now = 100L, speedMps = 0.2, gps = null, magnetic = 10.0).copy(speed = null)))
+        assertNull(selector.select(input(now = 3_000L, speedMps = 0.2, gps = null, magnetic = 10.0, speedAt = 900L)))
+    }
+
+    @Test
+    fun startsWithAValidSourceInsideHysteresisBand() {
+        // S09-26: the band only suppresses switching; the first selection uses a valid source.
+        val gps = selector().select(input(now = 1_000L, speedMps = 0.65, gps = 90.0, magnetic = 10.0))
+        val magnetic = selector().select(
+            input(now = 1_000L, speedMps = 0.65, gps = 90.0, magnetic = 10.0, gpsAccuracy = null),
+        )
+        val neither = selector().select(
+            input(now = 1_000L, speedMps = 0.65, gps = 90.0, magnetic = 10.0, gpsAccuracy = null, mounted = false),
+        )
+
+        assertEquals(PedestrianHeadingSource.GPS_COURSE, requireNotNull(gps).source)
+        assertEquals(90.0, gps.headingDegreesTrueNorth, 1e-9)
+        assertEquals(PedestrianHeadingSource.MAGNETIC_TRUE, requireNotNull(magnetic).source)
+        assertEquals(10.0, magnetic.headingDegreesTrueNorth, 1e-9)
+        assertNull(neither)
+    }
+
+    @Test
+    fun initialBandSelectionKeepsNormalSwitchHysteresisAfterwards() {
+        val selector = selector(minimumHoldMs = 1_000L, requiredConsecutive = 2)
+        selector.select(input(now = 0L, speedMps = 0.65, gps = 90.0, magnetic = 10.0))
+
+        val held = selector.select(input(now = 100L, speedMps = 0.3, gps = 92.0, magnetic = 12.0))
+        val stillHeld = selector.select(input(now = 200L, speedMps = 0.3, gps = 94.0, magnetic = 14.0))
+        val switched = selector.select(input(now = 1_000L, speedMps = 0.3, gps = 96.0, magnetic = 16.0))
+
+        assertEquals(PedestrianHeadingSource.GPS_COURSE, requireNotNull(held).source)
+        assertEquals(PedestrianHeadingSource.GPS_COURSE, requireNotNull(stillHeld).source)
+        assertEquals(PedestrianHeadingSource.MAGNETIC_TRUE, requireNotNull(switched).source)
+    }
+
+    @Test
+    fun gpsPreferredSpeedWithoutGpsCourseUsesValidMagneticImmediately() {
+        // S09-27: a missing preferred source is not a reason to leave a valid alternative unused.
+        val result = selector().select(
+            input(now = 1_000L, speedMps = 1.0, gps = null, magnetic = 20.0),
+        )
+
+        assertEquals(PedestrianHeadingSource.MAGNETIC_TRUE, requireNotNull(result).source)
+        assertEquals(20.0, result.headingDegreesTrueNorth, 1e-9)
+    }
+
+    @Test
+    fun lostActiveSourceIsReplacedWithoutNormalSwitchWait() {
+        val selector = selector(minimumHoldMs = 10_000L, requiredConsecutive = 3)
+        selector.select(input(now = 0L, speedMps = 1.0, gps = 90.0, magnetic = 20.0))
+
+        val replaced = selector.select(
+            input(now = 100L, speedMps = 1.0, gps = null, magnetic = 25.0),
+        )
+        val bothLost = selector.select(input(now = 200L, speedMps = 1.0, gps = null, magnetic = null))
+
+        assertEquals(PedestrianHeadingSource.MAGNETIC_TRUE, requireNotNull(replaced).source)
+        assertEquals(25.0, replaced.headingDegreesTrueNorth, 1e-9)
+        assertNull(bothLost)
+    }
+
+    @Test
+    fun lowSpeedLossOfMagneticDoesNotFallBackToGpsCourse() {
+        val selector = selector()
+        selector.select(input(now = 0L, speedMps = 0.2, gps = 90.0, magnetic = 10.0))
+
+        val result = selector.select(input(now = 100L, speedMps = 0.2, gps = 90.0, magnetic = 10.0, mounted = false))
+
+        assertNull(result)
     }
 
     @Test
     fun blendsAcrossNorthUsingShortestCircularArc() {
         val selector = selector(smoothingAlpha = 0.5)
         val first = selector.select(input(now = 0L, speedMps = 0.2, gps = 90.0, magnetic = -10.0))
-        val second = selector.select(input(now = 100L, speedMps = 0.2, gps = 90.0, magnetic = 10.0))
+        // S09-28: the configured gain is per nominal magnetic interval (500 ms), not per call.
+        val second = selector.select(input(now = 500L, speedMps = 0.2, gps = 90.0, magnetic = 10.0))
 
         assertEquals(350.0, requireNotNull(first).headingDegreesTrueNorth, 1e-9)
         assertEquals(0.0, requireNotNull(second).headingDegreesTrueNorth, 1e-9)
-    }
-
-    @Test
-    fun startsFailClosedInsideHysteresisBand() {
-        val selector = selector()
-
-        val result = selector.select(input(now = 1_000L, speedMps = 0.65, gps = 90.0, magnetic = 10.0))
-
-        assertNull(result)
     }
 
     private fun selector(

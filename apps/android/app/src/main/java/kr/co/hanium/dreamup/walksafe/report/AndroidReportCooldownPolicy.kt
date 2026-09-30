@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.report
 
+import android.os.SystemClock
 import java.util.Locale
 import kr.co.hanium.dreamup.walksafe.navigation.haversineMeters
 import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
@@ -17,7 +18,54 @@ data class AndroidReportSpatialScope(
 data class AndroidReportSuccessfulCooldown(
     val scope: AndroidReportSpatialScope,
     val lastUploadedAtMs: Long,
-)
+    val cooldownMonotonicMarkMs: Long? = null,
+    val cooldownRemainingAtMarkMs: Long? = null,
+    val bootCount: Int? = null,
+) {
+    fun toJson(): JSONObject = JSONObject()
+        .put("actor_id", scope.actorId)
+        .put("class_name", scope.className)
+        .put("latitude", scope.latitude)
+        .put("longitude", scope.longitude)
+        .put("last_uploaded_at_ms", lastUploadedAtMs)
+        .put("cooldown_monotonic_mark_ms", cooldownMonotonicMarkMs)
+        .put("cooldown_remaining_at_mark_ms", cooldownRemainingAtMarkMs)
+        .put("boot_count", bootCount)
+
+    companion object {
+        fun fromJson(item: JSONObject): AndroidReportSuccessfulCooldown? {
+            val scope = AndroidReportCooldownPolicy.spatialScopeOrNull(
+                actorId = item.optString("actor_id"),
+                className = item.optString("class_name"),
+                location = TrustedLocation(
+                    latitude = item.getDouble("latitude"),
+                    longitude = item.getDouble("longitude"),
+                    accuracyM = 0f,
+                    elapsedRealtimeMs = 0L,
+                ),
+            ) ?: return null
+            return AndroidReportSuccessfulCooldown(
+                scope = scope,
+                lastUploadedAtMs = item.getLong("last_uploaded_at_ms"),
+                cooldownMonotonicMarkMs = item.nonNegativeLongOrNull("cooldown_monotonic_mark_ms"),
+                cooldownRemainingAtMarkMs = item.nonNegativeLongOrNull(
+                    "cooldown_remaining_at_mark_ms",
+                    AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS,
+                ),
+                bootCount = item.nonNegativeLongOrNull("boot_count", Int.MAX_VALUE.toLong())?.toInt(),
+            )
+        }
+
+        private fun JSONObject.nonNegativeLongOrNull(key: String, maximum: Long = Long.MAX_VALUE): Long? {
+            val value = when (val raw = opt(key)) {
+                is Int -> raw.toLong()
+                is Long -> raw
+                else -> return null
+            }
+            return value.takeIf { it in 0L..maximum }
+        }
+    }
+}
 
 internal fun automaticReportCooldownScopeOrNull(
     metadata: JSONObject,
@@ -98,6 +146,23 @@ object AndroidReportCooldownPolicy {
         return (AUTOMATIC_COOLDOWN_MS - elapsedMs).coerceAtLeast(0L)
     }
 
+    /**
+     * S15-37: burst suppression while a same-area automatic report is still waiting in the local
+     * queue. It is a separate rule from the post-upload cooldown above and only shares today's
+     * 10-minute operating value. A waiting entry is never updated or merged with a later
+     * observation: location-based candidates go to admin review, not automatic merging
+     * (FP-032-DETAIL-01 interim). After the window a new observation is a separate entry, bounded
+     * by the automatic-only queue quota that keeps explicit reports' reserve.
+     */
+    const val PENDING_AUTOMATIC_DUPLICATE_WINDOW_MS = AUTOMATIC_COOLDOWN_MS
+
+    fun pendingAutomaticDuplicateSuppressed(queuedAtMs: Long, nowMs: Long): Boolean {
+        if (queuedAtMs <= 0L) return false
+        val elapsedMs = nowMs - queuedAtMs
+        // A clock rollback keeps the window closed rather than admitting a duplicate.
+        return elapsedMs < 0L || elapsedMs < PENDING_AUTOMATIC_DUPLICATE_WINDOW_MS
+    }
+
     fun shouldPruneState(
         lastTouchedAtMs: Long,
         lastUploadedAtMs: Long,
@@ -151,6 +216,8 @@ class AndroidReportAttemptLease internal constructor(
 /** Thread-safe, in-memory state for automatic spatial cooldown and upload retry serialization. */
 class AndroidReportAttemptStore(
     private val maxTrackedStates: Int = AndroidReportCooldownPolicy.MAX_TRACKED_STATES,
+    private val monotonicNowMs: () -> Long = { SystemClock.elapsedRealtime() },
+    private val bootCountProvider: () -> Int? = { null },
 ) {
     init {
         require(maxTrackedStates in 1..AndroidReportCooldownPolicy.MAX_TRACKED_STATES)
@@ -165,7 +232,8 @@ class AndroidReportAttemptStore(
         nowMs: Long,
         bypassAutomaticCooldown: Boolean,
     ): AndroidReportAttemptResult = synchronized(lock) {
-        pruneExpiredStates(nowMs)
+        val monotonicMs = monotonicNowOrNull()
+        pruneExpiredStates(nowMs, monotonicMs)
         var matches = states.values.filter { state ->
             AndroidReportCooldownPolicy.isSameCooldownArea(state.scope, scope) ||
                 state.inFlightScope?.let { AndroidReportCooldownPolicy.isSameCooldownArea(it, scope) } == true
@@ -185,26 +253,24 @@ class AndroidReportAttemptStore(
                 storageKey = storageKey,
                 scope = scope,
                 lastTouchedAtMs = nowMs,
+                lastTouchedMonotonicMs = monotonicMs,
             )
             states[storageKey] = state
             matches = listOf(state)
         }
 
         matches.firstOrNull(State::inFlight)?.let { state ->
-            state.lastTouchedAtMs = nowMs
+            state.touch(nowMs, monotonicMs)
             return@synchronized state.blocked(AndroidReportAttemptBlockReason.IN_FLIGHT)
         }
 
         if (!bypassAutomaticCooldown) {
             matches.maxByOrNull { state ->
-                AndroidReportCooldownPolicy.automaticCooldownRemainingMs(state.lastUploadedAtMs, nowMs)
+                state.automaticCooldownRemainingMs(nowMs, monotonicMs)
             }?.let { state ->
-                val remainingMs = AndroidReportCooldownPolicy.automaticCooldownRemainingMs(
-                    state.lastUploadedAtMs,
-                    nowMs,
-                )
+                val remainingMs = state.automaticCooldownRemainingMs(nowMs, monotonicMs)
                 if (remainingMs > 0L) {
-                    state.lastTouchedAtMs = nowMs
+                    state.touch(nowMs, monotonicMs)
                     return@synchronized state.blocked(
                         reason = AndroidReportAttemptBlockReason.AUTOMATIC_COOLDOWN,
                         remainingMs = remainingMs,
@@ -215,7 +281,7 @@ class AndroidReportAttemptStore(
 
         matches.maxByOrNull(State::retryNotBeforeMs)?.let { state ->
             if (state.retryNotBeforeMs > nowMs) {
-                state.lastTouchedAtMs = nowMs
+                state.touch(nowMs, monotonicMs)
                 return@synchronized state.blocked(
                     reason = AndroidReportAttemptBlockReason.RETRY_BACKOFF,
                     remainingMs = state.retryNotBeforeMs - nowMs,
@@ -226,7 +292,7 @@ class AndroidReportAttemptStore(
         val selected = matches.maxByOrNull(State::lastTouchedAtMs) ?: error("report state missing")
         selected.inFlight = true
         selected.inFlightScope = scope
-        selected.lastTouchedAtMs = nowMs
+        selected.touch(nowMs, monotonicMs)
         selected.lastAttemptCount += 1
         AndroidReportAttemptResult.Allowed(
             AndroidReportAttemptLease(
@@ -242,8 +308,11 @@ class AndroidReportAttemptStore(
         synchronized(lock) {
             findState(lease)?.apply {
                 scope = lease.attemptedScope
-                lastTouchedAtMs = nowMs
+                val monotonicMs = monotonicNowOrNull()
+                touch(nowMs, monotonicMs)
                 lastUploadedAtMs = nowMs
+                cooldownMonotonicMarkMs = monotonicMs
+                cooldownRemainingAtMarkMs = AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS
                 consecutiveFailures = 0
                 retryNotBeforeMs = 0L
             }
@@ -258,7 +327,7 @@ class AndroidReportAttemptStore(
         findState(lease)?.let { state ->
             state.consecutiveFailures += 1
             retryDelayForFailureCount(state.consecutiveFailures).also { retryDelayMs ->
-                state.lastTouchedAtMs = nowMs
+                state.touch(nowMs, monotonicNowOrNull())
                 state.retryNotBeforeMs = nowMs + retryDelayMs
             }
         }
@@ -287,23 +356,30 @@ class AndroidReportAttemptStore(
         cooldowns: List<AndroidReportSuccessfulCooldown>,
         nowMs: Long,
     ) = synchronized(lock) {
-        pruneExpiredStates(nowMs)
+        val monotonicMs = monotonicNowOrNull()
+        pruneExpiredStates(nowMs, monotonicMs)
+        val bootCount = currentBootCountOrNull()
         cooldowns
-            .sortedByDescending { it.lastUploadedAtMs }
-            .take(maxTrackedStates)
-            .forEach { cooldown ->
+            .map { it to restoredCooldownRemainingMs(it, nowMs, monotonicMs, bootCount) }
+            .filter { (_, remainingMs) -> remainingMs > 0L }
+            .sortedByDescending { (_, remainingMs) -> remainingMs }
+            .forEach { (cooldown, remainingMs) ->
                 val uploadedAtMs = cooldown.lastUploadedAtMs.coerceAtMost(nowMs)
-                if (AndroidReportCooldownPolicy.automaticCooldownRemainingMs(uploadedAtMs, nowMs) <= 0L) {
-                    return@forEach
-                }
                 val existing = states.values.firstOrNull { state ->
                     AndroidReportCooldownPolicy.isSameCooldownArea(state.scope, cooldown.scope)
                 }
+                // Restore the age of the successful state as well as its remaining cooldown.
+                val touchedMonotonicMs = monotonicMs?.minus(
+                    AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS - remainingMs,
+                )
                 if (existing != null) {
-                    if (uploadedAtMs > existing.lastUploadedAtMs) {
+                    if (remainingMs > existing.automaticCooldownRemainingMs(nowMs, monotonicMs)) {
                         existing.scope = cooldown.scope
                         existing.lastUploadedAtMs = uploadedAtMs
                         existing.lastTouchedAtMs = uploadedAtMs
+                        existing.lastTouchedMonotonicMs = touchedMonotonicMs
+                        existing.cooldownMonotonicMarkMs = monotonicMs
+                        existing.cooldownRemainingAtMarkMs = remainingMs
                     }
                 } else if (states.size < maxTrackedStates) {
                     val storageKey = uniqueStorageKey(cooldown.scope.storageKey)
@@ -312,23 +388,69 @@ class AndroidReportAttemptStore(
                         storageKey = storageKey,
                         scope = cooldown.scope,
                         lastTouchedAtMs = uploadedAtMs,
+                        lastTouchedMonotonicMs = touchedMonotonicMs,
                         lastUploadedAtMs = uploadedAtMs,
+                        cooldownMonotonicMarkMs = monotonicMs,
+                        cooldownRemainingAtMarkMs = remainingMs,
                     )
                 }
             }
     }
 
     fun successfulCooldowns(nowMs: Long): List<AndroidReportSuccessfulCooldown> = synchronized(lock) {
-        pruneExpiredStates(nowMs)
+        val monotonicMs = monotonicNowOrNull()
+        pruneExpiredStates(nowMs, monotonicMs)
+        val bootCount = currentBootCountOrNull()
         states.values
-            .filter { it.lastUploadedAtMs > 0L }
-            .sortedByDescending { it.lastUploadedAtMs }
+            .map { it to it.automaticCooldownRemainingMs(nowMs, monotonicMs) }
+            .filter { (_, remainingMs) -> remainingMs > 0L }
+            .sortedByDescending { (_, remainingMs) -> remainingMs }
             .take(maxTrackedStates)
-            .map { AndroidReportSuccessfulCooldown(it.scope, it.lastUploadedAtMs) }
+            .map { (state, remainingMs) ->
+                AndroidReportSuccessfulCooldown(
+                    scope = state.scope,
+                    lastUploadedAtMs = state.lastUploadedAtMs,
+                    cooldownMonotonicMarkMs = monotonicMs,
+                    cooldownRemainingAtMarkMs = remainingMs,
+                    bootCount = bootCount,
+                )
+            }
     }
 
-    private fun pruneExpiredStates(nowMs: Long) {
+    private fun currentBootCountOrNull(): Int? = runCatching { bootCountProvider() }
+        .getOrNull()
+        ?.takeIf { it >= 0 }
+
+    private fun restoredCooldownRemainingMs(
+        cooldown: AndroidReportSuccessfulCooldown,
+        nowMs: Long,
+        monotonicMs: Long?,
+        bootCount: Int?,
+    ): Long {
+        val markMs = cooldown.cooldownMonotonicMarkMs
+        val remainingAtMarkMs = cooldown.cooldownRemainingAtMarkMs
+        if (bootCount != null && bootCount == cooldown.bootCount &&
+            markMs != null && markMs >= 0L && monotonicMs != null && monotonicMs >= markMs &&
+            remainingAtMarkMs != null && remainingAtMarkMs in 0L..AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS
+        ) {
+            return (remainingAtMarkMs - (monotonicMs - markMs)).coerceAtLeast(0L)
+        }
+        // Legacy records, reboot, and unknown boot identity retain the bounded wall-clock fallback.
+        return AndroidReportCooldownPolicy.automaticCooldownRemainingMs(
+            cooldown.lastUploadedAtMs.coerceAtMost(nowMs),
+            nowMs,
+        )
+    }
+
+    private fun pruneExpiredStates(nowMs: Long, monotonicMs: Long?) {
         states.entries.removeIf { (_, state) ->
+            if (state.inFlight || state.retryNotBeforeMs > nowMs ||
+                state.automaticCooldownRemainingMs(nowMs, monotonicMs) > 0L
+            ) return@removeIf false
+            val touchedMs = state.lastTouchedMonotonicMs
+            if (touchedMs != null && monotonicMs != null && monotonicMs >= touchedMs) {
+                return@removeIf monotonicMs - touchedMs >= AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS
+            }
             AndroidReportCooldownPolicy.shouldPruneState(
                 lastTouchedAtMs = state.lastTouchedAtMs,
                 lastUploadedAtMs = state.lastUploadedAtMs,
@@ -339,8 +461,29 @@ class AndroidReportAttemptStore(
         }
     }
 
+    private fun monotonicNowOrNull(): Long? = runCatching { monotonicNowMs() }
+        .getOrNull()
+        ?.takeIf { it >= 0L }
+
+    private fun State.automaticCooldownRemainingMs(nowMs: Long, monotonicMs: Long?): Long {
+        val wallRemainingMs = AndroidReportCooldownPolicy.automaticCooldownRemainingMs(lastUploadedAtMs, nowMs)
+        val markMs = cooldownMonotonicMarkMs ?: return wallRemainingMs
+        if (monotonicMs == null || monotonicMs < markMs) return wallRemainingMs
+        val elapsedMs = monotonicMs - markMs
+        return (cooldownRemainingAtMarkMs - elapsedMs).coerceAtLeast(0L)
+    }
+
+    private fun State.touch(nowMs: Long, monotonicMs: Long?) {
+        lastTouchedAtMs = nowMs
+        lastTouchedMonotonicMs = monotonicMs
+    }
+
     private fun findState(lease: AndroidReportAttemptLease): State? {
-        return states[lease.storageKey]?.takeIf { it.id == lease.stateId }
+        return states[lease.storageKey]?.takeIf {
+            it.id == lease.stateId &&
+                it.lastAttemptCount == lease.attemptCount &&
+                it.inFlight
+        }
     }
 
     private fun uniqueStorageKey(baseKey: String): String {
@@ -365,7 +508,10 @@ class AndroidReportAttemptStore(
         val storageKey: String,
         var scope: AndroidReportSpatialScope,
         var lastTouchedAtMs: Long,
+        var lastTouchedMonotonicMs: Long? = null,
         var lastUploadedAtMs: Long = 0L,
+        var cooldownMonotonicMarkMs: Long? = null,
+        var cooldownRemainingAtMarkMs: Long = 0L,
         var lastAttemptCount: Int = 0,
         var inFlight: Boolean = false,
         var inFlightScope: AndroidReportSpatialScope? = null,

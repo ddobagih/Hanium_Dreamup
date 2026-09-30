@@ -11,7 +11,19 @@ internal data class OwnedTensorPreparation(
     val preparationMs: Long,
     val preparedAtElapsedRealtimeMs: Long,
     val strategy: YuvPreprocessingStrategy,
-)
+    val cropRect: YuvCropRect,
+) {
+    fun validImageCrop(): YuvCropRect? = cropRect.takeUnless {
+        it.isFull(transform.imageWidth, transform.imageHeight)
+    }
+
+    fun cropResult(result: AndroidDetectionResult): AndroidDetectionResult {
+        if (validImageCrop() == null) return result
+        return result.copy(detections = result.detections.mapNotNull {
+            cropRect.toValidSensorDetection(it, transform.imageWidth, transform.imageHeight)
+        })
+    }
+}
 
 internal data class OverlapPreparationResult(
     val status: OverlapFrameStatus,
@@ -90,6 +102,7 @@ internal class UnifiedFrameOverlapExperiment internal constructor(
         var completedPreparation = false
         try {
             val preprocessStartedNs = System.nanoTime()
+            val cropRect = YuvCropRect.fromImage(image).also { it.requireWithin(image.width, image.height) }
             val borrowed = preprocessor.preprocess(image, inputSize, preprocessingStrategy)
             val preprocessingMs = elapsedMs(preprocessStartedNs)
             val copyStartedNs = System.nanoTime()
@@ -103,7 +116,7 @@ internal class UnifiedFrameOverlapExperiment internal constructor(
                 lease,
                 OwnedTensorPreparation(
                     borrowed.transform, preprocessingMs, tensorCopyMs, preparationMs,
-                    preparedAtMs, preprocessingStrategy,
+                    preparedAtMs, preprocessingStrategy, cropRect,
                 ),
                 preparedAtMs,
             )
@@ -161,7 +174,8 @@ internal class UnifiedFrameOverlapExperiment internal constructor(
                 invocationWallMs = invocationWallMs,
                 outputCopyMs = outputCopyMs,
                 observedTiming = output.timing,
-                result = output.takeIf { status == OverlapFrameStatus.ACCEPTED },
+                result = output.takeIf { status == OverlapFrameStatus.ACCEPTED }
+                    ?.let(lease.metadata::cropResult),
                 rawOutput = raw.takeIf { status == OverlapFrameStatus.ACCEPTED },
             )
         } catch (error: Throwable) {

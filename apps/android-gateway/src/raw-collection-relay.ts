@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 
+import { matchGatewayRoute } from "./route-registry.js";
+
 import {
   gatewayFieldLongSessionBinding,
+  gatewaySessionAuthEpoch,
   type GatewayFieldLongSessionBinding
 } from "./auth.js";
 import {
@@ -18,7 +21,7 @@ import {
   type RawCollectionBackendProofInput,
   type RawCollectionOperation
 } from "./backend.js";
-import { getFieldWalk } from "./field-walk-ledger.js";
+import { fieldWalkRawUploadEligibility } from "./field-walk-ledger.js";
 import {
   authorizeIntegratedConsentRequest,
   CONSENT_NETWORK_TRANSPORT_HEADER
@@ -39,6 +42,9 @@ export const RAW_COMMIT_MAX_BYTES = 16 * 1024;
 const RAW_RESPONSE_MAX_BYTES = 512 * 1024;
 const RAW_ERROR_MAX_BYTES = 16 * 1024;
 const RAW_BODY_TIMEOUT_MS = 15_000;
+const RAW_BACKEND_TIMEOUT_MS = 20_000;
+/** S19-59: a RAW request's own limits (body read + Backend call), below the adapter deadline. */
+export const RAW_COLLECTION_OWN_LIMITS_MS = RAW_BODY_TIMEOUT_MS + RAW_BACKEND_TIMEOUT_MS;
 const RAW_MAX_OBJECTS = 64;
 const RAW_MAX_CHUNKS = 2_048;
 const RAW_MAX_TOTAL_BYTES = RAW_MAX_CHUNKS * RAW_CHUNK_MAX_BYTES;
@@ -47,7 +53,6 @@ const RAW_RECEIPT_QUARANTINE_DAYS_V2 = 14;
 const RAW_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const LOWER_SHA256 = /^[0-9a-f]{64}$/;
-const CANONICAL_INDEX = /^(?:0|[1-9][0-9]{0,3})$/;
 const CANONICAL_LENGTH = /^[1-9][0-9]{0,7}$/;
 const UTC_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const RAW_CONTENT_TYPE =
@@ -62,6 +67,9 @@ const RAW_STATES = new Set([
 const RAW_UPSTREAM_ERROR_CODES = new Set([
   "account_generation_inactive",
   "account_generation_tombstoned",
+  // RAW-CORE-F3: consent refusals of Backend raw_collection_ingest.py (409).
+  "automatic_reporting_consent_interrupted",
+  "automatic_reporting_consent_required",
   "raw_capacity_hold",
   "raw_capacity_reservation_unavailable",
   "raw_capacity_state_unavailable",
@@ -79,6 +87,7 @@ const RAW_UPSTREAM_ERROR_CODES = new Set([
   "raw_commit_binding_mismatch",
   "raw_commit_inventory_mismatch",
   "raw_commit_persistence_ambiguous",
+  "raw_consent_policy_not_current",
   "raw_consent_receipt_not_found",
   "raw_ingest_admission_unavailable",
   "raw_ingest_disabled",
@@ -100,6 +109,8 @@ export type RawCollectionRoute = {
   collectionId: string;
   objectId: string | null;
   chunkIndex: number | null;
+  bodyPolicy: "strict-none" | "json" | "stream";
+  queryPolicy: "none";
 };
 
 export type RawCollectionRelayDependencies = {
@@ -144,51 +155,36 @@ function methodNotAllowed(method: string): Response {
 }
 
 export function matchRawCollectionRoute(pathname: string): RawCollectionRoute | null {
-  const collection = pathname.match(
-    /^\/api\/raw-collections\/([0-9a-f-]{36})(?:\/(.*))?$/
-  );
-  if (!collection || !RAW_UUID.test(collection[1] ?? "")) return null;
-  const collectionId = collection[1]!;
-  const suffix = collection[2];
-  if (suffix === undefined) {
-    return {
-      operation: "GET_STATUS",
-      method: "GET",
-      publicPath: pathname,
-      backendPath: `/raw-collections/${collectionId}`,
-      collectionId,
-      objectId: null,
-      chunkIndex: null
-    };
-  }
-  if (suffix === "manifest" || suffix === "commit") {
-    const operation = suffix === "manifest" ? "PUT_MANIFEST" : "COMMIT";
-    return {
-      operation,
-      method: suffix === "manifest" ? "PUT" : "POST",
-      publicPath: pathname,
-      backendPath: `/raw-collections/${collectionId}/${suffix}`,
-      collectionId,
-      objectId: null,
-      chunkIndex: null
-    };
-  }
-  const chunk = suffix.match(
-    /^objects\/([0-9a-f-]{36})\/chunks\/([^/]+)$/
-  );
-  if (
-    !chunk || !RAW_UUID.test(chunk[1] ?? "") ||
-    !CANONICAL_INDEX.test(chunk[2] ?? "") || Number(chunk[2]) >= 2_048
-  ) return null;
-  return {
-    operation: "PUT_CHUNK",
-    method: "PUT",
+  const matched = matchGatewayRoute(new URL(pathname, "http://gateway.invalid"));
+  if (matched?.family !== "raw") return null;
+  const collectionId = matched.params.collectionId!;
+  const base = {
+    method: matched.methods[0] as "GET" | "PUT" | "POST",
     publicPath: pathname,
-    backendPath: `/raw-collections/${collectionId}/objects/${chunk[1]}/chunks/${chunk[2]}`,
     collectionId,
-    objectId: chunk[1]!,
-    chunkIndex: Number(chunk[2])
+    bodyPolicy: matched.body as "strict-none" | "json" | "stream",
+    queryPolicy: matched.query as "none"
   };
+  switch (matched.template) {
+    case "/api/raw-collections/{collection_id}":
+      return { ...base, operation: "GET_STATUS", backendPath: `/raw-collections/${collectionId}`,
+        objectId: null, chunkIndex: null };
+    case "/api/raw-collections/{collection_id}/manifest":
+      return { ...base, operation: "PUT_MANIFEST", backendPath: `/raw-collections/${collectionId}/manifest`,
+        objectId: null, chunkIndex: null };
+    case "/api/raw-collections/{collection_id}/commit":
+      return { ...base, operation: "COMMIT", backendPath: `/raw-collections/${collectionId}/commit`,
+        objectId: null, chunkIndex: null };
+    case "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}": {
+      const objectId = matched.params.objectId!;
+      const chunkIndex = Number(matched.params.index);
+      return { ...base, operation: "PUT_CHUNK",
+        backendPath: `/raw-collections/${collectionId}/objects/${objectId}/chunks/${chunkIndex}`,
+        objectId, chunkIndex };
+    }
+    default:
+      return null;
+  }
 }
 
 function exactHeader(request: Request, name: string): string | null {
@@ -267,20 +263,40 @@ function bindingMatches(
     (current.accountGeneration ?? null) === (expected.accountGeneration ?? null);
 }
 
-function activeWalkCurrent(
+/**
+ * Owner decision 3(b) (2026-09-29): RAW segments are written only after their walk ended, under
+ * the walk's original id, for a walk this account and device held within the phone's 30-day RAW
+ * retention; never while any walk of the account is active. Unreadable walk state fails closed.
+ */
+function endedWalkGate(
   binding: GatewayFieldLongSessionBinding,
-  walkId: string
-): boolean {
+  walkId: string,
+  stage: "initial" | "consent"
+): Response | null {
+  let eligibility: ReturnType<typeof fieldWalkRawUploadEligibility>;
   try {
-    const result = getFieldWalk(binding);
-    return result.status === 200 &&
-      result.body.result === "ACTIVE" &&
-      result.body.active_walk_id === walkId &&
-      result.body.active_device_id === binding.deviceId &&
-      result.body.held_by_current_device === true;
+    eligibility = fieldWalkRawUploadEligibility(binding, walkId);
   } catch {
-    return false;
+    return jsonError(
+      409,
+      "raw_collection_binding_stale",
+      stage === "initial"
+        ? "The device, walk, or account generation is no longer current."
+        : "The device, walk, or account generation changed during consent validation."
+    );
   }
+  if (eligibility === "ENDED_WALK") return null;
+  return eligibility === "WALK_IN_PROGRESS"
+    ? jsonError(
+      409,
+      "raw_collection_walk_in_progress",
+      "Raw collections are sent only after the account's walk has ended."
+    )
+    : jsonError(
+      409,
+      "raw_collection_walk_not_uploadable",
+      "The walk is not a recently ended walk of this account and device."
+    );
 }
 
 async function writeGate(
@@ -290,17 +306,15 @@ async function writeGate(
   headers: RawHeaderBinding,
   resolver: (request: Request) => GatewayFieldLongSessionBinding | null
 ): Promise<Response | null> {
-  if (
-    !bindingMatches(request, binding, resolver) ||
-    !privacyCurrent(lease) ||
-    !activeWalkCurrent(binding, headers.walkId)
-  ) {
+  if (!bindingMatches(request, binding, resolver) || !privacyCurrent(lease)) {
     return jsonError(
       409,
       "raw_collection_binding_stale",
       "The device, walk, or account generation is no longer current."
     );
   }
+  const walkRefused = endedWalkGate(binding, headers.walkId, "initial");
+  if (walkRefused) return walkRefused;
   const required: Array<
     "raw_source_collection" | "automatic_reporting" | "mobile_network_transfer"
   > = ["raw_source_collection"];
@@ -311,17 +325,15 @@ async function writeGate(
     required,
     consentActorBindingId(lease)
   );
-  if (
-    !bindingMatches(request, binding, resolver) ||
-    !privacyCurrent(lease) ||
-    !activeWalkCurrent(binding, headers.walkId)
-  ) {
+  if (!bindingMatches(request, binding, resolver) || !privacyCurrent(lease)) {
     return jsonError(
       409,
       "raw_collection_binding_stale",
       "The device, walk, or account generation changed during consent validation."
     );
   }
+  const walkChanged = endedWalkGate(binding, headers.walkId, "consent");
+  if (walkChanged) return walkChanged;
   return consent.error ? consent.error : null;
 }
 
@@ -916,7 +928,10 @@ async function fetchRawBackend(
       : "application/json"
   };
   const backendHeaders = rawCollectionBackendHeaders(
-    proofInput(binding, route, headers, method),
+    {
+      ...proofInput(binding, route, headers, method),
+      authEpoch: gatewaySessionAuthEpoch(request)
+    },
     initial
   );
   if (!backendHeaders) {
@@ -930,8 +945,8 @@ async function fetchRawBackend(
     ...(body === null ? {} : { body: Buffer.from(body) })
   };
   return fetchImpl
-    ? fetchBackend(request, backendUrl(route.backendPath), init, 20_000, fetchImpl)
-    : fetchBackend(request, backendUrl(route.backendPath), init, 20_000);
+    ? fetchBackend(request, backendUrl(route.backendPath), init, RAW_BACKEND_TIMEOUT_MS, fetchImpl)
+    : fetchBackend(request, backendUrl(route.backendPath), init, RAW_BACKEND_TIMEOUT_MS);
 }
 
 function acquireRawWrite(): (() => void) | null {
@@ -957,14 +972,14 @@ export async function relayRawCollection(
   const route = matchRawCollectionRoute(url.pathname);
   if (!route) return notFound();
   if (request.method !== route.method) return methodNotAllowed(route.method);
-  if (url.search !== "") {
+  if (route.queryPolicy === "none" && url.search !== "") {
     return jsonError(400, "raw_collection_query_invalid", "Raw collection queries are not allowed.");
   }
   const write = route.operation !== "GET_STATUS";
   if (
     request.headers.has("content-encoding") || request.headers.has("transfer-encoding") ||
     request.headers.has("digest") || request.headers.has("trailer") ||
-    (!write && (request.body !== null || request.headers.has("content-length") ||
+    (route.bodyPolicy === "strict-none" && (request.body !== null || request.headers.has("content-length") ||
       request.headers.has("content-type")))
   ) {
     return jsonError(400, "raw_collection_request_invalid", "The raw request framing is invalid.");

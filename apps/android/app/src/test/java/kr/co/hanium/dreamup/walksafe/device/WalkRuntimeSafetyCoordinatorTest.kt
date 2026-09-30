@@ -27,7 +27,7 @@ class WalkRuntimeSafetyCoordinatorTest {
     }
 
     @Test
-    fun productionProfileAllowsSafeTestFlowWithoutApprovedTimingThresholds() {
+    fun productionProfileDoesNotAuthorizeOutputWithoutApprovedTimingThresholds() {
         val callbacks = mutableListOf<WalkRuntimeSafetyStop>()
         val coordinator = WalkRuntimeSafetyCoordinator(
             thresholdProfile = WalkRuntimeSafetyCoordinator.productionThresholdProfile,
@@ -48,7 +48,7 @@ class WalkRuntimeSafetyCoordinatorTest {
         )
 
         assertEquals(WalkRuntimeSafetyDisposition.NOT_CONFIGURED, result.disposition)
-        assertTrue(result.safetyOutputsAllowed)
+        assertFalse(result.safetyOutputsAllowed)
         assertTrue(callbacks.isEmpty())
     }
 
@@ -177,7 +177,7 @@ class WalkRuntimeSafetyCoordinatorTest {
             val result = coordinator.observe(input)
 
             assertTrue(expectedCause.name, expectedCause in result.causes)
-            assertEquals(expectedCause.name, 1, callbacks.size)
+            assertEquals(expectedCause.name, if (expectedCause == WalkRuntimeSafetyStopCause.EPOCH_MISMATCH) 0 else 1, callbacks.size)
             assertFalse(expectedCause.name, result.safetyOutputsAllowed)
         }
 
@@ -188,8 +188,8 @@ class WalkRuntimeSafetyCoordinatorTest {
         val clockRollback = coordinator.observe(
             observation(observedAtElapsedRealtimeMs = 999L),
         )
-        assertTrue(WalkRuntimeSafetyStopCause.INVALID_TIME in clockRollback.causes)
-        assertEquals(1, callbacks.size)
+        assertFalse(WalkRuntimeSafetyStopCause.INVALID_TIME in clockRollback.causes)
+        assertTrue(callbacks.isEmpty())
     }
 
     @Test
@@ -230,7 +230,7 @@ class WalkRuntimeSafetyCoordinatorTest {
         coordinator.observe(observation(cameraTrusted = false))
 
         assertEquals(
-            WalkRuntimeSafetyDisposition.ALLOW_SAFETY_OUTPUT,
+            WalkRuntimeSafetyDisposition.AWAITING_EVIDENCE,
             coordinator.beginEpoch(EPOCH_2).disposition,
         )
         coordinator.observe(observation(epoch = EPOCH_2, ttsTrusted = false))
@@ -269,16 +269,16 @@ class WalkRuntimeSafetyCoordinatorTest {
     private fun observation(
         epoch: WalkRuntimeEpoch = EPOCH_1,
         observedAtElapsedRealtimeMs: Long = 1_000L,
-        cameraTrusted: Boolean? = null,
-        depthTrusted: Boolean? = null,
-        gpsTrusted: Boolean? = null,
-        riskTrusted: Boolean? = null,
-        ttsTrusted: Boolean? = null,
-        batteryCritical: Boolean? = null,
-        storageCritical: Boolean? = null,
-        thermalCritical: Boolean? = null,
-        frameCapturedAtElapsedRealtimeMs: Long? = null,
-        inferenceLatencyMs: Long? = null,
+        cameraTrusted: Boolean? = true,
+        depthTrusted: Boolean? = true,
+        gpsTrusted: Boolean? = true,
+        riskTrusted: Boolean? = true,
+        ttsTrusted: Boolean? = true,
+        batteryCritical: Boolean? = false,
+        storageCritical: Boolean? = false,
+        thermalCritical: Boolean? = false,
+        frameCapturedAtElapsedRealtimeMs: Long? = observedAtElapsedRealtimeMs,
+        inferenceLatencyMs: Long? = 0L,
         deferredFailures: Set<WalkRuntimeDeferredFailure> = emptySet(),
     ) = WalkRuntimeSafetyObservation(
         epoch = epoch,

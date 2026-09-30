@@ -355,6 +355,17 @@ public final class AdminReportWorkflowController {
             }
             return executeStatus(request);
         } catch (Exception error) {
+            if (error instanceof AdminDeviceProof.ChallengeTimeException) {
+                return fail(request, AdminRecoveryMessagePolicy.failureMessage(
+                    AdminRecoveryMessagePolicy.Phase.GENERAL, error
+                ));
+            }
+            if (error instanceof AdminSecurityApiException apiError
+                && apiError.code() == AdminSecurityApiException.Code.REAUTHENTICATION_FAILED) {
+                return fail(request, AdminRecoveryMessagePolicy.failureMessage(
+                    AdminRecoveryMessagePolicy.Phase.GENERAL, error
+                ));
+            }
             return fail(request, "고위험 작업을 완료하지 못했습니다. 재인증 후 다시 시도해 주세요.");
         } finally {
             request.destroy();
@@ -494,7 +505,7 @@ public final class AdminReportWorkflowController {
             } catch (AdminReportRepository.StatusConflictException conflict) {
                 return refreshAfterStatusConflict(request);
             } catch (Exception responseFailure) {
-                return applyStatusFailure(request);
+                return applyStatusFailure(request, responseFailure);
             }
         } finally {
             Arrays.fill(password, '\0');
@@ -510,14 +521,18 @@ public final class AdminReportWorkflowController {
         }
     }
 
-    private synchronized boolean applyStatusFailure(Request request) {
+    private synchronized boolean applyStatusFailure(Request request, Exception failure) {
         if (request.generation != generation) return false;
         if (statusStage == StatusStage.NOT_DISPATCHED) {
             clearStatusRecovery();
             state = new State(
                 Phase.ERROR,
                 request.reportId,
-                "상태 변경을 전송하지 못했습니다. 재인증 후 다시 시도해 주세요.",
+                failure instanceof AdminDeviceProof.ChallengeTimeException
+                    ? AdminRecoveryMessagePolicy.failureMessage(
+                        AdminRecoveryMessagePolicy.Phase.GENERAL, failure
+                    )
+                    : "상태 변경을 전송하지 못했습니다. 재인증 후 다시 시도해 주세요.",
                 null
             );
             return true;

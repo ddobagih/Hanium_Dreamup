@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.report
 
 import java.util.concurrent.CancellationException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
 import kr.co.hanium.dreamup.walksafe.network.GatewayFieldSession
@@ -10,6 +11,8 @@ import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentConfirmation
 internal interface ReportQueueTransport {
     fun statusCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt?>
     fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt>
+    fun uploadResultCall(report: QueuedReport): CancellableNetworkCall<ReportQueueUploadResult> =
+        uploadCall(report).map { ReportQueueUploadResult(it, creationOutcome = null) }
 }
 
 internal class AndroidReportQueueTransport(
@@ -25,7 +28,7 @@ internal class AndroidReportQueueTransport(
 
     override fun statusCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt?> =
         uploader.queuedStatusCall(
-            permit = requireNotNull(permitProvider(report.purpose())),
+            permit = permitFor(report),
             session = session,
             consentConfirmation = consentConfirmation,
             networkBinding = networkBinding,
@@ -34,8 +37,11 @@ internal class AndroidReportQueueTransport(
         )
 
     override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> =
-        uploader.queuedUploadCall(
-            permit = requireNotNull(permitProvider(report.purpose())),
+        uploadResultCall(report).map { it.receipt }
+
+    override fun uploadResultCall(report: QueuedReport): CancellableNetworkCall<ReportQueueUploadResult> =
+        uploader.queuedUploadResultCall(
+            permit = permitFor(report),
             session = session,
             consentConfirmation = consentConfirmation,
             networkBinding = networkBinding,
@@ -50,6 +56,12 @@ internal class AndroidReportQueueTransport(
             ReportTransferPurpose.AUTOMATIC
         }
 
+    private fun permitFor(report: QueuedReport): ReportUploadPermit {
+        check(report.reporterActorId == session.actorId)
+        check(report.accountGeneration == session.backendAccountGeneration)
+        return requireNotNull(permitProvider(report.purpose()))
+    }
+
     init { require(session.actorId.isNotBlank()) }
 }
 
@@ -57,8 +69,33 @@ internal enum class ReportQueueDrainOutcome {
     DELETED_AFTER_STATUS,
     DELETED_AFTER_UPLOAD,
     RECEIPT_REJECTED,
+    LOCAL_COMMIT_FAILED,
+    LOCAL_DELETE_FAILED,
+    QUARANTINED,
+    RETRY_DEFERRED,
+    AUTHORITY_BLOCKED,
     CANCELLED,
 }
+
+internal data class ReportQueueDrainResult(
+    val outcome: ReportQueueDrainOutcome,
+    val creationOutcome: ReportCreationOutcome? = null,
+    val reportPriority: ReportQueuePriority? = null,
+    /** transfer-F7: kept after 409 report_walk_in_progress; the caller retries once later. */
+    val walkInProgress: Boolean = false,
+)
+
+private fun ReportQueueDrainOutcome.withCreationOutcome(
+    reportPriority: ReportQueuePriority,
+    creationOutcome: ReportCreationOutcome? = null,
+): ReportQueueDrainResult = ReportQueueDrainResult(
+    outcome = this,
+    reportPriority = reportPriority,
+    creationOutcome = creationOutcome.takeIf {
+        this == ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD ||
+            this == ReportQueueDrainOutcome.RETRY_DEFERRED
+    },
+)
 
 /** Owns one status-then-POST attempt. Callers must revalidate on every movement/state change. */
 internal class ReportQueueDrainCoordinator(
@@ -67,7 +104,7 @@ internal class ReportQueueDrainCoordinator(
 ) {
     private data class ActiveDrain(
         val lease: ReportQueueDrainLease,
-        val call: CancellableNetworkCall<ReportQueueDrainOutcome>,
+        val call: CancellableNetworkCall<ReportQueueDrainResult>,
     )
 
     private var activeDrain: ActiveDrain? = null
@@ -76,19 +113,40 @@ internal class ReportQueueDrainCoordinator(
     fun startNext(
         contextProvider: () -> ReportQueueDrainContext,
         transport: ReportQueueTransport,
-        beforeDeleteAfterReceipt: (QueuedReport) -> Boolean = { true },
-    ): CancellableNetworkCall<ReportQueueDrainOutcome>? {
+        beforeDeleteAfterReceipt: (QueuedReport) -> Boolean = {
+            it.priority != ReportQueuePriority.AUTOMATIC
+        },
+    ): CancellableNetworkCall<ReportQueueDrainOutcome>? =
+        startNextWithResult(contextProvider, transport, beforeDeleteAfterReceipt)?.map { it.outcome }
+
+    @Synchronized
+    fun startNextWithResult(
+        contextProvider: () -> ReportQueueDrainContext,
+        transport: ReportQueueTransport,
+        beforeDeleteAfterReceipt: (QueuedReport) -> Boolean = {
+            it.priority != ReportQueuePriority.AUTOMATIC
+        },
+    ): CancellableNetworkCall<ReportQueueDrainResult>? {
         if (activeDrain != null) return null
         val initialContext = contextProvider()
-        val report = store.nextForRecoveryDrain(initialContext.reporterActorId) ?: return null
+        val report = store.nextForRecoveryDrain(
+            initialContext.reporterActorId,
+            initialContext.accountGeneration,
+        ) ?: return null
         val lease = policy.acquire(report, initialContext).lease ?: return null
         val nested = AtomicReference<CancellableNetworkCall<*>?>()
-        lateinit var outer: CancellableNetworkCall<ReportQueueDrainOutcome>
+        val executionStarted = AtomicBoolean(false)
+        lateinit var outer: CancellableNetworkCall<ReportQueueDrainResult>
         outer = CancellableNetworkCall(
             executeBlock = execute@{
+                synchronized(this) {
+                    if (outer.isCancelled()) return@execute ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
+                    executionStarted.set(true)
+                }
+                var uploadAttempted = false
                 try {
                     if (!policy.isCurrent(lease, contextProvider())) {
-                        return@execute ReportQueueDrainOutcome.CANCELLED
+                        return@execute ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
                     }
                     val statusCall = transport.statusCall(report)
                     nested.set(statusCall)
@@ -98,48 +156,75 @@ internal class ReportQueueDrainCoordinator(
                     ) {
                         nested.compareAndSet(statusCall, null)
                         statusCall.cancel()
-                        return@execute ReportQueueDrainOutcome.CANCELLED
+                        return@execute ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
                     }
                     val statusReceipt = statusCall.execute()
                     nested.compareAndSet(statusCall, null)
-                    if (!policy.isCurrent(lease, contextProvider())) {
-                        return@execute ReportQueueDrainOutcome.CANCELLED
+                    if (outer.isCancelled() || !policy.isCurrent(lease, contextProvider())) {
+                        return@execute ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
                     }
                     if (statusReceipt != null) {
-                        return@execute if (
-                            beforeDeleteAfterReceipt(report) &&
-                            store.deleteAfterReceipt(lease.reporterActorId, statusReceipt)
-                        ) {
-                            ReportQueueDrainOutcome.DELETED_AFTER_STATUS
-                        } else {
-                            ReportQueueDrainOutcome.RECEIPT_REJECTED
-                        }
+                        return@execute completeReceipt(
+                            report, statusReceipt, lease, outer, contextProvider,
+                            beforeDeleteAfterReceipt, ReportQueueDrainOutcome.DELETED_AFTER_STATUS,
+                        ).withCreationOutcome(report.priority)
                     }
-                    val uploadCall = transport.uploadCall(report)
+                    val beforeUpload = contextProvider()
+                    if (outer.isCancelled() || !policy.isCurrent(lease, beforeUpload)) {
+                        return@execute ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
+                    }
+                    if (!policy.mayUpload(lease, beforeUpload)) {
+                        return@execute ReportQueueDrainOutcome.RETRY_DEFERRED.withCreationOutcome(report.priority)
+                    }
+                    val uploadCall = transport.uploadResultCall(report)
                     nested.set(uploadCall)
                     if (
                         outer.isCancelled() ||
-                        !policy.isCurrent(lease, contextProvider())
+                        !policy.mayUpload(lease, contextProvider())
                     ) {
                         nested.compareAndSet(uploadCall, null)
                         uploadCall.cancel()
-                        return@execute ReportQueueDrainOutcome.CANCELLED
+                        return@execute ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
                     }
-                    val uploadReceipt = uploadCall.execute()
+                    uploadAttempted = true
+                    val uploadResult = uploadCall.execute()
                     nested.compareAndSet(uploadCall, null)
-                    if (!policy.isCurrent(lease, contextProvider())) {
-                        return@execute ReportQueueDrainOutcome.CANCELLED
+                    if (outer.isCancelled() || !policy.isCurrent(lease, contextProvider())) {
+                        return@execute ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
                     }
-                    if (
-                        beforeDeleteAfterReceipt(report) &&
-                        store.deleteAfterReceipt(lease.reporterActorId, uploadReceipt)
-                    ) {
-                        ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD
-                    } else {
-                        ReportQueueDrainOutcome.RECEIPT_REJECTED
+                    if (uploadResult.creationOutcome == ReportCreationOutcome.SUPPRESSED_BY_COOLDOWN) {
+                        return@execute ReportQueueDrainOutcome.RECEIPT_REJECTED.withCreationOutcome(report.priority)
                     }
+                    completeReceipt(
+                        report, uploadResult.receipt, lease, outer, contextProvider,
+                        beforeDeleteAfterReceipt, ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD,
+                    ).withCreationOutcome(report.priority, uploadResult.creationOutcome)
                 } catch (_: CancellationException) {
-                    ReportQueueDrainOutcome.CANCELLED
+                    ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
+                } catch (error: ReportUploadHttpException) {
+                    if (outer.isCancelled() || !policy.isCurrent(lease, contextProvider())) {
+                        ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
+                    } else when (error.error.statusCode) {
+                        400, 413, 415, 422 -> (if (store.recordUploadFailure(report, permanent = true)) {
+                            ReportQueueDrainOutcome.QUARANTINED
+                        } else ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED).withCreationOutcome(report.priority)
+                        401, 403 -> ReportQueueDrainOutcome.AUTHORITY_BLOCKED.withCreationOutcome(report.priority)
+                        else -> {
+                            val deferred = if (error.error.retryAfterMs != null &&
+                                !store.recordUploadFailure(report, false, error.error.retryAfterMs)
+                            ) ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED
+                            else ReportQueueDrainOutcome.RETRY_DEFERRED
+                            deferred.withCreationOutcome(
+                                report.priority,
+                                ReportCreationOutcome.SUPPRESSED_BY_COOLDOWN.takeIf {
+                                    report.priority == ReportQueuePriority.AUTOMATIC &&
+                                        uploadAttempted &&
+                                        error.error.retryAfterMs != null &&
+                                        error.error.isAutomaticCooldownSuppression()
+                                },
+                            ).copy(walkInProgress = error.error.isReportWalkInProgress())
+                        }
+                    }
                 } finally {
                     policy.release(lease)
                     synchronized(this) {
@@ -148,8 +233,11 @@ internal class ReportQueueDrainCoordinator(
                 }
             },
             cancelBlock = {
+                synchronized(this) {
+                    policy.release(lease)
+                    if (!executionStarted.get() && activeDrain?.call === outer) activeDrain = null
+                }
                 nested.getAndSet(null)?.cancel()
-                policy.release(lease)
             },
         )
         activeDrain = ActiveDrain(lease, outer)
@@ -160,7 +248,6 @@ internal class ReportQueueDrainCoordinator(
     fun revalidate(context: ReportQueueDrainContext): Boolean {
         val active = activeDrain ?: return false
         if (policy.isCurrent(active.lease, context)) return true
-        activeDrain = null
         active.call.cancel()
         return false
     }
@@ -173,7 +260,7 @@ internal class ReportQueueDrainCoordinator(
 
     @Synchronized
     fun onAutomaticReportingRevoked(consentReceiptSha256: String): Boolean {
-        cancelActiveLocked()
+        if (activeDrain?.lease?.priority == ReportQueuePriority.AUTOMATIC) cancelActiveLocked()
         return store.onAutomaticReportingRevoked(consentReceiptSha256)
     }
 
@@ -190,7 +277,28 @@ internal class ReportQueueDrainCoordinator(
 
     private fun cancelActiveLocked() {
         val active = activeDrain ?: return
-        activeDrain = null
         active.call.cancel()
+    }
+
+    @Synchronized
+    private fun completeReceipt(
+        report: QueuedReport,
+        receipt: ReportQueueReceipt,
+        lease: ReportQueueDrainLease,
+        call: CancellableNetworkCall<*>,
+        contextProvider: () -> ReportQueueDrainContext,
+        beforeDelete: (QueuedReport) -> Boolean,
+        success: ReportQueueDrainOutcome,
+    ): ReportQueueDrainOutcome {
+        if (call.isCancelled() || !policy.isCurrent(lease, contextProvider())) {
+            return ReportQueueDrainOutcome.CANCELLED
+        }
+        if (!receipt.matches(report)) return ReportQueueDrainOutcome.RECEIPT_REJECTED
+        if (!beforeDelete(report)) return ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED
+        if (call.isCancelled() || !policy.isCurrent(lease, contextProvider())) {
+            return ReportQueueDrainOutcome.CANCELLED
+        }
+        return if (store.deleteAfterReceipt(lease.reporterActorId, receipt)) success
+        else ReportQueueDrainOutcome.LOCAL_DELETE_FAILED
     }
 }

@@ -128,6 +128,8 @@ def test_server_manifest_digest_is_validated_before_database_access() -> None:
             request_id="delete_request_0001",
             manifest_sha256="A" * 64,
             terminal_at=None,  # type: ignore[arg-type]
+            quarantined_raw_collection_count=0,
+            external_copy_count=0,
         )
 
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically prune one bounded expired rate-event batch
+
+[Timer]
+OnBootSec=5m
+OnUnitInactiveSec=5m
+RandomizedDelaySec=30s
+AccuracySec=1m
+Unit=walksafe-actor-rate-retention.service
+
+[Install]
+WantedBy=timers.target

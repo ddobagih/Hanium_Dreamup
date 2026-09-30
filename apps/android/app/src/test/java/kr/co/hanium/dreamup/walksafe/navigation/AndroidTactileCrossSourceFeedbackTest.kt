@@ -8,6 +8,7 @@ import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.depth.Trend
 import kr.co.hanium.dreamup.walksafe.depth.UnknownObjectFeedbackBatch
+import kr.co.hanium.dreamup.walksafe.depth.UnknownObjectFeedbackPolicy
 import kr.co.hanium.dreamup.walksafe.depth.UserFacingDepth
 import kr.co.hanium.dreamup.walksafe.feedback.FeedbackPolicyConfig
 import kr.co.hanium.dreamup.walksafe.feedback.WalkSafeFeedbackPolicy
@@ -31,7 +32,7 @@ class AndroidTactileCrossSourceFeedbackTest {
             assertEquals(setOf(output(PRIMARY, now).let { "$PRIMARY|WARNING|${it.userFacing.message}" }),
                 dispatch.activeFeedbackDeliveryKeys)
             dispatch.action?.let {
-                assertTrue(policy.claimFeedbackDelivery(it.trackId, now))
+                assertTrue(policy.claimFeedbackDelivery(it.trackId, now, now))
                 assertTrue(policy.confirmFeedbackDelivery(it.trackId, now, now))
                 delivered += it.trackId
             }
@@ -166,7 +167,7 @@ class AndroidTactileCrossSourceFeedbackTest {
         val old = requireNotNull(dispatch(primary = emptyList()).action)
         val replacement = dispatch(now = START + 100L)
         assertEquals(PRIMARY, replacement.action?.trackId)
-        assertFalse(policy.claimFeedbackDelivery(old.trackId, START))
+        assertFalse(policy.claimFeedbackDelivery(old.trackId, START, START + 100L))
         assertFalse(policy.confirmFeedbackDelivery(old.trackId, START, START + 300L))
         assertFalse(old.deliveryKey in replacement.activeFeedbackDeliveryKeys)
     }
@@ -174,29 +175,29 @@ class AndroidTactileCrossSourceFeedbackTest {
     @Test
     fun lowerClaimCannotConsumeCooldownAfterHigherRiskReplacement() {
         val old = requireNotNull(dispatch(primary = emptyList()).action)
-        assertTrue(policy.claimFeedbackDelivery(old.trackId, START))
+        assertTrue(policy.claimFeedbackDelivery(old.trackId, START, START))
         val replacement = dispatch(now = START + 100L, primary = listOf(output(PRIMARY, level = MessageLevel.STOP)))
         assertEquals(PRIMARY, replacement.action?.trackId)
         assertFalse(policy.confirmFeedbackDelivery(old.trackId, START, START + 300L))
-        assertTrue(policy.claimFeedbackDelivery(PRIMARY, START + 100L))
+        assertTrue(policy.claimFeedbackDelivery(PRIMARY, START + 100L, START + 100L))
         assertTrue(policy.confirmFeedbackDelivery(PRIMARY, START + 100L, START + 300L))
     }
 
     @Test
     fun unknownStopCancelsClaimedLowerPrimaryAndCanStartImmediately() {
         val old = requireNotNull(dispatch(unknown = emptyList()).action)
-        assertTrue(policy.claimFeedbackDelivery(old.trackId, START))
+        assertTrue(policy.claimFeedbackDelivery(old.trackId, START, START))
         val stop = dispatch(now = START + 100L, unknown = listOf(output(UNKNOWN, level = MessageLevel.STOP)))
         assertEquals(UNKNOWN, stop.action?.trackId)
         assertEquals(MessageLevel.STOP, stop.action?.level)
         assertFalse(policy.confirmFeedbackDelivery(old.trackId, START, START + 200L))
-        assertTrue(policy.claimFeedbackDelivery(UNKNOWN, START + 100L))
+        assertTrue(policy.claimFeedbackDelivery(UNKNOWN, START + 100L, START + 100L))
     }
 
     @Test
     fun completedPrimaryWarningDoesNotDelayUnknownStopEscalation() {
         val old = requireNotNull(dispatch().action)
-        assertTrue(policy.claimFeedbackDelivery(old.trackId, START))
+        assertTrue(policy.claimFeedbackDelivery(old.trackId, START, START))
         assertTrue(policy.confirmFeedbackDelivery(old.trackId, START, START))
         val stop = dispatch(now = START + 100L, unknown = listOf(output(UNKNOWN, level = MessageLevel.STOP)))
         assertEquals(UNKNOWN, stop.action?.trackId)
@@ -220,6 +221,56 @@ class AndroidTactileCrossSourceFeedbackTest {
         assertNull(result.action)
         assertTrue(result.activeRiskTrackIds.isEmpty())
         assertTrue(result.activeFeedbackDeliveryKeys.isEmpty())
+    }
+
+    @Test
+    fun expiredPrimaryCannotSuppressFreshIndependentRegion() {
+        val expired = output(PRIMARY).copy(sourceValidUntilElapsedRealtimeMs = START - 1L)
+        val result = dispatch(primary = listOf(expired))
+        assertEquals(UNKNOWN, result.action?.trackId)
+        assertEquals(setOf(UNKNOWN), result.activeRiskTrackIds)
+    }
+
+    @Test
+    fun expiredIndependentStopCannotSuppressFreshPrimaryWarning() {
+        val expired = output(UNKNOWN, level = MessageLevel.STOP)
+            .copy(sourceValidUntilElapsedRealtimeMs = START - 1L)
+        val result = dispatch(unknown = listOf(expired))
+        assertEquals(PRIMARY, result.action?.trackId)
+        assertEquals(setOf(PRIMARY), result.activeRiskTrackIds)
+    }
+
+    @Test
+    fun missingPrimaryCaptureLeaseRemainsFailClosed() {
+        val unleased = output(PRIMARY).copy(sourceValidUntilElapsedRealtimeMs = null)
+        val result = dispatch(primary = listOf(unleased), unknown = emptyList())
+        assertNull(result.action)
+        assertTrue(result.activeFeedbackDeliveryKeys.isEmpty())
+    }
+
+    @Test
+    fun missingIndependentOutputLeaseIsNotCreatedFromDispatchTime() {
+        val unleased = output(UNKNOWN).copy(sourceValidUntilElapsedRealtimeMs = null)
+        val result = dispatch(primary = emptyList(), unknown = listOf(unleased))
+        assertNull(result.action)
+        assertTrue(result.activeRiskTrackIds.isEmpty())
+    }
+
+    @Test
+    fun independentBatchClampsCandidateBeforePolicyReservation() {
+        val longer = output(UNKNOWN).copy(sourceValidUntilElapsedRealtimeMs = START + 2_000L)
+        val result = dispatch(now = START + 700L, primary = emptyList(), unknown = listOf(longer))
+        assertEquals(START + 800L, requireNotNull(result.action).validUntilMs)
+    }
+
+    @Test
+    fun shorterIndependentOutputLeaseSurvivesFreshBatchAndRepeatedDispatch() {
+        val shorter = output(UNKNOWN).copy(sourceValidUntilElapsedRealtimeMs = START + 100L)
+        val initial = dispatch(now = START + 50L, primary = emptyList(), unknown = listOf(shorter))
+        assertEquals(START + 100L, requireNotNull(initial.action).validUntilMs)
+        val expired = dispatch(now = START + 101L, primary = emptyList(), unknown = listOf(shorter))
+        assertNull(expired.action)
+        assertTrue(expired.activeFeedbackDeliveryKeys.isEmpty())
     }
 
     private fun dispatch(
@@ -260,6 +311,7 @@ class AndroidTactileCrossSourceFeedbackTest {
             trend = Trend.STABLE, approachScore = 0f, approachSpeedMps = null, timeToCollisionMs = null,
             confidence = confidence(), userFacing = UserFacingDepth(null, level, "위험 $id"),
             trackAgeFrames = 20, trackStableMs = 1_900L,
+            sourceValidUntilElapsedRealtimeMs = now + UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS,
         )
     }
 

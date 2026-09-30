@@ -45,8 +45,29 @@ import {
   matchRawCollectionRoute,
   resetRawCollectionRelayForTests
 } from "../src/raw-collection-relay.js";
-import { handleGatewayRequest } from "../src/routes.js";
+import { handleGatewayRequest as routeGatewayRequest } from "../src/routes.js";
 import { configureTestStateEncryption } from "./state-encryption-fixture.js";
+
+/**
+ * transfer-F5 (w24 review): an authorized account session first passes the Backend
+ * session-current gate (POST /accounts/session-current, 204 = current). The Backend fake of
+ * every test answers it here, so each test's own fetchImpl sees only its RAW relay calls.
+ */
+function handleGatewayRequest(
+  request: Request,
+  dependencies: Parameters<typeof routeGatewayRequest>[1] = {}
+): Promise<Response> {
+  const fetchImpl = dependencies.fetchImpl;
+  return routeGatewayRequest(request, {
+    ...dependencies,
+    fetchImpl: async (input, init) => {
+      if (new URL(String(input)).pathname === "/accounts/session-current") {
+        return new Response(null, { status: 204 });
+      }
+      return fetchImpl ? fetchImpl(input, init) : fetch(input, init);
+    }
+  });
+}
 
 const INTERNAL_TOKEN = "raw-relay-internal-token-12345678901234567890";
 const SESSION_SECRET = "raw-relay-session-secret-123456789012345678901234567890";
@@ -173,6 +194,16 @@ before(async () => {
   assert.equal(started.status, 200);
   walkLeaseId = String(started.body.lease_id);
   walkFence = Number(started.body.fencing_token);
+  // Owner decision 3(b): raw segments are written only after their walk ended.
+  const ended = commandFieldWalk(currentBinding!, parseFieldWalkCommand({
+    schema_version: "walksafe.field-walk-command.v1",
+    request_id: "raw-relay-walk-end-0001",
+    action: "end",
+    walk_id: WALK_ID,
+    lease_id: walkLeaseId,
+    fencing_token: walkFence
+  })!);
+  assert.equal(ended.status, 200);
 
   const saved = await handleGatewayRequest(new Request(
     "https://gateway.invalid/privacy/rights?control=integrated-consent",
@@ -316,7 +347,11 @@ function assertGeneratedProof(
   assert.equal(headers.get(FIELD_TEST_TOKEN_HEADER), INTERNAL_TOKEN);
   assert.equal(headers.get(ACTOR_ID_HEADER), ACTOR_ID);
   assert.equal(headers.get(ACCOUNT_GENERATION_HEADER), "1");
-  assert.match(headers.get(ACTOR_ASSERTION_HEADER) ?? "", /^v2\.\d+\.[A-Za-z0-9_-]{43}$/);
+  // S19-52: request-bound v4 (signature verified in backend-actor-assertion-v4.test.ts).
+  assert.match(
+    headers.get(ACTOR_ASSERTION_HEADER) ?? "",
+    /^v4\.\d+\.\d+\.7\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/
+  );
   const proof = headers.get(RAW_REQUEST_PROOF_HEADER) ?? "";
   const issuedAt = Number(proof.split(".")[1]);
   assert.equal(proof, createRawCollectionRequestProof(input, issuedAt));
@@ -480,15 +515,6 @@ test("manifest uses HEAD then actual proof, projects strict status, and GET reco
   assert.deepEqual(await response.json(), statusPayload());
   assert.equal(calls, 2);
 
-  const ended = commandFieldWalk(currentBinding!, parseFieldWalkCommand({
-    schema_version: "walksafe.field-walk-command.v1",
-    request_id: "raw-relay-walk-end-0001",
-    action: "end",
-    walk_id: WALK_ID,
-    lease_id: walkLeaseId,
-    fencing_token: walkFence
-  })!);
-  assert.equal(ended.status, 200);
   const payload = manifest();
   const statusRequest = new Request(
     `https://gateway.invalid/api/raw-collections/${COLLECTION_ID}`,
@@ -518,13 +544,6 @@ test("manifest uses HEAD then actual proof, projects strict status, and GET reco
 });
 
 test("new commit rejects a legacy v1 receipt even with its exact 180-day contract", async () => {
-  const restarted = commandFieldWalk(currentBinding!, parseFieldWalkCommand({
-    schema_version: "walksafe.field-walk-command.v1",
-    request_id: "raw-relay-walk-restart-0001",
-    action: "start",
-    walk_id: WALK_ID
-  })!);
-  assert.equal(restarted.status, 200);
   const payload = manifest();
   const commitBody: Record<string, unknown> = {
     schema_version: "walksafe.raw-collection-commit.v1",

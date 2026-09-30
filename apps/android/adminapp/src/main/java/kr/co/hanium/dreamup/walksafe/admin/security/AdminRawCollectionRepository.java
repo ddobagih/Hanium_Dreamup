@@ -30,4 +30,7 @@ public interface AdminRawCollectionRepository {
         AdminRawCollectionModels.LegalHoldRequest request,
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException;
+
+    /** S18-18: explicit, non-blocking cancellation of requests still in flight (no re-send). */
+    default void cancelInFlightRequests() {}
 }

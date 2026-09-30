@@ -7,6 +7,7 @@ internal data class EmailAccountFormValidity(
     val emailValid: Boolean,
     val dateOfBirthValid: Boolean,
     val passwordValid: Boolean,
+    val newPasswordValid: Boolean,
     val passwordConfirmationValid: Boolean,
     val otpValid: Boolean,
     val requiredConsentsGranted: Boolean,
@@ -22,7 +23,7 @@ internal data class EmailAccountFormValidity(
 
     val canCreateAccount: Boolean
         get() =
-            emailValid && passwordValid && passwordConfirmationValid && otpValid &&
+            emailValid && newPasswordValid && passwordConfirmationValid && otpValid &&
                 requiredConsentsGranted
 }
 
@@ -38,12 +39,14 @@ internal object EmailAccountFormPolicy {
         selections: SignupConsentSelections,
     ): EmailAccountFormValidity {
         val passwordValid = GatewayAccountInputPolicy.validPassword(password)
+        val newPasswordValid = GatewayAccountInputPolicy.validNewPassword(password)
         return EmailAccountFormValidity(
             emailValid = GatewayAccountInputPolicy.validEmail(email),
             dateOfBirthValid = GatewayAccountInputPolicy.validDateOfBirth(dateOfBirth),
             passwordValid = passwordValid,
+            newPasswordValid = newPasswordValid,
             passwordConfirmationValid =
-                passwordValid && password == passwordConfirmation,
+                newPasswordValid && password == passwordConfirmation,
             otpValid = OTP.matches(otp),
             requiredConsentsGranted = selections.requiredGranted,
         )

@@ -16,6 +16,7 @@ class HandsFreeVoiceTerminalFailureTest {
             VoskStreamingError.MODEL_LOAD_FAILED to "model_load_failed",
             VoskStreamingError.AUDIO_START_FAILED to "audio_start_failed",
             VoskStreamingError.AUDIO_READ_FAILED to "audio_read_failed",
+            VoskStreamingError.AUDIO_SILENCED to "audio_input_silenced",
             VoskStreamingError.INFERENCE_FAILED to "inference_failed",
         )
 

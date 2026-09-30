@@ -5,6 +5,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,6 +26,15 @@ class TactileRoutePolicyTest {
         assertEquals(thresholds.getDouble("maximum_gps_accuracy_m").toFloat(), config.maximumGpsAccuracyM)
         assertEquals(thresholds.getDouble("steering_dead_zone").toFloat(), config.steeringDeadZone)
         val cases = root.getJSONArray("cases")
+        // Keep the shared v1 fixture normative for its other consumers. These exact three
+        // legacy permissions are an explicit Android safety-contract divergence, not a
+        // rewritten fixture or a blanket exemption for future tactile_local cases.
+        val legacyMovementCases = mapOf(
+            "stable-aligned-center-uses-tactile" to ("straight" to 0.5f),
+            "stable-aligned-left-steers-left" to ("left" to 0.25f),
+            "stable-aligned-right-steers-right" to ("right" to 0.75f),
+        )
+        val comparedLegacyCases = mutableSetOf<String>()
 
         for (index in 0 until cases.length()) {
             val case = cases.getJSONObject(index)
@@ -53,6 +63,29 @@ class TactileRoutePolicyTest {
                 ),
             )
             val expected = case.getJSONObject("expected")
+            val caseId = case.getString("id")
+            if (expected.getString("mode") == "tactile_local") {
+                val legacy = requireNotNull(legacyMovementCases[caseId]) { caseId }
+                assertEquals(caseId, legacy.first, expected.getString("steering"))
+                assertEquals(caseId, "stable_aligned_tactile", expected.getString("reason"))
+                val observation = requireNotNull(tactile)
+                assertEquals(legacy.second, observation.centerXNormalized, 0f)
+                assertTrue(caseId, case.getBoolean("navigation_active"))
+                assertTrue(caseId, case.getBoolean("tmap_on_route"))
+                assertEquals(TmapCorridorProjectionEvidence.OVERLAPS, observation.tmapCorridorProjection)
+                assertSame(caseId, observation, policy.selectCandidate(listOf(observation)))
+                // v1 records camera heading, image side and corridor association, not block
+                // axis, user axis or contact-pixel depth. Independent production counterexamples:
+                // AndroidTactileRouteSafetyRegressionTest.cameraAlignedWithTheRouteStillCannotAuthorizeFollowingTheBlock,
+                // rotatingOnlyThePhoneChangesImageSideButNeverGeneratesSteering, and
+                // matchingRepresentativeDepthValuesDoNotProveDepthAtTheContactPixel.
+                assertEquals(caseId, LocalRouteMode.TMAP, decision.mode)
+                assertEquals(caseId, "tactile_motion_evidence_unavailable", decision.reason)
+                assertNull(caseId, decision.steering)
+                assertNull(caseId, decision.instruction)
+                comparedLegacyCases += caseId
+                continue
+            }
             assertEquals(case.getString("id"), expected.getString("mode"), decision.mode.wireValue)
             if (expected.isNull("steering")) {
                 assertNull(case.getString("id"), decision.steering?.wireValue)
@@ -60,7 +93,58 @@ class TactileRoutePolicyTest {
                 assertEquals(case.getString("id"), expected.getString("steering"), decision.steering?.wireValue)
             }
             assertEquals(case.getString("id"), expected.getString("reason"), decision.reason)
+            assertNull(caseId, decision.instruction)
         }
+        assertEquals(legacyMovementCases.keys, comparedLegacyCases)
+    }
+
+    @Test
+    fun rejectedObservationRetainsItsReasonWithoutDisplacingAnEligibleCandidate() {
+        val valid = stableObservation("valid", "normal_tactile_block", centerX = 0.5f, inCorridor = true)
+            .copy(routeId = "active-route")
+        val config = TactileRoutePolicyConfig()
+        val rejectedCases = listOf(
+            "route_heading_mismatch" to valid.copy(routeHeadingDeltaDeg = 90f),
+            "route_heading_mismatch" to valid.copy(routeHeadingDeltaDeg = null),
+            "tactile_route_identity_mismatch" to valid.copy(routeId = "previous-route"),
+            "tactile_confidence_low" to valid.copy(confidence = 0.1f),
+            "tactile_not_stable" to valid.copy(stableFrames = 1),
+            "tactile_stale" to valid.copy(ageMs = config.maximumDetectionAgeMs + 1L),
+            "tactile_geometry_invalid" to valid.copy(centerXNormalized = 1.2f),
+            "tactile_outside_tmap_corridor" to valid.copy(tmapCorridorProjection = TmapCorridorProjectionEvidence.OUTSIDE),
+            "tmap_corridor_projection_unavailable" to valid.copy(tmapCorridorProjection = TmapCorridorProjectionEvidence.UNAVAILABLE),
+        )
+        for ((reason, template) in rejectedCases) {
+            val rejected = template.copy(candidateId = "rejected", confidence = if (reason == "tactile_confidence_low") 0.1f else 0.99f)
+            val selected = policy.selectCandidate(listOf(rejected), "active-route")
+            assertSame(reason, rejected, selected)
+            val diagnostic = policy.evaluate(baseInput(selected).copy(activeRouteId = "active-route"))
+            assertEquals(reason, diagnostic.reason)
+            assertEquals(LocalRouteMode.TMAP, diagnostic.mode)
+            assertNull(diagnostic.steering)
+            assertNull(diagnostic.instruction)
+
+            for (candidates in listOf(listOf(rejected, valid), listOf(valid, rejected))) {
+                val eligible = policy.selectCandidate(candidates, "active-route")
+                assertSame(reason, valid, eligible)
+                val decision = policy.evaluate(baseInput(eligible).copy(activeRouteId = "active-route"))
+                assertEquals("tactile_motion_evidence_unavailable", decision.reason)
+                assertEquals(LocalRouteMode.TMAP, decision.mode)
+                assertNull(decision.steering)
+                assertNull(decision.instruction)
+            }
+        }
+    }
+
+    @Test
+    fun noObservationStillReportsNotVisibleRatherThanARejection() {
+        val selected = policy.selectCandidate(emptyList())
+        val decision = policy.evaluate(baseInput(selected))
+        assertNull(selected)
+        assertEquals("tactile_not_visible", decision.reason)
+        assertEquals(LocalRouteMode.TMAP, decision.mode)
+        assertNull(decision.steering)
+        assertNull(decision.instruction)
     }
 
     @Test
@@ -92,8 +176,13 @@ class TactileRoutePolicyTest {
         val decision = policy.evaluate(baseInput(tactile = selected))
 
         assertEquals("normal", selected?.candidateId)
-        assertEquals(LocalRouteMode.TACTILE_LOCAL, decision.mode)
-        assertEquals(TactileSteering.STRAIGHT, decision.steering)
+        assertSame(normal, selected)
+        assertEquals(TmapCorridorProjectionEvidence.OVERLAPS, selected?.tmapCorridorProjection)
+        assertEquals(0.5f, requireNotNull(selected).centerXNormalized, 0f)
+        assertEquals(LocalRouteMode.TMAP, decision.mode)
+        assertEquals("tactile_motion_evidence_unavailable", decision.reason)
+        assertNull(decision.steering)
+        assertNull(decision.instruction)
     }
 
     @Test

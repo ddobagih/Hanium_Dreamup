@@ -18,6 +18,12 @@ internal class PendingExplicitRouteStart<C>(
 
     fun consumeIfCurrent(context: C, nowElapsedRealtimeMs: Long): C? {
         val request = pending ?: return null
+        return consumeIfCurrent(request, context, nowElapsedRealtimeMs)
+    }
+
+    fun consumeIfCurrent(expected: Request<C>, context: C, nowElapsedRealtimeMs: Long): C? {
+        val request = pending ?: return null
+        if (request !== expected) return null
         if (request.context != context) {
             pending = null
             return null
@@ -53,7 +59,7 @@ internal class PendingExplicitRouteStart<C>(
         val requestedAtElapsedRealtimeMs: Long,
     ) {
         internal fun isExpired(nowElapsedRealtimeMs: Long, timeoutMs: Long): Boolean {
-            require(nowElapsedRealtimeMs >= requestedAtElapsedRealtimeMs)
+            if (nowElapsedRealtimeMs < requestedAtElapsedRealtimeMs) return true
             return nowElapsedRealtimeMs - requestedAtElapsedRealtimeMs >= timeoutMs
         }
     }

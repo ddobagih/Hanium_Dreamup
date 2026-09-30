@@ -26,10 +26,39 @@ data class PermissionSessionSnapshot(
         get() = authentication == AuthenticationState.ACTIVE
 
     val mayCreateAutomaticReport: Boolean
-        get() = automaticReportConsentGranted
+        get() = authentication == AuthenticationState.ACTIVE && automaticReportConsentGranted
 
-    val mayReuseForTraining: Boolean
-        get() = rawCollectionConsentGranted && trainingReuseConsentGranted
+    fun mayReuseForTraining(kind: TrainingSourceKind): Boolean = TrainingReuseConsentRule.allows(
+        kind = kind,
+        rawCollectionConsentGranted = rawCollectionConsentGranted,
+        trainingReuseConsentGranted = trainingReuseConsentGranted,
+    )
+}
+
+/** Material that may become a model-training candidate; each kind has its own consent rule. */
+enum class TrainingSourceKind {
+    /** Walk raw/diagnostic material: only exists under raw collection consent (FP-013). */
+    WALK_RAW_DIAGNOSTIC,
+
+    /** Report original: needs training consent separate from report processing (FP-031 design_rules[3]). */
+    REPORT_ORIGINAL,
+}
+
+/**
+ * Single training-reuse truth table shared by [PermissionSessionSnapshot] and
+ * [IntegratedConsentSelections] (S02-22). Training consent is always required; walk raw material
+ * additionally requires raw collection consent, a report original does not. The server still makes
+ * the final per-item promotion decision; this only keeps the two Android views identical.
+ */
+object TrainingReuseConsentRule {
+    fun allows(
+        kind: TrainingSourceKind,
+        rawCollectionConsentGranted: Boolean,
+        trainingReuseConsentGranted: Boolean,
+    ): Boolean = trainingReuseConsentGranted && when (kind) {
+        TrainingSourceKind.WALK_RAW_DIAGNOSTIC -> rawCollectionConsentGranted
+        TrainingSourceKind.REPORT_ORIGINAL -> true
+    }
 }
 
 /** Keeps account, consent, and transfer decisions independent from Android permission ownership. */
@@ -47,21 +76,23 @@ class PermissionSessionPolicy(
     }
 
     fun rememberActor(actorId: String): PermissionSessionSnapshot = update {
-        it.copy(
-            actorId = normalizedActor(actorId),
+        val owner = normalizedActor(actorId)
+        it.forActor(owner).copy(
+            actorId = owner,
             authentication = AuthenticationState.REAUTHENTICATION_REQUIRED,
         )
     }
 
     fun authenticated(actorId: String): PermissionSessionSnapshot = update {
-        it.copy(
-            actorId = normalizedActor(actorId),
+        val owner = normalizedActor(actorId)
+        it.forActor(owner).copy(
+            actorId = owner,
             authentication = AuthenticationState.ACTIVE,
         )
     }
 
     fun explicitLogout(): PermissionSessionSnapshot = update {
-        it.copy(actorId = null, authentication = AuthenticationState.SIGNED_OUT)
+        PermissionSessionSnapshot(mobileNetworkPreference = it.mobileNetworkPreference)
     }
 
     fun authenticationExpired(): PermissionSessionSnapshot = update {
@@ -113,6 +144,11 @@ class PermissionSessionPolicy(
 
     private fun normalizedActor(actorId: String): String =
         actorId.trim().also { require(it.isNotEmpty()) { "actorId must not be blank" } }
+
+    private fun PermissionSessionSnapshot.forActor(actorId: String): PermissionSessionSnapshot =
+        if (this.actorId == actorId) this else PermissionSessionSnapshot(
+            mobileNetworkPreference = mobileNetworkPreference,
+        )
 }
 
 enum class ObservedPermission {
@@ -214,6 +250,20 @@ data class PermissionRecoveryGate(
             this
         }
 
+    /**
+     * Accepts the user's explicit resume only against a permission observation taken at that
+     * moment. An awaiting state computed earlier never releases resources when a required
+     * permission is missing now; it returns to the blocked recovery state instead.
+     */
+    fun acknowledgeExplicitResume(
+        observed: ObservedPermissionSnapshot,
+        requiredPermissions: Set<ObservedPermission>,
+    ): PermissionRecoveryGate {
+        if (state != PermissionRecoveryGateState.AWAITING_EXPLICIT_RESUME) return this
+        val missing = PermissionDependencyPolicy.missing(requiredPermissions, observed)
+        return if (missing.isNotEmpty()) blocked(missing) else PermissionRecoveryGate()
+    }
+
     companion object {
         fun restoredBlocked(
             affectedPermissions: Set<ObservedPermission>,
@@ -264,7 +314,8 @@ object PermissionDependencyPolicy {
         }
         return PermissionDependencyDecision(
             stoppedFeatures = stopped,
-            requiresWholeWalkSafetyStop = false,
+            requiresWholeWalkSafetyStop =
+                !observed.cameraGranted && !observed.preciseLocationGranted,
         )
     }
 }

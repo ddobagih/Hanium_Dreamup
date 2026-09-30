@@ -7,6 +7,9 @@
             android:name=".device.RuntimeCalibrationTestHostActivity"
             android:exported="false" />
         <activity
+            android:name=".voice.WalkVoiceForegroundServiceTestHostActivity"
+            android:exported="false" />
+        <activity
             android:name=".fieldtest.OutdoorPositionTestActivity"
             android:label="위치 야외 테스트"
             android:exported="true"

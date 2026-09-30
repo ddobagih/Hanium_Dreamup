@@ -72,6 +72,7 @@ from backend.app.schemas import (
 from backend.app.field_test_security import (
     FieldTestAccess,
     create_actor_assertion,
+    create_actor_assertion_v4,
     create_privacy_deletion_assertion,
 )
 import backend.app.services.privacy_lifecycle as privacy_lifecycle
@@ -891,12 +892,16 @@ def test_fp046_gateway_scoped_assertion_binds_body_path_and_tombstone(
             "x-walksafe-field-test-token": field_token,
             "x-walksafe-actor-id": actor_id,
             "x-walksafe-account-generation": "1",
-            "x-walksafe-actor-assertion": create_actor_assertion(
+            "x-walksafe-actor-assertion": create_actor_assertion_v4(
                 actor_id,
                 FieldTestAccess.FIELD,
                 gateway_secret,
                 account_generation=1,
-            ),
+                auth_epoch=None,
+                method="POST",
+                target="/privacy/consent-events",
+                body_sha256=hashlib.sha256(consent_body).hexdigest(),
+            ),  # w24 S20-41: writes need a request-bound v4 by default
         },
         content=consent_body,
     )
@@ -975,6 +980,7 @@ def test_fp046_optional_training_refusal_does_not_block_service_report_gate() ->
             db,
             privacy_subject=subject,
             account_generation=1,
+            source_kind="WALK_RAW_DIAGNOSTIC",
         ) is False
         db.rollback()
     with SessionFactory() as db:
@@ -1039,6 +1045,8 @@ def test_fp046_all_items_terminal_create_only_source_less_three_year_receipt() -
                 request_id=current.request_id,
                 manifest_sha256="1" * 64,
                 terminal_at=datetime.now(timezone.utc),
+                quarantined_raw_collection_count=0,
+                external_copy_count=0,
             )
     assert current.overall_status == "PARTIAL"
     assert current.completion_receipt_sha256 is None
@@ -1452,12 +1460,21 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
                 journal_root.resolve(),
                 journal_path,
             )
+            replay_manifest = json.loads(
+                (journal_root / "manifests" / f"{request_id}.json").read_text(
+                    encoding="utf-8"
+                )
+            )
             with WorkerSessionFactory() as db:
                 repeated = complete_server_deletion_inventory_from_manifest(
                     db,
                     request_id=request_id,
                     manifest_sha256=manifest_digest,
                     terminal_at=datetime.now(timezone.utc),
+                    quarantined_raw_collection_count=replay_manifest[
+                        "quarantined_raw_collection_count"
+                    ],
+                    external_copy_count=replay_manifest["external_copy_count"],
                 )
         finally:
             worker_engine.dispose()
@@ -1480,6 +1497,16 @@ def test_fp046_account_deletion_worker_removes_server_data_and_retains_ledger(
             "signup_consent_receipt_count": 0,
         }
         assert deletion_manifest["raw_collection_count"] == 2
+        # S1617-55/59: the quarantined RAW collection was deleted and re-queried;
+        # no institution copy exists, so both follow the worker inventory.
+        assert deletion_manifest["quarantined_raw_collection_count"] == 1
+        assert deletion_manifest["external_copy_count"] == 0
+        assert deletion_manifest["server_inventory"] == {
+            "report_records": "COMPLETED",
+            "server_copies": "NOT_APPLICABLE",
+            "server_originals": "COMPLETED",
+            "server_quarantine": "COMPLETED",
+        }
         raw_deletions = {
             item["collection_id"]: item
             for item in deletion_manifest["raw_collections"]
@@ -3031,6 +3058,7 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
             for table_name, row in app_table_privileges.items()
             if not row["runtime_insert"]
         } == {
+            "privacy_hmac_keyring",  # S1617-50: runtime reads; rotation is owner-only
             "admin_device_keys",
             "admin_report_mutation_claims",
             "admin_security_controls",
@@ -3042,6 +3070,7 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
             "report_deletion_legal_holds",
             "report_deletion_tombstones",
             "report_delivery_packages",
+            "report_institution_delivery_corrections",  # S18-40: owner-only INSERT
             "report_institution_delivery_events",
             "report_original_access_audits",
             "report_original_access_grants",
@@ -3290,6 +3319,8 @@ def test_fp046_database_rejects_false_completion_and_terminal_rewrite() -> None:
                 request_id=accepted.status.request_id,
                 manifest_sha256="c" * 64,
                 terminal_at=datetime.now(timezone.utc),
+                quarantined_raw_collection_count=0,
+                external_copy_count=0,
             )
     with pytest.raises(SQLAlchemyError):
         with SessionFactory.begin() as db:
@@ -3308,6 +3339,8 @@ def test_fp046_database_rejects_false_completion_and_terminal_rewrite() -> None:
                 request_id=accepted.status.request_id,
                 manifest_sha256="d" * 64,
                 terminal_at=datetime.now(timezone.utc),
+                quarantined_raw_collection_count=0,
+                external_copy_count=0,
             )
     assert transitioned.revision == accepted.status.revision + 4
     assert service_rewrite.value.code == "account_deletion_worker_role_unsafe"
@@ -3570,40 +3603,9 @@ def test_fp046_service_rejects_future_or_pre_acceptance_transition_times() -> No
                 evidence_sha256=None,
             )
     assert device_item.value.code == "device_deletion_evidence_required"
-
-    for label, completed_at in (
-        ("before", accepted.status.accepted_at - timedelta(seconds=1)),
-        ("future", datetime.now(timezone.utc) + timedelta(minutes=5)),
-    ):
-        evidence = DeviceDeletionEvidenceV2(
-            schema_version="walksafe.device-deletion-evidence.v2",
-            request_id=accepted.status.request_id,
-            tombstone_id=accepted.status.tombstone_id,
-            request_receipt_sha256=accepted.status.request_receipt_sha256,
-            installation_id=_installation_id(actor_id),
-            evidence_id=f"device-{label}-{suffix}",
-            client_revision=accepted.status.client_revision,
-            expected_status_revision=accepted.status.revision,
-            item="device_untransmitted_data",
-            result="DELETED",
-            completed_at=completed_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            evidence_sha256="0" * 64,
-        )
-        evidence = evidence.model_copy(
-            update={"evidence_sha256": deletion_evidence_sha256(evidence)}
-        )
-        with pytest.raises(PrivacyLifecycleError) as invalid_device_time:
-            with SessionFactory() as db:
-                record_device_deletion_evidence(
-                    db,
-                    payload=evidence,
-                    actor_id=actor_id,
-                    account_generation=1,
-                    access_pre_digest="a" * 64,
-                    tombstone_id=accepted.status.tombstone_id,
-                    secret=PRIVACY_SECRET,
-                )
-        assert invalid_device_time.value.code == "device_deletion_completed_time_out_of_range"
+    # S1617-53: a skewed device clock no longer rejects device evidence; the
+    # server receipt time becomes terminal_at and the observation is flagged.
+    # See test_privacy_sweep_w23_postgres_integration.py::test_s1617_53_*.
     engine.dispose()
 
 
@@ -3640,4 +3642,290 @@ def test_fp046_bound_hmac_fast_path_does_not_wait_for_global_lock() -> None:
                     text("SELECT pg_advisory_unlock(hashtextextended(:lock_key, 0))"),
                     {"lock_key": lock_key},
                 )
+    engine.dispose()
+
+
+def test_fp046_lost_response_replay_is_distinct_from_unaccepted_revision_conflict() -> None:
+    """Resending accepted evidence stays idempotent; an unaccepted stale revision stays a conflict.
+
+    The original evidence is replayed after another installation advanced the revision and
+    again after the whole request completed. Neither replay may add a ledger event or be
+    mistaken for a revision conflict, while evidence that was never accepted keeps failing
+    with the current revision so the client can refresh instead of blindly resending.
+    """
+
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex[:12]
+    actor_id = f"lost-response.{suffix}"
+    first_installation = f"install_lost_a_{suffix}"
+    second_installation = f"install_lost_b_{suffix}"
+    _record_consent(SessionFactory, actor_id=actor_id, installation_id=first_installation)
+    _record_consent(SessionFactory, actor_id=actor_id, installation_id=second_installation)
+    accepted = _accept(
+        SessionFactory,
+        actor_id=actor_id,
+        request_id=f"delete_lost_response_{suffix}",
+    )
+    request_id = accepted.status.request_id
+
+    def submit(evidence: DeviceDeletionEvidenceV2):
+        with SessionFactory() as db:
+            return record_device_deletion_evidence(
+                db,
+                payload=evidence,
+                actor_id=actor_id,
+                account_generation=1,
+                access_pre_digest="a" * 64,
+                tombstone_id=accepted.status.tombstone_id,
+                secret=PRIVACY_SECRET,
+            )
+
+    def event_count() -> int:
+        from sqlalchemy import func
+
+        with SessionFactory() as db:
+            return int(
+                db.scalar(
+                    select(func.count()).select_from(AccountDeletionEvent).where(
+                        AccountDeletionEvent.request_id == request_id
+                    )
+                )
+            )
+
+    first = _evidence(
+        accepted.status,
+        installation_id=first_installation,
+        evidence_id=f"lost-first-{suffix}",
+    )
+    after_first = submit(first)  # The device never sees this response.
+    assert after_first.revision == 2
+
+    never_accepted = _evidence(
+        accepted.status,
+        installation_id=second_installation,
+        evidence_id=f"lost-stale-{suffix}",
+    )
+    with pytest.raises(PrivacyLifecycleError) as stale:
+        submit(never_accepted)
+    assert stale.value.code == "account_deletion_revision_conflict"
+    assert stale.value.details == {
+        "current_status_revision": 2,
+        "current_overall_status": "PARTIAL",
+    }
+
+    second = _evidence(
+        after_first,
+        installation_id=second_installation,
+        evidence_id=f"lost-second-{suffix}",
+    )
+    after_second = submit(second)
+    assert after_second.revision == 3
+    assert after_second.items[0].status == "COMPLETED"
+    events_before_replay = event_count()
+
+    replayed = submit(first)
+    assert replayed.model_dump(mode="json") == after_second.model_dump(mode="json")
+    assert event_count() == events_before_replay
+    with pytest.raises(PrivacyLifecycleError) as still_stale:
+        submit(never_accepted)
+    assert still_stale.value.code == "account_deletion_revision_conflict"
+    assert still_stale.value.details["current_status_revision"] == 3
+
+    with _worker_session_factory(engine, suffix) as WorkerSessionFactory:
+        with WorkerSessionFactory() as db:
+            current = complete_server_deletion_inventory_from_manifest(
+                db,
+                request_id=request_id,
+                manifest_sha256="1" * 64,
+                terminal_at=datetime.now(timezone.utc),
+                quarantined_raw_collection_count=0,
+                external_copy_count=0,
+            )
+    remaining_keys = [
+        key
+        for key in DELETION_ITEM_KEYS
+        if key != "device_untransmitted_data" and key not in SERVER_OWNED_ITEM_KEYS
+    ]
+    for index, key in enumerate(remaining_keys, start=2):
+        with SessionFactory() as db:
+            current = transition_deletion_item(
+                db,
+                request_id=request_id,
+                item_key=key,
+                operation_id=f"lost-complete-{index}-{suffix}",
+                expected_status_revision=current.revision,
+                next_state="COMPLETED",
+                evidence_sha256=f"{index + 1:064x}",
+                terminal_at=datetime.now(timezone.utc),
+            )
+    assert current.overall_status == "COMPLETED"
+    events_after_completion = event_count()
+
+    for evidence in (first, second):
+        after_completion = submit(evidence)
+        assert after_completion.model_dump(mode="json") == current.model_dump(mode="json")
+    assert event_count() == events_after_completion
+    with pytest.raises(PrivacyLifecycleError) as completed_conflict:
+        submit(never_accepted)
+    assert completed_conflict.value.code == "account_deletion_already_completed"
+    engine.dispose()
+
+
+def test_fp046_worker_leftover_after_commit_keeps_server_items_incomplete(
+    tmp_path: Path,
+) -> None:
+    """A server record that survives the committed delete must block item completion.
+
+    The worker re-queries the database after its commit and before publishing the manifest.
+    A leftover report for the deleted generation therefore leaves every server-owned item
+    non-terminal and publishes no manifest; only after the leftover is gone does the same
+    journal reconcile to completed items.
+    """
+
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex[:12]
+    actor_id = f"worker-leftover.{suffix}"
+    request_id = f"delete_worker_leftover_{suffix}"
+    subject = privacy_subject_hmac(actor_id, 1, PRIVACY_SECRET)
+    upload_dir = tmp_path / "uploads"
+    upload_dir.mkdir(mode=0o700)
+    raw_object_dir = tmp_path / "raw-objects"
+    raw_object_dir.mkdir(mode=0o700)
+    tmp_path.chmod(0o700)
+    journal_root = (tmp_path / "worker").resolve()
+    prepare_account_deletion_worker_roots(journal_root)
+
+    def report_row(report_id: uuid.UUID) -> Report:
+        return Report(
+            id=report_id,
+            status="new",
+            class_id=0,
+            class_name="damaged_tactile_block",
+            confidence=0.9,
+            bbox_x=0.1,
+            bbox_y=0.1,
+            bbox_width=0.5,
+            bbox_height=0.5,
+            captured_at=datetime.now(timezone.utc),
+            source="android",
+            image_path=f"/uploads/{storage_name}",
+            image_content_type="image/jpeg",
+            payload={"source": "account-deletion-leftover-test"},
+            privacy_subject_hmac=subject,
+            account_generation=1,
+        )
+
+    original_report_id = uuid.uuid4()
+    leftover_report_id = uuid.uuid4()
+    storage_name = f"{uuid.uuid4()}.wse"
+    envelope = (b"walksafe-leftover-envelope-" + suffix.encode("ascii")) * 3
+    object_path = upload_dir / storage_name
+    object_path.write_bytes(envelope)
+    object_path.chmod(0o600)
+    _record_consent(SessionFactory, actor_id=actor_id)
+    with SessionFactory.begin() as db:
+        db.add(report_row(original_report_id))
+        db.flush()
+        db.add(
+            ReportImageObject(
+                report_id=original_report_id,
+                storage_name=storage_name,
+                envelope_version=1,
+                algorithm="AES-256-GCM",
+                aad_version=1,
+                key_id=f"leftover-key-{suffix}",
+                nonce=uuid.uuid4().bytes[:12],
+                plaintext_sha256=hashlib.sha256(b"plaintext").hexdigest(),
+                plaintext_size=9,
+                envelope_sha256=hashlib.sha256(envelope).hexdigest(),
+                envelope_size=len(envelope),
+                content_type="image/jpeg",
+            )
+        )
+    accepted = _accept(SessionFactory, actor_id=actor_id, request_id=request_id)
+    assert accepted.status.overall_status == "PARTIAL"
+
+    def with_report_triggers_disabled(action) -> None:
+        # Fixture-only superuser access that stands in for a store which kept its data.
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE reports DISABLE TRIGGER USER"))
+            try:
+                action(connection)
+            finally:
+                connection.execute(text("ALTER TABLE reports ENABLE TRIGGER USER"))
+
+    def insert_leftover(connection) -> None:
+        with Session(bind=connection) as db:
+            db.add(report_row(leftover_report_id))
+            db.flush()
+
+    def server_item_states() -> dict[str, str]:
+        with SessionFactory() as db:
+            return {
+                item.item_key: item.state
+                for item in db.scalars(
+                    select(AccountDeletionItem).where(
+                        AccountDeletionItem.request_id == request_id
+                    )
+                ).all()
+                if item.item_key in SERVER_OWNED_ITEM_KEYS
+            }
+
+    manifest_path = journal_root / "manifests" / f"{request_id}.json"
+    with _worker_session_factory(engine, suffix) as WorkerSessionFactory:
+        with pytest.raises(
+            RuntimeError,
+            match="server object inventory is not empty after commit",
+        ):
+            process_account_deletion_request(
+                WorkerSessionFactory,
+                request_id=request_id,
+                upload_dir=upload_dir.resolve(),
+                raw_object_dir=raw_object_dir.resolve(),
+                root=journal_root,
+                fault=lambda point: (
+                    with_report_triggers_disabled(insert_leftover)
+                    if point == "before_object_removal"
+                    else None
+                ),
+            )
+        with SessionFactory() as db:
+            assert db.get(Report, original_report_id) is None
+            assert db.get(Report, leftover_report_id) is not None
+            request = db.get(AccountDeletionRequest, request_id)
+            assert request is not None
+            assert request.overall_status != "COMPLETED"
+            assert request.completion_receipt_sha256 is None
+        assert all(
+            state not in {"COMPLETED", "NOT_APPLICABLE"}
+            for state in server_item_states().values()
+        )
+        assert not manifest_path.exists()
+        journal_path = next((journal_root / "journals").glob("*.json"))
+
+        # A restart must not mistake the leftover for a pre-commit state or finish over it.
+        with pytest.raises(
+            RuntimeError,
+            match="partial database deletion cannot be reconciled",
+        ):
+            reconcile_account_deletion_journal(
+                WorkerSessionFactory,
+                journal_root,
+                journal_path,
+            )
+        assert not manifest_path.exists()
+
+        with_report_triggers_disabled(
+            lambda connection: connection.execute(
+                delete(Report).where(Report.id == leftover_report_id)
+            )
+        )
+        manifest_digest = reconcile_account_deletion_journal(
+            WorkerSessionFactory,
+            journal_root,
+            journal_path,
+        )
+    assert manifest_path.is_file()
+    assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == manifest_digest
+    assert set(server_item_states().values()) == {"COMPLETED", "NOT_APPLICABLE"}
     engine.dispose()

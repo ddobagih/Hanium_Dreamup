@@ -23,8 +23,8 @@ class EmailAccountEnrollmentTest {
                 "terms_of_service" to "walksafe.terms-of-service.v1",
                 "privacy_notice" to "walksafe.privacy-notice.v1",
                 "location_terms" to "walksafe.location-terms.v1",
-                "raw_original" to "FP-013-RAW-1.1.0",
-                "automatic_reporting" to "FP-013-AUTO-1.1.0",
+                "raw_original" to "FP-013-RAW-1.2.0",
+                "automatic_reporting" to "FP-013-AUTO-1.2.0",
                 "training_reuse" to "FP-013-TRAINING-1.1.0",
             ),
             SIGNUP_DOCUMENT_VERSIONS,
@@ -94,7 +94,11 @@ class EmailAccountEnrollmentTest {
         val first = fence.begin(AccountRemoteAction.REQUEST_EMAIL_OTP, "state-1")!!
         assertNull(fence.begin(AccountRemoteAction.REQUEST_EMAIL_OTP, "state-1"))
         assertFalse(fence.completeIfCurrent(first, "state-2"))
-        assertTrue(fence.completeIfCurrent(first, "state-1"))
+        assertFalse(fence.completeIfCurrent(first, "state-1"))
+        assertFalse(fence.isInFlight())
+        val retry = fence.begin(AccountRemoteAction.REQUEST_EMAIL_OTP, "state-1")!!
+        assertTrue(fence.completeIfCurrent(retry, "state-1"))
+        assertFalse(fence.completeIfCurrent(retry, "state-1"))
 
         val second = fence.begin(AccountRemoteAction.PASSWORD_LOGIN, "state-2")!!
         fence.enteredBackground()

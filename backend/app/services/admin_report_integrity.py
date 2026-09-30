@@ -14,6 +14,22 @@ ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS = frozenset(
         "202609010001",
         "202609010002",
         "202609010003",
+        "202609210001",
+        "202609240001",
+        "202609240002",
+        "202609280001",
+        "202609280002",
+        "202609290001",
+        "202609290002",
+        "202609300001",
+        "202609300002",
+        "202609300003",
+        "202609300004",
+        "202609300005",
+        "202609300006",
+        "202609300007",
+        "202609300008",
+        "202609300009",
     }
 )
 
@@ -1263,6 +1279,354 @@ _PRE_DECISION_IDEMPOTENCY_BOUNDARY_SQL = text(
     )
 )
 
+# 202609240001 changes this pg_get_functiondef result; 202609240002 keeps it.
+_DUPLICATE_CYCLE_BOUNDARY_SQL = text(
+    _BOUNDARY_SQL.text.replace(
+        "21f28f5e68d48e0ab9566d3f837c978ce3e147fee0c7d35131af7fc22f691c2d",
+        "1f486b97e023c7599dd1b1944d7e6090c698075a55fd3c5dd485a2a792f6b924",
+    )
+)
+
+
+# 202609280001 adds the v4 review (expected_review_revision) and delivery
+# (follow-up observation) runtime functions; v3 stays executable.
+_REVIEW_DELIVERY_V4_BOUNDARY_SQL = text(
+    _DUPLICATE_CYCLE_BOUNDARY_SQL.text.replace(
+        "        ('public.walksafe_append_report_delivery_event_v3('\n"
+        "         'uuid,uuid,bigint,bigint,uuid,text,text,text,text,text,text,text,'\n"
+        "         'timestamptz,text,uuid,text,uuid,uuid,bytea,text,text)')\n"
+        "    ),\n",
+        "        ('public.walksafe_append_report_delivery_event_v3('\n"
+        "         'uuid,uuid,bigint,bigint,uuid,text,text,text,text,text,text,text,'\n"
+        "         'timestamptz,text,uuid,text,uuid,uuid,bytea,text,text)'),\n"
+        "        ('public.walksafe_append_report_review_decision_v4('\n"
+        "         'uuid,uuid,bigint,bigint,text,text,text,uuid,boolean,boolean,'\n"
+        "         'boolean,uuid,text,uuid,text,uuid,uuid,bytea,text,text)'),\n"
+        "        ('public.walksafe_append_report_delivery_event_v4('\n"
+        "         'uuid,uuid,bigint,bigint,uuid,text,text,text,text,text,text,text,'\n"
+        "         'timestamptz,text,uuid,text,uuid,uuid,bytea,text,text)')\n"
+        "    ),\n",
+        1,
+    ).replace(
+        "    expected_function_definitions(name, definition_sha256, result, helper) AS (\n"
+        "      VALUES\n",
+        "    expected_function_definitions(name, definition_sha256, result, helper) AS (\n"
+        "      VALUES\n"
+        "        ('walksafe_append_report_delivery_event_v4',\n"
+        "         'cd591e5b30b9f2d15adce31e283834a24df63883f4f96ebdf4ff6b58f9d7e421',\n"
+        "         'TABLE(result_status text, event_id uuid, event_revision bigint)', false),\n"
+        "        ('walksafe_append_report_review_decision_v4',\n"
+        "         '84e0cbbf23cc5c3bb5df8b3cfd1be5be111ef12fbf0658e953ce0a4f1beaf84d',\n"
+        "         'TABLE(result_status text, decision_id uuid, decision_revision bigint)', false),\n",
+        1,
+    ).replace(
+        "      AND (SELECT pg_catalog.count(*) = 7\n"
+        "             FROM resolved_functions\n",
+        "      AND (SELECT pg_catalog.count(*) = 9\n"
+        "             FROM resolved_functions\n",
+        1,
+    ).replace(
+        "      AND (SELECT pg_catalog.count(*) = 17\n"
+        "             FROM resolved_all_functions\n",
+        "      AND (SELECT pg_catalog.count(*) = 19\n"
+        "             FROM resolved_all_functions\n",
+        1,
+    )
+)
+# 202609280002 only widens the reconfirmation issuer allowlist and 202609290001
+# and 202609290002 only change administrator device keys, and 202609300001/
+# 202609300002/202609300003/202609300004 only change privacy deletion evidence,
+# the privacy HMAC keyring, and installation evidence keys, so all keep the
+# 202609280001 report function boundary.
+ADMIN_REPORT_REVIEW_DELIVERY_V4_REVISIONS = frozenset(
+    {
+        "202609280001",
+        "202609280002",
+        "202609290001",
+        "202609290002",
+        "202609300001",
+        "202609300002",
+        "202609300003",
+        "202609300004",
+    }
+)
+
+_DELIVERY_EVENT_ARGS_SQL = (
+    "         'uuid,uuid,bigint,bigint,uuid,text,text,text,text,text,text,text,'\n"
+    "         'timestamptz,text,uuid,text,uuid,uuid,bytea,text,text)'"
+)
+
+
+_CLAIM_PRIMARY_KEY_ANCHOR = (
+    "      AND EXISTS (\n"
+    "        SELECT 1\n"
+    "          FROM pg_catalog.pg_constraint AS claim_primary_key\n"
+)
+
+
+def _correction_key_check_sql(alias: str, name: str, contype: str, column: str) -> str:
+    return (
+        "      AND EXISTS (\n"
+        "        SELECT 1\n"
+        f"          FROM pg_catalog.pg_constraint AS {alias}\n"
+        f"         WHERE {alias}.conrelid =\n"
+        "               'public.report_institution_delivery_corrections'::regclass\n"
+        f"           AND {alias}.conname = '{name}'\n"
+        f"           AND {alias}.contype = '{contype}'\n"
+        f"           AND {alias}.convalidated\n"
+        f"           AND NOT {alias}.condeferrable\n"
+        f"           AND NOT {alias}.condeferred\n"
+        f"           AND {alias}.conkey = ARRAY[(\n"
+        "                 SELECT attribute.attnum\n"
+        "                   FROM pg_catalog.pg_attribute AS attribute\n"
+        f"                  WHERE attribute.attrelid = {alias}.conrelid\n"
+        f"                    AND attribute.attname = '{column}'\n"
+        "                    AND NOT attribute.attisdropped\n"
+        "               )]::smallint[]\n"
+        "      )\n"
+    )
+
+
+# tgtype 58 = BEFORE (2) | DELETE (8) | UPDATE (16) | TRUNCATE (32), FOR EACH STATEMENT.
+_DELIVERY_CORRECTION_KEY_CHECKS = (
+    _correction_key_check_sql(
+        "correction_primary_key", "pk_report_delivery_corrections", "p",
+        "corrects_event_id",
+    )
+    + _correction_key_check_sql(
+        "correction_challenge_unique", "uq_report_delivery_correction_challenge", "u",
+        "proof_challenge_id",
+    )
+    + _correction_key_check_sql(
+        "correction_reconfirmation_unique",
+        "uq_report_delivery_correction_reconfirmation", "u", "reconfirmation_id",
+    )
+    + "      AND EXISTS (\n"
+    "        SELECT 1\n"
+    "          FROM pg_catalog.pg_trigger AS correction_trigger\n"
+    "         WHERE correction_trigger.tgrelid =\n"
+    "               'public.report_institution_delivery_corrections'::regclass\n"
+    "           AND correction_trigger.tgname =\n"
+    "               'report_institution_delivery_corrections_append_only'\n"
+    "           AND NOT correction_trigger.tgisinternal\n"
+    "           AND correction_trigger.tgenabled = 'O'\n"
+    "           AND correction_trigger.tgtype = 58\n"
+    "           AND correction_trigger.tgqual IS NULL\n"
+    "           AND correction_trigger.tgnargs = 0\n"
+    "           AND correction_trigger.tgfoid = pg_catalog.to_regprocedure(\n"
+    "                 'public.walksafe_reject_audit_mutation()'\n"
+    "               )\n"
+    "      )\n"
+)
+
+
+def _replace_once(source: str, old: str, new: str) -> str:
+    if source.count(old) != 1:
+        raise RuntimeError("administrator report boundary template is unexpected")
+    return source.replace(old, new, 1)
+
+
+def _delivery_correction_boundary_sql() -> str:
+    source = _REVIEW_DELIVERY_V4_BOUNDARY_SQL.text
+    for anchor in (
+        "    ),\n    runtime_ingest_tables(name) AS (\n",
+        "    ),\n    owner_select_tables(name) AS (\n",
+        "    ),\n    owner_update_columns(table_name, column_name) AS (\n",
+    ):
+        source = _replace_once(
+            source,
+            "        ('public.report_institution_delivery_events')\n" + anchor,
+            "        ('public.report_institution_delivery_events'),\n"
+            "        ('public.report_institution_delivery_corrections')\n" + anchor,
+        )
+    source = _replace_once(
+        source,
+        "        ('public.report_institution_delivery_events'),\n"
+        "        ('public.report_export_audits')\n",
+        "        ('public.report_institution_delivery_events'),\n"
+        "        ('public.report_institution_delivery_corrections'),\n"
+        "        ('public.report_export_audits')\n",
+    )
+    source = _replace_once(
+        source,
+        "        ('public.report_institution_delivery_events', "
+        "'walksafe_report_evidence_owner', 'INSERT')\n"
+        "    ),\n    allowed_column_acl(",
+        "        ('public.report_institution_delivery_events', "
+        "'walksafe_report_evidence_owner', 'INSERT'),\n"
+        "        ('public.report_institution_delivery_corrections', "
+        "'walksafe_backend_runtime', 'SELECT'),\n"
+        "        ('public.report_institution_delivery_corrections', "
+        "'walksafe_report_evidence_owner', 'SELECT'),\n"
+        "        ('public.report_institution_delivery_corrections', "
+        "'walksafe_report_evidence_owner', 'INSERT')\n"
+        "    ),\n    allowed_column_acl(",
+    )
+    # The correction-unaware v3/v4 delivery functions move from the runtime
+    # set to the owner-only predecessor set; v5 and the correction replace them.
+    source = _replace_once(
+        source,
+        "        ('public.walksafe_append_report_delivery_event_v3('\n"
+        + _DELIVERY_EVENT_ARGS_SQL + "),\n"
+        "        ('public.walksafe_append_report_review_decision_v4('",
+        "        ('public.walksafe_append_report_review_decision_v4('",
+    )
+    source = _replace_once(
+        source,
+        "        ('public.walksafe_append_report_delivery_event_v4('\n"
+        + _DELIVERY_EVENT_ARGS_SQL + ")\n"
+        "    ),\n    owner_only_functions(signature) AS (\n",
+        "        ('public.walksafe_append_report_delivery_event_v5('\n"
+        + _DELIVERY_EVENT_ARGS_SQL + "),\n"
+        "        ('public.walksafe_correct_report_delivery_event('\n"
+        "         'uuid,uuid,uuid,bigint,text,text,text,uuid,text,uuid,uuid,bytea,'\n"
+        "         'text,text,text)')\n"
+        "    ),\n    owner_only_functions(signature) AS (\n",
+    )
+    source = _replace_once(
+        source,
+        "         'text,uuid,text,uuid,timestamptz,text,text)')\n"
+        "    ),\n    whitespace_functions(signature) AS (\n",
+        "         'text,uuid,text,uuid,timestamptz,text,text)'),\n"
+        "        ('public.walksafe_append_report_delivery_event_v3('\n"
+        + _DELIVERY_EVENT_ARGS_SQL + "),\n"
+        "        ('public.walksafe_append_report_delivery_event_v4('\n"
+        + _DELIVERY_EVENT_ARGS_SQL + ")\n"
+        "    ),\n    whitespace_functions(signature) AS (\n",
+    )
+    source = _replace_once(
+        source,
+        "    expected_function_definitions(name, definition_sha256, result, helper) AS (\n"
+        "      VALUES\n",
+        "    expected_function_definitions(name, definition_sha256, result, helper) AS (\n"
+        "      VALUES\n"
+        "        ('walksafe_append_report_delivery_event_v5',\n"
+        "         'f30d3777378a39256c8c9d1483d698eb800d2bc3e5de57fcbbe3cd4215115e00',\n"
+        "         'TABLE(result_status text, event_id uuid, event_revision bigint)', false),\n"
+        "        ('walksafe_correct_report_delivery_event',\n"
+        "         'b9abd98fba709af773a6be45c81d889d3e17cf4bef6078c80d205229ecd831f6',\n"
+        "         'TABLE(result_status text, correction_id uuid, corrected_event_id uuid)', false),\n",
+    )
+    source = _replace_once(
+        source,
+        "      AND (SELECT pg_catalog.count(*) = 4\n"
+        "             FROM resolved_old_runtime_functions\n",
+        "      AND (SELECT pg_catalog.count(*) = 6\n"
+        "             FROM resolved_old_runtime_functions\n",
+    )
+    # S18-40-F5: one correction per event (PK), one correction per device
+    # proof and per reconfirmation (UNIQUE), and the append-only trigger are
+    # pinned like the mutation-claim keys, so owner-side drift fails closed.
+    source = _replace_once(
+        source,
+        _CLAIM_PRIMARY_KEY_ANCHOR,
+        _DELIVERY_CORRECTION_KEY_CHECKS + _CLAIM_PRIMARY_KEY_ANCHOR,
+    )
+    return _replace_once(
+        source,
+        "      AND (SELECT pg_catalog.count(*) = 19\n"
+        "             FROM resolved_all_functions\n",
+        "      AND (SELECT pg_catalog.count(*) = 21\n"
+        "             FROM resolved_all_functions\n",
+    )
+
+
+# 202609300005 (S18-40) adds the append-only delivery correction table, the
+# correction function and delivery v5 (transition base skips corrected
+# events), and revokes runtime EXECUTE on the correction-unaware v3/v4.
+_DELIVERY_CORRECTION_BOUNDARY_SQL = text(_delivery_correction_boundary_sql())
+ADMIN_REPORT_DELIVERY_CORRECTION_REVISIONS = frozenset({"202609300005"})
+
+# 202609300006 (owner decision R3) rewrites only the integrated-consent version
+# literals of the runtime report ingest trigger (FP-013 1.1.0 -> 1.2.0).
+_CONSENT_V12_BOUNDARY_SQL = text(
+    _replace_once(
+        _DELIVERY_CORRECTION_BOUNDARY_SQL.text,
+        "37d67daddfca6121cc6cde66b0375561f49395b3f0c33a4afe757dfe7c2ff013",
+        "bdb19747b1347dceccd00698dfb88c26e59dfb77b1cdcf4d53baf278bd56d3e2",
+    )
+)
+ADMIN_REPORT_CONSENT_V12_REVISIONS = frozenset({"202609300006"})
+# 202609300007 (S1617-59) lets the account deletion worker read only the copy
+# identity columns (id, report_id, package_id) of delivery events.
+_ACCOUNT_COPY_INVENTORY_BOUNDARY_SQL = text(
+    _replace_once(
+        _CONSENT_V12_BOUNDARY_SQL.text,
+        "('public.report_institution_delivery_events', 'observed_at', "
+        "'walksafe_report_deletion_worker', 'SELECT')\n    ),",
+        "('public.report_institution_delivery_events', 'observed_at', "
+        "'walksafe_report_deletion_worker', 'SELECT'),\n"
+        "        ('public.report_institution_delivery_events', 'id', "
+        "'walksafe_account_deletion_worker', 'SELECT'),\n"
+        "        ('public.report_institution_delivery_events', 'report_id', "
+        "'walksafe_account_deletion_worker', 'SELECT'),\n"
+        "        ('public.report_institution_delivery_events', 'package_id', "
+        "'walksafe_account_deletion_worker', 'SELECT')\n    ),",
+    )
+)
+# 202609300008 (S18-5) only widens an attempt CHECK outside the boundary.
+ADMIN_REPORT_ACCOUNT_COPY_INVENTORY_REVISIONS = frozenset({"202609300007", "202609300008"})
+
+# 202609300009 changes the inner review function to require direct links to
+# representative reports, while preserving its original cycle guard.
+_DUPLICATE_REPRESENTATIVE_BOUNDARY_SQL = text(
+    _replace_once(
+        _replace_once(
+            _ACCOUNT_COPY_INVENTORY_BOUNDARY_SQL.text,
+            "1f486b97e023c7599dd1b1944d7e6090c698075a55fd3c5dd485a2a792f6b924",
+            "c2fb02f571021324c9ced411354abca78ea8a25b01590c3b68c27ffc51e6cb37",
+        ),
+        "      ) AS boundary_ready\n    ",
+        """      )
+      AND EXISTS (
+        SELECT 1
+          FROM pg_catalog.pg_trigger AS duplicate_trigger
+          JOIN pg_catalog.pg_proc AS duplicate_function
+            ON duplicate_function.oid = duplicate_trigger.tgfoid
+          JOIN pg_catalog.pg_language AS duplicate_language
+            ON duplicate_language.oid = duplicate_function.prolang
+         WHERE duplicate_trigger.tgname = 'report_review_duplicate_representative'
+           AND duplicate_trigger.tgrelid =
+               'public.report_review_decisions'::regclass
+           AND duplicate_trigger.tgtype = 7
+           AND duplicate_trigger.tgenabled = 'O'
+           AND NOT duplicate_trigger.tgisinternal
+           AND duplicate_trigger.tgnargs = 0
+           AND duplicate_trigger.tgqual IS NULL
+           AND duplicate_function.oid = pg_catalog.to_regprocedure(
+               'public.walksafe_enforce_duplicate_representative()'
+           )
+           AND duplicate_function.proowner = (
+               SELECT oid FROM pg_catalog.pg_roles
+                WHERE rolname = 'walksafe_report_evidence_owner'
+           )
+           AND duplicate_function.prosecdef
+           AND duplicate_function.proconfig =
+               ARRAY['search_path=pg_catalog, pg_temp']::text[]
+           AND duplicate_function.prokind = 'f'
+           AND duplicate_function.provolatile = 'v'
+           AND NOT duplicate_function.proisstrict
+           AND duplicate_function.proparallel = 'u'
+           AND duplicate_language.lanname = 'plpgsql'
+           AND pg_catalog.pg_get_function_result(duplicate_function.oid) =
+               'trigger'
+           AND pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+               pg_catalog.pg_get_functiondef(duplicate_function.oid), 'UTF8'
+           )), 'hex') =
+               'dab50537fbfc918e37ab8f6e693b1ea9868d421dc6c75c92131ebd1d331a43b3'
+           AND NOT EXISTS (
+               SELECT 1 FROM pg_catalog.aclexplode(coalesce(
+                   duplicate_function.proacl,
+                   pg_catalog.acldefault('f', duplicate_function.proowner)
+               )) AS privilege
+                WHERE privilege.privilege_type = 'EXECUTE'
+                  AND privilege.grantee <> duplicate_function.proowner
+           )
+      ) AS boundary_ready
+    """,
+    )
+)
+
 
 def admin_report_integrity_boundary_state(
     executor,
@@ -1280,11 +1644,22 @@ def admin_report_integrity_boundary_state(
         return None
     if current_revision not in ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS:
         return False
-    boundary_sql = (
-        _BOUNDARY_SQL
-        if current_revision == "202609010003"
-        else _PRE_DECISION_IDEMPOTENCY_BOUNDARY_SQL
-    )
+    if current_revision == "202609300009":
+        boundary_sql = _DUPLICATE_REPRESENTATIVE_BOUNDARY_SQL
+    elif current_revision in ADMIN_REPORT_ACCOUNT_COPY_INVENTORY_REVISIONS:
+        boundary_sql = _ACCOUNT_COPY_INVENTORY_BOUNDARY_SQL
+    elif current_revision in ADMIN_REPORT_CONSENT_V12_REVISIONS:
+        boundary_sql = _CONSENT_V12_BOUNDARY_SQL
+    elif current_revision in ADMIN_REPORT_DELIVERY_CORRECTION_REVISIONS:
+        boundary_sql = _DELIVERY_CORRECTION_BOUNDARY_SQL
+    elif current_revision in ADMIN_REPORT_REVIEW_DELIVERY_V4_REVISIONS:
+        boundary_sql = _REVIEW_DELIVERY_V4_BOUNDARY_SQL
+    elif current_revision in {"202609240001", "202609240002"}:
+        boundary_sql = _DUPLICATE_CYCLE_BOUNDARY_SQL
+    elif current_revision in {"202609010003", "202609210001"}:
+        boundary_sql = _BOUNDARY_SQL
+    else:
+        boundary_sql = _PRE_DECISION_IDEMPOTENCY_BOUNDARY_SQL
     return bool(executor.execute(boundary_sql).scalar_one())
 
 
@@ -1292,5 +1667,9 @@ __all__ = [
     "ADMIN_REPORT_INTEGRITY_HEAD",
     "ADMIN_REPORT_INTEGRITY_LEGACY_REVISIONS",
     "ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS",
+    "ADMIN_REPORT_REVIEW_DELIVERY_V4_REVISIONS",
+    "ADMIN_REPORT_DELIVERY_CORRECTION_REVISIONS",
+    "ADMIN_REPORT_CONSENT_V12_REVISIONS",
+    "ADMIN_REPORT_ACCOUNT_COPY_INVENTORY_REVISIONS",
     "admin_report_integrity_boundary_state",
 ]

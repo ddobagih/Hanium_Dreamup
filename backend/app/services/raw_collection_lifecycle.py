@@ -20,7 +20,11 @@ from backend.app.models import (
     RawCollectionPurposeDecision,
 )
 from backend.app.schemas import RawLegalHoldRequestV1, RawPurposeDecisionRequestV1
-from backend.app.services.privacy_lifecycle import consent_event_is_current
+from backend.app.services.privacy_lifecycle import (
+    TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC,
+    consent_event_is_current,
+    training_consent_allows,
+)
 
 
 TRAINING_FORBIDDEN_SOURCE_KINDS = frozenset(
@@ -71,10 +75,12 @@ def _latest_training_consent(
         .order_by(desc(PrivacyConsentEvent.subject_revision))
         .limit(1)
     )
+    # S02-22: a RAW collection is a walk RAW/diagnostic source, so training
+    # promotion needs both current consents (shared per-source-kind rule).
     if (
         event is None
         or not consent_event_is_current(event)
-        or not event.training_reuse
+        or not training_consent_allows(event, TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC)
     ):
         _fail(
             "raw_training_consent_not_current",

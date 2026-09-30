@@ -26,13 +26,20 @@ class YoloRawOutputParser(
     }
 
     private val anchors = listOf(8, 16, 32).sumOf { stride -> (inputSize / stride) * (inputSize / stride) }
+    private val imageBoxDedupIouThreshold = 0.999f
 
     private fun readCandidates(
         values: FloatArray,
         transform: LetterboxTransform? = null,
+        validImageCrop: YuvCropRect? = null,
         acceptScore: (String, Float) -> Boolean,
     ): ArrayList<RawDetection> {
-        require(values.size == (4 + classCount) * anchors) { "raw YOLO output shape mismatch" }
+        // S14-37: the model's output shape repeats on every frame; retrying cannot repair it.
+        if (values.size != (4 + classCount) * anchors) {
+            throw DetectorTensorContractViolation(
+                DetectorLoadFailureCode.OUTPUT_CONTRACT_MISMATCH, "raw YOLO output shape mismatch",
+            )
+        }
         val candidates = ArrayList<RawDetection>()
         for (anchor in 0 until anchors) {
             var classId = -1
@@ -64,7 +71,7 @@ class YoloRawOutputParser(
             if (!box.x.isFinite() || !box.y.isFinite() || !box.width.isFinite() || !box.height.isFinite() ||
                 !box.area.isFinite() || !(box.x + box.width).isFinite() || !(box.y + box.height).isFinite()) continue
             if (box.x >= 1f || box.y >= 1f || box.x + box.width <= 0f || box.y + box.height <= 0f) continue
-            if (transform != null && !transform.intersectsImageContent(box)) continue
+            if (transform != null && !transform.intersectsImageContent(box, validImageCrop)) continue
             candidates.add(RawDetection(anchor, classId, className, score, box))
         }
         return candidates
@@ -78,10 +85,25 @@ class YoloRawOutputParser(
         }.isNotEmpty()
     }
 
-    fun parse(values: FloatArray, transform: LetterboxTransform? = null): List<DetectionCandidate> {
-        require(transform == null || transform.modelSize == inputSize) { "letterbox model size mismatch" }
-        // Padding-only candidates cannot suppress visible boxes or consume maxDetections.
-        val candidates = readCandidates(values, transform) { className, score -> score >= thresholdForClass(className) }
+    fun parse(values: FloatArray, transform: LetterboxTransform? = null): List<DetectionCandidate> =
+        parse(values, transform, null)
+
+    /** Crop exclusion precedes score ordering, NMS and the detection limit. */
+    internal fun parse(
+        values: FloatArray,
+        transform: LetterboxTransform?,
+        validImageCrop: YuvCropRect?,
+    ): List<DetectionCandidate> {
+        if (transform != null && transform.modelSize != inputSize) {
+            throw DetectorTensorContractViolation(
+                DetectorLoadFailureCode.INPUT_CONTRACT_MISMATCH, "letterbox model size mismatch",
+            )
+        }
+        require(validImageCrop == null || transform != null) { "crop requires a letterbox transform" }
+        // Neither letterbox padding nor source-crop padding can suppress visible boxes or consume maxDetections.
+        val candidates = readCandidates(values, transform, validImageCrop) {
+            className, score -> score >= thresholdForClass(className)
+        }
         // Anchor index makes equal-confidence suppression deterministic across delegates.
         candidates.sortWith(compareByDescending<RawDetection> { it.score }.thenBy { it.anchor })
         val selected = ArrayList<RawDetection>(maxDetections)
@@ -90,6 +112,7 @@ class YoloRawOutputParser(
             selected.add(candidate)
             if (selected.size == maxDetections) break
         }
+        val seenImageBoxes = ArrayList<Pair<Int, RectNorm>>(selected.size)
         return selected.mapNotNull { detection ->
             // Suppress in un-clipped model coordinates, then clip before undoing letterboxing.
             val box = detection.box
@@ -98,7 +121,23 @@ class YoloRawOutputParser(
             val right = (box.x + box.width).coerceIn(0f, 1f)
             val bottom = (box.y + box.height).coerceIn(0f, 1f)
             if (right <= left || bottom <= top) return@mapNotNull null
-            DetectionCandidate(detection.className, detection.score, RectNorm(left, top, right - left, bottom - top))
+            val candidate = DetectionCandidate(
+                detection.className, detection.score, RectNorm(left, top, right - left, bottom - top),
+            )
+            val imageBox = transform?.modelDetectionToImageDetection(candidate)?.bboxNorm
+            if (imageBox != null) {
+                val duplicate = seenImageBoxes.any { (classId, previous) ->
+                    classId == detection.classId &&
+                        ((previous.x == imageBox.x && previous.y == imageBox.y &&
+                            previous.width == imageBox.width && previous.height == imageBox.height) ||
+                            iou(previous, imageBox) >= imageBoxDedupIouThreshold)
+                }
+                if (duplicate) return@mapNotNull null
+                seenImageBoxes.add(detection.classId to imageBox)
+            }
+            // Keep model coordinates, including when no valid image mapping is available.
+            // Deduplication does not refill the already capped, NMS-selected candidates.
+            candidate
         }
     }
 

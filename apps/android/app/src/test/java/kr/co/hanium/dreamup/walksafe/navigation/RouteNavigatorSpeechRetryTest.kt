@@ -47,14 +47,15 @@ class RouteNavigatorSpeechRetryTest {
 
     @Test
     fun timerRetryPreservesGuidanceIntervalForANewDistanceStage() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         val navigator = navigator(guidanceIntervalMs = 6_000)
-        val first = navigator.update(fix(0.0, 1_000), 1_000, false)
+        val first = navigator.update(fix(0.0, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
         assertTrue(navigator.reserveInstruction(first))
         navigator.acknowledgeInstruction(first, 1_001)
-        val closer = navigator.update(fix(0.00055, 2_000), 2_000, false)
+        val closer = navigator.update(fix(0.00055, 2_000), 2_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 2_000))
         assertEquals("guidance_rate_limited", closer.reason)
-        assertEquals("guidance_rate_limited", navigator.retryGuidance(7_000)?.reason)
-        val nextStage = requireNotNull(navigator.retryGuidance(7_001))
+        assertEquals("guidance_rate_limited", navigator.retryGuidance(7_000, facingObservation = RouteFacingObservation(90.0, 5.0, 7_000))?.reason)
+        val nextStage = requireNotNull(navigator.retryGuidance(7_001, facingObservation = RouteFacingObservation(90.0, 5.0, 7_001)))
         assertEquals("route_guidance", nextStage.reason)
         assertTrue(nextStage.instruction?.contains("50m 앞") == true)
         assertFalse(nextStage.instruction?.contains("길안내를 시작합니다") == true)
@@ -122,15 +123,16 @@ class RouteNavigatorSpeechRetryTest {
 
     @Test
     fun passingGuideDuringFailureRetiresOldCueAndRetriesOnlyTheNewGuide() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         val navigator = navigator(true)
-        val first = navigator.update(fix(0.00082, 1_000), 1_000, false)
+        val first = navigator.update(fix(0.00082, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
         assertTrue(navigator.reserveInstruction(first))
         navigator.releaseInstruction(first, 1_001)
-        val next = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 4_000), 4_000, false)
+        val next = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 4_000), 4_000, false, facingObservation = RouteFacingObservation(0.0, 5.0, 4_000))
         assertNotEquals(first.guideIndex, next.guideIndex)
         assertTrue(next.instruction?.contains("오른쪽으로 꺾으세요") == true)
         navigator.acknowledgeInstruction(first, 4_001)
-        val retry = requireNotNull(navigator.retryGuidance(4_002))
+        val retry = requireNotNull(navigator.retryGuidance(4_002, facingObservation = RouteFacingObservation(0.0, 5.0, 4_002)))
         assertEquals(next.guideIndex, retry.guideIndex)
         assertEquals(next.instruction, retry.instruction)
         assertFalse(navigator.reserveInstruction(first))

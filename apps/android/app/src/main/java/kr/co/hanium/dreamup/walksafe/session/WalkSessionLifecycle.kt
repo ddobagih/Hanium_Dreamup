@@ -33,14 +33,29 @@ enum class WalkSessionResumeConfirmation {
     ;
 
     companion object {
+        private val TRAILING_PUNCTUATION = Regex("""[\s.,!?。、！？…~]+$""")
+
         fun fromRecognizedText(text: String?): WalkSessionResumeConfirmation {
-            val normalized = text?.trim().orEmpty()
+            val normalized = text?.trim()?.replace(TRAILING_PUNCTUATION, "").orEmpty()
             return when {
                 normalized.isEmpty() -> NO_RESPONSE
                 normalized == "시작" -> START
                 normalized == "취소" -> CANCEL
                 else -> UNRECOGNIZED
             }
+        }
+
+        /**
+         * Resolves recognizer alternatives without widening the accepted words. Blank alternatives
+         * are skipped, the first spoken alternative decides, and an unrecognized first alternative
+         * is never overridden by a later "시작". Alternatives that contradict each other ask again.
+         */
+        fun fromRecognizedText(candidates: List<String?>): WalkSessionResumeConfirmation {
+            val spoken = candidates.map(::fromRecognizedText).filter { it != NO_RESPONSE }
+            val first = spoken.firstOrNull() ?: return NO_RESPONSE
+            if (first == UNRECOGNIZED) return UNRECOGNIZED
+            val contradicted = spoken.any { it != first && it != UNRECOGNIZED }
+            return if (contradicted) UNRECOGNIZED else first
         }
     }
 }
@@ -156,11 +171,25 @@ data class WalkSessionTransition(
  * Functional mode, lifecycle state and immutable readiness are separate. Every background or
  * recovery boundary advances [WalkRuntimeEpoch.recoveryGeneration]. A restarted process receives a
  * new walk identity and cannot reuse readiness or runtime work from the previous process.
+ *
+ * [clock] is the wall clock recorded in [WalkSessionTransition.occurredAtEpochMs] for diagnostics.
+ * [elapsedRealtimeClock] must be the same monotonic clock used for
+ * [WalkSessionReadinessSnapshot.assessedAtElapsedRealtimeMs]; Android passes
+ * `SystemClock::elapsedRealtime`. Readiness age is never computed across the two clocks. Only
+ * single-clock callers (pure tests, fixed practice clocks) may omit it; then the one [clock]
+ * sample of each event is used for both purposes.
  */
 class WalkSessionLifecycle(
     private val sessionIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val clock: () -> Long = System::currentTimeMillis,
+    private val elapsedRealtimeClock: (() -> Long)? = null,
 ) {
+    companion object {
+        // Bound point-in-time readiness to a prompt spoken/UI confirmation. This limits stale
+        // evidence exposure; it does not replace a fresh check of live device conditions.
+        const val CONFIRMATION_TOKEN_TTL_MS = 30_000L
+    }
+
     private var current = initialSnapshot()
 
     @Synchronized
@@ -179,18 +208,21 @@ class WalkSessionLifecycle(
     @Synchronized
     fun handle(event: WalkSessionEvent): WalkSessionTransition {
         val previous = current
-        current = reduce(previous, event)
+        val occurredAtEpochMs = clock()
+        val nowElapsedRealtimeMs = elapsedRealtimeClock?.invoke() ?: occurredAtEpochMs
+        current = reduce(previous, event, nowElapsedRealtimeMs)
         return WalkSessionTransition(
             previous = previous,
             current = current,
             reason = event.transitionReason(),
-            occurredAtEpochMs = clock(),
+            occurredAtEpochMs = occurredAtEpochMs,
         )
     }
 
     private fun reduce(
         snapshot: WalkSessionSnapshot,
         event: WalkSessionEvent,
+        nowElapsedRealtimeMs: Long,
     ): WalkSessionSnapshot = when (event) {
         WalkSessionEvent.EnteredForeground -> snapshot.copy(isForeground = true)
 
@@ -275,7 +307,11 @@ class WalkSessionLifecycle(
                     readiness = event.readiness,
                 )
             } else if (!event.readiness.hasUnavailableRequirement) {
-                snapshot
+                if (snapshot.readiness == null) snapshot else snapshot.copy(
+                    epoch = snapshot.epoch.nextGeneration(),
+                    mode = WalkSessionMode.UNAVAILABLE,
+                    readiness = null,
+                )
             } else {
                 safeStop(snapshot, event.readiness)
             }
@@ -288,7 +324,11 @@ class WalkSessionLifecycle(
                 event.token.readiness.plan.action == WalkSessionAction.START_WALK &&
                 snapshot.confirmationToken == event.token
             ) {
-                snapshot.copy(state = WalkSessionState.ACTIVE)
+                if (event.token.hasValidReadinessAt(nowElapsedRealtimeMs)) {
+                    snapshot.copy(state = WalkSessionState.ACTIVE)
+                } else {
+                    reduce(snapshot, WalkSessionEvent.RecheckRequested, nowElapsedRealtimeMs)
+                }
             } else {
                 snapshot
             }
@@ -328,10 +368,18 @@ class WalkSessionLifecycle(
                 snapshot.confirmationToken != event.token
             ) {
                 snapshot
+            } else if (!event.token.hasValidReadinessAt(nowElapsedRealtimeMs)) {
+                reduce(snapshot, WalkSessionEvent.RecheckRequested, nowElapsedRealtimeMs)
             } else if (event.confirmation == WalkSessionResumeConfirmation.START) {
                 snapshot.copy(
                     state = WalkSessionState.ACTIVE,
                     recoveryStage = null,
+                )
+            } else if (event.confirmation == WalkSessionResumeConfirmation.CANCEL) {
+                snapshot.copy(
+                    epoch = snapshot.epoch.nextGeneration(),
+                    recoveryStage = WalkSessionRecoveryStage.RECHECK_REQUIRED,
+                    readiness = null,
                 )
             } else {
                 snapshot
@@ -340,26 +388,45 @@ class WalkSessionLifecycle(
 
         is WalkSessionEvent.RuntimeReadinessChanged -> {
             if (
-                snapshot.state != WalkSessionState.ACTIVE ||
+                snapshot.state !in setOf(WalkSessionState.READY, WalkSessionState.ACTIVE, WalkSessionState.PAUSED) ||
                 snapshot.epoch != event.readiness.epoch ||
-                event.readiness.plan.action != WalkSessionAction.START_WALK
+                event.readiness.plan.action !in setOf(WalkSessionAction.START_WALK, WalkSessionAction.RESUME_WALK) ||
+                snapshot.readiness == null
             ) {
                 snapshot
+            } else if (snapshot.state != WalkSessionState.ACTIVE) {
+                if (event.readiness.isReady &&
+                    event.readiness.plan.mode == snapshot.mode &&
+                    event.readiness.observations == snapshot.readiness.observations
+                ) {
+                    snapshot
+                } else if (event.readiness.hasUnavailableRequirement) {
+                    safeStop(snapshot, event.readiness)
+                } else {
+                    snapshot.copy(
+                        epoch = snapshot.epoch.nextGeneration(),
+                        mode = WalkSessionMode.UNAVAILABLE,
+                        recoveryStage = if (snapshot.state == WalkSessionState.PAUSED) {
+                            WalkSessionRecoveryStage.RECHECK_REQUIRED
+                        } else null,
+                        readiness = null,
+                    )
+                }
             } else if (
                 event.readiness.isReady &&
-                event.readiness.plan.mode.isAvailable
+                event.readiness.plan.mode == snapshot.mode
             ) {
-                snapshot.copy(
-                    mode = event.readiness.plan.mode,
-                    readiness = event.readiness,
-                )
+                snapshot.copy(readiness = event.readiness)
             } else {
+                // S03-7: the confirmed functional mode is part of the start confirmation. An active
+                // walk never switches mode silently; losing the confirmed mode's inputs stops risk
+                // guidance at once (SP-05-POLICY-001, FP-043 design_rules[0]).
                 safeStop(snapshot, event.readiness)
             }
         }
 
         WalkSessionEvent.SafetyStopRequested -> {
-            if (snapshot.state == WalkSessionState.ENDED) {
+            if (snapshot.state == WalkSessionState.SAFE_STOP || snapshot.state == WalkSessionState.ENDED) {
                 snapshot
             } else {
                 snapshot.copy(
@@ -389,6 +456,15 @@ class WalkSessionLifecycle(
 
         WalkSessionEvent.ProcessRestarted ->
             initialSnapshot()
+    }
+
+    private fun WalkSessionConfirmationToken.hasValidReadinessAt(
+        nowElapsedRealtimeMs: Long,
+    ): Boolean {
+        val assessedAtElapsedRealtimeMs = readiness.assessedAtElapsedRealtimeMs
+        return readiness.isReady &&
+            nowElapsedRealtimeMs >= assessedAtElapsedRealtimeMs &&
+            nowElapsedRealtimeMs - assessedAtElapsedRealtimeMs <= CONFIRMATION_TOKEN_TTL_MS
     }
 
     private fun safeStop(

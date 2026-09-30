@@ -47,9 +47,17 @@ class TtsRuntimeFailurePolicyTest {
 
     @Test
     fun engineInitializationAndRuntimeFailuresShareOneAutomaticRecoveryBudget() {
-        val budget = TtsEngineRecoveryBudget()
+        val budget = TtsEngineRecoveryBudget(automaticRetries = 1)
 
         assertTrue(budget.claimRetry())
         repeat(10) { assertFalse(budget.claimRetry()) }
+    }
+
+    @Test
+    fun interimDefaultBudgetAllowsNoSilentRetry() {
+        // S13-12 / FP-027-DETAIL-03 interim: the first speech engine failure is final.
+        assertEquals(0, TtsEngineRecoveryBudget.INTERIM_AUTOMATIC_RETRIES)
+        val budget = TtsEngineRecoveryBudget()
+        repeat(3) { assertFalse(budget.claimRetry()) }
     }
 }

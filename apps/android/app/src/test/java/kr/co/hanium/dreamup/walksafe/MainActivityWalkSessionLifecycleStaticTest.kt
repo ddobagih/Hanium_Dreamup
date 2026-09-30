@@ -103,7 +103,12 @@ class MainActivityWalkSessionLifecycleStaticTest {
         assertFalse(prompt.contains("postDelayed("))
         assertTrue(response.contains("WalkSessionResumeConfirmation.fromRecognizedText("))
         assertTrue(response.contains("WalkSessionEvent.ResumeConfirmationReceived("))
-        assertTrue(response.contains("if (isWalkSessionRuntimeActive())"))
+        assertTrue(response.contains(
+            "if (response == WalkSessionResumeConfirmation.START && transition.changed && isWalkSessionRuntimeActive())",
+        ))
+        assertTrue(response.contains("!recheckWalkSessionResumeBeforeConfirmation(confirmationToken)"))
+        assertTrue(response.contains("if (!activateWalkSessionRuntime())"))
+        assertFalse(response.contains("speakInteraction(PriorityUserPractice.RESUME.instructionKo)"))
         assertTrue(response.contains("walkSessionResumeRetryRequiresUserAction"))
         assertTrue(
             functionBlock("private fun maybeAdvanceWalkSessionAfterCapabilityCheck()")
@@ -175,18 +180,27 @@ class MainActivityWalkSessionLifecycleStaticTest {
 
         assertTrue(create.contains("PREF_WALK_SESSION_INTERRUPTED"))
         assertTrue(create.contains("previousProcessHadInterruptedWalk"))
-        assertTrue(
+        assertFalse(
             Regex(
                 """putBoolean\(PREF_WALK_SESSION_INTERRUPTED, false\)\s*\.commit\(\)""",
             ).containsMatchIn(create),
         )
-        assertTrue(create.contains("walkSessionLifecycle = WalkSessionLifecycle()"))
+        assertTrue(create.contains("previousWalkInterruptionMarker = PreviousWalkInterruptionMarker("))
+        assertTrue(create.contains("interruptedAtStartup = previousProcessHadInterruptedWalk"))
+        assertTrue(create.contains("putBoolean(PREF_WALK_SESSION_INTERRUPTED, currentWalkRequiresMarker)"))
+        assertTrue(
+            create.contains(
+                "walkSessionLifecycle = WalkSessionLifecycle(elapsedRealtimeClock = SystemClock::elapsedRealtime)",
+            ),
+        )
         assertTrue(create.contains("previous_walk_interrupted_fresh_walk_created"))
         assertFalse(create.contains("interruptedSessionRequiresConfirmation"))
         assertTrue(source.contains("const val PREF_WALK_SESSION_INTERRUPTED"))
         assertTrue(persistence.contains("PREF_WALK_SESSION_INTERRUPTED"))
         assertTrue(persistence.contains("WalkSessionState.ACTIVE"))
         assertTrue(persistence.contains("WalkSessionState.PAUSED"))
+        assertTrue(persistence.contains("WalkSessionState.SAFE_STOP"))
+        assertTrue(persistence.contains("previousWalkInterruptionMarker.isPending"))
         assertTrue(persistence.contains(".commit()"))
     }
 
@@ -198,7 +212,10 @@ class MainActivityWalkSessionLifecycleStaticTest {
         val foregroundRecheck = functionBlock(
             "private fun enterWalkSessionForegroundRecheckAndCancelOutputs(",
         )
-        val outputCancellation = functionBlock("private fun cancelWalkSessionOutputs(")
+        val outputCancellationEntry = functionBlock("private fun cancelWalkSessionOutputs(")
+        assertTrue(outputCancellationEntry.contains("cancelWalkSessionOutputsInternal(reason, null)"))
+        val outputCancellation = functionBlock("private fun cancelWalkSessionOutputsInternal(")
+        assertTrue(source.contains("): Boolean = cancelWalkSessionOutputsInternal(reason, checkpoints)"))
         val preflight = functionBlock("private fun canBeginRuntimeMetricPreflight()")
 
         assertTrue(metricInvalidation.contains("WalkSessionEvent.SafetyStopRequested"))
@@ -207,7 +224,11 @@ class MainActivityWalkSessionLifecycleStaticTest {
         assertTrue(speechFailure.contains("기기 점검을 다시 실행"))
         assertFalse(speechFailure.contains("다른 기능은 계속"))
         assertTrue(speechFailure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
-        assertTrue(safetyStop.contains("cancelWalkSessionOutputs(reason)"))
+        assertTrue(safetyStop.contains("performWalkSessionSafetyStopCleanup(reason, persistInterruptionMarker, null, null)"))
+        val cleanup = functionBlock("private fun performWalkSessionSafetyStopCleanup(")
+        assertTrue(cleanup.contains("WalkSessionEvent.SafetyStopRequested"))
+        assertTrue(cleanup.contains("cancelWalkSessionOutputs(reason)"))
+        assertTrue(cleanup.contains("cancelWalkSessionOutputsForSafetyStop(reason, checkpoints)"))
         assertTrue(foregroundRecheck.contains("WalkSessionEvent.RecheckRequested"))
         assertTrue(foregroundRecheck.contains("cancelWalkSessionOutputs(reason)"))
         assertTrue(foregroundRecheck.contains("stopDepthSession(closeSession = true)"))
@@ -274,7 +295,8 @@ class MainActivityWalkSessionLifecycleStaticTest {
         assertTrue(permissions.contains("Manifest.permission.ACTIVITY_RECOGNITION"))
         assertTrue(requiredPermissions.contains("Manifest.permission.CAMERA"))
         assertTrue(requiredPermissions.contains("Manifest.permission.ACCESS_FINE_LOCATION"))
-        assertFalse(requiredPermissions.contains("Manifest.permission.RECORD_AUDIO"))
+        // S02-14: FP-014-DETAIL-01 makes the microphone a walk-start permission.
+        assertTrue(requiredPermissions.contains("Manifest.permission.RECORD_AUDIO"))
         assertFalse(requiredPermissions.contains("Manifest.permission.ACTIVITY_RECOGNITION"))
         assertTrue(effectiveMode.contains("toWalkSessionMode()"))
         assertFalse(effectiveMode.contains("!hasLocationPermission()"))

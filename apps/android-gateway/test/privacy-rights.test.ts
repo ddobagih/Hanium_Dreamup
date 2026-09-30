@@ -29,7 +29,10 @@ import {
   INTEGRATED_CONSENT_POLICY_VERSION,
   type IntegratedConsentConfirmation
 } from "../src/integrated-consent.js";
-import { handleGatewayRequest } from "../src/routes.js";
+import {
+  handleGatewayRequest, REPORT_ID_HEADER, REPORT_PAYLOAD_BYTES_HEADER,
+  REPORT_PAYLOAD_SHA256_HEADER
+} from "../src/routes.js";
 import type { GatewayFetch } from "../src/backend.js";
 import {
   configureTestStateEncryption,
@@ -54,6 +57,8 @@ before(async () => {
   Object.assign(process.env, {
     NODE_ENV: "test",
     WALKSAFE_GATEWAY_RATE_LIMIT_DIR: stateDirectory,
+    // R19-GB-01: per-file ledger so parallel test files never share the default lock.
+    WALKSAFE_FIELD_WALK_LEDGER_PATH: path.join(stateDirectory, "field-walk-ledger.json"),
     WALKSAFE_GATEWAY_SESSION_SECRET: "d".repeat(64),
     WALKSAFE_FIELD_TEST_TOKEN: "privacy-internal-test-token-only",
     WALKSAFE_GATEWAY_TRUSTED_IP_HEADER: "cf-connecting-ip",
@@ -503,7 +508,10 @@ test("tombstone rejects old access and refresh before replay retries revocation"
     [CONSENT_NETWORK_TRANSPORT_HEADER]: "wifi",
     [CONSENT_POLICY_HEADER]: consent.policy_version,
     [CONSENT_REVISION_HEADER]: String(consent.revision),
-    [CONSENT_RECEIPT_HEADER]: consent.backend_consent_receipt_sha256
+    [CONSENT_RECEIPT_HEADER]: consent.backend_consent_receipt_sha256,
+    [REPORT_ID_HEADER]: "11111111-1111-4111-8111-111111111111",
+    [REPORT_PAYLOAD_SHA256_HEADER]: "1".repeat(64),
+    [REPORT_PAYLOAD_BYTES_HEADER]: "123"
   };
   const reportForm = (autoReported: boolean): FormData => {
     const value = new FormData();

@@ -4,6 +4,7 @@ import kr.co.hanium.dreamup.walksafe.device.WALKSAFE_PRODUCT_PURPOSE_STATEMENT_K
 import kr.co.hanium.dreamup.walksafe.device.WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO
 import kr.co.hanium.dreamup.walksafe.network.ActiveNetworkCalls
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
+import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentAuthorityGuard
 
 const val REPORT_PRIVACY_DISCLOSURE_KO =
     "$WALKSAFE_PRODUCT_PURPOSE_STATEMENT_KO $WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO " +
@@ -20,8 +21,9 @@ const val REPORT_PRIVACY_DISCLOSURE_KO =
 const val REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO =
     "이번 손상 점자블록 직접 신고를 위해 방금 고정한 장면의 JPEG 사진을 메타데이터 제거 목적으로 " +
         "재인코딩하며 모자이크하지 않습니다. 정확한 GPS 좌표, GPS 이동 방향, 탐지·시각·모델 " +
-        "정보와 함께 기기에 암호화해 대기한 뒤, 보행을 멈추고 재확인한 상태에서 WalkSafe " +
-        "테스트 서버로 전송합니다. 운영 문안 승인 전의 개발 시험용이며 기관으로 자동 전송하지 " +
+        "정보와 함께 기기에 암호화해 보관했다가, 보행을 마친 뒤 허용된 연결에서 WalkSafe " +
+        "테스트 서버로 전송합니다. 보행 중·일시정지 중에는 전송하지 않습니다. 운영 문안 승인 " +
+        "전의 개발 시험용이며 기관으로 자동 전송하지 " +
         "않습니다. 선택 원본·진단수집 raw v2나 학습 재사용에는 이 확인을 사용하지 않습니다."
 
 enum class ReportTransferPurpose(val wireValue: String) {
@@ -53,18 +55,24 @@ internal object ReportPrivacyConsentSession {
     private val explicitCalls = ActiveNetworkCalls()
     private val automaticCalls = ActiveNetworkCalls()
     private var granted = false
+    private var authorityGuard: IntegratedConsentAuthorityGuard? = null
     private var accountDeletionBlocked = false
     private var permitGeneration = 0L
+    private var explicitGeneration = 0L
+    private var automaticGeneration = 0L
 
-    internal fun grantFromServerConfirmedIntegratedConsent(): Boolean {
+    internal fun grantFromServerConfirmedIntegratedConsent(
+        guard: IntegratedConsentAuthorityGuard? = null,
+    ): Boolean {
         return synchronized(lock) {
             if (accountDeletionBlocked) return@synchronized false
-            val changed = !granted
+            if (granted && authorityGuard === guard) return@synchronized false
             granted = true
+            authorityGuard = guard
             permitGeneration += 1L
             explicitCalls.cancelAll()
             automaticCalls.cancelAll()
-            changed
+            true
         }
     }
 
@@ -72,6 +80,7 @@ internal object ReportPrivacyConsentSession {
         return synchronized(lock) {
             val changed = granted
             granted = false
+            authorityGuard = null
             permitGeneration += 1L
             explicitCalls.cancelAll()
             automaticCalls.cancelAll()
@@ -79,14 +88,16 @@ internal object ReportPrivacyConsentSession {
         }
     }
 
-    internal fun isGranted(): Boolean =
-        synchronized(lock) { granted && !accountDeletionBlocked }
+    internal fun isGranted(): Boolean = withAuthority { guard -> synchronized(lock) {
+        granted && !accountDeletionBlocked && authorityGuard === guard
+    } } == true
 
     internal fun blockForAccountDeletion(): Boolean {
         return synchronized(lock) {
             val changed = !accountDeletionBlocked || granted
             accountDeletionBlocked = true
             granted = false
+            authorityGuard = null
             permitGeneration += 1L
             explicitCalls.cancelAll()
             automaticCalls.cancelAll()
@@ -99,6 +110,7 @@ internal object ReportPrivacyConsentSession {
             val changed = accountDeletionBlocked || granted
             accountDeletionBlocked = false
             granted = false
+            authorityGuard = null
             permitGeneration += 1L
             explicitCalls.cancelAll()
             automaticCalls.cancelAll()
@@ -111,47 +123,63 @@ internal object ReportPrivacyConsentSession {
 
     internal fun issueUploadPermit(
         purpose: ReportTransferPurpose,
-    ): ReportUploadPermit? = synchronized(lock) {
-        if (!granted || accountDeletionBlocked) return@synchronized null
-        CanonicalReportUploadPermit.issue(permitGeneration, purpose)
-    }
+    ): ReportUploadPermit? = withAuthority { guard -> synchronized(lock) {
+        GuardedValue(if (granted && !accountDeletionBlocked && authorityGuard === guard) {
+            CanonicalReportUploadPermit.issue(generationFor(purpose), purpose)
+        } else null)
+    } }?.value
 
     internal fun <T> withLiveUploadPermit(
         permit: ReportUploadPermit,
         expectedPurpose: ReportTransferPurpose,
         opener: () -> T,
-    ): T = synchronized(lock) {
-        check(isPermitLiveLocked(permit, expectedPurpose)) {
-            "report upload permit is stale or revoked"
-        }
-        opener()
+    ): T {
+        return withAuthority { guard -> synchronized(lock) {
+            check(authorityGuard === guard && granted && !accountDeletionBlocked) {
+                "report upload permit is stale or revoked"
+            }
+            check(isPermitLiveLocked(permit, expectedPurpose)) {
+                "report upload permit is stale or revoked"
+            }
+            GuardedValue(opener())
+        } }?.value ?: throw IllegalStateException("report upload permit is stale or revoked")
     }
 
     internal fun <T> trackIfLive(
         permit: ReportUploadPermit,
         call: CancellableNetworkCall<T>,
         purpose: ReportTransferPurpose,
-    ): CancellableNetworkCall<T>? = synchronized(lock) {
-        if (!isPermitLiveLocked(permit, purpose)) {
-            call.cancel()
-            null
-        } else {
-            callsFor(purpose).track(call)
-        }
+    ): CancellableNetworkCall<T>? {
+        val tracked = withAuthority { guard -> synchronized(lock) {
+            GuardedValue(if (authorityGuard === guard && isPermitLiveLocked(permit, purpose)) {
+                callsFor(purpose).track(call)
+            } else null)
+        } }?.value
+        if (tracked == null) call.cancel()
+        return tracked
     }
 
     internal fun <T> trackIfGranted(
         call: CancellableNetworkCall<T>,
         purpose: ReportTransferPurpose = ReportTransferPurpose.EXPLICIT,
     ): CancellableNetworkCall<T>? {
-        return synchronized(lock) {
-            if (!granted || accountDeletionBlocked) {
-                call.cancel()
-                null
-            } else {
+        val tracked = withAuthority { guard -> synchronized(lock) {
+            GuardedValue(if (granted && !accountDeletionBlocked && authorityGuard === guard) {
                 callsFor(purpose).track(call)
-            }
-        }
+            } else null)
+        } }?.value
+        if (tracked == null) call.cancel()
+        return tracked
+    }
+
+    private data class GuardedValue<T>(val value: T)
+
+    private fun <T : Any> withAuthority(
+        action: (IntegratedConsentAuthorityGuard?) -> T,
+    ): T? {
+        val guard = synchronized(lock) { authorityGuard }
+        // Never call into the Gateway process guard while holding the report permit lock.
+        return if (guard == null) action(null) else guard.withCurrent { action(guard) }
     }
 
     internal fun complete(call: CancellableNetworkCall<*>) {
@@ -162,9 +190,11 @@ internal object ReportPrivacyConsentSession {
     internal fun cancelActiveCalls(purpose: ReportTransferPurpose? = null) {
         synchronized(lock) {
             if (purpose == null || purpose == ReportTransferPurpose.EXPLICIT) {
+                explicitGeneration += 1L
                 explicitCalls.cancelAll()
             }
             if (purpose == null || purpose == ReportTransferPurpose.AUTOMATIC) {
+                automaticGeneration += 1L
                 automaticCalls.cancelAll()
             }
         }
@@ -184,7 +214,10 @@ internal object ReportPrivacyConsentSession {
         val issued = permit as? CanonicalReportUploadPermit ?: return false
         return granted &&
             !accountDeletionBlocked &&
-            issued.generation == permitGeneration &&
+            issued.generation == generationFor(expectedPurpose) &&
             issued.purpose == expectedPurpose
     }
+
+    private fun generationFor(purpose: ReportTransferPurpose): Long = permitGeneration +
+        if (purpose == ReportTransferPurpose.EXPLICIT) explicitGeneration else automaticGeneration
 }

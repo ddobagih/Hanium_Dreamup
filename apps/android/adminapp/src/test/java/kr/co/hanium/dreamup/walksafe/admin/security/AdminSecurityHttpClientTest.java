@@ -5,7 +5,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -13,10 +20,146 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.json.JSONObject;
 import org.junit.Test;
 
 public final class AdminSecurityHttpClientTest {
+    @Test
+    public void anotherSessionRevokeSignsExactTargetAndEmptyBodyWithCurrentSessionIdentity() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(200, stateJson("NORMAL", "revoked-other"));
+        transport.enqueue(200, stateJson("NORMAL", "still-signed-in"));
+        AdminSecurityHttpClient client = client(transport);
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        var state = client.revokeSession(ACCESS_TOKEN, OTHER_SESSION_ID);
+        assertEquals("revoked-other", state.stateVersion());
+        assertEquals(2, transport.challengeRequests.size());
+        Request revoke = transport.requests.get(1);
+        assertEquals("", revoke.body);
+        assertActionProof(transport.challengeRequests.get(1), revoke, "session.revoke",
+            "/admin/security/sessions/" + OTHER_SESSION_ID + "/revoke");
+        assertEquals("Bearer " + ACCESS_TOKEN, revoke.headers.get("Authorization"));
+        assertEquals("still-signed-in", client.getState(ACCESS_TOKEN).stateVersion());
+    }
+
+    @Test
+    public void currentSessionLogoutKeepsTheBearerOnlyContract() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(200, stateJson("NORMAL", "signed-out"));
+        AdminSecurityHttpClient client = client(transport);
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        client.revokeSession(ACCESS_TOKEN, CURRENT_SESSION_ID);
+
+        assertEquals(1, transport.challengeRequests.size());
+        Request revoke = transport.requests.get(1);
+        assertEquals("POST", revoke.method);
+        assertEquals("http://127.0.0.1:8000/admin/security/sessions/" + CURRENT_SESSION_ID + "/revoke", revoke.url);
+        assertEquals("{}", revoke.body);
+        assertEquals("Bearer " + ACCESS_TOKEN, revoke.headers.get("Authorization"));
+        assertFalse(revoke.headers.containsKey(AdminDeviceProof.SIGNATURE_HEADER));
+    }
+
+    @Test
+    public void sessionRevokeRejectsUnboundTokenAndInvalidTargetBeforeNetwork() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        AdminSecurityHttpClient client = client(transport);
+        assertThrows(IOException.class, () -> client.revokeSession(ACCESS_TOKEN, OTHER_SESSION_ID));
+        assertEquals(0, transport.requests.size());
+        assertEquals(0, transport.challengeRequests.size());
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        assertThrows(IOException.class, () -> client.revokeSession("another-access-token-123456", OTHER_SESSION_ID));
+        for (String target : new String[] {OTHER_SESSION_ID + "?other=true", "../sessions", "not-a-session"}) {
+            assertThrows(IOException.class, () -> client.revokeSession(ACCESS_TOKEN, target));
+        }
+        assertEquals(1, transport.requests.size());
+        assertEquals(1, transport.challengeRequests.size());
+    }
+
+    @Test
+    public void anotherSessionRevokeRejectsChallengeTargetBodyOrAuthorityMismatchBeforeMutation() throws Exception {
+        for (var mismatch : Map.of(
+            "path", "/admin/security/sessions/" + CURRENT_SESSION_ID + "/revoke",
+            "body_sha256", AdminCanonicalEncoding.sha256Hex("{}".getBytes(StandardCharsets.UTF_8)),
+            "session_id", OTHER_SESSION_ID,
+            "action", "device.report_lost"
+        ).entrySet()) {
+            FakeTransport transport = loggedInTransport();
+            transport.enqueue(200, stateJson("NORMAL", "must-not-mutate"));
+            AdminSecurityHttpClient client = client(transport);
+            client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+            transport.challengeOverrides.put(mismatch.getKey(), mismatch.getValue());
+
+            assertThrows(IOException.class, () -> client.revokeSession(ACCESS_TOKEN, OTHER_SESSION_ID));
+            assertEquals(1, transport.requests.size());
+            assertEquals(2, transport.challengeRequests.size());
+        }
+    }
+
+    @Test
+    public void anotherSessionRevokeCannotFallBackToBearerWhenSigningFails() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(200, stateJson("NORMAL", "must-not-mutate"));
+        AtomicInteger signatures = new AtomicInteger();
+        AdminSecurityHttpClient client = new AdminSecurityHttpClient(
+            "http://127.0.0.1:8000", true, AdminDeviceProofTest.MARKER, 1,
+            ignored -> {
+                if (signatures.incrementAndGet() > 1) throw new java.security.GeneralSecurityException("key unavailable");
+                return new byte[] {0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01};
+            },
+            () -> AdminDeviceProofTest.ISSUED_AT + 1, transport
+        );
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertThrows(IOException.class, () -> client.revokeSession(ACCESS_TOKEN, OTHER_SESSION_ID));
+        assertEquals(2, signatures.get());
+        assertEquals(1, transport.requests.size());
+        assertEquals(2, transport.challengeRequests.size());
+    }
+
+    @Test
+    public void anotherSessionRevokeDoesNotRetryAfterServerSuccessWithLostResponse() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(200, stateJson("NORMAL", "server-committed"));
+        AtomicInteger serverMutations = new AtomicInteger();
+        AdminSecurityHttpClient client = client((method, url, headers, body) -> {
+            var response = transport.execute(method, url, headers, body);
+            if (url.endsWith("/revoke")) {
+                serverMutations.incrementAndGet();
+                throw new SocketTimeoutException("response lost after server commit");
+            }
+            return response;
+        });
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertThrows(SocketTimeoutException.class, () -> client.revokeSession(ACCESS_TOKEN, OTHER_SESSION_ID));
+        assertEquals(1, serverMutations.get());
+        assertEquals(2, transport.requests.size());
+        assertEquals(2, transport.challengeRequests.size());
+    }
+
+    @Test
+    public void anotherSessionRevokeDoesNotRetryOrDowngradeAfterProofRejection() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(403, errorJson("admin_device_proof_invalid", "invalid signature"));
+        AdminSecurityHttpClient client = client(transport);
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertThrows(IOException.class, () -> client.revokeSession(ACCESS_TOKEN, OTHER_SESSION_ID));
+        assertEquals(2, transport.requests.size());
+        assertEquals(2, transport.challengeRequests.size());
+        assertTrue(transport.requests.get(1).headers.containsKey(AdminDeviceProof.SIGNATURE_HEADER));
+    }
+
     @Test
     public void loginAndProtectedStateUseExactAdminContextAndDeviceBinding() throws Exception {
         FakeTransport transport = new FakeTransport();
@@ -60,11 +203,15 @@ public final class AdminSecurityHttpClientTest {
                 CUSTODY_REFERENCE,
                 AdminSecurityApi.RecoveryMaterialKind.SECURITY_KEY,
                 AdminSecurityApi.RecoveryStorageLocation.OFF_PHONE,
-                true
+                true,
+                "1"
             );
         client.attestRecoveryCustody(ACCESS_TOKEN, attestation);
-        client.reportLostDevice(ACCESS_TOKEN, OTHER_DEVICE_ID);
-
+        client.reportLostDevice(
+            ACCESS_TOKEN,
+            OTHER_DEVICE_ID,
+            Map.of(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER, RECONFIRMATION_NONCE)
+        );
         assertEquals(3, transport.challengeRequests.size());
         Request custodyRequest = transport.requests.get(1);
         assertEquals("POST", custodyRequest.method);
@@ -78,12 +225,14 @@ public final class AdminSecurityHttpClientTest {
             "custody_reference",
             "material_kind",
             "storage_location",
-            "separate_encrypted_backup_confirmed"
+            "separate_encrypted_backup_confirmed",
+            "expected_state_version"
         ), keys(custodyBody));
         assertEquals(CUSTODY_REFERENCE, custodyBody.getString("custody_reference"));
         assertEquals("SECURITY_KEY", custodyBody.getString("material_kind"));
         assertEquals("OFF_PHONE", custodyBody.getString("storage_location"));
         assertTrue(custodyBody.getBoolean("separate_encrypted_backup_confirmed"));
+        assertEquals("1", custodyBody.getString("expected_state_version"));
         assertActionProof(
             transport.challengeRequests.get(1),
             custodyRequest,
@@ -99,6 +248,14 @@ public final class AdminSecurityHttpClientTest {
         );
         assertEquals(0, new JSONObject(lostRequest.body).length());
         assertEquals("Bearer " + ACCESS_TOKEN, lostRequest.headers.get("Authorization"));
+        // S18-29: the single-use reconfirmation nonce rides only on the protected request.
+        assertEquals(
+            RECONFIRMATION_NONCE,
+            lostRequest.headers.get(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER)
+        );
+        assertFalse(transport.challengeRequests.get(2).headers.containsKey(
+            AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER
+        ));
         assertActionProof(
             transport.challengeRequests.get(2),
             lostRequest,
@@ -133,8 +290,97 @@ public final class AdminSecurityHttpClientTest {
         AdminSecurityHttpClient client = client(transport);
         client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
 
-        assertThrows(IOException.class, () -> client.reportLostDevice(ACCESS_TOKEN, DEVICE_ID));
+        assertThrows(IOException.class, () -> client.reportLostDevice(
+            ACCESS_TOKEN,
+            DEVICE_ID,
+            Map.of(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER, RECONFIRMATION_NONCE)
+        ));
         assertEquals(1, transport.requests.size());
+    }
+
+    @Test
+    public void s18_29_lostDeviceReportWithoutExactReconfirmationMakesNoRequest() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        AdminSecurityHttpClient client = client(transport);
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        int requestsBefore = transport.requests.size();
+        int challengesBefore = transport.challengeRequests.size();
+        java.util.List<Map<String, String>> invalid = java.util.Arrays.asList(
+            null,
+            Map.of(),
+            Map.of(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER, "not-a-canonical-nonce"),
+            Map.of(
+                AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER, RECONFIRMATION_NONCE,
+                "X-Other", "value"
+            )
+        );
+        for (Map<String, String> headers : invalid) {
+            assertThrows(IOException.class, () ->
+                client.reportLostDevice(ACCESS_TOKEN, OTHER_DEVICE_ID, headers));
+        }
+        assertEquals(requestsBefore, transport.requests.size());
+        assertEquals(challengesBefore, transport.challengeRequests.size());
+    }
+
+    @Test
+    public void s18_25_deviceInventoryCarriesIdentificationAndCompleteness() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(200, "{\"sessions\":[" + sessionJson(
+                "11111111-1111-4111-8111-111111111111", DEVICE_ID, true, false
+            ) + "],\"devices\":["
+            + "{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true" + DEVICE_FIELDS + "},"
+            + "{\"device_id\":\"" + OTHER_DEVICE_ID + "\",\"current\":false,"
+            + "\"device_label\":null,\"last_seen_at\":null,\"key_version\":3,"
+            + "\"key_marker_prefix\":\"89abcdef\"}],"
+            + "\"device_total\":101,\"devices_complete\":false}");
+        AdminSecurityHttpClient client = client(transport);
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        AdminSecurityApi.DeviceInventory inventory = client.getDeviceInventory(ACCESS_TOKEN);
+
+        assertEquals(101, inventory.deviceTotal());
+        assertFalse(inventory.isDevicesComplete());
+        AdminSecurityApi.DeviceInfo current = inventory.devices().get(0);
+        assertEquals("test phone", current.deviceLabel());
+        assertEquals("2026-07-22T00:00:00Z", current.lastSeenAt());
+        assertEquals(1, current.keyVersion());
+        assertEquals("0123abcd", current.keyMarkerPrefix());
+        AdminSecurityApi.DeviceInfo keyOnly = inventory.devices().get(1);
+        assertEquals(null, keyOnly.deviceLabel());
+        assertEquals(null, keyOnly.lastSeenAt());
+        assertEquals(3, keyOnly.keyVersion());
+        assertEquals("89abcdef", keyOnly.keyMarkerPrefix());
+    }
+
+    @Test
+    public void s18_25_deviceInventoryRejectsMissingOrInconsistentIdentification() throws Exception {
+        String session = sessionJson("11111111-1111-4111-8111-111111111111", DEVICE_ID, true, false);
+        String currentDevice = "{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true";
+        String[] invalid = {
+            // identification fields missing (old server shape)
+            "{\"sessions\":[" + session + "],\"devices\":[" + currentDevice + "}],"
+                + "\"device_total\":1,\"devices_complete\":true}",
+            // completeness claims all devices while the total says otherwise
+            "{\"sessions\":[" + session + "],\"devices\":[" + currentDevice + DEVICE_FIELDS + "}],"
+                + "\"device_total\":2,\"devices_complete\":true}",
+            // completeness fields missing
+            "{\"sessions\":[" + session + "],\"devices\":[" + currentDevice + DEVICE_FIELDS + "}]}",
+            // non-lowercase marker prefix
+            "{\"sessions\":[" + session + "],\"devices\":[" + currentDevice
+                + ",\"device_label\":\"p\",\"last_seen_at\":null,\"key_version\":1,"
+                + "\"key_marker_prefix\":\"0123ABCD\"}],\"device_total\":1,\"devices_complete\":true}",
+            // key version below 1
+            "{\"sessions\":[" + session + "],\"devices\":[" + currentDevice
+                + ",\"device_label\":\"p\",\"last_seen_at\":null,\"key_version\":0,"
+                + "\"key_marker_prefix\":\"0123abcd\"}],\"device_total\":1,\"devices_complete\":true}"
+        };
+        for (String response : invalid) {
+            FakeTransport transport = loggedInTransport();
+            transport.enqueue(200, response);
+            AdminSecurityHttpClient client = client(transport);
+            client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+            assertThrows(IOException.class, () -> client.getDeviceInventory(ACCESS_TOKEN));
+        }
     }
 
     @Test
@@ -550,9 +796,9 @@ public final class AdminSecurityHttpClientTest {
               "revoked":false,
               "last_seen_at":"2026-07-22T00:00:00Z"
             }],"devices":[
-              {"device_id":"admin-device-12345678-1234-1234-1234-123456789abc","current":true},
-              {"device_id":"admin-device-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","current":false}
-            ]}
+              {"device_id":"admin-device-12345678-1234-1234-1234-123456789abc","current":true,"device_label":"test phone","last_seen_at":"2026-07-22T00:00:00Z","key_version":1,"key_marker_prefix":"0123abcd"},
+              {"device_id":"admin-device-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","current":false,"device_label":"test phone","last_seen_at":"2026-07-22T00:00:00Z","key_version":1,"key_marker_prefix":"0123abcd"}
+            ],"device_total":2,"devices_complete":true}
             """);
         AdminSecurityHttpClient client = client(transport);
         client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
@@ -567,6 +813,110 @@ public final class AdminSecurityHttpClientTest {
             inventory.devices().get(1).deviceId()
         );
         assertFalse(inventory.devices().get(1).isCurrent());
+    }
+
+    @Test
+    public void completeInventoryFindsOldActiveSessionAfterNinetyNineEndedSessions() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(200, sessionPage(1, 99, true));
+        transport.enqueue(200, sessionPage(100, 1, false));
+        AdminSecurityHttpClient client = client(transport);
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        AdminSecurityApi.DeviceInventory inventory = client.getCompleteDeviceInventory(
+            ACCESS_TOKEN, () -> { }
+        );
+
+        assertEquals(101, inventory.sessions().size());
+        assertTrue(inventory.sessions().get(0).isCurrent());
+        assertEquals(sessionId(100), inventory.sessions().get(100).sessionId());
+        assertFalse(inventory.sessions().get(100).isRevoked());
+        assertEquals(2, inventory.devices().size());
+        assertEquals("http://127.0.0.1:8000/admin/security/sessions?paged=true",
+            transport.requests.get(1).url);
+        assertEquals("http://127.0.0.1:8000/admin/security/sessions?after=" + sessionId(99),
+            transport.requests.get(2).url);
+        assertEquals(3, transport.requests.size());
+    }
+
+    @Test
+    public void completeInventoryChecksThePageAfterAnExactlyFullFinalPage() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(200, sessionPage(1, 99, false));
+        transport.enqueue(200, sessionPage(100, 0, false));
+        AdminSecurityHttpClient client = client(transport);
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertEquals(100, client.getCompleteDeviceInventory(ACCESS_TOKEN, () -> { }).sessions().size());
+        assertEquals(3, transport.requests.size());
+    }
+
+    @Test
+    public void completeInventoryRejectsARepeatedPageInsteadOfLooping() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(200, sessionPage(1, 99, false));
+        transport.enqueue(200, sessionPage(1, 99, false));
+        AdminSecurityHttpClient client = client(transport);
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertThrows(IOException.class, () -> client.getCompleteDeviceInventory(ACCESS_TOKEN, () -> { }));
+        assertEquals(3, transport.requests.size());
+    }
+
+    @Test
+    public void completeInventoryStrictlyRejectsMalformedLaterPage() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(200, sessionPage(1, 99, false));
+        transport.enqueue(200, sessionPage(100, 1, false).replace(
+            "\"devices\":", "\"unexpected\":true,\"devices\":"
+        ));
+        AdminSecurityHttpClient client = client(transport);
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertThrows(IOException.class, () -> client.getCompleteDeviceInventory(ACCESS_TOKEN, () -> { }));
+        assertEquals(3, transport.requests.size());
+    }
+
+    @Test
+    public void completeInventoryStopsWhenScreenGenerationChangesBeforeNextPage() throws Exception {
+        FakeTransport transport = loggedInTransport();
+        transport.enqueue(200, sessionPage(1, 99, false));
+        AdminSecurityHttpClient client = client(transport);
+        client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertThrows(IllegalStateException.class, () -> client.getCompleteDeviceInventory(
+            ACCESS_TOKEN,
+            () -> {
+                if (transport.requests.size() > 1) throw new IllegalStateException("screen replaced");
+            }
+        ));
+        assertEquals(2, transport.requests.size());
+    }
+
+    private static final String DEVICE_FIELDS = ",\"device_label\":\"test phone\","
+        + "\"last_seen_at\":\"2026-07-22T00:00:00Z\",\"key_version\":1,"
+        + "\"key_marker_prefix\":\"0123abcd\"";
+
+    private static String sessionPage(int first, int count, boolean revoked) {
+        StringBuilder sessions = new StringBuilder();
+        sessions.append(sessionJson("11111111-1111-4111-8111-111111111111", DEVICE_ID, true, false));
+        for (int index = first; index < first + count; index++) {
+            sessions.append(',').append(sessionJson(sessionId(index), OTHER_DEVICE_ID, false, revoked));
+        }
+        return "{\"sessions\":[" + sessions + "],\"devices\":["
+            + "{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true" + DEVICE_FIELDS + "},"
+            + "{\"device_id\":\"" + OTHER_DEVICE_ID + "\",\"current\":false" + DEVICE_FIELDS + "}],"
+            + "\"device_total\":2,\"devices_complete\":true}";
+    }
+
+    private static String sessionJson(String id, String deviceId, boolean current, boolean revoked) {
+        return "{\"session_id\":\"" + id + "\",\"device_id\":\"" + deviceId
+            + "\",\"device_label\":\"test phone\",\"current\":" + current
+            + ",\"revoked\":" + revoked + ",\"last_seen_at\":\"2026-07-22T00:00:00Z\"}";
+    }
+
+    private static String sessionId(int index) {
+        return "22222222-2222-4222-8222-" + String.format(java.util.Locale.ROOT, "%012d", index);
     }
 
     @Test
@@ -614,6 +964,10 @@ public final class AdminSecurityHttpClientTest {
         assertTrue(inventory.devices().get(0).isCurrent());
         assertEquals(OTHER_DEVICE_ID, inventory.devices().get(1).deviceId());
         assertFalse(inventory.devices().get(1).isCurrent());
+        // W20A-R7: a sessions-only response has no total, so the total is unknown (-1)
+        // instead of a misleading "N of N" partial list.
+        assertEquals(-1, inventory.deviceTotal());
+        assertFalse(inventory.isDevicesComplete());
     }
 
     @Test
@@ -624,7 +978,7 @@ public final class AdminSecurityHttpClientTest {
              "device_label":"test phone","current":true,"revoked":false,
              "last_seen_at":"2026-07-22T00:00:00Z"}
             """;
-        String device = "{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true}";
+        String device = "{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true" + DEVICE_FIELDS + "}";
         String[] invalidResponses = {
             "{\"devices\":[" + device + "]}",
             "{\"sessions\":[" + session + "],\"unexpected\":true}",
@@ -654,9 +1008,9 @@ public final class AdminSecurityHttpClientTest {
               "revoked":false,
               "last_seen_at":"2026-07-22T00:00:00Z"
             }],"devices":[
-              {"device_id":"admin-device-12345678-1234-1234-1234-123456789abc","current":true},
-              {"device_id":"admin-device-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","current":false}
-            ]}
+              {"device_id":"admin-device-12345678-1234-1234-1234-123456789abc","current":true,"device_label":"test phone","last_seen_at":"2026-07-22T00:00:00Z","key_version":1,"key_marker_prefix":"0123abcd"},
+              {"device_id":"admin-device-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","current":false,"device_label":"test phone","last_seen_at":"2026-07-22T00:00:00Z","key_version":1,"key_marker_prefix":"0123abcd"}
+            ],"device_total":2,"devices_complete":true}
             """);
         AdminSecurityHttpClient client = client(transport);
         client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
@@ -676,8 +1030,8 @@ public final class AdminSecurityHttpClientTest {
               "revoked":false,
               "last_seen_at":"2026-07-22T00:00:00"
             }],"devices":[
-              {"device_id":"admin-device-12345678-1234-1234-1234-123456789abc","current":true}
-            ]}
+              {"device_id":"admin-device-12345678-1234-1234-1234-123456789abc","current":true,"device_label":"test phone","last_seen_at":"2026-07-22T00:00:00Z","key_version":1,"key_marker_prefix":"0123abcd"}
+            ],"device_total":1,"devices_complete":true}
             """);
         AdminSecurityHttpClient client = client(transport);
         client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
@@ -695,14 +1049,16 @@ public final class AdminSecurityHttpClientTest {
             """;
         String[] invalidDevices = {
             "[]",
-            "[{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true},"
-                + "{\"device_id\":\"" + DEVICE_ID + "\",\"current\":false}]",
-            "[{\"device_id\":\"" + OTHER_DEVICE_ID + "\",\"current\":true}]",
-            "[{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true,\"extra\":false}]"
+            "[{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true" + DEVICE_FIELDS + "},"
+                + "{\"device_id\":\"" + DEVICE_ID + "\",\"current\":false" + DEVICE_FIELDS + "}]",
+            "[{\"device_id\":\"" + OTHER_DEVICE_ID + "\",\"current\":true" + DEVICE_FIELDS + "}]",
+            "[{\"device_id\":\"" + DEVICE_ID + "\",\"current\":true" + DEVICE_FIELDS
+                + ",\"extra\":false}]"
         };
         for (String devices : invalidDevices) {
             FakeTransport transport = loggedInTransport();
-            transport.enqueue(200, "{\"sessions\":[" + session + "],\"devices\":" + devices + "}");
+            transport.enqueue(200, "{\"sessions\":[" + session + "],\"devices\":" + devices
+                + ",\"device_total\":1,\"devices_complete\":true}");
             AdminSecurityHttpClient client = client(transport);
             client.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
             assertThrows(IOException.class, () -> client.getDeviceInventory(ACCESS_TOKEN));
@@ -728,18 +1084,25 @@ public final class AdminSecurityHttpClientTest {
             "admin_recovery_expired",
             "admin_recovery_invalid",
             "admin_auth_rate_limited",
+            "admin_totp_replayed",
+            "admin_reauthentication_failed",
             "admin_recovery_in_progress",
             "admin_totp_secret_not_replaced",
             "admin_recovery_verification_failed",
             "admin_recovery_device_key_required",
-            "admin_device_key_not_active"
+            "admin_device_key_not_active",
+            "admin_recovery_custody_required",
+            "admin_recovery_custody_state_version_conflict"
         };
         AdminSecurityApiException.Code[] expectedCodes = AdminSecurityApiException.Code.values();
+        assertEquals(expectedCodes.length, wireCodes.length);
 
         for (int index = 0; index < wireCodes.length; index++) {
             FakeTransport transport = new FakeTransport();
+            int status = expectedCodes[index]
+                == AdminSecurityApiException.Code.CUSTODY_STATE_VERSION_CONFLICT ? 409 : 429;
             transport.enqueue(
-                429,
+                status,
                 errorJson(wireCodes[index], "server-only detail " + PASSWORD),
                 Map.of("retry-after", "45")
             );
@@ -756,6 +1119,21 @@ public final class AdminSecurityHttpClientTest {
     }
 
     @Test
+    public void custodyVersionConflictCodeOutsideDefinitive409RemainsUncertain() {
+        FakeTransport transport = new FakeTransport();
+        transport.enqueue(503, errorJson(
+            "admin_recovery_custody_state_version_conflict", "server-only detail"
+        ), Map.of());
+
+        IOException error = assertThrows(IOException.class, () ->
+            client(transport).login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone")
+        );
+
+        assertFalse(error instanceof AdminSecurityApiException);
+        assertEquals("administrator API request failed: status=503", error.getMessage());
+    }
+
+    @Test
     public void unknownMalformedAndExtendedErrorBodiesRemainGenericAndFailClosed() {
         String[] bodies = {
             errorJson("admin_new_unapproved_error", "must stay private"),
@@ -767,6 +1145,30 @@ public final class AdminSecurityHttpClientTest {
         for (String body : bodies) {
             FakeTransport transport = new FakeTransport();
             transport.enqueue(400, body, Map.of("Retry-After", "99999"));
+
+            IOException error = assertThrows(IOException.class, () -> client(transport).login(
+                "admin-01", PASSWORD, "123456", DEVICE_ID, "test phone"
+            ));
+
+            assertFalse(error instanceof AdminSecurityApiException);
+            assertEquals("administrator API request failed: status=400", error.getMessage());
+        }
+    }
+
+    @Test
+    public void duplicateAndNonStrictErrorBodiesNeverBecomeTypedErrors() {
+        String validDetail = "{\"code\":\"admin_recovery_expired\",\"message\":\"private\"}";
+        String[] bodies = {
+            "{\"detail\":" + validDetail + ",\"detail\":" + validDetail + "}",
+            "{\"detail\":{\"code\":\"admin_recovery_invalid\",\"code\":\"admin_recovery_expired\",\"message\":\"private\"}}",
+            "{'detail':{'code':'admin_recovery_expired','message':'private'}}",
+            "{\"detail\":" + validDetail + "} trailing",
+            "{\"detail\":{\"code\":\"admin_recovery_expired\",\"message\":\"private\",}}"
+        };
+
+        for (String body : bodies) {
+            FakeTransport transport = new FakeTransport();
+            transport.enqueue(400, body);
 
             IOException error = assertThrows(IOException.class, () -> client(transport).login(
                 "admin-01", PASSWORD, "123456", DEVICE_ID, "test phone"
@@ -811,7 +1213,561 @@ public final class AdminSecurityHttpClientTest {
         assertTrue(transport.requests.isEmpty());
     }
 
-    private static AdminSecurityHttpClient client(FakeTransport transport) {
+    @Test
+    public void urlConnectionTransportRejectsSlowDripAtTheNewOverallDeadline() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        AtomicInteger reads = new AtomicInteger();
+        FakeHttpConnection connection = new FakeHttpConnection(new InputStream() {
+            @Override public int read() {
+                clock.advanceMillis(5_000);
+                reads.incrementAndGet();
+                return ' ';
+            }
+
+            @Override public int read(byte[] buffer, int offset, int length) {
+                if (length == 0) return 0;
+                buffer[offset] = (byte) read();
+                return 1;
+            }
+        });
+
+        assertThrows(SocketTimeoutException.class, () ->
+            httpTransport(connection, clock, scheduler).execute("GET", HTTP_TEST_URL, Map.of(), null)
+        );
+
+        assertEquals(4, reads.get());
+        assertEquals(1, connection.disconnects.get());
+        assertTrue(scheduler.tasks.get(0).cancelled);
+    }
+
+    @Test
+    public void urlConnectionTransportRejectsLateEofEvenWithoutTheWatchdogRunning() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        FakeHttpConnection connection = new FakeHttpConnection(new InputStream() {
+            @Override public int read() {
+                clock.advanceMillis(20_000);
+                return -1;
+            }
+        });
+
+        assertThrows(SocketTimeoutException.class, () ->
+            httpTransport(connection, clock, scheduler).execute("GET", HTTP_TEST_URL, Map.of(), null)
+        );
+
+        assertEquals(1, connection.disconnects.get());
+        assertTrue(scheduler.tasks.get(0).cancelled);
+    }
+
+    @Test
+    public void urlConnectionTransportChargesConnectionOpeningToTheSameBudget() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        FakeHttpConnection connection = new FakeHttpConnection(new InputStream() {
+            @Override public int read() {
+                clock.advanceMillis(12_000);
+                return -1;
+            }
+        });
+        AdminSecurityHttpClient.UrlConnectionTransport transport = new AdminSecurityHttpClient.UrlConnectionTransport(
+            url -> {
+                clock.advanceMillis(8_000);
+                return connection;
+            },
+            clock,
+            scheduler
+        );
+
+        assertThrows(SocketTimeoutException.class, () -> transport.execute("GET", HTTP_TEST_URL, Map.of(), null));
+
+        assertEquals(TimeUnit.MILLISECONDS.toNanos(12_000), scheduler.tasks.get(0).delayNanos);
+        assertEquals(1, connection.disconnects.get());
+    }
+
+    @Test
+    public void urlConnectionTransportPreservesNormalResponseAndExistingPhaseTimeouts() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        FakeHttpConnection connection = new FakeHttpConnection("{\"status\":\"ok\"}");
+        byte[] body = "unchanged request body".getBytes(StandardCharsets.UTF_8);
+
+        AdminSecurityHttpClient.Response response = httpTransport(connection, clock, scheduler).execute(
+            "POST", HTTP_TEST_URL, Map.of("Accept", "application/json"), body
+        );
+
+        assertEquals(200, response.statusCode);
+        assertEquals("{\"status\":\"ok\"}", response.body);
+        assertEquals("3", response.headers.get("Retry-After"));
+        assertEquals("POST", connection.getRequestMethod());
+        assertEquals("application/json", connection.getRequestProperty("Accept"));
+        assertEquals("unchanged request body", new String(connection.sentBody.toByteArray(), StandardCharsets.UTF_8));
+        assertEquals(8_000, connection.getConnectTimeout());
+        assertEquals(12_000, connection.getReadTimeout());
+        assertFalse(connection.getInstanceFollowRedirects());
+        assertTrue(connection.getDoInput());
+        assertTrue(connection.getDoOutput());
+        assertEquals(1, connection.outputOpens.get());
+        assertEquals(1, connection.disconnects.get());
+        assertEquals(TimeUnit.MILLISECONDS.toNanos(20_000), scheduler.tasks.get(0).delayNanos);
+        assertTrue(scheduler.tasks.get(0).cancelled);
+    }
+
+    @Test
+    public void urlConnectionTransportRejectsSuccessWhenStreamCleanupExceedsTheDeadline() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        FakeHttpConnection connection = new FakeHttpConnection(new ByteArrayInputStream(new byte[0]) {
+            @Override public void close() {
+                clock.advanceMillis(20_000);
+            }
+        });
+
+        assertThrows(SocketTimeoutException.class, () ->
+            httpTransport(connection, clock, scheduler).execute("GET", HTTP_TEST_URL, Map.of(), null)
+        );
+
+        assertEquals(1, connection.disconnects.get());
+        assertTrue(scheduler.tasks.get(0).cancelled);
+    }
+
+    @Test(timeout = 5_000)
+    public void urlConnectionTransportCancelsCompletelyStalledHeaders() throws Exception {
+        assertBlockedHttpRequestTimesOut("headers");
+    }
+
+    @Test(timeout = 5_000)
+    public void urlConnectionTransportCancelsCompletelyStalledBody() throws Exception {
+        assertBlockedHttpRequestTimesOut("body");
+    }
+
+    @Test(timeout = 5_000)
+    public void urlConnectionTransportCancelsCompletelyStalledPostWrite() throws Exception {
+        assertBlockedHttpRequestTimesOut("write");
+    }
+
+    @Test
+    public void urlConnectionTransportOldCancelledAlarmCannotDisconnectTheNextRequest() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        FakeHttpConnection first = new FakeHttpConnection("first");
+        FakeHttpConnection next = new FakeHttpConnection("next");
+        next.responseBody = new ByteArrayInputStream("next".getBytes(StandardCharsets.UTF_8)) {
+            @Override public synchronized int read(byte[] buffer, int offset, int length) {
+                scheduler.tasks.get(0).fireEvenIfCancelled();
+                assertEquals(0, next.disconnects.get());
+                return super.read(buffer, offset, length);
+            }
+        };
+        Deque<FakeHttpConnection> connections = new ArrayDeque<>(List.of(first, next));
+        AdminSecurityHttpClient.UrlConnectionTransport transport = new AdminSecurityHttpClient.UrlConnectionTransport(
+            url -> connections.removeFirst(), clock, scheduler
+        );
+
+        assertEquals("first", transport.execute("GET", HTTP_TEST_URL, Map.of(), null).body);
+        assertTrue(scheduler.tasks.get(0).cancelled);
+        clock.advanceMillis(20_000);
+        assertEquals("next", transport.execute("GET", HTTP_TEST_URL, Map.of(), null).body);
+
+        assertEquals(1, first.disconnects.get());
+        assertEquals(1, next.disconnects.get());
+        assertTrue(scheduler.tasks.get(1).cancelled);
+    }
+
+    @Test(timeout = 5_000)
+    public void urlConnectionTransportUncertainPostIsNotReplayedAndCanBeFollowedByARead() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        CountDownLatch accepted = new CountDownLatch(1);
+        FakeHttpConnection post = new FakeHttpConnection("{\"status\":\"committed\"}") {
+            @Override public int getResponseCode() throws IOException {
+                blockUntilDisconnected(accepted);
+                // The server may already have committed; a late success must not escape.
+                return 200;
+            }
+        };
+        FakeHttpConnection query = new FakeHttpConnection("{\"status\":\"committed\"}");
+        Deque<FakeHttpConnection> connections = new ArrayDeque<>(List.of(post, query));
+        AtomicInteger opens = new AtomicInteger();
+        AdminSecurityHttpClient.UrlConnectionTransport transport = new AdminSecurityHttpClient.UrlConnectionTransport(
+            url -> {
+                opens.incrementAndGet();
+                return connections.removeFirst();
+            },
+            clock,
+            scheduler
+        );
+        String operationId = "existing-operation-123";
+        String payload = "{\"operationId\":\"" + operationId + "\"}";
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            Future<AdminSecurityHttpClient.Response> result = worker.submit(() -> transport.execute(
+                "POST", HTTP_TEST_URL, Map.of("Idempotency-Key", operationId), payload.getBytes(StandardCharsets.UTF_8)
+            ));
+            assertTrue(accepted.await(2, TimeUnit.SECONDS));
+            clock.advanceMillis(20_000);
+            scheduler.tasks.get(0).fireEvenIfCancelled();
+
+            ExecutionException failure = assertThrows(ExecutionException.class, () -> result.get(2, TimeUnit.SECONDS));
+            assertTrue(failure.getCause() instanceof SocketTimeoutException);
+            assertEquals(1, opens.get());
+            assertEquals(1, post.outputOpens.get());
+            assertEquals(payload, new String(post.sentBody.toByteArray(), StandardCharsets.UTF_8));
+            assertEquals(operationId, post.getRequestProperty("Idempotency-Key"));
+            assertEquals(1, post.disconnects.get());
+            assertTrue(scheduler.tasks.get(0).cancelled);
+
+            assertEquals("{\"status\":\"committed\"}", transport.execute("GET", HTTP_TEST_URL, Map.of(), null).body);
+            assertEquals(2, opens.get());
+            assertEquals("GET", query.getRequestMethod());
+            assertEquals(0, query.outputOpens.get());
+        } finally {
+            post.disconnected.countDown();
+            worker.shutdownNow();
+        }
+    }
+
+    @Test(timeout = 5_000)
+    public void s18_18UrlConnectionTransportExplicitCancellationFailsTheBlockedRequestAtOnce()
+        throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        CountDownLatch entered = new CountDownLatch(1);
+        FakeHttpConnection connection = new FakeHttpConnection("{}") {
+            @Override public int getResponseCode() throws IOException {
+                blockUntilDisconnected(entered);
+                throw new IOException("fake HTTP connection closed");
+            }
+        };
+        AdminSecurityHttpClient.UrlConnectionTransport transport = httpTransport(connection, clock, scheduler);
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            Future<AdminSecurityHttpClient.Response> result = worker.submit(() -> transport.execute(
+                "POST", HTTP_TEST_URL, Map.of(), new byte[] {1}
+            ));
+            assertTrue(entered.await(2, TimeUnit.SECONDS));
+            assertEquals(1, transport.inFlightCount());
+
+            transport.cancelInFlight();
+
+            ExecutionException failure = assertThrows(ExecutionException.class,
+                () -> result.get(2, TimeUnit.SECONDS));
+            assertEquals("administrator HTTP request was cancelled; server outcome unknown",
+                failure.getCause().getMessage());
+            assertFalse(failure.getCause() instanceof SocketTimeoutException);
+            assertEquals(1, connection.disconnects.get());
+            assertEquals("the write is sent once and never replayed", 1, connection.outputOpens.get());
+            assertEquals(0, transport.inFlightCount());
+            assertTrue(scheduler.tasks.get(0).cancelled);
+        } finally {
+            connection.disconnected.countDown();
+            worker.shutdownNow();
+        }
+    }
+
+    @Test(timeout = 5_000)
+    public void s18_18ClientCancellationDoesNotWaitForTheRequestHoldingTheClientLock()
+        throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch cancelled = new CountDownLatch(1);
+        AdminSecurityHttpClient.Transport blocking = new AdminSecurityHttpClient.Transport() {
+            @Override
+            public AdminSecurityHttpClient.Response execute(
+                String method, String url, Map<String, String> headers, byte[] body
+            ) throws IOException {
+                entered.countDown();
+                try {
+                    if (!cancelled.await(3, TimeUnit.SECONDS)) throw new IOException("fake wait expired");
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("fake wait interrupted", error);
+                }
+                throw new IOException("administrator HTTP request was cancelled; server outcome unknown");
+            }
+
+            @Override
+            public void cancelInFlight() {
+                cancelled.countDown();
+            }
+        };
+        AdminSecurityHttpClient client = client(blocking);
+        ExecutorService worker = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> login = worker.submit(() -> {
+                client.login("admin-01", "synthetic-password-long", "123456", DEVICE_ID, "test phone");
+                return null;
+            });
+            assertTrue(entered.await(2, TimeUnit.SECONDS));
+
+            worker.submit(client::cancelInFlightRequests).get(500, TimeUnit.MILLISECONDS);
+
+            ExecutionException failure = assertThrows(ExecutionException.class,
+                () -> login.get(2, TimeUnit.SECONDS));
+            assertTrue(failure.getCause() instanceof IOException);
+        } finally {
+            cancelled.countDown();
+            worker.shutdownNow();
+        }
+    }
+
+    @Test
+    public void admF5SecurityTransportStreamsWritesWithAFixedLength() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        FakeHttpConnection login = new FakeHttpConnection("{\"status\":\"ok\"}");
+        FakeHttpConnection emptyRevoke = new FakeHttpConnection("{\"status\":\"ok\"}");
+        FakeHttpConnection read = new FakeHttpConnection("{\"status\":\"ok\"}");
+        Deque<FakeHttpConnection> connections = new ArrayDeque<>(List.of(login, emptyRevoke, read));
+        AdminSecurityHttpClient.UrlConnectionTransport transport = new AdminSecurityHttpClient.UrlConnectionTransport(
+            url -> connections.removeFirst(), clock, scheduler
+        );
+        byte[] body = "{\"password\":\"synthetic\"}".getBytes(StandardCharsets.UTF_8);
+
+        transport.execute("POST", HTTP_TEST_URL, Map.of(), body);
+        transport.execute("POST", HTTP_TEST_URL, Map.of(), new byte[0]);
+        transport.execute("GET", HTTP_TEST_URL, Map.of(), null);
+
+        assertEquals(body.length, login.streamingLength());
+        assertEquals("set before the body stream is opened", body.length, login.streamingLengthAtOutputOpen);
+        org.junit.Assert.assertArrayEquals(body, login.sentBody.toByteArray());
+        assertEquals(0, emptyRevoke.streamingLength());
+        assertEquals(-1, read.streamingLength());
+        assertEquals(0, read.outputOpens.get());
+    }
+
+    @Test
+    public void admF2SecurityTransportCancellationIsStickyForTheProofBoundPost() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        FakeHttpConnection challenge = new FakeHttpConnection("{\"challenge_id\":\"c\"}");
+        FakeHttpConnection protectedPost = new FakeHttpConnection("{\"status\":\"ok\"}");
+        Deque<FakeHttpConnection> connections = new ArrayDeque<>(List.of(challenge, protectedPost));
+        AtomicInteger opens = new AtomicInteger();
+        AdminSecurityHttpClient.UrlConnectionTransport transport = new AdminSecurityHttpClient.UrlConnectionTransport(
+            url -> {
+                opens.incrementAndGet();
+                return connections.removeFirst();
+            },
+            clock,
+            scheduler
+        );
+        transport.execute("POST", HTTP_TEST_URL, Map.of(), new byte[] {1});
+
+        // controller.close() lands between the challenge and the proof-bound POST.
+        transport.cancelInFlight();
+
+        IOException error = assertThrows(IOException.class, () ->
+            transport.execute("POST", HTTP_TEST_URL, Map.of(), "{\"password\":\"x\"}".getBytes(StandardCharsets.UTF_8))
+        );
+        assertFalse(error instanceof SocketTimeoutException);
+        assertEquals("administrator HTTP request was cancelled; server outcome unknown", error.getMessage());
+        assertEquals(1, opens.get());
+        assertEquals(0, protectedPost.outputOpens.get());
+        assertEquals(0, protectedPost.sentBody.size());
+        assertEquals(1, scheduler.tasks.size());
+        assertEquals(0, transport.inFlightCount());
+    }
+
+    @Test
+    public void admF2SecurityTransportCancellationThatRacesWithRegistrationStillWins() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        FakeHttpConnection post = new FakeHttpConnection("{\"status\":\"ok\"}");
+        java.util.concurrent.atomic.AtomicReference<AdminSecurityHttpClient.UrlConnectionTransport> self =
+            new java.util.concurrent.atomic.AtomicReference<>();
+        AdminSecurityHttpClient.UrlConnectionTransport transport = new AdminSecurityHttpClient.UrlConnectionTransport(
+            url -> {
+                // close() after the pre-open check, before the request is registered.
+                self.get().cancelInFlight();
+                return post;
+            },
+            clock,
+            scheduler
+        );
+        self.set(transport);
+
+        IOException error = assertThrows(IOException.class, () ->
+            transport.execute("POST", HTTP_TEST_URL, Map.of(), new byte[] {1})
+        );
+
+        assertEquals("administrator HTTP request was cancelled; server outcome unknown", error.getMessage());
+        assertEquals(0, post.outputOpens.get());
+        assertEquals(1, post.disconnects.get());
+        assertTrue(scheduler.tasks.isEmpty());
+        assertEquals(0, transport.inFlightCount());
+    }
+
+    @Test
+    public void urlConnectionTransportKeepsTheExistingResponseSizeLimit() throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        FakeHttpConnection connection = new FakeHttpConnection(new ByteArrayInputStream(new byte[64 * 1024 + 1]));
+
+        IOException failure = assertThrows(IOException.class, () ->
+            httpTransport(connection, clock, scheduler).execute("GET", HTTP_TEST_URL, Map.of(), null)
+        );
+
+        assertEquals("administrator API response is too large", failure.getMessage());
+        assertEquals(1, connection.disconnects.get());
+        assertTrue(scheduler.tasks.get(0).cancelled);
+    }
+
+    private static void assertBlockedHttpRequestTimesOut(String phase) throws Exception {
+        FakeHttpClock clock = new FakeHttpClock();
+        FakeDeadlineScheduler scheduler = new FakeDeadlineScheduler();
+        CountDownLatch entered = new CountDownLatch(1);
+        FakeHttpConnection connection = new FakeHttpConnection("{}") {
+            @Override public int getResponseCode() throws IOException {
+                if (phase.equals("headers")) {
+                    blockUntilDisconnected(entered);
+                    throw new IOException("fake HTTP connection closed");
+                }
+                return super.getResponseCode();
+            }
+
+            @Override public OutputStream getOutputStream() throws IOException {
+                if (!phase.equals("write")) return super.getOutputStream();
+                outputOpens.incrementAndGet();
+                return new OutputStream() {
+                    @Override public void write(int value) throws IOException {
+                        sentBody.write(value);
+                        blockUntilDisconnected(entered);
+                        throw new IOException("fake HTTP connection closed");
+                    }
+
+                    @Override public void write(byte[] value, int offset, int length) throws IOException {
+                        sentBody.write(value, offset, length);
+                        blockUntilDisconnected(entered);
+                        throw new IOException("fake HTTP connection closed");
+                    }
+                };
+            }
+        };
+        if (phase.equals("body")) {
+            connection.responseBody = new InputStream() {
+                @Override public int read() throws IOException {
+                    connection.blockUntilDisconnected(entered);
+                    throw new IOException("fake HTTP connection closed");
+                }
+            };
+        }
+        AdminSecurityHttpClient.UrlConnectionTransport transport = httpTransport(connection, clock, scheduler);
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            Future<AdminSecurityHttpClient.Response> result = worker.submit(() -> transport.execute(
+                phase.equals("write") ? "POST" : "GET", HTTP_TEST_URL, Map.of(),
+                phase.equals("write") ? new byte[] {1} : null
+            ));
+            assertTrue(entered.await(2, TimeUnit.SECONDS));
+            clock.advanceMillis(20_000);
+            scheduler.tasks.get(0).fireEvenIfCancelled();
+
+            ExecutionException failure = assertThrows(ExecutionException.class, () -> result.get(2, TimeUnit.SECONDS));
+            assertTrue(failure.getCause() instanceof SocketTimeoutException);
+            assertEquals(1, connection.disconnects.get());
+            assertTrue(scheduler.tasks.get(0).cancelled);
+        } finally {
+            connection.disconnected.countDown();
+            worker.shutdownNow();
+        }
+    }
+
+    private static AdminSecurityHttpClient.UrlConnectionTransport httpTransport(
+        FakeHttpConnection connection,
+        FakeHttpClock clock,
+        FakeDeadlineScheduler scheduler
+    ) {
+        return new AdminSecurityHttpClient.UrlConnectionTransport(url -> connection, clock, scheduler);
+    }
+
+    private static final class FakeHttpClock implements AdminSecurityHttpClient.UrlConnectionTransport.MonotonicClock {
+        private final AtomicLong nanos = new AtomicLong();
+
+        @Override public long nanoTime() { return nanos.get(); }
+
+        void advanceMillis(long millis) { nanos.addAndGet(TimeUnit.MILLISECONDS.toNanos(millis)); }
+    }
+
+    private static final class FakeDeadlineScheduler implements AdminSecurityHttpClient.UrlConnectionTransport.DeadlineScheduler {
+        final List<FakeDeadline> tasks = new ArrayList<>();
+
+        @Override public AdminSecurityHttpClient.UrlConnectionTransport.Cancellation schedule(Runnable task, long delayNanos) {
+            FakeDeadline deadline = new FakeDeadline(task, delayNanos);
+            tasks.add(deadline);
+            return deadline;
+        }
+    }
+
+    private static final class FakeDeadline implements AdminSecurityHttpClient.UrlConnectionTransport.Cancellation {
+        final Runnable task;
+        final long delayNanos;
+        volatile boolean cancelled;
+
+        FakeDeadline(Runnable task, long delayNanos) {
+            this.task = task;
+            this.delayNanos = delayNanos;
+        }
+
+        @Override public void cancel() { cancelled = true; }
+
+        void fireEvenIfCancelled() { task.run(); }
+    }
+
+    private static class FakeHttpConnection extends HttpURLConnection {
+        final ByteArrayOutputStream sentBody = new ByteArrayOutputStream();
+        final AtomicInteger outputOpens = new AtomicInteger();
+        final AtomicInteger disconnects = new AtomicInteger();
+        final CountDownLatch disconnected = new CountDownLatch(1);
+        InputStream responseBody;
+
+        FakeHttpConnection(String response) throws Exception {
+            this(new ByteArrayInputStream(response.getBytes(StandardCharsets.UTF_8)));
+        }
+
+        FakeHttpConnection(InputStream response) throws Exception {
+            super(new URL(HTTP_TEST_URL));
+            responseBody = response;
+        }
+
+        @Override public void connect() { }
+        @Override public boolean usingProxy() { return false; }
+        @Override public int getResponseCode() throws IOException { return 200; }
+        @Override public InputStream getInputStream() { return responseBody; }
+        @Override public InputStream getErrorStream() { return responseBody; }
+        @Override public String getHeaderField(String name) { return "Retry-After".equals(name) ? "3" : null; }
+
+        /** adm-F5: fixed-length streaming mode when the body stream was opened (-2 = never). */
+        volatile int streamingLengthAtOutputOpen = -2;
+
+        int streamingLength() {
+            return fixedContentLength;
+        }
+
+        @Override public OutputStream getOutputStream() throws IOException {
+            outputOpens.incrementAndGet();
+            streamingLengthAtOutputOpen = fixedContentLength;
+            return sentBody;
+        }
+
+        @Override public void disconnect() {
+            disconnects.incrementAndGet();
+            disconnected.countDown();
+        }
+
+        void blockUntilDisconnected(CountDownLatch entered) throws IOException {
+            entered.countDown();
+            try {
+                if (!disconnected.await(2, TimeUnit.SECONDS)) throw new IOException("fake HTTP wait expired");
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                throw new IOException("fake HTTP wait interrupted", error);
+            }
+        }
+    }
+
+    private static final String HTTP_TEST_URL = "http://127.0.0.1:8000/admin/security/deadline-test";
+
+    private static AdminSecurityHttpClient client(AdminSecurityHttpClient.Transport transport) {
         return new AdminSecurityHttpClient(
             "http://127.0.0.1:8000",
             true,
@@ -912,6 +1868,7 @@ public final class AdminSecurityHttpClientTest {
         final List<Request> requests = new ArrayList<>();
         final List<Request> challengeRequests = new ArrayList<>();
         int challengeStatus = 200;
+        final Map<String, Object> challengeOverrides = new java.util.LinkedHashMap<>();
 
         void enqueue(int status, String body) {
             responses.addLast(new AdminSecurityHttpClient.Response(status, body));
@@ -967,6 +1924,7 @@ public final class AdminSecurityHttpClientTest {
                 exact18.put("read_purpose", request.isNull("read_purpose") ? null : request.getString("read_purpose"));
                 exact18.put("schema_version", AdminDeviceProof.SCHEMA_VERSION);
                 exact18.put("session_id", request.isNull("session_id") ? null : request.getString("session_id"));
+                exact18.putAll(challengeOverrides);
                 Map<String, Object> exact19 = new java.util.LinkedHashMap<>(exact18);
                 exact19.put("signing_payload", AdminCanonicalEncoding.canonicalJson(exact18));
                 return new AdminSecurityHttpClient.Response(
@@ -993,6 +1951,8 @@ public final class AdminSecurityHttpClientTest {
         }
     }
 
+    private static final String CURRENT_SESSION_ID = "11111111-1111-4111-8111-111111111111";
+    private static final String OTHER_SESSION_ID = "22222222-2222-4222-8222-222222222222";
     private static final String DEVICE_ID = "admin-device-12345678-1234-1234-1234-123456789abc";
     private static final String OTHER_DEVICE_ID = "admin-device-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     private static final String PASSWORD = "correct horse battery staple";

@@ -183,12 +183,57 @@ class DebugOverlayContinuityTest {
     }
 
     @Test
-    fun sameClassBoxesMatchPreviousRectanglesAtMostOnce() {
+    fun ambiguousSameClassAssociationSnapsInsteadOfInterpolating() {
+        // S10-28: both new boxes could continue either previous box, so no pairing is trusted.
         val continuity = DebugOverlayContinuity()
         continuity.update(listOf(box(0f), box(30f)), 1L, 1_000L, 1_000L)
         continuity.update(listOf(box(10f), box(20f)), 2L, 1_100L, 1_100L)
 
+        val rendered = continuity.render(1_140L).boxes
+        assertEquals(listOf(10f, 20f), rendered.map { it.box.rect.left })
+        assertTrue(rendered.none { it.interpolated })
+    }
+
+    @Test
+    fun onePreviousBoxClaimedByTwoNewBoxesIsNotInterpolated() {
+        val continuity = DebugOverlayContinuity()
+        continuity.update(listOf(box(0f)), 1L, 1_000L, 1_000L)
+        continuity.update(listOf(box(10f), box(-10f)), 2L, 1_100L, 1_100L)
+
+        val rendered = continuity.render(1_140L).boxes
+        assertEquals(listOf(10f, -10f), rendered.map { it.box.rect.left })
+        assertTrue(rendered.none { it.interpolated })
+    }
+
+    @Test
+    fun stableObjectKeyKeepsItsOwnTransitionAndRejectsAnotherObjectsBox() {
+        val continuity = DebugOverlayContinuity()
+        continuity.update(
+            listOf(box(0f).copy(trackKey = "a"), box(30f).copy(trackKey = "b")),
+            1L, 1_000L, 1_000L,
+        )
+        continuity.update(
+            listOf(box(10f).copy(trackKey = "a"), box(20f).copy(trackKey = "b")),
+            2L, 1_100L, 1_100L,
+        )
+
         assertEquals(listOf(5f, 25f), continuity.render(1_140L).boxes.map { it.box.rect.left })
+        continuity.update(listOf(box(30f).copy(trackKey = "c")), 3L, 1_200L, 1_200L)
+        val switched = continuity.render(1_220L).boxes.single()
+        assertEquals(30f, switched.box.rect.left, 0.001f)
+        assertFalse(switched.interpolated)
+    }
+
+    @Test
+    fun sourceOlderThanTheVisualTrackingAgeIsMarkedStale() {
+        val continuity = DebugOverlayContinuity()
+        continuity.update(listOf(box(0f)), 1L, 1_000L, 1_000L)
+
+        assertFalse(continuity.render(1_800L).boxes.single().stale)
+        val old = continuity.render(1_801L).boxes.single()
+        assertTrue(old.stale)
+        assertEquals(801L, old.sourceAgeMs)
+        assertTrue(continuity.render(2_200L).boxes.isEmpty())
     }
 
     @Test

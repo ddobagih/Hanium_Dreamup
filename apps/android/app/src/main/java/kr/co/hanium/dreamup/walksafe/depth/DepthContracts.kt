@@ -117,6 +117,34 @@ data class DepthStats(
     val madM: Float?,
     val confidenceMedian: Float?,
     val outlierRatio: Float,
+    /** Near support cannot be identified as noise or assigned to the object's surface. */
+    val foregroundAmbiguous: Boolean = false,
+    /** Why in-region candidates were excluded before any statistic; diagnostic only. */
+    val rejectedSamples: DepthSampleRejections = DepthSampleRejections(),
+    /**
+     * S11-6: share of the sampled region's long-axis thirds (candidate extent in depth pixels)
+     * that hold kept depth. A thin object is judged along its length only. Null = not judged.
+     */
+    val spatialCoverage: Float? = null,
+)
+
+/**
+ * Per-reason counts of in-region depth candidates removed before statistics. A zero pixel is a
+ * missing measurement, never a near object; too-near values are kept apart from far and
+ * low-confidence gaps so recovery and guidance policies can tell them apart.
+ */
+data class DepthSampleRejections(
+    val invalidZero: Int = 0,
+    val tooNear: Int = 0,
+    val tooFar: Int = 0,
+    val lowConfidence: Int = 0,
+)
+
+/** Same-frame depth supported by several pixels immediately around the mapped bottom contact. */
+data class ContactDepthEstimate(
+    val distanceM: Float,
+    val spreadM: Float,
+    val validSampleCount: Int,
 )
 
 data class DepthConfidenceBreakdown(
@@ -203,9 +231,45 @@ data class TrackedObjectDepth(
     /** Original independent depth capture in the camera's millisecond clock, when known. */
     val depthObservedAtMs: Long? = null,
     val prediction: PredictedDepthEstimate? = null,
+    /** Source lease in the output clock, not the camera timestamp or the processing time. */
+    val sourceValidUntilElapsedRealtimeMs: Long? = null,
+    /** Null unless the selected, camera-aligned source supports the mapped contact neighborhood. */
+    val contactDepth: ContactDepthEstimate? = null,
+    /** S11-9: which interpretation supplied [riskDistanceM]; null when no metric distance exists. */
+    val riskDistanceKind: RiskDistanceKind? = null,
+    /** S11-9: gravity-horizontal range to the object center from the same-capture pose, if known. */
+    val horizontalDistanceM: Float? = null,
+    /**
+     * S11-6-F1: [riskDistanceM] comes from depth crowded into part of the object (long-axis
+     * coverage below the estimator's minimum). It is escalation-only proximity evidence: at most a
+     * warning, no motion or TTC, and never a safety release, far judgement or report source.
+     */
+    val spatialCoverageLimited: Boolean = false,
+    /**
+     * S10-21: index of the detector candidate (in the list given to the pipeline) this output was
+     * measured from, when the pipeline could bind it; consumers must not rebuild it from box equality.
+     */
+    val sourceDetectionIndex: Int? = null,
+    /**
+     * S11-11: the metric depth image was not captured with this camera image (reprojected), kept
+     * apart from [depthObservedAtMs]. Null when no metric source was used.
+     */
+    val depthReprojected: Boolean? = null,
 ) {
     val uprightBottomContactNorm: Point2?
         get() = bottomContactNorm?.let { sensorPointToUpright(it, imageQuarterTurns) }
+}
+
+/**
+ * S11-9: camera Z is depth along the optical axis. The other kinds need the same-capture camera
+ * pose (and gravity for the horizontal range). None of them is a body-clearance or collision
+ * distance; the app does not claim one.
+ */
+enum class RiskDistanceKind {
+    CAMERA_Z,
+    CAMERA_RAY_RANGE,
+    HORIZONTAL_RANGE,
+    GROUND_DISTANCE,
 }
 
 data class UserFacingDepth(

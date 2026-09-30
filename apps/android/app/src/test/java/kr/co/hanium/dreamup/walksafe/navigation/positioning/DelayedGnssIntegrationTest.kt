@@ -72,15 +72,17 @@ class DelayedGnssIntegrationTest {
             headingInput = heading(2_000L),
             quality = PdrStepQuality.HIGH,
         )
-        coordinator.observeZupt(ZuptObservation(2_500L))
+        val unsupportedZupt = coordinator.observeZupt(ZuptObservation(2_500L))
+        assertEquals(PedestrianMotionHardRejectReason.MOTION_NOT_CONFIRMED,
+            unsupportedZupt.motionUpdate?.hardRejectReason)
 
         val delayed = coordinator.observeGnss(fix(1_500L, receivedAtMs = 2_600L))
         assertNull(delayed.confidence.failureReason)
         assertEquals(GnssObservationDisposition.APPLIED, delayed.gnssUpdate?.disposition)
         assertEquals(1_500L, delayed.raw?.elapsedRealtimeMs)
         assertEquals(1_500L, delayed.filteredAtGnssMeasurement?.elapsedRealtimeMs)
-        assertEquals(2_500L, delayed.filtered?.elapsedRealtimeMs)
-        assertEquals(2, delayed.gnssUpdate?.replayedMotionEventCount)
+        assertEquals(2_000L, delayed.filtered?.elapsedRealtimeMs)
+        assertEquals(1, delayed.gnssUpdate?.replayedMotionEventCount)
         assertNotNull(delayed.filteredAtGnssMeasurement?.localEnu)
         assertTrue(requireNotNull(delayed.filtered).coordinate.longitude >
             requireNotNull(delayed.filteredAtGnssMeasurement).coordinate.longitude)

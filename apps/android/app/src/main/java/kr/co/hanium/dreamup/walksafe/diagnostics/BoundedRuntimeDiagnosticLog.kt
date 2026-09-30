@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.diagnostics
 import android.content.Context
 import android.os.SystemClock
 import java.io.File
+import java.security.SecureRandom
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -46,9 +47,13 @@ internal object BoundedRuntimeDiagnosticLog {
     fun initialize(context: Context) {
         if (!BuildConfig.DEBUG || writer != null) return
         runCatching {
-            writer = RuntimeDiagnosticFileWriter(
+            val created = RuntimeDiagnosticFileWriter(
                 File(context.applicationContext.cacheDir, "runtime-diagnostics"),
             )
+            // Marks where this process run starts inside files that outlive it. Queued before
+            // the writer is published, so no other thread's record can precede it.
+            created.enqueueRunStart(SystemClock.elapsedRealtime())
+            writer = created
         }
     }
 
@@ -100,6 +105,13 @@ private class RuntimeDiagnosticFileWriter(private val directory: File) {
     private val current = File(directory, "events.log")
     private val previous = File(directory, "events.previous.log")
     private val dropped = AtomicLong()
+
+    /**
+     * Random per process and kept only in memory: separates runs whose elapsed_ms restarts
+     * (process restart or reboot). It is not derived from any user, account or device ID.
+     */
+    private val runId: String = ByteArray(RUN_ID_BYTES).also { SecureRandom().nextBytes(it) }
+        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
     private val executor = ThreadPoolExecutor(
         1, 1, 0L, TimeUnit.MILLISECONDS,
         ArrayBlockingQueue<Runnable>(64),
@@ -107,13 +119,18 @@ private class RuntimeDiagnosticFileWriter(private val directory: File) {
         ThreadPoolExecutor.AbortPolicy(),
     )
 
+    /** One fixed start record per run; elapsed_ms counts from device boot, not wall time. */
+    fun enqueueRunStart(elapsedMs: Long) {
+        enqueue(elapsedMs, RUN_START_METADATA)
+    }
+
     // This raw string entry is private to this file and used only by the two typed formatters.
     fun enqueue(elapsedMs: Long, metadata: String) {
         try {
             executor.execute {
                 try {
                     val bytes = (
-                        "elapsed_ms=" + elapsedMs.coerceAtLeast(0L) +
+                        "run_id=" + runId + " elapsed_ms=" + elapsedMs.coerceAtLeast(0L) +
                             " dropped_total=" + dropped.get() + " " + metadata + "\n"
                         ).toByteArray(Charsets.UTF_8)
                     if (bytes.size > MAX_RECORD_BYTES) {
@@ -157,5 +174,7 @@ private class RuntimeDiagnosticFileWriter(private val directory: File) {
     private companion object {
         const val MAX_FILE_BYTES = 128L * 1024L
         const val MAX_RECORD_BYTES = 1024
+        const val RUN_ID_BYTES = 8
+        const val RUN_START_METADATA = "event=RUN_START clock=ELAPSED_REALTIME_SINCE_BOOT"
     }
 }

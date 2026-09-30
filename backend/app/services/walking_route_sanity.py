@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from math import atan2, cos, radians, sin, sqrt
+from math import atan2, cos, isfinite, radians, sin, sqrt
 
 from backend.app.schemas import RoutePoint
 
@@ -11,6 +11,13 @@ ROUTE_ENDPOINT_MAX_DISTANCE_M = 100.0
 ROUTE_SUMMARY_GEOMETRY_MIN_RATIO = 0.5
 ROUTE_SUMMARY_GEOMETRY_MAX_RATIO = 3.0
 ROUTE_SUMMARY_GEOMETRY_ABSOLUTE_TOLERANCE_M = 50.0
+# Only physically implausible *fast* pedestrian estimates are anomalies. Long
+# durations (signal waits, slow walking) are never rejected by a speed rule.
+ROUTE_MAX_PLAUSIBLE_WALKING_SPEED_MPS = 4.0
+ROUTE_DURATION_ROUNDING_TOLERANCE_M = 10.0
+# A caller may request a faster provider estimate (up to 20 km/h is accepted);
+# the cap then follows that requested speed with 25 % headroom (R19-GB-02).
+ROUTE_REQUESTED_SPEED_HEADROOM = 1.25
 
 
 class WalkingRouteSanityError(ValueError):
@@ -34,6 +41,16 @@ def route_point_distance_m(start: RoutePoint, end: RoutePoint) -> float:
     return earth_radius_m * 2 * atan2(sqrt(value), sqrt(1 - value))
 
 
+def route_max_plausible_speed_mps(speed_kmh: float | None = None) -> float:
+    """Fast-estimate cap; never below the 4 m/s pedestrian default."""
+    if speed_kmh is None or not isfinite(speed_kmh) or speed_kmh <= 0:
+        return ROUTE_MAX_PLAUSIBLE_WALKING_SPEED_MPS
+    return max(
+        ROUTE_MAX_PLAUSIBLE_WALKING_SPEED_MPS,
+        ROUTE_REQUESTED_SPEED_HEADROOM * speed_kmh / 3.6,
+    )
+
+
 def validate_normalized_walking_route(
     *,
     origin: RoutePoint,
@@ -41,6 +58,7 @@ def validate_normalized_walking_route(
     polyline: list[RoutePoint],
     distance_m: int,
     duration_s: int,
+    speed_kmh: float | None = None,
 ) -> None:
     if len(polyline) < 2:
         raise WalkingRouteSanityError(
@@ -60,6 +78,14 @@ def validate_normalized_walking_route(
         raise WalkingRouteSanityError(
             code="route_summary_invalid",
             message="Walking route distance and duration must be positive.",
+        )
+    if distance_m > (
+        duration_s * route_max_plausible_speed_mps(speed_kmh)
+        + ROUTE_DURATION_ROUNDING_TOLERANCE_M
+    ):
+        raise WalkingRouteSanityError(
+            code="route_duration_implausible",
+            message="Walking route duration is implausibly short for its distance.",
         )
 
     geometry_distance_m = sum(

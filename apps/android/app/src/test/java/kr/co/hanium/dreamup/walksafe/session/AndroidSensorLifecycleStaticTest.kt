@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.session
 
 import java.io.File
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -45,6 +46,20 @@ class AndroidSensorLifecycleStaticTest {
         assertTrue(orientationTracker.contains("val rotationRegistered ="))
         assertTrue(orientationTracker.contains("if (!rotationRegistered)"))
         assertTrue(orientationTracker.contains("chestMountedHeading.reset()"))
+    }
+
+    @Test
+    fun stalledCompassNoticeDoesNotClaimAReconnectionThatMayNotHappen() {
+        // S08-31: re-registration stops after two attempts per start, so the notice states only
+        // what is true (no input, direction guidance stopped).
+        val activity = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        val notice = activity.substringAfter("private fun routeCompassStatusMessage(): String {")
+            .substringBefore("private fun updateRouteOrientationReference(")
+            .substringAfter("RouteCompassHeadingReason.SENSOR_STALLED ->")
+            .substringBefore("RouteCompassHeadingReason.QUALITY_LOW")
+
+        assertTrue(notice.contains("\"나침반 센서 값이 들어오지 않아 방향 안내를 멈췄습니다.\""))
+        assertFalse(notice.contains("다시 연결"))
     }
 
     @Test

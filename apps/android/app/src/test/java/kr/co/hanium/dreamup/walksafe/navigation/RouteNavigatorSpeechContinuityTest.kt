@@ -15,21 +15,22 @@ import org.junit.Test
 class RouteNavigatorSpeechContinuityTest {
     @Test
     fun distanceBandChangesWaitForSentenceCompletionAndOfferOnlyLatestStage() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         listOf(false, true).forEach { testMode ->
             val navigator = navigator(testMode)
-            val first = navigator.update(fix(0.00055, 1_000), 1_000, false)
+            val first = navigator.update(fix(0.00055, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
             assertTrue(first.instruction?.contains("길안내를 시작합니다") == true)
             assertTrue(navigator.reserveInstruction(first))
 
             listOf(fix(0.00082, 2_000), fix(0.00095, 3_000)).forEach { nextFix ->
-                val update = navigator.update(nextFix, nextFix.elapsedRealtimeMs, false)
+                val update = navigator.update(nextFix, nextFix.elapsedRealtimeMs, false, facingObservation = RouteFacingObservation(90.0, 5.0, nextFix.elapsedRealtimeMs))
                 assertEquals("guidance_in_flight", update.reason)
                 assertFalse(update.cancelStaleNavigationSpeech)
                 assertNull(update.instruction)
                 assertFalse(navigator.reserveInstruction(update))
             }
             navigator.acknowledgeInstruction(first, 3_001)
-            val nextStage = requireNotNull(navigator.retryGuidance(3_002))
+            val nextStage = requireNotNull(navigator.retryGuidance(3_002, facingObservation = RouteFacingObservation(90.0, 5.0, 3_002)))
             assertEquals(first.guideIndex, nextStage.guideIndex)
             assertEquals(0, nextStage.speechCueToken?.distanceBand)
             assertTrue(nextStage.instruction?.contains("6m 앞") == true)
@@ -37,9 +38,9 @@ class RouteNavigatorSpeechContinuityTest {
             assertFalse(nextStage.cancelStaleNavigationSpeech)
             assertTrue(navigator.reserveInstruction(nextStage))
             navigator.acknowledgeInstruction(first, 3_003)
-            assertEquals("guidance_in_flight", navigator.retryGuidance(3_004)?.reason)
+            assertEquals("guidance_in_flight", navigator.retryGuidance(3_004, facingObservation = RouteFacingObservation(90.0, 5.0, 3_004))?.reason)
             navigator.acknowledgeInstruction(nextStage, 3_005)
-            assertNull(navigator.retryGuidance(3_006)?.instruction)
+            assertNull(navigator.retryGuidance(3_006, facingObservation = RouteFacingObservation(90.0, 5.0, 3_006))?.instruction)
         }
     }
 
@@ -67,15 +68,16 @@ class RouteNavigatorSpeechContinuityTest {
 
     @Test
     fun failedSentenceKeepsItsRetryDelayAcrossAPendingDistanceChange() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         val navigator = navigator()
-        val first = navigator.update(fix(0.00055, 1_000), 1_000, false)
+        val first = navigator.update(fix(0.00055, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
         assertTrue(navigator.reserveInstruction(first))
-        assertEquals("guidance_in_flight", navigator.update(fix(0.00082, 2_000), 2_000, false).reason)
+        assertEquals("guidance_in_flight", navigator.update(fix(0.00082, 2_000), 2_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 2_000)).reason)
         navigator.releaseInstruction(first, 2_001)
         navigator.acknowledgeInstruction(first, 2_002)
-        assertEquals("guidance_retry_wait", navigator.retryGuidance(2_003)?.reason)
-        assertEquals("guidance_retry_wait", navigator.retryGuidance(4_000)?.reason)
-        val latest = requireNotNull(navigator.retryGuidance(4_001))
+        assertEquals("guidance_retry_wait", navigator.retryGuidance(2_003, facingObservation = RouteFacingObservation(90.0, 5.0, 2_003))?.reason)
+        assertEquals("guidance_retry_wait", navigator.retryGuidance(4_000, facingObservation = RouteFacingObservation(90.0, 5.0, 4_000))?.reason)
+        val latest = requireNotNull(navigator.retryGuidance(4_001, facingObservation = RouteFacingObservation(90.0, 5.0, 4_001)))
         assertTrue(latest.instruction?.contains("20m 앞") == true)
         assertTrue(latest.instruction?.contains("길안내를 시작합니다") == true)
         assertNotEquals(first.speechCueToken, latest.speechCueToken)
@@ -178,16 +180,17 @@ class RouteNavigatorSpeechContinuityTest {
 
     @Test
     fun actualNextGuideStillCancelsPendingSentenceAndRejectsItsLateCompletion() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         val navigator = navigator(true)
-        val first = navigator.update(fix(0.00082, 1_000), 1_000, false)
+        val first = navigator.update(fix(0.00082, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
         assertTrue(navigator.reserveInstruction(first))
-        val next = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 4_000), 4_000, false)
+        val next = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 4_000), 4_000, false, facingObservation = RouteFacingObservation(0.0, 5.0, 4_000))
         assertTrue(next.cancelStaleNavigationSpeech)
         assertNotEquals(first.guideIndex, next.guideIndex)
         assertTrue(next.instruction?.contains("오른쪽으로 꺾으세요") == true)
         assertTrue(navigator.reserveInstruction(next))
         navigator.acknowledgeInstruction(first, 4_001)
-        assertEquals("guidance_in_flight", navigator.retryGuidance(4_002)?.reason)
+        assertEquals("guidance_in_flight", navigator.retryGuidance(4_002, facingObservation = RouteFacingObservation(0.0, 5.0, 4_002))?.reason)
     }
 
     @Test

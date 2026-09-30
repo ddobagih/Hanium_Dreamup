@@ -624,6 +624,7 @@ def test_backend_serializes_reconciliation_across_replicas(monkeypatch) -> None:
     def preflight(_db, _upload_dir, *, known_key_states) -> None:
         assert known_key_states
         calls.append("preflight")
+        return {}
 
     monkeypatch.setattr(main_app, "SessionLocal", FakeSessionFactory)
     monkeypatch.setattr(
@@ -740,7 +741,7 @@ def test_reconciliation_waits_for_inflight_encrypted_report_commit(
     monkeypatch.setattr(
         main_app,
         "validate_report_storage_database_inventory",
-        lambda _db, _upload_dir, **_kwargs: None,
+        lambda _db, _upload_dir, **_kwargs: {},
     )
 
     with ThreadPoolExecutor(max_workers=2) as pool:

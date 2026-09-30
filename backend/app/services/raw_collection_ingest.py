@@ -11,17 +11,23 @@ from dataclasses import dataclass
 from secrets import compare_digest
 from typing import Any, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.models import PrivacyConsentEvent
-from backend.app.schemas import RawCollectionPurpose
+from backend.app.schemas import (
+    PRIVACY_CONSENT_ITEM_VERSIONS,
+    PRIVACY_CONSENT_POLICY_VERSION,
+    RawCollectionPurpose,
+)
 from backend.app.services.privacy_lifecycle import (
     PrivacyLifecycleError,
     bind_or_verify_privacy_hmac_key,
+    configured_privacy_hmac_lookup_keys,
     consent_event_is_current,
     lock_report_ingest_transaction,
     privacy_subject_hmac,
+    resolve_privacy_subject,
 )
 
 
@@ -71,16 +77,41 @@ def load_raw_collection_consent_events(
     )
     if bound is None:
         return ()
-    return tuple(
-        db.scalars(
-            select(PrivacyConsentEvent)
-            .where(
-                PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
-                PrivacyConsentEvent.account_generation == account_generation,
-                PrivacyConsentEvent.subject_revision >= bound.subject_revision,
-            )
-            .order_by(PrivacyConsentEvent.subject_revision.asc())
-        ).all()
+    return (bound,)
+
+
+def first_raw_collection_consent_interruption(
+    db: Session,
+    *,
+    privacy_subject: str,
+    account_generation: int,
+    bound_revision: int,
+    purpose: RawCollectionPurpose,
+) -> PrivacyConsentEvent | None:
+    scope = (
+        PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
+        PrivacyConsentEvent.account_generation == account_generation,
+        PrivacyConsentEvent.subject_revision > bound_revision,
+    )
+    interruptions = [
+        PrivacyConsentEvent.policy_version.is_distinct_from(
+            PRIVACY_CONSENT_POLICY_VERSION
+        ),
+        PrivacyConsentEvent.item_versions.is_distinct_from(
+            PRIVACY_CONSENT_ITEM_VERSIONS
+        ),
+        PrivacyConsentEvent.raw_source_collection.is_not(True),
+    ]
+    if purpose == "AUTO_REPORT":
+        interruptions.append(PrivacyConsentEvent.automatic_reporting.is_not(True))
+    interrupted = or_(*interruptions)
+    if not db.scalar(select(exists().where(*scope, interrupted))):
+        return None
+    return db.scalar(
+        select(PrivacyConsentEvent)
+        .where(*scope, interrupted)
+        .order_by(PrivacyConsentEvent.subject_revision.asc())
+        .limit(1)
     )
 
 
@@ -162,16 +193,31 @@ def authorize_raw_collection_write(
         secret=settings.privacy_hmac_secret,
         key_version=settings.privacy_hmac_key_version,
     )
-    privacy_subject = privacy_subject_hmac(
-        actor_id,
-        account_generation,
-        settings.privacy_hmac_secret,
-    )
+    lock_options: dict[str, object] = {}
+    if configured_privacy_hmac_lookup_keys():
+        # S1617-50: after a rotation RAW joins the subject that owns the actor
+        # generation, and every candidate subject is fenced and checked.
+        resolved = resolve_privacy_subject(
+            db,
+            actor_id,
+            account_generation,
+            secret=settings.privacy_hmac_secret,
+            key_version=settings.privacy_hmac_key_version,
+        )
+        privacy_subject = resolved.subject
+        lock_options["lookup_subjects"] = resolved.candidates
+    else:
+        privacy_subject = privacy_subject_hmac(
+            actor_id,
+            account_generation,
+            settings.privacy_hmac_secret,
+        )
     lock_report_ingest_transaction(
         db,
         privacy_subject,
         account_generation,
         enforce_consent=False,
+        **lock_options,
     )
     consent = validate_raw_collection_consent_chain(
         load_raw_collection_consent_events(
@@ -183,6 +229,19 @@ def authorize_raw_collection_write(
         purpose=purpose,
         bound_receipt_sha256=consent_receipt_sha256,
     )
+    interruption = first_raw_collection_consent_interruption(
+        db,
+        privacy_subject=privacy_subject,
+        account_generation=account_generation,
+        bound_revision=consent.subject_revision,
+        purpose=purpose,
+    )
+    if interruption is not None:
+        validate_raw_collection_consent_chain(
+            (consent, interruption),
+            purpose=purpose,
+            bound_receipt_sha256=consent_receipt_sha256,
+        )
     return RawCollectionAdmission(
         actor_id=actor_id,
         account_generation=account_generation,
@@ -196,6 +255,7 @@ __all__ = [
     "RawCollectionAdmission",
     "RawCollectionStorageError",
     "authorize_raw_collection_write",
+    "first_raw_collection_consent_interruption",
     "load_raw_collection_consent_events",
     "validate_raw_collection_consent_chain",
 ]

@@ -180,14 +180,31 @@ class MainActivityWithdrawalRestartStaticTest {
                 source,
                 "private fun restorePrivacyControlStateFromPrefs",
             )
+        // Decode the pending/CAS journal for tuple validation; publish it only after confirmation.
+        assertTrue(restore.contains("PREF_PENDING_INTEGRATED_CONSENT_MUTATION"))
         assertTrue(
             appearsInOrder(
                 restore,
                 "PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION",
-                "PREF_PENDING_INTEGRATED_CONSENT_MUTATION",
+                "restoreCurrentConfirmation(confirmation)",
+                "restorePendingMutation(mutation, retry = true)",
+                "PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED",
+                "applyImmediateConsentWithdrawals(items)",
             ),
         )
-        assertTrue(restore.contains("restoreCurrentConfirmation(confirmation)"))
+        val pending = restore.substringAfter("val mutation = restoredPending")
+            .substringBefore("sensitivePrefs.getString(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED")
+        assertTrue(
+            appearsInOrder(
+                pending,
+                "!restoredPendingPreservesConfirmation(",
+                "integratedConsentSession.failClosed()",
+                "restorePendingMutation(mutation, retry = true)",
+                "pendingMutationOrNull() != mutation",
+                "pendingIntegratedConsentMutation = mutation",
+            ),
+        )
+        assertTrue(!pending.contains("mutation.copy("))
 
         val confirmation =
             ReportStaticSourceInspector.functionBlock(

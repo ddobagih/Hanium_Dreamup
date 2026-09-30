@@ -103,6 +103,14 @@ data class WalkSessionReadinessObservation(
     val requirement: WalkSessionReadinessRequirement,
     val status: WalkSessionReadinessStatus,
     val reason: String = "",
+    /**
+     * S03-9/S14-12: monotonic time (the snapshot clock) at which a changing condition was measured
+     * and how long that measurement stays valid. Both stay null for values read at collection time
+     * and for static records such as consent; a producer that reuses an earlier measurement must
+     * pass both so the snapshot cannot present it as current.
+     */
+    val observedAtElapsedRealtimeMs: Long? = null,
+    val maxAgeMs: Long? = null,
 ) {
     init {
         require(
@@ -113,17 +121,38 @@ data class WalkSessionReadinessObservation(
         ) {
             "A pending or unavailable observation must explain its reason"
         }
+        require((observedAtElapsedRealtimeMs == null) == (maxAgeMs == null)) {
+            "A measured observation needs both its measurement time and its validity"
+        }
+        require(observedAtElapsedRealtimeMs == null || observedAtElapsedRealtimeMs >= 0L) {
+            "observedAtElapsedRealtimeMs must not be negative"
+        }
+        require(maxAgeMs == null || maxAgeMs > 0L) { "maxAgeMs must be positive" }
+    }
+
+    /** A measurement taken after the assessment or older than its own validity is stale. */
+    fun isStaleAt(assessedAtElapsedRealtimeMs: Long): Boolean {
+        val observedAt = observedAtElapsedRealtimeMs ?: return false
+        val maxAge = maxAgeMs ?: return true
+        return observedAt > assessedAtElapsedRealtimeMs ||
+            assessedAtElapsedRealtimeMs - observedAt > maxAge
     }
 }
 
 data class WalkSessionReadinessSnapshot(
     val epoch: WalkRuntimeEpoch,
     val plan: WalkSessionReadinessPlan,
-    val assessedAtEpochMs: Long,
+    /**
+     * Monotonic assessment time (Android `SystemClock.elapsedRealtime()`), used only for readiness
+     * age checks. It is not a wall-clock timestamp and must not be compared with epoch times.
+     */
+    val assessedAtElapsedRealtimeMs: Long,
     val observations: Map<WalkSessionReadinessRequirement, WalkSessionReadinessObservation>,
 ) {
     init {
-        require(assessedAtEpochMs >= 0) { "assessedAtEpochMs must not be negative" }
+        require(assessedAtElapsedRealtimeMs >= 0) {
+            "assessedAtElapsedRealtimeMs must not be negative"
+        }
         require(observations.keys == WalkSessionReadinessRequirement.entries.toSet()) {
             "A readiness snapshot must include every requirement"
         }
@@ -143,10 +172,18 @@ data class WalkSessionReadinessSnapshot(
         }
     }
 
+    /** Required READY evidence that is no longer current at [assessedAtElapsedRealtimeMs]. */
+    val staleRequirements: Set<WalkSessionReadinessRequirement>
+        get() = plan.requiredRequirements.filterTo(linkedSetOf()) { requirement ->
+            val observation = observations.getValue(requirement)
+            observation.status == WalkSessionReadinessStatus.READY &&
+                observation.isStaleAt(assessedAtElapsedRealtimeMs)
+        }
+
     val isReady: Boolean
         get() = plan.requiredRequirements.all { requirement ->
             observations.getValue(requirement).status == WalkSessionReadinessStatus.READY
-        }
+        } && staleRequirements.isEmpty()
 
     val hasUnavailableRequirement: Boolean
         get() = plan.requiredRequirements.any { requirement ->
@@ -162,7 +199,7 @@ data class WalkSessionReadinessSnapshot(
                 }
                 ?.reason
                 ?.takeIf(String::isNotBlank)
-        }
+        } + staleRequirements.map { "stale_observation:${it.name.lowercase()}" }
 }
 
 data class WalkSessionConfirmationToken(
@@ -195,7 +232,7 @@ class WalkSessionReadinessCollector(
         return this
     }
 
-    fun build(assessedAtEpochMs: Long): WalkSessionReadinessSnapshot {
+    fun build(assessedAtElapsedRealtimeMs: Long): WalkSessionReadinessSnapshot {
         val missing = plan.requiredRequirements - observations.keys
         check(missing.isEmpty()) {
             "Missing required readiness observations: ${missing.joinToString()}"
@@ -212,7 +249,7 @@ class WalkSessionReadinessCollector(
         return WalkSessionReadinessSnapshot(
             epoch = epoch,
             plan = plan,
-            assessedAtEpochMs = assessedAtEpochMs,
+            assessedAtElapsedRealtimeMs = assessedAtElapsedRealtimeMs,
             observations = observations.toMap(),
         )
     }

@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.admin.security;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -22,7 +23,7 @@ public final class AdminSecurityControllerTest {
 
         var snapshot = controller.snapshot();
         assertEquals(AdminSecurityState.NORMAL, snapshot.securityState());
-        assertEquals("state-v1", snapshot.stateVersion());
+        assertEquals("1", snapshot.stateVersion());
         assertEquals("2026-07-22T00:00:00Z", snapshot.observedAt());
         assertEquals(AdminRecoveryCustodyState.ATTESTED, snapshot.recoveryCustodyState());
         assertEquals("2026-07-21T23:00:00Z", snapshot.recoveryCustodyAttestedAt());
@@ -75,22 +76,340 @@ public final class AdminSecurityControllerTest {
     }
 
     @Test
+    public void s18_27_lostResponseAndProcessRestartReuseOneDurableCustodyAttempt()
+        throws Exception {
+        CustodyStore store = new CustodyStore();
+        FakeApi firstApi = new FakeApi();
+        firstApi.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        firstApi.custodyAttestedAt = null;
+        firstApi.loseCustodyResponse = true;
+        AdminSecurityController first = new AdminSecurityController(firstApi, store);
+        first.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertThrows(IOException.class, () -> first.attestRecoveryCustody(
+            AdminSecurityApi.RecoveryMaterialKind.SECURITY_KEY
+        ));
+        String originalReference = firstApi.custodyReference;
+        assertEquals(1, firstApi.custodyPosts);
+        assertEquals(originalReference, store.pending.custodyReference());
+        assertEquals("admin-01", store.pending.adminId());
+        assertEquals(DEVICE_ID, store.pending.deviceId());
+        assertEquals("1", store.pending.expectedStateVersion());
+        assertEquals(AdminSecurityApi.RecoveryMaterialKind.SECURITY_KEY,
+            store.pending.materialKind());
+        first.close();
+
+        FakeApi retryApi = new FakeApi();
+        retryApi.custodyState = AdminRecoveryCustodyState.ATTESTED;
+        AdminSecurityController retry = new AdminSecurityController(retryApi, store);
+        retry.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        retry.attestRecoveryCustody(AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE);
+
+        assertEquals(originalReference, retryApi.custodyReference);
+        assertEquals(AdminSecurityApi.RecoveryMaterialKind.SECURITY_KEY,
+            retryApi.attestedMaterialKind);
+        assertEquals("1", retryApi.custodyExpectedStateVersion);
+        assertEquals(1, retryApi.custodyPosts);
+        assertNull(store.pending);
+    }
+
+    @Test
+    public void s18_27_failedPendingCommitBlocksPostAndAccountSwitchDiscardsOldReference()
+        throws Exception {
+        CustodyStore store = new CustodyStore();
+        FakeApi api = new FakeApi();
+        api.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        api.custodyAttestedAt = null;
+        AdminSecurityController controller = new AdminSecurityController(api, store);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        store.rejectCommit = true;
+        assertThrows(IOException.class, () -> controller.attestRecoveryCustody(
+            AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE
+        ));
+        assertEquals(0, api.custodyPosts);
+        controller.close();
+        store.rejectCommit = false;
+        FakeApi lostApi = new FakeApi();
+        lostApi.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        lostApi.custodyAttestedAt = null;
+        lostApi.loseCustodyResponse = true;
+        AdminSecurityController lost = new AdminSecurityController(lostApi, store);
+        lost.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        assertThrows(IOException.class, () -> lost.attestRecoveryCustody(
+            AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE
+        ));
+        String oldReference = store.pending.custodyReference();
+        lost.close();
+
+        AdminSecurityController otherAccount = new AdminSecurityController(new FakeApi(), store);
+        otherAccount.login("admin-02", PASSWORD, "123456", DEVICE_ID, "test phone");
+        assertNull(store.pending);
+        otherAccount.close();
+        FakeApi againApi = new FakeApi();
+        againApi.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        againApi.custodyAttestedAt = null;
+        AdminSecurityController again = new AdminSecurityController(againApi, store);
+        again.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        again.attestRecoveryCustody(AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE);
+        assertFalse(oldReference.equals(againApi.custodyReference));
+    }
+
+    @Test
+    public void s18_27_definitiveVersionConflictDiscardsPendingButNetworkLossKeepsIt()
+        throws Exception {
+        CustodyStore store = new CustodyStore();
+        FakeApi uncertainApi = new FakeApi();
+        uncertainApi.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        uncertainApi.custodyAttestedAt = null;
+        uncertainApi.loseCustodyResponse = true;
+        AdminSecurityController uncertain = new AdminSecurityController(uncertainApi, store);
+        uncertain.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        assertThrows(IOException.class, () -> uncertain.attestRecoveryCustody(
+            AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE
+        ));
+        String reference = store.pending.custodyReference();
+        uncertain.close();
+
+        FakeApi conflictApi = new FakeApi();
+        conflictApi.custodyFailure = new AdminSecurityApiException(
+            AdminSecurityApiException.Code.CUSTODY_STATE_VERSION_CONFLICT, null
+        );
+        AdminSecurityController conflict = new AdminSecurityController(conflictApi, store);
+        conflict.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        AdminSecurityApiException error = assertThrows(AdminSecurityApiException.class,
+            () -> conflict.attestRecoveryCustody(
+                AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE
+            ));
+        assertEquals(AdminSecurityApiException.Code.CUSTODY_STATE_VERSION_CONFLICT, error.code());
+        assertEquals(reference, conflictApi.custodyReference);
+        assertNull(store.pending);
+    }
+
+    @Test
+    public void s18_27_deviceSwitchDiscardsOldPendingReference() throws Exception {
+        CustodyStore store = new CustodyStore();
+        FakeApi firstApi = new FakeApi();
+        firstApi.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        firstApi.custodyAttestedAt = null;
+        firstApi.loseCustodyResponse = true;
+        AdminSecurityController first = new AdminSecurityController(firstApi, store);
+        first.login("admin-01", PASSWORD, "123456", DEVICE_ID, "first phone");
+        assertThrows(IOException.class, () -> first.attestRecoveryCustody(
+            AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE
+        ));
+        String firstReference = store.pending.custodyReference();
+        first.close();
+
+        FakeApi secondApi = new FakeApi();
+        secondApi.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        secondApi.custodyAttestedAt = null;
+        secondApi.currentDeviceId = OTHER_DEVICE_ID;
+        AdminSecurityController second = new AdminSecurityController(secondApi, store);
+        second.login("admin-01", PASSWORD, "123456", OTHER_DEVICE_ID, "second phone");
+        assertNull(store.pending);
+        second.attestRecoveryCustody(AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE);
+        assertFalse(firstReference.equals(secondApi.custodyReference));
+    }
+
+    @Test
+    public void s18_27_failedAccountSwitchRetainsFirstPendingReference() throws Exception {
+        CustodyStore store = new CustodyStore();
+        FakeApi firstApi = new FakeApi();
+        firstApi.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        firstApi.custodyAttestedAt = null;
+        firstApi.loseCustodyResponse = true;
+        AdminSecurityController first = new AdminSecurityController(firstApi, store);
+        first.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        assertThrows(IOException.class, () -> first.attestRecoveryCustody(
+            AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE
+        ));
+        String firstReference = store.pending.custodyReference();
+        first.close();
+
+        FakeApi failedSwitchApi = new FakeApi();
+        failedSwitchApi.loginFailure = new IOException("second account login timed out");
+        AdminSecurityController failedSwitch = new AdminSecurityController(failedSwitchApi, store);
+        assertThrows(IOException.class, () -> failedSwitch.login(
+            "admin-02", PASSWORD, "123456", DEVICE_ID, "test phone"
+        ));
+        assertEquals(firstReference, store.pending.custodyReference());
+        failedSwitch.close();
+
+        FakeApi retryApi = new FakeApi();
+        AdminSecurityController retry = new AdminSecurityController(retryApi, store);
+        retry.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        retry.attestRecoveryCustody(AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE);
+        assertEquals(firstReference, retryApi.custodyReference);
+        assertNull(store.pending);
+    }
+
+    @Test
     public void anotherAuthenticatedDeviceCanReportLostRemoteDeviceButNeverItself() throws Exception {
         FakeApi api = new FakeApi();
         AdminSecurityController controller = new AdminSecurityController(api);
         controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
 
-        assertThrows(IllegalArgumentException.class, () -> controller.reportLostDevice(DEVICE_ID));
+        assertThrows(IllegalArgumentException.class, () -> controller.reportLostDevice(
+            DEVICE_ID, PASSWORD.toCharArray(), "123456".toCharArray(), 1_000L
+        ));
         assertEquals(0, api.reportLostDeviceCount);
-
-        controller.reportLostDevice(OTHER_DEVICE_ID);
-
+        assertEquals(0, api.reauthenticateCount);
+        char[] password = PASSWORD.toCharArray();
+        char[] totp = "123456".toCharArray();
+        controller.reportLostDevice(OTHER_DEVICE_ID, password, totp, 1_000L);
         assertEquals(1, api.reportLostDeviceCount);
         assertEquals(OTHER_DEVICE_ID, api.reportedLostDeviceId);
+        // S18-29: exact device-path reconfirmation, nonce forwarded, credentials wiped.
+        assertEquals("device.report_lost", api.reconfirmationAction);
+        assertEquals("POST", api.reconfirmationMethod);
+        assertEquals(
+            "/admin/security/devices/" + OTHER_DEVICE_ID + "/report-lost",
+            api.reconfirmationPath
+        );
+        assertEquals(
+            java.util.Map.of(
+                AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER, api.reconfirmationNonce
+            ),
+            api.reportLostHeaders
+        );
+        assertTrue(new String(password).chars().allMatch(ch -> ch == 0));
+        assertTrue(new String(totp).chars().allMatch(ch -> ch == 0));
         assertEquals(1, controller.snapshot().sessions().size());
         assertEquals(DEVICE_ID, controller.snapshot().sessions().get(0).deviceId());
         assertTrue(controller.snapshot().sessions().get(0).isCurrent());
         assertEquals("state-v3", controller.snapshot().stateVersion());
+    }
+
+    @Test
+    public void s18_29_lostDeviceReportIsFrozenWithoutAttestedCustodyAndOnFailedReauth() throws Exception {
+        FakeApi api = new FakeApi();
+        AdminSecurityController controller = new AdminSecurityController(api);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        api.reauthenticationFailure = new IOException("reauthentication rejected");
+        char[] password = PASSWORD.toCharArray();
+        assertThrows(IOException.class, () -> controller.reportLostDevice(
+            OTHER_DEVICE_ID, password, "123456".toCharArray(), 1_000L
+        ));
+        assertEquals(0, api.reportLostDeviceCount);
+        assertTrue(new String(password).chars().allMatch(ch -> ch == 0));
+        FakeApi unattested = new FakeApi();
+        unattested.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        unattested.custodyAttestedAt = null;
+        AdminSecurityController frozen = new AdminSecurityController(unattested);
+        frozen.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        assertThrows(IllegalStateException.class, () -> frozen.reportLostDevice(
+            OTHER_DEVICE_ID, PASSWORD.toCharArray(), "123456".toCharArray(), 1_000L
+        ));
+        assertEquals(0, unattested.reauthenticateCount);
+        assertEquals(0, unattested.reportLostDeviceCount);
+    }
+    @Test
+    public void w20aR3LostDeviceLocalCustodyGateIsTypedForRecoveryGuidance() throws Exception {
+        FakeApi unattested = new FakeApi();
+        unattested.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        unattested.custodyAttestedAt = null;
+        AdminSecurityController frozen = new AdminSecurityController(unattested);
+        frozen.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        char[] password = PASSWORD.toCharArray();
+
+        AdminRecoveryCustodyRequiredException error = assertThrows(
+            AdminRecoveryCustodyRequiredException.class,
+            () -> frozen.reportLostDevice(OTHER_DEVICE_ID, password, "123456".toCharArray(), 1_000L)
+        );
+
+        assertEquals(
+            "복구자료 보관이 확인되지 않아 분실 처리를 할 수 없습니다. "
+                + "휴대전화 밖에 보관한 복구코드로 분실 복구를 시작하세요.",
+            AdminRecoveryMessagePolicy.failureMessage(
+                AdminRecoveryMessagePolicy.Phase.LOST_DEVICE_REPORT,
+                error
+            )
+        );
+        assertTrue(new String(password).chars().allMatch(ch -> ch == 0));
+        assertEquals(0, unattested.reauthenticateCount);
+        assertEquals(0, unattested.reportLostDeviceCount);
+    }
+
+    @Test
+    public void w20aR7ReportLostUpdatesPartialDeviceTotals() throws Exception {
+        FakeApi api = new FakeApi();
+        api.inventoryDeviceTotal = 5;
+        AdminSecurityController controller = new AdminSecurityController(api);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        assertEquals(5, controller.deviceTotal());
+        assertFalse(controller.devicesComplete());
+
+        controller.reportLostDevice(
+            OTHER_DEVICE_ID, PASSWORD.toCharArray(), "123456".toCharArray(), 1_000L
+        );
+
+        assertEquals(2, controller.snapshot().devices().size());
+        assertEquals(4, controller.deviceTotal());
+        assertFalse(controller.devicesComplete());
+        assertEquals(
+            "기기 목록이 일부만 표시되었습니다: 활성 장치 키 4대 중 2대. "
+                + "분실 기기가 보이지 않으면 서버 운영 절차로 확인하세요.",
+            AdminSecurityController.partialDeviceListNotice(
+                controller.deviceTotal(),
+                controller.snapshot().devices().size(),
+                controller.devicesComplete()
+            )
+        );
+    }
+
+    @Test
+    public void w20aR7ReportLostCanCompleteTheDeviceListAndKeepsCompleteTotals() throws Exception {
+        FakeApi partial = new FakeApi();
+        partial.inventoryDeviceTotal = 4;
+        AdminSecurityController nearlyComplete = new AdminSecurityController(partial);
+        nearlyComplete.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        nearlyComplete.reportLostDevice(
+            OTHER_DEVICE_ID, PASSWORD.toCharArray(), "123456".toCharArray(), 1_000L
+        );
+        assertEquals(3, nearlyComplete.deviceTotal());
+        assertFalse(nearlyComplete.devicesComplete());
+
+        FakeApi complete = new FakeApi();
+        AdminSecurityController controller = new AdminSecurityController(complete);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        assertEquals(3, controller.deviceTotal());
+        assertTrue(controller.devicesComplete());
+        controller.reportLostDevice(
+            KEY_ONLY_DEVICE_ID, PASSWORD.toCharArray(), "123456".toCharArray(), 1_000L
+        );
+        assertEquals(2, controller.snapshot().devices().size());
+        assertEquals(2, controller.deviceTotal());
+        assertTrue(controller.devicesComplete());
+        assertNull(AdminSecurityController.partialDeviceListNotice(
+            controller.deviceTotal(),
+            controller.snapshot().devices().size(),
+            controller.devicesComplete()
+        ));
+    }
+
+    @Test
+    public void w20aR7LegacyUnknownTotalStaysUnknownAndIsNotRenderedAsNofN() throws Exception {
+        FakeApi legacy = new FakeApi();
+        legacy.inventoryDeviceTotal = -1;
+        AdminSecurityController controller = new AdminSecurityController(legacy);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        assertEquals(-1, controller.deviceTotal());
+        assertFalse(controller.devicesComplete());
+
+        controller.reportLostDevice(
+            OTHER_DEVICE_ID, PASSWORD.toCharArray(), "123456".toCharArray(), 1_000L
+        );
+
+        assertEquals(-1, controller.deviceTotal());
+        assertFalse(controller.devicesComplete());
+        String notice = AdminSecurityController.partialDeviceListNotice(
+            controller.deviceTotal(),
+            controller.snapshot().devices().size(),
+            controller.devicesComplete()
+        );
+        assertTrue(notice.contains("전체 개수 확인 불가"));
+        assertTrue(notice.contains("표시된 기기 2대"));
+        assertFalse(notice.contains("대 중 "));
     }
 
     @Test
@@ -106,7 +425,9 @@ public final class AdminSecurityControllerTest {
             KEY_ONLY_DEVICE_ID.equals(device.deviceId()) && !device.isCurrent()
         ));
 
-        controller.reportLostDevice(KEY_ONLY_DEVICE_ID);
+        controller.reportLostDevice(
+            KEY_ONLY_DEVICE_ID, PASSWORD.toCharArray(), "123456".toCharArray(), 1_000L
+        );
 
         assertEquals(KEY_ONLY_DEVICE_ID, api.reportedLostDeviceId);
         assertFalse(controller.snapshot().devices().stream().anyMatch(device ->
@@ -291,6 +612,20 @@ public final class AdminSecurityControllerTest {
     }
 
     @Test
+    public void anotherSessionRevocationFailureClosesTheViewWithoutAutomaticRetry() throws Exception {
+        FakeApi api = new FakeApi();
+        AdminSecurityController controller = new AdminSecurityController(api);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        api.failRevoke = true;
+
+        assertThrows(IOException.class, () -> controller.revokeSession(OTHER_SESSION_ID));
+
+        assertEquals(1, api.revokeCalls);
+        assertEquals(AdminSecurityState.FAIL_CLOSED, controller.snapshot().securityState());
+        assertTrue(controller.snapshot().sessions().isEmpty());
+    }
+
+    @Test
     public void anotherDeviceCanBeRevokedWithoutUnlockingOperationalWorkflows() throws Exception {
         FakeApi api = new FakeApi();
         AdminSecurityController controller = new AdminSecurityController(api);
@@ -299,7 +634,7 @@ public final class AdminSecurityControllerTest {
         controller.revokeSession(OTHER_SESSION_ID);
 
         assertEquals(1, controller.snapshot().sessions().size());
-        assertEquals("state-v2", controller.snapshot().stateVersion());
+        assertEquals("2", controller.snapshot().stateVersion());
         assertFalse(controller.highRiskDecision(
             AdminHighRiskActionGate.Action.DATA_DELETE,
             1L,
@@ -407,6 +742,7 @@ public final class AdminSecurityControllerTest {
         assertEquals(DEVICE_ID, operations.session.deviceId());
         assertEquals(ACCESS_TOKEN, operations.session.accessToken());
         controller.signOutLocal();
+        assertTrue(api.localBindingCleared.await(2, java.util.concurrent.TimeUnit.SECONDS));
         assertEquals(1, api.clearLocalBindingCount);
         assertThrows(IllegalStateException.class, () -> controller.recordReviewDecision(
             "11111111-1111-4111-8111-111111111111", review, true
@@ -698,9 +1034,32 @@ public final class AdminSecurityControllerTest {
         ));
     }
 
+    private static final class CustodyStore implements AdminRecoveryCustodyAttempt.Store {
+        AdminRecoveryCustodyAttempt.Snapshot pending;
+        boolean rejectCommit;
+
+        @Override
+        public AdminRecoveryCustodyAttempt.Snapshot load() { return pending; }
+
+        @Override
+        public boolean save(AdminRecoveryCustodyAttempt.Snapshot value) {
+            if (rejectCommit) return false;
+            pending = value;
+            return true;
+        }
+
+        @Override
+        public boolean clear() {
+            if (rejectCommit) return false;
+            pending = null;
+            return true;
+        }
+    }
+
     private static final class FakeApi implements AdminSecurityApi {
         boolean failState;
         boolean failRevoke;
+        int revokeCalls;
         boolean loseFirstRecoveryStartResponse;
         boolean sameRecoveryRequestRetried;
         boolean oldRecoveryTokenRejected;
@@ -717,78 +1076,108 @@ public final class AdminSecurityControllerTest {
         String echoPath;
         String stateFailureMessage = "state unavailable";
         IOException reauthenticationFailure;
+        IOException loginFailure;
+        // null = complete inventory; otherwise the server total (-1 = legacy, unknown).
+        Integer inventoryDeviceTotal;
         AdminSecurityApiException completeRecoveryError;
         AdminRecoveryCustodyState custodyState = AdminRecoveryCustodyState.ATTESTED;
         String custodyAttestedAt = "2026-07-21T23:00:00Z";
+        String currentDeviceId = DEVICE_ID;
         String observedAt = "2026-07-22T00:00:00Z";
         String sessionLastSeenAt = "2026-07-22T00:00:00Z";
         int reauthenticateCount;
         int reportLostDeviceCount;
+        java.util.Map<String, String> reportLostHeaders;
         String reportedLostDeviceId;
         String custodyReference;
+        String custodyExpectedStateVersion;
+        int custodyPosts;
+        boolean loseCustodyResponse;
+        AdminSecurityApiException custodyFailure;
         RecoveryMaterialKind attestedMaterialKind;
         RecoveryStorageLocation attestedStorageLocation;
         boolean separateEncryptedBackupConfirmed;
         boolean omitCurrentSession;
         int clearLocalBindingCount;
+        final java.util.concurrent.CountDownLatch localBindingCleared = new java.util.concurrent.CountDownLatch(1);
 
         @Override
         public void clearLocalBinding() {
             clearLocalBindingCount += 1;
+            localBindingCleared.countDown();
         }
 
         @Override
-        public LoginResult login(String adminId, String password, String totpCode, String deviceId, String deviceLabel) {
+        public LoginResult login(String adminId, String password, String totpCode,
+            String deviceId, String deviceLabel) throws IOException {
+            if (loginFailure != null) throw loginFailure;
             return new LoginResult(ACCESS_TOKEN, AdminSecurityState.NORMAL, CURRENT_SESSION_ID);
         }
 
         @Override
         public StateSnapshot getState(String accessToken) throws IOException {
             if (failState) throw new IOException(stateFailureMessage);
-            return state("state-v1", observedAt);
+            return state("1", observedAt);
         }
 
         @Override
         public DeviceInventory getDeviceInventory(String accessToken) {
             List<SessionInfo> sessions = new ArrayList<>();
             if (!omitCurrentSession) {
-                sessions.add(session(CURRENT_SESSION_ID, DEVICE_ID, true, sessionLastSeenAt));
+                sessions.add(session(CURRENT_SESSION_ID, currentDeviceId, true, sessionLastSeenAt));
             }
-            sessions.add(session(OTHER_SESSION_ID, OTHER_DEVICE_ID, false, sessionLastSeenAt));
-            return new DeviceInventory(
-                sessions,
-                List.of(
-                    new DeviceInfo(DEVICE_ID, true),
-                    new DeviceInfo(OTHER_DEVICE_ID, false),
-                    new DeviceInfo(KEY_ONLY_DEVICE_ID, false)
-                )
+            String otherDeviceId = currentDeviceId.equals(DEVICE_ID) ? OTHER_DEVICE_ID : DEVICE_ID;
+            sessions.add(session(OTHER_SESSION_ID, otherDeviceId, false, sessionLastSeenAt));
+            List<DeviceInfo> devices = List.of(
+                new DeviceInfo(currentDeviceId, true),
+                new DeviceInfo(otherDeviceId, false),
+                new DeviceInfo(KEY_ONLY_DEVICE_ID, false)
             );
+            if (inventoryDeviceTotal != null) {
+                return new DeviceInventory(
+                    sessions,
+                    devices,
+                    inventoryDeviceTotal,
+                    inventoryDeviceTotal == devices.size()
+                );
+            }
+            return new DeviceInventory(sessions, devices);
         }
 
         @Override
         public StateSnapshot revokeSession(String accessToken, String sessionId) throws IOException {
+            revokeCalls += 1;
             if (failRevoke) throw new IOException("revoke unavailable");
-            return state("state-v2", "2026-07-22T00:01:00Z");
+            return state("2", "2026-07-22T00:01:00Z");
         }
 
         @Override
         public StateSnapshot attestRecoveryCustody(
             String accessToken,
             RecoveryCustodyAttestation attestation
-        ) {
+        ) throws IOException {
+            custodyPosts += 1;
             custodyReference = attestation.custodyReference();
+            custodyExpectedStateVersion = attestation.expectedStateVersion();
             attestedMaterialKind = attestation.materialKind();
             attestedStorageLocation = attestation.storageLocation();
             separateEncryptedBackupConfirmed = attestation.isSeparateEncryptedBackupConfirmed();
+            if (custodyFailure != null) throw custodyFailure;
             custodyState = AdminRecoveryCustodyState.ATTESTED;
             custodyAttestedAt = "2026-07-22T00:02:00Z";
-            return state("state-v2", custodyAttestedAt);
+            if (loseCustodyResponse) throw new IOException("server committed but response was lost");
+            return state("2", custodyAttestedAt);
         }
 
         @Override
-        public StateSnapshot reportLostDevice(String accessToken, String deviceId) {
+        public StateSnapshot reportLostDevice(
+            String accessToken,
+            String deviceId,
+            java.util.Map<String, String> reconfirmationHeaders
+        ) {
             reportLostDeviceCount += 1;
             reportedLostDeviceId = deviceId;
+            reportLostHeaders = reconfirmationHeaders;
             return state("state-v3", "2026-07-22T00:03:00Z");
         }
 

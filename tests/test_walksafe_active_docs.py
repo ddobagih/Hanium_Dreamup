@@ -40,7 +40,7 @@ def test_active_document_discovery_includes_mutable_android_readmes() -> None:
         )
         in selected
     )
-    assert Path("apps/android/README.md") not in selected
+    assert Path("apps/android/README.md") in selected
 
 
 def test_current_status_contracts_follow_checkpoint(tmp_path: Path) -> None:
@@ -132,8 +132,8 @@ def test_current_operational_docs_keep_exact_environment_and_source_facts() -> N
         "정확히 같은 비밀값으로 설정"
     ) in development
     for assignment in (
-        "WALKSAFE_SIGNUP_RAW_ORIGINAL_VERSION=FP-013-RAW-1.1.0",
-        "WALKSAFE_SIGNUP_AUTOMATIC_REPORTING_VERSION=FP-013-AUTO-1.1.0",
+        "WALKSAFE_SIGNUP_RAW_ORIGINAL_VERSION=FP-013-RAW-1.2.0",
+        "WALKSAFE_SIGNUP_AUTOMATIC_REPORTING_VERSION=FP-013-AUTO-1.2.0",
         "WALKSAFE_SIGNUP_TRAINING_REUSE_VERSION=FP-013-TRAINING-1.1.0",
     ):
         assert assignment in backend_deployment

@@ -12,6 +12,10 @@ internal enum class WalkSessionVoiceAction {
     NO_OP,
 }
 
+/** voice-F7: the whole-phrase walk session commands below; they carry no free words. */
+internal fun isWalkSessionVoicePhrase(phrase: String): Boolean =
+    compactVoicePhrase(phrase) in WalkSessionVoiceControlPolicy.PHRASES
+
 internal data class PendingVoiceEndToken(
     val epoch: WalkRuntimeEpoch,
 )
@@ -86,14 +90,15 @@ internal class WalkSessionVoiceControlPolicy(
         return WalkSessionVoiceDecision(action, token)
     }
 
-    private companion object {
-        const val DEFAULT_MINIMUM_CONFIDENCE = 0.80f
-        const val PAUSE_PHRASE = "보행일시정지"
-        const val RESUME_PHRASE = "보행재개"
-        const val REQUEST_END_PHRASE = "보행종료"
-        const val CONFIRM_END_PHRASE = "보행종료확인"
-        const val CANCEL_END_PHRASE = "보행종료취소"
-        val CONTROLLABLE_STATES = setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
-        val NO_OP_DECISION = WalkSessionVoiceDecision(WalkSessionVoiceAction.NO_OP)
+    internal companion object {
+        private const val DEFAULT_MINIMUM_CONFIDENCE = 0.80f
+        private const val PAUSE_PHRASE = "보행일시정지"
+        private const val RESUME_PHRASE = "보행재개"
+        private const val REQUEST_END_PHRASE = "보행종료"
+        private const val CONFIRM_END_PHRASE = "보행종료확인"
+        private const val CANCEL_END_PHRASE = "보행종료취소"
+        val PHRASES = setOf(PAUSE_PHRASE, RESUME_PHRASE, REQUEST_END_PHRASE, CONFIRM_END_PHRASE, CANCEL_END_PHRASE)
+        private val CONTROLLABLE_STATES = setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
+        private val NO_OP_DECISION = WalkSessionVoiceDecision(WalkSessionVoiceAction.NO_OP)
     }
 }

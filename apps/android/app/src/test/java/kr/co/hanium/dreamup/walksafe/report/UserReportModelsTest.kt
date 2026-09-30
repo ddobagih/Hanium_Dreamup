@@ -34,6 +34,11 @@ class UserReportModelsTest {
         )
         assertEquals("공개 기각 사유", parsed?.items?.get(1)?.publicRejectionReason)
         assertEquals("cursor_1", parsed?.nextCursor)
+        listOf(2, 3).forEach { index ->
+            val label = requireNotNull(parsed).items[index].userStatus.labelKo
+            assertTrue(label, label.contains("관리자가 수동 기록한 전달 상태"))
+        }
+        assertFalse(requireNotNull(parsed).items[0].userStatus.labelKo.contains("수동 기록"))
     }
 
     @Test
@@ -70,6 +75,16 @@ class UserReportModelsTest {
         assertNull(validatedUserReportRequestOrNull(request.dropLast(1) + ",\"internal_note\":null}"))
         assertNull(validatedUserReportRequestOrNull(request.replace("\"status_version\":1", "\"status_version\":1.0")))
         assertNull(validatedUserReportRequestOrNull(request.replace("\"status_version\":1", "\"status_version\":0")))
+        listOf("INSTITUTION_SUBMITTED", "RESOLVED").forEach { userStatus ->
+            val body = reportItem(reportId(1), userStatus = userStatus)
+                .removePrefix("{").removeSuffix("}")
+            val observed = validatedUserReportDetailOrNull(
+                """{"schema_version":"walksafe.user-report-detail.v1",$body}""",
+            )
+            assertEquals(userStatus, observed?.userStatus?.wireValue)
+            val label = requireNotNull(observed).userStatus.labelKo
+            assertTrue(label, label.contains("관리자가 수동 기록한 전달 상태"))
+        }
     }
 
     @Test

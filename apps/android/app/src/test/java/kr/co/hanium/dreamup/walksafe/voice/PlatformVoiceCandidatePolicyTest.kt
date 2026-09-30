@@ -253,10 +253,26 @@ class PlatformVoiceCandidatePolicyTest {
         }
     }
 
+    @Test
+    fun ownedButUnannouncedPageCannotPreviewEitherBareOrExplicitSelection() {
+        val state = dialog(pageIndex = 1, announced = false)
+        for (phrase in listOf("4번 선택", "4번")) {
+            val result = assess(listOf(phrase), dialogState = state, allowBareIndex = true)
+            assertEquals(PlatformVoiceCandidateDisposition.CONFIRMATION_REQUIRED, result.disposition)
+            assertNull(result.previewAction)
+        }
+        state.completeVoicePrompt(state.beginVoicePrompt())
+        assertEquals(AndroidVoiceAction.SelectDestinationCandidate(4),
+            assess(listOf("4번 선택"), dialogState = state).previewAction)
+        state.invalidateVoicePrompt()
+        assertNull(assess(listOf("4번 선택"), dialogState = state).previewAction)
+    }
+
     private fun dialog(
         candidateCount: Int = 4,
         pageIndex: Int = 0,
         moreResultsAvailable: Boolean = false,
+        announced: Boolean = true,
     ) = DestinationSearchVoiceState(
         query = "편의점",
         results = List(candidateCount) { index ->
@@ -272,5 +288,7 @@ class PlatformVoiceCandidatePolicyTest {
         },
         pageIndex = pageIndex,
         moreResultsAvailable = moreResultsAvailable,
-    )
+    ).also { state ->
+        if (announced) state.completeVoicePrompt(state.beginVoicePrompt())
+    }
 }

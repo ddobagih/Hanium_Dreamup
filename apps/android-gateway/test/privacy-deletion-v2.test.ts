@@ -27,8 +27,11 @@ import {
   deviceDeletionEvidenceSha256V2,
   drainAccountDeletionOutboxV2,
   forwardAccountDeletionRequestV2,
+  forwardDeviceDeletionEvidenceV2,
+  isAccountGenerationFencedV2,
   parseDeviceDeletionEvidenceV2,
   privacyDeletionV2LedgerPathForTests,
+  queueDeviceDeletionEvidenceV2,
   type AccountDeletionStatusV2,
   type DeviceDeletionEvidenceV2
 } from "../src/privacy-deletion-v2.js";
@@ -45,6 +48,63 @@ const REQUEST_RECEIPT = "a".repeat(64);
 const ACCEPTED_AT = "2026-08-09T00:00:00.000Z";
 let stateDirectory = "";
 let clientIp = 30;
+
+test("deletion fence rejects every older generation without blocking a future one", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "walksafe-fence-regression-"));
+  const previousDirectory = process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR;
+  process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR = directory;
+  try {
+    const actor = "deletion-fence-generation-regression";
+    assert.equal(acceptOrReplayAccountDeletionV2(actor, 3, {
+      schema_version: "walksafe.account-deletion-request.v2",
+      request_id: "deletion_fence_generation_request",
+      client_revision: 1,
+      confirmation: "DELETE_MY_ACCOUNT"
+    }, CAPABILITY).kind, "accepted");
+    assert.equal(isAccountGenerationFencedV2(actor, 1), true);
+    assert.equal(isAccountGenerationFencedV2(actor, 2), true);
+    assert.equal(isAccountGenerationFencedV2(actor, 3), true);
+    assert.equal(isAccountGenerationFencedV2(actor, 4), false);
+  } finally {
+    process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR = previousDirectory;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("S19-42 a deleted actor id is never re-admitted while a re-signup actor is independent", async () => {
+  // FP-015-DETAIL-03: re-signup after deletion is a new account (new actor id); the old
+  // actor id must not start a second deletion lifecycle with a later generation.
+  const directory = await mkdtemp(path.join(tmpdir(), "walksafe-s19-42-"));
+  const previousDirectory = process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR;
+  process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR = directory;
+  try {
+    const deleted = "s19-42-deleted-actor";
+    const resignup = "s19-42-resignup-actor";
+    const request = (requestId: string) => ({
+      schema_version: "walksafe.account-deletion-request.v2" as const,
+      request_id: requestId,
+      client_revision: 1,
+      confirmation: "DELETE_MY_ACCOUNT" as const
+    });
+    assert.equal(acceptOrReplayAccountDeletionV2(
+      deleted, 2, request("s19_42_first_request_0001"), CAPABILITY
+    ).kind, "accepted");
+    for (const generation of [1, 2, 3, 99]) {
+      assert.equal(acceptOrReplayAccountDeletionV2(
+        deleted, generation, request(`s19_42_again_request_${generation}`), CAPABILITY
+      ).kind, "inactive", String(generation));
+    }
+    const fresh = acceptOrReplayAccountDeletionV2(
+      resignup, 1, request("s19_42_resignup_request_01"), CAPABILITY
+    );
+    assert.equal(fresh.kind, "accepted");
+    assert.equal(isAccountGenerationFencedV2(resignup, 1), true);
+    assert.equal(isAccountGenerationFencedV2(deleted, 2), true);
+  } finally {
+    process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR = previousDirectory;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("terminal conflict contract is the exact frozen Android-facing set", () => {
   assert.deepEqual(ACCOUNT_DELETION_TERMINAL_CONFLICT_CODES_V2, [
@@ -73,7 +133,9 @@ before(async () => {
     WALKSAFE_GATEWAY_SESSION_SECRET:
       "deletion-v2-session-secret-123456789012345678901234567890",
     WALKSAFE_GATEWAY_TRUSTED_IP_HEADER: "cf-connecting-ip",
-    WALKSAFE_GATEWAY_RATE_LIMIT_DIR: stateDirectory
+    WALKSAFE_GATEWAY_RATE_LIMIT_DIR: stateDirectory,
+    // R19-GB-01: per-file ledger so parallel test files never share the default lock.
+    WALKSAFE_FIELD_WALK_LEDGER_PATH: path.join(stateDirectory, "field-walk-ledger.json")
   });
   await configureTestStateEncryption(path.join(stateDirectory, "state-keyring.json"));
 });
@@ -249,6 +311,64 @@ function assertDeletionBackendHeaders(
   return headers;
 }
 
+test("v2 outbox reaches a later due request while the first sixteen remain in flight", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "walksafe-deletion-fairness-"));
+  const previousDirectory = process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR;
+  process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR = directory;
+  try {
+    const acceptedAt = Date.now() - 60_000;
+    const requestIds = Array.from({ length: 17 }, (_, index) =>
+      `deletion_fairness_request_${String(index).padStart(2, "0")}`
+    );
+    for (const [index, requestId] of requestIds.entries()) {
+      assert.equal(acceptOrReplayAccountDeletionV2(
+        `deletion-fairness-actor-${index}`,
+        1,
+        {
+          schema_version: "walksafe.account-deletion-request.v2",
+          request_id: requestId,
+          client_revision: 1,
+          confirmation: "DELETE_MY_ACCOUNT"
+        },
+        CAPABILITY,
+        acceptedAt + index
+      ).kind, "accepted");
+    }
+
+    let releaseHeld!: (response: Response) => void;
+    const heldResponse = new Promise<Response>((resolve) => { releaseHeld = resolve; });
+    const heldForwards = requestIds.slice(0, 16).map((requestId) =>
+      forwardAccountDeletionRequestV2(
+        requestId,
+        new Request("http://127.0.0.1/privacy/account-deletions"),
+        async () => heldResponse
+      )
+    );
+    try {
+      const forwarded: string[] = [];
+      const fetchImpl: GatewayFetch = async (_input, init) => {
+        const requestId = (JSON.parse(String(init?.body)) as { request_id: string }).request_id;
+        forwarded.push(requestId);
+        return Response.json({ ...statusFixture(), request_id: requestId }, { status: 202 });
+      };
+      assert.deepEqual(await drainAccountDeletionOutboxV2(fetchImpl), {
+        attempted: 16, succeeded: 0
+      });
+      assert.deepEqual(forwarded, []);
+      assert.deepEqual(await drainAccountDeletionOutboxV2(fetchImpl), {
+        attempted: 16, succeeded: 1
+      });
+      assert.deepEqual(forwarded, [requestIds[16]]);
+    } finally {
+      releaseHeld(new Response(null, { status: 503 }));
+      await Promise.allSettled(heldForwards);
+    }
+  } finally {
+    process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR = previousDirectory;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("device evidence uses the cross-language whole-second canonical hash vector", () => {
   const statement = {
     schema_version: DEVICE_DELETION_EVIDENCE_SCHEMA_V2,
@@ -300,7 +420,8 @@ test("v2 deletion outbox retries v7 session revocation after a storage lock clea
   });
   const backendStatus = { ...statusFixture(), request_id: requestId };
   let backendCalls = 0;
-  const fetchImpl: GatewayFetch = async () => {
+  const fetchImpl: GatewayFetch = async (input) => {
+    if (String(input).endsWith("/accounts/session-current")) return new Response(null, { status: 204 });
     backendCalls += 1;
     return Response.json(backendStatus, { status: 202 });
   };
@@ -373,7 +494,7 @@ test("v2 deletion outbox retries v7 session revocation after a storage lock clea
   assert.deepEqual(
     await drainAccountDeletionOutboxV2(
       fetchImpl,
-      Date.now() + 24 * 60 * 60 * 1_000
+      Date.now() + 24 * 60 * 60 * 1_000 + 60_000
     ),
     { attempted: 1, succeeded: 1 }
   );
@@ -426,7 +547,8 @@ test("v2 deletion fence replaces an in-flight speech response", async () => {
         })
       }
     ), {
-      fetchImpl: async () => {
+      fetchImpl: async (input) => {
+        if (String(input).endsWith("/accounts/session-current")) return new Response(null, { status: 204 });
         signalSpeechStarted();
         return heldSpeech;
       }
@@ -914,6 +1036,9 @@ test("permanent request conflicts are durably quarantined and exposed without re
     );
     assert.equal(retried.kind, "pending");
   }
+  assert.equal(unknownCalls, 1, "direct replay must not bypass stored backoff");
+  await drainAccountDeletionOutboxV2(unknownFetch, Date.now() + 60_000);
+  await drainAccountDeletionOutboxV2(unknownFetch, Date.now() + 120_000);
   const boundedFailure = await forwardAccountDeletionRequestV2(
     unknownRequestId,
     new Request("http://127.0.0.1/privacy/account-deletions"),
@@ -939,4 +1064,89 @@ test("permanent request conflicts are durably quarantined and exposed without re
     await drainAccountDeletionOutboxV2(undefined, Date.now() + 24 * 60 * 60 * 1_000),
     { attempted: 0, succeeded: 0 }
   );
+});
+
+test("permanent evidence conflict does not starve later independent due evidence", async () => {
+  const requestId = "deletion_evidence_outbox_forward_0001";
+  const accepted = acceptOrReplayAccountDeletionV2(
+    "deletion-evidence-outbox-forward-actor",
+    1,
+    {
+      schema_version: "walksafe.account-deletion-request.v2",
+      request_id: requestId,
+      client_revision: 1,
+      confirmation: "DELETE_MY_ACCOUNT"
+    },
+    CAPABILITY
+  );
+  assert.equal(accepted.kind, "accepted");
+  const forwarded = await forwardAccountDeletionRequestV2(
+    requestId,
+    new Request("http://127.0.0.1/privacy/account-deletions"),
+    async () => Response.json({ ...statusFixture(), request_id: requestId }, { status: 202 })
+  );
+  assert.equal(forwarded.kind, "ok");
+
+  const makeEvidence = (installationId: string, evidenceId: string): DeviceDeletionEvidenceV2 => {
+    const statement = {
+      schema_version: DEVICE_DELETION_EVIDENCE_SCHEMA_V2,
+      request_id: requestId,
+      tombstone_id: TOMBSTONE_ID,
+      request_receipt_sha256: REQUEST_RECEIPT,
+      installation_id: installationId,
+      evidence_id: evidenceId,
+      client_revision: 1,
+      expected_status_revision: 1,
+      item: "device_untransmitted_data" as const,
+      result: "DELETED" as const,
+      completed_at: "2026-08-09T00:05:00Z"
+    };
+    return { ...statement, evidence_sha256: deviceDeletionEvidenceSha256V2(statement) };
+  };
+  const rejected = makeEvidence("installation-v2-not-targeted", "device-evidence-outbox-rejected");
+  const independent = makeEvidence("installation-v2-targeted", "device-evidence-outbox-independent");
+  const dueAt = Date.parse("2026-08-09T00:06:00Z");
+  assert.equal(queueDeviceDeletionEvidenceV2(rejected, CAPABILITY, dueAt).kind, "queued");
+  assert.equal(queueDeviceDeletionEvidenceV2(independent, CAPABILITY, dueAt).kind, "queued");
+
+  const calls: string[] = [];
+  const fetchImpl: GatewayFetch = async (input, init) => {
+    assert.equal(
+      String(input),
+      `http://127.0.0.1:8000/privacy/account-deletions/${requestId}/device-evidence`
+    );
+    const body = JSON.parse(String(init?.body)) as DeviceDeletionEvidenceV2;
+    calls.push(body.evidence_id);
+    if (body.evidence_id === rejected.evidence_id) {
+      return Response.json({
+        detail: {
+          code: "device_deletion_installation_not_targeted",
+          message: "The installation is not a deletion target."
+        }
+      }, { status: 409 });
+    }
+    assert.equal(body.evidence_id, independent.evidence_id);
+    assert.equal(body.expected_status_revision, 1);
+    return Response.json({ ...statusFixture(2), request_id: requestId }, { status: 200 });
+  };
+  assert.deepEqual(await drainAccountDeletionOutboxV2(fetchImpl, dueAt), {
+    attempted: 1, succeeded: 0
+  });
+  assert.deepEqual(calls, [rejected.evidence_id]);
+  assert.deepEqual(await drainAccountDeletionOutboxV2(fetchImpl, dueAt), {
+    attempted: 1, succeeded: 1
+  });
+  assert.deepEqual(calls, [rejected.evidence_id, independent.evidence_id]);
+
+  const conflict = await forwardDeviceDeletionEvidenceV2(
+    requestId,
+    rejected.evidence_id,
+    new Request("http://127.0.0.1/privacy/account-deletions/device-evidence"),
+    fetchImpl
+  );
+  assert.equal(conflict.kind, "terminal_conflict");
+  if (conflict.kind === "terminal_conflict") {
+    assert.equal(conflict.code, "device_deletion_installation_not_targeted");
+  }
+  assert.deepEqual(calls, [rejected.evidence_id, independent.evidence_id]);
 });

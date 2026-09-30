@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.admin.security;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,10 +18,14 @@ import okhttp3.RequestBody;
 
 /** Shared bounded OkHttp transport for administrator API clients that require PATCH. */
 final class AdminOkHttpTransport {
+    private static final int CONNECT_TIMEOUT_SECONDS = 8;
+    private static final int READ_TIMEOUT_SECONDS = 12;
+    private static final int REQUEST_TIMEOUT_SECONDS = CONNECT_TIMEOUT_SECONDS + READ_TIMEOUT_SECONDS;
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
         .cache(null)
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .callTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .followRedirects(false)
         .followSslRedirects(false)
         .retryOnConnectionFailure(false)
@@ -82,7 +87,10 @@ final class AdminOkHttpTransport {
             }
         });
         try {
-            completed.await();
+            if (!completed.await(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                call.cancel();
+                throw new SocketTimeoutException("administrator API request timed out; server outcome unknown");
+            }
         } catch (InterruptedException error) {
             call.cancel();
             Thread.currentThread().interrupt();

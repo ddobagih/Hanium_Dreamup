@@ -1,0 +1,2596 @@
+{
+  "cases": [
+    {
+      "name": "two_steps_valid",
+      "valid": true,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_total_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "legacy_null_valid",
+      "valid": true,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": null,
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 99,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "loop_revisit_valid",
+      "valid": true,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_step_sum_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 133,
+          "duration_s": 3000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0001,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.001,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 11,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0001,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 11,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0001,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 2,
+            "distance_m": 111,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.001,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 133,
+            "bearing_deg": 0.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0001,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "뒤로 돌아가세요.",
+            "turn_type": 14,
+            "point_type": "guide",
+            "facility_type": null,
+            "distance_from_start_m": 11,
+            "remaining_distance_m": 122,
+            "bearing_deg": 180.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "좌회전하세요.",
+            "turn_type": 12,
+            "point_type": "guide",
+            "facility_type": null,
+            "distance_from_start_m": 22,
+            "remaining_distance_m": 111,
+            "bearing_deg": 90.0
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "adjacent_zero_edge_valid",
+      "valid": true,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_step_sum_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 90,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 37.0,
+            "longitude": 127.0,
+            "name": null
+          },
+          {
+            "latitude": 37.0,
+            "longitude": 127.001,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 0,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 37.0,
+                "longitude": 127.0,
+                "name": null
+              },
+              {
+                "latitude": 37.0,
+                "longitude": 127.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 90,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 37.0,
+                "longitude": 127.0,
+                "name": null
+              },
+              {
+                "latitude": 37.0,
+                "longitude": 127.001,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 37.0,
+              "longitude": 127.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 90,
+            "bearing_deg": 89.99969909244078
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "step_index_gap",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_total_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 7,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "step_disconnected",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_total_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.001,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "step_shape_mismatch",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_total_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0005,
+                "longitude": 0.00045,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "step_total_mismatch",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_total_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 99,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "guide_off_route",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_total_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.001,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "guide_wrong_progress",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_total_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 160,
+            "remaining_distance_m": 40,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "guide_index_gap",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_total_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 7,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "legacy_guide_index_gap",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": null,
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 7,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "legacy_guide_off_route",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": null,
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0018,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.001,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "legacy_empty_steps_guide_off_route",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": null,
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0018,
+            "name": null
+          }
+        ],
+        "steps": [],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 200,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.001,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 100,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0018,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 200,
+            "remaining_distance_m": 0,
+            "bearing_deg": null
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "legacy_loop_ambiguous_progress",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": null,
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 133,
+          "duration_s": 3000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0001,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.001,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 11,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0001,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 11,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0001,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 2,
+            "distance_m": 111,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.001,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 133,
+            "bearing_deg": 0.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": null,
+            "remaining_distance_m": null,
+            "bearing_deg": 90.0
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "legacy_loop_declared_valid",
+      "valid": true,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": null,
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 133,
+          "duration_s": 3000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0001,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.001,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 11,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0001,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 11,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0001,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 2,
+            "distance_m": 111,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.001,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 133,
+            "bearing_deg": 0.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0001,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "뒤로 돌아가세요.",
+            "turn_type": 14,
+            "point_type": "guide",
+            "facility_type": null,
+            "distance_from_start_m": 11,
+            "remaining_distance_m": 122,
+            "bearing_deg": 180.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "좌회전하세요.",
+            "turn_type": 12,
+            "point_type": "guide",
+            "facility_type": null,
+            "distance_from_start_m": 22,
+            "remaining_distance_m": 111,
+            "bearing_deg": 90.0
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "normalized_u_turn_valid",
+      "valid": true,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_total_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 220,
+          "duration_s": 220
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.00018,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.00018,
+            "longitude": 0.0,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 220,
+            "duration_s": 220,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.00018,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.00018,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 220,
+            "bearing_deg": 90.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "왼쪽으로 꺾으세요.",
+            "turn_type": 12,
+            "point_type": "guide",
+            "facility_type": null,
+            "distance_from_start_m": 100,
+            "remaining_distance_m": 120,
+            "bearing_deg": 0.0
+          },
+          {
+            "index": 2,
+            "point": {
+              "latitude": 0.00018,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "왼쪽으로 꺾으세요.",
+            "turn_type": 12,
+            "point_type": "guide",
+            "facility_type": null,
+            "distance_from_start_m": 120,
+            "remaining_distance_m": 100,
+            "bearing_deg": 270.0
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "normalized_u_turn_wrong_visit",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": "provider_total_geometry_scaled",
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 220,
+          "duration_s": 220
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.00018,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.00018,
+            "longitude": 0.0,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 220,
+            "duration_s": 220,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.00018,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.00018,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 220,
+            "remaining_distance_m": 0,
+            "bearing_deg": 90.0
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "legacy_short_loop_ambiguous_progress",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": null,
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 17,
+          "duration_s": 3000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 2.25e-05,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0001,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 3,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 2.25e-05,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 3,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 2.25e-05,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 2,
+            "distance_m": 11,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0001,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": 0,
+            "remaining_distance_m": 17,
+            "bearing_deg": 0.0
+          },
+          {
+            "index": 1,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": null,
+            "remaining_distance_m": null,
+            "bearing_deg": 90.0
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "legacy_corner_null_progress_valid",
+      "valid": true,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": null,
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 200,
+          "duration_s": 2000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0009,
+            "name": null
+          },
+          {
+            "latitude": 0.0009,
+            "longitude": 0.0009,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 100,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0009,
+                "name": null
+              },
+              {
+                "latitude": 0.0009,
+                "longitude": 0.0009,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 0.0,
+              "longitude": 0.0009,
+              "name": null
+            },
+            "instruction": "왼쪽으로 꺾으세요.",
+            "turn_type": 12,
+            "point_type": "guide",
+            "facility_type": null,
+            "distance_from_start_m": null,
+            "remaining_distance_m": null,
+            "bearing_deg": 90.0
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    },
+    {
+      "name": "legacy_backtrack_midpoint_ambiguous_progress",
+      "valid": false,
+      "route": {
+        "schema_version": "walksafe.walking_route.v1",
+        "provider": "tmap_pedestrian",
+        "provider_route_id": null,
+        "distance_source": null,
+        "priority": "STAIR_AVOID",
+        "summary": {
+          "distance_m": 133,
+          "duration_s": 3000
+        },
+        "polyline": [
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0001,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "name": null
+          },
+          {
+            "latitude": 0.0,
+            "longitude": 0.001,
+            "name": null
+          }
+        ],
+        "steps": [
+          {
+            "index": 0,
+            "distance_m": 11,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0001,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 1,
+            "distance_m": 11,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0001,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          },
+          {
+            "index": 2,
+            "distance_m": 111,
+            "duration_s": 1000,
+            "points": [
+              {
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "name": null
+              },
+              {
+                "latitude": 0.0,
+                "longitude": 0.001,
+                "name": null
+              }
+            ],
+            "instruction": null,
+            "road_name": null,
+            "turn_type": null,
+            "facility_type": null
+          }
+        ],
+        "guide_points": [
+          {
+            "index": 0,
+            "point": {
+              "latitude": 5e-05,
+              "longitude": 0.0,
+              "name": null
+            },
+            "instruction": "Guide",
+            "turn_type": null,
+            "point_type": null,
+            "facility_type": null,
+            "distance_from_start_m": null,
+            "remaining_distance_m": null,
+            "bearing_deg": 0.0
+          }
+        ],
+        "start_gap_m": 0,
+        "end_gap_m": 0,
+        "provider_result_code": 0,
+        "provider_result_message": "OK"
+      }
+    }
+  ]
+}

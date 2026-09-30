@@ -206,6 +206,19 @@ class PriorityUserInteractivePracticeTest {
 
         policy.confirmSafePracticePlace()
         PriorityUserPractice.entries.forEach { complete(policy, it) }
+        assertFalse(policy.evaluate(environment).mayStartWalk)
+        assertEquals(
+            PriorityUserBlockReason.APP_USAGE_EDUCATION_INCOMPLETE,
+            policy.evaluate(environment).walkBlockReason,
+        )
+        policy.reviewPracticeNecessity(true)
+        policy.acceptEducationConsent()
+        policy.acknowledgeUsageConditions()
+        policy.finishAppUsageEducationPlayback(
+            policy.beginAppUsageEducationPlayback()!!,
+            completed = true,
+        )
+        policy.acceptAppUsageEducation()
         assertTrue(policy.evaluate(environment).mayStartWalk)
     }
 

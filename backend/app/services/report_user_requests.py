@@ -35,6 +35,9 @@ from backend.app.schemas import (
 )
 from backend.app.services.admin_security import AdminSessionIdentity
 from backend.app.services.privacy_lifecycle import lock_privacy_subject_shared
+from backend.app.services.report_delivery_effective import (
+    uncorrected_delivery_event_clause,
+)
 
 
 _CURSOR_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,1024}$")
@@ -211,6 +214,8 @@ def _user_status_expression():
             ReportInstitutionDeliveryEvent.report_id == Report.id,
             ReportInstitutionDeliveryEvent.status == "RESOLVED",
             ReportDeliveryPackage.content_revision == Report.content_revision,
+            # S18-40: a corrected event no longer counts for the user status.
+            uncorrected_delivery_event_clause(),
         )
     )
     any_submitted = exists(
@@ -226,6 +231,7 @@ def _user_status_expression():
                 ("SUBMITTED", "ACKNOWLEDGED")
             ),
             ReportDeliveryPackage.content_revision == Report.content_revision,
+            uncorrected_delivery_event_clause(),
         )
     )
     latest_decision = (

@@ -106,24 +106,22 @@ class WalkSafeStartupCapabilityTest {
         }
     }
 
+    // FP-009: full / distance-limited / unavailable. Only the missing metric distance capability
+    // may start in the limited tier; camera, location, microphone and on-device speech
+    // recognition failures block the start and name the missing function.
     @Test
-    fun everyUnavailableFeatureYieldsLimitedTierAndNamesTheRestriction() {
-        val unavailableInputs = listOf(
-            WalkSafeStartupRequirement.CAMERA to availableInput().copy(cameraAvailable = false),
-            WalkSafeStartupRequirement.GPS to availableInput().copy(gpsAvailable = false),
-            WalkSafeStartupRequirement.MICROPHONE to
-                availableInput().copy(microphoneAvailable = false),
-            WalkSafeStartupRequirement.ON_DEVICE_STT to
-                availableInput().copy(onDeviceSpeechRecognitionAvailable = false),
+    fun onlyMetricDistanceOrTheInactiveDeviceProfileGateYieldLimitedTier() {
+        val limitedInputs = listOf(
             WalkSafeStartupRequirement.METRIC_DISTANCE to
                 availableInput().copy(metricDistanceAvailable = false),
+            // The approved-device registry is still empty; its blocking is not activated here.
             WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE to availableInput().copy(
                 approvedDesignatedDeviceProfile = false,
                 designatedDeviceProfileVersion = null,
             ),
         )
 
-        unavailableInputs.forEach { (requirement, input) ->
+        limitedInputs.forEach { (requirement, input) ->
             val decision = WalkSafeStartupCapabilityResolver.resolve(input)
             assertEquals(WalkSafeStartupCapabilityTier.LIMITED, decision.tier)
             assertTrue(decision.mayConfirmAndStart)
@@ -131,6 +129,73 @@ class WalkSafeStartupCapabilityTest {
             assertTrue(decision.pendingRequirements.isEmpty())
             assertTrue(decision.noticeKo.contains(requirement.labelKo))
         }
+    }
+
+    @Test
+    fun cameraLocationMicrophoneOrSpeechRecognitionFailureBlocksStartAndNamesTheFunction() {
+        val blockingInputs = listOf(
+            WalkSafeStartupRequirement.CAMERA to availableInput().copy(cameraAvailable = false),
+            WalkSafeStartupRequirement.GPS to availableInput().copy(gpsAvailable = false),
+            WalkSafeStartupRequirement.MICROPHONE to
+                availableInput().copy(microphoneAvailable = false),
+            WalkSafeStartupRequirement.ON_DEVICE_STT to
+                availableInput().copy(onDeviceSpeechRecognitionAvailable = false),
+        )
+
+        blockingInputs.forEach { (requirement, input) ->
+            listOf(true, false).forEach { profileRequired ->
+                val decision = WalkSafeStartupCapabilityResolver.resolve(
+                    input,
+                    approvedDeviceProfileRequired = profileRequired,
+                )
+                assertEquals(WalkSafeStartupCapabilityTier.BLOCKED, decision.tier)
+                assertFalse(decision.mayConfirmAndStart)
+                assertEquals(listOf(requirement), decision.unavailableRequirements)
+                assertTrue(decision.pendingRequirements.isEmpty())
+                assertTrue(decision.noticeKo.contains(requirement.labelKo))
+                assertTrue(decision.noticeKo.contains("시작할 수 없습니다"))
+                assertTrue(
+                    WalkSafeStartupCapabilityResolver.blocksWalkStart(
+                        decision.unavailableRequirements,
+                    ),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun metricDistanceTogetherWithABlockingFunctionIsNotDowngradedToLimited() {
+        val decision = WalkSafeStartupCapabilityResolver.resolve(
+            availableInput().copy(
+                gpsAvailable = false,
+                metricDistanceAvailable = false,
+                approvedDesignatedDeviceProfile = false,
+                designatedDeviceProfileVersion = null,
+            ),
+        )
+        val distanceAndProfile = WalkSafeStartupCapabilityResolver.resolve(
+            availableInput().copy(
+                metricDistanceAvailable = false,
+                approvedDesignatedDeviceProfile = false,
+                designatedDeviceProfileVersion = null,
+            ),
+        )
+
+        assertEquals(WalkSafeStartupCapabilityTier.BLOCKED, decision.tier)
+        assertEquals(
+            listOf(
+                WalkSafeStartupRequirement.GPS,
+                WalkSafeStartupRequirement.METRIC_DISTANCE,
+                WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE,
+            ),
+            decision.unavailableRequirements,
+        )
+        assertEquals(WalkSafeStartupCapabilityTier.LIMITED, distanceAndProfile.tier)
+        assertFalse(
+            WalkSafeStartupCapabilityResolver.blocksWalkStart(
+                distanceAndProfile.unavailableRequirements,
+            ),
+        )
     }
 
     @Test
@@ -172,13 +237,13 @@ class WalkSafeStartupCapabilityTest {
     }
 
     @Test
-    fun unavailableGpsYieldsLimitedTier() {
+    fun unavailableGpsBlocksStart() {
         val decision = WalkSafeStartupCapabilityResolver.resolve(
             availableInput().copy(gpsAvailable = false),
         )
 
-        assertEquals(WalkSafeStartupCapabilityTier.LIMITED, decision.tier)
-        assertTrue(decision.mayConfirmAndStart)
+        assertEquals(WalkSafeStartupCapabilityTier.BLOCKED, decision.tier)
+        assertFalse(decision.mayConfirmAndStart)
         assertEquals(
             listOf(WalkSafeStartupRequirement.GPS),
             decision.unavailableRequirements,
@@ -264,8 +329,8 @@ class WalkSafeStartupCapabilityTest {
             WalkSafeStartupRequirement.METRIC_DISTANCE,
         )
 
-        assertEquals(WalkSafeStartupCapabilityTier.LIMITED, decision.tier)
-        assertTrue(decision.mayConfirmAndStart)
+        assertEquals(WalkSafeStartupCapabilityTier.BLOCKED, decision.tier)
+        assertFalse(decision.mayConfirmAndStart)
         assertEquals(expectedUnavailable, decision.unavailableRequirements)
         expectedUnavailable.forEach { requirement ->
             assertTrue(decision.noticeKo.contains(requirement.labelKo))

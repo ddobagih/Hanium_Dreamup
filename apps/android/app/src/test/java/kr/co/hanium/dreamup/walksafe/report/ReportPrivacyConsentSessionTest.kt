@@ -49,6 +49,32 @@ import org.junit.Test
 
 class ReportPrivacyConsentSessionTest {
     @Test
+    fun processEpochChangeClosesReportPermitBeforeUiObserver() {
+        ReportPrivacyConsentSession.resetForNewEnrollment()
+        val proofLive = AtomicBoolean(true)
+        val guard = object : kr.co.hanium.dreamup.walksafe.session.IntegratedConsentAuthorityGuard {
+            override fun <T : Any> withCurrent(action: () -> T): T? =
+                if (proofLive.get()) action() else null
+        }
+        try {
+            assertTrue(ReportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent(guard))
+            val permit = requireNotNull(
+                ReportPrivacyConsentSession.issueUploadPermit(ReportTransferPurpose.EXPLICIT),
+            )
+            proofLive.set(false)
+            assertFalse(ReportPrivacyConsentSession.isGranted())
+            assertNull(ReportPrivacyConsentSession.issueUploadPermit(ReportTransferPurpose.EXPLICIT))
+            assertThrows(IllegalStateException::class.java) {
+                ReportPrivacyConsentSession.withLiveUploadPermit(
+                    permit, ReportTransferPurpose.EXPLICIT,
+                ) { Unit }
+            }
+        } finally {
+            ReportPrivacyConsentSession.withdraw()
+        }
+    }
+
+    @Test
     fun mainActivityPauseInvalidatesPrivateFrameStateAndInFlightGenerationWithoutReplacingDetector() {
         val activity = MainActivity()
         val consent = MainActivity::class.java.getDeclaredField("reportPrivacyConsentSession").run {
@@ -100,6 +126,9 @@ class ReportPrivacyConsentSessionTest {
         consent.grantFromServerConfirmedIntegratedConsent()
         assertSame(call, consent.trackIfGranted(call))
 
+        // Navigation logging is unrelated to this plain-JVM privacy lifecycle test.
+        activityField("latestNavigationState")
+            .set(activity, "navigation=route_revalidation_required")
         activity.pauseWalkSafeRuntime()
 
         assertTrue(consent.isGranted())
@@ -179,6 +208,34 @@ class ReportPrivacyConsentSessionTest {
         assertTrue(call.isCancelled())
         assertThrows(CancellationException::class.java) { call.execute() }
         assertFalse(executed.get())
+    }
+
+    @Test
+    fun repeatedServerConfirmedGrantPreservesPermitsAndActiveCallsForBothPurposes() {
+        val consent = freshConsent()
+        assertTrue(consent.grantFromServerConfirmedIntegratedConsent())
+        val explicitPermit =
+            requireNotNull(consent.issueUploadPermit(ReportTransferPurpose.EXPLICIT))
+        val automaticPermit =
+            requireNotNull(consent.issueUploadPermit(ReportTransferPurpose.AUTOMATIC))
+        val explicit = CancellableNetworkCall<Unit>(executeBlock = { Unit })
+        val automatic = CancellableNetworkCall<Unit>(executeBlock = { Unit })
+        assertSame(explicit, consent.trackIfLive(explicitPermit, explicit, ReportTransferPurpose.EXPLICIT))
+        assertSame(automatic, consent.trackIfLive(automaticPermit, automatic, ReportTransferPurpose.AUTOMATIC))
+
+        assertFalse(consent.grantFromServerConfirmedIntegratedConsent())
+
+        assertTrue(consent.isGranted())
+        assertFalse(explicit.isCancelled())
+        assertFalse(automatic.isCancelled())
+        assertEquals(
+            "explicit",
+            consent.withLiveUploadPermit(explicitPermit, ReportTransferPurpose.EXPLICIT) { "explicit" },
+        )
+        assertEquals(
+            "automatic",
+            consent.withLiveUploadPermit(automaticPermit, ReportTransferPurpose.AUTOMATIC) { "automatic" },
+        )
     }
 
     @Test

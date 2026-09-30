@@ -78,6 +78,9 @@ interface FieldSessionLog : Closeable {
     fun blockForRawSourceWithdrawal(): Boolean = true
     fun resetRawSourceAfterConfirmedConsent(): Boolean = true
     fun resetForNewEnrollment(): Boolean = true
+    /** 16-17 #36: approved statistics of the last completed session, kept in the app. */
+    fun lastSessionStatsSummary(): FieldSessionStatsSummary? = null
+    fun analysisState(): FieldSessionAnalysisState = FieldSessionAnalysisState.NONE
 }
 
 class NoopFieldSessionLog : FieldSessionLog {
@@ -133,6 +136,8 @@ internal class PersistentFieldSessionLog(
     private var rawSourceCollectionBlocked = initiallyBlockedForRawSourceCollection
     private var activeSessionRestoreBlocked = false
     private var cryptoBlocked = false
+    private var stats: FieldSessionStatsAccumulator? = null
+    private var lastCompletedSummary: FieldSessionStatsSummary? = null
 
     init {
         synchronized(PROCESS_LOCK) {
@@ -194,6 +199,7 @@ internal class PersistentFieldSessionLog(
         lastCameraNonMetricSampleElapsedRealtimeMs = Long.MIN_VALUE
         recordBytesWritten = 0L
         storageLimitReached = false
+        stats = FieldSessionStatsAccumulator(id, now, coversWholeSession = true)
         if (
             !writeManifest(status = STATUS_ACTIVE, endedAtMs = null) ||
             !writeEncryptedFile(activePointerFile(), id, activePointerAad(), POINTER_LIMITS)
@@ -230,12 +236,23 @@ internal class PersistentFieldSessionLog(
         val now = nowMillis()
         if (expireActiveSessionIfNeeded(now)) return null
         val state = active ?: return null
+        // 16-17 #36: the approved statistics stay in the encrypted archive and in the app.
+        val summary = statsFor(state).summary(now)
+        appendRecord(
+            JSONObject()
+                .put("schema_version", RECORD_SCHEMA_VERSION)
+                .put("record_type", "session_stats_summary")
+                .put("recorded_at_epoch_ms", now)
+                .put("summary", summary.toJson()),
+        )
         appendEventRecord("session_stopped", emptyMap(), now)
         if (!writeManifest(status = STATUS_COMPLETED, endedAtMs = now)) {
             blockCryptoLocked()
             return null
         }
         activePointerFile().delete()
+        lastCompletedSummary = summary
+        stats = null
         active = null
         lastTelemetryAtMs = Long.MIN_VALUE
         lastCameraNonMetricSampleElapsedRealtimeMs = Long.MIN_VALUE
@@ -259,6 +276,8 @@ internal class PersistentFieldSessionLog(
         accountDeletionBlocked = true
         val preserveRawSourceBlock = rawSourceCollectionBlocked
         active = null
+        stats = null
+        lastCompletedSummary = null
         lastTelemetryAtMs = Long.MIN_VALUE
         lastCameraNonMetricSampleElapsedRealtimeMs = Long.MIN_VALUE
         recordBytesWritten = 0L
@@ -317,6 +336,9 @@ internal class PersistentFieldSessionLog(
         rawSourceCollectionBlocked = true
         val persisted = persistFence(rawSourceCollectionBlockFile())
         stopActiveSessionForPrivacyBlock()
+        // S1617-36-F1: the in-app statistics of a withdrawn RAW session are dropped, not only
+        // hidden, so a later re-consent does not show them again.
+        lastCompletedSummary = null
         persisted
     }
 
@@ -390,6 +412,7 @@ internal class PersistentFieldSessionLog(
             return@synchronized
         }
         lastTelemetryAtMs = now
+        active?.let { statsFor(it).onTelemetry(entry.detectDurationMs, entry.staleReason) }
         val runtimeJson = JSONObject()
             .put("step_count", runtime.stepCount)
             .put("step_length_m", runtime.stepLengthM)
@@ -429,6 +452,7 @@ internal class PersistentFieldSessionLog(
             if (elapsedSinceLastSampleMs < CAMERA_NON_METRIC_SAMPLE_INTERVAL_MS) return@synchronized
         }
         lastCameraNonMetricSampleElapsedRealtimeMs = sample.elapsedRealtimeMs
+        active?.let { statsFor(it).onCameraNonMetricSample(sample.inferenceMs) }
         appendEventRecord(
             "camera_non_metric_inference_sample",
             mapOf(
@@ -459,8 +483,33 @@ internal class PersistentFieldSessionLog(
         if (accountDeletionBlocked || rawSourceCollectionBlocked) return@synchronized
         val now = nowMillis()
         if (expireActiveSessionIfNeeded(now) || active == null) return@synchronized
+        if (name == FIELD_HEARTBEAT_EVENT_NAME) {
+            active?.let {
+                statsFor(it).onHeartbeat(fields["state"] as? String, (fields["gap_duration_ms"] as? Number)?.toLong())
+            }
+        }
         appendEventRecord(name, fields, now)
     }
+
+    @Synchronized
+    override fun lastSessionStatsSummary(): FieldSessionStatsSummary? = synchronized(PROCESS_LOCK) {
+        if (accountDeletionBlocked || rawSourceCollectionBlocked || cryptoBlocked) null else lastCompletedSummary
+    }
+
+    /** Encrypted records without an in-app summary are retrievable but not analysable (16-17 #36). */
+    @Synchronized
+    override fun analysisState(): FieldSessionAnalysisState = synchronized(PROCESS_LOCK) {
+        when {
+            lastSessionStatsSummary() != null -> FieldSessionAnalysisState.ANALYZABLE
+            rootDirectory.listFiles()?.any { it.isDirectory && SAFE_SESSION_ID.matches(it.name) } == true ->
+                FieldSessionAnalysisState.ARCHIVE_ONLY
+            else -> FieldSessionAnalysisState.NONE
+        }
+    }
+
+    private fun statsFor(state: SessionState): FieldSessionStatsAccumulator =
+        stats?.takeIf { it.sessionId == state.id }
+            ?: FieldSessionStatsAccumulator(state.id, state.startedAtMs, coversWholeSession = false).also { stats = it }
 
     @Synchronized
     override fun statusText(): String = synchronized(PROCESS_LOCK) {
@@ -1200,6 +1249,32 @@ internal class PersistentFieldSessionLog(
             "state",
             "tmap_authoritative",
             "tmap_route_active",
+            // field_heartbeat (16-17 #37): non-identifying liveness numbers/flags, no coordinates.
+            "gap_duration_ms",
+            "last_frame_age_ms",
+            "last_render_age_ms",
+            "location_age_ms",
+            "route_active",
+            "step_count",
+            // S09-20: Step Counter baseline state (enum name) next to the step count.
+            "step_counter_baseline",
+            "trusted_location_available",
+            // S08-34 route guidance diagnostic chain: enum names, whole degrees, metres, ms and a
+            // cue id only -- never coordinates or spoken text.
+            "compass_age_ms",
+            "compass_source",
+            "cue_id",
+            "expression_level",
+            "heading_accuracy_deg",
+            "position_uncertainty_m",
+            "rear_heading_deg",
+            "relative_angle_deg",
+            "reported_heading_accuracy_deg",
+            "route_bearing_deg",
+            "segment_index",
+            // S09-9 late step/ZUPT handling: whole milliseconds and an event count only.
+            "measurement_lag_ms",
+            "replayed_event_count",
         )
         val PROCESS_LOCK = Any()
         val FIELD_KEY_POLICY = AeadKeyPolicy(

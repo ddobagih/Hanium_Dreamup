@@ -90,7 +90,8 @@ class PermissionSessionLifecycleStaticTest {
 
         assertTrue(required.contains("Manifest.permission.CAMERA"))
         assertTrue(required.contains("Manifest.permission.ACCESS_FINE_LOCATION"))
-        assertFalse(required.contains("Manifest.permission.RECORD_AUDIO"))
+        // S02-14: FP-014-DETAIL-01 makes the microphone a walk-start permission.
+        assertTrue(required.contains("Manifest.permission.RECORD_AUDIO"))
         assertFalse(required.contains("Manifest.permission.ACTIVITY_RECOGNITION"))
         assertTrue(optional.contains("Manifest.permission.RECORD_AUDIO"))
         assertTrue(optional.contains("Manifest.permission.ACTIVITY_RECOGNITION"))
@@ -102,16 +103,19 @@ class PermissionSessionLifecycleStaticTest {
         val resumeRuntime =
             functionBlock("private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()")
         val recheck = functionBlock("private fun completePermissionRecoveryRecheckIfPossible()")
+        val prerequisites = functionBlock("private fun permissionRecoveryPrerequisitesReady(")
 
         assertTrue(resume.contains("resumeWalkSafeRuntimeAfterPrivacyStartupInspection()"))
         assertTrue(resumeRuntime.contains("permissionRecoveryGate.recheckRequired()"))
         assertTrue(resumeRuntime.contains("updateIntegratedConsentUi()"))
         assertTrue(resumeRuntime.contains("updateReportPrivacyConsentUi()"))
         assertTrue(resumeRuntime.contains("completePermissionRecoveryRecheckIfPossible()"))
-        assertTrue(recheck.contains("firstRunOnboardingComplete()"))
-        assertTrue(recheck.contains("currentReporterUserId()"))
-        assertTrue(recheck.contains("isGatewaySessionReadyForCurrentActor()"))
-        assertTrue(recheck.contains("walkSessionReadinessBlockReason(decision)"))
+        assertTrue(recheck.contains("permissionRecoveryPrerequisitesReady(decision)"))
+        assertTrue(prerequisites.contains("firstRunOnboardingComplete()"))
+        assertTrue(prerequisites.contains("currentReporterUserId()"))
+        assertTrue(prerequisites.contains("isGatewaySessionReadyForCurrentActor()"))
+        assertTrue(prerequisites.contains("decision.mayConfirmAndStart"))
+        assertTrue(prerequisites.contains("walkSessionReadinessBlockReason(decision)"))
         assertTrue(recheck.contains("completeFullRecheck("))
         val transitionIndex =
             recheck.indexOf("permissionRecoveryGate.completeFullRecheck(")
@@ -215,7 +219,7 @@ class PermissionSessionLifecycleStaticTest {
 
         assertTrue(awaitingConfirmation.contains("permissionDenialPanel.visibility = View.GONE"))
         assertTrue(awaitingConfirmation.contains("updateStatus("))
-        assertFalse(awaitingConfirmation.contains("acknowledgeExplicitResume()"))
+        assertFalse(awaitingConfirmation.contains("acknowledgeExplicitResume("))
         assertFalse(awaitingConfirmation.contains("persistPermissionRecoveryGate()"))
         assertFalse(awaitingConfirmation.contains("maybeAdvanceFirstRunOnboarding()"))
         assertFalse(awaitingConfirmation.contains("refreshStartupCapabilityUi()"))
@@ -226,15 +230,16 @@ class PermissionSessionLifecycleStaticTest {
             functionBlock("private fun resumePermissionRecoveryFromExplicitUserAction(): Boolean")
         assertTrue(startAction.contains("resumePermissionRecoveryFromExplicitUserAction()"))
         assertTrue(startAction.contains("ensurePermissionsThenStart()"))
-        assertFalse(startAction.contains("acknowledgeExplicitResume()"))
+        assertFalse(startAction.contains("acknowledgeExplicitResume("))
         assertFalse(startAction.contains("persistPermissionRecoveryGate()"))
         assertTrue(explicitResume.contains("PermissionRecoveryGateState.AWAITING_EXPLICIT_RESUME"))
-        val clearIndex = explicitResume.indexOf("acknowledgeExplicitResume()")
+        val clearIndex = explicitResume.indexOf("acknowledgeExplicitResume(")
+        assertTrue(explicitResume.contains("observed = currentObservedPermissionSnapshot()"))
         val persistIndex = explicitResume.indexOf("persistPermissionRecoveryGate()")
         val ensureIndex = explicitResume.indexOf("ensurePermissionsThenStart()")
         assertTrue(clearIndex < persistIndex && persistIndex < ensureIndex)
         assertTrue(
-            Regex(Regex.escape("acknowledgeExplicitResume()")).findAll(source).count() == 1,
+            Regex(Regex.escape("acknowledgeExplicitResume(")).findAll(source).count() == 1,
         )
         assertTrue(
             Regex(
@@ -388,7 +393,7 @@ class PermissionSessionLifecycleStaticTest {
         listOf(
             "permissionRecoveryGate = PermissionRecoveryGate()",
             "resumePermissionRecoveryFromExplicitUserAction()",
-            "acknowledgeExplicitResume()",
+            "acknowledgeExplicitResume(",
             "ensurePermissionsThenStart()",
         ).forEach { forbidden ->
             automaticSlices.forEach { automatic ->
@@ -400,7 +405,19 @@ class PermissionSessionLifecycleStaticTest {
         assertTrue(nonClearRestore.contains("PermissionRecoveryGate.restoredBlocked(affected)"))
 
         val guardMarker =
-            "if (permissionRecoveryGate.blocksAutomaticResourceStart) {"
+            "if (permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled) {"
+        assertTrue(
+            Regex(
+                """private val developmentGuidanceStartBypassEnabled:\s*Boolean\s+""" +
+                    """get\(\)\s*=\s*BuildConfig\.DEBUG\s*&&\s*""" +
+                    """BuildConfig\.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS\s*&&""",
+            ).containsMatchIn(source),
+        )
+        assertTrue(
+            activation.contains(
+                "permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled",
+            ),
+        )
         val recheckCallMarker = "completePermissionRecoveryRecheckIfPossible()"
         val blockedReturnMarker =
             "if (permissionRecoveryGate.blocksAutomaticResourceStart) return"

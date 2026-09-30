@@ -79,6 +79,25 @@ class ExplicitReportConfirmationPolicyTest {
     }
 
     @Test
+    fun lateDisclosureCannotArmExpiredPayloadWithoutCleanupTimer() {
+        val frozen = frozen(context)
+        val policy = ExplicitReportConfirmationPolicy()
+        policy.stage(frozen, 1_000L)
+
+        assertFalse(policy.arm(context, 121_001L))
+        assertTrue(frozen.isZeroizedForTests())
+        assertNull(policy.consumeIfConfirmed(context, 121_002L))
+    }
+
+    @Test
+    fun disclosureCanArmAtTheExactValidityBoundary() {
+        val policy = ExplicitReportConfirmationPolicy()
+        policy.stage(frozen(context), 1_000L)
+        assertTrue(policy.arm(context, 121_000L))
+        requireNotNull(policy.consumeIfConfirmed(context, 121_001L)).close()
+    }
+
+    @Test
     fun walkReporterConsentAndGatewaySessionChangesZeroizeTheFrozenPayload() {
         listOf(
             context.copy(walkSessionId = "22222222-2222-4222-8222-222222222222"),
@@ -145,14 +164,7 @@ class ExplicitReportConfirmationPolicyTest {
     private fun metadata(frame: Int = 1, actorId: String = context.reporterId): ByteArray =
         "{\"reporter_user_id\":\"$actorId\",\"frame\":$frame}".toByteArray()
 
-    private fun jpeg(marker: Int = 1): ByteArray =
-        byteArrayOf(
-            0xff.toByte(),
-            0xd8.toByte(),
-            marker.toByte(),
-            0xff.toByte(),
-            0xd9.toByte(),
-        )
+    private fun jpeg(marker: Int = 1): ByteArray = reportTestJpeg(scanByte = marker)
 
     private fun ownedByteReferences(
         frozen: ExplicitReportFrozenPayload,

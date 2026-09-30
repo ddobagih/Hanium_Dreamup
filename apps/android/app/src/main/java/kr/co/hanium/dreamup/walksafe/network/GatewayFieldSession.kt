@@ -59,6 +59,7 @@ class GatewayFieldSession private constructor(
     val accessExpiresAtEpochMs: Long,
     val idleExpiresAtEpochMs: Long,
     val absoluteExpiresAtEpochMs: Long,
+    internal val serverAccessExpiresAtEpochMs: Long = accessExpiresAtEpochMs,
     val verificationState: GatewaySessionVerificationState,
     internal val sessionScope: GatewaySessionScope,
     instanceId: String = UUID.randomUUID().toString(),
@@ -156,6 +157,7 @@ class GatewayFieldSession private constructor(
             accessExpiresAtEpochMs = accessExpiresAtEpochMs,
             idleExpiresAtEpochMs = idleExpiresAtEpochMs,
             absoluteExpiresAtEpochMs = absoluteExpiresAtEpochMs,
+            serverAccessExpiresAtEpochMs = serverAccessExpiresAtEpochMs,
         )
     }
 
@@ -309,6 +311,7 @@ class GatewayFieldSession private constructor(
             accessExpiresAtEpochMs: Long,
             idleExpiresAtEpochMs: Long,
             absoluteExpiresAtEpochMs: Long,
+            serverAccessExpiresAtEpochMs: Long,
         ): GatewayFieldSession = GatewayFieldSession(
             gatewayBaseUrl = gatewayBaseUrl,
             actorId = actorId,
@@ -320,6 +323,7 @@ class GatewayFieldSession private constructor(
             accessExpiresAtEpochMs = accessExpiresAtEpochMs,
             idleExpiresAtEpochMs = idleExpiresAtEpochMs,
             absoluteExpiresAtEpochMs = absoluteExpiresAtEpochMs,
+            serverAccessExpiresAtEpochMs = serverAccessExpiresAtEpochMs,
             verificationState = GatewaySessionVerificationState.VERIFIED,
             sessionScope = GatewaySessionScope.GENERAL,
         )
@@ -352,16 +356,30 @@ class GatewayFieldSession private constructor(
             if (
                 nowEpochMs >= snapshot.idleExpiresAtEpochMs ||
                 nowEpochMs >= snapshot.absoluteExpiresAtEpochMs ||
-                snapshot.idleExpiresAtEpochMs >
-                safeExpiryBound(nowEpochMs, MAX_REFRESH_IDLE_TTL_SECONDS) ||
-                snapshot.absoluteExpiresAtEpochMs >
-                safeExpiryBound(nowEpochMs, MAX_REFRESH_ABSOLUTE_TTL_SECONDS)
+                !withinRefreshExpiryBound(
+                    snapshot.idleExpiresAtEpochMs, nowEpochMs, MAX_REFRESH_IDLE_TTL_SECONDS,
+                ) ||
+                !withinRefreshExpiryBound(
+                    snapshot.absoluteExpiresAtEpochMs, nowEpochMs, MAX_REFRESH_ABSOLUTE_TTL_SECONDS,
+                )
             ) {
                 return null
             }
             if (
                 snapshot.accessExpiresAtEpochMs > snapshot.idleExpiresAtEpochMs ||
                 snapshot.idleExpiresAtEpochMs > snapshot.absoluteExpiresAtEpochMs
+            ) {
+                return null
+            }
+            val serverAccessExpiry =
+                snapshot.serverAccessExpiresAtEpochMs ?: snapshot.accessExpiresAtEpochMs
+            val maximumServerAccessExpiry = runCatching {
+                Math.addExact(snapshot.accessExpiresAtEpochMs, MAX_SERVER_CLOCK_SKEW_MS)
+            }.getOrDefault(Long.MAX_VALUE)
+            if (
+                serverAccessExpiry < snapshot.accessExpiresAtEpochMs ||
+                serverAccessExpiry > maximumServerAccessExpiry ||
+                serverAccessExpiry > snapshot.idleExpiresAtEpochMs
             ) {
                 return null
             }
@@ -384,6 +402,7 @@ class GatewayFieldSession private constructor(
                 accessExpiresAtEpochMs = snapshot.accessExpiresAtEpochMs,
                 idleExpiresAtEpochMs = snapshot.idleExpiresAtEpochMs,
                 absoluteExpiresAtEpochMs = snapshot.absoluteExpiresAtEpochMs,
+                serverAccessExpiresAtEpochMs = serverAccessExpiry,
                 verificationState = GatewaySessionVerificationState.RESTORED_UNVERIFIED,
                 sessionScope = GatewaySessionScope.GENERAL,
             )
@@ -445,6 +464,7 @@ class GatewayFieldSession private constructor(
             accessExpiresAtEpochMs: Long,
             idleExpiresAtEpochMs: Long,
             absoluteExpiresAtEpochMs: Long,
+            serverAccessExpiresAtEpochMs: Long = accessExpiresAtEpochMs,
         ): GatewayFieldSession = longLivedVerified(
             gatewayBaseUrl,
             actorId,
@@ -456,6 +476,7 @@ class GatewayFieldSession private constructor(
             accessExpiresAtEpochMs,
             idleExpiresAtEpochMs,
             absoluteExpiresAtEpochMs,
+            serverAccessExpiresAtEpochMs,
         )
 
         internal fun backendAccountDeviceSession(
@@ -493,6 +514,7 @@ internal class GatewayFieldSessionPersistence(
     val accessExpiresAtEpochMs: Long,
     val idleExpiresAtEpochMs: Long,
     val absoluteExpiresAtEpochMs: Long,
+    val serverAccessExpiresAtEpochMs: Long? = null,
 ) {
     override fun toString(): String =
         "GatewayFieldSessionPersistence(actorId=$actorId, deviceId=$deviceId, rotation=$rotation, credentials=redacted)"
@@ -534,10 +556,21 @@ internal class GatewaySessionRenewalProof(
 
 private object GatewayRefreshProofAttemptFence {
     private val lock = Any()
-    private val attemptedFingerprints = mutableSetOf<String>()
+    private val attemptedFingerprints = mutableMapOf<String, String>()
 
-    fun reserve(proof: GatewaySessionRenewalProof): Boolean = synchronized(lock) {
-        attemptedFingerprints.add(proof.fingerprint)
+    fun reserve(proof: GatewaySessionRenewalProof): String? = synchronized(lock) {
+        if (proof.fingerprint in attemptedFingerprints) return@synchronized null
+        UUID.randomUUID().toString().also { attemptedFingerprints[proof.fingerprint] = it }
+    }
+
+    fun isCurrent(fingerprint: String, attemptId: String): Boolean = synchronized(lock) {
+        attemptedFingerprints[fingerprint] == attemptId
+    }
+
+    fun release(fingerprint: String, attemptId: String): Boolean = synchronized(lock) {
+        if (attemptedFingerprints[fingerprint] != attemptId) return@synchronized false
+        attemptedFingerprints.remove(fingerprint)
+        true
     }
 
     fun resetForTests() = synchronized(lock) {
@@ -547,6 +580,25 @@ private object GatewayRefreshProofAttemptFence {
 
 internal fun resetGatewayRefreshProofFenceForTests() {
     GatewayRefreshProofAttemptFence.resetForTests()
+}
+
+/** A server-confirmed, unapplied attempt; the store releases it only after durable rollback. */
+internal class GatewayRefreshRetryReservation(
+    val sourceLease: GatewaySessionLease,
+    val retryAfterMs: Long,
+    private val fingerprint: String,
+    private val attemptId: String,
+) {
+    fun matches(version: GatewaySessionVersion): Boolean =
+        sourceLease.gatewayBaseUrl == version.gatewayBaseUrl &&
+            sourceLease.actorId == version.actorId && sourceLease.deviceId == version.deviceId &&
+            sourceLease.familyId == version.familyId && sourceLease.rotation == version.rotation
+
+    fun isCurrent(): Boolean = GatewayRefreshProofAttemptFence.isCurrent(fingerprint, attemptId)
+
+    fun releaseAfterDurableRollback(): Boolean = GatewayRefreshProofAttemptFence.release(fingerprint, attemptId)
+
+    override fun toString(): String = "GatewayRefreshRetryReservation(sourceLease=$sourceLease, proof=redacted)"
 }
 
 object GatewayCredentialPolicy {
@@ -623,7 +675,15 @@ data class GatewaySessionRevalidation(
 
 class GatewayFieldSessionClient(
     private val transport: GatewaySessionTransport = HttpUrlConnectionGatewaySessionTransport(),
+    private val elapsedRealtimeNanos: () -> Long = { System.nanoTime() },
+    approvedAccountOrigin: String = kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_GATEWAY_ORIGIN,
+    allowDebugAccountOrigin: Boolean = kr.co.hanium.dreamup.walksafe.BuildConfig.DEBUG,
 ) {
+    private val accountOriginGuard = GatewayAccountOriginGuard(
+        approvedAccountOrigin,
+        allowDebugAccountOrigin,
+    )
+
     fun login(
         gatewayBaseUrl: String,
         actorId: String?,
@@ -662,6 +722,7 @@ class GatewayFieldSessionClient(
         if (sessionScope == GatewaySessionScope.ACCOUNT_DELETION_RECOVERY) {
             loginBody.put("purpose", sessionScope.wireValue)
         }
+        val loginStartedAtNanos = if (enableLongLivedSession) elapsedRealtimeNanos() else 0L
         val login = transport.postJson(endpoint, loginBody.toString())
         if (login.statusCode == 200 && enableLongLivedSession) {
             return parseLongLivedSession(
@@ -675,6 +736,7 @@ class GatewayFieldSessionClient(
                 forbiddenCredential = credential,
                 forbiddenAccessCredential = null,
                 nowEpochMs = nowEpochMs,
+                requestStartedAtNanos = loginStartedAtNanos,
             )
         }
         if (login.statusCode == 200) {
@@ -745,7 +807,7 @@ class GatewayFieldSessionClient(
         ) {
             throw GatewaySessionHttpException(0, "invalid_account_credentials")
         }
-        val approvedOrigin = GatewayEndpointPolicy.debugOriginOrNull(gatewayBaseUrl)
+        val approvedOrigin = accountOriginGuard.originOrNull(gatewayBaseUrl)
         if (approvedOrigin == null || approvedOrigin != gatewayBaseUrl.trimEnd('/')) {
             throw GatewaySessionHttpException(0, "invalid_gateway_url")
         }
@@ -758,6 +820,7 @@ class GatewayFieldSessionClient(
             throw GatewaySessionHttpException(0, "invalid_gateway_url")
         }
         val endpoint = "$approvedOrigin/api/field-session"
+        val loginStartedAtNanos = elapsedRealtimeNanos()
         val login = transport.postJson(
             endpoint,
             JSONObject()
@@ -768,6 +831,12 @@ class GatewayFieldSessionClient(
                 .put("device_id", device)
                 .toString(),
         )
+        val responseNowEpochMs = runCatching {
+            Math.addExact(
+                nowEpochMs,
+                (elapsedRealtimeNanos() - loginStartedAtNanos).coerceAtLeast(0L) / 1_000_000L,
+            )
+        }.getOrElse { throw GatewaySessionHttpException(0, "invalid_gateway_cookie") }
         if (login.statusCode != 200) {
             throw login.toSessionException("account_password_login_failed")
         }
@@ -787,7 +856,7 @@ class GatewayFieldSessionClient(
         val backendBinding = parseBackendAccountDeviceCookieBinding(
             cookiePair = parsedCookie.cookiePair,
             expectedDeviceId = device,
-            nowEpochMs = nowEpochMs,
+            nowEpochMs = responseNowEpochMs,
         ) ?: throw GatewaySessionHttpException(0, "invalid_gateway_cookie")
         val cookieHeaders = mapOf(GatewayFieldSession.COOKIE_HEADER to parsedCookie.cookiePair)
         val status = transport.get(endpoint, cookieHeaders)
@@ -893,7 +962,8 @@ class GatewayFieldSessionClient(
             ?: throw GatewaySessionHttpException(statusCode = 0, reason = "invalid_named_actor")
         val proof = session.renewalProofOrNull(actor, nowEpochMs)
             ?: throw GatewaySessionHttpException(statusCode = 0, reason = "gateway_refresh_not_allowed")
-        if (!GatewayRefreshProofAttemptFence.reserve(proof)) {
+        val attemptId = GatewayRefreshProofAttemptFence.reserve(proof)
+        if (attemptId == null) {
             throw GatewaySessionHttpException(
                 statusCode = 0,
                 reason = "gateway_refresh_proof_already_attempted",
@@ -908,6 +978,7 @@ class GatewayFieldSessionClient(
             throw GatewaySessionHttpException(statusCode = 0, reason = "gateway_refresh_rotation_exhausted")
         }
         val endpoint = session.gatewayBaseUrl.trimEnd('/') + "/api/field-session"
+        val refreshStartedAtNanos = elapsedRealtimeNanos()
         val response = try {
             transport.postJson(
                 endpoint,
@@ -920,18 +991,27 @@ class GatewayFieldSessionClient(
                     .put("refresh_token", proof.refreshToken)
                     .toString(),
             )
-        } catch (_: RuntimeException) {
+        } catch (_: Exception) {
+            // I/O failures can occur after the server rotates this one-use refresh proof.
             session.invalidate()
             throw GatewaySessionHttpException(
                 statusCode = 0,
                 reason = "gateway_refresh_outcome_unknown",
+                nextAction = GatewaySessionNextAction.OUTCOME_UNKNOWN,
             )
         }
         if (response.statusCode != 200) {
+            val error = response.toSessionException("gateway_refresh_failed")
+            val retryAfterMs = response.confirmedUnappliedRefreshRetryAfterMs()
+            if (retryAfterMs != null) {
+                error.refreshRetryReservation = GatewayRefreshRetryReservation(
+                    proof.lease, retryAfterMs, proof.fingerprint, attemptId,
+                )
+            }
             if (response.statusCode in 400..499 && response.statusCode != 429) {
                 session.invalidate()
             }
-            throw response.toSessionException("gateway_refresh_failed")
+            throw error
         }
         val renewed = try {
             parseLongLivedSession(
@@ -945,6 +1025,7 @@ class GatewayFieldSessionClient(
                 forbiddenCredential = proof.refreshToken,
                 forbiddenAccessCredential = proof.accessToken,
                 nowEpochMs = nowEpochMs,
+                requestStartedAtNanos = refreshStartedAtNanos,
             )
         } catch (error: RuntimeException) {
             session.invalidate()
@@ -1013,7 +1094,11 @@ class GatewayFieldSessionClient(
             statusJson.optBoolean("required", false) &&
                 statusJson.optBoolean("authenticated", false) &&
                 statusJson.optString("actor_id") == actor &&
-                statusScopeMatches(statusJson, session.sessionScope) &&
+                statusScopeMatches(
+                    statusJson,
+                    session.sessionScope,
+                    allowLegacyMissingScope = !session.isLongLived,
+                ) &&
                 statusMatchesLease(statusJson, session)
         val capacityUpdate = GatewayCapacityProcessState.apply(
             GatewayCapacityParser.fromSessionStatus(statusJson),
@@ -1092,7 +1177,25 @@ class GatewayFieldSessionClient(
             reason = reason,
             retryAfterMs = retryAfterMs,
             serverCode = serverCode,
+            nextAction = GatewaySessionErrorContract.nextAction(statusCode, responseBody),
         )
+    }
+
+    /**
+     * Retry-After of a refresh answer that the Gateway registered as "nothing was applied":
+     * busy (503), a storage failure before any commit (S19-11, 503) or refresh admission
+     * (S19-10, 429), each with `retryable: true`. Only these keep the same proof for a retry;
+     * everything else (including outcome unknown) never creates a reservation.
+     */
+    private fun GatewayHttpResponse.confirmedUnappliedRefreshRetryAfterMs(): Long? {
+        val unappliedCodes = CONFIRMED_UNAPPLIED_REFRESH_CODES[statusCode] ?: return null
+        val retrySeconds = header("Retry-After")?.trim()?.toLongOrNull()
+            ?.takeIf { it in 1L..MAX_RETRY_AFTER_MS / 1_000L } ?: return null
+        val body = runCatching { JSONObject(responseBody) }.getOrNull() ?: return null
+        if (body.opt("code") !in unappliedCodes || body.opt("retryable") != true ||
+            body.opt("reauthentication_required") == true || body.has("detail")
+        ) return null
+        return retrySeconds * 1_000L
     }
 
     private fun parseLongLivedSession(
@@ -1106,7 +1209,16 @@ class GatewayFieldSessionClient(
         forbiddenCredential: String,
         forbiddenAccessCredential: String?,
         nowEpochMs: Long,
+        requestStartedAtNanos: Long,
     ): GatewayFieldSession {
+        val responseNowEpochMs = runCatching {
+            Math.addExact(
+                nowEpochMs,
+                (elapsedRealtimeNanos() - requestStartedAtNanos).coerceAtLeast(0L) / 1_000_000L,
+            )
+        }.getOrElse {
+            throw GatewaySessionHttpException(statusCode = 0, reason = "gateway_session_binding_failed")
+        }
         val requireSecure = runCatching {
             URI(gatewayBaseUrl).scheme.equals("https", ignoreCase = true)
         }.getOrElse {
@@ -1116,24 +1228,36 @@ class GatewayFieldSessionClient(
             ?: throw GatewaySessionHttpException(statusCode = 0, reason = "invalid_gateway_cookie")
         val json = runCatching { JSONObject(response.responseBody) }.getOrNull()
             ?: throw GatewaySessionHttpException(statusCode = 0, reason = "invalid_gateway_login_response")
-        val responseActorId = json.optString("actor_id")
+        // Long-lived session protocol: exactly the Gateway sessionResponse fields, JSON integers
+        // only (no string or decimal coercion) and the general scope.
+        if (
+            json.jsonKeySet() != LONG_LIVED_SESSION_RESPONSE_FIELDS ||
+            json.strictStringOrNull("session_scope") != GatewaySessionScope.GENERAL.wireValue
+        ) {
+            throw GatewaySessionHttpException(
+                statusCode = 0,
+                reason = "gateway_session_binding_failed",
+            )
+        }
+        val responseActorId = json.strictStringOrNull("actor_id")
         val responseDeviceId = GatewayCredentialPolicy.normalizedDeviceIdOrNull(
-            json.optString("device_id"),
+            json.strictStringOrNull("device_id"),
         )
         val responseFamilyId = GatewayCredentialPolicy.normalizedFamilyIdOrNull(
-            json.optString("family_id"),
+            json.strictStringOrNull("family_id"),
         )
-        val responseRotation = json.optLong("rotation", -1L)
+        val responseRotation = json.strictLongOrNull("rotation") ?: -1L
         val responseRefreshToken = GatewayCredentialPolicy.normalizedRefreshTokenOrNull(
-            json.optString("refresh_token"),
+            json.strictStringOrNull("refresh_token"),
         )
-        val accessExpiresAtEpochMs = json.optLong("access_expires_at_epoch_ms", -1L)
-        val idleExpiresAtEpochMs = json.optLong("idle_expires_at_epoch_ms", -1L)
-        val absoluteExpiresAtEpochMs = json.optLong("absolute_expires_at_epoch_ms", -1L)
+        val accessExpiresAtEpochMs = json.strictLongOrNull("access_expires_at_epoch_ms") ?: -1L
+        // Owner decision 2: JSON null = the Gateway set no idle / absolute limit (`unlimited`).
+        val idleExpiresAtEpochMs = json.strictExpiryOrNull("idle_expires_at_epoch_ms") ?: -1L
+        val absoluteExpiresAtEpochMs = json.strictExpiryOrNull("absolute_expires_at_epoch_ms") ?: -1L
         val accessToken = cookie.cookiePair.substringAfter('=')
         val localAccessExpiresAtEpochMs = runCatching {
             Math.addExact(
-                nowEpochMs,
+                responseNowEpochMs,
                 Math.multiplyExact(cookie.maxAgeSeconds, 1_000L),
             )
         }.getOrElse {
@@ -1166,14 +1290,16 @@ class GatewayFieldSessionClient(
                 accessToken != forbiddenCredential &&
                 accessToken != forbiddenAccessCredential &&
                 accessToken != responseRefreshToken &&
-                nowEpochMs < effectiveAccessExpiresAtEpochMs &&
+                responseNowEpochMs < effectiveAccessExpiresAtEpochMs &&
                 accessExpiresAtEpochMs <=
-                safeExpiryBound(nowEpochMs, MAX_ACCESS_TTL_SECONDS) &&
+                safeExpiryBound(responseNowEpochMs, MAX_ACCESS_TTL_SECONDS) &&
                 accessExpiresAtEpochMs <= maximumCookieAlignedAccessExpiry &&
-                idleExpiresAtEpochMs <=
-                safeExpiryBound(nowEpochMs, MAX_REFRESH_IDLE_TTL_SECONDS) &&
-                absoluteExpiresAtEpochMs <=
-                safeExpiryBound(nowEpochMs, MAX_REFRESH_ABSOLUTE_TTL_SECONDS) &&
+                withinRefreshExpiryBound(
+                    idleExpiresAtEpochMs, responseNowEpochMs, MAX_REFRESH_IDLE_TTL_SECONDS,
+                ) &&
+                withinRefreshExpiryBound(
+                    absoluteExpiresAtEpochMs, responseNowEpochMs, MAX_REFRESH_ABSOLUTE_TTL_SECONDS,
+                ) &&
                 effectiveAccessExpiresAtEpochMs <= idleExpiresAtEpochMs &&
                 idleExpiresAtEpochMs <= absoluteExpiresAtEpochMs
         if (!valid) {
@@ -1193,6 +1319,7 @@ class GatewayFieldSessionClient(
             accessExpiresAtEpochMs = effectiveAccessExpiresAtEpochMs,
             idleExpiresAtEpochMs = idleExpiresAtEpochMs,
             absoluteExpiresAtEpochMs = absoluteExpiresAtEpochMs,
+            serverAccessExpiresAtEpochMs = accessExpiresAtEpochMs,
         )
     }
 
@@ -1201,25 +1328,43 @@ class GatewayFieldSessionClient(
         session: GatewayFieldSession,
     ): Boolean {
         if (!session.isLongLived) return true
-        return statusJson.optString("session_mode") == "long_lived" &&
-            statusJson.optString("device_id") == session.deviceId &&
-            statusJson.optString("family_id") == session.familyId &&
-            statusJson.optLong("rotation", -1L) == session.rotation &&
-            statusJson.optLong("access_expires_at_epoch_ms", -1L) ==
-            session.accessExpiresAtEpochMs &&
-            statusJson.optLong("idle_expires_at_epoch_ms", -1L) ==
+        val fields = statusJson.jsonKeySet()
+        if (
+            fields != LONG_LIVED_STATUS_FIELDS &&
+            fields != LONG_LIVED_STATUS_FIELDS + "capacity"
+        ) {
+            return false
+        }
+        if (GatewayCapacityParser.fromSessionStatus(statusJson) == GatewayCapacityParseResult.Malformed) {
+            return false
+        }
+        return statusJson.opt("required") == true &&
+            statusJson.opt("authenticated") == true &&
+            statusJson.strictStringOrNull("session_scope") == GatewaySessionScope.GENERAL.wireValue &&
+            statusJson.strictStringOrNull("session_mode") == "long_lived" &&
+            statusJson.strictStringOrNull("device_id") == session.deviceId &&
+            statusJson.strictStringOrNull("family_id") == session.familyId &&
+            statusJson.strictLongOrNull("rotation") == session.rotation &&
+            statusJson.strictLongOrNull("access_expires_at_epoch_ms") ==
+            session.serverAccessExpiresAtEpochMs &&
+            statusJson.strictExpiryOrNull("idle_expires_at_epoch_ms") ==
             session.idleExpiresAtEpochMs &&
-            statusJson.optLong("absolute_expires_at_epoch_ms", -1L) ==
+            statusJson.strictExpiryOrNull("absolute_expires_at_epoch_ms") ==
             session.absoluteExpiresAtEpochMs
     }
 
+    /**
+     * The missing-scope branch is a legacy short-session compatibility rule only; long-lived
+     * sessions always carry the Gateway `session_scope` field (checked again in statusMatchesLease).
+     */
     private fun statusScopeMatches(
         statusJson: JSONObject,
         expected: GatewaySessionScope,
+        allowLegacyMissingScope: Boolean = true,
     ): Boolean {
         val actual = statusJson.optString("session_scope")
         return actual == expected.wireValue ||
-            expected == GatewaySessionScope.GENERAL && actual.isEmpty()
+            allowLegacyMissingScope && expected == GatewaySessionScope.GENERAL && actual.isEmpty()
     }
 }
 
@@ -1229,6 +1374,26 @@ private fun JSONObject.jsonKeySet(): Set<String> {
     while (keys.hasNext()) result += keys.next()
     return result
 }
+
+private fun JSONObject.strictStringOrNull(name: String): String? = opt(name) as? String
+
+private fun JSONObject.strictLongOrNull(name: String): Long? = when (val value = opt(name)) {
+    is Int -> value.toLong()
+    is Long -> value
+    else -> null
+}
+
+/**
+ * Owner decision 2 (2026-09-29): a Gateway configured with `unlimited` sends JSON null for the
+ * refresh idle / absolute expiry. Null maps to [GATEWAY_UNLIMITED_EXPIRY_EPOCH_MS]; a numeric
+ * value equal to that sentinel is not accepted as a disguised unlimited expiry.
+ */
+private fun JSONObject.strictExpiryOrNull(name: String): Long? =
+    if (has(name) && isNull(name)) {
+        GATEWAY_UNLIMITED_EXPIRY_EPOCH_MS
+    } else {
+        strictLongOrNull(name)?.takeIf { it != GATEWAY_UNLIMITED_EXPIRY_EPOCH_MS }
+    }
 
 private fun JSONObject.hasBackendAccountBasicStatusFields(): Boolean {
     val fields = jsonKeySet()
@@ -1243,7 +1408,11 @@ class GatewaySessionHttpException(
     val reason: String,
     val retryAfterMs: Long? = null,
     val serverCode: String? = null,
-) : IllegalStateException("gateway session request failed: $reason status=$statusCode")
+    /** S01-20: typed next action from [GatewaySessionErrorContract]; fail-closed default. */
+    val nextAction: GatewaySessionNextAction = GatewaySessionNextAction.REAUTHENTICATE,
+) : IllegalStateException("gateway session request failed: $reason status=$statusCode") {
+    internal var refreshRetryReservation: GatewayRefreshRetryReservation? = null
+}
 
 internal data class BackendAccountDeviceCookieBinding(
     val actorId: String,
@@ -1465,6 +1634,16 @@ private fun safeExpiryBound(nowEpochMs: Long, ttlSeconds: Long): Long =
         )
     }.getOrDefault(Long.MAX_VALUE)
 
+/** A finite refresh expiry keeps its approved bound; the unlimited sentinel has none. */
+private fun withinRefreshExpiryBound(expiresAtEpochMs: Long, nowEpochMs: Long, ttlSeconds: Long): Boolean =
+    expiresAtEpochMs == GATEWAY_UNLIMITED_EXPIRY_EPOCH_MS ||
+        expiresAtEpochMs <= safeExpiryBound(nowEpochMs, ttlSeconds)
+
+/**
+ * Owner decision 2: in-memory and persisted value of an unlimited refresh idle / absolute expiry.
+ * Every `now < expiry` check stays true, and the short access expiry still bounds each credential.
+ */
+internal const val GATEWAY_UNLIMITED_EXPIRY_EPOCH_MS = Long.MAX_VALUE
 private const val MAX_SESSION_AGE_SECONDS = 12L * 60L * 60L
 private const val PASSWORD_SESSION_LOCAL_TTL_SECONDS = 30L * 60L
 private const val MAX_ACCESS_TTL_SECONDS = 60L * 60L
@@ -1473,21 +1652,11 @@ private const val MAX_REFRESH_ABSOLUTE_TTL_SECONDS = 365L * 24L * 60L * 60L
 private const val MAX_SERVER_CLOCK_SKEW_MS = 5L * 60L * 1_000L
 private const val MAX_RETRY_AFTER_MS = 5L * 60L * 1_000L
 private const val MAX_RESPONSE_BYTES = 32 * 1024
-private val ALLOWED_SERVER_ERROR_CODES = setOf(
-    "field_long_lived_sessions_unavailable",
-    "field_session_device_capacity_unavailable",
-    "field_session_query_invalid",
-    "field_session_request_invalid",
-    "field_session_revoked",
-    "field_session_storage_outcome_unknown",
-    "field_session_storage_unavailable",
-    "gateway_auth_required",
-    "invalid_account_credentials",
-    "invalid_refresh_token",
-    "refresh_rotation_limit_reached",
-    "refresh_token_absolute_expired",
-    "refresh_token_idle_expired",
-    "refresh_token_reuse_detected",
+// S01-20: exactly the registered public field-session codes (GatewaySessionErrorContract).
+private val ALLOWED_SERVER_ERROR_CODES: Set<String> = GatewaySessionErrorContract.ENTRIES.keys
+private val CONFIRMED_UNAPPLIED_REFRESH_CODES: Map<Int, Set<String>> = mapOf(
+    503 to setOf("field_session_storage_busy", "field_session_storage_unavailable"),
+    429 to setOf("field_session_refresh_rate_limited"),
 )
 private val BACKEND_ACCOUNT_ACTOR_ID =
     Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
@@ -1495,6 +1664,32 @@ private val BACKEND_ACCOUNT_BASIC_STATUS_REQUIRED_FIELDS =
     setOf("required", "authenticated", "actor_id", "session_scope")
 private val BACKEND_ACCOUNT_BASIC_STATUS_ALLOWED_FIELDS =
     BACKEND_ACCOUNT_BASIC_STATUS_REQUIRED_FIELDS + "capacity"
+
+// apps/android-gateway/src/field-long-session.ts sessionResponse / fieldLongSessionStatus.
+private val LONG_LIVED_SESSION_RESPONSE_FIELDS = setOf(
+    "session_scope",
+    "actor_id",
+    "device_id",
+    "family_id",
+    "rotation",
+    "refresh_token",
+    "access_expires_at_epoch_ms",
+    "idle_expires_at_epoch_ms",
+    "absolute_expires_at_epoch_ms",
+)
+private val LONG_LIVED_STATUS_FIELDS = setOf(
+    "required",
+    "authenticated",
+    "actor_id",
+    "session_scope",
+    "session_mode",
+    "device_id",
+    "family_id",
+    "rotation",
+    "access_expires_at_epoch_ms",
+    "idle_expires_at_epoch_ms",
+    "absolute_expires_at_epoch_ms",
+)
 private val BASE64_URL_NO_PADDING = Regex("^[A-Za-z0-9_-]+$")
 private val POSITIVE_CANONICAL_INTEGER = Regex("^[1-9][0-9]{0,18}$")
 private val BACKEND_SESSION_ID = Regex("^[A-Za-z0-9_-]{32,128}$")

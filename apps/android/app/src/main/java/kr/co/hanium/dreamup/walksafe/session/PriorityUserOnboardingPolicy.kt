@@ -311,7 +311,7 @@ internal class PriorityUserPracticeLifecycle(
                 ),
             )
         }
-        return collector.build(assessedAtEpochMs = 0L)
+        return collector.build(assessedAtElapsedRealtimeMs = 0L)
     }
 }
 
@@ -430,6 +430,29 @@ class PriorityUserOnboardingPolicy(
 
     fun cancelAppUsageEducationPlayback() = synchronized(lock) {
         pendingUsagePlayback = null
+    }
+
+    /**
+     * S02-11 / FP-010-DETAIL-03 interim: while TalkBack is on, an explanatory step is read by TalkBack
+     * (the app's own explanation voice stays off) and completed by the user's explicit confirmation.
+     * This is a screen-review record, not a voice-playback success; practice steps are unaffected and
+     * still require the app's own speech (FP-004-DETAIL-01, prohibited_behaviors[1]).
+     */
+    fun confirmEducationReviewedWithScreenReader(
+        step: PriorityUserEducationPlayback,
+        screenReaderActive: Boolean,
+    ): PriorityUserOnboardingSnapshot = synchronized(lock) {
+        if (!screenReaderActive || accountBlockReason(current) != null) return@synchronized current
+        current = when (step) {
+            PriorityUserEducationPlayback.SAFETY_LIMITS -> current.copy(educationReviewed = true)
+            PriorityUserEducationPlayback.PRACTICE_NECESSITY ->
+                if (current.educationReviewed) current.copy(practiceNecessityReviewed = true) else current
+            PriorityUserEducationPlayback.APP_USAGE ->
+                if (current.safetyEducationConsentComplete && pendingUsagePlayback == null) {
+                    current.copy(appUsageReviewed = true)
+                } else current
+        }
+        current
     }
 
     fun acceptAppUsageEducation(): PriorityUserOnboardingSnapshot = synchronized(lock) {
@@ -556,7 +579,7 @@ class PriorityUserOnboardingPolicy(
                 PriorityUserBlockReason.SAFE_PRACTICE_PLACE_NOT_CONFIRMED
             remaining.isNotEmpty() ->
                 PriorityUserBlockReason.REQUIRED_PRACTICE_INCOMPLETE
-            else -> null
+            else -> PriorityUserBlockReason.APP_USAGE_EDUCATION_INCOMPLETE
         }
         PriorityUserOnboardingDecision(
             supportPriority = PriorityUserSupportPriority.EQUAL_BLIND_AND_LOW_VISION,

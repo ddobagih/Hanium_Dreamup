@@ -1,15 +1,46 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
 import kotlin.math.abs
-import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 private data class DepthSample(
     val depthM: Float,
     val confidence: Float?,
+    val candidate: DepthCandidate,
 )
+
+private data class DepthCandidate(
+    val x: Int,
+    val y: Int,
+    val row: Int,
+    val column: Int,
+    val rowPixels: IntArray,
+) {
+    fun isAdjacentTo(other: DepthCandidate): Boolean {
+        if (abs(row - other.row) > 1) return false
+        if (rowPixels.size == other.rowPixels.size) return abs(column - other.column) <= 1
+        // Across unequal row densities, align by the closest actual sample position first.
+        // Its immediate neighbors cover both diagonal directions without skipping grid cells.
+        return includesNeighborColumnAt(other.x) || other.includesNeighborColumnAt(x)
+    }
+
+    private fun includesNeighborColumnAt(pixelX: Int): Boolean {
+        val match = rowPixels.binarySearch(pixelX)
+        if (match >= 0) return abs(column - match) <= 1
+        val right = -match - 1
+        if (right == 0) return column <= 1
+        if (right == rowPixels.size) return column >= rowPixels.lastIndex - 1
+        val left = right - 1
+        val leftDistance = pixelX - rowPixels[left]
+        val rightDistance = rowPixels[right] - pixelX
+        // At an exact midpoint both equally close columns are valid alignments.
+        return (leftDistance <= rightDistance && abs(column - left) <= 1) ||
+            (rightDistance <= leftDistance && abs(column - right) <= 1)
+    }
+}
 
 data class DepthImage16(
     val width: Int,
@@ -62,6 +93,49 @@ data class DepthSampleOptions(
  * Invalid/confidence-gated pixels and median-absolute-deviation outliers never enter the result.
  */
 class DepthSampler {
+    /** Samples only the contact's five-by-five depth-pixel neighborhood, never the object median. */
+    fun sampleContactDepth(
+        depthImage: DepthImage16,
+        confidenceImage: ConfidenceImage8?,
+        polygonDepthNorm: List<Point2>,
+        contactDepthNorm: Point2,
+        minConfidence: Float?,
+    ): ContactDepthEstimate? {
+        if (polygonDepthNorm.size < 3 || !contactDepthNorm.x.isFinite() || !contactDepthNorm.y.isFinite() ||
+            contactDepthNorm.x !in 0f..1f || contactDepthNorm.y !in 0f..1f ||
+            (confidenceImage != null &&
+                (confidenceImage.width != depthImage.width || confidenceImage.height != depthImage.height))
+        ) return null
+
+        val centerX = (contactDepthNorm.x * (depthImage.width - 1)).roundToInt()
+        val centerY = (contactDepthNorm.y * (depthImage.height - 1)).roundToInt()
+        val depths = mutableListOf<Float>()
+        var eligiblePixels = 0
+        for (y in max(0, centerY - CONTACT_RADIUS_PX)..min(depthImage.height - 1, centerY + CONTACT_RADIUS_PX)) {
+            for (x in max(0, centerX - CONTACT_RADIUS_PX)..min(depthImage.width - 1, centerX + CONTACT_RADIUS_PX)) {
+                val point = Point2(x / max(1f, (depthImage.width - 1).toFloat()),
+                    y / max(1f, (depthImage.height - 1).toFloat()))
+                if (!pointInPolygon(point, polygonDepthNorm)) continue
+                eligiblePixels += 1
+                val depth = depthImage.depthMetersAt(x, y) ?: continue
+                if (depth !in CONTACT_MIN_DEPTH_M..CONTACT_MAX_DEPTH_M) continue
+                if (minConfidence != null && (confidenceImage?.confidenceAt(x, y) ?: 0f) < minConfidence) continue
+                depths += depth
+            }
+        }
+        if (depths.size < MIN_CONTACT_SAMPLES || eligiblePixels == 0 ||
+            depths.size.toFloat() / eligiblePixels < MIN_CONTACT_VALID_RATIO
+        ) return null
+        val sorted = depths.sorted()
+        val spread = sorted.last() - sorted.first()
+        if (spread > MAX_CONTACT_SPREAD_M) return null
+        return ContactDepthEstimate(
+            distanceM = percentile(sorted, 0.5f) ?: return null,
+            spreadM = spread,
+            validSampleCount = depths.size,
+        )
+    }
+
     fun sampleObjectDepth(
         depthImage: DepthImage16,
         confidenceImage: ConfidenceImage8?,
@@ -76,25 +150,51 @@ class DepthSampler {
             .takeIf { it.size >= 3 }
             ?: polygonDepthNorm
         val candidates = candidatePixels(depthImage.width, depthImage.height, polygon, options.maxSamples)
-        val samples = candidates.mapNotNull { (x, y) ->
-            val depth = depthImage.depthMetersAt(x, y) ?: return@mapNotNull null
-            if (depth < options.minDepthM || depth > options.maxDepthM) return@mapNotNull null
-            val confidence = confidenceImage?.confidenceAt(x, y)
-            if (options.minConfidence != null && confidenceImage != null && (confidence ?: 0f) < options.minConfidence) {
+            .filter { candidate ->
+                // Centroid contraction can leave a concave mask; never sample outside the source.
+                pointInPolygon(Point2(candidate.x / max(1f, (depthImage.width - 1).toFloat()),
+                    candidate.y / max(1f, (depthImage.height - 1).toFloat())), polygonDepthNorm)
+            }
+        var invalidZero = 0
+        var tooNear = 0
+        var tooFar = 0
+        var lowConfidence = 0
+        val samples = candidates.mapNotNull { candidate ->
+            // Candidates lie inside the image, so a missing value here is a zero/invalid pixel.
+            val depth = depthImage.depthMetersAt(candidate.x, candidate.y)
+            if (depth == null) {
+                invalidZero += 1
                 return@mapNotNull null
             }
-            DepthSample(depthM = depth, confidence = confidence)
+            // Low confidence is classified before range, so near low-confidence noise is never
+            // counted as too-near evidence. The kept sample set is unchanged by this order.
+            val confidence = confidenceImage?.confidenceAt(candidate.x, candidate.y)
+            if (options.minConfidence != null && confidenceImage != null && (confidence ?: 0f) < options.minConfidence) {
+                lowConfidence += 1
+                return@mapNotNull null
+            }
+            if (depth < options.minDepthM) {
+                tooNear += 1
+                return@mapNotNull null
+            }
+            if (depth > options.maxDepthM) {
+                tooFar += 1
+                return@mapNotNull null
+            }
+            DepthSample(depthM = depth, confidence = confidence, candidate = candidate)
         }
+        val rejected = DepthSampleRejections(invalidZero, tooNear, tooFar, lowConfidence)
 
         if (samples.size < options.minValidSamples) {
             return emptyStats(validSampleCount = samples.size, totalSampleCount = candidates.size)
+                .copy(rejectedSamples = rejected)
         }
 
-        return robustStats(samples, candidates.size, options)
+        return robustStats(samples, candidates.size, options, candidates).copy(rejectedSamples = rejected)
     }
 
-    private fun candidatePixels(width: Int, height: Int, polygonNorm: List<Point2>, maxSamples: Int): List<Pair<Int, Int>> {
-        val sampleLimit = if (maxSamples > 0) maxSamples else width * height
+    private fun candidatePixels(width: Int, height: Int, polygonNorm: List<Point2>, maxSamples: Int): List<DepthCandidate> {
+        val sampleLimit = if (maxSamples > 0) maxSamples.toLong() else width.toLong() * height.toLong()
         val minX = polygonNorm.minOf { it.x }.coerceIn(0f, 1f)
         val maxX = polygonNorm.maxOf { it.x }.coerceIn(0f, 1f)
         val minY = polygonNorm.minOf { it.y }.coerceIn(0f, 1f)
@@ -103,32 +203,69 @@ class DepthSampler {
         val right = floor(maxX * (width - 1)).toInt().coerceIn(0, width - 1)
         val top = floor(minY * (height - 1)).toInt().coerceIn(0, height - 1)
         val bottom = floor(maxY * (height - 1)).toInt().coerceIn(0, height - 1)
-        val boxPixels = max(1, (right - left + 1) * (bottom - top + 1))
-        val stride = max(1, ceil(kotlin.math.sqrt(boxPixels / sampleLimit.toDouble())).toInt())
-        val points = mutableListOf<Pair<Int, Int>>()
+        val boxWidth = right.toLong() - left.toLong() + 1L
+        val boxHeight = bottom.toLong() - top.toLong() + 1L
+        val sampleCount = min(sampleLimit, boxWidth * boxHeight)
+        if (sampleCount == 0L) return emptyList()
 
-        var y = top
-        while (y <= bottom) {
-            var x = left
-            while (x <= right) {
+        val minimumRows = sampleCount / boxWidth + (if (sampleCount % boxWidth != 0L) 1L else 0L)
+        val maximumRows = min(sampleCount, boxHeight)
+        val approximateRows = floor(
+            kotlin.math.sqrt(sampleCount.toDouble() * boxHeight.toDouble() / boxWidth.toDouble()) + 0.5,
+        ).toLong()
+        val rowCount = approximateRows.coerceIn(minimumRows, maximumRows)
+        val baseColumns = sampleCount / rowCount
+        val remainder = sampleCount % rowCount
+        val points = mutableListOf<DepthCandidate>()
+
+        // Visit the full two-dimensional extent without a ceil-stride budget cliff.
+        // Polygon rejection does not refill the budget or relax later quality gates.
+        for (row in 0L until rowCount) {
+            val columnCount = baseColumns + (if (row < remainder) 1L else 0L)
+            val y = top + (((2L * row + 1L) * boxHeight - 1L) / (2L * rowCount)).toInt()
+            val rowPixels = IntArray(columnCount.toInt()) { column ->
+                left + (((2L * column + 1L) * boxWidth - 1L) / (2L * columnCount)).toInt()
+            }
+            for (column in rowPixels.indices) {
+                val x = rowPixels[column]
                 val norm = Point2(x / max(1f, (width - 1).toFloat()), y / max(1f, (height - 1).toFloat()))
                 if (pointInPolygon(norm, polygonNorm)) {
-                    points += x to y
+                    points += DepthCandidate(
+                        x = x,
+                        y = y,
+                        row = row.toInt(),
+                        column = column,
+                        rowPixels = rowPixels,
+                    )
                 }
-                x += stride
             }
-            y += stride
         }
 
-        return points.take(sampleLimit)
+        return points
     }
 
-    private fun robustStats(samples: List<DepthSample>, totalSampleCount: Int, options: DepthSampleOptions): DepthStats {
+    private fun robustStats(samples: List<DepthSample>, totalSampleCount: Int, options: DepthSampleOptions,
+                            candidates: List<DepthCandidate> = emptyList()): DepthStats {
         val sortedDepths = samples.map { it.depthM }.sorted()
         val med = percentile(sortedDepths, 0.5f) ?: return emptyStats(samples.size, totalSampleCount)
         val deviations = sortedDepths.map { abs(it - med) }.sorted()
         val mad = percentile(deviations, 0.5f) ?: 0f
         val band = max(options.minOutlierBandM, mad * options.outlierMadK)
+        // A supported nearer population is not an isolated outlier. Without spatial membership
+        // evidence neither the majority background nor the minimum is a defensible object depth.
+        // Reuse the existing support gate rather than inventing a foreground operating threshold.
+        val originalRiskPercentile = percentile(sortedDepths, 0.20f) ?: med
+        val nearSamples = samples.filter { it.depthM < med - band }
+        if (originalRiskPercentile < med - band ||
+            nearSamples.size >= options.minValidSamples || nearSamples.indices.any { index ->
+                (index + 1 until nearSamples.size).any { otherIndex ->
+                    nearSamples[index].candidate.isAdjacentTo(nearSamples[otherIndex].candidate)
+                }
+            }
+        ) {
+            return emptyStats(validSampleCount = samples.size, totalSampleCount = totalSampleCount,
+                foregroundAmbiguous = true)
+        }
         val kept = samples.filter { abs(it.depthM - med) <= band }
         if (kept.size < options.minValidSamples) {
             return emptyStats(validSampleCount = kept.size, totalSampleCount = totalSampleCount)
@@ -154,10 +291,43 @@ class DepthSampler {
             madM = mad,
             confidenceMedian = confidenceMedian,
             outlierRatio = outlierRatio.coerceIn(0f, 1f),
+            spatialCoverage = longAxisCoverage(candidates, kept),
         )
     }
 
-    private fun emptyStats(validSampleCount: Int = 0, totalSampleCount: Int = 0): DepthStats {
+    /**
+     * S11-6: how many long-axis thirds of the in-region candidates hold a kept sample, divided by
+     * the thirds that hold any candidate (a concave mask can leave a third empty). Measured along
+     * the longer candidate extent in depth pixels, so a thin object is not judged by its width.
+     */
+    private fun longAxisCoverage(candidates: List<DepthCandidate>, kept: List<DepthSample>): Float? {
+        if (candidates.isEmpty()) return null
+        val xExtent = candidates.maxOf { it.x } - candidates.minOf { it.x } + 1
+        val yExtent = candidates.maxOf { it.y } - candidates.minOf { it.y } + 1
+        val horizontal = xExtent >= yExtent
+        val longCoverage = axisCoverage(candidates, kept, alongX = horizontal)
+        // S11-6: a wide object (short extent at least half the long one) is also judged across its
+        // short axis, so depth crowded into one band is not full coverage; a thin object keeps
+        // the long-axis judgement only.
+        val wide = 2 * minOf(xExtent, yExtent) >= maxOf(xExtent, yExtent)
+        if (!wide) return longCoverage
+        return minOf(longCoverage, axisCoverage(candidates, kept, alongX = !horizontal))
+    }
+
+    private fun axisCoverage(candidates: List<DepthCandidate>, kept: List<DepthSample>, alongX: Boolean): Float {
+        fun position(candidate: DepthCandidate) = if (alongX) candidate.x else candidate.y
+        val first = candidates.minOf(::position)
+        val extent = candidates.maxOf(::position) - first + 1
+        fun bin(candidate: DepthCandidate) =
+            ((position(candidate) - first).toLong() * LONG_AXIS_COVERAGE_BINS / extent).toInt()
+                .coerceIn(0, LONG_AXIS_COVERAGE_BINS - 1)
+        val eligible = candidates.map(::bin).toSet()
+        val occupied = kept.map { bin(it.candidate) }.toSet()
+        return occupied.size.toFloat() / eligible.size
+    }
+
+    private fun emptyStats(validSampleCount: Int = 0, totalSampleCount: Int = 0,
+                           foregroundAmbiguous: Boolean = false): DepthStats {
         return DepthStats(
             validSampleCount = validSampleCount,
             validSampleRatio = if (totalSampleCount == 0) 0f else validSampleCount.toFloat() / totalSampleCount,
@@ -169,7 +339,18 @@ class DepthSampler {
             madM = null,
             confidenceMedian = null,
             outlierRatio = 1f,
+            foregroundAmbiguous = foregroundAmbiguous,
         )
+    }
+
+    private companion object {
+        const val LONG_AXIS_COVERAGE_BINS = 3
+        const val CONTACT_RADIUS_PX = 2
+        const val MIN_CONTACT_SAMPLES = 5
+        const val MIN_CONTACT_VALID_RATIO = 0.6f
+        const val CONTACT_MIN_DEPTH_M = 0.5f
+        const val CONTACT_MAX_DEPTH_M = 5f
+        const val MAX_CONTACT_SPREAD_M = 0.35f
     }
 }
 

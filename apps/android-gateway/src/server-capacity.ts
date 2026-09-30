@@ -25,7 +25,8 @@ import {
   decryptGatewayStateJson,
   encryptGatewayStateJson,
   maxGatewayStateEnvelopeBytes,
-  parsePlaintextGatewayStateForMaintenance
+  parsePlaintextGatewayStateForMaintenance,
+  syncGatewayStateDirectoryAfterRename
 } from "./encrypted-json-store.js";
 import { withExclusiveFileLock } from "./exclusive-file-lock.js";
 
@@ -218,7 +219,6 @@ function writePersistedSnapshot(
   );
   const temporary = `${target}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
   let descriptor: number | null = null;
-  let directoryDescriptor: number | null = null;
   try {
     descriptor = openSync(
       temporary,
@@ -234,16 +234,10 @@ function writePersistedSnapshot(
     descriptor = null;
     chmodSync(temporary, 0o600);
     renameSync(temporary, target);
-    directoryDescriptor = openSync(
-      path.dirname(target),
-      fsConstants.O_RDONLY |
-        fsConstants.O_DIRECTORY |
-        fsConstants.O_NOFOLLOW
-    );
-    fsyncSync(directoryDescriptor);
+    // S19-27: after the rename a failure is outcome unknown, not "not written".
+    syncGatewayStateDirectoryAfterRename("server-capacity", path.dirname(target));
   } finally {
     if (descriptor !== null) closeSync(descriptor);
-    if (directoryDescriptor !== null) closeSync(directoryDescriptor);
     rmSync(temporary, { force: true });
   }
 }
@@ -383,17 +377,19 @@ function fetchCapacitySnapshotSingleFlight(
   fetchImpl: GatewayFetch,
   timeoutMs: number
 ): Promise<ServerCapacitySnapshot | null> {
-  if (capacityFetchInFlight) return capacityFetchInFlight;
-  const pending = fetchCapacitySnapshot(
-    request,
-    fieldToken,
-    fetchImpl,
-    timeoutMs
-  ).finally(() => {
-    if (capacityFetchInFlight === pending) capacityFetchInFlight = null;
-  });
-  capacityFetchInFlight = pending;
-  return pending;
+  if (request.signal.aborted) return Promise.reject(request.signal.reason);
+  if (!capacityFetchInFlight) {
+    const pending = fetchCapacitySnapshot(
+      new Request(request.url),
+      fieldToken,
+      fetchImpl,
+      timeoutMs
+    ).finally(() => {
+      if (capacityFetchInFlight === pending) capacityFetchInFlight = null;
+    });
+    capacityFetchInFlight = pending;
+  }
+  return waitForSignal(capacityFetchInFlight, request.signal);
 }
 
 function cachedCapacity(nowEpochMs: number): ServerCapacitySnapshot | null {

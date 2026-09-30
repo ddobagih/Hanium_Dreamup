@@ -1,0 +1,113 @@
+{
+  "request": {
+    "origin": {
+      "latitude": 0.0,
+      "longitude": 0.0,
+      "name": null
+    },
+    "destination": {
+      "latitude": 0.0,
+      "longitude": 0.001,
+      "name": null
+    },
+    "waypoints": [],
+    "priority": "STAIR_AVOID",
+    "radius_m": 5000,
+    "default_speed": null
+  },
+  "status": 502,
+  "response": {
+    "detail": {
+      "code": "invalid_tmap_response",
+      "message": "TMAP pedestrian route guide position is ambiguous or out of order.",
+      "provider_status": null,
+      "provider_result_code": null
+    }
+  },
+  "provider_input": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            0,
+            0
+          ]
+        },
+        "properties": {
+          "description": "Guide"
+        }
+      },
+      {
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            0.001,
+            0
+          ]
+        },
+        "properties": {
+          "description": "Guide"
+        }
+      },
+      {
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0.0001
+            ]
+          ]
+        },
+        "properties": {
+          "distance": 11,
+          "time": 10
+        }
+      },
+      {
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              0,
+              0.0001
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        },
+        "properties": {
+          "distance": 11,
+          "time": 10
+        }
+      },
+      {
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              0,
+              0
+            ],
+            [
+              0.001,
+              0
+            ]
+          ]
+        },
+        "properties": {
+          "distance": 111,
+          "time": 10
+        }
+      }
+    ]
+  }
+}

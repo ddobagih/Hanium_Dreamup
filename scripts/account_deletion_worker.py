@@ -31,6 +31,7 @@ sys.path.insert(0, str(ROOT))
 
 from backend.app.models import (  # noqa: E402
     AccountEnrollment,
+    AccountDeletionDeviceTarget,
     AccountDeletionItem,
     AccountDeletionRequest,
     AccountDeletionTombstone,
@@ -40,6 +41,7 @@ from backend.app.models import (  # noqa: E402
     RawCollectionObject,
     Report,
     ReportImageObject,
+    ReportInstitutionDeliveryEvent,
     SignupConsentReceipt,
     UserAccount,
 )
@@ -51,6 +53,8 @@ from backend.app.services.privacy_lifecycle import (  # noqa: E402
     lock_report_deletion_transaction,
 )
 from backend.app.services.report_storage import (  # noqa: E402
+    REPORT_DELETION_QUARANTINE_DIRECTORY_NAME,
+    RETENTION_QUARANTINE_DIRECTORY_NAME,
     lock_report_storage_reconciliation_transaction,
 )
 from backend.app.services.raw_collection_storage import (  # noqa: E402
@@ -98,6 +102,10 @@ FORBIDDEN_MANUAL_ENVIRONMENT_NAMES = frozenset(
 )
 _AT_FDCWD = -100
 _RENAME_NOREPLACE = 1
+_SERVER_INVENTORY_COUNT_KEYS = (
+    "quarantined_raw_collection_count",
+    "external_copy_count",
+)
 _CREDENTIAL_JOURNAL_SCHEMAS = frozenset(
     {JOURNAL_SCHEMA, CREDENTIAL_JOURNAL_SCHEMA}
 )
@@ -970,6 +978,16 @@ def _read_journal(path: Path) -> dict[str, object]:
                 "worker credential journal inventory is invalid"
             )
         if value["schema_version"] == JOURNAL_SCHEMA:
+            # S1617-55/59: optional in v4 (absent = prepared before the
+            # quarantine/copy inventory existed, legacy fixed basis).
+            for count_key in _SERVER_INVENTORY_COUNT_KEYS:
+                if count_key in value and (
+                    type(value[count_key]) is not int
+                    or not 0 <= value[count_key] <= 10_000
+                ):
+                    raise AccountDeletionWorkerError(
+                        "worker server inventory journal is invalid"
+                    )
             frozen_ids = _frozen_account_enrollment_ids(value)
             if (
                 "email_lookup_hmac" in value
@@ -1423,6 +1441,31 @@ def _object_inventory(
             }
         )
     return reports, objects
+
+
+def _external_copy_count(db: Session, reports: list[Report]) -> int:
+    """S1617-59: delivered institution copies of the subject's reports.
+
+    Every package (or unpackaged delivery event) counts as one external copy,
+    whatever its last delivery status; the institution, not this worker,
+    deletes it, so ``server_copies`` stays open until that is confirmed.
+    """
+
+    report_ids = [report.id for report in reports]
+    if not report_ids:
+        return 0
+    copy_key = func.coalesce(
+        ReportInstitutionDeliveryEvent.package_id,
+        ReportInstitutionDeliveryEvent.id,
+    )
+    return int(
+        db.scalar(
+            select(func.count(func.distinct(copy_key))).where(
+                ReportInstitutionDeliveryEvent.report_id.in_(report_ids)
+            )
+        )
+        or 0
+    )
 
 
 def _raw_inventory(
@@ -1967,6 +2010,92 @@ def _retained_signup_receipt_count(
     )
 
 
+def _server_inventory_counts(
+    journal: Mapping[str, object],
+) -> tuple[int | None, int | None]:
+    quarantined, copies = (
+        journal.get(count_key) for count_key in _SERVER_INVENTORY_COUNT_KEYS
+    )
+    return (
+        None if quarantined is None else int(quarantined),  # type: ignore[arg-type]
+        None if copies is None else int(copies),  # type: ignore[arg-type]
+    )
+
+
+def _manifest_server_inventory(journal: Mapping[str, object]) -> dict[str, str]:
+    quarantined, copies = _server_inventory_counts(journal)
+    return {
+        "report_records": "COMPLETED",
+        "server_copies": (
+            "EXTERNAL_PENDING" if copies else "NOT_APPLICABLE"
+        ),
+        "server_originals": "COMPLETED",
+        "server_quarantine": (
+            "COMPLETED" if quarantined else "NOT_APPLICABLE"
+        ),
+    }
+
+
+def _leftover_server_objects(journal: Mapping[str, object]) -> list[str]:
+    """S1617-55: re-scan storage roots for objects outside the journal.
+
+    Any entry whose name carries a deleted report or RAW collection id, in the
+    upload root, its report quarantine directories or the RAW object root,
+    keeps the server items open (for example a legacy plaintext copy).
+    """
+
+    report_ids = {
+        str(item[key]).split(".", 1)[0]
+        for item in journal.get("objects", [])  # type: ignore[union-attr]
+        if isinstance(item, dict)
+        for key in ("report_id", "storage_name")
+        if key in item
+    }
+    collection_ids = {
+        str(item["collection_id"])
+        for item in journal.get("raw_collections", [])  # type: ignore[union-attr]
+        if isinstance(item, dict) and "collection_id" in item
+    }
+    roots: list[tuple[Path, set[str]]] = []
+    upload_roots = {
+        Path(str(item["source_path"])).parent
+        for item in journal.get("objects", [])  # type: ignore[union-attr]
+        if isinstance(item, dict) and "source_path" in item
+    }
+    for upload_root in sorted(upload_roots):
+        roots.append((upload_root, report_ids))
+        for name in (
+            RETENTION_QUARANTINE_DIRECTORY_NAME,
+            REPORT_DELETION_QUARANTINE_DIRECTORY_NAME,
+        ):
+            roots.append((upload_root / name, report_ids))
+    raw_roots = {
+        Path(str(item["source_path"])).parent
+        for item in journal.get("raw_objects", [])  # type: ignore[union-attr]
+        if isinstance(item, dict) and "source_path" in item
+    }
+    for raw_root in sorted(raw_roots):
+        roots.append((raw_root, collection_ids))
+    leftovers: list[str] = []
+    for root, identifiers in roots:
+        if not identifiers:
+            continue
+        try:
+            names = os.listdir(root)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise AccountDeletionWorkerError(
+                "server storage cannot be re-scanned after commit"
+            ) from exc
+        leftovers.extend(
+            str(root / name)
+            for name in names
+            if any(identifier in name for identifier in identifiers)
+        )
+    return sorted(leftovers)
+
+
 def _final_manifest(journal: Mapping[str, object]) -> dict[str, object]:
     objects = [
         {
@@ -1994,13 +2123,11 @@ def _final_manifest(journal: Mapping[str, object]) -> dict[str, object]:
         "deleted_at": str(journal["deleted_at"]),
         "report_count": int(journal["report_count"]),
         "objects": objects,
-        "server_inventory": {
-            "report_records": "COMPLETED",
-            "server_copies": "NOT_APPLICABLE",
-            "server_originals": "COMPLETED",
-            "server_quarantine": "NOT_APPLICABLE",
-        },
+        "server_inventory": _manifest_server_inventory(journal),
     }
+    for count_key in _SERVER_INVENTORY_COUNT_KEYS:
+        if count_key in journal:
+            manifest[count_key] = int(journal[count_key])  # type: ignore[arg-type]
     if schema in _RAW_INVENTORY_JOURNAL_SCHEMAS:
         raw_collections = journal.get("raw_collections")
         if not isinstance(raw_collections, list):
@@ -2077,7 +2204,31 @@ def _finish_committed_journal(
                 raise AccountDeletionWorkerError(
                     "retained signup consent receipt inventory differs"
                 )
+        # S1617-55: the retained consent ledger must still name every frozen
+        # device target (count() is never NULL, so check the actual rows).
+        unbacked_targets = db.scalar(
+            select(func.count(AccountDeletionDeviceTarget.installation_subject_hmac))
+            .where(
+                AccountDeletionDeviceTarget.request_id == str(journal["request_id"]),
+                ~select(PrivacyConsentEvent.id)
+                .where(
+                    PrivacyConsentEvent.privacy_subject_hmac
+                    == str(journal["privacy_subject_hmac"]),
+                    PrivacyConsentEvent.account_generation
+                    == int(journal["account_generation"]),
+                    PrivacyConsentEvent.installation_subject_hmac
+                    == AccountDeletionDeviceTarget.installation_subject_hmac,
+                )
+                .exists(),
+            )
+        )
+        if unbacked_targets != 0:
+            raise AccountDeletionWorkerError("privacy consent ledger verification failed")
         db.rollback()
+    if _leftover_server_objects(journal):
+        raise AccountDeletionWorkerError(
+            "server object inventory is not empty after commit"
+        )
     _journal_path, quarantine_dir, manifest_path = _journal_paths(
         root, str(journal["request_id"])
     )
@@ -2086,26 +2237,19 @@ def _finish_committed_journal(
         _final_manifest(journal),
     )
     with SessionFactory() as db:
+        quarantined_count, external_copy_count = _server_inventory_counts(journal)
         status = complete_server_deletion_inventory_from_manifest(
             db,
             request_id=str(journal["request_id"]),
             manifest_sha256=manifest_sha256,
             terminal_at=_parse_time(journal["deleted_at"]),
+            quarantined_raw_collection_count=quarantined_count,
+            external_copy_count=external_copy_count,
         )
         completed = status.overall_status == "COMPLETED"
         has_receipt = status.completion_receipt_sha256 is not None
         if completed != has_receipt:
             raise AccountDeletionWorkerError("server deletion receipt state is inconsistent")
-        consent_count = db.scalar(
-            select(func.count(PrivacyConsentEvent.id)).where(
-                PrivacyConsentEvent.privacy_subject_hmac
-                == str(journal["privacy_subject_hmac"]),
-                PrivacyConsentEvent.account_generation
-                == int(journal["account_generation"]),
-            )
-        )
-        if consent_count is None:
-            raise AccountDeletionWorkerError("privacy consent ledger verification failed")
         db.rollback()
     try:
         quarantine_dir.rmdir()
@@ -2268,6 +2412,11 @@ def process_request(
                     str(enrollment_id) for enrollment_id in account_enrollment_ids
                 ),
                 "retained_signup_consent_receipt_count": signup_receipt_count,
+                "quarantined_raw_collection_count": sum(
+                    1 for collection in raw_collections
+                    if collection.state == "QUARANTINED"
+                ),
+                "external_copy_count": _external_copy_count(db, reports),
             }
             _atomic_write(journal_path, journal)
             _move_to_quarantine(_journal_objects(journal))
@@ -2275,6 +2424,14 @@ def process_request(
                 fault("after_quarantine")
             if reports:
                 db.execute(delete(Report).where(Report.id.in_([report.id for report in reports])))
+                # DELETE holds each report row until commit. A delivery that
+                # acquired the row between preparation and DELETE is now
+                # visible; one arriving afterward must wait for the DELETE.
+                # Do not publish a journal whose copy count missed that fact.
+                if _external_copy_count(db, reports) != journal["external_copy_count"]:
+                    raise AccountDeletionWorkerError(
+                        "external copy inventory changed during report deletion"
+                    )
             if raw_collections:
                 db.execute(
                     delete(RawCollection).where(

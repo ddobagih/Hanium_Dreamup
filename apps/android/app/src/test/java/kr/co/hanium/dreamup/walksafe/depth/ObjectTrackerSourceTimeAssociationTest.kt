@@ -116,7 +116,8 @@ class ObjectTrackerSourceTimeAssociationTest {
                 val snapshot = DepthFrameSnapshot(key(targetAt).frameId,
                     DepthImage16(192, 192, IntArray(192 * 192) { 1_000 }),
                     ConfidenceImage8(192, 192, ByteArray(192 * 192) { 255.toByte() }), null,
-                    rawDepthTimestampNs = key(targetAt).frameId, cameraImageTimestampNs = key(targetAt).frameId)
+                    rawDepthTimestampNs = key(targetAt).frameId, rawConfidenceTimestampNs = key(targetAt).frameId,
+                    cameraImageTimestampNs = key(targetAt).frameId)
                 val output = pipeline.processTrackedObservation(snapshot, observation, mapper, key(targetAt).frameId, targetAt)
                 assertEquals(2, output.size)
                 if (targetAt == 1_100L) {
@@ -193,7 +194,8 @@ class ObjectTrackerSourceTimeAssociationTest {
             val snapshot = DepthFrameSnapshot(key(at).frameId,
                 DepthImage16(192, 192, IntArray(192 * 192) { 1_000 }),
                 ConfidenceImage8(192, 192, ByteArray(192 * 192) { 255.toByte() }), null,
-                rawDepthTimestampNs = key(at).frameId, cameraImageTimestampNs = key(at).frameId)
+                rawDepthTimestampNs = key(at).frameId, rawConfidenceTimestampNs = key(at).frameId,
+                cameraImageTimestampNs = key(at).frameId)
             val output = pipeline.processTrackedObservation(snapshot, observation, mapper, key(at).frameId, at)
                 .sortedBy { it.bboxNorm.x }
             assertEquals(count, output.size)

@@ -116,13 +116,19 @@ class DebugBboxOverlayView(context: Context) : View(context) {
             rect.set(box.rect.left, box.rect.top, box.rect.right, box.rect.bottom)
             val paint = when {
                 presentation.interpolated -> interpolatedPaint
+                presentation.stale -> heldPaint
                 box.best -> bestPaint
                 box.held -> heldPaint
                 else -> detectionPaint
             }
             canvas.drawRect(rect, paint)
             canvas.drawCircle(rect.centerX(), rect.centerY(), CENTER_RADIUS, centerPaint)
-            val label = if (presentation.interpolated) "${box.label} · interp" else box.label
+            val label = when {
+                presentation.interpolated -> "${box.label} · interp"
+                // A smooth display is not a current observation: show how old its source is.
+                presentation.stale -> "${box.label} · stale ${presentation.sourceAgeMs}ms"
+                else -> box.label
+            }
             drawLabel(canvas, label, rect.left, rect.top)
         }
         removeCallbacks(expireOverlay)
@@ -157,6 +163,7 @@ class DebugBboxOverlayView(context: Context) : View(context) {
         className = className,
         held = held,
         smoothed = smoothed,
+        trackKey = trackKey,
     )
 
     data class DebugOverlayBox(
@@ -167,6 +174,7 @@ class DebugBboxOverlayView(context: Context) : View(context) {
         val held: Boolean = false,
         val smoothed: Boolean = false,
         val ageMs: Long? = null,
+        val trackKey: String? = null,
     ) {
         fun displayLabel(): String {
             val age = ageMs

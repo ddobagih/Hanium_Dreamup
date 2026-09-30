@@ -443,8 +443,25 @@ class MainActivityPhoneMountingStaticTest {
             fallbackConfirmation.contains("synchronized(phoneMountingObservationLock)"),
         )
         assertTrue(fallbackConfirmation.contains("if (!phoneMountingOutputsAllowed)"))
-        assertTrue(navigationSpeech.substringAfter("val mainThreadCompletion")
-            .contains("navigationEnvironmentOutputsAllowed()"))
+        val navigationCurrent = navigationSpeech.substringAfter("fun outputCurrent(): Boolean =")
+            .substringBefore("fun failOnce()")
+        assertTrue(navigationCurrent.contains("navigationEnvironmentOutputsAllowed()"))
+        assertTrue(navigationCurrent.contains("isWalkSessionRuntimeActive()"))
+        assertTrue(navigationCurrent.contains("isFeedbackLifecycleCurrent(generation)"))
+        assertTrue(navigationCurrent.contains("expectedWalkEpoch != null"))
+        assertTrue(navigationCurrent.contains("walkSessionLifecycle.currentRuntimeEpochOrNull() == expectedWalkEpoch"))
+        assertFalse(navigationCurrent.contains("isInstructionStillCurrent()"))
+        val navigationCompletion = blockStartingAt(navigationSpeech, "onCompleted = {")
+        assertInOrder(
+            navigationCompletion,
+            "if (outputCurrent() && terminal.compareAndSet(false, true))",
+            "onCompleted?.invoke()",
+        )
+        assertTrue(
+            navigationSpeech.contains(
+                "isStillValidAtStart = { outputCurrent() && isInstructionStillCurrent() }",
+            ),
+        )
         assertTrue(routeGuidance.contains("tryDispatchRouteInstruction(update, expectedWalkEpoch)"))
         val delivery = functionBlock("private fun tryDispatchRouteInstruction(")
         assertInOrder(
@@ -530,7 +547,18 @@ class MainActivityPhoneMountingStaticTest {
     private fun functionBlock(signature: String): String {
         val start = source.indexOf(signature)
         check(start >= 0) { "missing function: $signature" }
-        return balancedBlock(source, start)
+        var parameterDepth = 0
+        for (index in start until source.length) {
+            when (source[index]) {
+                '(' -> parameterDepth += 1
+                ')' -> parameterDepth -= 1
+                '{' -> if (parameterDepth == 0) {
+                    // A default lambda inside the parameter list is not the function body.
+                    return source.substring(start, index) + balancedBlock(source, index)
+                }
+            }
+        }
+        error("missing function body: $signature")
     }
 
     private fun declarationRegion(signature: String): String {

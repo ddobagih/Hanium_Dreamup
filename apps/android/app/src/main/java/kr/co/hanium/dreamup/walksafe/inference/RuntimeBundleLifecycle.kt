@@ -105,16 +105,26 @@ data class RuntimeBundleApprovalProfile(
     }
 }
 
-data class RuntimeBundleValidationEvidence(
-    val bundleVersion: String,
+class RuntimeBundleValidationEvidence(
+    descriptor: RuntimeBundleDescriptor,
     val compatibilityPassed: Boolean,
     val selfTestPassed: Boolean,
 ) {
-    init {
-        require(bundleVersion.isNotBlank() && bundleVersion == bundleVersion.trim()) {
-            "validation bundleVersion must be a trimmed non-blank value"
-        }
-    }
+    private val validatedDescriptor = RuntimeBundleDescriptor(
+        bundleVersion = descriptor.bundleVersion,
+        modelArtifacts = descriptor.modelArtifacts.toMap(),
+        modelClasses = descriptor.modelClasses.mapValues { (_, classes) -> classes.toList() },
+        guidanceAllowlist = descriptor.guidanceAllowlist.mapValues { (_, classes) -> classes.toSet() },
+        classThresholds = descriptor.classThresholds.mapValues { (_, thresholds) -> thresholds.toMap() },
+        appArtifactSha256 = descriptor.appArtifactSha256,
+        configSha256 = descriptor.configSha256,
+    )
+
+    val bundleVersion: String
+        get() = validatedDescriptor.bundleVersion
+
+    internal fun matchesTarget(descriptor: RuntimeBundleDescriptor): Boolean =
+        validatedDescriptor == descriptor
 }
 
 data class RuntimeBundleActivationRequest(
@@ -195,13 +205,20 @@ data class RuntimeBundleChangeResult(
 class RuntimeBundleLifecycle(
     initialCurrent: RuntimeBundleDescriptor,
     initialPreviousKnownGood: RuntimeBundleDescriptor? = null,
-    private val approvalProfile: RuntimeBundleApprovalProfile? = productionApprovalProfile,
+    approvalProfile: RuntimeBundleApprovalProfile? = productionApprovalProfile,
 ) {
-    private var current = initialCurrent
-    private var previousKnownGood = initialPreviousKnownGood
+    private val approvalProfile = approvalProfile?.let { profile ->
+        profile.copy(
+            bindings = profile.bindings.map { binding ->
+                binding.copy(descriptor = detachedDescriptor(binding.descriptor))
+            }.toSet(),
+        )
+    }
+    private var current = detachedDescriptor(initialCurrent)
+    private var previousKnownGood = initialPreviousKnownGood?.let(::detachedDescriptor)
 
     @Synchronized
-    fun snapshot() = RuntimeBundleLifecycleSnapshot(current, previousKnownGood)
+    fun snapshot() = detachedSnapshot()
 
     @Synchronized
     fun activateForNextWalk(
@@ -221,8 +238,9 @@ class RuntimeBundleLifecycle(
         validationFailure(request.candidate, request.validation)?.let { return result(it) }
         if (request.candidate == current) return result(RuntimeBundleChangeStatus.ALREADY_CURRENT)
 
+        val activated = detachedDescriptor(request.candidate)
         previousKnownGood = current
-        current = request.candidate
+        current = activated
         return result(RuntimeBundleChangeStatus.ACTIVATED_FOR_NEXT_WALK)
     }
 
@@ -264,8 +282,9 @@ class RuntimeBundleLifecycle(
             return result(RuntimeBundleChangeStatus.AUDIT_BINDING_MISSING)
         }
 
+        val restored = detachedDescriptor(request.target)
         val replaced = current
-        current = request.target
+        current = restored
         previousKnownGood = replaced
         return result(RuntimeBundleChangeStatus.ROLLED_BACK_FOR_NEXT_WALK)
     }
@@ -274,7 +293,7 @@ class RuntimeBundleLifecycle(
         descriptor: RuntimeBundleDescriptor,
         validation: RuntimeBundleValidationEvidence,
     ): RuntimeBundleChangeStatus? = when {
-        validation.bundleVersion != descriptor.bundleVersion ->
+        !validation.matchesTarget(descriptor) ->
             RuntimeBundleChangeStatus.VALIDATION_BINDING_MISMATCH
         !validation.compatibilityPassed -> RuntimeBundleChangeStatus.COMPATIBILITY_FAILED
         !validation.selfTestPassed -> RuntimeBundleChangeStatus.SELF_TEST_FAILED
@@ -283,7 +302,22 @@ class RuntimeBundleLifecycle(
 
     private fun result(status: RuntimeBundleChangeStatus) = RuntimeBundleChangeResult(
         status = status,
-        snapshot = RuntimeBundleLifecycleSnapshot(current, previousKnownGood),
+        snapshot = detachedSnapshot(),
+    )
+
+    private fun detachedSnapshot() = RuntimeBundleLifecycleSnapshot(
+        current = detachedDescriptor(current),
+        previousKnownGood = previousKnownGood?.let(::detachedDescriptor),
+    )
+
+    private fun detachedDescriptor(descriptor: RuntimeBundleDescriptor) = RuntimeBundleDescriptor(
+        bundleVersion = descriptor.bundleVersion,
+        modelArtifacts = descriptor.modelArtifacts.toMap(),
+        modelClasses = descriptor.modelClasses.mapValues { (_, classes) -> classes.toList() },
+        guidanceAllowlist = descriptor.guidanceAllowlist.mapValues { (_, classes) -> classes.toSet() },
+        classThresholds = descriptor.classThresholds.mapValues { (_, thresholds) -> thresholds.toMap() },
+        appArtifactSha256 = descriptor.appArtifactSha256,
+        configSha256 = descriptor.configSha256,
     )
 
     companion object {

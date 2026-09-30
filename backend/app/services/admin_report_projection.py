@@ -78,6 +78,7 @@ class AdminReportDetailRow:
     status_version: int
     content_revision: int
     latest_delivery_revision: int
+    latest_review_revision: int
     class_name: str
     confidence: float
     latitude: float | None
@@ -315,12 +316,22 @@ def admin_report_detail_columns() -> tuple[object, ...]:
         .scalar_subquery(),
         0,
     )
+    # Report-wide (every content revision), like the review CAS: after a
+    # content correction current_review is null but the next decision must
+    # still bind the latest revision (W20A-R1).
+    latest_review_revision = func.coalesce(
+        select(func.max(ReportReviewDecision.revision))
+        .where(ReportReviewDecision.report_id == Report.id)
+        .scalar_subquery(),
+        0,
+    )
     return (
         Report.id,
         Report.status,
         Report.status_version,
         Report.content_revision,
         latest_delivery_revision.label("latest_delivery_revision"),
+        latest_review_revision.label("latest_review_revision"),
         Report.class_name,
         Report.confidence,
         Report.latitude,
@@ -382,6 +393,9 @@ def project_admin_report_detail(
     )
     if delivery is not None:
         latest_delivery_revision = max(latest_delivery_revision, int(delivery.revision))
+    latest_review_revision = int(getattr(report, "latest_review_revision", 0) or 0)
+    if review is not None:
+        latest_review_revision = max(latest_review_revision, int(review.revision))
     return AdminReportDetailV2(
         schema_version="walksafe.admin-report-detail.v2",
         id=report.id,
@@ -389,6 +403,7 @@ def project_admin_report_detail(
         status_version=getattr(report, "status_version", None) or 1,
         content_revision=int(getattr(report, "content_revision", 0) or 0),
         latest_delivery_revision=latest_delivery_revision,
+        latest_review_revision=latest_review_revision,
         allowed_next_statuses=list(allowed_next_statuses(report.status)),
         class_name=report.class_name,
         confidence=report.confidence,

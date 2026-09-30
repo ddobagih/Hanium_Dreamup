@@ -457,16 +457,14 @@ def test_account_enrollment_create_authenticate_and_receipt_are_atomic() -> None
         assert authenticated.auth_epoch == 1
 
     with SessionFactory() as db:
-        with pytest.raises(AccountServiceError) as replayed:
-            service.create_account(
-                db,
-                _create_payload(
-                    issued.response.enrollment_handle,
-                    issued.delivery.code,
-                ),
-            )
-        assert replayed.value.code == "account_enrollment_conflict"
-        assert replayed.value.status_code == 409
+        replayed = service.create_account(
+            db,
+            _create_payload(
+                issued.response.enrollment_handle,
+                issued.delivery.code,
+            ),
+        )
+        assert replayed.model_dump() == created.model_dump()
     engine.dispose()
 
 
@@ -1033,6 +1031,438 @@ def test_expired_enrollment_envelope_is_available_to_bounded_manual_purge() -> N
     with SessionFactory() as db:
         assert db.get(AccountEnrollment, issued.delivery.enrollment_id) is None
     engine.dispose()
+
+
+def _creation_replay_pg_snapshot(db, handle: str):
+    enrollment = db.scalar(
+        select(AccountEnrollment).where(AccountEnrollment.enrollment_handle == handle)
+    )
+    assert enrollment is not None
+    account = db.get(UserAccount, enrollment.created_account_id)
+    assert account is not None
+    receipt = db.scalar(
+        select(SignupConsentReceipt).where(SignupConsentReceipt.account_id == account.id)
+    )
+    assert receipt is not None
+    return tuple({
+        column.name: getattr(row, column.name)
+        for column in type(row).__table__.columns
+    } for row in (enrollment, account, receipt))
+
+
+def _assert_creation_replay_pg_counts(db, *, email_hmac: str, account_id: uuid.UUID):
+    assert db.scalar(
+        select(func.count(UserAccount.id)).where(UserAccount.email_lookup_hmac == email_hmac)
+    ) == 1
+    assert db.scalar(
+        select(func.count(SignupConsentReceipt.id)).where(
+            SignupConsentReceipt.account_id == account_id
+        )
+    ) == 1
+
+
+def test_committed_account_result_replays_in_new_session_without_rewriting_rows() -> None:
+    engine, SessionFactory = _session_factory()
+    service = AccountService(settings)
+    suffix = uuid.uuid4().hex
+    email = f"creation-replay-{suffix}@example.com"
+    try:
+        issued = _active_enrollment(service, SessionFactory, email=email, suffix=suffix)
+        assert issued.delivery is not None
+        payload = _create_payload(issued.response.enrollment_handle, issued.delivery.code)
+        with SessionFactory() as db:
+            original = service.create_account(db, payload)
+            assert not db.in_transaction()
+        # Model a committed result not delivered to the caller, not a socket fault.
+        with SessionFactory() as db:
+            before = _creation_replay_pg_snapshot(db, payload.enrollment_handle)
+        for _ in range(2):
+            with SessionFactory() as db:
+                replayed = service.create_account(db, payload)
+                assert replayed.model_dump() == original.model_dump()
+            with SessionFactory() as db:
+                assert _creation_replay_pg_snapshot(db, payload.enrollment_handle) == before
+                _assert_creation_replay_pg_counts(
+                    db,
+                    email_hmac=service.normalized_email_lookup(email)[1],
+                    account_id=before[1]["id"],
+                )
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize("other_payload", ("same", "password", "consent"))
+def test_concurrent_account_creation_has_one_result_or_one_different_payload_winner(
+    other_payload: str,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    service = AccountService(settings)
+    suffix = uuid.uuid4().hex
+    email = f"creation-race-{suffix}@example.com"
+    ready = (Event(), Event())
+    release = Event()
+    try:
+        issued = _active_enrollment(service, SessionFactory, email=email, suffix=suffix)
+        assert issued.delivery is not None
+        first = _create_payload(issued.response.enrollment_handle, issued.delivery.code)
+        second_body = first.model_dump()
+        if other_payload == "password":
+            second_body["password"] = "another correct horse battery"
+        elif other_payload == "consent":
+            second_body["consent"]["selections"]["raw_original"] = True
+        payloads = (first, AccountCreateRequestV1.model_validate(second_body))
+
+        def create(index: int):
+            ready[index].set()
+            assert release.wait(timeout=5), "account creation race was not released"
+            try:
+                with SessionFactory() as db:
+                    return index, service.create_account(db, payloads[index])
+            except AccountServiceError as exc:
+                return index, exc
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(create, index) for index in range(2)]
+            try:
+                assert all(event.wait(timeout=5) for event in ready)
+            finally:
+                release.set()
+            outcomes = [future.result(timeout=5) for future in futures]
+        accepted = [(index, value) for index, value in outcomes
+                    if not isinstance(value, AccountServiceError)]
+        rejected = [value for _, value in outcomes if isinstance(value, AccountServiceError)]
+        if other_payload == "same":
+            assert len(accepted) == 2 and not rejected
+            assert accepted[0][1] == accepted[1][1]
+        else:
+            assert len(accepted) == len(rejected) == 1
+            assert rejected[0].code == "account_enrollment_conflict"
+            assert rejected[0].status_code == 409
+        winner, result = accepted[0]
+        with SessionFactory() as db:
+            snapshot = _creation_replay_pg_snapshot(db, first.enrollment_handle)
+            _assert_creation_replay_pg_counts(
+                db,
+                email_hmac=service.normalized_email_lookup(email)[1],
+                account_id=snapshot[1]["id"],
+            )
+            assert snapshot[0]["state"] == "CONSUMED"
+            assert snapshot[0]["attempt_count"] == 0
+            assert snapshot[1]["actor_id"] == result.actor_id
+            assert accounts_service.verify_account_password(
+                payloads[winner].password, snapshot[1]["password_hash"],
+            )
+            assert snapshot[2]["selections"] == payloads[winner].consent.selections.model_dump()
+    finally:
+        release.set()
+        engine.dispose()
+
+
+@pytest.mark.parametrize("changed", ("none", "disabled", "password_hash", "auth_epoch"))
+def test_creation_replay_refreshes_preloaded_enrollment_and_account_identity_map(
+    changed: str,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    service = AccountService(settings)
+    suffix = uuid.uuid4().hex
+    email = f"creation-fresh-{suffix}@example.com"
+    try:
+        issued = _active_enrollment(service, SessionFactory, email=email, suffix=suffix)
+        assert issued.delivery is not None
+        payload = _create_payload(issued.response.enrollment_handle, issued.delivery.code)
+        with SessionFactory() as stale:
+            cached_enrollment = stale.get(AccountEnrollment, issued.delivery.enrollment_id)
+            assert cached_enrollment is not None and cached_enrollment.state == "ACTIVE"
+            with SessionFactory() as fresh:
+                created = service.create_account(fresh, payload)
+            assert cached_enrollment.state == "ACTIVE"
+            cached_account = stale.scalar(
+                select(UserAccount).where(UserAccount.actor_id == created.actor_id)
+            )
+            assert cached_account is not None and cached_account.status == "ACTIVE"
+            old_hash = cached_account.password_hash
+            if changed != "none":
+                with SessionFactory.begin() as fresh:
+                    current = fresh.get(UserAccount, cached_account.id)
+                    assert current is not None
+                    if changed == "disabled":
+                        current.status = "DISABLED"
+                        current.auth_epoch += 1
+                    elif changed == "password_hash":
+                        current.password_hash = accounts_service.hash_account_password(payload.password)
+                    else:
+                        current.auth_epoch += 1
+                assert cached_account.status == "ACTIVE"
+                assert cached_account.password_hash == old_hash
+                assert cached_account.auth_epoch == 1
+            with SessionFactory() as fresh:
+                before = _creation_replay_pg_snapshot(fresh, payload.enrollment_handle)
+            if changed == "none":
+                assert service.create_account(stale, payload) == created
+            else:
+                with pytest.raises(AccountServiceError) as rejected:
+                    service.create_account(stale, payload)
+                assert rejected.value.code == "account_enrollment_conflict"
+                assert rejected.value.status_code == 409
+            assert cached_enrollment.state == "CONSUMED"
+            stale.rollback()
+        with SessionFactory() as fresh:
+            assert _creation_replay_pg_snapshot(fresh, payload.enrollment_handle) == before
+            _assert_creation_replay_pg_counts(
+                fresh,
+                email_hmac=service.normalized_email_lookup(email)[1],
+                account_id=before[1]["id"],
+            )
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize("missing", ("purged_enrollment", "unknown_handle", "deleted_account"))
+def test_creation_replay_does_not_reconstruct_missing_rows(
+    missing: str,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    service = AccountService(settings)
+    suffix = uuid.uuid4().hex
+    email = f"creation-missing-{suffix}@example.com"
+    try:
+        issued = _active_enrollment(service, SessionFactory, email=email, suffix=suffix)
+        assert issued.delivery is not None
+        payload = _create_payload(issued.response.enrollment_handle, issued.delivery.code)
+        with SessionFactory() as db:
+            created = service.create_account(db, payload)
+        with SessionFactory() as db:
+            account_id = db.scalar(select(UserAccount.id).where(
+                UserAccount.actor_id == created.actor_id
+            ))
+            assert account_id is not None
+        if missing == "unknown_handle":
+            payload = payload.model_copy(update={
+                "enrollment_handle": uuid.uuid4().hex + uuid.uuid4().hex[:11],
+            })
+        else:
+            with SessionFactory.begin() as db:
+                if missing == "purged_enrollment":
+                    db.execute(AccountEnrollment.__table__.delete().where(
+                        AccountEnrollment.id == issued.delivery.enrollment_id
+                    ))
+                else:
+                    db.execute(UserAccount.__table__.delete().where(UserAccount.id == account_id))
+        with SessionFactory() as db:
+            with pytest.raises(AccountServiceError) as rejected:
+                service.create_account(db, payload)
+            assert rejected.value.code == (
+                "account_enrollment_conflict" if missing == "deleted_account"
+                else "account_enrollment_verification_failed"
+            )
+            assert rejected.value.status_code == (409 if missing == "deleted_account" else 401)
+        with SessionFactory() as db:
+            assert db.scalar(select(func.count(UserAccount.id)).where(
+                UserAccount.email_lookup_hmac == service.normalized_email_lookup(email)[1]
+            )) == (0 if missing == "deleted_account" else 1)
+            assert db.scalar(select(func.count(SignupConsentReceipt.id)).where(
+                SignupConsentReceipt.account_id == account_id
+            )) == 1
+            assert db.scalar(select(func.count(AccountEnrollment.id)).where(
+                AccountEnrollment.id == issued.delivery.enrollment_id
+            )) == (0 if missing == "purged_enrollment" else 1)
+    finally:
+        engine.dispose()
+
+
+def test_creation_binding_check_failure_rolls_back_account_receipt_and_consumption(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    service = AccountService(settings)
+    suffix = uuid.uuid4().hex
+    email = f"creation-rollback-{suffix}@example.com"
+    try:
+        issued = _active_enrollment(service, SessionFactory, email=email, suffix=suffix)
+        assert issued.delivery is not None
+        payload = _create_payload(issued.response.enrollment_handle, issued.delivery.code)
+        with SessionFactory() as db:
+            enrollment = db.get(AccountEnrollment, issued.delivery.enrollment_id)
+            assert enrollment is not None
+            before = {
+                column.name: getattr(enrollment, column.name)
+                for column in AccountEnrollment.__table__.columns
+            }
+        attempted_accounts = []
+        with monkeypatch.context() as patch:
+            def invalid_binding(_self, **kwargs):
+                attempted_accounts.append(kwargs["account"].id)
+                return "not-a-valid-binding"
+            patch.setattr(accounts_service.AccountEmailCrypto, "creation_binding_hmac", invalid_binding)
+            with SessionFactory() as db:
+                with pytest.raises(IntegrityError) as rejected:
+                    service.create_account(db, payload)
+                assert getattr(rejected.value.orig, "sqlstate", None) == "23514"
+                assert rejected.value.orig.diag.constraint_name == "ck_account_enrollments_creation_binding"
+                assert not db.in_transaction()
+        assert len(attempted_accounts) == 1
+        with SessionFactory() as db:
+            enrollment = db.get(AccountEnrollment, issued.delivery.enrollment_id)
+            assert enrollment is not None
+            assert {
+                column.name: getattr(enrollment, column.name)
+                for column in AccountEnrollment.__table__.columns
+            } == before
+            assert db.scalar(select(func.count(UserAccount.id)).where(
+                UserAccount.email_lookup_hmac == service.normalized_email_lookup(email)[1]
+            )) == 0
+            assert db.scalar(select(func.count(SignupConsentReceipt.id)).where(
+                SignupConsentReceipt.account_id.in_(attempted_accounts)
+            )) == 0
+        with SessionFactory() as db:
+            created = service.create_account(db, payload)
+        with SessionFactory() as db:
+            assert service.create_account(db, payload) == created
+            snapshot = _creation_replay_pg_snapshot(db, payload.enrollment_handle)
+            _assert_creation_replay_pg_counts(
+                db,
+                email_hmac=service.normalized_email_lookup(email)[1],
+                account_id=snapshot[1]["id"],
+            )
+    finally:
+        engine.dispose()
+
+
+def _creation_binding_pg_row():
+    now = utc_now()
+    return {
+        "id": uuid.uuid4(),
+        "request_id": f"binding_{uuid.uuid4().hex}",
+        "request_hmac": "a" * 64,
+        "enrollment_handle": uuid.uuid4().hex + uuid.uuid4().hex[:11],
+        "email_lookup_hmac": uuid.uuid4().hex + uuid.uuid4().hex,
+        "email_ciphertext": b"e" * 17,
+        "email_nonce": b"n" * 12,
+        "email_key_version": 1,
+        "otp_hmac": None,
+        "state": "CONSUMED",
+        "state_version": 2,
+        "attempt_count": 0,
+        "max_attempts": 5,
+        "issue_count": 1,
+        "expires_at": now + timedelta(minutes=10),
+        "resend_not_before": now,
+        "consumed_at": now,
+        "created_at": now,
+        "updated_at": now,
+        "created_account_id": uuid.uuid4(),
+        "creation_binding_hmac": "b" * 64,
+        "creation_binding_key_version": 1,
+    }
+
+
+@pytest.mark.parametrize("invalid", (*range(1, 7), "uppercase", "short", "zero", "negative", "active"))
+def test_creation_binding_postgres_check_rejects_partial_or_invalid_proofs(invalid) -> None:
+    engine, _ = _session_factory()
+    row = _creation_binding_pg_row()
+    if isinstance(invalid, int):
+        for bit, field in enumerate((
+            "created_account_id", "creation_binding_hmac", "creation_binding_key_version",
+        )):
+            if not (invalid & (1 << bit)):
+                row[field] = None
+    elif invalid == "uppercase":
+        row["creation_binding_hmac"] = "B" * 64
+    elif invalid == "short":
+        row["creation_binding_hmac"] = "b" * 63
+    elif invalid == "zero":
+        row["creation_binding_key_version"] = 0
+    elif invalid == "negative":
+        row["creation_binding_key_version"] = -1
+    else:
+        row.update(state="ACTIVE", consumed_at=None, otp_hmac="c" * 64)
+    try:
+        with pytest.raises(IntegrityError) as rejected:
+            with engine.begin() as connection:
+                connection.execute(AccountEnrollment.__table__.insert().values(**row))
+        assert getattr(rejected.value.orig, "sqlstate", None) == "23514"
+        assert rejected.value.orig.diag.constraint_name == "ck_account_enrollments_creation_binding"
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize("kind", ("legacy", "active_unbound", "bound"))
+def test_creation_binding_postgres_check_preserves_legacy_and_accepts_complete_proof(kind: str) -> None:
+    engine, _ = _session_factory()
+    row = _creation_binding_pg_row()
+    if kind != "bound":
+        row.update(
+            created_account_id=None,
+            creation_binding_hmac=None,
+            creation_binding_key_version=None,
+        )
+    if kind == "active_unbound":
+        row.update(state="ACTIVE", consumed_at=None, otp_hmac="c" * 64)
+    try:
+        with engine.begin() as connection:
+            connection.execute(AccountEnrollment.__table__.insert().values(**row))
+        with engine.connect() as connection:
+            assert connection.execute(
+                select(func.count(AccountEnrollment.id)).where(AccountEnrollment.id == row["id"])
+            ).scalar_one() == 1
+    finally:
+        engine.dispose()
+
+
+def test_creation_binding_postgres_unique_prevents_two_enrollments_claiming_one_account() -> None:
+    engine, _ = _session_factory()
+    first = _creation_binding_pg_row()
+    second = _creation_binding_pg_row()
+    second["created_account_id"] = first["created_account_id"]
+    try:
+        with engine.begin() as connection:
+            connection.execute(AccountEnrollment.__table__.insert().values(**first))
+        with pytest.raises(IntegrityError) as rejected:
+            with engine.begin() as connection:
+                connection.execute(AccountEnrollment.__table__.insert().values(**second))
+        assert getattr(rejected.value.orig, "sqlstate", None) == "23505"
+        assert rejected.value.orig.diag.constraint_name == "uq_account_enrollments_created_account"
+        with engine.connect() as connection:
+            assert connection.execute(select(func.count(AccountEnrollment.id)).where(
+                AccountEnrollment.created_account_id == first["created_account_id"]
+            )).scalar_one() == 1
+    finally:
+        engine.dispose()
+
+
+def test_creation_replay_downgrade_refuses_to_discard_success_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, _ = _session_factory()
+    row = _creation_binding_pg_row()
+    migration = importlib.import_module(
+        "backend.alembic.versions.202609210001_account_creation_replay"
+    )
+    try:
+        with engine.begin() as connection:
+            connection.execute(AccountEnrollment.__table__.insert().values(**row))
+        with engine.connect() as connection:
+            transaction = connection.begin()
+            monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+            try:
+                with pytest.raises(SQLAlchemyError) as rejected:
+                    migration.downgrade()
+                assert getattr(rejected.value.orig, "sqlstate", None) == "55000"
+            finally:
+                transaction.rollback()
+        with engine.connect() as connection:
+            stored = connection.execute(select(
+                AccountEnrollment.created_account_id,
+                AccountEnrollment.creation_binding_hmac,
+                AccountEnrollment.creation_binding_key_version,
+            ).where(AccountEnrollment.id == row["id"])).one()
+            assert tuple(stored) == (
+                row["created_account_id"], row["creation_binding_hmac"],
+                row["creation_binding_key_version"],
+            )
+    finally:
+        engine.dispose()
+
 
 
 def test_postgres_account_tables_never_define_raw_birth_or_email_columns() -> None:

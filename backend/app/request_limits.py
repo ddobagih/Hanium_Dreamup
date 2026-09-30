@@ -31,6 +31,12 @@ _ACCOUNT_PATHS = frozenset(
         "/accounts/authenticate",
     }
 )
+_REPORT_PRIVATE_PATHS = (
+    "/reports",
+    "/admin/reports",
+    "/admin/report-requests",
+    "/admin/report-deletions",
+)
 
 
 logger = logging.getLogger(__name__)
@@ -42,19 +48,28 @@ def _is_raw_collection_path(path: str) -> bool:
     )
 
 
+def _is_report_sensitive_path(path: str) -> bool:
+    return path.startswith("/uploads/") or any(
+        path == prefix or path.startswith(f"{prefix}/")
+        for prefix in _REPORT_PRIVATE_PATHS
+    )
+
+
 class RequestBodyTooLarge(Exception):
     pass
 
 
 class PrivacyNoStoreMiddleware:
-    """Prevent every privacy response, including CORS preflight, from being cached."""
+    """Prevent privacy and report responses from being cached."""
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not scope.get("path", "").startswith(
-            "/privacy/"
+        path = scope.get("path", "")
+        report_response = _is_report_sensitive_path(path)
+        if scope["type"] != "http" or not (
+            path.startswith("/privacy/") or report_response
         ):
             await self.app(scope, receive, send)
             return
@@ -69,7 +84,7 @@ class PrivacyNoStoreMiddleware:
                 ]
                 headers.extend(
                     [
-                        (b"cache-control", b"no-store"),
+                        (b"cache-control", b"private, no-store" if report_response else b"no-store"),
                         (b"pragma", b"no-cache"),
                     ]
                 )

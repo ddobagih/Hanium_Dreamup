@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -12,6 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +22,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -28,9 +36,14 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     static final String APP_KIND = "ADMIN_ANDROID";
     static final String ROLE = "ADMIN";
     static final String AUDIENCE = "walksafe-admin-api";
+    private static final int SESSION_PAGE_SIZE = 99;
+    private static final int MAX_SESSION_PAGES = 1000;
 
     interface Transport {
         Response execute(String method, String url, Map<String, String> headers, byte[] body) throws IOException;
+
+        /** S18-18: explicit cancellation of requests still in flight; never waits. */
+        default void cancelInFlight() {}
     }
 
     static final class Response {
@@ -141,6 +154,60 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         return result;
     }
 
+    /**
+     * S18-20: the same request as the String login, encoded from the caller's mutable buffers
+     * into a sensitive buffer; no String of the password or TOTP is created, and the encoded
+     * bytes are zeroed on success, failure and cancellation. Validation order is unchanged.
+     */
+    @Override
+    public synchronized LoginResult login(
+        String adminId,
+        char[] password,
+        char[] totpCode,
+        String deviceId,
+        String deviceLabel
+    ) throws IOException {
+        clearLocalBinding();
+        String safeAdminId = requireAdminId(adminId);
+        String safeDeviceId = requireIdentifier(deviceId, "invalid_device_id");
+        requireSecret(password, "invalid_password", 12, 256);
+        requireTotp(totpCode);
+        String safeLabel = requireLabel(deviceLabel);
+        SensitiveByteBuffer encoded = new SensitiveByteBuffer(SENSITIVE_BODY_CAPACITY);
+        byte[] body = null;
+        try {
+            encoded.writeAscii("{\"admin_id\":");
+            encoded.writeJsonString(safeAdminId.toCharArray());
+            encoded.writeAscii(",\"password\":");
+            encoded.writeJsonString(password);
+            encoded.writeAscii(",\"totp_code\":");
+            encoded.writeJsonString(totpCode);
+            encoded.writeAscii(",\"device_id\":");
+            encoded.writeJsonString(safeDeviceId.toCharArray());
+            encoded.writeAscii(",\"device_label\":");
+            encoded.writeJsonString(safeLabel.toCharArray());
+            encoded.writeAscii("}");
+            body = encoded.copy();
+            JSONObject response = proofPost(
+                "/admin/security/sessions",
+                AdminDeviceProof.Purpose.LOGIN,
+                safeAdminId,
+                safeDeviceId,
+                body,
+                publicHeaders(safeDeviceId)
+            );
+            LoginResult result = parseLoginResult(response);
+            boundAccessTokenSha256 = tokenSha256(result.accessToken());
+            boundAdminId = safeAdminId;
+            boundDeviceId = safeDeviceId;
+            boundSessionId = result.currentSessionId();
+            return result;
+        } finally {
+            if (body != null) Arrays.fill(body, (byte) 0);
+            encoded.destroy();
+        }
+    }
+
     @Override
     public synchronized StateSnapshot getState(String accessToken) throws IOException {
         return parseState(get("/admin/security/state", protectedHeaders(accessToken)));
@@ -148,9 +215,67 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
 
     @Override
     public synchronized DeviceInventory getDeviceInventory(String accessToken) throws IOException {
-        JSONObject response = get("/admin/security/sessions", protectedHeaders(accessToken));
-        boolean legacyResponse = hasExactKeys(response, AdminJava8Collections.set("sessions"));
-        if (!legacyResponse) requireExactKeys(response, AdminJava8Collections.set("sessions", "devices"));
+        return parseDeviceInventory(get("/admin/security/sessions", protectedHeaders(accessToken)), false);
+    }
+
+    @Override
+    public synchronized DeviceInventory getCompleteDeviceInventory(
+        String accessToken,
+        Runnable ensureCurrent
+    ) throws IOException {
+        if (ensureCurrent == null) throw new IllegalArgumentException("current operation check is required");
+        Map<String, String> headers = protectedHeaders(accessToken);
+        List<SessionInfo> otherSessions = new ArrayList<>();
+        Set<String> seenOtherSessionIds = new HashSet<>();
+        SessionInfo currentSession = null;
+        DeviceInventory firstPage = null;
+        String path = "/admin/security/sessions?paged=true";
+        for (int pageNumber = 0; pageNumber < MAX_SESSION_PAGES; pageNumber++) {
+            ensureCurrent.run();
+            DeviceInventory page = parseDeviceInventory(get(path, headers), true);
+            ensureCurrent.run();
+            int otherCount = 0;
+            String lastOtherSessionId = null;
+            for (SessionInfo session : page.sessions()) {
+                if (session.isCurrent()) {
+                    if (currentSession == null) {
+                        currentSession = session;
+                    } else if (!currentSession.sessionId().equals(session.sessionId())) {
+                        throw new IOException("current administrator session changed during listing");
+                    }
+                } else {
+                    if (!seenOtherSessionIds.add(session.sessionId())) {
+                        throw new IOException("administrator session page did not advance");
+                    }
+                    otherSessions.add(session);
+                    otherCount += 1;
+                    lastOtherSessionId = session.sessionId();
+                }
+            }
+            if (firstPage == null) firstPage = page;
+            if (otherCount < SESSION_PAGE_SIZE) {
+                List<SessionInfo> sessions = new ArrayList<>(otherSessions.size() + 1);
+                sessions.add(currentSession);
+                sessions.addAll(otherSessions);
+                return new DeviceInventory(
+                    sessions,
+                    firstPage.devices(),
+                    firstPage.deviceTotal(),
+                    firstPage.isDevicesComplete()
+                );
+            }
+            path = "/admin/security/sessions?after=" + lastOtherSessionId;
+        }
+        throw new IOException("administrator session listing exceeded the page limit");
+    }
+
+    private DeviceInventory parseDeviceInventory(JSONObject response, boolean paged) throws IOException {
+        boolean legacyResponse = !paged && hasExactKeys(response, AdminJava8Collections.set("sessions"));
+        if (!legacyResponse) {
+            requireExactKeys(response, AdminJava8Collections.set(
+                "sessions", "devices", "device_total", "devices_complete"
+            ));
+        }
         JSONArray array = requiredArray(response, "sessions");
         if (array.length() > 100) throw new IOException("too many administrator sessions");
         List<SessionInfo> sessions = new ArrayList<>();
@@ -196,7 +321,9 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             for (String deviceId : activeDeviceIds) {
                 devices.add(new DeviceInfo(deviceId, deviceId.equals(boundDeviceId)));
             }
-            return new DeviceInventory(sessions, devices);
+            // A sessions-only response cannot prove that every trusted device is listed,
+            // and it carries no total: -1 marks the total as unknown (W20A-R7).
+            return new DeviceInventory(sessions, devices, -1, false);
         }
 
         JSONArray deviceArray = requiredArray(response, "devices");
@@ -207,12 +334,25 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         for (int index = 0; index < deviceArray.length(); index++) {
             JSONObject item = deviceArray.optJSONObject(index);
             if (item == null) throw new IOException("invalid administrator device item");
-            requireExactKeys(item, AdminJava8Collections.set("device_id", "current"));
+            requireExactKeys(item, AdminJava8Collections.set(
+                "device_id", "current", "device_label", "last_seen_at",
+                "key_version", "key_marker_prefix"
+            ));
             if (!(item.opt("current") instanceof Boolean)) {
                 throw new IOException("invalid administrator device flags");
             }
             String deviceId = requiredIdentifier(item, "device_id");
             boolean current = item.optBoolean("current", false);
+            String deviceLabel = nullableText(item, "device_label", 128);
+            String lastSeenAt = nullableAwareRfc3339(item, "last_seen_at", 128);
+            Object rawKeyVersion = item.opt("key_version");
+            if (!(rawKeyVersion instanceof Integer) || (Integer) rawKeyVersion < 1) {
+                throw new IOException("invalid administrator device key version");
+            }
+            String keyMarkerPrefix = requiredText(item, "key_marker_prefix", 8);
+            if (!keyMarkerPrefix.matches("[0-9a-f]{8}")) {
+                throw new IOException("invalid administrator device key marker prefix");
+            }
             if (!deviceIds.add(deviceId)) throw new IOException("duplicate administrator device id");
             if (current) {
                 currentDeviceCount += 1;
@@ -220,20 +360,31 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
                     throw new IOException("current administrator device binding is invalid");
                 }
             }
-            devices.add(new DeviceInfo(deviceId, current));
+            devices.add(new DeviceInfo(
+                deviceId, current, deviceLabel, lastSeenAt, (Integer) rawKeyVersion, keyMarkerPrefix
+            ));
         }
         if (currentDeviceCount != 1) throw new IOException("one current administrator device is required");
-        return new DeviceInventory(sessions, devices);
+        Object rawTotal = response.opt("device_total");
+        Object rawComplete = response.opt("devices_complete");
+        if (!(rawTotal instanceof Integer) || !(rawComplete instanceof Boolean)) {
+            throw new IOException("invalid administrator device completeness");
+        }
+        int deviceTotal = (Integer) rawTotal;
+        boolean devicesComplete = (Boolean) rawComplete;
+        if (deviceTotal < devices.size() || devicesComplete != (deviceTotal == devices.size())) {
+            throw new IOException("administrator device completeness is inconsistent");
+        }
+        return new DeviceInventory(sessions, devices, deviceTotal, devicesComplete);
     }
 
     @Override
     public synchronized StateSnapshot revokeSession(String accessToken, String sessionId) throws IOException {
         String safeSessionId = requireCanonicalUuid(sessionId, "invalid_session_id");
-        JSONObject response = post(
-            "/admin/security/sessions/" + safeSessionId + "/revoke",
-            new JSONObject(),
-            protectedHeaders(accessToken)
-        );
+        String path = "/admin/security/sessions/" + safeSessionId + "/revoke";
+        JSONObject response = safeSessionId.equals(boundSessionId)
+            ? post(path, new JSONObject(), protectedHeaders(accessToken))
+            : actionProofPost(path, "session.revoke", accessToken, new byte[0]);
         return parseState(response);
     }
 
@@ -244,15 +395,21 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     ) throws IOException {
         if (attestation == null) throw new IOException("recovery custody attestation is required");
         String path = "/admin/security/recovery-custody/attest";
-        byte[] body = jsonBytes(
-            jsonObject(
-                "custody_reference", attestation.custodyReference(),
-                "material_kind", attestation.materialKind().name(),
-                "storage_location", attestation.storageLocation().name(),
-                "separate_encrypted_backup_confirmed",
-                attestation.isSeparateEncryptedBackupConfirmed()
-            )
+        JSONObject request = jsonObject(
+            "custody_reference", attestation.custodyReference(),
+            "material_kind", attestation.materialKind().name(),
+            "storage_location", attestation.storageLocation().name(),
+            "separate_encrypted_backup_confirmed",
+            attestation.isSeparateEncryptedBackupConfirmed()
         );
+        if (attestation.expectedStateVersion() != null) {
+            try {
+                request.put("expected_state_version", attestation.expectedStateVersion());
+            } catch (JSONException invalid) {
+                throw new IOException("recovery custody version could not be serialized", invalid);
+            }
+        }
+        byte[] body = jsonBytes(request);
         JSONObject response = actionProofPost(
             path,
             "recovery.custody.attest",
@@ -263,16 +420,43 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     }
 
     @Override
-    public synchronized StateSnapshot reportLostDevice(String accessToken, String deviceId) throws IOException {
+    public synchronized StateSnapshot reportLostDevice(
+        String accessToken,
+        String deviceId,
+        Map<String, String> reconfirmationHeaders
+    ) throws IOException {
         String safeDeviceId = requireIdentifier(deviceId, "invalid_lost_device_id");
         if (safeDeviceId.equals(boundDeviceId)) throw new IOException("current device cannot be reported lost");
+        Map<String, String> reconfirmation = requireReconfirmationHeader(reconfirmationHeaders);
         String path = "/admin/security/devices/" + safeDeviceId + "/report-lost";
         return parseState(actionProofPost(
             path,
             "device.report_lost",
             accessToken,
-            jsonBytes(new JSONObject())
+            AdminHighRiskActionGate.REPORT_LOST_BODY.getBytes(StandardCharsets.UTF_8),
+            reconfirmation
         ));
+    }
+
+    private static Map<String, String> requireReconfirmationHeader(Map<String, String> headers)
+        throws IOException {
+        if (headers == null || headers.size() != 1) {
+            throw new IOException("exact reconfirmation header is required");
+        }
+        String nonce = headers.get(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER);
+        if (!AdminHighRiskActionGate.isCanonicalNonce(nonce)) {
+            throw new IOException("exact reconfirmation header is required");
+        }
+        return AdminJava8Collections.map(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER, nonce);
+    }
+
+    /**
+     * S18-18: deliberately not synchronized. A blocked request holds this client's monitor;
+     * cancellation only signals the transport, which disconnects on its own thread.
+     */
+    @Override
+    public void cancelInFlightRequests() {
+        transport.cancelInFlight();
     }
 
     @Override
@@ -294,20 +478,45 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         String path,
         String nonce
     ) throws IOException {
+        return reauthenticate(accessToken, password, totpCode, action, method, path, nonce, (String) null);
+    }
+
+    @Override
+    public synchronized ReauthenticationResult reauthenticate(
+        String accessToken,
+        String password,
+        String totpCode,
+        String action,
+        String method,
+        String path,
+        String nonce,
+        String intentSha256
+    ) throws IOException {
+        if (intentSha256 != null && !intentSha256.matches("[0-9a-f]{64}")) {
+            throw new IOException("invalid reauthentication intent digest");
+        }
         String safeAction = requireAction(action);
         String safeMethod = requireMethod(method);
         String safePath = requirePath(path);
         String safeNonce = requireNonce(nonce);
+        JSONObject body = jsonObject(
+            "password", requireSecret(password, "invalid_password", 12, 256),
+            "totp_code", requireTotp(totpCode),
+            "action", safeAction,
+            "method", safeMethod,
+            "path", safePath,
+            "nonce", safeNonce
+        );
+        if (intentSha256 != null) {
+            try {
+                body.put("intent_sha256", intentSha256);
+            } catch (org.json.JSONException error) {
+                throw new IOException("reauthentication request could not be encoded", error);
+            }
+        }
         JSONObject response = post(
             "/admin/security/reauthenticate",
-            jsonObject(
-                "password", requireSecret(password, "invalid_password", 12, 256),
-                "totp_code", requireTotp(totpCode),
-                "action", safeAction,
-                "method", safeMethod,
-                "path", safePath,
-                "nonce", safeNonce
-            ),
+            body,
             protectedHeaders(accessToken)
         );
         return parseReauthentication(response, safeAction, safeMethod, safePath);
@@ -323,6 +532,23 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         String path,
         String nonce
     ) throws IOException {
+        return reauthenticate(accessToken, password, totpCode, action, method, path, nonce, (String) null);
+    }
+
+    @Override
+    public synchronized ReauthenticationResult reauthenticate(
+        String accessToken,
+        char[] password,
+        char[] totpCode,
+        String action,
+        String method,
+        String path,
+        String nonce,
+        String intentSha256
+    ) throws IOException {
+        if (intentSha256 != null && !intentSha256.matches("[0-9a-f]{64}")) {
+            throw new IOException("invalid reauthentication intent digest");
+        }
         requireSecret(password, "invalid_password", 12, 256);
         requireTotp(totpCode);
         String safeAction = requireAction(action);
@@ -344,6 +570,10 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             encoded.writeJsonString(safePath.toCharArray());
             encoded.writeAscii(",\"nonce\":");
             encoded.writeJsonString(safeNonce.toCharArray());
+            if (intentSha256 != null) {
+                encoded.writeAscii(",\"intent_sha256\":");
+                encoded.writeJsonString(intentSha256.toCharArray());
+            }
             encoded.writeAscii("}");
             body = encoded.copy();
             JSONObject response = execute(
@@ -410,6 +640,47 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         return new RecoveryStartResult(token, state);
     }
 
+    /** S18-20: recovery start from the caller's mutable recovery code (see char[] login). */
+    @Override
+    public synchronized RecoveryStartResult startRecovery(
+        String adminId,
+        char[] recoveryCode,
+        String deviceId,
+        String deviceLabel
+    ) throws IOException {
+        clearLocalBinding();
+        String safeAdminId = requireAdminId(adminId);
+        requireSecret(recoveryCode, "invalid_recovery_code", 24, 256);
+        String safeDeviceId = requireIdentifier(deviceId, "invalid_device_id");
+        String safeLabel = requireLabel(deviceLabel);
+        SensitiveByteBuffer encoded = new SensitiveByteBuffer(SENSITIVE_BODY_CAPACITY);
+        byte[] body = null;
+        try {
+            encoded.writeAscii("{\"admin_id\":");
+            encoded.writeJsonString(safeAdminId.toCharArray());
+            encoded.writeAscii(",\"recovery_code\":");
+            encoded.writeJsonString(recoveryCode);
+            encoded.writeAscii(",\"device_id\":");
+            encoded.writeJsonString(safeDeviceId.toCharArray());
+            encoded.writeAscii(",\"device_label\":");
+            encoded.writeJsonString(safeLabel.toCharArray());
+            encoded.writeAscii("}");
+            body = encoded.copy();
+            JSONObject response = execute(
+                "POST", "/admin/security/recovery/start", publicHeaders(safeDeviceId), body
+            );
+            requireExactKeys(response, AdminJava8Collections.set("recovery_token", "security_state"));
+            String token = requiredToken(response, "recovery_token");
+            AdminSecurityState state = requiredState(response);
+            if (state != AdminSecurityState.RECOVERY_IN_PROGRESS) throw new IOException("recovery did not start");
+            recoveryAdminId = safeAdminId;
+            return new RecoveryStartResult(token, state);
+        } finally {
+            if (body != null) Arrays.fill(body, (byte) 0);
+            encoded.destroy();
+        }
+    }
+
     @Override
     public synchronized LoginResult completeRecovery(
         String recoveryToken,
@@ -447,6 +718,58 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         return result;
     }
 
+    /** S18-20: recovery completion from the caller's mutable secrets (see char[] login). */
+    @Override
+    public synchronized LoginResult completeRecovery(
+        String recoveryToken,
+        char[] newPassword,
+        char[] totpCode,
+        String deviceId,
+        String deviceLabel
+    ) throws IOException {
+        if (recoveryAdminId == null) throw new IOException("recovery administrator identity is unavailable");
+        String safeAdminId = requireAdminId(recoveryAdminId);
+        String safeDeviceId = requireIdentifier(deviceId, "invalid_device_id");
+        String safeToken = requireToken(recoveryToken);
+        requireSecret(newPassword, "invalid_new_password", 12, 256);
+        requireTotp(totpCode);
+        String safeLabel = requireLabel(deviceLabel);
+        SensitiveByteBuffer encoded = new SensitiveByteBuffer(SENSITIVE_BODY_CAPACITY);
+        byte[] body = null;
+        try {
+            encoded.writeAscii("{\"recovery_token\":");
+            encoded.writeJsonString(safeToken.toCharArray());
+            encoded.writeAscii(",\"new_password\":");
+            encoded.writeJsonString(newPassword);
+            encoded.writeAscii(",\"totp_code\":");
+            encoded.writeJsonString(totpCode);
+            encoded.writeAscii(",\"device_id\":");
+            encoded.writeJsonString(safeDeviceId.toCharArray());
+            encoded.writeAscii(",\"device_label\":");
+            encoded.writeJsonString(safeLabel.toCharArray());
+            encoded.writeAscii("}");
+            body = encoded.copy();
+            JSONObject response = proofPost(
+                "/admin/security/recovery/complete",
+                AdminDeviceProof.Purpose.RECOVERY_COMPLETE,
+                safeAdminId,
+                safeDeviceId,
+                body,
+                publicHeaders(safeDeviceId)
+            );
+            LoginResult result = parseLoginResult(response);
+            boundAccessTokenSha256 = tokenSha256(result.accessToken());
+            boundAdminId = safeAdminId;
+            boundDeviceId = safeDeviceId;
+            boundSessionId = result.currentSessionId();
+            recoveryAdminId = null;
+            return result;
+        } finally {
+            if (body != null) Arrays.fill(body, (byte) 0);
+            encoded.destroy();
+        }
+    }
+
     private JSONObject get(String path, Map<String, String> headers) throws IOException {
         return execute("GET", path, headers, null);
     }
@@ -463,7 +786,9 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         byte[] body,
         Map<String, String> baseHeaders
     ) throws IOException {
-        return proofPost(path, purpose, adminId, deviceId, body, baseHeaders, null, null);
+        return proofPost(
+            path, purpose, adminId, deviceId, body, baseHeaders, null, null, AdminJava8Collections.map()
+        );
     }
 
     private JSONObject actionProofPost(
@@ -471,6 +796,16 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         String action,
         String accessToken,
         byte[] body
+    ) throws IOException {
+        return actionProofPost(path, action, accessToken, body, AdminJava8Collections.map());
+    }
+
+    private JSONObject actionProofPost(
+        String path,
+        String action,
+        String accessToken,
+        byte[] body,
+        Map<String, String> operationOnlyHeaders
     ) throws IOException {
         if (boundAdminId == null || boundSessionId == null) {
             throw new IOException("administrator session identity binding is unavailable");
@@ -483,7 +818,8 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             body,
             protectedHeaders(accessToken),
             action,
-            boundSessionId
+            boundSessionId,
+            operationOnlyHeaders
         );
     }
 
@@ -495,9 +831,98 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         byte[] body,
         Map<String, String> baseHeaders,
         String action,
-        String sessionId
+        String sessionId,
+        Map<String, String> operationOnlyHeaders
     ) throws IOException {
+        return proofPost(
+            path, purpose, adminId, deviceId, body, baseHeaders, action, sessionId,
+            operationOnlyHeaders, UUID.randomUUID().toString()
+        );
+    }
+
+    /**
+     * S18-3: confirms this device's PENDING key. The PENDING key signs the canonical rotation
+     * payload, which names the same correlation id as the ACTIVE key's device proof.
+     */
+    @Override
+    public synchronized DeviceKeyRotationResult confirmDeviceKeyRotation(
+        String accessToken,
+        DeviceKeyRotationRequest request
+    ) throws IOException {
+        if (request == null) throw new IOException("device key rotation request is required");
+        if (boundAdminId == null || boundSessionId == null || boundDeviceId == null) {
+            throw new IOException("administrator session identity binding is unavailable");
+        }
+        if (request.previousKeyVersion() != deviceKeyVersion
+            || !request.previousKeyMarker().equals(deviceKeyMarker)) {
+            throw new IOException("rotation must be proven by the current device key");
+        }
+        String path = "/admin/security/device-keys/rotation/confirm";
         String correlationId = UUID.randomUUID().toString();
+        String payload = AdminDeviceKeyRotation.rotationPayload(
+            boundAdminId,
+            boundDeviceId,
+            boundSessionId,
+            correlationId,
+            request.previousKeyVersion(),
+            request.previousKeyMarker(),
+            request.keyVersion(),
+            request.keyMarker()
+        );
+        final byte[] signature;
+        try {
+            signature = request.pendingKeySigner().sign(payload.getBytes(StandardCharsets.UTF_8));
+        } catch (GeneralSecurityException error) {
+            throw new IOException("pending device key could not sign the rotation", error);
+        }
+        if (!AdminDeviceProof.isCanonicalDerEcdsa(signature)) {
+            throw new IOException("pending device key signature is not canonical DER ECDSA");
+        }
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("key_marker", request.keyMarker());
+        fields.put("key_version", request.keyVersion());
+        fields.put("previous_key_marker", request.previousKeyMarker());
+        fields.put("previous_key_version", request.previousKeyVersion());
+        fields.put("rotation_signature", Base64.getUrlEncoder().withoutPadding().encodeToString(signature));
+        byte[] body = AdminCanonicalEncoding.canonicalJson(fields).getBytes(StandardCharsets.UTF_8);
+        JSONObject response = proofPost(
+            path,
+            AdminDeviceProof.Purpose.ACTION,
+            boundAdminId,
+            boundDeviceId,
+            body,
+            protectedHeaders(accessToken),
+            "device_key.rotation.confirm",
+            boundSessionId,
+            AdminJava8Collections.map(),
+            correlationId
+        );
+        requireExactKeys(response, AdminJava8Collections.set(
+            "device_id", "key_version", "key_marker", "previous_key_version", "status", "idempotent"
+        ));
+        if (!boundDeviceId.equals(requiredText(response, "device_id", 128))
+            || response.optInt("key_version", -1) != request.keyVersion()
+            || response.optInt("previous_key_version", -1) != request.previousKeyVersion()
+            || !request.keyMarker().equals(requiredText(response, "key_marker", 64))
+            || !"ACTIVE".equals(requiredText(response, "status", 16))
+            || !(response.opt("idempotent") instanceof Boolean)) {
+            throw new IOException("device key rotation response does not match the request");
+        }
+        return new DeviceKeyRotationResult(request.keyVersion(), request.keyMarker());
+    }
+
+    private JSONObject proofPost(
+        String path,
+        AdminDeviceProof.Purpose purpose,
+        String adminId,
+        String deviceId,
+        byte[] body,
+        Map<String, String> baseHeaders,
+        String action,
+        String sessionId,
+        Map<String, String> operationOnlyHeaders,
+        String correlationId
+    ) throws IOException {
         AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
             action,
             adminId,
@@ -521,13 +946,14 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             AdminJava8Collections.copyMap(challengeHeaders),
             intent.challengeRequestBytes()
         );
+        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
         requireExactStatus(challenge.statusCode, 200, "administrator device challenge");
         final AdminDeviceProof.SignedChallenge proof;
         try {
             proof = AdminDeviceProof.parseAndSign(
                 challenge.body,
                 intent,
-                clock.nowEpochMs(),
+                challengeTime.estimatedNowEpochMs(clock.monotonicNanos()),
                 signer
             );
         } catch (GeneralSecurityException | IllegalArgumentException error) {
@@ -535,6 +961,9 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         }
         Map<String, String> protectedHeaders = new LinkedHashMap<>(challengeHeaders);
         protectedHeaders.putAll(proof.proofHeaders());
+        // The reconfirmation nonce is consumed by the protected request only, never by
+        // the challenge request.
+        protectedHeaders.putAll(operationOnlyHeaders);
         Response operation = executeRaw("POST", path, AdminJava8Collections.copyMap(protectedHeaders), body);
         requireExactStatus(operation.statusCode, 200, "administrator proof-bound request");
         return parseJsonResponse(operation.body);
@@ -834,7 +1263,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
 
     private static AdminSecurityApiException parseTypedError(Response response) {
         try {
-            JSONObject root = new JSONObject(response.body);
+            JSONObject root = parseJsonResponse(response.body);
             requireExactKeys(root, AdminJava8Collections.set("detail"));
             JSONObject detail = root.optJSONObject("detail");
             if (detail == null) return null;
@@ -843,8 +1272,10 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             requiredText(detail, "message", 1024);
             AdminSecurityApiException.Code code = AdminSecurityApiException.Code.fromWireValue(wireCode);
             if (code == null) return null;
+            if (code == AdminSecurityApiException.Code.CUSTODY_STATE_VERSION_CONFLICT
+                && response.statusCode != 409) return null;
             return new AdminSecurityApiException(code, retryAfterSeconds(response.headers));
-        } catch (IOException | JSONException | RuntimeException ignored) {
+        } catch (IOException | RuntimeException ignored) {
             return null;
         }
     }
@@ -895,7 +1326,19 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         return value.toString().getBytes(StandardCharsets.UTF_8);
     }
 
+    // Large enough for the biggest login/recovery body (256-char secrets, labels), so the
+    // buffer does not grow and leave un-zeroed copies of earlier contents behind.
+    private static final int SENSITIVE_BODY_CAPACITY = 4_096;
+
     private static final class SensitiveByteBuffer extends ByteArrayOutputStream {
+        SensitiveByteBuffer() {
+            super();
+        }
+
+        SensitiveByteBuffer(int capacity) {
+            super(capacity);
+        }
+
         void writeAscii(String value) {
             for (int index = 0; index < value.length(); index++) write((byte) value.charAt(index));
         }
@@ -959,47 +1402,228 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         }
     }
 
-    private static final class UrlConnectionTransport implements Transport {
+    static final class UrlConnectionTransport implements Transport {
+        private static final int CONNECT_TIMEOUT_MS = 8_000;
+        private static final int READ_TIMEOUT_MS = 12_000;
+        // New per-HTTP-request cap derived from the existing connect/read budgets.
+        // A challenge and its proof-bound POST remain separate HTTP requests.
+        private static final long REQUEST_TIMEOUT_NANOS = TimeUnit.MILLISECONDS.toNanos(
+            CONNECT_TIMEOUT_MS + READ_TIMEOUT_MS
+        );
+        private static final ScheduledExecutorService DEADLINES = Executors.newSingleThreadScheduledExecutor(task -> {
+            Thread thread = new Thread(task, "walksafe-admin-http-deadline");
+            thread.setDaemon(true);
+            return thread;
+        });
+
+        interface ConnectionFactory {
+            HttpURLConnection open(String url) throws IOException;
+        }
+
+        interface MonotonicClock {
+            long nanoTime();
+        }
+
+        interface Cancellation {
+            void cancel();
+        }
+
+        interface DeadlineScheduler {
+            Cancellation schedule(Runnable task, long delayNanos);
+        }
+
+        static final String CANCELLED_MESSAGE =
+            "administrator HTTP request was cancelled; server outcome unknown";
+
+        private final ConnectionFactory connections;
+        private final MonotonicClock monotonicClock;
+        private final DeadlineScheduler deadlines;
+        private final Set<RequestOwner> inFlight = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        /**
+         * adm-F2: {@link #cancelInFlight()} is the close path of this per-Activity client, so it
+         * is sticky. The proof-bound POST (or a login carrying password and TOTP) that follows a
+         * challenge must not open a connection after close.
+         */
+        private volatile boolean closed;
+
+        private UrlConnectionTransport() {
+            this(
+                url -> (HttpURLConnection) new URL(url).openConnection(),
+                System::nanoTime,
+                (task, delayNanos) -> {
+                    ScheduledFuture<?> future = DEADLINES.schedule(task, delayNanos, TimeUnit.NANOSECONDS);
+                    return () -> future.cancel(false);
+                }
+            );
+        }
+
+        UrlConnectionTransport(
+            ConnectionFactory connections,
+            MonotonicClock monotonicClock,
+            DeadlineScheduler deadlines
+        ) {
+            if (connections == null || monotonicClock == null || deadlines == null) {
+                throw new IllegalArgumentException("HTTP connection, clock and deadline scheduler are required");
+            }
+            this.connections = connections;
+            this.monotonicClock = monotonicClock;
+            this.deadlines = deadlines;
+        }
+
+        /**
+         * S18-18: fails and disconnects every request still in flight; never waits.
+         * adm-F2: sticky, every later request of this transport fails before connecting.
+         */
+        @Override
+        public void cancelInFlight() {
+            closed = true;
+            for (RequestOwner owner : inFlight) owner.cancel();
+        }
+
+        int inFlightCount() {
+            return inFlight.size();
+        }
+
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body) throws IOException {
-            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setRequestMethod(method);
-            connection.setConnectTimeout(8_000);
-            connection.setReadTimeout(12_000);
-            connection.setInstanceFollowRedirects(false);
-            connection.setDoInput(true);
-            connection.setDoOutput(body != null);
-            headers.forEach(connection::setRequestProperty);
+            // adm-F2: a closed transport opens nothing.
+            if (closed) throw new IOException(CANCELLED_MESSAGE);
+            long startedAtNanos = monotonicClock.nanoTime();
+            HttpURLConnection connection = connections.open(url);
+            RequestOwner owner = new RequestOwner(connection, monotonicClock, startedAtNanos);
+            Cancellation deadline = null;
+            inFlight.add(owner);
             try {
+                // adm-F2: a cancellation that ran before this registration was visible still wins.
+                if (closed) owner.markCancelled();
+                owner.checkDeadline();
+                deadline = deadlines.schedule(owner::cancelAtDeadline, Math.max(0L, owner.remainingNanos()));
+                owner.checkDeadline();
+                connection.setRequestMethod(method);
+                connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                connection.setReadTimeout(READ_TIMEOUT_MS);
+                connection.setInstanceFollowRedirects(false);
+                connection.setDoInput(true);
+                connection.setDoOutput(body != null);
+                // adm-F5: stream the exact body; the platform keeps no retryable (and un-zeroed)
+                // copy of it, so a connection failure cannot make the platform re-send it.
+                if (body != null) connection.setFixedLengthStreamingMode(body.length);
+                headers.forEach(connection::setRequestProperty);
+                owner.checkDeadline();
                 if (body != null) {
                     try (var output = connection.getOutputStream()) {
+                        owner.checkDeadline();
                         output.write(body);
+                        owner.checkDeadline();
                     }
                 }
+                owner.checkDeadline();
                 int status = connection.getResponseCode();
+                owner.checkDeadline();
                 InputStream stream = status >= 200 && status <= 299
                     ? connection.getInputStream()
                     : connection.getErrorStream();
+                owner.checkDeadline();
                 String retryAfter = connection.getHeaderField("Retry-After");
+                owner.checkDeadline();
                 Map<String, String> responseHeaders = retryAfter == null
                     ? AdminJava8Collections.map()
                     : AdminJava8Collections.map("Retry-After", retryAfter);
-                return new Response(status, stream == null ? "" : readBounded(stream), responseHeaders);
+                return new Response(status, stream == null ? "" : readBounded(stream, owner), responseHeaders);
             } finally {
-                connection.disconnect();
+                try {
+                    owner.disconnect();
+                } finally {
+                    inFlight.remove(owner);
+                    try {
+                        // Also reject a response whose stream cleanup finished after the deadline
+                        // or an explicit cancellation.
+                        owner.finish();
+                    } finally {
+                        if (deadline != null) deadline.cancel();
+                    }
+                }
             }
         }
 
-        private static String readBounded(InputStream input) throws IOException {
+        private static String readBounded(InputStream input, RequestOwner owner) throws IOException {
             try (input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
                 byte[] buffer = new byte[4096];
                 while (true) {
+                    owner.checkDeadline();
                     int read = input.read(buffer);
+                    owner.checkDeadline();
                     if (read < 0) break;
                     if (output.size() + read > 64 * 1024) throw new IOException("administrator API response is too large");
                     output.write(buffer, 0, read);
                 }
                 return AdminStrictJson.decodeUtf8(output.toByteArray());
+            }
+        }
+
+        private static final class RequestOwner {
+            private static final int ACTIVE = 0;
+            private static final int TIMED_OUT = 1;
+            private static final int FINISHED = 2;
+            private static final int CANCELLED = 3;
+
+            private final HttpURLConnection connection;
+            private final MonotonicClock clock;
+            private final long startedAtNanos;
+            private final AtomicInteger state = new AtomicInteger(ACTIVE);
+            private final AtomicBoolean disconnectClaimed = new AtomicBoolean();
+
+            private RequestOwner(HttpURLConnection connection, MonotonicClock clock, long startedAtNanos) {
+                this.connection = connection;
+                this.clock = clock;
+                this.startedAtNanos = startedAtNanos;
+            }
+
+            private long remainingNanos() {
+                return REQUEST_TIMEOUT_NANOS - (clock.nanoTime() - startedAtNanos);
+            }
+
+            private void checkDeadline() throws IOException {
+                if (remainingNanos() <= 0L) state.compareAndSet(ACTIVE, TIMED_OUT);
+                int current = state.get();
+                if (current == TIMED_OUT) throw deadlineExceeded();
+                if (current == CANCELLED) {
+                    throw new IOException(CANCELLED_MESSAGE);
+                }
+            }
+
+            /** The caller's own thread fails the request; its finally disconnects synchronously. */
+            private void markCancelled() {
+                state.compareAndSet(ACTIVE, CANCELLED);
+            }
+
+            private void cancel() {
+                if (!state.compareAndSet(ACTIVE, CANCELLED)) return;
+                Thread cancellation = new Thread(this::disconnect, "walksafe-admin-http-cancel");
+                cancellation.setDaemon(true);
+                cancellation.start();
+            }
+
+            private void cancelAtDeadline() {
+                if (!state.compareAndSet(ACTIVE, TIMED_OUT)) return;
+                // Best-effort platform cancellation must not block the shared deadline scheduler.
+                // This task captures one owner, never a mutable "current connection" reference.
+                Thread cancellation = new Thread(this::disconnect, "walksafe-admin-http-cancel");
+                cancellation.setDaemon(true);
+                cancellation.start();
+            }
+
+            private void disconnect() {
+                if (disconnectClaimed.compareAndSet(false, true)) connection.disconnect();
+            }
+
+            private void finish() throws IOException {
+                checkDeadline();
+                if (!state.compareAndSet(ACTIVE, FINISHED)) checkDeadline();
+            }
+
+            private static SocketTimeoutException deadlineExceeded() {
+                return new SocketTimeoutException("administrator HTTP request deadline exceeded");
             }
         }
     }

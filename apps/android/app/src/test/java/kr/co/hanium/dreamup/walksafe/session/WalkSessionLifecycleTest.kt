@@ -37,6 +37,134 @@ class WalkSessionLifecycleTest {
     }
 
     @Test
+    fun startConfirmationExpiresImmediatelyAfterTtlBoundaryAndRequiresFreshCheck() {
+        var now = 100L
+        val atBoundary = foregroundLifecycle(clock = { now })
+        atBoundary.handle(
+            WalkSessionEvent.InitialCheckCompleted(
+                ready(atBoundary, WalkSessionAction.START_WALK, WalkSessionMode.FULL),
+            ),
+        )
+        val validToken = atBoundary.snapshot().confirmationToken!!
+        now += WalkSessionLifecycle.CONFIRMATION_TOKEN_TTL_MS
+
+        assertTrue(atBoundary.handle(WalkSessionEvent.StartRequested(validToken)).changed)
+        assertEquals(WalkSessionState.ACTIVE, atBoundary.snapshot().state)
+
+        now = 100L
+        val expired = foregroundLifecycle(clock = { now })
+        expired.handle(
+            WalkSessionEvent.InitialCheckCompleted(
+                ready(expired, WalkSessionAction.START_WALK, WalkSessionMode.FULL),
+            ),
+        )
+        val expiredToken = expired.snapshot().confirmationToken!!
+        val oldEpoch = expired.snapshot().epoch
+        now += WalkSessionLifecycle.CONFIRMATION_TOKEN_TTL_MS + 1L
+
+        assertTrue(expired.handle(WalkSessionEvent.StartRequested(expiredToken)).changed)
+        assertSnapshot(expired, WalkSessionState.READY, WalkSessionMode.UNAVAILABLE, null, true)
+        assertEquals(
+            oldEpoch.copy(recoveryGeneration = oldEpoch.recoveryGeneration + 1L),
+            expired.snapshot().epoch,
+        )
+        assertNull(expired.snapshot().readiness)
+        assertNull(expired.snapshot().confirmationToken)
+        assertFalse(expired.handle(WalkSessionEvent.StartRequested(expiredToken)).changed)
+
+        expired.handle(
+            WalkSessionEvent.InitialCheckCompleted(
+                ready(
+                    expired,
+                    WalkSessionAction.START_WALK,
+                    WalkSessionMode.FULL,
+                    assessedAtElapsedRealtimeMs = now,
+                ),
+            ),
+        )
+        assertTrue(
+            expired.handle(
+                WalkSessionEvent.StartRequested(expired.snapshot().confirmationToken!!),
+            ).changed,
+        )
+        assertEquals(WalkSessionState.ACTIVE, expired.snapshot().state)
+    }
+
+    @Test
+    fun resumeConfirmationExpiresImmediatelyAfterTtlBoundaryAndRequiresFreshRecheck() {
+        var now = 100L
+        val atBoundary = awaitingConfirmationLifecycle(clock = { now })
+        val validToken = atBoundary.snapshot().confirmationToken!!
+        now += WalkSessionLifecycle.CONFIRMATION_TOKEN_TTL_MS
+
+        assertTrue(
+            atBoundary.handle(
+                WalkSessionEvent.ResumeConfirmationReceived(
+                    WalkSessionResumeConfirmation.START,
+                    validToken,
+                ),
+            ).changed,
+        )
+        assertEquals(WalkSessionState.ACTIVE, atBoundary.snapshot().state)
+
+        now = 100L
+        val expired = awaitingConfirmationLifecycle(clock = { now })
+        val expiredToken = expired.snapshot().confirmationToken!!
+        val oldEpoch = expired.snapshot().epoch
+        now += WalkSessionLifecycle.CONFIRMATION_TOKEN_TTL_MS + 1L
+
+        assertTrue(
+            expired.handle(
+                WalkSessionEvent.ResumeConfirmationReceived(
+                    WalkSessionResumeConfirmation.START,
+                    expiredToken,
+                ),
+            ).changed,
+        )
+        assertSnapshot(
+            expired,
+            WalkSessionState.PAUSED,
+            WalkSessionMode.FULL,
+            WalkSessionRecoveryStage.RECHECK_REQUIRED,
+            true,
+        )
+        assertEquals(
+            oldEpoch.copy(recoveryGeneration = oldEpoch.recoveryGeneration + 1L),
+            expired.snapshot().epoch,
+        )
+        assertNull(expired.snapshot().readiness)
+        assertNull(expired.snapshot().confirmationToken)
+        assertFalse(
+            expired.handle(
+                WalkSessionEvent.ResumeConfirmationReceived(
+                    WalkSessionResumeConfirmation.START,
+                    expiredToken,
+                ),
+            ).changed,
+        )
+
+        expired.handle(
+            WalkSessionEvent.RecoveryRecheckCompleted(
+                ready(
+                    expired,
+                    WalkSessionAction.RESUME_WALK,
+                    WalkSessionMode.FULL,
+                    assessedAtElapsedRealtimeMs = now,
+                ),
+            ),
+        )
+        assertTrue(
+            expired.handle(
+                WalkSessionEvent.ResumeConfirmationReceived(
+                    WalkSessionResumeConfirmation.START,
+                    expired.snapshot().confirmationToken!!,
+                ),
+            ).changed,
+        )
+        assertEquals(WalkSessionState.ACTIVE, expired.snapshot().state)
+    }
+
+    @Test
     fun unavailableInitialCheckFailsClosedIntoSafeStop() {
         val lifecycle = foregroundLifecycle()
 
@@ -201,6 +329,40 @@ class WalkSessionLifecycleTest {
     }
 
     @Test
+    fun repeatedSafetyStopRequestsRetainStoppedEpochAndReportEachReason() {
+        val lifecycle = activeLifecycle(WalkSessionMode.FULL)
+        val activeEpoch = lifecycle.snapshot().epoch
+
+        val firstStop = lifecycle.handle(WalkSessionEvent.SafetyStopRequested)
+        val stopped = lifecycle.snapshot()
+        assertTrue(firstStop.changed)
+        assertEquals(activeEpoch.recoveryGeneration + 1, stopped.epoch.recoveryGeneration)
+        assertEquals(WalkSessionState.SAFE_STOP, stopped.state)
+        assertEquals(WalkSessionMode.UNAVAILABLE, stopped.mode)
+        assertNull(stopped.readiness)
+        assertFalse(lifecycle.isRuntimeEpochCurrent(activeEpoch))
+
+        repeat(2) {
+            val repeatedStop = lifecycle.handle(WalkSessionEvent.SafetyStopRequested)
+            assertFalse(repeatedStop.changed)
+            assertEquals(stopped, repeatedStop.previous)
+            assertEquals(stopped, repeatedStop.current)
+            assertEquals(
+                WalkSessionTransitionReason.SAFETY_STOP_REQUESTED,
+                repeatedStop.reason,
+            )
+        }
+
+        assertFalse(lifecycle.handle(WalkSessionEvent.RecheckRequested).changed)
+        assertEquals(stopped, lifecycle.snapshot())
+
+        val newWalk = lifecycle.handle(WalkSessionEvent.NewWalkRequested)
+        assertTrue(newWalk.changed)
+        assertNotEquals(stopped.epoch.walkSessionId, newWalk.current.epoch.walkSessionId)
+        assertEquals(WalkSessionState.READY, newWalk.current.state)
+    }
+
+    @Test
     fun cancellationNoResponseAndMisrecognitionRemainPaused() {
         listOf(
             WalkSessionResumeConfirmation.CANCEL,
@@ -219,7 +381,9 @@ class WalkSessionLifecycleTest {
 
             assertEquals(WalkSessionState.PAUSED, lifecycle.snapshot().state)
             assertEquals(
-                WalkSessionRecoveryStage.AWAITING_RESUME_CONFIRMATION,
+                if (response == WalkSessionResumeConfirmation.CANCEL) {
+                    WalkSessionRecoveryStage.RECHECK_REQUIRED
+                } else WalkSessionRecoveryStage.AWAITING_RESUME_CONFIRMATION,
                 lifecycle.snapshot().recoveryStage,
             )
         }
@@ -335,23 +499,265 @@ class WalkSessionLifecycleTest {
         assertEquals(WalkSessionMode.UNAVAILABLE, lifecycle.snapshot().mode)
     }
 
-    private fun foregroundLifecycle() = WalkSessionLifecycle().also {
+    @Test
+    fun eachPendingInitialRequirementRevokesStartUntilFreshExplicitConfirmation() {
+        val plan = WalkSessionReadinessPlan(WalkSessionAction.START_WALK, WalkSessionMode.FULL)
+        for (requirement in plan.requiredRequirements) {
+            val lifecycle = foregroundLifecycle()
+            val originalReady = ready(lifecycle, WalkSessionAction.START_WALK, WalkSessionMode.FULL)
+            assertTrue(lifecycle.handle(WalkSessionEvent.InitialCheckCompleted(originalReady)).changed)
+            val waiting = lifecycle.snapshot()
+            val oldToken = checkNotNull(waiting.confirmationToken)
+            assertSnapshot(lifecycle, WalkSessionState.READY, WalkSessionMode.FULL, null, true)
+            assertEquals(originalReady, waiting.readiness)
+
+            val pending = pendingRequirementFrom(originalReady, requirement)
+            assertEquals(waiting.epoch, pending.epoch)
+            assertEquals(WalkSessionAction.START_WALK, pending.plan.action)
+            assertEquals(WalkSessionMode.FULL, pending.plan.mode)
+            assertEquals(
+                setOf(requirement),
+                pending.observations.filterValues {
+                    it.status == WalkSessionReadinessStatus.PENDING
+                }.keys,
+            )
+            assertFalse(pending.isReady)
+            assertFalse(pending.hasUnavailableRequirement)
+
+            assertTrue(lifecycle.handle(WalkSessionEvent.InitialCheckCompleted(pending)).changed)
+
+            val invalidated = lifecycle.snapshot()
+            assertSnapshot(lifecycle, WalkSessionState.READY, WalkSessionMode.UNAVAILABLE, null, true)
+            assertEquals(
+                waiting.epoch.copy(recoveryGeneration = waiting.epoch.recoveryGeneration + 1L),
+                invalidated.epoch,
+            )
+            assertNull(invalidated.readiness)
+            assertNull(invalidated.confirmationToken)
+            assertFalse(lifecycle.handle(WalkSessionEvent.StartRequested(oldToken)).changed)
+            assertFalse(lifecycle.handle(WalkSessionEvent.InitialCheckCompleted(originalReady)).changed)
+            assertEquals(invalidated, lifecycle.snapshot())
+
+            val fresh = ready(lifecycle, WalkSessionAction.START_WALK, WalkSessionMode.FULL)
+            assertEquals(invalidated.epoch, fresh.epoch)
+            assertTrue(lifecycle.handle(WalkSessionEvent.InitialCheckCompleted(fresh)).changed)
+            val freshWaiting = lifecycle.snapshot()
+            val newToken = checkNotNull(freshWaiting.confirmationToken)
+            assertSnapshot(lifecycle, WalkSessionState.READY, WalkSessionMode.FULL, null, true)
+            assertEquals(fresh, freshWaiting.readiness)
+            assertEquals(invalidated.epoch, newToken.epoch)
+            assertNotEquals(oldToken, newToken)
+            assertFalse(lifecycle.handle(WalkSessionEvent.StartRequested(oldToken)).changed)
+            assertEquals(freshWaiting, lifecycle.snapshot())
+
+            assertTrue(lifecycle.handle(WalkSessionEvent.StartRequested(newToken)).changed)
+            assertSnapshot(lifecycle, WalkSessionState.ACTIVE, WalkSessionMode.FULL, null, true)
+        }
+    }
+
+    @Test
+    fun eachPendingRuntimeRequirementRevokesReadyStartButDuplicateReadyPreservesIt() {
+        val plan = WalkSessionReadinessPlan(WalkSessionAction.START_WALK, WalkSessionMode.FULL)
+        for (requirement in plan.requiredRequirements) {
+            val lifecycle = foregroundLifecycle()
+            val originalReady = ready(lifecycle, WalkSessionAction.START_WALK, WalkSessionMode.FULL)
+            assertTrue(lifecycle.handle(WalkSessionEvent.InitialCheckCompleted(originalReady)).changed)
+            val waiting = lifecycle.snapshot()
+            val oldToken = checkNotNull(waiting.confirmationToken)
+            assertSnapshot(lifecycle, WalkSessionState.READY, WalkSessionMode.FULL, null, true)
+            assertEquals(waiting.epoch, originalReady.epoch)
+            assertEquals(WalkSessionAction.START_WALK, originalReady.plan.action)
+
+            assertFalse(lifecycle.handle(WalkSessionEvent.RuntimeReadinessChanged(originalReady)).changed)
+            assertEquals(waiting, lifecycle.snapshot())
+            assertEquals(oldToken, lifecycle.snapshot().confirmationToken)
+            assertEquals(waiting.epoch, lifecycle.snapshot().epoch)
+
+            val pending = pendingRequirementFrom(originalReady, requirement)
+            assertEquals(waiting.epoch, pending.epoch)
+            assertEquals(WalkSessionAction.START_WALK, pending.plan.action)
+            assertEquals(WalkSessionMode.FULL, pending.plan.mode)
+            assertEquals(
+                setOf(requirement),
+                pending.observations.filterValues {
+                    it.status == WalkSessionReadinessStatus.PENDING
+                }.keys,
+            )
+            assertFalse(pending.isReady)
+            assertFalse(pending.hasUnavailableRequirement)
+
+            assertTrue(lifecycle.handle(WalkSessionEvent.RuntimeReadinessChanged(pending)).changed)
+
+            val invalidated = lifecycle.snapshot()
+            assertSnapshot(lifecycle, WalkSessionState.READY, WalkSessionMode.UNAVAILABLE, null, true)
+            assertEquals(
+                waiting.epoch.copy(recoveryGeneration = waiting.epoch.recoveryGeneration + 1L),
+                invalidated.epoch,
+            )
+            assertNull(invalidated.readiness)
+            assertNull(invalidated.confirmationToken)
+            assertFalse(lifecycle.handle(WalkSessionEvent.StartRequested(oldToken)).changed)
+            assertFalse(lifecycle.handle(WalkSessionEvent.RuntimeReadinessChanged(originalReady)).changed)
+            assertFalse(lifecycle.handle(WalkSessionEvent.InitialCheckCompleted(originalReady)).changed)
+            assertEquals(invalidated, lifecycle.snapshot())
+
+            val fresh = ready(lifecycle, WalkSessionAction.START_WALK, WalkSessionMode.FULL)
+            assertEquals(invalidated.epoch, fresh.epoch)
+            assertTrue(lifecycle.handle(WalkSessionEvent.InitialCheckCompleted(fresh)).changed)
+            val freshWaiting = lifecycle.snapshot()
+            val newToken = checkNotNull(freshWaiting.confirmationToken)
+            assertSnapshot(lifecycle, WalkSessionState.READY, WalkSessionMode.FULL, null, true)
+            assertEquals(fresh, freshWaiting.readiness)
+            assertNotEquals(oldToken, newToken)
+            assertFalse(lifecycle.handle(WalkSessionEvent.StartRequested(oldToken)).changed)
+            assertEquals(freshWaiting, lifecycle.snapshot())
+
+            assertTrue(lifecycle.handle(WalkSessionEvent.StartRequested(newToken)).changed)
+            assertSnapshot(lifecycle, WalkSessionState.ACTIVE, WalkSessionMode.FULL, null, true)
+        }
+    }
+
+    @Test
+    fun eachPendingResumeRequirementRequiresFreshRecheckAndExplicitNewResumeToken() {
+        val plan = WalkSessionReadinessPlan(WalkSessionAction.RESUME_WALK, WalkSessionMode.FULL)
+        for (requirement in plan.requiredRequirements) {
+            val lifecycle = awaitingConfirmationLifecycle()
+            val waiting = lifecycle.snapshot()
+            val originalReady = checkNotNull(waiting.readiness)
+            val oldToken = checkNotNull(waiting.confirmationToken)
+            assertSnapshot(
+                lifecycle,
+                WalkSessionState.PAUSED,
+                WalkSessionMode.FULL,
+                WalkSessionRecoveryStage.AWAITING_RESUME_CONFIRMATION,
+                true,
+            )
+            val pending = pendingRequirementFrom(originalReady, requirement)
+            assertEquals(waiting.epoch, pending.epoch)
+            assertEquals(WalkSessionAction.RESUME_WALK, pending.plan.action)
+            assertEquals(WalkSessionMode.FULL, pending.plan.mode)
+            assertEquals(
+                setOf(requirement),
+                pending.observations.filterValues {
+                    it.status == WalkSessionReadinessStatus.PENDING
+                }.keys,
+            )
+            assertFalse(pending.isReady)
+            assertFalse(pending.hasUnavailableRequirement)
+
+            assertTrue(lifecycle.handle(WalkSessionEvent.RuntimeReadinessChanged(pending)).changed)
+
+            val invalidated = lifecycle.snapshot()
+            assertSnapshot(
+                lifecycle,
+                WalkSessionState.PAUSED,
+                WalkSessionMode.UNAVAILABLE,
+                WalkSessionRecoveryStage.RECHECK_REQUIRED,
+                true,
+            )
+            assertEquals(
+                waiting.epoch.copy(recoveryGeneration = waiting.epoch.recoveryGeneration + 1L),
+                invalidated.epoch,
+            )
+            assertNull(invalidated.readiness)
+            assertNull(invalidated.confirmationToken)
+            assertFalse(
+                lifecycle.handle(
+                    WalkSessionEvent.ResumeConfirmationReceived(
+                        WalkSessionResumeConfirmation.START,
+                        oldToken,
+                    ),
+                ).changed,
+            )
+            assertFalse(lifecycle.handle(WalkSessionEvent.RecoveryRecheckCompleted(originalReady)).changed)
+            assertFalse(lifecycle.handle(WalkSessionEvent.RuntimeReadinessChanged(originalReady)).changed)
+            assertEquals(invalidated, lifecycle.snapshot())
+
+            val fresh = ready(lifecycle, WalkSessionAction.RESUME_WALK, WalkSessionMode.FULL)
+            assertEquals(invalidated.epoch, fresh.epoch)
+            assertFalse(lifecycle.handle(WalkSessionEvent.RuntimeReadinessChanged(fresh)).changed)
+            assertEquals(invalidated, lifecycle.snapshot())
+            assertTrue(lifecycle.handle(WalkSessionEvent.RecoveryRecheckCompleted(fresh)).changed)
+            val freshWaiting = lifecycle.snapshot()
+            val newToken = checkNotNull(freshWaiting.confirmationToken)
+            assertSnapshot(
+                lifecycle,
+                WalkSessionState.PAUSED,
+                WalkSessionMode.FULL,
+                WalkSessionRecoveryStage.AWAITING_RESUME_CONFIRMATION,
+                true,
+            )
+            assertEquals(fresh, freshWaiting.readiness)
+            assertEquals(invalidated.epoch, newToken.epoch)
+            assertNotEquals(oldToken, newToken)
+            assertFalse(
+                lifecycle.handle(
+                    WalkSessionEvent.ResumeConfirmationReceived(
+                        WalkSessionResumeConfirmation.START,
+                        oldToken,
+                    ),
+                ).changed,
+            )
+            assertFalse(lifecycle.handle(WalkSessionEvent.RecoveryRecheckCompleted(originalReady)).changed)
+            assertFalse(lifecycle.handle(WalkSessionEvent.RuntimeReadinessChanged(originalReady)).changed)
+            assertEquals(freshWaiting, lifecycle.snapshot())
+
+            assertTrue(
+                lifecycle.handle(
+                    WalkSessionEvent.ResumeConfirmationReceived(
+                        WalkSessionResumeConfirmation.START,
+                        newToken,
+                    ),
+                ).changed,
+            )
+            assertSnapshot(lifecycle, WalkSessionState.ACTIVE, WalkSessionMode.FULL, null, true)
+        }
+    }
+
+    private fun pendingRequirementFrom(
+        readiness: WalkSessionReadinessSnapshot,
+        pendingRequirement: WalkSessionReadinessRequirement,
+    ): WalkSessionReadinessSnapshot {
+        require(readiness.plan.requires(pendingRequirement))
+        val collector = WalkSessionReadinessCollector(readiness.epoch, readiness.plan)
+        readiness.plan.requiredRequirements.forEach { requirement ->
+            val observation = readiness.observations.getValue(requirement)
+            collector.record(
+                if (requirement == pendingRequirement) {
+                    observation.copy(
+                        status = WalkSessionReadinessStatus.PENDING,
+                        reason = "required_evidence_pending",
+                    )
+                } else observation,
+            )
+        }
+        return collector.build(assessedAtElapsedRealtimeMs = readiness.assessedAtElapsedRealtimeMs)
+    }
+
+    private fun foregroundLifecycle(clock: () -> Long = { 100L }) =
+        WalkSessionLifecycle(clock = clock).also {
         it.handle(WalkSessionEvent.EnteredForeground)
     }
 
-    private fun activeLifecycle(mode: WalkSessionMode) = foregroundLifecycle().also {
+    private fun activeLifecycle(
+        mode: WalkSessionMode,
+        clock: () -> Long = { 100L },
+    ) = foregroundLifecycle(clock).also {
         val readiness = ready(it, WalkSessionAction.START_WALK, mode)
         it.handle(WalkSessionEvent.InitialCheckCompleted(readiness))
         it.handle(WalkSessionEvent.StartRequested(it.snapshot().confirmationToken!!))
     }
 
-    private fun pausedForegroundLifecycle(mode: WalkSessionMode) = activeLifecycle(mode).also {
+    private fun pausedForegroundLifecycle(
+        mode: WalkSessionMode,
+        clock: () -> Long = { 100L },
+    ) = activeLifecycle(mode, clock).also {
         it.handle(WalkSessionEvent.EnteredBackground)
         it.handle(WalkSessionEvent.EnteredForeground)
     }
 
-    private fun awaitingConfirmationLifecycle() =
-        pausedForegroundLifecycle(WalkSessionMode.FULL).also {
+    private fun awaitingConfirmationLifecycle(clock: () -> Long = { 100L }) =
+        pausedForegroundLifecycle(WalkSessionMode.FULL, clock).also {
             it.handle(
                 WalkSessionEvent.RecoveryRecheckCompleted(
                     ready(
@@ -367,6 +773,7 @@ class WalkSessionLifecycleTest {
         lifecycle: WalkSessionLifecycle,
         action: WalkSessionAction,
         mode: WalkSessionMode,
+        assessedAtElapsedRealtimeMs: Long = 100L,
     ): WalkSessionReadinessSnapshot {
         val epoch = lifecycle.snapshot().epoch
         val collector = WalkSessionReadinessCollector(
@@ -382,7 +789,7 @@ class WalkSessionLifecycleTest {
                 ),
             )
         }
-        return collector.build(assessedAtEpochMs = 100)
+        return collector.build(assessedAtElapsedRealtimeMs = assessedAtElapsedRealtimeMs)
     }
 
     private fun blocked(
@@ -409,7 +816,7 @@ class WalkSessionLifecycleTest {
                 ),
             )
         }
-        return collector.build(assessedAtEpochMs = 100)
+        return collector.build(assessedAtElapsedRealtimeMs = 100)
     }
 
     private fun assertSnapshot(

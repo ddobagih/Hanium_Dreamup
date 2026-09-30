@@ -86,7 +86,7 @@ class WalkSessionLifecycleFp012Test {
                 ),
             )
         }
-        return collector.build(assessedAtEpochMs = 1_000L)
+        return collector.build(assessedAtElapsedRealtimeMs = 1_000L)
     }
 
     private fun lease(): GatewayWalkLease =

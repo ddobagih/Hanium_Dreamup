@@ -140,7 +140,14 @@ internal class CameraTestFeedbackCoordinator {
                         }
                 }
         }
-        val accepted = sample.copy(outputs = sample.outputs.toList())
+        // Sample admission above proves the capture clock and frame ownership. Bind that
+        // lease before selection/evaluation, never after an action has already been reserved.
+        val accepted = sample.copy(outputs = sample.outputs.map { output ->
+            output.copy(sourceValidUntilElapsedRealtimeMs = minOf(
+                output.sourceValidUntilElapsedRealtimeMs ?: sample.validUntilMs,
+                sample.validUntilMs,
+            ))
+        })
         samples[sample.source] = accepted
         if (sample.source == Source.PRIMARY) {
             updateClaimedUnknownHandoff(accepted, nowMs)
@@ -168,11 +175,11 @@ internal class CameraTestFeedbackCoordinator {
             (!delivery.wasClaimed || (claimedDelivery == delivery &&
                 policy.hasClaimedFeedbackDelivery(delivery.action.trackId, delivery.action.level))) &&
             delivery.action.deliveryKey in policy.activeFeedbackDeliveryKeys(
-                selectWarningRegions(nowMs).candidates.mapNotNull { it.output.toFeedbackCandidate() }, true)
+                selectWarningRegions(nowMs).candidates.mapNotNull { it.output.toFeedbackCandidate() }, true, nowMs)
 
     fun claim(delivery: Delivery, nowMs: Long): Boolean {
         if (!isDeliverable(delivery, nowMs) ||
-            !policy.claimFeedbackDelivery(delivery.action.trackId, delivery.evaluatedAtMs)) return false
+            !policy.claimFeedbackDelivery(delivery.action.trackId, delivery.evaluatedAtMs, nowMs)) return false
         delivery.wasClaimed = true
         claimedDelivery = delivery
         claimedUnknownHandoff = null
@@ -225,7 +232,8 @@ internal class CameraTestFeedbackCoordinator {
     private fun selectWarningRegions(nowMs: Long): WarningSelection {
         val ordered = (samples.values + retainedUnknownSamples).filter { it.fresh(nowMs) }.flatMap { sample ->
             AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(sample.outputs).filter { output ->
-                hasMetricEvidence(output) && output.walkingObstacleCandidate &&
+                output.sourceValidUntilElapsedRealtimeMs?.let { nowMs <= it } == true &&
+                    hasMetricEvidence(output) && output.walkingObstacleCandidate &&
                     output.userFacing.messageLevel in ALERT_LEVELS &&
                     output.trackAgeFrames >= 3 && output.trackStableMs >= 700L &&
                     output.confidence.finalScore >= 0.55f

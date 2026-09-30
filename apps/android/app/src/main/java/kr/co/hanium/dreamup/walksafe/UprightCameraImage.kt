@@ -3,13 +3,25 @@ package kr.co.hanium.dreamup.walksafe
 import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import kr.co.hanium.dreamup.walksafe.inference.ArgbImage
 import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /** Rotation follows ARCore's image-to-display basis, including display rotation. */
 internal object UprightCameraImage {
-    fun quarterTurns(viewBasis: FloatArray): Int =
-        ((atan2((viewBasis[3] - viewBasis[1]).toDouble(),
-            (viewBasis[2] - viewBasis[0]).toDouble()) / (Math.PI / 2)).roundToInt() + 4) % 4
+    /** Shortest VIEW-pixel basis edge accepted as a direction (S10-13 "too small" vector). */
+    const val MIN_VIEW_DIRECTION_PX = 1f
+
+    fun quarterTurns(viewBasis: FloatArray): Int? {
+        if (viewBasis.size < 4) return null
+        for (index in 0..3) if (!viewBasis[index].isFinite()) return null
+        val dx = viewBasis[2] - viewBasis[0]
+        val dy = viewBasis[3] - viewBasis[1]
+        if (!dx.isFinite() || !dy.isFinite() || (dx == 0f && dy == 0f)) return null
+        // Callers pass an IMAGE_NORMALIZED unit edge mapped to VIEW pixels, which spans the
+        // whole image. A sub-pixel edge means a degenerate view transform, not a direction.
+        if (hypot(dx, dy) < MIN_VIEW_DIRECTION_PX) return null
+        return ((atan2(dy.toDouble(), dx.toDouble()) / (Math.PI / 2)).roundToInt() + 4) % 4
+    }
 
     fun rotate(image: ArgbImage, turns: Int): ArgbImage {
         require(turns in 0..3)

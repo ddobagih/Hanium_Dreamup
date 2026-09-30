@@ -273,6 +273,9 @@ def clean_test_storage() -> Iterator[Callable[[], None] | None]:
                     table_name
                     for table_name in (
                         "admin_report_mutation_claims",
+                        # S18-40: references delivery events, challenges and
+                        # reconfirmations, so it is truncated with them.
+                        "report_institution_delivery_corrections",
                         *_FP008_CLEANUP_TABLES,
                     *_CRITICAL_INCIDENT_CLEANUP_TABLES,
                     *_REPORT_IMAGE_CLEANUP_TABLES,

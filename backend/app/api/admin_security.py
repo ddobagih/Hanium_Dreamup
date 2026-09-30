@@ -22,6 +22,8 @@ from backend.app.database import SessionLocal, get_db
 from backend.app.services.admin_device_proof import (
     AdminDeviceProofService,
     VerifiedAdminDeviceProof,
+    canonical_admin_query_sha256,
+    raw_body_sha256,
 )
 from backend.app.services.admin_security import (
     ADMIN_APP_KIND,
@@ -71,6 +73,10 @@ CustodyReference = Annotated[
         )
     ),
 ]
+CustodyStateVersion = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=19, pattern=r"^[1-9][0-9]{0,18}$"),
+]
 OpaqueRecoveryToken = Annotated[str, StringConstraints(min_length=32, max_length=512)]
 AdminAction = Annotated[
     str,
@@ -84,7 +90,7 @@ AdminMethod = Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
 AdminPath = Annotated[str, StringConstraints(min_length=1, max_length=512, pattern=r"^/[^?#%]*$")]
 ReconfirmationNonce = Annotated[
     str,
-    StringConstraints(min_length=22, max_length=128, pattern=r"^[A-Za-z0-9_-]+$"),
+    StringConstraints(min_length=22, max_length=22, pattern=r"^[A-Za-z0-9_-]{21}[AQgw]$"),
 ]
 SecurityStateWire = Literal["NORMAL", "RECOVERY_REQUIRED", "RECOVERY_IN_PROGRESS"]
 DeviceProofPurpose = Literal["LOGIN", "ACTION", "RECOVERY_COMPLETE"]
@@ -149,19 +155,35 @@ class SessionItem(_StrictModel):
 
 
 class DeviceItem(_StrictModel):
+    """One active trusted device with the fields a person needs to tell it apart."""
+
     device_id: DeviceId
     current: bool
+    # Label and last activity come from the device's most recent session;
+    # both are null for a device that only has a registered key.
+    device_label: DeviceLabel | None
+    last_seen_at: AwareDatetime | None
+    key_version: int = Field(ge=1, strict=True)
+    key_marker_prefix: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{8}$")]
 
 
 class SessionsResponse(_StrictModel):
     sessions: list[SessionItem] = Field(max_length=100)
     devices: list[DeviceItem] = Field(max_length=100)
+    # Active trusted devices in total; devices_complete is false when the
+    # 100-item list omits some of them.
+    device_total: int = Field(ge=1, strict=True)
+    devices_complete: bool
 
     @model_validator(mode="after")
     def validate_current_device(self) -> "SessionsResponse":
         device_ids = [item.device_id for item in self.devices]
         if len(device_ids) != len(set(device_ids)):
             raise ValueError("administrator device identifiers must be unique")
+        if self.device_total < len(self.devices) or self.devices_complete != (
+            self.device_total == len(self.devices)
+        ):
+            raise ValueError("administrator device completeness is inconsistent")
         current_sessions = [
             item for item in self.sessions if item.current and not item.revoked
         ]
@@ -191,6 +213,9 @@ class ReauthenticateRequest(_StrictModel):
     method: AdminMethod
     path: AdminPath
     nonce: ReconfirmationNonce
+    # S18-7: SHA-256 of the exact request body this reconfirmation approves.
+    # When present, only a request with that body can consume it.
+    intent_sha256: LowerSha256 | None = None
 
 
 class ReauthenticateResponse(_StrictModel):
@@ -225,6 +250,7 @@ class RecoveryCustodyAttestRequest(_StrictModel):
     material_kind: Literal["RECOVERY_CODE", "SECURITY_KEY"]
     storage_location: Literal["OFF_PHONE"]
     separate_encrypted_backup_confirmed: Literal[True]
+    expected_state_version: CustodyStateVersion | None = None
 
     @model_validator(mode="after")
     def validate_canonical_custody_reference(
@@ -239,6 +265,28 @@ class RecoveryCustodyAttestRequest(_StrictModel):
 
 class EmptyRequest(_StrictModel):
     pass
+
+
+class DeviceKeyRotationConfirmRequest(_StrictModel):
+    """S18-3: the PENDING key's signature over the canonical rotation payload."""
+
+    previous_key_version: int = Field(ge=1, strict=True)
+    previous_key_marker: LowerSha256
+    key_version: int = Field(ge=2, strict=True)
+    key_marker: LowerSha256
+    rotation_signature: Annotated[
+        str,
+        StringConstraints(min_length=80, max_length=104, pattern=r"^[A-Za-z0-9_-]+$"),
+    ]
+
+
+class DeviceKeyRotationConfirmResponse(_StrictModel):
+    device_id: DeviceId
+    key_version: int = Field(ge=2, strict=True)
+    key_marker: LowerSha256
+    previous_key_version: int = Field(ge=1, strict=True)
+    status: Literal["ACTIVE"]
+    idempotent: bool
 
 
 class DeviceProofChallengeRequest(_StrictModel):
@@ -407,6 +455,80 @@ def _request_identity(request: Request) -> AdminSessionIdentity:
     return identity
 
 
+async def _require_empty_revoke_body(request: Request) -> None:
+    body = b""
+    async for chunk in request.stream():
+        if len(chunk) > 2 - len(body):
+            break
+        body += chunk
+    else:
+        if body in (b"", b"{}"):
+            request.state.admin_revoke_raw_body = body
+            return
+    raise HTTPException(
+        status_code=422,
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+        detail={
+            "code": "admin_revoke_request_invalid",
+            "message": "The revoke request body must be absent or exactly {}.",
+        },
+    )
+
+
+def _require_cross_session_revoke_proof(
+    request: Request,
+    identity: AdminSessionIdentity,
+    session_id: uuid.UUID,
+) -> None:
+    if session_id == identity.session_id:
+        return
+    if (
+        getattr(request.state, "admin_revoke_raw_body", None) != b""
+        or request.scope.get("query_string", b"") != b""
+    ):
+        raise HTTPException(
+            status_code=422,
+            headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+            detail={
+                "code": "admin_revoke_request_invalid",
+                "message": "A cross-session revoke requires an empty body and query.",
+            },
+        )
+    proof = getattr(request.state, "admin_device_proof", None)
+    if not isinstance(proof, VerifiedAdminDeviceProof):
+        raise HTTPException(
+            status_code=401,
+            headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+            detail={
+                "code": "admin_device_proof_required",
+                "message": "A valid registered administrator device proof is required.",
+            },
+        )
+    if (
+        proof.purpose != "ACTION"
+        or proof.action != "session.revoke"
+        or proof.admin_id != identity.admin_id
+        or proof.session_id != identity.session_id
+        or proof.device_id != identity.device_id
+        or proof.read_purpose is not None
+        or proof.method != "POST"
+        or proof.path != request.scope.get("path")
+        or proof.body_sha256 != raw_body_sha256(b"")
+        or proof.query_sha256 != canonical_admin_query_sha256(b"")
+        or proof.request_body != b""
+        or str(proof.challenge_id) != request.headers.get("x-walksafe-device-challenge-id")
+        or str(proof.correlation_id) != request.headers.get("x-walksafe-correlation-id")
+    ):
+        raise HTTPException(
+            status_code=403,
+            headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+            detail={
+                "code": "admin_device_proof_binding_mismatch",
+                "message": "The administrator device proof does not match this request.",
+            },
+        )
+
+
 def _source(request: Request) -> str:
     return request.client.host if request.client is not None else "unknown"
 
@@ -491,6 +613,9 @@ def create_router(
             result = service.issue_challenge(
                 **payload.model_dump(),
                 identity=identity,
+                # S18-5: session-less LOGIN/RECOVERY issuance is admitted per
+                # source (the trusted client address the proxy resets).
+                source=_source(request) if identity is None else None,
             )
         except AdminSecurityError as exc:
             _raise_http(exc)
@@ -550,21 +675,41 @@ def create_router(
         request: Request,
         response: Response,
         service: Any = Depends(get_service),
+        paged: bool = False,
+        after: uuid.UUID | None = None,
     ) -> SessionsResponse:
+        """Page by session ID with the current session repeated on every page.
+
+        Set paged=true for the first page, then pass the last non-current
+        session_id as after. A current-only page ends the traversal.
+        """
         _disable_sensitive_response_caching(response)
         _require_enabled(settings)
         try:
             identity = _request_identity(request)
-            sessions = service.list_sessions(identity)
+            if paged or after is not None:
+                sessions = service.list_sessions(identity, paged=True, after=after)
+            else:
+                sessions = service.list_sessions(identity)
             devices = service.list_active_devices(identity)
+            # The list and the count are separate statements; a key provisioned
+            # or revoked in between must not make the total smaller than the
+            # list it describes (W20A-R6), which would fail the response model.
+            device_total = max(service.count_active_devices(identity), len(devices))
         except AdminSecurityError as exc:
             _raise_http(exc)
         return SessionsResponse(
             sessions=[SessionItem(**item) for item in sessions],
             devices=[DeviceItem(**item) for item in devices],
+            device_total=device_total,
+            devices_complete=device_total == len(devices),
         )
 
-    @router.post("/sessions/{session_id}/revoke", response_model=StateResponse)
+    @router.post(
+        "/sessions/{session_id}/revoke",
+        response_model=StateResponse,
+        dependencies=[Depends(_require_empty_revoke_body)],
+    )
     def revoke_session(
         session_id: uuid.UUID,
         request: Request,
@@ -574,7 +719,9 @@ def create_router(
         _disable_sensitive_response_caching(response)
         _require_enabled(settings)
         try:
-            result = service.revoke_session(_request_identity(request), session_id)
+            identity = _request_identity(request)
+            _require_cross_session_revoke_proof(request, identity, session_id)
+            result = service.revoke_session(identity, session_id)
         except AdminSecurityError as exc:
             _raise_http(exc)
         return StateResponse(**result)
@@ -591,7 +738,7 @@ def create_router(
         try:
             result = service.attest_recovery_custody(
                 _request_identity(request),
-                **payload.model_dump(),
+                **payload.model_dump(exclude_unset=True),
             )
         except AdminSecurityError as exc:
             _raise_http(exc)
@@ -620,6 +767,54 @@ def create_router(
             _raise_http(exc)
         return StateResponse(**result)
 
+    @router.post(
+        "/device-keys/rotation/confirm",
+        response_model=DeviceKeyRotationConfirmResponse,
+    )
+    def confirm_device_key_rotation(
+        payload: DeviceKeyRotationConfirmRequest,
+        request: Request,
+        response: Response,
+        service: Any = Depends(get_service),
+    ) -> DeviceKeyRotationConfirmResponse:
+        _disable_sensitive_response_caching(response)
+        _require_enabled(settings)
+        identity = _request_identity(request)
+        proof = getattr(request.state, "admin_device_proof", None)
+        if not isinstance(proof, VerifiedAdminDeviceProof) or (
+            proof.purpose != "ACTION"
+            or proof.action != "device_key.rotation.confirm"
+            or proof.admin_id != identity.admin_id
+            or proof.device_id != identity.device_id
+            or proof.session_id != identity.session_id
+            or proof.read_purpose is not None
+            or proof.method != "POST"
+            or proof.path != "/admin/security/device-keys/rotation/confirm"
+        ):
+            raise HTTPException(
+                status_code=401,
+                headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+                detail={
+                    "code": "admin_device_proof_required",
+                    "message": "A valid registered administrator device proof is required.",
+                },
+            )
+        try:
+            result = service.confirm_device_key_rotation(
+                identity,
+                proof_key_version=proof.device_key_version,
+                proof_key_marker=proof.device_key_marker,
+                proof_correlation_id=proof.correlation_id,
+                previous_key_version=payload.previous_key_version,
+                previous_key_marker=payload.previous_key_marker,
+                key_version=payload.key_version,
+                key_marker=payload.key_marker,
+                rotation_signature=payload.rotation_signature,
+            )
+        except AdminSecurityError as exc:
+            _raise_http(exc)
+        return DeviceKeyRotationConfirmResponse(**result)
+
     @router.post("/reauthenticate", response_model=ReauthenticateResponse)
     def reauthenticate(
         payload: ReauthenticateRequest,
@@ -639,6 +834,12 @@ def create_router(
                 path=payload.path,
                 nonce=payload.nonce,
                 source=_source(request),
+                # Only a body-bound request passes the extra binding (S18-7).
+                **(
+                    {}
+                    if payload.intent_sha256 is None
+                    else {"intent_sha256": payload.intent_sha256}
+                ),
             )
         except AdminSecurityError as exc:
             _raise_http(exc)

@@ -30,6 +30,12 @@ enum class WalkSafeStartupCapabilityTier {
     BLOCKED,
 }
 
+enum class WalkSafeMetricDistanceProbeFailure {
+    ARCORE_ERROR,
+    ARCORE_TIMED_OUT,
+    QUERY_EXCEPTION,
+}
+
 enum class WalkSafeStartupRequirement(val labelKo: String) {
     ANDROID_VERSION("지원 Android 버전"),
     CAMERA("카메라"),
@@ -41,6 +47,19 @@ enum class WalkSafeStartupRequirement(val labelKo: String) {
     METRIC_DISTANCE("미터 단위 거리 측정"),
     APPROVED_DEVICE_PROFILE("승인된 지정 기기 프로필"),
 }
+
+/**
+ * FP-009 three tiers (full / distance-limited / unavailable): only a missing metric distance
+ * capability may start in the limited tier. A known failure of any of these functions blocks the
+ * walk start. APPROVED_DEVICE_PROFILE is a designation, not a capability, and its blocking is not
+ * activated until designated test devices are registered.
+ */
+val WALK_START_BLOCKING_CAPABILITIES: Set<WalkSafeStartupRequirement> = setOf(
+    WalkSafeStartupRequirement.CAMERA,
+    WalkSafeStartupRequirement.GPS,
+    WalkSafeStartupRequirement.MICROPHONE,
+    WalkSafeStartupRequirement.ON_DEVICE_STT,
+)
 
 val USER_INSTALLABLE_REQUIREMENTS: Set<WalkSafeStartupRequirement> = setOf(
     WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS,
@@ -57,6 +76,7 @@ data class WalkSafeStartupCapabilityInput(
     val metricDistanceAvailable: Boolean?,
     val approvedDesignatedDeviceProfile: Boolean?,
     val designatedDeviceProfileVersion: String?,
+    val metricDistanceProbeFailure: WalkSafeMetricDistanceProbeFailure? = null,
 )
 
 data class WalkSafeStartupCapabilityDecision(
@@ -127,12 +147,34 @@ object WalkSafeStartupCapabilityResolver {
             } else {
                 " 확인된 미지원 기능: ${unavailable.labelsKo()}"
             }
+            val metricDistanceFailureNotice = if (input.metricDistanceAvailable == null) {
+                when (input.metricDistanceProbeFailure) {
+                    WalkSafeMetricDistanceProbeFailure.ARCORE_ERROR ->
+                        " 미터 단위 거리 측정: ARCore 지원 조회 오류가 발생했습니다."
+                    WalkSafeMetricDistanceProbeFailure.ARCORE_TIMED_OUT ->
+                        " 미터 단위 거리 측정: ARCore 지원 조회 시간이 초과되었습니다."
+                    WalkSafeMetricDistanceProbeFailure.QUERY_EXCEPTION ->
+                        " 미터 단위 거리 측정: 지원 조회에 실패했습니다."
+                    null -> ""
+                }
+            } else {
+                ""
+            }
             return WalkSafeStartupCapabilityDecision(
                 tier = WalkSafeStartupCapabilityTier.BLOCKED,
                 unavailableRequirements = unavailable,
                 pendingRequirements = pending,
                 noticeKo = "기기 기능을 확인하는 중입니다: ${pending.labelsKo()}." +
-                    unavailableNotice,
+                    unavailableNotice + metricDistanceFailureNotice,
+            )
+        }
+        if (blocksWalkStart(unavailable)) {
+            return WalkSafeStartupCapabilityDecision(
+                tier = WalkSafeStartupCapabilityTier.BLOCKED,
+                unavailableRequirements = unavailable,
+                pendingRequirements = emptyList(),
+                noticeKo = "필수 기기 기능을 사용할 수 없어 WalkSafe 보행을 시작할 수 없습니다. " +
+                    "사용할 수 없는 기능: ${unavailable.labelsKo()}.",
             )
         }
         if (unavailable.isNotEmpty()) {
@@ -159,6 +201,9 @@ object WalkSafeStartupCapabilityResolver {
             noticeKo = "필수 기기 기능 확인을 통과했습니다. 이 결과는 기능 시작 가능 여부만 뜻하며 보행 안전을 보장하지 않습니다.",
         )
     }
+
+    fun blocksWalkStart(unavailable: Collection<WalkSafeStartupRequirement>): Boolean =
+        unavailable.any(WALK_START_BLOCKING_CAPABILITIES::contains)
 }
 
 private fun Collection<WalkSafeStartupRequirement>.labelsKo(): String =

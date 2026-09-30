@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
@@ -20,6 +21,61 @@ internal interface WalkVoiceSessionControllerProvider {
     val walkVoiceSessionController: WalkVoiceSessionController?
 }
 
+internal enum class WalkVoiceStartFailure {
+    SECURITY,
+    FOREGROUND_START_RESTRICTED,
+    CONTROLLER_REJECTED,
+    RUNTIME,
+    /** S04-27: capture silenced by a call, another app or OS policy after it started. */
+    INPUT_SILENCED,
+}
+
+internal fun classifyWalkVoiceStartFailure(
+    error: RuntimeException,
+    foregroundStartRestricted: Boolean,
+): WalkVoiceStartFailure = when {
+    error is SecurityException -> WalkVoiceStartFailure.SECURITY
+    foregroundStartRestricted -> WalkVoiceStartFailure.FOREGROUND_START_RESTRICTED
+    else -> WalkVoiceStartFailure.RUNTIME
+}
+
+internal fun isWalkVoiceForegroundStartRestricted(error: RuntimeException): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        error is ForegroundServiceStartNotAllowedException
+
+internal fun handleWalkVoiceServiceStartException(
+    error: RuntimeException,
+    foregroundStartRestricted: Boolean,
+    cleanup: () -> Unit,
+    reportFailure: (WalkVoiceStartFailure) -> Unit,
+) {
+    var cleanupFailure: RuntimeException? = null
+    try {
+        cleanup()
+    } catch (failure: RuntimeException) {
+        cleanupFailure = failure
+    }
+    if (error is SecurityException || foregroundStartRestricted) {
+        reportFailure(classifyWalkVoiceStartFailure(error, foregroundStartRestricted))
+        cleanupFailure?.let { throw it }
+        return
+    }
+    cleanupFailure?.let(error::addSuppressed)
+    throw error
+}
+
+internal fun replaceWalkVoiceSessionIfNeeded(
+    sessionStarted: Boolean,
+    activeController: WalkVoiceSessionController?,
+    nextController: WalkVoiceSessionController,
+    stopCurrent: () -> Unit,
+): Boolean {
+    if (!sessionStarted) return true
+    if (activeController === nextController) return false
+    stopCurrent()
+    return true
+}
+
 class WalkVoiceForegroundService : Service() {
     private var foregroundStarted = false
     private var sessionStarted = false
@@ -29,9 +85,13 @@ class WalkVoiceForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START -> startVoiceSession()
+            ACTION_START -> startVoiceSession(intent.getLongExtra(EXTRA_START_REQUEST_ID, 0L))
             ACTION_STOP -> {
-                if (stopSelfResult(startId)) stopVoiceSession()
+                if (stopSelfResult(startId)) {
+                    // S04-30: this is the user's stop, not a transient one; the owner must keep it.
+                    (application as? WalkSafeApplication)?.reportWalkVoiceUserStop(activeController)
+                    stopVoiceSession()
+                }
             }
             else -> {
                 // A null intent can be delivered only for a system recreation. Never resume the mic.
@@ -63,28 +123,42 @@ class WalkVoiceForegroundService : Service() {
         foregroundStarted = true
     }
 
-    private fun startVoiceSession() {
-        ensureForegroundStarted()
-        if (sessionStarted) return
-
-        sessionStarted = true
+    private fun startVoiceSession(requestId: Long) {
+        val app = application as? WalkSafeApplication
+        val controller = app?.walkVoiceSessionController
+        if (app == null || controller == null ||
+            !app.acceptsWalkVoiceStartRequest(requestId, controller)
+        ) {
+            if (!sessionStarted) stopSelf()
+            return
+        }
         try {
-            val controller =
-                (application as? WalkVoiceSessionControllerProvider)?.walkVoiceSessionController
-                    ?: run {
-                        stopVoiceSession(stopController = false)
-                        stopSelf()
-                        return
-                    }
+            if (!replaceWalkVoiceSessionIfNeeded(sessionStarted, activeController, controller) {
+                    stopVoiceSession()
+                }
+            ) return
+            sessionStarted = true
             activeController = controller
-            if (!controller.start()) {
+            ensureForegroundStarted()
+            if (!app.startWalkVoiceController(requestId, controller)) {
                 stopVoiceSession(stopController = false)
                 stopSelf()
             }
-        } catch (error: Throwable) {
-            stopVoiceSession()
-            stopSelf()
-            throw error
+        } catch (error: RuntimeException) {
+            handleWalkVoiceServiceStartException(
+                error = error,
+                foregroundStartRestricted = isWalkVoiceForegroundStartRestricted(error),
+                cleanup = {
+                    try {
+                        stopVoiceSession()
+                    } finally {
+                        stopSelf()
+                    }
+                },
+                reportFailure = { failure ->
+                    app.reportWalkVoiceStartFailure(requestId, controller, failure)
+                },
+            )
         }
     }
 
@@ -93,7 +167,13 @@ class WalkVoiceForegroundService : Service() {
         activeController = null
         if (sessionStarted) {
             sessionStarted = false
-            if (stopController) runCatching { controller?.stop() }
+            if (stopController) {
+                try {
+                    controller?.stop()
+                } catch (error: RuntimeException) {
+                    android.util.Log.w("WalkSafeVoice", "controller_stop_failed", error)
+                }
+            }
         }
         if (foregroundStarted) {
             foregroundStarted = false
@@ -145,6 +225,8 @@ class WalkVoiceForegroundService : Service() {
             "kr.co.hanium.dreamup.walksafe.voice.action.START"
         const val ACTION_STOP =
             "kr.co.hanium.dreamup.walksafe.voice.action.STOP"
+        const val EXTRA_START_REQUEST_ID =
+            "kr.co.hanium.dreamup.walksafe.voice.extra.START_REQUEST_ID"
 
         private const val NOTIFICATION_CHANNEL_ID = "walk_voice_session"
         private const val NOTIFICATION_ID = 2_401

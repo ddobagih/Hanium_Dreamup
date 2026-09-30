@@ -337,6 +337,66 @@ public final class AdminReportWave5Test {
     }
 
     @Test
+    public void challengeTimeGuidanceOnlyAppearsBeforeStatusDispatch() throws Exception {
+        for (boolean dispatched : new boolean[] {false, true}) {
+            final int[] sends = {0};
+            AdminReportWorkflowController controller = new AdminReportWorkflowController(
+                new AdminReportWorkflowController.Loader() {
+                    @Override
+                    public AdminReportModels.StatusSnapshot updateStatus(
+                        String reportId, String nextStatus, int expectedVersion,
+                        char[] password, char[] totp
+                    ) {
+                        throw new AssertionError("the dispatch-aware loader must be used");
+                    }
+
+                    @Override
+                    public AdminReportModels.StatusSnapshot updateStatus(
+                        String reportId, String nextStatus, int expectedVersion,
+                        char[] password, char[] totp,
+                        AdminReportWorkflowController.StatusDispatch dispatch
+                    ) throws IOException {
+                        if (dispatched) {
+                            assertTrue(dispatch.markDispatched());
+                            sends[0] += 1;
+                        }
+                        throw new AdminDeviceProof.ChallengeTimeException();
+                    }
+
+                    @Override
+                    public AdminDeliveryPackage createPackage(
+                        AdminDeliveryPackage.Eligibility eligibility,
+                        char[] password, char[] totp
+                    ) {
+                        throw new AssertionError("package must not run");
+                    }
+
+                    @Override
+                    public AdminReportModels.Detail refreshDetail(String reportId) {
+                        throw new AssertionError("status failure must not refresh detail");
+                    }
+                }
+            );
+            assertTrue(controller.execute(controller.beginStatus(
+                REPORT_ID, "resolved", 1,
+                "long-test-password".toCharArray(), "123456".toCharArray()
+            )));
+            assertEquals(dispatched ? 1 : 0, sends[0]);
+            if (dispatched) {
+                assertEquals(AdminReportWorkflowController.Phase.UPDATED_DETAIL_STALE,
+                    controller.snapshot().phase());
+                assertFalse(controller.snapshot().message().contains("자동 날짜"));
+                assertTrue(controller.snapshot().message().contains("PATCH를 재전송하지 않고"));
+            } else {
+                assertEquals(AdminReportWorkflowController.Phase.ERROR,
+                    controller.snapshot().phase());
+                assertTrue(controller.snapshot().message().contains("자동 날짜·시간 설정"));
+                assertEquals(null, controller.statusDetailRecovery());
+            }
+        }
+    }
+
+    @Test
     public void lifecycleAfterPatchConfirmationRestoresExactTargetAndUsesGetOnly()
         throws Exception {
         CountDownLatch refreshStarted = new CountDownLatch(1);

@@ -22,7 +22,7 @@ class AndroidIntegratedConsentBootstrapTest {
 
         assertNull(
             validatedIntegratedConsentBootstrapOrNull(
-                readyBody().replace("FP-013-RAW-1.1.0", "FP-013-RAW-1.0.0"),
+                readyBody().replace("FP-013-RAW-1.2.0", "FP-013-RAW-1.1.0"),
                 INSTALLATION_ID,
             ),
         )
@@ -99,10 +99,10 @@ class AndroidIntegratedConsentBootstrapTest {
           "status":"READY",
           "source":"SIGNUP_CONSENT",
           "installation_id":"$INSTALLATION_ID",
-          "policy_version":"FP-013-1.1.0",
+          "policy_version":"FP-013-1.2.0",
           "item_versions":{
-            "raw_source_collection":"FP-013-RAW-1.1.0",
-            "automatic_reporting":"FP-013-AUTO-1.1.0",
+            "raw_source_collection":"FP-013-RAW-1.2.0",
+            "automatic_reporting":"FP-013-AUTO-1.2.0",
             "mobile_network_transfer":"FP-013-MOBILE-1.0.0",
             "training_reuse":"FP-013-TRAINING-1.1.0"
           },
@@ -124,10 +124,10 @@ class AndroidIntegratedConsentBootstrapTest {
           "status":"RECONSENT_REQUIRED",
           "source":"NONE",
           "installation_id":"$INSTALLATION_ID",
-          "policy_version":"FP-013-1.1.0",
+          "policy_version":"FP-013-1.2.0",
           "item_versions":{
-            "raw_source_collection":"FP-013-RAW-1.1.0",
-            "automatic_reporting":"FP-013-AUTO-1.1.0",
+            "raw_source_collection":"FP-013-RAW-1.2.0",
+            "automatic_reporting":"FP-013-AUTO-1.2.0",
             "mobile_network_transfer":"FP-013-MOBILE-1.0.0",
             "training_reuse":"FP-013-TRAINING-1.1.0"
           },

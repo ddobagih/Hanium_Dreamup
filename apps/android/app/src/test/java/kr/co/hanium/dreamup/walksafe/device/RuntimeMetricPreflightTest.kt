@@ -46,6 +46,7 @@ class RuntimeMetricPreflightTest {
             generation = 2L,
             startedAtElapsedRealtimeMs = START_MS,
             depthSupport = RuntimeMetricDepthSupport.UNSUPPORTED,
+            profile = RuntimeMetricPreflightPolicy.testCandidateProfile,
         )
         val unknownSession = supportedSession(generation = 3L)
         unknownSession.failTransiently(START_MS + 500L)
@@ -261,11 +262,13 @@ class RuntimeMetricPreflightTest {
             generation = 1L,
             startedAtElapsedRealtimeMs = START_MS,
             depthSupport = RuntimeMetricDepthSupport.UNSUPPORTED,
+            profile = RuntimeMetricPreflightPolicy.testCandidateProfile,
         ).result()
         val unknown = RuntimeMetricPreflightSession(
             generation = 2L,
             startedAtElapsedRealtimeMs = START_MS,
             depthSupport = RuntimeMetricDepthSupport.UNKNOWN,
+            profile = RuntimeMetricPreflightPolicy.testCandidateProfile,
         ).expire(START_MS + 10_000L)
 
         assertEquals(RuntimeMetricPreflightStatus.UNSUPPORTED, unsupported.status)
@@ -386,6 +389,7 @@ class RuntimeMetricPreflightTest {
         generation = generation,
         startedAtElapsedRealtimeMs = START_MS,
         depthSupport = RuntimeMetricDepthSupport.SUPPORTED,
+        profile = RuntimeMetricPreflightPolicy.testCandidateProfile,
     )
 
     private fun frame(

@@ -36,16 +36,19 @@ internal class GnssQualityEstimator(
     private val config: GnssQualityEstimatorConfig = GnssQualityEstimatorConfig(),
 ) {
     private val epochs = ArrayDeque<Epoch>()
-    private var clockHighWatermarkNanos: Long? = null
     private var latestEpochAtNanos: Long? = null
-    private var stale = false
+
+    /** First C/N0-bearing epoch since [clear]; accepted epochs are strictly increasing, so it never moves. */
+    private var firstSignalAtNanos: Long? = null
 
     fun addEpoch(
         elapsedRealtimeNanos: Long,
         signals: List<GnssSatelliteSignal>,
+        timeSource: GnssSignalTimeSource? = null,
+        timestampUncertaintyNanos: Double? = null,
     ): GnssQualitySnapshot {
         require(elapsedRealtimeNanos >= 0L)
-        val highWatermark = clockHighWatermarkNanos
+        val highWatermark = latestEpochAtNanos
         if (highWatermark != null && elapsedRealtimeNanos <= highWatermark) {
             return buildSnapshot(highWatermark)
         }
@@ -55,14 +58,16 @@ internal class GnssQualityEstimator(
             epochs.clear()
         }
 
-        clockHighWatermarkNanos = elapsedRealtimeNanos
         latestEpochAtNanos = elapsedRealtimeNanos
-        stale = false
+        val cn0BySignal = finiteCn0BySignal(signals)
+        if (firstSignalAtNanos == null && cn0BySignal.isNotEmpty()) firstSignalAtNanos = elapsedRealtimeNanos
         epochs.addLast(
             Epoch(
                 elapsedRealtimeNanos = elapsedRealtimeNanos,
-                cn0BySignal = finiteCn0BySignal(signals),
+                cn0BySignal = cn0BySignal,
                 frequencySummary = summarizeGnssFrequencies(signals),
+                timeSource = timeSource,
+                timestampUncertaintyNanos = timestampUncertaintyNanos,
             ),
         )
         trimWindow(elapsedRealtimeNanos)
@@ -71,27 +76,14 @@ internal class GnssQualityEstimator(
 
     fun snapshot(elapsedRealtimeNanos: Long): GnssQualitySnapshot {
         require(elapsedRealtimeNanos >= 0L)
-        val highWatermark = clockHighWatermarkNanos
-        if (highWatermark != null && elapsedRealtimeNanos < highWatermark) {
-            return buildSnapshot(highWatermark)
-        }
-
-        clockHighWatermarkNanos = elapsedRealtimeNanos
-        val lastEpoch = latestEpochAtNanos
-        if (lastEpoch != null && elapsedRealtimeNanos - lastEpoch > config.staleAfterNanos) {
-            epochs.clear()
-            stale = true
-        } else {
-            trimWindow(elapsedRealtimeNanos)
-        }
+        // A query neither consumes source order nor applies future signal quality to an old fix.
         return buildSnapshot(elapsedRealtimeNanos)
     }
 
     fun clear() {
         epochs.clear()
-        clockHighWatermarkNanos = null
         latestEpochAtNanos = null
-        stale = false
+        firstSignalAtNanos = null
     }
 
     private fun finiteCn0BySignal(signals: List<GnssSatelliteSignal>): Map<SignalIdentity, Double> {
@@ -121,7 +113,14 @@ internal class GnssQualityEstimator(
     }
 
     private fun buildSnapshot(evaluatedAtNanos: Long): GnssQualitySnapshot {
-        val latest = epochs.peekLast()
+        val atOrBefore = epochs.filter { it.elapsedRealtimeNanos <= evaluatedAtNanos }
+        val lastAt = atOrBefore.lastOrNull()?.elapsedRealtimeNanos
+        val stale = lastAt != null && evaluatedAtNanos - lastAt > config.staleAfterNanos
+        val cutoff = (evaluatedAtNanos - config.windowDurationNanos).coerceAtLeast(0L)
+        val epochs = if (stale) emptyList() else atOrBefore.filter { it.elapsedRealtimeNanos >= cutoff }
+        val latest = epochs.lastOrNull()
+        // S09-6: a query never borrows a later first signal, so a backward query stays UNSUPPORTED.
+        val signalObservedByThen = firstSignalAtNanos?.let { it <= evaluatedAtNanos } == true
         if (latest == null) {
             return GnssQualitySnapshot(
                 evaluatedAtNanos = evaluatedAtNanos,
@@ -137,6 +136,11 @@ internal class GnssQualityEstimator(
                 signalEnvironmentRiskScore = null,
                 measurementNoiseMultiplier = 1.0,
                 isStale = stale,
+                signalAvailability = if (signalObservedByThen) {
+                    GnssSignalAvailability.LOST_EXPIRED
+                } else {
+                    GnssSignalAvailability.UNSUPPORTED
+                },
             )
         }
 
@@ -150,8 +154,9 @@ internal class GnssQualityEstimator(
         } else {
             ((maximumSignalCount - latest.cn0BySignal.size).toDouble() / maximumSignalCount).coerceIn(0.0, 1.0)
         }
-        val volatility = calculateVolatility()
+        val volatility = calculateVolatility(epochs)
 
+        var lossHeld = false
         val canAssessRisk =
             epochs.size >= config.minEpochCountForRisk &&
                 maximumSignalCount >= config.minSignalCountForRisk &&
@@ -169,8 +174,23 @@ internal class GnssQualityEstimator(
                 0.3 * dropoutRisk +
                 0.15 * volatilityRisk +
                 0.15 * scarcityRisk).coerceIn(0.0, 1.0)
+        } else if (latestCn0.isEmpty()) {
+            // An empty epoch must not erase assessed risk immediately or extend its lifetime.
+            val lastSignalAt = epochs.lastOrNull { it.cn0BySignal.isNotEmpty() }?.elapsedRealtimeNanos
+            if (lastSignalAt != null && evaluatedAtNanos - lastSignalAt <= config.staleAfterNanos) {
+                // pos-F5: "holding" only when there is an assessed risk to hold.
+                buildSnapshot(lastSignalAt).signalEnvironmentRiskScore.also { held -> lossHeld = held != null }
+            } else {
+                null
+            }
         } else {
             null
+        }
+        val availability = when {
+            !signalObservedByThen -> GnssSignalAvailability.UNSUPPORTED
+            latestCn0.isNotEmpty() -> GnssSignalAvailability.OBSERVING
+            lossHeld -> GnssSignalAvailability.LOST_HOLDING
+            else -> GnssSignalAvailability.LOST_EXPIRED
         }
         val risk = when {
             riskScore == null -> SignalEnvironmentRisk.UNKNOWN
@@ -187,7 +207,7 @@ internal class GnssQualityEstimator(
 
         return GnssQualitySnapshot(
             evaluatedAtNanos = evaluatedAtNanos,
-            latestEpochAtNanos = latestEpochAtNanos,
+            latestEpochAtNanos = latest.elapsedRealtimeNanos,
             epochCount = epochs.size,
             finiteSignalCount = latest.cn0BySignal.size,
             medianCn0DbHz = medianCn0,
@@ -199,10 +219,13 @@ internal class GnssQualityEstimator(
             signalEnvironmentRiskScore = riskScore,
             measurementNoiseMultiplier = noiseMultiplier,
             isStale = stale,
+            latestEpochTimeSource = latest.timeSource,
+            latestEpochTimestampUncertaintyNanos = latest.timestampUncertaintyNanos,
+            signalAvailability = availability,
         )
     }
 
-    private fun calculateVolatility(): Double? {
+    private fun calculateVolatility(epochs: List<Epoch>): Double? {
         val previousBySignal = mutableMapOf<SignalIdentity, Double>()
         val squaredChanges = mutableListOf<Double>()
         epochs.forEach { epoch ->
@@ -231,6 +254,8 @@ internal class GnssQualityEstimator(
         val elapsedRealtimeNanos: Long,
         val cn0BySignal: Map<SignalIdentity, Double>,
         val frequencySummary: GnssFrequencySummary,
+        val timeSource: GnssSignalTimeSource?,
+        val timestampUncertaintyNanos: Double?,
     )
 
     private data class SignalIdentity(

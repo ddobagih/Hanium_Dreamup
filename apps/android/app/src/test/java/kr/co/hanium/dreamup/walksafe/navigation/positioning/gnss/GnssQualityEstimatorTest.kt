@@ -8,6 +8,29 @@ import org.junit.Test
 
 class GnssQualityEstimatorTest {
     @Test
+    fun futureSnapshotDoesNotConsumeObservationWatermarkOrDeleteHistoricalQuality() {
+        val estimator = estimator(minEpochs = 1, minSignals = 1)
+        estimator.addEpoch(10L, listOf(signal(1, 10.0)))
+        assertTrue(estimator.snapshot(200L).isStale)
+        val next = estimator.addEpoch(20L, listOf(signal(1, 20.0)))
+        assertEquals(20L, next.latestEpochAtNanos)
+        assertEquals(2, next.epochCount)
+        assertEquals(10.0, requireNotNull(estimator.snapshot(10L).medianCn0DbHz), 0.0)
+    }
+
+    @Test
+    fun historicalFixCannotBorrowFutureSignalQuality() {
+        val estimator = estimator(minEpochs = 1, minSignals = 1)
+        estimator.addEpoch(10L, listOf(signal(1, 35.0)))
+        estimator.addEpoch(20L, listOf(signal(1, 5.0)))
+        val earlier = estimator.snapshot(15L)
+        assertEquals(15L, earlier.evaluatedAtNanos)
+        assertEquals(10L, earlier.latestEpochAtNanos)
+        assertEquals(35.0, requireNotNull(earlier.medianCn0DbHz), 0.0)
+        assertEquals(0, estimator.snapshot(9L).epochCount)
+    }
+
+    @Test
     fun calculatesStatisticsFromFiniteCn0Only() {
         val estimator = estimator(minEpochs = 1, minSignals = 3)
 

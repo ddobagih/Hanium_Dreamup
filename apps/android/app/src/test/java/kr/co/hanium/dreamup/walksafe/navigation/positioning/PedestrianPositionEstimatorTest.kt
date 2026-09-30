@@ -165,6 +165,7 @@ class PedestrianPositionEstimatorTest {
         val update = estimator.observePdrStep(
             PdrStepObservation(
                 stepCount = 2,
+                headingCoversWholeBatch = true,
                 stepLengthM = 0.65,
                 headingDegreesTrueNorth = 90.0,
                 headingAccuracyDegrees = 5.0,
@@ -265,6 +266,7 @@ class PedestrianPositionEstimatorTest {
         val update = estimator.observePdrStep(
             PdrStepObservation(
                 stepCount = 2,
+                headingCoversWholeBatch = true,
                 stepLengthM = 0.65,
                 headingDegreesTrueNorth = 90.0,
                 headingAccuracyDegrees = 5.0,

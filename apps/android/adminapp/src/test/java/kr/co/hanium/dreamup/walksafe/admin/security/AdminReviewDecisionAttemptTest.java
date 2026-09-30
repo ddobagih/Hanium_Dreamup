@@ -99,4 +99,46 @@ public final class AdminReviewDecisionAttemptTest {
             null
         );
     }
+    @Test
+    public void s18_35_pendingRetryKeepsTheReviewRevisionItWasPreparedAgainst() throws Exception {
+        AdminReviewDecisionAttempt attempt = new AdminReviewDecisionAttempt();
+        AdminReportDecision first = attempt.prepare(
+            REPORT_ID,
+            AdminReportDecision.Decision.REJECTED,
+            "현장 확인 결과 처리 대상이 아님",
+            "처리 대상이 아닙니다",
+            null,
+            true,
+            true,
+            true,
+            3,
+            null,
+            2L
+        );
+        org.json.JSONObject body = new org.json.JSONObject(new String(
+            first.requestBody(REPORT_ID), java.nio.charset.StandardCharsets.UTF_8
+        ));
+        assertEquals(2L, body.getLong("expected_review_revision"));
+        // A retry after a refreshed detail (now showing revision 3) must not silently rebind
+        // the pending intent to the newer revision: it replays revision 2 exactly.
+        AdminReportDecision retry = attempt.prepare(
+            REPORT_ID,
+            AdminReportDecision.Decision.REJECTED,
+            "현장 확인 결과 처리 대상이 아님",
+            "처리 대상이 아닙니다",
+            null,
+            true,
+            true,
+            true,
+            3,
+            null,
+            3L
+        );
+        assertSame(first, retry);
+        assertEquals(2L, retry.expectedReviewRevision());
+        assertThrows(IllegalArgumentException.class, () -> new AdminReportDecision(
+            AdminReportDecision.Decision.REJECTED, "사유", "사유", null, true, true, true, 0,
+            null, "33333333-3333-4333-8333-333333333333", -1L
+        ));
+    }
 }

@@ -92,11 +92,17 @@ _DEVICE_PROOF_WORKFLOW_PATHS = {
     "/admin/security/devices/{device_id}/report-lost": {
         "post": ("device.report_lost", None),
     },
+    "/admin/security/device-keys/rotation/confirm": {
+        "post": ("device_key.rotation.confirm", None),
+    },
     "/reports/{report_id}/review-decisions": {
         "post": ("report.review.decide", None),
         "get": (None, "report.review_decisions"),
     },
     "/reports/{report_id}/review-decisions/history": {
+        "get": (None, "report.review_decisions"),
+    },
+    "/reports/{report_id}/review-decisions/{decision_id}": {
         "get": (None, "report.review_decisions"),
     },
     "/reports/{report_id}/original-access-grants": {
@@ -108,6 +114,9 @@ _DEVICE_PROOF_WORKFLOW_PATHS = {
     },
     "/reports/{report_id}/deliveries/history": {
         "get": (None, "report.delivery_events"),
+    },
+    "/reports/{report_id}/delivery-corrections": {
+        "post": ("report.delivery.correct", None),
     },
 }
 _HIGH_RISK_DEVICE_PROOF_WORKFLOWS = {
@@ -136,6 +145,10 @@ _HIGH_RISK_DEVICE_PROOF_WORKFLOWS = {
         "post",
         "/reports/{report_id}/original-access-grants",
     ): "report.original.grant",
+    (
+        "post",
+        "/reports/{report_id}/delivery-corrections",
+    ): "report.delivery.correct",
 }
 _ADMIN_RECONFIRMATION_PARAMETER = {
     "name": ADMIN_RECONFIRM_NONCE_HEADER_NAME,
@@ -153,6 +166,31 @@ _ADMIN_RECONFIRMATION_PARAMETER = {
     },
 }
 _SHA256_SCHEMA = {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+
+
+def _install_response_variant_components(components: dict[str, Any]) -> None:
+    """S1617-51-F1: register schemas named by x-walksafe-response-variants.
+
+    A throwaway FastAPI app renders them with the same generator, so nested
+    component names and shapes match the runtime schema. Existing components
+    are never replaced.
+    """
+
+    schemas = components.setdefault("schemas", {})
+    if "AccountDeletionStatusV2" not in schemas:
+        return
+    from backend.app.schemas import AccountDeletionStatusWithDeviceVerificationV2
+
+    probe = FastAPI()
+
+    @probe.get("/variant", response_model=AccountDeletionStatusWithDeviceVerificationV2)
+    def _variant() -> None:  # pragma: no cover - schema rendering only
+        return None
+
+    for name, variant_schema in (
+        probe.openapi().get("components", {}).get("schemas", {}).items()
+    ):
+        schemas.setdefault(name, variant_schema)
 
 
 def _install_privacy_schema_invariants(components: dict[str, Any]) -> None:
@@ -240,8 +278,13 @@ def _install_privacy_schema_invariants(components: dict[str, Any]) -> None:
                 },
             },
         ]
-    status = schemas.get("AccountDeletionStatusV2")
-    if isinstance(status, dict):
+    for status in (
+        schemas.get("AccountDeletionStatusV2"),
+        # S1617-51-F1: the opt-in view carries the same receipt invariant.
+        schemas.get("AccountDeletionStatusWithDeviceVerificationV2"),
+    ):
+        if not isinstance(status, dict):
+            continue
         status["allOf"] = [
             {
                 "if": {
@@ -351,6 +394,20 @@ def install_walksafe_openapi_contract(app: FastAPI, settings: Any) -> None:
             return app.openapi_schema
 
         schema = default_openapi()
+        # FastAPI's default descriptions follow Python's HTTPStatus phrases,
+        # which changed for 413 and 422 without changing the HTTP contract.
+        for path_item in schema.get("paths", {}).values():
+            for operation in path_item.values():
+                if not isinstance(operation, dict):
+                    continue
+                responses = operation.get("responses", {})
+                for status, current, canonical in (
+                    ("413", "Content Too Large", "Request Entity Too Large"),
+                    ("422", "Unprocessable Content", "Unprocessable Entity"),
+                ):
+                    response = responses.get(status)
+                    if isinstance(response, dict) and response.get("description") == current:
+                        response["description"] = canonical
         components = schema.setdefault("components", {})
         admin_security_enabled = bool(
             getattr(settings, "admin_security_enabled", False)
@@ -486,6 +543,7 @@ def install_walksafe_openapi_contract(app: FastAPI, settings: Any) -> None:
                 "description": "Legacy development/test administrator token. It does not grant field-client access.",
             }
         components["securitySchemes"] = security_schemes
+        _install_response_variant_components(components)
         _install_privacy_schema_invariants(components)
 
         admin_context_requirement = {

@@ -157,6 +157,24 @@ internal object GatewayPersistedLoginStatePolicy {
         }
     }
 
+    fun rollbackRenewalForRetry(
+        current: GatewayPersistedLoginState?,
+        expectedVersion: GatewaySessionVersion,
+        operationId: String,
+    ): GatewayPersistedStateTransition {
+        if (!operationIdPattern.matches(operationId)) {
+            return unchanged(GatewaySessionStoreResult.BLOCKED, current)
+        }
+        return when {
+            current == null -> unchanged(GatewaySessionStoreResult.NOT_FOUND, null)
+            current is GatewayPersistedLoginState.Renewing &&
+                current.operationId == operationId &&
+                current.bundle.session.version() == expectedVersion ->
+                committed(GatewayPersistedLoginState.Active(current.bundle))
+            else -> unchanged(GatewaySessionStoreResult.STALE, current)
+        }
+    }
+
     fun abandonRenewal(
         current: GatewayPersistedLoginState?,
         expectedVersion: GatewaySessionVersion,
@@ -311,7 +329,8 @@ internal object GatewayPersistedLoginStatePolicy {
             first.rotation == second.rotation &&
             first.accessExpiresAtEpochMs == second.accessExpiresAtEpochMs &&
             first.idleExpiresAtEpochMs == second.idleExpiresAtEpochMs &&
-            first.absoluteExpiresAtEpochMs == second.absoluteExpiresAtEpochMs
+            first.absoluteExpiresAtEpochMs == second.absoluteExpiresAtEpochMs &&
+            first.serverAccessExpiresAtEpochMs == second.serverAccessExpiresAtEpochMs
 
     private fun GatewayPersistedLoginBundle.pendingRevocation(
         operationId: String,

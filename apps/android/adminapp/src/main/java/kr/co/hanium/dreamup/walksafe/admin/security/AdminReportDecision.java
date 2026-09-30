@@ -23,7 +23,8 @@ public final class AdminReportDecision {
         "privacy_reviewed",
         "content_revision",
         "evidence_grant_id",
-        "decision_id"
+        "decision_id",
+        "expected_review_revision"
     );
 
     private final Decision decision;
@@ -36,6 +37,7 @@ public final class AdminReportDecision {
     private final int contentRevision;
     private final String evidenceGrantId;
     private final String decisionId;
+    private final long expectedReviewRevision;
 
     public AdminReportDecision(
         Decision decision,
@@ -49,7 +51,35 @@ public final class AdminReportDecision {
         String evidenceGrantId,
         String decisionId
     ) {
+        this(
+            decision, reason, userVisibleReason, duplicateOfReportId, locationReviewed,
+            photoReviewed, privacyReviewed, contentRevision, evidenceGrantId, decisionId, 0L
+        );
+    }
+
+    /**
+     * expectedReviewRevision is the latest review revision the administrator saw (0 when no
+     * decision exists). The server rejects the decision with 409 review_revision_conflict if
+     * another decision was recorded meanwhile (S18-35).
+     */
+    public AdminReportDecision(
+        Decision decision,
+        String reason,
+        String userVisibleReason,
+        String duplicateOfReportId,
+        boolean locationReviewed,
+        boolean photoReviewed,
+        boolean privacyReviewed,
+        int contentRevision,
+        String evidenceGrantId,
+        String decisionId,
+        long expectedReviewRevision
+    ) {
         if (decision == null) throw new IllegalArgumentException("decision is required");
+        if (expectedReviewRevision < 0L) {
+            throw new IllegalArgumentException("expected_review_revision is invalid");
+        }
+        this.expectedReviewRevision = expectedReviewRevision;
         this.decision = decision;
         this.reason = requiredText(reason, "reason", 500);
         this.userVisibleReason = userVisibleReason == null
@@ -91,6 +121,7 @@ public final class AdminReportDecision {
     public int contentRevision() { return contentRevision; }
     public String evidenceGrantId() { return evidenceGrantId; }
     public String decisionId() { return decisionId; }
+    public long expectedReviewRevision() { return expectedReviewRevision; }
 
     public byte[] requestBody(String reportId) {
         String canonicalReportId = canonicalUuid(reportId, "report_id");
@@ -108,8 +139,9 @@ public final class AdminReportDecision {
         fields.put("content_revision", contentRevision);
         fields.put("evidence_grant_id", evidenceGrantId);
         fields.put("decision_id", decisionId);
+        fields.put("expected_review_revision", expectedReviewRevision);
         if (!fields.keySet().equals(EXACT_KEYS)) {
-            throw new IllegalStateException("invalid exact10 review shape");
+            throw new IllegalStateException("invalid exact11 review shape");
         }
         return AdminCanonicalEncoding.canonicalJsonBytes(fields);
     }

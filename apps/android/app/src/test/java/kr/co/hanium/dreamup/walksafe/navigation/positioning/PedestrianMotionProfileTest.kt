@@ -131,6 +131,44 @@ class PedestrianMotionProfileTest {
         assertTrue(calibrated.walkingProcessAccelerationSigmaMps2 < defaults.walkingProcessAccelerationSigmaMps2)
     }
 
+    @Test
+    fun restoredVarianceRemainsAPriorUntilEnoughNewSamplesExist() {
+        val profile = PedestrianMotionProfile()
+        val prior = PersistedPedestrianMotionProfile(0.7, 1.0, 0.64, 12L)
+        assertTrue(profile.restore(prior))
+
+        repeat(2) {
+            val warming = profile.calibrate(sample(7.0, 10, 7_000L))
+            assertEquals(MotionCalibrationStatus.ACCEPTED_WARMUP, warming.status)
+            assertTrue(warming.snapshot.isCalibrated)
+            assertEquals(prior.speedVarianceMps2, warming.snapshot.speedVarianceMps2, 0.0)
+            assertEquals(prior.stepLengthM, warming.snapshot.stepLengthM, 0.0)
+        }
+        val updated = profile.calibrate(sample(7.0, 10, 7_000L))
+        assertEquals(MotionCalibrationStatus.UPDATED, updated.status)
+        assertTrue(updated.snapshot.speedVarianceMps2 < prior.speedVarianceMps2)
+        assertEquals(15L, updated.snapshot.acceptedSampleCount)
+    }
+
+    @Test
+    fun restoringAgainDiscardsThePartialNewObservationWindow() {
+        val profile = PedestrianMotionProfile()
+        val prior = PersistedPedestrianMotionProfile(0.7, 1.0, 0.49, Long.MAX_VALUE)
+        assertTrue(profile.restore(prior))
+        repeat(2) { profile.calibrate(sample(7.0, 10, 7_000L)) }
+        assertTrue(profile.restore(prior))
+        assertEquals(
+            MotionCalibrationStatus.REJECTED,
+            profile.calibrate(sample(7.0, 10, 7_000L, trusted = false)).status,
+        )
+
+        val warming = profile.calibrate(sample(7.0, 10, 7_000L))
+        assertEquals(MotionCalibrationStatus.ACCEPTED_WARMUP, warming.status)
+        assertEquals(prior.speedVarianceMps2, warming.snapshot.speedVarianceMps2, 0.0)
+        assertEquals(Long.MAX_VALUE, warming.snapshot.acceptedSampleCount)
+        assertEquals(prior, profile.snapshotForPersistence())
+    }
+
     private fun sample(
         distanceM: Double,
         steps: Int,

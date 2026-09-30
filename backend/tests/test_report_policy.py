@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import csv
 from datetime import datetime, timezone
 import errno
 import fcntl
+import io
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -215,7 +217,16 @@ def test_export_row_escapes_formula_like_review_flags() -> None:
         updated_at=datetime(2026, 6, 2, 12, 1, tzinfo=timezone.utc),
     )
 
-    assert str(_report_export_row(report)["review_flags"]).startswith("'")
+    row = _report_export_row(report)
+    assert row["review_flags"] == "\t=HYPERLINK(bad)"
+    original_row = dict(row)
+    for bom in (False, True):
+        exported = reports_api._csv_export_text([row], bom=bom)
+        assert exported.startswith("\ufeff") is bom
+        decoded = list(csv.DictReader(io.StringIO(exported.removeprefix("\ufeff"))))
+        assert len(decoded) == 1
+        assert decoded[0]["review_flags"] == "'\t=HYPERLINK(bad)"
+        assert row == original_row
 
 
 def test_minimum_export_row_removes_internal_evidence_fields() -> None:

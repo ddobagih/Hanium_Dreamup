@@ -271,7 +271,7 @@ class MessageMotionPolicyTest {
     }
 
     @Test
-    fun pseudoDepthKeepsRelativeCautionAndConfidenceFloorDespiteMetricMotionEvidence() {
+    fun pseudoDepthKeepsRelativeCautionForPositiveScoreDespiteMetricMotionEvidence() {
         val result = obstacle(ObjectMovementDirection.TOWARD_USER).copy(
             source = DepthSource.POLYGON_TREND_PSEUDO_DEPTH,
             riskDistanceM = 1f,
@@ -279,8 +279,8 @@ class MessageMotionPolicyTest {
             timeToCollisionMs = 1_000L,
             objectMotion = ObjectMotion.OBJECT_APPROACHING,
         )
-        val below = evaluate(result.copy(confidenceFinal = 0.3499f))
-        val atFloor = evaluate(result.copy(confidenceFinal = 0.35f))
+        val below = evaluate(result.copy(confidenceFinal = 0f))
+        val atFloor = evaluate(result.copy(confidenceFinal = 0.10f))
 
         assertEquals(MessageLevel.NONE, below.userFacing.messageLevel)
         assertNull(below.userFacing.message)
@@ -290,6 +290,7 @@ class MessageMotionPolicyTest {
         assertTrue(atFloor.userFacing.message!!.contains("거리가 줄어드는 것 같습니다"))
         assertFalse(atFloor.userFacing.message!!.contains("다가오는"))
         assertFalse(atFloor.userFacing.message!!.contains("멈추세요"))
+        assertNoSpokenDistanceOrStepCount(atFloor.userFacing)
     }
 
     @Test

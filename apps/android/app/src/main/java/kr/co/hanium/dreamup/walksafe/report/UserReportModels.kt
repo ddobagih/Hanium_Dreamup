@@ -20,8 +20,8 @@ internal const val USER_REPORT_REQUEST_HISTORY_SCHEMA_VERSION =
 internal enum class UserReportStatus(val wireValue: String, val labelKo: String) {
     RECEIVED("RECEIVED", "접수됨"),
     REJECTED("REJECTED", "기각됨"),
-    INSTITUTION_SUBMITTED("INSTITUTION_SUBMITTED", "기관 제출됨"),
-    RESOLVED("RESOLVED", "처리 완료"),
+    INSTITUTION_SUBMITTED("INSTITUTION_SUBMITTED", "기관 제출 기록 · 관리자가 수동 기록한 전달 상태"),
+    RESOLVED("RESOLVED", "기관 처리 완료 기록 · 관리자가 수동 기록한 전달 상태"),
     ;
 
     companion object {

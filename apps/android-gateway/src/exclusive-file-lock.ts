@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   closeSync,
   constants as fsConstants,
@@ -25,9 +25,11 @@ type HeldLock = {
   identity: LockIdentity;
 };
 
-export type SharedFileLockLease = {
+export type FileLockLease = {
   release: () => void;
 };
+
+export type SharedFileLockLease = FileLockLease;
 
 type SynchronousAction<Action extends () => unknown> =
   Extract<ReturnType<Action>, PromiseLike<unknown>> extends never
@@ -151,6 +153,55 @@ function acquireKernelLock(
   }
 }
 
+function acquireKernelLockAsync(
+  descriptor: number,
+  lockPath: string
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let helper: ReturnType<typeof spawn>;
+    try {
+      helper = spawn(
+        FLOCK_HELPER,
+        ["--exclusive", "--nonblock", FLOCK_CHILD_DESCRIPTOR],
+        { stdio: ["ignore", "ignore", "ignore", descriptor] }
+      );
+    } catch {
+      reject(new ExclusiveFileLockIntegrityError(
+        "required /usr/bin/flock lock helper is unavailable or failed"
+      ));
+      return;
+    }
+
+    let spawnFailed = false;
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      if (!spawnFailed) helper.kill("SIGKILL");
+    }, FLOCK_HELPER_TIMEOUT_MS);
+    helper.once("error", () => {
+      spawnFailed = true;
+    });
+    // Wait for close, not just exit: the helper must relinquish its inherited
+    // descriptor before an unsuccessful acquisition closes the parent's fd.
+    helper.once("close", (status, signal) => {
+      clearTimeout(timeout);
+      if (spawnFailed || timedOut) {
+        reject(new ExclusiveFileLockIntegrityError(
+          "required /usr/bin/flock lock helper is unavailable or failed"
+        ));
+      } else if (status === 1 && signal === null) {
+        reject(new ExclusiveFileLockBusyError(lockPath));
+      } else if (status === 0 && signal === null) {
+        resolve();
+      } else {
+        reject(new ExclusiveFileLockIntegrityError(
+          "exclusive file flock acquisition failed"
+        ));
+      }
+    });
+  });
+}
+
 function acquireFileLock(
   rawLockPath: string,
   mode: "exclusive" | "shared"
@@ -198,6 +249,45 @@ function acquireExclusiveFileLock(rawLockPath: string): HeldLock {
   return acquireFileLock(rawLockPath, "exclusive");
 }
 
+async function acquireExclusiveFileLockAsync(rawLockPath: string): Promise<HeldLock> {
+  const lockPath = path.resolve(rawLockPath);
+  let descriptor: number | null = null;
+  try {
+    // Keep the synchronous API's local-host, path, and inode checks intact.
+    if (process.platform !== "linux") {
+      throw new ExclusiveFileLockIntegrityError(
+        "exclusive file locks require a single Linux host and local filesystem"
+      );
+    }
+    secureParentDirectory(lockPath);
+    descriptor = openSync(
+      lockPath,
+      fsConstants.O_CREAT |
+        fsConstants.O_RDWR |
+        fsConstants.O_NOFOLLOW,
+      0o600
+    );
+    const identity = verifiedLockIdentity(lockPath, descriptor);
+    await acquireKernelLockAsync(descriptor, lockPath);
+    verifiedLockIdentity(lockPath, descriptor, identity);
+    const held = { descriptor, lockPath, identity };
+    descriptor = null;
+    return held;
+  } catch (error) {
+    if (
+      error instanceof ExclusiveFileLockBusyError ||
+      error instanceof ExclusiveFileLockIntegrityError
+    ) {
+      throw error;
+    }
+    throw new ExclusiveFileLockIntegrityError(
+      "exclusive file lock storage validation failed"
+    );
+  } finally {
+    if (descriptor !== null) closeWithoutMasking(descriptor);
+  }
+}
+
 function releaseFileLock(lock: HeldLock): void {
   let failure: unknown;
   try {
@@ -218,8 +308,11 @@ function releaseFileLock(lock: HeldLock): void {
   if (failure) throw failure;
 }
 
-export function acquireSharedFileLock(rawLockPath: string): SharedFileLockLease {
-  const lock = acquireFileLock(rawLockPath, "shared");
+function acquireFileLockLease(
+  rawLockPath: string,
+  mode: "exclusive" | "shared"
+): FileLockLease {
+  const lock = acquireFileLock(rawLockPath, mode);
   let released = false;
   return {
     release: () => {
@@ -228,6 +321,14 @@ export function acquireSharedFileLock(rawLockPath: string): SharedFileLockLease 
       releaseFileLock(lock);
     }
   };
+}
+
+export function acquireSharedFileLock(rawLockPath: string): SharedFileLockLease {
+  return acquireFileLockLease(rawLockPath, "shared");
+}
+
+export function acquireExclusiveFileLockLease(rawLockPath: string): FileLockLease {
+  return acquireFileLockLease(rawLockPath, "exclusive");
 }
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
@@ -275,11 +376,30 @@ export function withExclusiveFileLock<Action extends () => unknown>(
   }
 }
 
+/**
+ * Asynchronous lease form for callers that retry on ExclusiveFileLockBusyError: only the
+ * acquisition can report busy, never the caller's own action. The kernel lock is released
+ * when the descriptor closes, including when the process dies.
+ */
+export async function acquireExclusiveFileLockLeaseAsync(
+  rawLockPath: string
+): Promise<FileLockLease> {
+  const lock = await acquireExclusiveFileLockAsync(rawLockPath);
+  let released = false;
+  return {
+    release: () => {
+      if (released) return;
+      released = true;
+      releaseFileLock(lock);
+    }
+  };
+}
+
 export async function withExclusiveFileLockAsync<T>(
   lockPath: string,
   action: () => Promise<T> | T
 ): Promise<T> {
-  const lock = acquireExclusiveFileLock(lockPath);
+  const lock = await acquireExclusiveFileLockAsync(lockPath);
   try {
     return await action();
   } finally {

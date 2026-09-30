@@ -352,8 +352,11 @@ def _identity() -> AdminSessionIdentity:
     )
 
 
-def _review_payload(content_revision: int) -> ReportReviewDecisionRequest:
+def _review_payload(
+    content_revision: int, expected_review_revision: int = 0
+) -> ReportReviewDecisionRequest:
     return ReportReviewDecisionRequest(
+        expected_review_revision=expected_review_revision,
         decision_id=uuid.uuid4(),
         decision="APPROVED",
         reason="정정 내용을 재검수했습니다",
@@ -420,7 +423,7 @@ def test_correction_invalidates_old_approval_then_new_package_supersedes() -> No
     current_review = append_report_review_decision(
         review_db,  # type: ignore[arg-type]
         report_id=REPORT_ID,
-        payload=_review_payload(1),
+        payload=_review_payload(1, expected_review_revision=1),
         identity=_identity(),
         correlation_id=uuid.uuid4(),
         now=NOW,

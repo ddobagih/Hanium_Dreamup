@@ -186,6 +186,9 @@ class IntegratedConsentRevisionHardeningTest {
         )
 
         assertTrue(restarted.restoreCurrentConfirmation(exactGrant))
+        assertNull(restarted.currentConfirmationOrNull())
+        assertEquals(exactGrant, restarted.cachedConfirmationOrNull())
+        assertEquals(IntegratedConsentApplyResult.DUPLICATE, restarted.applyConfirmation(exactGrant))
         assertEquals(exactGrant, restarted.currentConfirmationOrNull())
         assertEquals(
             PurposeConsentSyncState.CONFIRMED_GRANTED,
@@ -343,6 +346,8 @@ class IntegratedConsentRevisionHardeningTest {
         )
         val restarted = IntegratedConsentSession()
         assertTrue(restarted.restoreCurrentConfirmation(denied))
+        assertNull(restarted.currentConfirmationOrNull())
+        assertEquals(IntegratedConsentApplyResult.DUPLICATE, restarted.applyConfirmation(denied))
 
         val oldGrant = confirmation(
             requestId = "consent_request_00000001",
@@ -423,6 +428,223 @@ class IntegratedConsentRevisionHardeningTest {
         )
     }
 
+    @Test
+    fun genericThenExactDuplicateCompletesOnlyThePendingWithdrawal() {
+        val (prior, mutation, confirmed) = withdrawalOrderFixture()
+        val session = IntegratedConsentSession()
+        assertTrue(session.restoreCurrentConfirmation(prior))
+        assertFalse(session.isAllowed(IntegratedConsentItem.RAW_SOURCE_COLLECTION))
+        assertEquals(IntegratedConsentApplyResult.DUPLICATE, session.applyConfirmation(prior))
+        assertTrue(session.isAllowed(IntegratedConsentItem.RAW_SOURCE_COLLECTION))
+        assertTrue(session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+        assertTrue(session.restorePendingMutation(mutation, retry = true))
+
+        assertEquals(IntegratedConsentApplyResult.APPLIED, session.applyConfirmation(confirmed))
+        assertEquals(confirmed, session.currentConfirmationOrNull())
+        assertEquals(mutation, session.pendingMutationOrNull())
+        assertEquals(
+            PurposeConsentSyncState.WITHDRAWAL_RETRY,
+            session.status(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+        )
+        assertFalse(session.isAllowed(IntegratedConsentItem.RAW_SOURCE_COLLECTION))
+        assertTrue(session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+        assertEquals(
+            IntegratedConsentApplyResult.DUPLICATE,
+            session.evaluateExactPendingConfirmation(confirmed),
+        )
+
+        assertTrue(session.applyExactPendingConfirmation(confirmed))
+
+        assertNull(session.pendingMutationOrNull())
+        assertEquals(confirmed, session.currentConfirmationOrNull())
+        assertEquals(
+            PurposeConsentSyncState.CONFIRMED_DENIED,
+            session.status(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+        )
+        assertFalse(session.isAllowed(IntegratedConsentItem.RAW_SOURCE_COLLECTION))
+        assertEquals(
+            PurposeConsentSyncState.CONFIRMED_GRANTED,
+            session.status(IntegratedConsentItem.AUTOMATIC_REPORTING),
+        )
+        assertTrue(session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+    }
+
+    @Test
+    fun exactThenGenericDuplicatePreservesCompletedWithdrawalAndIndependentGrant() {
+        val (prior, mutation, confirmed) = withdrawalOrderFixture()
+        val session = IntegratedConsentSession()
+        assertTrue(session.restoreCurrentConfirmation(prior))
+        assertFalse(session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+        assertEquals(IntegratedConsentApplyResult.DUPLICATE, session.applyConfirmation(prior))
+        assertTrue(session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+        assertTrue(session.restorePendingMutation(mutation, retry = true))
+        assertEquals(
+            PurposeConsentSyncState.WITHDRAWAL_RETRY,
+            session.status(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+        )
+        assertEquals(
+            IntegratedConsentApplyResult.APPLIED,
+            session.evaluateExactPendingConfirmation(confirmed),
+        )
+
+        assertTrue(session.applyExactPendingConfirmation(confirmed))
+        assertNull(session.pendingMutationOrNull())
+        assertEquals(
+            PurposeConsentSyncState.CONFIRMED_DENIED,
+            session.status(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+        )
+        assertTrue(session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+        assertEquals(IntegratedConsentApplyResult.DUPLICATE, session.applyConfirmation(confirmed))
+
+        assertNull(session.pendingMutationOrNull())
+        assertEquals(confirmed, session.currentConfirmationOrNull())
+        assertEquals(
+            PurposeConsentSyncState.CONFIRMED_DENIED,
+            session.status(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+        )
+        assertFalse(session.isAllowed(IntegratedConsentItem.RAW_SOURCE_COLLECTION))
+        assertEquals(
+            PurposeConsentSyncState.CONFIRMED_GRANTED,
+            session.status(IntegratedConsentItem.AUTOMATIC_REPORTING),
+        )
+        assertTrue(session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+    }
+
+    @Test
+    fun equalRevisionDifferentConfirmationContentCannotCompletePendingWithdrawal() {
+        val (prior, mutation, confirmed) = withdrawalOrderFixture()
+        val conflicts = listOf(
+            "raw selection" to confirmed.copy(
+                selections = confirmed.selections.copy(rawSourceCollection = true),
+            ),
+            "request identity" to confirmed.copy(requestId = "consent_request_00000003"),
+            "client revision" to confirmed.copy(clientRevision = 3L),
+            "confirmation time" to confirmed.copy(confirmedAt = "2026-07-25T00:00:01.000Z"),
+            "backend receipt" to confirmed.copy(backendConsentReceiptSha256 = "3".repeat(64)),
+            "gateway receipt" to confirmed.copy(gatewayAuditRecordSha256 = "8".repeat(64)),
+            "control secret" to confirmed.copy(controlSecret = "d".repeat(64)),
+        )
+        for ((name, conflict) in conflicts) {
+            val session = IntegratedConsentSession()
+            assertTrue(name, session.restoreCurrentConfirmation(prior))
+            assertTrue(name, session.restorePendingMutation(mutation, retry = true))
+            assertEquals(name, IntegratedConsentApplyResult.APPLIED, session.applyConfirmation(confirmed))
+            assertEquals(name, confirmed, session.currentConfirmationOrNull())
+            assertTrue(name, session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+            assertEquals(
+                name,
+                PurposeConsentSyncState.WITHDRAWAL_RETRY,
+                session.status(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+            )
+            assertEquals(name, confirmed.revision, conflict.revision)
+            assertFalse(name, conflict == confirmed)
+            assertEquals(
+                name,
+                IntegratedConsentApplyResult.REVISION_CONFLICT_FAIL_CLOSED,
+                session.evaluateExactPendingConfirmation(conflict),
+            )
+
+            assertFalse(name, session.applyExactPendingConfirmation(conflict))
+
+            assertEquals(name, mutation, session.pendingMutationOrNull())
+            assertNull(name, session.currentConfirmationOrNull())
+            assertEquals(
+                name,
+                PurposeConsentSyncState.FAIL_CLOSED,
+                session.status(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+            )
+            assertEquals(
+                name,
+                PurposeConsentSyncState.FAIL_CLOSED,
+                session.status(IntegratedConsentItem.AUTOMATIC_REPORTING),
+            )
+            assertFalse(name, session.isAllowed(IntegratedConsentItem.RAW_SOURCE_COLLECTION))
+            assertFalse(name, session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+        }
+    }
+
+    @Test
+    fun identicalCurrentConfirmationMustStillMatchTheExactPendingMutation() {
+        val (prior, mutation, confirmed) = withdrawalOrderFixture()
+        val mismatches = listOf(
+            "pending request identity" to mutation.copy(requestId = "consent_request_00000003"),
+            "pending desired selections" to mutation.copy(
+                desiredSelections = confirmed.selections.copy(mobileNetworkTransfer = true),
+            ),
+        )
+        for ((name, mismatch) in mismatches) {
+            val session = IntegratedConsentSession()
+            assertTrue(name, session.restoreCurrentConfirmation(prior))
+            assertTrue(name, session.restorePendingMutation(mismatch, retry = true))
+            assertFalse(name, mismatch.isExactNewerConfirmation(confirmed))
+            assertEquals(name, IntegratedConsentApplyResult.APPLIED, session.applyConfirmation(confirmed))
+            assertEquals(name, confirmed, session.currentConfirmationOrNull())
+            assertEquals(name, mismatch, session.pendingMutationOrNull())
+            assertTrue(name, session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+            assertEquals(
+                name,
+                PurposeConsentSyncState.WITHDRAWAL_RETRY,
+                session.status(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+            )
+            assertEquals(
+                name,
+                IntegratedConsentApplyResult.REVISION_CONFLICT_FAIL_CLOSED,
+                session.evaluateExactPendingConfirmation(confirmed),
+            )
+
+            assertFalse(name, session.applyExactPendingConfirmation(confirmed))
+
+            assertEquals(name, mismatch, session.pendingMutationOrNull())
+            assertNull(name, session.currentConfirmationOrNull())
+            assertEquals(
+                name,
+                PurposeConsentSyncState.FAIL_CLOSED,
+                session.status(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+            )
+            assertEquals(
+                name,
+                PurposeConsentSyncState.FAIL_CLOSED,
+                session.status(IntegratedConsentItem.AUTOMATIC_REPORTING),
+            )
+            assertFalse(name, session.isAllowed(IntegratedConsentItem.RAW_SOURCE_COLLECTION))
+            assertFalse(name, session.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+        }
+    }
+
+    private fun withdrawalOrderFixture(): Triple<
+        IntegratedConsentConfirmation,
+        PendingIntegratedConsentMutation,
+        IntegratedConsentConfirmation,
+    > {
+        val prior = confirmation(
+            requestId = "consent_request_00000001",
+            clientRevision = 1L,
+            revision = 1L,
+            rawSourceCollection = true,
+            receipt = "1".repeat(64),
+        ).copy(
+            selections = IntegratedConsentSelections(
+                rawSourceCollection = true,
+                automaticReporting = true,
+            ),
+        )
+        val confirmed = confirmation(
+            requestId = "consent_request_00000002",
+            clientRevision = 2L,
+            revision = 2L,
+            rawSourceCollection = false,
+            receipt = "2".repeat(64),
+        ).copy(selections = prior.selections.copy(rawSourceCollection = false))
+        val mutation = pendingMutation(
+            installationId = INSTALLATION_ID,
+            requestId = confirmed.requestId,
+            clientRevision = confirmed.clientRevision,
+            previousServerRevision = prior.revision,
+            selections = confirmed.selections,
+        ).copy(withdrawalItems = setOf(IntegratedConsentItem.RAW_SOURCE_COLLECTION))
+        return Triple(prior, mutation, confirmed)
+    }
+
     private fun confirmation(
         requestId: String,
         clientRevision: Long,
@@ -444,7 +666,7 @@ class IntegratedConsentRevisionHardeningTest {
                 mobileNetworkTransfer = false,
                 trainingReuse = false,
             ),
-            confirmedAt = "2026-07-25T00:00:00Z",
+            confirmedAt = "2026-07-25T00:00:00.000Z",
             gatewayAuditRecordSha256 = "9".repeat(64),
             backendConsentReceiptSha256 = receipt,
             controlSecret = "c".repeat(64),
@@ -472,6 +694,6 @@ class IntegratedConsentRevisionHardeningTest {
 
     private companion object {
         const val INSTALLATION_ID = "install-test-0001"
-        const val POLICY_VERSION = "FP-013-1.1.0"
+        const val POLICY_VERSION = "FP-013-1.2.0"
     }
 }

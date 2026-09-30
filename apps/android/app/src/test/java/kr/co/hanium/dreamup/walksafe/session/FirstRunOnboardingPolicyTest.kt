@@ -164,10 +164,138 @@ class FirstRunOnboardingPolicyTest {
         assertEquals(FirstRunOnboardingStage.PURPOSE_AND_SAFETY, missingSafety.snapshot.stage)
         assertEquals(FirstRunOnboardingRejection.STAGE_MISMATCH, missingSafety.rejection)
         assertTrue(restored.fullyRestored)
-        assertTrue(restored.snapshot.isComplete)
+        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, restored.snapshot.stage)
+        assertFalse(restored.snapshot.isComplete)
+        assertEquals(
+            mapOf(
+                FirstRunOnboardingStage.VERIFIED_LOGIN to receipt(47),
+                FirstRunOnboardingStage.PURPOSE_AND_SAFETY to receipt(49),
+                FirstRunOnboardingStage.FP004_TRAINING to receipt(48),
+            ),
+            restored.snapshot.completedReceiptHashes,
+        )
         assertTrue(
             FirstRunOnboardingStage.PURPOSE_AND_SAFETY in
                 restored.snapshot.completedReceiptHashes,
+        )
+        val permission = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            restored.snapshot,
+            restored.snapshot.epoch,
+            restored.snapshot.revision,
+        )
+        assertTrue(permission.accepted)
+        assertEquals(FirstRunOnboardingStage.DEVICE_CHECK, permission.current.stage)
+        assertFalse(permission.current.isComplete)
+        val device = FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(
+            permission.current,
+            permission.current.epoch,
+            permission.current.revision,
+        )
+        assertTrue(device.accepted)
+        assertTrue(device.current.isComplete)
+        assertEquals(restored.snapshot.completedReceiptHashes, device.current.completedReceiptHashes)
+    }
+
+    @Test
+    fun rejectedEmailTrainingRestoreKeepsThePreSkipSnapshot() {
+        val beforeTraining = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+            epoch = 5L,
+            orderedEvidence = emailTrainingEvidence().dropLast(1),
+            verifier = acceptingVerifier,
+        )
+        var trainingVerifierCalls = 0
+        val rejected = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+            epoch = 5L,
+            orderedEvidence = emailTrainingEvidence(),
+            verifier = FirstRunOnboardingEvidenceVerifier { _, evidence ->
+                if (evidence is FirstRunOnboardingEvidence.Fp004Training) {
+                    trainingVerifierCalls += 1
+                    false
+                } else {
+                    true
+                }
+            },
+        )
+
+        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, beforeTraining.snapshot.stage)
+        assertFalse(rejected.fullyRestored)
+        assertEquals(2, rejected.restoredEvidenceCount)
+        assertEquals(FirstRunOnboardingRejection.REMOTE_EVIDENCE_REJECTED, rejected.rejection)
+        assertEquals(beforeTraining.snapshot, rejected.snapshot)
+        assertEquals(1, trainingVerifierCalls)
+    }
+
+    @Test
+    fun throwingEmailTrainingVerifierKeepsThePreSkipSnapshot() {
+        val beforeTraining = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+            epoch = 5L,
+            orderedEvidence = emailTrainingEvidence().dropLast(1),
+            verifier = acceptingVerifier,
+        )
+        var trainingVerifierCalls = 0
+        val rejected = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+            epoch = 5L,
+            orderedEvidence = emailTrainingEvidence(),
+            verifier = FirstRunOnboardingEvidenceVerifier { _, evidence ->
+                if (evidence is FirstRunOnboardingEvidence.Fp004Training) {
+                    trainingVerifierCalls += 1
+                    throw IllegalStateException("training verification unavailable")
+                }
+                true
+            },
+        )
+
+        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, beforeTraining.snapshot.stage)
+        assertFalse(rejected.fullyRestored)
+        assertEquals(2, rejected.restoredEvidenceCount)
+        assertEquals(FirstRunOnboardingRejection.REMOTE_EVIDENCE_REJECTED, rejected.rejection)
+        assertEquals(beforeTraining.snapshot, rejected.snapshot)
+        assertEquals(1, trainingVerifierCalls)
+    }
+
+    @Test
+    fun verifiedEmailTrainingRestoreStillCompletes() {
+        var trainingVerifierCalls = 0
+        val restored = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+            epoch = 5L,
+            orderedEvidence = emailTrainingEvidence(),
+            verifier = FirstRunOnboardingEvidenceVerifier { _, evidence ->
+                if (evidence is FirstRunOnboardingEvidence.Fp004Training) {
+                    trainingVerifierCalls += 1
+                }
+                true
+            },
+        )
+
+        assertTrue(restored.fullyRestored)
+        assertEquals(3, restored.restoredEvidenceCount)
+        assertNull(restored.rejection)
+        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, restored.snapshot.stage)
+        assertFalse(restored.snapshot.mayEnterWalk)
+        assertEquals(
+            receipt(48),
+            restored.snapshot.completedReceiptHashes[FirstRunOnboardingStage.FP004_TRAINING],
+        )
+        assertEquals(1, trainingVerifierCalls)
+        val permission = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            restored.snapshot,
+            restored.snapshot.epoch,
+            restored.snapshot.revision,
+        )
+        assertTrue(permission.accepted)
+        assertEquals(FirstRunOnboardingStage.DEVICE_CHECK, permission.current.stage)
+        assertFalse(permission.current.mayEnterWalk)
+        val device = FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(
+            permission.current,
+            permission.current.epoch,
+            permission.current.revision,
+        )
+        assertTrue(device.accepted)
+        assertEquals(FirstRunOnboardingStage.COMPLETE, device.current.stage)
+        assertTrue(device.current.mayEnterWalk)
+        assertEquals(
+            receipt(48),
+            device.current.completedReceiptHashes[FirstRunOnboardingStage.FP004_TRAINING],
         )
     }
 
@@ -625,6 +753,331 @@ class FirstRunOnboardingPolicyTest {
         assertEquals(actorBinding(), retrained.current.reporterActorBinding)
     }
 
+    @Test
+    fun legacyAgeStageRejectsVerifiedEmailAgeWithoutConsumingTheValidRequest() {
+        val cases = listOf(
+            Triple(
+                FirstRunAgeBand.UNDER_14,
+                FirstRunOnboardingStage.BLOCKED_UNDER_14,
+                false,
+            ),
+            Triple(
+                FirstRunAgeBand.AGE_14_TO_17,
+                FirstRunOnboardingStage.INTEGRATED_CONSENT,
+                true,
+            ),
+            Triple(
+                FirstRunAgeBand.ADULT_18_PLUS,
+                FirstRunOnboardingStage.INTEGRATED_CONSENT,
+                false,
+            ),
+        )
+        for ((validAge, expectedStage, expectedGuardian) in cases) {
+            val original = completePurpose(FirstRunOnboardingPolicy.initial(epoch = 61L))
+            val ageRequest = request(original)
+            assertEquals(FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED, original.stage)
+            assertEquals(1L, original.revision)
+            assertNull(original.ageBand)
+            assertEquals(
+                mapOf(FirstRunOnboardingStage.PURPOSE_AND_SAFETY to receipt(1)),
+                original.completedReceiptHashes,
+            )
+
+            val rejected = FirstRunOnboardingPolicy.recordAgeAndGuardianNeed(
+                original,
+                ageRequest,
+                FirstRunAgeBand.VERIFIED_14_PLUS,
+                receipt(60),
+            )
+
+            assertFlowAgeMismatchPreservesSnapshot(original, rejected)
+            val accepted = FirstRunOnboardingPolicy.recordAgeAndGuardianNeed(
+                original,
+                ageRequest,
+                validAge,
+                receipt(61),
+            )
+            assertTrue(accepted.accepted)
+            assertNull(accepted.rejection)
+            assertSame(original, accepted.previous)
+            assertEquals(FirstRunOnboardingFlow.LEGACY_PHONE_V3, accepted.current.flow)
+            assertEquals(61L, accepted.current.epoch)
+            assertEquals(2L, accepted.current.revision)
+            assertEquals(expectedStage, accepted.current.stage)
+            assertEquals(validAge, accepted.current.ageBand)
+            assertEquals(expectedGuardian, accepted.current.guardianApprovalRequired)
+            assertEquals(
+                mapOf(
+                    FirstRunOnboardingStage.PURPOSE_AND_SAFETY to receipt(1),
+                    FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED to receipt(61),
+                ),
+                accepted.current.completedReceiptHashes,
+            )
+            assertNull(accepted.current.pendingAttempt)
+            assertNull(accepted.current.localCredentialPhoneSubmissionHandle)
+            assertNull(accepted.current.verifiedActorBinding)
+            if (validAge == FirstRunAgeBand.UNDER_14) {
+                assertTrue(accepted.current.isTerminal)
+            } else {
+                assertFalse(accepted.current.isTerminal)
+            }
+            assertFalse(accepted.current.mayEnterWalk)
+        }
+    }
+
+    @Test
+    fun emailEnrollmentAttemptRejectsLegacyAgeBeforeVerifierAndKeepsItsToken() {
+        for (invalidAge in listOf(
+            FirstRunAgeBand.UNDER_14,
+            FirstRunAgeBand.AGE_14_TO_17,
+            FirstRunAgeBand.ADULT_18_PLUS,
+        )) {
+            val initial = FirstRunOnboardingPolicy.initialEmailAccount(epoch = 62L)
+            val started = FirstRunOnboardingPolicy.beginAttempt(initial, request(initial))
+            assertTrue(started.accepted)
+            assertNull(started.rejection)
+            val original = started.current
+            val token = original.pendingAttempt!!
+            assertEquals(FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT, original.stage)
+            assertEquals(FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT, token.stage)
+            assertEquals(1L, original.revision)
+            assertNull(original.ageBand)
+            assertTrue(original.completedReceiptHashes.isEmpty())
+            var verifierCalls = 0
+            var observedToken: FirstRunOnboardingAttemptToken? = null
+            var observedEvidence: FirstRunOnboardingEvidence? = null
+            val verifier = FirstRunOnboardingEvidenceVerifier { verifiedToken, evidence ->
+                verifierCalls += 1
+                observedToken = verifiedToken
+                observedEvidence = evidence
+                true
+            }
+
+            val rejected = FirstRunOnboardingPolicy.completeAttempt(
+                original,
+                token,
+                FirstRunOnboardingEvidence.EmailOtpEnrollment(invalidAge, receipt(62)),
+                verifier,
+            )
+
+            assertFlowAgeMismatchPreservesSnapshot(original, rejected)
+            assertSame(token, rejected.current.pendingAttempt)
+            assertEquals(0, verifierCalls)
+            assertNull(observedToken)
+            assertNull(observedEvidence)
+            val validEvidence = FirstRunOnboardingEvidence.EmailOtpEnrollment(
+                FirstRunAgeBand.VERIFIED_14_PLUS,
+                receipt(63),
+            )
+            val accepted = FirstRunOnboardingPolicy.completeAttempt(
+                original,
+                token,
+                validEvidence,
+                verifier,
+            )
+            assertTrue(accepted.accepted)
+            assertNull(accepted.rejection)
+            assertSame(original, accepted.previous)
+            assertEquals(1, verifierCalls)
+            assertSame(token, observedToken)
+            assertSame(validEvidence, observedEvidence)
+            assertEquals(FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4, accepted.current.flow)
+            assertEquals(FirstRunOnboardingStage.ACCOUNT_CREATED, accepted.current.stage)
+            assertEquals(FirstRunAgeBand.VERIFIED_14_PLUS, accepted.current.ageBand)
+            assertEquals(62L, accepted.current.epoch)
+            assertEquals(2L, accepted.current.revision)
+            assertEquals(
+                mapOf(FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT to receipt(63)),
+                accepted.current.completedReceiptHashes,
+            )
+            assertNull(accepted.current.pendingAttempt)
+            assertNull(accepted.current.localCredentialPhoneSubmissionHandle)
+            assertNull(accepted.current.verifiedActorBinding)
+            assertFalse(accepted.current.guardianApprovalRequired)
+        }
+
+        val emailInitial = FirstRunOnboardingPolicy.initialEmailAccount(epoch = 63L)
+        val wrongLocal = FirstRunOnboardingPolicy.recordAgeAndGuardianNeed(
+            emailInitial,
+            request(emailInitial),
+            FirstRunAgeBand.ADULT_18_PLUS,
+            receipt(64),
+        )
+        assertFlowAgeMismatchPreservesSnapshot(emailInitial, wrongLocal)
+        val recorded = FirstRunOnboardingPolicy.recordEmailOtpEnrollment(emailInitial, receipt(65))
+        assertTrue(recorded.accepted)
+        assertNull(recorded.rejection)
+        assertEquals(FirstRunOnboardingStage.ACCOUNT_CREATED, recorded.current.stage)
+        assertEquals(FirstRunAgeBand.VERIFIED_14_PLUS, recorded.current.ageBand)
+        assertEquals(1L, recorded.current.revision)
+        assertEquals(
+            mapOf(FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT to receipt(65)),
+            recorded.current.completedReceiptHashes,
+        )
+        assertNull(recorded.current.pendingAttempt)
+    }
+
+    @Test
+    fun receiptRestorationRejectsCrossFlowAgeBeforeAdvancingOrVerifyingLaterEvidence() {
+        val purpose = FirstRunOnboardingEvidence.PurposeAndSafety(receipt(1))
+        val remote = FirstRunOnboardingEvidence.IntegratedConsent(receipt(67))
+        val legacyVerifiedEvidence = mutableListOf<FirstRunOnboardingEvidence>()
+        val legacyVerifier = FirstRunOnboardingEvidenceVerifier { _, evidence ->
+            legacyVerifiedEvidence += evidence
+            true
+        }
+        val rejectedLegacy = FirstRunOnboardingPolicy.restoreVerifiedReceiptPrefix(
+            epoch = 64L,
+            orderedEvidence = listOf(
+                purpose,
+                FirstRunOnboardingEvidence.AgeAndGuardianNeed(
+                    FirstRunAgeBand.VERIFIED_14_PLUS,
+                    receipt(66),
+                ),
+                remote,
+            ),
+            verifier = legacyVerifier,
+        )
+
+        assertFalse(rejectedLegacy.fullyRestored)
+        assertEquals(1, rejectedLegacy.restoredEvidenceCount)
+        assertEquals(FirstRunOnboardingRejection.STAGE_MISMATCH, rejectedLegacy.rejection)
+        assertTrue(legacyVerifiedEvidence.isEmpty())
+        assertEquals(FirstRunOnboardingFlow.LEGACY_PHONE_V3, rejectedLegacy.snapshot.flow)
+        assertEquals(FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED, rejectedLegacy.snapshot.stage)
+        assertEquals(64L, rejectedLegacy.snapshot.epoch)
+        assertEquals(1L, rejectedLegacy.snapshot.revision)
+        assertNull(rejectedLegacy.snapshot.ageBand)
+        assertEquals(
+            mapOf(FirstRunOnboardingStage.PURPOSE_AND_SAFETY to receipt(1)),
+            rejectedLegacy.snapshot.completedReceiptHashes,
+        )
+        assertNull(rejectedLegacy.snapshot.pendingAttempt)
+        assertNull(rejectedLegacy.snapshot.localCredentialPhoneSubmissionHandle)
+        assertNull(rejectedLegacy.snapshot.verifiedActorBinding)
+
+        val restoredLegacy = FirstRunOnboardingPolicy.restoreVerifiedReceiptPrefix(
+            epoch = 64L,
+            orderedEvidence = listOf(
+                purpose,
+                FirstRunOnboardingEvidence.AgeAndGuardianNeed(
+                    FirstRunAgeBand.ADULT_18_PLUS,
+                    receipt(66),
+                ),
+                remote,
+            ),
+            verifier = legacyVerifier,
+        )
+        assertTrue(restoredLegacy.fullyRestored)
+        assertNull(restoredLegacy.rejection)
+        assertEquals(3, restoredLegacy.restoredEvidenceCount)
+        assertEquals(listOf(remote), legacyVerifiedEvidence)
+        assertEquals(
+            FirstRunOnboardingStage.LOCAL_CREDENTIAL_PHONE_SUBMISSION,
+            restoredLegacy.snapshot.stage,
+        )
+        assertEquals(3L, restoredLegacy.snapshot.revision)
+        assertEquals(FirstRunAgeBand.ADULT_18_PLUS, restoredLegacy.snapshot.ageBand)
+        assertFalse(restoredLegacy.snapshot.guardianApprovalRequired)
+        assertEquals(
+            mapOf(
+                FirstRunOnboardingStage.PURPOSE_AND_SAFETY to receipt(1),
+                FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED to receipt(66),
+                FirstRunOnboardingStage.INTEGRATED_CONSENT to receipt(67),
+            ),
+            restoredLegacy.snapshot.completedReceiptHashes,
+        )
+        assertNull(restoredLegacy.snapshot.pendingAttempt)
+        assertNull(restoredLegacy.snapshot.localCredentialPhoneSubmissionHandle)
+        assertNull(restoredLegacy.snapshot.verifiedActorBinding)
+
+        for (invalidAge in listOf(
+            FirstRunAgeBand.UNDER_14,
+            FirstRunAgeBand.AGE_14_TO_17,
+            FirstRunAgeBand.ADULT_18_PLUS,
+        )) {
+            var verifierCalls = 0
+            var observedEvidence: FirstRunOnboardingEvidence? = null
+            val verifier = FirstRunOnboardingEvidenceVerifier { _, evidence ->
+                verifierCalls += 1
+                observedEvidence = evidence
+                true
+            }
+            val rejectedEmail = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+                epoch = 65L,
+                orderedEvidence = listOf(
+                    FirstRunOnboardingEvidence.EmailOtpEnrollment(invalidAge, receipt(68)),
+                    FirstRunOnboardingEvidence.AccountCreated(receipt(69)),
+                ),
+                verifier = verifier,
+            )
+
+            assertFalse(rejectedEmail.fullyRestored)
+            assertEquals(0, rejectedEmail.restoredEvidenceCount)
+            assertEquals(FirstRunOnboardingRejection.STAGE_MISMATCH, rejectedEmail.rejection)
+            assertEquals(0, verifierCalls)
+            assertNull(observedEvidence)
+            assertEquals(FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4, rejectedEmail.snapshot.flow)
+            assertEquals(FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT, rejectedEmail.snapshot.stage)
+            assertEquals(65L, rejectedEmail.snapshot.epoch)
+            assertEquals(0L, rejectedEmail.snapshot.revision)
+            assertNull(rejectedEmail.snapshot.ageBand)
+            assertTrue(rejectedEmail.snapshot.completedReceiptHashes.isEmpty())
+            assertNull(rejectedEmail.snapshot.pendingAttempt)
+            assertNull(rejectedEmail.snapshot.localCredentialPhoneSubmissionHandle)
+            assertNull(rejectedEmail.snapshot.verifiedActorBinding)
+
+            val validEvidence = FirstRunOnboardingEvidence.EmailOtpEnrollment(
+                FirstRunAgeBand.VERIFIED_14_PLUS,
+                receipt(70),
+            )
+            val restoredEmail = FirstRunOnboardingPolicy.restoreVerifiedEmailReceiptPrefix(
+                epoch = 65L,
+                orderedEvidence = listOf(validEvidence),
+                verifier = verifier,
+            )
+            assertTrue(restoredEmail.fullyRestored)
+            assertNull(restoredEmail.rejection)
+            assertEquals(1, restoredEmail.restoredEvidenceCount)
+            assertEquals(1, verifierCalls)
+            assertSame(validEvidence, observedEvidence)
+            assertEquals(FirstRunOnboardingStage.ACCOUNT_CREATED, restoredEmail.snapshot.stage)
+            assertEquals(FirstRunAgeBand.VERIFIED_14_PLUS, restoredEmail.snapshot.ageBand)
+            assertEquals(1L, restoredEmail.snapshot.revision)
+            assertFalse(restoredEmail.snapshot.guardianApprovalRequired)
+            assertEquals(
+                mapOf(FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT to receipt(70)),
+                restoredEmail.snapshot.completedReceiptHashes,
+            )
+            assertNull(restoredEmail.snapshot.pendingAttempt)
+            assertNull(restoredEmail.snapshot.localCredentialPhoneSubmissionHandle)
+            assertNull(restoredEmail.snapshot.verifiedActorBinding)
+        }
+    }
+
+    private fun assertFlowAgeMismatchPreservesSnapshot(
+        original: FirstRunOnboardingSnapshot,
+        rejected: FirstRunOnboardingTransition,
+    ) {
+        assertFalse(rejected.accepted)
+        assertEquals(FirstRunOnboardingRejection.STAGE_MISMATCH, rejected.rejection)
+        assertSame(original, rejected.previous)
+        assertSame(original, rejected.current)
+        assertEquals(original.policyVersion, rejected.current.policyVersion)
+        assertEquals(original.flow, rejected.current.flow)
+        assertEquals(original.stage, rejected.current.stage)
+        assertEquals(original.epoch, rejected.current.epoch)
+        assertEquals(original.revision, rejected.current.revision)
+        assertEquals(original.ageBand, rejected.current.ageBand)
+        assertSame(original.completedReceiptHashes, rejected.current.completedReceiptHashes)
+        assertSame(original.pendingAttempt, rejected.current.pendingAttempt)
+        assertEquals(
+            original.localCredentialPhoneSubmissionHandle,
+            rejected.current.localCredentialPhoneSubmissionHandle,
+        )
+        assertEquals(original.verifiedActorBinding, rejected.current.verifiedActorBinding)
+    }
+
     private fun readyForRemoteFlow(ageBand: FirstRunAgeBand): FirstRunOnboardingSnapshot =
         completeAge(
             completePurpose(FirstRunOnboardingPolicy.initial()),
@@ -716,6 +1169,12 @@ class FirstRunOnboardingPolicyTest {
         FirstRunOnboardingEvidence.JitPermissionObservation(receipt(9)),
         FirstRunOnboardingEvidence.DeviceCheck(receipt(10)),
         FirstRunOnboardingEvidence.Fp004Training(receipt(11)),
+    )
+
+    private fun emailTrainingEvidence(): List<FirstRunOnboardingEvidence> = listOf(
+        FirstRunOnboardingEvidence.VerifiedLogin(actorBinding(), receipt(47)),
+        FirstRunOnboardingEvidence.PurposeAndSafety(receipt(49)),
+        FirstRunOnboardingEvidence.Fp004Training(receipt(48)),
     )
 
     private fun request(

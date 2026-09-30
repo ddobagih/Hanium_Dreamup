@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import Future
+from copy import deepcopy
+import math
 from datetime import UTC, datetime
 import os
 from pathlib import Path
@@ -31,7 +33,9 @@ from backend.app.services.admin_report_integrity import (
     admin_report_integrity_boundary_state,
 )
 from backend.app.services.accounts import (
+    ACCOUNT_KEY_PURPOSES_AUTHENTICATION,
     AccountServiceError,
+    account_crypto_binding_mismatched_purposes,
     account_email_crypto_for_settings,
     assert_account_crypto_keys_bound,
 )
@@ -45,10 +49,18 @@ from backend.app.services.report_image_keys import (
     ReportImageKeyManager,
     create_report_image_key_manager,
 )
+from backend.app.services.report_storage_monitor import ReportStorageMonitor
 from backend.app.services.report_storage import (
+    ReportStorageJournalUnresolved,
     ReportStorageInventorySetMismatch,
+    ReportStorageRecoveryDeferred,
     validate_report_storage_database_inventory,
 )
+from backend.app.services.report_storage_recovery import (
+    locked_report_storage_session,
+    recover_pending_report_writes,
+)
+from backend.app.api import reports
 from backend.app.services.raw_collection_storage import (
     lock_raw_storage_reconciliation_transaction,
     probe_raw_object_directory,
@@ -58,10 +70,24 @@ from backend.app.services.tmap_pedestrian import (
     probe_tmap_dependencies,
     tmap_dependency_readiness,
 )
+from backend.app.services.tmap_runtime import (
+    TmapCallBudgetExhausted,
+    TmapReadinessProbeDeferred,
+    TmapRuntime,
+)
 
 
-EXPECTED_ALEMBIC_HEAD = "202609010003"
+EXPECTED_ALEMBIC_HEAD = "202609300009"
 READINESS_LOCAL_CHECK_TIMEOUT_SECONDS = 5.0
+# S20-48: an in-flight probe older than this is reported as stuck. The worker
+# thread is not killed and no replacement thread is started; restart decisions
+# stay with the process supervisor.
+READINESS_PROBE_STUCK_SECONDS = 30.0
+# A cold detector warm-up may legitimately block up to the configured startup
+# timeout; it is reported as stuck only after that bound plus this margin.
+DETECTOR_PROBE_STUCK_MARGIN_SECONDS = 5.0
+RUNTIME_REPORT_RECOVERY_MAX_ITEMS = 16
+RUNTIME_REPORT_RECOVERY_TIME_SECONDS = 1.0
 TMAP_READINESS_FAILURE_COOLDOWN_SECONDS = 5.0
 _REPORT_STORAGE_INCIDENT_NAMESPACE = uuid.uuid5(
     uuid.NAMESPACE_URL,
@@ -364,11 +390,25 @@ def _account_crypto_binding_readiness(settings: Settings) -> dict[str, object]:
     try:
         crypto = account_email_crypto_for_settings(settings)
         with SessionLocal.begin() as db:
-            assert_account_crypto_keys_bound(db, crypto)
+            # S01-14: readiness follows password login (encryption + lookup);
+            # an OTP-only key change keeps login available while OTP issuance
+            # and verification fail closed per request.
+            binding = assert_account_crypto_keys_bound(
+                db,
+                crypto,
+                ACCOUNT_KEY_PURPOSES_AUTHENTICATION,
+            )
+            otp_mismatch = bool(account_crypto_binding_mismatched_purposes(binding, crypto))
     except AccountServiceError:
         return {"ready": False, "reason": "account_crypto_binding_mismatch"}
     except Exception:
         return {"ready": False, "reason": "account_crypto_binding_unavailable"}
+    if otp_mismatch:
+        return {
+            "ready": True,
+            "binding": "matched",
+            "otp_hmac_binding": "mismatch",
+        }
     return {"ready": True, "binding": "matched"}
 
 
@@ -394,6 +434,18 @@ def _upload_readiness(upload_dir: Path) -> dict[str, object]:
         probe.unlink(missing_ok=True)
         os.close(directory_descriptor)
     return {"ready": True}
+
+
+def _locked_upload_readiness(settings: Settings) -> dict[str, object]:
+    # The probe creates an intentionally non-image file in the upload root.
+    # Use the recovery lock so neither inventory nor a writer can observe it.
+    with locked_report_storage_session(
+        SessionLocal,
+        reports._shared_report_write_lock,
+        settings.maintenance_lock_path,
+        settings.maintenance_lock_group_gid,
+    ):
+        return _upload_readiness(settings.upload_dir)
 
 
 def _raw_object_readiness(
@@ -468,10 +520,30 @@ def _report_storage_inventory_readiness(
     settings: Settings,
     key_manager: ReportImageKeyManager,
 ) -> dict[str, object]:
-    """Recheck the complete encrypted-object inventory after startup."""
+    """Recover a bounded journal batch, then validate the encrypted inventory."""
 
     try:
-        with SessionLocal.begin() as db:
+        with locked_report_storage_session(
+            SessionLocal,
+            reports._shared_report_write_lock,
+            settings.maintenance_lock_path,
+            settings.maintenance_lock_group_gid,
+        ) as db:
+            try:
+                recover_pending_report_writes(
+                    db,
+                    settings.upload_dir,
+                    max_items=RUNTIME_REPORT_RECOVERY_MAX_ITEMS,
+                    deadline=time.monotonic() + RUNTIME_REPORT_RECOVERY_TIME_SECONDS,
+                )
+            except ReportStorageRecoveryDeferred:
+                return {"ready": False, "reason": "report_storage_recovery_deferred"}
+            except ReportStorageJournalUnresolved:
+                return {"ready": False, "reason": "report_storage_journal_unresolved"}
+            except OSError:
+                return {"ready": False, "reason": "report_storage_recovery_retryable"}
+            except Exception:
+                return {"ready": False, "reason": "report_storage_recovery_unavailable"}
             try:
                 validate_report_storage_database_inventory(
                     db,
@@ -493,16 +565,58 @@ def _report_storage_inventory_readiness(
                     "ready": False,
                     "reason": "report_storage_inventory_invalid",
                 }
+            except Exception:
+                return {
+                    "ready": False,
+                    "reason": "report_storage_inventory_invalid",
+                }
     except Exception:
         return {
             "ready": False,
-            "reason": "report_storage_inventory_invalid",
+            "reason": "report_storage_recovery_unavailable",
         }
     return {"ready": True, "inventory": "database_and_encrypted_objects_matched"}
 
 
 def _report_storage_inventory_incident_id(evidence_sha256: str) -> uuid.UUID:
     return uuid.uuid5(_REPORT_STORAGE_INCIDENT_NAMESPACE, evidence_sha256)
+
+
+def _with_report_storage_recovery_guidance(check: dict[str, object]) -> dict[str, object]:
+    """Describe recovery without exposing paths or moving unverified evidence."""
+    if check.get("ready") is True:
+        return check
+    reason = check.get("reason")
+    if reason == "report_storage_recovery_deferred":
+        recovery = {"action": "retry_readiness", "restart_required": False}
+    elif reason == "report_storage_recovery_retryable":
+        recovery = {
+            "action": "restore_storage_io_then_retry_readiness",
+            "restart_required": False,
+        }
+    elif reason in {
+        "report_storage_journal_unresolved",
+        "report_storage_inventory_invalid",
+        "report_storage_inventory_incident_record_failed",
+    }:
+        recovery = {
+            "action": "preserve_evidence_and_verify_storage_under_maintenance_lock",
+            "isolation": "readiness_blocked_evidence_retained_in_place",
+            "restart_required": None,
+            # Inventory failures also include an outdated in-memory keyring.
+            # Only an unresolved journal proves a restart cannot repair it.
+            "restart_alone_repairs": (
+                False if reason == "report_storage_journal_unresolved" else None
+            ),
+        }
+    elif reason == "report_storage_recovery_unavailable":
+        recovery = {
+            "action": "check_database_and_storage_access_then_retry_readiness",
+            "restart_required": None,
+        }
+    else:
+        return check
+    return {**check, "recovery": recovery}
 
 
 def _record_report_storage_inventory_incident(
@@ -554,6 +668,12 @@ def _detector_readiness(settings: Any, warmup: Callable[[], None]) -> dict[str, 
     return result
 
 
+def detector_probe_stuck_seconds(settings: Any) -> float:
+    """S20-48: max(30, INFERENCE_STARTUP_TIMEOUT_SECONDS + 5) for the warm-up probe."""
+    startup = float(getattr(settings, "inference_startup_timeout_seconds", 0.0))
+    return max(READINESS_PROBE_STUCK_SECONDS, startup + DETECTOR_PROBE_STUCK_MARGIN_SECONDS)
+
+
 class _DetectorReadinessProbe:
     def __init__(self, settings: Any, warmup: Callable[[], None]) -> None:
         self._settings = settings
@@ -569,26 +689,69 @@ class _DetectorReadinessProbe:
 
 
 class _OffloadedReadinessProbe:
-    """Keep one dependency probe in flight without occupying the API executor."""
+    """Single-flight dependency probe with opt-in, success-only snapshot reuse."""
 
-    def __init__(self, check: Callable[[], dict[str, object]]) -> None:
+    def __init__(
+        self,
+        check: Callable[[], dict[str, object]],
+        *,
+        cache_seconds: float = 0.0,
+        clock: Callable[[], float] = time.monotonic,
+        stuck_seconds: float = READINESS_PROBE_STUCK_SECONDS,
+    ) -> None:
+        if not math.isfinite(cache_seconds) or cache_seconds < 0:
+            raise ValueError("readiness cache duration must be finite and nonnegative")
+        if not math.isfinite(stuck_seconds) or stuck_seconds <= 0:
+            raise ValueError("readiness stuck threshold must be finite and positive")
         self._check = check
+        self._cache_seconds = cache_seconds
+        self._stuck_threshold = float(stuck_seconds)
+        self._clock = clock
         self._lock = Lock()
         self._inflight: Future[dict[str, object]] | None = None
+        self._inflight_started: float | None = None
+        self._cache_until = 0.0
+
+    def _stuck_seconds(self) -> int | None:
+        """Age of an unfinished probe once it passes the stuck threshold."""
+        with self._lock:
+            future, started = self._inflight, self._inflight_started
+            if future is None or future.done() or started is None:
+                return None
+            elapsed = self._clock() - started
+        if not math.isfinite(elapsed) or elapsed < self._stuck_threshold:
+            return None
+        return int(elapsed)
 
     def _complete(self, future: Future[dict[str, object]]) -> None:
+        started = self._clock()
         try:
-            result = self._check()
+            result = deepcopy(self._check())
         except BaseException as exc:
             future.set_exception(exc)
         else:
-            future.set_result(result)
+            completed = self._clock()
+            with self._lock:
+                if (
+                    result.get("ready") is True
+                    and completed - started < READINESS_LOCAL_CHECK_TIMEOUT_SECONDS
+                ):
+                    self._cache_until = completed + self._cache_seconds
+                future.set_result(result)
 
     def _future(self) -> Future[dict[str, object]]:
         with self._lock:
+            if (
+                self._inflight is not None
+                and self._inflight.done()
+                and self._clock() < self._cache_until
+            ):
+                return self._inflight
             if self._inflight is None or self._inflight.done():
+                self._cache_until = 0.0
                 future: Future[dict[str, object]] = Future()
                 self._inflight = future
+                self._inflight_started = self._clock()
                 worker = Thread(
                     target=self._complete,
                     args=(future,),
@@ -603,18 +766,24 @@ class _OffloadedReadinessProbe:
 
     async def check(self) -> dict[str, object]:
         future = self._future()
+        stuck = self._stuck_seconds()
+        if stuck is not None:
+            # Do not make every /ready wait again behind a probe known stuck.
+            return {"ready": False, "reason": "probe_stuck", "stuck_seconds": stuck}
         loop = asyncio.get_running_loop()
         deadline = loop.time() + READINESS_LOCAL_CHECK_TIMEOUT_SECONDS
         try:
             while not future.done():
                 remaining = deadline - loop.time()
                 if remaining <= 0:
+                    stuck = self._stuck_seconds()
+                    if stuck is not None:
+                        return {"ready": False, "reason": "probe_stuck", "stuck_seconds": stuck}
                     return {"ready": False, "reason": "check_timeout"}
                 await asyncio.sleep(min(0.01, remaining))
-            return future.result()
+            return deepcopy(future.result())
         except Exception as exc:
             return {"ready": False, "reason": type(exc).__name__}
-
 
 class _NavigationReadinessProbe:
     """Share one live TMAP dependency probe and briefly cache provider failures."""
@@ -662,7 +831,11 @@ class _NavigationReadinessProbe:
             return {"ready": False, "reason": type(exc).__name__}
 
 
-async def _navigation_readiness(settings: Any) -> dict[str, object]:
+async def _navigation_readiness(
+    settings: Any,
+    *,
+    runtime_provider: Callable[[], TmapRuntime | None] | None = None,
+) -> dict[str, object]:
     if getattr(settings, "walking_route_provider", None) != "tmap_pedestrian":
         return {"ready": False, "reason": "walking_provider_invalid"}
     if getattr(settings, "tmap_poi_provider", None) != "live":
@@ -679,11 +852,37 @@ async def _navigation_readiness(settings: Any) -> dict[str, object]:
             "live_probe_enabled": False,
         }
     try:
+        if runtime_provider is None:
+            probe = probe_tmap_dependencies(settings)
+        else:
+            runtime = runtime_provider()
+            if runtime is None:
+                raise RuntimeError("TMAP app runtime is unavailable")
+            probe = probe_tmap_dependencies(settings, runtime=runtime)
         result = await asyncio.wait_for(
-            probe_tmap_dependencies(settings),
+            probe,
             timeout=settings.tmap_readiness_probe_timeout_seconds,
         )
         return {**result, "live_probe_enabled": True}
+    except TmapCallBudgetExhausted as exc:
+        # S20-29/R9: navigation-specific reason, distinct from a provider
+        # failure. The global /ready aggregation is unchanged (S20-49).
+        return {
+            **cached,
+            "ready": False,
+            "reason": "tmap_call_budget_exhausted",
+            "exhausted_windows": list(exc.exhausted_windows),
+            "resets_in_seconds": exc.resets_in_seconds,
+            "live_probe_enabled": True,
+        }
+    except TmapReadinessProbeDeferred as exc:
+        return {
+            **cached,
+            "ready": False,
+            "reason": "tmap_live_probe_deferred",
+            "next_probe_in_seconds": exc.next_probe_in_seconds,
+            "live_probe_enabled": True,
+        }
     except Exception as exc:
         return {
             **cached,
@@ -698,6 +897,9 @@ def create_router(
     settings: Settings,
     detector_warmup: Callable[[], None],
     report_image_key_manager: ReportImageKeyManager | None = None,
+    *,
+    runtime_provider: Callable[[], TmapRuntime | None] | None = None,
+    report_storage_monitor: ReportStorageMonitor | None = None,
 ) -> APIRouter:
     if report_image_key_manager is None:
         report_image_key_manager = create_report_image_key_manager(settings)
@@ -712,27 +914,16 @@ def create_router(
     account_crypto_probe = _OffloadedReadinessProbe(
         lambda: _account_crypto_binding_readiness(settings)
     )
-    upload_probe = _OffloadedReadinessProbe(
-        lambda: _upload_readiness(settings.upload_dir)
-    )
     raw_object_probe = _OffloadedReadinessProbe(
-        lambda: _raw_object_readiness(settings, report_image_key_manager)
+        lambda: _raw_object_readiness(settings, report_image_key_manager),
+        cache_seconds=settings.readiness_inventory_cache_seconds,
     )
-    detector_offload_probe = _OffloadedReadinessProbe(detector_probe.check)
-    encryption_probe = _OffloadedReadinessProbe(
-        lambda: _report_image_encryption_readiness(
-            settings,
-            report_image_key_manager,
-        )
-    )
-    report_storage_probe = _OffloadedReadinessProbe(
-        lambda: _report_storage_inventory_readiness(
-            settings,
-            report_image_key_manager,
-        )
+    detector_offload_probe = _OffloadedReadinessProbe(
+        detector_probe.check,
+        stuck_seconds=detector_probe_stuck_seconds(settings),
     )
     navigation_probe = _NavigationReadinessProbe(
-        lambda: _navigation_readiness(settings)
+        lambda: _navigation_readiness(settings, runtime_provider=runtime_provider)
     )
     router.add_api_route("/health", health, methods=["GET"])
 
@@ -742,39 +933,44 @@ def create_router(
             database,
             privacy_hmac_binding,
             account_crypto_binding,
-            upload_root,
             raw_object_root,
             detector,
             navigation,
-            report_image_encryption,
-            report_storage,
         ) = await asyncio.gather(
             database_probe.check(),
             privacy_hmac_probe.check(),
             account_crypto_probe.check(),
-            upload_probe.check(),
             raw_object_probe.check(),
             detector_offload_probe.check(),
             navigation_probe.check(),
-            encryption_probe.check(),
-            report_storage_probe.check(),
+        )
+        report_checks = (
+            report_storage_monitor.checks() if report_storage_monitor is not None else {
+                name: {"ready": False, "reason": "report_storage_not_checked"}
+                for name in ("upload_root", "report_image_encryption", "report_storage")
+            }
         )
         checks: dict[str, dict[str, object]] = {
             "database": database,
             "privacy_hmac_binding": privacy_hmac_binding,
             "account_crypto_binding": account_crypto_binding,
             "account_enrollment": _account_enrollment_config_readiness(settings),
-            "upload_root": upload_root,
+            "upload_root": report_checks["upload_root"],
             "raw_object_root": raw_object_root,
             "detector": detector,
             "navigation": navigation,
-            "report_image_encryption": report_image_encryption,
-            "report_storage": report_storage,
+            "report_image_encryption": report_checks["report_image_encryption"],
+            "report_storage": _with_report_storage_recovery_guidance(report_checks["report_storage"]),
         }
         ready = all(check.get("ready") is True for check in checks.values())
         if not ready:
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         payload: dict[str, object] = {"status": "ready" if ready else "not_ready", "checks": checks}
+        # S01-14-F2: an OTP-only key mismatch keeps login and readiness up while
+        # OTP issuance and account creation fail closed; name the degraded
+        # feature so deployment checks and alerts see it (additive key).
+        if account_crypto_binding.get("otp_hmac_binding") == "mismatch":
+            payload["degraded_features"] = ["account_enrollment"]
         if settings.walksafe_source_commit:
             payload["source_commit"] = settings.walksafe_source_commit
         return payload

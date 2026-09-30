@@ -2,6 +2,16 @@ package kr.co.hanium.dreamup.walksafe.fieldlog
 
 import java.io.File
 import kr.co.hanium.dreamup.walksafe.MetadataCaptureLogEntry
+import kr.co.hanium.dreamup.walksafe.navigation.RouteCompassHeadingReason
+import kr.co.hanium.dreamup.walksafe.navigation.RouteCompassHeadingResult
+import kr.co.hanium.dreamup.walksafe.navigation.RouteFacingObservation
+import kr.co.hanium.dreamup.walksafe.navigation.RouteGuidanceDiagnostics
+import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigator
+import kr.co.hanium.dreamup.walksafe.navigation.RoutePoint
+import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
+import kr.co.hanium.dreamup.walksafe.navigation.WalkingRoute
+import kr.co.hanium.dreamup.walksafe.navigation.WalkingRouteGuidePoint
+import kr.co.hanium.dreamup.walksafe.navigation.WalkingRouteSummary
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -63,6 +73,95 @@ class PersistentFieldSessionLogTest {
         assertFalse(rawArtifacts.contains("session_stopped"))
         assertFalse(rawArtifacts.contains(deviceInfo().sourceCommit))
         assertFalse(File(root, "active_session.txt").exists())
+    }
+
+    @Test
+    fun stopKeepsAnApprovedInAppStatsSummaryWithoutCoordinatesOrText() {
+        // 16-17 #36: the archive stays encrypted; the app keeps approved statistics only.
+        val root = temporaryFolder.newFolder("field_stats_summary")
+        var now = 10_000L
+        val log = logger(root, now = { now })
+        assertEquals(FieldSessionAnalysisState.NONE, log.analysisState())
+        assertEquals("field-test-session", log.start())
+        listOf(20L, 40L, 90L, 150L, 900L).forEachIndexed { index, detectMs ->
+            now += 1_000L
+            log.appendTelemetry(
+                entry(index.toLong()).copy(
+                    detectDurationMs = detectMs,
+                    staleReason = if (index == 4) "detector_stale" else null,
+                ),
+                runtime(),
+            )
+        }
+        log.appendCameraNonMetricSample(cameraSample(elapsedRealtimeMs = 50_000L))
+        log.recordEvent("field_heartbeat", mapOf("state" to "RENDERING_STOPPED", "gap_duration_ms" to 3_500L))
+        log.recordEvent("field_heartbeat", mapOf("state" to "FRAMES_FLOWING", "gap_duration_ms" to 7_000L))
+        assertEquals(FieldSessionAnalysisState.ARCHIVE_ONLY, log.analysisState())
+        now += 1_000L
+        log.stop()
+
+        val summary = requireNotNull(log.lastSessionStatsSummary())
+        assertEquals(FieldSessionAnalysisState.ANALYZABLE, log.analysisState())
+        assertTrue(summary.coversWholeSession)
+        assertEquals(6_000L, summary.sessionDurationMs)
+        assertEquals(5, summary.telemetryCount)
+        assertEquals(1, summary.staleTelemetryCount)
+        assertEquals(6, summary.detectorLatencySampleCount)
+        assertEquals(900L, summary.detectorLatencyMaxMs)
+        // Buckets <33,<66,<100,<200,<400,<800,>=800: 20|40|90|150|480|900 -> p50 in <100, p95 in the open bucket.
+        assertEquals(listOf(1, 1, 1, 1, 0, 1, 1), summary.detectorLatencyHistogram)
+        assertEquals(100L, summary.detectorLatencyP50UpperBoundMs)
+        assertEquals(900L, summary.detectorLatencyP95UpperBoundMs)
+        assertEquals(1, summary.cameraNonMetricSampleCount)
+        assertEquals(mapOf(FieldHeartbeatState.RENDERING_STOPPED to 1), summary.heartbeatGapRecordCounts)
+        assertEquals(7_000L, summary.longestObservationGapMs)
+
+        val json = summary.toJson().toString()
+        listOf("latitude", "longitude", "heading", "destination", "class_name", "person", "bbox", "navigation_state", "image")
+            .forEach { assertFalse(it, json.contains(it, ignoreCase = true)) }
+        // The same summary is sealed into the encrypted archive, never written as plaintext.
+        val records = readRecords(File(root, "field-test-session"))
+        assertEquals(1, records.count { it.optString("record_type") == "session_stats_summary" })
+        val rawArtifacts = File(root, "field-test-session").walkTopDown().filter(File::isFile).joinToString("\n") { it.readText() }
+        assertFalse(rawArtifacts.contains("detector_latency_ms_histogram"))
+    }
+
+    @Test
+    fun aRawWithdrawalDropsTheInAppSummaryAndAReconsentDoesNotBringItBack() {
+        // S1617-36-F1: blocking for a RAW withdrawal discards the summary instead of hiding it.
+        val root = temporaryFolder.newFolder("field_stats_withdrawal")
+        var now = 1_000L
+        val log = logger(root, now = { now })
+        log.start()
+        log.appendTelemetry(entry(1L).copy(detectDurationMs = 30L), runtime())
+        now = 2_000L
+        log.stop()
+        requireNotNull(log.lastSessionStatsSummary())
+        assertTrue(log.blockForRawSourceWithdrawal())
+        assertNull(log.lastSessionStatsSummary())
+        assertTrue(log.resetRawSourceAfterConfirmedConsent())
+        assertNull(log.lastSessionStatsSummary())
+        // Only the encrypted archive is left: retrievable, not analysable in the app.
+        assertEquals(FieldSessionAnalysisState.ARCHIVE_ONLY, log.analysisState())
+    }
+
+    @Test
+    fun aSessionRestoredAfterAProcessRestartIsMarkedPartialAndPurgeDropsTheSummary() {
+        val root = temporaryFolder.newFolder("field_stats_restart")
+        var now = 1_000L
+        val first = logger(root, now = { now })
+        first.start()
+        first.close()
+        now = 5_000L
+        val resumed = logger(root, now = { now })
+        resumed.appendTelemetry(entry(1L).copy(detectDurationMs = 30L), runtime())
+        now = 6_000L
+        resumed.stop()
+        val summary = requireNotNull(resumed.lastSessionStatsSummary())
+        assertFalse(summary.coversWholeSession)
+        assertEquals(1, summary.telemetryCount)
+        assertTrue(resumed.purgeAll())
+        assertNull(resumed.lastSessionStatsSummary())
     }
 
     @Test
@@ -672,6 +771,92 @@ class PersistentFieldSessionLogTest {
         assertFalse(advisoryFields.getBoolean("metric"))
         assertTrue(advisoryFields.getBoolean("tmap_authoritative"))
         assertFalse(advisoryFields.getBoolean("reports_allowed"))
+    }
+
+    @Test
+    fun heartbeatLivenessAndGapDurationSurviveTheEventAllowlist() {
+        // S1617-37-F2: the heartbeat fields were silently dropped by the allowlist, leaving only "state".
+        val root = temporaryFolder.newFolder("field_heartbeat_events")
+        var now = 45_000L
+        val log = PersistentFieldSessionLog(
+            rootDirectory = root,
+            aead = fieldAead,
+            deviceInfo = deviceInfo(),
+            nowMillis = { now++ },
+            idFactory = { "field-heartbeat" },
+        )
+        log.start()
+        val heartbeat = FieldSessionHeartbeat(log)
+        val sensors = FieldHeartbeatSensors(
+            stepCount = 12,
+            trustedLocationAvailable = true,
+            locationAgeMs = 400L,
+            routeActive = true,
+            stepCounterBaseline = "ESTABLISHED",
+        )
+        assertEquals(FieldHeartbeatState.RENDERING_STOPPED, heartbeat.tick(1_000L, sensors))
+        assertEquals(FieldHeartbeatState.RENDERING_STOPPED, heartbeat.tick(11_000L, sensors))
+        log.stop()
+
+        val fields = readRecords(File(root, "field-heartbeat"))
+            .filter { it.optString("event_name") == "field_heartbeat" }
+            .map { it.getJSONObject("fields") }
+        assertEquals(2, fields.size)
+        assertEquals("RENDERING_STOPPED", fields.last().getString("state"))
+        assertEquals(10_000L, fields.last().getLong("gap_duration_ms"))
+        assertEquals(12, fields.last().getInt("step_count"))
+        // S09-20 (pos-F10): the Counter baseline enum survives the event allowlist.
+        assertEquals("ESTABLISHED", fields.last().getString("step_counter_baseline"))
+        assertTrue(fields.last().getBoolean("trusted_location_available"))
+        assertEquals(400L, fields.last().getLong("location_age_ms"))
+        assertTrue(fields.last().getBoolean("route_active"))
+        assertFalse("no frame yet", fields.last().has("last_frame_age_ms"))
+        assertFalse(fields.last().keys().asSequence().any { it.contains("lat") || it.contains("lon") })
+    }
+
+    @Test
+    fun routeGuidanceDiagnosticChainSurvivesTheEventAllowlist() {
+        // S08-34: the route compass/alignment events kept only "reason"; every chain field must persist.
+        val root = temporaryFolder.newFolder("route_guidance_events")
+        var now = 50_000L
+        val log = PersistentFieldSessionLog(
+            rootDirectory = root,
+            aead = fieldAead,
+            deviceInfo = deviceInfo(),
+            nowMillis = { now++ },
+            idFactory = { "field-route-guidance" },
+        )
+        log.start()
+        val observation = RouteFacingObservation(91.6, 4.4, 900L)
+        val navigator = RouteNavigator().apply {
+            setRoute(WalkingRoute("TEST", WalkingRouteSummary(400, 400),
+                listOf(RoutePoint(0.0, 0.0), RoutePoint(0.0, 400.0 / 111_194.92664455874)),
+                listOf(WalkingRouteGuidePoint(0, RoutePoint(0.0, 200.0 / 111_194.92664455874), "안내", 200, 200,
+                    turnType = 13))))
+        }
+        val update = navigator.update(TrustedLocation(0.0, 50.0 / 111_194.92664455874, 2f, 1_000L), 1_000L, false,
+            facingObservation = RouteFacingObservation(0.0, 5.0, 1_000L))
+        val events = linkedMapOf(
+            "route_compass_state_changed" to RouteGuidanceDiagnostics.compassState(
+                RouteCompassHeadingResult(observation, RouteCompassHeadingReason.VALID), 1_000L),
+            "route_alignment" to RouteGuidanceDiagnostics.alignment(
+                requireNotNull(update.routeAlignmentDiagnostic), observation, 7.6f, 1_000L),
+            "route_guidance_generated" to RouteGuidanceDiagnostics.guidanceGenerated(update, 1_010L),
+            "route_guidance_started" to RouteGuidanceDiagnostics.guidanceStartChecked(update, 1_200L, current = true),
+        )
+        events.forEach { (name, fields) -> log.recordEvent(name, fields) }
+        log.stop()
+
+        val records = readRecords(File(root, "field-route-guidance"))
+        events.forEach { (name, fields) ->
+            val persisted = records.first { it.optString("event_name") == name }.getJSONObject("fields")
+            fields.filterValues { it != null }.forEach { (key, value) ->
+                assertTrue("$name.$key dropped", persisted.has(key))
+                assertEquals("$name.$key", value.toString(), persisted.get(key).toString())
+            }
+            val coordinateOrText = setOf("lat", "lon", "lng", "latitude", "longitude", "instruction", "text")
+            assertFalse(persisted.keys().asSequence().any { key -> key.split('_').any(coordinateOrText::contains) })
+        }
     }
 
     @Test

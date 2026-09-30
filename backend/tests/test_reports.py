@@ -4,6 +4,7 @@ import json
 import io
 import fcntl
 import os
+from datetime import timedelta
 from pathlib import Path
 import sys
 from typing import Optional
@@ -22,8 +23,10 @@ sys.path.insert(0, str(ROOT))
 from backend.app.config import get_settings  # noqa: E402
 from backend.app.database import SessionLocal  # noqa: E402
 from backend.app.main import app, settings as app_settings  # noqa: E402
+from backend.app.services.privacy_lifecycle import bind_or_verify_privacy_hmac_key  # noqa: E402
 from backend.app.models import (  # noqa: E402
     Report,
+    ReportContentRevision,
     ReportImageObject,
     ReportReadAudit,
     ReportStatusAudit,
@@ -196,6 +199,97 @@ def test_sensitive_reads_persist_actor_resource_time_and_purpose(
     assert audits[3].details["result_count"] == duplicate_check.json()["duplicate_count"]
     assert "lat" not in audits[3].details and "lng" not in audits[3].details
     assert all(audit.created_at is not None for audit in audits)
+
+
+def test_list_read_audit_fingerprint_tracks_page_ids_and_content_revision(
+    client: ASGITestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = create_report(client)
+    second = create_report(client)
+    model_key = f"list-audit-{uuid.uuid4()}"
+    with SessionLocal() as db:
+        first_row = db.get(Report, uuid.UUID(first["id"]))
+        second_row = db.get(Report, uuid.UUID(second["id"]))
+        assert first_row is not None and second_row is not None
+        first_row.payload = {**first_row.payload, "model_key": model_key}
+        second_row.created_at = first_row.created_at + timedelta(seconds=1)
+        db.commit()
+
+    monkeypatch.setattr(app_settings, "field_test_security_enabled", True)
+    monkeypatch.setattr(app_settings, "field_test_token", "field-token-for-read-audit-tests-123456")
+    monkeypatch.setattr(app_settings, "admin_token", "admin-token-for-read-audit-tests-123456")
+    monkeypatch.setattr(app_settings, "walksafe_environment", "development")
+    monkeypatch.setattr(app_settings, "allow_insecure_local_dev", True)
+    actor_id = "audit.list.fingerprint@example.com"
+    headers = {
+        "x-walksafe-admin-token": app_settings.admin_token,
+        "x-walksafe-actor-id": actor_id,
+        "x-walksafe-read-purpose": "admin_report_list",
+    }
+    params = {"model_key": model_key, "limit": 1, "offset": 0}
+
+    first_page = client.get("/reports", params=params, headers=headers)
+    with SessionLocal() as db:
+        second_row = db.get(Report, uuid.UUID(second["id"]))
+        assert second_row is not None
+        second_row.payload = {**second_row.payload, "model_key": model_key}
+        db.commit()
+    second_page = client.get("/reports", params=params, headers=headers)
+    with SessionLocal() as db:
+        second_row = db.get(Report, uuid.UUID(second["id"]))
+        assert second_row is not None
+        # The projection guard accepts a content bump only with its append-only revision row.
+        if second_row.privacy_subject_hmac is None:
+            # Production binds the privacy HMAC key before any pseudonymous row exists.
+            bind_or_verify_privacy_hmac_key(
+                db,
+                secret=app_settings.privacy_hmac_secret,
+                key_version=app_settings.privacy_hmac_key_version,
+            )
+            second_row.privacy_subject_hmac = "c" * 64
+            second_row.account_generation = 1
+            db.flush()
+        db.add(
+            ReportContentRevision(
+                report_id=second_row.id,
+                revision=second_row.content_revision + 1,
+                expected_revision=second_row.content_revision,
+                idempotency_key=uuid.uuid4(),
+                privacy_subject_hmac=second_row.privacy_subject_hmac,
+                account_generation=second_row.account_generation,
+                intent_sha256="a" * 64,
+                content_sha256="b" * 64,
+            )
+        )
+        db.flush()
+        second_row.content_revision += 1
+        db.commit()
+    revised_page = client.get("/reports", params=params, headers=headers)
+
+    assert [page.status_code for page in (first_page, second_page, revised_page)] == [200, 200, 200]
+    assert [ids(page.json()) for page in (first_page, second_page, revised_page)] == [
+        {first["id"]}, {second["id"]}, {second["id"]}
+    ]
+    with SessionLocal() as db:
+        audits = list(
+            db.scalars(
+                select(ReportReadAudit)
+                .where(ReportReadAudit.actor_id == actor_id)
+                .order_by(ReportReadAudit.created_at, ReportReadAudit.id)
+            )
+        )
+    assert len(audits) == 3
+    assert all(audit.details["result_count"] == 1 for audit in audits)
+    assert all(audit.details["limit"] == 1 and audit.details["offset"] == 0 for audit in audits)
+    assert all(audit.details["exact_location_filter_applied"] is False for audit in audits)
+    fingerprints = [audit.details["result_fingerprint_sha256"] for audit in audits]
+    assert all(len(value) == 64 and all(char in "0123456789abcdef" for char in value) for value in fingerprints)
+    assert fingerprints[0] != fingerprints[1]
+    assert fingerprints[1] != fingerprints[2]
+    assert all(first["id"] not in json.dumps(audit.details) for audit in audits)
+    assert all(second["id"] not in json.dumps(audit.details) for audit in audits)
+    assert all("lat" not in audit.details and "lng" not in audit.details for audit in audits)
 
 
 def test_report_summary_is_withheld_when_read_audit_cannot_be_persisted(
@@ -405,6 +499,30 @@ def test_report_status_sequential_transition(client: ASGITestClient) -> None:
         (1, 2),
         (2, 3),
     ]
+
+
+def test_report_status_rejects_unknown_fields_without_mutation(client: ASGITestClient) -> None:
+    created = create_report(client)
+    report_id = uuid.UUID(created["id"])
+
+    rejected = client.patch(
+        f"/reports/{report_id}/status",
+        json={"status": "reviewed", "unexpected": "ignored"},
+    )
+    assert rejected.status_code == 422
+    with SessionLocal() as db:
+        stored = db.get(Report, report_id)
+        audits = db.scalars(
+            select(ReportStatusAudit).where(ReportStatusAudit.report_id == report_id)
+        ).all()
+    assert stored is not None
+    assert stored.status == "new"
+    assert stored.status_version == 1
+    assert audits == []
+
+    accepted = client.patch(f"/reports/{report_id}/status", json={"status": "reviewed"})
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "reviewed"
 
 
 def test_report_status_write_fails_closed_during_maintenance(

@@ -67,11 +67,7 @@ internal class ExplicitReportFrozenPayload private constructor(
             if (
                 capturedAtEpochMs < 0L ||
                 reportActorIdFromMetadataOrNull(metadataUtf8) != context.reporterId ||
-                imageJpeg.size < 4 ||
-                imageJpeg[0] != 0xff.toByte() ||
-                imageJpeg[1] != 0xd8.toByte() ||
-                imageJpeg[imageJpeg.lastIndex - 1] != 0xff.toByte() ||
-                imageJpeg[imageJpeg.lastIndex] != 0xd9.toByte()
+                !JpegStructureValidator.isStructurallyValid(imageJpeg)
             ) {
                 return null
             }
@@ -150,6 +146,9 @@ internal class ExplicitReportConfirmationPolicy(
     ): Boolean {
         require(nowElapsedRealtimeMs >= 0L)
         val existing = pending ?: return false
+        if (existing.payload.context == context && invalidateExpired(nowElapsedRealtimeMs)) {
+            return false
+        }
         if (
             existing.payload.context != context ||
             existing.armedAtElapsedRealtimeMs != null ||

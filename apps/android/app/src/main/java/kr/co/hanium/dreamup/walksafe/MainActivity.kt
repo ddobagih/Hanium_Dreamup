@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe
 
 import android.Manifest
+import kr.co.hanium.dreamup.walksafe.session.PreviousWalkInterruptionMarker
+import kr.co.hanium.dreamup.walksafe.session.WalkInterruptionRecord
 import kr.co.hanium.dreamup.walksafe.inference.AndroidRuntimeLoadObservationSource
 import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceTuningProfileStore
 import kr.co.hanium.dreamup.walksafe.device.AndroidRuntimeCalibrationSession
@@ -28,6 +30,9 @@ import kr.co.hanium.dreamup.walksafe.navigation.AndroidTactileFrameCoordinator
 import kr.co.hanium.dreamup.walksafe.navigation.CurrentTrackedFrameEvidence
 import kr.co.hanium.dreamup.walksafe.navigation.UserMotionEstimateFactory
 import kr.co.hanium.dreamup.walksafe.navigation.UserMotionLocationEvidence
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.UserMovementState
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.UserMotionStateSnapshot
+import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyDisposition
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -71,6 +76,9 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import kr.co.hanium.dreamup.walksafe.voice.PreferredOfflineSpeechRecognizer
+import kr.co.hanium.dreamup.walksafe.voice.OfflineKoreanSpeechGuidance
+import kr.co.hanium.dreamup.walksafe.voice.OfflineKoreanSpeechGuidancePolicy
+import kr.co.hanium.dreamup.walksafe.voice.OfflineKoreanSpeechSettingsAction
 import kr.co.hanium.dreamup.walksafe.voice.OfflineSpeechEngine
 import kr.co.hanium.dreamup.walksafe.voice.VoiceInputDiagnosticEvent
 import kr.co.hanium.dreamup.walksafe.diagnostics.BoundedRuntimeDiagnosticLog
@@ -149,8 +157,10 @@ import kr.co.hanium.dreamup.walksafe.device.AndroidLocalTactileTier
 import kr.co.hanium.dreamup.walksafe.device.AndroidDeviceCheckHapticProbe
 import kr.co.hanium.dreamup.walksafe.device.AndroidPhoneMountingSensorProbe
 import kr.co.hanium.dreamup.walksafe.device.AndroidStartupCapabilityProbe
+import kr.co.hanium.dreamup.walksafe.device.AndroidAllocatableBytes
 import kr.co.hanium.dreamup.walksafe.device.AndroidWalkSessionResourceProbe
 import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyCoordinator
+import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeStopCleanupCheckpoints
 import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyObservation
 import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyStop
 import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyStopCause
@@ -189,6 +199,7 @@ import kr.co.hanium.dreamup.walksafe.device.OfficialEnvironmentGpsPreflightPolic
 import kr.co.hanium.dreamup.walksafe.device.OfficialEnvironmentGpsSample
 import kr.co.hanium.dreamup.walksafe.device.RuntimeMeasuredQualityGate
 import kr.co.hanium.dreamup.walksafe.device.ApprovedDeviceProfileMatch
+import kr.co.hanium.dreamup.walksafe.device.DeviceGatePurpose
 import kr.co.hanium.dreamup.walksafe.device.DeviceGateState
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckCameraSampleVerdict
 import kr.co.hanium.dreamup.walksafe.device.DeviceCheckCameraSamplingPolicy
@@ -214,6 +225,7 @@ import kr.co.hanium.dreamup.walksafe.device.WalkSafeApprovedDeviceProfiles
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeEnvironmentProfileBundle
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeEnvironmentProfiles
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupCapabilityDecision
+import kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupCapabilityResolver
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupCapabilityTier
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupRequirement
 import kr.co.hanium.dreamup.walksafe.depth.ArCoreFrameProvider
@@ -234,6 +246,7 @@ import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.depth.UserFacingDepth
 import kr.co.hanium.dreamup.walksafe.depth.Vec3
+import kr.co.hanium.dreamup.walksafe.depth.isCurrentQualitativeCaution
 import kr.co.hanium.dreamup.walksafe.depth.debugSummaryText
 import kr.co.hanium.dreamup.walksafe.depth.toSnapshotAndClose
 import kr.co.hanium.dreamup.walksafe.debuglog.DebugFrameCaptureUploaderFactory
@@ -251,19 +264,31 @@ import kr.co.hanium.dreamup.walksafe.feedback.NonMetricAdvisoryGate
 import kr.co.hanium.dreamup.walksafe.feedback.NonMetricObstacleAdvisoryAction
 import kr.co.hanium.dreamup.walksafe.feedback.TemporaryGatewayWavPlayer
 import kr.co.hanium.dreamup.walksafe.feedback.WalkSafeFeedbackPolicy
+import kr.co.hanium.dreamup.walksafe.feedback.dispatchCurrentNavigationSpeech
 import kr.co.hanium.dreamup.walksafe.feedback.shouldSuppressFeedbackDuringVoiceRecognition
 import kr.co.hanium.dreamup.walksafe.feedback.utteranceTerminalTimeoutMs
 import kr.co.hanium.dreamup.walksafe.voice.BundledVoskModelInstaller
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceController
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceEligibility
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceTerminalFailure
+import kr.co.hanium.dreamup.walksafe.voice.VoskStreamingError
 import kr.co.hanium.dreamup.walksafe.voice.WalkSafeApplication
 import kr.co.hanium.dreamup.walksafe.voice.WalkVoiceForegroundService
+import kr.co.hanium.dreamup.walksafe.voice.WalkVoiceSessionController
+import kr.co.hanium.dreamup.walksafe.voice.WalkVoiceStartFailure
+import kr.co.hanium.dreamup.walksafe.voice.WalkVoiceStartFailurePresentation
+import kr.co.hanium.dreamup.walksafe.voice.WalkVoiceStartRecovery
+import kr.co.hanium.dreamup.walksafe.voice.classifyWalkVoiceStartFailure
+import kr.co.hanium.dreamup.walksafe.voice.isWalkVoiceForegroundStartRestricted
 import kr.co.hanium.dreamup.walksafe.voice.VoskWakePhraseProbe
 import kr.co.hanium.dreamup.walksafe.voice.VoskWakePhraseProbeAvailability
 import kr.co.hanium.dreamup.walksafe.fieldlog.CameraNonMetricFieldSample
+import kr.co.hanium.dreamup.walksafe.fieldlog.DebugCollectionArtifacts
 import kr.co.hanium.dreamup.walksafe.fieldlog.FieldRuntimeSnapshot
+import kr.co.hanium.dreamup.walksafe.fieldlog.FIELD_HEARTBEAT_INTERVAL_MS
+import kr.co.hanium.dreamup.walksafe.fieldlog.FieldHeartbeatSensors
 import kr.co.hanium.dreamup.walksafe.fieldlog.FieldSessionDeviceInfo
+import kr.co.hanium.dreamup.walksafe.fieldlog.FieldSessionHeartbeat
 import kr.co.hanium.dreamup.walksafe.fieldlog.FieldSessionLog
 import kr.co.hanium.dreamup.walksafe.fieldlog.NoopFieldSessionLog
 import kr.co.hanium.dreamup.walksafe.fieldlog.PersistentFieldSessionLog
@@ -273,14 +298,19 @@ import kr.co.hanium.dreamup.walksafe.fieldlog.PositionFieldSessionStatus
 import kr.co.hanium.dreamup.walksafe.fieldlog.PositionFieldPurgeDurability
 import kr.co.hanium.dreamup.walksafe.fieldlog.RecorderBinding
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectionResult
+import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorRuntime
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorTiming
 import kr.co.hanium.dreamup.walksafe.inference.AndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.ArgbImage
 import kr.co.hanium.dreamup.walksafe.inference.DetectorRuntimeFailureAction
 import kr.co.hanium.dreamup.walksafe.inference.AdaptiveInferencePacingPolicy
 import kr.co.hanium.dreamup.walksafe.inference.DetectorRuntimeSupervisor
+import kr.co.hanium.dreamup.walksafe.inference.detectorRuntimeFailureKind
 import kr.co.hanium.dreamup.walksafe.inference.InferencePacingTicket
 import kr.co.hanium.dreamup.walksafe.inference.NoopAndroidFrameDetector
+import kr.co.hanium.dreamup.walksafe.inference.RunningDetectorIdentity
+import kr.co.hanium.dreamup.walksafe.inference.RunningDetectorLoadEvidence
+import kr.co.hanium.dreamup.walksafe.inference.RunningDetectorVerificationGate
 import kr.co.hanium.dreamup.walksafe.inference.TfliteAndroidFrameDetector
 import kr.co.hanium.dreamup.walksafe.inference.TwoModelRuntimeConfig
 import kr.co.hanium.dreamup.walksafe.inference.YuvImagePreprocessor
@@ -313,6 +343,8 @@ import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchLocationControl
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchLocationLease
 import kr.co.hanium.dreamup.walksafe.navigation.ConsecutiveTmapFailureGuard
 import kr.co.hanium.dreamup.walksafe.navigation.EncryptedRouteSnapshotStore
+import kr.co.hanium.dreamup.walksafe.navigation.RouteSnapshotOwner
+import kr.co.hanium.dreamup.walksafe.navigation.RouteSnapshotScope
 import kr.co.hanium.dreamup.walksafe.navigation.FrozenImageToDepthTransform
 import kr.co.hanium.dreamup.walksafe.navigation.GatewayProxyHttpException
 import kr.co.hanium.dreamup.walksafe.navigation.LocationTrustPolicy
@@ -320,7 +352,9 @@ import kr.co.hanium.dreamup.walksafe.navigation.NavigationTestLocationPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.NavigationBackendErrorKind
 import kr.co.hanium.dreamup.walksafe.navigation.haversineMeters
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigator
+import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorConfig
 import kr.co.hanium.dreamup.walksafe.navigation.RouteFacingObservation
+import kr.co.hanium.dreamup.walksafe.navigation.RouteGuidanceDiagnostics
 import kr.co.hanium.dreamup.walksafe.navigation.RouteFacingSource
 import kr.co.hanium.dreamup.walksafe.navigation.RouteCompassLocationReference
 import kr.co.hanium.dreamup.walksafe.navigation.RouteCompassHeadingReason
@@ -332,6 +366,8 @@ import kr.co.hanium.dreamup.walksafe.navigation.ROUTE_SNAPSHOT_TTL_MS
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchResult
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceCommand
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState
+import kr.co.hanium.dreamup.walksafe.navigation.displayAddressOrNull
+import kr.co.hanium.dreamup.walksafe.navigation.destinationSearchCanRequestMore
 import kr.co.hanium.dreamup.walksafe.navigation.HomeDestinationVoiceDialogLease
 import kr.co.hanium.dreamup.walksafe.navigation.EarthOrientationAccuracy
 import kr.co.hanium.dreamup.walksafe.navigation.RoutePoint
@@ -344,13 +380,18 @@ import kr.co.hanium.dreamup.walksafe.navigation.StepEventSource
 import kr.co.hanium.dreamup.walksafe.navigation.TactileProjectionContext
 import kr.co.hanium.dreamup.walksafe.navigation.TactileRouteGuidanceResult
 import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
+import kr.co.hanium.dreamup.walksafe.navigation.WalkingRoute
 import kr.co.hanium.dreamup.walksafe.navigation.WalkingRouteRequest
+import kr.co.hanium.dreamup.walksafe.navigation.distanceToPolylineMeters
 import kr.co.hanium.dreamup.walksafe.navigation.WalkSessionVoiceAction
 import kr.co.hanium.dreamup.walksafe.navigation.WalkSessionVoiceControlPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.formatDestinationDistance
+import kr.co.hanium.dreamup.walksafe.navigation.approximateDestinationDistanceKo
+import kr.co.hanium.dreamup.walksafe.navigation.destinationOriginUncertaintyNoticeKo
 import kr.co.hanium.dreamup.walksafe.navigation.reliableMovementHeadingDegrees
 import kr.co.hanium.dreamup.walksafe.navigation.classifyNavigationBackendFailure
 import kr.co.hanium.dreamup.walksafe.navigation.canonicalDestinationSearchQueryOrNull
+import kr.co.hanium.dreamup.walksafe.navigation.destinationSearchUserMessage
 import kr.co.hanium.dreamup.walksafe.navigation.selectAndroidVoiceAction
 import kr.co.hanium.dreamup.walksafe.navigation.VoiceCommandUiDestination
 import kr.co.hanium.dreamup.walksafe.navigation.uiDestination
@@ -397,7 +438,6 @@ import kr.co.hanium.dreamup.walksafe.network.AndroidNavigationRequestCoordinator
 import kr.co.hanium.dreamup.walksafe.network.AndroidNavigationRequestEvent
 import kr.co.hanium.dreamup.walksafe.network.ActiveNetworkTransport
 import kr.co.hanium.dreamup.walksafe.network.ActivityOriginalStationarySnapshot
-import kr.co.hanium.dreamup.walksafe.network.ActivityOriginalMotionEvidence
 import kr.co.hanium.dreamup.walksafe.network.ActivityOriginalUploadAdmissionController
 import kr.co.hanium.dreamup.walksafe.network.AndroidGatewaySessionStore
 import kr.co.hanium.dreamup.walksafe.account.AccountRemoteAction
@@ -416,6 +456,7 @@ import kr.co.hanium.dreamup.walksafe.network.AndroidGatewaySpeechClient
 import kr.co.hanium.dreamup.walksafe.network.AndroidIntegratedConsentClient
 import kr.co.hanium.dreamup.walksafe.network.IntegratedConsentBootstrap
 import kr.co.hanium.dreamup.walksafe.network.IntegratedConsentBootstrapStatus
+import kr.co.hanium.dreamup.walksafe.network.IntegratedConsentBootstrapSource
 import kr.co.hanium.dreamup.walksafe.network.IntegratedConsentHttpException
 import kr.co.hanium.dreamup.walksafe.network.AndroidPrivacyDeletionClient
 import kr.co.hanium.dreamup.walksafe.network.AndroidUserReportClient
@@ -445,6 +486,16 @@ import kr.co.hanium.dreamup.walksafe.network.GatewaySpeechCallbackFence
 import kr.co.hanium.dreamup.walksafe.network.GatewaySpeechTranscript
 import kr.co.hanium.dreamup.walksafe.network.GatewayFieldSessionClient
 import kr.co.hanium.dreamup.walksafe.network.GatewayPendingRevocation
+import kr.co.hanium.dreamup.walksafe.network.GatewayRenewalFailureNotice
+import kr.co.hanium.dreamup.walksafe.network.GatewayInRunRenewalContext
+import kr.co.hanium.dreamup.walksafe.network.GatewayInRunRenewalGate
+import kr.co.hanium.dreamup.walksafe.network.GatewayInRunRenewalPolicy
+import kr.co.hanium.dreamup.walksafe.network.GatewayInRunRenewalProcessState
+import kr.co.hanium.dreamup.walksafe.network.GatewayInRunRenewalTrigger
+import kr.co.hanium.dreamup.walksafe.network.GatewayInRunSessionAction
+import kr.co.hanium.dreamup.walksafe.network.GatewayRenewalFailureAction
+import kr.co.hanium.dreamup.walksafe.network.GatewaySessionLease
+import kr.co.hanium.dreamup.walksafe.network.GatewayWalkRenewalFailure
 import kr.co.hanium.dreamup.walksafe.network.GatewaySessionOperation
 import kr.co.hanium.dreamup.walksafe.network.GatewaySessionProcessCoordinator
 import kr.co.hanium.dreamup.walksafe.network.GatewaySessionProcessSnapshot
@@ -459,9 +510,13 @@ import kr.co.hanium.dreamup.walksafe.network.GatewaySessionVersion
 import kr.co.hanium.dreamup.walksafe.network.GatewayWalkAuthorityCompletion
 import kr.co.hanium.dreamup.walksafe.network.GatewayWalkAuthorityController
 import kr.co.hanium.dreamup.walksafe.network.GatewayWalkAuthorityOperation
+import kr.co.hanium.dreamup.walksafe.network.GatewayWalkHttpException
+import kr.co.hanium.dreamup.walksafe.network.GatewayWalkLease
+import kr.co.hanium.dreamup.walksafe.network.GatewayWalkRenewalFailurePolicy
 import kr.co.hanium.dreamup.walksafe.network.GatewayWalkSessionClient
 import kr.co.hanium.dreamup.walksafe.network.GatewayWalkStartResult
 import kr.co.hanium.dreamup.walksafe.network.GatewayWalkTakeoverConfirmation
+import kr.co.hanium.dreamup.walksafe.network.GatewayWalkEndRetryPolicy
 import kr.co.hanium.dreamup.walksafe.network.RestoredGatewayLoginBundle
 import kr.co.hanium.dreamup.walksafe.network.MobileNetworkPreference
 import kr.co.hanium.dreamup.walksafe.network.GatewaySpeechNetworkGate
@@ -470,6 +525,7 @@ import kr.co.hanium.dreamup.walksafe.network.isGatewaySpeechCallbackCurrent
 import kr.co.hanium.dreamup.walksafe.report.AndroidReportCandidateInput
 import kr.co.hanium.dreamup.walksafe.report.AndroidReportCandidate
 import kr.co.hanium.dreamup.walksafe.report.AndroidReportCandidatePolicy
+import kr.co.hanium.dreamup.walksafe.report.AndroidReportCandidateResult
 import kr.co.hanium.dreamup.walksafe.report.AndroidReportAttemptStore
 import kr.co.hanium.dreamup.walksafe.report.AndroidReportAttemptResult
 import kr.co.hanium.dreamup.walksafe.report.AndroidAccountDeletionFallbackMarker
@@ -490,6 +546,8 @@ import kr.co.hanium.dreamup.walksafe.report.EXPLICIT_REPORT_DISCLOSURE_VALIDITY_
 import kr.co.hanium.dreamup.walksafe.report.ReportQueueDrainContext
 import kr.co.hanium.dreamup.walksafe.report.ReportQueueDrainCoordinator
 import kr.co.hanium.dreamup.walksafe.report.ReportQueueDrainOutcome
+import kr.co.hanium.dreamup.walksafe.report.ReportQueueDrainResult
+import kr.co.hanium.dreamup.walksafe.report.ReportCreationOutcome
 import kr.co.hanium.dreamup.walksafe.report.ReportQueuePriority
 import kr.co.hanium.dreamup.walksafe.report.PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE
 import kr.co.hanium.dreamup.walksafe.report.approvedReportQueueGatewayOriginOrNull
@@ -522,8 +580,10 @@ import kr.co.hanium.dreamup.walksafe.report.validUserReportRequestText
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionRuntimeContext
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionRuntimeCoordinator
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionUploadOutcome
-import kr.co.hanium.dreamup.walksafe.rawcollection.RawDetectionMetadataSample
-import kr.co.hanium.dreamup.walksafe.rawcollection.RawPerformanceMetadataSample
+import kr.co.hanium.dreamup.walksafe.rawcollection.RawConsentSupersede
+import kr.co.hanium.dreamup.walksafe.rawcollection.RawDetectorRuntimeIdentity
+import kr.co.hanium.dreamup.walksafe.rawcollection.rawConsentSupersede
+import kr.co.hanium.dreamup.walksafe.rawcollection.RawRuntimeWindowAccumulator
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
 import kr.co.hanium.dreamup.walksafe.security.AndroidKeyStoreAead
 import kr.co.hanium.dreamup.walksafe.security.AndroidSensitivePreferenceStore
@@ -540,11 +600,15 @@ import kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessPlan
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessRequirement
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessSnapshot
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessStatus
+import kr.co.hanium.dreamup.walksafe.session.WalkSessionFeatureReadiness
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionRecoveryStage
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionResumeConfirmation
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionState
+import kr.co.hanium.dreamup.walksafe.session.WalkSessionTransitionDiagnostics
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionSnapshot
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionTransition
+import kr.co.hanium.dreamup.walksafe.session.walkReadinessStopReasonKo
+import kr.co.hanium.dreamup.walksafe.session.allowsPostWalkTransfer
 import kr.co.hanium.dreamup.walksafe.session.AuthenticationState
 import kr.co.hanium.dreamup.walksafe.session.EnvironmentEvidenceStatus
 import kr.co.hanium.dreamup.walksafe.session.FirstRunAgeBand
@@ -561,10 +625,12 @@ import kr.co.hanium.dreamup.walksafe.session.INTEGRATED_CONSENT_DISCLOSURE_KO
 import kr.co.hanium.dreamup.walksafe.session.INTEGRATED_CONSENT_POLICY_VERSION
 import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentConfirmation
 import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentApplyResult
+import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentSubmissionResult
 import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentItem
 import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentSelections
-import kr.co.hanium.dreamup.walksafe.session.PREVIOUS_INTEGRATED_CONSENT_POLICY_VERSION
+import kr.co.hanium.dreamup.walksafe.session.KNOWN_PREVIOUS_INTEGRATED_CONSENT_POLICY_VERSIONS
 import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentSession
+import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentAuthorityGuard
 import kr.co.hanium.dreamup.walksafe.session.AccountDeletionApplyResult
 import kr.co.hanium.dreamup.walksafe.session.AccountDeletionStartupRestoreResult
 import kr.co.hanium.dreamup.walksafe.session.AccountDeletionActivityLease
@@ -596,6 +662,9 @@ import kr.co.hanium.dreamup.walksafe.session.dispatchAccountDeletionWorkerStage
 import kr.co.hanium.dreamup.walksafe.session.accountDeletionStartupAuthorityDecision
 import kr.co.hanium.dreamup.walksafe.session.isConfirmedTerminalAccountDeletion
 import kr.co.hanium.dreamup.walksafe.session.PendingIntegratedConsentMutation
+import kr.co.hanium.dreamup.walksafe.session.RejectedConsentCasSupersession
+import kr.co.hanium.dreamup.walksafe.session.RejectedConsentCasRecoveryJournal
+import kr.co.hanium.dreamup.walksafe.session.RejectedConsentCasJournalCodec
 import kr.co.hanium.dreamup.walksafe.session.PurposeConsentSyncState
 import kr.co.hanium.dreamup.walksafe.session.GpsQualityObservation
 import kr.co.hanium.dreamup.walksafe.session.MeasuredEnvironmentEvidence
@@ -608,6 +677,12 @@ import kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentSupport
 import kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentUserConfirmation
 import kr.co.hanium.dreamup.walksafe.session.ObservedPermission
 import kr.co.hanium.dreamup.walksafe.session.ObservedPermissionSnapshot
+import kr.co.hanium.dreamup.walksafe.session.PermissionExplanation
+import kr.co.hanium.dreamup.walksafe.session.PermissionExplanationKind
+import kr.co.hanium.dreamup.walksafe.session.PermissionExplanationPolicy
+import kr.co.hanium.dreamup.walksafe.session.PermissionLocationState
+import kr.co.hanium.dreamup.walksafe.session.PermissionReRequestability
+import kr.co.hanium.dreamup.walksafe.session.PermissionRequestAnswer
 import kr.co.hanium.dreamup.walksafe.session.PermissionDependentFeature
 import kr.co.hanium.dreamup.walksafe.session.PermissionDependencyPolicy
 import kr.co.hanium.dreamup.walksafe.session.PermissionRecoveryGate
@@ -642,6 +717,7 @@ import java.util.concurrent.Executor
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.roundToInt
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -676,6 +752,65 @@ internal fun userReportAuthorityExpiryDelayMs(
         absoluteExpiresAtEpochMs,
     )
     return if (nowEpochMs >= expiresAtEpochMs) 0L else expiresAtEpochMs - nowEpochMs
+}
+
+internal enum class RouteResponseInstallLocationStatus {
+    CONNECTED,
+    LOCATION_UNAVAILABLE,
+    ROUTE_DISCONNECTED,
+}
+
+/** A delayed response can be installed only while the latest fix still connects to its route. */
+internal fun routeResponseInstallLocationStatus(
+    route: WalkingRoute,
+    requestOrigin: TrustedLocation,
+    location: TrustedLocation?,
+    nowElapsedRealtimeMs: Long,
+): RouteResponseInstallLocationStatus {
+    val fresh = LocationTrustPolicy.freshOrNull(location, nowElapsedRealtimeMs)
+        ?: return RouteResponseInstallLocationStatus.LOCATION_UNAVAILABLE
+    val distanceM = distanceToPolylineMeters(fresh, route.polyline)
+    val maximumRouteDistanceM = RouteNavigatorConfig().offRouteDistanceM
+    if (!distanceM.isFinite() || distanceM > maximumRouteDistanceM ||
+        !fresh.accuracyM.isFinite() || fresh.accuracyM !in 0f..100f
+    ) return RouteResponseInstallLocationStatus.ROUTE_DISCONNECTED
+    // Match RouteAlignmentSelector's local search radius before accepting a route as usable.
+    if (distanceM <= maxOf(8.0, fresh.accuracyM.toDouble() * 2.0)) {
+        return RouteResponseInstallLocationStatus.CONNECTED
+    }
+    // A provider may snap the route's first point away from the request fix. Only an unchanged
+    // request origin can authorize that explicit start connector; a later lateral move cannot.
+    val firstLeg = route.polyline.zipWithNext().firstOrNull { (start, end) ->
+        haversineMeters(start.latitude, start.longitude, end.latitude, end.longitude) > 0.01
+    } ?: return RouteResponseInstallLocationStatus.ROUTE_DISCONNECTED
+    val firstLengthM = haversineMeters(
+        firstLeg.first.latitude, firstLeg.first.longitude,
+        firstLeg.second.latitude, firstLeg.second.longitude,
+    )
+    val originToStartM = haversineMeters(
+        requestOrigin.latitude, requestOrigin.longitude,
+        firstLeg.first.latitude, firstLeg.first.longitude,
+    )
+    val originToEndM = haversineMeters(
+        requestOrigin.latitude, requestOrigin.longitude,
+        firstLeg.second.latitude, firstLeg.second.longitude,
+    )
+    val originToCurrentM = haversineMeters(
+        requestOrigin.latitude, requestOrigin.longitude,
+        fresh.latitude, fresh.longitude,
+    )
+    val originProgressM = ((originToStartM * originToStartM + firstLengthM * firstLengthM -
+        originToEndM * originToEndM) / (2.0 * firstLengthM)).coerceIn(0.0, firstLengthM)
+    val originUncertaintyM = kotlin.math.hypot(
+        requestOrigin.accuracyM.toDouble(), fresh.accuracyM.toDouble(),
+    )
+    return if (requestOrigin.accuracyM.isFinite() && requestOrigin.accuracyM in 0f..100f &&
+        requestOrigin.elapsedRealtimeMs in 0L..fresh.elapsedRealtimeMs &&
+        originToStartM.isFinite() && originToStartM <= maximumRouteDistanceM &&
+        originProgressM.isFinite() && originProgressM <= maxOf(8.0, requestOrigin.accuracyM.toDouble()) &&
+        originToCurrentM.isFinite() && originToCurrentM <= maxOf(8.0, originUncertaintyM)
+    ) RouteResponseInstallLocationStatus.CONNECTED
+    else RouteResponseInstallLocationStatus.ROUTE_DISCONNECTED
 }
 
 private enum class OfficialEnvironmentPreflightPhase {
@@ -946,6 +1081,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var cameraXReleaseBlocked = false
     private var cameraFallbackCleanupPending = false
     private var cameraFallbackAfterRelease: (() -> Unit)? = null
+    private var cameraFallbackAfterReleaseFailure: (() -> Unit)? = null
     @Volatile
     private var cameraFallbackFrameAnalyzedGeneration = -1
     private var cameraFallbackStartReason: CameraFallbackStartReason? = null
@@ -976,12 +1112,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val backgroundRenderer = CameraBackgroundRenderer()
     @Volatile
     private var frameDetector: AndroidFrameDetector = NoopAndroidFrameDetector()
-    private val detectorRuntimeSupervisor = DetectorRuntimeSupervisor()
+    /**
+     * S14-36: an output counts only while its call still owns the current detector run (generation and
+     * walk epoch) and pacing ticket; the supervisor re-arms its freshness clock once per new run (S14-37).
+     */
+    private val detectorRuntimeSupervisor = DetectorRuntimeSupervisor(
+        ownsCurrentWork = { claim ->
+            val walkEpoch = claim.walkRun as? WalkRuntimeEpoch
+            walkEpoch != null &&
+                isCurrentFrameGeneration(claim.detectorGeneration, walkEpoch) &&
+                adaptiveInferencePacing.ownsSlot(claim.ticket)
+        },
+    )
     private val captureLog = MetadataCaptureLog()
     private var feedbackActuator: AndroidFeedbackActuator? = null
     private var speechRecognizer: PreferredOfflineSpeechRecognizer? = null
     private var voiceRecognitionActive = false
     private var voiceRecognitionGeneration = 0
+    private val foregroundHomeWakeInputGeneration = AtomicLong(0L)
     private val commandSpeechResponseCallbacks = UtteranceCallbackRegistry()
     private var commandSpeechResponseGeneration = 0L
     private var voiceCommandPromptPending = false
@@ -996,7 +1144,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var handsFreeVoiceModelPreparationFailed = false
     private var handsFreeVoiceModelPreparing = false
     private var handsFreeVoiceServiceRequested = false
+    private var handsFreeVoiceStartRequestId: Long? = null
+    private val handsFreeVoiceStartRecovery = WalkVoiceStartRecovery()
+    private var pendingHandsFreeVoiceStartFailure: WalkVoiceStartFailurePresentation? = null
     private var handsFreeVoiceRestartRunnable: Runnable? = null
+    /** Consecutive hands-free transcriber failures since listening last started (FP-025 persistence). */
+    private var handsFreeTranscriberFailureCount = 0
     private var handsFreeVoiceModelGeneration = 0L
     private var handsFreeVoiceDestroyed = false
     private val handsFreeVoiceModelExecutor = Executors.newSingleThreadExecutor { runnable ->
@@ -1031,6 +1184,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var voiceEndConfirmationPromptPending = false
     private var walkSessionResumePromptPending = false
     private var walkSessionResumeRetryRequiresUserAction = false
+    @Volatile
+    private var walkSessionResumeActivationToken: WalkSessionConfirmationToken? = null
     private var walkSessionResumeConfirmationToken: WalkSessionConfirmationToken? = null
     private var gatewayWalkTakeoverPromptPending = false
     private var gatewayWalkTakeoverPromptOperationId: String? = null
@@ -1086,11 +1241,30 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var lastProgressBeepAtMs = 0L
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var stepTracker: AndroidStepTracker
+    @Volatile
     private var positioningCoordinator = PositioningCoordinator()
+    @Volatile
+    private var positioningCollectionBinding: PositioningCollectionBinding? = null
+
+    private class PositioningCollectionBinding(
+        val coordinator: PositioningCoordinator,
+        val inputGeneration: Long,
+        val owner: LocationCollectionOwner,
+        val locationGeneration: Int,
+        val startedAtElapsedRealtimeMs: Long,
+    ) {
+        // The first counter delta may span the previous collection boundary.
+        var counterBoundaryEstablished = false
+    }
     private var pedestrianMotionTracker: AndroidPedestrianMotionTracker? = null
     private var gnssQualityObserver: GnssQualityObserver? = null
     private var latestGnssQualitySnapshot: GnssQualitySnapshot? = null
+    // S09-56 (pos-F2): also read by the account-deletion cleanup thread.
+    @Volatile
     private var pedestrianProfileStore: AndroidPedestrianProfileStore? = null
+
+    /** S09-56: status of the current actor's last profile load, repeated when a field session starts. */
+    private var latestPedestrianProfileLoadStatus: String? = null
     private var positioningProfileActorId: String? = null
     private var positioningProfileLoaded = false
     private var latestWalkingSpeedObservation: WalkingSpeedObservation? = null
@@ -1137,8 +1311,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var pendingPositionFieldExportAuthority: PositionFieldExportAuthority? = null
     private var latestPositionStationaryState = PositionStationaryState.UNKNOWN
     private var latestPositionStationarySinceMs: Long? = null
-    private val activityOriginalUploadAdmission =
-        ActivityOriginalUploadAdmissionController()
+    // Owner decision 3(b) / ADD-MOTION-043: DEBUG activity originals only after the walk, while
+    // charging; no stillness evidence is consulted once the walk is over.
+    private val activityOriginalUploadAdmission = ActivityOriginalUploadAdmissionController()
     private lateinit var earthOrientationTracker: AndroidEarthOrientationTracker
     private val stepLengthEstimator = StepLengthEstimator()
     private lateinit var stepLengthPrefs: SharedPreferences
@@ -1156,12 +1331,44 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         kr.co.hanium.dreamup.walksafe.network.EmailOtpRequestRetryPolicy(
             elapsedRealtimeMs = SystemClock::elapsedRealtime,
             createRequestId = { UUID.randomUUID().toString() },
+            // S01-5: survive a process restart between send and response.
+            pendingStore = {
+                if (::emailEnrollmentStore.isInitialized && !emailEnrollmentStorageBlocked) {
+                    emailEnrollmentStore
+                } else {
+                    null
+                }
+            },
         )
     private val gatewayAccountClient = GatewayAccountClient()
     private lateinit var accountDeletionResetCoordinator: AccountDeletionResetCoordinator
     private var accountDeletionResetJournalStateAtStartup:
         AccountDeletionResetJournalState = AccountDeletionResetJournalState.Absent
     private lateinit var networkStateProbe: AndroidNetworkStateProbe
+    /** Owner decision 3(b) / FP-035-DETAIL-04 interim: the RAW upload needs charging, read per check. */
+    private val chargingStateProbe by lazy {
+        kr.co.hanium.dreamup.walksafe.device.AndroidChargingStateProbe(applicationContext)
+    }
+    @Volatile
+    private var postWalkTransferCharging = false
+    /** transfer-F3: last RAW outcome counters written to the field log (raw executor only). */
+    private var lastLoggedRawCollectionOutcomes: Map<String, Long>? = null
+    /** transfer-F7: capability callbacks that change nothing relevant keep the transfers running. */
+    private val postWalkNetworkChangeFilter =
+        kr.co.hanium.dreamup.walksafe.network.NetworkCapabilityChangeFilter()
+    /** transfer-F7: a charger plugged in while the app is in the foreground after a walk. */
+    private val postWalkPowerConnectedReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_POWER_CONNECTED) {
+                runOnUiThread { onPostWalkChargingMaybeChanged() }
+            }
+        }
+    }
+    private var postWalkPowerConnectedReceiverRegistered = false
+    private val postWalkRetryHandler by lazy(LazyThreadSafetyMode.NONE) { Handler(Looper.getMainLooper()) }
+    /** transfer-F7: the post-walk walk id whose one delayed walk-in-progress retry was scheduled. */
+    private var postWalkWalkInProgressRetryWalkId: String? = null
+    private val postWalkWalkInProgressRetry = Runnable { schedulePostWalkTransfers() }
     private var permissionSessionPolicy = PermissionSessionPolicy()
     private var permissionRecoveryGate = PermissionRecoveryGate()
     @Volatile
@@ -1179,13 +1386,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var walkSessionResourceProbeStarted = false
     private val walkRuntimeSafetyCoordinator = WalkRuntimeSafetyCoordinator(
         thresholdProfile = WalkRuntimeSafetyCoordinator.productionThresholdProfile,
-        onSafeStop = ::onWalkRuntimeSafetyStop,
+        onSafeStopWithCompletion = ::onWalkRuntimeSafetyStop,
+        scheduleStopRetry = ::scheduleWalkRuntimeSafetyStopRetry,
+        onStopDeliveryExhausted = ::onWalkRuntimeSafetyStopExhausted,
+        onStopCausesChanged = ::onWalkRuntimeSafetyStopCausesChanged,
     )
+    private var walkRuntimeSafetyStopCleanupEpoch: WalkRuntimeEpoch? = null
+    private var walkRuntimeSafetyStopCleanup: WalkRuntimeStopCleanupCheckpoints? = null
+    @Volatile private var walkRuntimeSafetyStopDestroyed = false
+    @Volatile private var walkRuntimeSafetyStopRetryRunnable: Runnable? = null
     private var applyingRuntimeReadiness = false
     private var previousProcessHadInterruptedWalk = false
+    /** S03-19: this Activity continues the walk of a configuration-changed predecessor. */
+    private var walkContinuedAfterConfigurationChange = false
     private val walkingRouteClient = BackendWalkingRouteClient()
     private val reportQueueStore by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-        AndroidReportQueueStore(applicationContext.filesDir)
+        AndroidReportQueueStore(
+            applicationContext.filesDir,
+            allocatableBytes = AndroidAllocatableBytes(applicationContext, applicationContext.filesDir),
+        )
     }
     private val reportQueueDrainCoordinator by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         ReportQueueDrainCoordinator(reportQueueStore)
@@ -1201,34 +1420,33 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
     private lateinit var rawCollectionRuntimeCoordinator: RawCollectionRuntimeCoordinator
-    private var rawDetectionWindowWalkId: String? = null
-    private var rawDetectionWindowStartedAtElapsedMs = 0L
-    private var rawDetectionProcessedFrameCount = 0
-    private var rawDetectionDroppedFrameCount = 0
-    private var rawDetectionCount = 0
-    private var rawDetectionInferenceTotalMs = 0L
-    private var rawDetectionModelRevision: String? = null
+    // Raw collection executor only (16-17 #2, #4): counters, max and fixed buckets per window.
+    private val rawRuntimeWindow = RawRuntimeWindowAccumulator()
     private val rawDetectionDueButInFlightDropCount = AtomicInteger(0)
     @Volatile
     private var rawCollectionUploadWalkId: String? = null
     private val reportQueueDrainLock = Any()
-    private val reportQueuePausedRecoveryMotionEvidence = ActivityOriginalMotionEvidence()
     private var reportQueueDrainTrigger: ReportQueueDrainTrigger? = null
-    private var reportQueuePausedRecoveryObservationActive = false
-    private var reportQueuePausedRecoveryObservationGeneration = 0L
-    private var reportQueuePausedRecoveryStationaryCheckScheduled = false
     private var reportQueueDrainMovementGeneration = 0L
     private var reportQueueDrainNetworkGeneration = 0L
     private var reportQueueDrainWalkState: WalkSessionState? = null
     private var reportQueueDrainWalkSessionId: String? = null
     private val gatewaySessionClient = GatewayFieldSessionClient()
     private val gatewayWalkSessionClient = GatewayWalkSessionClient()
-    private val gatewayWalkAuthorityController = GatewayWalkAuthorityController()
+    // Walk lease deadlines are computed from SystemClock.elapsedRealtime(); expiry must use the same
+    // deep-sleep-inclusive clock (System.nanoTime() stops during Android deep sleep).
+    private val gatewayWalkAuthorityController = GatewayWalkAuthorityController(
+        elapsedClock = SystemClock::elapsedRealtime,
+    )
     private lateinit var gatewayWalkRenewalHandler: Handler
     private val cameraReleaseHandler by lazy(LazyThreadSafetyMode.NONE) {
         Handler(Looper.getMainLooper())
     }
     private val gatewayWalkRenewalRunnable = Runnable {
+        // S14-43-F2: this ACTIVE/PAUSED tick (<= GATEWAY_WALK_RENEW_INTERVAL_MS) re-reads battery,
+        // storage and thermal state, so a monitor that silently stops delivering events after
+        // SUBSCRIBED cannot keep the last "not critical" values for the rest of the walk.
+        observeWalkRuntimeResourceSafety()
         requestGatewayWalkRenewal()
     }
     private val routeNavigator = RouteNavigator(
@@ -1317,6 +1535,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var integratedConsentBootstrapReady = false
     private var integratedConsentExpectedPreviousBackendReceiptSha256: String? = null
     private var integratedConsentConfirmedActorSha256: String? = null
+    private var lastIntegratedConsentAuthoritySnapshot: GatewaySessionProcessSnapshot? = null
     private val accountDeletionLock = Any()
     private enum class AccountDeletionCallPurpose {
         INITIAL,
@@ -1376,11 +1595,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val gatewaySessionOwner = Any()
     @Volatile
     private var backendDeviceRestorePending = false
+    private val gatewayRenewalRetryRunnable = Runnable { retryPendingGatewayRenewal() }
     private val reportLocationStartScheduled = AtomicBoolean(false)
     private val gatewaySessionExecutor
         get() = GatewaySessionProcessCoordinator.executor
     @Volatile
     private var latestTrustedLocation: TrustedLocation? = null
+    /** S09-45: ENU covariance of the filtered fix that produced exactly [latestTrustedLocation]. */
+    private var latestTrustedLocationCovariance: Pair<TrustedLocation, kr.co.hanium.dreamup.walksafe.navigation.positioning.EnuPositionCovariance>? = null
     private val gatewayFieldSession: GatewayFieldSession?
         get() = GatewaySessionProcessCoordinator.snapshot().let { snapshot ->
             snapshot.session.takeUnless { snapshot.deletionRecoveryOnly }
@@ -1401,15 +1623,31 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
 
             override fun onLost(network: Network) {
+                postWalkNetworkChangeFilter.reset()
                 onReportQueueDrainNetworkChanged()
                 refreshGatewayFeatureNetworkPolicy()
             }
-
             override fun onCapabilitiesChanged(
                 network: Network,
                 networkCapabilities: NetworkCapabilities,
             ) {
-                onReportQueueDrainNetworkChanged()
+                // transfer-F7: only a changed network, transport or validation restarts the transfers.
+                val transport = when {
+                    networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ->
+                        ActiveNetworkTransport.WIFI
+                    networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ->
+                        ActiveNetworkTransport.CELLULAR
+                    else -> ActiveNetworkTransport.OTHER
+                }
+                if (
+                    postWalkNetworkChangeFilter.changed(
+                        network,
+                        transport,
+                        networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
+                    )
+                ) {
+                    onReportQueueDrainNetworkChanged()
+                }
                 refreshGatewayFeatureNetworkPolicy()
             }
         }
@@ -1432,12 +1670,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var latestExplicitReportGateState: DeviceGateState? = null
     @Volatile
     private var latestExplicitReportCapturedAtMs: Long = 0L
+    /** S12-17: equals latestExplicitReportCapturedAtMs only for a frame with unmeasured damage. */
+    @Volatile
+    private var latestExplicitReportUnmeasuredDamageCapturedAtMs: Long = 0L
+    /** S10-17: same-capture normal/damaged pair cannot establish a reportable damage state. */
+    @Volatile
+    private var latestExplicitReportConflictingStateCapturedAtMs: Long = 0L
     @Volatile
     private var isRouteActive = false
     @Volatile
     private var latestTmapOnRoute = false
     private var directionGuidancePauseReason: String? = null
     private var lastRouteCompassStatusKey: String? = null
+    /** S08-8: the compass cause of the latest route facing lookup, passed with that observation. */
+    private var latestRouteFacingUnavailableReason: RouteCompassHeadingReason? = null
     private var lastRouteAlignmentDiagnosticKey: String? = null
     private var lastRouteAlignmentDiagnosticAtMs = 0L
     private var pendingRouteCompassRefresh: Runnable? = null
@@ -1448,7 +1694,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var routeDecisionSpeechRetryRunnable: Runnable? = null
     private var renderedArrivalDecisionToken: RouteNavigatorDecisionToken? = null
     private var routeDeviationHapticDecision: RouteNavigatorUserDecision? = null
-    private var routeSnapshotPurgeFailed = false
+    @Volatile private var routeSnapshotPurgeFailed = false
+    private var routeSnapshotAccountOwner: RouteSnapshotOwner? = null
+    private var routeSnapshotAccountBindingEstablished = false
+    private var routeSnapshotWalkScope: RouteSnapshotScope? = null
     private var routeSnapshotExpiryRunnable: Runnable? = null
     @Volatile
     private var latestTactileRouteState = "localRoute=tmap:navigation_inactive"
@@ -1459,17 +1708,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var destinationSearchLocationMessage: String? = null
     private var destinationSearchGeneration = 0
     private var destinationSearchQuery = ""
+    /** S06-33: the query whose finished search really returned no candidate; null otherwise. */
+    private var destinationSearchZeroResultQuery: String? = null
     private var destinationSearchPage = 1
+    // The server's paging answer for the current list (S06-10/11); null = not reported.
+    private var destinationSearchProviderHasMore: Boolean? = null
+    // S06-31: origin (point + fix accuracy) of the current list, set together with the list.
+    private var destinationSearchOrigin: kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchOrigin? = null
     private val destinationSearchResults = mutableListOf<DestinationSearchResult>()
     private var pendingVoiceDestinationQuery: String? = null
     private var pendingVoiceDestinationPageIndex: Int? = null
     private var destinationSearchVoiceState: DestinationSearchVoiceState? = null
+    /** S06-34: the list header naming the numbers the voice dialog reads now; rebuilt with the list. */
+    private var destinationVoiceRangeText: TextView? = null
     private var routeRequestGeneration = 0
+    /** S06-39: reason of the route request that set [routeRequestInFlight]; read only while it is set. */
+    private var activeRouteRequestReason: String? = null
     private val routeExecutor = newNavigationRequestExecutor()
     private var reportRuntimeConfig: TwoModelRuntimeConfig? = null
     private var reportModelConfigSha256: String? = null
     private var reportApkSha256: String? = null
-    private var reportAttemptStore = AndroidReportAttemptStore()
+    private var reportAttemptStore = AndroidReportAttemptStore(bootCountProvider = ::reportCooldownBootCount)
     private val legacyPendingReportQueuePurgeLock = Any()
     private var legacyPendingReportQueuePurgeInFlight = false
     private var legacyPendingReportQueuePurgeSucceeded = false
@@ -1511,12 +1770,123 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var metadataLogUploader: MetadataLogUploader
     private lateinit var frameCaptureUploader: FrameCaptureUploader
     private lateinit var fieldSessionLog: FieldSessionLog
+    // 16-17 #37: debug-only field heartbeat on its own thread, independent of onDrawFrame.
+    @Volatile
+    private var fieldSessionHeartbeat: FieldSessionHeartbeat? = null
+    // S1617-37-F1: started on the privacy-inspection worker, stopped in onDestroy on main.
+    private val fieldHeartbeatLock = Any()
+    private var fieldHeartbeatDestroyed = false // guarded by fieldHeartbeatLock
+    private var fieldSessionHeartbeatExecutor: java.util.concurrent.ScheduledExecutorService? = null // guarded by fieldHeartbeatLock
     private val frameCapturePreprocessor = YuvImagePreprocessor()
     private val detectorExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "walksafe-tflite-detector").apply {
             priority = Thread.NORM_PRIORITY - 1
         }
     }
+    internal class DetectorStallWatchdog(
+        private val budgetMs: Long,
+        private val nowMs: () -> Long,
+    ) {
+        internal class Flight internal constructor(
+            val deadlineElapsedRealtimeMs: Long,
+            val walkEpoch: WalkRuntimeEpoch?,
+        ) {
+            internal var completed = false
+        }
+
+        private val lock = Any()
+        private var active: Flight? = null
+        private var admittedWalkEpoch: WalkRuntimeEpoch? = null
+        private var blocked = false
+        private var stopRequestedForEpoch: WalkRuntimeEpoch? = null
+
+        fun begin(walkEpoch: WalkRuntimeEpoch? = null): Flight? = synchronized(lock) {
+            if (blocked || active != null ||
+                (admittedWalkEpoch != null && walkEpoch != admittedWalkEpoch)
+            ) return@synchronized null
+            Flight(nowMs() + budgetMs, walkEpoch).also { active = it }
+        }
+
+        fun expire(flight: Flight): Boolean = synchronized(lock) {
+            if (active !== flight || flight.completed || blocked || nowMs() < flight.deadlineElapsedRealtimeMs) {
+                return@synchronized false
+            }
+            blocked = true
+            true
+        }
+
+        fun complete(flight: Flight): Boolean = synchronized(lock) {
+            if (active !== flight) return@synchronized false
+            if (nowMs() >= flight.deadlineElapsedRealtimeMs) blocked = true
+            active = null
+            flight.completed = true
+            !blocked
+        }
+
+        fun publishIfCurrent(flight: Flight, publish: () -> Unit): Boolean = synchronized(lock) {
+            if (active !== flight || flight.completed || blocked) return@synchronized false
+            if (nowMs() >= flight.deadlineElapsedRealtimeMs) {
+                blocked = true
+                return@synchronized false
+            }
+            publish()
+            true
+        }
+
+        fun blocksNewWork(): Boolean = synchronized(lock) { blocked }
+
+        fun rejectBlockedWork(
+            currentEpoch: WalkRuntimeEpoch?,
+            currentState: WalkSessionState?,
+            requestSafeStop: (WalkRuntimeEpoch) -> Unit,
+        ): Boolean = rejectUnavailableWork(currentEpoch, currentState, false, requestSafeStop)
+
+        fun rejectUnsafeWalkEntry(
+            currentEpoch: WalkRuntimeEpoch,
+            currentState: WalkSessionState,
+            requestSafeStop: (WalkRuntimeEpoch) -> Unit,
+        ): Boolean = rejectUnavailableWork(currentEpoch, currentState, true, requestSafeStop)
+
+        private fun rejectUnavailableWork(
+            currentEpoch: WalkRuntimeEpoch?,
+            currentState: WalkSessionState?,
+            rejectUnresolvedOtherFlight: Boolean,
+            requestSafeStop: (WalkRuntimeEpoch) -> Unit,
+        ): Boolean {
+            var stopEpoch: WalkRuntimeEpoch? = null
+            val rejected = synchronized(lock) {
+                if (rejectUnresolvedOtherFlight && currentEpoch != null) {
+                    admittedWalkEpoch = currentEpoch
+                }
+                val unresolvedOtherFlight = rejectUnresolvedOtherFlight &&
+                    active?.let { it.walkEpoch != currentEpoch } == true
+                if (!blocked && !unresolvedOtherFlight) return@synchronized false
+                if (currentState == WalkSessionState.ACTIVE &&
+                    currentEpoch != null && stopRequestedForEpoch != currentEpoch
+                ) {
+                    stopRequestedForEpoch = currentEpoch
+                    stopEpoch = currentEpoch
+                }
+                true
+            }
+            stopEpoch?.let(requestSafeStop)
+            return rejected
+        }
+    }
+
+    internal data class NativeDetectorFlight(
+        val ticket: DetectorStallWatchdog.Flight,
+        val timeout: Runnable,
+        val walkEpoch: WalkRuntimeEpoch,
+        val detectorGeneration: Int,
+        val stopClaim: AtomicBoolean,
+    )
+
+    private val detectorWatchdogHandler by lazy { Handler(Looper.getMainLooper()) }
+    private val detectorStallWatchdog = DetectorStallWatchdog(
+        MAX_DEPTH_DETECTION_SOURCE_AGE_MS,
+        SystemClock::elapsedRealtime,
+    )
     private val detectionInFlight = AtomicBoolean(false)
     private val unknownFrameCopyInFlight = AtomicBoolean(false)
     @Volatile private var unknownRuntimeService: FastSamRuntimeService<UnknownRuntimeAttachment>? = null
@@ -1582,6 +1952,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val context: UnknownProcessingContext,
         val batches: List<UnknownObjectFeedbackBatch>,
     )
+    @Volatile
     private var detectorLoadGeneration = 0L
     private var detectorClosing = false
     private val deviceTuningStore by lazy { AndroidDeviceTuningProfileStore(applicationContext) }
@@ -1838,6 +2209,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     @Volatile
     private var detectorLoadedModelKey: String? = null
     private var detectorModelFallbackUsed: Boolean = false
+    /** S14-33: verification of the exact running instance; Booleans alone never open outputs. */
+    private val runningDetectorVerification = RunningDetectorVerificationGate()
     @Volatile
     private var detectorLoadReason: String? = null
     private var detectorLoadAttempted = false
@@ -1879,17 +2252,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         postLoginDeviceCheckResultStore = AndroidDeviceCheckResultStore(stepLengthPrefs)
         routeSnapshotStore = EncryptedRouteSnapshotStore(
             getSharedPreferences("walksafe_route_snapshot", MODE_PRIVATE),
+            // S07-41: the boot count settles "same boot" exactly; -1 keeps the monotonic check only.
+            bootCount = {
+                Settings.Global.getInt(applicationContext.contentResolver, Settings.Global.BOOT_COUNT, -1)
+            },
         )
         val routeSnapshotNowEpochMs = System.currentTimeMillis()
         routeSnapshotPurgeFailed = !runCatching {
             routeSnapshotStore.purgeExpired(routeSnapshotNowEpochMs)
         }.getOrDefault(false)
         if (!routeSnapshotPurgeFailed) {
-            runCatching { routeSnapshotStore.load(routeSnapshotNowEpochMs) }
+            runCatching { routeSnapshotStore.expiryMetadata(routeSnapshotNowEpochMs) }
                 .getOrNull()
                 ?.let { snapshot ->
                     scheduleEncryptedRouteSnapshotExpiry(
-                        walkSessionId = snapshot.walkSessionId,
+                        scope = snapshot.scope,
                         expiresAtEpochMs = snapshot.expiresAtEpochMs,
                     )
                 }
@@ -1927,8 +2304,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
         fieldSessionLog = NoopFieldSessionLog()
         networkStateProbe = AndroidNetworkStateProbe(this)
-        walkSessionLifecycle = WalkSessionLifecycle()
+        walkSessionLifecycle = WalkSessionLifecycle(elapsedRealtimeClock = SystemClock::elapsedRealtime)
         gatewayWalkAuthorityController.reset()
+        // S03-19 (FP-018-DETAIL-05): same process, same paused walk; never a process restart.
+        processWalkConfigurationChangeRetention.take(SystemClock.elapsedRealtime())?.let { retained ->
+            walkSessionLifecycle = retained.lifecycle
+            gatewayWalkAuthorityController.adoptHeldLeaseFrom(retained.authority)
+            walkContinuedAfterConfigurationChange = true
+        }
         walkSessionResourceProbe = AndroidWalkSessionResourceProbe(this)
         phoneMountingSensorProbe = AndroidPhoneMountingSensorProbe(this)
         cameraFallbackLifecycleOwner = CameraFallbackLifecycleOwner().also {
@@ -1940,7 +2323,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 val noBackupRoot = noBackupFilesDir
                 rawCollectionRuntimeCoordinator = RawCollectionRuntimeCoordinator(
                     File(noBackupRoot, "raw_collections"),
+                    elapsedRealtimeMs = SystemClock::elapsedRealtime,
+                    allocatableBytes = AndroidAllocatableBytes(applicationContext, noBackupRoot),
                 )
+                // Retention must not depend on the next walk: prune once per process start.
+                executeRawCollectionTask { rawCollectionRuntimeCoordinator.pruneExpired() }
                 if (BuildConfig.DEBUG) initializePositionFieldRecorder()
                 val fileAccountDeletionIntentAuthority =
                     FileAccountDeletionIntentAuthority(
@@ -1972,11 +2359,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     getSharedPreferences("walksafe_email_enrollment", MODE_PRIVATE),
                 )
                 readAccountDeletionFallbackMarkerAtStartup()
-                previousProcessHadInterruptedWalk =
+                previousProcessHadInterruptedWalk = !walkContinuedAfterConfigurationChange &&
                     stepLengthPrefs.getBoolean(PREF_WALK_SESSION_INTERRUPTED, false)
-                stepLengthPrefs.edit()
-                    .putBoolean(PREF_WALK_SESSION_INTERRUPTED, false)
-                    .commit()
+                // S03-16: the versioned record only selects the notice; it never restores a walk.
+                previousWalkInterruptionRecord = WalkInterruptionRecord.restore(
+                    rawRecord = stepLengthPrefs.getString(PREF_WALK_SESSION_INTERRUPTION_RECORD, null),
+                    legacyInterrupted = previousProcessHadInterruptedWalk,
+                )
+                previousWalkInterruptionMarker = PreviousWalkInterruptionMarker(
+                    interruptedAtStartup = previousProcessHadInterruptedWalk,
+                    writeReleasedMarker = { currentWalkRequiresMarker ->
+                        val currentRecord = runCatching { currentWalkInterruptionRecordOrNull() }
+                            .getOrNull()
+                        stepLengthPrefs.edit()
+                            .putBoolean(PREF_WALK_SESSION_INTERRUPTED, currentWalkRequiresMarker)
+                            .also { editor -> editor.putWalkInterruptionRecord(currentRecord) }
+                            .commit()
+                    },
+                )
                 restorePermissionRecoveryGateFromPrefs()
                 metadataLogUploader = DebugMetadataLogUploaderFactory.create(this)
                 frameCaptureUploader = DebugFrameCaptureUploaderFactory.create(this)
@@ -2081,6 +2481,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     fieldSessionLog.blockActiveSessionRestore()
                 }
                 fieldSessionLog.recordEvent("app_created")
+                if (BuildConfig.DEBUG) startFieldSessionHeartbeat()
                 if (previousProcessHadInterruptedWalk) {
                     fieldSessionLog.recordEvent(
                         "previous_walk_interrupted_fresh_walk_created",
@@ -2089,6 +2490,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 PrivacyStartupInspectionResult.READY
             },
             onReady = {
+                window.decorView.post {
+                    if (!isFinishing && !isDestroyed) {
+                        showPreviousWalkInterruptionNoticeIfNeeded()
+                    }
+                }
                 scheduleLegacyPendingReportQueuePurge()
                 reconcileAccountDeletionFallbackMarkerAtStartup()
                 syncActiveSessionScreenPolicy()
@@ -2118,23 +2524,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             latestStepCount = steps
                         }
                     },
-                    onTrackingStarted = {
-                        activityOriginalUploadAdmission.onTrackingStarted(
-                            observedAtMs = SystemClock.elapsedRealtime(),
-                            cancelActiveUploads = ::cancelActivityOriginalUploads,
-                        )
+                    onStepEvent = { event ->
+                        val binding = positioningCollectionBinding
+                        val receivedAtMs = SystemClock.elapsedRealtime()
+                        if (binding != null) {
+                            runOnUiThread {
+                                handlePositioningStepEvent(event, binding, receivedAtMs)
+                            }
+                        }
                     },
-                    onMotionSensorSample = { steps ->
-                        val observedAtMs = SystemClock.elapsedRealtime()
-                        activityOriginalUploadAdmission.onSensorSample(
-                            stepCount = steps,
-                            observedAtMs = observedAtMs,
-                            cancelActiveUploads = ::cancelActivityOriginalUploads,
-                        )
-                        onReportQueueDrainStepSample(steps, observedAtMs)
-                        onPausedReportQueueRecoveryMotionSample(steps, observedAtMs)
-                    },
-                    onStepEvent = ::handlePositioningStepEvent,
                 )
                 earthOrientationTracker = AndroidEarthOrientationTracker(this)
                 setContentView(insetNativeContent(buildContentView()))
@@ -2679,9 +3077,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             null,
         ) ?: return true
         if (storedPolicy == INTEGRATED_CONSENT_POLICY_VERSION) return true
-        if (storedPolicy != PREVIOUS_INTEGRATED_CONSENT_POLICY_VERSION) {
+        // Root decision R3: a 1.1.0 (or 1.0.0) confirmation becomes a denied reconsent. Queued
+        // reports and RAW segments are kept, not deleted, and wait for the new consent.
+        if (storedPolicy !in KNOWN_PREVIOUS_INTEGRATED_CONSENT_POLICY_VERSIONS) {
             integratedConsentSession.failClosed()
             return true
+        }
+        if (hasUnsettledIntegratedConsentControl()) {
+            applyImmediateConsentWithdrawals(
+                IntegratedConsentItem.entries.toSet(), recordLocalWithdrawal = false,
+            )
+            integratedConsentSession.invalidate()
+            return false
         }
         if (
             !stepLengthPrefs.edit()
@@ -2691,6 +3098,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             integratedConsentSession.failClosed()
             return false
         }
+        if (!resetIntegratedConsentForReconsent()) return false
         val migrated = sensitivePrefs.edit()
             .remove(PREF_INTEGRATED_CONSENT_POLICY_VERSION)
             .remove(PREF_INTEGRATED_CONSENT_REVISION)
@@ -2698,9 +3106,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             .remove(PREF_INTEGRATED_CONSENT_BACKEND_RECEIPT_SHA256)
             .remove(PREF_INTEGRATED_CONSENT_GATEWAY_AUDIT_SHA256)
             .remove(PREF_INTEGRATED_CONSENT_ACTOR_SHA256)
-            .remove(PREF_PENDING_INTEGRATED_CONSENT_MUTATION)
             .remove(PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION)
-            .remove(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED)
             .remove(PREF_REPORT_PRIVACY_CONSENT_KEY)
             .remove(PREF_AUTOMATIC_REPORT_CONSENT_KEY)
             .remove(PREF_MOBILE_NETWORK_PREFERENCE_KEY)
@@ -2710,7 +3116,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             integratedConsentSession.failClosed()
             return false
         }
-        integratedConsentSession.resetForPolicyReconsent()
         pendingIntegratedConsentMutation = null
         integratedConsentDraft = IntegratedConsentSelections()
         integratedConsentBootstrapReady = false
@@ -2745,6 +3150,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun restorePrivacyControlStateFromPrefs(): Boolean {
         if (!gatewayActivityCallbackAllowed(accountDeletionActivityLease)) return false
+        // A durable receipt is recovery input, not this process's Backend authority check.
+        reportPrivacyConsentSession.withdraw()
         if (sensitivePrefs.isBlocked()) {
             val startupDecision = accountDeletionStartupAuthorityDecision(
                 snapshot = accountDeletionAuthorityAtStartup,
@@ -2809,6 +3216,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val legacyFloorRestored =
             restoreLegacyIntegratedConsentRevisionFloor()
+        val restoredPendingRaw = sensitivePrefs.getString(
+            PREF_PENDING_INTEGRATED_CONSENT_MUTATION, null,
+        )
+        val restoredPending = restoredPendingRaw?.let(::pendingIntegratedConsentMutationOrNull)
+        val restoredCasRaw = sensitivePrefs.getString(PREF_REJECTED_CONSENT_CAS_JOURNAL, null)
+        val restoredCasJournal = restoredCasRaw?.let {
+            rejectedConsentCasJournalOrNull(it, restoredPending)
+        }
+        if ((restoredPendingRaw != null && restoredPending == null) ||
+            (restoredCasRaw != null && restoredCasJournal == null)
+        ) integratedConsentSession.failClosed()
         sensitivePrefs.getString(PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION, null)
             ?.let { raw ->
                 val confirmation = integratedConsentConfirmationOrNull(raw)
@@ -2848,7 +3266,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     confirmation.installationId != installationId ||
                     confirmation.policyVersion != legacyPolicyVersion ||
                     confirmation.revision != legacyRevision ||
-                    confirmation.clientRevision != legacyClientRevision ||
+                    (
+                        confirmation.clientRevision != legacyClientRevision &&
+                            restoredPending?.let { pending ->
+                                restoredPendingPreservesConfirmation(
+                                    pending, confirmation, storedActorSha256,
+                                    legacyClientRevision, restoredCasJournal,
+                                )
+                            } != true
+                        ) ||
                     confirmation.selections != legacySelections ||
                     confirmation.backendConsentReceiptSha256 != legacyReceipt ||
                     confirmation.gatewayAuditRecordSha256 != storedGatewayAudit ||
@@ -2867,30 +3293,26 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         )
                     integratedConsentExpectedPreviousBackendReceiptSha256 =
                         confirmation.backendConsentReceiptSha256
-                    integratedConsentBootstrapReady = true
+                    integratedConsentBootstrapReady = false
                     integratedConsentConfirmedActorSha256 = storedActorSha256
-                    permissionSessionPolicy.applyIntegratedConsentSelections(
-                        confirmation.selections,
-                    )
-                    reportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent()
+                    reapplyActorBoundIntegratedConsent()
                 }
             }
-        sensitivePrefs.getString(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED, null)
-            ?.let { raw ->
-                val items = localWithdrawalMarkerItemsOrNull(raw)
-                if (items == null) {
+        restoredPendingRaw
+            ?.let { _ ->
+                val mutation = restoredPending
+                val restoredConfirmation = integratedConsentSession.cachedConfirmationOrNull()
+                if (mutation == null ||
+                    (restoredConfirmation != null && !restoredPendingPreservesConfirmation(
+                        mutation, restoredConfirmation, integratedConsentConfirmedActorSha256,
+                        sensitivePrefs.getLong(PREF_INTEGRATED_CONSENT_CLIENT_REVISION, 0L),
+                        restoredCasJournal,
+                    ))
+                ) {
                     integratedConsentSession.failClosed()
                 } else {
-                    applyImmediateConsentWithdrawals(items)
-                    integratedConsentSession.failClosed()
-                }
-            }
-        sensitivePrefs.getString(PREF_PENDING_INTEGRATED_CONSENT_MUTATION, null)
-            ?.let { raw ->
-                val mutation = pendingIntegratedConsentMutationOrNull(raw)
-                if (mutation == null) {
-                    integratedConsentSession.failClosed()
-                } else {
+                    // Restore the validated durable request before any later local withdrawal.
+                    // Its exact receipt settles only this request's withdrawal items.
                     integratedConsentSession.restorePendingMutation(mutation, retry = true)
                     if (integratedConsentSession.pendingMutationOrNull() != mutation) {
                         integratedConsentSession.failClosed()
@@ -2905,6 +3327,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     }
                 }
             }
+        sensitivePrefs.getString(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED, null)
+            ?.let { raw ->
+                val items = localWithdrawalMarkerItemsOrNull(raw)
+                if (items == null) {
+                    integratedConsentSession.failClosed()
+                } else {
+                    applyImmediateConsentWithdrawals(items)
+                    // A valid marker with a restored actor-bound confirmation can be re-sent
+                    // as a denial. Unknown ownership or corrupt storage remains fail closed.
+                    if (integratedConsentSession.cachedConfirmationOrNull() == null ||
+                        integratedConsentConfirmedActorSha256 == null
+                    ) integratedConsentSession.failClosed()
+                }
+            }
+        reapplyActorBoundIntegratedConsent()
         sensitivePrefs.getString(PREF_ACCOUNT_DELETION_JOURNAL, null)
             ?.let { raw ->
                 val journal = accountDeletionJournalOrNull(raw)
@@ -3150,9 +3587,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         integratedConsentClientRevision =
             maxOf(integratedConsentClientRevision, clientRevision)
         integratedConsentDraft = persistedIntegratedConsentSelections()
-        permissionSessionPolicy.applyIntegratedConsentSelections(
-            integratedConsentDraft,
-        )
+        reapplyActorBoundIntegratedConsent()
         if (!integratedConsentDraft.rawSourceCollection) {
             fieldSessionLog.blockForRawSourceWithdrawal()
             if (
@@ -3185,6 +3620,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (pendingIntegratedConsentMutation != null) {
             retryPendingIntegratedConsentMutation()
+        } else if (integratedConsentSession.withdrawalRecoverySelectionsOrNull() != null) {
+            persistIntegratedConsentDraft(announce = false)
         } else {
             refreshIntegratedConsentFromServer()
         }
@@ -3298,108 +3735,39 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun pendingIntegratedConsentMutationJson(
         mutation: PendingIntegratedConsentMutation,
-    ): String =
-        JSONObject()
-            .put("schema_version", PENDING_CONSENT_MUTATION_SCHEMA_VERSION)
-            .put("installation_id", mutation.installationId)
-            .put("actor_sha256", mutation.actorSha256)
-            .put("request_id", mutation.requestId)
-            .put("policy_version", mutation.policyVersion)
-            .put("client_revision", mutation.clientRevision)
-            .put("previous_server_revision", mutation.previousServerRevision)
-            .put(
-                "expected_previous_backend_receipt_sha256",
-                mutation.expectedPreviousBackendReceiptSha256 ?: JSONObject.NULL,
-            )
-            .put(
-                "desired_selections",
-                integratedConsentSelectionsJson(mutation.desiredSelections),
-            )
-            .put(
-                "withdrawal_items",
-                JSONArray(mutation.withdrawalItems.map(IntegratedConsentItem::wireValue)),
-            )
-            .put("created_at_epoch_ms", mutation.createdAtEpochMs)
-            .toString()
+    ): String = RejectedConsentCasJournalCodec.pendingJson(mutation)
 
     private fun pendingIntegratedConsentMutationOrNull(
         raw: String,
-    ): PendingIntegratedConsentMutation? = runCatching {
-        val root = JSONObject(raw)
-        if (
-            root.jsonKeySet() != setOf(
-                "schema_version",
-                "installation_id",
-                "actor_sha256",
-                "request_id",
-                "policy_version",
-                "client_revision",
-                "previous_server_revision",
-                "expected_previous_backend_receipt_sha256",
-                "desired_selections",
-                "withdrawal_items",
-                "created_at_epoch_ms",
-            ) ||
-            root.getString("schema_version") != PENDING_CONSENT_MUTATION_SCHEMA_VERSION
-        ) return null
-        val withdrawals = root.getJSONArray("withdrawal_items")
-        val items = mutableSetOf<IntegratedConsentItem>()
-        for (index in 0 until withdrawals.length()) {
-            val wireValue = withdrawals.getString(index)
-            val item = IntegratedConsentItem.entries
-                .singleOrNull { it.wireValue == wireValue } ?: return null
-            if (!items.add(item)) return null
-        }
-        PendingIntegratedConsentMutation(
-            installationId = root.getString("installation_id"),
-            actorSha256 = root.getString("actor_sha256"),
-            requestId = root.getString("request_id"),
-            policyVersion = root.getString("policy_version"),
-            clientRevision = root.getLong("client_revision"),
-            previousServerRevision = root.getLong("previous_server_revision"),
-            expectedPreviousBackendReceiptSha256 =
-                if (root.isNull("expected_previous_backend_receipt_sha256")) {
-                    null
-                } else {
-                    root.getString("expected_previous_backend_receipt_sha256")
-                },
-            desiredSelections =
-                integratedConsentSelectionsOrNull(root.getJSONObject("desired_selections"))
-                    ?: return null,
-            withdrawalItems = items,
-            createdAtEpochMs = root.getLong("created_at_epoch_ms"),
-        )
-    }.getOrNull()
+    ): PendingIntegratedConsentMutation? = RejectedConsentCasJournalCodec.pendingOrNull(raw)
+
+    private fun rejectedConsentCasJournalJson(
+        journal: RejectedConsentCasRecoveryJournal,
+    ): String = RejectedConsentCasJournalCodec.journalJson(journal)
+
+    private fun rejectedConsentCasJournalOrNull(
+        raw: String,
+        pending: PendingIntegratedConsentMutation?,
+    ): RejectedConsentCasRecoveryJournal? =
+        RejectedConsentCasJournalCodec.journalOrNull(raw, pending)
+
+    private fun restoredPendingPreservesConfirmation(
+        pending: PendingIntegratedConsentMutation,
+        confirmation: IntegratedConsentConfirmation,
+        actorSha256: String?,
+        localClientRevision: Long,
+        casJournal: RejectedConsentCasRecoveryJournal?,
+    ): Boolean = RejectedConsentCasJournalCodec.restoredPendingPreservesConfirmation(
+        pending, confirmation, actorSha256, localClientRevision, casJournal,
+    )
 
     private fun integratedConsentSelectionsJson(
         selections: IntegratedConsentSelections,
-    ): JSONObject =
-        JSONObject()
-            .put("raw_source_collection", selections.rawSourceCollection)
-            .put("automatic_reporting", selections.automaticReporting)
-            .put("mobile_network_transfer", selections.mobileNetworkTransfer)
-            .put("training_reuse", selections.trainingReuse)
+    ): JSONObject = RejectedConsentCasJournalCodec.selectionsJson(selections)
 
     private fun integratedConsentSelectionsOrNull(
         value: JSONObject,
-    ): IntegratedConsentSelections? {
-        if (
-            value.jsonKeySet() != setOf(
-                "raw_source_collection",
-                "automatic_reporting",
-                "mobile_network_transfer",
-                "training_reuse",
-            )
-        ) return null
-        return runCatching {
-            IntegratedConsentSelections(
-                rawSourceCollection = value.getBoolean("raw_source_collection"),
-                automaticReporting = value.getBoolean("automatic_reporting"),
-                mobileNetworkTransfer = value.getBoolean("mobile_network_transfer"),
-                trainingReuse = value.getBoolean("training_reuse"),
-            )
-        }.getOrNull()
-    }
+    ): IntegratedConsentSelections? = RejectedConsentCasJournalCodec.selectionsOrNull(value)
 
     private fun localWithdrawalMarkerItemsOrNull(
         raw: String,
@@ -3669,9 +4037,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         }
                         integratedConsentSession.resetForNewEnrollment()
                         reportPrivacyConsentSession.resetForNewEnrollment()
-                        permissionSessionPolicy.applyIntegratedConsentSelections(
-                            integratedConsentDraft,
-                        )
+                        reapplyActorBoundIntegratedConsent()
                         schedulePrivacyControlOperationsAfterStartupInspection()
                         updateNavigationStatus(
                             "accountDeletion=not_accepted:fallback_marker_storage",
@@ -4189,7 +4555,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun purgeAccountDeletionLocalDataOnCleanupThread(): Boolean {
+        val routeSnapshotPurged = retryAccountDeletionPurgeOnCleanupThread {
+            purgeEncryptedRouteSnapshotForAccount()
+        }
         val legacyQueuePurged = purgeLegacyPendingReportQueueOnCleanupThread()
+        // The unsent report queue and RAW collections are device-unsent data as well. Each
+        // purge writes its durable fence before deleting files and keys, and its verified
+        // result must gate DELETED evidence instead of an unobserved asynchronous task.
+        val reportQueuePurged = retryAccountDeletionPurgeOnCleanupThread {
+            reportQueueDrainCoordinator.onAccountDeleted()
+        }
+        val rawCollectionsPurged =
+            ::rawCollectionRuntimeCoordinator.isInitialized &&
+                retryAccountDeletionPurgeOnCleanupThread {
+                    rawCollectionRuntimeCoordinator.onAccountDeleted()
+                }
         val profileKeys = sensitivePrefs.keys().filter { key ->
             key == PREF_REPORT_COOLDOWNS_KEY ||
                 key == PREF_REPORT_ATTEMPT_STATE_V2 ||
@@ -4207,7 +4587,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             } else {
                 true
             }
-        return legacyQueuePurged && preferencesPurged && fieldSessionsPurged
+        // S21-50: the debug outdoor test keeps raw GNSS text outside every other purge.
+        val outdoorPositionTestPurged = DebugCollectionArtifacts.purgeOutdoorPositionTest(noBackupFilesDir)
+        // S09-56: the explicit profile reset path; stored step profiles are account data as well.
+        // pos-F2: queued saves are dropped and the reset runs on the serial profile I/O thread after a save
+        // being written, so no save can recreate a profile after the reset; the purge waits for it.
+        val pedestrianProfilesPurged = !::stepLengthPrefs.isInitialized ||
+            kr.co.hanium.dreamup.walksafe.navigation.positioning.SerialPedestrianProfileWriter.shared
+                .clearPendingAndRun {
+                    (pedestrianProfileStore ?: runCatching { AndroidPedestrianProfileStore(stepLengthPrefs) }.getOrNull())
+                        ?.resetAllProfiles() == true
+                }
+        return routeSnapshotPurged && legacyQueuePurged && reportQueuePurged && rawCollectionsPurged &&
+            preferencesPurged && fieldSessionsPurged && outdoorPositionTestPurged && pedestrianProfilesPurged
     }
 
     private fun isCurrentAccountDeletionPreparation(generation: Long): Boolean =
@@ -5711,6 +6103,28 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         return false
     }
 
+    /**
+     * Idempotent store purges get the same bounded retry as the legacy queue purge, so one
+     * transient KeyStore or IO failure does not fix the deletion evidence at FAILED.
+     */
+    private fun retryAccountDeletionPurgeOnCleanupThread(purge: () -> Boolean): Boolean {
+        for (attempt in 0 until LEGACY_REPORT_CLEANUP_MAX_ATTEMPTS) {
+            if (attempt > 0) {
+                try {
+                    Thread.sleep(
+                        LEGACY_REPORT_CLEANUP_INITIAL_BACKOFF_MS *
+                            (1L shl (attempt - 1)),
+                    )
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return false
+                }
+            }
+            if (runCatching(purge).getOrDefault(false)) return true
+        }
+        return false
+    }
+
     private fun purgeLegacyPendingReportQueueOnCleanupThread(): Boolean {
         for (attempt in 0 until LEGACY_REPORT_CLEANUP_MAX_ATTEMPTS) {
             if (attempt > 0) {
@@ -5934,8 +6348,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             IntegratedConsentSelections(),
         )
         if (::metadataLogUploader.isInitialized) metadataLogUploader.setEnabled(false)
+        cancelActivityOriginalUploads()
         invalidateFrameStateForPause()
-        reportAttemptStore = AndroidReportAttemptStore()
+        reportAttemptStore = AndroidReportAttemptStore(bootCountProvider = ::reportCooldownBootCount)
         synchronized(reportAttemptStateLock) {
             reportAttemptStateActorHash = null
             reportAttemptStateStorageBlocked = false
@@ -6341,6 +6756,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
 
     private fun clearAccountDeletionPlainResetArtifacts(): Boolean {
+        // This existing reset participant reports BLOCKED until the archive is actually absent.
+        val routeSnapshotPurged = purgeEncryptedRouteSnapshotForAccount()
         val keys = setOf(
             PREF_RAW_SOURCE_FIELD_LOG_BLOCKED,
             PREF_ACCOUNT_DELETION_RESET_REQUIRED,
@@ -6354,7 +6771,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val committed = stepLengthPrefs.edit().also { editor ->
             keys.forEach(editor::remove)
         }.commit()
-        return committed && runCatching {
+        return routeSnapshotPurged && committed && runCatching {
             val remaining = stepLengthPrefs.all.keys
             keys.none(remaining::contains)
         }.getOrDefault(false)
@@ -6498,6 +6915,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
+    // S01-9: set when this process received the OTP; wall-clock changes do not move it.
+    private var emailOtpDeadline: kr.co.hanium.dreamup.walksafe.account.EmailOtpDeadline? = null
+
+    private fun emailOtpPartialStillValid(
+        partial: EmailEnrollmentPartial,
+        ownerBinding: String,
+    ): Boolean {
+        val deadline = emailOtpDeadline?.takeIf { it.expiresAtEpochMs == partial.expiresAtEpochMs }
+            ?: return partial.isValidAt(System.currentTimeMillis(), ownerBinding)
+        return partial.ownerBindingSha256 == ownerBinding &&
+            deadline.isOpenAt(SystemClock.elapsedRealtime())
+    }
+
     private fun emailOtpEnrollmentReceipt(
         partial: EmailEnrollmentPartial,
     ): FirstRunReceiptHash = FirstRunReceiptHash.fromSha256Hex(
@@ -6527,7 +6957,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun onGatewayProcessSessionChanged(
         snapshot: GatewaySessionProcessSnapshot,
+        consentAuthorityChanged: Boolean,
     ) {
+        if (snapshot.generation == GatewaySessionProcessCoordinator.snapshot().generation) {
+            reconcileRouteSnapshotAccount(snapshot)
+        }
         if (snapshot.session?.isBackendAccountDeviceBound == true) {
             backendDeviceRestorePending = snapshot.session.verificationState ==
                 GatewaySessionVerificationState.RESTORED_UNVERIFIED
@@ -6539,19 +6973,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         cancelUserReportAuthorityExpirySchedule()
         invalidatePendingExplicitReport()
-        cancelIntegratedConsentControlCall()
         val confirmedActor = integratedConsentConfirmedActorSha256
         val currentSession = snapshot.session
         if (
-            integratedConsentSession.currentConfirmationOrNull() != null &&
+            confirmedActor != null &&
             (
                 currentSession == null ||
                     confirmedActor !=
                     integratedConsentActorSha256(currentSession)
                 )
         ) {
-            applyImmediateConsentWithdrawals(IntegratedConsentItem.entries.toSet())
-            integratedConsentSession.resetForPolicyReconsent()
+            applyImmediateConsentWithdrawals(
+                IntegratedConsentItem.entries.toSet(), recordLocalWithdrawal = false,
+            )
+            if (!resetIntegratedConsentForReconsent()) {
+                // Keep the previous owner's withdrawal journal, but never its active grant.
+                integratedConsentSession.invalidate()
+            }
+            integratedConsentConfirmedActorSha256 = null
             integratedConsentDraft = IntegratedConsentSelections()
             integratedConsentBootstrapReady = false
             integratedConsentExpectedPreviousBackendReceiptSha256 = null
@@ -6702,6 +7141,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         } else {
             permissionSessionPolicy.authenticationExpired()
         }
+        reapplyActorBoundIntegratedConsent()
         if (verifiedActorSession != null) {
             enforcePriorityUserAccountEligibility()
         }
@@ -6766,13 +7206,55 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
             }
         }
-        maybeStartPausedReportQueueRecoveryObservation()
+        schedulePostWalkTransfers()
         startLocationUpdatesIfAllowed()
+        if (
+            consentAuthorityChanged &&
+            integratedConsentSession.cachedConfirmationOrNull() != null &&
+            pendingIntegratedConsentMutation == null &&
+            verifiedActorSession != null
+        ) {
+            refreshIntegratedConsentFromServer()
+        }
     }
 
     private fun dispatchGatewayProcessSessionChanged(
         snapshot: GatewaySessionProcessSnapshot,
     ) {
+        val current = GatewaySessionProcessCoordinator.snapshot()
+        var consentAuthorityChanged = false
+        if (
+            snapshot.generation == current.generation &&
+            snapshot.session === current.session &&
+            snapshot.storageBlocked == current.storageBlocked &&
+            snapshot.deletionRecoveryOnly == current.deletionRecoveryOnly
+        ) {
+            consentAuthorityChanged = synchronized(integratedConsentLock) {
+                val previous = lastIntegratedConsentAuthoritySnapshot
+                lastIntegratedConsentAuthoritySnapshot = snapshot
+                val changed = previous == null ||
+                    previous.generation != snapshot.generation ||
+                    previous.session !== snapshot.session ||
+                    previous.storageBlocked != snapshot.storageBlocked ||
+                    previous.deletionRecoveryOnly != snapshot.deletionRecoveryOnly
+                if (changed) {
+                    cancelIntegratedConsentControlCall()
+                    integratedConsentSession.invalidateBackendAuthority()
+                    integratedConsentBootstrapReady = false
+                }
+                changed
+            }
+            if (consentAuthorityChanged) {
+                // Observer delivery can precede its UI task by an arbitrary time. Close permits now.
+                reportPrivacyConsentSession.withdraw()
+                cancelReportQueueDrain()
+                cancelActivityOriginalUploads()
+                if (::rawCollectionRuntimeCoordinator.isInitialized) {
+                    rawCollectionRuntimeCoordinator.cancelActiveUpload()
+                }
+                reapplyActorBoundIntegratedConsent()
+            }
+        }
         val deliver = Runnable {
             if (
                 privacyStartupInspectionDestroyed ||
@@ -6788,7 +7270,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 snapshot.storageBlocked != latest.storageBlocked ||
                 snapshot.deletionRecoveryOnly != latest.deletionRecoveryOnly
             ) return@Runnable
-            onGatewayProcessSessionChanged(snapshot)
+            onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)
+            retryPendingGatewayRenewal()
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
             deliver.run()
@@ -6877,6 +7360,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         GatewaySessionRevalidationStatus.NOT_READY
                     ) {
                         postGatewayActivityCallback(expectedActivityLease) {
+                            // login-F1/F4: an expired or rejected long-lived login is refreshed
+                            // durably once (renewed, or the revocation reason) before any clear.
+                            if (probeGatewaySessionAfterUnauthorized(session)) {
+                                return@postGatewayActivityCallback
+                            }
                             clearGatewaySession(
                                 logoutRemote = false,
                                 expectedSession = session,
@@ -6931,6 +7419,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun restoreGatewaySessionFromPrefs() {
         val processSnapshot = GatewaySessionProcessCoordinator.snapshot()
+        if (processSnapshot.renewalRetryAtElapsedMs?.let { SystemClock.elapsedRealtime() < it } == true) {
+            retryPendingGatewayRenewal()
+            return
+        }
         if (
             processSnapshot.session != null ||
             processSnapshot.inFlightOperationId != null
@@ -7007,7 +7499,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             GatewaySessionProcessCoordinator.markStorageBlocked(operation)
             return
         }
-        val actorId = restored.firstRunSnapshot.reporterActorBinding?.value
+        val actorId = restored.firstRunSnapshot.verifiedActorBinding?.value
         if (actorId == null || actorId != restored.session.actorId) {
             restored.session.invalidate()
             android.util.Log.w("WalkSafeSession", "restore=actor_binding_mismatch")
@@ -7032,6 +7524,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 firstRunSnapshot = restored.firstRunSnapshot,
             ) ?: return
         renewRestoredGatewaySession(restored, renewalOperation)
+    }
+
+    private fun retryPendingGatewayRenewal() {
+        window.decorView.removeCallbacks(gatewayRenewalRetryRunnable)
+        // login-F1: every session publish and foreground return re-arms the in-run renewal.
+        scheduleInRunGatewaySessionRenewal()
+        val retryAt = GatewaySessionProcessCoordinator.snapshot().renewalRetryAtElapsedMs ?: return
+        if (!isActivityForeground || !privacyStartupInspectionComplete || privacyStartupInspectionDestroyed ||
+            accountDeletionStateMachine.processingBlocked()
+        ) return
+        val remainingMs = retryAt - SystemClock.elapsedRealtime()
+        if (remainingMs > 0L) {
+            window.decorView.postDelayed(gatewayRenewalRetryRunnable, remainingMs)
+            return
+        }
+        restoreGatewaySessionFromPrefs()
     }
 
     private fun retryPendingBackendDeviceRestore() {
@@ -7204,6 +7712,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
+    private fun reportCooldownBootCount(): Int? = runCatching {
+        Settings.Global.getInt(contentResolver, Settings.Global.BOOT_COUNT).takeIf { it >= 0 }
+    }.getOrNull()
+
     private fun restoreReportCooldownsFromPrefs() {
         if (sensitivePrefs.isBlocked()) {
             reportAttemptStateStorageBlocked = true
@@ -7215,22 +7727,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             buildList {
                 for (index in 0 until minOf(payload.length(), AndroidReportCooldownPolicy.MAX_TRACKED_STATES)) {
                     val item = payload.optJSONObject(index) ?: continue
-                    val scope = AndroidReportCooldownPolicy.spatialScopeOrNull(
-                        actorId = item.optString("actor_id"),
-                        className = item.optString("class_name"),
-                        location = TrustedLocation(
-                            latitude = item.getDouble("latitude"),
-                            longitude = item.getDouble("longitude"),
-                            accuracyM = 0f,
-                            elapsedRealtimeMs = 0L,
-                        ),
-                    ) ?: continue
-                    add(
-                        AndroidReportSuccessfulCooldown(
-                            scope = scope,
-                            lastUploadedAtMs = item.getLong("last_uploaded_at_ms"),
-                        ),
-                    )
+                    add(AndroidReportSuccessfulCooldown.fromJson(item) ?: continue)
                 }
             }
         }.getOrElse {
@@ -7246,14 +7743,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (sensitivePrefs.isBlocked()) return false
         val payload = JSONArray()
         reportAttemptStore.successfulCooldowns(System.currentTimeMillis()).forEach { cooldown ->
-            payload.put(
-                JSONObject()
-                    .put("actor_id", cooldown.scope.actorId)
-                    .put("class_name", cooldown.scope.className)
-                    .put("latitude", cooldown.scope.latitude)
-                    .put("longitude", cooldown.scope.longitude)
-                    .put("last_uploaded_at_ms", cooldown.lastUploadedAtMs),
-            )
+            payload.put(cooldown.toJson())
         }
         return sensitivePrefs.edit()
             .putString(PREF_REPORT_COOLDOWNS_KEY, payload.toString())
@@ -7264,20 +7754,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         cooldown: AndroidReportSuccessfulCooldown,
     ): Boolean {
         if (sensitivePrefs.isBlocked()) return false
-        val cooldowns =
+        val cooldowns = listOf(cooldown) +
             reportAttemptStore.successfulCooldowns(System.currentTimeMillis())
-                .filterNot { it.scope == cooldown.scope } + cooldown
+                .filterNot { it.scope == cooldown.scope }
+                .take(AndroidReportCooldownPolicy.MAX_TRACKED_STATES - 1)
         val payload = JSONArray()
-        cooldowns.takeLast(AndroidReportCooldownPolicy.MAX_TRACKED_STATES)
+        cooldowns
             .forEach { item ->
-                payload.put(
-                    JSONObject()
-                        .put("actor_id", item.scope.actorId)
-                        .put("class_name", item.scope.className)
-                        .put("latitude", item.scope.latitude)
-                        .put("longitude", item.scope.longitude)
-                        .put("last_uploaded_at_ms", item.lastUploadedAtMs),
-                )
+                payload.put(item.toJson())
             }
         return sensitivePrefs.edit()
             .putString(PREF_REPORT_COOLDOWNS_KEY, payload.toString())
@@ -7582,8 +8066,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             )
             return
         }
-        if (!GatewayAccountInputPolicy.validPassword(password)) {
-            showAccountInputError(accountPasswordInput, "비밀번호는 10자 이상 128자 이하로 입력하세요.")
+        if (!GatewayAccountInputPolicy.validNewPassword(password)) {
+            showAccountInputError(accountPasswordInput, "비밀번호는 12자 이상 128자 이하로 입력하세요.")
             return
         }
         if (password != confirmation) {
@@ -7669,6 +8153,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             return@runOnUiThread
                         }
                         emailEnrollmentPartial = partial
+                        emailOtpDeadline = kr.co.hanium.dreamup.walksafe.account.EmailOtpDeadline.received(
+                            expiresAtEpochMs = partial.expiresAtEpochMs,
+                            receivedAtEpochMs = System.currentTimeMillis(),
+                            receivedAtElapsedMs = SystemClock.elapsedRealtime(),
+                        )
                         firstRunOnboardingSnapshot = transition.current
                         accountSignupExpanded = true
                         applyAccountConsentSelections(selections)
@@ -7708,7 +8197,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             firstRunOnboardingSnapshot.stage != FirstRunOnboardingStage.ACCOUNT_CREATED ||
             partial == null ||
             ownerBinding == null ||
-            !partial.isValidAt(System.currentTimeMillis(), ownerBinding)
+            !emailOtpPartialStillValid(partial, ownerBinding)
         ) {
             emailEnrollmentStore.clear()
             emailEnrollmentPartial = null
@@ -7735,10 +8224,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             showAccountInputError(accountOtpInput, "이메일 인증번호 6자리를 확인하세요.")
             return
         }
-        if (!GatewayAccountInputPolicy.validPassword(password)) {
+        if (!GatewayAccountInputPolicy.validNewPassword(password)) {
             showAccountInputError(
                 accountPasswordInput,
-                "비밀번호는 10자 이상 128자 이하로 입력하세요.",
+                "비밀번호는 12자 이상 128자 이하로 입력하세요.",
             )
             return
         }
@@ -7985,6 +8474,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         if (!permissionSessionPolicy.isAuthenticatedFor(session.actorId)) {
                             permissionSessionPolicy.rememberActor(session.actorId)
                         }
+                        reapplyActorBoundIntegratedConsent()
                         emailEnrollmentStore.clear()
                         emailEnrollmentPartial = null
                         accountEmailInput.text?.clear()
@@ -8052,6 +8542,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 val waitMs = emailOtpRequestRetryPolicy.remainingWaitMs(otpAttempt.payload)
                 "이전 이메일 인증 요청을 처리 중입니다. " + ((waitMs + 999L) / 1_000L) +
                     "초 뒤 같은 가입 정보로 요청 버튼을 다시 누르세요. 자동으로 재전송하지 않습니다."
+            } else if (otpAttempt != null && statusCode == 409 &&
+                serverCode == "account_enrollment_idempotency_conflict") {
+                "이전 인증 요청을 사용할 수 없습니다. 가입 정보를 확인한 뒤 인증번호 요청 버튼을 다시 누르세요. 새 요청으로 시작합니다."
+            } else if (token.action == AccountRemoteAction.CREATE_ACCOUNT &&
+                statusCode == 0 && serverCode == null) {
+                "가입 결과를 확인하지 못했습니다. 계정이 이미 만들어졌을 수 있습니다. " +
+                    "같은 가입 정보로 다시 시도하거나 이메일과 비밀번호로 로그인하세요."
             } else when (serverCode) {
                 "account_enrollment_not_allowed" ->
                     "만 14세 미만은 현재 WalkSafe 계정에 가입할 수 없습니다."
@@ -8061,6 +8558,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     "인증번호가 틀렸거나 만료되었습니다. 확인 후 다시 시도하세요."
                 "account_enrollment_conflict" ->
                     "이미 계정이 만들어졌을 수 있습니다. 이메일과 비밀번호로 로그인하세요."
+                "account_password_too_common" ->
+                    "많이 쓰이거나 추측하기 쉬운 비밀번호는 사용할 수 없습니다. 다른 비밀번호를 입력하세요."
+                // S01-3: required signup documents changed; this build cannot show them.
+                kr.co.hanium.dreamup.walksafe.account.SignupConsentPolicyNotice.OUTDATED_CODE ->
+                    kr.co.hanium.dreamup.walksafe.account.SignupConsentPolicyNotice.OUTDATED_MESSAGE
                 "invalid_account_credentials" ->
                     "이메일 또는 비밀번호를 확인하세요."
                 else -> if (statusCode == 401) {
@@ -8082,9 +8584,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         passwordLoginFailureNotice = null
         accountAccessNotice = message
         if (::accountAccessStatusText.isInitialized) {
+            // S13-30: the POLITE live region reads this status change; an extra announcement repeated it.
+            val changed = accountAccessStatusText.text?.toString() != message
             accountAccessStatusText.text = message
             accountAccessStatusText.contentDescription = message
-            accountAccessStatusText.announceForAccessibility(message)
+            // S13-30-F1: the live region is silent for an unchanged text or a view that is not shown.
+            if (isScreenReaderActive() && (!changed || !accountAccessStatusText.isShown)) {
+                announceForTalkBack(message, TalkBackAnnouncementPriority.INTERACTION)
+            }
         }
         updateStatus("계정 등록", message)
     }
@@ -8363,6 +8870,77 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
+    /** Pending control belongs to its original actor, including across policy migration. */
+    private fun hasUnsettledIntegratedConsentControl(): Boolean =
+        sensitivePrefs.isBlocked() ||
+            pendingIntegratedConsentMutation != null ||
+            integratedConsentSession.pendingMutationOrNull() != null ||
+            sensitivePrefs.contains(PREF_PENDING_INTEGRATED_CONSENT_MUTATION) ||
+            sensitivePrefs.contains(PREF_REJECTED_CONSENT_CAS_JOURNAL) ||
+            sensitivePrefs.contains(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED) ||
+            IntegratedConsentItem.entries.any { item ->
+                integratedConsentSession.status(item) in setOf(
+                    PurposeConsentSyncState.WITHDRAWAL_PENDING,
+                    PurposeConsentSyncState.WITHDRAWAL_RETRY,
+                )
+            }
+
+    private fun resetIntegratedConsentForReconsent(): Boolean {
+        if (hasUnsettledIntegratedConsentControl()) return false
+        val changed = integratedConsentSession.resetForPolicyReconsent()
+        // False can mean an already-empty session, not only a refused reset.
+        return changed || (
+            integratedConsentSession.currentConfirmationOrNull() == null &&
+                integratedConsentSession.pendingMutationOrNull() == null &&
+                IntegratedConsentItem.entries.all {
+                    integratedConsentSession.status(it) == PurposeConsentSyncState.UNCONFIRMED
+                }
+            )
+    }
+
+    private fun reapplyActorBoundIntegratedConsent() {
+        val process = GatewaySessionProcessCoordinator.snapshot()
+        val session = process.session
+        val confirmation = integratedConsentSession.currentConfirmationOrNull()
+        val currentOwner = session != null && confirmation != null &&
+            !process.storageBlocked && !process.deletionRecoveryOnly &&
+            session.verificationState == GatewaySessionVerificationState.VERIFIED &&
+            session.isUsableFor(session.actorId) &&
+            session.actorId == reporterUserId &&
+            permissionSessionPolicy.isAuthenticatedFor(session.actorId) &&
+            integratedConsentConfirmedActorSha256 == integratedConsentActorSha256(session)
+        val selections = if (currentOwner) {
+            IntegratedConsentSelections(
+                rawSourceCollection = integratedConsentSession.isAllowed(
+                    IntegratedConsentItem.RAW_SOURCE_COLLECTION,
+                ),
+                automaticReporting = integratedConsentSession.isAllowed(
+                    IntegratedConsentItem.AUTOMATIC_REPORTING,
+                ),
+                mobileNetworkTransfer = integratedConsentSession.isAllowed(
+                    IntegratedConsentItem.MOBILE_NETWORK_TRANSFER,
+                ),
+                trainingReuse = integratedConsentSession.isAllowed(
+                    IntegratedConsentItem.TRAINING_REUSE,
+                ),
+            )
+        } else IntegratedConsentSelections()
+        permissionSessionPolicy.applyIntegratedConsentSelections(selections)
+    }
+
+    private fun holdIntegratedConsentAuthorityForRefresh() {
+        // Fence an older callback before closing local permits for this new authority read.
+        cancelIntegratedConsentControlCall()
+        integratedConsentSession.invalidateBackendAuthority()
+        reportPrivacyConsentSession.withdraw()
+        cancelReportQueueDrain()
+        cancelActivityOriginalUploads()
+        if (::rawCollectionRuntimeCoordinator.isInitialized) {
+            rawCollectionRuntimeCoordinator.cancelActiveUpload()
+        }
+        reapplyActorBoundIntegratedConsent()
+    }
+
     private fun integratedConsentHttpBlocked(): Boolean =
         accountDeletionStateMachine.processingBlocked() ||
             IntegratedConsentItem.entries.any { item ->
@@ -8372,10 +8950,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun applyImmediateConsentWithdrawals(
         items: Set<IntegratedConsentItem>,
+        recordLocalWithdrawal: Boolean = true,
     ) {
         if (items.isNotEmpty()) {
             val previousReceipt = integratedConsentSession
-                .currentConfirmationOrNull()
+                .cachedConfirmationOrNull()
                 ?.backendConsentReceiptSha256
             cancelReportQueueDrain()
             if (
@@ -8384,6 +8963,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ) {
                 reportQueueDrainCoordinator.onAutomaticReportingRevoked(previousReceipt)
             }
+            // S21-50: an in-flight debug JPEG/metadata transfer stops with the RAW withdrawal.
+            if (IntegratedConsentItem.RAW_SOURCE_COLLECTION in items) cancelActivityOriginalUploads()
             if (
                 IntegratedConsentItem.RAW_SOURCE_COLLECTION in items &&
                 ::rawCollectionRuntimeCoordinator.isInitialized
@@ -8402,7 +8983,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         }
         items.forEach { item ->
-            integratedConsentSession.withdrawImmediately(item)
+            if (recordLocalWithdrawal) integratedConsentSession.withdrawImmediately(item)
             when (item) {
                 IntegratedConsentItem.RAW_SOURCE_COLLECTION -> {
                     permissionSessionPolicy.setRawCollectionConsent(false)
@@ -8448,6 +9029,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun refreshIntegratedConsentFromServer() {
+        holdIntegratedConsentAuthorityForRefresh()
         if (integratedConsentHttpBlocked()) return
         val gatewayOrigin = configuredGatewayOriginOrNull() ?: return
         val gatewaySession = integratedConsentRefreshSessionOrNull() ?: return
@@ -8475,6 +9057,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         bootstrapReady: Boolean,
     ): Boolean {
         if (sensitivePrefs.isBlocked()) return false
+        applyImmediateConsentWithdrawals(
+            IntegratedConsentItem.entries.toSet(), recordLocalWithdrawal = false,
+        )
+        if (!resetIntegratedConsentForReconsent()) {
+            integratedConsentSession.invalidate()
+            return false
+        }
         if (
             !stepLengthPrefs.edit()
                 .putBoolean(PREF_RAW_SOURCE_FIELD_LOG_BLOCKED, true)
@@ -8490,9 +9079,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             .remove(PREF_INTEGRATED_CONSENT_BACKEND_RECEIPT_SHA256)
             .remove(PREF_INTEGRATED_CONSENT_GATEWAY_AUDIT_SHA256)
             .remove(PREF_INTEGRATED_CONSENT_ACTOR_SHA256)
-            .remove(PREF_PENDING_INTEGRATED_CONSENT_MUTATION)
             .remove(PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION)
-            .remove(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED)
             .remove(PREF_REPORT_PRIVACY_CONSENT_KEY)
             .remove(PREF_AUTOMATIC_REPORT_CONSENT_KEY)
             .remove(PREF_MOBILE_NETWORK_PREFERENCE_KEY)
@@ -8503,8 +9090,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             integratedConsentSession.failClosed()
             return false
         }
-        applyImmediateConsentWithdrawals(IntegratedConsentItem.entries.toSet())
-        integratedConsentSession.resetForPolicyReconsent()
         pendingIntegratedConsentMutation = null
         integratedConsentDraft = IntegratedConsentSelections()
         integratedConsentClientRevision = clientRevisionFloor
@@ -8524,6 +9109,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         installationId: String,
     ) {
         if (!isCurrentGatewaySession(gatewaySession)) return
+        val processGeneration = GatewaySessionProcessCoordinator.snapshot().generation
         val localFloor = integratedConsentClientRevision.coerceAtLeast(0L)
         val localReceipt = integratedConsentSession.currentConfirmationOrNull()
             ?.backendConsentReceiptSha256
@@ -8550,12 +9136,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     val bootstrap = call.execute()
                     if (
                         !claimIntegratedConsentBootstrapCompletion(generation, call) ||
-                        !isCurrentGatewaySession(gatewaySession)
+                        !isCurrentIntegratedConsentSession(gatewaySession, processGeneration)
                     ) return@execute
                     runOnUiThread {
                         if (
                             privacyStartupInspectionDestroyed ||
-                            !isCurrentGatewaySession(gatewaySession) ||
+                            !isCurrentIntegratedConsentSession(gatewaySession, processGeneration) ||
                             synchronized(integratedConsentLock) {
                                 generation != integratedConsentRequestGeneration
                             }
@@ -8593,6 +9179,147 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             call.cancel()
             claimIntegratedConsentBootstrapCompletion(generation, call)
             postIntegratedConsentUiRefresh()
+        }
+    }
+
+    private fun startRejectedIntegratedConsentCasRecovery(
+        gatewaySession: GatewayFieldSession,
+        rejected: PendingIntegratedConsentMutation,
+        recoveryAttempts: Int,
+    ) {
+        if (!isCurrentIntegratedConsentMutation(rejected, gatewaySession)) return
+        val processGeneration = GatewaySessionProcessCoordinator.snapshot().generation
+        // The old request is known rejected, but its withdrawal remains in the durable journal.
+        holdIntegratedConsentAuthorityForRefresh()
+        if (!isCurrentIntegratedConsentMutation(rejected, gatewaySession)) return
+        val call = integratedConsentClient.fetchBootstrapCall(
+            gatewayBaseUrl = gatewaySession.gatewayBaseUrl,
+            session = gatewaySession,
+            installationId = rejected.installationId,
+        )
+        val generation = synchronized(integratedConsentLock) {
+            integratedConsentBootstrapCall?.cancel()
+            integratedConsentRequestGeneration += 1L
+            integratedConsentCall = null
+            integratedConsentBootstrapCall = call
+            integratedConsentRequestInFlight = true
+            integratedConsentRequestGeneration
+        }
+        try {
+            gatewaySessionExecutor.execute {
+                try {
+                    val bootstrap = call.execute()
+                    if (!claimIntegratedConsentBootstrapCompletion(generation, call) ||
+                        !isCurrentIntegratedConsentSession(gatewaySession, processGeneration)
+                    ) return@execute
+                    val receipt = bootstrap.expectedPreviousBackendReceiptSha256
+                    val choices = bootstrap.selections
+                    val cached = integratedConsentSession.cachedConfirmationOrNull()
+                    if (bootstrap.status != IntegratedConsentBootstrapStatus.READY ||
+                        bootstrap.source != IntegratedConsentBootstrapSource.CURRENT_CONSENT ||
+                        bootstrap.installationId != rejected.installationId ||
+                        receipt == null || receipt != bootstrap.sourceReceiptSha256 ||
+                        choices == null ||
+                        bootstrap.clientRevisionFloor < (cached?.clientRevision ?: 0L) ||
+                        bootstrap.clientRevisionFloor == Long.MAX_VALUE
+                    ) {
+                        integratedConsentSession.markPendingRetry()
+                        postIntegratedConsentUiRefresh()
+                        return@execute
+                    }
+                    val existingJournalRaw = sensitivePrefs.getString(
+                        PREF_REJECTED_CONSENT_CAS_JOURNAL, null,
+                    )
+                    val existingJournal = existingJournalRaw?.let {
+                        rejectedConsentCasJournalOrNull(it, rejected)
+                    }
+                    if (existingJournalRaw != null && existingJournal == null) {
+                        integratedConsentSession.failClosed()
+                        return@execute
+                    }
+                    val withdrawals = (existingJournal?.cumulativeDenials ?: emptySet()) +
+                        rejected.deniedItems() + integratedConsentSession.localWithdrawalItems()
+                    val successor = rejected.successorAfterRejectedCas(
+                        backendSelections = choices,
+                        backendReceiptSha256 = receipt,
+                        backendClientRevisionFloor = bootstrap.clientRevisionFloor,
+                        clientRevision = bootstrap.clientRevisionFloor + 1L,
+                        withdrawalItems = withdrawals,
+                        createdAtEpochMs = System.currentTimeMillis().coerceAtLeast(1L),
+                    )
+                    val transition = RejectedConsentCasSupersession(
+                        original = rejected,
+                        backendSelections = choices,
+                        backendReceiptSha256 = receipt,
+                        backendClientRevisionFloor = bootstrap.clientRevisionFloor,
+                        successor = successor,
+                    )
+                    val journal = RejectedConsentCasRecoveryJournal.next(
+                        existingJournal, transition,
+                    )
+                    val journalJson = rejectedConsentCasJournalJson(journal)
+                    if (journalJson.toByteArray(Charsets.UTF_8).size >
+                        RejectedConsentCasJournalCodec.MAX_JOURNAL_BYTES
+                    ) {
+                        integratedConsentSession.markPendingRetry()
+                        return@execute
+                    }
+                    val result = GatewaySessionProcessCoordinator.withCurrentGeneralSession(
+                        processGeneration, gatewaySession,
+                    ) {
+                        synchronized(integratedConsentLock) {
+                            if (generation != integratedConsentRequestGeneration ||
+                                !integratedConsentSession.isPendingMutationCurrent(rejected)
+                            ) return@synchronized IntegratedConsentSubmissionResult.REJECTED
+                            integratedConsentSession.supersedeRejectedCasMutation(
+                                transition,
+                                persist = {
+                                    sensitivePrefs.edit()
+                                        .putLong(
+                                            PREF_INTEGRATED_CONSENT_CLIENT_REVISION,
+                                            successor.clientRevision,
+                                        )
+                                        .putString(
+                                            PREF_PENDING_INTEGRATED_CONSENT_MUTATION,
+                                            pendingIntegratedConsentMutationJson(successor),
+                                        )
+                                        .putString(
+                                            PREF_REJECTED_CONSENT_CAS_JOURNAL,
+                                            journalJson,
+                                        )
+                                        .remove(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED)
+                                        .commit()
+                                },
+                            ).also { outcome ->
+                                if (outcome == IntegratedConsentSubmissionResult.APPLIED) {
+                                    pendingIntegratedConsentMutation = successor
+                                    integratedConsentClientRevision = successor.clientRevision
+                                    integratedConsentDraft = successor.desiredSelections
+                                }
+                            }
+                        }
+                    }
+                    if (result == IntegratedConsentSubmissionResult.STORAGE_FAILED) {
+                        integratedConsentSession.failClosed()
+                    } else if (result == IntegratedConsentSubmissionResult.APPLIED &&
+                        isCurrentIntegratedConsentSession(gatewaySession, processGeneration)
+                    ) {
+                        retryPendingIntegratedConsentMutation(
+                            casRecoveryAttempts = recoveryAttempts + 1,
+                        )
+                    }
+                    postIntegratedConsentUiRefresh()
+                } catch (_: CancellationException) {
+                    claimIntegratedConsentBootstrapCompletion(generation, call)
+                } catch (_: Exception) {
+                    claimIntegratedConsentBootstrapCompletion(generation, call)
+                    integratedConsentSession.markPendingRetry()
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            call.cancel()
+            claimIntegratedConsentBootstrapCompletion(generation, call)
+            integratedConsentSession.markPendingRetry()
         }
     }
 
@@ -8728,7 +9455,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             return
         }
         val clientRevision = integratedConsentClientRevision + 1L
-        val selections = integratedConsentDraft
+        val recoverySelections = integratedConsentSession.withdrawalRecoverySelectionsOrNull()
+        val selections = recoverySelections ?: integratedConsentDraft
         val requestId = "consent_" + sha256Hex(
             (
                 "FP013|$installationId|$clientRevision|" +
@@ -8738,7 +9466,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val confirmedSelections = persistedIntegratedConsentSelections()
         val withdrawalItems = IntegratedConsentItem.entries
             .filterTo(mutableSetOf()) { item ->
-                confirmedSelections.isGranted(item) && !selections.isGranted(item)
+                (confirmedSelections.isGranted(item) || item in integratedConsentSession.localWithdrawalItems()) &&
+                    !selections.isGranted(item)
             }
         val mutation = PendingIntegratedConsentMutation(
             installationId = installationId,
@@ -8755,59 +9484,80 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             withdrawalItems = withdrawalItems,
             createdAtEpochMs = System.currentTimeMillis().coerceAtLeast(1L),
         )
-        val mutationStored = sensitivePrefs.edit()
-            .putLong(PREF_INTEGRATED_CONSENT_CLIENT_REVISION, clientRevision)
-            .putString(
-                PREF_PENDING_INTEGRATED_CONSENT_MUTATION,
-                pendingIntegratedConsentMutationJson(mutation),
-            )
-            .remove(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED)
-            .commit()
-        if (!mutationStored) {
-            applyImmediateConsentWithdrawals(withdrawalItems)
-            integratedConsentSession.failClosed()
-            updateNavigationStatus("integratedConsent=blocked:mutation_storage")
-            if (announce) {
-                speakInteraction("철회 상태를 안전하게 저장하지 못해 개인정보 기능을 잠갔습니다.")
-            }
-            return
-        }
-        synchronized(integratedConsentLock) {
-            integratedConsentRequestGeneration += 1L
-            integratedConsentCall?.cancel()
-            integratedConsentBootstrapCall?.cancel()
-            integratedConsentCall = null
-            integratedConsentBootstrapCall = null
-            integratedConsentRequestInFlight = false
-        }
-        integratedConsentClientRevision = clientRevision
-        pendingIntegratedConsentMutation = mutation
-        integratedConsentSession.restorePendingMutation(mutation)
-        applyImmediateConsentWithdrawals(withdrawalItems)
-        startIntegratedConsentRequest(
-            call = integratedConsentClient.saveCall(
-                gatewayBaseUrl = gatewayOrigin,
-                session = gatewaySession,
-                installationId = installationId,
-                controlSecret = controlSecret,
-                requestId = requestId,
-                clientRevision = clientRevision,
-                selections = selections,
-                expectedPreviousBackendReceiptSha256 =
-                    mutation.expectedPreviousBackendReceiptSha256,
-            ),
-            expectedSelections = selections,
-            expectedClientRevision = clientRevision,
-            completeOnboarding =
-                firstRunOnboardingSnapshot.stage ==
-                    FirstRunOnboardingStage.INTEGRATED_CONSENT,
-            announce = announce,
-            expectedSession = gatewaySession,
-            bootstrapOnCasConflict = true,
+        val submission = integratedConsentSession.submitPendingMutation(
+            mutation = mutation,
+            persist = { accepted ->
+                sensitivePrefs.edit()
+                    .putLong(PREF_INTEGRATED_CONSENT_CLIENT_REVISION, accepted.clientRevision)
+                    .putString(
+                        PREF_PENDING_INTEGRATED_CONSENT_MUTATION,
+                        pendingIntegratedConsentMutationJson(accepted),
+                    )
+                    .remove(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED)
+                    .commit()
+            },
+            dispatch = dispatch@{ accepted ->
+                if (!isCurrentIntegratedConsentMutation(accepted, gatewaySession)) return@dispatch false
+                // Publish the durable request before cancellation/transport reservation can fail.
+                integratedConsentClientRevision = accepted.clientRevision
+                pendingIntegratedConsentMutation = accepted
+                if (recoverySelections != null) integratedConsentDraft = accepted.desiredSelections
+                synchronized(integratedConsentLock) {
+                    integratedConsentRequestGeneration += 1L
+                    integratedConsentCall?.cancel()
+                    integratedConsentBootstrapCall?.cancel()
+                    integratedConsentCall = null
+                    integratedConsentBootstrapCall = null
+                    integratedConsentRequestInFlight = false
+                }
+                applyImmediateConsentWithdrawals(withdrawalItems)
+                startIntegratedConsentRequest(
+                    call = integratedConsentClient.saveCall(
+                        gatewayBaseUrl = gatewayOrigin,
+                        session = gatewaySession,
+                        installationId = installationId,
+                        controlSecret = controlSecret,
+                        requestId = requestId,
+                        clientRevision = clientRevision,
+                        selections = selections,
+                        expectedPreviousBackendReceiptSha256 =
+                            mutation.expectedPreviousBackendReceiptSha256,
+                    ),
+                    expectedSelections = selections,
+                    expectedClientRevision = clientRevision,
+                    completeOnboarding =
+                        firstRunOnboardingSnapshot.stage ==
+                            FirstRunOnboardingStage.INTEGRATED_CONSENT,
+                    announce = announce,
+                    expectedSession = gatewaySession,
+                    bootstrapOnCasConflict = true,
+                    expectedMutation = accepted,
+                )
+            },
         )
+        when (submission) {
+            IntegratedConsentSubmissionResult.REJECTED -> {
+                updateNavigationStatus("integratedConsent=blocked:pending_withdrawal_or_candidate")
+                if (announce) speakInteraction("진행 중인 철회를 완료한 뒤 다시 허용해 주세요.")
+            }
+            IntegratedConsentSubmissionResult.STORAGE_FAILED -> {
+                applyImmediateConsentWithdrawals(withdrawalItems)
+                integratedConsentSession.failClosed()
+                updateNavigationStatus("integratedConsent=blocked:mutation_storage")
+                if (announce) speakInteraction("철회 상태를 안전하게 저장하지 못해 개인정보 기능을 잠갔습니다.")
+            }
+            IntegratedConsentSubmissionResult.DISPATCH_FAILED -> {
+                updateNavigationStatus("integratedConsent=pending:retry")
+                postIntegratedConsentUiRefresh()
+            }
+            else -> Unit
+        }
     }
 
-    private fun retryPendingIntegratedConsentMutation(announce: Boolean = false) {
+    private fun retryPendingIntegratedConsentMutation(
+        announce: Boolean = false,
+        casRecoveryAttempts: Int = 0,
+    ) {
         if (integratedConsentHttpBlocked()) return
         val mutation = pendingIntegratedConsentMutation ?: return
         val gatewayOrigin = configuredGatewayOriginOrNull() ?: run {
@@ -8836,31 +9586,54 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             integratedConsentSession.failClosed()
             return
         }
-        integratedConsentDraft = mutation.desiredSelections
-        integratedConsentClientRevision =
-            maxOf(integratedConsentClientRevision, mutation.clientRevision)
-        integratedConsentSession.restorePendingMutation(mutation, retry = true)
-        applyImmediateConsentWithdrawals(mutation.withdrawalItems)
-        startIntegratedConsentRequest(
-            call = integratedConsentClient.saveCall(
-                gatewayBaseUrl = gatewayOrigin,
-                session = gatewaySession,
-                installationId = mutation.installationId,
-                controlSecret = controlSecret,
-                requestId = mutation.requestId,
-                clientRevision = mutation.clientRevision,
-                selections = mutation.desiredSelections,
-                expectedPreviousBackendReceiptSha256 =
-                    mutation.expectedPreviousBackendReceiptSha256,
-            ),
-            expectedSelections = mutation.desiredSelections,
-            expectedClientRevision = mutation.clientRevision,
-            completeOnboarding = false,
-            announce = announce,
-            expectedSession = gatewaySession,
-            bootstrapOnCasConflict = true,
+        val submission = integratedConsentSession.submitPendingMutation(
+            mutation = mutation,
+            retry = true,
+            persist = { true }, // This exact pending request is already durable.
+            dispatch = dispatch@{ accepted ->
+                if (!isCurrentIntegratedConsentMutation(accepted, gatewaySession)) return@dispatch false
+                integratedConsentDraft = mutation.desiredSelections
+                integratedConsentClientRevision =
+                    maxOf(integratedConsentClientRevision, mutation.clientRevision)
+                applyImmediateConsentWithdrawals(mutation.withdrawalItems)
+                startIntegratedConsentRequest(
+                    call = integratedConsentClient.saveCall(
+                        gatewayBaseUrl = gatewayOrigin,
+                        session = gatewaySession,
+                        installationId = mutation.installationId,
+                        controlSecret = controlSecret,
+                        requestId = mutation.requestId,
+                        clientRevision = mutation.clientRevision,
+                        selections = mutation.desiredSelections,
+                        expectedPreviousBackendReceiptSha256 =
+                            mutation.expectedPreviousBackendReceiptSha256,
+                    ),
+                    expectedSelections = mutation.desiredSelections,
+                    expectedClientRevision = mutation.clientRevision,
+                    completeOnboarding = false,
+                    announce = announce,
+                    expectedSession = gatewaySession,
+                    bootstrapOnCasConflict = true,
+                    expectedMutation = accepted,
+                    casRecoveryAttempts = casRecoveryAttempts,
+                )
+            },
         )
+        if (submission == IntegratedConsentSubmissionResult.REJECTED) {
+            updateNavigationStatus("integratedConsent=blocked:retry_candidate")
+        } else if (submission == IntegratedConsentSubmissionResult.DISPATCH_FAILED) {
+            postIntegratedConsentUiRefresh()
+        }
     }
+
+    private fun isCurrentIntegratedConsentMutation(
+        mutation: PendingIntegratedConsentMutation,
+        expectedSession: GatewayFieldSession,
+    ): Boolean =
+        isCurrentGatewaySession(expectedSession) &&
+            mutation.actorSha256 == integratedConsentActorSha256(expectedSession) &&
+            !integratedConsentHttpBlocked() &&
+            integratedConsentSession.isPendingMutationCurrent(mutation)
 
     private fun startIntegratedConsentRequest(
         call: CancellableNetworkCall<IntegratedConsentConfirmation?>,
@@ -8871,14 +9644,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         expectedSession: GatewayFieldSession,
         bootstrapOnMissing: Boolean = false,
         bootstrapOnCasConflict: Boolean = false,
-    ) {
+        expectedMutation: PendingIntegratedConsentMutation? = null,
+        casRecoveryAttempts: Int = 0,
+    ): Boolean {
         if (
             integratedConsentHttpBlocked() ||
-            !isCurrentGatewaySession(expectedSession)
+            !isCurrentGatewaySession(expectedSession) ||
+            (expectedMutation != null && !isCurrentIntegratedConsentMutation(expectedMutation, expectedSession))
         ) {
             call.cancel()
-            return
+            return false
         }
+        val processGeneration = GatewaySessionProcessCoordinator.snapshot().generation
         val generation = synchronized(integratedConsentLock) {
             integratedConsentCall?.cancel()
             integratedConsentBootstrapCall?.cancel()
@@ -8888,14 +9665,31 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             integratedConsentRequestInFlight = true
             integratedConsentRequestGeneration
         }
+        if (expectedMutation != null && !isCurrentIntegratedConsentMutation(expectedMutation, expectedSession)) {
+            call.cancel()
+            claimIntegratedConsentCallCompletion(generation, call)
+            return false
+        }
         postIntegratedConsentUiRefresh()
         try {
             gatewaySessionExecutor.execute {
                 try {
+                    if (
+                        !isCurrentIntegratedConsentSession(expectedSession, processGeneration) ||
+                        integratedConsentHttpBlocked() ||
+                        (expectedMutation != null && !isCurrentIntegratedConsentMutation(expectedMutation, expectedSession)) ||
+                        synchronized(integratedConsentLock) {
+                            generation != integratedConsentRequestGeneration || integratedConsentCall !== call
+                        }
+                    ) {
+                        call.cancel()
+                        claimIntegratedConsentCallCompletion(generation, call)
+                        return@execute
+                    }
                     val confirmation = call.execute()
                     if (
                         !claimIntegratedConsentCallCompletion(generation, call) ||
-                        !isCurrentGatewaySession(expectedSession)
+                        !isCurrentIntegratedConsentSession(expectedSession, processGeneration)
                     ) {
                         return@execute
                     }
@@ -8933,28 +9727,45 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         return@execute
                     }
                     if (
-                        !isCurrentGatewaySession(expectedSession) ||
+                        !isCurrentIntegratedConsentSession(expectedSession, processGeneration) ||
                         synchronized(integratedConsentLock) {
                             generation != integratedConsentRequestGeneration
                         }
                     ) return@execute
-                    val applied =
-                        confirmation != null &&
-                            (
-                                expectedClientRevision == null ||
-                                    confirmation.clientRevision == expectedClientRevision
-                                ) &&
-                            (
-                                expectedSelections == null ||
-                                    confirmation.selections == expectedSelections
-                            ) &&
-                            applyIntegratedConsentConfirmation(
-                                confirmation,
-                                integratedConsentActorSha256(expectedSession),
+                    val authorityGuard = object : IntegratedConsentAuthorityGuard {
+                        override fun <T : Any> withCurrent(action: () -> T): T? =
+                            GatewaySessionProcessCoordinator.withCurrentGeneralSession(
+                                processGeneration, expectedSession, action,
                             )
+                    }
+                    val applied = GatewaySessionProcessCoordinator.withCurrentGeneralSession(
+                        processGeneration, expectedSession,
+                    ) {
+                        synchronized(integratedConsentLock) {
+                            generation == integratedConsentRequestGeneration &&
+                                confirmation != null &&
+                                (
+                                    expectedClientRevision == null ||
+                                        confirmation.clientRevision == expectedClientRevision
+                                ) &&
+                                (
+                                    expectedSelections == null ||
+                                        confirmation.selections == expectedSelections
+                                ) &&
+                                applyIntegratedConsentConfirmation(
+                                    confirmation,
+                                    integratedConsentActorSha256(expectedSession),
+                                    authorityGuard,
+                                )
+                        }
+                    } == true
+                    if (applied && isCurrentIntegratedConsentSession(expectedSession, processGeneration)) {
+                        postIntegratedConsentUiRefresh()
+                        schedulePostWalkTransfers()
+                    }
                     val appliedConfirmation = confirmation.takeIf { applied }
                     if (
-                        !isCurrentGatewaySession(expectedSession) ||
+                        !isCurrentIntegratedConsentSession(expectedSession, processGeneration) ||
                         synchronized(integratedConsentLock) {
                             generation != integratedConsentRequestGeneration
                         }
@@ -8972,7 +9783,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     runOnUiThread {
                         if (
                             privacyStartupInspectionDestroyed ||
-                            !isCurrentGatewaySession(expectedSession) ||
+                            !isCurrentIntegratedConsentSession(expectedSession, processGeneration) ||
                             !accountDeletionStateMachine.activityLeaseIsCurrent(
                                 accountDeletionActivityLease,
                             ) ||
@@ -9012,7 +9823,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     if (!current) return@execute
                     if (
                         (bootstrapOnMissing || bootstrapOnCasConflict) &&
-                        isCurrentGatewaySession(expectedSession) &&
+                        isCurrentIntegratedConsentSession(expectedSession, processGeneration) &&
                         error is IntegratedConsentHttpException &&
                         error.statusCode == 409 &&
                         (
@@ -9032,13 +9843,28 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                     )
                             )
                     ) {
-                        startIntegratedConsentBootstrap(
-                            gatewayOrigin = expectedSession.gatewayBaseUrl,
-                            gatewaySession = expectedSession,
-                            installationId =
-                                gatewaySessionStore.getOrCreateInstallDeviceId()
-                                    ?: return@execute,
-                        )
+                        if (bootstrapOnCasConflict &&
+                            error.serverCode == "privacy_consent_previous_receipt_conflict"
+                        ) {
+                            if (expectedMutation != null &&
+                                casRecoveryAttempts < MAX_AUTOMATIC_REJECTED_CAS_RECOVERIES
+                            ) {
+                                startRejectedIntegratedConsentCasRecovery(
+                                    expectedSession, expectedMutation, casRecoveryAttempts,
+                                )
+                            } else {
+                                holdIntegratedConsentAuthorityForRefresh()
+                                integratedConsentSession.markPendingRetry()
+                            }
+                        } else {
+                            startIntegratedConsentBootstrap(
+                                gatewayOrigin = expectedSession.gatewayBaseUrl,
+                                gatewaySession = expectedSession,
+                                installationId =
+                                    gatewaySessionStore.getOrCreateInstallDeviceId()
+                                        ?: return@execute,
+                            )
+                        }
                         return@execute
                     }
                     if (pendingIntegratedConsentMutation != null) {
@@ -9047,7 +9873,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     runOnUiThread {
                         if (
                             privacyStartupInspectionDestroyed ||
-                            !isCurrentGatewaySession(expectedSession) ||
+                            !isCurrentIntegratedConsentSession(expectedSession, processGeneration) ||
                             !accountDeletionStateMachine.activityLeaseIsCurrent(
                                 accountDeletionActivityLease,
                             ) ||
@@ -9068,8 +9894,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         } catch (_: RejectedExecutionException) {
             call.cancel()
             claimIntegratedConsentCallCompletion(generation, call)
+            integratedConsentSession.markPendingRetry()
             postIntegratedConsentUiRefresh()
+            return false
         }
+        return true
     }
 
     private fun claimIntegratedConsentCallCompletion(
@@ -9091,13 +9920,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun applyIntegratedConsentConfirmation(
         confirmation: IntegratedConsentConfirmation,
         expectedActorSha256: String,
+        authorityGuard: IntegratedConsentAuthorityGuard,
     ): Boolean {
         if (sensitivePrefs.isBlocked()) return false
         if (!INTEGRATED_CONSENT_RECEIPT_SHA256.matches(expectedActorSha256)) return false
         if (confirmation.clientRevision < integratedConsentClientRevision) return false
         val previousReceipt = integratedConsentSession
-            .currentConfirmationOrNull()
+            .cachedConfirmationOrNull()
             ?.backendConsentReceiptSha256
+        val previousRawConfirmation = integratedConsentSession.cachedConfirmationOrNull()
+        val previousConfirmedActorSha256 = integratedConsentConfirmedActorSha256
         val pending = pendingIntegratedConsentMutation
         if (pending != null && pending.actorSha256 != expectedActorSha256) return false
         val exactPending =
@@ -9178,7 +10010,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 PREF_TRAINING_REUSE_CONSENT_KEY,
                 confirmation.selections.trainingReuse,
             )
-        if (exactPending) editor.remove(PREF_PENDING_INTEGRATED_CONSENT_MUTATION)
+        if (exactPending) editor
+            .remove(PREF_PENDING_INTEGRATED_CONSENT_MUTATION)
+            .remove(PREF_REJECTED_CONSENT_CAS_JOURNAL)
         if (!editor.commit()) {
             integratedConsentSession.failClosed()
             return false
@@ -9191,11 +10025,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             integratedConsentSession.failClosed()
             return false
         }
+        // S1617-14-F2: keep the earlier RAW receipt's segments until its continue/revoke decision
+        // runs on the raw executor, even if a queued capture already sees the new receipt.
+        if (
+            previousReceipt != null &&
+            previousReceipt != confirmation.backendConsentReceiptSha256 &&
+            ::rawCollectionRuntimeCoordinator.isInitialized
+        ) {
+            rawCollectionRuntimeCoordinator.holdReceiptUntilDecided(previousReceipt)
+        }
         if (exactPending) {
-            check(integratedConsentSession.applyExactPendingConfirmation(confirmation))
+            check(integratedConsentSession.applyExactPendingConfirmation(confirmation, authorityGuard))
             pendingIntegratedConsentMutation = null
         } else {
-            val applied = integratedConsentSession.applyConfirmation(confirmation)
+            val applied = integratedConsentSession.applyConfirmation(confirmation, authorityGuard)
             if (
                 applied != IntegratedConsentApplyResult.APPLIED &&
                 applied != IntegratedConsentApplyResult.DUPLICATE
@@ -9210,7 +10053,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             fieldSessionLog.resetRawSourceAfterConfirmedConsent()
         }
         val effectiveSelections = if (pending != null && !exactPending) {
-            pending.withdrawalItems.fold(confirmation.selections) { selections, item ->
+            IntegratedConsentItem.entries.filter {
+                !pending.desiredSelections.isGranted(it) || it in pending.withdrawalItems
+            }.fold(confirmation.selections) { selections, item ->
                 selections.withDecision(item, false)
             }
         } else {
@@ -9222,15 +10067,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!effectiveSelections.rawSourceCollection) {
             fieldSessionLog.blockForRawSourceWithdrawal()
         }
+        // Re-delivery of the exact current confirmation for the same actor and receipt keeps
+        // in-flight report work; any other confirmation still invalidates every report permit.
+        val unchangedReportAuthority =
+            !exactPending &&
+                evaluation == IntegratedConsentApplyResult.DUPLICATE &&
+                previousReceipt == confirmation.backendConsentReceiptSha256 &&
+                previousConfirmedActorSha256 == expectedActorSha256
         synchronized(reportUploadSafetyLock) {
-            reportUploadSafetyGeneration += 1L
-            automaticReportUploadSafetyGeneration += 1L
-            reportPrivacyConsentSession.cancelActiveCalls()
-            reportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent()
+            if (!unchangedReportAuthority || !reportPrivacyConsentSession.isGranted()) {
+                reportUploadSafetyGeneration += 1L
+                automaticReportUploadSafetyGeneration += 1L
+                reportPrivacyConsentSession.cancelActiveCalls()
+            }
+            reportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent(authorityGuard)
         }
-        permissionSessionPolicy.applyIntegratedConsentSelections(
-            effectiveSelections,
-        )
+        reapplyActorBoundIntegratedConsent()
         integratedConsentDraft =
             if (pending != null && !exactPending) pending.desiredSelections
             else confirmation.selections
@@ -9246,9 +10098,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (::rawCollectionRuntimeCoordinator.isInitialized) {
                 rawCollectionUploadWalkId = null
                 rawCollectionRuntimeCoordinator.cancelActiveUpload()
+                // S1617-14: only a RAW withdrawal (or a policy/item change) ends earlier receipts.
+                val rawSupersede = rawConsentSupersede(
+                    previousRawConfirmation,
+                    confirmation,
+                    currentRawEffective = effectiveSelections.rawSourceCollection,
+                )
                 executeRawCollectionTask {
                     if (previousReceipt != null) {
-                        rawCollectionRuntimeCoordinator.onConsentRevoked(previousReceipt)
+                        if (rawSupersede == RawConsentSupersede.RAW_CONTINUED) {
+                            rawCollectionRuntimeCoordinator.onConsentContinued(
+                                previousReceipt,
+                                confirmation.backendConsentReceiptSha256,
+                            )
+                        } else {
+                            rawCollectionRuntimeCoordinator.onConsentRevoked(previousReceipt)
+                        }
                     }
                     clearRawDetectionWindow()
                     currentRawCollectionRuntimeContextOrNull()?.let { context ->
@@ -9257,8 +10122,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
             }
         }
-        postIntegratedConsentUiRefresh()
-        maybeStartPausedReportQueueRecoveryObservation()
         return true
     }
 
@@ -9337,26 +10200,33 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             !::networkStateProbe.isInitialized
         ) return false
         return activityOriginalUploadAdmission.isAllowed(
+            walkState = currentActivityOriginalWalkState(),
             consentAllowed = true,
+            charging = chargingStateProbe::isCharging,
             preference = permissionSessionPolicy.snapshot().mobileNetworkPreference,
             transport = networkStateProbe.currentTransport(),
-            observedAtMs = SystemClock.elapsedRealtime(),
         )
     }
 
     private fun runIfActivityOriginalUploadAllowed(action: () -> Unit): Boolean {
         if (!::networkStateProbe.isInitialized) return false
         return activityOriginalUploadAdmission.admit(
+            walkState = currentActivityOriginalWalkState(),
             consentAllowed =
                 integratedConsentSession.isAllowed(
                     IntegratedConsentItem.RAW_SOURCE_COLLECTION,
                 ),
+            charging = chargingStateProbe::isCharging,
             preference = permissionSessionPolicy.snapshot().mobileNetworkPreference,
             transport = networkStateProbe.currentTransport(),
-            observedAtMs = SystemClock.elapsedRealtime(),
             action = action,
         )
     }
+
+    /** Unknown (not yet initialized) is treated as a walk in progress: fail closed. */
+    private fun currentActivityOriginalWalkState(): WalkSessionState =
+        if (::walkSessionLifecycle.isInitialized) walkSessionLifecycle.snapshot().state
+        else WalkSessionState.ACTIVE
 
     private fun gatewayFeatureNetworkState(): Pair<MobileNetworkPreference, ActiveNetworkTransport> =
         permissionSessionPolicy.snapshot().mobileNetworkPreference to
@@ -10476,9 +11346,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
+    /**
+     * Durable reserve -> renew -> commit of a long-lived login. [inRun] is set when the running
+     * app renews its published login (login-F1); otherwise this is the restored login at start.
+     */
     private fun renewRestoredGatewaySession(
         restored: RestoredGatewayLoginBundle,
         operation: GatewaySessionOperation,
+        inRun: GatewayInRunRenewalContext? = null,
     ) {
         val expectedActivityLease = accountDeletionActivityLease
         val reserved = gatewaySessionStore.reserveRenewal(
@@ -10501,6 +11376,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             } else {
                 GatewaySessionProcessCoordinator.clear(operation)
             }
+            inRun?.let { completeInRunGatewaySessionRenewal(it, expectedActivityLease) }
             return
         }
         try {
@@ -10546,7 +11422,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     val published = GatewaySessionProcessCoordinator.publishVerified(
                         operation = operation,
                         session = renewal.session,
-                        firstRunSnapshot = restored.firstRunSnapshot,
+                        firstRunSnapshot = inRun?.publishFirstRunSnapshot ?: restored.firstRunSnapshot,
                     )
                     if (!published) {
                         runCatching { gatewaySessionClient.logout(renewal.session) }
@@ -10559,14 +11435,45 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         updateBackendAuthButtonText()
                         updateReportPrivacyConsentUi()
                         updateNavigationStatus(
-                            "gateway=session_restored_verified purpose=general",
+                            if (inRun != null) {
+                                "gateway=session_renewed_in_run purpose=general"
+                            } else {
+                                "gateway=session_restored_verified purpose=general"
+                            },
                         )
                     }
                 } catch (error: RuntimeException) {
-                    if (
-                        error is GatewaySessionHttpException &&
-                        error.reason == "gateway_refresh_proof_already_attempted"
-                    ) {
+                    // Same failure mapping for a restored and an in-run renewal (login-F1).
+                    val failure = GatewayInRunRenewalPolicy.failureAction(error, restored.session.lease)
+                    if (failure is GatewayRenewalFailureAction.DuplicateAttempt) {
+                        return@execute
+                    }
+                    if (failure is GatewayRenewalFailureAction.RetryAfterRollback) {
+                        val retryReservation = failure.reservation
+                        val rolledBack = gatewaySessionStore.rollbackRenewalForRetry(
+                            restored.version, operation.operationId, retryReservation,
+                        )
+                        when (rolledBack) {
+                            GatewaySessionStoreResult.COMMITTED -> {
+                                val retryAt = SystemClock.elapsedRealtime() + retryReservation.retryAfterMs
+                                // login-F1: the durable login is unchanged, so the running app keeps
+                                // its published credential and retries after the busy answer.
+                                val kept = inRun != null &&
+                                    GatewaySessionProcessCoordinator.publishVerified(
+                                        operation, inRun.sourceSession, inRun.publishFirstRunSnapshot,
+                                    )
+                                if (kept) {
+                                    inRun?.retryNotBeforeElapsedMs = retryAt
+                                } else {
+                                    GatewaySessionProcessCoordinator.deferRenewalAfterRollback(
+                                        operation, retryAt,
+                                    )
+                                }
+                            }
+                            GatewaySessionStoreResult.NOT_FOUND,
+                            GatewaySessionStoreResult.STALE -> GatewaySessionProcessCoordinator.clear(operation)
+                            else -> GatewaySessionProcessCoordinator.markStorageBlocked(operation)
+                        }
                         return@execute
                     }
                     val abandoned = gatewaySessionStore.abandonRenewal(
@@ -10605,19 +11512,36 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             GatewaySessionProcessCoordinator.markStorageBlocked(operation)
                         }
                     }
-                    if (
-                        error is GatewaySessionHttpException &&
-                        error.serverCode == "refresh_token_reuse_detected"
-                    ) {
+                    // failure is Abandon here; its notice is GatewayRenewalFailureNotice.of(error).
+                    GatewayRenewalFailureNotice.of(error)?.let { notice ->
                         postGatewayActivityCallback(expectedActivityLease) {
-                            updateNavigationStatus("gateway=refresh_reuse_detected reauthentication_required")
-                            speakInteraction("기기 로그인 재사용이 감지되어 다시 로그인해야 합니다.")
+                            updateNavigationStatus(notice.statusToken)
+                            val statusBefore = if (::accountAccessStatusText.isInitialized) {
+                                accountAccessStatusText.text?.toString()
+                            } else {
+                                null
+                            }
+                            // Owner decision 1: the login screen keeps the reason until the next login.
+                            accountAccessNotice = notice.speech
+                            updateFirstRunOnboardingUi()
+                            // login-F9 (S13-30-F1): the POLITE live region already reads a shown,
+                            // changed status; speaking it too would read the sentence twice.
+                            val readByLiveRegion = ::accountAccessStatusText.isInitialized &&
+                                GatewayInRunRenewalPolicy.liveRegionReadsNotice(
+                                    screenReaderActive = isScreenReaderActive(),
+                                    statusShown = accountAccessStatusText.isShown,
+                                    statusBefore = statusBefore,
+                                    statusAfter = accountAccessStatusText.text?.toString(),
+                                    message = notice.speech,
+                                )
+                            if (!readByLiveRegion) speakInteraction(notice.speech)
                         }
                     }
                 } finally {
                     postGatewayActivityCallback(expectedActivityLease) {
                         updateBackendAuthButtonText()
                     }
+                    inRun?.let { completeInRunGatewaySessionRenewal(it, expectedActivityLease) }
                 }
             }
         } catch (_: RejectedExecutionException) {
@@ -10654,6 +11578,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     GatewaySessionProcessCoordinator.markStorageBlocked(operation)
                 }
             }
+            inRun?.let { completeInRunGatewaySessionRenewal(it, expectedActivityLease) }
         }
     }
 
@@ -10988,6 +11913,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun clearGatewayNavigationState() {
+        // Account clear applies in PAUSED/SAFE_STOP/ENDED as well as ACTIVE.
+        reconcileRouteSnapshotAccount(GatewaySessionProcessCoordinator.snapshot())
+        invalidateGuidanceStopConfirmation()
         cancelNavigationSpeechRetry()
         cancelRouteDecisionSpeech()
         routeRequestGeneration += 1
@@ -11053,6 +11981,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             session.verificationState != GatewaySessionVerificationState.VERIFIED ||
             session.isUsableFor(session.actorId)
         ) return
+        // login-F1 (owner decision 2, Root R1): an expired access credential of a renewable
+        // long-lived login is renewed durably instead of being moved to pending revocation.
+        if (requestInRunGatewaySessionRenewal(session, GatewayInRunRenewalTrigger.ON_DEMAND)) return
         val process = GatewaySessionProcessCoordinator.snapshot()
         clearGatewaySession(
             logoutRemote = false,
@@ -11061,14 +11992,241 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
     }
 
+    /**
+     * login-F1 (owner decision 2, Root decision R1): renews a renewable long-lived login of the
+     * running app through the durable reserve -> renew -> commit path of a restored login
+     * ([renewRestoredGatewaySession]); single flight per process, concurrent callers join.
+     * Returns true when the caller must not clear the session (renewal started, joined,
+     * deferred after a busy answer, or waiting for a network): a connection failure would make
+     * the one-use refresh outcome unknown, so no attempt is made while offline.
+     */
+    private fun requestInRunGatewaySessionRenewal(
+        session: GatewayFieldSession,
+        trigger: GatewayInRunRenewalTrigger,
+        waiter: (() -> Unit)? = null,
+    ): Boolean {
+        if (
+            !BuildConfig.WALKSAFE_LONG_LIVED_LOGIN_ENABLED ||
+            !::gatewaySessionStore.isInitialized ||
+            privacyStartupInspectionDestroyed ||
+            accountDeletionStateMachine.processingBlocked()
+        ) return false
+        val process = GatewaySessionProcessCoordinator.snapshot()
+        if (
+            process.session !== session ||
+            process.storageBlocked ||
+            process.deletionRecoveryOnly ||
+            GatewayInRunRenewalPolicy.actionFor(session, trigger, System.currentTimeMillis()) !=
+            GatewayInRunSessionAction.RENEW
+        ) return false
+        val gate = GatewayInRunRenewalProcessState.gate
+        when (gate.tryBegin(session.lease, SystemClock.elapsedRealtime(), waiter)) {
+            GatewayInRunRenewalGate.Admission.JOINED -> return true
+            GatewayInRunRenewalGate.Admission.DEFERRED -> {
+                // Keep the login for the scheduled retry; a waiting caller continues now.
+                runOnUiThread(::scheduleInRunGatewaySessionRenewal)
+                waiter?.let { runCatching { it() } }
+                return true
+            }
+            GatewayInRunRenewalGate.Admission.STARTED -> Unit
+        }
+        if (
+            ::networkStateProbe.isInitialized &&
+            networkStateProbe.currentTransport() == ActiveNetworkTransport.OFFLINE
+        ) {
+            finishInRunGatewaySessionRenewal(
+                session.lease,
+                SystemClock.elapsedRealtime() + GatewayInRunRenewalPolicy.RENEWAL_RETRY_DELAY_MS,
+            )
+            runOnUiThread(::scheduleInRunGatewaySessionRenewal)
+            return true
+        }
+        val restored = gatewaySessionStore.restoreActive(
+            expectedGatewayBaseUrl = session.gatewayBaseUrl,
+        )
+        if (
+            restored == null ||
+            restored.version != session.versionOrNull ||
+            restored.firstRunSnapshot.verifiedActorBinding?.value != session.actorId
+        ) {
+            restored?.session?.invalidate()
+            finishInRunGatewaySessionRenewal(session.lease)
+            return false
+        }
+        val operation = GatewaySessionProcessCoordinator.beginGeneralSessionOperationIfCurrent(
+            expectedGeneration = process.generation,
+            expectedSession = session,
+        ) ?: run {
+            restored.session.invalidate()
+            finishInRunGatewaySessionRenewal(session.lease)
+            return false
+        }
+        val processFirstRun = process.restoredFirstRunSnapshot
+            ?.takeIf { it.verifiedActorBinding?.value == session.actorId }
+        renewRestoredGatewaySession(
+            restored = restored,
+            operation = operation,
+            inRun = GatewayInRunRenewalContext(
+                sourceSession = session,
+                publishFirstRunSnapshot = processFirstRun ?: restored.firstRunSnapshot,
+            ),
+        )
+        return true
+    }
+
+    private fun finishInRunGatewaySessionRenewal(
+        sourceLease: GatewaySessionLease,
+        retryNotBeforeElapsedMs: Long? = null,
+    ) {
+        GatewayInRunRenewalProcessState.gate.finish(sourceLease, retryNotBeforeElapsedMs)
+            .forEach { waiter -> runCatching { waiter() } }
+    }
+
+    /** Called once per in-run renewal after its durable outcome and process publish. */
+    private fun completeInRunGatewaySessionRenewal(
+        inRun: GatewayInRunRenewalContext,
+        expectedActivityLease: AccountDeletionActivityLease,
+    ) {
+        finishInRunGatewaySessionRenewal(
+            inRun.sourceSession.lease,
+            inRun.retryNotBeforeElapsedMs,
+        )
+        postGatewayActivityCallback(expectedActivityLease) {
+            if (GatewaySessionProcessCoordinator.snapshot().session == null) {
+                // The renewal ended the login (pending revocation or blocked storage): apply the
+                // same runtime downgrade as clearGatewaySession.
+                handleGatewaySessionDowngrade("gateway_session_renewal_failed", expectedActivityLease)
+                synchronized(reportUploadSafetyLock) {
+                    reportUploadSafetyGeneration += 1L
+                    reportPrivacyConsentSession.cancelActiveCalls()
+                }
+                cancelGatewayNetworkCalls()
+                clearGatewayNavigationState()
+                updateReportPrivacyConsentUi()
+            }
+            scheduleInRunGatewaySessionRenewal()
+        }
+    }
+
+    /**
+     * login-F4: after the Gateway rejected a long-lived access credential, one durable refresh
+     * (bounded per family, [GatewayUnauthorizedRenewalProbe]) either keeps a login the server
+     * still has or returns the revocation reason (e.g. `field_session_revoked_reuse_detected`)
+     * for [GatewayRenewalFailureNotice]. Returns true when the probe replaced the clear.
+     */
+    private fun probeGatewaySessionAfterUnauthorized(
+        session: GatewayFieldSession,
+        waiter: (() -> Unit)? = null,
+    ): Boolean {
+        if (
+            GatewaySessionProcessCoordinator.snapshot().session !== session ||
+            GatewayInRunRenewalPolicy.actionFor(
+                session,
+                GatewayInRunRenewalTrigger.UNAUTHORIZED,
+                System.currentTimeMillis(),
+            ) != GatewayInRunSessionAction.RENEW
+        ) return false
+        if (GatewayInRunRenewalProcessState.gate.joinIfInFlight(waiter ?: {})) return true
+        // An access credential that already expired locally is login-F1's case (no probe bound).
+        if (!session.isUsableFor(session.actorId)) {
+            return requestInRunGatewaySessionRenewal(
+                session,
+                GatewayInRunRenewalTrigger.ON_DEMAND,
+                waiter,
+            )
+        }
+        if (
+            !GatewayInRunRenewalProcessState.unauthorizedProbe.tryAcquire(
+                session.familyId,
+                SystemClock.elapsedRealtime(),
+            )
+        ) return false
+        return requestInRunGatewaySessionRenewal(
+            session,
+            GatewayInRunRenewalTrigger.UNAUTHORIZED,
+            waiter,
+        )
+    }
+
+    /** login-F1: [previous] was replaced only by an in-run renewal of the same login. */
+    private fun isRenewedGatewaySessionContinuation(previous: GatewayFieldSession): Boolean {
+        val current = gatewayFieldSession ?: return false
+        return GatewayInRunRenewalPolicy.isRenewedContinuation(previous, current) &&
+            isCurrentGatewaySession(current)
+    }
+
+    /** login-F1: queues [waiter] behind a running in-run renewal, or runs it if already renewed. */
+    private fun awaitInRunGatewaySessionRenewal(waiter: () -> Unit): Boolean {
+        if (GatewayInRunRenewalProcessState.gate.joinIfInFlight(waiter)) return true
+        if (!isGatewaySessionReadyForCurrentActor(gatewayFieldSession)) return false
+        waiter()
+        return true
+    }
+
+    private val inRunGatewayRenewalRunnable = Runnable { onInRunGatewaySessionRenewalDue() }
+
+    /** login-F1: arms the proactive renewal about one minute before access expiry. */
+    private fun scheduleInRunGatewaySessionRenewal() {
+        if (!::gatewayWalkRenewalHandler.isInitialized) return
+        gatewayWalkRenewalHandler.removeCallbacks(inRunGatewayRenewalRunnable)
+        if (!BuildConfig.WALKSAFE_LONG_LIVED_LOGIN_ENABLED || privacyStartupInspectionDestroyed) return
+        val process = GatewaySessionProcessCoordinator.snapshot()
+        if (process.storageBlocked || process.deletionRecoveryOnly) return
+        val delayMs = GatewayInRunRenewalPolicy.proactiveDelayMsOrNull(
+            process.session,
+            System.currentTimeMillis(),
+        ) ?: return
+        val deferralMs = GatewayInRunRenewalProcessState.gate.deferralRemainingMs(
+            SystemClock.elapsedRealtime(),
+        )
+        gatewayWalkRenewalHandler.postDelayed(inRunGatewayRenewalRunnable, maxOf(delayMs, deferralMs))
+    }
+
+    private fun onInRunGatewaySessionRenewalDue() {
+        val session = GatewaySessionProcessCoordinator.snapshot().session ?: return
+        val walkState = if (::walkSessionLifecycle.isInitialized) {
+            walkSessionLifecycle.snapshot().state
+        } else {
+            null
+        }
+        // "While the app is running": foreground, or a walk that keeps its lease in background.
+        // A backgrounded app without a walk renews on its next foreground return.
+        if (
+            !privacyStartupInspectionComplete ||
+            (
+                !isActivityForeground &&
+                    walkState != WalkSessionState.ACTIVE &&
+                    walkState != WalkSessionState.PAUSED
+                )
+        ) return
+        requestInRunGatewaySessionRenewal(session, GatewayInRunRenewalTrigger.PROACTIVE)
+    }
+
     private fun isCurrentGatewaySession(session: GatewayFieldSession): Boolean =
         isGatewaySessionReadyForCurrentActor(session)
+
+    private fun isCurrentIntegratedConsentSession(
+        session: GatewayFieldSession,
+        processGeneration: Long,
+    ): Boolean =
+        GatewaySessionProcessCoordinator.snapshot().let { snapshot ->
+            snapshot.generation == processGeneration &&
+                snapshot.session === session &&
+                isCurrentGatewaySession(session)
+        }
 
     private fun gatewayFailureUiGuardOrNull(
         session: GatewayFieldSession,
         expectedAuthenticationFailure: Boolean,
     ): GatewayFailureUiGuard? {
         if (expectedAuthenticationFailure) {
+            // login-F4: a rejected long-lived access credential gets one durable refresh first; its
+            // outcome (renewed login or the revocation reason notice) replaces this failure UI.
+            if (probeGatewaySessionAfterUnauthorized(session)) {
+                updateNavigationStatus("gateway=session_renewing reason=request_rejected")
+                speakInteraction("로그인을 확인하고 있습니다. 잠시 후 다시 시도하세요.")
+                return null
+            }
             val clearedGeneration = clearGatewaySession(
                 logoutRemote = false,
                 expectedSession = session,
@@ -11152,6 +12310,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     override fun onResume() {
         super.onResume()
+        // S04-27-F1: a capture silenced after the app had already left is retried on this return
+        // (not a second leave) once no call or other recorder holds the input; the notice follows.
+        if (pendingHandsFreeVoiceStartFailure == null ||
+            handsFreeVoiceStartRecovery.retriesOnNextForegroundReturn && !voiceInputHeldElsewhere()
+        ) {
+            handsFreeVoiceStartRecovery.onForegroundReturn()
+        }
         accountRequestFence.enteredForeground()
         feedbackLifecycleGeneration += 1
         isActivityForeground = true
@@ -11168,6 +12333,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         resumeWalkSafeRuntimeAfterPrivacyStartupInspection()
     }
 
+    override fun onStop() {
+        if (pendingHandsFreeVoiceStartFailure == null) {
+            handsFreeVoiceStartRecovery.onStopped()
+        }
+        super.onStop()
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (
@@ -11182,6 +12354,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection() {
+        retryPendingGatewayRenewal()
         retryPendingBackendDeviceRestore()
         if (permissionRecoveryGate.blocksAutomaticResourceStart) {
             permissionRecoveryGate = permissionRecoveryGate.recheckRequired()
@@ -11219,7 +12392,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         updateIntegratedConsentUi()
         updateReportPrivacyConsentUi()
         completePermissionRecoveryRecheckIfPossible()
-        maybeStartPausedReportQueueRecoveryObservation()
+        registerPostWalkPowerConnectedReceiver()
+        schedulePostWalkTransfers()
         if (postLoginDeviceCheckPermissionResultPending) {
             val permissionBinding = postLoginDeviceCheckPendingPermissionBinding
             postLoginDeviceCheckPermissionResultPending = false
@@ -11236,6 +12410,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             updateStatus("ARCore Depth 대기", "카메라 권한이 허용되었습니다. ARCore Depth를 시작할 수 있습니다.")
         }
         scheduleDeviceRuntimeCalibration()
+        showPendingHandsFreeVoiceStartFailure()
     }
 
     @SuppressLint("GestureBackNavigation")
@@ -11297,6 +12472,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     override fun onPause() {
+        invalidateGuidanceStopConfirmation()
         cancelDeviceRuntimeCalibration("backgrounded")
         runtimeLoadMonitor.pause()
         if (runtimeLoadObservationSourceHolder.isInitialized()) runtimeLoadObservationSource.pause()
@@ -11334,6 +12510,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountRequestFence.enteredBackground()
         emailOtpRequestRetryPolicy.suspendForLifecycle()
         cancelReportQueueDrain()
+        unregisterPostWalkPowerConnectedReceiver()
         if (!privacyStartupInspectionComplete) {
             isActivityForeground = false
             feedbackLifecycleGeneration += 1
@@ -11434,6 +12611,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     override fun onDestroy() {
+        window.decorView.removeCallbacks(gatewayRenewalRetryRunnable)
+        synchronized(fieldHeartbeatLock) {
+            fieldHeartbeatDestroyed = true
+            fieldSessionHeartbeatExecutor?.shutdownNow()
+            fieldSessionHeartbeatExecutor = null
+            fieldSessionHeartbeat = null
+        }
+        walkRuntimeSafetyStopDestroyed = true
+        walkRuntimeSafetyCoordinator.close()
+        walkRuntimeSafetyStopRetryRunnable?.let(cameraReleaseHandler::removeCallbacks)
+        walkRuntimeSafetyStopRetryRunnable = null
         if (runtimeLoadObservationSourceHolder.isInitialized()) runtimeLoadObservationSource.close()
         synchronized(frameStateLock) {
             detectorClosing = true
@@ -11464,6 +12652,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         unregisterGatewayCapacityNetworkObserver()
         cancelEncryptedRouteSnapshotExpirySchedule()
+        if (::routeSnapshotStore.isInitialized) routeSnapshotStore.detach()
         pendingPrivacyStartupReadyAction = null
         if (!privacyStartupInspectionComplete) {
             if (::accountDeletionActivityLease.isInitialized) {
@@ -11506,7 +12695,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (::gatewayWalkRenewalHandler.isInitialized) {
             gatewayWalkRenewalHandler.removeCallbacksAndMessages(null)
         }
-        gatewayWalkAuthorityController.reset()
+        postWalkRetryHandler.removeCallbacks(postWalkWalkInProgressRetry)
+        unregisterPostWalkPowerConnectedReceiver()
+        // S03-19: a configuration re-creation hands the paused walk (same id and lease) to the next
+        // Activity of this process; finishing and process death keep the reset/new-walk path.
+        val walkRetainedForConfigurationChange = isChangingConfigurations &&
+            ::walkSessionLifecycle.isInitialized &&
+            processWalkConfigurationChangeRetention.retain(
+                walkSessionLifecycle,
+                gatewayWalkAuthorityController,
+                SystemClock.elapsedRealtime(),
+            )
+        if (!walkRetainedForConfigurationChange) gatewayWalkAuthorityController.reset()
+        // S03-19-F2: callbacks this destroyed Activity already queued (renewal, gateway, detector)
+        // must not transition the walk it handed over; from here they reach a private placeholder
+        // lifecycle with a different epoch, while the next Activity owns the retained one.
+        if (walkRetainedForConfigurationChange) {
+            walkSessionLifecycle = WalkSessionLifecycle(elapsedRealtimeClock = SystemClock::elapsedRealtime)
+        }
         gatewayWalkStartConfirmationToken = null
         gatewayWalkTakeoverPromptPending = false
         gatewayWalkTakeoverPromptOperationId = null
@@ -11584,10 +12790,41 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             walkSessionPermissionRequestInFlight = false
         }
         if (!isPermissionRequestLeaseCurrent(lease)) return
-        val observed = currentObservedPermissionSnapshot()
-        val missingRequested = lease.requestedPermissions
-            .filterNot(observed::isGranted)
-            .toSet()
+        val requestExplanation = if (
+            lease.purpose == PermissionRequestPurpose.WALK_SESSION &&
+            permissions.size == grantResults.size
+        ) {
+            val answers = permissions.indices.mapNotNull { index ->
+                val permission = permissions[index]
+                if (permission !in lease.requestedAndroidPermissions) return@mapNotNull null
+                val kind = when (permission) {
+                    Manifest.permission.CAMERA -> PermissionExplanationKind.CAMERA
+                    Manifest.permission.ACCESS_FINE_LOCATION -> PermissionExplanationKind.PRECISE_LOCATION
+                    Manifest.permission.ACCESS_COARSE_LOCATION -> PermissionExplanationKind.APPROXIMATE_LOCATION
+                    Manifest.permission.RECORD_AUDIO -> PermissionExplanationKind.MICROPHONE
+                    Manifest.permission.ACTIVITY_RECOGNITION -> PermissionExplanationKind.ACTIVITY_RECOGNITION
+                    else -> null
+                }
+                kind?.let {
+                    PermissionRequestAnswer(
+                        permission = it,
+                        granted = grantResults[index] == PackageManager.PERMISSION_GRANTED,
+                        rationaleRecommended =
+                            grantResults[index] != PackageManager.PERMISSION_GRANTED &&
+                                shouldShowRequestPermissionRationale(permission),
+                    )
+                }
+            }
+            PermissionExplanationPolicy.afterRequest(
+                answers = answers,
+                coarseLocationCurrentlyGranted = ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ) == PackageManager.PERMISSION_GRANTED,
+            )
+        } else {
+            null
+        }
         if (lease.purpose == PermissionRequestPurpose.WALK_SESSION) {
             permissionRecoveryGate = PermissionRecoveryGate()
             persistPermissionRecoveryGate()
@@ -11607,13 +12844,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         applyObservedPermissionStateChange(
             "permission_result_${lease.purpose.name.lowercase(Locale.US)}",
         )
-        if (
-            lease.purpose == PermissionRequestPurpose.WALK_SESSION &&
-            missingRequested.isNotEmpty()
-        ) {
+        if (requestExplanation != null) {
             showPermissionDenialPanel(
-                missingPermissions = missingRequested,
+                missingPermissions = emptySet(),
                 reason = "permission_result_walk_session",
+                requestExplanation = requestExplanation,
             )
         }
     }
@@ -11661,6 +12896,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             generation = generation,
             firstRunLease = currentFirstRunAsyncLease(),
             requestedPermissions = requestedPermissions,
+            requestedAndroidPermissions = permissions.toSet(),
             postLoginBinding = postLoginBinding,
         )
         try {
@@ -11747,13 +12983,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             updateStatus(
                 "필수 권한 필요",
                 "보행 안내를 시작하지 않았습니다. 필요한 권한: " +
-                    missingRequired.joinToString(", ") { it.permissionLabelKo() },
+                    missingRequired.permissionGuidanceLabelsKo(),
             )
         } else if (missing.isNotEmpty()) {
             updateStatus(
                 "일부 기능 권한 없음",
                 "허용된 기능으로 계속합니다. 사용할 때 다시 확인할 권한: " +
-                    missing.joinToString(", ") { it.permissionLabelKo() },
+                    missing.permissionGuidanceLabelsKo(),
             )
         }
     }
@@ -11830,6 +13066,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         runtimeLoadNormalFrameAtMs = null
         runtimeLoadMonitor.reset()
         currentVisualTrackingBudgetNs = 5_000_000L
+        // S11-15: the ending generation's unstarted feedback goes with its pipeline and tracker.
+        feedbackPolicy.discardUnstartedFeedbackForTrackPrefix("visual-$visualGeometryVersion-")
         visualGeometryVersion += 1L
         lastVisualFrameKey = null
         lastRuntimeCameraFrameId = 0L
@@ -11849,6 +13087,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             nowElapsedRealtimeMs - capturedAt in 0L..MAX_DEPTH_DETECTION_SOURCE_AGE_MS
     }
 
+    /** S11-18: bounded field-log record of the operational acquisition failure counts. */
+    private fun recordDepthAcquisitionFailuresIfDue(provider: ArCoreFrameProvider, nowElapsedRealtimeMs: Long) {
+        val summary = provider.runtimeAcquisitionFieldLogSummaryIfDue(nowElapsedRealtimeMs) ?: return
+        if (::fieldSessionLog.isInitialized) {
+            fieldSessionLog.recordEvent("depth_acquisition_failures", mapOf("state" to summary))
+        }
+    }
+
     private fun captureVisualTrackingFrame(
         provider: ArCoreFrameProvider,
         frame: Frame,
@@ -11864,7 +13110,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             visualGeometryVersion
         }
         val gray = try {
-            provider.acquireCameraImageOrNull(frame)?.use { image ->
+            provider.acquireCameraImageOrNull(
+                frame, kr.co.hanium.dreamup.walksafe.depth.CameraImageConsumer.VISUAL_TRACKING,
+            )?.use { image ->
                 if (image.timestamp <= 0L || image.timestamp != snapshot.cameraImageTimestampNs) return@use null
                 val plane = image.planes.firstOrNull() ?: return@use null
                 GrayTrackingFrame.copyFromLuma(
@@ -11885,6 +13133,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             val admission = visualFrameTracker.offerFrame(gray)
             if (!admission.accepted) return null
             if (admission.reset) {
+                feedbackPolicy.discardUnstartedFeedbackForTrackPrefix("visual-$geometryVersion-")
                 currentObjectDepthPipeline = ObjectDepthRuntimePipeline(
                     rawDepthMotionOnly = true,
                     tracker = ObjectTracker(trackIdPrefix = "visual-$geometryVersion-${gray.key.frameId}-track-"),
@@ -11896,8 +13145,52 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
+    private fun startFieldSessionHeartbeat() {
+        synchronized(fieldHeartbeatLock) {
+            // S1617-37-F1: onDestroy may already have run on main while the startup inspection worker ran.
+            if (fieldHeartbeatDestroyed || fieldSessionHeartbeatExecutor != null) return
+            val heartbeat = FieldSessionHeartbeat(fieldSessionLog)
+            val executor = Executors.newSingleThreadScheduledExecutor { runnable ->
+                Thread(runnable, "walksafe-field-heartbeat").apply {
+                    isDaemon = true
+                    priority = Thread.MIN_PRIORITY
+                }
+            }
+            fieldSessionHeartbeat = heartbeat
+            fieldSessionHeartbeatExecutor = executor
+            executor.scheduleWithFixedDelay(
+                {
+                    runCatching {
+                        val now = SystemClock.elapsedRealtime()
+                        // Read-only freshness check: the main-thread location helper also clears state.
+                        val location = LocationTrustPolicy.freshOrNull(latestTrustedLocation, now)
+                        heartbeat.tick(
+                            now,
+                            FieldHeartbeatSensors(
+                                stepCount = latestStepCount,
+                                trustedLocationAvailable = location != null,
+                                locationAgeMs = location?.let { (now - it.elapsedRealtimeMs).coerceAtLeast(0L) },
+                                routeActive = isRouteActive,
+                                // S09-20 (pos-F10): Counter baseline state, enum name only.
+                                stepCounterBaseline = if (::stepTracker.isInitialized) {
+                                    stepTracker.counterBaselineState.name
+                                } else {
+                                    null
+                                },
+                            ),
+                        )
+                    }
+                },
+                FIELD_HEARTBEAT_INTERVAL_MS,
+                FIELD_HEARTBEAT_INTERVAL_MS,
+                java.util.concurrent.TimeUnit.MILLISECONDS,
+            )
+        }
+    }
+
     /** Keeps preview, coordinate mapping and depth acquisition on the same ARCore frame. */
     override fun onDrawFrame(gl: GL10?) {
+        fieldSessionHeartbeat?.onRenderCallback(SystemClock.elapsedRealtime())
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
@@ -11973,6 +13266,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 includeFullDepthWhenRawAvailable = includeFullDepthWhenRawAvailable,
             )
         }
+        // S14-25: read once per runtime frame so an old failure never stops a later frame.
+        val runtimeAcquisitionFailure =
+            if (arLease.purpose == ArSessionPurpose.PREFLIGHT) null else provider.consumeRuntimeAcquisitionFailure()
         val depthProcessingMs = SystemClock.elapsedRealtime() - depthProcessingStartedMs
         if (!isArSessionLeaseCurrent(arLease)) return
         if (arLease.purpose == ArSessionPurpose.PREFLIGHT) {
@@ -12000,6 +13296,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             observedAtElapsedRealtimeMs = elapsedRealtimeMs,
             expectedArSessionGeneration = arLease.generation,
             expectedWalkEpoch = walkEpoch,
+            acquisitionFailure = runtimeAcquisitionFailure,
         )
         synchronized(frameStateLock) {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
@@ -12033,6 +13330,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
         val currentFrameTracking = frame.camera.trackingState == TrackingState.TRACKING
         if (!currentRuntimeVisualDepthProcessingAllowsWork(arLease, frame.timestamp, currentFrameTracking)) {
+            // S11-18: acquisition failure counts stay logged (and visible below) while tracking is lost.
+            recordDepthAcquisitionFailuresIfDue(provider, elapsedRealtimeMs)
             if (cameraScreenVisible && elapsedRealtimeMs - lastCameraScreenFrameUiMs >= 250L) {
                 lastCameraScreenFrameUiMs = elapsedRealtimeMs
                 val observed = latestDetectionSnapshot
@@ -12043,7 +13342,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     grayFrame?.sourceWidth, grayFrame?.sourceHeight)
                 val message = "ARCore ${frame.camera.trackingState}\n${snapshot.statusTextForNoDetection()}\n" +
                     observed.debugStatusText(nowMs, timestampMs,
-                        MAX_OVERLAY_DETECTION_SOURCE_AGE_MS, MAX_OVERLAY_DETECTION_FRAME_DELTA_MS)
+                        MAX_OVERLAY_DETECTION_SOURCE_AGE_MS, MAX_OVERLAY_DETECTION_FRAME_DELTA_MS) +
+                    "\ndepthAcquisitionFailures=${provider.runtimeAcquisitionDiagnostics()}"
                 val displayFrameId = observed.frameEvidence?.frameId ?: frame.timestamp
                 runOnUiThread {
                     if (cameraScreenVisible && isArSessionLeaseCurrent(arLease)) {
@@ -12083,14 +13383,31 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         detectionSequenceId = evidence.frameId,
                         detectionCompleted = true,
                         mapper = requireNotNull(evidence.depthMapper),
+                        mapperFrameId = evidence.depthMapper.frameId,
                         motionContext = evidence.motionContext,
                         imageQuarterTurns = evidence.imageQuarterTurns,
-                    )
+                    ).map { output ->
+                        bindLegacyFeedbackToCapture(
+                            output = output,
+                            sourceFrameId = evidence.frameId,
+                            sourceTimestampMs = evidence.frameTimestampMs,
+                            sourceCapturedAtElapsedRealtimeMs = detectionSnapshot.capturedAtElapsedRealtimeMs
+                                ?.takeIf { capturedAt ->
+                                    detectionSnapshot.frameEvidence?.frameId == evidence.frameId &&
+                                        evidence.visualFrameKey?.let { key ->
+                                            key.frameId == evidence.frameId &&
+                                                key.capturedAtElapsedRealtimeMs == capturedAt
+                                        } != false
+                                },
+                            nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                        )
+                    }
                 }
             }
         } else null
         val frozenReportOutputs = frozenPreparedFrame?.frame?.guidance?.outputs.orEmpty()
-        val trackingPriority = PrimaryTrackingPriorityPolicy.sourceIndices(
+        // S10-21: measured risks, then walking-corridor obstacles whose distance is uncertain.
+        val trackingPriority = PrimaryTrackingPriorityPolicy.schedulingIndices(
             detectionSnapshot.detections, frozenReportOutputs,
             detectionSnapshot.frameEvidence?.frameId ?: 0L, detectionSnapshot.sourceAgeMs(nowMs))
         val trackingProcessingStartedMs = SystemClock.elapsedRealtime()
@@ -12106,6 +13423,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 prioritySourceIndices = trackingPriority,
             )
         }
+        // Lost/competing/entering/untracked objects: ask for the next detection early (bounded by pacing).
+        if (trackingResult?.redetectRequested == true) {
+            adaptiveInferencePacing.requestEarlyStart(SystemClock.elapsedRealtime())
+        }
         runtimeLoadObservationSource.recordFrame(
             cameraTimestampNs = snapshot.cameraImageTimestampNs ?: frame.timestamp,
             observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
@@ -12118,7 +13439,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             val currentViewBasis = FloatArray(6)
             frame.transformCoordinates2d(Coordinates2d.IMAGE_NORMALIZED,
                 floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f), Coordinates2d.VIEW, currentViewBasis)
-            DetectionFrameEvidence(
+            val currentImageQuarterTurns = UprightCameraImage.quarterTurns(currentViewBasis)
+            if (currentImageQuarterTurns == null) null else DetectionFrameEvidence(
                 frameId = frame.timestamp,
                 frameTimestampMs = timestampMs,
                 depthSnapshot = snapshot,
@@ -12131,7 +13453,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 navigationActive = isRouteActive && !routeRequestInFlight.get(),
                 tmapOnRoute = latestTmapOnRoute,
                 visualFrameKey = grayFrame.key,
-                imageQuarterTurns = UprightCameraImage.quarterTurns(currentViewBasis),
+                imageQuarterTurns = currentImageQuarterTurns,
             )
         } else null
         val currentObservation = if (trackingResult != null && currentEvidence != null) {
@@ -12149,15 +13471,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             "visual=${overlayDetections.size}/${result.observations.size} " +
                 "cost=${result.metrics.durationNs / 1_000_000L}ms " +
                 "budget=${result.metrics.executionBudgetNs / 1_000_000L}ms overrun=${result.metrics.executionBudgetOverrun} " +
-                "lost=${result.observations.mapNotNull { it.failure }.distinct().joinToString()}"
+                "lost=${result.observations.mapNotNull { it.failure }.distinct().joinToString()} " +
+                "redetect=${result.redetectReasons.joinToString()}"
         } ?: "visual=source_or_current_image_unavailable"
         if (!currentRuntimeVisualDepthProcessingAllowsWork(arLease, frame.timestamp, currentFrameTracking)) return
-        val currentFrame = tactileFrameCoordinator.processTrackedObservation(
+        val rawCurrentFrame = tactileFrameCoordinator.processTrackedObservation(
             frame = currentObservation,
             nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
             navigationActiveNow = isRouteActive && !routeRequestInFlight.get(),
             tmapOnRouteNow = latestTmapOnRoute,
             activeRouteId = routeNavigator.currentRouteId(),
+            activeRouteProgress = routeNavigator.currentTactileRouteProgress(),
         ) { observation, evidence ->
             synchronized(frameStateLock) {
                 if (!isCurrentFrameGeneration(frameGeneration, walkEpoch) ||
@@ -12173,18 +13497,35 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 )
             }
         }
+        val safeGuidance = rawCurrentFrame.guidance.let { guidance ->
+            val uncertainTactileState = AndroidRiskSelectionPolicy.hasConflictingTactileState(guidance.outputs)
+            guidance.copy(
+                observation = if (uncertainTactileState) null else guidance.observation,
+                decision = if (uncertainTactileState) guidance.decision.copy(
+                    mode = kr.co.hanium.dreamup.walksafe.navigation.LocalRouteMode.TMAP,
+                    steering = null,
+                    reason = "conflicting_tactile_state",
+                    instruction = null,
+                ) else guidance.decision,
+            )
+        }
+        val currentFrame = rawCurrentFrame.copy(guidance = safeGuidance)
         val preparedTactileFrame = ProductionPreparedTactileFrameDispatch(currentFrame)
         val tactileFrame = preparedTactileFrame.frame
         synchronized(frameStateLock) {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
             latestTactileRouteState =
-                "localRoute=${tactileFrame.guidance.decision.mode.wireValue}:${tactileFrame.guidance.decision.reason}"
+                "localRoute=${tactileFrame.guidance.decision.mode.wireValue}:${tactileFrame.guidance.decision.reason} " +
+                    tactileFrame.guidance.observationDiagnosticsText()
         }
         val matchedEvidence = tactileFrame.matchedEvidence
         val depthDetections = tactileFrame.depthDetections
         val depthMapper = matchedEvidence?.depthMapper
         val depthInputDetections = if (depthMapper == null) emptyList() else depthDetections
-        val guidanceOutputs = tactileFrame.guidance.outputs
+        val guidanceOutputs = AndroidRiskSelectionPolicy.resolveConflictingStateFeedback(
+            tactileFrame.guidance.outputs,
+            nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+        )
         val bestOutput = AndroidRiskSelectionPolicy.selectBestOutput(guidanceOutputs)
         val currentCapturedAtElapsedMs = grayFrame?.key?.capturedAtElapsedRealtimeMs
         val reportOutput = AndroidRiskSelectionPolicy.selectReportOutput(frozenReportOutputs)
@@ -12195,6 +13536,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
         val feedbackGateOutput = prioritizedFeedbackOutputs.firstOrNull { output ->
             output.source.metric && output.confidence.finalScore >= FEEDBACK_MIN_DEPTH_CONFIDENCE
+        }
+        val qualitativeFeedbackGateOutput = guidanceOutputs.firstOrNull { output ->
+            output.isCurrentQualitativeCaution(SystemClock.elapsedRealtime())
         }
         val shouldUpdateOverlay = synchronized(frameStateLock) {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
@@ -12256,6 +13600,31 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return
         if (!currentRuntimeMetricOutputAllowsWork(arLease.generation)) {
+            val qualitativeNowMs = SystemClock.elapsedRealtime()
+            val qualitativeOutputs = AndroidRiskSelectionPolicy.resolveConflictingStateFeedback(
+                tactileFrame.guidance.outputs,
+                nowElapsedRealtimeMs = qualitativeNowMs,
+            ).filter { it.isCurrentQualitativeCaution(qualitativeNowMs) }
+            val qualitativeRuntimeReady = currentRuntimeVisualDepthProcessingAllowsWork(
+                arLease,
+                frame.timestamp,
+                currentFrameTracking,
+            )
+            val qualitativeGateState = buildDeviceGateState(
+                bestOutput = null,
+                staleReason = null,
+                expectedRuntimeMetricGeneration = arLease.generation,
+                qualitativeOutput = qualitativeOutputs.firstOrNull(),
+                qualitativeRuntimeReady = qualitativeRuntimeReady,
+            )
+            dispatchTactileFrameFeedback(
+                frame = tactileFrame.copy(guidance = tactileFrame.guidance.copy(outputs = qualitativeOutputs)),
+                stale = !qualitativeRuntimeReady,
+                deviceGateAllowsAlerts = qualitativeGateState.alertsAllowed,
+                nowMs = qualitativeNowMs,
+                independentFreshOutputs = emptyList(),
+                warningContext = null,
+            )
             if (cameraScreenVisible && elapsedRealtimeMs - lastCameraScreenFrameUiMs >= 250L) {
                 lastCameraScreenFrameUiMs = elapsedRealtimeMs
                 var renderedGapStatus: String? = null
@@ -12323,6 +13692,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             bestOutput = feedbackGateOutput,
             staleReason = if (independentFeedbackBatches.isNotEmpty()) null else captureLogEntry.staleReason,
             expectedRuntimeMetricGeneration = arLease.generation,
+            qualitativeOutput = qualitativeFeedbackGateOutput,
         )
         val reportGateState = buildDeviceGateState(
             bestOutput = automaticReportOutput,
@@ -12343,6 +13713,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 !isCurrentFrameGeneration(frameGeneration, walkEpoch) ||
                 !currentRuntimeMetricOutputAllowsWork(arLease.generation)
             ) return
+            fieldSessionHeartbeat?.onFrameProduced(SystemClock.elapsedRealtime())
             fieldSessionLog.appendTelemetry(
                 entry = captureLogEntry,
                 runtime = FieldRuntimeSnapshot(
@@ -12368,6 +13739,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 reportGateState = reportGateState,
                 explicitReportOutput = reportOutput,
                 explicitReportGateState = explicitReportGateState,
+                explicitReportDamageWithoutDepth =
+                    AndroidRiskSelectionPolicy.hasReportableDamageWithoutReportDepth(frozenReportOutputs),
+                explicitReportConflictingState =
+                    AndroidRiskSelectionPolicy.hasConflictingReportDamage(frozenReportOutputs),
                 reportImage = detectionSnapshot.reportImage,
                 nowMs = nowMs,
                 capturedAtMs = detectionSnapshot.capturedAtMs ?: nowMs,
@@ -12399,6 +13774,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         }
         if (!shouldUpdateUi) return
+        // Bounded operational acquisition counters distinguish missing Raw, pair mismatch, expiry,
+        // resource exhaustion and lost tracking instead of one generic "no depth" state.
+        val depthAcquisitionStatus = "depthAcquisitionFailures=${provider.runtimeAcquisitionDiagnostics()}"
+        recordDepthAcquisitionFailuresIfDue(provider, elapsedRealtimeMs)
 
         runOnUiThread {
             if (!isCurrentFrameGeneration(frameGeneration, walkEpoch)) return@runOnUiThread
@@ -12410,7 +13789,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         "${detectionSnapshot.debugStatusText(nowMs, timestampMs, MAX_OVERLAY_DETECTION_SOURCE_AGE_MS, MAX_OVERLAY_DETECTION_FRAME_DELTA_MS)}\n" +
                         "$gateText · $latestTactileRouteState · ${feedbackActuatorStatusText()} · $latestReportCandidateStatus · steps=$latestStepCount stepLength=${meters(stepLengthEstimator.stepLengthM)}\n" +
                         "${currentUserMotionStatusText()}\n" +
-                        "${adaptiveInferencePacingStatusText()}\n${latestVisualTrackingStatus}\n" +
+                        "${adaptiveInferencePacingStatusText()}\n${latestVisualTrackingStatus}\n$depthAcquisitionStatus\n" +
                         "$detectorStatusText\n$unknownRuntimeStatus\n" +
                         "${metadataLogUploader.statusText()}\n" +
                         captureLog.summaryText(),
@@ -12423,7 +13802,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         "${bestOutput.debugGeometryText()}\n" +
                         "$gateText · $latestTactileRouteState · ${feedbackActuatorStatusText()} · $latestReportCandidateStatus · steps=$latestStepCount stepLength=${meters(stepLengthEstimator.stepLengthM)}\n" +
                         "${currentUserMotionStatusText()}\n" +
-                        "${adaptiveInferencePacingStatusText()}\n${latestVisualTrackingStatus}\n" +
+                        "${adaptiveInferencePacingStatusText()}\n${latestVisualTrackingStatus}\n$depthAcquisitionStatus\n" +
                         "$detectorStatusText\n$unknownRuntimeStatus\n" +
                         "${metadataLogUploader.statusText()}\n" +
                         captureLog.summaryText(),
@@ -12594,7 +13973,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         observedAtElapsedRealtimeMs: Long,
         expectedArSessionGeneration: Long,
         expectedWalkEpoch: WalkRuntimeEpoch,
+        acquisitionFailure: kr.co.hanium.dreamup.walksafe.depth.DepthAcquisitionFailureReason? = null,
     ) {
+        val acquisitionFatal = acquisitionFailure?.stopsImmediately == true
         val activation = synchronized(runtimeMetricStateLock) {
             if (
                 !isWalkSessionRuntimeActive() ||
@@ -12635,7 +14016,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         isStartupCapabilityConfirmed()
                 if (!stillCurrent) {
                     runtimeMetricOutputAllowed = false
-                } else if (result.status == RuntimeMetricPreflightStatus.AVAILABLE) {
+                } else if (result.status == RuntimeMetricPreflightStatus.AVAILABLE && !acquisitionFatal) {
                     runtimeMetricOutputAllowed = frameEvidence.tracking &&
                         frameEvidence.metricDepthAvailable &&
                         frameEvidence.validMetricSamplesInRange >=
@@ -12649,7 +14030,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     runtimeVisualDepthFrameTracking = frameEvidence.tracking && runtimeMetricOutputAllowed
                 } else {
                     runtimeMetricOutputAllowed = false
-                    lost = result.status == RuntimeMetricPreflightStatus.UNKNOWN
+                    lost = result.status == RuntimeMetricPreflightStatus.UNKNOWN || acquisitionFatal
                 }
             }
             if (activated) {
@@ -12688,6 +14069,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 lastValidFrameAtElapsedRealtimeMs = runtimeMetricLastValidFrameAtMs,
                 samplesAreValid = samplesAreValid,
                 staleTimeoutMs = RUNTIME_METRIC_STALE_TIMEOUT_MS,
+                acquisitionFailure = acquisitionFailure,
             )
             if (assessment.isNewFrame) {
                 runtimeMetricLastFrameTimestampNanos = frame.timestamp
@@ -12735,11 +14117,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ArCoreApk.getInstance().checkAvailability(this)
         }.getOrDefault(ArCoreApk.Availability.UNKNOWN_ERROR)
         stopDepthSession(closeSession = true)
-        updateStatus(
-            "미터 거리 기능 제한",
-            "실제 거리 프레임을 더 이상 확인할 수 없어 미터 거리 안내만 제한했습니다. " +
-                "현재 사용 가능한 다른 기능은 계속됩니다.",
-        )
+        // S03-6/S03-7: no "다른 기능은 계속" notice here. The fallback request ends in a safety stop
+        // (mode change) or a recheck, and each of those sets its own status.
         requestCameraFallbackStart(CameraFallbackStartReason.RUNTIME_METRIC_LOST, availability)
     }
 
@@ -13077,6 +14456,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             gatewayVoiceRecorder?.isRecording != true && activeGatewaySpeechInteraction == null
 
     private fun cancelForegroundHomeWakeListening(resetFailure: Boolean = false) {
+        invalidateForegroundHomeWakeInput()
         foregroundHomeWakeGeneration += 1L
         foregroundHomeWakeOwnerIsCurrent = null
         val probe = foregroundHomeWakeProbe
@@ -13091,7 +14471,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         foregroundHomeWakeAcknowledgement?.cancel()
     }
 
-    private fun acknowledgeForegroundHomeWake(command: kr.co.hanium.dreamup.walksafe.voice.VoskTranscript?) {
+    private fun acknowledgeForegroundHomeWake(
+        command: kr.co.hanium.dreamup.walksafe.voice.VoskTranscript?,
+        expectedNavigationDecisionToken: RouteNavigatorDecisionToken?,
+    ) {
         cancelForegroundHomeWakeAcknowledgement()
         showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)
         val actor = reporterUserId ?: return
@@ -13119,6 +14502,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!isCurrent()) return
         // The lease exists before play: an unavailable tone can fail synchronously.
         if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeVoiceInput", "event=HOME_WAKE_ACK_REQUESTED")
+        invalidateForegroundHomeWakeInput()
         player.play { result ->
             if (!isCurrent()) return@play
             foregroundHomeWakeAcknowledgementGeneration += 1L
@@ -13138,7 +14522,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 handleVoiceCommandPhrases(
                     phrases = listOf(command.text),
                     confidenceScores = floatArrayOf(command.confidence ?: Float.NaN),
-                    expectedNavigationDecisionToken = routeNavigator.pendingDecisionToken(),
+                    expectedNavigationDecisionToken = expectedNavigationDecisionToken,
                     includeRecognizedTextInStatus = false,
                     redactedRecognitionSource = "on_device_home_wake",
                     resultBackend = OfflineSpeechEngine.VOSK,
@@ -13163,6 +14547,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val generation = ++foregroundHomeWakeGeneration
         val actor = reporterUserId
         val processGeneration = GatewaySessionProcessCoordinator.snapshot().generation
+        val expectedNavigationDecisionToken = routeNavigator.pendingDecisionToken()
         val isCurrent = {
             foregroundHomeWakeGeneration == generation &&
                 reporterUserId == actor &&
@@ -13188,6 +14573,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             context = this,
             modelDirectory = directory,
             listenUntilWake = true,
+            inputGeneration = foregroundHomeWakeInputGeneration::get,
             isInputSuppressed = {
                 !isActivityForeground || nativeUiPage != NativeUiPage.HOME ||
                     voiceRecognitionActive || isHandsFreeVoiceRecognitionBlocked()
@@ -13211,7 +14597,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         if (BuildConfig.DEBUG) {
                             android.util.Log.d("WalkSafeVoiceInput", "event=HOME_WAKE_HANDOFF backend=VOSK")
                         }
-                        acknowledgeForegroundHomeWake(result.commandTranscript)
+                        acknowledgeForegroundHomeWake(
+                            result.commandTranscript, expectedNavigationDecisionToken,
+                        )
                     } else {
                         // A passive render must not create an unbounded failure/restart loop.
                         foregroundHomeWakeFailed = true
@@ -13324,6 +14712,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun showNativeUiPage(page: NativeUiPage, preserveVoiceInteraction: Boolean) {
+        if (nativeUiPage != page && !preserveVoiceInteraction) invalidateGuidanceStopConfirmation()
         if (nativeUiPage != page) cancelDeviceRuntimeCalibration("page_changed")
         if (!preserveVoiceInteraction) cancelForegroundHomeWakeAcknowledgement()
         cancelForegroundHomeWakeListening(resetFailure = true)
@@ -13475,7 +14864,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             nativeGuidanceControls.visibility =
                 if (featureVisible && nativeUiPage == NativeUiPage.GUIDANCE) View.VISIBLE else View.GONE
             nativeVoiceControls.visibility =
-                if (featureVisible && nativeUiPage == NativeUiPage.VOICE_COMMAND) View.VISIBLE else View.GONE
+                if (featureVisible && nativeUiPage.isVoiceInteractionPage()) View.VISIBLE else View.GONE
             gatewayVoiceStatusText.visibility = nativeVoiceControls.visibility
             val preparingDestination = nativeUiPage == NativeUiPage.GUIDANCE
             if (nativeUiPage == NativeUiPage.DESTINATION_CONFIRM) {
@@ -13804,7 +15193,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val needsKoreanVoice = startupCapabilityDecision?.unavailableRequirements
             ?.contains(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS) == true
         show(voiceDataInstallButton, deviceScreen && needsKoreanVoice)
-        voiceDataInstallButton.text = "한국어 음성 데이터 설치"
+        offlineKoreanSpeechGuidance().let { guidance ->
+            voiceDataInstallButton.text = guidance.actionLabel
+            voiceDataInstallButton.contentDescription = guidance.actionContentDescription
+        }
         if (needsKoreanVoice) startupMetricPreflightButton.isEnabled = false
         show(postLoginDeviceCheckSettingsButton,
             deviceScreen && deviceState == PostLoginDeviceCheckState.FAIL &&
@@ -14038,6 +15430,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             actorId == priorityUserOnboardingActorId && postLoginDeviceCheckPassesFeatureGate() &&
             priorityUserOnboardingPolicy.accountBlockReason() == null
         val playing = priorityUserEducationInFlight || priorityUserPracticeInFlight != null
+        // S02-11: with TalkBack the buttons confirm what TalkBack read instead of starting app speech.
+        val screenReaderReview = isScreenReaderActive()
         val educationPlaying = priorityUserEducationInFlight && !priorityUserEducationPlaybackIsPracticeNecessity
         val necessityPlaying = priorityUserEducationInFlight && priorityUserEducationPlaybackIsPracticeNecessity
         val playback = if (!priorityUserEducationInFlight) null else when {
@@ -14055,7 +15449,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         priorityUserEducationBodyText.contentDescription = body
         priorityUserEducationProgressText.visibility = if (showAnyEducation) View.VISIBLE else View.GONE
         val progress = PriorityUserEducationPresentation.progressNotice(
-            state, playback, priorityUserPracticeInFlight, hazardResponseReady,
+            state, playback, priorityUserPracticeInFlight, hazardResponseReady, screenReaderReview,
         )
         if (priorityUserEducationProgressText.text.toString() != progress) {
             priorityUserEducationProgressText.text = progress
@@ -14109,6 +15503,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         priorityUserEducationButton.text = when {
             priorityUserPracticeInFlight != null -> "이번 연습 중지"
             educationPlaying -> if (showPosture) "사전 연습 듣기 중지" else "1. 안전 제한 안내 듣기 중지"
+            screenReaderReview && showPosture ->
+                if (state.appUsageReviewed) "사전 연습 설명 확인 완료" else "사전 연습 설명을 화면에서 모두 확인했습니다"
+            screenReaderReview ->
+                if (state.educationReviewed) "1. 안전 제한 안내 확인 완료" else "1. 안전 제한 안내를 화면에서 모두 확인했습니다"
             showPosture && state.appUsageReviewed -> "사전 연습 다시 듣기"
             showPosture -> "사전 연습 듣기"
             state.educationReviewed -> "1. 안전 제한 안내 다시 듣기"
@@ -14116,6 +15514,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         priorityUserPracticeNecessityButton.text = when {
             necessityPlaying -> "2. 연습 필요성 듣기 중지"
+            screenReaderReview ->
+                if (state.practiceNecessityReviewed) "2. 연습 필요성 확인 완료" else "2. 연습 필요성을 화면에서 모두 확인했습니다"
             state.practiceNecessityReviewed -> "2. 연습 필요성 다시 듣기"
             else -> "2. 연습 필요성 듣기"
         }
@@ -14205,6 +15605,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (priorityUserOnboardingActorId != actorId || policy.accountBlockReason() != null ||
             priorityUserEducationInFlight || priorityUserPracticeInFlight != null ||
             (practiceNecessity && !state.educationReviewed)) return
+        if (isScreenReaderActive()) {
+            // S02-11 / FP-010-DETAIL-03 interim: TalkBack reads this screen; the app voice stays off and
+            // the button records the user's confirmation as a screen review (never as speech success).
+            confirmNativeEducationWithScreenReader(policy, usageEducation, practiceNecessity)
+            return
+        }
         val usageToken = if (usageEducation) policy.beginAppUsageEducationPlayback() ?: return else null
         stopAccountConsentSpeech()
         if (voiceRecognitionActive) cancelVoiceCommandRecognition()
@@ -14282,6 +15688,26 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (dispatch != NavigationSpeechDispatchResult.ACCEPTED) failed()
         }
         dispatchWhenReady()
+    }
+
+    private fun confirmNativeEducationWithScreenReader(
+        policy: PriorityUserOnboardingPolicy,
+        usageEducation: Boolean,
+        practiceNecessity: Boolean,
+    ) {
+        if (!beginPriorityUserProfileMutationOrFailClosed()) return
+        policy.confirmEducationReviewedWithScreenReader(
+            step = when {
+                usageEducation -> PriorityUserEducationPlayback.APP_USAGE
+                practiceNecessity -> PriorityUserEducationPlayback.PRACTICE_NECESSITY
+                else -> PriorityUserEducationPlayback.SAFETY_LIMITS
+            },
+            screenReaderActive = isScreenReaderActive(),
+        )
+        if (!persistPriorityUserOnboardingOrFailClosed()) {
+            updateStatus("확인 기록 저장 실패", "화면 확인 기록을 저장하지 못해 다음 단계를 열지 않습니다. 다시 시도하세요.")
+        }
+        updateNativeSafetyEducationUi()
     }
 
     private fun acceptNativeSafetyEducation() {
@@ -14528,6 +15954,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun beginDevelopmentGuidanceImmediately(walk: WalkSessionSnapshot) {
         if (!isActivityForeground || gatewayWalkStartConfirmationToken != null) return
+        android.util.Log.d(
+            "WalkSafeNavigation",
+            "event=GUIDANCE_START_BYPASS_REQUESTED build_marker=${BuildConfig.WALKSAFE_BUILD_MARKER}",
+        )
         cancelDeviceRuntimeCalibration("guidance_start_requested")
         invalidateOfficialEnvironmentEvidence("debug_guidance_start")
         invalidatePhoneMountingEvidence("debug_guidance_start")
@@ -14639,9 +16069,61 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val gatewayGeneration: Long,
         val destination: RoutePoint,
     )
+    // S06-40: a candidate chosen by voice while walking waits here for a separate "길안내 시작".
+    private val walkingDestinationChange =
+        kr.co.hanium.dreamup.walksafe.navigation.WalkingDestinationChangeConfirmation<Triple<String, Long, WalkRuntimeEpoch>>()
     private val pendingExplicitRouteStart =
         PendingExplicitRouteStart<ExplicitRouteStartContext>(ROUTE_START_LOCATION_TIMEOUT_MS)
     private var pendingExplicitRouteStartTimeout: Runnable? = null
+    /**
+     * S21-32: read-only observation for the opt-in real-Activity navigation fixture (androidTest).
+     * It reports state the UI does not show; it never opens, relaxes or completes a walk/route gate.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal data class NavigationFixtureObservation(
+        val homeFeatureContextAvailable: Boolean,
+        val destinationSearchAllowed: Boolean,
+        val runtimeEpochPresent: Boolean,
+        val routeRequestInFlight: Boolean,
+        val routeActive: Boolean,
+        val routeRequestGeneration: Int,
+        val pendingUiDestination: DestinationSearchResult?,
+        val currentDestination: RoutePoint?,
+        val explicitRouteStartPending: Boolean,
+        val nativeUiPage: String,
+    )
+    @androidx.annotation.VisibleForTesting
+    internal fun navigationFixtureObservation(): NavigationFixtureObservation = NavigationFixtureObservation(
+        homeFeatureContextAvailable = nativeHomeFeatureContextAvailable(),
+        destinationSearchAllowed = currentDestinationSearchAllowsWork(),
+        runtimeEpochPresent = ::walkSessionLifecycle.isInitialized &&
+            walkSessionLifecycle.currentRuntimeEpochOrNull() != null,
+        routeRequestInFlight = routeRequestInFlight.get(),
+        routeActive = isRouteActive,
+        routeRequestGeneration = routeRequestGeneration,
+        pendingUiDestination = pendingUiDestination,
+        currentDestination = currentDestination,
+        explicitRouteStartPending = pendingExplicitRouteStart.currentOrNull() != null,
+        nativeUiPage = nativeUiPage.name,
+    )
+    /** Fixture input only: the destination-search callback (no speech recognizer or place provider). */
+    @androidx.annotation.VisibleForTesting
+    internal fun deliverDestinationSearchResultForFixture(result: DestinationSearchResult) {
+        check(BuildConfig.DEBUG) { "debug-only fixture seam" } // S21-32-F1: release refuses mutation.
+        openNativeDestinationConfirmation(result)
+    }
+    /** Fixture input only: disarms the future automatic route callback; the real prewalk stays active. */
+    @androidx.annotation.VisibleForTesting
+    internal fun disarmPendingDestinationForFixture() {
+        check(BuildConfig.DEBUG) { "debug-only fixture seam" }
+        pendingUiDestination = null
+    }
+    /** Failure-only fixture input: drops the trusted fix; it never invents a position or opens a gate. */
+    @androidx.annotation.VisibleForTesting
+    internal fun dropTrustedLocationForFixture() {
+        check(BuildConfig.DEBUG) { "debug-only fixture seam" }
+        latestTrustedLocation = null
+    }
 
     private fun openNativeDestinationConfirmation(result: DestinationSearchResult) {
         if (!currentDestinationSearchAllowsWork()) {
@@ -14655,8 +16137,44 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         showNativeUiPage(NativeUiPage.DESTINATION_CONFIRM)
     }
 
-    private fun nativeDestinationConfirmationMessage(): String =
-        pendingUiDestination?.name ?: "목적지를 선택해 주세요."
+    private fun nativeDestinationConfirmationMessage(): String {
+        // Confirm the selected candidate itself (its id and search-time fields). A name/point lookup in
+        // the live list loses the address once the list is cleared and can pick a same-name neighbour.
+        val destination = pendingUiDestination ?: return "목적지를 선택해 주세요."
+        val address = destination.displayAddressOrNull()
+        // S06-31: the confirmation screen is never more precise than the search origin either.
+        val distance = destination.distanceM?.let {
+            "검색 시점 기준 ${approximateDestinationDistanceKo(it, destinationSearchOrigin?.accuracyM)}"
+        }
+        // S06-30: the kind of that distance (straight line or provider radius), never a walking distance.
+        val distanceKind = destination.distanceM?.let {
+            kr.co.hanium.dreamup.walksafe.navigation.destinationDistanceKindKo(destination.distanceSource)
+        }
+        val originNotice = destinationOriginUncertaintyNoticeKo(destinationSearchOrigin)
+        // S06-31: the confirmation also says when the search origin is old.
+        val originAgeNotice = kr.co.hanium.dreamup.walksafe.navigation.destinationOriginAgeNoticeKo(
+            destinationSearchOrigin,
+            SystemClock.elapsedRealtime(),
+        )
+        return listOfNotNull(destination.name, address, distance, distanceKind, originNotice, originAgeNotice)
+            .joinToString(", ")
+    }
+
+    /**
+     * Same-name places stay distinguishable: repeat the address the candidate was read with.
+     * S06-7: the chosen candidate is also said with its search-time distance basis, in the HOME and
+     * the walking branch alike (the walking branch has no confirmation screen before "길안내 시작").
+     */
+    private fun selectedDestinationSpeechKo(selected: DestinationSearchResult): String =
+        listOfNotNull(
+            selected.displayAddressOrNull()?.let { "${selected.name}, ${it}에 있는 장소를 선택했습니다." }
+                ?: "${selected.name} 목적지를 선택했습니다.",
+            kr.co.hanium.dreamup.walksafe.navigation.selectedDestinationDistanceSentenceKo(
+                selected,
+                destinationSearchOrigin,
+                SystemClock.elapsedRealtime(),
+            ),
+        ).joinToString(" ")
 
     private fun clearNativeDestinationSearchState() {
         if (nativePrewalkStartEpoch != null && !isWalkSessionRuntimeActive()) {
@@ -14672,6 +16190,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         destinationSearchQuery = ""
         destinationSearchPage = 1
         destinationSearchResults.clear()
+        destinationSearchOrigin = null
         destinationSearchVoiceState = null
         pendingUiDestination = null
         destinationQueryInput.text?.clear()
@@ -14785,10 +16304,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val cameraOutputAvailable = cameraEngineStarted && currentFeedbackDeviceGateAllowsAlerts()
         val cameraReason = when {
             !hasCameraPermission() -> "카메라 권한이 없어 객체인식을 사용할 수 없습니다."
+            runningDetectorBlocksWalkEntry() ->
+                kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness.WALK_BLOCK_NOTICE_KO
             !cameraAnalysisFeaturesEnabled() -> "현재 기기 기능 설정에서 카메라 안내를 사용할 수 없습니다."
             !developmentGuidanceStartBypassEnabled && !mounting.canStartOrResumeDetection ->
                 mounting.accessibleReasonKo + "\n" + mounting.accessibleActionKo
             !detectorAvailable -> "객체인식 모델이 아직 준비되지 않았습니다."
+            cameraEngineStarted && !cameraOutputAvailable &&
+                runningDetectorVerification.state(frameDetector) !=
+                kr.co.hanium.dreamup.walksafe.inference.RunningDetectorVerificationState.VERIFIED ->
+                kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness.CHECKING_NOTICE_KO
             cameraEngineStarted && !cameraOutputAvailable ->
                 "객체인식 엔진이 준비됐지만 실제 안내 출력 조건을 확인하고 있습니다."
             else -> null
@@ -14824,7 +16349,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             presentation.routeMessageKo,
             presentation.cameraMessageKo,
             if (developmentGuidanceStartBypassEnabled)
-                "시험 모드: 환경·장착·성능 기준으로 안내 시작을 차단하지 않습니다."
+                "시험용 우회 켜짐 [${BuildConfig.WALKSAFE_BUILD_MARKER}]: 환경·장착·성능 기준으로 안내 시작을 차단하지 않습니다."
             else if (isWalkSessionRuntimeActive())
                 officialEnvironmentMeasurementDetail(currentOfficialEnvironmentAssessment()).trim()
             else nativeDestinationPreparationMessage(),
@@ -15576,7 +17101,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountPasswordInput = EditText(this).apply {
             id = View.generateViewId()
             hint = "비밀번호"
-            contentDescription = "계정 비밀번호 입력, 10자 이상 128자 이하"
+            contentDescription = "계정 비밀번호 입력, 새 비밀번호는 12자 이상 128자 이하"
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -15607,13 +17132,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "거부하면 가입할 수 없습니다. [선택] 원본·진단수집 raw v2: 탐지·성능 메타데이터와 " +
                 "chunk 시각·크기·hash를 " +
                 "품질 진단에 사용합니다. 영상·음성·이미지·정확한 위치·이동경로·개별 frame·bbox는 " +
-                "이 경로에서 수집하지 않습니다. 기기에는 최대 30일 암호화 저장하고, 재확인한 PAUSED " +
-                "상태에서만 전송하며 END에서는 전송하지 않습니다. 서버 검역은 receipt commit부터 최대 " +
+                "이 경로에서 수집하지 않습니다. 기기에는 최대 30일 암호화 저장하고, 보행을 끝낸 뒤 " +
+                "Wi-Fi에 연결되어 충전 중일 때만 원래 보행 기록 그대로 전송하며, 보행 중·일시정지 중에는 " +
+                "전송하지 않습니다. 서버 검역은 receipt commit부터 최대 " +
                 "14일입니다. 거부하면 raw 수집만 꺼지며, 신고 사진과 정확한 위치를 건별 확인하는 " +
                 "직접 신고에는 영향이 없습니다. " +
-                "[선택] 자동 신고: JPEG 신고 사진, 정확한 위치·방향과 탐지 metadata를 보행 중 암호화해 " +
-                "대기하고, 재확인한 PAUSED 상태에서만 조건을 다시 검사해 전송합니다. END는 자동 전송 " +
-                "시점이 아닙니다. 거부하면 자동 신고만 꺼집니다. [선택] 학습 재사용: 사람이 승인하고 " +
+                "[선택] 자동 신고: JPEG 신고 사진, 정확한 위치·방향과 탐지 metadata를 보행 중에는 " +
+                "보내지 않고 휴대전화에 암호화해 보관했다가, 보행을 끝낸 뒤 허용된 연결(Wi-Fi, 또는 " +
+                "이동통신망 전송을 선택한 경우 이동통신망)에서 자동 전송합니다. 후보별 취소는 없으며 " +
+                "설정에서 앞으로의 자동 신고를 끌 수 있습니다. 거부하면 자동 신고만 꺼집니다. " +
+                "[선택] 학습 재사용: 사람이 승인하고 " +
                 "비식별 처리한 정제 이미지·라벨·metadata만 dataset 승인일부터 최대 3년 모델 개선에 " +
                 "사용하고, 정확한 위치·원본 음성·식별 가능한 얼굴은 제외합니다. 거부하면 학습 재사용만 " +
                 "꺼집니다. " +
@@ -17413,6 +18941,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         reporterUserId = session.actorId
         priorityUserOnboardingActorId = session.actorId
         permissionSessionPolicy.authenticated(session.actorId)
+        reapplyActorBoundIntegratedConsent()
         val missingPermissions = requiredPostLoginDeviceCheckPermissions()
         if (missingPermissions.isNotEmpty()) {
             if (!developmentQuickStartPermissionsRequested) {
@@ -17602,6 +19131,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         metricDistanceCapabilityOverride = null
         runtimeObstacleDetectionCapabilityOverride = null
         onDeviceSpeechRecognitionCapabilityOverride = null
+        handsFreeTranscriberFailureCount = 0
         offlineKoreanTextToSpeechCapabilityOverride = null
         return true
     }
@@ -17702,13 +19232,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             } else {
                 null
             }
-            onDeviceSpeechRecognitionCapabilityOverride = if (
-                PostLoginDeviceCheckFeature.HANDS_FREE_VOICE in restored.disabledFeatures
-            ) {
-                false
-            } else {
-                null
-            }
+            // A stored wake-word test miss stays a hands-free feature restriction (same as in-session);
+            // it is not evidence that the on-device STT engine is unavailable.
+            onDeviceSpeechRecognitionCapabilityOverride = null
+            handsFreeTranscriberFailureCount = 0
             offlineKoreanTextToSpeechCapabilityOverride = if (
                 PostLoginDeviceCheckFeature.VOICE_GUIDANCE in restored.disabledFeatures
             ) {
@@ -17732,6 +19259,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             metricDistanceCapabilityOverride = null
             runtimeObstacleDetectionCapabilityOverride = null
             onDeviceSpeechRecognitionCapabilityOverride = null
+            handsFreeTranscriberFailureCount = 0
             offlineKoreanTextToSpeechCapabilityOverride = null
         }
         maybeStartStoredDeviceCheckBindingValidation()
@@ -17987,8 +19515,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     observeWalkRuntimeResourceSafety()
                     maybeContinuePostLoginDeviceCheck()
                     refreshStartupCapabilityUi()
+                    onPostWalkChargingMaybeChanged()
                 }
             }.getOrDefault(false)
+    }
+
+    /**
+     * S14-43-F1: [AndroidWalkSessionResourceProbe.start] is re-entrant after a failed subscription,
+     * but after onboarding it was reached only from activation, which needs READY first. Readiness
+     * capture (start, resume and every user retry) therefore retries the subscription itself.
+     */
+    private fun retryFailedWalkSessionResourceMonitoring() {
+        if (!::walkSessionResourceProbe.isInitialized) return
+        if (walkSessionResourceProbe.monitoringHealth.state ==
+            kr.co.hanium.dreamup.walksafe.device.WalkSessionResourceMonitoringState.SUBSCRIPTION_FAILED
+        ) {
+            ensureWalkSessionResourceMonitoring()
+        }
     }
 
     private fun resetWalkSessionResourceProbe() {
@@ -18214,7 +19757,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             },
             detector = when {
                 !detectorLoadAttempted -> PostLoginDeviceCheckSignal.PENDING
-                detectorConfigLoaded && detectorAvailable -> PostLoginDeviceCheckSignal.READY
+                detectorConfigLoaded && detectorAvailable ->
+                    kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness.deviceCheckSignal(
+                        runningDetectorVerification.state(frameDetector),
+                    )
                 else -> PostLoginDeviceCheckSignal.UNAVAILABLE
             },
             cameraPipeline = cameraPipeline,
@@ -18315,7 +19861,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         deviceCheck = deviceCheck,
                     )
                 }
-                scheduleRawCollectionPausedUpload()
+                schedulePostWalkTransfers()
             }
         }
         if (advancesFirstRun) {
@@ -19031,7 +20577,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun deferredCameraDependentChecksCanBeRetried(): Boolean =
         postLoginDeviceCheckSnapshot.passesFeatureGate &&
-            postLoginCameraDependentChecksDeferred &&
+            (
+                postLoginCameraDependentChecksDeferred ||
+                    // S03-6: obstacle detection gates every walk, so a stored limit stays re-checkable.
+                    PostLoginDeviceCheckFeature.OBSTACLE_DETECTION in
+                    postLoginDeviceCheckSnapshot.disabledFeatures ||
+                    // S03-6: a runtime model-load (or camera fallback) failure blocks every walk as
+                    // well, so it must stay re-checkable instead of lasting for the process lifetime.
+                    runtimeObstacleDetectionCapabilityOverride == false
+            ) &&
             hasCameraPermission()
 
     private fun cameraAnalysisFeaturesEnabled(): Boolean =
@@ -19212,7 +20766,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "카메라 영상과 기기 내 탐지 모델을 함께 실행할 수 없습니다. 다시 점검하세요."
         }
         PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE ->
-            "한국어 안내 음성을 실제로 만들지 못했습니다. 한국어 음성 데이터를 설치한 뒤 다시 점검하세요."
+            offlineKoreanSpeechGuidance().detail
         PostLoginDeviceCheckFailure.WAKE_PHRASE_UNAVAILABLE ->
             "기기 내 음성 모델이 ‘길라잡이’를 인식하지 못했습니다. 조용한 곳에서 다시 점검하세요."
         PostLoginDeviceCheckFailure.HAPTIC_UNAVAILABLE ->
@@ -19377,27 +20931,32 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             return@setAnalyzer
                         }
                         var frameFailure = PostLoginCameraPipelineFailure.NO_VALID_FRAME
+                        var imageProxyClosed = false
                         val detectorSucceeded = try {
                             val mediaImage = imageProxy.image
                             if (mediaImage == null) {
                                 false
                             } else {
                                 frameFailure = PostLoginCameraPipelineFailure.DETECTOR_FAILED
+                                val imageTimestampNs = imageProxy.imageInfo.timestamp
+                                val imageWidth = mediaImage.width
+                                val imageHeight = mediaImage.height
+                                val ownedFrame = kr.co.hanium.dreamup.walksafe.inference.OwnedYuvFrame.copyOf(mediaImage, imageProxy.cropRect)
+                                imageProxy.close()
+                                imageProxyClosed = true
                                 val result = frameDetector.detect(
-                                    cameraImage = mediaImage,
-                                    timestampMs =
-                                        imageProxy.imageInfo.timestamp /
-                                            NANOS_PER_MILLISECOND,
+                                    cameraFrame = ownedFrame,
+                                    timestampMs = imageTimestampNs / NANOS_PER_MILLISECOND,
                                 )
-                                mediaImage.width > 0 &&
-                                    mediaImage.height > 0 &&
-                                    imageProxy.imageInfo.timestamp > 0L &&
+                                imageWidth > 0 &&
+                                    imageHeight > 0 &&
+                                    imageTimestampNs > 0L &&
                                     DeviceCheckDetectorExecutionPolicy.passes(result)
                             }
                         } catch (_: RuntimeException) {
                             false
                         } finally {
-                            imageProxy.close()
+                            if (!imageProxyClosed) imageProxy.close()
                         }
                         // Count successful camera/model invocations, not detection accuracy.
                         val attempts = attemptedFrames.incrementAndGet()
@@ -19599,15 +21158,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (developmentGuidanceStartBypassEnabled) {
             return walkSessionLifecycle.isRuntimeEpochCurrent(runtimeEpoch)
         }
+        val receivedAtMs = SystemClock.elapsedRealtime()
         return walkRuntimeSafetyCoordinator.observe(
             WalkRuntimeSafetyObservation(
                 epoch = runtimeEpoch,
-                observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                observedAtElapsedRealtimeMs = receivedAtMs,
+                receivedAtElapsedRealtimeMs = receivedAtMs,
                 batteryCritical = resources.batteryNotLow == false,
                 storageCritical = resources.privateStorageAboveSystemLow == false,
                 thermalCritical = resources.thermalBelowCritical == false,
             ),
-        ).safetyOutputsAllowed
+        ).let { decision ->
+            // Starting sensors is not permission to publish quantitative safety output.
+            decision.epoch == runtimeEpoch &&
+                decision.disposition != WalkRuntimeSafetyDisposition.SAFE_STOP_LATCHED &&
+                decision.disposition != WalkRuntimeSafetyDisposition.IGNORED_OBSERVATION
+        }
     }
 
     private fun firstRunPermissionRequestAllowed(
@@ -19668,6 +21234,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             )
             metricDistanceCapabilityOverride = null
             runtimeObstacleDetectionCapabilityOverride = null
+            // S03-6: the re-check loads the obstacle model again after a runtime load failure.
+            // A detector that is being closed (stall or teardown) is not reloaded here.
+            if (!detectorAvailable && !detectorClosing) detectorLoadAttempted = false
         }
         if (
             postLoginDeviceCheckSnapshot.state in setOf(
@@ -19720,6 +21289,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         metricDistanceCapabilityOverride = null
         runtimeObstacleDetectionCapabilityOverride = null
         onDeviceSpeechRecognitionCapabilityOverride = null
+        handsFreeTranscriberFailureCount = 0
         offlineKoreanTextToSpeechCapabilityOverride = null
         postLoginDeviceCheckPermissionResultPending = false
         postLoginDeviceCheckPendingPermissionBinding = null
@@ -19980,6 +21550,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun openPostLoginDeviceCheckSettings() {
         val failure = postLoginDeviceCheckSnapshot.failure
+        if (failure == PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE) {
+            // Same cause-specific screen and return recheck as the voice-data button.
+            openVoiceDataInstallSettings()
+            return
+        }
         val intent = when (failure) {
             PostLoginDeviceCheckFailure.LOCATION_SERVICE_DISABLED ->
                 Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
@@ -19994,8 +21569,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
                 else -> Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
             }
-            PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE ->
-                Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)
             else -> if (
                 postLoginDeviceCheckSnapshot.passesFeatureGate &&
                 requiredPostLoginDeviceCheckPermissions().isEmpty() &&
@@ -20019,10 +21592,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
+    /** S13-15: install voice data vs choose another preferred engine; never a network voice or auto switch. */
+    private fun offlineKoreanSpeechGuidance(): OfflineKoreanSpeechGuidance =
+        OfflineKoreanSpeechGuidancePolicy.guidance(
+            if (::startupCapabilityProbe.isInitialized) {
+                startupCapabilityProbe.offlineKoreanTextToSpeechUnavailableCause()
+            } else {
+                null
+            },
+        )
     private fun openVoiceDataInstallSettings() {
+        val guidance = offlineKoreanSpeechGuidance()
+        val installVoiceData = Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)
+        val chooseEngine = Intent(ANDROID_TTS_SETTINGS_ACTION)
         val candidates = listOf(
-            Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA),
-            Intent(ANDROID_TTS_SETTINGS_ACTION),
+            if (guidance.settingsAction == OfflineKoreanSpeechSettingsAction.CHOOSE_PREFERRED_ENGINE) chooseEngine else installVoiceData,
+            if (guidance.settingsAction == OfflineKoreanSpeechSettingsAction.CHOOSE_PREFERRED_ENGINE) installVoiceData else chooseEngine,
             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = Uri.fromParts("package", packageName, null)
             },
@@ -20036,10 +21621,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (opened) {
             voiceDataInstallRecheckPending = true
             voiceDataInstallRecheckInFlight = false
-            updateStatus(
-                "한국어 음성 데이터 설치",
-                "한국어 음성 데이터를 설치한 뒤 WalkSafe로 돌아오면 사용 가능 여부를 다시 확인합니다.",
-            )
+            updateStatus(guidance.actionLabel, guidance.openedDetail)
             return
         }
         val detail = "휴대폰 설정에서 한국어 음성 데이터 설치 화면을 열 수 없습니다."
@@ -20095,7 +21677,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!available) {
             updateStatus(
                 "한국어 음성 데이터 확인 필요",
-                "한국어 오프라인 음성 안내를 아직 사용할 수 없습니다. 설치 상태를 확인한 뒤 다시 시도하세요.",
+                "한국어 오프라인 음성 안내를 아직 사용할 수 없습니다. ${offlineKoreanSpeechGuidance().detail}",
             )
             return
         }
@@ -20259,6 +21841,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 reporterUserId = session.actorId
                 priorityUserOnboardingActorId = session.actorId
                 permissionSessionPolicy.authenticated(session.actorId)
+                reapplyActorBoundIntegratedConsent()
             }
             updateFirstRunOnboardingUi()
             if (::startupCapabilityProbe.isInitialized) refreshStartupCapabilityUi()
@@ -23600,6 +25183,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val observedAtElapsedRealtimeMs = observation.observedAtElapsedRealtimeMs
         val observationGeneration = phoneMountingObservationGeneration
         if (
+            expectedCameraPreflightGeneration == null &&
+            walkSessionResumeActivationToken?.epoch == epoch
+        ) {
+            // Recheck committed runtime evidence on the UI thread, never the incoming frame alone.
+            statusText.post { completePendingWalkSessionResumeActivation(epoch) }
+            statusText.post { completePendingFreshWalkActivation(epoch) }
+        }
+        if (
             walkSessionLifecycle.snapshot().epoch != epoch ||
             (
                 expectedCameraPreflightGeneration != null &&
@@ -24036,8 +25627,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
     }
 
-    private fun cancelRuntimeCameraHandoff() {
+    private fun cancelRuntimeCameraHandoff(expectedEpoch: WalkRuntimeEpoch? = null) {
         synchronized(phoneMountingObservationLock) {
+            if (expectedEpoch != null && runtimeCameraHandoffEpoch != expectedEpoch) return@synchronized
             runtimeCameraHandoffEpoch = null
             runtimeCameraHandoffStartedAtElapsedRealtimeMs = null
             runtimeCameraHandoffGeneration += 1L
@@ -24714,7 +26306,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
                 postLoginDeviceCheckSnapshot.failure ==
                     PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE ->
-                    "한국어 음성 데이터 설치 열기"
+                    offlineKoreanSpeechGuidance().settingsButtonText
                 else -> "Android 앱 권한 설정 열기"
             }
             contentDescription = text
@@ -24853,9 +26445,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 cancelWalkSessionOutputs("runtime_readiness_changed")
                 stopCameraFallbackSession(updateUi = false)
                 stopDepthSession(closeSession = true)
-                val reason = readiness.blockingReasons.joinToString(", ").ifBlank {
-                    "필수 기능 상태가 바뀌어 새 보행 준비가 필요합니다."
-                }
+                // S03-6: raw readiness codes stay in the diagnostics; the user hears the lost
+                // feature and the next action (FP-018 user_guidance, FP-043 design_rules[4]).
+                updateNavigationStatus(
+                    "walk=runtime_readiness_safe_stop reasons=" +
+                        readiness.blockingReasons.joinToString(","),
+                )
+                val reason = walkReadinessStopReasonKo(readiness)
                 updateStatus("필수 기능 변경 · 안전 중지", reason)
                 speakInteraction(
                     "보행 기능을 안전 중지했습니다. $reason",
@@ -24898,6 +26494,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             } else {
                 null
             },
+            // Read only after the walk: the RAW upload is the only consumer (fail closed when unknown).
+            charging = walk.state.allowsPostWalkTransfer && chargingStateProbe.isCharging(),
         )
     }
 
@@ -24914,13 +26512,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun clearRawDetectionWindow(clearPendingDropCount: Boolean = true) {
-        rawDetectionWindowWalkId = null
-        rawDetectionWindowStartedAtElapsedMs = 0L
-        rawDetectionProcessedFrameCount = 0
-        rawDetectionDroppedFrameCount = 0
-        rawDetectionCount = 0
-        rawDetectionInferenceTotalMs = 0L
-        rawDetectionModelRevision = null
+        rawRuntimeWindow.resetAll()
         if (clearPendingDropCount) {
             rawDetectionDueButInFlightDropCount.set(0)
         }
@@ -24931,10 +26523,28 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         detectionCount: Int,
         inferenceMs: Long,
         modelRevision: String?,
+        executedRuntime: AndroidDetectorRuntime?,
     ) {
         val observedAtEpochMs = System.currentTimeMillis()
         val observedAtElapsedMs = SystemClock.elapsedRealtime()
         val detectorWasAvailable = detectorAvailable
+        // S1617-6: hashes come from the verified running instance (S14-33), the delegate and
+        // fallback from this inference; an unverified detector yields no identity (rejected).
+        val verifiedDetector = runningDetectorVerification.current()?.identity
+        val runtimeIdentity = RawDetectorRuntimeIdentity.ofOrNull(
+            modelArtifactSha256 = verifiedDetector?.modelSetSha256,
+            runtimeConfigSha256 = verifiedDetector?.configSha256,
+            classListSha256 = verifiedDetector?.classListSha256,
+            activeDelegate = executedRuntime?.activeDelegate,
+            delegateFallbackUsed = executedRuntime?.let { it.fallbackUsed || verifiedDetector?.fallbackUsed == true },
+        )?.takeIf {
+            // S1617-6-F1: the token must still name the live detector instance and load generation,
+            // so a window after a swap and before its re-verification never pairs the earlier
+            // token's hashes with the new delegate; such a window is rejected instead.
+            verifiedDetector != null &&
+                verifiedDetector.generation == detectorLoadGeneration &&
+                runningDetectorVerification.allowsOutput(frameDetector, verifiedDetector)
+        }
         val dueButInFlightDropCount = rawDetectionDueButInFlightDropCount.getAndSet(0)
         executeRawCollectionTask {
             val context = currentRawCollectionRuntimeContextOrNull()
@@ -24946,46 +26556,45 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 clearRawDetectionWindow()
                 return@executeRawCollectionTask
             }
-            if (rawDetectionWindowWalkId != expectedWalkEpoch.walkSessionId) {
-                clearRawDetectionWindow(clearPendingDropCount = false)
-                rawDetectionWindowWalkId = expectedWalkEpoch.walkSessionId
-                rawDetectionWindowStartedAtElapsedMs = observedAtElapsedMs
-            }
-            rawDetectionProcessedFrameCount += 1
-            rawDetectionDroppedFrameCount += dueButInFlightDropCount
-            rawDetectionCount += detectionCount.coerceAtLeast(0)
-            rawDetectionInferenceTotalMs += inferenceMs.coerceAtLeast(0L)
-            rawDetectionModelRevision = modelRevision?.takeIf {
-                RAW_COLLECTION_MODEL_REVISION.matches(it)
-            }
-            val elapsedWindowMs =
-                observedAtElapsedMs - rawDetectionWindowStartedAtElapsedMs
+            rawRuntimeWindow.recordCompletedInference(
+                walkSessionId = expectedWalkEpoch.walkSessionId,
+                observedAtElapsedMs = observedAtElapsedMs,
+                detectionCount = detectionCount,
+                inferenceMs = inferenceMs,
+                busyDroppedSincePrevious = dueButInFlightDropCount,
+                modelRevision = modelRevision?.takeIf {
+                    RAW_COLLECTION_MODEL_REVISION.matches(it)
+                },
+                runtimeIdentity = runtimeIdentity,
+            )
+            // ADD-MOTION-045: the motion state (enums and times only), read after the ACTIVE/epoch
+            // and RAW consent checks with a read-only peek (F1): this path never publishes a
+            // navigation motion snapshot, so it cannot cause INVALID_TIME or a missed ZUPT there.
+            val motionCollectionAllowed = context.consentSession.currentConfirmationOrNull(
+                setOf(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+            ) != null
+            rawRuntimeWindow.recordMotion(
+                if (motionCollectionAllowed) {
+                    runCatching { positioningCoordinator.peekUserMotion(SystemClock.elapsedRealtime()) }.getOrNull()
+                } else {
+                    null
+                },
+                collectionAllowed = motionCollectionAllowed,
+            )
+            val elapsedWindowMs = rawRuntimeWindow.windowElapsedMs(observedAtElapsedMs)
             if (elapsedWindowMs < RAW_COLLECTION_CAPTURE_INTERVAL_MS) {
                 return@executeRawCollectionTask
             }
             val capturedWindowStartedAtEpochMs =
                 (observedAtEpochMs - elapsedWindowMs).coerceAtLeast(0L)
-            val processedFrames = rawDetectionProcessedFrameCount
-            val averageProcessingFrameMs = if (processedFrames == 0) {
-                0L
-            } else {
-                rawDetectionInferenceTotalMs / processedFrames
-            }
-            val detectionSample = RawDetectionMetadataSample(
+            val detectionSample = rawRuntimeWindow.detectionSample(
                 windowStartedAtEpochMs = capturedWindowStartedAtEpochMs,
                 capturedAtEpochMs = observedAtEpochMs,
-                processedFrameCount = processedFrames,
-                detectionCount = rawDetectionCount,
-                averageInferenceMs = averageProcessingFrameMs,
                 detectorAvailable = detectorWasAvailable,
-                modelRevision = rawDetectionModelRevision,
             )
-            val performanceSample = RawPerformanceMetadataSample(
+            val performanceSample = rawRuntimeWindow.performanceSample(
                 windowStartedAtEpochMs = capturedWindowStartedAtEpochMs,
                 capturedAtEpochMs = observedAtEpochMs,
-                processedFrameCount = processedFrames,
-                droppedFrameCount = rawDetectionDroppedFrameCount,
-                averageFrameDurationMs = averageProcessingFrameMs,
                 thermalThrottled = if (::walkSessionResourceProbe.isInitialized) {
                     runCatching {
                         walkSessionResourceProbe.snapshot().thermalThrottled
@@ -24994,11 +26603,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     null
                 },
             )
-            clearRawDetectionWindow(clearPendingDropCount = false)
+            // The next window keeps the last completion time so a stall across the boundary
+            // still counts as one long frame interval.
+            rawRuntimeWindow.resetWindow()
             rawCollectionRuntimeCoordinator.captureMetadataBatch(
                 context,
                 detectionSample,
                 performanceSample,
+                observedAtElapsedRealtimeMs = observedAtElapsedMs,
             )
         }
     }
@@ -25013,36 +26625,119 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
-    private fun scheduleRawCollectionPausedUpload() {
+    /**
+     * Owner decision 3(b) / S1617-13: the RAW upload starts only after the walk (never ACTIVE or
+     * PAUSED), in the foreground, on Wi-Fi while charging (FP-035-DETAIL-04 interim) and with no
+     * Gateway walk lease held. Each ended walk's segment keeps its own walk id and receipt.
+     */
+    private fun scheduleRawCollectionPostWalkUpload() {
         executeRawCollectionTask {
             val initial = currentRawCollectionRuntimeContextOrNull()
                 ?: return@executeRawCollectionTask
             rawCollectionRuntimeCoordinator.revalidate(initial)
             if (
-                initial.walk.state != WalkSessionState.PAUSED ||
-                initial.walk.recoveryStage != WalkSessionRecoveryStage.RECHECK_REQUIRED ||
+                !initial.walk.state.allowsPostWalkTransfer ||
+                !isActivityForeground ||
                 rawCollectionUploadWalkId != initial.walk.epoch.walkSessionId ||
                 initial.networkTransport != ActiveNetworkTransport.WIFI ||
                 initial.networkBinding?.transport != IntegratedConsentNetworkTransport.WIFI ||
-                initial.gatewayWalkLease == null
+                !initial.charging ||
+                initial.gatewayWalkLease != null
             ) return@executeRawCollectionTask
-            rawCollectionRuntimeCoordinator.sealActiveSegment(initial)
-            while (true) {
-                val fallback = currentRawCollectionRuntimeContextOrNull()
-                    ?: return@executeRawCollectionTask
-                val call = rawCollectionRuntimeCoordinator.startNextUpload {
-                    currentRawCollectionRuntimeContextOrNull()
-                        ?: fallback.copy(session = null, gatewayWalkLease = null)
-                } ?: run {
-                    rawCollectionUploadWalkId = null
-                    return@executeRawCollectionTask
+            // transfer-F3: the batch runs after the walk (often in a later app run), so its outcomes
+            // are written to the internal field log at every exit of the batch.
+            try {
+                // The ended walk's segment (or an earlier walk's, left by a process end) is sealed first.
+                rawCollectionRuntimeCoordinator.sealActiveSegment(initial)
+                // One task uploads a bounded batch so resume, withdrawal and metadata tasks queued on
+                // the same executor are not held behind a large backlog. Remaining items continue in a
+                // new task that revalidates the post-walk, Wi-Fi, charging and consent gates from scratch.
+                repeat(RAW_COLLECTION_POST_WALK_UPLOADS_PER_TASK) {
+                    val fallback = currentRawCollectionRuntimeContextOrNull()
+                        ?: return@executeRawCollectionTask
+                    val call = rawCollectionRuntimeCoordinator.startNextUpload {
+                        currentRawCollectionRuntimeContextOrNull()
+                            ?: fallback.copy(session = null, gatewayWalkLease = null)
+                    } ?: run {
+                        rawCollectionUploadWalkId = null
+                        return@executeRawCollectionTask
+                    }
+                    val completed = runCatching { call.execute() }.getOrNull()
+                    if (completed == RawCollectionUploadOutcome.WALK_IN_PROGRESS) {
+                        schedulePostWalkRetryAfterWalkInProgress()
+                    }
+                    if (
+                        completed != RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT &&
+                        completed != RawCollectionUploadOutcome.QUARANTINED &&
+                        completed != RawCollectionUploadOutcome.WALK_REJECTED
+                    ) return@executeRawCollectionTask
                 }
-                val completed = runCatching { call.execute() }.getOrNull()
-                if (
-                    completed != RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT
-                ) return@executeRawCollectionTask
+            } finally {
+                recordRawCollectionOutcomesIfChanged()
             }
+            scheduleRawCollectionPostWalkUpload()
         }
+    }
+
+    /**
+     * Owner decision 3(b): opens the post-walk transfer window for the current (ended) walk
+     * snapshot. Triggers: walk end, app start and foreground return, session change, network
+     * change and charging start. Never in ACTIVE or PAUSED; background transfer is not built.
+     */
+    private fun schedulePostWalkTransfers() {
+        if (!isActivityForeground || !::walkSessionLifecycle.isInitialized) return
+        val walk = walkSessionLifecycle.snapshot()
+        if (!walk.state.allowsPostWalkTransfer) return
+        if (::rawCollectionRuntimeCoordinator.isInitialized) {
+            rawCollectionUploadWalkId = walk.epoch.walkSessionId
+            scheduleRawCollectionPostWalkUpload()
+        }
+        maybeStartPostWalkReportQueueDrain()
+    }
+
+    /**
+     * transfer-F7: the Gateway still sees a walk of the account as active (409 *_walk_in_progress:
+     * the END command raced the write, or an earlier walk's lease has not expired after a restart).
+     * One delayed retry per post-walk walk id runs after the Gateway lease TTL plus a margin.
+     */
+    private fun schedulePostWalkRetryAfterWalkInProgress() {
+        runOnUiThread {
+            if (!::walkSessionLifecycle.isInitialized || isFinishing || isDestroyed) return@runOnUiThread
+            val walkId = walkSessionLifecycle.snapshot().epoch.walkSessionId
+            if (postWalkWalkInProgressRetryWalkId == walkId) return@runOnUiThread
+            postWalkWalkInProgressRetryWalkId = walkId
+            postWalkRetryHandler.removeCallbacks(postWalkWalkInProgressRetry)
+            postWalkRetryHandler.postDelayed(
+                postWalkWalkInProgressRetry,
+                POST_WALK_WALK_IN_PROGRESS_RETRY_DELAY_MS,
+            )
+        }
+    }
+
+    /** transfer-F7: charger plugged in while in the foreground (the battery sticky state is read too). */
+    private fun registerPostWalkPowerConnectedReceiver() {
+        if (postWalkPowerConnectedReceiverRegistered) return
+        postWalkPowerConnectedReceiverRegistered = runCatching {
+            registerReceiver(
+                postWalkPowerConnectedReceiver,
+                android.content.IntentFilter(Intent.ACTION_POWER_CONNECTED),
+            )
+        }.isSuccess
+        onPostWalkChargingMaybeChanged()
+    }
+
+    private fun unregisterPostWalkPowerConnectedReceiver() {
+        if (!postWalkPowerConnectedReceiverRegistered) return
+        postWalkPowerConnectedReceiverRegistered = false
+        runCatching { unregisterReceiver(postWalkPowerConnectedReceiver) }
+    }
+
+    /** Charging start (via the resource probe's battery broadcast) retries the post-walk transfer. */
+    private fun onPostWalkChargingMaybeChanged() {
+        val charging = chargingStateProbe.isCharging()
+        val started = charging && !postWalkTransferCharging
+        postWalkTransferCharging = charging
+        if (started) schedulePostWalkTransfers()
     }
 
     private fun handleRawCollectionTransition(
@@ -25052,29 +26747,58 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!transition.changed || !::rawCollectionRuntimeCoordinator.isInitialized) return
         revalidateRawCollectionRuntime()
         when {
-            transition.current.state == WalkSessionState.ENDED -> {
+            transition.current.state == WalkSessionState.ENDED ||
+                transition.current.state == WalkSessionState.SAFE_STOP -> {
                 rawCollectionUploadWalkId = null
                 rawCollectionRuntimeCoordinator.cancelActiveUpload()
                 executeRawCollectionTask {
                     val context = currentRawCollectionRuntimeContextOrNull()
                         ?: return@executeRawCollectionTask
+                    // S1617-13 (16-17 #13) / owner decision 3(b): the ended walk's segment is kept
+                    // (sealed for the post-walk upload); only an unsealable remainder is deleted,
+                    // and both are counted in the outcome log below.
                     rawCollectionRuntimeCoordinator.onWalkEnded(context)
                     rawCollectionRuntimeCoordinator.discardEndedPartials(context)
                     clearRawDetectionWindow()
+                    // S1617-6-F1: windows dropped at an identity change become an internal count.
+                    rawCollectionRuntimeCoordinator.recordIdentitySplitWindows(rawRuntimeWindow.takeIdentitySplitCount())
+                    // 16-17 #12: counts only, debug field log only; never spoken or shown.
+                    if (::fieldSessionLog.isInitialized) {
+                        val outcomes = rawCollectionRuntimeCoordinator.outcomeCountersSnapshot()
+                        lastLoggedRawCollectionOutcomes = outcomes
+                        fieldSessionLog.recordEvent("raw_collection_outcomes", outcomes)
+                    }
                 }
+                schedulePostWalkTransfers()
             }
-            transition.current.state == WalkSessionState.PAUSED &&
-                transition.current.recoveryStage ==
-                WalkSessionRecoveryStage.RECHECK_REQUIRED &&
-                event == WalkSessionEvent.RecheckRequested -> {
-                rawCollectionUploadWalkId = transition.current.epoch.walkSessionId
-                scheduleRawCollectionPausedUpload()
-            }
+            // Owner decision 3(b): PAUSED is still the walk, so it starts no upload.
             transition.current.state != WalkSessionState.PAUSED -> {
                 rawCollectionUploadWalkId = null
                 executeRawCollectionTask(::clearRawDetectionWindow)
+                if (
+                    transition.current.state.allowsPostWalkTransfer &&
+                    (
+                        !transition.previous.state.allowsPostWalkTransfer ||
+                            transition.previous.epoch.walkSessionId !=
+                            transition.current.epoch.walkSessionId
+                        )
+                ) {
+                    schedulePostWalkTransfers()
+                }
             }
         }
+    }
+
+    /**
+     * transfer-F3: internal diagnostics only (debug field log; never spoken or shown). The counters
+     * are written when a post-walk batch ends, once per change, and at walk end.
+     */
+    private fun recordRawCollectionOutcomesIfChanged() {
+        if (!::fieldSessionLog.isInitialized) return
+        val outcomes = rawCollectionRuntimeCoordinator.outcomeCountersSnapshot()
+        if (outcomes == lastLoggedRawCollectionOutcomes) return
+        lastLoggedRawCollectionOutcomes = outcomes
+        fieldSessionLog.recordEvent("raw_collection_outcomes", outcomes)
     }
 
     private fun handleWalkSessionForegroundReturn() {
@@ -25094,8 +26818,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun transitionWalkSession(event: WalkSessionEvent): kr.co.hanium.dreamup.walksafe.session.WalkSessionTransition {
         val before = walkSessionLifecycle.snapshot()
-        val reportQueueDrainCandidate =
-            captureReportQueueDrainTriggerBeforeTransition(before, event)
         val gatewaySessionForEnd = if (event == WalkSessionEvent.EndRequested) {
             gatewayFieldSession
         } else {
@@ -25107,6 +26829,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             null
         }
         val transition = walkSessionLifecycle.handle(event)
+        updateRouteSnapshotWalkOwnership(transition)
+        if (transition.changed) invalidateGuidanceStopConfirmation()
+        if (
+            event == WalkSessionEvent.SafetyStopRequested &&
+            walkRuntimeSafetyStopCleanupEpoch == transition.previous.epoch
+        ) {
+            walkRuntimeSafetyStopCleanup?.recordSafetyStopTransition(transition)
+        }
         if (transition.current.state !in setOf(WalkSessionState.READY, WalkSessionState.ENDED)) {
             cancelDeviceRuntimeCalibration("walk_transition")
         }
@@ -25117,21 +26847,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     transition.current.state != WalkSessionState.ACTIVE
             )
         ) {
+            walkSessionResumeActivationToken = null
             stopHandsFreeVoiceService()
             invalidatePendingExplicitReport()
         }
         updateReportQueueDrainForTransition(transition)
-        if (
-            transition.changed &&
-            transition.previous.state != transition.current.state &&
-            (
-                transition.previous.state == WalkSessionState.ACTIVE ||
-                    transition.current.state == WalkSessionState.ACTIVE
-            )
-        ) {
-            activityOriginalUploadAdmission.onSessionActiveChanged(
-                active = transition.current.state == WalkSessionState.ACTIVE,
-                observedAtMs = SystemClock.elapsedRealtime(),
+        if (transition.changed && transition.previous.state != transition.current.state) {
+            // Owner decision 3(b): a walk that becomes ACTIVE or PAUSED closes the admission and
+            // cancels in-flight DEBUG originals; after the walk each admission rechecks the gates.
+            activityOriginalUploadAdmission.onWalkStateChanged(
+                state = transition.current.state,
                 cancelActiveUploads = ::cancelActivityOriginalUploads,
             )
         }
@@ -25151,7 +26876,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             transition.current.state == WalkSessionState.SAFE_STOP
         ) {
             gatewayWalkRenewalHandler.removeCallbacks(gatewayWalkRenewalRunnable)
-            gatewayWalkAuthorityController.invalidate(transition.previous.epoch)
+            // S03-6/S03-21: a readiness-driven stop (location or camera loss, mode change, recheck
+            // result) also sends the server walk end. Paths that already began the end or dropped
+            // the lease get null from beginEnd and keep the local invalidation only.
+            val stopEnd = if (endOperation == null) {
+                gatewayWalkAuthorityController.beginEnd(transition.previous.epoch)
+            } else {
+                null
+            }
+            val stopSession = gatewayFieldSession
+            if (stopEnd != null && stopSession != null) {
+                endGatewayWalkBestEffort(stopSession, stopEnd)
+            } else {
+                gatewayWalkAuthorityController.invalidate(transition.previous.epoch)
+            }
             gatewayWalkResumeRevalidationPending = false
         }
         if (transition.changed && ::fieldSessionLog.isInitialized) {
@@ -25169,36 +26907,32 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ),
             )
         }
+        val rejection = WalkSessionTransitionDiagnostics.rejectionOrNull(event, transition)
+        if (rejection != null && ::fieldSessionLog.isInitialized) {
+            // Rejected admissions are otherwise invisible because they rarely change the snapshot.
+            fieldSessionLog.recordEvent(
+                "walk_session_transition_rejected",
+                mapOf(
+                    "walk_session_id" to transition.current.epoch.walkSessionId,
+                    "recovery_generation" to transition.current.epoch.recoveryGeneration,
+                    "state" to transition.previous.state.name,
+                    "recovery_stage" to (transition.previous.recoveryStage?.name ?: "none"),
+                    "reason" to transition.reason.name,
+                    "rejection" to rejection.name,
+                    "occurred_at_epoch_ms" to transition.occurredAtEpochMs,
+                ),
+            )
+        }
         handleRawCollectionTransition(transition, event)
         if (endOperation != null && gatewaySessionForEnd != null) {
             gatewayWalkRenewalHandler.removeCallbacks(gatewayWalkRenewalRunnable)
             endGatewayWalkBestEffort(gatewaySessionForEnd, endOperation)
         }
-        startReportQueueDrainAfterTransition(reportQueueDrainCandidate, transition, event)
-        maybeStartPausedReportQueueRecoveryObservation()
-        return transition
-    }
-
-    private fun captureReportQueueDrainTriggerBeforeTransition(
-        before: WalkSessionSnapshot,
-        event: WalkSessionEvent,
-    ): ReportQueueDrainTrigger? {
-        if (
-            before.state != WalkSessionState.ACTIVE ||
-            event != WalkSessionEvent.RecheckRequested ||
-            !isActivityForeground ||
-            !::networkStateProbe.isInitialized ||
-            !reportPrivacyConsentSession.isGranted()
-        ) {
-            return null
+        // Owner decision 3(b): queued reports are sent only after the walk (FP-032-DETAIL-02).
+        if (transition.changed && transition.current.state.allowsPostWalkTransfer) {
+            maybeStartPostWalkReportQueueDrain()
         }
-        val stationarySnapshot = activityOriginalUploadAdmission.stationarySnapshot(
-            SystemClock.elapsedRealtime(),
-        ) ?: return null
-        return buildReportQueueDrainTrigger(
-            walkSessionId = before.epoch.walkSessionId,
-            stationarySnapshot = stationarySnapshot,
-        )
+        return transition
     }
 
     private fun buildReportQueueDrainTrigger(
@@ -25256,20 +26990,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val cancelActiveDrain = synchronized(reportQueueDrainLock) {
             reportQueueDrainWalkState = transition.current.state
             reportQueueDrainWalkSessionId = transition.current.epoch.walkSessionId
-            if (
-                reportQueuePausedRecoveryObservationActive &&
-                transition.current.state != WalkSessionState.PAUSED
-            ) {
-                reportQueuePausedRecoveryObservationActive = false
-                reportQueuePausedRecoveryObservationGeneration += 1L
-                reportQueuePausedRecoveryStationaryCheckScheduled = false
-                reportQueuePausedRecoveryMotionEvidence.reset()
-            }
             val active = reportQueueDrainTrigger
+            // Owner decision 3(b): a walk that becomes ACTIVE or PAUSED again stops the drain.
             if (
                 active != null &&
                 (
-                    transition.current.state != WalkSessionState.PAUSED ||
+                    !transition.current.state.allowsPostWalkTransfer ||
                         transition.current.epoch.walkSessionId != active.walkSessionId
                 )
             ) {
@@ -25286,24 +27012,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
-    private fun startReportQueueDrainAfterTransition(
-        trigger: ReportQueueDrainTrigger?,
-        transition: WalkSessionTransition,
-        event: WalkSessionEvent,
-    ) {
-        if (
-            trigger == null ||
-            transition.previous.state != WalkSessionState.ACTIVE ||
-            event != WalkSessionEvent.RecheckRequested ||
-            transition.current.state != WalkSessionState.PAUSED ||
-            transition.current.recoveryStage != WalkSessionRecoveryStage.RECHECK_REQUIRED ||
-            transition.current.epoch.walkSessionId != trigger.walkSessionId
-        ) {
-            return
-        }
-        startBoundedReportQueueDrain(trigger)
-    }
-
     private fun startBoundedReportQueueDrain(trigger: ReportQueueDrainTrigger): Boolean {
         val initialCount = reportQueueStore.countForRecoveryDrain(trigger.reporterActorId)
         if (initialCount <= 0) return false
@@ -25312,7 +27020,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 reportQueueDrainTrigger != null ||
                 reportQueueDrainMovementGeneration != trigger.movementGeneration ||
                 reportQueueDrainNetworkGeneration != trigger.networkGeneration ||
-                reportQueueDrainWalkState != WalkSessionState.PAUSED ||
+                reportQueueDrainWalkState?.allowsPostWalkTransfer != true ||
                 reportQueueDrainWalkSessionId != trigger.walkSessionId
             ) {
                 false
@@ -25338,44 +27046,41 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
-    private fun maybeStartPausedReportQueueRecoveryObservation() {
+    /**
+     * Owner decision 3(b) / FP-032-DETAIL-02: queued reports (explicit and automatic) are sent only
+     * after the walk (never ACTIVE or PAUSED), in the foreground, on an allowed connection (Wi-Fi, or
+     * cellular when the user chose it); no charging condition. No stillness is consulted: the walk
+     * is over, and a walk that becomes ACTIVE or PAUSED again cancels the drain.
+     */
+    private fun maybeStartPostWalkReportQueueDrain() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            runOnUiThread(::maybeStartPausedReportQueueRecoveryObservation)
+            runOnUiThread(::maybeStartPostWalkReportQueueDrain)
             return
         }
-        if (
-            !isActivityForeground ||
-            !::walkSessionLifecycle.isInitialized ||
-            !::stepTracker.isInitialized ||
-            !hasActivityRecognitionPermission()
-        ) return
+        if (!isActivityForeground || !::walkSessionLifecycle.isInitialized) return
         val walk = walkSessionLifecycle.snapshot()
-        if (
-            walk.state != WalkSessionState.PAUSED ||
-            !walk.isForeground ||
-            !reportQueueRecoveryBaseGatesAvailable()
-        ) return
+        if (!walk.state.allowsPostWalkTransfer || !reportQueueRecoveryBaseGatesAvailable()) return
         val reporter = currentReporterUserId() ?: return
         if (reportQueueStore.countForRecoveryDrain(reporter) <= 0) return
-        val started = synchronized(reportQueueDrainLock) {
-            if (
-                reportQueueDrainTrigger != null ||
-                reportQueuePausedRecoveryObservationActive
-            ) {
+        val idle = synchronized(reportQueueDrainLock) {
+            if (reportQueueDrainTrigger != null) {
                 false
             } else {
                 reportQueueDrainWalkState = walk.state
                 reportQueueDrainWalkSessionId = walk.epoch.walkSessionId
-                reportQueuePausedRecoveryObservationActive = true
-                reportQueuePausedRecoveryObservationGeneration += 1L
-                reportQueuePausedRecoveryStationaryCheckScheduled = false
-                reportQueuePausedRecoveryMotionEvidence.beginObservation()
                 true
             }
         }
-        if (!started) return
-        stepTrackingEpoch = null
-        stepTracker.start()
+        if (!idle) return
+        val trigger = buildReportQueueDrainTrigger(
+            walkSessionId = walk.epoch.walkSessionId,
+            // Step baseline only; after the walk no step window gates the drain.
+            stationarySnapshot = ActivityOriginalStationarySnapshot(
+                stepCount = latestStepCount,
+                observedAtMs = SystemClock.elapsedRealtime(),
+            ),
+        ) ?: return
+        startBoundedReportQueueDrain(trigger)
     }
 
     private fun reportQueueRecoveryBaseGatesAvailable(): Boolean {
@@ -25405,106 +27110,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ) &&
             confirmation.backendConsentReceiptSha256.isNotEmpty()
     }
-
-    private fun onPausedReportQueueRecoveryMotionSample(
-        stepCount: Int,
-        observedAtMs: Long,
-    ) {
-        val active = synchronized(reportQueueDrainLock) {
-            reportQueuePausedRecoveryObservationActive
-        }
-        if (!active) return
-        reportQueuePausedRecoveryMotionEvidence.observeStepCount(stepCount, observedAtMs)
-        schedulePausedReportQueueRecoveryStationaryCheck()
-    }
-
-    private fun schedulePausedReportQueueRecoveryStationaryCheck() {
-        val generation = synchronized(reportQueueDrainLock) {
-            if (
-                !reportQueuePausedRecoveryObservationActive ||
-                reportQueuePausedRecoveryStationaryCheckScheduled
-            ) {
-                null
-            } else {
-                reportQueuePausedRecoveryStationaryCheckScheduled = true
-                reportQueuePausedRecoveryObservationGeneration
-            }
-        } ?: return
-        reportCleanupCallbackHandler.postDelayed(
-            {
-                val current = synchronized(reportQueueDrainLock) {
-                    val matches =
-                        reportQueuePausedRecoveryObservationActive &&
-                            reportQueuePausedRecoveryObservationGeneration == generation
-                    if (matches) reportQueuePausedRecoveryStationaryCheckScheduled = false
-                    matches
-                }
-                if (!current) return@postDelayed
-                val stationary = reportQueuePausedRecoveryMotionEvidence.stationarySnapshotAt(
-                    SystemClock.elapsedRealtime(),
-                )
-                if (stationary == null) {
-                    schedulePausedReportQueueRecoveryStationaryCheck()
-                    return@postDelayed
-                }
-                startPausedReportQueueRecoveryIfCurrent(generation, stationary)
-            },
-            REPORT_QUEUE_PAUSED_STATIONARY_RECHECK_MS,
-        )
-    }
-
-    private fun startPausedReportQueueRecoveryIfCurrent(
-        observationGeneration: Long,
-        stationarySnapshot: ActivityOriginalStationarySnapshot,
-    ) {
-        val walk = walkSessionLifecycle.snapshot()
-        if (
-            !isActivityForeground ||
-            walk.state != WalkSessionState.PAUSED ||
-            !walk.isForeground
-        ) {
-            cancelPausedReportQueueRecoveryObservation()
-            return
-        }
-        val trigger = buildReportQueueDrainTrigger(
-            walkSessionId = walk.epoch.walkSessionId,
-            stationarySnapshot = stationarySnapshot,
-        )
-        if (trigger == null) {
-            schedulePausedReportQueueRecoveryStationaryCheck()
-            return
-        }
-        val claimed = synchronized(reportQueueDrainLock) {
-            if (
-                !reportQueuePausedRecoveryObservationActive ||
-                reportQueuePausedRecoveryObservationGeneration != observationGeneration ||
-                reportQueueDrainTrigger != null
-            ) {
-                false
-            } else {
-                reportQueuePausedRecoveryObservationActive = false
-                reportQueuePausedRecoveryObservationGeneration += 1L
-                reportQueuePausedRecoveryStationaryCheckScheduled = false
-                reportQueuePausedRecoveryMotionEvidence.reset()
-                true
-            }
-        }
-        if (!claimed) return
-        if (!startBoundedReportQueueDrain(trigger)) stopStepTrackingNow()
-    }
-
-    private fun cancelPausedReportQueueRecoveryObservation(): Boolean =
-        synchronized(reportQueueDrainLock) {
-            if (!reportQueuePausedRecoveryObservationActive) {
-                false
-            } else {
-                reportQueuePausedRecoveryObservationActive = false
-                reportQueuePausedRecoveryObservationGeneration += 1L
-                reportQueuePausedRecoveryStationaryCheckScheduled = false
-                reportQueuePausedRecoveryMotionEvidence.reset()
-                true
-            }
-        }
 
     private fun IntegratedConsentNetworkBinding.matches(
         transport: ActiveNetworkTransport,
@@ -25575,13 +27180,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             consentAllowed = consentAllowed,
             automaticReportingAllowed =
                 consentAllowed &&
-                    currentConfirmation?.selections?.automaticReporting == true,
+                    currentConfirmation?.selections?.automaticReporting == true &&
+                    integratedConsentSession.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING),
             authorityAllowed = authorityAllowed,
             reporterActorId = reporter.orEmpty(),
             walkSessionId = runtime.walkSessionId.orEmpty(),
             consentReceiptSha256 =
                 currentConfirmation?.backendConsentReceiptSha256.orEmpty(),
             movementGeneration = runtime.movementGeneration,
+            accountGeneration = currentGateway.session?.backendAccountGeneration,
+            sessionGeneration = currentGateway.generation,
         )
     }
 
@@ -25594,7 +27202,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     )
 
     private fun ReportQueueDrainContext.allRequiredBaseGatesAllowed(): Boolean =
-        walkState == WalkSessionState.PAUSED &&
+        walkState.allowsPostWalkTransfer &&
             appForeground &&
             stationary &&
             networkAllowed &&
@@ -25612,32 +27220,97 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             networkBinding = trigger.networkBinding,
             permitProvider = reportPrivacyConsentSession::issueUploadPermit,
         )
+        val activityLease = accountDeletionActivityLease
+        val walkEpoch = walkSessionLifecycle.snapshot().epoch
+        val notices = linkedSetOf<String>()
+        val spokenNotices = linkedSetOf<String>()
         var remaining = initialCount
         try {
             while (remaining > 0) {
                 val context = reportQueueDrainContext(trigger)
                 if (!context.allRequiredBaseGatesAllowed()) break
-                val call = reportQueueDrainCoordinator.startNext(
+                val call = reportQueueDrainCoordinator.startNextWithResult(
                     contextProvider = { reportQueueDrainContext(trigger) },
                     transport = transport,
                     beforeDeleteAfterReceipt =
                         ::persistAutomaticReportCooldownBeforeQueueDelete,
                 ) ?: break
-                val outcome = try {
+                val result = try {
                     call.execute()
                 } catch (_: Exception) {
                     break
                 }
+                // transfer-F7: the Gateway still holds this device's walk; one delayed retry.
+                if (result.walkInProgress) schedulePostWalkRetryAfterWalkInProgress()
+                reportQueueDrainResultMessage(result)?.let { message ->
+                    notices.add(message)
+                    if (result.reportPriority == ReportQueuePriority.EXPLICIT) spokenNotices.add(message)
+                }
+                val outcome = result.outcome
                 if (
                     outcome != ReportQueueDrainOutcome.DELETED_AFTER_STATUS &&
-                    outcome != ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD
+                    outcome != ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD &&
+                    outcome != ReportQueueDrainOutcome.QUARANTINED
                 ) {
                     break
                 }
                 remaining -= 1
             }
         } finally {
-            finishReportQueueDrain(trigger)
+            if (finishReportQueueDrain(trigger) && notices.isNotEmpty()) {
+                postReportQueueDrainNotice(
+                    trigger, activityLease, walkEpoch, notices.joinToString(" "),
+                    spokenNotices.takeIf { it.isNotEmpty() }?.joinToString(" "),
+                )
+            }
+        }
+    }
+
+    private fun reportQueueDrainResultMessage(result: ReportQueueDrainResult): String? = when (result.outcome) {
+        ReportQueueDrainOutcome.DELETED_AFTER_STATUS -> "이전에 접수된 신고를 확인했습니다. 중복 접수하지 않았습니다."
+        ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD -> when (result.creationOutcome) {
+            ReportCreationOutcome.CREATED -> "신고가 접수되었습니다."
+            ReportCreationOutcome.REPLAYED -> "이전에 접수된 신고를 확인했습니다. 중복 접수하지 않았습니다."
+            null -> "신고 접수를 확인했습니다."
+            ReportCreationOutcome.SUPPRESSED_BY_COOLDOWN -> null
+        }
+        ReportQueueDrainOutcome.RETRY_DEFERRED -> if (
+            result.creationOutcome == ReportCreationOutcome.SUPPRESSED_BY_COOLDOWN
+        ) "최근 같은 위치의 신고가 있어 이번에는 추가 접수하지 않았습니다." else null
+        // The isolated entry stays encrypted on the device; later reports keep draining.
+        ReportQueueDrainOutcome.QUARANTINED ->
+            "서버가 받을 수 없는 신고는 다시 보내지 않고 기기에 보관했습니다. 다른 신고는 계속 확인합니다."
+        else -> null
+    }
+
+    private fun postReportQueueDrainNotice(
+        trigger: ReportQueueDrainTrigger,
+        activityLease: AccountDeletionActivityLease,
+        walkEpoch: WalkRuntimeEpoch,
+        message: String,
+        spokenMessage: String?,
+    ) {
+        postGatewayActivityCallback(activityLease) {
+            val walk = walkSessionLifecycle.snapshot()
+            val gateway = GatewaySessionProcessCoordinator.snapshot()
+            val drainCompletedWithoutReplacement = synchronized(reportQueueDrainLock) {
+                reportQueueDrainTrigger == null &&
+                    reportQueueDrainMovementGeneration == trigger.movementGeneration + 1L &&
+                    reportQueueDrainNetworkGeneration == trigger.networkGeneration
+            }
+            if (!drainCompletedWithoutReplacement || !isActivityForeground ||
+                walk.epoch != walkEpoch || !walk.state.allowsPostWalkTransfer || !walk.isForeground ||
+                currentReporterUserId() != trigger.reporterActorId ||
+                gateway.generation != trigger.gatewaySessionGeneration || gateway.session !== trigger.gatewaySession ||
+                gateway.storageBlocked || gateway.deletionRecoveryOnly ||
+                !trigger.gatewaySession.isUsableFor(trigger.reporterActorId) ||
+                !reportPrivacyConsentSession.isGranted() ||
+                integratedConsentSession.currentConfirmationOrNull() != trigger.consentConfirmation
+            ) return@postGatewayActivityCallback
+            // Automatic reporting stays silent; an explicit receipt cannot interrupt active output.
+            if (spokenMessage != null && !isHandsFreeVoiceOutputActive()) speakStatusExplanation(spokenMessage)
+            // Command speech also updates this view. Restore the full mixed-batch result afterwards.
+            showWalkLastResult(message)
         }
     }
 
@@ -25655,7 +27328,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         return try {
             if (
                 !persistReportCooldownForSuccess(
-                    AndroidReportSuccessfulCooldown(scope, nowMs),
+                    AndroidReportSuccessfulCooldown(
+                        scope = scope,
+                        lastUploadedAtMs = nowMs,
+                        cooldownMonotonicMarkMs = SystemClock.elapsedRealtime(),
+                        cooldownRemainingAtMarkMs = AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS,
+                        bootCount = reportCooldownBootCount(),
+                    ),
                 )
             ) {
                 false
@@ -25668,7 +27347,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
-    private fun finishReportQueueDrain(trigger: ReportQueueDrainTrigger) {
+    private fun finishReportQueueDrain(trigger: ReportQueueDrainTrigger): Boolean {
         val finished = synchronized(reportQueueDrainLock) {
             if (reportQueueDrainTrigger !== trigger) {
                 false
@@ -25682,10 +27361,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             reportQueueDrainCoordinator.cancelActive()
             stopStepTrackingNow()
         }
+        return finished
     }
 
     private fun cancelReportQueueDrain() {
-        val observationCancelled = cancelPausedReportQueueRecoveryObservation()
         val cancelled = synchronized(reportQueueDrainLock) {
             if (reportQueueDrainTrigger == null) {
                 false
@@ -25698,8 +27377,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (cancelled) {
             reportQueueDrainCoordinator.cancelActive()
-        }
-        if (cancelled || observationCancelled) {
             stopStepTrackingNow()
         }
     }
@@ -25708,9 +27385,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (::rawCollectionRuntimeCoordinator.isInitialized) {
             rawCollectionRuntimeCoordinator.cancelActiveUpload()
             revalidateRawCollectionRuntime()
-            scheduleRawCollectionPausedUpload()
         }
-        val observationCancelled = cancelPausedReportQueueRecoveryObservation()
         val cancelled = synchronized(reportQueueDrainLock) {
             reportQueueDrainNetworkGeneration += 1L
             if (reportQueueDrainTrigger == null) {
@@ -25724,35 +27399,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (cancelled) {
             reportQueueDrainCoordinator.cancelActive()
-        }
-        if (cancelled || observationCancelled) {
             stopStepTrackingNow()
         }
-        maybeStartPausedReportQueueRecoveryObservation()
-    }
-
-    private fun onReportQueueDrainStepSample(
-        stepCount: Int,
-        observedAtMs: Long,
-    ) {
-        val movementDetected = synchronized(reportQueueDrainLock) {
-            val trigger = reportQueueDrainTrigger ?: return@synchronized false
-            if (
-                stepCount == trigger.stationarySnapshot.stepCount &&
-                observedAtMs >= trigger.stationarySnapshot.observedAtMs
-            ) {
-                false
-            } else {
-                reportQueueDrainTrigger = null
-                reportQueueDrainMovementGeneration += 1L
-                stepTrackingEpoch = null
-                true
-            }
-        }
-        if (movementDetected) {
-            reportQueueDrainCoordinator.cancelActive()
-            stopStepTrackingNow()
-        }
+        // Owner decision 3(b): the changed network may now allow the post-walk transfers.
+        schedulePostWalkTransfers()
     }
 
     private fun maybeAdvanceWalkSessionAfterCapabilityCheck() {
@@ -25788,10 +27438,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
         val blockReason = walkSessionReadinessBlockReason(decision)
         if (blockReason != null) {
+            // Before any walk starts, a missing user-installable item (Korean voice data) only
+            // blocks the start. Failing closed into SAFE_STOP here would record a walk
+            // interruption that never happened and require an extra step after installation.
+            // Other unavailable items only limit features (LIMITED tier); an unsupported Android
+            // version still fails closed.
+            val installableGapBeforeWalk = session.state == WalkSessionState.READY &&
+                decision.unavailableRequirements.any(USER_INSTALLABLE_REQUIREMENTS::contains) &&
+                WalkSafeStartupRequirement.ANDROID_VERSION !in decision.unavailableRequirements
             if (
                 decision.tier == WalkSafeStartupCapabilityTier.BLOCKED &&
                 decision.pendingRequirements.isEmpty() &&
-                decision.unavailableRequirements.isNotEmpty()
+                decision.unavailableRequirements.isNotEmpty() &&
+                !installableGapBeforeWalk
             ) {
                 val action = if (session.state == WalkSessionState.PAUSED) {
                     WalkSessionAction.RESUME_WALK
@@ -25940,6 +27599,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 runOnUiThread {
                     if (!isGatewayWalkOperationCurrent(operation, token, gatewaySession)) {
                         gatewayWalkAuthorityController.cancel(operation)
+                        endAbandonedGatewayWalkStartLeaseBestEffort(
+                            gatewaySession = gatewaySession,
+                            operation = operation,
+                            lease = abandonedGatewayWalkStartLeaseOrNull(outcome),
+                        )
                         return@runOnUiThread
                     }
                     outcome.fold(
@@ -25953,6 +27617,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         },
                         onFailure = {
                             gatewayWalkAuthorityController.cancel(operation)
+                            endAbandonedGatewayWalkStartLeaseBestEffort(
+                                gatewaySession = gatewaySession,
+                                operation = operation,
+                                lease = abandonedGatewayWalkStartLeaseOrNull(outcome),
+                            )
                             makeGatewayWalkStartRetryAvailable(
                                 detail =
                                     "서버 보행 권한을 확인하지 못해 시작하지 않았습니다. " +
@@ -26160,6 +27829,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             operation,
                             clearConflict = true,
                         )
+                        endAbandonedGatewayWalkStartLeaseBestEffort(
+                            gatewaySession = gatewaySession,
+                            operation = operation,
+                            lease = outcome.getOrNull(),
+                        )
                         return@runOnUiThread
                     }
                     outcome.fold(
@@ -26235,9 +27909,26 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         gatewayWalkStartConfirmationToken = null
         transitionWalkSession(WalkSessionEvent.StartRequested(token))
+        if (walkSessionLifecycle.snapshot().state != WalkSessionState.ACTIVE) {
+            // The lifecycle rejected the confirmation (e.g. its readiness expired while the
+            // server responded). Release the lease this start acquired instead of holding it.
+            val endOperation = gatewayWalkAuthorityController.beginEnd(token.epoch)
+            val currentGatewaySession = gatewayFieldSession
+            if (endOperation != null && currentGatewaySession != null) {
+                endGatewayWalkBestEffort(currentGatewaySession, endOperation)
+            } else {
+                gatewayWalkAuthorityController.invalidate(token.epoch)
+            }
+            makeGatewayWalkStartRetryAvailable(
+                detail = "준비 확인이 오래되어 보행 안내를 시작하지 않았습니다. 다시 점검한 뒤 시도하세요.",
+            )
+            return
+        }
         if (isWalkSessionRuntimeActive()) {
-            scheduleGatewayWalkRenewal()
-            activateWalkSessionRuntime()
+            pendingFreshWalkActivationToken = token.takeIf {
+                previousWalkInterruptionMarker.isPending
+            }
+            if (!activateWalkSessionRuntime()) pendingFreshWalkActivationToken = null
         }
     }
 
@@ -26288,6 +27979,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
     }
 
+    /** S03-23: transient renewal retries already used, keyed by walk id. */
+    private var gatewayWalkRenewalRetries: Pair<String, Int>? = null
+
     private fun requestGatewayWalkRenewal() {
         gatewayWalkRenewalHandler.removeCallbacks(gatewayWalkRenewalRunnable)
         val snapshot = walkSessionLifecycle.snapshot()
@@ -26307,6 +28001,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val gatewaySession = gatewaySessionOrNull("walk_renew", speak = false) ?: run {
             gatewayWalkAuthorityController.cancel(operation)
+            // login-F1: an expired access credential of a renewable login is being renewed in
+            // the running app; renew the lease with the renewed login instead of stopping.
+            if (awaitInRunGatewaySessionRenewal { gatewayWalkRenewalHandler.post(gatewayWalkRenewalRunnable) }) {
+                return
+            }
             handleGatewayWalkAuthorityLost("walk_lease_gateway_session_missing")
             return
         }
@@ -26327,6 +28026,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         callbackSnapshot.state !in
                         setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
                     ) return@runOnUiThread
+                    // A renewal answered for a replaced or signed-out gateway session must not
+                    // extend the current walk, even when the lease itself still matches.
+                    if (!isCurrentGatewaySession(gatewaySession)) {
+                        gatewayWalkAuthorityController.cancel(operation)
+                        if (!isRenewedGatewaySessionContinuation(gatewaySession)) {
+                            handleGatewayWalkAuthorityLost("walk_lease_gateway_session_changed")
+                        } else {
+                            // login-F1: the same login was renewed in-run meanwhile; this answer is
+                            // not applied, the lease is renewed again with the renewed credential.
+                            gatewayWalkRenewalHandler.post(gatewayWalkRenewalRunnable)
+                        }
+                        return@runOnUiThread
+                    }
                     when (gatewayWalkAuthorityController.currentOperationStatus(operation)) {
                         GatewayWalkAuthorityCompletion.INVALID -> {
                             handleGatewayWalkAuthorityLost(
@@ -26338,8 +28050,45 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         else -> return@runOnUiThread
                     }
                     val renewed = outcome.getOrNull()
+                    if (renewed == null) {
+                        gatewayWalkAuthorityController.cancel(operation)
+                        // S03-23: rejection and login loss stop at once; a transient failure is
+                        // retried a bounded number of times, only inside the lease already held.
+                        val failure = GatewayWalkRenewalFailurePolicy.classify(outcome.exceptionOrNull())
+                        // login-F1/F4: a login rejection of a renewable long-lived login first gets one
+                        // durable refresh; renewed -> the lease renewal is retried, revoked -> the
+                        // reason is shown and the next attempt stops the walk as before.
+                        if (
+                            failure == GatewayWalkRenewalFailure.LOGIN_REQUIRED &&
+                            probeGatewaySessionAfterUnauthorized(gatewaySession) {
+                                gatewayWalkRenewalHandler.post(gatewayWalkRenewalRunnable)
+                            }
+                        ) {
+                            updateNavigationStatus("walk_lease=renew_waiting_login_refresh")
+                            return@runOnUiThread
+                        }
+                        val previousRetries = gatewayWalkRenewalRetries
+                            ?.takeIf { it.first == operation.epoch.walkSessionId }?.second ?: 0
+                        val retryDelayMs = GatewayWalkRenewalFailurePolicy.retryDelayMsOrNull(
+                            failure = failure,
+                            previousRetries = previousRetries,
+                            safeRemainingMs = gatewayWalkAuthorityController
+                                .safeRemainingMsOrNull(operation.epoch),
+                        )
+                        if (retryDelayMs != null) {
+                            gatewayWalkRenewalRetries =
+                                operation.epoch.walkSessionId to previousRetries + 1
+                            updateNavigationStatus(
+                                "walk_lease=renew_retry attempt=${previousRetries + 1} " +
+                                    "reason=${failure.reasonCode}",
+                            )
+                            gatewayWalkRenewalHandler.postDelayed(gatewayWalkRenewalRunnable, retryDelayMs)
+                        } else {
+                            handleGatewayWalkAuthorityLost(failure.reasonCode, GatewayWalkRenewalFailurePolicy.detailKo(failure))
+                        }
+                        return@runOnUiThread
+                    }
                     if (
-                        renewed == null ||
                         gatewayWalkAuthorityController.completeRenew(
                             operation,
                             renewed,
@@ -26349,13 +28098,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         handleGatewayWalkAuthorityLost("walk_lease_renew_failed")
                         return@runOnUiThread
                     }
+                    gatewayWalkRenewalRetries = null
                     gatewayWalkResumeRevalidationPending = false
                     scheduleGatewayWalkRenewal()
                     if (
                         walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED &&
                         isActivityForeground
                     ) {
-                        scheduleRawCollectionPausedUpload()
                         refreshStartupCapabilityUi()
                     }
                 }
@@ -26377,7 +28126,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         requestGatewayWalkRenewal()
     }
 
-    private fun handleGatewayWalkAuthorityLost(reason: String) {
+    private fun handleGatewayWalkAuthorityLost(
+        reason: String,
+        detailKo: String = "서버의 단일 활성 보행 권한을 확인하지 못했습니다.",
+    ) {
         gatewayWalkRenewalHandler.removeCallbacks(gatewayWalkRenewalRunnable)
         gatewayWalkResumeRevalidationPending = false
         gatewayWalkTakeoverPromptPending = false
@@ -26390,7 +28142,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         updateStatus(
             "보행 권한 만료 · 안전 중지",
-            "서버의 단일 활성 보행 권한을 확인하지 못했습니다.",
+            detailKo,
         )
     }
 
@@ -26418,15 +28170,64 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun endGatewayWalkBestEffort(
         gatewaySession: GatewayFieldSession,
         operation: GatewayWalkAuthorityOperation,
+        previousRetries: Int = 0,
     ) {
         val lease = operation.sourceLease ?: return
         try {
             gatewaySessionExecutor.execute {
-                runCatching {
+                val outcome = runCatching {
                     gatewayWalkSessionClient.end(
                         session = gatewaySession,
                         lease = lease,
                         requestId = operation.requestId,
+                    )
+                }
+                // S03-21: the local stop is already done. A lost or transient server answer is
+                // resent with the same request id, by the owning session, while the lease may hold.
+                runOnUiThread {
+                    val retryDelayMs = GatewayWalkEndRetryPolicy.retryDelayMsOrNull(
+                        error = outcome.exceptionOrNull(),
+                        previousRetries = previousRetries,
+                        leaseMayStillBeHeld = lease.isLocallyUsable(SystemClock.elapsedRealtime()),
+                        sameGatewaySession = isCurrentGatewaySession(gatewaySession),
+                    ) ?: return@runOnUiThread
+                    gatewayWalkRenewalHandler.postDelayed(
+                        { endGatewayWalkBestEffort(gatewaySession, operation, previousRetries + 1) },
+                        retryDelayMs,
+                    )
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            // The server lease expires after its bounded lifetime.
+        }
+    }
+
+    private fun abandonedGatewayWalkStartLeaseOrNull(
+        outcome: Result<GatewayWalkStartResult>,
+    ): GatewayWalkLease? =
+        (outcome.getOrNull() as? GatewayWalkStartResult.Granted)?.lease
+            ?: (outcome.exceptionOrNull() as? GatewayWalkHttpException)?.abandonedLease
+
+    /**
+     * A start or takeover the server granted after this operation became stale was never held by
+     * [gatewayWalkAuthorityController]. End exactly that lease with the session that obtained it.
+     * A later start of the same walk may already be queued ahead of this task and receive the same
+     * lease (ALREADY_ACTIVE), so the end is skipped while the controller still tracks the walk.
+     */
+    private fun endAbandonedGatewayWalkStartLeaseBestEffort(
+        gatewaySession: GatewayFieldSession,
+        operation: GatewayWalkAuthorityOperation,
+        lease: GatewayWalkLease?,
+    ) {
+        if (lease == null || lease.walkId != operation.epoch.walkSessionId) return
+        try {
+            gatewaySessionExecutor.execute {
+                if (gatewayWalkAuthorityController.tracksWalk(lease.walkId)) return@execute
+                runCatching {
+                    gatewayWalkSessionClient.end(
+                        session = gatewaySession,
+                        lease = lease,
+                        requestId = UUID.randomUUID().toString(),
                     )
                 }
             }
@@ -26459,6 +28260,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             action = action,
             mode = effectiveDecision.effectiveWalkSessionMode(),
         )
+        retryFailedWalkSessionResourceMonitoring()
         val deviceResources = walkSessionResourceProbe.snapshot()
         val collector = WalkSessionReadinessCollector(epoch = epoch, plan = plan)
         plan.requiredRequirements.forEach { requirement ->
@@ -26506,44 +28308,26 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 WalkSessionReadinessRequirement.PERMISSIONS -> {
                     WalkSessionReadinessStatus.READY to ""
                 }
-                WalkSessionReadinessRequirement.CAMERA ->
-                    if (!cameraAnalysisFeaturesEnabled()) {
-                        WalkSessionReadinessStatus.READY to ""
-                    } else {
-                        combineReadinessChecks(
-                            startupRequirementCheck(
-                                effectiveDecision,
-                                setOf(WalkSafeStartupRequirement.CAMERA),
-                            ),
-                            if (hasCameraPermission()) {
-                                WalkSessionReadinessStatus.READY to ""
-                            } else {
-                                WalkSessionReadinessStatus.UNAVAILABLE to
-                                    "camera_permission_missing"
-                            },
-                        )
-                    }
-                WalkSessionReadinessRequirement.LOCATION ->
-                    if (
-                        !postLoginDeviceFeatureEnabled(
-                            PostLoginDeviceCheckFeature.LOCATION_GUIDANCE,
-                        )
-                    ) {
-                        WalkSessionReadinessStatus.READY to ""
-                    } else {
-                        combineReadinessChecks(
-                            startupRequirementCheck(
-                                effectiveDecision,
-                                setOf(WalkSafeStartupRequirement.GPS),
-                            ),
-                            if (hasLocationPermission()) {
-                                WalkSessionReadinessStatus.READY to ""
-                            } else {
-                                WalkSessionReadinessStatus.UNAVAILABLE to
-                                    "precise_location_permission_missing"
-                            },
-                        )
-                    }
+                // S03-6: camera, precise location and model are required in both approved modes
+                // (FP-017-DETAIL-01); a disabled feature is UNAVAILABLE, never READY.
+                WalkSessionReadinessRequirement.CAMERA -> WalkSessionFeatureReadiness.camera(
+                    guidanceEnabled = cameraAnalysisFeaturesEnabled(),
+                    permissionGranted = hasCameraPermission(),
+                    capability = startupRequirementCheck(
+                        effectiveDecision,
+                        setOf(WalkSafeStartupRequirement.CAMERA),
+                    ),
+                )
+                WalkSessionReadinessRequirement.LOCATION -> WalkSessionFeatureReadiness.location(
+                    guidanceEnabled = postLoginDeviceFeatureEnabled(
+                        PostLoginDeviceCheckFeature.LOCATION_GUIDANCE,
+                    ),
+                    permissionGranted = hasLocationPermission(),
+                    capability = startupRequirementCheck(
+                        effectiveDecision,
+                        setOf(WalkSafeStartupRequirement.GPS),
+                    ),
+                )
                 WalkSessionReadinessRequirement.METRIC_DISTANCE ->
                     startupRequirementCheck(
                         effectiveDecision,
@@ -26552,13 +28336,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             WalkSafeStartupRequirement.APPROVED_DEVICE_PROFILE,
                         ),
                     )
-                WalkSessionReadinessRequirement.MODEL ->
-                    if (!cameraAnalysisFeaturesEnabled() || detectorAvailable) {
-                        WalkSessionReadinessStatus.READY to ""
-                    } else {
-                        WalkSessionReadinessStatus.UNAVAILABLE to
-                            "model_unavailable:${detectorLoadReason ?: "not_loaded"}"
-                    }
+                WalkSessionReadinessRequirement.MODEL -> WalkSessionFeatureReadiness.model(
+                    cameraGuidanceEnabled = cameraAnalysisFeaturesEnabled(),
+                    detectorAvailable = detectorAvailable,
+                    detectorLoadReason = detectorLoadReason,
+                )
                 WalkSessionReadinessRequirement.VOICE_INPUT -> if (
                     !effectiveDecision.allowsRequirement(WalkSafeStartupRequirement.MICROPHONE) ||
                     !effectiveDecision.allowsRequirement(WalkSafeStartupRequirement.ON_DEVICE_STT)
@@ -26571,18 +28353,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         WalkSessionReadinessStatus.UNAVAILABLE to "microphone_permission_missing"
                     }
                 }
-                WalkSessionReadinessRequirement.VOICE_OUTPUT -> if (
-                    !effectiveDecision.allowsRequirement(
-                        WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS,
-                    )
-                ) {
-                    WalkSessionReadinessStatus.READY to ""
-                } else {
+                // Required Korean speech output is never reported READY while it is limited.
+                WalkSessionReadinessRequirement.VOICE_OUTPUT ->
                     startupRequirementCheck(
                         effectiveDecision,
                         setOf(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS),
                     )
-                }
                 WalkSessionReadinessRequirement.ROUTE_SERVICE -> {
                     val endpointReady = if (BuildConfig.DEBUG) {
                         GatewayEndpointPolicy.debugOriginOrNull(
@@ -26626,7 +28402,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ),
             )
         }
-        return collector.build(assessedAtEpochMs = SystemClock.elapsedRealtime())
+        return collector.build(assessedAtElapsedRealtimeMs = SystemClock.elapsedRealtime())
     }
 
     private fun startupRequirementCheck(
@@ -26675,6 +28451,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (developmentGuidanceStartBypassEnabled) return null
         if (!decision.mayConfirmAndStart) return decision.noticeKo
         if (
+            PermissionDependencyPolicy.evaluate(
+                currentObservedPermissionSnapshot(),
+            ).requiresWholeWalkSafetyStop
+        ) {
+            return "카메라와 정확한 위치 권한이 모두 없어 보행 안내를 시작할 수 없습니다."
+        }
+        if (
             !postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE) ||
                 !decision.allowsRequirement(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS)
         ) {
@@ -26699,7 +28482,26 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val missingPermissions = missingRequiredWalkSessionPermissions(action)
         if (missingPermissions.isNotEmpty()) {
-            return "필수 권한이 필요합니다: ${missingPermissions.joinToString(", ") { it.permissionLabelKo() }}"
+            return "필수 권한이 필요합니다: ${missingPermissions.permissionGuidanceLabelsKo()}"
+        }
+        // S03-6: both approved modes need camera obstacle guidance and precise location
+        // (FP-017-DETAIL-01). Block here so a start or resume never becomes a safety stop.
+        // S14-33-F1/FP-039: a model that failed its sample inference starts neither hazard detection nor a walk.
+        if (runningDetectorBlocksWalkEntry()) {
+            return kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness.WALK_BLOCK_NOTICE_KO
+        }
+        if (!cameraAnalysisFeaturesEnabled()) {
+            if (detectorLoadAttempted && !detectorAvailable) {
+                // The model failed to load in this process; the device re-check reloads it.
+                return "장애물 탐지 모델을 불러오지 못해 보행 안내를 시작하지 않습니다. " +
+                    "'카메라·거리 기능 다시 점검'을 누르거나 앱을 완전히 종료한 뒤 다시 열어 주세요."
+            }
+            return "카메라 장애물 안내를 사용할 수 없어 보행 안내를 시작하지 않습니다. " +
+                "카메라 권한과 카메라·거리 기능 점검 결과를 확인해 주세요."
+        }
+        if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)) {
+            return "정확한 위치를 사용할 수 없어 보행 안내를 시작하지 않습니다. " +
+                "위치 서비스와 정확한 위치 권한을 확인해 주세요."
         }
         return null
     }
@@ -26707,16 +28509,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun missingRequiredWalkSessionPermissions(
         action: WalkSessionAction,
     ): List<String> = buildList {
-        if (cameraAnalysisFeaturesEnabled() && !hasCameraPermission()) {
-            add(Manifest.permission.CAMERA)
-        }
-        val locationGuidanceEnabled = postLoginDeviceFeatureEnabled(
-            PostLoginDeviceCheckFeature.LOCATION_GUIDANCE,
-        )
-        if (locationGuidanceEnabled && !hasLocationPermission()) {
+        val observed = currentObservedPermissionSnapshot()
+        val missing = requiredStartWalkObservedPermissions().filterNot(observed::isGranted)
+        if (ObservedPermission.CAMERA in missing) add(Manifest.permission.CAMERA)
+        if (ObservedPermission.PRECISE_LOCATION in missing) {
             add(Manifest.permission.ACCESS_FINE_LOCATION)
             add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
+        if (ObservedPermission.MICROPHONE in missing) add(Manifest.permission.RECORD_AUDIO)
     }
 
     private fun missingWalkSessionPermissions(
@@ -26785,13 +28585,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun String.permissionLabelKo(): String = when (this) {
         Manifest.permission.CAMERA -> "카메라"
-        Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.ACCESS_COARSE_LOCATION,
-        -> "정확한 위치"
+        Manifest.permission.ACCESS_FINE_LOCATION -> "정확한 위치"
+        Manifest.permission.ACCESS_COARSE_LOCATION -> "대략적 위치"
         Manifest.permission.RECORD_AUDIO -> "마이크"
         Manifest.permission.ACTIVITY_RECOGNITION -> "보행 센서"
         else -> this
     }
+
+    private fun List<String>.permissionGuidanceLabelsKo(): String =
+        filterNot { permission ->
+            permission == Manifest.permission.ACCESS_COARSE_LOCATION &&
+                ContextCompat.checkSelfPermission(
+                    this@MainActivity,
+                    permission,
+                ) == PackageManager.PERMISSION_GRANTED
+        }.joinToString(", ") { it.permissionLabelKo() }
 
     private fun WalkSafeStartupCapabilityDecision.allowsRequirement(
         requirement: WalkSafeStartupRequirement,
@@ -26812,6 +28620,29 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun WalkSafeStartupCapabilityDecision.effectiveWalkSessionMode(): WalkSessionMode =
         toWalkSessionMode()
 
+    private lateinit var previousWalkInterruptionMarker: PreviousWalkInterruptionMarker
+    private var previousWalkInterruptionRecord: WalkInterruptionRecord? = null
+    private var previousWalkInterruptionNoticeScheduled = false
+    private var pendingFreshWalkActivationToken: WalkSessionConfirmationToken? = null
+
+    private fun showPreviousWalkInterruptionNoticeIfNeeded() {
+        if (!previousWalkInterruptionMarker.isPending || previousWalkInterruptionNoticeScheduled) return
+        previousWalkInterruptionNoticeScheduled = true
+        AlertDialog.Builder(this)
+            .setTitle("이전 보행 중단")
+            .setMessage(
+                (previousWalkInterruptionRecord ?: WalkInterruptionRecord.LEGACY)
+                    .noticeMessageKo(currentActorId = currentReporterUserId()),
+            )
+            .setPositiveButton("확인") { _, _ ->
+                val state = walkSessionLifecycle.snapshot().state
+                val currentWalkRequiresMarker = state == WalkSessionState.ACTIVE ||
+                    state == WalkSessionState.PAUSED || state == WalkSessionState.SAFE_STOP
+                previousWalkInterruptionMarker.onNoticeAcknowledged(currentWalkRequiresMarker)
+            }
+            .show()
+    }
+
     private fun isWalkSessionRuntimeActive(): Boolean {
         if (!::walkSessionLifecycle.isInitialized) return false
         val snapshot = walkSessionLifecycle.snapshot()
@@ -26823,31 +28654,94 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             gatewayWalkAuthorityController.activeLeaseOrNull(snapshot.epoch) != null
     }
 
+    /** S03-16: record of the walk that would be interrupted if the process ended now. */
+    private fun currentWalkInterruptionRecordOrNull(): WalkInterruptionRecord? {
+        if (!::walkSessionLifecycle.isInitialized) return null
+        val snapshot = walkSessionLifecycle.snapshot()
+        return WalkInterruptionRecord.forCurrentWalk(
+            state = snapshot.state,
+            walkSessionId = snapshot.epoch.walkSessionId,
+            recoveryStage = snapshot.recoveryStage,
+            safetyStopCauses = snapshot.readiness?.blockingReasons.orEmpty(),
+            actorId = currentReporterUserId(),
+            recordedAtEpochMs = System.currentTimeMillis(),
+        )
+    }
+
+    private fun SharedPreferences.Editor.putWalkInterruptionRecord(
+        record: WalkInterruptionRecord?,
+    ): SharedPreferences.Editor = if (record == null) {
+        remove(PREF_WALK_SESSION_INTERRUPTION_RECORD)
+    } else {
+        putString(PREF_WALK_SESSION_INTERRUPTION_RECORD, record.encode())
+    }
+
     @SuppressLint("ApplySharedPref")
-    private fun persistWalkSessionInterruptionMarker() {
-        if (!::stepLengthPrefs.isInitialized || !::walkSessionLifecycle.isInitialized) return
+    private fun persistWalkSessionInterruptionMarker(): Boolean {
+        if (!::stepLengthPrefs.isInitialized || !::walkSessionLifecycle.isInitialized) return false
         val state = walkSessionLifecycle.snapshot().state
         val interrupted = state == WalkSessionState.ACTIVE ||
             state == WalkSessionState.PAUSED ||
-            state == WalkSessionState.SAFE_STOP
-        stepLengthPrefs.edit().putBoolean(PREF_WALK_SESSION_INTERRUPTED, interrupted).commit()
+            state == WalkSessionState.SAFE_STOP ||
+            previousWalkInterruptionMarker.isPending
+        // S03-16: advisory record first; the Boolean commit below stays the authoritative result.
+        // A pending previous interruption keeps its own record while no newer walk replaces it.
+        val currentRecord = runCatching { currentWalkInterruptionRecordOrNull() }.getOrNull()
+        if (currentRecord != null || !previousWalkInterruptionMarker.isPending) {
+            runCatching {
+                stepLengthPrefs.edit().putWalkInterruptionRecord(currentRecord).commit()
+            }
+        }
+        return try {
+            stepLengthPrefs.edit().putBoolean(PREF_WALK_SESSION_INTERRUPTED, interrupted).commit()
+        } catch (_: RuntimeException) {
+            false
+        }
     }
 
-    private fun activateWalkSessionRuntime() {
-        if (!isWalkSessionRuntimeActive()) return handleGatewayWalkAuthorityLost(
-            "walk_lease_missing_before_runtime",
-        )
+    private fun activateWalkSessionRuntime(): Boolean {
+        if (!isWalkSessionRuntimeActive()) {
+            handleGatewayWalkAuthorityLost("walk_lease_missing_before_runtime")
+            return false
+        }
         val runtimeEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull()
-            ?: return handleGatewayWalkAuthorityLost("walk_epoch_missing_before_runtime")
-        if (!walkRuntimeSafetyCoordinator.beginEpoch(runtimeEpoch).safetyOutputsAllowed) return
+        if (runtimeEpoch == null) {
+            handleGatewayWalkAuthorityLost("walk_epoch_missing_before_runtime")
+            return false
+        }
+        if (rejectUnsafeDetectorAtWalkEntry(runtimeEpoch, walkSessionLifecycle.snapshot().state) { epoch ->
+                if (walkSessionLifecycle.isRuntimeEpochCurrent(epoch)) {
+                    enterWalkSessionSafetyStopAndCancelOutputs("detector_stalled")
+                }
+            }
+        ) return false
+        if (!persistWalkSessionInterruptionMarker()) {
+            enterWalkSessionForegroundRecheckAndCancelOutputs("interruption_marker_write_failed")
+            walkSessionResumeRetryRequiresUserAction = true
+            updateStatus("보행 재개 확인 필요", "중단 상태를 저장하지 못해 보행 안내를 시작하지 않았습니다. 다시 시도해 주세요.")
+            return false
+        }
+        if (walkRuntimeSafetyCoordinator.beginEpoch(runtimeEpoch).disposition ==
+            WalkRuntimeSafetyDisposition.SAFE_STOP_LATCHED
+        ) {
+            if (walkRuntimeSafetyCoordinator.stopCleanupExhausted) showWalkRuntimeSafetyRestartNotice()
+            return false
+        }
         ensureWalkSessionResourceMonitoring()
-        if (!observeWalkRuntimeResourceSafety(runtimeEpoch)) return
+        // S14-43/FP-045: a failed resource monitor is never assumed normal; retry after a recheck.
+        if (!developmentGuidanceStartBypassEnabled &&
+            walkSessionResourceProbe.monitoringHealth.blocksReadiness
+        ) {
+            enterWalkSessionForegroundRecheckAndCancelOutputs("resource_monitoring_unavailable")
+            walkSessionResumeRetryRequiresUserAction = true
+            updateStatus("보행 재개 확인 필요", "배터리·저장공간·발열 감시를 시작하지 못해 보행 안내를 시작하지 않았습니다. 다시 시도해 주세요.")
+            return false
+        }
+        if (!observeWalkRuntimeResourceSafety(runtimeEpoch)) return false
         scheduleGatewayWalkRenewal()
-        persistWalkSessionInterruptionMarker()
         walkSessionResumePromptPending = false
-        walkSessionResumeRetryRequiresUserAction = false
-        if (!activateOfficialEnvironmentRuntime()) return
-        if (!activatePhoneMountingRuntime()) return
+        if (!activateOfficialEnvironmentRuntime()) return false
+        if (!activatePhoneMountingRuntime()) return false
         if (developmentGuidanceStartBypassEnabled) {
             // Navigation is independent of camera teardown, ARCore and detector readiness.
             startNavigationServicesIfNeeded()
@@ -26865,6 +28759,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             },
         )
         if (developmentGuidanceStartBypassEnabled) refreshStartupCapabilityUi()
+        // Admission is not completion: camera release and fresh runtime evidence may arrive later.
+        return true
     }
 
     private fun startWalkSessionRuntimeAfterCameraRelease(
@@ -26874,7 +28770,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             !isWalkSessionRuntimeActive() ||
             !walkSessionLifecycle.isRuntimeEpochCurrent(expectedEpoch)
         ) {
-            cancelRuntimeCameraHandoff()
+            cancelRuntimeCameraHandoff(expectedEpoch)
             return
         }
         if (cameraFallbackCleanupPending) {
@@ -26886,6 +28782,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (!cameraAnalysisFeaturesEnabled()) {
             startWalkSessionRuntimeWithoutCamera()
+            completePendingWalkSessionResumeActivation(expectedEpoch)
+            completePendingFreshWalkActivation(expectedEpoch)
             return
         }
         if (cameraXReleaseBlocked) {
@@ -26914,6 +28812,56 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         startNavigationServicesIfNeeded()
         maybeStartHandsFreeVoiceService()
         refreshStartupCapabilityUi()
+        completePendingWalkSessionResumeActivation(expectedEpoch)
+        completePendingFreshWalkActivation(expectedEpoch)
+    }
+
+    private fun completePendingFreshWalkActivation(expectedEpoch: WalkRuntimeEpoch) {
+        val token = pendingFreshWalkActivationToken ?: return
+        if (token.epoch != expectedEpoch) return
+        if (
+            !isActivityForeground || !isWalkSessionRuntimeActive() ||
+            !walkSessionLifecycle.isRuntimeEpochCurrent(expectedEpoch)
+        ) return
+        if (synchronized(phoneMountingObservationLock) { runtimeCameraHandoffEpoch == expectedEpoch }) return
+        if (!navigationEnvironmentOutputsAllowed()) return
+        val decision = startupCapabilityDecision ?: return
+        if (walkSessionReadinessBlockReason(decision) != null) return
+        val readiness = captureWalkSessionReadiness(decision, WalkSessionAction.START_WALK)
+        if (
+            !readiness.isReady || readiness.epoch != expectedEpoch ||
+            readiness.plan.action != WalkSessionAction.START_WALK ||
+            readiness.plan.mode != token.readiness.plan.mode ||
+            pendingFreshWalkActivationToken != token
+        ) return
+        pendingFreshWalkActivationToken = null
+        previousWalkInterruptionMarker.onNewWalkActivationCompleted(currentWalkRequiresMarker = true)
+    }
+
+    private fun completePendingWalkSessionResumeActivation(expectedEpoch: WalkRuntimeEpoch) {
+        val token = walkSessionResumeActivationToken ?: return
+        if (token.epoch != expectedEpoch) return
+        if (
+            !isActivityForeground || !isWalkSessionRuntimeActive() ||
+            !walkSessionLifecycle.isRuntimeEpochCurrent(expectedEpoch)
+        ) {
+            if (walkSessionResumeActivationToken == token) walkSessionResumeActivationToken = null
+            return
+        }
+        if (synchronized(phoneMountingObservationLock) { runtimeCameraHandoffEpoch == expectedEpoch }) return
+        if (!navigationEnvironmentOutputsAllowed()) return
+        val decision = startupCapabilityDecision ?: return
+        if (walkSessionReadinessBlockReason(decision) != null) return
+        val readiness = captureWalkSessionReadiness(decision, WalkSessionAction.RESUME_WALK)
+        if (
+            !readiness.isReady || readiness.epoch != expectedEpoch ||
+            readiness.plan.mode != token.readiness.plan.mode ||
+            walkSessionResumeActivationToken != token
+        ) return
+        walkSessionResumeActivationToken = null
+        walkSessionResumeRetryRequiresUserAction = false
+        updateStatus("보행 안내 재개", "필수 기능과 런타임 연결을 다시 확인해 보행 안내를 재개했습니다.")
+        speakInteraction(PriorityUserPractice.RESUME.instructionKo)
     }
 
     private fun startWalkSessionRuntimeWithoutCamera() {
@@ -27025,25 +28973,30 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private fun handleWalkSessionResumeRecognition(phrases: List<String>) {
         val confirmationToken = walkSessionResumeConfirmationToken ?: return
+        val response = WalkSessionResumeConfirmation.fromRecognizedText(phrases)
+        if (response == WalkSessionResumeConfirmation.START &&
+            !recheckWalkSessionResumeBeforeConfirmation(confirmationToken)
+        ) return
         walkSessionResumePromptPending = false
         walkSessionResumeConfirmationToken = null
-        val response = WalkSessionResumeConfirmation.fromRecognizedText(phrases.firstOrNull())
-        transitionWalkSession(
+        val transition = transitionWalkSession(
             WalkSessionEvent.ResumeConfirmationReceived(
                 confirmation = response,
                 token = confirmationToken,
             ),
         )
         walkSessionResumeRetryRequiresUserAction =
-            response != WalkSessionResumeConfirmation.START
-        persistWalkSessionInterruptionMarker()
-        if (isWalkSessionRuntimeActive()) {
-            activateWalkSessionRuntime()
-            updateStatus("보행 안내 재개", "필수 기능 재검사와 사용자 확인을 마쳐 새 판단으로 재개했습니다.")
-            // A walker who cannot see the screen has no other way to know guidance is back, and
-            // this is the sentence the practice screen rehearsed.
-            speakInteraction(PriorityUserPractice.RESUME.instructionKo)
+            response != WalkSessionResumeConfirmation.START || !transition.changed || !isWalkSessionRuntimeActive()
+        if (response == WalkSessionResumeConfirmation.START && transition.changed && isWalkSessionRuntimeActive()) {
+            walkSessionResumeActivationToken = confirmationToken
+            walkSessionResumeRetryRequiresUserAction = true
+            updateStatus("보행 재개 준비 중", "런타임 연결과 필수 기능을 확인하고 있습니다.")
+            if (!activateWalkSessionRuntime()) {
+                if (walkSessionResumeActivationToken == confirmationToken) walkSessionResumeActivationToken = null
+                walkSessionResumeRetryRequiresUserAction = true
+            }
         } else {
+            persistWalkSessionInterruptionMarker()
             val detail = when (response) {
                 WalkSessionResumeConfirmation.CANCEL -> "사용자가 취소해 일시중지를 유지합니다."
                 WalkSessionResumeConfirmation.NO_RESPONSE -> "응답이 없어 일시중지를 유지합니다."
@@ -27076,24 +29029,59 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             snapshot.state != WalkSessionState.PAUSED ||
             snapshot.recoveryStage != WalkSessionRecoveryStage.AWAITING_RESUME_CONFIRMATION
         ) return
+        if (!recheckWalkSessionResumeBeforeConfirmation(token)) return
         walkSessionResumePromptPending = false
-        walkSessionResumeRetryRequiresUserAction = false
+        walkSessionResumeRetryRequiresUserAction = true
         walkSessionResumeConfirmationToken = null
-        transitionWalkSession(
+        val transition = transitionWalkSession(
             WalkSessionEvent.ResumeConfirmationReceived(
                 confirmation = WalkSessionResumeConfirmation.START,
                 token = token,
             ),
         )
-        persistWalkSessionInterruptionMarker()
-        if (isWalkSessionRuntimeActive()) {
-            activateWalkSessionRuntime()
-            updateStatus(
-                "보행 안내 재개",
-                "화면의 재개 버튼 확인으로 보행 안내를 다시 시작했습니다.",
-            )
-            speakInteraction(PriorityUserPractice.RESUME.instructionKo)
+        if (transition.changed && isWalkSessionRuntimeActive()) {
+            walkSessionResumeActivationToken = token
+            updateStatus("보행 재개 준비 중", "런타임 연결과 필수 기능을 확인하고 있습니다.")
+            if (!activateWalkSessionRuntime()) {
+                if (walkSessionResumeActivationToken == token) walkSessionResumeActivationToken = null
+                walkSessionResumeRetryRequiresUserAction = true
+            }
         }
+    }
+
+    private fun recheckWalkSessionResumeBeforeConfirmation(token: WalkSessionConfirmationToken): Boolean {
+        val snapshot = walkSessionLifecycle.snapshot()
+        if (
+            !isActivityForeground ||
+            snapshot.state != WalkSessionState.PAUSED ||
+            snapshot.recoveryStage != WalkSessionRecoveryStage.AWAITING_RESUME_CONFIRMATION ||
+            snapshot.epoch != token.epoch || snapshot.confirmationToken != token
+        ) return false
+        // Runtime gates the start path checks before StartRequested (completeGatewayWalkActivation),
+        // plus a pending lease revalidation, are checked before the resume transition.
+        if (gatewayWalkAuthorityController.activeLeaseOrNull(snapshot.epoch) == null) {
+            handleGatewayWalkAuthorityLost("walk_lease_missing_on_resume_confirmation")
+            return false
+        }
+        val runtimeGatesOpen =
+            (!permissionRecoveryGate.blocksAutomaticResourceStart || developmentGuidanceStartBypassEnabled) &&
+                !gatewayWalkResumeRevalidationPending
+        val decision = startupCapabilityDecision
+        val readiness = if (
+            runtimeGatesOpen && decision != null && walkSessionReadinessBlockReason(decision) == null
+        ) {
+            captureWalkSessionReadiness(decision, WalkSessionAction.RESUME_WALK)
+        } else null
+        if (readiness != null && readiness.isReady &&
+            readiness.epoch == token.epoch &&
+            readiness.plan.action == WalkSessionAction.RESUME_WALK &&
+            readiness.plan.action == token.readiness.plan.action &&
+            readiness.plan.mode == token.readiness.plan.mode
+        ) return true
+        enterWalkSessionForegroundRecheckAndCancelOutputs("resume_readiness_changed")
+        walkSessionResumeRetryRequiresUserAction = true
+        updateStatus("보행 재개 확인 필요", "필수 기능 상태가 바뀌어 재개하지 않았습니다. 다시 확인해 주세요.")
+        return false
     }
 
     private fun canBeginRuntimeMetricPreflight(): Boolean {
@@ -27293,6 +29281,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             generation = generation,
             startedAtElapsedRealtimeMs = startedAtMs,
             depthSupport = RuntimeMetricDepthSupport.SUPPORTED,
+            profile = activeEnvironmentProfiles?.runtimeMetric,
         )
         val resumeRenderer = pauseRendererForSessionClose()
         try {
@@ -27352,6 +29341,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             generation = generation,
             startedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
             depthSupport = depthSupport,
+            profile = activeEnvironmentProfiles?.runtimeMetric,
         )
         val result = if (depthSupport == RuntimeMetricDepthSupport.UNKNOWN) {
             evaluator.failTransiently(SystemClock.elapsedRealtime())
@@ -28309,8 +30299,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (isGatewaySessionReadyForCurrentActor(session)) return session
         if (session != null) clearExpiredGatewaySessionIfCurrent(session)
         if (speak) {
-            updateNavigationStatus("gateway=session_required reason=$reason")
-            speakInteraction("현장 게이트웨이에 먼저 로그인하세요.")
+            // login-F1: a long-lived login being renewed in the running app is not a missing login.
+            if (GatewayInRunRenewalProcessState.gate.isInFlight()) {
+                updateNavigationStatus("gateway=session_renewing reason=$reason")
+                speakInteraction("로그인을 확인하고 있습니다. 잠시 후 다시 시도하세요.")
+            } else {
+                updateNavigationStatus("gateway=session_required reason=$reason")
+                speakInteraction("현장 게이트웨이에 먼저 로그인하세요.")
+            }
         }
         return null
     }
@@ -28450,14 +30446,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             activityRecognitionGranted = hasActivityRecognitionPermission(),
         )
 
-    private fun requiredStartWalkObservedPermissions(): Set<ObservedPermission> = buildSet {
-        if (cameraAnalysisFeaturesEnabled()) add(ObservedPermission.CAMERA)
-        if (
-            postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)
-        ) {
-            add(ObservedPermission.PRECISE_LOCATION)
-        }
-    }
+    // S02-14: FP-014-DETAIL-01 makes camera, precise location and microphone the OS permissions of
+    // every walk start and resume; in-use revocation still stops only the dependent features.
+    private fun requiredStartWalkObservedPermissions(): Set<ObservedPermission> =
+        WalkStartPermissionPolicy.required(activityRecognitionRequired = false)
 
     private fun String.toObservedPermission(): ObservedPermission? = when (this) {
         Manifest.permission.CAMERA -> ObservedPermission.CAMERA
@@ -28539,12 +30531,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             updatePermissionRecoveryUi()
             return
         }
-        val allPrerequisitesReady =
-            firstRunOnboardingComplete() &&
-                currentReporterUserId() != null &&
-                isGatewaySessionReadyForCurrentActor() &&
-                decision.mayConfirmAndStart &&
-                walkSessionReadinessBlockReason(decision) == null
+        val allPrerequisitesReady = permissionRecoveryPrerequisitesReady(decision)
         permissionRecoveryGate = permissionRecoveryGate.completeFullRecheck(
             observed = observed,
             requiredPermissions = requiredStartWalkObservedPermissions(),
@@ -28598,19 +30585,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun showPermissionDenialPanel(
         missingPermissions: Set<ObservedPermission>,
         reason: String,
+        requestExplanation: PermissionExplanation? = null,
     ) {
         if (!::permissionDenialPanel.isInitialized) return
-        val ordered = ObservedPermission.entries.filter(missingPermissions::contains)
-        val itemSummary = if (ordered.isEmpty()) {
-            "현재 필요한 권한 상태를 확인할 수 없습니다."
-        } else {
-            ordered.joinToString(" ") { permission ->
-                "${permission.labelKo()} 권한: ${permission.denialReasonKo()}"
-            }
-        }
-        val message =
-            "일부 기능에 필요한 권한이 거부되었거나 철회되었습니다. " +
-                "$itemSummary 해당 기능만 제한되며 나머지 기능은 계속 사용할 수 있습니다."
+        val message = (requestExplanation ?: PermissionExplanationPolicy.withoutResult(
+            missingPermissions.mapTo(mutableSetOf()) { permission ->
+                when (permission) {
+                    ObservedPermission.CAMERA -> PermissionExplanationKind.CAMERA
+                    ObservedPermission.PRECISE_LOCATION -> PermissionExplanationKind.PRECISE_LOCATION
+                    ObservedPermission.MICROPHONE -> PermissionExplanationKind.MICROPHONE
+                    ObservedPermission.ACTIVITY_RECOGNITION ->
+                        PermissionExplanationKind.ACTIVITY_RECOGNITION
+                }
+            },
+            coarseLocationCurrentlyGranted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED,
+        )).messageKo()
         permissionDenialPanel.visibility = View.VISIBLE
         permissionDenialSummaryText.text = message
         permissionDenialSummaryText.contentDescription = message
@@ -28626,6 +30618,50 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 )
             }
         }
+    }
+
+    private fun PermissionExplanation.messageKo(): String {
+        if (unavailablePermissions.isEmpty()) {
+            return "현재 필요한 권한 상태를 확인할 수 없습니다. 앱 설정에서 권한 상태를 확인해 주세요."
+        }
+        val details = buildList {
+            when (locationState) {
+                PermissionLocationState.APPROXIMATE_ONLY ->
+                    add("대략적 위치는 허용됐지만 정확한 위치는 허용되지 않아 정확한 위치가 필요한 기능이 제한됩니다.")
+                PermissionLocationState.NO_LOCATION ->
+                    add("정확한 위치와 대략적 위치 모두 허용되지 않아 위치 기능이 제한됩니다.")
+                PermissionLocationState.NOT_APPLICABLE -> Unit
+            }
+            unavailablePermissions.forEach { permission ->
+                when (permission) {
+                    PermissionExplanationKind.CAMERA -> add("카메라 권한이 필요합니다.")
+                    PermissionExplanationKind.MICROPHONE -> add("마이크 권한이 필요합니다.")
+                    PermissionExplanationKind.ACTIVITY_RECOGNITION -> add("보행 센서 권한이 필요합니다.")
+                    PermissionExplanationKind.PRECISE_LOCATION,
+                    PermissionExplanationKind.APPROXIMATE_LOCATION,
+                    -> Unit
+                }
+            }
+        }.joinToString(" ")
+        val recovery = unavailablePermissions.joinToString(" ") { permission ->
+            val name = when (permission) {
+                PermissionExplanationKind.CAMERA -> "카메라"
+                PermissionExplanationKind.PRECISE_LOCATION -> "정확한 위치"
+                PermissionExplanationKind.APPROXIMATE_LOCATION -> "대략적 위치"
+                PermissionExplanationKind.MICROPHONE -> "마이크"
+                PermissionExplanationKind.ACTIVITY_RECOGNITION -> "보행 센서"
+            }
+            when (reRequestabilityByPermission[permission]) {
+                PermissionReRequestability.NOT_EVALUATED, null ->
+                    "$name 권한은 요청 결과가 확인되지 않아 거부 원인이나 재요청 가능 여부를 단정할 수 없습니다. 앱 설정에서 상태를 확인해 주세요."
+                PermissionReRequestability.RATIONALE_RECOMMENDED ->
+                    "$name 권한은 Android가 앱 내 재요청 전 이유 안내를 권장하는 상태입니다. 앱 설정에서도 허용할 수 있습니다."
+                PermissionReRequestability.NO_RATIONALE_SIGNAL ->
+                    "$name 권한은 앱 설정에서 허용할 수 있습니다. 앱 내 요청 화면이 다시 표시될지는 Android가 결정합니다."
+            }
+        }
+        val prefix = if (requestResultReceived) "이번 권한 요청 결과, " else "현재 "
+        return "$prefix$details 해당 기능만 제한되며 나머지 기능은 계속 사용할 수 있습니다. $recovery"
     }
 
     private fun onPermissionDenialConfirmed() {
@@ -28682,6 +30718,18 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         runtimeControls.visibility = View.GONE
     }
 
+    /** Shared by the automatic recheck and the explicit resume tap so both use one predicate. */
+    private fun permissionRecoveryPrerequisitesReady(
+        decision: WalkSafeStartupCapabilityDecision?,
+    ): Boolean {
+        if (decision == null) return false
+        return firstRunOnboardingComplete() &&
+            currentReporterUserId() != null &&
+            isGatewaySessionReadyForCurrentActor() &&
+            decision.mayConfirmAndStart &&
+            walkSessionReadinessBlockReason(decision) == null
+    }
+
     private fun resumePermissionRecoveryFromExplicitUserAction(): Boolean {
         if (
             permissionRecoveryGate.state !=
@@ -28689,8 +30737,29 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ) {
             return false
         }
-        permissionRecoveryGate = permissionRecoveryGate.acknowledgeExplicitResume()
+        // The awaiting state may predate this tap. Accept it only against the permissions
+        // observed now and the same prerequisite predicate the automatic recheck used.
+        val acknowledged = permissionRecoveryGate.acknowledgeExplicitResume(
+            observed = currentObservedPermissionSnapshot(),
+            requiredPermissions = requiredStartWalkObservedPermissions(),
+        )
+        permissionRecoveryGate = if (
+            acknowledged.state == PermissionRecoveryGateState.CLEAR &&
+            !permissionRecoveryPrerequisitesReady(startupCapabilityDecision)
+        ) {
+            acknowledged.recheckRequired()
+        } else {
+            acknowledged
+        }
         persistPermissionRecoveryGate()
+        if (permissionRecoveryGate.blocksAutomaticResourceStart) {
+            completePermissionRecoveryRecheckIfPossible()
+            updateStatus(
+                "권한 재개 보류",
+                "재개를 누른 시점의 권한, 로그인 또는 시작 준비 상태가 달라 보행 기능을 시작하지 않았습니다. 상태를 다시 확인하세요.",
+            )
+            return true
+        }
         ensurePermissionsThenStart()
         return true
     }
@@ -28726,6 +30795,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (
             sessionSnapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
+            PermissionDependencyPolicy.evaluate(
+                currentObservedPermissionSnapshot(),
+            ).requiresWholeWalkSafetyStop
+        ) {
+            enterWalkSessionSafetyStopAndCancelOutputs("core_guidance_permissions_unavailable")
+            enterPermissionRecoveryBarrier(
+                missingPermissions = setOf(
+                    ObservedPermission.CAMERA,
+                    ObservedPermission.PRECISE_LOCATION,
+                ),
+                reason = reason,
+            )
+            return
+        }
+        // S03-6: refresh first. A lost camera or location safety-stops an active walk there, and the
+        // "나머지 기능은 계속" limitation notice below must not contradict that stop.
+        if (::startupCapabilityProbe.isInitialized) refreshStartupCapabilityUi()
+        val stateAfterRefresh = walkSessionLifecycle.snapshot().state
+        if (
+            sessionSnapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
+            stateAfterRefresh in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
             hasCurrentPostLoginDeviceRestrictions()
         ) {
             val stoppedOnly = setOfNotNull(
@@ -28751,8 +30841,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             permissionDenialPanel.visibility = View.GONE
         }
         if (::startupCapabilityProbe.isInitialized) {
-            refreshStartupCapabilityUi()
-            if (sessionSnapshot.state == WalkSessionState.ACTIVE) {
+            // The refresh above may have safety-stopped the walk (S03-6); read the state again.
+            if (walkSessionLifecycle.snapshot().state == WalkSessionState.ACTIVE) {
                 if (!cameraAnalysisFeaturesEnabled()) {
                     activatePhoneMountingRuntime()
                     applyCurrentOfficialEnvironmentRuntimeAssessment()
@@ -28983,6 +31073,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         generation = generation,
                         startedAtElapsedRealtimeMs = runtimeStartedAtMs,
                         depthSupport = RuntimeMetricDepthSupport.SUPPORTED,
+                        profile = activeEnvironmentProfiles?.runtimeMetric,
                     )
                     cameraTextureBound = textureBound
                     generation
@@ -29153,6 +31244,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         pendingCameraFallbackStart = PendingCameraFallbackStart(reason, availability)
         refreshStartupCapabilityUi()
         val walkAfterChange = walkSessionLifecycle.snapshot()
+        if (
+            walkBeforeChange.state == WalkSessionState.ACTIVE &&
+            walkAfterChange.state == WalkSessionState.SAFE_STOP
+        ) {
+            // S03-7: an active walk never adopts the distance-limited mode silently. The refresh
+            // safety-stopped it; keep that stop notice and start no fallback camera.
+            pendingCameraFallbackStart = null
+            return
+        }
         val automaticTransitionReady =
             automaticallyContinueMetricOnlyDowngrade &&
                 walkAfterChange.epoch == walkBeforeChange.epoch &&
@@ -29334,6 +31434,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         latestTactileRouteState = "localRoute=tmap:tactile_not_visible"
         latestReportCandidateStatus = "reportCandidate=blocked:camera_non_metric_unavailable"
         refreshStartupCapabilityUi()
+        // S03-6: camera guidance is a runtime requirement. When the refresh safety-stopped the
+        // walk, keep its stop notice instead of announcing a camera-less continuation.
+        if (walkSessionLifecycle.snapshot().state != WalkSessionState.ACTIVE) return
         activatePhoneMountingRuntime()
         applyCurrentOfficialEnvironmentRuntimeAssessment()
         startWalkSessionRuntimeWithoutCamera()
@@ -29359,14 +31462,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun stopCameraFallbackSession(
         updateUi: Boolean = true,
         onReleased: (() -> Unit)? = null,
+        onReleaseFailed: (() -> Unit)? = null,
     ) {
         val stoppedWalkEpoch = if (::walkSessionLifecycle.isInitialized) {
             walkSessionLifecycle.currentRuntimeEpochOrNull()
         } else {
             null
         }
-        if (onReleased != null || !cameraFallbackCleanupPending) {
+        if (onReleased != null || onReleaseFailed != null || !cameraFallbackCleanupPending) {
             cameraFallbackAfterRelease = onReleased
+            cameraFallbackAfterReleaseFailure = onReleaseFailed
         }
         val wasRequested = cameraFallbackRequested
         val ownedProvider = cameraFallbackProvider
@@ -29401,14 +31506,16 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (!cameraFallbackCleanupPending) {
                 val afterRelease = cameraFallbackAfterRelease
                 cameraFallbackAfterRelease = null
+                cameraFallbackAfterReleaseFailure = null
                 afterRelease?.invoke()
             }
             return
         }
         cameraFallbackCleanupPending = true
-        ownedAnalysis?.clearAnalyzer()
+        runCatching { ownedAnalysis?.clearAnalyzer() }
         val releaseClaim = AtomicBoolean(false)
         val analyzerBarrierTimedOut = AtomicBoolean(false)
+        val releasePreparationFailed = AtomicBoolean(false)
         lateinit var release: Runnable
         lateinit var releaseDeadline: Runnable
         release = Runnable {
@@ -29421,17 +31528,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 runCatching { ownedProvider?.unbind(ownedPreview) }
             }
             if (::cameraFallbackLifecycleOwner.isInitialized) {
-                cameraFallbackLifecycleOwner.moveTo(Lifecycle.State.CREATED)
+                runCatching { cameraFallbackLifecycleOwner.moveTo(Lifecycle.State.CREATED) }
+                    .onFailure { releasePreparationFailed.set(true) }
             }
             awaitCameraXClosed(ownedCamera) { closed ->
                 cameraFallbackCleanupPending = false
                 val afterRelease = cameraFallbackAfterRelease
                 cameraFallbackAfterRelease = null
-                if (closed && !analyzerBarrierTimedOut.get()) {
+                val afterReleaseFailure = cameraFallbackAfterReleaseFailure
+                cameraFallbackAfterReleaseFailure = null
+                if (closed && !analyzerBarrierTimedOut.get() && !releasePreparationFailed.get()) {
                     afterRelease?.invoke()
                 } else {
                     cameraXReleaseBlocked = true
-                    if (
+                    if (afterReleaseFailure != null) {
+                        afterReleaseFailure.invoke()
+                    } else if (
                         stoppedWalkEpoch != null &&
                         walkSessionLifecycle.isRuntimeEpochCurrent(stoppedWalkEpoch)
                     ) {
@@ -29488,6 +31600,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         var detectorInvoked = false
         var inferenceDurationMs: Long? = null
         var detectorSucceeded = false
+        var imageProxyClosed = false
+        val imageTimestampNs = imageProxy.imageInfo.timestamp
+        val imageQuarterTurns = (imageProxy.imageInfo.rotationDegrees / 90) % 4
         try {
             if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.OBSTACLE_DETECTION)) {
                 return
@@ -29508,7 +31623,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 imageProxy.imageInfo.timestamp, nowMs, null, null, null, runtimeLoadEnvironmentKey(),
             )
             observeRuntimeInferenceLoad(inputObserved = true)
-            pacingTicket = tryStartDetectionWork(nowMs) ?: return
+            val detectorTicket = tryStartDetectionWork(nowMs) ?: return
+            pacingTicket = detectorTicket
             val lifecycleGeneration = feedbackLifecycleGeneration
             val detectorFrameGeneration = detectorGeneration
             val mediaImage = imageProxy.image ?: return
@@ -29527,30 +31643,48 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ) ?: return
             if (!cameraEnvironmentOutputsAllowed()) return
             var detectorStartedAtElapsedRealtimeMs = nowMs
-            var result = AndroidDetectionResult.empty()
+            // Until a model call completes, this frame is not an empty scene.
+            var result = AndroidDetectionResult.unavailable()
+            var detectorOutputExpired = false
             val admission = CameraDetectorAdmissionPolicy.admit(
                 currentEpoch = expectedWalkEpoch,
                 nowElapsedRealtimeMs = nowMs,
                 observation = qualityObservation,
                 approvedProfile = activeCameraFrameQualityProfile,
             ) {
-                detectorInvoked = true
                 detectorStartedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
                 result = try {
-                    frameDetector.detectOriented(
-                        cameraImage = mediaImage,
-                        timestampMs = imageProxy.imageInfo.timestamp / NANOS_PER_MILLISECOND,
-                        quarterTurns = (imageProxy.imageInfo.rotationDegrees / 90) % 4,
-                    ).also {
-                        if (
-                            isCurrentFrameGeneration(
-                                detectorFrameGeneration,
-                                expectedWalkEpoch,
-                            )
-                        ) {
-                            detectorRuntimeSupervisor.onSuccess()
+                    val ownedFrame = kr.co.hanium.dreamup.walksafe.inference.OwnedYuvFrame.copyOf(mediaImage, imageProxy.cropRect)
+                    imageProxy.close()
+                    imageProxyClosed = true
+                    val flight = beginNativeDetectorFlight(
+                        expectedWalkEpoch, detectorFrameGeneration,
+                    ) ?: return@admit
+                    try {
+                        detectorInvoked = true
+                        detectorStartedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
+                        frameDetector.detectOriented(
+                            cameraFrame = ownedFrame,
+                            timestampMs = imageTimestampNs / NANOS_PER_MILLISECOND,
+                            quarterTurns = imageQuarterTurns,
+                        ).also {
+                            // S14-36/S10-4: the supervisor checks this call's run and ticket; an unavailable
+                            // call or an old capture only keeps its no-valid-output clock running.
+                            detectorOutputExpired = detectorRuntimeSupervisor.onDetectorOutput(
+                                claim = kr.co.hanium.dreamup.walksafe.inference.DetectorWorkClaim(
+                                    detectorFrameGeneration, expectedWalkEpoch, detectorTicket,
+                                ),
+                                result = it,
+                                capturedAtElapsedRealtimeMs = nowMs,
+                                completedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                            ).action == DetectorRuntimeFailureAction.SAFE_STOP
+                            // Returning without an exception is not success unless inference completed.
+                            if (it.inferenceCompleted) {
+                                detectorSucceeded = true
+                            }
                         }
-                        detectorSucceeded = true
+                    } finally {
+                        completeNativeDetectorFlight(flight)
                     }
                 } catch (error: RuntimeException) {
                     handleDetectorRuntimeFailure(
@@ -29558,12 +31692,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         detectorFrameGeneration,
                         expectedWalkEpoch,
                     )
-                    AndroidDetectionResult.empty()
+                    AndroidDetectionResult.failed()
                 } finally {
                     inferenceDurationMs = SystemClock.elapsedRealtime() - detectorStartedAtElapsedRealtimeMs
                 }
             }
             if (!admission.detectorInvocationAllowed) return
+            if (detectorOutputExpired) {
+                handleDetectorRuntimeFailure(
+                    kr.co.hanium.dreamup.walksafe.inference.DetectorValidOutputExpired(),
+                    detectorFrameGeneration,
+                    expectedWalkEpoch,
+                )
+                return
+            }
+            // A failed or unavailable call is not evidence that the scene is empty.
+            if (!result.inferenceCompleted) return
             inferenceDurationMs = result.timing.totalMs ?: inferenceDurationMs
             if (detectorSucceeded) {
                 val completedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
@@ -29607,6 +31751,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                 detectorStartedAtElapsedRealtimeMs
                             ).coerceAtLeast(0L),
                     modelRevision = result.timing.modelKey ?: detectorLoadedModelKey,
+                    executedRuntime = result.timing.modelRuntime ?: result.timing.customRuntime,
                 )
             }
             val advisoryGate = currentCameraFallbackAdvisoryGate(nowMs)
@@ -29617,7 +31762,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             val action = nonMetricAdvisoryPolicy.evaluate(
                 detections = result.detections,
                 gate = advisoryGate,
-                frameId = imageProxy.imageInfo.timestamp,
+                frameId = imageTimestampNs,
                 nowMs = nowMs,
             )
             if (
@@ -29649,7 +31794,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         } finally {
             try {
-                imageProxy.close()
+                if (!imageProxyClosed) imageProxy.close()
             } finally {
                 pacingTicket?.let { ticket ->
                     finishDetectionWork(ticket, detectorInvoked, inferenceDurationMs, validCompletion = detectorSucceeded)
@@ -29714,20 +31859,28 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         observedAtElapsedRealtimeMs: Long,
         inferenceLatencyMs: Long,
     ): Boolean {
+        val receivedAtMs = SystemClock.elapsedRealtime()
         if (developmentGuidanceStartBypassEnabled) {
             return walkSessionLifecycle.isRuntimeEpochCurrent(epoch) &&
                 frameCapturedAtElapsedRealtimeMs >= 0L &&
                 observedAtElapsedRealtimeMs >= frameCapturedAtElapsedRealtimeMs &&
+                observedAtElapsedRealtimeMs <= receivedAtMs &&
                 inferenceLatencyMs >= 0L
         }
-        return walkRuntimeSafetyCoordinator.observe(
+        val decision = walkRuntimeSafetyCoordinator.observe(
             WalkRuntimeSafetyObservation(
                 epoch = epoch,
                 observedAtElapsedRealtimeMs = observedAtElapsedRealtimeMs,
+                receivedAtElapsedRealtimeMs = receivedAtMs,
                 frameCapturedAtElapsedRealtimeMs = frameCapturedAtElapsedRealtimeMs,
                 inferenceLatencyMs = inferenceLatencyMs,
             ),
-        ).safetyOutputsAllowed
+        )
+        // This shared path admits collection/non-metric fallback, not metric output.
+        return walkSessionLifecycle.isRuntimeEpochCurrent(epoch) &&
+            decision.epoch == epoch &&
+            decision.disposition != WalkRuntimeSafetyDisposition.SAFE_STOP_LATCHED &&
+            decision.disposition != WalkRuntimeSafetyDisposition.IGNORED_OBSERVATION
     }
 
     private fun emitCameraFallbackAdvisory(
@@ -29861,7 +32014,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         return NonMetricAdvisoryGate(
             cameraPermissionGranted = hasCameraPermission(),
             cameraFallbackRunning = cameraFallbackRunning,
-            detectorAvailable = detectorAvailable,
+            detectorAvailable = runningDetectorVerifiedForOutput(),
             imuFresh = hasFreshCameraFallbackImu(nowMs),
             tmapRouteActive = hasFreshTmapFallbackContext(nowMs),
         )
@@ -29902,8 +32055,112 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     /** ARCore and CameraX share one physical detector and never enqueue replacement frames. */
+    private fun beginNativeDetectorFlight(
+        expectedWalkEpoch: WalkRuntimeEpoch,
+        expectedDetectorGeneration: Int,
+    ): NativeDetectorFlight? {
+        val ticket = detectorStallWatchdog.begin(expectedWalkEpoch) ?: run {
+            rejectBlockedNativeDetectorWork()
+            return null
+        }
+        val stopClaim = AtomicBoolean(false)
+        val timeout = Runnable {
+            if (detectorStallWatchdog.expire(ticket) && stopClaim.compareAndSet(false, true)) {
+                handleNativeDetectorStall(expectedWalkEpoch, expectedDetectorGeneration)
+            }
+        }
+        val delayMs = (ticket.deadlineElapsedRealtimeMs - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+        if (!detectorWatchdogHandler.postDelayed(timeout, delayMs)) {
+            detectorStallWatchdog.complete(ticket)
+            return null
+        }
+        return NativeDetectorFlight(
+            ticket, timeout, expectedWalkEpoch, expectedDetectorGeneration, stopClaim,
+        )
+    }
+
+    private fun completeNativeDetectorFlight(flight: NativeDetectorFlight) {
+        val completedBeforeDeadline = detectorStallWatchdog.complete(flight.ticket)
+        detectorWatchdogHandler.removeCallbacks(flight.timeout)
+        if (!completedBeforeDeadline) requestNativeDetectorStall(flight)
+    }
+
+    private fun requestNativeDetectorStall(flight: NativeDetectorFlight) {
+        if (detectorStallWatchdog.blocksNewWork() &&
+            flight.stopClaim.compareAndSet(false, true)
+        ) {
+            runOnUiThread {
+                handleNativeDetectorStall(flight.walkEpoch, flight.detectorGeneration)
+            }
+        }
+    }
+
+    private fun rejectBlockedNativeDetectorWork(): Boolean {
+        val walk = if (::walkSessionLifecycle.isInitialized) walkSessionLifecycle.snapshot() else null
+        return detectorStallWatchdog.rejectBlockedWork(walk?.epoch, walk?.state) { epoch ->
+            detectorWatchdogHandler.post {
+                if (!isDestroyed && ::walkSessionLifecycle.isInitialized &&
+                    detectorStallWatchdog.blocksNewWork() &&
+                    walkSessionLifecycle.isRuntimeEpochCurrent(epoch)
+                ) {
+                    enterWalkSessionSafetyStopAndCancelOutputs("detector_stalled")
+                }
+            }
+        }
+    }
+
+    internal fun rejectUnsafeDetectorAtWalkEntry(
+        epoch: WalkRuntimeEpoch,
+        state: WalkSessionState,
+        watchdog: DetectorStallWatchdog = detectorStallWatchdog,
+        requestSafeStop: (WalkRuntimeEpoch) -> Unit,
+    ): Boolean = watchdog.rejectUnsafeWalkEntry(epoch, state, requestSafeStop)
+
+    private fun handleNativeDetectorStall(
+        expectedWalkEpoch: WalkRuntimeEpoch,
+        expectedDetectorGeneration: Int,
+    ) {
+        if (!::walkSessionLifecycle.isInitialized || isDestroyed) return
+        val ownsCurrentWalk = synchronized(frameStateLock) {
+            val walk = walkSessionLifecycle.snapshot()
+            if (!nativeDetectorStallOwnsWalk(
+                    expectedWalkEpoch, expectedDetectorGeneration,
+                    walk.epoch, detectorGeneration, walk.state,
+                )
+            ) return@synchronized false
+            detectorGeneration += 1
+            detectorLoadGeneration += 1L
+            detectorClosing = true
+            detectorAvailable = false
+            latestDetectionSnapshot = DetectionSnapshot.empty()
+            true
+        }
+        if (!ownsCurrentWalk) return
+        walkRuntimeSafetyCoordinator.observe(
+            WalkRuntimeSafetyObservation(
+                epoch = expectedWalkEpoch,
+                observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                riskTrusted = false,
+            ),
+        )
+        val walk = walkSessionLifecycle.snapshot()
+        if (nativeDetectorStallOwnsWalk(
+                expectedWalkEpoch, expectedDetectorGeneration + 1,
+                walk.epoch, detectorGeneration, walk.state,
+            )
+        ) {
+            enterWalkSessionSafetyStopAndCancelOutputs("detector_stalled")
+        }
+        if (::debugBboxOverlay.isInitialized) debugBboxOverlay.clear()
+        if (::statusText.isInitialized && !isDestroyed) {
+            updateStatus("객체 탐지 지연 · 안전 중지", "검출 기한 800ms를 넘겨 보행 기능을 안전 중지했습니다.")
+        }
+        closeDetectorAsync()
+    }
+
     private fun tryStartDetectionWork(nowElapsedRealtimeMs: Long): InferencePacingTicket? =
         synchronized(frameStateLock) {
+            if (rejectBlockedNativeDetectorWork()) return@synchronized null
             if (unknownFrameCopyInFlight.get()) return@synchronized null
             if (detectionInFlight.get()) {
                 if (nowElapsedRealtimeMs >= adaptiveInferencePacing.snapshot().nextEligibleAtElapsedRealtimeMs) {
@@ -30046,13 +32303,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         try {
             val cameraImage = provider.acquireCameraImageOrNull(frame) ?: return
             acquiredImage = cameraImage
-            synchronized(frameStateLock) {
+            val requestGeometryVersion = synchronized(frameStateLock) {
                 if (!isCurrentFrameGeneration(frameGeneration, expectedWalkEpoch)) {
                     return
                 }
                 lastDetectionCaptureFrameId = frame.timestamp
                 lastDetectionCaptureGeneration = frameGeneration
                 lastDetectionCaptureArSessionGeneration = expectedArSessionGeneration
+                visualGeometryVersion
             }
             val generation = frameGeneration
             val imageWidth = cameraImage.width
@@ -30060,7 +32318,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             val orientationBasis = FloatArray(6)
             frame.transformCoordinates2d(Coordinates2d.IMAGE_NORMALIZED,
                 floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f), Coordinates2d.VIEW, orientationBasis)
-            val imageQuarterTurns = UprightCameraImage.quarterTurns(orientationBasis)
+            val imageQuarterTurns = UprightCameraImage.quarterTurns(orientationBasis) ?: return
             val detectionIdentity = AndroidDetectionSnapshotFrameIdentity(
                 captureFrameId = frame.timestamp,
                 frameTimestampMs = timestampMs,
@@ -30085,11 +32343,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     it.frameId == frame.timestamp && it.cameraTimestampNs == cameraImage.timestamp &&
                         it.cameraTimestampNs == capturedDepthSnapshot.cameraImageTimestampNs
                 },
+                geometryVersion = requestGeometryVersion,
             )
             detectorExecutor.execute {
                 var detectorInvoked = false
                 var inferenceDurationMs: Long? = null
                 var detectorSucceeded = false
+                var cameraImageClosed = false
                 try {
                     if (!isCurrentFrameGeneration(generation, expectedWalkEpoch)) {
                         return@execute
@@ -30129,21 +32389,31 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     val startedAtMs = System.currentTimeMillis()
                     var completedAtMs = startedAtMs
                     var detectorStartedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
-                    var result = AndroidDetectionResult.empty()
+                    // Until a model call completes, this frame is not an empty scene.
+                    var result = AndroidDetectionResult.unavailable()
+                    var detectorOutputExpired = false
                     val admission = CameraDetectorAdmissionPolicy.admit(
                         currentEpoch = expectedWalkEpoch,
                         nowElapsedRealtimeMs = SystemClock.elapsedRealtime(),
                         observation = qualityObservation,
                         approvedProfile = activeCameraFrameQualityProfile,
                     ) {
-                        detectorInvoked = true
                         detectorStartedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
                         result = try {
-                            frameDetector.detectOriented(
-                                cameraImage,
-                                timestampMs = timestampMs,
-                                quarterTurns = imageQuarterTurns,
-                            ) { partialResult ->
+                            val ownedFrame = kr.co.hanium.dreamup.walksafe.inference.OwnedYuvFrame.copyOf(cameraImage)
+                            cameraImage.close()
+                            cameraImageClosed = true
+                            val flight = beginNativeDetectorFlight(
+                                expectedWalkEpoch, generation,
+                            ) ?: return@admit
+                            try {
+                                detectorInvoked = true
+                                detectorStartedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
+                                frameDetector.detectOriented(
+                                    cameraFrame = ownedFrame,
+                                    timestampMs = timestampMs,
+                                    quarterTurns = imageQuarterTurns,
+                                ) { partialResult ->
                                 val observedAtElapsedRealtimeMs = SystemClock.elapsedRealtime()
                                 val inferenceLatencyMs = partialResult.timing.totalMs
                                     ?: (
@@ -30171,17 +32441,31 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                         frameEvidence = frameEvidence,
                                         expectedWalkEpoch = expectedWalkEpoch,
                                         capturedAtElapsedRealtimeMs = elapsedRealtimeMs,
+                                        nativeFlight = flight,
                                     )
                                 }
-                            }.also {
-                                if (isCurrentFrameGeneration(generation, expectedWalkEpoch)) {
-                                    detectorRuntimeSupervisor.onSuccess()
+                                }.also {
+                                    // S14-36/S10-4: the supervisor checks this call's run and ticket; an unavailable
+                                    // call or an old capture only keeps its no-valid-output clock running.
+                                    detectorOutputExpired = detectorRuntimeSupervisor.onDetectorOutput(
+                                        claim = kr.co.hanium.dreamup.walksafe.inference.DetectorWorkClaim(
+                                            generation, expectedWalkEpoch, pacingTicket,
+                                        ),
+                                        result = it,
+                                        capturedAtElapsedRealtimeMs = elapsedRealtimeMs,
+                                        completedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                                    ).action == DetectorRuntimeFailureAction.SAFE_STOP
+                                    // Returning without an exception is not success unless inference completed.
+                                    if (it.inferenceCompleted) {
+                                        detectorSucceeded = true
+                                    }
                                 }
-                                detectorSucceeded = true
+                            } finally {
+                                completeNativeDetectorFlight(flight)
                             }
                         } catch (error: RuntimeException) {
                             handleDetectorRuntimeFailure(error, generation, expectedWalkEpoch)
-                            AndroidDetectionResult.empty()
+                            AndroidDetectionResult.failed()
                         } finally {
                             completedAtMs = System.currentTimeMillis()
                             inferenceDurationMs = SystemClock.elapsedRealtime() - detectorStartedAtElapsedRealtimeMs
@@ -30189,6 +32473,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     }
                     if (!admission.detectorInvocationAllowed) {
                         completedAtMs = System.currentTimeMillis()
+                        return@execute
+                    }
+                    if (detectorOutputExpired) {
+                        handleDetectorRuntimeFailure(
+                            kr.co.hanium.dreamup.walksafe.inference.DetectorValidOutputExpired(),
+                            generation,
+                            expectedWalkEpoch,
+                        )
                         return@execute
                     }
                     inferenceDurationMs = result.timing.totalMs ?: inferenceDurationMs
@@ -30205,6 +32497,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             )
                         ) return@execute
                     }
+                    // A failed or unavailable call must not replace the last completed result with
+                    // an "empty scene"; that result still expires by its own capture age.
+                    if (!result.inferenceCompleted) return@execute
                     val published = this@MainActivity.publishDetectionSnapshot(
                         result = result,
                         generation = generation,
@@ -30226,6 +32521,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             inferenceMs = result.timing.totalMs
                                 ?: (completedAtMs - startedAtMs),
                             modelRevision = result.timing.modelKey ?: detectorLoadedModelKey,
+                            executedRuntime = result.timing.modelRuntime ?: result.timing.customRuntime,
                         )
                         synchronized(frameStateLock) {
                             if (!isCurrentFrameGeneration(generation, expectedWalkEpoch)) {
@@ -30257,7 +32553,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     }
                 } finally {
                     try {
-                        cameraImage.close()
+                        if (!cameraImageClosed) cameraImage.close()
                     } finally {
                         finishDetectionWork(
                             pacingTicket, detectorInvoked, inferenceDurationMs,
@@ -30314,31 +32610,50 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         frameEvidence: DetectionFrameEvidence,
         expectedWalkEpoch: WalkRuntimeEpoch? = null,
         capturedAtElapsedRealtimeMs: Long? = null,
-    ): DetectionSnapshot? = synchronized(frameStateLock) {
-        if (
-            generation != detectorGeneration ||
-            (
-                expectedWalkEpoch != null &&
-                    (
-                        !walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch) ||
-                            !cameraEnvironmentOutputsAllowed()
-                    )
+        nativeFlight: NativeDetectorFlight? = null,
+    ): DetectionSnapshot? {
+        var stalledFlight: NativeDetectorFlight? = null
+        val published = synchronized(frameStateLock) {
+            if (
+                generation != detectorGeneration ||
+                detectorStallWatchdog.blocksNewWork() ||
+                // S10-2: a result requested before a rotation/display change never attaches to the new geometry.
+                (frameEvidence.geometryVersion != null && frameEvidence.geometryVersion != visualGeometryVersion) ||
+                (
+                    expectedWalkEpoch != null &&
+                        (
+                            !walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch) ||
+                                !cameraEnvironmentOutputsAllowed()
+                        )
+                )
+            ) return@synchronized null
+            val snapshot = DetectionSnapshot.published(
+                result = result,
+                identity = detectionIdentity,
+                capturedAtMs = capturedAtMs,
+                startedAtMs = startedAtMs,
+                completedAtMs = completedAtMs,
+                imageWidth = imageWidth,
+                imageHeight = imageHeight,
+                reportImageJpeg = reportImageJpeg,
+                frameEvidence = frameEvidence,
+                capturedAtElapsedRealtimeMs = capturedAtElapsedRealtimeMs,
             )
-        ) return@synchronized null
-        DetectionSnapshot.published(
-            result = result,
-            identity = detectionIdentity,
-            capturedAtMs = capturedAtMs,
-            startedAtMs = startedAtMs,
-            completedAtMs = completedAtMs,
-            imageWidth = imageWidth,
-            imageHeight = imageHeight,
-            reportImageJpeg = reportImageJpeg,
-            frameEvidence = frameEvidence,
-            capturedAtElapsedRealtimeMs = capturedAtElapsedRealtimeMs,
-        ).also { snapshot ->
-            latestDetectionSnapshot = snapshot
+            if (nativeFlight != null) {
+                if (!detectorStallWatchdog.publishIfCurrent(nativeFlight.ticket) {
+                        latestDetectionSnapshot = snapshot
+                    }
+                ) {
+                    if (detectorStallWatchdog.blocksNewWork()) stalledFlight = nativeFlight
+                    return@synchronized null
+                }
+            } else {
+                latestDetectionSnapshot = snapshot
+            }
+            snapshot
         }
+        stalledFlight?.let(::requestNativeDetectorStall)
+        return published
     }
 
     // Frozen FP-017 trace markers; the live contract below additionally binds
@@ -30351,7 +32666,8 @@ generation != cameraFallbackGeneration
         generation: Int,
         expectedWalkEpoch: WalkRuntimeEpoch? = null,
     ): Boolean =
-        firstRunOnboardingComplete() &&
+        !rejectBlockedNativeDetectorWork() &&
+            firstRunOnboardingComplete() &&
             isWalkSessionRuntimeActive() &&
             generation == detectorGeneration &&
             (
@@ -30545,6 +32861,7 @@ generation != cameraFallbackGeneration
                     },
                     best = true,
                     className = output.className,
+                    trackKey = output.trackId,
                 )
             }
         }
@@ -30746,12 +33063,15 @@ generation != cameraFallbackGeneration
         var image: android.media.Image? = null
         var queued = false
         try {
-            val owned = provider.acquireCameraImageOrNull(frame) ?: return
+            val owned = provider.acquireCameraImageOrNull(
+                frame, kr.co.hanium.dreamup.walksafe.depth.CameraImageConsumer.UNKNOWN_OBJECT,
+            ) ?: return
             image = owned
             if (owned.timestamp <= 0L || owned.timestamp != snapshot.cameraImageTimestampNs) return
             val basis = FloatArray(6)
             frame.transformCoordinates2d(Coordinates2d.IMAGE_NORMALIZED,
                 floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f), Coordinates2d.VIEW, basis)
+            val imageQuarterTurns = UprightCameraImage.quarterTurns(basis) ?: return
             val evidence = UnknownCaptureEvidence(
                 frameId = frame.timestamp,
                 depthSnapshot = snapshot,
@@ -30759,7 +33079,7 @@ generation != cameraFallbackGeneration
                     frame, frame.timestamp, owned.width, owned.height, snapshot, allowMissingDepth = true,
                 ),
                 motionContext = buildDepthMotionContext(capturedElapsedMs),
-                imageQuarterTurns = UprightCameraImage.quarterTurns(basis),
+                imageQuarterTurns = imageQuarterTurns,
                 processingLease = processingLease,
             )
             detectorExecutor.execute {
@@ -31066,6 +33386,7 @@ generation != cameraFallbackGeneration
                         }
                     }
                     if (adopted) baseline.close() else ready.close()
+                    if (adopted) scheduleRunningDetectorVerification(ready, loaded.modelKey, loaded.fallbackUsed)
                     runOnUiThread {
                         runtimeServicesPreparing = false
                         if (adopted) {
@@ -31169,7 +33490,10 @@ generation != cameraFallbackGeneration
         detectorLoadReason = detectorLoad.reason
         detectorModelKeyForReports = detectorLoad.modelKey?.toReportModelKey()
         detectorStatusText = "detector=${detectorLoad.reason} model=${detectorLoad.modelKey ?: "-"} fallback=${detectorLoad.fallbackUsed}"
-        detectorLoad.detector?.let { detector -> frameDetector = detector }
+        detectorLoad.detector?.let { detector ->
+            frameDetector = detector
+            scheduleRunningDetectorVerification(detector, detectorLoad.modelKey, detectorLoad.fallbackUsed)
+        }
         val initialRuntime = bootstrapConfig?.unifiedWalksafe?.runtime
         runtimeActiveCandidate = initialRuntime?.takeIf {
             detectorLoad.modelKey == TwoModelRuntimeConfig.UNIFIED_MODEL_KEY && !detectorLoad.fallbackUsed
@@ -31186,6 +33510,151 @@ generation != cameraFallbackGeneration
             }
         }
     }
+
+    /**
+     * S14-33: binds the verification to the instance that is [frameDetector] now. A loaded
+     * instance already passed the asset hash check and interpreter creation; one fixed in-app
+     * fixture inference on that same instance is the sample-input check (FP-039). Any later
+     * replacement bumps [detectorLoadGeneration], so a late result can never verify a newer one.
+     * S14-33-F1: the verification is an explicit bounded state. A failed sample inference is retried
+     * after [RunningDetectorVerificationGate.retryDelayMs] up to [RunningDetectorVerificationGate.maxAttempts];
+     * the last failure, a rejected executor, or [RunningDetectorVerificationGate.pendingDeadlineMs]
+     * of waiting disables the instance (FP-039 failure_behavior) instead of staying silently closed.
+     */
+    private fun scheduleRunningDetectorVerification(
+        detector: TfliteAndroidFrameDetector,
+        modelKey: String?,
+        fallbackUsed: Boolean,
+        retryAttempt: Boolean = false,
+    ) {
+        if (!retryAttempt) {
+            runningDetectorVerification.begin(detector, SystemClock.elapsedRealtime())
+            detectorWatchdogHandler.postDelayed(
+                { expireRunningDetectorVerification(detector) },
+                runningDetectorVerification.pendingDeadlineMs,
+            )
+        }
+        val verify = Runnable {
+            val generation = synchronized(frameStateLock) {
+                if (frameDetector !== detector || detectorClosing) return@Runnable
+                detectorLoadGeneration
+            }
+            val sample = runCatching {
+                val fixtures = RuntimeCalibrationFixtures(applicationContext)
+                detector.detectCalibrationImage(fixtures.loadArgb(fixtures.loadManifest().fixtures.first { it.required }))
+            }.getOrNull()
+            val identity = RunningDetectorIdentity.of(
+                reportRuntimeConfig, reportModelConfigSha256, modelKey,
+                sample?.timing?.modelRuntime?.activeDelegate, fallbackUsed, generation,
+            )
+            val step = synchronized(frameStateLock) {
+                if (frameDetector !== detector || detectorLoadGeneration != generation || detectorClosing) return@Runnable
+                runningDetectorVerification.recordAttempt(
+                    detector, identity,
+                    RunningDetectorLoadEvidence(
+                        assetIntegrityVerified = true,
+                        interpreterLoaded = true,
+                        sampleInferencePassed = sample?.inferenceCompleted == true,
+                    ),
+                    SystemClock.elapsedRealtime(),
+                )
+            }
+            when (step) {
+                kr.co.hanium.dreamup.walksafe.inference.RunningDetectorVerificationStep.RETRY -> detectorWatchdogHandler.postDelayed(
+                    {
+                        if (!isDestroyed) {
+                            scheduleRunningDetectorVerification(detector, modelKey, fallbackUsed, retryAttempt = true)
+                        }
+                    },
+                    runningDetectorVerification.retryDelayMs,
+                )
+                kr.co.hanium.dreamup.walksafe.inference.RunningDetectorVerificationStep.FAILED ->
+                    runOnUiThread { disableDetectorAfterVerificationFailure(detector) }
+                kr.co.hanium.dreamup.walksafe.inference.RunningDetectorVerificationStep.VERIFIED -> runOnUiThread {
+                    if (!isDestroyed) {
+                        maybeContinuePostLoginDeviceCheck()
+                        refreshStartupCapabilityUi()
+                    }
+                }
+                kr.co.hanium.dreamup.walksafe.inference.RunningDetectorVerificationStep.STALE -> Unit
+            }
+        }
+        try {
+            detectorExecutor.execute(verify)
+        } catch (_: RejectedExecutionException) {
+            runningDetectorVerification.invalidate()
+            if (runningDetectorVerification.fail(detector)) {
+                runOnUiThread { disableDetectorAfterVerificationFailure(detector) }
+            }
+        }
+    }
+
+    /** S14-33-F1: bounds the "checking" state of [detector]; runs on the UI thread. */
+    private fun expireRunningDetectorVerification(detector: TfliteAndroidFrameDetector) {
+        if (isDestroyed) return
+        if (runningDetectorVerification.expire(detector, SystemClock.elapsedRealtime())) {
+            disableDetectorAfterVerificationFailure(detector)
+        }
+    }
+
+    /**
+     * S14-33-F1 (FP-039 failure_behavior, FP-019): an instance whose sample inference could not be
+     * verified never starts hazard detection. It is detached and closed on the detector thread; the
+     * device check shows the detector as unavailable, a new walk is blocked with the reason, the
+     * device re-check reloads the model, and a running walk stops on the detector failure path.
+     */
+    private fun disableDetectorAfterVerificationFailure(detector: TfliteAndroidFrameDetector) {
+        if (isDestroyed) return
+        val disabled = synchronized(frameStateLock) {
+            if (frameDetector !== detector || detectorClosing) return@synchronized false
+            frameDetector = NoopAndroidFrameDetector()
+            detectorGeneration += 1
+            detectorLoadGeneration += 1L
+            detectorAvailable = false
+            detectorLoadReason = kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness.SAMPLE_INFERENCE_UNVERIFIED_REASON
+            detectorStatusText = "detector=$detectorLoadReason"
+            latestDetectionSnapshot = DetectionSnapshot.empty()
+            true
+        }
+        if (!disabled) return
+        if (runtimeCalibration != null || unknownCalibration != null) {
+            cancelDeviceRuntimeCalibration("detector_verification_failed")
+        }
+        try {
+            detectorExecutor.execute { detector.close() }
+        } catch (_: RejectedExecutionException) {
+            // A shut-down executor already owns detector teardown; never close during an invoke.
+        }
+        if (postLoginDeviceCheckSnapshot.passesFeatureGate) {
+            if (postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.METRIC_DISTANCE_GUIDANCE)) {
+                metricDistanceCapabilityOverride = false
+            }
+            runtimeObstacleDetectionCapabilityOverride = false
+        }
+        val walking = ::walkSessionLifecycle.isInitialized &&
+            walkSessionLifecycle.snapshot().state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
+        if (walking) enterWalkSessionSafetyStopAndCancelOutputs("detector_runtime_failed")
+        if (::debugBboxOverlay.isInitialized) debugBboxOverlay.clear()
+        if (::statusText.isInitialized) {
+            updateStatus(
+                if (walking) "객체 탐지 모델 확인 실패 · 안전 중지" else "객체 탐지 모델 확인 실패",
+                kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness.WALK_BLOCK_NOTICE_KO,
+            )
+        }
+        maybeContinuePostLoginDeviceCheck()
+        refreshStartupCapabilityUi()
+    }
+
+    /** S14-33-F1: the running model failed its sample inference (FP-039: no hazard detection, no walk). */
+    private fun runningDetectorBlocksWalkEntry(): Boolean =
+        kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness.blocksWalkEntry(
+            runningDetectorVerification.state(frameDetector), detectorAvailable, detectorLoadReason,
+        )
+
+    /** S14-33 output gate: the Booleans plus the token of this exact instance and generation. */
+    private fun runningDetectorVerifiedForOutput(): Boolean =
+        detectorConfigLoaded && detectorAvailable &&
+            runningDetectorVerification.allowsOutput(frameDetector, detectorLoadGeneration, reportModelConfigSha256)
 
     /**
      * Measures the installed model with the versioned in-app calibration images only. This is a
@@ -31381,6 +33850,7 @@ generation != cameraFallbackGeneration
                                 if (!current()) false else {
                                     frameDetector = replacement
                                     detectorLoadGeneration += 1L
+                                    scheduleRunningDetectorVerification(replacement, load.modelKey, load.fallbackUsed)
                                     runtimeActiveCandidate = profile.candidate
                                     runtimeActiveProfile = profile
                                     adaptiveInferencePacing.reset()
@@ -31714,6 +34184,7 @@ generation != cameraFallbackGeneration
                                 runtimeActiveCandidate = selection.profile.candidate
                                 runtimeActiveProfile = selection.profile
                                 detectorLoadGeneration += 1L
+                                scheduleRunningDetectorVerification(load.detector, load.modelKey, load.fallbackUsed)
                                 adaptiveInferencePacing.reset()
                                 runtimeLoadMonitor.reset()
                                 runtimeLoadPendingRecordedBinding = null
@@ -31757,6 +34228,9 @@ generation != cameraFallbackGeneration
         expectedWalkEpoch: WalkRuntimeEpoch,
     ) {
         if (!isCurrentFrameGeneration(expectedDetectorGeneration, expectedWalkEpoch)) return
+        // The supervisor re-arms its freshness clock once per walk/camera run: an earlier run's output
+        // is not this run's freshness origin, and later failures of the run keep the clock it armed.
+        val detectorRun = expectedDetectorGeneration to expectedWalkEpoch
         val runtimeConfig = reportRuntimeConfig
         val legacyAvailable = runtimeConfig?.fallbackModelKey == TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY &&
             runtimeConfig.customTactile != null &&
@@ -31766,6 +34240,9 @@ generation != cameraFallbackGeneration
                 activeModelKey = detectorLoadedModelKey,
                 legacyFallbackAvailable = legacyAvailable,
                 activeWalk = true,
+                failureKind = detectorRuntimeFailureKind(error),
+                atElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                run = detectorRun,
             )
         ) {
             DetectorRuntimeFailureAction.KEEP_CURRENT -> {
@@ -31773,7 +34250,8 @@ generation != cameraFallbackGeneration
                     detectorStatusText =
                         "detector=runtime_failure_${detectorRuntimeSupervisor.consecutiveFailures} error=${error::class.java.simpleName}"
                 } else {
-                    detectorRuntimeSupervisor.onSuccess()
+                    // A stale generation resets the streak; a reset is never a success (S14-36).
+                    detectorRuntimeSupervisor.disarmValidOutputClock()
                 }
             }
             DetectorRuntimeFailureAction.SAFE_STOP -> {
@@ -31837,7 +34315,7 @@ generation != cameraFallbackGeneration
             }
         }
         if (disabledGeneration == null) {
-            detectorRuntimeSupervisor.onSuccess()
+            detectorRuntimeSupervisor.disarmValidOutputClock()
             return
         }
         clearDetectionStateAfterRuntimeTransition(expectedWalkEpoch)
@@ -31908,7 +34386,7 @@ generation != cameraFallbackGeneration
         }
     }
 
-    /** Avoids duplicate app TTS while TalkBack owns speech, but preserves the risk haptic. */
+    /** App-owned risk feedback retains explicit speech completion, including with TalkBack. */
     private fun emitFeedbackAction(action: FeedbackAction, policyEvaluatedAtMs: Long) {
         val generation = feedbackLifecycleGeneration
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -31921,55 +34399,69 @@ generation != cameraFallbackGeneration
             }
             return
         }
-        if (!isFeedbackLifecycleCurrent(generation)) {
-            feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
-            return
-        }
-        if (!isFeedbackActionStillDeliverable(action)) {
+        if (!isFeedbackLifecycleCurrent(generation) || !isFeedbackActionStillDeliverable(action)) {
             feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
             return
         }
         cancelPendingFeedbackTerminalResolution()
-        if (!feedbackPolicy.claimFeedbackDelivery(action.trackId, policyEvaluatedAtMs)) return
-        if (!isFeedbackActionStillDeliverable(action)) {
-            feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
+        if (!feedbackPolicy.claimFeedbackDelivery(action.trackId, policyEvaluatedAtMs, SystemClock.elapsedRealtime())) return
+        val expectedWalkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull()
+        var cancelled = false
+        val completionCurrent: () -> Boolean = {
+            !cancelled && expectedWalkEpoch != null &&
+                isFeedbackLifecycleCurrent(generation) &&
+                walkSessionLifecycle.currentRuntimeEpochOrNull() == expectedWalkEpoch
+        }
+        val outputCurrent: () -> Boolean = {
+            completionCurrent() && isFeedbackActionStillDeliverable(action)
+        }
+        val cancelDelivery: () -> Unit = {
+            runOnUiThread {
+                cancelled = true
+                // An old callback must not retire a newer action's terminal timer.
+                val pending = pendingFeedbackTerminalResolution
+                if (pending?.action == action && pending.policyEvaluatedAtMs == policyEvaluatedAtMs) {
+                    cancelPendingFeedbackTerminalResolution()
+                }
+                feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
+            }
+        }
+        if (!outputCurrent()) {
+            cancelDelivery()
             return
         }
-        val isRisk = action.level != kr.co.hanium.dreamup.walksafe.depth.MessageLevel.INFO
+        val isRisk = action.level != MessageLevel.INFO
         if (isRisk) cancelGatewaySpeechInteraction("risk_feedback")
         if (isRisk && voiceRecognitionActive) cancelVoiceCommandRecognition()
-        if (shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk)) {
-            feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
+        if (shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk) || !outputCurrent()) {
+            cancelDelivery()
             return
         }
         val actuator = ensureFeedbackActuator()
         if (isRisk) {
-            val speechGeneration = generation
             val feedbackStartedAtMs = SystemClock.elapsedRealtime()
             var vibrationAccepted = false
             val dispatch = actuator.emit(
                 action = action,
-                isStillValidAtStart = {
-                    isFeedbackLifecycleCurrent(speechGeneration) && isFeedbackActionStillDeliverable(action)
-                },
+                isStillValidAtStart = outputCurrent,
                 onSpeechCompleted = {
                     runOnUiThread {
-                        if (isFeedbackLifecycleCurrent(speechGeneration)) {
+                        if (completionCurrent()) {
                             confirmFeedbackDelivery(action, policyEvaluatedAtMs, outputCompleted = true)
                         } else {
-                            feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
+                            cancelDelivery()
                         }
                     }
                 },
                 onSpeechFailed = {
                     runOnUiThread {
-                        if (!isFeedbackLifecycleCurrent(speechGeneration)) {
-                            feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
+                        if (!completionCurrent()) {
+                            cancelDelivery()
                         } else if (vibrationAccepted) {
                             scheduleFeedbackTerminalResolution(
                                 action = action,
                                 policyEvaluatedAtMs = policyEvaluatedAtMs,
-                                generation = speechGeneration,
+                                generation = generation,
                                 delayMs = (
                                     feedbackStartedAtMs + vibrationDurationMs(action) -
                                         SystemClock.elapsedRealtime()
@@ -31980,47 +34472,84 @@ generation != cameraFallbackGeneration
                         }
                     }
                 },
+                onSpeechCancelled = cancelDelivery,
             )
             vibrationAccepted = dispatch.vibrationAccepted
-            if (dispatch.speech != NavigationSpeechDispatchResult.ACCEPTED) {
+            if (dispatch.speech != NavigationSpeechDispatchResult.ACCEPTED && !cancelled) {
                 if (vibrationAccepted) {
                     scheduleFeedbackTerminalResolution(
                         action = action,
                         policyEvaluatedAtMs = policyEvaluatedAtMs,
                         generation = generation,
-                        delayMs = vibrationDurationMs(action),
+                        delayMs = (
+                            feedbackStartedAtMs + vibrationDurationMs(action) - SystemClock.elapsedRealtime()
+                            ).coerceAtLeast(1L),
                     )
                 } else {
                     feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
                 }
             }
         } else {
-            val speechGeneration = generation
             val speech = actuator.speakNavigation(
                 message = action.message,
+                isStillValidAtStart = outputCurrent,
                 requiresExplicitTerminalCallback = true,
                 onCompleted = {
                     runOnUiThread {
-                        if (isFeedbackLifecycleCurrent(speechGeneration)) {
-                            confirmFeedbackDelivery(action, policyEvaluatedAtMs)
+                        if (completionCurrent()) {
+                            confirmFeedbackDelivery(action, policyEvaluatedAtMs, outputCompleted = true)
                         } else {
-                            feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
+                            cancelDelivery()
                         }
                     }
                 },
-                onFailed = {
-                    feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
-                },
+                onFailed = cancelDelivery,
+                onCancelled = cancelDelivery,
             )
-            if (speech != NavigationSpeechDispatchResult.ACCEPTED) {
-                feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
-            }
+            if (speech != NavigationSpeechDispatchResult.ACCEPTED) cancelDelivery()
         }
+    }
+
+    /** Convert the frozen source's clock once; processing time must never renew its lease. */
+    private fun bindLegacyFeedbackToCapture(
+        output: TrackedObjectDepth,
+        sourceFrameId: Long,
+        sourceTimestampMs: Long,
+        sourceCapturedAtElapsedRealtimeMs: Long?,
+        nowElapsedRealtimeMs: Long,
+    ): TrackedObjectDepth {
+        val capturedAt = sourceCapturedAtElapsedRealtimeMs
+        val depthAgeMs = output.depthObservedAtMs?.let { sourceTimestampMs - it }
+            ?: if (output.source.metric) -1L else 0L
+        val captureValid = capturedAt != null && capturedAt in 0L..nowElapsedRealtimeMs &&
+            output.frameId == sourceFrameId &&
+            depthAgeMs in 0L..MAX_DEPTH_DETECTION_SOURCE_AGE_MS
+        val deadline = if (captureValid) {
+            requireNotNull(capturedAt) + MAX_DEPTH_DETECTION_SOURCE_AGE_MS - depthAgeMs
+        } else {
+            Long.MIN_VALUE
+        }
+        return output.copy(
+            sourceValidUntilElapsedRealtimeMs = minOf(
+                output.sourceValidUntilElapsedRealtimeMs ?: Long.MAX_VALUE,
+                deadline,
+            ),
+        )
     }
 
     private fun isFeedbackActionStillDeliverable(action: FeedbackAction): Boolean {
         val current = latestFeedbackDeliveryState
         val nowMs = SystemClock.elapsedRealtime()
+        val requiresRuntimeSafetyPermission = action.reason == "fresh_metric_depth_alert" ||
+            action.reason == "fresh_metric_path_guidance" ||
+            action.reason == "fresh_qualitative_depth_caution"
+        if (requiresRuntimeSafetyPermission) {
+            val epoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return false
+            val decision = walkRuntimeSafetyCoordinator.evaluate(nowMs)
+            if (!walkSessionLifecycle.isRuntimeEpochCurrent(epoch) ||
+                decision.epoch != epoch || !decision.safetyOutputsAllowed
+            ) return false
+        }
         if (action.trackId.startsWith("unknown:") && freshUnknownFeedbackBatches(nowMs).none { batch ->
                 batch.outputs.any { output ->
                     output.trackId == action.trackId && output.userFacing.message == action.message &&
@@ -32028,12 +34557,45 @@ generation != cameraFallbackGeneration
                 }
             }
         ) return false
+        val currentDeliveryGateAllowsAlerts = if (action.reason == "fresh_qualitative_depth_caution") {
+            currentArCoreQualitativeFeedbackAllowsWork(nowMs)
+        } else {
+            currentFeedbackDeviceGateAllowsAlerts()
+        }
         return nowMs <= action.validUntilMs &&
             action.deliveryKey in current.activeFeedbackDeliveryKeys &&
             current.deviceGateAllowsAlerts &&
             current.observedAtMs <= nowMs &&
-            currentFeedbackDeviceGateAllowsAlerts()
+            currentDeliveryGateAllowsAlerts
     }
+
+    private fun currentArCoreQualitativeFeedbackAllowsWork(nowMs: Long): Boolean =
+        synchronized(runtimeMetricStateLock) {
+            val decision = startupCapabilityDecision
+            val metricReady = currentRuntimeMetricOutputAllowsWork()
+            val visualGapReady = runtimeMetricActivationSession == null &&
+                allowsRuntimeDepthGapProcessing(
+                    frameTimestampNanos = runtimeMetricLastFrameTimestampNanos,
+                    latestFrameTimestampNanos = runtimeMetricLastFrameTimestampNanos,
+                    observedAtElapsedRealtimeMs = nowMs,
+                    lastValidFrameAtElapsedRealtimeMs = runtimeMetricLastValidFrameAtMs,
+                    tracking = runtimeVisualDepthFrameTracking,
+                )
+            firstRunOnboardingComplete() &&
+                isWalkSessionRuntimeActive() &&
+                isActivityForeground &&
+                cameraEnvironmentOutputsAllowed() &&
+                phoneMountingOutputsAllowed &&
+                hasCameraPermission() &&
+                runningDetectorVerifiedForOutput() &&
+                arCoreSupported && depthSupported &&
+                decision?.allowsMetricDistance() == true &&
+                isStartupCapabilityConfirmed() &&
+                arSessionPurpose == ArSessionPurpose.RUNTIME &&
+                session != null && frameProvider != null &&
+                !cameraFallbackRequested && !cameraFallbackRunning &&
+                (metricReady || visualGapReady)
+        }
 
     private fun currentFeedbackDeviceGateAllowsAlerts(): Boolean {
         if (!firstRunOnboardingComplete()) return false
@@ -32056,8 +34618,7 @@ generation != cameraFallbackGeneration
             phoneMountingOutputsAllowed &&
             capabilityGate &&
             hasCameraPermission() &&
-            detectorConfigLoaded &&
-            detectorAvailable &&
+            runningDetectorVerifiedForOutput() &&
             latestFeedbackDeliveryState.deviceGateAllowsAlerts
     }
 
@@ -32117,7 +34678,9 @@ generation != cameraFallbackGeneration
                 action.trackId.startsWith("unknown:${context.identity}:") && isUnknownContextCurrent(context)
             } == true
         } else true
-        if (!unknownContextCurrent || (!outputCompleted && !isFeedbackActionStillDeliverable(action))) {
+        if (!unknownContextCurrent || !currentFeedbackDeviceGateAllowsAlerts() ||
+            (!outputCompleted && !isFeedbackActionStillDeliverable(action))
+        ) {
             feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)
             return
         }
@@ -32155,46 +34718,92 @@ generation != cameraFallbackGeneration
         message: String,
         onCompleted: (() -> Unit)? = null,
         onFailed: (() -> Unit)? = null,
+        isInstructionStillCurrent: () -> Boolean = { true },
     ): Boolean {
+        // Capture before posting to UI, not when a stale queued request is eventually run.
         val generation = feedbackLifecycleGeneration
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            runOnUiThread {
-                if (!isFeedbackLifecycleCurrent(generation)) {
-                    onFailed?.invoke()
-                    return@runOnUiThread
-                }
-                dispatchNavigationSpeech(message, onCompleted, onFailed)
+        val expectedWalkEpoch = if (::walkSessionLifecycle.isInitialized) {
+            walkSessionLifecycle.currentRuntimeEpochOrNull()
+        } else null
+        val expectedRouteId = routeNavigator.currentRouteId()
+        val expectedDecisionToken = routeNavigator.pendingDecisionToken()
+        val terminal = AtomicBoolean(false)
+        val cancelled = AtomicBoolean(false)
+        fun outputCurrent(): Boolean =
+            !cancelled.get() && !terminal.get() &&
+                isFeedbackLifecycleCurrent(generation) &&
+                expectedWalkEpoch != null &&
+                walkSessionLifecycle.currentRuntimeEpochOrNull() == expectedWalkEpoch &&
+                routeNavigator.currentRouteId() == expectedRouteId &&
+                routeNavigator.pendingDecisionToken() == expectedDecisionToken &&
+                isWalkSessionRuntimeActive() && navigationEnvironmentOutputsAllowed() &&
+                deferredVoiceRecognitionStart == null &&
+                !shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)
+        fun failOnce() {
+            if (terminal.compareAndSet(false, true)) onFailed?.invoke()
+        }
+        val deliver: () -> Boolean = delivery@{
+            if (!outputCurrent()) {
+                failOnce()
+                return@delivery false
             }
+            dispatchCurrentNavigationSpeech(
+                message = message,
+                onCompleted = {
+                    if (outputCurrent() && terminal.compareAndSet(false, true)) {
+                        onCompleted?.invoke()
+                    } else {
+                        failOnce()
+                    }
+                },
+                isStillValid = ::outputCurrent,
+                speakWithTts = { text, completed, failed ->
+                ensureFeedbackActuator().speakNavigation(
+                    message = text,
+                    isStillValidAtStart = { outputCurrent() && isInstructionStillCurrent() },
+                        onCompleted = {
+                            runOnUiThread {
+                                if (outputCurrent()) completed?.invoke() else failOnce()
+                            }
+                        },
+                        onFailed = {
+                            runOnUiThread {
+                                if (outputCurrent()) failed?.invoke() else failOnce()
+                            }
+                        },
+                        // Cancellation is terminal, not an engine failure eligible for fallback.
+                        onCancelled = {
+                            runOnUiThread {
+                                cancelled.set(true)
+                                failOnce()
+                            }
+                        },
+                        requiresExplicitTerminalCallback = true,
+                    )
+                },
+            fallBackToTalkBack = { text, _ ->
+                if (!outputCurrent() || !isScreenReaderActive() || !isInstructionStillCurrent()) {
+                    false
+                } else {
+                    announceForTalkBack(
+                        message = text,
+                        priority = TalkBackAnnouncementPriority.NAVIGATION,
+                        isStillValid = { outputCurrent() && isInstructionStillCurrent() },
+                        ).also { dispatched ->
+                            // This API reports event dispatch, not TalkBack utterance completion.
+                            // Release the caller's reservation without committing route progress.
+                            if (dispatched) failOnce()
+                        }
+                    }
+                },
+                onFailed = ::failOnce,
+            )
+        }
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            runOnUiThread { deliver() }
             return true
         }
-        if (!isFeedbackLifecycleCurrent(generation) ||
-            !isWalkSessionRuntimeActive() || !navigationEnvironmentOutputsAllowed() ||
-            deferredVoiceRecognitionStart != null ||
-            shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)
-        ) {
-            onFailed?.invoke()
-            return false
-        }
-        val mainThreadCompletion = onCompleted?.let { completion ->
-            {
-                runOnUiThread {
-                    if (isFeedbackLifecycleCurrent(generation) &&
-                        isWalkSessionRuntimeActive() && navigationEnvironmentOutputsAllowed()
-                    ) completion() else onFailed?.invoke()
-                }
-            }
-        }
-        val mainThreadFailure = onFailed?.let { failure ->
-            { runOnUiThread { failure() } }
-        }
-        val accepted = ensureFeedbackActuator().speakNavigation(
-            message = message,
-            onCompleted = mainThreadCompletion,
-            onFailed = mainThreadFailure,
-            requiresExplicitTerminalCallback = onCompleted != null || onFailed != null,
-        ) == NavigationSpeechDispatchResult.ACCEPTED
-        if (!accepted) onFailed?.invoke()
-        return accepted
+        return deliver()
     }
 
     private fun showWalkLastResult(message: String) {
@@ -32252,6 +34861,7 @@ generation != cameraFallbackGeneration
             return false
         }
         // New output owns the visible response; cancellation of an older TTS cannot overwrite it.
+        invalidateForegroundHomeWakeInput()
         val responseGeneration = ++commandSpeechResponseGeneration
         // registerLatest retires old callbacks silently. Preserve retry for an interrupted
         // route decision before its callback is retired, without changing other response policy.
@@ -32486,8 +35096,9 @@ generation != cameraFallbackGeneration
         onDelivered: (() -> Unit)? = null,
         riskRank: Int? = null,
         riskTrackId: String? = null,
+        isStillValid: () -> Boolean = { true },
     ): Boolean {
-        if (message.isBlank()) return false
+        if (message.isBlank() || !isStillValid()) return false
         if (
             shouldSuppressFeedbackDuringVoiceRecognition(
                 voiceRecognitionActive,
@@ -32511,6 +35122,7 @@ generation != cameraFallbackGeneration
                 lastRiskAnnouncementTrackId = riskTrackId.orEmpty()
                 lastRiskAnnouncementMs = nowMs
                 lastRiskAnnouncementRank = rank
+                invalidateForegroundHomeWakeInput()
                 riskAnnouncementHoldUntilMs = nowMs + utteranceTerminalTimeoutMs(message.length)
             }
             TalkBackAnnouncementPriority.INTERACTION -> {
@@ -32526,6 +35138,7 @@ generation != cameraFallbackGeneration
                     nowMs - lastInteractionAnnouncementMs < TALKBACK_INTERACTION_DUP_WINDOW_MS
                 ) return false
                 lastInteractionAnnouncement = message
+                invalidateForegroundHomeWakeInput()
                 lastInteractionAnnouncementMs = nowMs
             }
             TalkBackAnnouncementPriority.ADVISORY -> {
@@ -32536,6 +35149,7 @@ generation != cameraFallbackGeneration
                     nowMs - lastAdvisoryAnnouncementMs < TALKBACK_ADVISORY_DUP_WINDOW_MS
                 ) return false
                 lastAdvisoryAnnouncement = message
+                invalidateForegroundHomeWakeInput()
                 lastAdvisoryAnnouncementMs = nowMs
             }
             TalkBackAnnouncementPriority.NAVIGATION -> {
@@ -32547,10 +35161,12 @@ generation != cameraFallbackGeneration
                 ) return false
                 lastNavigationAnnouncement = message
                 lastNavigationAnnouncementMs = nowMs
+                invalidateForegroundHomeWakeInput()
                 navigationAnnouncementHoldUntilMs = nowMs + utteranceTerminalTimeoutMs(message.length)
             }
         }
         runOnUiThread {
+            if (!isStillValid()) return@runOnUiThread
             statusText.announceForAccessibility(message)
             onDelivered?.invoke()
         }
@@ -32561,17 +35177,24 @@ generation != cameraFallbackGeneration
         message: String,
         delayMs: Long,
         onDelivered: (() -> Unit)? = null,
+        waitForVoiceRecognitionEnd: Boolean = false,
     ): Boolean {
         if (!::statusText.isInitialized) return false
         pendingTalkBackInteraction?.let(statusText::removeCallbacks)
         val delivery = Runnable {
             pendingTalkBackInteraction = null
+            // Pause/teardown clears pendingTalkBackInteraction, which also ends this re-check.
+            if (waitForVoiceRecognitionEnd && voiceRecognitionActive) {
+                scheduleTalkBackInteraction(message, delayMs, onDelivered, waitForVoiceRecognitionEnd = true)
+                return@Runnable
+            }
             announceForTalkBack(
                 message,
                 TalkBackAnnouncementPriority.INTERACTION,
                 onDelivered = onDelivered,
             )
         }
+        invalidateForegroundHomeWakeInput()
         pendingTalkBackInteraction = delivery
         statusText.postDelayed(delivery, delayMs.coerceAtLeast(1L))
         return true
@@ -32629,7 +35252,7 @@ generation != cameraFallbackGeneration
                     scheduleNavigationSpeechRetry(delayMs = 0L)
                 }
             },
-            speechAllowed = ::navigationSpeechCapabilityAllowed,
+            speechAllowed = ::authorizeActuatorSpeechForHomeWakeInput,
             hapticAllowed = {
                 startupCapabilityDecision?.allowsRequirement(
                     WalkSafeStartupRequirement.VIBRATION,
@@ -32692,6 +35315,15 @@ generation != cameraFallbackGeneration
         }
     }
 
+    private data class HandsFreeNavigationDecisionCapture(
+        val actorId: String?,
+        val sessionGeneration: Long,
+        val walkEpoch: WalkRuntimeEpoch,
+        val decisionToken: RouteNavigatorDecisionToken?,
+    )
+
+    private var handsFreeNavigationDecisionCapture: HandsFreeNavigationDecisionCapture? = null
+
     private fun attachHandsFreeVoiceController(modelDirectory: File) {
         if (handsFreeVoiceController != null || handsFreeVoiceDestroyed) return
         val controller = HandsFreeVoiceController(
@@ -32707,20 +35339,30 @@ generation != cameraFallbackGeneration
             },
             isAppSpeechActive = ::isHandsFreeVoiceOutputActive,
             onCommand = command@{ text, confidence ->
-                if (!isWalkSessionRuntimeActive()) return@command
+                val capture = handsFreeNavigationDecisionCapture ?: return@command
+                handsFreeNavigationDecisionCapture = null
+                if (!isWalkSessionRuntimeActive() ||
+                    capture.actorId != reporterUserId ||
+                    capture.sessionGeneration != GatewaySessionProcessCoordinator.snapshot().generation ||
+                    capture.walkEpoch != walkSessionLifecycle.snapshot().epoch
+                ) return@command
+                val workBefore = handsFreeCommandWorkGenerations()
                 handleVoiceCommandPhrases(
                     phrases = listOf(text),
                     confidenceScores = floatArrayOf(confidence ?: Float.NaN),
-                    expectedNavigationDecisionToken = routeNavigator.pendingDecisionToken(),
+                    expectedNavigationDecisionToken = capture.decisionToken,
                     includeRecognizedTextInStatus = false,
                     redactedRecognitionSource = "on_device_hands_free",
                 )
+                bindHandsFreeCommandWork(workBefore)
             },
             onStatus = ::updateNavigationStatus,
             onCommandListeningStarted = ::handleHandsFreeVoiceCommandListeningStarted,
             onTerminalFailure = ::handleHandsFreeVoiceTerminalFailure,
             onSessionEnded = ::handleHandsFreeVoiceSessionEnded,
             isSpeechRecognitionBlocked = ::isHandsFreeVoiceRecognitionBlocked,
+            isCommandWorkPending = ::isHandsFreeCommandWorkPending,
+            speakLowConfidenceReprompt = ::speakHandsFreeLowConfidenceReprompt,
         )
         handsFreeVoiceController = controller
         (application as? WalkSafeApplication)?.attachWalkVoiceSessionController(controller)
@@ -32729,6 +35371,34 @@ generation != cameraFallbackGeneration
                 controller.close()
                 updateNavigationStatus("voice_hands_free=application_provider_missing")
             }
+        (application as? WalkSafeApplication)?.setWalkVoiceUserStopListener(::handleHandsFreeVoiceUserStop)
+    }
+
+    /** S04-30: the notification's "음성 입력 중지", delivered before the service stops the controller. */
+    private fun handleHandsFreeVoiceUserStop(stopped: WalkVoiceSessionController) {
+        if (stopped !== handsFreeVoiceController || !::walkSessionLifecycle.isInitialized) return
+        (application as? WalkSafeApplication)?.walkVoiceUserStopHold
+            ?.recordUserStop(walkSessionLifecycle.snapshot().epoch.walkSessionId)
+        handsFreeNavigationDecisionCapture = null
+        handsFreeVoiceServiceRequested = false
+        clearHandsFreeVoiceStartRequest()
+        updateNavigationStatus("voice_hands_free=user_stopped")
+        updateStatus(
+            "호출어 음성 입력 중지",
+            "알림에서 음성 입력을 껐습니다. 이번 보행이 끝날 때까지 호출어를 듣지 않습니다.",
+        )
+    }
+
+    private fun invalidateForegroundHomeWakeInput() {
+        foregroundHomeWakeInputGeneration.incrementAndGet()
+    }
+
+    private fun authorizeActuatorSpeechForHomeWakeInput(): Boolean {
+        if (!navigationSpeechCapabilityAllowed()) return false
+        // Every actuator speech submission and queued dispatch crosses this boundary before
+        // it can block recognition. Failed submissions may conservatively discard old audio.
+        invalidateForegroundHomeWakeInput()
+        return true
     }
 
     private fun isHandsFreeVoiceOutputActive(): Boolean {
@@ -32757,10 +35427,53 @@ generation != cameraFallbackGeneration
             )
     }
 
+    /** S04-11: the search/route request one hands-free command started, bound to that command's id. */
+    private data class HandsFreeCommandWork(
+        val commandId: Long,
+        val searchGeneration: Int?,
+        val routeGeneration: Int?,
+    )
+
+    private var handsFreeCommandWork: HandsFreeCommandWork? = null
+
+    private fun handsFreeCommandWorkGenerations(): Pair<Int, Int> =
+        destinationSearchGeneration to routeRequestGeneration
+
+    private fun bindHandsFreeCommandWork(before: Pair<Int, Int>) {
+        val commandId = handsFreeVoiceController?.dispatchingCommandId()
+        val search = destinationSearchGeneration.takeIf { destinationSearchInFlight && it != before.first }
+        val route = routeRequestGeneration.takeIf { routeRequestInFlight.get() && it != before.second }
+        handsFreeCommandWork = if (commandId != null && (search != null || route != null)) {
+            HandsFreeCommandWork(commandId, search, route)
+        } else null
+    }
+
+    // Completion, failure and cancellation all end the bound request (in-flight off or a newer generation).
+    private fun isHandsFreeCommandWorkPending(commandId: Long): Boolean {
+        val work = handsFreeCommandWork?.takeIf { it.commandId == commandId } ?: return false
+        val pending = (work.searchGeneration != null && destinationSearchInFlight &&
+            destinationSearchGeneration == work.searchGeneration) ||
+            (work.routeGeneration != null && routeRequestInFlight.get() &&
+                routeRequestGeneration == work.routeGeneration)
+        if (!pending) handsFreeCommandWork = null
+        return pending
+    }
+
     private fun handleHandsFreeVoiceCommandListeningStarted() {
+        handsFreeTranscriberFailureCount = 0
+        handsFreeNavigationDecisionCapture = if (isWalkSessionRuntimeActive()) {
+            HandsFreeNavigationDecisionCapture(
+                actorId = reporterUserId,
+                sessionGeneration = GatewaySessionProcessCoordinator.snapshot().generation,
+                walkEpoch = walkSessionLifecycle.snapshot().epoch,
+                decisionToken = routeNavigator.pendingDecisionToken(),
+            )
+        } else null
         if (isWalkSessionRuntimeActive()) {
             handsFreeVoiceOwnsCommandPage = true
-            if (nativeUiPage != NativeUiPage.DESTINATION_SEARCH) {
+            // S05-33: waking the assistant does not move the walking guidance page either; only a
+            // command whose result is chosen on another screen moves the page (executeVoiceAction).
+            if (nativeUiPage != NativeUiPage.DESTINATION_SEARCH && nativeUiPage != NativeUiPage.GUIDANCE) {
                 showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)
             }
         }
@@ -32769,26 +35482,76 @@ generation != cameraFallbackGeneration
         updateNavigationStatus("voice_hands_free=listening_command")
     }
 
+    /**
+     * R18 (S04-19, FP-026 "낮은 신뢰도는 no-op 후 재질문"): a hands-free command rejected for low
+     * confidence is asked for once again aloud; the controller reopens the command window when this
+     * re-ask has ended (and counts a second doubtful command in a row as the end of the exchange).
+     */
+    private fun speakHandsFreeLowConfidenceReprompt(
+        onFinished: (kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult) -> Unit,
+    ) {
+        val delivered = java.util.concurrent.atomic.AtomicBoolean(false)
+        val finish = { result: kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult ->
+            runOnUiThread { if (delivered.compareAndSet(false, true)) onFinished(result) }
+        }
+        updateNavigationStatus("voice_hands_free=reprompt_low_confidence")
+        showWalkLastResult(kr.co.hanium.dreamup.walksafe.voice.HANDS_FREE_LOW_CONFIDENCE_REPROMPT_KO)
+        val accepted = runCatching {
+            ensureFeedbackActuator().speakInteraction(
+                message = kr.co.hanium.dreamup.walksafe.voice.HANDS_FREE_LOW_CONFIDENCE_REPROMPT_KO,
+                onCompleted = { finish(kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.COMPLETED) },
+                onFailed = { finish(kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.FAILED) },
+            ) == NavigationSpeechDispatchResult.ACCEPTED
+        }.getOrDefault(false)
+        if (!accepted) finish(kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.FAILED)
+    }
+
     private fun handleHandsFreeVoiceSessionEnded() {
+        handsFreeNavigationDecisionCapture = null
         handsFreeVoiceRestartRunnable?.let { pending ->
             if (::statusText.isInitialized) statusText.removeCallbacks(pending)
         }
         handsFreeVoiceRestartRunnable = null
         handsFreeVoiceServiceRequested = false
-        runCatching { stopService(Intent(this, WalkVoiceForegroundService::class.java)) }
+        clearHandsFreeVoiceStartRequest(onSessionEnded = true)
+        if (isCurrentHandsFreeVoiceController(handsFreeVoiceController)) {
+            runCatching { stopService(Intent(this, WalkVoiceForegroundService::class.java)) }
+        }
     }
 
     private fun handleHandsFreeVoiceTerminalFailure(
         failure: HandsFreeVoiceTerminalFailure,
     ) {
+        handsFreeNavigationDecisionCapture = null
         handsFreeVoiceRestartRunnable?.let { pending ->
             if (::statusText.isInitialized) statusText.removeCallbacks(pending)
         }
         handsFreeVoiceRestartRunnable = null
         handsFreeVoiceServiceRequested = false
-        runCatching { stopService(Intent(this, WalkVoiceForegroundService::class.java)) }
+        clearHandsFreeVoiceStartRequest()
+        if (isCurrentHandsFreeVoiceController(handsFreeVoiceController)) {
+            runCatching { stopService(Intent(this, WalkVoiceForegroundService::class.java)) }
+        }
         when (failure) {
             is HandsFreeVoiceTerminalFailure.Transcriber -> {
+                if (failure.error == VoskStreamingError.AUDIO_SILENCED) {
+                    // S04-27/FP-025: the system silenced capture. Say so, never auto-restart into the same
+                    // block, keep STT capability (the model is fine); retry after the user returns.
+                    reportWalkVoiceStartFailure(WalkVoiceStartFailure.INPUT_SILENCED)
+                    speakInteraction("통화나 다른 앱이 마이크를 쓰고 있어 음성 명령을 들을 수 없습니다.")
+                    return
+                }
+                // FP-025: only a persistent recognizer failure disables on-device STT (and so blocks walks);
+                // a single transient audio/inference error restarts hands-free listening first.
+                handsFreeTranscriberFailureCount += 1
+                val persistentTranscriberFailure =
+                    failure.error == VoskStreamingError.MODEL_UNAVAILABLE ||
+                        handsFreeTranscriberFailureCount >= HANDS_FREE_TRANSCRIBER_PERSISTENT_FAILURES
+                if (!persistentTranscriberFailure) {
+                    updateNavigationStatus("voice_hands_free=internal_restart_${failure.statusToken}")
+                    scheduleHandsFreeVoiceRestart()
+                    return
+                }
                 val wasConfirmed = isStartupCapabilityConfirmed()
                 onDeviceSpeechRecognitionCapabilityOverride = false
                 refreshStartupCapabilityUi()
@@ -32798,10 +35561,16 @@ generation != cameraFallbackGeneration
                     }
                     refreshStartupCapabilityUi()
                 }
+                val walkStartStillAllowed = startupCapabilityDecision?.mayConfirmAndStart == true
                 updateStatus(
-                    "호출어 음성 기능 제한",
-                    "기기 내 Vosk 음성 처리 오류로 호출어 기능만 제한했습니다. " +
-                        "화면 음성 명령과 보행의 다른 기능은 계속 사용할 수 있습니다.",
+                    if (walkStartStillAllowed) "호출어 음성 기능 제한" else "휴대폰 내부 음성 인식 사용 불가",
+                    if (walkStartStillAllowed) {
+                        "기기 내 Vosk 음성 처리 오류로 호출어 기능만 제한했습니다. " +
+                            "화면 음성 명령과 보행의 다른 기능은 계속 사용할 수 있습니다."
+                    } else {
+                        "기기 내 Vosk 음성 처리 오류로 휴대폰 내부 음성 인식을 사용할 수 없어 " +
+                            "보행을 시작하거나 계속할 수 없습니다."
+                    },
                 )
                 updateNavigationStatus(
                     "voice_hands_free=transcriber_limited_${failure.statusToken}",
@@ -32809,10 +35578,15 @@ generation != cameraFallbackGeneration
             }
             HandsFreeVoiceTerminalFailure.CommandDispatchFailed,
             HandsFreeVoiceTerminalFailure.OutputTimeout,
+            HandsFreeVoiceTerminalFailure.CommandResultTimeout,
             -> {
                 updateNavigationStatus(
                     "voice_hands_free=internal_restart_${failure.statusToken}",
                 )
+                if (failure == HandsFreeVoiceTerminalFailure.CommandResultTimeout) {
+                    // S04-11: the command did not silently vanish; the restart waits for this notice.
+                    speakInteraction("요청한 결과를 받지 못했습니다. 다시 말해 주세요.")
+                }
                 scheduleHandsFreeVoiceRestart()
             }
         }
@@ -32821,6 +35595,7 @@ generation != cameraFallbackGeneration
     private fun maybeStartHandsFreeVoiceService() {
         refreshForegroundHomeWakeListening()
         if (foregroundHomeWakeProbe != null) return
+        if (handsFreeVoiceStartRecovery.blocksAutomaticRetry) return
         if (!isActivityForeground ||
             (nativeUiPage == NativeUiPage.VOICE_COMMAND && !handsFreeVoiceOwnsCommandPage) ||
             pendingNativeUiPage == NativeUiPage.VOICE_COMMAND
@@ -32853,22 +35628,119 @@ generation != cameraFallbackGeneration
             handsFreeVoiceServiceRequested ||
             handsFreeVoiceController == null ||
             handsFreeVoiceModelDirectory?.isDirectory != true ||
-            !hasRecordAudioPermission() ||
             voiceRecognitionActive || voiceCommandPromptPending || deferredVoiceRecognitionStart != null ||
             gatewayVoiceRecorder?.isRecording == true ||
             activeGatewaySpeechInteraction != null ||
             !isWalkSessionRuntimeActive()
         ) return
+        // S04-30: a user's stop from the notification holds for the rest of this walk.
+        if ((application as? WalkSafeApplication)?.walkVoiceUserStopHold
+                ?.blocksAutomaticStart(walkSessionLifecycle.snapshot().epoch.walkSessionId) == true
+        ) {
+            updateNavigationStatus("voice_hands_free=user_stopped")
+            return
+        }
+        if (!hasRecordAudioPermission()) {
+            applyObservedPermissionStateChange("voice_hands_free_microphone_permission_missing")
+            return
+        }
+        val controller = handsFreeVoiceController ?: return
+        val app = application as? WalkSafeApplication ?: return
+        pendingHandsFreeVoiceStartFailure = null
+        val requestId = app.registerWalkVoiceStartRequest(controller, ::handleWalkVoiceStartFailure)
+        handsFreeVoiceStartRequestId = requestId
         val startIntent = Intent(this, WalkVoiceForegroundService::class.java)
             .setAction(WalkVoiceForegroundService.ACTION_START)
+            .putExtra(WalkVoiceForegroundService.EXTRA_START_REQUEST_ID, requestId)
         try {
             android.util.Log.i("WalkSafeVoice", "service_start_requested")
             startService(startIntent)
             handsFreeVoiceServiceRequested = true
-        } catch (_: RuntimeException) {
+        } catch (error: SecurityException) {
             handsFreeVoiceServiceRequested = false
             android.util.Log.w("WalkSafeVoice", "service_start_failed")
-            updateNavigationStatus("voice_hands_free=service_start_failed")
+            app.reportWalkVoiceStartFailure(
+                requestId,
+                controller,
+                WalkVoiceStartFailure.SECURITY,
+            )
+        } catch (error: IllegalStateException) {
+            handsFreeVoiceServiceRequested = false
+            android.util.Log.w("WalkSafeVoice", "service_start_failed")
+            app.reportWalkVoiceStartFailure(
+                requestId,
+                controller,
+                WalkVoiceStartFailure.FOREGROUND_START_RESTRICTED,
+            )
+        }
+    }
+
+    private fun handleWalkVoiceStartFailure(
+        failedId: Long,
+        failedController: WalkVoiceSessionController,
+        failure: WalkVoiceStartFailure,
+    ) {
+        if (
+            handsFreeVoiceDestroyed ||
+            handsFreeVoiceStartRequestId != failedId ||
+            handsFreeVoiceController !== failedController
+        ) return
+        handsFreeVoiceStartRequestId = null
+        handsFreeVoiceServiceRequested = false
+        reportWalkVoiceStartFailure(failure)
+    }
+
+    private fun reportWalkVoiceStartFailure(failure: WalkVoiceStartFailure) {
+        val microphoneGranted = hasRecordAudioPermission()
+        val presentation = handsFreeVoiceStartRecovery.recordFailure(
+            failure,
+            microphoneGranted,
+            appInForeground = isActivityForeground,
+        )
+        stopHandsFreeVoiceService()
+        pendingHandsFreeVoiceStartFailure = presentation
+        if (isActivityForeground && failure == WalkVoiceStartFailure.SECURITY && !microphoneGranted) {
+            applyObservedPermissionStateChange("voice_hands_free_start_security_permission_missing")
+        }
+        showPendingHandsFreeVoiceStartFailure()
+    }
+
+    private fun showPendingHandsFreeVoiceStartFailure() {
+        val presentation = pendingHandsFreeVoiceStartFailure ?: return
+        if (!isActivityForeground || !::statusText.isInitialized || !::detailText.isInitialized) return
+        pendingHandsFreeVoiceStartFailure = null
+        updateNavigationStatus("voice_hands_free=${presentation.statusToken}")
+        updateStatus("호출어 음성 시작 실패", presentation.guidance)
+        // S04-27-F1: the first spoken notice came during the call; say the outcome again on return.
+        handsFreeVoiceStartRecovery.spokenNoticeOnReturn(presentation)?.let(::speakInteraction)
+    }
+
+    /**
+     * S04-27-F1: our own capture is already stopped here, so a call mode or any active recording
+     * belongs to someone else and would silence a new capture again. Unknown means not held (one
+     * bounded retry; a repeated silencing blocks until the user leaves and returns).
+     */
+    private fun voiceInputHeldElsewhere(): Boolean = runCatching {
+        val audio = getSystemService(android.media.AudioManager::class.java) ?: return@runCatching false
+        audio.mode == android.media.AudioManager.MODE_IN_CALL ||
+            audio.mode == android.media.AudioManager.MODE_IN_COMMUNICATION ||
+            audio.activeRecordingConfigurations.isNotEmpty()
+    }.getOrDefault(false)
+
+    private fun isCurrentHandsFreeVoiceController(controller: HandsFreeVoiceController?): Boolean =
+        controller != null &&
+            (application as? WalkSafeApplication)?.walkVoiceSessionController === controller
+
+    private fun clearHandsFreeVoiceStartRequest(onSessionEnded: Boolean = false) {
+        val requestId = handsFreeVoiceStartRequestId ?: return
+        val controller = handsFreeVoiceController
+        val app = application as? WalkSafeApplication
+        if (onSessionEnded && controller != null &&
+            app?.invalidateWalkVoiceStartRequestOnSessionEnd(requestId, controller) == false
+        ) return
+        handsFreeVoiceStartRequestId = null
+        if (!onSessionEnded && controller != null) {
+            app?.invalidateWalkVoiceStartRequest(requestId, controller)
         }
     }
 
@@ -32886,16 +35758,28 @@ generation != cameraFallbackGeneration
     }
 
     private fun stopHandsFreeVoiceService() {
+        handsFreeNavigationDecisionCapture = null
         handsFreeVoiceRestartRunnable?.let { pending ->
             if (::statusText.isInitialized) statusText.removeCallbacks(pending)
         }
         handsFreeVoiceRestartRunnable = null
         val controller = handsFreeVoiceController
-        val serviceMayBeRunning = handsFreeVoiceServiceRequested || controller != null
+        val serviceMayBeRunning =
+            (handsFreeVoiceServiceRequested || controller != null) &&
+                isCurrentHandsFreeVoiceController(controller)
         handsFreeVoiceServiceRequested = false
-        controller?.stop()
+        clearHandsFreeVoiceStartRequest()
+        try {
+            controller?.stop()
+        } catch (error: RuntimeException) {
+            android.util.Log.w("WalkSafeVoice", "controller_stop_failed", error)
+        }
         if (serviceMayBeRunning) {
-            runCatching { stopService(Intent(this, WalkVoiceForegroundService::class.java)) }
+            try {
+                stopService(Intent(this, WalkVoiceForegroundService::class.java))
+            } catch (error: RuntimeException) {
+                android.util.Log.w("WalkSafeVoice", "service_stop_failed", error)
+            }
         }
     }
 
@@ -32911,32 +35795,120 @@ generation != cameraFallbackGeneration
         val controller = handsFreeVoiceController
         handsFreeVoiceController = null
         if (controller != null) {
+            (application as? WalkSafeApplication)?.setWalkVoiceUserStopListener(null)
             (application as? WalkSafeApplication)?.detachWalkVoiceSessionController(controller)
             controller.close()
         }
         handsFreeVoiceModelExecutor.shutdownNow()
     }
 
-    private fun onWalkRuntimeSafetyStop(stop: WalkRuntimeSafetyStop) {
+    private fun scheduleWalkRuntimeSafetyStopRetry(retry: Runnable): Boolean {
+        if (walkRuntimeSafetyStopDestroyed) return false
+        lateinit var scheduled: Runnable
+        scheduled = Runnable {
+            if (walkRuntimeSafetyStopRetryRunnable !== scheduled || walkRuntimeSafetyStopDestroyed) {
+                return@Runnable
+            }
+            walkRuntimeSafetyStopRetryRunnable = null
+            retry.run()
+        }
+        walkRuntimeSafetyStopRetryRunnable = scheduled
+        val posted = cameraReleaseHandler.postDelayed(scheduled, 250L)
+        if (!posted && walkRuntimeSafetyStopRetryRunnable === scheduled) {
+            walkRuntimeSafetyStopRetryRunnable = null
+        }
+        return posted
+    }
+
+    private fun showWalkRuntimeSafetyRestartNotice() {
+        updateStatus(
+            "보행 안전 중지",
+            "안전 정리를 완료하지 못했습니다. 앱을 다시 시작한 뒤 기기 점검을 다시 진행해 주세요.",
+        )
+        updateNavigationStatus("navigation=safety_stopped reason=runtime_cleanup_exhausted")
+        if (::startupCapabilityProbe.isInitialized) refreshStartupCapabilityUi()
+    }
+
+    private fun onWalkRuntimeSafetyStopExhausted(@Suppress("UNUSED_PARAMETER") stop: WalkRuntimeSafetyStop) {
         runOnUiThread {
-            if (developmentGuidanceStartBypassEnabled && stop.causes.none {
-                    it == WalkRuntimeSafetyStopCause.EPOCH_MISMATCH ||
-                        it == WalkRuntimeSafetyStopCause.INVALID_TIME
-                }
-            ) return@runOnUiThread
-            if (
-                !::walkSessionLifecycle.isInitialized ||
-                !walkSessionLifecycle.isRuntimeEpochCurrent(stop.epoch)
-            ) {
+            if (!walkRuntimeSafetyStopDestroyed) showWalkRuntimeSafetyRestartNotice()
+        }
+    }
+
+    /** Cleanup stays one-shot; only the displayed stop reason follows causes added later. */
+    private fun onWalkRuntimeSafetyStopCausesChanged(
+        @Suppress("UNUSED_PARAMETER") changed: WalkRuntimeSafetyStop,
+    ) {
+        // Always queue behind an already-posted stop delivery, even from the UI thread, so the
+        // cleanup epoch is set before this runs and a cause added in between is not dropped.
+        reportCleanupCallbackHandler.post {
+            if (walkRuntimeSafetyStopDestroyed || !::walkSessionLifecycle.isInitialized) {
+                return@post
+            }
+            // Re-read the latch so out-of-order callbacks cannot show an older cause set.
+            val stop = walkRuntimeSafetyCoordinator.latchedStop() ?: return@post
+            if (walkRuntimeSafetyStopCleanupEpoch != stop.epoch) return@post
+            val causes = stop.causes.map { it.name.lowercase(Locale.US) }.sorted().joinToString("+")
+            // Not a route failure token: camera or thermal causes must not read as a failed route.
+            updateNavigationStatus(
+                "navigation=runtime_safety_stopped reason=runtime_safety_coordinator:$causes",
+            )
+        }
+    }
+
+    private fun onWalkRuntimeSafetyStop(
+        stop: WalkRuntimeSafetyStop,
+        completion: (Boolean) -> Unit,
+    ) {
+        runOnUiThread {
+            if (walkRuntimeSafetyStopDestroyed || !::walkSessionLifecycle.isInitialized) {
+                completion(false)
                 return@runOnUiThread
             }
-            val causes = stop.causes
-                .map { it.name.lowercase(Locale.US) }
-                .sorted()
-                .joinToString("+")
-            enterWalkSessionSafetyStopAndCancelOutputs(
-                reason = "runtime_safety_coordinator:$causes",
-            )
+            val currentSession = walkSessionLifecycle.snapshot()
+            val retainedCheckpoints = walkRuntimeSafetyStopCleanup
+                ?.takeIf { walkRuntimeSafetyStopCleanupEpoch == stop.epoch }
+            if (
+                currentSession.epoch != stop.epoch &&
+                retainedCheckpoints?.ownsStoppedSession(stop.epoch, currentSession) != true
+            ) {
+                completion(false)
+                return@runOnUiThread
+            }
+            val checkpoints = retainedCheckpoints ?: WalkRuntimeStopCleanupCheckpoints()
+            walkRuntimeSafetyStopCleanupEpoch = stop.epoch
+            walkRuntimeSafetyStopCleanup = checkpoints
+            // A cause latched between the coordinator's delivery snapshot and this runnable
+            // was dropped by the cause handler (epoch not set yet); show the current set now.
+            walkRuntimeSafetyCoordinator.latchedStop()
+                ?.takeIf { it.epoch == stop.epoch && it.causes != stop.causes }
+                ?.let(::onWalkRuntimeSafetyStopCausesChanged)
+            var synchronousFinished = false
+            var synchronousComplete = false
+            var cameraReleased: Boolean? = null
+            var reported = false
+            fun reportIfReady() {
+                if (!synchronousFinished || cameraReleased == null || reported) return
+                reported = true
+                completion(synchronousComplete && cameraReleased == true)
+            }
+            try {
+                val causes = stop.causes.map { it.name.lowercase(Locale.US) }.sorted().joinToString("+")
+                synchronousComplete = performWalkSessionSafetyStopCleanup(
+                    reason = "runtime_safety_coordinator:$causes",
+                    persistInterruptionMarker = true,
+                    checkpoints = checkpoints,
+                    onCameraResult = { released ->
+                        cameraReleased = released
+                        reportIfReady()
+                    },
+                )
+            } catch (_: Exception) {
+                checkpoints.finishAsync("camera_release", false)
+                cameraReleased = false
+            }
+            synchronousFinished = true
+            reportIfReady()
         }
     }
 
@@ -32944,44 +35916,106 @@ generation != cameraFallbackGeneration
         reason: String,
         persistInterruptionMarker: Boolean = true,
     ) {
+        performWalkSessionSafetyStopCleanup(reason, persistInterruptionMarker, null, null)
+    }
+
+    private fun performWalkSessionSafetyStopCleanup(
+        reason: String,
+        persistInterruptionMarker: Boolean,
+        checkpoints: WalkRuntimeStopCleanupCheckpoints?,
+        onCameraResult: ((Boolean) -> Unit)?,
+    ): Boolean {
         if (developmentGuidanceStartBypassEnabled && reason in setOf(
                 "camera_release_timed_out", "detector_runtime_failed",
                 "offline_korean_tts_runtime_failure", "required_app_permission_denied",
             )
         ) {
             updateNavigationStatus("navigation=test_continues unavailable=$reason")
-            return
+            return true
         }
-        val walkSnapshot = if (::walkSessionLifecycle.isInitialized) {
-            walkSessionLifecycle.snapshot()
+        var complete = true
+        fun stage(key: String, idempotent: Boolean = false, action: () -> Unit) {
+            val succeeded = if (checkpoints == null) {
+                action()
+                true
+            } else {
+                checkpoints.runStage(key, idempotent, action)
+            }
+            if (!succeeded) complete = false
+        }
+        stage("session_transition") {
+            val walkSnapshot = if (::walkSessionLifecycle.isInitialized) walkSessionLifecycle.snapshot() else null
+            val gatewaySessionForEnd = walkSnapshot?.takeIf {
+                it.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
+            }?.let { gatewayFieldSession }
+            val endOperation = walkSnapshot?.takeIf {
+                it.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
+            }?.let { gatewayWalkAuthorityController.beginEnd(it.epoch) }
+            if (::walkSessionLifecycle.isInitialized) {
+                transitionWalkSession(WalkSessionEvent.SafetyStopRequested)
+            }
+            if (endOperation != null && gatewaySessionForEnd != null) {
+                endGatewayWalkBestEffort(gatewaySessionForEnd, endOperation)
+            }
+        }
+        if (persistInterruptionMarker && ::walkSessionLifecycle.isInitialized) {
+            stage("interruption_marker", idempotent = true) {
+                val persisted = persistWalkSessionInterruptionMarker()
+                if (checkpoints != null && !persisted) {
+                    throw IllegalStateException("walk interruption marker was not persisted")
+                }
+            }
+        }
+        stage("official_environment") { invalidateOfficialEnvironmentEvidence("safety_stop:$reason") }
+        stage("phone_mounting") { invalidatePhoneMountingEvidence("safety_stop:$reason") }
+        stage("resume_state") {
+            walkSessionResumePromptPending = false
+            walkSessionResumeRetryRequiresUserAction = false
+            walkSessionResumeConfirmationToken = null
+        }
+        if (checkpoints == null) {
+            cancelWalkSessionOutputs(reason)
+            stopCameraFallbackSession(updateUi = false)
         } else {
-            null
+            if (!cancelWalkSessionOutputsForSafetyStop(reason, checkpoints)) complete = false
+            if (checkpoints.beginAsync("camera_release")) {
+                try {
+                    stopCameraFallbackSession(
+                        updateUi = false,
+                        onReleased = {
+                            if (checkpoints.finishAsync("camera_release", true)) onCameraResult?.invoke(true)
+                        },
+                        onReleaseFailed = {
+                            if (checkpoints.finishAsync("camera_release", false)) onCameraResult?.invoke(false)
+                        },
+                    )
+                } catch (_: Exception) {
+                    checkpoints.finishAsync("camera_release", false)
+                    onCameraResult?.invoke(false)
+                }
+            } else if (checkpoints.isComplete("camera_release")) {
+                onCameraResult?.invoke(true)
+            } else if (checkpoints.isUncertain("camera_release")) {
+                onCameraResult?.invoke(false)
+            }
         }
-        val gatewaySessionForEnd = walkSnapshot?.takeIf {
-            it.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
-        }?.let { gatewayFieldSession }
-        val endOperation = walkSnapshot?.takeIf {
-            it.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
-        }?.let { gatewayWalkAuthorityController.beginEnd(it.epoch) }
-        if (::walkSessionLifecycle.isInitialized) {
-            transitionWalkSession(WalkSessionEvent.SafetyStopRequested)
-            if (persistInterruptionMarker) persistWalkSessionInterruptionMarker()
+        stage("depth_session") { stopDepthSession(closeSession = true) }
+        stage("startup_ui") {
+            if (::startupCapabilityProbe.isInitialized) refreshStartupCapabilityUi()
         }
-        if (endOperation != null && gatewaySessionForEnd != null) {
-            endGatewayWalkBestEffort(gatewaySessionForEnd, endOperation)
-        }
-        invalidateOfficialEnvironmentEvidence("safety_stop:$reason")
-        invalidatePhoneMountingEvidence("safety_stop:$reason")
-        walkSessionResumePromptPending = false
-        walkSessionResumeRetryRequiresUserAction = false
-        walkSessionResumeConfirmationToken = null
-        cancelWalkSessionOutputs(reason)
-        stopCameraFallbackSession(updateUi = false)
-        stopDepthSession(closeSession = true)
-        if (::startupCapabilityProbe.isInitialized) refreshStartupCapabilityUi()
+        return complete
     }
 
     private fun startFreshWalk(reason: String) {
+        if (walkRuntimeSafetyCoordinator.stopCleanupBlocksNewWalk) {
+            if (walkRuntimeSafetyCoordinator.stopCleanupExhausted) {
+                showWalkRuntimeSafetyRestartNotice()
+            } else {
+                updateStatus("보행 안전 중지", "안전 정리가 끝나기 전에는 새 보행을 시작할 수 없습니다.")
+            }
+            return
+        }
+        pendingFreshWalkActivationToken = null
         transitionWalkSession(WalkSessionEvent.NewWalkRequested)
         persistWalkSessionInterruptionMarker()
         invalidateOfficialEnvironmentEvidence("new_walk:$reason")
@@ -33050,65 +36084,106 @@ generation != cameraFallbackGeneration
     }
 
     private fun cancelWalkSessionOutputs(reason: String) {
-        if (BuildConfig.DEBUG) runCatching {
-            android.util.Log.d("WalkSafeNavigation", "output=session_outputs_cancelled reason=$reason")
+        cancelWalkSessionOutputsInternal(reason, null)
+    }
+
+    private fun cancelWalkSessionOutputsForSafetyStop(
+        reason: String,
+        checkpoints: WalkRuntimeStopCleanupCheckpoints,
+    ): Boolean = cancelWalkSessionOutputsInternal(reason, checkpoints)
+
+    private fun cancelWalkSessionOutputsInternal(
+        reason: String,
+        checkpoints: WalkRuntimeStopCleanupCheckpoints?,
+    ): Boolean {
+        var complete = true
+        fun stage(key: String, action: () -> Unit) {
+            val succeeded = if (checkpoints == null) {
+                action()
+                true
+            } else {
+                checkpoints.runStage("outputs:$key", action = action)
+            }
+            if (!succeeded) complete = false
         }
-        feedbackLifecycleGeneration += 1
-        invalidatePendingExplicitReport()
-        invalidateArCoreAvailabilityRecheck()
-        confirmedStartupCapabilityDecision = null
-        startupCapabilityConfirmationPending = false
-        startupCapabilityRetryRequiresUserAction = false
-        pendingCameraFallbackStart = null
-        stopHandsFreeVoiceService()
-        cancelVoiceCommandRecognition()
-        synchronized(reportUploadSafetyLock) {
-            reportUploadSafetyGeneration += 1L
-            reportPrivacyConsentSession.cancelActiveCalls()
+        stage("debug_log") {
+            if (BuildConfig.DEBUG) runCatching {
+                android.util.Log.d("WalkSafeNavigation", "output=session_outputs_cancelled reason=$reason")
+            }
         }
-        val navigationCancellation = cancelNavigationRequestsForPause()
-        clearDestinationSearchState(navigationCancellation.destinationSearchCancelled)
-        if (
-            ::walkSessionLifecycle.isInitialized &&
-            walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED
-        ) {
-            resetRouteState(purgeRouteSnapshot = false)
-        } else {
-            resetRouteState()
+        stage("feedback_generation") { feedbackLifecycleGeneration += 1 }
+        stage("explicit_report") { invalidatePendingExplicitReport() }
+        stage("ar_recheck") { invalidateArCoreAvailabilityRecheck() }
+        stage("startup_state") {
+            confirmedStartupCapabilityDecision = null
+            startupCapabilityConfirmationPending = false
+            startupCapabilityRetryRequiresUserAction = false
+            pendingCameraFallbackStart = null
         }
-        invalidateFrameStateForPause()
-        stopActivePositionFieldSession()
-        if (!currentLocationCollectionAllowsWork()) stopLocationUpdates()
-        stopStepTracking()
-        if (::phoneMountingSensorProbe.isInitialized) phoneMountingSensorProbe.stop()
-        retainLocationCompassOrStop()
-        feedbackPolicy.cancelPendingFeedbackDeliveries()
-        if (::statusText.isInitialized) {
-            pendingTalkBackInteraction?.let(statusText::removeCallbacks)
+        stage("voice_service") { stopHandsFreeVoiceService() }
+        stage("voice_recognition") { cancelVoiceCommandRecognition() }
+        stage("report_uploads") {
+            synchronized(reportUploadSafetyLock) {
+                reportUploadSafetyGeneration += 1L
+                reportPrivacyConsentSession.cancelActiveCalls()
+            }
         }
-        pendingTalkBackInteraction = null
-        cancelPendingFeedbackTerminalResolution()
-        latestFeedbackDeliveryState = FeedbackDeliveryState()
-        feedbackActuator?.close()
-        feedbackActuator = null
-        if (::cameraFallbackLifecycleOwner.isInitialized) {
-            cameraFallbackLifecycleOwner.moveTo(Lifecycle.State.CREATED)
+        stage("navigation_requests") {
+            val navigationCancellation = cancelNavigationRequestsForPause()
+            clearDestinationSearchState(navigationCancellation.destinationSearchCancelled)
         }
-        if (::surfaceView.isInitialized) {
-            syncGlSurfaceRenderMode(
-                forceFrame = true,
-                allowContinuousRendering = false,
-            )
-            surfaceView.onPause()
+        stage("route_state") {
+            if (
+                ::walkSessionLifecycle.isInitialized &&
+                walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED
+            ) {
+                resetRouteState(purgeRouteSnapshot = false)
+            } else {
+                resetRouteState()
+            }
+            if (checkpoints != null && routeSnapshotPurgeFailed) {
+                throw IllegalStateException("route snapshot purge failed during safety stop")
+            }
         }
-        syncActiveSessionScreenPolicy()
-        if (::fieldSessionLog.isInitialized) {
-            fieldSessionLog.recordEvent(
-                "walk_session_outputs_cancelled",
-                mapOf("reason" to reason),
-            )
+        stage("frame_state") { invalidateFrameStateForPause() }
+        stage("position_field") { stopActivePositionFieldSession() }
+        stage("location_stop") { if (!currentLocationCollectionAllowsWork()) stopLocationUpdates() }
+        stage("step_tracking") { stopStepTracking() }
+        stage("mounting_probe") {
+            if (::phoneMountingSensorProbe.isInitialized) phoneMountingSensorProbe.stop()
         }
-        startLocationUpdatesIfAllowed()
+        stage("compass") { retainLocationCompassOrStop() }
+        stage("feedback_pending") { feedbackPolicy.cancelPendingFeedbackDeliveries() }
+        stage("talkback") {
+            if (::statusText.isInitialized) pendingTalkBackInteraction?.let(statusText::removeCallbacks)
+            pendingTalkBackInteraction = null
+        }
+        stage("feedback_terminal") { cancelPendingFeedbackTerminalResolution() }
+        stage("feedback_delivery_state") { latestFeedbackDeliveryState = FeedbackDeliveryState() }
+        stage("feedback_actuator") {
+            feedbackActuator?.close()
+            feedbackActuator = null
+        }
+        stage("camera_lifecycle") {
+            if (::cameraFallbackLifecycleOwner.isInitialized) {
+                cameraFallbackLifecycleOwner.moveTo(Lifecycle.State.CREATED)
+            }
+        }
+        stage("surface") {
+            if (::surfaceView.isInitialized) {
+                syncGlSurfaceRenderMode(forceFrame = true, allowContinuousRendering = false)
+                surfaceView.onPause()
+            }
+        }
+        stage("screen") { syncActiveSessionScreenPolicy() }
+        stage("activity_original_uploads") { cancelActivityOriginalUploads() }
+        stage("field_log") {
+            if (::fieldSessionLog.isInitialized) {
+                fieldSessionLog.recordEvent("walk_session_outputs_cancelled", mapOf("reason" to reason))
+            }
+        }
+        stage("location_restart") { startLocationUpdatesIfAllowed() }
+        return complete
     }
 
     private fun handleOneShotSpeechRecognitionFailure(
@@ -33176,7 +36251,21 @@ generation != cameraFallbackGeneration
                 "$detail 한국어 음성 데이터를 설치하고 기기 점검을 다시 실행하기 전에는 보행 안내를 시작하거나 재개할 수 없습니다."
             },
         )
-        if (isScreenReaderActive()) startupCapabilityText.announceForAccessibility(detail)
+        // S13-30: through the single TalkBack channel, so an active risk announcement keeps priority.
+        if (isScreenReaderActive()) announceTalkBackInteractionAfterVoiceRecognition(detail)
+    }
+
+    /**
+     * S13-30-F2: once the app TTS failed TalkBack is the only channel, so an INTERACTION message that
+     * voice recognition would suppress is delivered after recognition ends instead of being dropped.
+     */
+    private fun announceTalkBackInteractionAfterVoiceRecognition(message: String): Boolean {
+        if (!voiceRecognitionActive) return announceForTalkBack(message, TalkBackAnnouncementPriority.INTERACTION)
+        return scheduleTalkBackInteraction(
+            message,
+            TALKBACK_VOICE_RECOGNITION_RECHECK_MS,
+            waitForVoiceRecognitionEnd = true,
+        )
     }
 
     private fun feedbackActuatorStatusText(): String {
@@ -33187,26 +36276,43 @@ generation != cameraFallbackGeneration
         bestOutput: TrackedObjectDepth?,
         staleReason: String?,
         expectedRuntimeMetricGeneration: Long? = null,
+        qualitativeOutput: TrackedObjectDepth? = null,
+        qualitativeRuntimeReady: Boolean = false,
     ): DeviceGateState {
         val runtimeMetricReady = currentRuntimeMetricOutputAllowsWork(expectedRuntimeMetricGeneration)
+        val runtimeQualitativeReady = qualitativeRuntimeReady &&
+            expectedRuntimeMetricGeneration != null &&
+            arSessionGeneration == expectedRuntimeMetricGeneration &&
+            currentArCoreQualitativeFeedbackAllowsWork(SystemClock.elapsedRealtime())
+        val runtimeReady = runtimeMetricReady || runtimeQualitativeReady
         return DeviceGateState(
             cameraPermissionGranted = hasCameraPermission(),
-            arCoreSupported = arCoreSupported && runtimeMetricReady,
-            depthSupported = depthSupported && runtimeMetricReady,
+            arCoreSupported = arCoreSupported && runtimeReady,
+            depthSupported = depthSupported && runtimeReady,
             tfliteConfigLoaded = detectorConfigLoaded,
-            detectorAvailable = detectorAvailable,
-            arSessionRunning = runtimeMetricReady,
+            detectorAvailable = runningDetectorVerifiedForOutput(),
+            arSessionRunning = runtimeReady,
             freshDepthObject = runtimeMetricReady &&
                 bestOutput != null &&
                 bestOutput.source.metric &&
                 bestOutput.confidence.finalScore >= FEEDBACK_MIN_DEPTH_CONFIDENCE,
+            freshQualitativeObject = runtimeReady &&
+                qualitativeOutput?.isCurrentQualitativeCaution(SystemClock.elapsedRealtime()) == true,
             staleReason = staleReason,
         )
     }
 
     private fun DeviceGateState.statusText(): String {
-        val state = if (actuatorsAllowed) "deviceGate=READY" else "deviceGate=WAIT:${blockedReason()}"
-        val alertState = if (alertsAllowed) "alertGate=PASS" else "alertGate=WAIT:${blockedReason()}"
+        val state = if (actuatorsAllowed) {
+            "deviceGate=READY"
+        } else {
+            "deviceGate=WAIT:${blockedReason(DeviceGatePurpose.ACTUATOR_READINESS)}"
+        }
+        val alertState = if (alertsAllowed) {
+            "alertGate=PASS"
+        } else {
+            "alertGate=WAIT:${blockedReason(DeviceGatePurpose.RISK_ALERT)}"
+        }
         return "$state $alertState startupReady=$startupReady depth=$depthSupported detector=$detectorAvailable"
     }
 
@@ -33221,6 +36327,8 @@ generation != cameraFallbackGeneration
         nowMs: Long,
         capturedAtMs: Long,
         expectedWalkEpoch: WalkRuntimeEpoch? = null,
+        explicitReportDamageWithoutDepth: Boolean = false,
+        explicitReportConflictingState: Boolean = false,
     ): Boolean = synchronized(frameStateLock) frameLock@ {
         if (!isCurrentFrameGeneration(frameGeneration, expectedWalkEpoch)) {
             return@frameLock false
@@ -33240,6 +36348,11 @@ generation != cameraFallbackGeneration
             latestExplicitReportImage = reportImage
             latestExplicitReportGateState = explicitReportGateState
             latestExplicitReportCapturedAtMs = capturedAtMs
+            // Every reset clears the capture time, which also retires this marker.
+            latestExplicitReportUnmeasuredDamageCapturedAtMs =
+                if (explicitReportDamageWithoutDepth) capturedAtMs else 0L
+            latestExplicitReportConflictingStateCapturedAtMs =
+                if (explicitReportConflictingState) capturedAtMs else 0L
             true
         }
     }
@@ -33330,7 +36443,7 @@ generation != cameraFallbackGeneration
             }
             return "reportCandidate=blocked:gps_missing"
         }
-        val candidate = reportCandidatePolicy.prepare(
+        val evaluation = reportCandidatePolicy.evaluate(
             AndroidReportCandidateInput(
                 depth = output,
                 location = trustedLocation,
@@ -33358,11 +36471,12 @@ generation != cameraFallbackGeneration
                 modelLoadReason = detectorLoadReason,
             ),
         )
-        return if (candidate == null) {
-            "reportCandidate=blocked"
-        } else {
-            processReportCandidate(
-                candidate = candidate,
+        return when (evaluation) {
+            // Fixed reason token only; no image, coordinate or metadata value enters the status.
+            is AndroidReportCandidateResult.Rejected ->
+                "reportCandidate=blocked:candidate_${evaluation.reason.diagnosticCode}"
+            is AndroidReportCandidateResult.Ready -> processReportCandidate(
+                candidate = evaluation.candidate,
                 reportImage = reportImage,
                 explicitRequest = explicitRequest,
                 expectedWalkEpoch = expectedWalkEpoch,
@@ -33404,6 +36518,14 @@ generation != cameraFallbackGeneration
             integratedConsentSession.currentConfirmationOrNull()
                 ?: return "reportCandidate=blocked:consent_confirmation_required"
         if (!explicitRequest && !consentConfirmation.selections.automaticReporting) {
+            return "reportCandidate=blocked:automatic_report_consent_required"
+        }
+        // The server receipt keeps its old selection until a withdrawal is confirmed.
+        // Automatic creation follows the effective consent, including local withdrawal.
+        if (
+            !explicitRequest &&
+            !integratedConsentSession.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING)
+        ) {
             return "reportCandidate=blocked:automatic_report_consent_required"
         }
         val imageJpeg = reportImage ?: return "reportCandidate=blocked:no_report_image"
@@ -33473,6 +36595,8 @@ generation != cameraFallbackGeneration
                 walkSessionId = expectedWalkEpoch.walkSessionId,
                 consentReceiptSha256 =
                     consentConfirmation.backendConsentReceiptSha256,
+                accountGeneration = GatewaySessionProcessCoordinator.snapshot()
+                    .session?.backendAccountGeneration,
             )
         } finally {
             metadataUtf8.fill(0)
@@ -33481,7 +36605,7 @@ generation != cameraFallbackGeneration
         if (queued == null) {
             return "reportCandidate=queue_disabled_or_rejected"
         }
-        if (explicitRequest) speakInteraction("신고 후보를 안전하게 저장했습니다.")
+        if (explicitRequest) speakInteraction(kr.co.hanium.dreamup.walksafe.report.ExplicitReportSubmissionNotice.SAVED_NOT_SUBMITTED_KO)
         return "reportCandidate=queued id=${queued.payload.reportId.take(12)}"
     }
 
@@ -33528,11 +36652,17 @@ generation != cameraFallbackGeneration
         updateNavigationStatus(status)
         if (status == "reportCandidate=awaiting:explicit_transfer_confirmation") {
             beginExplicitReportConfirmationDisclosure(context, source)
-        } else if (
-            status == "reportCandidate=blocked:no_depth_object" ||
-            status.contains("blocked:not_reportable_class")
-        ) {
-            speakInteraction("신고할 손상 점자블록이 없습니다.")
+        } else {
+            val rejectionMessage = if (status == "reportCandidate=blocked:conflicting_tactile_state") {
+                "점자블록의 손상 상태가 불확실해 신고를 저장하지 않았습니다. 손상 부위를 다시 확인한 뒤 신고해 주세요."
+            } else {
+                kr.co.hanium.dreamup.walksafe.report.ExplicitReportRejectionNotice.messageFor(status)
+            }
+            rejectionMessage?.let { message ->
+                // S12-17: one sentence for speech, the last-result line and TalkBack (live region).
+                speakInteraction(message)
+                renderExplicitReportConfirmationIdle(message)
+            }
         }
     }
 
@@ -33624,6 +36754,10 @@ generation != cameraFallbackGeneration
                 "reportCandidate=blocked:confirmation_context_changed"
             } else {
                 confirmed.useExactBytes { metadataUtf8, imageJpeg ->
+                    val queueGateway = GatewaySessionProcessCoordinator.snapshot()
+                    if (queueGateway.generation != confirmed.context.gatewaySessionGeneration ||
+                        queueGateway.session?.actorId != confirmed.context.reporterId
+                    ) return@useExactBytes "reportCandidate=blocked:confirmation_context_changed"
                     reportQueueStore.enqueue(
                         expectedReporterActorId = confirmed.context.reporterId,
                         metadataUtf8 = metadataUtf8,
@@ -33631,6 +36765,7 @@ generation != cameraFallbackGeneration
                         priority = ReportQueuePriority.EXPLICIT,
                         walkSessionId = confirmed.context.walkSessionId,
                         consentReceiptSha256 = confirmed.context.consentReceiptSha256,
+                        accountGeneration = queueGateway.session?.backendAccountGeneration,
                     )?.let { queued ->
                         "reportCandidate=queued id=${queued.payload.reportId.take(12)}"
                     } ?: "reportCandidate=queue_disabled_or_rejected"
@@ -33639,11 +36774,17 @@ generation != cameraFallbackGeneration
         } finally {
             confirmed.close()
         }
-        renderExplicitReportConfirmationIdle()
+        // S05-34: saved on the phone is not "accepted"; the server result is announced later.
+        val savedNotice = if (status.startsWith("reportCandidate=queued")) {
+            kr.co.hanium.dreamup.walksafe.report.ExplicitReportSubmissionNotice.SAVED_NOT_SUBMITTED_KO
+        } else {
+            null
+        }
+        renderExplicitReportConfirmationIdle(savedNotice)
         latestReportCandidateStatus = status
         updateNavigationStatus(status)
-        if (status.startsWith("reportCandidate=queued")) {
-            speakInteraction("방금 확인한 신고 후보를 안전하게 저장했습니다.")
+        if (savedNotice != null) {
+            speakInteraction(savedNotice)
         } else if (status == "reportCandidate=blocked:confirmation_context_changed") {
             speakInteraction("신고 확인 중 상태가 바뀌어 저장하지 않았습니다. 다시 신고해 주세요.")
         }
@@ -33661,6 +36802,10 @@ generation != cameraFallbackGeneration
                     return@runtimeLock "reportCandidate=blocked:runtime_metric_unavailable"
                 }
                 val output = latestExplicitReportOutput
+                val unmeasuredDamage = latestExplicitReportCapturedAtMs > 0L &&
+                    latestExplicitReportUnmeasuredDamageCapturedAtMs == latestExplicitReportCapturedAtMs
+                val conflictingState = latestExplicitReportCapturedAtMs > 0L &&
+                    latestExplicitReportConflictingStateCapturedAtMs == latestExplicitReportCapturedAtMs
                 prepareReportCandidate(
                     reportOutput = output,
                     gateState = latestExplicitReportGateState ?: buildDeviceGateState(
@@ -33676,7 +36821,13 @@ generation != cameraFallbackGeneration
                     explicitConfirmationContext = confirmationContext,
                     explicitConfirmationRequestedAtElapsedRealtimeMs =
                         requestedAtElapsedRealtimeMs,
-                )
+                ).let { status ->
+                    if (status == "reportCandidate=blocked:no_depth_object" && conflictingState) {
+                        "reportCandidate=blocked:conflicting_tactile_state"
+                    } else {
+                        kr.co.hanium.dreamup.walksafe.report.ExplicitReportRejectionNotice.explicitStatus(status, unmeasuredDamage)
+                    }
+                }
             }
         }
 
@@ -33889,9 +37040,12 @@ generation != cameraFallbackGeneration
             updateGatewayVoiceStatus("목적지 검색이 끝나면 후보 안내를 듣고 말씀해 주세요.")
             return
         }
-        val dialogState = currentVoiceDestinationDialogState()
+        val dialogState = currentVoiceDestinationDialogState() ?: destinationSearchVoiceState?.takeIf {
+            !nativeHomeFeatureContextAvailable() && it.query == destinationSearchQuery &&
+                it.currentPageResults.isNotEmpty() && !destinationSearchInFlight
+        }
         if (dialogState != null) {
-            speakHomeDestinationVoicePrompt(dialogState, "다시 듣기 또는 해당 번호를 말해주세요.")
+            speakHomeDestinationVoicePrompt(dialogState, listenAfterPrompt = true)
             return
         }
         startVoiceCommandRecognition()
@@ -33953,6 +37107,7 @@ generation != cameraFallbackGeneration
             return false
         }
         runCatching { ensureFeedbackActuator().playVoiceListeningStartVibration() }
+        invalidateForegroundHomeWakeInput()
         voiceRecognitionActive = true
         voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
         updateGatewayVoiceStatus("녹음 중입니다. 버튼을 다시 눌러 전송하세요.")
@@ -34095,6 +37250,7 @@ generation != cameraFallbackGeneration
                     }
                     updateGatewayVoiceStatus("서버 음성 안내를 재생하고 있습니다.")
                     val player = TemporaryGatewayWavPlayer()
+                    invalidateForegroundHomeWakeInput()
                     gatewaySpeechPlayer = player
                     val started = player.play(
                         temporaryFile = audio.temporaryFile,
@@ -34342,6 +37498,7 @@ generation != cameraFallbackGeneration
                 expectedNavigationDecisionToken = expectedNavigationDecisionToken,
             ),
         )
+        invalidateForegroundHomeWakeInput()
         voiceRecognitionActive = true
         updateVoiceCommandButton(active = true)
         updateNavigationStatus(
@@ -34426,7 +37583,10 @@ generation != cameraFallbackGeneration
                     VoiceRecognitionPurpose.COMMAND -> {
                         if (voiceRecognitionGeneration == generation &&
                             commandSpeechResponseGeneration == responseGeneration
-                        ) clearVoiceEndConfirmation()
+                        ) {
+                            clearVoiceEndConfirmation()
+                            invalidateGuidanceStopConfirmation()
+                        }
                     }
                     VoiceRecognitionPurpose.WALK_SESSION_RESUME -> {
                         if (resumeToken != null && walkSessionResumeConfirmationToken == resumeToken) {
@@ -34493,12 +37653,14 @@ generation != cameraFallbackGeneration
         commandSpeechResponseGeneration += 1L
         failInterruptedRouteDecisionSpeech(commandSpeechResponseGeneration - 1L)
         commandSpeechResponseCallbacks.clear()
+        destinationSearchVoiceState?.invalidateVoicePrompt()
         voiceCommandPromptPending = false
         voiceCommandPromptReadyGeneration = null
         feedbackActuator?.cancelCommandInteraction()
     }
 
     private fun cancelVoiceCommandRecognition() {
+        invalidateGuidanceStopConfirmation()
         cancelForegroundHomeWakeAcknowledgement()
         cancelGatewaySpeechInteraction("voice_cancelled")
         voiceRecognitionGeneration += 1
@@ -34727,7 +37889,14 @@ generation != cameraFallbackGeneration
         hasAdditionalAlternatives: Boolean = false,
     ) {
         val recognized = phrases.firstOrNull().orEmpty()
+        // R17: every final ends an earlier "길안내를 끝낼까요?" question; only a stop said inside it counts.
+        val confirmationWasOpen = guidanceStopConfirmation.consumeOpenConfirmation(SystemClock.elapsedRealtime())
         val snapshot = walkSessionLifecycle.snapshot()
+        val guidanceStopConfirmationOpen = confirmationWasOpen &&
+            guidanceStopConfirmationRouteGeneration == routeRequestGeneration &&
+            guidanceStopConfirmationWalkEpoch == snapshot.epoch && isRouteActive
+        guidanceStopConfirmationRouteGeneration = null
+        guidanceStopConfirmationWalkEpoch = null
         val walkDecision = walkSessionVoiceControlPolicy.evaluate(
             phrase = recognized,
             confidence = confidenceScores?.getOrNull(0) ?: Float.NaN,
@@ -34835,7 +38004,7 @@ generation != cameraFallbackGeneration
         if (platformCandidate?.disposition == PlatformVoiceCandidateDisposition.UNRECOGNIZED) {
             // Saying it again cannot help; nothing said was a command. Same wording as the scored
             // path's miss below, so one dead end does not survive in a second place.
-            val message = "못 알아들었습니다. ${unrecognizedCommandHintKo()}"
+            val message = unrecognizedCommandMessageKo(recognized)
             updateGatewayVoiceStatus(message)
             if (!retryHomeDestinationVoiceDialog(message)) {
                 speakInteraction(message)
@@ -34878,8 +38047,15 @@ generation != cameraFallbackGeneration
                     "voice=command_unmatched source=$redactedRecognitionSource"
                 },
             )
-            if (!retryHomeDestinationVoiceDialog("명령을 이해하지 못했습니다.")) {
-                speakInteraction("못 알아들었습니다. ${unrecognizedCommandHintKo()}")
+            val retryMessage = if (kr.co.hanium.dreamup.walksafe.navigation.isCompoundVoiceCommand(recognized)) {
+                kr.co.hanium.dreamup.walksafe.navigation.COMPOUND_VOICE_COMMAND_REFUSAL_KO
+            } else if (kr.co.hanium.dreamup.walksafe.navigation.isLocationDescriptionRequest(recognized)) {
+                kr.co.hanium.dreamup.walksafe.navigation.LOCATION_DESCRIPTION_UNSUPPORTED_KO
+            } else {
+                "명령을 이해하지 못했습니다."
+            }
+            if (!retryHomeDestinationVoiceDialog(retryMessage)) {
+                speakInteraction(unrecognizedCommandMessageKo(recognized))
             }
             return
         }
@@ -34898,8 +38074,11 @@ generation != cameraFallbackGeneration
             speakInteraction("경로 상태가 바뀌어 이전 음성 결정을 적용하지 않았습니다. 다시 확인해 주세요.")
             return
         }
+        if (action == AndroidVoiceAction.StopNavigation &&
+            confirmGuidanceStopFirst(recognized, guidanceStopConfirmationOpen)
+        ) return
         logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.COMMAND_EXECUTION_REQUESTED)
-        executeVoiceAction(action)
+        executeVoiceAction(action, expectedNavigationDecisionToken)
     }
 
     private fun executeWalkSessionVoiceAction(
@@ -35003,14 +38182,19 @@ generation != cameraFallbackGeneration
         walkSessionVoiceControlPolicy.invalidatePendingEnd()
     }
 
-    private fun executeVoiceAction(action: AndroidVoiceAction) {
+    private fun executeVoiceAction(
+        action: AndroidVoiceAction,
+        expectedNavigationDecisionToken: RouteNavigatorDecisionToken?,
+    ) {
         if (nativeHomeFeatureContextAvailable() &&
             action !is AndroidVoiceAction.SearchDestination &&
             action !is AndroidVoiceAction.SelectDestinationCandidate &&
             action !in setOf(
                 AndroidVoiceAction.RepeatDestinationCandidates,
                 AndroidVoiceAction.HearMoreDestinationCandidates,
+                AndroidVoiceAction.PreviousDestinationCandidates,
                 AndroidVoiceAction.CancelDestination,
+                AndroidVoiceAction.CancelDialog,
                 AndroidVoiceAction.StartNavigation,
                 AndroidVoiceAction.SpeakCurrentGuidance,
                 AndroidVoiceAction.SpeakVoiceHelp,
@@ -35025,19 +38209,29 @@ generation != cameraFallbackGeneration
             VoiceCommandUiDestination.VOICE_COMMAND -> NativeUiPage.VOICE_COMMAND
             VoiceCommandUiDestination.DESTINATION_SEARCH -> NativeUiPage.DESTINATION_SEARCH
             VoiceCommandUiDestination.SETTINGS -> NativeUiPage.SETTINGS
+            // S05-33: no re-render or destination-location request for an answer that needs no other
+            // screen; on the walking guidance page the answer is spoken there as well.
+            VoiceCommandUiDestination.CURRENT_VOICE_PAGE ->
+                if (nativeUiPage.isVoiceInteractionPage() || nativeUiPage == NativeUiPage.GUIDANCE) null
+                else NativeUiPage.VOICE_COMMAND
         }
-        showNativeUiPage(commandPage, preserveVoiceInteraction = true)
+        commandPage?.let { showNativeUiPage(it, preserveVoiceInteraction = true) }
         when (action) {
             AndroidVoiceAction.OpenSettings -> speakStatusExplanation("설정 화면을 열었습니다.")
             AndroidVoiceAction.StartNavigation -> {
-                if (pendingUiDestination != null) startNativeDestinationGuidance()
+                if (startPendingWalkingDestinationChange()) Unit
+                else if (pendingUiDestination != null) startNativeDestinationGuidance()
                 else speakInteraction(
                     if (isRouteActive) "이미 길안내 중입니다."
                     else "목적지를 검색하고 후보를 선택한 뒤 안내 시작이라고 말해 주세요.",
                 )
             }
             AndroidVoiceAction.SpeakCurrentGuidance -> {
-                if (isWalkSessionRuntimeActive()) speakNextNavigationInstruction()
+                // S05-11 / FP-026: an open candidate dialog outranks guidance for "다시 말해줘".
+                if (activeVoiceCandidateDialogOrNull() != null) repeatVoiceDestinationCandidates()
+                // S06-40: a walking selection waiting for "길안내 시작" is a confirmation dialog too.
+                else if (repeatPendingWalkingDestinationChange()) Unit
+                else if (isWalkSessionRuntimeActive()) speakNextNavigationInstruction()
                 else speakInteraction("진행 중인 길안내가 없습니다. 목적지를 먼저 선택해 주세요.")
             }
             AndroidVoiceAction.SpeakVoiceHelp -> {
@@ -35045,7 +38239,7 @@ generation != cameraFallbackGeneration
                     "일시정지 중에는 보행 재개 또는 보행 종료라고 말해 주세요. 종료할 때는 확인을 한 번 더 받습니다."
                 } else {
                     "목적지는 서울역으로 안내해줘처럼 말해 주세요. 후보 안내 뒤에는 1번 또는 첫 번째라고 선택할 수 있습니다. " +
-                        "더 듣기, 목적지 취소, 안내 시작, 설정을 사용할 수 있습니다. " +
+                        "더 듣기, 이전 후보, 목적지 취소, 안내 시작, 설정을 사용할 수 있습니다. " +
                         "보행 중에는 다음 안내 알려줘, 다시 말해줘, 경로 다시 찾아줘, 위치 다시 확인, " +
                         "도착했어, 아직 도착 아니야, 길안내 종료, 신고해, 보행 일시정지, 보행 종료를 말할 수 있습니다. " +
                         "신고와 보행 종료는 확인 안내를 따라 주세요."
@@ -35060,13 +38254,15 @@ generation != cameraFallbackGeneration
             is AndroidVoiceAction.SelectDestinationCandidate -> selectVoiceDestinationCandidate(action.oneBasedIndex)
             AndroidVoiceAction.RepeatDestinationCandidates -> repeatVoiceDestinationCandidates()
             AndroidVoiceAction.HearMoreDestinationCandidates -> hearMoreVoiceDestinationCandidates()
+            AndroidVoiceAction.PreviousDestinationCandidates -> previousVoiceDestinationCandidates()
             AndroidVoiceAction.CancelDestination -> cancelDestinationFromVoice()
+            AndroidVoiceAction.CancelDialog -> cancelVoiceDialogFromVoice()
             AndroidVoiceAction.SpeakNextNavigationInstruction -> speakNextNavigationInstruction()
-            AndroidVoiceAction.RequestReroute -> requestRerouteFromVoice()
-            AndroidVoiceAction.RecheckLocation -> recheckLocationFromVoice()
-            AndroidVoiceAction.ConfirmArrival -> confirmArrivalFromVoice()
-            AndroidVoiceAction.RejectArrival -> rejectArrivalFromVoice()
-            AndroidVoiceAction.StopNavigation -> stopNavigationFromVoice()
+            AndroidVoiceAction.RequestReroute -> requestRerouteFromVoice(expectedNavigationDecisionToken)
+            AndroidVoiceAction.RecheckLocation -> recheckLocationFromVoice(expectedNavigationDecisionToken)
+            AndroidVoiceAction.ConfirmArrival -> confirmArrivalFromVoice(expectedNavigationDecisionToken)
+            AndroidVoiceAction.RejectArrival -> rejectArrivalFromVoice(expectedNavigationDecisionToken)
+            AndroidVoiceAction.StopNavigation -> stopNavigationFromVoice(expectedNavigationDecisionToken)
         }
     }
 
@@ -35090,7 +38286,175 @@ generation != cameraFallbackGeneration
         else -> "목적지를 말하거나 도움말이라고 말씀해 주세요."
     }
 
+    /**
+     * S05-6: a sentence with two commands is refused whole and the user is asked for one at a time.
+     * S05-10: a location description request is named as not offered, apart from a plain miss.
+     */
+    private fun unrecognizedCommandMessageKo(recognized: String): String =
+        if (kr.co.hanium.dreamup.walksafe.navigation.isCompoundVoiceCommand(recognized)) {
+            "${kr.co.hanium.dreamup.walksafe.navigation.COMPOUND_VOICE_COMMAND_REFUSAL_KO} ${unrecognizedCommandHintKo()}"
+        } else if (kr.co.hanium.dreamup.walksafe.navigation.isLocationDescriptionRequest(recognized)) {
+            "${kr.co.hanium.dreamup.walksafe.navigation.LOCATION_DESCRIPTION_UNSUPPORTED_KO} ${unrecognizedCommandHintKo()}" +
+                locationRecheckOfferKo()
+        } else {
+            "못 알아들었습니다. ${unrecognizedCommandHintKo()}"
+        }
+
+    /**
+     * voice-F10 (S05-10, 05.txt:139 "재측정 요청과 위치 설명 요청을 구분"): while the route waits for a
+     * location re-check or a reroute choice, the location question is paired with the re-measure command
+     * that works now. Elsewhere "위치 다시 확인" is not accepted (recheckLocationFromVoice), so not offered.
+     */
+    private fun locationRecheckOfferKo(): String = when (routeNavigator.pendingUserDecision()) {
+        RouteNavigatorUserDecision.LOCATION_RECHECK, RouteNavigatorUserDecision.REROUTE ->
+            " 위치 다시 확인이라고 하면 현재 위치를 다시 잽니다."
+        else -> ""
+    }
+
+    /**
+     * S05-12/S06-21: a bare "취소" closes only the dialog open now - the candidate dialog, a running
+     * search or a walking selection waiting for "길안내 시작". It never removes the destination, never
+     * touches a route or a route request and never ends guidance ("목적지 취소"/"길안내 종료" do that).
+     */
+    private fun cancelVoiceDialogFromVoice() {
+        // voice-F5: an explicit report waiting for its confirmation is the dialog open now; it is dropped.
+        if (explicitReportConfirmationPolicy.invalidate()) {
+            invalidatePendingExplicitReport()
+            updateNavigationStatus("voice=dialog_cancelled report=true route_active=$isRouteActive")
+            speakInteraction("신고를 취소했습니다. 저장하지 않았습니다.")
+            return
+        }
+        // voice-F5: a search still waiting for its location fix, or a spoken query with no list yet,
+        // is a running search too.
+        val searchCancelled = destinationSearchInFlight ||
+            destinationSearchLocationController?.isAcquiring == true ||
+            (pendingVoiceDestinationQuery != null && destinationSearchVoiceState == null)
+        val dialogOpen = searchCancelled || voiceDestinationDialogOpen()
+        if (!dialogOpen) {
+            updateNavigationStatus("voice=dialog_cancel_nothing_open route_active=$isRouteActive")
+            speakInteraction(
+                when {
+                    // voice-F2: a confirmed switch to another place is on its way; only "목적지 취소" stops
+                    // it and keeps the running route ("길안내 종료" would end both).
+                    destinationReplacementRequestPending() ->
+                        "새 목적지 경로를 준비하고 있습니다. 바꾸지 않으려면 목적지 취소라고 말해 주세요. " +
+                            "진행 중인 길안내는 계속됩니다."
+                    // voice-F5: a route question waiting for its answer names its own answers.
+                    voiceRouteDecisionPending() -> "취소할 대화가 없습니다. ${unrecognizedCommandHintKo()}"
+                    isRouteActive -> "취소할 대화가 없습니다. 길안내를 끝내려면 길안내 종료라고 말해 주세요."
+                    pendingUiDestination != null || currentDestination != null ->
+                        "취소할 대화가 없습니다. 목적지를 지우려면 목적지 취소라고 말해 주세요."
+                    else -> "취소할 대화가 없습니다."
+                },
+            )
+            return
+        }
+        walkingDestinationChange.clear()
+        pendingVoiceDestinationQuery = null
+        pendingVoiceDestinationPageIndex = null
+        destinationSearchVoiceState = null
+        clearHomeDestinationVoiceDialog()
+        if (searchCancelled) cancelDestinationSearch()
+        // The location wait ends without a request in flight; refresh its "현재 위치를 확인하고 있습니다" line.
+        if (searchCancelled) updateDestinationSearchUi()
+        updateNavigationStatus("voice=dialog_cancelled search=$searchCancelled route_active=$isRouteActive")
+        speakInteraction(
+            (if (searchCancelled) "목적지 검색을 취소했습니다." else "후보 선택을 닫았습니다.") +
+                (if (isRouteActive) " 진행 중인 길안내는 계속됩니다." else ""),
+        )
+    }
+
+    /** R17: the one "길안내를 끝낼까요?" question, in memory only, ended by its window or the next utterance. */
+    private val guidanceStopConfirmation = kr.co.hanium.dreamup.walksafe.navigation.GuidanceStopConfirmationPolicy()
+    private var guidanceStopConfirmationRouteGeneration: Int? = null
+    private var guidanceStopConfirmationWalkEpoch: WalkRuntimeEpoch? = null
+
+    private fun invalidateGuidanceStopConfirmation() {
+        guidanceStopConfirmation.invalidate()
+        guidanceStopConfirmationRouteGeneration = null
+        guidanceStopConfirmationWalkEpoch = null
+    }
+
+    /**
+     * R17 (voice-F3, S05-12/S06-21; 05.txt:157): during guidance with a candidate dialog, a search or a
+     * walking selection open, a stop phrase without "길" ("안내 취소") may be about the candidate reading,
+     * so it is asked once. True when the question was asked and nothing else may run for this utterance.
+     * "길안내 종료/취소" and every stop with no dialog open end guidance at once (중지 우선, 05.txt:125).
+     */
+    private fun confirmGuidanceStopFirst(recognized: String, confirmationOpen: Boolean): Boolean {
+        val phrase = kr.co.hanium.dreamup.walksafe.navigation.guidanceStopPhraseOrNull(recognized) ?: return false
+        val decision = guidanceStopConfirmation.decide(
+            phrase = phrase,
+            confirmationWasOpen = confirmationOpen,
+            dialogOpen = voiceDestinationDialogOpen(),
+            guidanceRunning = isRouteActive,
+            nowMs = SystemClock.elapsedRealtime(),
+        )
+        if (decision != kr.co.hanium.dreamup.walksafe.navigation.GuidanceStopDecision.CONFIRM) return false
+        val expectedRouteGeneration = routeRequestGeneration
+        val expectedWalkEpoch = walkSessionLifecycle.snapshot().epoch
+        val preparationGeneration = voiceRecognitionGeneration
+        val responseGeneration = commandSpeechResponseGeneration + 1L
+        guidanceStopConfirmationRouteGeneration = expectedRouteGeneration
+        guidanceStopConfirmationWalkEpoch = expectedWalkEpoch
+        updateNavigationStatus("voice=navigation_stop_confirmation_requested")
+        speakCommandResponse(
+            message = kr.co.hanium.dreamup.walksafe.navigation.GUIDANCE_STOP_CONFIRMATION_PROMPT_KO,
+            preparingInput = true,
+            onCompleted = {
+                val current = commandSpeechResponseGeneration == responseGeneration &&
+                    voiceRecognitionGeneration == preparationGeneration &&
+                    guidanceStopConfirmationRouteGeneration == expectedRouteGeneration &&
+                    guidanceStopConfirmationWalkEpoch == expectedWalkEpoch &&
+                    walkSessionLifecycle.snapshot().epoch == expectedWalkEpoch &&
+                    routeRequestGeneration == expectedRouteGeneration && isRouteActive &&
+                    voiceCommandPromptPending
+                if (current) {
+                    guidanceStopConfirmation.promptDelivered(SystemClock.elapsedRealtime())
+                    voiceCommandPromptPending = false
+                    voiceCommandPromptReadyGeneration = preparationGeneration
+                    if (!startVoiceCommandRecognition()) {
+                        invalidateGuidanceStopConfirmation()
+                        voiceCommandPromptReadyGeneration = null
+                        updateVoiceCommandButton(active = false)
+                    }
+                } else if (commandSpeechResponseGeneration == responseGeneration) {
+                    invalidateGuidanceStopConfirmation()
+                    voiceCommandPromptPending = false
+                    voiceCommandPromptReadyGeneration = null
+                    updateVoiceCommandButton(active = voiceRecognitionActive)
+                }
+            },
+            onFailed = {
+                if (commandSpeechResponseGeneration == responseGeneration) {
+                    invalidateGuidanceStopConfirmation()
+                    voiceCommandPromptPending = false
+                    voiceCommandPromptReadyGeneration = null
+                    updateVoiceCommandButton(active = voiceRecognitionActive)
+                }
+            },
+        )
+        return true
+    }
+
+    /** voice-F2/S06-40: a confirmed switch to another place is being routed while the old route runs. */
+    private fun destinationReplacementRequestPending(): Boolean =
+        isRouteActive && routeNavigator.hasRoute() && routeRequestInFlight.get() &&
+            activeRouteRequestReason == "user_destination"
+
+    /** voice-F5: arrival, reroute or location re-check is waiting for the walker's spoken answer. */
+    private fun voiceRouteDecisionPending(): Boolean = routeNavigator.pendingUserDecision() != null
+
+    /** S05-12/R17: a candidate dialog, a running or location-waiting search, or a walking selection is open. */
+    private fun voiceDestinationDialogOpen(): Boolean =
+        destinationSearchInFlight || destinationSearchVoiceState != null ||
+            homeDestinationVoiceDialogLease != null || walkingDestinationChange.hasPending() ||
+            pendingVoiceDestinationQuery != null || destinationSearchLocationController?.isAcquiring == true
+
     private var homeDestinationVoiceDialogLease: HomeDestinationVoiceDialogLease? = null
+
+    /** voice-F6: the candidate list's age notice is said once per searched list. */
+    private val destinationOriginAgeNoticeOnce = kr.co.hanium.dreamup.walksafe.navigation.DestinationOriginAgeNoticeOnce()
 
     private fun clearHomeDestinationVoiceDialog() {
         clearHomeDestinationVoiceDialog(VoiceDialogDiagnosticReason.UNKNOWN)
@@ -35100,6 +38464,10 @@ generation != cameraFallbackGeneration
         val dialogForDiagnostic = currentVoiceDestinationDialogState()
         homeDestinationVoiceDialogLease?.close()
         homeDestinationVoiceDialogLease = null
+        destinationSearchVoiceState?.invalidateVoicePrompt()
+        // S06-34: a closed or cancelled dialog no longer shows a voice range. voice-F9: also when the
+        // list itself is kept (BACKGROUNDED, PAGE_CHANGED); a page shows it again only when spoken.
+        refreshDestinationVoiceRangeText(null)
         logVoiceDialogDiagnostic(
             stage = VoiceDialogDiagnosticStage.DIALOG_CLEARED,
             reason = reason,
@@ -35108,8 +38476,9 @@ generation != cameraFallbackGeneration
         )
     }
 
-    private fun currentVoiceDestinationDialogState(): DestinationSearchVoiceState? =
-        homeDestinationVoiceDialogLease?.currentState(
+    private fun currentVoiceDestinationDialogState(): DestinationSearchVoiceState? {
+        val lease = homeDestinationVoiceDialogLease ?: return null
+        val state = lease.currentState(
             actorId = reporterUserId,
             sessionGeneration = GatewaySessionProcessCoordinator.snapshot().generation,
             searchGeneration = destinationSearchGeneration,
@@ -35118,6 +38487,13 @@ generation != cameraFallbackGeneration
             homeContextAvailable = nativeHomeFeatureContextAvailable(),
             voicePage = nativeUiPage.isVoiceInteractionPage(),
         )
+        if (state == null && homeDestinationVoiceDialogLease === lease) {
+            lease.close()
+            homeDestinationVoiceDialogLease = null
+            refreshDestinationVoiceRangeText(null)
+        }
+        return state
+    }
 
     private fun retryHomeDestinationVoiceDialog(message: String): Boolean {
         val state = currentVoiceDestinationDialogState()
@@ -35140,7 +38516,7 @@ generation != cameraFallbackGeneration
         )
         speakHomeDestinationVoicePrompt(
             state,
-            "인식하지 못하였습니다. 다시 듣기 또는 해당 번호를 말해주세요.",
+            message,
         )
         return true
     }
@@ -35148,18 +38524,24 @@ generation != cameraFallbackGeneration
     private fun speakHomeDestinationVoicePrompt(
         state: DestinationSearchVoiceState,
         message: String = state.voicePrompt(),
+        listenAfterPrompt: Boolean = nativeHomeFeatureContextAvailable() && nativeUiPage.isVoiceInteractionPage(),
     ): Boolean {
         clearHomeDestinationVoiceDialog()
-        if (!nativeHomeFeatureContextAvailable() ||
-            !nativeUiPage.isVoiceInteractionPage() || state.results.isEmpty()
-        ) return speakInteraction(message)
+        if (state.results.isEmpty()) return speakInteraction(message)
         val actorId = reporterUserId ?: return false
-        val lease = HomeDestinationVoiceDialogLease(
+        // S06-34/voice-F9: only a page that is actually spoken shows its range.
+        refreshDestinationVoiceRangeText(state)
+        val sessionGeneration = GatewaySessionProcessCoordinator.snapshot().generation
+        val searchGeneration = destinationSearchGeneration
+        val homeFollowUp = nativeHomeFeatureContextAvailable() && nativeUiPage.isVoiceInteractionPage()
+        val lease = if (homeFollowUp) HomeDestinationVoiceDialogLease(
             actorId = actorId,
-            sessionGeneration = GatewaySessionProcessCoordinator.snapshot().generation,
-            searchGeneration = destinationSearchGeneration,
+            sessionGeneration = sessionGeneration,
+            searchGeneration = searchGeneration,
             state = state,
-        )
+            nowElapsedRealtimeMs = SystemClock::elapsedRealtime,
+            answerWindowStartsAfterPrompt = true,
+        ) else null
         homeDestinationVoiceDialogLease = lease
         val dialogForDiagnostic = currentVoiceDestinationDialogState()
         logVoiceDialogDiagnostic(
@@ -35167,19 +38549,49 @@ generation != cameraFallbackGeneration
             dialogValid = dialogForDiagnostic != null,
             pageIndex = dialogForDiagnostic?.pageIndex,
         )
+        // Retry hints cannot authorize a page whose candidate list was never fully spoken.
+        val candidatePrompt = state.voicePrompt()
+        // S06-31: a list measured long ago says that its distances may have changed; the numbers, order
+        // and distances stay as searched (S06-32). voice-F6: once per list, after the direct answer,
+        // next to the page's distance basis.
+        val originAgeNotice = destinationOriginAgeNoticeOnce.noticeOrNull(state.origin, SystemClock.elapsedRealtime())
+        val pagePrompt = originAgeNotice?.let { state.voicePrompt(originAgeNotice = it) } ?: candidatePrompt
+        val completePrompt = if (message.contains(candidatePrompt)) {
+            message.replace(candidatePrompt, pagePrompt)
+        } else {
+            "$message $pagePrompt"
+        }
+        val attempt = state.beginVoicePrompt()
         val preparationGeneration = voiceRecognitionGeneration
+        val responseGeneration = commandSpeechResponseGeneration + 1L
+        fun pageCurrent(): Boolean =
+            destinationSearchVoiceState === state && destinationSearchQuery == state.query &&
+                destinationSearchGeneration == searchGeneration && reporterUserId == actorId &&
+                GatewaySessionProcessCoordinator.snapshot().generation == sessionGeneration &&
+                (!homeFollowUp || (homeDestinationVoiceDialogLease === lease &&
+                    currentVoiceDestinationDialogState() === state))
         return speakCommandResponse(
-            message = message,
-            preparingInput = true,
+            message = completePrompt,
+            preparingInput = listenAfterPrompt,
             onCompleted = {
-                if (homeDestinationVoiceDialogLease === lease &&
+                val current = pageCurrent() && voiceRecognitionGeneration == preparationGeneration &&
+                    state.completeVoicePrompt(attempt)
+                if (!current) state.failVoicePrompt(attempt)
+                if (current && originAgeNotice != null) destinationOriginAgeNoticeOnce.markDelivered(state.origin)
+                // The answer time is measured from here, not from the start of a long page prompt.
+                lease?.openAnswerWindow()
+                if (current && lease != null) {
+                    reportCleanupCallbackHandler.postDelayed({
+                        if (homeDestinationVoiceDialogLease === lease) currentVoiceDestinationDialogState()
+                    }, 30_000L)
+                }
+                if (listenAfterPrompt && (!homeFollowUp || homeDestinationVoiceDialogLease === lease) &&
                     voiceRecognitionGeneration == preparationGeneration
                 ) {
                     val awaitingInput = voiceCommandPromptPending
                     voiceCommandPromptPending = false
-                    val current = awaitingInput && currentVoiceDestinationDialogState() === state
-                    voiceCommandPromptReadyGeneration = if (current) preparationGeneration else null
-                    if (current) {
+                    voiceCommandPromptReadyGeneration = if (current && awaitingInput) preparationGeneration else null
+                    if (current && awaitingInput) {
                         if (BuildConfig.DEBUG) android.util.Log.d(
                             "WalkSafeVoiceInput", "event=DESTINATION_VOICE_PROMPT_DONE dialog_current=true",
                         )
@@ -35199,9 +38611,15 @@ generation != cameraFallbackGeneration
                 }
             },
             onFailed = {
-                if (homeDestinationVoiceDialogLease === lease &&
+                state.failVoicePrompt(attempt)
+                lease?.openAnswerWindow()
+                if (commandSpeechResponseGeneration == responseGeneration &&
+                    destinationVoiceRangeState === state
+                ) refreshDestinationVoiceRangeText(null)
+                if (listenAfterPrompt && (!homeFollowUp || homeDestinationVoiceDialogLease === lease) &&
                     voiceRecognitionGeneration == preparationGeneration
                 ) {
+                    // Keep only the owned retry context; the failed page has no selection authority.
                     voiceCommandPromptPending = false
                     voiceCommandPromptReadyGeneration = null
                     updateGatewayVoiceStatus(
@@ -35211,6 +38629,29 @@ generation != cameraFallbackGeneration
                 }
             },
         )
+    }
+
+    /**
+     * S06-38 (S05-14): "이전 후보" goes back one page of the list this search already fetched; no request.
+     * The page is read in full again before its numbers can be chosen (the current-page rule is kept).
+     */
+    private fun previousVoiceDestinationCandidates() {
+        val state = if (nativeHomeFeatureContextAvailable()) {
+            currentVoiceDestinationDialogState()
+        } else {
+            destinationSearchVoiceState
+        }
+        if (state == null) {
+            speakInteraction(noVoiceDestinationCandidatesMessage())
+            return
+        }
+        val transition = state.onCommand(DestinationSearchVoiceCommand.PreviousPage)
+        if (!transition.accepted) {
+            speakHomeDestinationVoicePrompt(state, "첫 번째 후보 목록입니다.")
+            return
+        }
+        destinationSearchVoiceState = transition.state
+        speakHomeDestinationVoicePrompt(transition.state)
     }
 
     private fun startVoiceDestinationSearch(query: String) {
@@ -35223,6 +38664,7 @@ generation != cameraFallbackGeneration
             cancelDestinationSearch()
         }
         destinationQueryInput.setText(query)
+        walkingDestinationChange.clear()
         pendingVoiceDestinationQuery = query
         pendingVoiceDestinationPageIndex = 0
         destinationSearchVoiceState = null
@@ -35236,18 +38678,60 @@ generation != cameraFallbackGeneration
     }
 
     private fun repeatVoiceDestinationCandidates() {
+        // S06-40 x S05-11 (FP-026 design_rules[1]): the pending confirmation outranks the old list.
+        if (repeatPendingWalkingDestinationChange()) return
         val state = if (nativeHomeFeatureContextAvailable()) {
             currentVoiceDestinationDialogState()
         } else {
             destinationSearchVoiceState
-        }
+        } ?: voiceStateForShownDestinationResultsOrNull()
         val transition = state?.onCommand(DestinationSearchVoiceCommand.RepeatPage)
         if (transition == null || !transition.accepted) {
-            speakInteraction("먼저 목적지를 검색해 주세요.")
+            // S05-11: with no candidate dialog, the walk's current guidance owns "다시 듣기".
+            if (!destinationSearchInFlight && isWalkSessionRuntimeActive() && isRouteActive) {
+                speakNextNavigationInstruction()
+            } else {
+                speakInteraction(noVoiceDestinationCandidatesMessage())
+            }
             return
         }
         speakHomeDestinationVoicePrompt(transition.state)
     }
+
+    /** S05-11: the candidate dialog that currently owns repeat requests, or null when none is open. */
+    private fun activeVoiceCandidateDialogOrNull(): DestinationSearchVoiceState? =
+        if (nativeHomeFeatureContextAvailable()) {
+            currentVoiceDestinationDialogState()
+        } else {
+            destinationSearchVoiceState?.takeIf { it.query == destinationSearchQuery && !destinationSearchInFlight }
+        }
+
+    /**
+     * S06-6: the one result list already on screen becomes the voice page when no candidate dialog
+     * owns it (keyboard search, or a dialog that expired). There is no re-search, and a number is
+     * accepted only after this page has been read in full (speakHomeDestinationVoicePrompt).
+     */
+    private fun voiceStateForShownDestinationResultsOrNull(): DestinationSearchVoiceState? {
+        if (destinationSearchInFlight || destinationSearchQuery.isBlank() || destinationSearchResults.isEmpty()) {
+            return null
+        }
+        val results = destinationSearchResults.toList()
+        destinationSearchVoiceState?.takeIf { it.query == destinationSearchQuery && it.results == results }
+            ?.let { return it }
+        return DestinationSearchVoiceState(
+            query = destinationSearchQuery,
+            results = results,
+            moreResultsAvailable = destinationSearchCanLoadMore(),
+            origin = destinationSearchOrigin,
+        ).also { destinationSearchVoiceState = it }
+    }
+
+    private fun noVoiceDestinationCandidatesMessage(): String =
+        if (destinationSearchInFlight) {
+            "목적지를 검색하고 있습니다. 결과를 받은 뒤 다시 듣기라고 말씀해 주세요."
+        } else {
+            "먼저 목적지를 검색해 주세요."
+        }
 
     private fun hearMoreVoiceDestinationCandidates() {
         if (!currentDestinationSearchAllowsWork()) {
@@ -35260,7 +38744,13 @@ generation != cameraFallbackGeneration
             destinationSearchVoiceState
         }
         if (state == null) {
-            speakInteraction("먼저 목적지를 검색해 주세요.")
+            // No page was heard yet in this dialog: start from the first page of the shown results.
+            val shown = voiceStateForShownDestinationResultsOrNull()
+            if (shown == null) {
+                speakInteraction(noVoiceDestinationCandidatesMessage())
+            } else {
+                speakHomeDestinationVoicePrompt(shown)
+            }
             return
         }
         val transition = state.onCommand(DestinationSearchVoiceCommand.HearMore)
@@ -35269,49 +38759,92 @@ generation != cameraFallbackGeneration
             speakHomeDestinationVoicePrompt(transition.state)
             return
         }
-        val canLoadMore = destinationSearchResults.size >= destinationSearchPage * DESTINATION_SEARCH_PAGE_SIZE &&
-            destinationSearchResults.size < DESTINATION_SEARCH_MAX_RESULTS
-        if (!canLoadMore || destinationSearchInFlight) {
+        // A running request is not an exhausted list: say which one it is.
+        if (destinationSearchInFlight) {
             speakHomeDestinationVoicePrompt(
                 state,
-                "더 안내할 목적지 후보가 없습니다. 안내한 후보 번호를 말씀해 주세요.",
+                "추가 후보를 아직 찾고 있습니다. 잠시 후 더 듣기라고 말씀해 주세요.",
             )
             return
         }
-        pendingVoiceDestinationQuery = destinationSearchQuery
-        pendingVoiceDestinationPageIndex = state.pageIndex + 1
-        if (!performDestinationSearch(reset = false)) {
-            pendingVoiceDestinationQuery = null
-            pendingVoiceDestinationPageIndex = null
-        }
+        // S06-9: the search already fetched every candidate it can offer (DESTINATION_SEARCH_MAX_RESULTS
+        // in one request), so "더 듣기" only pages that list and never sends a second request. One search
+        // keeps one origin and one list version; nothing is merged or silently re-sorted (S06-13/S06-14).
+        speakHomeDestinationVoicePrompt(
+            state,
+            if (destinationSearchProviderHasMore == true) {
+                "이번 검색에서 안내할 수 있는 후보를 모두 안내했습니다. 다른 후보는 더 자세한 장소명으로 " +
+                    "다시 검색해 주세요. 안내한 후보 번호를 말씀해 주셔도 됩니다."
+            } else {
+                "더 안내할 목적지 후보가 없습니다. 안내한 후보 번호를 말씀해 주세요."
+            },
+        )
     }
 
     private fun cancelDestinationFromVoice() {
         if (blockRouteMutationWhileDeviationChoicePending()) return
+        // S06-39: "목적지 취소" cancels the search, the candidate choice and a confirmed replacement
+        // request; it never ends a running route. Ending guidance is the separate "길안내 종료".
+        val routeRunning = isRouteActive && routeNavigator.hasRoute()
+        val searchLocationAcquiring = destinationSearchLocationController?.isAcquiring == true
+        if (routeRunning) {
+            // A confirmed switch to another place (S06-40) is still a destination choice; an
+            // off-route reroute belongs to the running guidance and is kept.
+            val replacementPending = routeRequestInFlight.get() &&
+                activeRouteRequestReason == "user_destination"
+            val hadSearch = destinationSearchInFlight || searchLocationAcquiring ||
+                destinationSearchVoiceState != null ||
+                homeDestinationVoiceDialogLease != null || walkingDestinationChange.hasPending() ||
+                replacementPending
+            // The walking selection waiting for "길안내 시작" (S06-40) is a candidate choice too.
+            walkingDestinationChange.clear()
+            pendingVoiceDestinationQuery = null
+            pendingVoiceDestinationPageIndex = null
+            destinationSearchVoiceState = null
+            clearHomeDestinationVoiceDialog()
+            if (destinationSearchInFlight || searchLocationAcquiring) cancelDestinationSearch()
+            if (replacementPending) cancelActiveRouteRequest(preserveExistingRoute = true)
+            updateNavigationStatus(
+                "voice=destination_cancel_route_kept hadSearch=$hadSearch replacement=$replacementPending",
+            )
+            speakInteraction(
+                (if (hadSearch) "목적지 검색과 후보 선택을 취소했습니다. " else "") +
+                    "진행 중인 길안내는 계속됩니다. 길안내를 끝내려면 길안내 종료라고 말해 주세요.",
+            )
+            return
+        }
+        // No route is running here. A first route request still in flight belongs to the destination
+        // being removed and is cancelled with it by resetRouteState().
+        val firstRequestCancelled = routeRequestInFlight.get()
         val hadDestination = isRouteActive ||
             routeRequestInFlight.get() ||
             destinationSearchInFlight ||
+            searchLocationAcquiring ||
             currentDestination != null ||
             destinationQueryInput.text?.isNotBlank() == true ||
             (::destinationLatInput.isInitialized && destinationLatInput.text?.isNotBlank() == true) ||
             (::destinationLngInput.isInitialized && destinationLngInput.text?.isNotBlank() == true)
         pendingUiDestination = null
+        walkingDestinationChange.clear()
         pendingVoiceDestinationQuery = null
         pendingVoiceDestinationPageIndex = null
         destinationSearchVoiceState = null
-        if (destinationSearchInFlight) cancelDestinationSearch()
+        if (destinationSearchInFlight || searchLocationAcquiring) cancelDestinationSearch()
         resetRouteState()
         destinationSearchQuery = ""
         destinationQueryInput.setText("")
         if (::destinationLatInput.isInitialized) destinationLatInput.setText("")
         if (::destinationLngInput.isInitialized) destinationLngInput.setText("")
         updateDestinationSearchUi()
-        val message = if (hadDestination) {
-            "목적지와 진행 중인 경로를 취소했습니다."
-        } else {
-            "취소할 목적지가 없습니다."
+        val message = when {
+            // No guidance was running (see above); say only what was actually removed.
+            firstRequestCancelled -> "목적지와 경로 요청을 취소했습니다. 길안내는 시작하지 않습니다."
+            hadDestination -> "목적지를 취소했습니다."
+            else -> "취소할 목적지가 없습니다."
         }
-        updateNavigationStatus("voice=destination_cancelled hadDestination=$hadDestination")
+        updateNavigationStatus(
+            "voice=destination_cancelled hadDestination=$hadDestination firstRequest=$firstRequestCancelled",
+        )
         speakInteraction(message)
     }
 
@@ -35331,10 +38864,15 @@ generation != cameraFallbackGeneration
         )
         val selected = voiceSelection?.selectedResult
         if (selected == null) {
-            val message = if (destinationSearchInFlight) {
-                "목적지 검색이 끝난 뒤 후보 번호를 말씀해 주세요."
-            } else {
-                "선택할 ${oneBasedIndex}번 목적지 후보가 없습니다."
+            // Searching, out-of-range number, expired or never-spoken dialog, and no results are
+            // different situations; each says what can be done now (S06-8). STT failure is separate.
+            val message = when {
+                destinationSearchInFlight -> "목적지 검색이 끝난 뒤 후보 번호를 말씀해 주세요."
+                state != null -> state.selectionRejectionMessage(oneBasedIndex)
+                destinationSearchResults.isNotEmpty() ->
+                    "후보 선택 시간이 지났거나 아직 후보를 음성으로 안내하지 않았습니다. " +
+                        "다시 듣기라고 말씀하시면 현재 후보를 안내합니다."
+                else -> "선택할 목적지 후보가 없습니다. 먼저 목적지를 검색해 주세요."
             }
             updateNavigationStatus("voice=destination_candidate_missing index=$oneBasedIndex")
             if (!retryHomeDestinationVoiceDialog(message)) {
@@ -35349,25 +38887,82 @@ generation != cameraFallbackGeneration
             openNativeDestinationConfirmation(selected)
             updateNavigationStatus("voice=destination_candidate_selected index=$oneBasedIndex")
             speakInteraction(
-                "${selected.name} 목적지를 선택했습니다. 길안내 시작을 선택하면 " +
+                "${selectedDestinationSpeechKo(selected)} 길안내 시작을 선택하면 " +
                     "현재 상태를 확인한 뒤 안내를 시작합니다.",
             )
             return
+        }
+        // S06-40 (FP-026-DETAIL-01): while walking the number only selects the place, as at home; the
+        // route is requested after a separate "길안내 시작" for this selection. Until then it stays.
+        val owner = walkingDestinationChangeOwnerOrNull() ?: return
+        walkingDestinationChange.offer(selected, owner, SystemClock.elapsedRealtime())
+        pendingVoiceDestinationQuery = null
+        pendingVoiceDestinationPageIndex = null
+        destinationSearchVoiceState = null
+        updateNavigationStatus("voice=destination_candidate_selected index=$oneBasedIndex start_pending=true")
+        speakInteraction(
+            "${selectedDestinationSpeechKo(selected)} " + if (isRouteActive || routeRequestInFlight.get()) {
+                "지금 길안내는 그대로 계속됩니다. 이 장소로 경로를 바꾸려면 길안내 시작이라고 말해 주세요."
+            } else {
+                "이 장소로 길안내를 시작하려면 길안내 시작이라고 말해 주세요."
+            },
+        )
+    }
+
+    private fun walkingDestinationChangeOwnerOrNull(): Triple<String, Long, WalkRuntimeEpoch>? {
+        val actorId = reporterUserId ?: return null
+        return Triple(actorId, GatewaySessionProcessCoordinator.snapshot().generation, walkSessionLifecycle.snapshot().epoch)
+    }
+
+    /** S06-40: "길안내 시작" consumes the walking selection; a stale or foreign one keeps the route. */
+    private fun startPendingWalkingDestinationChange(): Boolean {
+        if (!walkingDestinationChange.hasPending()) return false
+        if (nativeHomeFeatureContextAvailable()) {
+            // The walk is over: the home confirmation screen owns "안내 시작" again.
+            walkingDestinationChange.clear()
+            return false
+        }
+        val selected = walkingDestinationChangeOwnerOrNull()?.let { owner ->
+            walkingDestinationChange.consume(owner, SystemClock.elapsedRealtime())
+        }
+        if (selected == null) {
+            updateNavigationStatus("voice=destination_change_expired")
+            speakInteraction("선택한 목적지의 확인 시간이 지났습니다. 지금 길안내는 그대로입니다. 목적지를 다시 선택해 주세요.")
+            return true
         }
         if (!onDestinationSelected(selected)) {
             if (currentDestination == selected.point && currentRouteLocationOrNull() == null) {
                 speakInteraction(
                     "${selected.name} 목적지를 유지했습니다. GPS 위치를 확인한 뒤 " +
-                        "같은 후보 번호를 다시 말하거나 경로 시작을 선택해 주세요.",
+                        "같은 후보 번호를 다시 말하고 길안내 시작이라고 말해 주세요.",
                 )
             }
-            return
+            return true
         }
-        pendingVoiceDestinationQuery = null
-        pendingVoiceDestinationPageIndex = null
-        destinationSearchVoiceState = null
-        updateNavigationStatus("voice=destination_candidate_selected index=$oneBasedIndex")
-        speakInteraction("${selected.name} 목적지를 선택했습니다. 경로를 확인합니다.")
+        updateNavigationStatus("voice=destination_change_started")
+        speakInteraction("${selected.name} 경로를 확인합니다.")
+        return true
+    }
+
+    /**
+     * S06-40 x S05-11: "다시 말해줘"/"다시 듣기" while a walking selection waits for "길안내 시작" repeats
+     * that confirmation prompt, not the route guidance. It only reads the selection (peek); the
+     * 30 s window and the one-shot consume by "길안내 시작" are unchanged.
+     */
+    private fun repeatPendingWalkingDestinationChange(): Boolean {
+        if (!walkingDestinationChange.hasPending() || nativeHomeFeatureContextAvailable()) return false
+        val waiting = walkingDestinationChangeOwnerOrNull()?.let { owner ->
+            walkingDestinationChange.peek(owner, SystemClock.elapsedRealtime())
+        } ?: return false
+        updateNavigationStatus("voice=destination_change_prompt_repeated")
+        speakInteraction(
+            "${selectedDestinationSpeechKo(waiting)} " + if (isRouteActive || routeRequestInFlight.get()) {
+                "지금 길안내는 그대로 계속됩니다. 이 장소로 경로를 바꾸려면 길안내 시작이라고 말해 주세요."
+            } else {
+                "이 장소로 길안내를 시작하려면 길안내 시작이라고 말해 주세요."
+            },
+        )
+        return true
     }
 
     /**
@@ -35397,7 +38992,12 @@ generation != cameraFallbackGeneration
         )
     }
 
+    // Non-voice UI callers capture on click; voice dispatch always supplies its input token.
     private fun requestRerouteFromVoice() {
+        requestRerouteFromVoice(routeNavigator.pendingDecisionToken())
+    }
+
+    private fun requestRerouteFromVoice(expectedToken: RouteNavigatorDecisionToken?) {
         if (!currentNavigationCollectionAllowsWork()) {
             explainNavigationFeatureUnavailable()
             return
@@ -35411,7 +39011,15 @@ generation != cameraFallbackGeneration
             explainRouteCommandUnavailable()
             return
         }
-        val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.NEW_ROUTE)
+        if (expectedToken == null) {
+            explainRouteCommandUnavailable()
+            return
+        }
+        val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.NEW_ROUTE, expectedToken)
+        if (!decision.shouldReroute) {
+            explainRouteCommandUnavailable()
+            return
+        }
         updateRouteDeviationActions(decision.pendingUserDecision)
         updateNavigationStatus("navigation=off_route_reroute_user_confirmed")
         speakInteraction(requireNotNull(decision.instruction))
@@ -35421,7 +39029,12 @@ generation != cameraFallbackGeneration
         }
     }
 
+    // Non-voice UI callers capture on click; voice dispatch always supplies its input token.
     private fun recheckLocationFromVoice() {
+        recheckLocationFromVoice(routeNavigator.pendingDecisionToken())
+    }
+
+    private fun recheckLocationFromVoice(expectedToken: RouteNavigatorDecisionToken?) {
         if (!currentNavigationCollectionAllowsWork()) {
             explainNavigationFeatureUnavailable()
             return
@@ -35436,7 +39049,15 @@ generation != cameraFallbackGeneration
             explainRouteCommandUnavailable()
             return
         }
-        val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
+        if (expectedToken == null) {
+            explainRouteCommandUnavailable()
+            return
+        }
+        val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION, expectedToken)
+        if (decision.reason != "off_route_location_recheck_requested") {
+            explainRouteCommandUnavailable()
+            return
+        }
         updateRouteDeviationActions(decision.pendingUserDecision)
         latestTmapOnRoute = false
         directionGuidancePauseReason = "off_route_recheck"
@@ -35445,7 +39066,12 @@ generation != cameraFallbackGeneration
         speakInteraction(requireNotNull(decision.instruction))
     }
 
+    // Non-voice UI callers capture on click; voice dispatch always supplies its input token.
     private fun endNavigationAfterDeviation() {
+        endNavigationAfterDeviation(routeNavigator.pendingDecisionToken())
+    }
+
+    private fun endNavigationAfterDeviation(expectedToken: RouteNavigatorDecisionToken?) {
         if (
             !isRouteActive ||
             routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE
@@ -35453,7 +39079,8 @@ generation != cameraFallbackGeneration
             explainRouteCommandUnavailable()
             return
         }
-        val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.END_NAVIGATION)
+        if (expectedToken == null) return
+        val decision = routeNavigator.selectDeviationChoice(RouteDeviationChoice.END_NAVIGATION, expectedToken)
         if (decision.reason != "off_route_navigation_ended") return
         resetRouteState()
         if (routeSnapshotPurgeFailed) {
@@ -35471,8 +39098,17 @@ generation != cameraFallbackGeneration
         }
     }
 
+    // Non-voice UI callers capture on click; voice dispatch always supplies its input token.
     private fun confirmArrivalFromVoice() {
-        val decision = routeNavigator.confirmArrival()
+        confirmArrivalFromVoice(routeNavigator.pendingDecisionToken())
+    }
+
+    private fun confirmArrivalFromVoice(expectedToken: RouteNavigatorDecisionToken?) {
+        if (expectedToken == null) {
+            requestArrivalConfirmationFromVoice()
+            return
+        }
+        val decision = routeNavigator.confirmArrival(expectedToken)
         if (!decision.arrived) {
             explainRouteCommandUnavailable("아직 도착 안내가 없습니다.")
             return
@@ -35480,6 +39116,26 @@ generation != cameraFallbackGeneration
         resetRouteState()
         updateNavigationStatus("navigation=arrival_confirmed_by_user")
         speakInteraction(requireNotNull(decision.instruction))
+    }
+
+    // "도착했어" without an open question asks once more; it never ends guidance by itself.
+    private fun requestArrivalConfirmationFromVoice() {
+        if (!isRouteActive || routeRequestInFlight.get() || routeNavigator.pendingUserDecision() != null) {
+            explainRouteCommandUnavailable("아직 도착 안내가 없습니다.")
+            return
+        }
+        val update = routeNavigator.requestArrivalConfirmation(SystemClock.elapsedRealtime())
+        updateNavigationStatus("navigation=${update.reason}")
+        if (update.pendingUserDecision != RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
+            val message = update.instruction
+            if (message != null) {
+                speakInteraction(message)
+            } else {
+                explainRouteCommandUnavailable("아직 도착 안내가 없습니다.")
+            }
+            return
+        }
+        applyRouteDeviationSafetyUpdate(update)
     }
 
     private fun confirmArrivalFromButton(expectedToken: RouteNavigatorDecisionToken?) {
@@ -35499,8 +39155,17 @@ generation != cameraFallbackGeneration
         speakInteraction(requireNotNull(decision.instruction))
     }
 
+    // Non-voice UI callers capture on click; voice dispatch always supplies its input token.
     private fun rejectArrivalFromVoice() {
-        val decision = routeNavigator.rejectArrival()
+        rejectArrivalFromVoice(routeNavigator.pendingDecisionToken())
+    }
+
+    private fun rejectArrivalFromVoice(expectedToken: RouteNavigatorDecisionToken?) {
+        if (expectedToken == null) {
+            explainRouteCommandUnavailable("아직 도착 안내가 없습니다.")
+            return
+        }
+        val decision = routeNavigator.rejectArrival(expectedToken)
         if (decision.reason != "arrival_rejected_route_retained") {
             explainRouteCommandUnavailable("아직 도착 안내가 없습니다.")
             return
@@ -35556,7 +39221,7 @@ generation != cameraFallbackGeneration
         }
         // Reuse the fresh automatic context without adding another location/motion observation.
         val nowMs = SystemClock.elapsedRealtime()
-        val update = routeNavigator.currentGuidance(nowMs, currentRouteFacingObservation(nowMs))
+        val update = routeNavigator.currentGuidance(nowMs, currentRouteFacingObservation(nowMs), latestRouteFacingUnavailableReason)
         if (update == null) {
             speakInteraction("현재 위치를 확인한 뒤 다음 경로를 안내합니다.")
             return
@@ -35564,17 +39229,22 @@ generation != cameraFallbackGeneration
         tryDispatchRouteInstruction(update, expectedWalkEpoch)
     }
 
+    // Non-voice UI callers capture on click; voice dispatch always supplies its input token.
     private fun stopNavigationFromVoice() {
+        stopNavigationFromVoice(routeNavigator.pendingDecisionToken())
+    }
+
+    private fun stopNavigationFromVoice(expectedToken: RouteNavigatorDecisionToken?) {
         val hadActiveNavigation = isRouteActive || routeRequestInFlight.get()
         if (
             isRouteActive &&
             routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.REROUTE
         ) {
-            endNavigationAfterDeviation()
+            endNavigationAfterDeviation(expectedToken)
             return
         }
         if (routeRequestInFlight.get()) {
-            cancelActiveRouteRequest()
+            cancelActiveRouteRequest(preserveExistingRoute = false)
         } else if (isRouteActive) {
             resetRouteState()
         }
@@ -35656,7 +39326,9 @@ generation != cameraFallbackGeneration
             return
         }
         if (!::fusedLocationClient.isInitialized) return
-        if (!forceRestart && locationCallback != null && locationCollectionOwner == owner) {
+        if (!forceRestart && locationCallback != null && locationCollectionOwner == owner &&
+            positioningCollectionBinding?.let(::isPositioningCollectionCurrent) == true
+        ) {
             startPositioningObservationSources()
             return
         }
@@ -35665,17 +39337,32 @@ generation != cameraFallbackGeneration
         }
         val generation = ++locationCallbackGeneration
         locationCollectionOwner = owner
+        ensurePositioningProfileForCurrentActor()
+        val coordinator = positioningCoordinator
+        val binding = PositioningCollectionBinding(
+            coordinator = coordinator,
+            inputGeneration = coordinator.currentInputGeneration(),
+            owner = owner,
+            locationGeneration = generation,
+            startedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+        )
+        positioningCollectionBinding = binding
         lateinit var callback: LocationCallback
         callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                if (!isLocationCallbackCurrent(owner, generation, callback)) return
+                val receivedAtMs = SystemClock.elapsedRealtime()
+                if (!isLocationCallbackCurrent(owner, generation, callback) ||
+                    !isPositioningCollectionCurrent(binding)
+                ) return
                 result.lastLocation?.let { location ->
-                    handleLocationUpdate(location, owner, generation)
+                    handleLocationUpdate(location, owner, generation, binding, receivedAtMs)
                 }
             }
 
             override fun onLocationAvailability(availability: LocationAvailability) {
-                if (!isLocationCallbackCurrent(owner, generation, callback)) return
+                if (!isLocationCallbackCurrent(owner, generation, callback) ||
+                    !isPositioningCollectionCurrent(binding)
+                ) return
                 if (!availability.isLocationAvailable) {
                     walkSessionLifecycle.currentRuntimeEpochOrNull()?.let { walkEpoch ->
                         recordOfficialEnvironmentGpsObservation(
@@ -35729,6 +39416,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun stopLocationUpdates(stopFieldSession: Boolean = true) {
+        positioningCollectionBinding = null
         if (stopFieldSession) stopActivePositionFieldSession()
         locationCallbackGeneration += 1
         val callback = locationCallback
@@ -35760,6 +39448,15 @@ generation != cameraFallbackGeneration
         positioningCoordinator.reset()
         clearTrustedLocation()
     }
+
+    private fun isPositioningCollectionCurrent(binding: PositioningCollectionBinding): Boolean =
+        positioningCollectionBinding === binding &&
+            positioningCoordinator === binding.coordinator &&
+            binding.coordinator.currentInputGeneration() == binding.inputGeneration &&
+            locationCallback != null &&
+            locationCallbackGeneration == binding.locationGeneration &&
+            locationCollectionOwner == binding.owner &&
+            currentLocationCollectionOwnerOrNull() == binding.owner
 
     private fun isLocationCallbackCurrent(
         owner: LocationCollectionOwner,
@@ -35866,9 +39563,6 @@ generation != cameraFallbackGeneration
     }
 
     private fun stopStepTrackingNow() {
-        activityOriginalUploadAdmission.onTrackingStopped(
-            ::cancelActivityOriginalUploads,
-        )
         if (!::stepTracker.isInitialized) return
         val stop = { stepTracker.stop() }
         if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -35891,8 +39585,10 @@ generation != cameraFallbackGeneration
         val owner = locationCollectionOwner ?: return
         val generation = locationCallbackGeneration
         val callback = locationCallback ?: return
-        if (!isLocationCallbackCurrent(owner, generation, callback)) return
-        ensurePositioningProfileForCurrentActor()
+        val binding = positioningCollectionBinding ?: return
+        if (!isLocationCallbackCurrent(owner, generation, callback) ||
+            !isPositioningCollectionCurrent(binding)
+        ) return
         ensureEarthOrientationForLocation()
         if (gnssQualityObserver == null) {
             val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
@@ -35902,7 +39598,9 @@ generation != cameraFallbackGeneration
                     executor = ContextCompat.getMainExecutor(this),
                 ),
                 onSnapshot = { snapshot ->
-                    if (isLocationCallbackCurrent(owner, generation, callback)) {
+                    if (isLocationCallbackCurrent(owner, generation, callback) &&
+                        isPositioningCollectionCurrent(binding)
+                    ) {
                         latestGnssQualitySnapshot = snapshot
                     }
                 },
@@ -35917,44 +39615,43 @@ generation != cameraFallbackGeneration
         }
         if (pedestrianMotionTracker == null) {
             pedestrianMotionTracker = AndroidPedestrianMotionTracker(this) motion@{ decision ->
-                if (!isLocationCallbackCurrent(owner, generation, callback)) return@motion
+                if (!isLocationCallbackCurrent(owner, generation, callback) ||
+                    !isPositioningCollectionCurrent(binding)
+                ) return@motion
                 if (!currentNavigationCollectionAllowsWork() &&
                     !currentPositionFieldCollectionAllowsWork()
                 ) return@motion
                 val nowMs = SystemClock.elapsedRealtime()
-                if (decision.accepted) {
-                    latestPositionStationaryState = when (decision.state.name) {
-                        "MOVING" -> PositionStationaryState.MOVING
-                        "CANDIDATE" -> PositionStationaryState.CANDIDATE
-                        "STATIONARY" -> PositionStationaryState.STATIONARY
-                        else -> PositionStationaryState.UNKNOWN
-                    }
-                    latestPositionStationarySinceMs = when (latestPositionStationaryState) {
-                        PositionStationaryState.CANDIDATE,
-                        PositionStationaryState.STATIONARY,
-                        -> decision.candidateSinceElapsedRealtimeMs ?: nowMs
-                        else -> nowMs
-                    }
-                }
-                if (decision.accepted && !decision.shouldApplyZeroVelocityUpdate) {
+                val userMotion = binding.coordinator.observeUserMotion(
+                    decision,
+                    receivedAtElapsedRealtimeMs = nowMs,
+                    expectedGeneration = binding.inputGeneration,
+                )
+                applyUserMotionState(userMotion)
+                if (!userMotion.zeroVelocityUpdateAllowed) {
                     lastPositionZuptAtElapsedMs = null
                 }
                 val zuptDue = lastPositionZuptAtElapsedMs?.let { nowMs - it >= 1_000L } ?: true
                 val zuptSnapshot = if (
-                    decision.shouldApplyZeroVelocityUpdate && zuptDue &&
+                    decision.shouldApplyZeroVelocityUpdate && userMotion.zeroVelocityUpdateAllowed && zuptDue &&
                     (
                         currentNavigationCollectionAllowsWork() ||
                             currentPositionFieldLeaseOrNull() != null
                     )
                 ) {
-                    lastPositionZuptAtElapsedMs = nowMs
-                    positioningCoordinator.observeZupt(
-                        ZuptObservation(nowMs),
-                    )
+                    binding.coordinator.observeZupt(
+                        ZuptObservation(decision.sample?.elapsedRealtimeMs ?: nowMs),
+                        receivedAtElapsedRealtimeMs = nowMs,
+                        expectedGeneration = binding.inputGeneration,
+                    ).also { snapshot ->
+                        if (snapshot.motionUpdate?.disposition ==
+                            kr.co.hanium.dreamup.walksafe.navigation.positioning.PedestrianMotionUpdateDisposition.APPLIED
+                        ) lastPositionZuptAtElapsedMs = nowMs
+                    }
                 } else {
                     null
                 }
-                zuptSnapshot?.let(::applyPositioningMotionSnapshot)
+                zuptSnapshot?.let { applyPositioningMotionSnapshot(it, binding) }
                 val telemetryDue = lastPositionFieldTelemetryAtElapsedMs
                     ?.let { nowMs - it >= 1_000L } ?: true
                 if (currentPositionFieldCollectionAllowsWork() &&
@@ -35964,7 +39661,8 @@ generation != cameraFallbackGeneration
                     appendPositionFieldMotionTrace(
                         snapshot = zuptSnapshot,
                         stepDetected = false,
-                        zuptApplied = zuptSnapshot != null,
+                        zuptApplied = zuptSnapshot?.motionUpdate?.disposition ==
+                            kr.co.hanium.dreamup.walksafe.navigation.positioning.PedestrianMotionUpdateDisposition.APPLIED,
                         measurementElapsedRealtimeMs = nowMs,
                     )
                 }
@@ -35979,6 +39677,7 @@ generation != cameraFallbackGeneration
         positioningCoordinator = PositioningCoordinator()
         positioningProfileActorId = actorId
         positioningProfileLoaded = true
+        latestPedestrianProfileLoadStatus = null
         walkingCalibrationSegments.reset()
         if (pedestrianProfileStore == null && ::stepLengthPrefs.isInitialized) {
             pedestrianProfileStore = runCatching {
@@ -35986,7 +39685,12 @@ generation != cameraFallbackGeneration
             }.getOrNull()
         }
         val restored = actorId?.let { id ->
-            runCatching { pedestrianProfileStore?.load(id) }.getOrNull()
+            // S09-55: a save still queued for this actor is newer than the stored value.
+            kr.co.hanium.dreamup.walksafe.navigation.positioning.SerialPedestrianProfileWriter.shared
+                .pendingProfileOrNull(id)
+                // S09-56: the load status separates default step length, migration, reset and a blocked store.
+                ?: runCatching { pedestrianProfileStore?.loadResult(id) }.getOrNull()
+                    ?.also(::recordPedestrianProfileLoad)?.profile
         }
         restored?.let(positioningCoordinator::restoreProfile)
         val stepLengthM = positioningCoordinator.currentProfile().stepLengthM.toFloat()
@@ -35995,14 +39699,32 @@ generation != cameraFallbackGeneration
         currentObjectDepthPipeline.setUserStepLength(stepLengthM)
     }
 
+    private fun recordPedestrianProfileLoad(
+        result: kr.co.hanium.dreamup.walksafe.navigation.positioning.PedestrianProfileLoadResult,
+    ) {
+        latestPedestrianProfileLoadStatus = result.status.name
+        if (::fieldSessionLog.isInitialized) {
+            fieldSessionLog.recordEvent("pedestrian_profile_loaded", mapOf("result" to result.status.name))
+        }
+    }
+
     private fun persistPositioningProfileForCurrentActor() {
         val actorId = currentReporterUserId() ?: return
         if (actorId != positioningProfileActorId) return
         val profile = positioningCoordinator.snapshotProfileForPersistence() ?: return
-        runCatching { pedestrianProfileStore?.save(actorId, profile) }
+        val store = pedestrianProfileStore ?: return
+        // S09-55: the encrypted commit runs on the serial profile I/O thread, pinned to this actor and store.
+        kr.co.hanium.dreamup.walksafe.navigation.positioning.SerialPedestrianProfileWriter.shared
+            .submit(actorId, profile) { id, value -> store.save(id, value) }
     }
 
-    private fun updatePositioningHeadingInputs(location: Location, elapsedRealtimeMs: Long) {
+    private fun updatePositioningHeadingInputs(
+        location: Location,
+        elapsedRealtimeMs: Long,
+        binding: PositioningCollectionBinding,
+        receivedAtElapsedRealtimeMs: Long,
+    ) {
+        if (!isPositioningCollectionCurrent(binding)) return
         if (latestGpsMotionInputs?.evidence?.observedAtElapsedRealtimeMs
                 ?.let { elapsedRealtimeMs <= it } == true
         ) return
@@ -36051,6 +39773,12 @@ generation != cameraFallbackGeneration
             ),
         )
         latestGpsMotionInputs = inputs
+        binding.coordinator.observeUserSpeed(
+            inputs.speed,
+            inputs.evidence,
+            receivedAtElapsedRealtimeMs = receivedAtElapsedRealtimeMs,
+            expectedGeneration = binding.inputGeneration,
+        )
         gpsMotionInputHistory.addLast(inputs)
         while (gpsMotionInputHistory.size > 64 || gpsMotionInputHistory.firstOrNull()?.let {
                 elapsedRealtimeMs - it.evidence.observedAtElapsedRealtimeMs > 5_000L
@@ -36058,19 +39786,41 @@ generation != cameraFallbackGeneration
         ) gpsMotionInputHistory.removeFirst()
     }
 
-    private fun handlePositioningStepEvent(event: StepEvent) {
+    private fun handlePositioningStepEvent(
+        event: StepEvent,
+        binding: PositioningCollectionBinding,
+        receivedAtElapsedRealtimeMs: Long,
+    ) {
+        if (!isPositioningCollectionCurrent(binding) ||
+            event.timestampMs <= binding.startedAtElapsedRealtimeMs ||
+            event.timestampMs > receivedAtElapsedRealtimeMs ||
+            event.deltaSteps !in 1..64
+        ) return
         if (
             !currentNavigationCollectionAllowsWork() &&
             currentPositionFieldLeaseOrNull() == null
         ) return
-        ensurePositioningProfileForCurrentActor()
+        if (event.source == StepEventSource.STEP_COUNTER && !binding.counterBoundaryEstablished) {
+            binding.counterBoundaryEstablished = true
+            return
+        }
         pedestrianMotionTracker?.recordStep(event.timestampMs)
+        // S09-40/S09-43: usage condition of this step (enum names only) for the step-length sigma and calibration.
+        // pos-F6: set before the calibration segments so a sample completed by this step records this step's
+        // condition; only this walk's mounting confirmation counts.
+        val currentWalkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull()
+        binding.coordinator.setCurrentCalibrationCondition(
+            kr.co.hanium.dreamup.walksafe.navigation.positioning.PedestrianCalibrationCondition(
+                stepInput = event.source.name,
+                mounting = phoneMountingUserConfirmation?.takeIf { it.epoch == currentWalkEpoch }?.method?.name,
+            ),
+        )
         walkingCalibrationSegments.onStep(
             timestampMs = event.timestampMs,
             deltaSteps = event.deltaSteps,
             individualStepDetector = event.source == StepEventSource.STEP_DETECTOR &&
                 event.confidence == StepEventConfidence.HIGH,
-            receivedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            receivedAtElapsedRealtimeMs = receivedAtElapsedRealtimeMs,
         ).forEach(::applyWalkingCalibrationSample)
         val quality = when (event.confidence) {
             StepEventConfidence.HIGH -> PdrStepQuality.HIGH
@@ -36085,7 +39835,7 @@ generation != cameraFallbackGeneration
         val chestAtCourse = if (chestHeading != null && courseAtStep != null) {
             chestMountedHeadingForStep(courseAtStep.elapsedRealtimeMs, maximumAgeMs = 100L)
         } else null
-        val snapshot = positioningCoordinator.observeStep(
+        val snapshot = binding.coordinator.observeStep(
                 stepCount = event.deltaSteps,
                 headingInput = PedestrianHeadingInput(
                     nowElapsedRealtimeMs = event.timestampMs,
@@ -36096,9 +39846,10 @@ generation != cameraFallbackGeneration
                     phoneForwardMounted = chestHeading != null,
                 ),
                 quality = quality,
-                receivedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                receivedAtElapsedRealtimeMs = receivedAtElapsedRealtimeMs,
+                expectedGeneration = binding.inputGeneration,
             )
-        applyPositioningMotionSnapshot(snapshot)
+        applyPositioningMotionSnapshot(snapshot, binding)
         appendPositionFieldMotionTrace(
             snapshot = snapshot,
             stepDetected = true,
@@ -36131,8 +39882,10 @@ generation != cameraFallbackGeneration
         if (pendingRouteCompassRefresh != null || !::nativeHomeCompassText.isInitialized) return
         val owner = locationCollectionOwner ?: return
         val generation = locationCallbackGeneration
+        val binding = positioningCollectionBinding ?: return
         if (!isActivityForeground || !orientationLocationOwnerActive || locationCallback == null ||
-            currentLocationCollectionOwnerOrNull() != owner
+            currentLocationCollectionOwnerOrNull() != owner ||
+            !isPositioningCollectionCurrent(binding)
         ) return
         lateinit var refresh: Runnable
         refresh = Runnable {
@@ -36140,10 +39893,17 @@ generation != cameraFallbackGeneration
             pendingRouteCompassRefresh = null
             if (!isActivityForeground || !orientationLocationOwnerActive || locationCallback == null ||
                 locationCollectionOwner != owner || locationCallbackGeneration != generation ||
-                currentLocationCollectionOwnerOrNull() != owner
+                currentLocationCollectionOwnerOrNull() != owner ||
+                !isPositioningCollectionCurrent(binding)
             ) return@Runnable
-            // Observe even before a route exists; do not start TTS or speech recognition here.
-            currentRouteFacingObservation(SystemClock.elapsedRealtime())
+            // Expire state only: never publish this prediction as a fresh location fix.
+            val nowMs = SystemClock.elapsedRealtime()
+            val snapshot = binding.coordinator.evaluate(nowMs, binding.inputGeneration)
+            snapshot.userMotion?.let(::applyUserMotionState)
+            if (currentNavigationCollectionAllowsWork() || currentPositionFieldCollectionAllowsWork()) {
+                applyPositionConfidenceDecision(snapshot, emitAnnouncements = false)
+            }
+            currentRouteFacingObservation(nowMs)
             refreshRouteCompassPresentation()
             scheduleRouteCompassPresentationUpdate()
         }
@@ -36188,12 +39948,14 @@ generation != cameraFallbackGeneration
 
     /** Route speech follows the rear camera axis; step/PDR mounting confirmation stays separate. */
     private fun currentRouteFacingObservation(nowMs: Long): RouteFacingObservation? {
+        latestRouteFacingUnavailableReason = null
         if (!isActivityForeground || !::earthOrientationTracker.isInitialized ||
             !orientationLocationOwnerActive || locationCallback == null || locationCollectionOwner == null ||
             currentLocationCollectionOwnerOrNull() != locationCollectionOwner
         ) return null
         val facing = earthOrientationTracker.latestRouteCompassHeading(nowMs)
         val observation = facing.observation
+        latestRouteFacingUnavailableReason = facing.reason
         val statusKey = "${facing.reason}:${observation?.source}"
         if (lastRouteCompassStatusKey != statusKey) {
             lastRouteCompassStatusKey = statusKey
@@ -36201,13 +39963,8 @@ generation != cameraFallbackGeneration
                 android.util.Log.d("WalkSafeNavigation", "compass=$statusKey heading=${observation?.degreesTrueNorth}")
             }
             if (::fieldSessionLog.isInitialized) {
-                fieldSessionLog.recordEvent("route_compass_state_changed", mapOf(
-                    "reason" to facing.reason.name,
-                    "source" to observation?.source?.name,
-                    "headingTrueNorthDeg" to observation?.degreesTrueNorth,
-                    "reportedHeadingAccuracyDeg" to observation?.reportedHeadingAccuracyDegrees,
-                    "sampleAgeMs" to observation?.let { nowMs - it.observedAtElapsedRealtimeMs },
-                ))
+                // S08-34: allowlisted keys, so the persisted chain keeps more than the reason.
+                fieldSessionLog.recordEvent("route_compass_state_changed", RouteGuidanceDiagnostics.compassState(facing, nowMs))
             }
         }
         return observation
@@ -36235,6 +39992,8 @@ generation != cameraFallbackGeneration
                 "보조 나침반에 필요한 센서 값을 기다리고 있습니다."
             RouteCompassHeadingReason.GRAVITY_UNSTABLE ->
                 "휴대폰 움직임이 커서 방향을 다시 확인하고 있습니다. 잠시 안정적으로 잡아 주세요."
+            RouteCompassHeadingReason.SENSOR_STALLED ->
+                "나침반 센서 값이 들어오지 않아 방향 안내를 멈췄습니다."
             RouteCompassHeadingReason.QUALITY_LOW, RouteCompassHeadingReason.HEADING_ACCURACY,
             RouteCompassHeadingReason.MAGNETIC_FIELD_ANOMALY ->
                 "나침반 방향이 불안정합니다. 자석·금속에서 떨어져 휴대폰을 천천히 움직여 주세요."
@@ -36270,26 +40029,42 @@ generation != cameraFallbackGeneration
         return earthOrientationTracker.chestMountedHeadingAt(timestampMs, maximumAgeMs)
     }
 
-    private fun applyPositioningMotionSnapshot(snapshot: PositioningSnapshot) {
+    private fun applyPositioningMotionSnapshot(
+        snapshot: PositioningSnapshot,
+        binding: PositioningCollectionBinding,
+    ) {
+        if (!isPositioningCollectionCurrent(binding) ||
+            snapshot.inputGeneration != binding.inputGeneration
+        ) return
+        // S09-9 (09.txt:34): late step/ZUPT replays and refusals are measured (lag, replayed events) in the field log.
+        snapshot.motionUpdate?.lateMotionEventFieldsOrNull()?.let { fields ->
+            if (::fieldSessionLog.isInitialized) fieldSessionLog.recordEvent("pdr_late_motion", fields)
+        }
+        snapshot.userMotion?.let(::applyUserMotionState)
+        if (snapshot.motionUpdate?.disposition ==
+            kr.co.hanium.dreamup.walksafe.navigation.positioning.PedestrianMotionUpdateDisposition.HARD_REJECTED
+        ) {
+            applyPositionConfidenceDecision(snapshot)
+            return
+        }
         val filtered = snapshot.filtered ?: return
         latestTrustedLocation = filtered.toTrustedLocation()
+        rememberTrustedLocationCovariance(filtered)
         applyPositionConfidenceDecision(snapshot)
     }
 
     private fun handlePositioningUnavailable(elapsedRealtimeMs: Long): Boolean {
-        val snapshot = positioningCoordinator.observeGnss(
-            GnssPositionObservation(
-                latitude = Double.NaN,
-                longitude = Double.NaN,
-                horizontalAccuracyM = null,
-                elapsedRealtimeMs = elapsedRealtimeMs,
-                receivedAtElapsedRealtimeMs = elapsedRealtimeMs,
-            ),
-        )
+        val binding = positioningCollectionBinding ?: return false
+        if (!isPositioningCollectionCurrent(binding)) return false
+        val snapshot = binding.coordinator.evaluate(elapsedRealtimeMs, binding.inputGeneration)
+        snapshot.userMotion?.let(::applyUserMotionState)
         return applyPositionConfidenceDecision(snapshot)
     }
 
-    private fun applyPositionConfidenceDecision(snapshot: PositioningSnapshot): Boolean {
+    private fun applyPositionConfidenceDecision(
+        snapshot: PositioningSnapshot,
+        emitAnnouncements: Boolean = true,
+    ): Boolean {
         if (developmentGuidanceStartBypassEnabled) {
             positionGuidancePaused = false
             return false
@@ -36308,7 +40083,7 @@ generation != cameraFallbackGeneration
             latestTmapOnRoute = false
             updateNavigationStatus("navigation=direction_paused reason=$pauseReason")
         }
-        decision.announcementRequest?.let { request ->
+        decision.announcementRequest?.takeIf { emitAnnouncements }?.let { request ->
             val message = when (request.kind) {
                 PositionConfidenceAnnouncementKind.LOW ->
                     "위치 정확도가 낮아 방향 안내를 잠시 중지합니다."
@@ -36337,6 +40112,10 @@ generation != cameraFallbackGeneration
         accuracyM = horizontalUncertaintyM.toFloat(),
         elapsedRealtimeMs = elapsedRealtimeMs,
     )
+
+    private fun rememberTrustedLocationCovariance(filtered: PositioningFilteredFix) {
+        latestTrustedLocationCovariance = latestTrustedLocation?.let { location -> filtered.covarianceEnu?.let { location to it } }
+    }
 
     /** Coordinates GPS, pedestrian motion, and confidence before app consumers use a fix. */
     private fun explicitRouteStartContextOrNull(
@@ -36404,6 +40183,7 @@ generation != cameraFallbackGeneration
         }
         if (currentRouteLocationOrNull() == null) return
         val retained = pendingExplicitRouteStart.consumeIfCurrent(
+            request,
             current,
             SystemClock.elapsedRealtime(),
         ) ?: return
@@ -36431,14 +40211,16 @@ generation != cameraFallbackGeneration
         location: Location,
         owner: LocationCollectionOwner,
         locationGeneration: Int,
+        binding: PositioningCollectionBinding,
+        receivedAtElapsedRealtimeMs: Long,
     ) {
         if (
             locationCollectionOwner != owner ||
             currentLocationCollectionOwnerOrNull() != owner ||
             locationGeneration != locationCallbackGeneration ||
+            !isPositioningCollectionCurrent(binding) ||
             !currentLocationCollectionAllowsWork()
         ) return
-        ensurePositioningProfileForCurrentActor()
         val accuracy = if (location.hasAccuracy()) location.accuracy else null
         val elapsedMs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             location.elapsedRealtimeNanos / 1_000_000L
@@ -36454,26 +40236,29 @@ generation != cameraFallbackGeneration
             )
         ) updateRouteOrientationReference(location)
         val currentGnssQualitySnapshot = runCatching {
-            gnssQualityObserver?.snapshot(SystemClock.elapsedRealtimeNanos())
+            gnssQualityObserver?.snapshot(location.elapsedRealtimeNanos)
         }.getOrNull()
         latestGnssQualitySnapshot = currentGnssQualitySnapshot
         val measurementNoiseMultiplier = currentGnssQualitySnapshot
             ?.measurementNoiseMultiplier
             ?.takeIf { it.isFinite() && it >= 1.0 }
             ?: 1.0
-        val effectiveAccuracyM = accuracy
+        val reportedAccuracyM = accuracy
             ?.takeIf { it.isFinite() && it >= 0f }
             ?.toDouble()
-            ?.times(kotlin.math.sqrt(measurementNoiseMultiplier))
-        var positioningSnapshot = positioningCoordinator.observeGnss(
+        val effectiveAccuracyM = reportedAccuracyM?.times(kotlin.math.sqrt(measurementNoiseMultiplier))
+        // The signal weight travels separately so a missing accuracy is weighted on the default sigma.
+        var positioningSnapshot = binding.coordinator.observeGnss(
             GnssPositionObservation(
                 latitude = location.latitude,
                 longitude = location.longitude,
-                horizontalAccuracyM = effectiveAccuracyM,
+                horizontalAccuracyM = reportedAccuracyM,
                 elapsedRealtimeMs = elapsedMs,
-                receivedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),
+                receivedAtElapsedRealtimeMs = receivedAtElapsedRealtimeMs,
                 mock = mock,
+                measurementNoiseMultiplier = measurementNoiseMultiplier,
             ),
+            expectedGeneration = binding.inputGeneration,
         )
         currentGnssQualitySnapshot?.let { qualitySnapshot ->
             positioningSnapshot = positioningSnapshot.copy(
@@ -36513,6 +40298,15 @@ generation != cameraFallbackGeneration
             )
         } else null
         latestNavigationTestLocation = navigationTestFix
+        if (hardRejected && navigationTestFix == null && positioningSnapshot.singleOutlierAgainstFreshEstimate) {
+            // S09-36 (09.txt:96): one far jump against a still-fresh estimate neither replaces nor clears it.
+            // Spoofing, time and other rejections, or an expired estimate, keep the fail-closed path below.
+            if (currentNavigationCollectionAllowsWork() || currentPositionFieldCollectionAllowsWork()) {
+                applyPositionConfidenceDecision(positioningSnapshot)
+                updateNavigationStatus("navigation=gps_outlier_ignored accuracy=${accuracy?.toInt() ?: "null"}m")
+            }
+            return
+        }
         if (hardRejected || filtered == null) {
             clearTrustedLocation()
             if (navigationTestFix != null && currentNavigationCollectionAllowsWork()) {
@@ -36541,7 +40335,11 @@ generation != cameraFallbackGeneration
             }
             return
         }
-        updatePositioningHeadingInputs(location, elapsedMs)
+        updatePositioningHeadingInputs(location, elapsedMs, binding, receivedAtElapsedRealtimeMs)
+        positioningSnapshot = positioningSnapshot.copy(
+            userMotion = binding.coordinator.currentUserMotion(receivedAtElapsedRealtimeMs),
+        )
+        positioningSnapshot.userMotion?.let(::applyUserMotionState)
         val filteredTrusted = filtered.toTrustedLocation()
         val rawRouteLocation = TrustedLocation(
             latitude = location.latitude,
@@ -36550,6 +40348,7 @@ generation != cameraFallbackGeneration
             elapsedRealtimeMs = elapsedMs,
         )
         latestTrustedLocation = filteredTrusted
+        rememberTrustedLocationCovariance(filtered)
         latestRawRouteLocation = rawRouteLocation
         if (!currentNavigationCollectionAllowsWork()) {
             if (currentPositionFieldCollectionAllowsWork()) {
@@ -36604,6 +40403,18 @@ generation != cameraFallbackGeneration
         )
     }
 
+    private fun applyUserMotionState(snapshot: UserMotionStateSnapshot) {
+        latestPositionStationaryState = when (snapshot.movement) {
+            UserMovementState.MOVING -> PositionStationaryState.MOVING
+            UserMovementState.STATIONARY -> PositionStationaryState.STATIONARY
+            UserMovementState.UNKNOWN -> if (snapshot.stationaryCandidateSinceElapsedRealtimeMs != null) {
+                PositionStationaryState.CANDIDATE
+            } else PositionStationaryState.UNKNOWN
+        }
+        latestPositionStationarySinceMs = snapshot.stationaryCandidateSinceElapsedRealtimeMs
+            ?: snapshot.stateSinceElapsedRealtimeMs ?: snapshot.evaluatedAtElapsedRealtimeMs
+    }
+
     private fun currentUserMotionStatusText(): String {
         val nowMs = SystemClock.elapsedRealtime()
         val inputs = latestGpsMotionInputs
@@ -36615,7 +40426,10 @@ generation != cameraFallbackGeneration
             locationEvidence = inputs?.evidence,
         )
         fun number(value: Double?): String = value?.let { String.format(Locale.US, "%.1f", it) } ?: "unknown"
-        return "userSpeed=${number(motion.speedMps)}m/s " +
+        val state = positioningCoordinator.peekUserMotion(nowMs)
+        return "userState=${state.movement.name} locomotion=${state.locomotion.name} " +
+            "deviceRotation=${state.deviceRotation.name} motionReason=${state.reason.name} " +
+            "userSpeed=${number(motion.speedMps)}m/s " +
             "travelCourse=${number(motion.courseDegreesTrueNorth)}deg " +
             "phoneHeading=${number(motion.phoneHeadingDegreesTrueNorth)}deg"
     }
@@ -36664,6 +40478,7 @@ generation != cameraFallbackGeneration
         navigationActiveNow = isRouteActive && !routeRequestInFlight.get(),
         tmapOnRouteNow = latestTmapOnRoute,
         activeRouteId = routeNavigator.currentRouteId(),
+        activeRouteProgress = routeNavigator.currentTactileRouteProgress(),
         processDepth = processDepth,
     )
 
@@ -36754,8 +40569,12 @@ generation != cameraFallbackGeneration
     private fun attemptStepCalibration(location: Location, snapshot: PositioningSnapshot) {
         val raw = snapshot.raw ?: return walkingCalibrationSegments.reset()
         val receivedAtMs = SystemClock.elapsedRealtime()
-        val freshMovingEvidence = latestPositionStationaryState == PositionStationaryState.MOVING &&
-            latestPositionStationarySinceMs?.let { receivedAtMs - it in 0L..2_000L } == true
+        // stateSince is the first approval time, not freshness: use this fix's own motion evaluation.
+        val userMotion = snapshot.userMotion
+        // MOVING from this fix's GNSS speed alone is not walking evidence; require a fresh (TTL-filtered) step.
+        val freshMovingEvidence = userMotion?.movement == UserMovementState.MOVING &&
+            userMotion.stepObservedAtElapsedRealtimeMs != null &&
+            receivedAtMs - userMotion.evaluatedAtElapsedRealtimeMs in 0L..2_000L
         val disposition = snapshot.gnssUpdate?.disposition
         if (disposition == GnssObservationDisposition.REINITIALIZED) {
             walkingCalibrationSegments.reset()
@@ -36850,6 +40669,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun resetRouteState(purgeRouteSnapshot: Boolean = true) {
+        invalidateGuidanceStopConfirmation()
         cancelNavigationSpeechRetry()
         clearPendingExplicitRouteStart()
         navigationRequests.cancelRoute()
@@ -36881,10 +40701,69 @@ generation != cameraFallbackGeneration
         )
     }
 
-    private fun purgeEncryptedRouteSnapshot(): Boolean {
+    private fun routeSnapshotOwnerOrNull(session: GatewayFieldSession?): RouteSnapshotOwner? {
+        session ?: return null
+        val generation = session.backendAccountGeneration?.let { "account:$it" }
+            ?: session.familyId?.let { "session-family:$it" } ?: return null
+        return runCatching { RouteSnapshotOwner(session.actorId, generation) }.getOrNull()
+    }
+
+    private fun reconcileRouteSnapshotAccount(snapshot: GatewaySessionProcessSnapshot): Boolean {
+        if (!::routeSnapshotStore.isInitialized) return false
+        val owner = routeSnapshotOwnerOrNull(snapshot.session)
+        if (routeSnapshotAccountBindingEstablished && routeSnapshotAccountOwner == owner) return true
         cancelEncryptedRouteSnapshotExpirySchedule()
+        routeSnapshotWalkScope = null
+        routeSnapshotAccountOwner = owner
+        val purged = runCatching { routeSnapshotStore.bindAccount(owner) }.getOrDefault(false)
+        routeSnapshotAccountBindingEstablished = purged
+        routeSnapshotPurgeFailed = !purged
+        if (purged && owner != null) {
+            runCatching { routeSnapshotStore.expiryMetadata() }.getOrNull()
+                ?.takeIf { it.scope.owner == owner }
+                ?.let { scheduleEncryptedRouteSnapshotExpiry(it.scope, it.expiresAtEpochMs) }
+        }
+        return purged
+    }
+
+    private fun updateRouteSnapshotWalkOwnership(transition: WalkSessionTransition) {
+        if (!::routeSnapshotStore.isInitialized || !transition.changed) return
+        if (transition.previous.epoch.walkSessionId != transition.current.epoch.walkSessionId ||
+            transition.current.state in setOf(WalkSessionState.ENDED, WalkSessionState.SAFE_STOP)) {
+            cancelEncryptedRouteSnapshotExpirySchedule()
+            routeSnapshotPurgeFailed = !runCatching { routeSnapshotStore.endWalk() }.getOrDefault(false)
+        }
+        if (transition.current.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)) return
+        val processSnapshot = GatewaySessionProcessCoordinator.snapshot()
+        if (!reconcileRouteSnapshotAccount(processSnapshot)) return
+        val owner = routeSnapshotOwnerOrNull(processSnapshot.session) ?: return
+        val scope = RouteSnapshotScope(owner, transition.current.epoch.walkSessionId)
+        if (runCatching { routeSnapshotStore.beginWalk(scope) }.getOrDefault(false)) {
+            routeSnapshotWalkScope = scope
+        } else {
+            routeSnapshotPurgeFailed = true
+        }
+    }
+
+    private fun purgeEncryptedRouteSnapshotForAccount(): Boolean {
+        cancelEncryptedRouteSnapshotExpirySchedule()
+        val purged = ::routeSnapshotStore.isInitialized && runCatching {
+            routeSnapshotStore.bindAccount(null)
+        }.getOrDefault(false)
+        routeSnapshotAccountOwner = null
+        routeSnapshotAccountBindingEstablished = purged
+        routeSnapshotWalkScope = null
+        routeSnapshotPurgeFailed = !purged
+        return purged
+    }
+
+    private fun purgeEncryptedRouteSnapshot(
+        expectedScope: RouteSnapshotScope? = routeSnapshotWalkScope,
+    ): Boolean {
+        cancelEncryptedRouteSnapshotExpirySchedule()
+        if (expectedScope == null) return !routeSnapshotPurgeFailed
         val purged = !::routeSnapshotStore.isInitialized || runCatching {
-            routeSnapshotStore.clear()
+            routeSnapshotStore.clearWalk(expectedScope)
         }.getOrDefault(false)
         routeSnapshotPurgeFailed = !purged
         return purged
@@ -36896,7 +40775,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun scheduleEncryptedRouteSnapshotExpiry(
-        walkSessionId: String,
+        scope: RouteSnapshotScope,
         expiresAtEpochMs: Long,
     ) {
         cancelEncryptedRouteSnapshotExpirySchedule()
@@ -36904,10 +40783,10 @@ generation != cameraFallbackGeneration
         expiry = Runnable {
             if (routeSnapshotExpiryRunnable !== expiry) return@Runnable
             routeSnapshotExpiryRunnable = null
-            val purged = purgeEncryptedRouteSnapshot()
+            val purged = purgeEncryptedRouteSnapshot(scope)
             val activeSnapshotExpired = ::walkSessionLifecycle.isInitialized &&
-                walkSessionLifecycle.currentRuntimeEpochOrNull()?.walkSessionId == walkSessionId &&
-                isRouteActive
+                walkSessionLifecycle.currentRuntimeEpochOrNull()?.walkSessionId == scope.walkSessionId &&
+                routeSnapshotWalkScope == scope && isRouteActive
             if (activeSnapshotExpired && !developmentGuidanceStartBypassEnabled) {
                 enterWalkSessionSafetyStopAndCancelOutputs("route_snapshot_expired")
                 val detail =
@@ -36930,8 +40809,12 @@ generation != cameraFallbackGeneration
         reportCleanupCallbackHandler.postDelayed(expiry, remainingMs)
     }
 
-    private fun cancelActiveRouteRequest() {
-        clearActiveRouteRequestState(navigationRequests.cancelRoute())
+    private fun cancelActiveRouteRequest(preserveExistingRoute: Boolean = true) {
+        invalidateGuidanceStopConfirmation()
+        clearActiveRouteRequestState(
+            navigationRequests.cancelRoute(),
+            preserveExistingRoute = preserveExistingRoute,
+        )
     }
 
     private fun clearActiveRouteRequestState(
@@ -36939,9 +40822,9 @@ generation != cameraFallbackGeneration
         preserveExistingRoute: Boolean = false,
     ) {
         if (!routeRequestInFlight.get() && !transportWasActive) return
-        routeRequestGeneration += 1
-        routeRequestInFlight.set(false)
+        invalidateActiveRouteRequestLease()
         if (preserveExistingRoute && isRouteActive && routeNavigator.hasRoute()) {
+            routeNavigator.rerouteRequestFailed()?.let(::applyRouteDeviationSafetyUpdate)
             navigationPermissionsRequestedForRoute = false
             updateRouteButtonText()
             updateNavigationStatus("navigation=route_request_cancelled existing_route_retained")
@@ -36969,6 +40852,12 @@ generation != cameraFallbackGeneration
                 "navigation=route_request_cancelled hazard_only"
             },
         )
+    }
+
+    /** Invalidates a completed response even when its UI installation has not run yet. */
+    internal fun invalidateActiveRouteRequestLease() {
+        routeRequestGeneration += 1
+        routeRequestInFlight.set(false)
     }
 
     private fun suspendNavigationForRecovery(
@@ -37111,10 +41000,15 @@ generation != cameraFallbackGeneration
             return false
         }
         val resetSearch = reset || destinationSearchQuery != query
+        // S06-9: every search asks once for the whole candidate cap, so there is no append request; one
+        // would re-fetch the same list from a newer origin and mix two distance bases (S06-13/S06-14).
+        if (!resetSearch) return false
         if (resetSearch) {
             destinationSearchPage = 1
+            destinationSearchProviderHasMore = null
             destinationSearchResults.clear()
             destinationSearchQuery = query
+            destinationSearchZeroResultQuery = null
             destinationSearchVoiceState = null
             updateDestinationSearchUi()
         }
@@ -37122,20 +41016,44 @@ generation != cameraFallbackGeneration
         val origin = searchLocationLease?.let { destinationSearchLocationControllerOrNull()?.originOrNull(it) }
         if (origin == null) return requestDestinationSearchLocation(query, resetSearch)
         destinationSearchLocationMessage = null
+        // S06-31: the list keeps its origin accuracy; voice distances and directions stay within it.
+        val searchOrigin = searchLocationLease?.let { lease ->
+            destinationSearchLocationControllerOrNull()?.searchOriginOrNull(lease)
+        }
+        val requestedPage = if (resetSearch) 1 else destinationSearchPage + 1
+        val retainedCandidates = destinationSearchResults.toList()
+        val retainedVoicePageIndex = destinationSearchVoiceState?.takeIf { it.query == query }?.pageIndex ?: 0
         val requestId = destinationSearchGeneration + 1
         destinationSearchGeneration = requestId
         fun isCurrentSearchRequest(): Boolean =
             isDestinationSearchLeaseCurrent(expectedWalkEpoch, requestId) &&
                 GatewaySessionProcessCoordinator.snapshot().generation == expectedGatewaySessionGeneration &&
                 isCurrentGatewaySession(gatewaySession)
-        if (!resetSearch) {
-            destinationSearchPage += 1
+        fun recoverRetainedCandidates(message: String): Boolean {
+            if (resetSearch || retainedCandidates.isEmpty() || !isCurrentSearchRequest() ||
+                destinationSearchQuery != query
+            ) return false
+            pendingVoiceDestinationQuery = null
+            pendingVoiceDestinationPageIndex = null
+            val state = DestinationSearchVoiceState(
+                query = query,
+                results = retainedCandidates,
+                pageIndex = retainedVoicePageIndex.coerceAtMost((retainedCandidates.size - 1) / DESTINATION_SEARCH_PAGE_SIZE),
+                moreResultsAvailable = destinationSearchCanLoadMore(retainedCandidates.size),
+            )
+            destinationSearchVoiceState = state
+            // Re-offer the retained page with the new request generation; never revive an old lease.
+            speakHomeDestinationVoicePrompt(state, message + " " + state.voicePrompt())
+            return true
         }
-        val queryLimit = DESTINATION_SEARCH_PAGE_SIZE * destinationSearchPage
+        // S06-9: one request for the whole cap; voice then reads it three at a time from this one list.
+        val queryLimit = DESTINATION_SEARCH_MAX_RESULTS
         destinationSearchInFlight = true
         destinationSearchButton.isEnabled = false
         destinationMoreButton.isEnabled = false
         destinationCancelButton.isEnabled = true
+        // The list was cleared for the new query: show "searching" until the response, not a zero result.
+        updateDestinationSearchUi()
         val searchCall = trackDestinationSearchRequest(
             walkingRouteClient.searchDestinationsCall(
                 session = gatewaySession,
@@ -37181,6 +41099,7 @@ generation != cameraFallbackGeneration
                                 destinationSearchButton.isEnabled = true
                                 destinationCancelButton.isEnabled = false
                                 updateDestinationSearchUi()
+                                recoverRetainedCandidates("추가 검색을 잠시 진행할 수 없습니다. 다시 더 듣기라고 말씀해 주세요.")
                             }
                             if (pendingVoiceDestinationQuery == query) {
                                 pendingVoiceDestinationQuery = null
@@ -37240,11 +41159,20 @@ generation != cameraFallbackGeneration
                         destinationSearchInFlight = false
                         destinationSearchButton.isEnabled = true
                         destinationCancelButton.isEnabled = false
-                        val merged = if (reset) result.results else {
+                        destinationSearchPage = requestedPage
+                        destinationSearchProviderHasMore = result.moreResultsAvailable
+                        if (resetSearch) destinationSearchOrigin = searchOrigin
+                        val merged = if (resetSearch) result.results else {
                             destinationSearchResults + result.results
                         }
                         destinationSearchResults.clear()
-                        destinationSearchResults.addAll(merged.distinctBy { "${it.id}:${it.point.latitude}:${it.point.longitude}" })
+                        // Existing candidates come first, so announced numbers never move; only the newly
+                        // added tail is limited, and the list never exceeds the candidate cap (S06-12).
+                        destinationSearchResults.addAll(
+                            merged.distinctBy { "${it.id}:${it.point.latitude}:${it.point.longitude}" }
+                                .take(DESTINATION_SEARCH_MAX_RESULTS),
+                        )
+                        destinationSearchZeroResultQuery = if (destinationSearchResults.isEmpty()) query else null
                         updateDestinationSearchUi()
                         updateNavigationStatus("navigation=search_results query=${result.query} count=${result.results.size}")
                         if (pendingVoiceDestinationQuery == query) {
@@ -37261,24 +41189,27 @@ generation != cameraFallbackGeneration
                                     query = query,
                                     results = destinationSearchResults.toList(),
                                     pageIndex = requestedPageIndex,
-                                    moreResultsAvailable =
-                                        destinationSearchResults.size >=
-                                            destinationSearchPage * DESTINATION_SEARCH_PAGE_SIZE &&
-                                            destinationSearchResults.size < DESTINATION_SEARCH_MAX_RESULTS,
+                                    moreResultsAvailable = destinationSearchCanLoadMore(),
+                                    origin = destinationSearchOrigin,
                                 )
                                 speakHomeDestinationVoicePrompt(requireNotNull(destinationSearchVoiceState))
                             } else {
+                                // A "more" merge that added no new unique candidate is not the end
+                                // of the search while the provider still reports more results.
+                                val providerHasMore = destinationSearchCanLoadMore()
                                 destinationSearchVoiceState = DestinationSearchVoiceState(
                                     query = query,
                                     results = destinationSearchResults.toList(),
                                     pageIndex = lastPageIndex,
-                                    moreResultsAvailable = false,
+                                    moreResultsAvailable = providerHasMore,
                                 )
                                 val state = requireNotNull(destinationSearchVoiceState)
-                                speakHomeDestinationVoicePrompt(
-                                    state,
-                                    "더 안내할 목적지 후보가 없습니다. " + state.voicePrompt(),
-                                )
+                                val lead = if (providerHasMore) {
+                                    "이번에는 새 후보를 찾지 못했습니다. '더 듣기'로 다시 찾을 수 있습니다. "
+                                } else {
+                                    "더 안내할 목적지 후보가 없습니다. "
+                                }
+                                speakHomeDestinationVoicePrompt(state, lead + state.voicePrompt())
                             }
                         }
                     }
@@ -37293,6 +41224,7 @@ generation != cameraFallbackGeneration
                         destinationCancelButton.isEnabled = false
                         updateDestinationSearchUi()
                         updateNavigationStatus("navigation=destination_search_cancelled")
+                        recoverRetainedCandidates("추가 검색을 완료하지 못했습니다. 다시 더 듣기라고 말씀해 주세요.")
                     }
                 } catch (error: Exception) {
                     if (error is InterruptedException) Thread.currentThread().interrupt()
@@ -37320,11 +41252,16 @@ generation != cameraFallbackGeneration
                             return@runOnUiThread
                         }
                         val failure = classifyNavigationBackendFailure(error)
-                        destinationSearchLocationMessage = failure.kind.userMessage
+                        // Shared error kinds, search wording: a search failure is not a route failure,
+                        // and each message names the next step (search again, another name, login).
+                        val searchFailureMessage = failure.kind.destinationSearchUserMessage
+                        destinationSearchLocationMessage = searchFailureMessage
                         updateDestinationSearchUi()
                         updateNavigationStatus("navigation=destination_search_failed ${failure.kind.statusToken}")
-                        updateStatus("목적지 검색 실패", failure.kind.userMessage)
-                        speakInteraction(failure.kind.userMessage)
+                        updateStatus("목적지 검색 실패", searchFailureMessage)
+                        if (!recoverRetainedCandidates("추가 검색에 실패했습니다. 다시 더 듣기라고 말씀해 주세요.")) {
+                            speakInteraction(searchFailureMessage)
+                        }
                     }
                 } finally {
                     completeDestinationSearchRequest(searchCall)
@@ -37340,9 +41277,11 @@ generation != cameraFallbackGeneration
             destinationSearchInFlight = false
             destinationSearchButton.isEnabled = true
             destinationCancelButton.isEnabled = false
-            destinationSearchResults.removeAll { true }
             updateDestinationSearchUi()
             updateNavigationStatus("navigation=destination_search_failed executor_rejected")
+            if (recoverRetainedCandidates("추가 검색을 시작할 수 없습니다. 다시 더 듣기라고 말씀해 주세요.")) {
+                return false
+            }
             if (pendingVoiceDestinationQuery == query) {
                 pendingVoiceDestinationQuery = null
                 pendingVoiceDestinationPageIndex = null
@@ -37351,6 +41290,16 @@ generation != cameraFallbackGeneration
             return false
         }
     }
+
+    /** One "more candidates" rule for voice, screen and failure recovery (S06-10/11). */
+    private fun destinationSearchCanLoadMore(resultCount: Int = destinationSearchResults.size): Boolean =
+        destinationSearchCanRequestMore(
+            resultCount = resultCount,
+            // S06-9: each search already requested the whole cap, so no larger request can add candidates.
+            requestedCount = DESTINATION_SEARCH_MAX_RESULTS,
+            maxResults = DESTINATION_SEARCH_MAX_RESULTS,
+            providerMoreAvailable = destinationSearchProviderHasMore,
+        )
 
     private fun isDestinationSearchLeaseCurrent(
         expectedWalkEpoch: WalkRuntimeEpoch,
@@ -37398,20 +41347,24 @@ generation != cameraFallbackGeneration
         val cancellation = cancelNavigationRequestsForDestinationSelection()
         clearDestinationSearchState(cancellation.destinationSearchCancelled)
         if (!requireReporterUserId("login_required_route_select")) return false
+        val preserveExistingRoute = isRouteActive && routeNavigator.hasRoute()
         if (routeRequestInFlight.get() || cancellation.routeCancelled) {
-            clearActiveRouteRequestState(cancellation.routeCancelled)
-        } else if (isRouteActive) {
-            resetRouteState()
+            clearActiveRouteRequestState(
+                cancellation.routeCancelled,
+                preserveExistingRoute = preserveExistingRoute,
+            )
         }
-        if (::destinationLatInput.isInitialized) {
-            destinationLatInput.setText(result.point.latitude.toString())
+        if (!preserveExistingRoute) {
+            if (::destinationLatInput.isInitialized) {
+                destinationLatInput.setText(result.point.latitude.toString())
+            }
+            if (::destinationLngInput.isInitialized) {
+                destinationLngInput.setText(result.point.longitude.toString())
+            }
+            currentDestination = result.point
+            isRouteActive = false
+            latestTmapOnRoute = false
         }
-        if (::destinationLngInput.isInitialized) {
-            destinationLngInput.setText(result.point.longitude.toString())
-        }
-        currentDestination = result.point
-        isRouteActive = false
-        latestTmapOnRoute = false
         updateRouteButtonText()
         updateNavigationStatus("navigation=destination_selected ${result.name} ${formatDestinationDistance(result.distanceM)}")
         val routeRequestGenerationBefore = routeRequestGeneration
@@ -37479,7 +41432,13 @@ generation != cameraFallbackGeneration
                             "위치 기능 제한으로 목적지 검색을 사용할 수 없습니다."
                         destinationSearchLocationMessage != null -> requireNotNull(destinationSearchLocationMessage)
                         destinationSearchQuery.isBlank() -> "검색어를 입력하세요."
-                        else -> "검색 결과 없음"
+                        // Location wait and failures already set destinationSearchLocationMessage above.
+                        destinationSearchInFlight -> "목적지를 검색하고 있습니다. 결과가 오면 바로 표시합니다."
+                        // S06-33: a cancelled search, or one that never ran for this query (a late
+                        // location answer after the input changed), is not a zero result.
+                        destinationSearchZeroResultQuery != destinationSearchQuery ->
+                            "검색이 끝나지 않았습니다. 다시 검색하려면 검색을 누르거나 목적지를 말씀해 주세요."
+                        else -> "검색 결과가 없습니다. 다른 장소명으로 다시 검색해 주세요."
                     }
                     textSize = 18f
                     setTextColor(WS_COLOR_NOTICE_TEXT)
@@ -37494,9 +41453,35 @@ generation != cameraFallbackGeneration
             return
         }
         val density = resources.displayMetrics.density
-        destinationSearchResults.forEach { result ->
-            val details = "${result.address ?: "주소 없음"} · ${formatDestinationDistance(result.distanceM)}"
-            val label = android.text.SpannableStringBuilder(result.name).apply {
+        // S06-31: the list TalkBack reads is never more precise than its search origin.
+        val originAccuracyM = destinationSearchOrigin?.accuracyM
+        destinationOriginUncertaintyNoticeKo(destinationSearchOrigin)?.let { notice ->
+            destinationSearchResultsContainer.addView(
+                TextView(this).apply {
+                    text = notice
+                    contentDescription = notice
+                    textSize = 18f
+                    setTextColor(WS_COLOR_NOTICE_TEXT)
+                    applyWsStatusCard(this)
+                },
+            )
+        }
+        // S06-34: which of these numbers the voice dialog reads now; the buttons keep their global numbers.
+        destinationVoiceRangeText = TextView(this).apply {
+            textSize = 18f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+        }.also { header ->
+            destinationSearchResultsContainer.addView(header)
+            refreshDestinationVoiceRangeText()
+        }
+        destinationSearchResults.forEachIndexed { index, result ->
+            val details = "${result.displayAddressOrNull() ?: "주소 없음"} · " +
+                approximateDestinationDistanceKo(result.distanceM, originAccuracyM) +
+                // S06-30: the screen names the same kind of distance the voice list says.
+                (kr.co.hanium.dreamup.walksafe.navigation.destinationDistanceKindKo(result.distanceSource)
+                    ?.let { " ($it)" } ?: "")
+            // The same global number the voice dialog reads and accepts (S06-34); also read by TalkBack.
+            val label = android.text.SpannableStringBuilder("${index + 1}번 ${result.name}").apply {
                 append("\n")
                 val detailsStart = length
                 append(details)
@@ -37531,10 +41516,27 @@ generation != cameraFallbackGeneration
                 },
             )
         }
-        val canLoadMore = destinationSearchResults.size >= destinationSearchPage * DESTINATION_SEARCH_PAGE_SIZE &&
-            destinationSearchResults.size < DESTINATION_SEARCH_MAX_RESULTS
+        val canLoadMore = destinationSearchCanLoadMore()
         destinationMoreButton.visibility = if (canLoadMore) View.VISIBLE else View.GONE
         updateWalkFeatureAvailabilityUi()
+    }
+
+    /** voice-F9: the page the voice dialog reads now; null once that dialog is closed. List rebuilds keep it. */
+    private var destinationVoiceRangeState: DestinationSearchVoiceState? = null
+
+    /**
+     * S06-34: updates only the header text on a voice page change - the candidate buttons are not
+     * rebuilt, no live region is used and focus does not move (TalkBack reads it when reached).
+     */
+    private fun refreshDestinationVoiceRangeText(state: DestinationSearchVoiceState? = destinationVoiceRangeState) {
+        destinationVoiceRangeState = state
+        val header = destinationVoiceRangeText ?: return
+        val label = state
+            ?.takeIf { it.query == destinationSearchQuery && it.results == destinationSearchResults }
+            ?.voicePageRangeLabelKo()
+        header.text = label.orEmpty()
+        header.contentDescription = label
+        header.visibility = if (label == null) View.GONE else View.VISIBLE
     }
 
     private fun updateRouteButtonText() {
@@ -37548,6 +41550,13 @@ generation != cameraFallbackGeneration
         }
         updateWalkFeatureAvailabilityUi()
     }
+
+    /** Checked when the completed HTTP response's UI work actually runs, not when it is posted. */
+    internal fun routeResponseInstallLeaseCurrent(
+        expectedRequestId: Int,
+        isCurrentRequest: () -> Boolean,
+    ): Boolean = routeRequestInFlight.get() &&
+        routeRequestGeneration == expectedRequestId && isCurrentRequest()
 
     /** Serializes route requests so user start and off-route reroute cannot race each other. */
     private fun requestRoute(
@@ -37569,7 +41578,14 @@ generation != cameraFallbackGeneration
             )
             return
         }
-        val preserveExistingRoute = reason == "off_route" && isRouteActive
+        val preserveExistingRoute = isRouteActive && routeNavigator.hasRoute()
+        fun retainExistingRouteAfterFailure(message: String) {
+            if (reason == "off_route") {
+                retainRouteAfterRerouteFailure(message)
+            } else {
+                speakInteraction("$message 기존 목적지와 경로를 유지합니다.")
+            }
+        }
         if (!isGatewayNetworkAllowed(reason = "walking_route")) {
             if (!preserveExistingRoute) isRouteActive = false
             updateRouteButtonText()
@@ -37577,7 +41593,7 @@ generation != cameraFallbackGeneration
         }
         val gatewaySession = gatewaySessionOrNull("walking_route") ?: run {
             if (!preserveExistingRoute) isRouteActive = false
-            latestTmapOnRoute = false
+            if (!preserveExistingRoute || reason == "off_route") latestTmapOnRoute = false
             if (!preserveExistingRoute) currentDestination = null
             updateRouteButtonText()
             return
@@ -37633,9 +41649,19 @@ generation != cameraFallbackGeneration
             updateNavigationStatus("navigation=route_blocked request_in_flight")
             return
         }
+        // S06-39: "목적지 취소" cancels a confirmed destination replacement but keeps a reroute.
+        activeRouteRequestReason = reason
         isRouteActive = true
-        currentDestination = destination
+        // The installed route keeps its destination until a validated replacement is ready.
+        if (!preserveExistingRoute) currentDestination = destination
         val requestId = ++routeRequestGeneration
+        fun isCurrentRouteRequest(): Boolean {
+            val currentSession = GatewaySessionProcessCoordinator.snapshot()
+            return isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId) &&
+                currentSession.generation == expectedGatewaySessionGeneration &&
+                currentSession.session === gatewaySession &&
+                currentReporterUserId() == gatewaySession.actorId
+        }
         updateNavigationStatus("navigation=route_requesting reason=$reason priority=STAIR_AVOID")
         updateRouteButtonText()
         val routeCall = trackRouteRequest(
@@ -37652,7 +41678,7 @@ generation != cameraFallbackGeneration
                 var routeProviderCallInProgress = false
                 try {
                     if (
-                        !isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId) ||
+                        !isCurrentRouteRequest() ||
                         !isCurrentGatewaySession(gatewaySession)
                     ) {
                         completeRouteRequest(routeCall)
@@ -37669,12 +41695,7 @@ generation != cameraFallbackGeneration
                         completeRouteRequest(routeCall)
                         routeCall.cancel()
                         runOnUiThread {
-                            if (
-                                !isRouteRequestLeaseCurrent(
-                                    expectedWalkEpoch,
-                                    requestId,
-                                )
-                            ) return@runOnUiThread
+                            if (!isCurrentRouteRequest()) return@runOnUiThread
                             if (
                                 revalidation.status ==
                                 GatewaySessionRevalidationStatus.NOT_READY
@@ -37685,9 +41706,9 @@ generation != cameraFallbackGeneration
                                 )
                             } else if (preserveExistingRoute) {
                                 routeRequestInFlight.set(false)
-                                latestTmapOnRoute = false
-                                retainRouteAfterRerouteFailure(
-                                    "새 TMAP 경로를 아직 확인하지 못해 방향 안내를 중지했습니다.",
+                                if (reason == "off_route") latestTmapOnRoute = false
+                                retainExistingRouteAfterFailure(
+                                    "새 TMAP 경로를 아직 확인하지 못했습니다.",
                                 )
                                 updateRouteButtonText()
                             } else {
@@ -37707,7 +41728,7 @@ generation != cameraFallbackGeneration
                         return@execute
                     }
                     if (
-                        !isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId) ||
+                        !isCurrentRouteRequest() ||
                         !isCurrentGatewaySession(gatewaySession)
                     ) {
                         completeRouteRequest(routeCall)
@@ -37720,12 +41741,7 @@ generation != cameraFallbackGeneration
                     if (!isCurrentGatewaySession(gatewaySession)) {
                         completeRouteRequest(routeCall)
                         runOnUiThread {
-                            if (
-                                !isRouteRequestLeaseCurrent(
-                                    expectedWalkEpoch,
-                                    requestId,
-                                )
-                            ) return@runOnUiThread
+                            if (!isCurrentRouteRequest()) return@runOnUiThread
                             isRouteActive = false
                             latestTmapOnRoute = false
                             currentDestination = null
@@ -37735,18 +41751,15 @@ generation != cameraFallbackGeneration
                         }
                         return@execute
                     }
-                    if (!isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId)) {
+                    if (!isCurrentRouteRequest()) {
                         completeRouteRequest(routeCall)
                         return@execute
                     }
                     completeRouteRequest(routeCall)
                     runOnUiThread {
-                        if (
-                            !isRouteRequestLeaseCurrent(
-                                expectedWalkEpoch,
-                                requestId,
-                            )
-                        ) return@runOnUiThread
+                        if (!routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)) {
+                            return@runOnUiThread
+                        }
                         if (!isCurrentGatewaySession(gatewaySession)) {
                             isRouteActive = false
                             latestTmapOnRoute = false
@@ -37758,13 +41771,47 @@ generation != cameraFallbackGeneration
                         }
                         if (!isRouteActive) return@runOnUiThread
                         if (!routeSnapshotPurgeFenceAllowsRoute()) return@runOnUiThread
+                        val installLocation = currentRouteLocationOrNull()
+                        if (!isCurrentRouteRequest() || !isRouteActive) return@runOnUiThread
+                        val installLocationStatus = routeResponseInstallLocationStatus(
+                            route,
+                            origin,
+                            installLocation,
+                            SystemClock.elapsedRealtime(),
+                        )
+                        if (installLocationStatus != RouteResponseInstallLocationStatus.CONNECTED) {
+                            // The provider succeeded, but its old request origin no longer proves
+                            // that the returned route begins at the walker's current position.
+                            tmapFailureGuard.recordSuccess()
+                            routeRequestInFlight.set(false)
+                            if (!preserveExistingRoute) {
+                                isRouteActive = false
+                                latestTmapOnRoute = false
+                                routeNavigator.clear()
+                                routeStartStepCount = null
+                            }
+                            updateRouteButtonText()
+                            updateNavigationStatus(
+                                "navigation=route_location_recheck_required " +
+                                    "reason=${installLocationStatus.name.lowercase(Locale.US)}",
+                            )
+                            val detail = "현재 위치와 새 경로의 연결을 확인하지 못했습니다. " +
+                                "위치를 확인한 뒤 길안내를 다시 요청해 주세요."
+                            if (preserveExistingRoute) retainExistingRouteAfterFailure(detail)
+                            else speakInteraction(detail)
+                            return@runOnUiThread
+                        }
+                        val connectedInstallLocation = requireNotNull(installLocation)
                         val storedRouteSnapshot = runCatching {
+                            val owner = routeSnapshotOwnerOrNull(gatewaySession) ?: return@runCatching null
+                            val scope = RouteSnapshotScope(owner, expectedWalkEpoch.walkSessionId)
+                            if (routeSnapshotWalkScope != scope) return@runCatching null
                             val saved = routeSnapshotStore.saveFirstRoute(
-                                walkSessionId = expectedWalkEpoch.walkSessionId,
+                                scope = scope,
                                 route = route,
                                 destination = destination,
                             )
-                            if (!saved) null else routeSnapshotStore.load()
+                            if (!saved) null else routeSnapshotStore.load(scope)
                         }.getOrNull()?.takeIf {
                             it.walkSessionId == expectedWalkEpoch.walkSessionId
                         }
@@ -37784,7 +41831,7 @@ generation != cameraFallbackGeneration
                         if (storedRouteSnapshot != null) {
                             routeSnapshotPurgeFailed = false
                             scheduleEncryptedRouteSnapshotExpiry(
-                                walkSessionId = storedRouteSnapshot.walkSessionId,
+                                scope = storedRouteSnapshot.scope,
                                 expiresAtEpochMs = storedRouteSnapshot.expiresAtEpochMs,
                             )
                         }
@@ -37803,6 +41850,13 @@ generation != cameraFallbackGeneration
                                 "distanceM" to route.summary.distanceM,
                             ),
                         )
+                        currentDestination = destination
+                        if (::destinationLatInput.isInitialized) {
+                            destinationLatInput.setText(destination.latitude.toString())
+                        }
+                        if (::destinationLngInput.isInitialized) {
+                            destinationLngInput.setText(destination.longitude.toString())
+                        }
                         routeStartStepCount = latestStepCount
                         directionGuidancePauseReason = null
                         latestTmapOnRoute = true
@@ -37811,33 +41865,56 @@ generation != cameraFallbackGeneration
                         updateNavigationStatus(
                             "navigation=route_ready distance=${route.summary.distanceM}m priority=${route.priority}",
                         )
-                        val routeLocation = currentRouteLocationOrNull()
-                        if (routeLocation != null) {
-                            updateRouteGuidance(routeLocation, latestRawRouteLocation ?: routeLocation)
-                        } else {
-                            val accepted = speakStatusExplanation(
-                                "목적지까지 약 ${route.summary.distanceM}미터의 경로를 찾았습니다. " +
-                                    "현재 위치를 확인하면 이동 방향을 안내하겠습니다.",
+                        // S07-12 (FP-022-DETAIL-03 interim): once per new destination route, its own short
+                        // utterance says stairs are avoided and nothing else was confirmed. A reroute keeps silent.
+                        val scopeDisclosure = kr.co.hanium.dreamup.walksafe.navigation
+                            .routeScopeDisclosureKo(route.priority).takeIf { reason != "off_route" }
+                        val scopeRouteGeneration = routeRequestGeneration
+                        if (currentRouteLocationOrNull() != null) {
+                            // Navigation speech is held while this interaction plays and is retried after it.
+                            scopeDisclosure?.let(::speakInteraction)
+                            updateRouteGuidance(
+                                connectedInstallLocation,
+                                latestRawRouteLocation ?: connectedInstallLocation,
                             )
-                            routeLocationStatusResponseGeneration =
-                                commandSpeechResponseGeneration.takeIf { accepted }
+                        } else {
+                            var routeFoundAnnounced = false
+                            val announceRouteFound = announce@{
+                                if (routeFoundAnnounced) return@announce
+                                routeFoundAnnounced = true
+                                if (routeRequestGeneration != scopeRouteGeneration || !isRouteActive ||
+                                    currentRouteLocationOrNull() != null
+                                ) return@announce
+                                val accepted = speakStatusExplanation(
+                                    "목적지까지 약 ${route.summary.distanceM}미터의 경로를 찾았습니다. " +
+                                        "현재 위치를 확인하면 이동 방향을 안내하겠습니다.",
+                                )
+                                routeLocationStatusResponseGeneration =
+                                    commandSpeechResponseGeneration.takeIf { accepted }
+                            }
+                            if (scopeDisclosure == null) {
+                                announceRouteFound()
+                            } else if (!speakCommandResponse(
+                                    scopeDisclosure,
+                                    onCompleted = { announceRouteFound() },
+                                    onFailed = { announceRouteFound() },
+                                    statusExplanation = true,
+                                )
+                            ) {
+                                announceRouteFound()
+                            }
                         }
                     }
                 } catch (_: CancellationException) {
                     completeRouteRequest(routeCall)
                     runOnUiThread {
-                        if (
-                            !isRouteRequestLeaseCurrent(
-                                expectedWalkEpoch,
-                                requestId,
-                            )
-                        ) return@runOnUiThread
+                        if (!isCurrentRouteRequest()) return@runOnUiThread
                         routeRequestInFlight.set(false)
                         if (!preserveExistingRoute) isRouteActive = false
-                        latestTmapOnRoute = false
+                        if (!preserveExistingRoute || reason == "off_route") latestTmapOnRoute = false
                         if (!preserveExistingRoute) currentDestination = null
                         if (preserveExistingRoute) {
-                            retainRouteAfterRerouteFailure("TMAP 새 경로 요청이 취소되어 방향 안내를 중지했습니다.")
+                            retainExistingRouteAfterFailure("TMAP 새 경로 요청이 취소되었습니다.")
                         }
                         updateRouteButtonText()
                         updateNavigationStatus("navigation=route_cancelled")
@@ -37845,61 +41922,61 @@ generation != cameraFallbackGeneration
                 } catch (error: Exception) {
                     completeRouteRequest(routeCall)
                     val navigationFailure = classifyNavigationBackendFailure(error)
-                    val countableTmapFailure = routeProviderCallInProgress &&
-                        navigationFailure.kind != NavigationBackendErrorKind.AUTHENTICATION
+                    val countableRouteFailure = routeProviderCallInProgress &&
+                        !navigationFailure.isUserSessionAuthentication
                     runOnUiThread {
-                        if (
-                            !isRouteRequestLeaseCurrent(
-                                expectedWalkEpoch,
-                                requestId,
-                            )
-                        ) return@runOnUiThread
+                        if (!isCurrentRouteRequest()) return@runOnUiThread
                         val failureGuard = gatewayFailureUiGuardOrNull(
                             session = gatewaySession,
                             expectedAuthenticationFailure =
-                                navigationFailure.kind == NavigationBackendErrorKind.AUTHENTICATION,
+                                navigationFailure.isUserSessionAuthentication,
                         )
                         routeRequestInFlight.set(false)
                         updateRouteButtonText()
                         if (failureGuard == null || !isGatewayFailureUiGuardCurrent(gatewaySession, failureGuard)) {
                             return@runOnUiThread
                         }
+                        if (navigationFailure.isUserSessionAuthentication) {
+                            updateNavigationStatus("navigation=route_failed ${navigationFailure.statusMetadata}")
+                            speakInteraction(navigationFailure.routeUserMessage)
+                            return@runOnUiThread
+                        }
                         if (
-                            countableTmapFailure &&
+                            countableRouteFailure &&
                             tmapFailureGuard.recordFailure() &&
                             !developmentGuidanceStartBypassEnabled
                         ) {
-                            enterWalkSessionSafetyStopAndCancelOutputs("tmap_consecutive_failures")
+                            enterWalkSessionSafetyStopAndCancelOutputs("route_consecutive_failures")
                             val safetyStopDetail =
-                                "${navigationFailure.kind.userMessage} " +
-                                    "TMAP 경로 요청이 두 번 연속 실패해 모든 보행 기능을 중지했습니다. " +
+                                "${navigationFailure.routeUserMessage} " +
+                                    "경로 요청이 두 번 연속 실패해 모든 보행 기능을 중지했습니다. " +
                                     "새 보행을 직접 시작해 주세요."
                             updateStatus(
                                 "길안내 안전 중지",
                                 safetyStopDetail,
                             )
                             updateNavigationStatus(
-                                "navigation=safety_stopped reason=tmap_consecutive_failures " +
-                                    "kind=${navigationFailure.kind.statusToken}",
+                                "navigation=safety_stopped reason=route_consecutive_failures " +
+                                    navigationFailure.statusMetadata,
                             )
                             speakInteraction(safetyStopDetail)
                             return@runOnUiThread
                         }
                         if (!preserveExistingRoute) isRouteActive = false
-                        latestTmapOnRoute = false
+                        if (!preserveExistingRoute || reason == "off_route") latestTmapOnRoute = false
                         if (!preserveExistingRoute) currentDestination = null
                         updateRouteButtonText()
                         updateNavigationStatus(
                             if (preserveExistingRoute) {
-                                "navigation=reroute_failed ${navigationFailure.kind.statusToken} existing_route_retained"
+                                "navigation=reroute_failed ${navigationFailure.statusMetadata} existing_route_retained"
                             } else {
-                                "navigation=route_failed ${navigationFailure.kind.statusToken}"
+                                "navigation=route_failed ${navigationFailure.statusMetadata}"
                             },
                         )
                         if (preserveExistingRoute) {
-                            retainRouteAfterRerouteFailure(navigationFailure.kind.userMessage)
+                            retainExistingRouteAfterFailure(navigationFailure.routeUserMessage)
                         } else {
-                            speakInteraction(navigationFailure.kind.userMessage)
+                            speakInteraction(navigationFailure.routeUserMessage)
                         }
                     }
                 } finally {
@@ -37909,10 +41986,10 @@ generation != cameraFallbackGeneration
         } catch (_: RejectedExecutionException) {
             completeRouteRequest(routeCall)
             routeCall.cancel()
-            if (!isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId)) return
+            if (!isCurrentRouteRequest()) return
             routeRequestInFlight.set(false)
             if (!preserveExistingRoute) isRouteActive = false
-            latestTmapOnRoute = false
+            if (!preserveExistingRoute || reason == "off_route") latestTmapOnRoute = false
             if (!preserveExistingRoute) currentDestination = null
             updateRouteButtonText()
             updateNavigationStatus(
@@ -37923,7 +42000,7 @@ generation != cameraFallbackGeneration
                 },
             )
             if (preserveExistingRoute) {
-                retainRouteAfterRerouteFailure("TMAP 새 경로를 확인할 수 없어 방향 안내를 중지했습니다.")
+                retainExistingRouteAfterFailure("TMAP 새 경로를 확인할 수 없습니다.")
             } else {
                 speakInteraction("TMAP 경로를 확인할 수 없어 길안내를 시작하지 않았습니다.")
             }
@@ -37966,10 +42043,13 @@ generation != cameraFallbackGeneration
             requestInFlight = routeRequestInFlight.get(),
             stepProgressM = routeStepProgressMOrNull(),
             facingObservation = facing,
+            facingUnavailableReason = latestRouteFacingUnavailableReason,
             filteredPosition = FilteredRoutePosition(
                 point = RoutePoint(location.latitude, location.longitude),
                 horizontalAccuracyM = location.accuracyM.toDouble(),
                 elapsedRealtimeMs = location.elapsedRealtimeMs,
+                // S09-45: direction-specific covariance only when it belongs to this exact trusted fix.
+                covarianceEnu = latestTrustedLocationCovariance?.takeIf { it.first == location }?.second,
                 heading = latestGpsCourseObservation
                     ?.takeIf { latestWalkingSpeedObservation?.speedMps?.let { it > 0.5 } == true }
                     ?.let { heading ->
@@ -38024,15 +42104,7 @@ generation != cameraFallbackGeneration
         if (lastRouteAlignmentDiagnosticKey == key && nowMs - lastRouteAlignmentDiagnosticAtMs in 0L..1_999L) return
         lastRouteAlignmentDiagnosticKey = key
         lastRouteAlignmentDiagnosticAtMs = nowMs
-        val values = mapOf(
-            "reason" to alignment.reason.name,
-            "segmentIndex" to alignment.segmentIndex,
-            "routeBearingDeg" to alignment.bearingDegreesTrueNorth,
-            "rearHeadingDeg" to facing?.degreesTrueNorth,
-            "compassSource" to facing?.source?.name,
-            "compassAgeMs" to facing?.let { nowMs - it.observedAtElapsedRealtimeMs },
-            "positionUncertaintyM" to positionUncertaintyM,
-        )
+        val values = RouteGuidanceDiagnostics.alignment(alignment, facing, positionUncertaintyM, nowMs)
         if (BuildConfig.DEBUG) runCatching {
             android.util.Log.d("WalkSafeNavigation", "route_alignment=$values")
         }
@@ -38081,6 +42153,7 @@ generation != cameraFallbackGeneration
             val nowMs = SystemClock.elapsedRealtime()
             val update = routeNavigator.retryGuidance(
                 nowMs, facingObservation = currentRouteFacingObservation(nowMs),
+                facingUnavailableReason = latestRouteFacingUnavailableReason,
             ) ?: return@Runnable
             tryDispatchRouteInstruction(update, epoch)
         }
@@ -38090,6 +42163,9 @@ generation != cameraFallbackGeneration
 
     private fun tryDispatchRouteInstruction(update: RouteNavigatorUpdate, expectedWalkEpoch: WalkRuntimeEpoch) {
         if (update.userDecisionRequired) return
+        // Manual and retry updates skip applyRouteDeviationSafetyUpdate; a revoked in-flight
+        // relative-direction sentence must still stop before any replacement is dispatched.
+        if (update.cancelStaleNavigationSpeech) feedbackActuator?.cancelNavigationSpeech()
         val instruction = update.instruction
         if (instruction == null) {
             if (update.reason in setOf(
@@ -38110,10 +42186,26 @@ generation != cameraFallbackGeneration
             return
         }
         if (!routeNavigator.reserveInstruction(update)) return
+        // S08-34: generation and playback-start checks of one cue share its id in the field log.
+        if (::fieldSessionLog.isInitialized) fieldSessionLog.recordEvent(
+            "route_guidance_generated", RouteGuidanceDiagnostics.guidanceGenerated(update, SystemClock.elapsedRealtime()),
+        )
         cancelNavigationSpeechRetry()
         cancelRouteLocationStatusSpeech()
+        // S08-34 (nav-F5/F6): submission checks record nothing; the engine's actual start check does, once.
+        val startRecorded = AtomicBoolean(false)
         val accepted = dispatchNavigationSpeech(
             instruction,
+            isInstructionStillCurrent = {
+                val nowMs = SystemClock.elapsedRealtime()
+                routeNavigator.isInstructionCurrent(update, nowMs, currentRouteFacingObservation(nowMs)).also { current ->
+                    if (feedbackActuator?.validatingStartedSpeech == true && startRecorded.compareAndSet(false, true) &&
+                        ::fieldSessionLog.isInitialized
+                    ) fieldSessionLog.recordEvent(
+                        "route_guidance_started", RouteGuidanceDiagnostics.guidanceStartChecked(update, nowMs, current),
+                    )
+                }
+            },
             onCompleted = {
                 if (isRouteSpeechCurrent(expectedWalkEpoch, requestGeneration, lifecycleGeneration)) {
                     routeNavigator.acknowledgeInstruction(update, SystemClock.elapsedRealtime())
@@ -38661,6 +42753,12 @@ generation != cameraFallbackGeneration
             AccountDeletionPhase.RETRY_WAIT ->
                 if (rev0ReauthenticationRequired) {
                     "삭제 요청 복구를 위해 현장 게이트웨이에 다시 로그인해야 합니다."
+                } else if (
+                    accountDeletionStateMachine.snapshotOrNull()?.lastErrorCode ==
+                    kr.co.hanium.dreamup.walksafe.network.ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE
+                ) {
+                    // S19-44: the new deletion was not accepted; a fresh password login is needed.
+                    "보안을 위해 비밀번호로 다시 로그인한 뒤 계정 삭제를 다시 요청하세요."
                 } else {
                     "삭제 상태 확인을 재시도해야 합니다."
                 }
@@ -38830,6 +42928,8 @@ generation != cameraFallbackGeneration
         if (!progressBeepEnabled || progressBeepVolumePercent <= 0) return
         if (!isRouteActive || offRoute || arrived) return
         if (shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)) return
+        // The beep yields to the same app, gateway and TalkBack speech ownership as voice input.
+        if (isHandsFreeVoiceSpeechOutputActive()) return
         if (!feedbackPolicy.canSpeakNavigation(nowMs)) return
         if (nowMs - lastProgressBeepAtMs < PROGRESS_BEEP_INTERVAL_MS) return
         ensureFeedbackActuator().playProgressBeep(progressBeepVolumePercent)
@@ -39313,6 +43413,8 @@ generation != cameraFallbackGeneration
     private fun markPositionFieldCheckpoint() {
         val lease = currentPositionFieldLeaseOrNull() ?: return
         val nowMs = SystemClock.elapsedRealtime()
+        // The cached UI state may be up to one refresh old; re-check its source expiry now.
+        applyUserMotionState(positioningCoordinator.currentUserMotion(nowMs))
         val stationarySinceMs = latestPositionStationarySinceMs
         val sessionStartedAtMs = positionFieldStartedAtElapsedMs
         val stationaryDurationMs = stationarySinceMs?.let { nowMs - it } ?: 0L
@@ -39571,6 +43673,8 @@ generation != cameraFallbackGeneration
         if (!BuildConfig.DEBUG) return
         if (fieldSessionLog.isActive()) {
             fieldSessionLog.stop()
+            // S1617-36: approved statistics only; the encrypted archive stays unanalysable on the host.
+            fieldSessionLog.lastSessionStatsSummary()?.let { updateStatus("현장 로그 요약", it.displayText()) }
             if (!isRouteActive && !navigationPermissionsRequestedForRoute && !navigationPermissionsRequestedForReport) {
                 stopLocationUpdates()
                 stopStepTracking()
@@ -39624,6 +43728,10 @@ generation != cameraFallbackGeneration
                     "audio_permission" to hasRecordAudioPermission(),
                 ),
             )
+            // S09-56: a profile loaded before this session started is still visible in its log.
+            latestPedestrianProfileLoadStatus?.let { status ->
+                fieldSessionLog.recordEvent("pedestrian_profile_loaded", mapOf("result" to status))
+            }
             if (
                 startupCapabilityDecision?.allowsRequirement(
                     WalkSafeStartupRequirement.GPS,
@@ -39670,6 +43778,8 @@ generation != cameraFallbackGeneration
         val tier = if (
             WalkSafeStartupRequirement.ANDROID_VERSION in unavailable ||
             WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in unavailable ||
+            // FP-009: a feature restriction must not reopen a capability-blocked start.
+            WalkSafeStartupCapabilityResolver.blocksWalkStart(decision.unavailableRequirements) ||
             pending.isNotEmpty()
         ) {
             WalkSafeStartupCapabilityTier.BLOCKED
@@ -39891,6 +44001,8 @@ generation != cameraFallbackGeneration
         val tmapOnRoute: Boolean,
         val visualFrameKey: kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey? = null,
         val imageQuarterTurns: Int = 0,
+        /** S10-2: display geometry (visualGeometryVersion) the detection was requested under. */
+        val geometryVersion: Long? = null,
     ) {
         fun tactileFrameIdentity(): AndroidTactileEvidenceFrameIdentity = AndroidTactileEvidenceFrameIdentity(
             frameId = frameId,
@@ -39959,6 +44071,8 @@ generation != cameraFallbackGeneration
             maxSourceAgeMs: Long,
             maxFrameDeltaMs: Long,
         ): String? {
+            // S10-1: no completed inference yet (no frame, or only unavailable/failed calls) is not a fresh empty scene.
+            if (completedAtMs == null) return DETECTION_NOT_COMPLETED_STALE_REASON
             val frameDelta = rawFrameDeltaMs(currentFrameTimestampMs)
             if (frameDelta != null) {
                 if (frameDelta < -FRAME_TIMESTAMP_TOLERANCE_MS) return "frame_delta_negative"
@@ -40044,6 +44158,8 @@ generation != cameraFallbackGeneration
                 partial = false,
                 frameEvidence = null,
             )
+
+            const val DETECTION_NOT_COMPLETED_STALE_REASON = "not_completed"
 
             private fun formatPercent(value: Float): String = String.format(Locale.US, "%.0f%%", value * 100f)
 
@@ -40186,6 +44302,8 @@ generation != cameraFallbackGeneration
 
     private companion object {
         const val ROUTE_START_LOCATION_TIMEOUT_MS = 15_000L
+        /** FP-025 "계속 실패": this many consecutive transcriber failures disable on-device STT. */
+        const val HANDS_FREE_TRANSCRIBER_PERSISTENT_FAILURES = 2
         /** 마지막 컨트롤 아래 확보할 여백. 화면 밀도에 맞춰 px 로 환산한다. */
         /** 팀원 UI/UX 디자인 토큰. */
         const val WS_COLOR_BUTTON_FILL = 0xffffffff.toInt()
@@ -40327,7 +44445,6 @@ generation != cameraFallbackGeneration
             "device_check_location_age_bucket_v1"
         const val HANDS_FREE_VOICE_DISCLOSURE_VERSION = 1
         const val PERSISTENT_REPORT_QUEUE_ENABLED = false
-        const val REPORT_QUEUE_PAUSED_STATIONARY_RECHECK_MS = 5_001L
         const val HANDS_FREE_VOICE_RESTART_DELAY_MS = 500L
         const val DEFERRED_VOICE_INPUT_POLL_MS = 100L
         const val DEFERRED_VOICE_INPUT_MAX_WAIT_MS = 30_000L
@@ -40357,14 +44474,15 @@ generation != cameraFallbackGeneration
             "integrated_consent_control_secret"
         const val PREF_PENDING_INTEGRATED_CONSENT_MUTATION =
             "pending_integrated_consent_mutation_v1"
+        const val PREF_REJECTED_CONSENT_CAS_JOURNAL =
+            "rejected_integrated_consent_cas_journal_v1"
+        const val MAX_AUTOMATIC_REJECTED_CAS_RECOVERIES = 1
         const val PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION =
             "integrated_consent_server_confirmation_v2"
         const val PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED =
             "local_withdrawal_fail_closed_v1"
         const val PREF_RAW_SOURCE_FIELD_LOG_BLOCKED =
             "raw_source_field_log_blocked_v1"
-        const val PENDING_CONSENT_MUTATION_SCHEMA_VERSION =
-            "walksafe.pending-integrated-consent-mutation.v2"
         const val PREF_ACCOUNT_DELETION_JOURNAL =
             "account_deletion_journal_v2"
         const val PREF_ACCOUNT_DELETION_ACTOR_HASH =
@@ -40397,6 +44515,7 @@ generation != cameraFallbackGeneration
         const val LEGACY_REPORT_CLEANUP_MAX_ATTEMPTS = 3
         const val LEGACY_REPORT_CLEANUP_INITIAL_BACKOFF_MS = 250L
         const val PREF_WALK_SESSION_INTERRUPTED = "walk_session_interrupted"
+        const val PREF_WALK_SESSION_INTERRUPTION_RECORD = "walk_session_interruption_v2"
         const val PREF_PERMISSION_RECOVERY_GATE_STATE =
             "permission_recovery_gate_state_v1"
         const val PREF_PERMISSION_RECOVERY_GATE_ITEMS =
@@ -40447,6 +44566,7 @@ generation != cameraFallbackGeneration
                 PREF_INTEGRATED_CONSENT_ACTOR_SHA256,
                 PREF_INTEGRATED_CONSENT_CONTROL_SECRET,
                 PREF_PENDING_INTEGRATED_CONSENT_MUTATION,
+                PREF_REJECTED_CONSENT_CAS_JOURNAL,
                 PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION,
                 PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED,
                 PREF_ACCOUNT_DELETION_JOURNAL,
@@ -40479,8 +44599,12 @@ generation != cameraFallbackGeneration
         const val TALKBACK_INTERACTION_PRIORITY_WINDOW_MS = 750L
         const val TALKBACK_NAVIGATION_DUP_WINDOW_MS = 2_000L
         const val TALKBACK_ADVISORY_DUP_WINDOW_MS = 4_000L
+        const val TALKBACK_VOICE_RECOGNITION_RECHECK_MS = 500L
         const val OVERLAY_UPDATE_INTERVAL_MS = 100L
         const val RAW_COLLECTION_CAPTURE_INTERVAL_MS = 30_000L
+        const val RAW_COLLECTION_POST_WALK_UPLOADS_PER_TASK = 4
+        /** transfer-F7: Gateway walk lease TTL (90 s, field-walk-ledger LEASE_TTL_MS) plus a margin. */
+        const val POST_WALK_WALK_IN_PROGRESS_RETRY_DELAY_MS = 90_000L + 15_000L
         val RAW_COLLECTION_MODEL_REVISION = Regex("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
         const val CAMERA_FALLBACK_IMU_MAX_AGE_MS = 1_500L
         const val CAMERA_FALLBACK_WIDTH = 640
@@ -40539,6 +44663,7 @@ generation != cameraFallbackGeneration
         val generation: Long,
         val firstRunLease: FirstRunAsyncLease,
         val requestedPermissions: Set<ObservedPermission>,
+        val requestedAndroidPermissions: Set<String>,
         val postLoginBinding: PostLoginDeviceCheckBinding?,
     )
 
@@ -40622,6 +44747,17 @@ generation != cameraFallbackGeneration
     )
 
 }
+
+internal fun nativeDetectorStallOwnsWalk(
+    expectedEpoch: WalkRuntimeEpoch,
+    expectedDetectorGeneration: Int,
+    currentEpoch: WalkRuntimeEpoch,
+    currentDetectorGeneration: Int,
+    currentState: WalkSessionState,
+): Boolean =
+    expectedEpoch == currentEpoch &&
+        expectedDetectorGeneration == currentDetectorGeneration &&
+        currentState in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
 
 private class CameraFallbackLifecycleOwner : LifecycleOwner {
     private val registry = LifecycleRegistry(this)

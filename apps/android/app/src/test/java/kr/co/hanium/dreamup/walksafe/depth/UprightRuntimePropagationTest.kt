@@ -16,7 +16,7 @@ class UprightRuntimePropagationTest {
             val detection = DetectionCandidate("person", .95f,
                 UprightCameraImage.toSensor(RectNorm(.42f, .72f, .16f, .16f), turns ?: 1))
             val frozen = ObjectDepthRuntimePipeline().process(snapshot, key.frameId, 1_000L,
-                listOf(detection), mapper = mapper, imageQuarterTurns = turns).single()
+                listOf(detection), mapper = mapper, mapperFrameId = key.frameId, imageQuarterTurns = turns).single()
             val observation = requireNotNull(CurrentTrackedFrameObservation.fromTrackingResult(
                 VisualTrackingResult(key, key, listOf(VisualTrackingObservation(
                     sourceIndex = 0, detectorSourceKey = key, trackedTargetKey = key,
@@ -41,7 +41,8 @@ class UprightRuntimePropagationTest {
     private val snapshot = DepthFrameSnapshot(key.frameId,
         rawDepth = DepthImage16(100, 100, IntArray(10_000) { 1_600 }),
         rawConfidence = ConfidenceImage8(100, 100, ByteArray(10_000) { 255.toByte() }), fullDepth = null,
-        rawDepthTimestampNs = key.cameraTimestampNs, cameraImageTimestampNs = key.cameraTimestampNs)
+        rawDepthTimestampNs = key.cameraTimestampNs, rawConfidenceTimestampNs = key.cameraTimestampNs,
+        cameraImageTimestampNs = key.cameraTimestampNs)
     private val mapper = LetterboxCoordinateMapper(
         ModelInputTransform(100, 100, 100, 100, 1f, 0f, 0f), ImageSize(100, 100))
 }

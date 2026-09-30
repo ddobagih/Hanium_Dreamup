@@ -28,8 +28,18 @@ import path from "node:path";
 import {
   decryptGatewayStateJson,
   encryptGatewayStateJson,
-  maxGatewayStateEnvelopeBytes
+  maxGatewayStateEnvelopeBytes,
+  syncGatewayStateDirectoryAfterRename
 } from "./encrypted-json-store.js";
+import {
+  registerRequiredGatewayStateFile,
+  requiredGatewayStateFileWasLost
+} from "./state-init-marker.js";
+import {
+  acquireExclusiveFileLockLeaseAsync,
+  ExclusiveFileLockBusyError,
+  type FileLockLease
+} from "./exclusive-file-lock.js";
 
 export const ACCOUNT_DELETION_CONTROL = "account-deletion";
 export const ACCOUNT_DELETION_SECRET_HEADER =
@@ -40,6 +50,9 @@ export const ACCOUNT_DELETION_REQUEST_SCHEMA =
 const LEDGER_SCHEMA_VERSION = 2;
 export const PRIVACY_LEDGER_MAX_BYTES = 16 * 1024 * 1024;
 const LOCK_WAIT_MS = 1_000;
+/** S19-25: non-blocking retry backoff for the asynchronous ledger lock (total LOCK_WAIT_MS). */
+const LOCK_RETRY_INITIAL_MS = 10;
+const LOCK_RETRY_MAX_MS = 200;
 const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{15,127}$/;
 const OPERATION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{15,127}$/;
 const PRIVACY_ACTOR_ID = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$/;
@@ -784,7 +797,13 @@ function readLedger(): PrivacyLedger {
     }
     return decoded;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return emptyLedger();
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      // S19-26: a lost ledger must not silently reopen fenced account generations.
+      if (requiredGatewayStateFileWasLost(ledgerPath())) {
+        throw new PrivacyRightsLedgerError("integrity", "privacy ledger is missing");
+      }
+      return emptyLedger();
+    }
     if (error instanceof PrivacyRightsLedgerError) throw error;
     throw new PrivacyRightsLedgerError("integrity", "privacy ledger cannot be read");
   }
@@ -844,15 +863,9 @@ function writeLedger(ledger: PrivacyLedger): void {
     closeSync(descriptor);
     descriptor = null;
     renameSync(temporary, target);
-    const directoryDescriptor = openSync(
-      stateDirectory(),
-      fsConstants.O_RDONLY | (fsConstants.O_DIRECTORY ?? 0)
-    );
-    try {
-      fsyncSync(directoryDescriptor);
-    } finally {
-      closeSync(directoryDescriptor);
-    }
+    // S19-27: after the rename a failure is outcome unknown, not "not written".
+    syncGatewayStateDirectoryAfterRename("privacy-rights-ledger", stateDirectory());
+    registerRequiredGatewayStateFile(target);
   } finally {
     if (descriptor !== null) closeSync(descriptor);
     rmSync(temporary, { force: true });
@@ -962,26 +975,71 @@ export function holdPrivacyLedgerFlockForTests(): never {
   while (true) Atomics.wait(sleepArray, 0, 0, 60_000);
 }
 
-function mutateLedger<T>(mutator: (ledger: PrivacyLedger) => {
+type LedgerMutator<T> = (ledger: PrivacyLedger) => {
   value: T;
   changed: boolean;
-}): T {
+};
+
+function applyLedgerMutation<T>(mutator: LedgerMutator<T>): T {
+  const ledger = readLedger();
+  const result = mutator(ledger);
+  if (result.changed) {
+    if (!validLedger(ledger)) {
+      throw new PrivacyRightsLedgerError(
+        "integrity",
+        "next privacy ledger state failed validation"
+      );
+    }
+    writeLedger(ledger);
+  }
+  return result.value;
+}
+
+function mutateLedger<T>(mutator: LedgerMutator<T>): T {
   const lock = acquireLock();
   try {
-    const ledger = readLedger();
-    const result = mutator(ledger);
-    if (result.changed) {
-      if (!validLedger(ledger)) {
-        throw new PrivacyRightsLedgerError(
-          "integrity",
-          "next privacy ledger state failed validation"
-        );
-      }
-      writeLedger(ledger);
-    }
-    return result.value;
+    return applyLedgerMutation(mutator);
   } finally {
     releaseLock(lock);
+  }
+}
+
+function lockRetryDelay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+/**
+ * S19-25: the same ledger lock (flock on privacy-rights/ledger.lock) acquired without
+ * blocking the event loop. Each attempt is a non-blocking flock through an asynchronous
+ * helper; contention backs off with timers (10 ms doubling to 200 ms) for at most
+ * LOCK_WAIT_MS and then fails as `busy`, exactly like the synchronous path. The critical
+ * section itself stays synchronous, so no other ledger work interleaves with it.
+ */
+async function mutateLedgerAsync<T>(mutator: LedgerMutator<T>): Promise<T> {
+  ensureDirectory();
+  const lockFile = path.join(stateDirectory(), "ledger.lock");
+  const deadline = performance.now() + LOCK_WAIT_MS;
+  let backoff = LOCK_RETRY_INITIAL_MS;
+  let lease: FileLockLease | null = null;
+  while (lease === null) {
+    try {
+      lease = await acquireExclusiveFileLockLeaseAsync(lockFile);
+    } catch (error) {
+      if (!(error instanceof ExclusiveFileLockBusyError)) {
+        throw new PrivacyRightsLedgerError("integrity", "privacy ledger lock storage failed");
+      }
+      const remaining = deadline - performance.now();
+      if (remaining <= 0) {
+        throw new PrivacyRightsLedgerError("busy", "privacy ledger is busy");
+      }
+      await lockRetryDelay(Math.min(backoff, remaining));
+      backoff = Math.min(backoff * 2, LOCK_RETRY_MAX_MS);
+    }
+  }
+  try {
+    return applyLedgerMutation(mutator);
+  } finally {
+    lease.release();
   }
 }
 
@@ -1052,6 +1110,21 @@ export function activateActorGeneration(
   actorId: string,
   nowEpochMs = Date.now()
 ): number {
+  return mutateLedger(activateActorGenerationMutator(actorId, nowEpochMs));
+}
+
+/** S19-25: route-facing form that never blocks the event loop on lock contention. */
+export async function activateActorGenerationAsync(
+  actorId: string,
+  nowEpochMs = Date.now()
+): Promise<number> {
+  return mutateLedgerAsync(activateActorGenerationMutator(actorId, nowEpochMs));
+}
+
+function activateActorGenerationMutator(
+  actorId: string,
+  nowEpochMs: number
+): LedgerMutator<number> {
   const occurredAt = isoInstantFromEpoch(nowEpochMs);
   if (!PRIVACY_ACTOR_ID.test(actorId) || !occurredAt) {
     throw new PrivacyRightsLedgerError(
@@ -1059,7 +1132,7 @@ export function activateActorGeneration(
       "actor generation input is invalid"
     );
   }
-  return mutateLedger((ledger) => {
+  return (ledger) => {
     const digest = actorDigest(actorId);
     const existing = ledger.actors[digest];
     if (existing) {
@@ -1087,7 +1160,7 @@ export function activateActorGeneration(
       processing_epoch: actor.processing_epoch
     });
     return { value: generation, changed: true };
-  });
+  };
 }
 
 export function bindBackendActorGeneration(
@@ -1095,6 +1168,25 @@ export function bindBackendActorGeneration(
   accountGeneration: number,
   nowEpochMs = Date.now()
 ): number {
+  return mutateLedger(bindBackendActorGenerationMutator(actorId, accountGeneration, nowEpochMs));
+}
+
+/** S19-25: route-facing form that never blocks the event loop on lock contention. */
+export async function bindBackendActorGenerationAsync(
+  actorId: string,
+  accountGeneration: number,
+  nowEpochMs = Date.now()
+): Promise<number> {
+  return mutateLedgerAsync(
+    bindBackendActorGenerationMutator(actorId, accountGeneration, nowEpochMs)
+  );
+}
+
+function bindBackendActorGenerationMutator(
+  actorId: string,
+  accountGeneration: number,
+  nowEpochMs: number
+): LedgerMutator<number> {
   const occurredAt = isoInstantFromEpoch(nowEpochMs);
   if (
     !PRIVACY_ACTOR_ID.test(actorId) ||
@@ -1106,7 +1198,7 @@ export function bindBackendActorGeneration(
       "backend actor generation input is invalid"
     );
   }
-  return mutateLedger((ledger) => {
+  return (ledger) => {
     const digest = actorDigest(actorId);
     const existing = ledger.actors[digest];
     if (existing) {
@@ -1130,7 +1222,7 @@ export function bindBackendActorGeneration(
       processing_epoch: 1
     });
     return { value: accountGeneration, changed: true };
-  });
+  };
 }
 
 export function currentActorGeneration(actorId: string): number | null {

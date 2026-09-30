@@ -159,6 +159,24 @@ class PositionConfidencePolicy(
         return true
     }
 
+    /** Watchdog reads expire evidence without counting a new GNSS/recovery sample. */
+    fun evaluate(nowElapsedRealtimeMs: Long): PositionConfidenceDecision {
+        val previousEvaluation = lastEvaluationAtMs
+        if (nowElapsedRealtimeMs < 0L || previousEvaluation?.let { nowElapsedRealtimeMs < it } == true) {
+            return PositionConfidenceDecision(PositionQuality.UNAVAILABLE, currentQuality,
+                PositionConfidenceTransition.FAIL_CLOSED, true, degradedEpisodeId, consecutiveHighSamples,
+                PositionConfidenceFailureReason.INVALID_TIME)
+        }
+        lastEvaluationAtMs = nowElapsedRealtimeMs
+        val sampleAt = lastSampleAtMs
+        val expired = sampleAt == null || nowElapsedRealtimeMs - sampleAt > config.maximumSampleAgeMs
+        return applyQuality(
+            if (expired) PositionQuality.UNAVAILABLE else currentQuality ?: PositionQuality.UNAVAILABLE,
+            nowElapsedRealtimeMs,
+            if (expired) PositionConfidenceFailureReason.STALE else null,
+        )
+    }
+
     private fun validateTime(
         sampleAtMs: Long,
         nowMs: Long,

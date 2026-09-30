@@ -80,6 +80,10 @@ class UnknownObjectFeedbackPolicy(stepLengthM: Float = 0.65f) {
             val safeMotion = if (attributed) motion else ObjectMotionEstimate()
             val safeObjectMotion = if (attributed) output.objectMotion else ObjectMotion.UNKNOWN
             output.copy(
+                sourceValidUntilElapsedRealtimeMs = minOf(
+                    output.sourceValidUntilElapsedRealtimeMs ?: Long.MAX_VALUE,
+                    capturedAtMs + MAX_SOURCE_AGE_MS,
+                ),
                 userFacing = messages.buildUserFacing(
                     MetricDepthDecision(
                         className = CLASS_NAME,

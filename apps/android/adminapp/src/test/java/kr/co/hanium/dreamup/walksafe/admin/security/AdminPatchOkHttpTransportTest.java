@@ -6,6 +6,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -221,6 +222,50 @@ public final class AdminPatchOkHttpTransportTest {
             assertNotNull(failure.get());
             assertEquals(IOException.class, failure.get().getClass());
             assertEquals("cancelled", failure.get().getMessage());
+        }
+    }
+
+    @Test
+    public void stalledPatchResponseTimesOutWithoutReplayingTheWrite() throws Exception {
+        try (MockWebServer server = new MockWebServer()) {
+            server.start();
+            server.enqueue(new MockResponse.Builder()
+                .code(200)
+                .bodyDelay(30, TimeUnit.SECONDS)
+                .body("response remains slow beyond the request deadline")
+                .build());
+            AtomicReference<Throwable> failure = new AtomicReference<>();
+            Thread requestThread = new Thread(() -> {
+                try {
+                    AdminOkHttpTransport.execute(
+                        "PATCH",
+                        server.url("/admin/reports/123/status").toString(),
+                        Map.of("Content-Type", "application/json"),
+                        "{}".getBytes(StandardCharsets.UTF_8),
+                        1_024,
+                        "cancelled",
+                        "no progress",
+                        "too large"
+                    );
+                } catch (Throwable error) {
+                    failure.set(error);
+                }
+            });
+
+            requestThread.start();
+            RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
+            assertNotNull(request);
+            requestThread.join(26_000);
+            if (requestThread.isAlive()) {
+                requestThread.interrupt();
+                requestThread.join(2_000);
+            }
+
+            assertFalse("stalled request exceeded the request deadline", requestThread.isAlive());
+            assertTrue(failure.get() instanceof IOException);
+            assertEquals("PATCH", request.getMethod());
+            assertEquals(1, server.getRequestCount());
+            assertNull(server.takeRequest(1, TimeUnit.SECONDS));
         }
     }
 

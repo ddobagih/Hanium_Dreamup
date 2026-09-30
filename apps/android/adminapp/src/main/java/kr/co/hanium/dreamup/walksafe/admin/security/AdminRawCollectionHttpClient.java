@@ -25,11 +25,18 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
     private static final int MAX_RESPONSE_BYTES = 128 * 1024;
     private static final byte[] EMPTY_BODY = new byte[0];
 
-    interface Clock { long nowEpochMs(); }
+    interface Clock {
+        long nowEpochMs();
+
+        default long monotonicNanos() { return System.nanoTime(); }
+    }
 
     interface Transport {
         Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException;
+
+        /** S18-18: explicit cancellation of requests still in flight; never waits. */
+        default void cancelInFlight() {}
     }
 
     static final class Response {
@@ -248,9 +255,10 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
             jsonHeaders(protectedHeaders(session, correlationId, null)),
             intent.challengeRequestBytes()
         );
+        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
         requireStatus(challenge, 200);
         AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
-            jsonBody(challenge), intent, clock.nowEpochMs(), signer
+            jsonBody(challenge), intent, challengeTime.estimatedNowEpochMs(clock.monotonicNanos()), signer
         );
         Map<String, String> headers = new LinkedHashMap<>(
             protectedHeaders(session, correlationId, readPurpose)
@@ -360,6 +368,12 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
         return AdminStrictJson.decodeUtf8(response.body);
     }
 
+    /** S18-18: not synchronized; it only signals the transport, which never waits. */
+    @Override
+    public void cancelInFlightRequests() {
+        transport.cancelInFlight();
+    }
+
     private static void requireNoStore(Response response) throws IOException {
         if (!hasDirective(response.cacheControl, "no-store")
             || !hasDirective(response.pragma, "no-cache")) {
@@ -375,44 +389,76 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
         return false;
     }
 
-    private static final class UrlConnectionTransport implements Transport {
+    /**
+     * S18-19: every request has the overall deadline of {@link AdminHttpRequestDeadline} on
+     * top of the connect/read phase limits. A timeout fails as "server outcome unknown" and a
+     * purpose decision or legal hold write is never re-sent automatically.
+     */
+    static final class UrlConnectionTransport implements Transport {
+        private final AdminHttpRequestDeadline deadlines;
+
+        UrlConnectionTransport() {
+            this(AdminHttpRequestDeadline.system());
+        }
+
+        UrlConnectionTransport(AdminHttpRequestDeadline deadlines) {
+            if (deadlines == null) throw new IllegalArgumentException("request deadline is required");
+            this.deadlines = deadlines;
+        }
+
+        /** Explicit cancellation of every request still in flight (it does not wait). */
+        @Override
+        public void cancelInFlight() {
+            deadlines.cancelInFlight();
+        }
+
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException {
-            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setUseCaches(false);
-            connection.setRequestMethod(method);
-            connection.setConnectTimeout(8_000);
-            connection.setReadTimeout(12_000);
-            connection.setInstanceFollowRedirects(false);
-            connection.setDoInput(true);
-            connection.setDoOutput(body != null);
-            headers.forEach(connection::setRequestProperty);
+            AdminHttpRequestDeadline.Owner owner = deadlines.open(url);
             try {
+                HttpURLConnection connection = owner.connection();
+                connection.setUseCaches(false);
+                connection.setRequestMethod(method);
+                connection.setInstanceFollowRedirects(false);
+                connection.setDoInput(true);
+                connection.setDoOutput(body != null);
+                // adm-F5: stream the exact body; the platform keeps no retryable copy to re-send.
+                if (body != null) connection.setFixedLengthStreamingMode(body.length);
+                headers.forEach(connection::setRequestProperty);
+                owner.check();
                 if (body != null) {
-                    try (var output = connection.getOutputStream()) { output.write(body); }
+                    try (var output = connection.getOutputStream()) {
+                        owner.check();
+                        output.write(body);
+                        owner.check();
+                    }
                 }
+                owner.check();
                 int status = connection.getResponseCode();
+                owner.check();
                 InputStream stream = status >= 200 && status <= 299
                     ? connection.getInputStream() : connection.getErrorStream();
-                byte[] bytes = stream == null ? new byte[0] : readBounded(stream);
-                return new Response(
-                    status,
-                    bytes,
-                    connection.getHeaderField("Content-Type"),
-                    connection.getHeaderField("Cache-Control"),
-                    connection.getHeaderField("Pragma")
-                );
+                owner.check();
+                byte[] bytes = stream == null ? new byte[0] : readBounded(stream, owner);
+                String contentType = connection.getHeaderField("Content-Type");
+                String cacheControl = connection.getHeaderField("Cache-Control");
+                String pragma = connection.getHeaderField("Pragma");
+                owner.check();
+                return new Response(status, bytes, contentType, cacheControl, pragma);
             } finally {
-                connection.disconnect();
+                owner.close();
             }
         }
 
-        private static byte[] readBounded(InputStream input) throws IOException {
+        private static byte[] readBounded(InputStream input, AdminHttpRequestDeadline.Owner owner)
+            throws IOException {
             try (input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
                 byte[] buffer = new byte[4_096];
                 while (true) {
+                    owner.check();
                     int read = input.read(buffer);
+                    owner.check();
                     if (read < 0) break;
                     if (output.size() + read > MAX_RESPONSE_BYTES) {
                         throw new IOException("administrator raw collection response is too large");

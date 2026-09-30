@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.report
 
 import kr.co.hanium.dreamup.walksafe.network.GatewayCredentialPolicy
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionState
+import kr.co.hanium.dreamup.walksafe.session.allowsPostWalkTransfer
 
 internal data class ReportQueueDrainContext(
     val walkState: WalkSessionState,
@@ -15,6 +16,8 @@ internal data class ReportQueueDrainContext(
     val walkSessionId: String,
     val consentReceiptSha256: String,
     val movementGeneration: Long,
+    val accountGeneration: Long? = null,
+    val sessionGeneration: Long = 0L,
 )
 
 internal data class ReportQueueDrainLease(
@@ -26,6 +29,9 @@ internal data class ReportQueueDrainLease(
     val runtimeWalkSessionId: String,
     val consentReceiptSha256: String,
     val movementGeneration: Long,
+    val accountGeneration: Long? = null,
+    val sessionGeneration: Long = 0L,
+    val automaticReportingAllowedAtAcquire: Boolean = true,
 )
 
 internal data class ReportQueueDrainDecision(
@@ -59,12 +65,17 @@ internal class ReportQueueDrainPolicy {
             runtimeWalkSessionId = context.walkSessionId,
             consentReceiptSha256 = context.consentReceiptSha256,
             movementGeneration = context.movementGeneration,
+            accountGeneration = context.accountGeneration,
+            sessionGeneration = context.sessionGeneration,
+            automaticReportingAllowedAtAcquire = context.automaticReportingAllowed,
         )
         currentLease = lease
         return ReportQueueDrainDecision(
             lease = lease,
             allowedStatusRequests = 1,
-            allowedPostRequests = 1,
+            allowedPostRequests = if (
+                report.priority != ReportQueuePriority.AUTOMATIC || context.automaticReportingAllowed
+            ) 1 else 0,
         )
     }
 
@@ -75,23 +86,32 @@ internal class ReportQueueDrainPolicy {
     ): Boolean {
         val current = currentLease
         val valid = current == lease &&
-            context.walkState == WalkSessionState.PAUSED &&
+            // Owner decision 3(b): only after the walk; ACTIVE or PAUSED again cancels.
+            context.walkState.allowsPostWalkTransfer &&
             context.appForeground &&
             context.stationary &&
             context.networkAllowed &&
             context.consentAllowed &&
             (
                 lease.priority != ReportQueuePriority.AUTOMATIC ||
-                    context.automaticReportingAllowed
+                    context.automaticReportingAllowed == lease.automaticReportingAllowedAtAcquire
             ) &&
             context.authorityAllowed &&
             context.reporterActorId == lease.reporterActorId &&
+            context.accountGeneration == lease.accountGeneration &&
+            context.sessionGeneration == lease.sessionGeneration &&
             context.walkSessionId == lease.runtimeWalkSessionId &&
             context.consentReceiptSha256 == lease.consentReceiptSha256 &&
             context.movementGeneration == lease.movementGeneration
         if (!valid && current == lease) currentLease = null
         return valid
     }
+
+    /** Status recovery uses current authority; creating an automatic report also needs its opt-in. */
+    @Synchronized
+    fun mayUpload(lease: ReportQueueDrainLease, context: ReportQueueDrainContext): Boolean =
+        isCurrent(lease, context) &&
+            (lease.priority != ReportQueuePriority.AUTOMATIC || context.automaticReportingAllowed)
 
     @Synchronized
     fun release(lease: ReportQueueDrainLease): Boolean {
@@ -102,15 +122,16 @@ internal class ReportQueueDrainPolicy {
 
     private fun eligible(report: QueuedReport, context: ReportQueueDrainContext): Boolean =
         context.movementGeneration >= 0L &&
-            context.walkState == WalkSessionState.PAUSED &&
+            context.sessionGeneration >= 0L &&
+            (context.accountGeneration == null || context.accountGeneration > 0L) &&
+            report.accountGeneration == context.accountGeneration &&
+            !report.quarantined &&
+            // Owner decision 3(b) / FP-032-DETAIL-02: queued reports are sent after the walk.
+            context.walkState.allowsPostWalkTransfer &&
             context.appForeground &&
             context.stationary &&
             context.networkAllowed &&
             context.consentAllowed &&
-            (
-                report.priority != ReportQueuePriority.AUTOMATIC ||
-                    context.automaticReportingAllowed
-            ) &&
             context.authorityAllowed &&
             report.reporterActorId == context.reporterActorId &&
             GatewayCredentialPolicy.normalizedActorIdOrNull(context.reporterActorId) ==

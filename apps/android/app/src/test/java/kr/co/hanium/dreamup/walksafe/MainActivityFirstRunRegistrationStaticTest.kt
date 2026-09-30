@@ -379,7 +379,10 @@ class MainActivityFirstRunRegistrationStaticTest {
             functionBlock("private fun startWalkSessionRuntimeAfterCameraRelease(")
         assertInOrder(
             activation,
-            "if (!isWalkSessionRuntimeActive()) return",
+            "if (!isWalkSessionRuntimeActive()) {",
+            "handleGatewayWalkAuthorityLost(\"walk_lease_missing_before_runtime\")",
+            "return false",
+            "if (!persistWalkSessionInterruptionMarker()) {",
             "beginRuntimeCameraHandoff(runtimeEpoch)",
             "stopOfficialEnvironmentCameraPreflight(",
             "startWalkSessionRuntimeAfterCameraRelease(runtimeEpoch)",

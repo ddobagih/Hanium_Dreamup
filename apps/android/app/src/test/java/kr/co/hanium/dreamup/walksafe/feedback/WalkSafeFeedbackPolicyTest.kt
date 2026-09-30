@@ -33,6 +33,99 @@ class WalkSafeFeedbackPolicyTest {
     }
 
     @Test
+    fun freshHighConfidenceRawDepthImminentStopRequiresMoreThan400MsLease() {
+        val policy = WalkSafeFeedbackPolicy()
+        val stop = candidate(
+            level = MessageLevel.STOP,
+            message = "멈추세요.",
+            confidence = 0.90f,
+            trackAgeFrames = 2,
+            trackStableMs = 100L,
+        ).copy(
+            validUntilMs = 1_401L,
+            timeToCollisionMs = 300L,
+            riskDistanceM = 0.9f,
+        )
+
+        val action = policy.evaluate(stop, true, 1_000L)
+
+        assertEquals(MessageLevel.STOP, action!!.level)
+        assertEquals(1_401L, action.validUntilMs)
+        assertEquals(setOf(stop.trackId), policy.activeRiskTrackIds(listOf(stop), true, 1_000L))
+        assertEquals(setOf(stop.deliveryKey), policy.activeFeedbackDeliveryKeys(listOf(stop), true, 1_000L))
+    }
+
+    @Test
+    fun emergencyStopDoesNotBecomeEligibleAsItsLeaseAgesIntoTheLast400Ms() {
+        val stop = candidate(
+            level = MessageLevel.STOP,
+            message = "멈추세요.",
+            confidence = 0.90f,
+            trackAgeFrames = 2,
+            trackStableMs = 100L,
+        ).copy(
+            validUntilMs = 1_401L,
+            timeToCollisionMs = 300L,
+            riskDistanceM = 0.9f,
+        )
+
+        assertNotNull(WalkSafeFeedbackPolicy().evaluate(stop, true, 1_000L))
+        assertNull(WalkSafeFeedbackPolicy().evaluate(stop, true, 1_001L))
+        assertNull(WalkSafeFeedbackPolicy().evaluate(stop, true, 1_002L))
+        assertNull(WalkSafeFeedbackPolicy().evaluate(stop, true, 1_402L))
+    }
+
+    @Test
+    fun transientStopNearMissesDoNotBypassNormalStability() {
+        val urgent = candidate(
+            level = MessageLevel.STOP,
+            message = "멈추세요.",
+            confidence = 0.90f,
+            trackAgeFrames = 2,
+            trackStableMs = 100L,
+        ).copy(
+            validUntilMs = 1_401L,
+            timeToCollisionMs = 300L,
+            riskDistanceM = 0.9f,
+        )
+        val nearMisses = listOf(
+            urgent.copy(confidence = 0.89f),
+            urgent.copy(source = DepthSource.ARCORE_FULL_DEPTH),
+            urgent.copy(trackAgeFrames = 1),
+            urgent.copy(trackStableMs = 99L),
+            urgent.copy(timeToCollisionMs = 301L),
+            urgent.copy(riskDistanceM = 0.91f),
+            urgent.copy(validUntilMs = 1_400L),
+            urgent.copy(validUntilMs = Long.MAX_VALUE),
+            urgent.copy(stale = true),
+        )
+
+        nearMisses.forEach { stop ->
+            assertNull(stop.toString(), WalkSafeFeedbackPolicy().evaluate(stop, true, 1_000L))
+        }
+        assertNull(WalkSafeFeedbackPolicy().evaluate(urgent, true, 1_402L))
+        assertNull(WalkSafeFeedbackPolicy().evaluate(urgent, false, 1_000L))
+    }
+
+    @Test
+    fun urgentRiskNumbersDoNotRelaxOrdinaryWarningStability() {
+        val policy = WalkSafeFeedbackPolicy()
+        val warning = candidate(
+            level = MessageLevel.WARNING,
+            confidence = 0.90f,
+            trackAgeFrames = 2,
+            trackStableMs = 100L,
+        ).copy(
+            validUntilMs = 1_400L,
+            timeToCollisionMs = 300L,
+            riskDistanceM = 0.9f,
+        )
+
+        assertNull(policy.evaluate(warning, true, 1_000L))
+        assertNotNull(policy.evaluate(warning.copy(trackAgeFrames = 3, trackStableMs = 700L), true, 1_100L))
+    }
+
+    @Test
     fun rateLimitsPerTrackAndGlobalAlerts() {
         val policy = WalkSafeFeedbackPolicy()
 
@@ -99,11 +192,12 @@ class WalkSafeFeedbackPolicyTest {
     }
 
     @Test
-    fun interruptedInformationSpeechReleasesClaimAndIgnoresLateCompletion() {
+    fun cancelledInformationClaimCannotRetireItsReplacementThroughALateFailure() {
         val policy = WalkSafeFeedbackPolicy()
         val info = candidate(level = MessageLevel.INFO, message = "점자블록을 따라 이동하세요.")
+            .copy(timestampMs = 1_000L, validUntilMs = 1_800L)
         val action = requireNotNull(policy.evaluate(info, true, 1_000L))
-        assertTrue(policy.claimFeedbackDelivery(action.trackId, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(action.trackId, 1_000L, 1_000L))
         val callbacks = UtteranceCallbackRegistry()
         var completed = 0
         var failures = 0
@@ -118,7 +212,11 @@ class WalkSafeFeedbackPolicyTest {
                 policy.rejectUndeliveredFeedback(action.trackId, 1_000L)
             },
         )
-        assertNull(policy.evaluate(info, true, 6_000L))
+        policy.cancelFeedbackForTracks(setOf(action.trackId))
+        assertFalse(policy.hasClaimedFeedbackDelivery(action.trackId, MessageLevel.INFO))
+        val replacement = info.copy(timestampMs = 6_000L, validUntilMs = 6_800L)
+        assertNotNull(policy.evaluate(replacement, true, 6_000L))
+        assertTrue(policy.claimFeedbackDelivery(action.trackId, 6_000L, 6_000L))
 
         callbacks.takeTerminalCallback("info", completed = false, notifyFailure = true)?.invoke()
         callbacks.takeTerminalCallback("info", completed = true, notifyFailure = true)?.invoke()
@@ -126,7 +224,63 @@ class WalkSafeFeedbackPolicyTest {
 
         assertEquals(0, completed)
         assertEquals(1, failures)
-        assertNotNull(policy.evaluate(info, true, 6_100L))
+        assertNull(policy.evaluate(replacement, true, 6_100L))
+        assertTrue(policy.hasClaimedFeedbackDelivery(action.trackId, MessageLevel.INFO))
+        assertTrue(policy.confirmFeedbackDelivery(action.trackId, 6_000L, 6_100L))
+    }
+
+    @Test
+    fun informationClaimKeepsCompletionOwnershipAfterItsStartDeadline() {
+        val policy = WalkSafeFeedbackPolicy()
+        val info = candidate(level = MessageLevel.INFO, message = "점자블록이 관측됩니다.")
+            .copy(timestampMs = 1_000L, validUntilMs = 1_800L)
+        val action = requireNotNull(policy.evaluate(info, true, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(action.trackId, 1_000L, 1_000L))
+
+        val replacement = info.copy(timestampMs = 6_000L, validUntilMs = 6_800L)
+        assertNull(policy.evaluate(replacement, true, 6_000L))
+        assertTrue(policy.hasClaimedFeedbackDelivery(action.trackId, MessageLevel.INFO))
+        assertTrue(policy.confirmFeedbackDelivery(action.trackId, 1_000L, 6_001L))
+        assertFalse(policy.confirmFeedbackDelivery(action.trackId, 1_000L, 6_002L))
+    }
+
+    @Test
+    fun cancelledInformationClaimCannotConfirmItsReplacementThroughALateCompletion() {
+        val policy = WalkSafeFeedbackPolicy()
+        val info = candidate(level = MessageLevel.INFO, message = "점자블록이 관측됩니다.")
+            .copy(timestampMs = 1_000L, validUntilMs = 1_800L)
+        val action = requireNotNull(policy.evaluate(info, true, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(action.trackId, 1_000L, 1_000L))
+        val callbacks = UtteranceCallbackRegistry()
+        var completionCallbacks = 0
+        var lateCompletionConfirmed = false
+        var failures = 0
+        callbacks.register(
+            "info",
+            onCompleted = {
+                completionCallbacks += 1
+                lateCompletionConfirmed = policy.confirmFeedbackDelivery(action.trackId, 1_000L, 6_100L)
+            },
+            onFailed = {
+                failures += 1
+                policy.rejectUndeliveredFeedback(action.trackId, 1_000L)
+            },
+        )
+        policy.cancelFeedbackForTracks(setOf(action.trackId))
+        val replacement = info.copy(timestampMs = 6_000L, validUntilMs = 6_800L)
+        assertNotNull(policy.evaluate(replacement, true, 6_000L))
+        assertTrue(policy.claimFeedbackDelivery(action.trackId, 6_000L, 6_000L))
+
+        callbacks.takeTerminalCallback("info", completed = true, notifyFailure = true)?.invoke()
+        callbacks.takeTerminalCallback("info", completed = false, notifyFailure = true)?.invoke()
+        callbacks.takeTerminalCallback("info", completed = true, notifyFailure = true)?.invoke()
+
+        assertEquals(1, completionCallbacks)
+        assertFalse(lateCompletionConfirmed)
+        assertEquals(0, failures)
+        assertNull(policy.evaluate(replacement, true, 6_100L))
+        assertTrue(policy.hasClaimedFeedbackDelivery(action.trackId, MessageLevel.INFO))
+        assertTrue(policy.confirmFeedbackDelivery(action.trackId, 6_000L, 6_100L))
     }
 
     @Test
@@ -177,7 +331,7 @@ class WalkSafeFeedbackPolicyTest {
 
         val first = policy.evaluateCandidates(candidates, true, 1_000L)!!
         assertEquals("a", first.trackId)
-        assertTrue(policy.claimFeedbackDelivery(first.trackId, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(first.trackId, 1_000L, 1_000L))
         assertNull(policy.evaluateCandidates(candidates.drop(1), true, 1_010L))
 
         policy.confirmFeedbackDelivery(first.trackId, 1_000L, 1_020L)
@@ -238,7 +392,7 @@ class WalkSafeFeedbackPolicyTest {
         val warningB = candidate(trackId = "warning-b")
         val warningC = candidate(trackId = "warning-c")
         val active = policy.evaluateCandidates(listOf(warningA, warningB, warningC), true, 1_000L)!!
-        assertTrue(policy.claimFeedbackDelivery(active.trackId, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(active.trackId, 1_000L, 1_000L))
 
         val stop = policy.evaluateCandidates(
             listOf(
@@ -291,7 +445,7 @@ class WalkSafeFeedbackPolicyTest {
             true,
             1_000L,
         )!!
-        assertTrue(failedPolicy.claimFeedbackDelivery(failed.trackId, 1_000L))
+        assertTrue(failedPolicy.claimFeedbackDelivery(failed.trackId, 1_000L, 1_000L))
         failedPolicy.rejectUndeliveredFeedback(failed.trackId, 1_000L)
         assertEquals(
             "next",
@@ -306,7 +460,7 @@ class WalkSafeFeedbackPolicyTest {
             true,
             2_000L,
         )!!
-        assertTrue(lifecyclePolicy.claimFeedbackDelivery(cancelled.trackId, 2_000L))
+        assertTrue(lifecyclePolicy.claimFeedbackDelivery(cancelled.trackId, 2_000L, 2_000L))
         lifecyclePolicy.cancelPendingFeedbackDeliveries()
         assertEquals(
             "after-resume",
@@ -322,7 +476,7 @@ class WalkSafeFeedbackPolicyTest {
         policy.evaluate(candidate(source = DepthSource.POLYGON_TREND_PSEUDO_DEPTH), true, 1_100L)
         policy.evaluate(candidate(source = DepthSource.POLYGON_TREND_PSEUDO_DEPTH), true, 1_200L)
 
-        assertFalse(policy.claimFeedbackDelivery(pending.trackId, 1_000L))
+        assertFalse(policy.claimFeedbackDelivery(pending.trackId, 1_000L, 1_200L))
         assertEquals("b", policy.evaluate(candidate(trackId = "b"), true, 1_300L)!!.trackId)
     }
 
@@ -340,7 +494,7 @@ class WalkSafeFeedbackPolicyTest {
             1_100L,
         )!!
 
-        assertFalse(policy.claimFeedbackDelivery(warning.trackId, 1_000L))
+        assertFalse(policy.claimFeedbackDelivery(warning.trackId, 1_000L, 1_100L))
         assertEquals("stop", stop.trackId)
     }
 
@@ -348,7 +502,7 @@ class WalkSafeFeedbackPolicyTest {
     fun higherSeverityInvalidatesAClaimedDecisionStillAwaitingSpeechCompletion() {
         val policy = WalkSafeFeedbackPolicy()
         val warning = policy.evaluate(candidate(trackId = "warning"), true, 1_000L)!!
-        assertTrue(policy.claimFeedbackDelivery(warning.trackId, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(warning.trackId, 1_000L, 1_000L))
 
         val stop = policy.evaluateCandidates(
             listOf(
@@ -364,22 +518,22 @@ class WalkSafeFeedbackPolicyTest {
     }
 
     @Test
-    fun claimedDecisionCannotBeClearedBeforeItsDeliveryIsResolved() {
+    fun deviceGateRevocationInvalidatesClaimedUndeliveredDecision() {
         val policy = WalkSafeFeedbackPolicy()
         val pending = policy.evaluate(candidate(trackId = "a"), true, 1_000L)!!
-        assertTrue(policy.claimFeedbackDelivery(pending.trackId, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(pending.trackId, 1_000L, 1_000L))
 
         policy.evaluate(null, deviceGateAllowsAlerts = false, nowMs = 1_100L)
 
-        policy.confirmFeedbackDelivery(pending.trackId, 1_000L)
-        assertFalse(policy.canSpeakNavigation(1_200L))
+        assertFalse(policy.confirmFeedbackDelivery(pending.trackId, 1_000L))
+        assertTrue(policy.canSpeakNavigation(1_200L))
     }
 
     @Test
     fun lifecycleCancellationRollsBackAClaimedUndeliveredDecision() {
         val policy = WalkSafeFeedbackPolicy()
         val pending = policy.evaluate(candidate(trackId = "a"), true, 1_000L)!!
-        assertTrue(policy.claimFeedbackDelivery(pending.trackId, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(pending.trackId, 1_000L, 1_000L))
 
         policy.cancelPendingFeedbackDeliveries()
 
@@ -403,7 +557,7 @@ class WalkSafeFeedbackPolicyTest {
     fun cooldownStartsWhenDelayedSpeechDeliveryCompletes() {
         val policy = WalkSafeFeedbackPolicy()
         val pending = policy.evaluate(candidate(trackId = "a"), true, 1_000L)!!
-        assertTrue(policy.claimFeedbackDelivery(pending.trackId, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(pending.trackId, 1_000L, 1_000L))
 
         assertTrue(policy.confirmFeedbackDelivery(pending.trackId, 1_000L, deliveredAtMs = 4_000L))
 
@@ -415,13 +569,13 @@ class WalkSafeFeedbackPolicyTest {
     fun stopEscalationBypassesLowerCompletedWarningButNotTheNextStopCooldown() {
         val policy = WalkSafeFeedbackPolicy()
         val warning = policy.evaluate(candidate(trackId = "a"), true, 1_000L)!!
-        assertTrue(policy.claimFeedbackDelivery(warning.trackId, 1_000L))
+        assertTrue(policy.claimFeedbackDelivery(warning.trackId, 1_000L, 1_000L))
         assertTrue(policy.confirmFeedbackDelivery(warning.trackId, 1_000L, 4_000L))
 
         val stop = policy.evaluate(candidate(trackId = "a", level = MessageLevel.STOP), true, 4_100L)!!
         assertEquals(MessageLevel.STOP, stop.level)
         assertEquals(5_600L, stop.validUntilMs)
-        assertTrue(policy.claimFeedbackDelivery(stop.trackId, 4_100L))
+        assertTrue(policy.claimFeedbackDelivery(stop.trackId, 4_100L, 4_100L))
         assertTrue(policy.confirmFeedbackDelivery(stop.trackId, 4_100L, 4_200L))
 
         assertNull(policy.evaluate(candidate(trackId = "a", level = MessageLevel.STOP), true, 4_300L))
@@ -472,7 +626,7 @@ class WalkSafeFeedbackPolicyTest {
         policy.evaluate(candidate(), true, 1_000L)!!
         assertTrue(policy.confirmFeedbackDelivery("track-1", 1_000L, 4_000L))
         policy.evaluate(candidate(level = MessageLevel.STOP), true, 4_100L)!!
-        assertTrue(policy.claimFeedbackDelivery("track-1", 4_100L))
+        assertTrue(policy.claimFeedbackDelivery("track-1", 4_100L, 4_100L))
 
         policy.rejectUndeliveredFeedback("track-1", 4_100L)
 
@@ -486,7 +640,7 @@ class WalkSafeFeedbackPolicyTest {
         policy.evaluate(candidate(), true, 1_000L)!!
         assertTrue(policy.confirmFeedbackDelivery("track-1", 1_000L, 4_000L))
         policy.evaluate(candidate(level = MessageLevel.STOP), true, 4_100L)!!
-        assertTrue(policy.claimFeedbackDelivery("track-1", 4_100L))
+        assertTrue(policy.claimFeedbackDelivery("track-1", 4_100L, 4_100L))
 
         policy.cancelPendingFeedbackDeliveries()
 
@@ -503,7 +657,7 @@ class WalkSafeFeedbackPolicyTest {
         policy.evaluate(candidate(level = MessageLevel.STOP), true, 4_100L)!!
 
         policy.evaluate(null, true, 5_601L)
-        assertFalse(policy.claimFeedbackDelivery("track-1", 4_100L))
+        assertFalse(policy.claimFeedbackDelivery("track-1", 4_100L, 5_601L))
         policy.resetForNewWalk()
         assertNotNull(policy.evaluate(candidate(level = MessageLevel.CAUTION), true, 5_602L))
     }
@@ -512,7 +666,7 @@ class WalkSafeFeedbackPolicyTest {
     fun cancellingUnknownTracksPreservesAPrimaryClaimAndClearsOnlyTheirQueuedEntries() {
         val policy = WalkSafeFeedbackPolicy(FeedbackPolicyConfig(pendingQueueCapacity = 2))
         policy.evaluateCandidates(listOf(candidate(trackId = "primary"), candidate(trackId = "unknown")), true, 1_000L)!!
-        assertTrue(policy.claimFeedbackDelivery("primary", 1_000L))
+        assertTrue(policy.claimFeedbackDelivery("primary", 1_000L, 1_000L))
 
         policy.cancelFeedbackForTracks(setOf("unknown"))
 
@@ -533,7 +687,7 @@ class WalkSafeFeedbackPolicyTest {
             true,
             4_100L,
         )!!
-        assertTrue(policy.claimFeedbackDelivery("unknown", 4_100L))
+        assertTrue(policy.claimFeedbackDelivery("unknown", 4_100L, 4_100L))
 
         policy.cancelFeedbackForTracks(setOf("unknown"))
 
@@ -571,9 +725,65 @@ class WalkSafeFeedbackPolicyTest {
                     candidate(trackId = "info", level = MessageLevel.INFO),
                 ),
                 deviceGateAllowsAlerts = true,
+                nowMs = 1_000L,
             ),
         )
-        assertTrue(policy.activeRiskTrackIds(listOf(candidate()), false).isEmpty())
+        assertTrue(policy.activeRiskTrackIds(listOf(candidate()), false, 1_000L).isEmpty())
+    }
+
+    @Test
+    fun expiredLeaseIsAbsentFromActiveQueriesAndCannotBeClaimedAfterDeadline() {
+        for (level in listOf(MessageLevel.INFO, MessageLevel.CAUTION, MessageLevel.WARNING, MessageLevel.STOP)) {
+            val leased = candidate(level = level).copy(validUntilMs = 1_100L)
+            val policy = WalkSafeFeedbackPolicy()
+            val riskIds = if (leased.alertableLevel) setOf(leased.trackId) else emptySet()
+
+            assertEquals(riskIds, policy.activeRiskTrackIds(listOf(leased), true, 1_100L))
+            assertEquals(setOf(leased.deliveryKey), policy.activeFeedbackDeliveryKeys(listOf(leased), true, 1_100L))
+            assertTrue(policy.activeRiskTrackIds(listOf(leased), true, 1_101L).isEmpty())
+            assertTrue(policy.activeFeedbackDeliveryKeys(listOf(leased), true, 1_101L).isEmpty())
+
+            val expired = requireNotNull(policy.evaluate(leased, true, 1_000L))
+            assertFalse(level.name, policy.claimFeedbackDelivery(expired.trackId, 1_000L, 1_101L))
+            assertFalse(policy.confirmFeedbackDelivery(expired.trackId, 1_000L, 1_102L))
+            // Rejecting a late start must release its reservation and restore the cooldown.
+            val refreshed = requireNotNull(policy.evaluate(leased.copy(validUntilMs = 2_000L), true, 1_101L))
+            assertTrue(policy.claimFeedbackDelivery(refreshed.trackId, 1_101L, 1_101L))
+
+            val boundaryPolicy = WalkSafeFeedbackPolicy()
+            val atDeadline = requireNotNull(boundaryPolicy.evaluate(leased, true, 1_000L))
+            assertTrue(boundaryPolicy.claimFeedbackDelivery(atDeadline.trackId, 1_000L, 1_100L))
+        }
+    }
+
+    @Test
+    fun endingAVisualTrackingGenerationDiscardsItsUnstartedFeedbackOnly() {
+        // S11-15 (originals/11.txt:153-157): the generation's reserved and queued feedback go with it.
+        val policy = WalkSafeFeedbackPolicy(FeedbackPolicyConfig(pendingQueueCapacity = 3))
+        val reserved = requireNotNull(policy.evaluateCandidates(
+            listOf(candidate(trackId = "visual-3-track-1"), candidate(trackId = "visual-3-track-2"), candidate(trackId = "track-9")),
+            true, 1_000L,
+        ))
+        assertEquals("visual-3-track-1", reserved.trackId)
+        policy.discardUnstartedFeedbackForTrackPrefix("visual-3-")
+        // The unstarted reservation is gone (its cooldown is restored) ...
+        assertFalse(policy.claimFeedbackDelivery("visual-3-track-1", 1_000L, 1_010L))
+        // ... and the next delivery is the other producer's queued track, not the old generation's.
+        assertEquals("track-9", requireNotNull(policy.evaluateCandidates(listOf(candidate(trackId = "track-9")), true, 1_100L)).trackId)
+    }
+
+    @Test
+    fun anUtteranceThatAlreadyStartedIsNotCutByTheGenerationChange() {
+        val policy = WalkSafeFeedbackPolicy()
+        val started = requireNotNull(policy.evaluate(candidate(trackId = "visual-4-track-1"), true, 5_000L))
+        assertTrue(policy.claimFeedbackDelivery(started.trackId, 5_000L, 5_000L))
+        policy.discardUnstartedFeedbackForTrackPrefix("visual-4-")
+        assertTrue(policy.confirmFeedbackDelivery(started.trackId, 5_000L, 5_100L))
+        // The prefix ends at its separator: generation 10 is not generation 1.
+        val other = WalkSafeFeedbackPolicy()
+        requireNotNull(other.evaluate(candidate(trackId = "visual-10-track-1"), true, 1_000L))
+        other.discardUnstartedFeedbackForTrackPrefix("visual-1-")
+        assertTrue(other.claimFeedbackDelivery("visual-10-track-1", 1_000L, 1_000L))
     }
 
     private fun candidate(

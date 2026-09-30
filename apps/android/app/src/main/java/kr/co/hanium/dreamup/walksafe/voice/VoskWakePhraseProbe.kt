@@ -93,6 +93,8 @@ internal class VoskWakePhraseProbe internal constructor(
     private val onReady: () -> Unit = {},
     private val onDiagnostic: (VoiceInputDiagnosticEvent, Float?) -> Unit = { _, _ -> },
     private val listenUntilWake: Boolean = false,
+    private val isInputSuppressed: () -> Boolean = { false },
+    private val inputGeneration: () -> Long? = { null },
 ) : Closeable {
     private enum class State {
         IDLE,
@@ -119,6 +121,7 @@ internal class VoskWakePhraseProbe internal constructor(
             logVoiceInputDiagnostic(event, backend = OfflineSpeechEngine.VOSK, confidence = confidence)
         },
         listenUntilWake: Boolean = false,
+        inputGeneration: () -> Long? = { null },
     ) : this(
         streamFactory = VoskWakePhraseStreamFactory { listener ->
             AndroidVoskWakePhraseStream(
@@ -128,6 +131,7 @@ internal class VoskWakePhraseProbe internal constructor(
                 listener = listener,
                 onDiagnostic = onDiagnostic,
                 homeWakeEndpointing = listenUntilWake,
+                inputGeneration = inputGeneration,
             )
         },
         dispatcher = AndroidVoskWakePhraseProbeDispatcher(),
@@ -136,6 +140,8 @@ internal class VoskWakePhraseProbe internal constructor(
         onReady = onReady,
         onDiagnostic = onDiagnostic,
         listenUntilWake = listenUntilWake,
+        isInputSuppressed = isInputSuppressed,
+        inputGeneration = inputGeneration,
     )
 
     init {
@@ -148,12 +154,18 @@ internal class VoskWakePhraseProbe internal constructor(
         }
 
         override fun onTranscript(runId: Long, transcript: VoskTranscript) {
+            val capturedGeneration = runCatching(inputGeneration).getOrElse { return }
+            onTranscript(runId, transcript, capturedGeneration)
+        }
+
+        override fun onTranscript(runId: Long, transcript: VoskTranscript, inputGeneration: Long?) {
+            if (!isInputCurrent(inputGeneration)) return
             if (listenUntilWake && transcript.isFinal) {
                 // Capture callbacks must return before HOME cleanup joins the capture worker.
-                // Deliver handoff only after dispatcher-thread stop/close releases its lease.
-                dispatcher.post { handleTranscript(runId, transcript) }
+                // Preserve the decoder's input generation while this result waits in the queue.
+                dispatcher.post { handleTranscript(runId, transcript, inputGeneration) }
             } else {
-                handleTranscript(runId, transcript)
+                handleTranscript(runId, transcript, inputGeneration)
             }
         }
 
@@ -274,17 +286,23 @@ internal class VoskWakePhraseProbe internal constructor(
         }
 
         diagnose(VoiceInputDiagnosticEvent.WAKE_READY)
-        runCatching { dispatcher.post(onReady) }
+        runCatching {
+            dispatcher.post {
+                val current = synchronized(stateLock) { state == State.LISTENING && activeRunId == runId }
+                if (current) onReady()
+            }
+        }
     }
 
     private fun handleTranscript(
         runId: Long,
         transcript: VoskTranscript,
+        capturedInputGeneration: Long?,
     ) {
         val current = synchronized(stateLock) {
             state == State.LISTENING && activeRunId == runId
         }
-        if (!current) return
+        if (!current || !isInputCurrent(capturedInputGeneration)) return
         if (!transcript.isFinal) {
             val firstPartial = synchronized(stateLock) {
                 if (partialObserved) false else {
@@ -305,6 +323,13 @@ internal class VoskWakePhraseProbe internal constructor(
             transcript = transcript.text,
             mode = WakePhraseCommandMode.WAKE_PHRASE_REQUIRED,
         )
+        if (extraction is WakePhraseCommandExtraction.Command &&
+            !transcript.wakeSpanTrustedBefore(extraction.text)
+        ) {
+            // S04-19: a clearly heard command does not lift a doubtful wake phrase.
+            diagnose(VoiceInputDiagnosticEvent.WAKE_FINAL_UNTRUSTED, transcript.confidence)
+            return
+        }
         val addressed = when (extraction) {
             WakePhraseCommandExtraction.NotAddressed -> false
             WakePhraseCommandExtraction.AwaitingCommand,
@@ -319,9 +344,16 @@ internal class VoskWakePhraseProbe internal constructor(
         if (addressed) {
             // Only HOME consumes a command in the wake utterance; capability probes never do.
             val command = if (listenUntilWake && extraction is WakePhraseCommandExtraction.Command) {
-                transcript.copy(text = extraction.text)
+                // S04-19/S05-23: a doubtful command part is dropped; the wake still opens the window.
+                transcript.commandSpanOrNull(extraction.text)
             } else null
-            finish(VoskWakePhraseProbeResult.available(command))
+            if (!isInputCurrent(capturedInputGeneration)) return
+            finish(
+                VoskWakePhraseProbeResult.available(command),
+                expectedState = State.LISTENING,
+                expectedRunId = runId,
+                expectedInputGeneration = capturedInputGeneration,
+            )
         }
     }
 
@@ -351,6 +383,7 @@ internal class VoskWakePhraseProbe internal constructor(
         result: VoskWakePhraseProbeResult,
         expectedState: State? = null,
         expectedRunId: Long? = null,
+        expectedInputGeneration: Long? = null,
     ) {
         val resources = synchronized(stateLock) {
             if (state == State.TERMINAL) return
@@ -376,9 +409,23 @@ internal class VoskWakePhraseProbe internal constructor(
         runCatching { resources.timeout?.cancel() }
         resources.stream?.let(::releaseStream)
         runCatching {
-            dispatcher.post { onResult(result) }
+            dispatcher.post {
+                val delivered = if (
+                    result.availability == VoskWakePhraseProbeAvailability.AVAILABLE &&
+                    !isInputCurrent(expectedInputGeneration)
+                ) {
+                    // Cleanup has already ended this attempt; notify its owner without a wake handoff.
+                    VoskWakePhraseProbeResult.unavailable(VoskWakePhraseProbeFailure.CANCELLED)
+                } else result
+                onResult(delivered)
+            }
         }
     }
+
+    private fun isInputCurrent(expectedGeneration: Long?): Boolean = runCatching {
+        inputGeneration() == expectedGeneration && !isInputSuppressed() &&
+            inputGeneration() == expectedGeneration
+    }.getOrDefault(false)
 
     private fun diagnose(event: VoiceInputDiagnosticEvent, confidence: Float? = null) {
         runCatching { onDiagnostic(event, confidence) }
@@ -406,6 +453,7 @@ private class AndroidVoskWakePhraseStream(
     listener: VoskStreamingListener,
     onDiagnostic: (VoiceInputDiagnosticEvent, Float?) -> Unit,
     homeWakeEndpointing: Boolean,
+    inputGeneration: () -> Long?,
 ) : VoskWakePhraseStream {
     private var previousSuppression: Boolean? = null
     private val transcriber = VoskStreamingTranscriber(
@@ -427,6 +475,7 @@ private class AndroidVoskWakePhraseStream(
         },
         listener = listener,
         homeWakeEndpointing = homeWakeEndpointing,
+        inputGeneration = inputGeneration,
     )
 
     override fun start() {

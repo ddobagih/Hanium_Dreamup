@@ -234,3 +234,199 @@ def test_admin_quarantine_list_projects_latest_cas_revisions(monkeypatch) -> Non
     assert summary.training_decision_revision == 0
     assert summary.legal_hold_active is True
     assert summary.legal_hold_revision == 4
+
+
+class _ConsentSession:
+    """Fake scalar() sequence: tombstone lookup, then the latest consent event."""
+
+    def __init__(self, event: object | None) -> None:
+        self._scalars = iter((None, event))
+
+    def scalar(self, _statement):
+        return next(self._scalars)
+
+
+def _training_consent_event(*, raw_source_collection: bool, training_reuse: bool):
+    from backend.app.schemas import (
+        PRIVACY_CONSENT_ITEM_VERSIONS,
+        PRIVACY_CONSENT_POLICY_VERSION,
+    )
+
+    return SimpleNamespace(
+        policy_version=PRIVACY_CONSENT_POLICY_VERSION,
+        item_versions=dict(PRIVACY_CONSENT_ITEM_VERSIONS),
+        raw_source_collection=raw_source_collection,
+        training_reuse=training_reuse,
+        receipt_sha256="c" * 64,
+    )
+
+
+@pytest.mark.parametrize(
+    ("raw_source_collection", "training_reuse", "allowed"),
+    [
+        (True, True, True),
+        # S02-22: a walk RAW/diagnostic source needs both current consents,
+        # matching Android TrainingReuseConsentRule (WALK_RAW = raw && training).
+        (False, True, False),
+        (True, False, False),
+        (False, False, False),
+    ],
+)
+def test_s02_22_raw_training_promotion_needs_current_raw_and_training_consent(
+    raw_source_collection: bool, training_reuse: bool, allowed: bool,
+) -> None:
+    from backend.app.services import raw_collection_lifecycle
+
+    event = _training_consent_event(
+        raw_source_collection=raw_source_collection,
+        training_reuse=training_reuse,
+    )
+    collection = SimpleNamespace(privacy_subject_hmac="a" * 64, account_generation=1)
+    if allowed:
+        assert raw_collection_lifecycle._latest_training_consent(
+            _ConsentSession(event), collection,  # type: ignore[arg-type]
+        ) is event
+        return
+    with pytest.raises(raw_collection_lifecycle.RawCollectionLifecycleError) as rejected:
+        raw_collection_lifecycle._latest_training_consent(
+            _ConsentSession(event), collection,  # type: ignore[arg-type]
+        )
+    assert rejected.value.code == "raw_training_consent_not_current"
+    assert rejected.value.status_code == 409
+
+
+def test_s02_22_dataset_steps_stay_bound_to_the_promotion_receipt() -> None:
+    """A later raw withdrawal writes a new receipt, so dataset steps fail closed."""
+    from backend.app.services import training_dataset_lifecycle
+
+    approved = _training_consent_event(raw_source_collection=True, training_reuse=True)
+    withdrawn_raw = _training_consent_event(raw_source_collection=False, training_reuse=True)
+    withdrawn_raw.receipt_sha256 = "d" * 64
+    training_dataset_lifecycle._require_current_consent(
+        _ConsentSession(approved),  # type: ignore[arg-type]
+        privacy_subject_hmac="a" * 64,
+        account_generation=1,
+        receipt_sha256=approved.receipt_sha256,
+    )
+    with pytest.raises(training_dataset_lifecycle.TrainingDatasetLifecycleError):
+        training_dataset_lifecycle._require_current_consent(
+            _ConsentSession(withdrawn_raw),  # type: ignore[arg-type]
+            privacy_subject_hmac="a" * 64,
+            account_generation=1,
+            receipt_sha256=approved.receipt_sha256,
+        )
+
+
+# --- S02-22 follow-up (be-F6): one per-source-kind rule for every RAW check ---
+
+
+class _SequenceSession:
+    """Tombstone lookup, then the latest consent event; no dataset expiries."""
+
+    def __init__(self, event: object | None) -> None:
+        self._scalars = iter((None, event))
+        self.locks = 0
+
+    def execute(self, _statement, _params=None):
+        self.locks += 1
+
+    def scalar(self, _statement):
+        return next(self._scalars)
+
+    def scalars(self, _statement):
+        return SimpleNamespace(all=lambda: [])
+
+
+@pytest.mark.parametrize(
+    ("kind", "raw_source_collection", "training_reuse", "allowed"),
+    [
+        ("WALK_RAW_DIAGNOSTIC", True, True, True),
+        ("WALK_RAW_DIAGNOSTIC", False, True, False),
+        ("WALK_RAW_DIAGNOSTIC", True, False, False),
+        ("REPORT_ORIGINAL", False, True, True),
+        ("REPORT_ORIGINAL", True, False, False),
+    ],
+)
+def test_s02_22_shared_rule_matches_the_android_truth_table(
+    kind: str, raw_source_collection: bool, training_reuse: bool, allowed: bool,
+) -> None:
+    from backend.app.services import privacy_lifecycle
+
+    event = _training_consent_event(
+        raw_source_collection=raw_source_collection, training_reuse=training_reuse,
+    )
+    assert privacy_lifecycle.TRAINING_SOURCE_KINDS == {"WALK_RAW_DIAGNOSTIC", "REPORT_ORIGINAL"}
+    assert privacy_lifecycle.training_consent_allows(event, kind) is allowed
+    session = _SequenceSession(event)
+    assert privacy_lifecycle.training_ingest_allowed(
+        session,  # type: ignore[arg-type]
+        privacy_subject="a" * 64,
+        account_generation=1,
+        source_kind=kind,
+    ) is allowed
+    assert session.locks == 1
+
+
+def test_s02_22_training_ingest_gate_requires_a_known_source_kind() -> None:
+    import inspect
+
+    from backend.app.services import privacy_lifecycle
+
+    parameter = inspect.signature(privacy_lifecycle.training_ingest_allowed).parameters["source_kind"]
+    assert parameter.default is inspect.Parameter.empty  # callers must choose
+    event = _training_consent_event(raw_source_collection=True, training_reuse=True)
+    for unknown in ("RAW", "walk_raw_diagnostic", ""):
+        with pytest.raises(ValueError, match="source kind"):
+            privacy_lifecycle.training_consent_allows(event, unknown)
+        session = _SequenceSession(event)
+        with pytest.raises(ValueError, match="source kind"):
+            privacy_lifecycle.training_ingest_allowed(
+                session,  # type: ignore[arg-type]
+                privacy_subject="a" * 64,
+                account_generation=1,
+                source_kind=unknown,
+            )
+        assert session.locks == 0
+
+
+def test_s02_22_dataset_step_rejects_a_raw_withdrawn_receipt_approved_under_the_old_rule() -> None:
+    """A decision bound to a raw=false/training=true receipt no longer passes downstream."""
+    from backend.app.services import training_dataset_lifecycle
+
+    old_rule_receipt = _training_consent_event(raw_source_collection=False, training_reuse=True)
+    with pytest.raises(training_dataset_lifecycle.TrainingDatasetLifecycleError):
+        training_dataset_lifecycle._require_current_consent(
+            _ConsentSession(old_rule_receipt),  # type: ignore[arg-type]
+            privacy_subject_hmac="a" * 64,
+            account_generation=1,
+            receipt_sha256=old_rule_receipt.receipt_sha256,
+        )
+
+
+@pytest.mark.parametrize(
+    ("raw_source_collection", "training_reuse", "reason"),
+    [
+        (True, True, None),
+        (False, True, "CONSENT_WITHDRAWN"),
+        (True, False, "CONSENT_WITHDRAWN"),
+    ],
+)
+def test_s02_22_retention_removes_artifacts_after_raw_consent_withdrawal(
+    raw_source_collection: bool, training_reuse: bool, reason: str | None,
+) -> None:
+    from scripts.manage_training_artifact_retention import _removal_reason
+
+    event = _training_consent_event(
+        raw_source_collection=raw_source_collection, training_reuse=training_reuse,
+    )
+    artifact = SimpleNamespace(
+        id=uuid.uuid4(),
+        privacy_subject_hmac="a" * 64,
+        account_generation=1,
+        consent_receipt_sha256=event.receipt_sha256,
+    )
+    assert _removal_reason(
+        _SequenceSession(event),  # type: ignore[arg-type]
+        artifact,  # type: ignore[arg-type]
+        as_of=datetime.now(UTC),
+    ) == reason

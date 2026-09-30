@@ -1,6 +1,5 @@
 package kr.co.hanium.dreamup.walksafe.report
 
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.CodingErrorAction
@@ -109,6 +108,9 @@ internal data class QueuedReport(
     val consentReceiptSha256: String,
     val createdAtEpochMs: Long,
     val expiresAtEpochMs: Long,
+    val accountGeneration: Long? = null,
+    val quarantined: Boolean = false,
+    val retryNotBeforeEpochMs: Long = 0L,
 )
 
 internal fun reportActorIdFromMetadataOrNull(metadataUtf8: ByteArray): String? = runCatching {
@@ -117,6 +119,27 @@ internal fun reportActorIdFromMetadataOrNull(metadataUtf8: ByteArray): String? =
     GatewayCredentialPolicy.normalizedActorIdOrNull(actorId)
         ?.takeIf { it == actorId }
 }.getOrNull()
+
+/**
+ * Queue priority implied by the frozen metadata. Automatic entries must carry `trigger=auto` with
+ * `auto_reported=true`; explicit entries must carry a voice/on-screen trigger with
+ * `auto_reported=false`. Missing, non-string/non-boolean or contradictory values yield null.
+ */
+internal fun reportQueuePriorityFromMetadataOrNull(metadataUtf8: ByteArray): ReportQueuePriority? =
+    runCatching {
+        val root = JSONObject(String(metadataUtf8, Charsets.UTF_8))
+        val trigger = root.get("trigger") as? String ?: return@runCatching null
+        val automatic = root.get("auto_reported") as? Boolean ?: return@runCatching null
+        when {
+            automatic && trigger == AndroidReportCandidatePolicy.TRIGGER_AUTO ->
+                ReportQueuePriority.AUTOMATIC
+            !automatic && (
+                trigger == AndroidReportCandidatePolicy.TRIGGER_VOICE ||
+                    trigger == AndroidReportCandidatePolicy.TRIGGER_ON_SCREEN
+                ) -> ReportQueuePriority.EXPLICIT
+            else -> null
+        }
+    }.getOrNull()
 
 internal data class ReportQueueReceipt(
     val reportId: String,
@@ -132,19 +155,24 @@ internal fun reportPayloadSha256(
     imageJpeg: ByteArray,
 ): String {
     require(isCanonicalReportUuid(reportId))
-    val preimage = ByteArrayOutputStream().use { output ->
-        output.write(REPORT_PAYLOAD_DOMAIN)
-        output.write(reportId.toByteArray(StandardCharsets.US_ASCII))
-        output.write(u64be(metadataUtf8.size.toLong()))
-        output.write(metadataUtf8)
-        output.write(u64be(imageJpeg.size.toLong()))
-        output.write(imageJpeg)
-        output.toByteArray()
+    return MessageDigest.getInstance("SHA-256").apply {
+        update(REPORT_PAYLOAD_DOMAIN)
+        update(reportId.toByteArray(StandardCharsets.US_ASCII))
+        update(u64be(metadataUtf8.size.toLong()))
+        update(metadataUtf8)
+        update(u64be(imageJpeg.size.toLong()))
+        update(imageJpeg)
+    }.digest().joinToString("") { byte ->
+        "%02x".format(Locale.ROOT, byte.toInt() and 0xff)
     }
-    val digest = sha256Hex(preimage)
-    preimage.fill(0)
-    return digest
 }
+
+internal fun ReportQueueReceipt.matches(report: QueuedReport): Boolean =
+    reportId == report.payload.reportId &&
+        payloadSha256 == report.payload.payloadSha256 &&
+        payloadBytes == report.payload.payloadBytes &&
+        marker == REPORT_RECEIPT_MARKER &&
+        isCanonicalReportUuid(persistenceMarker)
 
 internal fun isCanonicalReportUuid(value: String): Boolean = runCatching {
     UUID.fromString(value).toString() == value
@@ -166,12 +194,7 @@ private fun isStrictUtf8(value: ByteArray): Boolean = runCatching {
     true
 }.getOrDefault(false)
 
-private fun isJpeg(value: ByteArray): Boolean =
-    value.size >= 4 &&
-        value[0] == 0xff.toByte() &&
-        value[1] == 0xd8.toByte() &&
-        value[value.lastIndex - 1] == 0xff.toByte() &&
-        value[value.lastIndex] == 0xd9.toByte()
+private fun isJpeg(value: ByteArray): Boolean = JpegStructureValidator.isStructurallyValid(value)
 
 internal fun sha256Hex(value: ByteArray): String = MessageDigest.getInstance("SHA-256")
     .digest(value)

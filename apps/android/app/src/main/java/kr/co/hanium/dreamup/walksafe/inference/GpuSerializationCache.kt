@@ -93,7 +93,9 @@ internal class GpuSerializationCache private constructor(
             return directory
         }
 
+        // A model tensor contract violation is not a cache problem; retrying cannot repair it.
         private fun isRecoverable(error: Throwable): Boolean =
-            error !is DetectorNativeCleanupFailure && (error is Exception || error is LinkageError)
+            error !is DetectorNativeCleanupFailure && error !is DetectorTensorContractViolation &&
+                (error is Exception || error is LinkageError)
     }
 }

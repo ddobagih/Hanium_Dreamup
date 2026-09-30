@@ -4,9 +4,15 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.channels.FileChannel
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.NoSuchFileException
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.BasicFileAttributes
 import java.util.Comparator
+
+class RawCollectionStorageReadException internal constructor(area: String, cause: Exception? = null) :
+    IllegalStateException("raw collection storage is unreadable: $area", cause)
 
 /** Each write method is a durable temp-write + fsync + atomic-rename transaction. */
 internal interface RawCollectionStorage {
@@ -19,6 +25,8 @@ internal interface RawCollectionStorage {
     fun writeChunkAtomically(collectionId: String, ordinal: Int, envelope: String): Boolean
     fun deleteChunk(collectionId: String, ordinal: Int): Boolean
     fun listCollectionIds(): Set<String>
+    fun quarantineCollection(collectionId: String): Boolean = false
+    fun listQuarantinedCollectionIds(): Set<String> = emptySet()
     fun deleteCollection(collectionId: String): Boolean
     fun deleteAllCollections(): Boolean
     fun verifiedEmptyAfterAccountPurge(): Boolean
@@ -27,6 +35,8 @@ internal interface RawCollectionStorage {
     fun writeFenceAtomically(name: String, value: String): Boolean
     fun listFenceNames(): Set<String>
     fun clearAllFences(): Boolean
+    /** On-disk footprint of live and quarantined collections; null when it cannot be measured. */
+    fun measureUsage(): RawStorageUsage? = null
 }
 
 internal class FileRawCollectionStorage(
@@ -34,6 +44,7 @@ internal class FileRawCollectionStorage(
 ) : RawCollectionStorage {
     private val root = File(rootDirectory, ROOT_DIRECTORY_NAME)
     private val collections = File(root, COLLECTIONS_DIRECTORY_NAME)
+    private val quarantine = File(root, QUARANTINE_DIRECTORY_NAME)
     private val fences = File(root, FENCES_DIRECTORY_NAME)
     private val activePointer = File(root, ACTIVE_POINTER_NAME)
 
@@ -82,10 +93,31 @@ internal class FileRawCollectionStorage(
         chunkFileOrNull(collectionId, ordinal)?.let(::deleteFileAndSync) ?: false
 
     @Synchronized
-    override fun listCollectionIds(): Set<String> = collections
-        .listFiles { file -> file.isDirectory && isCanonicalUuid(file.name) }
-        .orEmpty()
-        .mapTo(linkedSetOf(), File::getName)
+    override fun listCollectionIds(): Set<String> = collectionIds(collections)
+
+    @Synchronized
+    override fun listQuarantinedCollectionIds(): Set<String> = collectionIds(quarantine)
+
+    /** Preserve unreadable bytes; neither infer an owner/expiry nor decrypt them during isolation. */
+    @Synchronized
+    override fun quarantineCollection(collectionId: String): Boolean = synchronized(QUARANTINE_LOCK) {
+        runCatching {
+            val source = collectionDirectoryOrNull(collectionId) ?: return@runCatching false
+            val target = File(quarantine, collectionId)
+            val sourceIds = collectionIds(collections)
+            val targetIds = collectionIds(quarantine)
+            if (collectionId !in sourceIds) return@runCatching collectionId in targetIds
+            if (collectionId in targetIds || !ensureDirectory(quarantine)) return@runCatching false
+            if (readActiveCollectionId() == collectionId && !clearActiveCollectionId()) {
+                return@runCatching false
+            }
+            // Do not request replacement: an existing quarantine artifact must never be overwritten.
+            Files.move(source.toPath(), target.toPath())
+            syncDirectory(collections)
+            syncDirectory(quarantine)
+            true
+        }.getOrDefault(false)
+    }
 
     @Synchronized
     override fun deleteCollection(collectionId: String): Boolean {
@@ -103,22 +135,28 @@ internal class FileRawCollectionStorage(
 
     @Synchronized
     override fun deleteAllCollections(): Boolean {
-        if (!collections.exists()) return true
-        val artifacts = collections.listFiles() ?: return false
-        return artifacts.map(::deleteCollectionArtifact).all { it }
+        return runCatching {
+            val live = directoryEntries(collections)
+            val isolated = directoryEntries(quarantine)
+            val liveDeleted = live.map { deleteCollectionArtifact(it, collections) }.all { it }
+            val isolatedDeleted = isolated.map { deleteCollectionArtifact(it, quarantine) }.all { it }
+            liveDeleted && isolatedDeleted
+        }.getOrDefault(false)
     }
 
     @Synchronized
     override fun verifiedEmptyAfterAccountPurge(): Boolean {
-        if (!root.isDirectory || activePointer.exists()) return false
-        val rootArtifacts = root.listFiles() ?: return false
-        if (rootArtifacts.any { it.name !in EXPECTED_RESET_ROOT_ARTIFACTS }) return false
-        if (collections.exists()) {
-            if (!collections.isDirectory) return false
-            val collectionArtifacts = collections.list() ?: return false
-            if (collectionArtifacts.isNotEmpty()) return false
-        }
-        return !fences.exists() || fences.isDirectory
+        return runCatching {
+            if (!root.isDirectory || Files.exists(activePointer.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                return@runCatching false
+            }
+            if (directoryEntries(root).any { it.name !in EXPECTED_RESET_ROOT_ARTIFACTS }) {
+                return@runCatching false
+            }
+            directoryEntries(collections).isEmpty() &&
+                directoryEntries(quarantine).isEmpty() &&
+                directoryEntries(fences).all { !Files.isSymbolicLink(it.toPath()) }
+        }.getOrDefault(false)
     }
 
     @Synchronized
@@ -138,11 +176,14 @@ internal class FileRawCollectionStorage(
     }
 
     @Synchronized
-    override fun listFenceNames(): Set<String> = fences
-        .listFiles { file -> file.isFile && file.name.endsWith(FENCE_SUFFIX) }
-        .orEmpty()
-        .mapNotNullTo(linkedSetOf()) { file ->
-            file.name.removeSuffix(FENCE_SUFFIX).takeIf(FENCE_NAME::matches)
+    override fun listFenceNames(): Set<String> = directoryEntries(fences)
+        .mapTo(linkedSetOf()) { file ->
+            val metadata = entryAttributes(file)
+            val name = file.name.removeSuffix(FENCE_SUFFIX)
+            if (!metadata.isRegularFile || metadata.isSymbolicLink ||
+                !file.name.endsWith(FENCE_SUFFIX) || !FENCE_NAME.matches(name)
+            ) throw RawCollectionStorageReadException("fences")
+            name
         }
 
     @Synchronized
@@ -158,6 +199,27 @@ internal class FileRawCollectionStorage(
         return artifacts.map(::deleteFileAndSync).all { it }
     }
 
+    @Synchronized
+    override fun measureUsage(): RawStorageUsage? = runCatching {
+        val live = directoryEntries(collections)
+        val isolated = directoryEntries(quarantine)
+        var bytes = 0L
+        (live + isolated).forEach { artifact ->
+            Files.walk(artifact.toPath()).use { paths ->
+                paths.forEach { path ->
+                    val metadata = Files.readAttributes(path, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+                    if (metadata.isSymbolicLink) throw RawCollectionStorageReadException("usage")
+                    if (metadata.isRegularFile) bytes = Math.addExact(bytes, metadata.size())
+                }
+            }
+        }
+        RawStorageUsage(
+            liveCollections = live.count { isCanonicalUuid(it.name) },
+            quarantinedCollections = isolated.count { isCanonicalUuid(it.name) },
+            totalBytes = bytes,
+        )
+    }.getOrNull()
+
     private fun collectionDirectoryOrNull(collectionId: String): File? =
         collectionId.takeIf(::isCanonicalUuid)?.let { File(collections, it) }
 
@@ -171,7 +233,11 @@ internal class FileRawCollectionStorage(
         name.takeIf(FENCE_NAME::matches)?.let { File(fences, "$it$FENCE_SUFFIX") }
 
     private fun readBounded(file: File, maxBytes: Long): String? = runCatching {
-        if (!file.isFile || file.length() !in 1..maxBytes) return@runCatching null
+        requireDirectoryPath(file.parentFile ?: return@runCatching null)
+        val metadata = entryAttributes(file)
+        if (!metadata.isRegularFile || metadata.isSymbolicLink || metadata.size() !in 1..maxBytes) {
+            return@runCatching null
+        }
         file.readText(Charsets.UTF_8)
     }.getOrNull()
 
@@ -206,24 +272,70 @@ internal class FileRawCollectionStorage(
         true
     }.getOrDefault(false)
 
-    private fun deleteCollectionArtifact(artifact: File): Boolean = runCatching {
-        if (artifact.parentFile?.canonicalFile != collections.canonicalFile) {
+    private fun deleteCollectionArtifact(artifact: File, directory: File): Boolean = runCatching {
+        requireDirectoryPath(directory)
+        if (artifact.parentFile?.canonicalFile != directory.canonicalFile) {
             return@runCatching false
         }
         Files.walk(artifact.toPath()).use { paths ->
             paths.sorted(Comparator.reverseOrder()).forEach(Files::delete)
         }
-        syncDirectory(collections)
+        syncDirectory(directory)
         true
     }.getOrDefault(false)
 
     private fun ensureDirectory(directory: File): Boolean {
-        if (directory.exists()) return directory.isDirectory
+        if (Files.exists(directory.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            return runCatching { requireDirectoryPath(directory); true }.getOrDefault(false)
+        }
         val parent = directory.parentFile
         if (parent != null && !ensureDirectory(parent)) return false
         return directory.mkdir() && runCatching {
             parent?.let(::syncDirectory)
         }.isSuccess
+    }
+
+    private fun collectionIds(directory: File): Set<String> = directoryEntries(directory)
+        .mapNotNullTo(linkedSetOf()) { file ->
+            val metadata = entryAttributes(file)
+            if (metadata.isSymbolicLink || (!metadata.isDirectory && !metadata.isRegularFile)) {
+                throw RawCollectionStorageReadException("collections")
+            }
+            file.name.takeIf(::isCanonicalUuid)
+        }
+
+    private fun directoryEntries(directory: File): Array<File> {
+        try {
+            requireDirectoryPath(directory)
+            if (!Files.exists(directory.toPath(), LinkOption.NOFOLLOW_LINKS)) return emptyArray()
+            return directory.listFiles() ?: throw RawCollectionStorageReadException("directory listing")
+        } catch (error: RawCollectionStorageReadException) {
+            throw error
+        } catch (error: Exception) {
+            throw RawCollectionStorageReadException("directory listing", error)
+        }
+    }
+
+    private fun requireDirectoryPath(directory: File) {
+        val path = directory.toPath().toAbsolutePath().normalize()
+        var current = path.root ?: throw RawCollectionStorageReadException("directory path")
+        for (part in path) {
+            current = current.resolve(part)
+            val metadata = try {
+                Files.readAttributes(current, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+            } catch (_: NoSuchFileException) {
+                continue
+            }
+            if (!metadata.isDirectory || metadata.isSymbolicLink) {
+                throw RawCollectionStorageReadException("directory path")
+            }
+        }
+    }
+
+    private fun entryAttributes(file: File): BasicFileAttributes = try {
+        Files.readAttributes(file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+    } catch (error: Exception) {
+        throw RawCollectionStorageReadException("entry metadata", error)
     }
 
     private fun syncFile(file: File) {
@@ -237,6 +349,7 @@ internal class FileRawCollectionStorage(
     private companion object {
         const val ROOT_DIRECTORY_NAME = "raw_collections_v2"
         const val COLLECTIONS_DIRECTORY_NAME = "collections"
+        const val QUARANTINE_DIRECTORY_NAME = "quarantine"
         const val FENCES_DIRECTORY_NAME = "fences"
         const val ACTIVE_POINTER_NAME = "active_collection"
         const val MANIFEST_FILE_NAME = "manifest.aead"
@@ -246,9 +359,11 @@ internal class FileRawCollectionStorage(
         const val MAX_FENCE_BYTES = 128L
         val EXPECTED_RESET_ROOT_ARTIFACTS = setOf(
             COLLECTIONS_DIRECTORY_NAME,
+            QUARANTINE_DIRECTORY_NAME,
             FENCES_DIRECTORY_NAME,
         )
         val FENCE_NAME = Regex("[a-z0-9-]{1,96}")
         val FENCE_VALUE = Regex("[A-Z_]{1,64}")
+        val QUARANTINE_LOCK = Any()
     }
 }

@@ -1,7 +1,9 @@
 package kr.co.hanium.dreamup.walksafe
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyCoordinator
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,16 +19,46 @@ class MainActivityRuntimeSafetyStaticTest {
                 "thresholdProfile = WalkRuntimeSafetyCoordinator.productionThresholdProfile",
             ),
         )
+        // The coordinator callback uses the same lifecycle safe-stop core as
+        // enterWalkSessionSafetyStopAndCancelOutputs, with checkpoints so a retry resumes stages.
+        val stopCallback = functionBlock("private fun onWalkRuntimeSafetyStop(")
+        assertTrue(stopCallback.contains("performWalkSessionSafetyStopCleanup("))
+        assertTrue(stopCallback.contains("checkpoints = checkpoints"))
         assertTrue(
-            functionBlock("private fun onWalkRuntimeSafetyStop(")
-                .contains("enterWalkSessionSafetyStopAndCancelOutputs("),
+            functionBlock("private fun enterWalkSessionSafetyStopAndCancelOutputs(")
+                .contains("performWalkSessionSafetyStopCleanup(reason, persistInterruptionMarker, null, null)"),
         )
         assertTrue(
-            functionBlock("private fun activateWalkSessionRuntime(")
-                .contains(
-                    "!walkRuntimeSafetyCoordinator.beginEpoch(runtimeEpoch).safetyOutputsAllowed",
-                ),
+            functionBlock("private fun performWalkSessionSafetyStopCleanup(")
+                .contains("transitionWalkSession(WalkSessionEvent.SafetyStopRequested)"),
         )
+        assertNull(WalkRuntimeSafetyCoordinator.productionThresholdProfile)
+        val activation = functionBlock("private fun activateWalkSessionRuntime(")
+        assertTrue(activation.contains(
+            "walkRuntimeSafetyCoordinator.beginEpoch(runtimeEpoch).disposition ==",
+        ))
+        assertTrue(activation.contains("WalkRuntimeSafetyDisposition.SAFE_STOP_LATCHED"))
+        assertTrue(activation.contains("if (!observeWalkRuntimeResourceSafety(runtimeEpoch)) return"))
+        assertFalse(activation.contains(
+            "!walkRuntimeSafetyCoordinator.beginEpoch(runtimeEpoch).safetyOutputsAllowed",
+        ))
+
+        val delivery = functionBlock("private fun isFeedbackActionStillDeliverable(")
+        assertTrue(delivery.contains("action.reason == \"fresh_metric_depth_alert\""))
+        assertTrue(delivery.contains("action.reason == \"fresh_metric_path_guidance\""))
+        assertTrue(delivery.contains("action.reason == \"fresh_qualitative_depth_caution\""))
+        val metricGateStart = delivery.indexOf("if (requiresRuntimeSafetyPermission) {")
+        val remainingDeliveryStart = delivery.indexOf("if (action.trackId.startsWith(")
+        assertTrue(metricGateStart >= 0)
+        assertTrue(remainingDeliveryStart >= 0)
+        assertTrue(remainingDeliveryStart > metricGateStart)
+        val metricGate = delivery.substring(metricGateStart, remainingDeliveryStart)
+        assertTrue(metricGate.contains(
+            "walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return false",
+        ))
+        assertTrue(metricGate.contains("walkRuntimeSafetyCoordinator.evaluate(nowMs)"))
+        assertTrue(metricGate.contains("!walkSessionLifecycle.isRuntimeEpochCurrent(epoch)"))
+        assertTrue(metricGate.contains("decision.epoch != epoch || !decision.safetyOutputsAllowed"))
     }
 
     @Test
@@ -38,12 +70,23 @@ class MainActivityRuntimeSafetyStaticTest {
         assertTrue(resource.contains("thermalCritical = resources.thermalBelowCritical == false"))
         assertTrue(resource.contains("walkRuntimeSafetyCoordinator.observe("))
         assertFalse(resource.contains("if (!walkRuntimeSafetyCoordinator.configured) return true"))
+        assertTrue(resource.contains("receivedAtElapsedRealtimeMs = receivedAtMs"))
+        assertTrue(resource.contains("decision.epoch == runtimeEpoch"))
+        assertTrue(resource.contains("decision.disposition != WalkRuntimeSafetyDisposition.SAFE_STOP_LATCHED"))
+        assertTrue(resource.contains("decision.disposition != WalkRuntimeSafetyDisposition.IGNORED_OBSERVATION"))
+        assertFalse(resource.contains(".safetyOutputsAllowed"))
 
         val timing = functionBlock("private fun observeWalkRuntimeDetectorTiming(")
         assertTrue(timing.contains("frameCapturedAtElapsedRealtimeMs"))
         assertTrue(timing.contains("inferenceLatencyMs"))
         assertTrue(timing.contains("walkRuntimeSafetyCoordinator.observe("))
         assertFalse(timing.contains("if (!walkRuntimeSafetyCoordinator.configured) return true"))
+        assertTrue(timing.contains("receivedAtElapsedRealtimeMs = receivedAtMs"))
+        assertTrue(timing.contains("walkSessionLifecycle.isRuntimeEpochCurrent(epoch)"))
+        assertTrue(timing.contains("decision.epoch == epoch"))
+        assertTrue(timing.contains("decision.disposition != WalkRuntimeSafetyDisposition.SAFE_STOP_LATCHED"))
+        assertTrue(timing.contains("decision.disposition != WalkRuntimeSafetyDisposition.IGNORED_OBSERVATION"))
+        assertFalse(timing.contains(".safetyOutputsAllowed"))
         assertTrue(source.contains("!observeWalkRuntimeDetectorTiming("))
     }
 

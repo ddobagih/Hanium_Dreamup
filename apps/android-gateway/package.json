@@ -11,7 +11,7 @@
     "clean": "node --input-type=module --eval \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true })\"",
     "start": "node dist/server.js",
     "state-encryption-maintenance": "node dist/src/state-encryption-maintenance.js",
-    "test": "npm run build && node --test dist/test/*.test.js",
+    "test": "npm run build && node ../../scripts/run_walksafe_node_tests.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

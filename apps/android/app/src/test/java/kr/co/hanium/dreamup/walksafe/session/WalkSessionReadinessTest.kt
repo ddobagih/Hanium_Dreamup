@@ -28,7 +28,7 @@ class WalkSessionReadinessTest {
             )
         }
 
-        val readiness = collector.build(assessedAtEpochMs = 100)
+        val readiness = collector.build(assessedAtElapsedRealtimeMs = 100)
 
         assertTrue(readiness.isReady)
         assertEquals(epoch, readiness.epoch)
@@ -87,7 +87,7 @@ class WalkSessionReadinessTest {
             excluded = WalkSessionReadinessRequirement.MODEL,
         )
 
-        expectIllegalState { collector.build(assessedAtEpochMs = 100) }
+        expectIllegalState { collector.build(assessedAtElapsedRealtimeMs = 100) }
     }
 
     @Test
@@ -113,7 +113,7 @@ class WalkSessionReadinessTest {
             ),
         )
 
-        val readiness = collector.build(assessedAtEpochMs = 100)
+        val readiness = collector.build(assessedAtElapsedRealtimeMs = 100)
 
         assertFalse(readiness.isReady)
         assertEquals(listOf("model_not_ready"), readiness.blockingReasons)
@@ -162,7 +162,7 @@ class WalkSessionReadinessTest {
                 excluded = WalkSessionReadinessRequirement.FIRST_RUN_ONBOARDING,
             )
 
-            expectIllegalState { collector.build(assessedAtEpochMs = 100) }
+            expectIllegalState { collector.build(assessedAtElapsedRealtimeMs = 100) }
         }
     }
 

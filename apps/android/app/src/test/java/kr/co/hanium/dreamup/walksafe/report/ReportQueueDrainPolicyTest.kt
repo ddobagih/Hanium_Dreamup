@@ -8,21 +8,21 @@ import org.junit.Test
 
 class ReportQueueDrainPolicyTest {
     @Test
-    fun onlyPausedWalkAllowsStatusAndPostRequests() {
-        WalkSessionState.entries
-            .filterNot { it == WalkSessionState.PAUSED }
-            .forEach { state ->
-                val decision = ReportQueueDrainPolicy().acquire(
-                    report(),
-                    context(walkState = state),
-                )
-
-                assertFalse("$state must not drain reports", decision.allowed)
-                assertEquals(0, decision.allowedStatusRequests)
-                assertEquals(0, decision.allowedPostRequests)
-            }
-
-        assertTrue(ReportQueueDrainPolicy().acquire(report(), context()).allowed)
+    fun onlyAfterTheWalkAllowsStatusAndPostRequests() {
+        // Owner decision 3(b) / FP-032-DETAIL-02: ACTIVE and PAUSED are the walk; R4: SAFE_STOP is a
+        // system stop, not an explicit end, so nothing is sent in it either.
+        for (state in listOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED, WalkSessionState.SAFE_STOP)) {
+            val decision = ReportQueueDrainPolicy().acquire(report(), context(walkState = state))
+            assertFalse("$state must not drain reports", decision.allowed)
+            assertEquals(0, decision.allowedStatusRequests)
+            assertEquals(0, decision.allowedPostRequests)
+        }
+        for (state in listOf(WalkSessionState.ENDED, WalkSessionState.READY)) {
+            val decision = ReportQueueDrainPolicy().acquire(report(), context(walkState = state))
+            assertTrue("$state is after the walk", decision.allowed)
+            assertEquals(1, decision.allowedStatusRequests)
+            assertEquals(1, decision.allowedPostRequests)
+        }
     }
 
     @Test
@@ -81,23 +81,40 @@ class ReportQueueDrainPolicyTest {
     }
 
     @Test
-    fun automaticReportRequiresAutomaticReportingConsentAndPinsPriority() {
-        val automatic = report(priority = ReportQueuePriority.AUTOMATIC)
-        val blocked = ReportQueueDrainPolicy().acquire(
-            automatic,
-            context(automaticReportingAllowed = false),
-        )
-        assertFalse(blocked.allowed)
-
+    fun automaticOptOutStillAllowsAStatusOnlyLeaseUnderCurrentAuthority() {
         val policy = ReportQueueDrainPolicy()
-        val lease = requireNotNull(policy.acquire(automatic, context()).lease)
-        assertEquals(ReportQueuePriority.AUTOMATIC, lease.priority)
-        assertFalse(
-            policy.isCurrent(
-                lease,
-                context(automaticReportingAllowed = false),
-            ),
+        val current = context(automaticReportingAllowed = false)
+        val decision = policy.acquire(
+            report(priority = ReportQueuePriority.AUTOMATIC),
+            current,
         )
+        assertTrue("fresh authority must allow status recovery without automatic POST", decision.allowed)
+        assertEquals(1, decision.allowedStatusRequests)
+        assertEquals(0, decision.allowedPostRequests)
+        assertTrue(policy.isCurrent(requireNotNull(decision.lease), current))
+        assertFalse(policy.mayUpload(requireNotNull(decision.lease), current))
+    }
+
+    @Test
+    fun automaticPostRequiresItsOptInAndEitherSelectionChangeCancelsTheLease() {
+        val automatic = report(priority = ReportQueuePriority.AUTOMATIC)
+        listOf(false, true).forEach { initial ->
+            val policy = ReportQueueDrainPolicy()
+            val current = context(automaticReportingAllowed = initial)
+            val lease = requireNotNull(policy.acquire(automatic, current).lease)
+            assertEquals(ReportQueuePriority.AUTOMATIC, lease.priority)
+            assertEquals(initial, policy.mayUpload(lease, current))
+            assertFalse(policy.isCurrent(lease, context(automaticReportingAllowed = !initial)))
+            assertFalse(policy.mayUpload(lease, current))
+        }
+    }
+
+    @Test
+    fun explicitPostDoesNotDependOnTheAutomaticSelection() {
+        val policy = ReportQueueDrainPolicy()
+        val lease = requireNotNull(policy.acquire(report(), context(automaticReportingAllowed = false)).lease)
+        assertTrue(policy.mayUpload(lease, context(automaticReportingAllowed = false)))
+        assertTrue(policy.mayUpload(lease, context(automaticReportingAllowed = true)))
     }
 
     @Test
@@ -133,11 +150,10 @@ class ReportQueueDrainPolicyTest {
             val lease = requireNotNull(policy.acquire(report(), context()).lease)
             assertFalse(policy.isCurrent(lease, changed))
         }
+        // Owner decision 3(b): a walk that becomes ACTIVE or PAUSED again ends the lease.
         listOf(
-            WalkSessionState.READY,
             WalkSessionState.ACTIVE,
-            WalkSessionState.SAFE_STOP,
-            WalkSessionState.ENDED,
+            WalkSessionState.PAUSED,
         ).forEach { state ->
             val policy = ReportQueueDrainPolicy()
             val lease = requireNotNull(policy.acquire(report(), context()).lease)
@@ -170,7 +186,7 @@ class ReportQueueDrainPolicyTest {
     }
 
     private fun context(
-        walkState: WalkSessionState = WalkSessionState.PAUSED,
+        walkState: WalkSessionState = WalkSessionState.ENDED,
         appForeground: Boolean = true,
         stationary: Boolean = true,
         networkAllowed: Boolean = true,
@@ -195,8 +211,7 @@ class ReportQueueDrainPolicyTest {
         movementGeneration = movementGeneration,
     )
 
-    private fun jpeg() =
-        byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xd9.toByte())
+    private fun jpeg() = reportTestJpeg()
 
     private companion object {
         const val REPORT_1 = "123e4567-e89b-42d3-a456-426614174000"

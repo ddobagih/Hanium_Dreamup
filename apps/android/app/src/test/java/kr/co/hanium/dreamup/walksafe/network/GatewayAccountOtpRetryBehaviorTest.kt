@@ -14,6 +14,9 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+// S01-9: fixtures expire at 2026-09-06T03:10:00Z; the client now checks them against a clock.
+private const val OTP_FIXTURE_NOW_MS = 1_788_663_600_000L // 2026-09-06T03:00:00Z
+
 class GatewayAccountOtpRetryBehaviorTest {
     @Test
     fun timeoutThenPendingWaitsForExplicitRetryWithTheSameWireIdUntil202() {
@@ -23,7 +26,7 @@ class GatewayAccountOtpRetryBehaviorTest {
             pending("17"),
             success(),
         )
-        val client = GatewayAccountClient(transport)
+        val client = GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS })
         val first = requireNotNull(harness.policy.begin(PAYLOAD))
         assertThrows(SocketTimeoutException::class.java) { send(client, first) }
         assertTrue(harness.policy.recordFailure(first, PAYLOAD, 0, null, null))
@@ -62,7 +65,7 @@ class GatewayAccountOtpRetryBehaviorTest {
     @Test
     fun pendingResponseNeverAutomaticallyPostsTheQueuedSuccessResponse() {
         val transport = OtpTransport(pending("30"), success())
-        val client = GatewayAccountClient(transport)
+        val client = GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS })
         val error = assertThrows(GatewayAccountHttpException::class.java) {
             client.requestEmailOtp(
                 PAYLOAD.gatewayBaseUrl, PAYLOAD.email, PAYLOAD.dateOfBirth, "synthetic_request_1",
@@ -127,13 +130,13 @@ class GatewayAccountOtpRetryBehaviorTest {
     fun retryAfterKeepsTheExistingAndroid300SecondBoundAndRejectsUntrustedTiming() {
         for (seconds in listOf("1", "17", "300")) {
             val transport = OtpTransport(pending(seconds, "rEtRy-AfTeR"))
-            val error = failure(GatewayAccountClient(transport))
+            val error = failure(GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS }))
             assertEquals(seconds.toLong() * 1_000L, error.retryAfterMs)
             assertEquals(1, transport.bodies.size)
         }
         for (invalid in listOf("0", "-1", "1.5", "301", "1000000", "9223372036854775808",
             "Sun, 06 Sep 2026 03:00:00 GMT")) {
-            val error = failure(GatewayAccountClient(OtpTransport(pending(invalid))))
+            val error = failure(GatewayAccountClient(OtpTransport(pending(invalid)), clockEpochMs = { OTP_FIXTURE_NOW_MS }))
             assertNull(error.retryAfterMs)
             val harness = Harness()
             val attempt = requireNotNull(harness.policy.begin(PAYLOAD))
@@ -154,7 +157,7 @@ class GatewayAccountOtpRetryBehaviorTest {
         val harness = Harness()
         val attempt = requireNotNull(harness.policy.begin(PAYLOAD))
         val error = assertThrows(GatewayAccountHttpException::class.java) {
-            send(GatewayAccountClient(transport), attempt)
+            send(GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS }), attempt)
         }
         assertTrue(harness.policy.recordFailure(
             attempt, PAYLOAD, error.statusCode, error.serverCode, error.retryAfterMs,
@@ -173,7 +176,7 @@ class GatewayAccountOtpRetryBehaviorTest {
         val attempt = requireNotNull(harness.policy.begin(payload))
         val transport = OtpTransport(success())
 
-        assertNotNull(send(GatewayAccountClient(transport), attempt))
+        assertNotNull(send(GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS }), attempt))
 
         val body = JSONObject(transport.bodies.single())
         assertEquals(payload.email, body.getString("email"))
@@ -189,7 +192,7 @@ class GatewayAccountOtpRetryBehaviorTest {
         val oldToken = requireNotNull(fence.begin(AccountRemoteAction.REQUEST_EMAIL_OTP, "signup-binding"))
         val oldAttempt = requireNotNull(harness.policy.begin(PAYLOAD))
         val transport = OtpTransport(success(), success())
-        val client = GatewayAccountClient(transport)
+        val client = GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS })
         val lateResponse = send(client, oldAttempt)
 
         fence.enteredBackground()
@@ -233,6 +236,105 @@ class GatewayAccountOtpRetryBehaviorTest {
         assertEquals(first.requestId, retry.requestId)
         assertNotEquals(first, retry)
         assertEquals(1, harness.generatedIds)
+    }
+
+    @Test
+    fun terminalConflictWithoutRetryAfterRequiresExplicitNewIdBeforeAcceptingNewEnrollment() {
+        val harness = Harness()
+        val newHandle = "A".repeat(42) + "E"
+        val transport = OtpTransport(terminalConflict(), successWithHandle(newHandle))
+        val client = GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS })
+        val first = requireNotNull(harness.policy.begin(PAYLOAD))
+        val error = assertThrows(GatewayAccountHttpException::class.java) {
+            send(client, first)
+        }
+
+        assertEquals(409, error.statusCode)
+        assertEquals("account_enrollment_idempotency_conflict", error.serverCode)
+        assertNull(error.retryAfterMs)
+        assertEquals(1, harness.generatedIds)
+        assertEquals(1, transport.bodies.size)
+        assertTrue(harness.policy.recordFailure(
+            first, PAYLOAD, error.statusCode, error.serverCode, error.retryAfterMs,
+        ))
+        assertEquals(0L, harness.policy.remainingWaitMs(PAYLOAD))
+        assertEquals(1, harness.generatedIds)
+        assertEquals(1, transport.bodies.size)
+
+        harness.nowMs += 300_000L
+        assertEquals(0L, harness.policy.remainingWaitMs(PAYLOAD))
+        assertEquals(1, harness.generatedIds)
+        assertEquals(1, transport.bodies.size)
+
+        val explicitNext = requireNotNull(harness.policy.begin(PAYLOAD))
+        assertNotEquals(first.requestId, explicitNext.requestId)
+        assertEquals(2, harness.generatedIds)
+        assertEquals(1, transport.bodies.size)
+        val result = send(client, explicitNext)
+
+        assertEquals(newHandle, result.enrollmentHandle)
+        assertNotEquals(HANDLE, result.enrollmentHandle)
+        assertEquals(2, transport.bodies.size)
+        val firstWireId = JSONObject(transport.bodies[0]).getString("request_id")
+        val nextWireId = JSONObject(transport.bodies[1]).getString("request_id")
+        assertEquals(first.requestId, firstWireId)
+        assertEquals(explicitNext.requestId, nextWireId)
+        assertNotEquals(firstWireId, nextWireId)
+        assertTrue(harness.policy.recordSuccess(explicitNext, PAYLOAD))
+        assertEquals(2, harness.generatedIds)
+        assertEquals(2, transport.bodies.size)
+    }
+
+    @Test
+    fun lateTerminalCallbacksCannotReleaseOrChangeTheExplicitReplacementAttempt() {
+        val harness = Harness()
+        val newHandle = "A".repeat(42) + "E"
+        val transport = OtpTransport(terminalConflict(), successWithHandle(newHandle))
+        val client = GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS })
+        val old = requireNotNull(harness.policy.begin(PAYLOAD))
+        val error = assertThrows(GatewayAccountHttpException::class.java) {
+            send(client, old)
+        }
+        assertEquals(409, error.statusCode)
+        assertEquals("account_enrollment_idempotency_conflict", error.serverCode)
+        assertNull(error.retryAfterMs)
+        assertTrue(harness.policy.recordFailure(
+            old, PAYLOAD, error.statusCode, error.serverCode, error.retryAfterMs,
+        ))
+        assertEquals(0L, harness.policy.remainingWaitMs(PAYLOAD))
+        assertEquals(1, harness.generatedIds)
+        assertEquals(1, transport.bodies.size)
+
+        val current = requireNotNull(harness.policy.begin(PAYLOAD))
+        assertNotEquals(old.requestId, current.requestId)
+        assertNull(harness.policy.begin(PAYLOAD))
+        assertEquals(2, harness.generatedIds)
+        assertEquals(1, transport.bodies.size)
+
+        assertFalse(harness.policy.recordFailure(
+            old, PAYLOAD, error.statusCode, error.serverCode, error.retryAfterMs,
+        ))
+        assertEquals(0L, harness.policy.remainingWaitMs(PAYLOAD))
+        assertNull(harness.policy.begin(PAYLOAD))
+        assertEquals(2, harness.generatedIds)
+        assertEquals(1, transport.bodies.size)
+
+        assertFalse(harness.policy.recordSuccess(old, PAYLOAD))
+        assertEquals(0L, harness.policy.remainingWaitMs(PAYLOAD))
+        assertNull(harness.policy.begin(PAYLOAD))
+        assertEquals(2, harness.generatedIds)
+        assertEquals(1, transport.bodies.size)
+
+        val result = send(client, current)
+        assertEquals(newHandle, result.enrollmentHandle)
+        assertNotEquals(HANDLE, result.enrollmentHandle)
+        assertEquals(2, transport.bodies.size)
+        assertEquals(old.requestId, JSONObject(transport.bodies[0]).getString("request_id"))
+        assertEquals(current.requestId, JSONObject(transport.bodies[1]).getString("request_id"))
+        assertTrue(harness.policy.recordSuccess(current, PAYLOAD))
+        assertEquals(0L, harness.policy.remainingWaitMs(PAYLOAD))
+        assertEquals(2, harness.generatedIds)
+        assertEquals(2, transport.bodies.size)
     }
 
     private class Harness {
@@ -305,6 +407,17 @@ class GatewayAccountOtpRetryBehaviorTest {
             409,
             """{"detail":{"code":"account_enrollment_in_progress"}}""",
             mapOf(header to seconds),
+        )
+
+        fun terminalConflict() = GatewayHttpResponse(
+            409,
+            """{"detail":{"code":"account_enrollment_idempotency_conflict","message":"The enrollment request could not be accepted."}}""",
+            mapOf("Cache-Control" to "no-store", "Pragma" to "no-cache"),
+        )
+
+        fun successWithHandle(handle: String) = GatewayHttpResponse(
+            202,
+            JSONObject(success().responseBody).put("enrollment_handle", handle).toString(),
         )
 
         fun success() = GatewayHttpResponse(

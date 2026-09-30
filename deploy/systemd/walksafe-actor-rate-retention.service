@@ -1,0 +1,29 @@
+[Unit]
+Description=WalkSafe bounded shared rate-event retention and metrics
+After=network-online.target walksafe-backend.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=walksafe-backend
+Group=walksafe-backend
+WorkingDirectory=/srv/walksafe/backend
+Environment=PYTHONPATH=/srv/walksafe/backend
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/walksafe/backend-runtime.env
+UMask=0077
+ExecStart=/srv/walksafe/backend/.venv/bin/python -B -m backend.app.services.actor_rate_limit_retention --apply --batch-size 500
+TimeoutStartSec=10min
+TimeoutStopSec=30s
+StandardOutput=journal
+StandardError=journal
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+InaccessiblePaths=/etc/walksafe/backend-migration.env /etc/walksafe/backend.env /etc/walksafe/backup.env /etc/walksafe/backup-key-control.lock -/var/lib/walksafe-backup -/var/lib/walksafe-backup-gnupg -/run/walksafe-backup

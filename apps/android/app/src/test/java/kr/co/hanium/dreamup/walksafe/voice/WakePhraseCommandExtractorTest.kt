@@ -37,10 +37,22 @@ class WakePhraseCommandExtractorTest {
     }
 
     @Test
-    fun discardsNoiseBeforeTheFirstExactWakePhrase() {
+    fun leadingNoiseCannotOpenACommand() {
         assertEquals(
-            WakePhraseCommandExtraction.Command("다음 안내 알려줘"),
+            WakePhraseCommandExtraction.NotAddressed,
             extract("자동차 소리, 사람 말소리... 길라잡이! 다음 안내 알려줘"),
+        )
+    }
+
+    @Test
+    fun narrationContainingWakePhraseIsNotDirectAddress() {
+        assertEquals(
+            WakePhraseCommandExtraction.NotAddressed,
+            extract("예시 문구는 길라잡이 안내 중지해줘"),
+        )
+        assertEquals(
+            WakePhraseCommandExtraction.Command("안내 중지해줘"),
+            extract("길라잡이 안내 중지해줘"),
         )
     }
 
@@ -77,7 +89,7 @@ class WakePhraseCommandExtractorTest {
 
         assertEquals(
             WakePhraseCommandExtraction.Command("서울역으로 안내해줘"),
-            extract("잡음！\u3000$decomposedWakePhrase，  서울역으로\t\n안내해줘。"),
+            extract("$decomposedWakePhrase！\u3000  서울역으로\t\n안내해줘。"),
         )
     }
 

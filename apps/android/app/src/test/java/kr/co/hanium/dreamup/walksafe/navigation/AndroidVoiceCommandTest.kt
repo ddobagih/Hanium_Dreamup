@@ -206,9 +206,11 @@ class AndroidVoiceCommandTest {
         )
 
         assertEquals(
-            "서울역 목적지 후보가 2곳 있습니다. " +
-                "1번 서울역, 서울 중구 한강대로 405, 320m. " +
-                "2번 서울역 버스환승센터, 서울 중구 봉래동, 480m. 원하는 번호나 다시 듣기라고 말씀해 주세요.",
+            // FP-022-DETAIL-01 (S06-37/S06-31): distinct names without the address, rough distances.
+            "서울역 목적지 후보는 현재 1번부터 2번까지입니다. " +
+                "1번 서울역, 약 300미터. " +
+                "2번 서울역 버스환승센터, 약 500미터. " +
+                "현재 결과에서 더 안내할 후보는 없습니다. 원하는 번호나 다시 듣기라고 말씀해 주세요.",
             formatDestinationSearchVoicePrompt("서울역", results),
         )
     }
@@ -237,19 +239,27 @@ class AndroidVoiceCommandTest {
         val firstPage = DestinationSearchVoiceState(query = "도서관", results = results)
 
         assertEquals(listOf("도서관 1", "도서관 2", "도서관 3"), firstPage.currentPageResults.map { it.name })
-        assertTrue(firstPage.voicePrompt().contains("1번 도서관 1, 서울 1길, 100m"))
-        assertTrue(firstPage.voicePrompt().contains("3번 도서관 3, 서울 3길, 300m"))
+        assertTrue(firstPage.voicePrompt().contains("1번 도서관 1, 약 100미터"))
+        assertTrue(firstPage.voicePrompt().contains("3번 도서관 3, 약 300미터"))
+        assertFalse(firstPage.voicePrompt().contains("서울 1길"))
 
         val secondPage = firstPage.onCommand(DestinationSearchVoiceCommand.HearMore)
         assertTrue(secondPage.accepted)
         assertEquals(listOf("도서관 4", "도서관 5", "도서관 6"), secondPage.state.currentPageResults.map { it.name })
-        assertTrue(secondPage.state.voicePrompt().contains("4번 도서관 4, 서울 4길, 400m"))
-        assertTrue(secondPage.state.voicePrompt().contains("6번 도서관 6, 서울 6길, 600m"))
+        assertEquals(
+            "도서관 목적지 후보는 현재 4번부터 6번까지입니다. " +
+                "4번 도서관 4, 약 400미터. " +
+                "5번 도서관 5, 약 500미터. " +
+                "6번 도서관 6, 약 600미터. " +
+                "추가 후보가 더 있습니다. 더 들으려면 더 듣기라고 말씀해 주세요. " +
+                "원하는 번호나 다시 듣기라고 말씀해 주세요.",
+            secondPage.state.voicePrompt(),
+        )
 
         val thirdPage = secondPage.state.onCommand(DestinationSearchVoiceCommand.HearMore)
         assertTrue(thirdPage.accepted)
         assertEquals(listOf("도서관 7"), thirdPage.state.currentPageResults.map { it.name })
-        assertTrue(thirdPage.state.voicePrompt().contains("7번 도서관 7, 서울 7길, 700m"))
+        assertTrue(thirdPage.state.voicePrompt().contains("7번 도서관 7, 약 700미터"))
         assertTrue(!thirdPage.state.onCommand(DestinationSearchVoiceCommand.HearMore).accepted)
     }
 
@@ -261,7 +271,15 @@ class AndroidVoiceCommandTest {
             moreResultsAvailable = true,
         )
 
-        assertTrue(state.voicePrompt().contains("더 듣기"))
+        assertEquals(
+            "도서관 목적지 후보는 현재 1번부터 3번까지입니다. " +
+                "1번 도서관 1, 거리 미상. " +
+                "2번 도서관 2, 거리 미상. " +
+                "3번 도서관 3, 거리 미상. " +
+                "추가 후보가 더 있습니다. 더 들으려면 더 듣기라고 말씀해 주세요. " +
+                "원하는 번호나 다시 듣기라고 말씀해 주세요.",
+            state.voicePrompt(),
+        )
         assertFalse(state.onCommand(DestinationSearchVoiceCommand.HearMore).accepted)
     }
 
@@ -311,7 +329,11 @@ class AndroidVoiceCommandTest {
         val results = (1..7).map { destinationResult("후보 ${it}") }
         val firstPage = DestinationSearchVoiceState(query = "후보", results = results)
 
-        assertNull(parseDestinationSearchVoiceCommand("첫 번째 선택"))
+        assertTrue(firstPage.completeVoicePrompt(firstPage.beginVoicePrompt()))
+        // S05: explicit ordinals share the general command grammar, but never bypass page scope.
+        val firstOrdinal = requireNotNull(parseDestinationSearchVoiceCommand("첫 번째 선택"))
+        assertEquals(DestinationSearchVoiceCommand.SelectCandidate(1), firstOrdinal)
+        assertTrue(firstPage.onCommand(firstOrdinal).accepted)
         assertEquals(
             DestinationSearchVoiceCommand.SelectCandidate(4),
             parseDestinationSearchVoiceCommand("4번 선택"),
@@ -319,6 +341,8 @@ class AndroidVoiceCommandTest {
         assertTrue(!firstPage.onCommand(DestinationSearchVoiceCommand.SelectCandidate(4)).accepted)
 
         val secondPage = firstPage.onCommand(DestinationSearchVoiceCommand.HearMore).state
+        assertTrue(secondPage.completeVoicePrompt(secondPage.beginVoicePrompt()))
+        assertFalse(secondPage.onCommand(firstOrdinal).accepted)
         assertTrue(!secondPage.onCommand(DestinationSearchVoiceCommand.SelectCandidate(1)).accepted)
         val selection = secondPage.onCommand(DestinationSearchVoiceCommand.SelectCandidate(4))
         assertTrue(selection.accepted)
@@ -329,12 +353,12 @@ class AndroidVoiceCommandTest {
     @Test
     fun destinationSearchPromptHandlesEmptyAndMissingMetadata() {
         assertEquals(
-            "병원 목적지 검색 결과가 없습니다.",
+            "병원 목적지 검색 결과가 없습니다. 다른 장소명으로 다시 말씀해 주세요.",
             formatDestinationSearchVoicePrompt("병원", emptyList()),
         )
         assertTrue(
             formatDestinationSearchVoicePrompt("병원", listOf(destinationResult("병원")))
-                .contains("1번 병원, 주소 미상, 거리미상"),
+                .contains("1번 병원, 거리 미상"),
         )
     }
 
@@ -427,6 +451,7 @@ class AndroidVoiceCommandTest {
         assertEquals(DestinationSearchVoiceCommand.SelectCandidate(4), command)
         assertFalse(firstPage.onCommand(requireNotNull(command)).accepted)
         val secondPage = firstPage.onCommand(DestinationSearchVoiceCommand.HearMore).state
+        assertTrue(secondPage.completeVoicePrompt(secondPage.beginVoicePrompt()))
         val selection = secondPage.onCommand(command)
         assertTrue(selection.accepted)
         assertEquals("후보 4", selection.selectedResult?.name)
@@ -464,8 +489,11 @@ class AndroidVoiceCommandTest {
             "종로 찾아줘" to "종로",
             "구로 가고 싶어" to "구로",
             "낙성대로 목적지로 해줘" to "낙성대로",
-            "학교로 안내해줘" to "학교",
-            "금오공대로 안내해줘" to "금오공대",
+            // A bare final '로' can be part of a name; preserve it without a place dictionary.
+            "학교로 안내해줘" to "학교로",
+            "금오공대로 안내해줘" to "금오공대로",
+            "학교 로 안내해줘" to "학교",
+            "금오공대 로 안내해줘" to "금오공대",
             "종로로 안내해줘" to "종로",
         )
         cases.forEach { (phrase, query) ->
@@ -485,6 +513,22 @@ class AndroidVoiceCommandTest {
             assertNull(phrase, parseAndroidVoiceCommand(phrase))
             assertNull(phrase, selectAndroidVoiceAction(listOf(phrase), floatArrayOf(0.9f)))
         }
+    }
+
+    @Test
+    fun unsupportedExclusionDoesNotBecomeADestinationSearch() {
+        listOf(
+            "서울역말고 편의점 찾아줘",
+            "서울역 말고 편의점 찾아줘",
+            "서울역말고, 편의점 찾아줘",
+        ).forEach { phrase ->
+            assertNull(phrase, parseAndroidVoiceCommand(phrase))
+            assertNull(phrase, selectAndroidVoiceAction(listOf(phrase), floatArrayOf(0.9f)))
+        }
+        assertEquals(
+            AndroidVoiceCommand.SetDestination("말고개역"),
+            parseAndroidVoiceCommand("말고개역 찾아줘"),
+        )
     }
 
     @Test
@@ -511,6 +555,7 @@ class AndroidVoiceCommandTest {
             results = listOf(destinationResult("첫 후보"), destinationResult("다른 후보")),
         )
         assertNull(parseDestinationSearchVoiceCommand("첫 후보"))
+        assertTrue(state.completeVoicePrompt(state.beginVoicePrompt()))
         assertEquals(2, state.onCommand(DestinationSearchVoiceCommand.SelectCandidate(2)).selectedOneBasedIndex)
     }
 

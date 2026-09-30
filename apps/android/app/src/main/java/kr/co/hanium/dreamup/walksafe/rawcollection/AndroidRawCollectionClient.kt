@@ -99,9 +99,12 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
                 return@cancellableHttpCall receipt
             }
 
-            val missingBindings = status.missingBindings
+            // FP-035-DETAIL-02 interim (owner decision 3(b)): until resumable transfer is verified,
+            // every post-walk attempt sends the small segment again from its first chunk instead of
+            // only what the server reports missing; an already stored identical chunk is re-acked.
+            val sendBindings = backendManifest.chunkBindings
                 .sortedBy(BackendRawChunkBinding::localOrdinal)
-            missingBindings.forEachIndexed { index, binding ->
+            sendBindings.forEachIndexed { index, binding ->
                 val chunk = requireNotNull(chunksByOrdinal[binding.localOrdinal])
                 requestJson(
                     session = session,
@@ -118,17 +121,18 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
                     cancellation = cancellation,
                     isCurrent = ::currentOrCancel,
                 ).let { body ->
-                    val expectedState = if (index == missingBindings.lastIndex) {
-                        RAW_STATE_READY_TO_COMMIT
+                    // Resent chunks may already be stored, so only the last ack must be complete.
+                    val expectedStates = if (index == sendBindings.lastIndex) {
+                        setOf(RAW_STATE_READY_TO_COMMIT)
                     } else {
-                        RAW_STATE_RECEIVING
+                        setOf(RAW_STATE_RECEIVING, RAW_STATE_READY_TO_COMMIT)
                     }
-                    if (!validChunkAck(body, backendManifest, binding, expectedState)) {
+                    if (!validChunkAck(body, backendManifest, binding, expectedStates)) {
                         throw RawCollectionProtocolException()
                     }
                 }
             }
-            if (missingBindings.isNotEmpty()) {
+            if (sendBindings.isNotEmpty()) {
                 status = requestStatus(
                     session,
                     networkBinding,
@@ -271,7 +275,11 @@ internal class AndroidRawCollectionClient : RawCollectionNetworkClient {
             isCurrent()
             val response = connection.readBoundedResponse(RAW_RESPONSE_MAX_BYTES, cancellation)
             if (response.statusCode !in acceptedStatusCodes) {
-                throw RawCollectionHttpException(response.statusCode)
+                throw RawCollectionHttpException(
+                    statusCode = response.statusCode,
+                    errorBody = response.body,
+                    retryAfterHeader = connection.getHeaderField("Retry-After"),
+                )
             }
             val responseContentType = connection.getHeaderField("Content-Type")
                 ?.substringBefore(';')
@@ -466,7 +474,7 @@ private fun validChunkAck(
     body: String,
     manifest: BackendRawManifest,
     binding: BackendRawChunkBinding,
-    expectedState: String,
+    expectedStates: Set<String>,
 ): Boolean = runCatching {
     val root = JSONObject(body)
     require(root.exactKeys() == RAW_CHUNK_ACK_FIELDS)
@@ -476,8 +484,9 @@ private fun validChunkAck(
     require(root.strictInt("index") == binding.chunkIndex)
     require(root.strictInt("size_bytes") == binding.sizeBytes)
     require(root.getString("sha256") == binding.sha256)
-    require(expectedState in setOf(RAW_STATE_RECEIVING, RAW_STATE_READY_TO_COMMIT))
-    require(root.getString("state") == expectedState)
+    require(expectedStates.isNotEmpty())
+    require(expectedStates.all { it in setOf(RAW_STATE_RECEIVING, RAW_STATE_READY_TO_COMMIT) })
+    require(root.getString("state") in expectedStates)
     require(canonicalUtcSecond(root.getString("stored_at")))
     true
 }.getOrDefault(false)
@@ -546,6 +555,8 @@ private fun canonicalUtcSecond(value: String): Boolean = runCatching {
 
 internal class RawCollectionHttpException(
     val statusCode: Int,
+    val errorBody: String = "",
+    val retryAfterHeader: String? = null,
 ) : IllegalStateException("raw collection request failed: $statusCode")
 
 internal class RawCollectionProtocolException :

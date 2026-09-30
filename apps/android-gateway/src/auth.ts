@@ -21,7 +21,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
+  FieldLongSessionStorageUnavailableError,
+  backendFieldLongSessionAuthenticatedAtEpochMs,
+  fieldLongSessionStorageOutcomeUnknownResponse,
+  backendFieldLongSessionIdentity,
+  fieldLongSessionAuthenticatedAtEpochMs,
   fieldLongSessionIdentity,
+  fieldSessionReuseRevokedAtEpochMs,
   revokeAllFieldLongSessions
 } from "./field-long-session.js";
 import {
@@ -32,6 +38,7 @@ import {
 import {
   decryptGatewayStateJson,
   encryptGatewayStateJson,
+  GatewayStorageOutcomeUnknownError,
   maxGatewayStateEnvelopeBytes
 } from "./encrypted-json-store.js";
 
@@ -42,11 +49,13 @@ const LOGIN_ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
 const LOGIN_BLOCK_MS = 15 * 60 * 1000;
 const LOGIN_CLIENT_ATTEMPT_LIMIT = 5;
 const LOGIN_GLOBAL_ATTEMPT_LIMIT = 120;
+const LOGIN_TOTAL_ATTEMPT_LIMIT = 240;
 const LOGIN_CLIENT_FILE_LIMIT = 256;
 const LOGIN_LOCK_WAIT_MS = 1000;
 const LOGIN_ATTEMPT_RETENTION_MS = LOGIN_ATTEMPT_WINDOW_MS + LOGIN_BLOCK_MS;
 const LOGIN_CLIENT_ATTEMPT_FILE = /^field-[0-9a-f]{64}\.log$/;
 const LOGIN_GLOBAL_ATTEMPT_FILE = "global-attempts.log";
+const LOGIN_GLOBAL_FAILURE_FILE = "global-failures.log";
 const ACTOR_ID = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$/;
 const DEVICE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const RESERVED_ACTOR_IDS = new Set(["unknown", "system", "anonymous"]);
@@ -164,9 +173,15 @@ type GatewaySessionIdentity =
   | BackendGatewaySessionIdentity
   | BackendDeviceGatewaySessionIdentity;
 
+// The exact three-key shape adds one v6 slot without a second file or lock.
+// Existing singleton, device-ledger and watermark shapes remain readable.
+// Older readers reject the combined shape; mixed-version writers and rollback
+// deployment are not supported by this internal format extension.
+// The existing device cap counts v7 entries; the v6 slot remains singular.
 type BackendDeviceGatewaySessionLedger = {
   actorId: string;
   sessions: BackendDeviceGatewaySessionIdentity[];
+  compatibilitySession?: BackendGatewaySessionIdentity;
 };
 
 type BackendGatewaySessionWatermark = {
@@ -319,9 +334,9 @@ function isBackendSessionIdentity(
 }
 
 function readActiveSession(actorId: string): GatewaySessionState | null {
-  const filePath = sessionStatePath(actorId);
   let descriptor: number | null = null;
   try {
+    const filePath = sessionStatePath(actorId);
     descriptor = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
     const metadata = fstatSync(descriptor);
     if (
@@ -350,7 +365,9 @@ function readActiveSession(actorId: string): GatewaySessionState | null {
     return state;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
+    // Unreadable, undecryptable, or insecure state is a storage fault, not an
+    // invalid credential; callers map this to the retryable 503 response.
+    throw new FieldLongSessionStorageUnavailableError();
   } finally {
     if (descriptor !== null) closeSync(descriptor);
   }
@@ -395,7 +412,9 @@ export function validShortSessionStateForMaintenance(
     return recordId === `field-${digest}.json`;
   }
   const ledgerKeys = ["actorId", "sessions"].sort().join("\0");
-  if (keys === ledgerKeys) {
+  const coexistenceKeys = ["actorId", "sessions", "compatibilitySession"]
+    .sort().join("\0");
+  if (keys === ledgerKeys || keys === coexistenceKeys) {
     if (
       typeof state.actorId !== "string" ||
       !ACTOR_ID.test(state.actorId) ||
@@ -440,6 +459,25 @@ export function validShortSessionStateForMaintenance(
       ) return false;
       devices.add(entry.deviceId);
       sessionIds.add(entry.sessionId);
+    }
+    if (keys === coexistenceKeys) {
+      const compatibility = state.compatibilitySession;
+      if (
+        typeof compatibility !== "object" ||
+        compatibility === null ||
+        Array.isArray(compatibility)
+      ) return false;
+      const entry = compatibility as Record<string, unknown>;
+      if (
+        Object.keys(entry).sort().join("\0") !== backendKeys ||
+        entry.sessionKind !== "backend_account" ||
+        entry.actorId !== state.actorId ||
+        entry.accountGeneration !== accountGeneration ||
+        entry.authEpoch !== authEpoch ||
+        typeof entry.sessionId !== "string" ||
+        sessionIds.has(entry.sessionId) ||
+        !validShortSessionStateForMaintenance(entry, recordId)
+      ) return false;
     }
     const digest = createHash("sha256")
       .update(`field\0${state.actorId}`)
@@ -502,11 +540,18 @@ function writeSessionState(target: string, state: GatewaySessionState): void {
     descriptor = null;
     chmodSync(temporary, 0o600);
     renameSync(temporary, target);
-    directoryDescriptor = openSync(
-      path.dirname(target),
-      fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
-    );
-    fsyncSync(directoryDescriptor);
+    // S19-27: after the rename the new session state may be durable; a later failure is
+    // reported as outcome unknown, never as the not-committed storage error.
+    try {
+      injectShortSessionStorageFault("directory_fsync");
+      directoryDescriptor = openSync(
+        path.dirname(target),
+        fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
+      );
+      fsyncSync(directoryDescriptor);
+    } catch (error) {
+      throw new GatewayStorageOutcomeUnknownError("short-session", { cause: error });
+    }
   } finally {
     if (descriptor !== null) closeSync(descriptor);
     if (directoryDescriptor !== null) closeSync(directoryDescriptor);
@@ -514,9 +559,25 @@ function writeSessionState(target: string, state: GatewaySessionState): void {
   }
 }
 
+let shortSessionStorageFaultForTests: "directory_fsync" | null = null;
+
+/** Tests only (S19-27): injects a failure right after the short-session rename. */
+export function setShortSessionStorageFaultForTests(stage: "directory_fsync" | null): void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("short-session storage faults are unavailable in production");
+  }
+  shortSessionStorageFaultForTests = stage;
+}
+
+function injectShortSessionStorageFault(stage: "directory_fsync"): void {
+  if (shortSessionStorageFaultForTests === stage) {
+    throw new Error(`injected short-session ${stage} failure`);
+  }
+}
+
 function currentBackendDeviceSessions(
   state: GatewaySessionState | null,
-  identity: BackendDeviceGatewaySessionIdentity,
+  identity: BackendAccountSessionBinding,
   nowSeconds: number
 ): BackendDeviceGatewaySessionIdentity[] {
   const sessions = state && isBackendDeviceSessionLedger(state)
@@ -557,13 +618,47 @@ function backendSessionWatermark(
 }
 
 function backendSessionWatermarkState(
-  state: BackendGatewaySessionIdentity | BackendDeviceGatewaySessionIdentity
+  state: BackendAccountSessionBinding
 ): BackendGatewaySessionWatermark {
   return {
     actorId: state.actorId,
     accountGeneration: state.accountGeneration,
     authEpoch: state.authEpoch
   };
+}
+
+function currentBackendCompatibilitySession(
+  state: GatewaySessionState | null,
+  identity: BackendAccountSessionBinding,
+  nowSeconds: number
+): BackendGatewaySessionIdentity | undefined {
+  const session = state && isBackendDeviceSessionLedger(state)
+    ? state.compatibilitySession
+    : state && isBackendSessionIdentity(state) &&
+      state.sessionKind === "backend_account"
+      ? state
+      : undefined;
+  return session &&
+    session.actorId === identity.actorId &&
+    session.accountGeneration === identity.accountGeneration &&
+    session.authEpoch === identity.authEpoch &&
+    session.expiresAtSeconds > nowSeconds &&
+    session.expiresAtSeconds <= nowSeconds + SESSION_MAX_AGE_SECONDS
+    ? session
+    : undefined;
+}
+
+function backendSessionStateWithSlots(
+  binding: BackendAccountSessionBinding,
+  sessions: BackendDeviceGatewaySessionIdentity[],
+  compatibilitySession?: BackendGatewaySessionIdentity
+): GatewaySessionState {
+  if (sessions.length > 0) {
+    return compatibilitySession
+      ? { actorId: binding.actorId, sessions, compatibilitySession }
+      : { actorId: binding.actorId, sessions };
+  }
+  return compatibilitySession ?? backendSessionWatermarkState(binding);
 }
 
 function writeActiveSession(identity: GatewaySessionIdentity): void {
@@ -581,24 +676,26 @@ function writeActiveSession(identity: GatewaySessionIdentity): void {
       )) {
         throw new GatewaySessionRollbackError();
       }
-    }
-    if (
-      "sessionKind" in identity &&
-      identity.sessionKind === "backend_account_device"
-    ) {
       const nowSeconds = Math.floor(Date.now() / 1000);
-      const sessions = currentBackendDeviceSessions(
+      let sessions = currentBackendDeviceSessions(active, identity, nowSeconds);
+      let compatibilitySession = currentBackendCompatibilitySession(
         active,
         identity,
         nowSeconds
-      ).filter((session) => session.deviceId !== identity.deviceId);
-      if (sessions.length >= SHORT_DEVICE_SESSION_LIMIT) {
-        throw new GatewaySessionDeviceCapacityError();
+      );
+      if (identity.sessionKind === "backend_account_device") {
+        sessions = sessions.filter((session) => session.deviceId !== identity.deviceId);
+        if (sessions.length >= SHORT_DEVICE_SESSION_LIMIT) {
+          throw new GatewaySessionDeviceCapacityError();
+        }
+        sessions = [...sessions, identity];
+      } else {
+        compatibilitySession = identity;
       }
-      writeSessionState(target, {
-        actorId: identity.actorId,
-        sessions: [...sessions, identity]
-      });
+      writeSessionState(
+        target,
+        backendSessionStateWithSlots(identity, sessions, compatibilitySession)
+      );
       return;
     }
     writeSessionState(target, identity);
@@ -610,18 +707,29 @@ function clearActiveSession(identity: GatewaySessionIdentity): void {
   withExclusiveFileLock(`${target}.lock`, () => {
     const active = readActiveSession(identity.actorId);
     if (active && isBackendDeviceSessionLedger(active)) {
+      if ("sessionKind" in identity && identity.sessionKind === "backend_account") {
+        if (active.compatibilitySession?.sessionId !== identity.sessionId) return;
+        writeSessionState(
+          target,
+          backendSessionStateWithSlots(active.sessions[0]!, active.sessions)
+        );
+        return;
+      }
+      if (!("sessionKind" in identity) ||
+        identity.sessionKind !== "backend_account_device"
+      ) return;
       const sessions = active.sessions.filter(
         (session) => session.sessionId !== identity.sessionId
       );
       if (sessions.length === active.sessions.length) return;
-      if (sessions.length === 0) {
-        writeSessionState(
-          target,
-          backendSessionWatermarkState(active.sessions[0]!)
-        );
-      } else {
-        writeSessionState(target, { actorId: active.actorId, sessions });
-      }
+      writeSessionState(
+        target,
+        backendSessionStateWithSlots(
+          active.sessions[0]!,
+          sessions,
+          active.compatibilitySession
+        )
+      );
       return;
     }
     if (active && isBackendSessionWatermark(active)) return;
@@ -675,7 +783,8 @@ function validLegacySessionIdentity(candidate: string): LegacyGatewaySessionIden
   ) {
     return null;
   }
-  return { actorId, sessionId, expiresAtSeconds, sessionScope };
+  const identity = { actorId, sessionId, expiresAtSeconds, sessionScope };
+  return endedByAccountWideReuse(identity) ? null : identity;
 }
 
 function positiveCanonicalInteger(value: string): number | null {
@@ -734,7 +843,10 @@ function validBackendSessionIdentity(
     sessionScope
   );
   if (!expected || !constantTimeEqual(candidate, expected)) return null;
-  const active = readActiveSession(actorId);
+  const state = readActiveSession(actorId);
+  const active = state && isBackendDeviceSessionLedger(state)
+    ? state.compatibilitySession ?? null
+    : state;
   if (
     !active ||
     isBackendDeviceSessionLedger(active) ||
@@ -748,7 +860,7 @@ function validBackendSessionIdentity(
     active.expiresAtSeconds !== expiresAtSeconds ||
     active.sessionScope !== sessionScope
   ) return null;
-  return {
+  const identity: BackendGatewaySessionIdentity = {
     actorId,
     accountGeneration,
     authEpoch,
@@ -757,6 +869,7 @@ function validBackendSessionIdentity(
     sessionKind: "backend_account",
     sessionScope
   };
+  return endedByAccountWideReuse(identity) ? null : identity;
 }
 
 function validBackendDeviceSessionIdentity(
@@ -838,7 +951,7 @@ function validBackendDeviceSessionIdentity(
     backendDeviceActive.expiresAtSeconds !== expiresAtSeconds ||
     backendDeviceActive.sessionScope !== sessionScope
   ) return null;
-  return {
+  const identity: BackendDeviceGatewaySessionIdentity = {
     actorId,
     accountGeneration,
     authEpoch,
@@ -848,6 +961,7 @@ function validBackendDeviceSessionIdentity(
     sessionKind: "backend_account_device",
     sessionScope
   };
+  return endedByAccountWideReuse(identity) ? null : identity;
 }
 
 function validSessionIdentity(candidate: string): GatewaySessionIdentity | null {
@@ -856,13 +970,27 @@ function validSessionIdentity(candidate: string): GatewaySessionIdentity | null 
   return validLegacySessionIdentity(candidate);
 }
 
-function requestCookies(request: Request): Map<string, string> {
+/**
+ * login-F3 (owner decision 1, FP-011-DETAIL-02 "immediately"): a short session issued at or
+ * before the actor's last account-wide reuse revocation is rejected, fail-closed, even when
+ * revokeShortFieldSessionsForActor could not rewrite the short-session store (lock busy,
+ * storage error, unknown rename outcome). Issue time has second precision, so a login in
+ * the same second as the revocation is also rejected and must log in again.
+ */
+function endedByAccountWideReuse(identity: GatewaySessionIdentity): boolean {
+  const reuseRevokedAt = fieldSessionReuseRevokedAtEpochMs(identity.actorId);
+  if (reuseRevokedAt === null) return false;
+  return (identity.expiresAtSeconds - SESSION_MAX_AGE_SECONDS) * 1000 <= reuseRevokedAt;
+}
+
+function requestCookies(request: Request): Map<string, string> | null {
   const cookies = new Map<string, string>();
   for (const part of (request.headers.get("cookie") ?? "").split(";")) {
     const separator = part.indexOf("=");
     if (separator <= 0) continue;
     const name = part.slice(0, separator).trim();
     const value = part.slice(separator + 1).trim();
+    if (name === FIELD_COOKIE && cookies.has(name)) return null;
     if (name) cookies.set(name, value);
   }
   return cookies;
@@ -978,6 +1106,10 @@ function globalLoginAttemptPath(directory: string): string {
   return path.join(directory, LOGIN_GLOBAL_ATTEMPT_FILE);
 }
 
+function globalLoginFailurePath(directory: string): string {
+  return path.join(directory, LOGIN_GLOBAL_FAILURE_FILE);
+}
+
 function ownedByCurrentProcess(uid: number): boolean {
   return typeof process.getuid !== "function" || uid === process.getuid();
 }
@@ -1000,7 +1132,11 @@ async function secureLoginAttemptDirectory(): Promise<string> {
 
 async function pruneExpiredLoginAttemptFiles(directory: string, now: number): Promise<void> {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (!LOGIN_CLIENT_ATTEMPT_FILE.test(entry.name) && entry.name !== LOGIN_GLOBAL_ATTEMPT_FILE) continue;
+    if (
+      !LOGIN_CLIENT_ATTEMPT_FILE.test(entry.name) &&
+      entry.name !== LOGIN_GLOBAL_ATTEMPT_FILE &&
+      entry.name !== LOGIN_GLOBAL_FAILURE_FILE
+    ) continue;
     const filePath = path.join(directory, entry.name);
     let metadata;
     try {
@@ -1037,7 +1173,7 @@ async function readLoginAttempts(filePath: string): Promise<number[]> {
     }
     const raw = await handle.readFile({ encoding: "utf8" });
     if (Buffer.byteLength(raw, "utf8") > 64 * 1024) {
-      return Array.from({ length: LOGIN_GLOBAL_ATTEMPT_LIMIT }, () => Date.now());
+      return Array.from({ length: LOGIN_TOTAL_ATTEMPT_LIMIT }, () => Date.now());
     }
     return raw
       .split("\n")
@@ -1071,9 +1207,21 @@ async function writeLoginAttempts(filePath: string, attempts: number[]): Promise
       throw new Error("gateway rate-limit file must be owned by this process and mode 0600");
     }
     await handle.writeFile(`${attempts.join("\n")}\n`, { encoding: "utf8" });
+    // Login limits are security state: match the session ledger durability
+    // (file fsync -> rename -> directory fsync) so a power loss cannot reset them.
+    await handle.sync();
     await handle.close();
     handle = null;
     await rename(temporary, filePath);
+    const directoryHandle = await open(
+      path.dirname(filePath),
+      fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
+    );
+    try {
+      await directoryHandle.sync();
+    } finally {
+      await directoryHandle.close();
+    }
   } finally {
     await handle?.close();
     await rm(temporary, { force: true });
@@ -1125,7 +1273,7 @@ function cookieHeader(value: string, request: Request, maxAge: number | null): s
     "SameSite=Strict"
   ];
   if (maxAge !== null) attributes.push(`Max-Age=${maxAge}`);
-  if (secureRequest(request)) attributes.push("Secure");
+  if (process.env.NODE_ENV === "production" || secureRequest(request)) attributes.push("Secure");
   return attributes.join("; ");
 }
 
@@ -1183,7 +1331,19 @@ function gatewaySessionAuthorization(request: Request): GatewaySessionAuthorizat
       authEpoch: null
     };
   }
-  const candidate = requestCookies(request).get(FIELD_COOKIE) ?? "";
+  // Owner decision 2 / S19-1: Backend-email long-session family. The stored binding carries
+  // the account generation and auth epoch, so backendAccountSessionGate checks Backend
+  // currency on every request exactly as for a v7 device session.
+  const backendLong = backendFieldLongSessionIdentity(request);
+  if (backendLong) {
+    return {
+      actorId: backendLong.actorId,
+      sessionScope: "general",
+      accountGeneration: backendLong.binding.accountGeneration,
+      authEpoch: backendLong.binding.authEpoch
+    };
+  }
+  const candidate = requestCookies(request)?.get(FIELD_COOKIE) ?? "";
   const shortIdentity = validSessionIdentity(candidate);
   return shortIdentity
     ? {
@@ -1199,6 +1359,32 @@ function gatewaySessionAuthorization(request: Request): GatewaySessionAuthorizat
 
 export function isGatewaySessionAuthorized(request: Request): boolean {
   return gatewaySessionAuthorization(request) !== null;
+}
+
+/**
+ * S19-44: when the credential check behind the current session happened. Short sessions
+ * are only minted by a password or token login with a fixed lifetime, so their issue time
+ * is `expiresAtSeconds - SESSION_MAX_AGE_SECONDS`; long sessions use the family creation
+ * time. Returns null when the session is not authorized or the time is unknown.
+ */
+export function gatewaySessionAuthenticatedAtEpochMs(
+  request: Request,
+  nowEpochMs = Date.now()
+): number | null {
+  const identity = fieldLongSessionIdentity(request, nowEpochMs);
+  if (identity && isGatewayActorConfigured(identity.actorId)) {
+    return fieldLongSessionAuthenticatedAtEpochMs(request, nowEpochMs);
+  }
+  if (backendFieldLongSessionIdentity(request, nowEpochMs)) {
+    return backendFieldLongSessionAuthenticatedAtEpochMs(request, nowEpochMs);
+  }
+  const candidate = requestCookies(request)?.get(FIELD_COOKIE) ?? "";
+  const shortIdentity = validSessionIdentity(candidate);
+  if (!shortIdentity) return null;
+  const issuedAtEpochMs = (shortIdentity.expiresAtSeconds - SESSION_MAX_AGE_SECONDS) * 1000;
+  return Number.isSafeInteger(issuedAtEpochMs) && issuedAtEpochMs > 0
+    ? issuedAtEpochMs
+    : null;
 }
 
 export function gatewaySessionScope(request: Request): GatewaySessionScope | null {
@@ -1244,7 +1430,20 @@ export function gatewayFieldLongSessionBinding(
       accountGeneration: null
     };
   }
-  const candidate = requestCookies(request).get(FIELD_COOKIE) ?? "";
+  // A Backend-email long family binds a walk like a v7 device session: the account key and
+  // auth epoch stay fixed while the refresh rotation changes on every renewal.
+  const backendLong = backendFieldLongSessionIdentity(request);
+  if (backendLong) {
+    return {
+      actorId: backendLong.actorId,
+      accountId: `${backendLong.actorId}:generation:${backendLong.binding.accountGeneration}`,
+      deviceId: backendLong.deviceId,
+      familyId: backendLong.familyId,
+      sessionRotation: backendLong.binding.authEpoch,
+      accountGeneration: backendLong.binding.accountGeneration
+    };
+  }
+  const candidate = requestCookies(request)?.get(FIELD_COOKIE) ?? "";
   const backendIdentity = validBackendDeviceSessionIdentity(candidate);
   return backendIdentity
     ? {
@@ -1309,35 +1508,58 @@ export async function gatewayLoginRateLimitResponse(
       }
     );
   }
-  const [clientAttempts, globalAttempts] = await Promise.all([
+  const [clientAttempts, globalFailures, totalAttempts] = await Promise.all([
     readLoginAttempts(clientPath),
+    readLoginAttempts(globalLoginFailurePath(directory)),
     readLoginAttempts(globalLoginAttemptPath(directory))
   ]);
+  // Legacy global timestamps are requests, not confirmed credential failures.
+  // Legacy client timestamps retain their conservative IP bound until expiry.
   const clientBlockedUntil = blockedUntilFromAttempts(
     recentLoginAttempts(clientAttempts, now),
     LOGIN_CLIENT_ATTEMPT_LIMIT,
     now
   );
   const globalBlockedUntil = blockedUntilFromAttempts(
-    recentLoginAttempts(globalAttempts, now),
+    recentLoginAttempts(globalFailures, now),
     LOGIN_GLOBAL_ATTEMPT_LIMIT,
     now
   );
   const blockedUntil = Math.max(clientBlockedUntil, globalBlockedUntil);
-  if (blockedUntil <= now) return null;
-  const retryAfterSeconds = Math.max(1, Math.ceil((blockedUntil - now) / 1000));
+  if (blockedUntil > now) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((blockedUntil - now) / 1000));
+    return Response.json(
+      {
+        code: globalBlockedUntil >= clientBlockedUntil
+          ? "gateway_login_global_rate_limited"
+          : "gateway_login_rate_limited",
+        message: "인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요."
+      },
+      {
+        status: 429,
+        headers: {
+          "cache-control": "no-store",
+          "retry-after": String(retryAfterSeconds)
+        }
+      }
+    );
+  }
+  const recentTotal = totalAttempts.filter(
+    (attemptAt) => attemptAt > now - LOGIN_ATTEMPT_WINDOW_MS && attemptAt <= now
+  );
+  if (recentTotal.length < LOGIN_TOTAL_ATTEMPT_LIMIT) return null;
   return Response.json(
     {
-      code: globalBlockedUntil >= clientBlockedUntil
-        ? "gateway_login_global_rate_limited"
-        : "gateway_login_rate_limited",
+      code: "gateway_login_total_rate_limited",
       message: "인증 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요."
     },
     {
       status: 429,
       headers: {
         "cache-control": "no-store",
-        "retry-after": String(retryAfterSeconds)
+        "retry-after": String(Math.max(1, Math.ceil(
+          (recentTotal[recentTotal.length - LOGIN_TOTAL_ATTEMPT_LIMIT]! + LOGIN_ATTEMPT_WINDOW_MS - now) / 1000
+        )))
       }
     }
   );
@@ -1352,12 +1574,25 @@ export async function recordGatewayLoginAttempt(request: Request): Promise<void>
     throw new Error("gateway rate-limit client file capacity reached");
   }
   const globalPath = globalLoginAttemptPath(directory);
-  const [clientAttempts, globalAttempts] = await Promise.all([
+  const globalAttempts = await readLoginAttempts(globalPath);
+  await writeLoginAttempts(globalPath, [...recentLoginAttempts(globalAttempts, now), now]);
+}
+
+export async function recordGatewayLoginFailure(request: Request): Promise<void> {
+  const now = Date.now();
+  const directory = await secureLoginAttemptDirectory();
+  await pruneExpiredLoginAttemptFiles(directory, now);
+  const clientPath = loginAttemptPath(directory, request);
+  if (await loginClientFileCapacityReached(directory, clientPath)) {
+    throw new Error("gateway rate-limit client file capacity reached");
+  }
+  const globalPath = globalLoginFailurePath(directory);
+  const [clientAttempts, globalFailures] = await Promise.all([
     readLoginAttempts(clientPath),
     readLoginAttempts(globalPath)
   ]);
-  await writeLoginAttempts(globalPath, [...recentLoginAttempts(globalAttempts, now), now]);
   await writeLoginAttempts(clientPath, [...recentLoginAttempts(clientAttempts, now), now]);
+  await writeLoginAttempts(globalPath, [...recentLoginAttempts(globalFailures, now), now]);
 }
 
 export function gatewayLoginBusyResponse(): Response {
@@ -1384,6 +1619,10 @@ export function establishGatewaySession(
   try {
     writeActiveSession({ actorId: account.actorId, sessionId, expiresAtSeconds, sessionScope });
   } catch (error) {
+    // S19-27: the session state may be durable; the client logs in again.
+    if (error instanceof GatewayStorageOutcomeUnknownError) {
+      return fieldLongSessionStorageOutcomeUnknownResponse();
+    }
     return error instanceof ExclusiveFileLockBusyError
       ? gatewayLoginBusyResponse()
       : gatewayUnavailableResponse();
@@ -1461,7 +1700,7 @@ export function establishBackendGatewaySession(
     }
     return error instanceof ExclusiveFileLockBusyError
       ? gatewayLoginBusyResponse()
-      : gatewayUnavailableResponse();
+      : gatewaySessionStorageFailureResponse(error);
   }
   return Response.json({ session_scope: sessionScope }, {
     status: 200,
@@ -1490,10 +1729,16 @@ function gatewaySessionStorageFailureResponse(error: unknown): Response {
       }
     );
   }
+  // S19-27: the session may already be committed; the client logs in again.
+  if (error instanceof GatewayStorageOutcomeUnknownError) {
+    return fieldLongSessionStorageOutcomeUnknownResponse();
+  }
+  // S19-11: nothing was committed, so the request can be retried unchanged.
   return Response.json(
     {
       code: "field_session_storage_unavailable",
-      message: "현장 세션 상태를 안전하게 저장할 수 없습니다."
+      message: "현장 세션 상태를 안전하게 저장할 수 없습니다.",
+      retryable: true
     },
     {
       status: 503,
@@ -1506,7 +1751,7 @@ export function listBackendDeviceGatewaySessionDevices(
   request: Request,
   nowEpochMs = Date.now()
 ): Response | null {
-  const candidate = requestCookies(request).get(FIELD_COOKIE) ?? "";
+  const candidate = requestCookies(request)?.get(FIELD_COOKIE) ?? "";
   if (!candidate.startsWith("v7.")) return null;
   const nowSeconds = Math.floor(nowEpochMs / 1000);
   const identity = validBackendDeviceSessionIdentity(candidate, nowSeconds);
@@ -1561,7 +1806,7 @@ export function revokeBackendDeviceGatewaySession(
   deviceId: string,
   nowEpochMs = Date.now()
 ): Response | null {
-  const candidate = requestCookies(request).get(FIELD_COOKIE) ?? "";
+  const candidate = requestCookies(request)?.get(FIELD_COOKIE) ?? "";
   if (!candidate.startsWith("v7.")) return null;
   if (!DEVICE_ID.test(deviceId)) {
     return Response.json(
@@ -1583,14 +1828,14 @@ export function revokeBackendDeviceGatewaySession(
           (session) => session.deviceId !== deviceId
         );
         if (sessions.length !== state.sessions.length) {
-          if (sessions.length === 0) {
-            writeSessionState(
-              target,
-              backendSessionWatermarkState(state.sessions[0]!)
-            );
-          } else {
-            writeSessionState(target, { actorId: state.actorId, sessions });
-          }
+          writeSessionState(
+            target,
+            backendSessionStateWithSlots(
+              state.sessions[0]!,
+              sessions,
+              state.compatibilitySession
+            )
+          );
         }
       } else if (
         state &&
@@ -1615,7 +1860,9 @@ export function revokeBackendDeviceGatewaySession(
 }
 
 export function clearGatewaySession(request: Request): Response {
-  const candidate = requestCookies(request).get(FIELD_COOKIE) ?? "";
+  const cookies = requestCookies(request);
+  if (!cookies) return gatewayUnauthorizedResponse();
+  const candidate = cookies.get(FIELD_COOKIE) ?? "";
   try {
     const identity = validSessionIdentity(candidate);
     if (identity) clearActiveSession(identity);
@@ -1629,6 +1876,27 @@ export function clearGatewaySession(request: Request): Response {
     headers: {
       "cache-control": "no-store",
       "set-cookie": cookieHeader("", request, 0)
+    }
+  });
+}
+
+/**
+ * Owner decision 1 (2026-09-29, FP-011-DETAIL-02): after a refresh-token reuse revoked every
+ * long-session family of the actor, every short device session of the actor ends too.
+ * Backend account state keeps its generation/auth-epoch watermark (no login rollback).
+ */
+export function revokeShortFieldSessionsForActor(actorId: string): void {
+  if (!ACTOR_ID.test(actorId)) return;
+  const target = sessionStatePath(actorId);
+  withExclusiveFileLock(`${target}.lock`, () => {
+    const active = readActiveSession(actorId);
+    if (!active || isBackendSessionWatermark(active)) return;
+    if (isBackendDeviceSessionLedger(active)) {
+      writeSessionState(target, backendSessionWatermarkState(active.sessions[0]!));
+    } else if (isBackendSessionIdentity(active)) {
+      writeSessionState(target, backendSessionWatermarkState(active));
+    } else {
+      durableUnlinkSync(target);
     }
   });
 }

@@ -13,8 +13,15 @@ import java.util.UUID;
 public final class AdminDeviceProof {
     public static final String SCHEMA_VERSION = "walksafe.admin-device-proof.v2";
     public static final long CHALLENGE_TTL_MS = 120_000L;
+    private static final long MAX_FUTURE_ISSUED_SKEW_MS = 5_000L;
     public static final String CHALLENGE_ID_HEADER = "X-WalkSafe-Device-Challenge-Id";
     public static final String SIGNATURE_HEADER = "X-WalkSafe-Device-Signature";
+
+    public static final class ChallengeTimeException extends IOException {
+        ChallengeTimeException() {
+            super("device challenge is outside the freshness window");
+        }
+    }
 
     public enum Purpose {
         LOGIN,
@@ -158,13 +165,16 @@ public final class AdminDeviceProof {
             boolean postAction = "POST".equals(method)
                 && ("report.review.decide".equals(action)
                     || "report.delivery.create".equals(action)
+                    || "report.delivery.correct".equals(action)
                     || "report.original.grant".equals(action)
                     || "admin.report.delivery_package.create".equals(action)
                     || "report.external_copy_deletion.record".equals(action)
                     || "admin.raw_collection.purpose_decide".equals(action)
                     || "admin.raw_collection.legal_hold".equals(action)
                     || "recovery.custody.attest".equals(action)
-                    || "device.report_lost".equals(action));
+                    || "device.report_lost".equals(action)
+                    || "device_key.rotation.confirm".equals(action)
+                    || "session.revoke".equals(action));
             if (readPurpose != null || !(statusUpdate || postAction)) {
                 throw new IllegalArgumentException("administrator action proof fields do not match the contract");
             }
@@ -266,10 +276,13 @@ public final class AdminDeviceProof {
         if (!SCHEMA_VERSION.equals(schemaVersion)) throw new IOException("unsupported device proof schema");
         if (issuedAt < 0L
             || issuedAt > Long.MAX_VALUE - CHALLENGE_TTL_MS
-            || expiresAt != issuedAt + CHALLENGE_TTL_MS
-            || issuedAt > nowEpochMs
-            || nowEpochMs >= expiresAt) {
+            || expiresAt != issuedAt + CHALLENGE_TTL_MS) {
             throw new IOException("device challenge is outside the freshness window");
+        }
+        if (nowEpochMs < 0L
+            || (issuedAt > nowEpochMs && issuedAt - nowEpochMs > MAX_FUTURE_ISSUED_SKEW_MS)
+            || nowEpochMs >= expiresAt) {
+            throw new ChallengeTimeException();
         }
 
         Map<String, Object> exact18 = new LinkedHashMap<>();

@@ -341,12 +341,18 @@ data class FirstRunOnboardingSnapshot internal constructor(
             if (stage == FirstRunOnboardingStage.VERIFIED_LOGIN) {
                 return signupPrefix.take(2).toSet()
             }
+            val preservedTraining = if (FirstRunOnboardingStage.FP004_TRAINING in actual) {
+                setOf(FirstRunOnboardingStage.FP004_TRAINING)
+            } else {
+                emptySet()
+            }
             val completedPostLogin = when (stage) {
                 FirstRunOnboardingStage.PURPOSE_AND_SAFETY -> emptySet()
                 FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION,
                 FirstRunOnboardingStage.DEVICE_CHECK,
-                FirstRunOnboardingStage.FP004_TRAINING,
-                -> setOf(FirstRunOnboardingStage.PURPOSE_AND_SAFETY)
+                -> setOf(FirstRunOnboardingStage.PURPOSE_AND_SAFETY) + preservedTraining
+                FirstRunOnboardingStage.FP004_TRAINING ->
+                    setOf(FirstRunOnboardingStage.PURPOSE_AND_SAFETY)
                 FirstRunOnboardingStage.COMPLETE ->
                     setOf(
                         FirstRunOnboardingStage.PURPOSE_AND_SAFETY,
@@ -646,7 +652,7 @@ object FirstRunOnboardingPolicy {
                     FirstRunOnboardingRejection.TERMINAL_STATE,
                 )
             }
-            if (evidence.stage != snapshot.stage) {
+            if (evidence.stage != snapshot.stage || !evidenceMatchesFlow(snapshot, evidence)) {
                 return restoreStopped(
                     snapshot,
                     index,
@@ -694,6 +700,8 @@ object FirstRunOnboardingPolicy {
         verifier: FirstRunOnboardingEvidenceVerifier = productionEvidenceVerifier,
     ): FirstRunOnboardingRestoreResult {
         var snapshot = initialEmailAccount(epoch)
+        var restoredHistoricalPermission = false
+        var restoredHistoricalDevice = false
         orderedEvidence.forEachIndexed { index, evidence ->
             if (snapshot.isTerminal) {
                 return restoreStopped(
@@ -702,25 +710,28 @@ object FirstRunOnboardingPolicy {
                     FirstRunOnboardingRejection.TERMINAL_STATE,
                 )
             }
-            if (
+            val awaitingFreshChecks =
                 snapshot.stage == FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION &&
-                evidence is FirstRunOnboardingEvidence.Fp004Training
-            ) {
-                snapshot = recordEmailJitPermissionObservation(
-                    snapshot,
-                    snapshot.epoch,
-                    snapshot.revision,
-                ).current
-                snapshot = recordEmailDeviceCheckPassed(
-                    snapshot,
-                    snapshot.epoch,
-                    snapshot.revision,
-                ).current
-            }
+                    FirstRunOnboardingStage.FP004_TRAINING !in snapshot.completedReceiptHashes
+            val historicalPermission =
+                awaitingFreshChecks &&
+                    evidence is FirstRunOnboardingEvidence.JitPermissionObservation &&
+                    !restoredHistoricalPermission
+            val historicalDevice =
+                awaitingFreshChecks &&
+                    evidence is FirstRunOnboardingEvidence.DeviceCheck &&
+                    restoredHistoricalPermission &&
+                    !restoredHistoricalDevice
+            val restoringTraining =
+                awaitingFreshChecks && evidence is FirstRunOnboardingEvidence.Fp004Training
             val returningLogin =
                 snapshot.stage == FirstRunOnboardingStage.EMAIL_OTP_ENROLLMENT &&
                     evidence is FirstRunOnboardingEvidence.VerifiedLogin
-            if (!returningLogin && evidence.stage != snapshot.stage) {
+            if (
+                (!returningLogin && !historicalPermission && !historicalDevice &&
+                    !restoringTraining && evidence.stage != snapshot.stage) ||
+                !evidenceMatchesFlow(snapshot, evidence)
+            ) {
                 return restoreStopped(
                     snapshot,
                     index,
@@ -749,7 +760,22 @@ object FirstRunOnboardingPolicy {
                 )
             }
             snapshot = when {
-                returningLogin -> {
+                historicalPermission -> {
+                    restoredHistoricalPermission = true
+                    snapshot
+                }
+                historicalDevice -> {
+                    restoredHistoricalDevice = true
+                    snapshot
+                }
+                restoringTraining -> snapshot.copy(
+                    revision = snapshot.revision + 1L,
+                    completedReceiptHashes = immutableReceiptHashes(
+                        snapshot.completedReceiptHashes +
+                            (FirstRunOnboardingStage.FP004_TRAINING to evidence.receiptHash),
+                    ),
+                )
+                evidence is FirstRunOnboardingEvidence.VerifiedLogin -> {
                     val login = evidence as FirstRunOnboardingEvidence.VerifiedLogin
                     recordVerifiedEmailLogin(
                         snapshot,
@@ -757,18 +783,6 @@ object FirstRunOnboardingPolicy {
                         login.receiptHash,
                     ).current
                 }
-                evidence is FirstRunOnboardingEvidence.JitPermissionObservation ->
-                    recordEmailJitPermissionObservation(
-                        snapshot,
-                        snapshot.epoch,
-                        snapshot.revision,
-                    ).current
-                evidence is FirstRunOnboardingEvidence.DeviceCheck ->
-                    recordEmailDeviceCheckPassed(
-                        snapshot,
-                        snapshot.epoch,
-                        snapshot.revision,
-                    ).current
                 else -> advance(snapshot, evidence)
             }
         }
@@ -849,7 +863,11 @@ object FirstRunOnboardingPolicy {
         ) {
             return rejected(snapshot, FirstRunOnboardingRejection.ATTEMPT_MISMATCH)
         }
-        if (token.stage != snapshot.stage || evidence.stage != snapshot.stage) {
+        if (
+            token.stage != snapshot.stage ||
+            evidence.stage != snapshot.stage ||
+            !evidenceMatchesFlow(snapshot, evidence)
+        ) {
             return rejected(snapshot, FirstRunOnboardingRejection.STAGE_MISMATCH)
         }
         if (
@@ -890,13 +908,30 @@ object FirstRunOnboardingPolicy {
         )
     }
 
+    private fun evidenceMatchesFlow(
+        snapshot: FirstRunOnboardingSnapshot,
+        evidence: FirstRunOnboardingEvidence,
+    ): Boolean = when (evidence) {
+        is FirstRunOnboardingEvidence.AgeAndGuardianNeed ->
+            snapshot.flow == FirstRunOnboardingFlow.LEGACY_PHONE_V3 &&
+                evidence.ageBand != FirstRunAgeBand.VERIFIED_14_PLUS
+        is FirstRunOnboardingEvidence.EmailOtpEnrollment ->
+            snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4 &&
+                evidence.ageBand == FirstRunAgeBand.VERIFIED_14_PLUS
+        else -> true
+    }
+
     private fun applyLocalEvidence(
         snapshot: FirstRunOnboardingSnapshot,
         request: FirstRunOnboardingAttemptRequest,
         evidence: FirstRunOnboardingEvidence,
     ): FirstRunOnboardingTransition {
         validateRequest(snapshot, request)?.let { return rejected(snapshot, it) }
-        if (evidence.stage != snapshot.stage || snapshot.stage !in LOCAL_STAGES) {
+        if (
+            evidence.stage != snapshot.stage ||
+            snapshot.stage !in LOCAL_STAGES ||
+            !evidenceMatchesFlow(snapshot, evidence)
+        ) {
             return rejected(snapshot, FirstRunOnboardingRejection.STAGE_MISMATCH)
         }
         if (snapshot.revision == Long.MAX_VALUE) {
@@ -929,7 +964,14 @@ object FirstRunOnboardingPolicy {
             snapshot,
             snapshot.copy(
                 revision = snapshot.revision + 1L,
-                stage = nextStage,
+                stage = if (
+                    expectedStage == FirstRunOnboardingStage.DEVICE_CHECK &&
+                    FirstRunOnboardingStage.FP004_TRAINING in snapshot.completedReceiptHashes
+                ) {
+                    FirstRunOnboardingStage.COMPLETE
+                } else {
+                    nextStage
+                },
                 pendingAttempt = null,
             ),
         )

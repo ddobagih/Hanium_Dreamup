@@ -38,7 +38,21 @@ class MainActivityEmailAccountStaticTest {
         assertFalse(request.contains("putString(email"))
         assertFalse(request.contains("putString(dateOfBirth"))
 
+        // S01-13: signup uses the 12-character rule; login keeps the legacy check.
+        assertTrue(request.contains("GatewayAccountInputPolicy.validNewPassword(password)"))
+        assertFalse(request.contains("GatewayAccountInputPolicy.validPassword(password)"))
+        assertTrue(request.contains("비밀번호는 12자 이상 128자 이하로 입력하세요."))
+
         val create = functionBlock("private fun createEmailAccount()")
+        assertTrue(create.contains("GatewayAccountInputPolicy.validNewPassword(password)"))
+        assertFalse(create.contains("GatewayAccountInputPolicy.validPassword(password)"))
+        assertTrue(create.contains("비밀번호는 12자 이상 128자 이하로 입력하세요."))
+        assertTrue(functionBlock("private fun loginEmailAccount(")
+            .contains("GatewayAccountInputPolicy.validPassword(password)"))
+        assertTrue(source.contains(
+            "\"account_password_too_common\" ->\n" +
+                "                    \"많이 쓰이거나 추측하기 쉬운 비밀번호는 사용할 수 없습니다. 다른 비밀번호를 입력하세요.\"",
+        ))
         assertTrue(create.contains("if (!selections.requiredGranted)"))
         assertTrue(create.contains("password != confirmation"))
         assertTrue(create.contains("Regex(\"^[0-9]{6}$\")"))
@@ -186,6 +200,20 @@ class MainActivityEmailAccountStaticTest {
         val failure = functionBlock("private fun postAccountFailure(")
         assertTrue(failure.contains("account_enrollment_not_allowed"))
         assertTrue(failure.contains("만 14세 미만은 현재 WalkSafe 계정에 가입할 수 없습니다."))
+    }
+
+    @Test
+    fun finishedOtpRequestExplainsExplicitFreshRequestRatherThanConnectionFailure() {
+        val failure = functionBlock("private fun postAccountFailure(")
+        assertInOrder(
+            failure,
+            "emailOtpRequestRetryPolicy.recordFailure(",
+            "serverCode == \"account_enrollment_idempotency_conflict\"",
+            "이전 인증 요청을 사용할 수 없습니다.",
+            "새 요청으로 시작합니다.",
+            "showAccountMessage(message)",
+        )
+        assertTrue(failure.contains("otpAttempt != null && statusCode == 409 &&"))
     }
 
     @Test

@@ -23,11 +23,11 @@ class RuntimeRiskMotionSeparationTest {
         assertEquals(800L, stable.trackStableMs)
         val action = requireNotNull(feedback.evaluateCandidates(candidates(stable), true, 1_800L))
         assertEquals(MessageLevel.STOP, action.level)
-        assertTrue(feedback.claimFeedbackDelivery(action.trackId, 1_800L))
+        assertTrue(feedback.claimFeedbackDelivery(action.trackId, 1_800L, 1_800L))
 
         val next = candidates(observe(pipeline, 1_833L, raw = true, mm = 1_000, pose = false))
         assertNull(feedback.evaluateCandidates(next, true, 1_833L))
-        assertTrue(action.deliveryKey in feedback.activeFeedbackDeliveryKeys(next, true))
+        assertTrue(action.deliveryKey in feedback.activeFeedbackDeliveryKeys(next, true, 1_833L))
         assertTrue(feedback.confirmFeedbackDelivery(action.trackId, 1_800L, 1_833L))
         for (at in listOf(2_500L, 3_500L, 4_300L)) {
             val current = candidates(observe(pipeline, at, raw = true, mm = 1_000, pose = false))
@@ -191,13 +191,16 @@ class RuntimeRiskMotionSeparationTest {
             rawConfidence = if (raw) ConfidenceImage8(40, 40, ByteArray(1_600) { 255.toByte() }) else null,
             fullDepth = DepthImage16(40, 40, IntArray(1_600) { mm }),
             rawDepthTimestampNs = if (raw) rawTimestampNs else null,
+            rawConfidenceTimestampNs = if (raw) rawTimestampNs else null,
             fullDepthTimestampNs = ns,
             cameraImageTimestampNs = ns,
             cameraPoseEvidence = if (pose) CameraPoseEvidence(referenceId, at, 0f, 0f, -(at - 1_000L) / 1_000f,
                 0f, 0f, -1f, CameraImageProjection(1_000, 1_000, 700f, 700f, 500f, 500f,
                     1f, 0f, 0f, 0f, 1f, 0f)) else null,
         )
-        return pipeline.process(snapshot, ns, at,
+        return pipeline.processPrealignedForTest(snapshot, ns, at,
             detections = listOf(DetectionCandidate("person", .95f, RectNorm(.25f, .25f, .5f, .5f)))).single()
+            // This synthetic fixture deliberately uses the same camera and elapsed clocks.
+            .copy(sourceValidUntilElapsedRealtimeMs = at + CurrentTrackedFrameObservation.MAX_SOURCE_AGE_MS)
     }
 }

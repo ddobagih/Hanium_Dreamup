@@ -91,11 +91,25 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         assertTrue(dispatch.contains("GatewaySessionProcessCoordinator.snapshot()"))
         assertTrue(dispatch.contains("snapshot.generation != latest.generation"))
         assertTrue(dispatch.contains("snapshot.session !== latest.session"))
+        assertTrue(dispatch.contains("snapshot.restoredFirstRunSnapshot != latest.restoredFirstRunSnapshot"))
+        assertTrue(dispatch.contains("snapshot.storageBlocked != latest.storageBlocked"))
+        assertTrue(dispatch.contains("snapshot.deletionRecoveryOnly != latest.deletionRecoveryOnly"))
+        assertTrue(dispatch.contains("accountDeletionStateMachine.activityLeaseIsCurrent("))
         assertInOrder(
             dispatch,
+            "val current = GatewaySessionProcessCoordinator.snapshot()",
+            "snapshot.generation == current.generation",
+            "snapshot.session === current.session",
+            "consentAuthorityChanged = synchronized(integratedConsentLock)",
+            "integratedConsentSession.invalidateBackendAuthority()",
+            "val deliver = Runnable {",
             "val latest = GatewaySessionProcessCoordinator.snapshot()",
-            "onGatewayProcessSessionChanged(snapshot)",
+            "snapshot.generation != latest.generation",
+            "snapshot.session !== latest.session",
+            "onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)",
         )
+        val applied = functionBlock("private fun onGatewayProcessSessionChanged(")
+        assertInOrder(applied, "consentAuthorityChanged &&", "refreshIntegratedConsentFromServer()")
     }
 
     @Test
@@ -161,7 +175,8 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         assertTrue(bind.contains("PostLoginMetricDepthState.SUPPORTED -> true"))
         assertTrue(bind.contains("PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED -> false"))
         assertTrue(bind.contains("else -> null"))
-        assertTrue(bind.contains("HANDS_FREE_VOICE in restored.disabledFeatures"))
+        // S14-16-b: a stored wake-word test miss (HANDS_FREE_VOICE) is no longer an STT override.
+        assertFalse(bind.contains("HANDS_FREE_VOICE in restored.disabledFeatures"))
         assertTrue(bind.contains("VOICE_GUIDANCE in restored.disabledFeatures"))
         assertFalse(bind.contains("startPostLoginDeviceCheckRuntime("))
         assertFalse(bind.contains("beginPostLoginDeviceCheckFromUserAction("))
@@ -182,7 +197,18 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
         assertTrue(resultBinding.contains("missingRequiredPermissions ="))
         assertTrue(resultBinding.contains("offlineKoreanTextToSpeechAvailable ="))
         assertTrue(resultBinding.contains("onDeviceSpeechRecognitionAvailable ="))
-        assertTrue(advance.contains("postLoginDeviceCheckSnapshot.passesFeatureGate"))
+        assertTrue(advance.contains("!postLoginDeviceCheckPassesFeatureGate()"))
+        val featureGate = functionBlock("private fun postLoginDeviceCheckPassesFeatureGate()")
+        listOf(
+            "!isActivityForeground",
+            "!postLoginDeviceCheckSnapshot.passesFeatureGate",
+            "binding.actorId == session.actorId",
+            "binding.sessionGeneration == process.generation",
+            "session.verificationState == GatewaySessionVerificationState.VERIFIED",
+            "session.isUsableFor(binding.actorId)",
+            "!process.storageBlocked",
+            "!process.deletionRecoveryOnly",
+        ).forEach { guard -> assertTrue("Missing restored device-check gate: $guard", featureGate.contains(guard)) }
         assertTrue(advance.contains("recordEmailJitPermissionObservation("))
         assertTrue(advance.contains("recordEmailDeviceCheckPassed("))
         assertFalse(advance.contains("startPostLoginDeviceCheckRuntime("))
@@ -248,7 +274,7 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
             .substringAfterRequired("val offlineKoreanTextToSpeechAvailable =")
             .substringBeforeRequired("val environmentProfile =")
         val handsFreeOverride = bind
-            .substringAfterRequired("onDeviceSpeechRecognitionCapabilityOverride = if (")
+            .substringAfterRequired("runtimeObstacleDetectionCapabilityOverride = if (")
             .substringBeforeRequired("offlineKoreanTextToSpeechCapabilityOverride = if (")
         val voiceGuidanceOverride = bind
             .substringAfterRequired("offlineKoreanTextToSpeechCapabilityOverride = if (")
@@ -274,10 +300,9 @@ class MainActivityDeviceCheckRecoveryContractStaticTest {
             "cancelPostLoginDeviceCheckRuntime(\"saved_result_prerequisites_changed\")",
             "state = PostLoginDeviceCheckState.NOT_RUN",
         )
-        assertTrue(handsFreeOverride.contains("HANDS_FREE_VOICE in restored.disabledFeatures"))
-        assertTrue(handsFreeOverride.contains("false"))
-        assertTrue(handsFreeOverride.contains("else"))
-        assertTrue(handsFreeOverride.contains("null"))
+        // S14-16-b: the restored STT override is cleared, never derived from HANDS_FREE_VOICE.
+        assertTrue(handsFreeOverride.contains("onDeviceSpeechRecognitionCapabilityOverride = null"))
+        assertFalse(handsFreeOverride.contains("HANDS_FREE_VOICE"))
         assertTrue(voiceGuidanceOverride.contains("VOICE_GUIDANCE in restored.disabledFeatures"))
         assertTrue(voiceGuidanceOverride.contains("false"))
         assertTrue(voiceGuidanceOverride.contains("else"))

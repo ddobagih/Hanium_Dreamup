@@ -130,6 +130,128 @@ def test_review_decision_idempotency_migration_preserves_existing_rows(
                 text("SELECT version_num FROM public.alembic_version")
             ).scalar_one() == "202609010003"
             assert admin_report_integrity_boundary_state(connection) is True
+
+        for revision in (
+            "202609210001", "202609240001", "202609240002", "202609280001",
+            "202609280002", "202609290001", "202609290002", "202609300001",
+            "202609300002", "202609300003", "202609300004", "202609300005",
+            "202609300006", "202609300007", "202609300008",
+            "202609300009",
+        ):
+            command.upgrade(config, revision)
+            assert stored_decision() == predecessor_row
+            with disposable_engine.connect() as connection:
+                assert connection.execute(
+                    text("SELECT version_num FROM public.alembic_version")
+                ).scalar_one() == revision
+                assert admin_report_integrity_boundary_state(connection) is True
+
+        command.downgrade(config, "202609210001")
+        assert stored_decision() == predecessor_row
+        with disposable_engine.connect() as connection:
+            assert admin_report_integrity_boundary_state(connection) is True
+    finally:
+        disposable_engine.dispose()
+        if created_database:
+            with admin_engine.connect().execution_options(
+                isolation_level="AUTOCOMMIT"
+            ) as connection:
+                connection.execute(
+                    text(
+                        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                        "WHERE datname = :database_name AND pid <> pg_backend_pid()"
+                    ),
+                    {"database_name": database_name},
+                ).all()
+                connection.exec_driver_sql(
+                    f"DROP DATABASE IF EXISTS {quoted_database}"
+                )
+        admin_engine.dispose()
+
+
+def test_latest_head_acl_drift_disables_database_readiness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configured_url = make_url(os.environ["WALKSAFE_TEST_DATABASE_URL"].strip())
+    database_name = f"walksafe_admin_integrity_readiness_test_{uuid.uuid4().hex}"
+    disposable_url = configured_url.set(database=database_name)
+    migration_url = disposable_url.render_as_string(hide_password=False)
+    admin_engine = create_engine(configured_url, pool_pre_ping=True)
+    disposable_engine = create_engine(disposable_url, pool_pre_ping=True)
+    quoted_database = admin_engine.dialect.identifier_preparer.quote(database_name)
+    created_database = False
+
+    try:
+        with admin_engine.connect().execution_options(
+            isolation_level="AUTOCOMMIT"
+        ) as connection:
+            connection.exec_driver_sql(f"CREATE DATABASE {quoted_database}")
+            created_database = True
+
+        config = _set_migration_url(monkeypatch, migration_url)
+        command.upgrade(config, "head")
+        with disposable_engine.connect() as connection:
+            assert connection.execute(
+                text("SELECT version_num FROM public.alembic_version")
+            ).scalar_one() == "202609300009"
+            assert admin_report_integrity_boundary_state(connection) is True
+        assert _database_readiness(migration_url)["ready"] is True
+
+        with disposable_engine.connect() as connection:
+            transaction = connection.begin()
+            connection.execute(text(
+                "ALTER TABLE public.report_review_decisions "
+                "DISABLE TRIGGER report_review_duplicate_representative"
+            ))
+            assert admin_report_integrity_boundary_state(connection) is False
+            transaction.rollback()
+        with disposable_engine.connect() as connection:
+            assert admin_report_integrity_boundary_state(connection) is True
+
+        with disposable_engine.begin() as connection:
+            original_definition = connection.execute(
+                text(
+                    "SELECT pg_get_functiondef(oid) FROM pg_proc "
+                    "WHERE pronamespace = 'public'::regnamespace "
+                    "AND proname = 'walksafe_append_report_review_decision'"
+                )
+            ).scalar_one()
+            changed_definition = original_definition.replace(
+                "BEGIN", "BEGIN\n          -- injected definition drift", 1
+            )
+            assert changed_definition != original_definition
+            connection.execute(text(changed_definition))
+        try:
+            with disposable_engine.connect() as connection:
+                assert admin_report_integrity_boundary_state(connection) is False
+            assert _database_readiness(migration_url)["ready"] is False
+        finally:
+            with disposable_engine.begin() as connection:
+                connection.execute(text(original_definition))
+
+        assert _database_readiness(migration_url)["ready"] is True
+
+        with disposable_engine.begin() as connection:
+            connection.execute(
+                text(
+                    "GRANT INSERT ON TABLE public.report_review_decisions "
+                    "TO walksafe_backend_runtime"
+                )
+            )
+        try:
+            with disposable_engine.connect() as connection:
+                assert admin_report_integrity_boundary_state(connection) is False
+            assert _database_readiness(migration_url)["ready"] is False
+        finally:
+            with disposable_engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "REVOKE INSERT ON TABLE public.report_review_decisions "
+                        "FROM walksafe_backend_runtime"
+                    )
+                )
+
+        assert _database_readiness(migration_url)["ready"] is True
     finally:
         disposable_engine.dispose()
         if created_database:
@@ -360,7 +482,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
             "ready": False,
             "reason": "migration_not_at_head",
             "current_revision": "202608300005",
-            "expected_revision": "202609010003",
+            "expected_revision": "202609300009",
         }
 
         with disposable_engine.begin() as connection:
@@ -377,7 +499,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
                 "ready": False,
                 "reason": "migration_not_at_head",
                 "current_revision": "202608300005",
-                "expected_revision": "202609010003",
+                "expected_revision": "202609300009",
             }
         finally:
             with disposable_engine.begin() as connection:
@@ -435,7 +557,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
                 "ready": False,
                 "reason": "migration_not_at_head",
                 "current_revision": "202608300005",
-                "expected_revision": "202609010003",
+                "expected_revision": "202609300009",
             }
         finally:
             with disposable_engine.begin() as connection:

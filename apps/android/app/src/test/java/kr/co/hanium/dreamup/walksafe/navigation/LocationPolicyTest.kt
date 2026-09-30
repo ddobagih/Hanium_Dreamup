@@ -86,4 +86,24 @@ class LocationPolicyTest {
         assertNull(reliableMovementHeadingDegrees(90f, 1f, 50f, null, current))
         assertEquals(90f, reliableMovementHeadingDegrees(90f, 1f, 5f, null, current)!!, 0.001f)
     }
+
+    @Test
+    fun movementHeadingRequiresDisplacementBeyondBothFixUncertainties() {
+        val previous = TrustedLocation(37.0, 127.0, 5f, 1_000L)
+        val noiseOnly = TrustedLocation(37.0, 127.00008, 5f, 2_000L)
+        val clearMovement = TrustedLocation(37.0, 127.00015, 5f, 3_000L)
+
+        assertNull(reliableMovementHeadingDegrees(null, null, null, previous, noiseOnly))
+        assertEquals(90f, reliableMovementHeadingDegrees(null, null, null, previous, clearMovement)!!, 0.1f)
+    }
+
+    @Test
+    fun reportedStopBlocksDisplacementFallbackButSlowMovementCanUseIt() {
+        val previous = TrustedLocation(37.0, 127.0, 5f, 1_000L)
+        val apparentJump = TrustedLocation(37.0, 127.00015, 5f, 3_000L)
+        val slowMovement = apparentJump.copy(elapsedRealtimeMs = 131_000L)
+
+        assertNull(reliableMovementHeadingDegrees(90f, 0f, 5f, previous, apparentJump))
+        assertEquals(90f, reliableMovementHeadingDegrees(null, 0.1f, null, previous, slowMovement)!!, 0.1f)
+    }
 }

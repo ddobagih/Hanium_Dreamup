@@ -1,0 +1,187 @@
+{
+  "created": {
+    "status": 201,
+    "body": {
+      "id": "db05d771-59a7-4f68-83ea-9ea84afe9910",
+      "status": "new",
+      "class_id": 1,
+      "class_name": "damaged_tactile_block",
+      "confidence": 0.91,
+      "bbox": {
+        "x": 0.2,
+        "y": 0.35,
+        "width": 0.4,
+        "height": 0.22
+      },
+      "captured_at": "2026-09-26T09:53:00.220309Z",
+      "source": "android",
+      "gps": {
+        "latitude": 37.5,
+        "longitude": 127.0,
+        "accuracy_m": 5.0
+      },
+      "heading": 181.0,
+      "image_path": "/uploads/db05d771-59a7-4f68-83ea-9ea84afe9910.jpg",
+      "image_content_type": "image/jpeg",
+      "metadata": {
+        "gps": {
+          "latitude": 37.5,
+          "longitude": 127.0,
+          "accuracy_m": 5.0
+        },
+        "bbox": {
+          "x": 0.2,
+          "y": 0.35,
+          "width": 0.4,
+          "height": 0.22
+        },
+        "source": "android",
+        "heading": 181.0,
+        "trigger": "auto",
+        "category": "tactile",
+        "model_key": "custom_tactile",
+        "class_name": "damaged_tactile_block",
+        "confidence": 0.91,
+        "captured_at": "2026-09-26T09:53:00.220309Z",
+        "data_origin": "field_candidate",
+        "fake_source": false,
+        "received_at": "2026-09-26T09:53:00.227207Z",
+        "image_sha256": "9061626b3fe82e6a519642bb7535385e770ada8687091b4d8912d1d3079736d8",
+        "review_flags": [],
+        "runtime_mode": "android",
+        "source_model": "android/custom-tactile-contract",
+        "auto_reported": true,
+        "source_commit": "ffffffffffffffffffffffffffffffffffffffff",
+        "model_class_id": 1,
+        "payload_sha256": "47d065137b7c457cc8476393bc7075517836291059168667246cf2c3e797a268",
+        "schema_version": "detect.v2",
+        "threshold_used": 0.25,
+        "actor_provenance": "gateway_forwarded",
+        "provenance_status": "client_asserted",
+        "performance_excluded": true,
+        "coordinate_gate_status": "pass",
+        "performance_exclusion_reason": "client_asserted_detection"
+      },
+      "location_quality": "high",
+      "review_flags": [],
+      "duplicate_report_ids": [],
+      "duplicate_count": 0,
+      "created_at": "2026-09-26T09:53:00.226419Z",
+      "updated_at": "2026-09-26T09:53:00.226419Z",
+      "transport_receipt": {
+        "marker": "DATABASE_AND_ENCRYPTED_IMAGE_STORE",
+        "report_id": "db05d771-59a7-4f68-83ea-9ea84afe9910",
+        "persistence_marker": "e05ead19-e38d-4b29-ba2b-0929e8a774e2",
+        "payload_sha256": "8d220131b460b404c2ec7efec52ecdda37ae1eb0b7312315225a6488ae28b6d9",
+        "payload_bytes": 1226
+      },
+      "creation_outcome": "CREATED"
+    },
+    "retry_after": null,
+    "request": {
+      "report_id": "db05d771-59a7-4f68-83ea-9ea84afe9910",
+      "metadata_utf8_base64": "eyJzY2hlbWFfdmVyc2lvbiI6ICJkZXRlY3QudjIiLCAibW9kZWxfa2V5IjogImN1c3RvbV90YWN0aWxlIiwgInNvdXJjZV9tb2RlbCI6ICJhbmRyb2lkL2N1c3RvbS10YWN0aWxlLWNvbnRyYWN0IiwgIm1vZGVsX2NsYXNzX2lkIjogMSwgImNsYXNzX25hbWUiOiAiZGFtYWdlZF90YWN0aWxlX2Jsb2NrIiwgImNhdGVnb3J5IjogInRhY3RpbGUiLCAiY29uZmlkZW5jZSI6IDAuOTEsICJiYm94IjogeyJ4IjogMC4yLCAieSI6IDAuMzUsICJ3aWR0aCI6IDAuNCwgImhlaWdodCI6IDAuMjJ9LCAidGhyZXNob2xkX3VzZWQiOiAwLjI1LCAiY2FwdHVyZWRfYXQiOiAiMjAyNi0wOS0yNlQwOTo1MzowMC4yMjAzMDkrMDA6MDAiLCAiZ3BzIjogeyJsYXRpdHVkZSI6IDM3LjUsICJsb25naXR1ZGUiOiAxMjcuMCwgImFjY3VyYWN5X20iOiA1LjB9LCAiaGVhZGluZyI6IDE4MS4wLCAidHJpZ2dlciI6ICJhdXRvIiwgImF1dG9fcmVwb3J0ZWQiOiB0cnVlLCAic291cmNlIjogImFuZHJvaWQiLCAic291cmNlX2NvbW1pdCI6ICJmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmIiwgImNvb3JkaW5hdGVfZ2F0ZV9zdGF0dXMiOiAicGFzcyJ9",
+      "image_jpeg_base64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAEAAQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDYooor4c9I/9k="
+    }
+  },
+  "replayed": {
+    "status": 201,
+    "body": {
+      "id": "db05d771-59a7-4f68-83ea-9ea84afe9910",
+      "status": "new",
+      "class_id": 1,
+      "class_name": "damaged_tactile_block",
+      "confidence": 0.91,
+      "bbox": {
+        "x": 0.2,
+        "y": 0.35,
+        "width": 0.4,
+        "height": 0.22
+      },
+      "captured_at": "2026-09-26T09:53:00.220309Z",
+      "source": "android",
+      "gps": {
+        "latitude": 37.5,
+        "longitude": 127.0,
+        "accuracy_m": 5.0
+      },
+      "heading": 181.0,
+      "image_path": "/uploads/db05d771-59a7-4f68-83ea-9ea84afe9910.jpg",
+      "image_content_type": "image/jpeg",
+      "metadata": {
+        "gps": {
+          "latitude": 37.5,
+          "longitude": 127.0,
+          "accuracy_m": 5.0
+        },
+        "bbox": {
+          "x": 0.2,
+          "y": 0.35,
+          "width": 0.4,
+          "height": 0.22
+        },
+        "source": "android",
+        "heading": 181.0,
+        "trigger": "auto",
+        "category": "tactile",
+        "model_key": "custom_tactile",
+        "class_name": "damaged_tactile_block",
+        "confidence": 0.91,
+        "captured_at": "2026-09-26T09:53:00.220309Z",
+        "data_origin": "field_candidate",
+        "fake_source": false,
+        "received_at": "2026-09-26T09:53:00.227207Z",
+        "image_sha256": "9061626b3fe82e6a519642bb7535385e770ada8687091b4d8912d1d3079736d8",
+        "review_flags": [],
+        "runtime_mode": "android",
+        "source_model": "android/custom-tactile-contract",
+        "auto_reported": true,
+        "source_commit": "ffffffffffffffffffffffffffffffffffffffff",
+        "model_class_id": 1,
+        "payload_sha256": "47d065137b7c457cc8476393bc7075517836291059168667246cf2c3e797a268",
+        "schema_version": "detect.v2",
+        "threshold_used": 0.25,
+        "actor_provenance": "gateway_forwarded",
+        "provenance_status": "client_asserted",
+        "performance_excluded": true,
+        "coordinate_gate_status": "pass",
+        "performance_exclusion_reason": "client_asserted_detection"
+      },
+      "location_quality": "high",
+      "review_flags": [],
+      "duplicate_report_ids": [],
+      "duplicate_count": 0,
+      "created_at": "2026-09-26T09:53:00.226419Z",
+      "updated_at": "2026-09-26T09:53:00.226419Z",
+      "transport_receipt": {
+        "marker": "DATABASE_AND_ENCRYPTED_IMAGE_STORE",
+        "report_id": "db05d771-59a7-4f68-83ea-9ea84afe9910",
+        "persistence_marker": "e05ead19-e38d-4b29-ba2b-0929e8a774e2",
+        "payload_sha256": "8d220131b460b404c2ec7efec52ecdda37ae1eb0b7312315225a6488ae28b6d9",
+        "payload_bytes": 1226
+      },
+      "creation_outcome": "REPLAYED"
+    },
+    "retry_after": null,
+    "request": {
+      "report_id": "db05d771-59a7-4f68-83ea-9ea84afe9910",
+      "metadata_utf8_base64": "eyJzY2hlbWFfdmVyc2lvbiI6ICJkZXRlY3QudjIiLCAibW9kZWxfa2V5IjogImN1c3RvbV90YWN0aWxlIiwgInNvdXJjZV9tb2RlbCI6ICJhbmRyb2lkL2N1c3RvbS10YWN0aWxlLWNvbnRyYWN0IiwgIm1vZGVsX2NsYXNzX2lkIjogMSwgImNsYXNzX25hbWUiOiAiZGFtYWdlZF90YWN0aWxlX2Jsb2NrIiwgImNhdGVnb3J5IjogInRhY3RpbGUiLCAiY29uZmlkZW5jZSI6IDAuOTEsICJiYm94IjogeyJ4IjogMC4yLCAieSI6IDAuMzUsICJ3aWR0aCI6IDAuNCwgImhlaWdodCI6IDAuMjJ9LCAidGhyZXNob2xkX3VzZWQiOiAwLjI1LCAiY2FwdHVyZWRfYXQiOiAiMjAyNi0wOS0yNlQwOTo1MzowMC4yMjAzMDkrMDA6MDAiLCAiZ3BzIjogeyJsYXRpdHVkZSI6IDM3LjUsICJsb25naXR1ZGUiOiAxMjcuMCwgImFjY3VyYWN5X20iOiA1LjB9LCAiaGVhZGluZyI6IDE4MS4wLCAidHJpZ2dlciI6ICJhdXRvIiwgImF1dG9fcmVwb3J0ZWQiOiB0cnVlLCAic291cmNlIjogImFuZHJvaWQiLCAic291cmNlX2NvbW1pdCI6ICJmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmIiwgImNvb3JkaW5hdGVfZ2F0ZV9zdGF0dXMiOiAicGFzcyJ9",
+      "image_jpeg_base64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAEAAQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDYooor4c9I/9k="
+    }
+  },
+  "suppressed": {
+    "status": 429,
+    "body": {
+      "detail": {
+        "code": "automatic_report_cooldown_active",
+        "creation_outcome": "SUPPRESSED_BY_COOLDOWN"
+      }
+    },
+    "retry_after": "600",
+    "request": {
+      "report_id": "adabe3c8-6783-4629-bbe2-8d8cc24ef7cc",
+      "metadata_utf8_base64": "eyJzY2hlbWFfdmVyc2lvbiI6ICJkZXRlY3QudjIiLCAibW9kZWxfa2V5IjogImN1c3RvbV90YWN0aWxlIiwgInNvdXJjZV9tb2RlbCI6ICJhbmRyb2lkL2N1c3RvbS10YWN0aWxlLWNvbnRyYWN0IiwgIm1vZGVsX2NsYXNzX2lkIjogMSwgImNsYXNzX25hbWUiOiAiZGFtYWdlZF90YWN0aWxlX2Jsb2NrIiwgImNhdGVnb3J5IjogInRhY3RpbGUiLCAiY29uZmlkZW5jZSI6IDAuOTEsICJiYm94IjogeyJ4IjogMC4yLCAieSI6IDAuMzUsICJ3aWR0aCI6IDAuNCwgImhlaWdodCI6IDAuMjJ9LCAidGhyZXNob2xkX3VzZWQiOiAwLjI1LCAiY2FwdHVyZWRfYXQiOiAiMjAyNi0wOS0yNlQwOTo1MzowMS4yMjAzMDkrMDA6MDAiLCAiZ3BzIjogeyJsYXRpdHVkZSI6IDM3LjUwMDIxLCAibG9uZ2l0dWRlIjogMTI3LjAsICJhY2N1cmFjeV9tIjogNS4wfSwgImhlYWRpbmciOiAxODEuMCwgInRyaWdnZXIiOiAiYXV0byIsICJhdXRvX3JlcG9ydGVkIjogdHJ1ZSwgInNvdXJjZSI6ICJhbmRyb2lkIiwgInNvdXJjZV9jb21taXQiOiAiZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZiIsICJjb29yZGluYXRlX2dhdGVfc3RhdHVzIjogInBhc3MifQ==",
+      "image_jpeg_base64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAEAAQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDYooor4c9I/9k="
+    }
+  }
+}

@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.concurrency import run_in_threadpool
 
 from backend.app.config import get_settings
 
@@ -34,4 +35,4 @@ async def get_db() -> AsyncGenerator[Session, None]:
     try:
         yield db
     finally:
-        db.close()
+        await run_in_threadpool(db.close)

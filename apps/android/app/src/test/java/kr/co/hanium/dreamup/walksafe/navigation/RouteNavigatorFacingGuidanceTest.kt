@@ -13,9 +13,28 @@ class RouteNavigatorFacingGuidanceTest {
             val navigator = navigator()
             val update = navigator.update(fix(), 1_000, false, facingObservation = facing(heading, 1_000))
             assertTrue(update.instruction?.contains(phrase) == true)
-            assertTrue(update.instruction?.contains("50m 앞, 오른쪽으로 꺾으세요.") == true)
+            // S08: only an aligned observation may combine facing with a movement instruction.
+            assertEquals(heading == 90.0, update.instruction?.contains("50m 앞, 오른쪽으로 꺾으세요.") == true)
             assertFalse(update.instruction?.contains("뒤로 걸") == true)
+            val aligned = requireNotNull(navigator.currentGuidance(1_001, facing(90.0, 1_001)))
+            assertTrue(aligned.instruction?.contains("50m 앞, 오른쪽으로 꺾으세요.") == true)
         }
+    }
+
+    @Test
+    fun clockManeuverSuppressesFacingClockButOrdinaryRightTurnKeepsIt() {
+        val clockTurn = navigator(turnType = 18)
+        clockTurn.update(fix(), 1_000, false, facingObservation = facing(90.0, 1_000))
+        val clockSpeech = requireNotNull(clockTurn.currentGuidance(1_001, facing(90.0, 1_001))?.instruction)
+        assertEquals(1, Regex("""(?:1[0-2]|[1-9])시 방향""").findAll(clockSpeech).count())
+        assertFalse(clockSpeech.contains("약 12시 방향"))
+        assertTrue(clockSpeech.endsWith("50m 앞, 2시 방향 오른쪽 길로 이동하세요."))
+
+        val ordinaryTurn = navigator()
+        ordinaryTurn.update(fix(), 1_000, false, facingObservation = facing(90.0, 1_000))
+        val ordinarySpeech = requireNotNull(ordinaryTurn.currentGuidance(1_001, facing(90.0, 1_001))?.instruction)
+        assertTrue(ordinarySpeech.contains("약 12시 방향"))
+        assertTrue(ordinarySpeech.endsWith("50m 앞, 오른쪽으로 꺾으세요."))
     }
 
     @Test
@@ -37,7 +56,9 @@ class RouteNavigatorFacingGuidanceTest {
         val navigator = navigator()
         val first = navigator.update(fix(), 1_000, false, facingObservation = facing(90.0, 1_000))
         assertTrue(navigator.reserveInstruction(first))
-        val turning = requireNotNull(navigator.retryGuidance(2_000, facing(270.0, 2_000)))
+        // S08-23: an adjacent turn (ahead -> right) finishes the sentence; turning around revokes it
+        // (RouteSpeechEvidenceRegressionTest.aReversingTurnRevokes...).
+        val turning = requireNotNull(navigator.retryGuidance(2_000, facing(0.0, 2_000)))
         assertEquals("guidance_in_flight", turning.reason)
         assertFalse(turning.cancelStaleNavigationSpeech)
         navigator.acknowledgeInstruction(first, 3_000)
@@ -56,7 +77,7 @@ class RouteNavigatorFacingGuidanceTest {
             val update = navigator.update(raw, 1_000, false,
                 FilteredRoutePosition(RoutePoint(raw.latitude, raw.longitude), 2.0, 1_000,
                     heading = RouteHeadingEstimate(90.0, 5.0)), facingObservation = observation)
-            assertTrue(update.instruction?.contains("현재 바라보는 방향을 확인할 수 없습니다") == true)
+            assertTrue(update.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
             assertFalse(update.instruction?.contains("앞쪽이 경로") == true)
             assertNotNull(navigator.currentAcceptedRouteMatchFor(1_000))
         }
@@ -79,7 +100,8 @@ class RouteNavigatorFacingGuidanceTest {
         val navigator = navigator()
         val first = navigator.update(fix(), 1_000, false, facingObservation = facing(90.0, 1_000))
         assertTrue(navigator.reserveInstruction(first))
-        assertEquals("guidance_in_flight", navigator.currentGuidance(1_100, facing(270.0, 1_100))?.reason)
+        // S08-23: only a turn that does not reverse the playing command keeps it in flight.
+        assertEquals("guidance_in_flight", navigator.currentGuidance(1_100, facing(0.0, 1_100))?.reason)
         navigator.acknowledgeInstruction(first, 2_000)
         val manual = requireNotNull(navigator.currentGuidance(2_001, facing(270.0, 2_001)))
         assertTrue(manual.instruction?.contains("경로 진행 방향이 뒤쪽") == true)
@@ -132,7 +154,7 @@ class RouteNavigatorFacingGuidanceTest {
         val update = nav.update(fix(), 1_000, false,
             facingObservation = RouteFacingObservation(70.0, 20.0, 1_000))
         assertTrue(update.instruction?.contains("나침반 방향은 측정되지만") == true)
-        assertFalse(update.instruction?.contains("현재 바라보는 방향을 확인할 수 없습니다") == true)
+        assertFalse(update.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
         assertFalse(update.instruction?.contains("몸을 돌리세요") == true)
     }
 
@@ -141,7 +163,7 @@ class RouteNavigatorFacingGuidanceTest {
         val nav = navigator()
         val missing = nav.update(fix(), 1_000, false)
         val measured = requireNotNull(nav.currentGuidance(1_001, RouteFacingObservation(70.0, 20.0, 1_001)))
-        assertTrue(missing.instruction?.contains("현재 바라보는 방향을 확인할 수 없습니다") == true)
+        assertTrue(missing.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
         assertTrue(measured.instruction?.contains("나침반 방향은 측정되지만") == true)
         assertNotEquals(missing.speechCueToken, measured.speechCueToken)
         assertFalse(nav.reserveInstruction(missing))
@@ -149,10 +171,11 @@ class RouteNavigatorFacingGuidanceTest {
         assertEquals("guidance_in_flight", nav.currentGuidance(1_002)?.reason)
     }
 
-    private fun navigator(degraded: Boolean = false) = RouteNavigator(allowDegradedRouteGuidance = degraded).apply { setRoute(route()) }
-    private fun route() = WalkingRoute("TEST", WalkingRouteSummary(200, 200),
+    private fun navigator(degraded: Boolean = false, turnType: Int = 13) =
+        RouteNavigator(allowDegradedRouteGuidance = degraded).apply { setRoute(route(turnType)) }
+    private fun route(turnType: Int = 13) = WalkingRoute("TEST", WalkingRouteSummary(200, 200),
         listOf(RoutePoint(0.0, 0.0), RoutePoint(0.0, 0.0009), RoutePoint(-0.0009, 0.0009)),
-        listOf(WalkingRouteGuidePoint(0, RoutePoint(0.0, 0.0009), null, 100, 100, turnType = 13)))
+        listOf(WalkingRouteGuidePoint(0, RoutePoint(0.0, 0.0009), null, 100, 100, turnType = turnType)))
     private fun fix(now: Long = 1_000) = TrustedLocation(0.0, 0.00045, 2f, now)
     private fun facing(heading: Double, now: Long) = RouteFacingObservation(heading, 5.0, now)
 }

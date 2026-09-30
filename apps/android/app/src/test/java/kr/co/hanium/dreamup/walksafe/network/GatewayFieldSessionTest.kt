@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.network
 
 import java.time.Instant
 import java.io.IOException
+import java.util.Base64
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -89,6 +90,71 @@ class GatewayFieldSessionTest {
     }
 
     @Test
+    fun passwordLoginBoundsMaximumServerTtlAtResponseTimeWithClockSkew() {
+        val requestNow = 1_000_000L
+        val responseElapsedMs = 1_000L
+        val serverClockAheadMs = 300_000L
+        val maximumExpiresAtSeconds =
+            (requestNow + responseElapsedMs + serverClockAheadMs) / 1_000L + 43_200L
+        val actorId = "123e4567-e89b-42d3-a456-426614174000"
+        val encoder = Base64.getUrlEncoder().withoutPadding()
+        val encodedActor = encoder.encodeToString(actorId.toByteArray(Charsets.UTF_8))
+        val encodedDevice = encoder.encodeToString(DEVICE_ID.toByteArray(Charsets.UTF_8))
+
+        fun transportFor(expiresAtSeconds: Long): FakeTransport {
+            val cookie = listOf(
+                "v7", encodedActor, "1", "1", encodedDevice, "general",
+                expiresAtSeconds.toString(), "s".repeat(32), "h".repeat(43),
+            ).joinToString(".")
+            return FakeTransport(
+                loginResponse = GatewayHttpResponse(
+                    statusCode = 200,
+                    responseBody = """{"session_scope":"general"}""",
+                    headers = mapOf(
+                        "Set-Cookie" to
+                            "walksafe_field_session=$cookie; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200",
+                    ),
+                ),
+                statusBody =
+                    """{"required":true,"authenticated":true,"actor_id":"$actorId","session_scope":"general"}""",
+            )
+        }
+
+        fun clientFor(transport: FakeTransport): GatewayFieldSessionClient {
+            val clock = listOf(0L, responseElapsedMs * 1_000_000L).iterator()
+            return GatewayFieldSessionClient(transport, elapsedRealtimeNanos = { clock.next() })
+        }
+
+        val acceptedTransport = transportFor(maximumExpiresAtSeconds)
+        val session = clientFor(acceptedTransport).loginWithPassword(
+            gatewayBaseUrl = "http://127.0.0.1:8081",
+            email = "walker@example.test",
+            password = "Valid-password-123!",
+            rememberMe = true,
+            deviceId = DEVICE_ID,
+            nowEpochMs = requestNow,
+        )
+
+        assertEquals(maximumExpiresAtSeconds * 1_000L, session.accessExpiresAtEpochMs)
+        assertTrue(session.isUsableFor(actorId, requestNow + responseElapsedMs))
+        assertEquals(1, acceptedTransport.getCount)
+
+        val rejectedTransport = transportFor(maximumExpiresAtSeconds + 1L)
+        val error = assertThrows(GatewaySessionHttpException::class.java) {
+            clientFor(rejectedTransport).loginWithPassword(
+                gatewayBaseUrl = "http://127.0.0.1:8081",
+                email = "walker@example.test",
+                password = "Valid-password-123!",
+                rememberMe = true,
+                deviceId = DEVICE_ID,
+                nowEpochMs = requestNow,
+            )
+        }
+        assertEquals("invalid_gateway_cookie", error.reason)
+        assertEquals(0, rejectedTransport.getCount)
+    }
+
+    @Test
     fun longLivedLoginSeparatesAccessAndRefreshCredentialsAndBindsTheDevice() {
         val transport = FakeTransport(
             loginResponse = longLivedResponse(
@@ -124,6 +190,49 @@ class GatewayFieldSessionTest {
         val persisted = session.persistenceSnapshotOrNull()!!
         assertFalse(persisted.toString().contains(ACCESS_TOKEN_0))
         assertFalse(persisted.toString().contains(REFRESH_TOKEN_0))
+    }
+
+    @Test
+    fun longLivedLoginBoundsMaximumServerTtlAtResponseTime() {
+        val requestNow = 1_000_000L
+        val responseElapsedMs = 1_000L
+        val maximumServerExpiry = requestNow + responseElapsedMs + 3_600_000L + 300_000L
+        val idleExpiry = maximumServerExpiry + 1_000L
+        val absoluteExpiry = idleExpiry + 1_000L
+
+        fun loginFor(serverExpiry: Long): GatewayFieldSession {
+            val clock = listOf(0L, responseElapsedMs * 1_000_000L).iterator()
+            val client = GatewayFieldSessionClient(
+                FakeTransport(
+                    loginResponse = longLivedResponse(
+                        rotation = 0L,
+                        accessToken = ACCESS_TOKEN_0,
+                        refreshToken = REFRESH_TOKEN_0,
+                        accessExpiresAtEpochMs = serverExpiry,
+                        idleExpiresAtEpochMs = idleExpiry,
+                        absoluteExpiresAtEpochMs = absoluteExpiry,
+                        cookieMaxAgeSeconds = 3_600L,
+                    ),
+                ),
+                elapsedRealtimeNanos = { clock.next() },
+            )
+            return client.login(
+                gatewayBaseUrl = "https://field.example",
+                actorId = "tester-01",
+                token = ACCOUNT_TOKEN,
+                nowEpochMs = requestNow,
+                enableLongLivedSession = true,
+                deviceId = DEVICE_ID,
+            )
+        }
+
+        val accepted = loginFor(maximumServerExpiry)
+        assertEquals(maximumServerExpiry, accepted.serverAccessExpiresAtEpochMs)
+        assertEquals(requestNow + responseElapsedMs + 3_600_000L, accepted.accessExpiresAtEpochMs)
+        val error = assertThrows(GatewaySessionHttpException::class.java) {
+            loginFor(maximumServerExpiry + 1L)
+        }
+        assertEquals("gateway_session_binding_failed", error.reason)
     }
 
     @Test
@@ -590,6 +699,54 @@ class GatewayFieldSessionTest {
     }
 
     @Test
+    fun renewalBoundsMaximumServerTtlAtResponseTime() {
+        val requestNow = 1_000_000L
+        val responseElapsedMs = 1_000L
+        val maximumServerExpiry = requestNow + responseElapsedMs + 3_600_000L + 300_000L
+        val idleExpiry = maximumServerExpiry + 10_000L
+        val absoluteExpiry = idleExpiry + 10_000L
+
+        fun clientAndSourceFor(serverExpiry: Long): Pair<GatewayFieldSessionClient, GatewayFieldSession> {
+            val clock = listOf(0L, 0L, 2_000_000_000L, 3_000_000_000L).iterator()
+            val client = GatewayFieldSessionClient(
+                FakeTransport(
+                    loginResponse = longLivedResponse(
+                        rotation = 0L,
+                        accessToken = ACCESS_TOKEN_0,
+                        refreshToken = REFRESH_TOKEN_0,
+                        idleExpiresAtEpochMs = idleExpiry,
+                        absoluteExpiresAtEpochMs = absoluteExpiry,
+                    ),
+                    refreshResponse = longLivedResponse(
+                        rotation = 1L,
+                        accessToken = ACCESS_TOKEN_1,
+                        refreshToken = REFRESH_TOKEN_1,
+                        accessExpiresAtEpochMs = serverExpiry,
+                        idleExpiresAtEpochMs = idleExpiry,
+                        absoluteExpiresAtEpochMs = absoluteExpiry,
+                        cookieMaxAgeSeconds = 3_600L,
+                    ),
+                ),
+                elapsedRealtimeNanos = { clock.next() },
+            )
+            return client to loginLongLived(client)
+        }
+
+        val (acceptedClient, acceptedSource) = clientAndSourceFor(maximumServerExpiry)
+        val accepted = acceptedClient.renew(acceptedSource, "tester-01", nowEpochMs = requestNow).session
+        assertEquals(maximumServerExpiry, accepted.serverAccessExpiresAtEpochMs)
+        assertEquals(requestNow + responseElapsedMs + 3_600_000L, accepted.accessExpiresAtEpochMs)
+
+        resetGatewayRefreshProofFenceForTests()
+        val (rejectedClient, rejectedSource) = clientAndSourceFor(maximumServerExpiry + 1L)
+        val error = assertThrows(GatewaySessionHttpException::class.java) {
+            rejectedClient.renew(rejectedSource, "tester-01", nowEpochMs = requestNow)
+        }
+        assertEquals("gateway_session_binding_failed", error.reason)
+        assertFalse(rejectedSource.isRenewableFor("tester-01", requestNow))
+    }
+
+    @Test
     fun separatelyRestoredCopiesCannotSendTheSameRefreshProofTwice() {
         val transport = FakeTransport(
             loginResponse = longLivedResponse(
@@ -773,6 +930,91 @@ class GatewayFieldSessionTest {
             )
         }
         assertEquals("gateway_session_binding_failed", rejected.reason)
+    }
+
+    @Test
+    fun longLivedStatusBindsServerExpiryWithoutExtendingLocalCookieDeadline() {
+        val serverExpiry = NOW + 60_050L
+        val transport = FakeTransport(
+            loginResponse = longLivedResponse(
+                rotation = 0L,
+                accessToken = ACCESS_TOKEN_0,
+                refreshToken = REFRESH_TOKEN_0,
+                accessExpiresAtEpochMs = serverExpiry,
+            ),
+        )
+        val client = GatewayFieldSessionClient(transport)
+        val session = loginLongLived(client)
+        val localDeadline = NOW + 60_000L
+
+        assertEquals(localDeadline, session.accessExpiresAtEpochMs)
+        assertEquals(serverExpiry, session.serverAccessExpiresAtEpochMs)
+        transport.statusBody = longLivedStatus(serverExpiry, rotation = 0L)
+        assertEquals(
+            GatewaySessionRevalidationStatus.READY,
+            client.revalidate(session, "tester-01", nowEpochMs = NOW + 1L).status,
+        )
+        assertTrue(session.isUsableFor("tester-01", localDeadline - 1L))
+        assertFalse(session.isUsableFor("tester-01", localDeadline))
+
+        val persisted = session.persistenceSnapshotOrNull()!!
+        assertEquals(localDeadline, persisted.accessExpiresAtEpochMs)
+        assertEquals(serverExpiry, persisted.serverAccessExpiresAtEpochMs)
+        val restored = GatewayFieldSession.restore(
+            snapshot = persisted,
+            expectedGatewayBaseUrl = "https://field.example",
+            expectedActorId = "tester-01",
+            nowEpochMs = NOW + 1L,
+        )!!
+        assertEquals(localDeadline, restored.accessExpiresAtEpochMs)
+        assertEquals(serverExpiry, restored.serverAccessExpiresAtEpochMs)
+        assertFalse(restored.isUsableFor("tester-01", NOW + 1L))
+        assertTrue(restored.isRenewableFor("tester-01", NOW + 1L))
+
+        val equalTransport = FakeTransport(
+            loginResponse = longLivedResponse(
+                rotation = 0L,
+                accessToken = ACCESS_TOKEN_0,
+                refreshToken = REFRESH_TOKEN_0,
+                accessExpiresAtEpochMs = localDeadline,
+            ),
+            statusBody = longLivedStatus(localDeadline, rotation = 0L),
+        )
+        val equalClient = GatewayFieldSessionClient(equalTransport)
+        val equalSession = loginLongLived(equalClient)
+        assertEquals(localDeadline, equalSession.serverAccessExpiresAtEpochMs)
+        assertEquals(
+            GatewaySessionRevalidationStatus.READY,
+            equalClient.revalidate(equalSession, "tester-01", nowEpochMs = NOW + 1L).status,
+        )
+    }
+
+    @Test
+    fun renewedSessionAlsoBindsServerExpiryInsteadOfItsEarlierCookieDeadline() {
+        val renewedServerExpiry = NOW + 1L + 60_050L
+        val transport = FakeTransport(
+            loginResponse = longLivedResponse(
+                rotation = 0L,
+                accessToken = ACCESS_TOKEN_0,
+                refreshToken = REFRESH_TOKEN_0,
+            ),
+            refreshResponse = longLivedResponse(
+                rotation = 1L,
+                accessToken = ACCESS_TOKEN_1,
+                refreshToken = REFRESH_TOKEN_1,
+                accessExpiresAtEpochMs = renewedServerExpiry,
+            ),
+        )
+        val client = GatewayFieldSessionClient(transport)
+        val renewed = client.renew(loginLongLived(client), "tester-01", nowEpochMs = NOW + 1L).session
+
+        assertEquals(NOW + 1L + 60_000L, renewed.accessExpiresAtEpochMs)
+        assertEquals(renewedServerExpiry, renewed.serverAccessExpiresAtEpochMs)
+        transport.statusBody = longLivedStatus(renewedServerExpiry, rotation = 1L)
+        assertEquals(
+            GatewaySessionRevalidationStatus.READY,
+            client.revalidate(renewed, "tester-01", nowEpochMs = NOW + 2L).status,
+        )
     }
 
     @Test
@@ -1072,6 +1314,21 @@ class GatewayFieldSessionTest {
         return """{"required":true,"authenticated":true,"actor_id":"tester-01","capacity":{"version":$versionJson,"observed_at":"$observedAt","expires_at":"$expiresAt","level":"${level.name}","reason":"STORAGE_UTILIZATION"}}"""
     }
 
+    private fun longLivedStatus(accessExpiresAtEpochMs: Long, rotation: Long): String =
+        JSONObject()
+            .put("required", true)
+            .put("authenticated", true)
+            .put("actor_id", "tester-01")
+            .put("session_scope", GatewaySessionScope.GENERAL.wireValue)
+            .put("session_mode", "long_lived")
+            .put("device_id", DEVICE_ID)
+            .put("family_id", FAMILY_ID)
+            .put("rotation", rotation)
+            .put("access_expires_at_epoch_ms", accessExpiresAtEpochMs)
+            .put("idle_expires_at_epoch_ms", IDLE_EXPIRES_AT)
+            .put("absolute_expires_at_epoch_ms", ABSOLUTE_EXPIRES_AT)
+            .toString()
+
     private class FakeTransport(
         private val setCookie: String = COOKIE_ATTRIBUTES,
         statusBody: String = """{"required":true,"authenticated":true,"actor_id":"tester-01"}""",
@@ -1161,8 +1418,11 @@ class GatewayFieldSessionTest {
             accessExpiresAtEpochMs: Long = ACCESS_EXPIRES_AT,
             idleExpiresAtEpochMs: Long = IDLE_EXPIRES_AT,
             absoluteExpiresAtEpochMs: Long = ABSOLUTE_EXPIRES_AT,
+            cookieMaxAgeSeconds: Long = 60L,
         ): GatewayHttpResponse {
+            // Same 9 fields as the Gateway sessionResponse (field-long-session.ts).
             val body = JSONObject()
+                .put("session_scope", GatewaySessionScope.GENERAL.wireValue)
                 .put("actor_id", actorId)
                 .put("device_id", deviceId)
                 .put("family_id", familyId)
@@ -1172,7 +1432,7 @@ class GatewayFieldSessionTest {
                 .put("idle_expires_at_epoch_ms", idleExpiresAtEpochMs)
                 .put("absolute_expires_at_epoch_ms", absoluteExpiresAtEpochMs)
             val cookie =
-                "walksafe_field_session=$accessToken; Path=/; HttpOnly; SameSite=Strict; Max-Age=60; Secure"
+                "walksafe_field_session=$accessToken; Path=/; HttpOnly; SameSite=Strict; Max-Age=$cookieMaxAgeSeconds; Secure"
             return GatewayHttpResponse(
                 statusCode = 200,
                 responseBody = body.toString(),

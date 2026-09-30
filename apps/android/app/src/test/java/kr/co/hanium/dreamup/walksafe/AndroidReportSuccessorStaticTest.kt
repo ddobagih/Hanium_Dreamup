@@ -46,14 +46,14 @@ class AndroidReportSuccessorStaticTest {
         )
 
         val queuedUpload =
-            ReportStaticSourceInspector.functionBlock(uploader, "internal fun queuedUploadCall")
+            ReportStaticSourceInspector.functionBlock(uploader, "internal fun queuedUploadResultCall")
         assertFalse(queuedUpload.contains("consentConfirmation.backendConsentReceiptSha256 =="))
         assertTrue(
             uploader.contains(
                 "setRequestProperty(\n                    CONSENT_RECEIPT_HEADER,\n                    consentConfirmation.backendConsentReceiptSha256",
             ),
         )
-        assertTrue(queuedUpload.contains("parseQueuedUploadReceiptOrNull(response.body, report)"))
+        assertTrue(queuedUpload.contains("parseQueuedUploadResultOrNull(response.body, report)"))
 
         val transport =
             ReportStaticSourceInspector.functionBlock(uploader, "private fun <T> reportTransportCall")
@@ -93,25 +93,49 @@ class AndroidReportSuccessorStaticTest {
         val main = ReportStaticSourceInspector.read(MAIN_ACTIVITY_PATH)
         val coordinator = ReportStaticSourceInspector.read(DRAIN_COORDINATOR_PATH)
         val startNext =
-            ReportStaticSourceInspector.functionBlock(coordinator, "fun startNext")
+            ReportStaticSourceInspector.functionBlock(coordinator, "fun startNextWithResult")
         val statusReceipt = startNext.substringAfter("if (statusReceipt != null)")
             .substringBefore("val uploadCall")
         assertTrue(
             appearsInOrder(
                 statusReceipt,
-                "store.deleteAfterReceipt(lease.reporterActorId, statusReceipt)",
-                "ReportQueueDrainOutcome.DELETED_AFTER_STATUS",
-                "ReportQueueDrainOutcome.RECEIPT_REJECTED",
+                "return@execute completeReceipt(",
+                "report, statusReceipt, lease, outer, contextProvider,",
+                "beforeDeleteAfterReceipt, ReportQueueDrainOutcome.DELETED_AFTER_STATUS",
             ),
         )
-        val uploadReceipt = startNext.substringAfter("val uploadReceipt = uploadCall.execute()")
+        val uploadReceipt = startNext.substringAfter("val uploadResult = uploadCall.execute()")
         assertTrue(
             appearsInOrder(
                 uploadReceipt,
                 "policy.isCurrent(lease, contextProvider())",
-                "store.deleteAfterReceipt(lease.reporterActorId, uploadReceipt)",
-                "ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD",
-                "ReportQueueDrainOutcome.RECEIPT_REJECTED",
+                "completeReceipt(",
+                "report, uploadResult.receipt, lease, outer, contextProvider,",
+                "beforeDeleteAfterReceipt, ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD",
+            ),
+        )
+        val completion = ReportStaticSourceInspector.functionBlock(
+            coordinator,
+            "private fun completeReceipt",
+        )
+        val cooldownCommit =
+            "if (!beforeDelete(report)) return ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED"
+        assertTrue(completion.contains(cooldownCommit))
+        assertTrue(
+            appearsInOrder(
+                completion.substringBefore(cooldownCommit),
+                "if (call.isCancelled() || !policy.isCurrent(lease, contextProvider()))",
+                "return ReportQueueDrainOutcome.CANCELLED",
+                "if (!receipt.matches(report)) return ReportQueueDrainOutcome.RECEIPT_REJECTED",
+            ),
+        )
+        assertTrue(
+            appearsInOrder(
+                completion.substringAfter(cooldownCommit),
+                "if (call.isCancelled() || !policy.isCurrent(lease, contextProvider()))",
+                "return ReportQueueDrainOutcome.CANCELLED",
+                "return if (store.deleteAfterReceipt(lease.reporterActorId, receipt)) success",
+                "else ReportQueueDrainOutcome.LOCAL_DELETE_FAILED",
             ),
         )
         assertTrue(startNext.contains("finally"))
@@ -168,12 +192,28 @@ class AndroidReportSuccessorStaticTest {
         val main = ReportStaticSourceInspector.read(MAIN_ACTIVITY_PATH)
         val uploader = ReportStaticSourceInspector.read(UPLOADER_PATH)
         val queuedUpload =
-            ReportStaticSourceInspector.functionBlock(uploader, "internal fun queuedUploadCall")
+            ReportStaticSourceInspector.functionBlock(uploader, "internal fun queuedUploadResultCall")
+        val httpFailure = ReportStaticSourceInspector.blockAfter(
+            queuedUpload,
+            "if (response.statusCode !in 200..299)",
+        )
+        assertTrue(
+            appearsInOrder(
+                httpFailure,
+                "val error = response.toUploadException(connection)",
+                "cancellation.throwIfCancelled()",
+                "consumeGatewayAuthenticationStaleResponse(authenticationRequest, session, response)",
+                "throw error",
+            ),
+        )
         assertTrue(
             appearsInOrder(
                 queuedUpload,
-                "if (response.statusCode !in 200..299) throw response.toUploadException(connection)",
-                "parseQueuedUploadReceiptOrNull(response.body, report)",
+                "val authenticationRequest = captureGatewayAuthenticationRequest(session)",
+                "return reportTransportCall(",
+                "connection.readBoundedResponse(REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation)",
+                "if (response.statusCode !in 200..299)",
+                "parseQueuedUploadResultOrNull(response.body, report)",
                 "throw ReportUploadProtocolException()",
             ),
         )

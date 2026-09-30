@@ -11,6 +11,83 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UprightCameraImageTest {
+    @Test fun shortBasisIsRejectedWithoutThrowing() {
+        for (size in 0..3) {
+            assertNull(UprightCameraImage.quarterTurns(FloatArray(size)))
+        }
+    }
+
+    @Test fun nonFiniteUsedCoordinatesAreRejectedWithoutThrowing() {
+        for (index in 0..3) {
+            for (invalid in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+                val basis = floatArrayOf(0f, 0f, 1f, 0f, 0f, 1f)
+                basis[index] = invalid
+                assertNull(UprightCameraImage.quarterTurns(basis))
+            }
+        }
+    }
+
+    @Test fun zeroDirectionIncludingSignedZeroIsRejected() {
+        for (basis in listOf(
+            FloatArray(6),
+            floatArrayOf(100f, 300f, 100f, 300f, 0f, 0f),
+            floatArrayOf(0f, 0f, -0f, -0f),
+        )) {
+            assertNull(UprightCameraImage.quarterTurns(basis))
+        }
+    }
+
+    @Test fun finiteCoordinatesWithOverflowingFloatDifferencesAreRejected() {
+        for (basis in listOf(
+            floatArrayOf(-Float.MAX_VALUE, 0f, Float.MAX_VALUE, 0f),
+            floatArrayOf(0f, -Float.MAX_VALUE, 0f, Float.MAX_VALUE),
+            floatArrayOf(-Float.MAX_VALUE, -Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE),
+        )) {
+            assertTrue(basis.all { it.isFinite() })
+            assertNull(UprightCameraImage.quarterTurns(basis))
+        }
+    }
+
+    @Test fun firstFourCoordinatesKeepAllFourNormalRotations() {
+        val bases = listOf(
+            floatArrayOf(0f, 0f, 1f, 0f),
+            floatArrayOf(0f, 0f, 0f, 1f),
+            floatArrayOf(0f, 0f, -1f, 0f),
+            floatArrayOf(0f, 0f, 0f, -1f),
+        )
+        bases.forEachIndexed { turns, basis ->
+            assertEquals(turns, UprightCameraImage.quarterTurns(basis))
+            assertEquals(turns, UprightCameraImage.quarterTurns(basis + floatArrayOf(0f, 0f)))
+        }
+    }
+
+    @Test fun subPixelNonZeroDirectionsAreRejectedAsTooSmall() {
+        // originals/10.txt:159: a vector that is too small is rejected, not turned into a direction.
+        for (tiny in listOf(Float.MIN_VALUE, 1e-30f, 0.5f, 0.999f)) {
+            for (basis in listOf(
+                floatArrayOf(0f, 0f, tiny, 0f),
+                floatArrayOf(0f, 0f, 0f, tiny),
+                floatArrayOf(0f, 0f, -tiny, 0f),
+                floatArrayOf(0f, 0f, 0f, -tiny),
+                floatArrayOf(500f, 500f, 500f + tiny, 500f),
+            )) {
+                assertNull(UprightCameraImage.quarterTurns(basis))
+            }
+        }
+    }
+
+    @Test fun onePixelDirectionsStillKeepAllFourRotations() {
+        val bases = listOf(
+            floatArrayOf(10f, 10f, 11f, 10f),
+            floatArrayOf(10f, 10f, 10f, 11f),
+            floatArrayOf(10f, 10f, 9f, 10f),
+            floatArrayOf(10f, 10f, 10f, 9f),
+        )
+        bases.forEachIndexed { turns, basis ->
+            assertEquals(turns, UprightCameraImage.quarterTurns(basis))
+        }
+    }
+
     @Test fun portraitImagePixelsAreUprightAndAllRotationsRoundTrip() {
         val source = ArgbImage(3, 2, intArrayOf(1, 2, 3, 4, 5, 6))
         val portrait = UprightCameraImage.rotate(source, 1)

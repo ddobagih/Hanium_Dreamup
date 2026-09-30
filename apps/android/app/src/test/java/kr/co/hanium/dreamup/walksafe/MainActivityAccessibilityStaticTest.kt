@@ -23,11 +23,31 @@ class MainActivityAccessibilityStaticTest {
         assertFalse(risk.contains("announceForTalkBack("))
         assertFalse(risk.contains("isScreenReaderActive()"))
         val navigation = functionBlock("private fun dispatchNavigationSpeech(")
-        assertTrue(navigation.contains("val mainThreadCompletion = onCompleted?.let"))
+        assertTrue(navigation.contains("dispatchCurrentNavigationSpeech("))
         assertTrue(navigation.contains("isWalkSessionRuntimeActive() && navigationEnvironmentOutputsAllowed()"))
-        assertTrue(navigation.contains("onCompleted = mainThreadCompletion"))
+        assertTrue(navigation.contains("isStillValid = ::outputCurrent"))
+        assertTrue(
+            navigation.contains("isStillValidAtStart = { outputCurrent() && isInstructionStillCurrent() }"),
+        )
+        val navigationCurrent = navigation.substringAfter("fun outputCurrent(): Boolean =")
+            .substringBefore("fun failOnce()")
+        assertTrue(navigationCurrent.contains("!cancelled.get() && !terminal.get()"))
+        assertTrue(navigationCurrent.contains("isFeedbackLifecycleCurrent(generation)"))
+        assertTrue(navigationCurrent.contains("expectedWalkEpoch != null"))
+        assertTrue(navigationCurrent.contains("walkSessionLifecycle.currentRuntimeEpochOrNull() == expectedWalkEpoch"))
+        assertFalse(navigationCurrent.contains("isInstructionStillCurrent()"))
+        val navigationCompletion = navigation.substringAfter("onCompleted = {")
+            .substringBefore("isStillValid = ::outputCurrent")
+        assertTrue(navigationCompletion.contains("if (outputCurrent() && terminal.compareAndSet(false, true))"))
+        assertTrue(navigationCompletion.contains("onCompleted?.invoke()"))
+        assertFalse(navigationCompletion.contains("isInstructionStillCurrent()"))
         assertTrue(navigation.contains("ensureFeedbackActuator().speakNavigation("))
-        assertFalse(navigation.contains("announceForTalkBack("))
+        assertTrue(navigation.contains("onCancelled = {"))
+        assertTrue(navigation.contains("cancelled.set(true)"))
+        assertTrue(navigation.contains("announceForTalkBack("))
+        assertTrue(navigation.contains("if (dispatched) failOnce()"))
+        assertTrue(navigation.contains("isStillValid = { outputCurrent() && isInstructionStillCurrent() }"))
+        assertTrue(navigation.contains("return deliver()"))
         assertFalse(source.contains("private fun dispatchNavigationTalkBackFallback("))
         val interaction = functionBlock("private fun speakInteraction(")
         val commandResponse = functionBlock("private fun speakCommandResponse(")
@@ -259,9 +279,22 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(feedback.contains("if (isRisk && voiceRecognitionActive) cancelVoiceCommandRecognition()"))
         assertTrue(feedback.contains("shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk)"))
         assertTrue(feedback.contains("isFeedbackActionStillDeliverable(action)"))
-        assertTrue(feedback.contains("feedbackPolicy.claimFeedbackDelivery(action.trackId, policyEvaluatedAtMs)"))
+        assertTrue(feedback.contains("feedbackPolicy.claimFeedbackDelivery(action.trackId, policyEvaluatedAtMs,"))
+        assertFalse(feedback.contains("feedbackPolicy.claimFeedbackDelivery(action.trackId, policyEvaluatedAtMs)"))
         assertTrue(feedback.contains("feedbackPolicy.rejectUndeliveredFeedback(action.trackId, policyEvaluatedAtMs)"))
-        assertTrue(feedback.contains("confirmFeedbackDelivery(action, policyEvaluatedAtMs)"))
+        val riskCompletion = feedback.substringAfter("onSpeechCompleted = {")
+            .substringBefore("onSpeechFailed = {")
+        assertTrue(riskCompletion.contains("completionCurrent()"))
+        assertTrue(
+            riskCompletion.contains("confirmFeedbackDelivery(action, policyEvaluatedAtMs, outputCompleted = true)"),
+        )
+        assertFalse(riskCompletion.contains("outputCurrent()"))
+        val riskFailure = feedback.substringAfter("onSpeechFailed = {")
+            .substringBefore("onSpeechCancelled = cancelDelivery")
+        assertTrue(riskFailure.contains("completionCurrent()"))
+        assertFalse(riskFailure.contains("outputCurrent()"))
+        assertTrue(feedback.contains("isStillValidAtStart = outputCurrent"))
+        assertTrue(feedback.contains("onSpeechCancelled = cancelDelivery"))
         assertTrue(feedback.contains("onSpeechCompleted = {"))
         assertTrue(feedback.contains("onSpeechFailed = {"))
         assertTrue(feedback.contains("scheduleFeedbackTerminalResolution("))
@@ -314,6 +347,30 @@ class MainActivityAccessibilityStaticTest {
     }
 
     @Test
+    fun informationStartExpiryDoesNotRevokeOwnedCompletion() {
+        val feedback = functionBlock("private fun emitFeedbackAction(")
+        assertTrue(feedback.contains("val completionCurrent"))
+        val completionFence = feedback.substringAfter("val completionCurrent")
+            .substringBefore("val outputCurrent")
+        assertTrue(completionFence.contains("!cancelled"))
+        assertTrue(completionFence.contains("expectedWalkEpoch != null"))
+        assertTrue(completionFence.contains("isFeedbackLifecycleCurrent(generation)"))
+        assertTrue(completionFence.contains("walkSessionLifecycle.currentRuntimeEpochOrNull() == expectedWalkEpoch"))
+        assertFalse(completionFence.contains("isFeedbackActionStillDeliverable"))
+        assertFalse(completionFence.contains("validUntilMs"))
+        val startFence = feedback.substringAfter("val outputCurrent").substringBefore("val cancelDelivery")
+        assertTrue(startFence.contains("completionCurrent()"))
+        assertTrue(startFence.contains("isFeedbackActionStillDeliverable(action)"))
+        val information = feedback.substringAfter("val speech = actuator.speakNavigation(")
+        assertTrue(information.contains("isStillValidAtStart = outputCurrent"))
+        assertTrue(information.contains("onCancelled = cancelDelivery"))
+        val completion = information.substringAfter("onCompleted = {").substringBefore("onFailed =")
+        assertTrue(completion.contains("completionCurrent()"))
+        assertTrue(completion.contains("outputCompleted = true"))
+        assertFalse(completion.contains("outputCurrent()"))
+    }
+
+    @Test
     fun asynchronousFeedbackCannotCrossForegroundGeneration() {
         val lifecycle = source.substringAfter("override fun onResume()")
             .substringBefore("override fun onDestroy()")
@@ -330,7 +387,9 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(lifecycle.contains("isActivityForeground = false\n        feedbackLifecycleGeneration += 1"))
         assertTrue(gatewayLogin.contains("val feedbackGeneration = feedbackLifecycleGeneration"))
         assertTrue(gatewayLogin.contains("if (isFeedbackLifecycleCurrent(feedbackGeneration))"))
-        assertTrue(navigation.contains("if (!isFeedbackLifecycleCurrent(generation) ||"))
+        assertTrue(navigation.contains("isFeedbackLifecycleCurrent(generation)"))
+        assertTrue(navigation.contains("if (!outputCurrent())"))
+        assertTrue(navigation.contains("walkSessionLifecycle.currentRuntimeEpochOrNull() == expectedWalkEpoch"))
         assertTrue(navigation.contains("shouldSuppressFeedbackDuringVoiceRecognition"))
         assertTrue(navigation.contains("isWalkSessionRuntimeActive() && navigationEnvironmentOutputsAllowed()"))
         assertTrue(interaction.contains("speakCommandResponse(message)"))
@@ -371,7 +430,7 @@ class MainActivityAccessibilityStaticTest {
             .substringBefore("private fun ensureFeedbackActuator()")
 
         assertTrue(drawFrame.contains("val elapsedRealtimeMs = SystemClock.elapsedRealtime()"))
-        assertTrue(drawFrame.contains("nowMs = elapsedRealtimeMs"))
+        assertTrue(drawFrame.contains("nowMs = SystemClock.elapsedRealtime()"))
         assertTrue(routeGuidance.contains("val nowMs = SystemClock.elapsedRealtime()"))
         assertTrue(accessibility.contains("val nowMs = SystemClock.elapsedRealtime()"))
     }
@@ -385,7 +444,9 @@ class MainActivityAccessibilityStaticTest {
 
         assertTrue(source.contains("private fun speakInteraction(message: String)"))
         assertTrue(voice.contains("speakInteraction(message)"))
-        assertTrue(voice.contains("routeNavigator.currentGuidance(nowMs, currentRouteFacingObservation(nowMs))"))
+        // S08-8: the manual repeat also passes the compass cause of that facing lookup.
+        assertTrue(voice.contains(
+            "routeNavigator.currentGuidance(nowMs, currentRouteFacingObservation(nowMs), latestRouteFacingUnavailableReason)"))
         assertTrue(voice.contains("tryDispatchRouteInstruction(update, expectedWalkEpoch)"))
         assertTrue(route.contains("dispatchNavigationSpeech("))
         assertTrue(route.contains("routeNavigator.reserveInstruction(update)"))
@@ -586,7 +647,19 @@ class MainActivityAccessibilityStaticTest {
     private fun functionBlock(marker: String): String {
         val start = source.indexOf(marker)
         require(start >= 0) { "missing: $marker" }
-        val open = source.indexOf('{', start)
+        var parameterDepth = 0
+        var open = -1
+        for (index in start until source.length) {
+            when (source[index]) {
+                '(' -> parameterDepth += 1
+                ')' -> parameterDepth -= 1
+                '{' -> if (parameterDepth == 0) {
+                    // Skip default-argument lambdas until the parameter list has closed.
+                    open = index
+                    break
+                }
+            }
+        }
         require(open >= 0) { "missing function body: $marker" }
         var depth = 0
         for (index in open until source.length) {

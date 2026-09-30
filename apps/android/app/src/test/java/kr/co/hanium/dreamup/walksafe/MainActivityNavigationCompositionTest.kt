@@ -92,12 +92,17 @@ class MainActivityNavigationCompositionTest {
 
         assertTrue(source.contains("const val DESTINATION_SEARCH_PAGE_SIZE = 3"))
         assertTrue(hearMore.contains("DestinationSearchVoiceCommand.HearMore"))
-        assertTrue(hearMore.contains("performDestinationSearch(reset = false)"))
+        // S06-9: local paging only; the first search already fetched the whole candidate cap.
+        assertFalse(hearMore.contains("performDestinationSearch("))
         assertTrue(selection.contains("DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex)"))
-        assertTrue(selection.contains("if (!onDestinationSelected(selected)) {"))
+        // S06-40: selecting only selects; the separate "길안내 시작" requests the route and says so.
+        val start = functionBlock("private fun startPendingWalkingDestinationChange(")
+        assertFalse(selection.contains("onDestinationSelected("))
+        assertTrue(start.contains("if (!onDestinationSelected(selected)) {"))
+        assertTrue(start.contains("경로를 확인합니다"))
         assertTrue(
-            selection.indexOf("if (!onDestinationSelected(selected)) {") <
-                selection.indexOf("TMAP 경로를 확인합니다"),
+            start.indexOf("if (!onDestinationSelected(selected)) {") <
+                start.indexOf("경로를 확인합니다"),
         )
     }
 
@@ -172,17 +177,42 @@ class MainActivityNavigationCompositionTest {
 
     @Test
     fun onlyNewRouteChoiceCallsTheTmapRouteRequest() {
-        val newRoute = functionBlock("private fun requestRerouteFromVoice(")
-        val recheck = functionBlock("private fun recheckLocationFromVoice(")
-        val end = functionBlock("private fun endNavigationAfterDeviation(")
+        val newRoute = functionBlock(
+            "private fun requestRerouteFromVoice(expectedToken: RouteNavigatorDecisionToken?)",
+        )
+        val recheck = functionBlock(
+            "private fun recheckLocationFromVoice(expectedToken: RouteNavigatorDecisionToken?)",
+        )
+        val end = functionBlock(
+            "private fun endNavigationAfterDeviation(expectedToken: RouteNavigatorDecisionToken?)",
+        )
         val request = functionBlock("private fun requestRoute(")
         val destinationSelection = functionBlock("private fun onDestinationSelected(")
 
-        assertTrue(newRoute.contains("RouteDeviationChoice.NEW_ROUTE"))
+        listOf("requestRerouteFromVoice", "recheckLocationFromVoice", "endNavigationAfterDeviation")
+            .forEach { action ->
+                val uiEntry = functionBlock("private fun $action()")
+                assertTrue(uiEntry.contains("$action(routeNavigator.pendingDecisionToken())"))
+            }
+        listOf(newRoute, recheck, end).forEach { action ->
+            assertTrue(action.contains("if (expectedToken == null)"))
+            assertFalse(action.contains("pendingDecisionToken()"))
+            assertTrue(
+                action.indexOf("if (expectedToken == null)") in
+                    0 until action.indexOf("routeNavigator.selectDeviationChoice("),
+            )
+        }
+        assertTrue(newRoute.contains("routeNavigator.selectDeviationChoice(RouteDeviationChoice.NEW_ROUTE, expectedToken)"))
         assertTrue(newRoute.contains("requestRoute(destination, reason = \"off_route\")"))
-        assertTrue(recheck.contains("RouteDeviationChoice.RECHECK_LOCATION"))
+        assertTrue(
+            newRoute.indexOf("if (!decision.shouldReroute)") in
+                0 until newRoute.indexOf("requestRoute(destination, reason = \"off_route\")"),
+        )
+        assertTrue(recheck.contains("routeNavigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION, expectedToken)"))
+        assertTrue(recheck.contains("decision.reason != \"off_route_location_recheck_requested\""))
         assertFalse(recheck.contains("requestRoute("))
-        assertTrue(end.contains("RouteDeviationChoice.END_NAVIGATION"))
+        assertTrue(end.contains("routeNavigator.selectDeviationChoice(RouteDeviationChoice.END_NAVIGATION, expectedToken)"))
+        assertTrue(end.contains("if (decision.reason != \"off_route_navigation_ended\") return"))
         assertFalse(end.contains("requestRoute("))
         assertTrue(request.contains("reason != \"off_route\" && blockRouteMutationWhileDeviationChoicePending()"))
         assertTrue(destinationSelection.contains("blockRouteMutationWhileDeviationChoicePending()"))
@@ -198,7 +228,17 @@ class MainActivityNavigationCompositionTest {
         val purgeFence = functionBlock("private fun routeSnapshotPurgeFenceAllowsRoute(")
         val snapshotSave = request.indexOf("routeSnapshotStore.saveFirstRoute(")
         val uiCommit = request.lastIndexOf("runOnUiThread {", snapshotSave)
-        val leaseCheck = request.lastIndexOf("isRouteRequestLeaseCurrent(", snapshotSave)
+        val leaseCheck = request.lastIndexOf(
+            "routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)", snapshotSave,
+        )
+        val postLocationLeaseCheck = request.lastIndexOf(
+            "if (!isCurrentRouteRequest() || !isRouteActive)", snapshotSave,
+        )
+        val requestOwner = request.substringAfter("fun isCurrentRouteRequest(): Boolean")
+            .substringBefore("updateNavigationStatus(")
+        assertTrue(requestOwner.contains("isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId)"))
+        assertTrue(requestOwner.contains("currentSession.generation == expectedGatewaySessionGeneration"))
+        assertTrue(requestOwner.contains("currentSession.session === gatewaySession"))
         val firstPurgeFence = request.indexOf("routeSnapshotPurgeFenceAllowsRoute()")
         val secondPurgeFence = request.indexOf(
             "routeSnapshotPurgeFenceAllowsRoute()",
@@ -213,13 +253,15 @@ class MainActivityNavigationCompositionTest {
         assertTrue(firstPurgeFence < request.indexOf("walkingRouteClient.fetchRouteCall("))
         assertTrue(secondPurgeFence > leaseCheck)
         assertTrue(secondPurgeFence < snapshotSave)
+        assertTrue(postLocationLeaseCheck > secondPurgeFence)
+        assertTrue(postLocationLeaseCheck < snapshotSave)
         assertTrue(request.indexOf("catch (_: CancellationException)") < request.indexOf("catch (error: Exception)"))
         assertTrue(request.contains("tmapFailureGuard.recordSuccess()"))
         assertTrue(request.contains("tmapFailureGuard.recordFailure()"))
-        assertTrue(request.contains("countableTmapFailure = routeProviderCallInProgress"))
-        assertTrue(request.contains("enterWalkSessionSafetyStopAndCancelOutputs(\"tmap_consecutive_failures\")"))
-        assertTrue(request.contains("NavigationBackendErrorKind.AUTHENTICATION"))
-        assertTrue(request.contains("navigationFailure.kind.userMessage"))
+        assertTrue(request.contains("countableRouteFailure = routeProviderCallInProgress"))
+        assertTrue(request.contains("enterWalkSessionSafetyStopAndCancelOutputs(\"route_consecutive_failures\")"))
+        assertTrue(request.contains("navigationFailure.isUserSessionAuthentication"))
+        assertTrue(request.contains("navigationFailure.routeUserMessage"))
         assertTrue(request.contains("scheduleEncryptedRouteSnapshotExpiry("))
         assertTrue(retainedFailure.contains("applyRouteDeviationSafetyUpdate"))
 
@@ -234,7 +276,7 @@ class MainActivityNavigationCompositionTest {
     fun terminalRouteSafetyStopsSpeakOneBoundedAccessibleDetail() {
         val request = functionBlock("private fun requestRoute(")
         val tmapStopStart = request.indexOf(
-            "enterWalkSessionSafetyStopAndCancelOutputs(\"tmap_consecutive_failures\")",
+            "enterWalkSessionSafetyStopAndCancelOutputs(\"route_consecutive_failures\")",
         )
         val tmapStopEnd = request.indexOf("return@runOnUiThread", tmapStopStart)
         val tmapStop = request.substring(tmapStopStart, tmapStopEnd)
@@ -242,7 +284,7 @@ class MainActivityNavigationCompositionTest {
             .substringBefore("return@runOnUiThread")
         val expiry = functionBlock("private fun scheduleEncryptedRouteSnapshotExpiry(")
 
-        assertTrue(tmapStop.contains("navigationFailure.kind.userMessage"))
+        assertTrue(tmapStop.contains("navigationFailure.routeUserMessage"))
         assertTrue(tmapStop.contains("모든 보행 기능을 중지했습니다"))
         assertEquals(1, Regex("speakInteraction\\(safetyStopDetail\\)").findAll(tmapStop).count())
         assertFalse(tmapStop.contains("error.message"))
@@ -258,11 +300,17 @@ class MainActivityNavigationCompositionTest {
         val clearLocation = functionBlock("private fun clearTrustedLocation(")
         val confidence = functionBlock("private fun applyPositionConfidenceDecision(")
         val foregroundPause = functionBlock("private fun enterWalkSessionForegroundRecheckAndCancelOutputs(")
-        val cancelOutputs = functionBlock("private fun cancelWalkSessionOutputs(")
+        val cancelEntry = functionBlock("private fun cancelWalkSessionOutputs(")
+        val cancelOutputs = functionBlock("private fun cancelWalkSessionOutputsInternal(")
         val reset = functionBlock("private fun resetRouteState(")
         val purge = functionBlock("private fun purgeEncryptedRouteSnapshot(")
 
-        assertTrue(location.contains("positioningCoordinator.observeGnss("))
+        assertTrue(location.contains("binding.coordinator.observeGnss("))
+        assertTrue(location.contains("expectedGeneration = binding.inputGeneration"))
+        assertTrue(
+            location.indexOf("!isPositioningCollectionCurrent(binding)") in
+                0 until location.indexOf("binding.coordinator.observeGnss("),
+        )
         assertFalse(location.contains("handleRouteLocationUntrusted()"))
         assertFalse(clearLocation.contains("handleRouteLocationUntrusted()"))
         assertTrue(confidence.contains("feedbackActuator?.cancelNavigationSpeech()"))
@@ -270,17 +318,22 @@ class MainActivityNavigationCompositionTest {
         assertFalse(confidence.contains("directionGuidancePauseReason = pauseReason"))
         assertTrue(confidence.contains("commitAnnouncementDelivered("))
         assertTrue(foregroundPause.contains("cancelWalkSessionOutputs(reason)"))
+        assertTrue(cancelEntry.contains("cancelWalkSessionOutputsInternal(reason, null)"))
         assertTrue(cancelOutputs.contains("WalkSessionState.PAUSED"))
         assertTrue(cancelOutputs.contains("resetRouteState(purgeRouteSnapshot = false)"))
-        assertTrue(reset.contains("purgeEncryptedRouteSnapshot()"))
-        assertTrue(purge.contains("routeSnapshotStore.clear()"))
+        assertTrue(reset.contains("if (purgeRouteSnapshot) purgeEncryptedRouteSnapshot()"))
+        assertTrue(purge.contains("expectedScope: RouteSnapshotScope? = routeSnapshotWalkScope"))
+        assertTrue(purge.contains("routeSnapshotStore.clearWalk(expectedScope)"))
+        assertTrue(purge.contains("routeSnapshotPurgeFailed = !purged"))
     }
 
     @Test
     fun poorGpsUsesCoordinatorSoftGateAndFilteredLocation() {
         val handler = functionBlock("private fun handleLocationUpdate(")
 
-        assertTrue(handler.contains("positioningCoordinator.observeGnss("))
+        assertTrue(handler.contains("binding.coordinator.observeGnss("))
+        assertTrue(handler.contains("expectedGeneration = binding.inputGeneration"))
+        assertTrue(handler.contains("receivedAtElapsedRealtimeMs = receivedAtElapsedRealtimeMs"))
         assertTrue(handler.contains("GnssObservationDisposition.HARD_REJECTED"))
         assertFalse(handler.contains("LocationTrustPolicy.trustedOrNull("))
         assertTrue(handler.contains("latestTrustedLocation = filteredTrusted"))
@@ -296,11 +349,13 @@ class MainActivityNavigationCompositionTest {
         val heading = functionBlock("private fun updatePositioningHeadingInputs(")
         val route = functionBlock("private fun updateRouteGuidance(")
 
+        assertTrue(step.contains("pedestrianMotionTracker?.recordStep(event.timestampMs)"))
         assertTrue(
             step.indexOf("pedestrianMotionTracker?.recordStep(event.timestampMs)") <
-                step.indexOf("positioningCoordinator.observeStep("),
+                step.indexOf("binding.coordinator.observeStep("),
         )
-        assertTrue(step.contains("positioningCoordinator.observeStep("))
+        assertTrue(step.contains("binding.coordinator.observeStep("))
+        assertTrue(step.contains("expectedGeneration = binding.inputGeneration"))
         assertTrue(step.contains("gpsCourse = courseAtStep"))
         assertTrue(step.contains("magneticTrueHeading = chestHeading"))
         assertTrue(step.contains("phoneForwardMounted = chestHeading != null"))
@@ -332,7 +387,8 @@ class MainActivityNavigationCompositionTest {
         assertTrue(sources.contains("Manifest.permission.ACCESS_FINE_LOCATION"))
         assertTrue(sources.contains("AndroidGnssObservationSource("))
         assertTrue(sources.contains("AndroidPedestrianMotionTracker("))
-        assertTrue(sources.contains("positioningCoordinator.observeZupt("))
+        assertTrue(sources.contains("binding.coordinator.observeZupt("))
+        assertTrue(sources.contains("expectedGeneration = binding.inputGeneration"))
         assertTrue(sources.contains("ensureEarthOrientationForLocation()"))
         assertTrue(stop.contains("gnssQualityObserver?.close()"))
         assertTrue(stop.contains("pedestrianMotionTracker?.close()"))
@@ -345,11 +401,18 @@ class MainActivityNavigationCompositionTest {
     @Test
     fun gnssQualityIsRefreshedPerFixAndHeadingChangesOnlyAfterHardAcceptance() {
         val handler = functionBlock("private fun handleLocationUpdate(")
-        val snapshot = "gnssQualityObserver?.snapshot(SystemClock.elapsedRealtimeNanos())"
-        val acceptedHeading = "updatePositioningHeadingInputs(location, elapsedMs)"
+        val snapshot = "gnssQualityObserver?.snapshot(location.elapsedRealtimeNanos)"
+        val acceptedHeading =
+            "updatePositioningHeadingInputs(location, elapsedMs, binding, receivedAtElapsedRealtimeMs)"
         val hardReject = "if (hardRejected || filtered == null)"
 
         assertTrue(handler.contains(snapshot))
+        assertTrue(handler.contains(acceptedHeading))
+        assertTrue(handler.contains(hardReject))
+        assertTrue(handler.contains("expectedGeneration = binding.inputGeneration"))
+        assertTrue(
+            handler.indexOf(snapshot) in 0 until handler.indexOf("binding.coordinator.observeGnss("),
+        )
         assertTrue(handler.indexOf(acceptedHeading) > handler.indexOf(hardReject))
         assertTrue(handler.indexOf(acceptedHeading) > handler.indexOf("return", handler.indexOf(hardReject)))
     }
@@ -473,14 +536,22 @@ class MainActivityNavigationCompositionTest {
     }
 
     @Test
-    fun actualPauseAndDestroyEntriesEachCancelTheMainActivityActiveRouteAndSearchCalls() {
+    fun pauseEntryAndDestroyHookEachCancelTheMainActivityActiveRouteAndSearchCalls() {
         listOf("onPause", "onDestroy").forEach { lifecycleMethod ->
             val activity = MainActivity()
             setBooleanField(activity, "privacyStartupInspectionComplete", true)
             val route = activity.trackRouteRequest(recordingCall(AtomicInteger()))
             val search = activity.trackDestinationSearchRequest(recordingCall(AtomicInteger()))
 
-            val entryFailure = invokeEntry(activity, lifecycleMethod)
+            val entryFailure = if (lifecycleMethod == "onPause") {
+                invokeEntry(activity, lifecycleMethod)
+            } else {
+                // Plain JVM Activity.getWindow is not available. Exercise the real destroy
+                // cancellation hook and separately keep its onDestroy call-site contract.
+                assertTrue(functionBlock("override fun onDestroy()").contains("cancelNavigationRequestsForDestroy()"))
+                activity.cancelNavigationRequestsForDestroy()
+                null
+            }
 
             assertTrue("$lifecycleMethod failed before cancellation: $entryFailure", route.isCancelled())
             assertTrue("$lifecycleMethod failed before cancellation: $entryFailure", search.isCancelled())

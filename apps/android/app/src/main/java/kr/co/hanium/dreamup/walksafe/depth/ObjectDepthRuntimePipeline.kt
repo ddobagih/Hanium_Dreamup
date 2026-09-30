@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import java.util.IdentityHashMap
 import java.util.Locale
 import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey
 import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingFailure
@@ -27,10 +28,12 @@ class ObjectDepthRuntimePipeline(
         messagePolicy = this.messagePolicy,
     )
     private var lastCompletedDetectionSequenceId: Long? = null
+    private var lastCompletedDetectionDepthCapture: DepthCaptureIdentity? = null
     private var lastVisualSourceKey: VisualFrameKey? = null
     private var lastVisualObservation: CurrentTrackedFrameObservation? = null
     private var visualAssignments: Map<Int, String> = emptyMap()
     private var lastVisualOutputs: List<TrackedObjectDepth> = emptyList()
+    private var sourceIndexByGeometry: Map<ObjectGeometry, Int> = emptyMap()
 
     fun setUserStepLength(stepLengthM: Float) {
         messagePolicy = messagePolicy.withStepLength(stepLengthM)
@@ -41,6 +44,10 @@ class ObjectDepthRuntimePipeline(
         )
     }
 
+    /**
+     * Camera safety path (S14-29): the frozen image-to-depth [mapper] and its capture [mapperFrameId]
+     * are required, and a mapper of another capture produces no output.
+     */
     fun process(
         snapshot: DepthFrameSnapshot,
         frameId: Long,
@@ -48,24 +55,73 @@ class ObjectDepthRuntimePipeline(
         detections: List<DetectionCandidate>? = null,
         detectionSequenceId: Long = frameId,
         detectionCompleted: Boolean = true,
-        mapper: CoordinateMapper? = null,
+        mapper: CoordinateMapper,
+        mapperFrameId: Long,
         motionContext: MotionContext = MotionContext(),
         imageQuarterTurns: Int? = 0,
+    ): List<TrackedObjectDepth> {
+        if (mapperFrameId != frameId) return emptyList()
+        return processMapped(
+            snapshot, frameId, timestampMs, detections, detectionSequenceId, detectionCompleted,
+            mapper, motionContext, imageQuarterTurns,
+        )
+    }
+
+    /**
+     * Identity image-to-depth mapping for tests and pre-aligned normalized image/depth planes only.
+     * Never used by the camera safety path, which must supply its frame transform through [process].
+     */
+    internal fun processPrealignedForTest(
+        snapshot: DepthFrameSnapshot,
+        frameId: Long,
+        timestampMs: Long,
+        detections: List<DetectionCandidate>? = null,
+        detectionSequenceId: Long = frameId,
+        detectionCompleted: Boolean = true,
+        motionContext: MotionContext = MotionContext(),
+        imageQuarterTurns: Int? = 0,
+    ): List<TrackedObjectDepth> {
+        val depthWidth = snapshot.rawDepth?.width ?: snapshot.fullDepth?.width ?: DEFAULT_DEPTH_SIZE
+        val depthHeight = snapshot.rawDepth?.height ?: snapshot.fullDepth?.height ?: DEFAULT_DEPTH_SIZE
+        return processMapped(
+            snapshot, frameId, timestampMs, detections, detectionSequenceId, detectionCompleted,
+            identityMapper(depthWidth, depthHeight), motionContext, imageQuarterTurns,
+        )
+    }
+
+    private fun processMapped(
+        snapshot: DepthFrameSnapshot,
+        frameId: Long,
+        timestampMs: Long,
+        detections: List<DetectionCandidate>?,
+        detectionSequenceId: Long,
+        detectionCompleted: Boolean,
+        effectiveMapper: CoordinateMapper,
+        motionContext: MotionContext,
+        imageQuarterTurns: Int?,
     ): List<TrackedObjectDepth> {
         // Partial legacy-model output is useful for the overlay, but must never count as one of
         // the three completed detector observations required by the warning/report safety gate.
         if (!detectionCompleted) return emptyList()
-        val depthWidth = snapshot.rawDepth?.width ?: snapshot.fullDepth?.width ?: DEFAULT_DEPTH_SIZE
-        val depthHeight = snapshot.rawDepth?.height ?: snapshot.fullDepth?.height ?: DEFAULT_DEPTH_SIZE
-        // A missing mapper is valid only for tests or pre-aligned normalized image/depth planes.
-        val effectiveMapper = mapper ?: identityMapper(depthWidth, depthHeight)
         val sourceDetections = detections ?: detectionProvider.detect(frameId, timestampMs)
-        val geometries = sourceDetections
-            .map { extractor.extract(it, imageQuarterTurns = imageQuarterTurns) }
-            .filter { it.detectionConfidence >= MIN_DETECTION_CONFIDENCE }
+        val indexedGeometries = sourceDetections.mapIndexedNotNull { index, detection ->
+            extractor.extract(detection, imageQuarterTurns = imageQuarterTurns)
+                .takeIf { it.detectionConfidence >= MIN_DETECTION_CONFIDENCE }?.let { index to it }
+        }
+        val geometries = indexedGeometries.map { it.second }
         val isNewCompletedDetection = detectionSequenceId != lastCompletedDetectionSequenceId
+        val depthCapture = snapshot.captureIdentity()
         if (isNewCompletedDetection) {
             lastCompletedDetectionSequenceId = detectionSequenceId
+            lastCompletedDetectionDepthCapture = depthCapture
+            // S10-21: the tracker keeps each geometry object, so its candidate index is bound by identity.
+            sourceIndexByGeometry = IdentityHashMap<ObjectGeometry, Int>().apply {
+                indexedGeometries.forEach { (index, geometry) -> put(geometry, index) }
+            }
+        } else if (depthCapture != lastCompletedDetectionDepthCapture) {
+            // Detector geometry describes its own capture only. Sampling a newer depth image under
+            // that old region could read background, so it is not a distance or TTC observation.
+            return emptyList()
         }
         if (geometries.isEmpty()) {
             if (isNewCompletedDetection) tracker.predictOnly()
@@ -74,12 +130,15 @@ class ObjectDepthRuntimePipeline(
         val activeTracks = if (isNewCompletedDetection) {
             tracker.update(geometries, timestampMs)
         } else {
-            // ARCore depth can be resampled on every camera frame, while detector stability is
-            // advanced only once for each unique completed inference snapshot.
+            // Replaying the same capture must not advance detector stability, which counts each
+            // unique completed inference snapshot once.
             tracker.activeTracks()
         }
 
-        return estimateTracks(snapshot, frameId, timestampMs, activeTracks, effectiveMapper, motionContext)
+        val tracksById = activeTracks.associateBy { it.trackId }
+        return estimateTracks(snapshot, frameId, timestampMs, activeTracks, effectiveMapper, motionContext).map { output ->
+            output.copy(sourceDetectionIndex = tracksById[output.trackId]?.latestGeometry?.let { sourceIndexByGeometry[it] })
+        }
     }
 
     /** Consumes actual current-image geometry; detector confirmation advances only on a new source. */
@@ -163,7 +222,27 @@ class ObjectDepthRuntimePipeline(
         lastVisualOutputs = estimateTracks(
             snapshot, observation.targetKey.frameId, observation.timestampMs, tracks, mapper, motionContext, visualQualities,
             requireIndependentDepthObservation = true,
-        )
+        ).map { output ->
+            // The existing depth-gap policy requires this same visual-tracking quality before
+            // trusting a gap. A low-quality optical-flow box cannot establish pseudo approach.
+            val currentOutput = if (output.source == DepthSource.POLYGON_TREND_PSEUDO_DEPTH &&
+                output.userFacing.messageLevel == MessageLevel.CAUTION &&
+                visualQualities[output.trackId]?.let { it.isFinite() && it >= MIN_QUALITATIVE_TRACKING_QUALITY } != true
+            ) output.copy(userFacing = UserFacingDepth(null, MessageLevel.NONE, null)) else output
+            // A pseudo frame is leased by current visual capture, not the last metric sample.
+            val depthAgeMs = if (currentOutput.source.metric) currentOutput.depthObservedAtMs?.let { observed ->
+                (observation.timestampMs - observed).coerceAtLeast(0L)
+            } ?: 0L else 0L
+            // S11-11: guidance keeps its own depth-age budget from the first depth observation, and a
+            // TTC exists only for the capture's own non-reprojected Raw observation.
+            val budgetedOutput = if (currentOutput.timeToCollisionMs != null &&
+                !DepthAgeBudget.admits(DepthUse.TIME_TO_COLLISION, currentOutput, observation.timestampMs)
+            ) currentOutput.copy(timeToCollisionMs = null, approachSpeedMps = null) else currentOutput
+            budgetedOutput.copy(sourceValidUntilElapsedRealtimeMs = minOf(
+                observation.sourceKey.capturedAtElapsedRealtimeMs + CurrentTrackedFrameObservation.MAX_SOURCE_AGE_MS,
+                observation.targetKey.capturedAtElapsedRealtimeMs - depthAgeMs + DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS,
+            ))
+        }
         return lastVisualOutputs
     }
 
@@ -178,6 +257,7 @@ class ObjectDepthRuntimePipeline(
         requireIndependentDepthObservation: Boolean = false,
     ): List<TrackedObjectDepth> = tracks.filter { it.missedFrames == 0 }.mapNotNull { track ->
             val geometry = track.latestGeometry ?: return@mapNotNull null
+            val hasValidatedRawPair = snapshot.rawConfidenceMatchesRawDepth
             estimator.estimate(
                 ObjectDepthInput(
                     frameId = frameId,
@@ -185,13 +265,13 @@ class ObjectDepthRuntimePipeline(
                     geometry = geometry,
                     track = track,
                     mapper = mapper,
-                    rawDepth = snapshot.rawDepth,
-                    rawConfidence = snapshot.rawConfidence,
+                    rawDepth = snapshot.rawDepth?.takeIf { hasValidatedRawPair },
+                    rawConfidence = snapshot.rawConfidence?.takeIf { hasValidatedRawPair },
                     rawDepthFreshnessQuality = snapshot.rawDepthFreshnessQuality,
-                    rawDepthMatchesCameraFrame = snapshot.rawDepthMatchesCameraImage,
+                    rawDepthMatchesCameraFrame = hasValidatedRawPair && snapshot.rawDepthMatchesCameraImage,
                     fullDepth = snapshot.fullDepth?.takeIf { snapshot.hasFreshFullDepth },
                     fullDepthMatchesCameraFrame = snapshot.hasFreshFullDepth,
-                    rawDepthTimestampNs = snapshot.rawDepthTimestampNs,
+                    rawDepthTimestampNs = snapshot.rawDepthTimestampNs?.takeIf { hasValidatedRawPair },
                     fullDepthTimestampNs = snapshot.fullDepthTimestampNs,
                     visualTrackingQuality = visualQualities[track.trackId] ?: 1f,
                     requireIndependentDepthObservation = requireIndependentDepthObservation || rawDepthMotionOnly,
@@ -200,7 +280,13 @@ class ObjectDepthRuntimePipeline(
                         cameraPoseEvidence = snapshot.cameraPoseEvidence,
                     ),
                 ),
-            )
+            ).let { output ->
+                // S11-21: a compatible-class flicker keeps the track's accumulated class name.
+                val accumulated = track.accumulatedClassName
+                if (accumulated != output.className && sameAssociationClass(accumulated, output.className)) {
+                    output.copy(className = accumulated)
+                } else output
+            }
         }
 
     private fun identityMapper(width: Int, height: Int): LetterboxCoordinateMapper {
@@ -220,9 +306,24 @@ class ObjectDepthRuntimePipeline(
 
     private companion object {
         const val MIN_DETECTION_CONFIDENCE = 0.10f
+        // Reuse ShortDepthGapState.validContext's visual-tracking admission floor.
+        const val MIN_QUALITATIVE_TRACKING_QUALITY = 0.65f
         const val DEFAULT_DEPTH_SIZE = 1
     }
 }
+
+/** Clocks that identify one captured depth observation, independent of pixel buffer identity. */
+private data class DepthCaptureIdentity(
+    val frameTimestampNs: Long,
+    val cameraImageTimestampNs: Long?,
+    val rawDepthTimestampNs: Long?,
+    val rawConfidenceTimestampNs: Long?,
+    val fullDepthTimestampNs: Long?,
+)
+
+private fun DepthFrameSnapshot.captureIdentity() = DepthCaptureIdentity(
+    frameTimestampNs, cameraImageTimestampNs, rawDepthTimestampNs, rawConfidenceTimestampNs, fullDepthTimestampNs,
+)
 
 fun TrackedObjectDepth.debugSummaryText(): String {
     val distance = riskDistanceM?.let { String.format(Locale.US, "%.2fm", it) } ?: "거리 없음"

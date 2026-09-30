@@ -148,8 +148,8 @@ class AndroidPedestrianMotionTracker(
         if (timestampMs <= lastEmittedTimestampMs) return
         lastEmittedTimestampMs = timestampMs
 
-        val acceleration = magnitudeStatistics(accelerationWindow)
-        val angularVelocity = magnitudeStatistics(gyroscopeWindow)
+        val acceleration = magnitudeStatistics(accelerationWindow, timestampNs)
+        val angularVelocity = magnitudeStatistics(gyroscopeWindow, timestampNs)
         onDecision(
             detector.observe(
                 PedestrianMotionSample(
@@ -159,6 +159,8 @@ class AndroidPedestrianMotionTracker(
                     accelerationMagnitudeVarianceMps4 = acceleration?.variance,
                     gyroscopeRmsRadPerSecond = angularVelocity?.rootMeanSquare,
                     gyroscopePeakRadPerSecond = angularVelocity?.peak,
+                    accelerationWindow = acceleration?.coverage,
+                    gyroscopeWindow = angularVelocity?.coverage,
                 ),
             ),
         )
@@ -224,8 +226,32 @@ class AndroidPedestrianMotionTracker(
         }
     }
 
-    private fun magnitudeStatistics(window: ArrayDeque<TimedMagnitude>): MagnitudeStatistics? {
-        if (window.isEmpty()) return null
+    private fun magnitudeStatistics(
+        window: ArrayDeque<TimedMagnitude>,
+        nowNs: Long,
+    ): MagnitudeStatistics? {
+        if (window.size < MINIMUM_WINDOW_SAMPLES) return null
+        val first = window.peekFirst() ?: return null
+        val last = window.peekLast() ?: return null
+        var maximumGapNs = 0L
+        var previousAtNs = first.timestampNs
+        for (reading in window) {
+            maximumGapNs = maxOf(maximumGapNs, reading.timestampNs - previousAtNs)
+            previousAtNs = reading.timestampNs
+        }
+        val coverage = PedestrianMotionWindowCoverage(
+            sampleCount = window.size,
+            startedAtElapsedRealtimeMs = first.timestampNs / NANOS_PER_MILLISECOND,
+            endedAtElapsedRealtimeMs = last.timestampNs / NANOS_PER_MILLISECOND,
+            maximumGapMs = (maximumGapNs + NANOS_PER_MILLISECOND - 1L) / NANOS_PER_MILLISECOND,
+        )
+        if (!coverage.isSufficient(
+                nowNs / NANOS_PER_MILLISECOND,
+                MINIMUM_WINDOW_SAMPLES,
+                MINIMUM_WINDOW_DURATION_MS,
+                MAXIMUM_WINDOW_GAP_MS,
+            )
+        ) return null
         var sum = 0.0
         var sumOfSquares = 0.0
         var peak = 0.0
@@ -245,6 +271,7 @@ class AndroidPedestrianMotionTracker(
             variance = squaredDeviationSum / window.size,
             rootMeanSquare = sqrt(sumOfSquares / window.size),
             peak = peak,
+            coverage = coverage,
         )
     }
 
@@ -266,10 +293,14 @@ class AndroidPedestrianMotionTracker(
         val variance: Double,
         val rootMeanSquare: Double,
         val peak: Double,
+        val coverage: PedestrianMotionWindowCoverage,
     )
 
     private companion object {
         const val WINDOW_DURATION_NS = 1_000_000_000L
+        const val MINIMUM_WINDOW_SAMPLES = 5
+        const val MINIMUM_WINDOW_DURATION_MS = 200L
+        const val MAXIMUM_WINDOW_GAP_MS = 250L
         const val RECENT_STEP_WINDOW_MS = 2_000L
         const val NANOS_PER_MILLISECOND = 1_000_000L
         const val NO_TIMESTAMP = -1L

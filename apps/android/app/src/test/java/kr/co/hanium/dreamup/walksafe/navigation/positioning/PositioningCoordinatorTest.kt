@@ -75,6 +75,7 @@ class PositioningCoordinatorTest {
 
         val step = coordinator.observeStep(
             stepCount = 2,
+            headingCoversWholeBatch = true,
             headingInput = PedestrianHeadingInput(
                 nowElapsedRealtimeMs = 2_000L,
                 speed = WalkingSpeedObservation(1.0, 0.1, 2_000L),
@@ -87,7 +88,17 @@ class PositioningCoordinatorTest {
 
         assertEquals(PedestrianMotionUpdateDisposition.APPLIED, step.motionUpdate?.disposition)
         assertTrue(requireNotNull(step.filtered).localEnu.eastM > 1.0)
-        val zupt = coordinator.observeZupt(ZuptObservation(elapsedRealtimeMs = 3_000L))
+        val detector = PedestrianStationaryDetector()
+        for (at in 3_400L..5_000L step 100L) {
+            val coverage = PedestrianMotionWindowCoverage(5, at - 200L, at, 50L)
+            coordinator.observeUserMotion(detector.observe(PedestrianMotionSample(at,
+                accelerationMagnitudeMeanMps2 = 9.81, accelerationMagnitudeVarianceMps4 = 0.02,
+                gyroscopeRmsRadPerSecond = 0.02, gyroscopePeakRadPerSecond = 0.05,
+                accelerationWindow = coverage, gyroscopeWindow = coverage)), at)
+        }
+        coordinator.observeUserSpeed(WalkingSpeedObservation(0.0, 0.1, 5_000L),
+            kr.co.hanium.dreamup.walksafe.navigation.UserMotionLocationEvidence(5_000L, 2.0, false), 5_000L)
+        val zupt = coordinator.observeZupt(ZuptObservation(elapsedRealtimeMs = 5_000L))
         assertEquals(PedestrianMotionUpdateDisposition.APPLIED, zupt.motionUpdate?.disposition)
         assertTrue(kotlin.math.abs(requireNotNull(zupt.filtered).velocityEastMps) < 0.1)
     }

@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from backend.app.services.admin_device_proof import (  # noqa: E402
+    ADMIN_DEVICE_KEY_SECURITY_LEVELS,
     admin_device_key_marker,
     load_p256_spki_public_key,
     provision_admin_device_key,
@@ -73,6 +74,24 @@ def _parser() -> argparse.ArgumentParser:
         type=_canonical_key_marker,
         help="expected lowercase SHA-256 hex digest of the canonical SPKI DER",
     )
+    parser.add_argument(
+        "--security-level",
+        required=True,
+        type=_security_level,
+        help=(
+            "descriptor security_level from Android KeyInfo: TRUSTED_ENVIRONMENT "
+            "or STRONGBOX (software-only keys are rejected)"
+        ),
+    )
+    parser.add_argument(
+        "--replace-active",
+        action="store_true",
+        help=(
+            "emergency only: revoke the device's ACTIVE key immediately because its "
+            "private key is gone. Normal rotation registers the new key as PENDING "
+            "and the app confirms it with the old key."
+        ),
+    )
     key_input = parser.add_mutually_exclusive_group(required=True)
     key_input.add_argument(
         "--public-key-spki-der",
@@ -91,6 +110,15 @@ def _canonical_key_marker(value: str) -> str:
     if _KEY_MARKER_PATTERN.fullmatch(value) is None:
         raise argparse.ArgumentTypeError(
             "expected key marker must be 64 lowercase hexadecimal characters"
+        )
+    return value
+
+
+def _security_level(value: str) -> str:
+    if value not in ADMIN_DEVICE_KEY_SECURITY_LEVELS:
+        raise argparse.ArgumentTypeError(
+            "security level must be TRUSTED_ENVIRONMENT or STRONGBOX; "
+            "software-only device keys are not registered"
         )
     return value
 
@@ -146,6 +174,8 @@ def main(
             device_id=args.device_id,
             key_version=args.key_version,
             public_key_spki_der=public_key_spki_der,
+            security_level=args.security_level,
+            replace_active=args.replace_active,
         )
     except AdminSecurityError as exc:
         parser.error(str(exc))
@@ -170,6 +200,7 @@ def main(
                 "key_id": str(result.key_id),
                 "key_marker": result.key_marker,
                 "key_version": result.key_version,
+                "security_level": result.security_level,
                 "status": result.status,
             },
             ensure_ascii=False,

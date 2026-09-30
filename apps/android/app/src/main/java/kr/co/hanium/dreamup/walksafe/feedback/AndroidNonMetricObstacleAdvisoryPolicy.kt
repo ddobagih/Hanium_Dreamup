@@ -87,6 +87,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
     private var pendingDelivery: PendingDelivery? = null
     private var nextQueueSequence = 0L
     private var lastGlobalDeliveryAtMs: Long? = null
+    private var lastAcceptedFrameId: Long? = null
 
     init {
         require(config.minStableFrames > 0) { "minStableFrames must be positive" }
@@ -110,6 +111,13 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
             reset()
             return null
         }
+        pendingDelivery?.let { pending ->
+            if (pending.state == DeliveryState.RESERVED && nowMs > pending.action.validUntilMs) {
+                pendingDelivery = null
+            }
+        }
+        if (lastAcceptedFrameId?.let { frameId <= it } == true) return null
+        lastAcceptedFrameId = frameId
         val observations = detections.mapNotNull(::toObservation)
             .groupBy(Observation::key)
             .mapNotNull { (_, candidates) -> candidates.maxByOrNull { it.candidate.visualPriority() } }
@@ -117,6 +125,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
         sightings.keys.retainAll(observedKeys)
         observations.forEach { observation ->
             val existing = sightings[observation.key]
+            if (existing != null && frameId <= existing.lastFrameId) return@forEach
             if (
                 existing == null ||
                 nowMs - existing.lastSeenAtMs !in 0L..config.maxContinuityGapMs ||
@@ -124,7 +133,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
             ) {
                 sightings[observation.key] = Sighting(1, nowMs, nowMs, frameId, observation)
             } else {
-                if (existing.lastFrameId != frameId) existing.consecutiveFrames += 1
+                existing.consecutiveFrames += 1
                 existing.lastSeenAtMs = nowMs
                 existing.lastFrameId = frameId
                 existing.observation = observation
@@ -149,8 +158,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
         val stableKeys = stable.mapTo(hashSetOf(), Observation::key)
         queuedAdvisories.removeAll { it.observation.key !in stableKeys }
         pendingDelivery?.let { pending ->
-            val expiredBeforeClaim = pending.state == DeliveryState.RESERVED && nowMs > pending.action.validUntilMs
-            if (pending.action.key !in stableKeys || expiredBeforeClaim) pendingDelivery = null
+            if (pending.action.key !in stableKeys) pendingDelivery = null
         }
         stable.forEach { observation ->
             val queued = queuedAdvisories.firstOrNull { it.observation.key == observation.key }
@@ -223,6 +231,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
         pendingDelivery = null
         nextQueueSequence = 0L
         lastGlobalDeliveryAtMs = null
+        lastAcceptedFrameId = null
     }
 
     private fun toObservation(candidate: DetectionCandidate): Observation? {

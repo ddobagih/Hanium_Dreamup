@@ -12,16 +12,13 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import java.lang.reflect.Field
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchResult
 import kr.co.hanium.dreamup.walksafe.navigation.RoutePoint
 import kr.co.hanium.dreamup.walksafe.session.DeviceTestAccountUiLogin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -56,31 +53,14 @@ class ActualActivityVoiceNavigationDeviceTest {
                 SystemClock.elapsedRealtime() + PREFLIGHT_TIMEOUT_MS,
             )
             val homeReady = waitUntil(PREFLIGHT_TIMEOUT_MS) {
-                onMain(instrumentation) {
-                    invokeBoolean(activity, "nativeHomeFeatureContextAvailable")
-                }
+                onMain(instrumentation) { observe(activity).homeFeatureContextAvailable }
             }
             requireFixtureCondition(homeReady, "native_home_context_unavailable")
-            requireFixtureCondition(
-                onMain(instrumentation) {
-                    invokeBoolean(activity, "currentDestinationSearchAllowsWork")
-                },
-                "destination_search_gate_unavailable",
-            )
-            requireFixtureCondition(
-                onMain(instrumentation) { runtimeEpochOrNull(activity) == null },
-                "cold_home_without_runtime_epoch_required",
-            )
-            requireFixtureCondition(
-                onMain(instrumentation) {
-                    !(readField(activity, "routeRequestInFlight") as AtomicBoolean).get()
-                },
-                "route_request_already_in_flight",
-            )
-            requireFixtureCondition(
-                onMain(instrumentation) { readField(activity, "pendingUiDestination") == null },
-                "destination_confirmation_already_pending",
-            )
+            val cold = onMain(instrumentation) { observe(activity) }
+            requireFixtureCondition(cold.destinationSearchAllowed, "destination_search_gate_unavailable")
+            requireFixtureCondition(!cold.runtimeEpochPresent, "cold_home_without_runtime_epoch_required")
+            requireFixtureCondition(!cold.routeRequestInFlight, "route_request_already_in_flight")
+            requireFixtureCondition(cold.pendingUiDestination == null, "destination_confirmation_already_pending")
 
             val destination = DestinationSearchResult(
                 id = "fixture",
@@ -91,35 +71,27 @@ class ActualActivityVoiceNavigationDeviceTest {
                 category = null,
                 distanceM = null,
             )
-            onMain(instrumentation) {
-                invoke(
-                    activity,
-                    "openNativeDestinationConfirmation",
-                    arrayOf<Class<*>>(DestinationSearchResult::class.java),
-                    arrayOf(destination),
-                )
-            }
+            onMain(instrumentation) { activity.deliverDestinationSearchResultForFixture(destination) }
             instrumentation.waitForIdleSync()
+            val confirmation = onMain(instrumentation) { observe(activity) }
             assertEquals(
                 "Destination callback must retain the proposed result",
                 destination,
-                onMain(instrumentation) { readField(activity, "pendingUiDestination") },
+                confirmation.pendingUiDestination,
             )
             assertEquals(
                 "Destination callback must open confirmation without starting a route",
                 "DESTINATION_CONFIRM",
-                onMain(instrumentation) { readField(activity, "nativeUiPage").toString() },
+                confirmation.nativeUiPage,
             )
 
             onMain(instrumentation) {
-                val startButton = readField(activity, "nativeDestinationStartButton") as Button
-                check(startButton.isEnabled) { "native_destination_start_button_disabled" }
-                check(startButton.performClick()) { "native_destination_start_click_not_dispatched" }
+                clickVisibleButton(activity, START_GUIDANCE_LABEL)
                 // Disarm only the future automatic route callback. The real prewalk remains active.
-                writeField(activity, "pendingUiDestination", null)
+                activity.disarmPendingDestinationForFixture()
             }
             val epochReady = waitUntil(PREWALK_RESOLUTION_TIMEOUT_MS) {
-                onMain(instrumentation) { runtimeEpochOrNull(activity) != null }
+                onMain(instrumentation) { observe(activity).runtimeEpochPresent }
             }
             if (!epochReady) {
                 val visibleReason = onMain(instrumentation) {
@@ -140,28 +112,22 @@ class ActualActivityVoiceNavigationDeviceTest {
             }
 
             val result = onMain(instrumentation) {
-                invoke(
-                    activity,
-                    "openNativeDestinationConfirmation",
-                    arrayOf<Class<*>>(DestinationSearchResult::class.java),
-                    arrayOf(destination),
-                )
+                activity.deliverDestinationSearchResultForFixture(destination)
                 // Failure-only fixture. It never invents a trusted position or changes a gate.
-                writeField(activity, "latestTrustedLocation", null)
-                val epochBeforeRoute = runtimeEpochOrNull(activity)
-                val generationBeforeRoute = routeGeneration(activity)
-                invoke(activity, "startNativeDestinationGuidance")
+                activity.dropTrustedLocationForFixture()
+                val before = observe(activity)
+                clickVisibleButton(activity, START_GUIDANCE_LABEL)
+                val after = observe(activity)
                 val allTexts = collectText(activity.window.decorView, visibleOnly = false)
                 val visibleTexts = collectText(activity.window.decorView, visibleOnly = true)
                 RouteAttemptObservation(
-                    epochBeforeRoute = epochBeforeRoute,
-                    generationBeforeRoute = generationBeforeRoute,
-                    generationAfterRoute = routeGeneration(activity),
-                    routeInFlight =
-                        (readField(activity, "routeRequestInFlight") as AtomicBoolean).get(),
-                    routeActive = readField(activity, "isRouteActive") as Boolean,
-                    currentDestination = readField(activity, "currentDestination"),
-                    pendingStartRetained = pendingExplicitRouteStartOrNull(activity) != null,
+                    epochBeforeRoute = before.runtimeEpochPresent,
+                    generationBeforeRoute = before.routeRequestGeneration,
+                    generationAfterRoute = after.routeRequestGeneration,
+                    routeInFlight = after.routeRequestInFlight,
+                    routeActive = after.routeActive,
+                    currentDestination = after.currentDestination,
+                    pendingStartRetained = after.explicitRouteStartPending,
                     routeWaitingStatusObserved = allTexts.any {
                         it.contains(
                             "navigation=route_waiting trusted_gps_missing start_request_pending",
@@ -195,7 +161,7 @@ class ActualActivityVoiceNavigationDeviceTest {
                     "visible=${result.relevantVisibleText}",
             )
 
-            assertNotNull("Walk epoch must exist before the route entry runs", result.epochBeforeRoute)
+            assertTrue("Walk epoch must exist before the route entry runs", result.epochBeforeRoute)
             assertEquals(
                 "Missing trusted GPS must not issue an HTTP route request",
                 result.generationBeforeRoute,
@@ -216,17 +182,17 @@ class ActualActivityVoiceNavigationDeviceTest {
             )
 
             val resolved = waitUntil(ROUTE_START_TIMEOUT_OBSERVATION_MS) {
-                onMain(instrumentation) { pendingExplicitRouteStartOrNull(activity) == null }
+                onMain(instrumentation) { !observe(activity).explicitRouteStartPending }
             }
             assertTrue("Pending explicit start was not resolved within 17 seconds", resolved)
             val resolution = onMain(instrumentation) {
+                val state = observe(activity)
                 val allTexts = collectText(activity.window.decorView, visibleOnly = false)
                 val visibleTexts = collectText(activity.window.decorView, visibleOnly = true)
                 PendingResolutionObservation(
-                    generation = routeGeneration(activity),
-                    routeInFlight =
-                        (readField(activity, "routeRequestInFlight") as AtomicBoolean).get(),
-                    routeActive = readField(activity, "isRouteActive") as Boolean,
+                    generation = state.routeRequestGeneration,
+                    routeInFlight = state.routeRequestInFlight,
+                    routeActive = state.routeActive,
                     explicitRetryStatusObserved = allTexts.any {
                         it.contains(
                             "navigation=route_waiting trusted_gps_missing timeout " +
@@ -258,7 +224,7 @@ class ActualActivityVoiceNavigationDeviceTest {
                     assertEquals(
                         "The selected destination must survive the real-fix continuation",
                         destination.point,
-                        onMain(instrumentation) { readField(activity, "currentDestination") },
+                        onMain(instrumentation) { observe(activity).currentDestination },
                     )
                 }
                 else -> fail(
@@ -274,25 +240,22 @@ class ActualActivityVoiceNavigationDeviceTest {
         }
     }
 
-    private fun runtimeEpochOrNull(activity: MainActivity): Any? {
-        val lifecycle = checkNotNull(readField(activity, "walkSessionLifecycle"))
-        val method = (lifecycle.javaClass.declaredMethods + lifecycle.javaClass.methods)
-            .firstOrNull {
-                it.name.startsWith("currentRuntimeEpochOrNull") && it.parameterCount == 0
-            } ?: error("currentRuntimeEpochOrNull_missing")
-        method.isAccessible = true
-        return method.invoke(lifecycle)
-    }
+    /** Narrow @VisibleForTesting seam; no private field or method name is read by reflection. */
+    private fun observe(activity: MainActivity): MainActivity.NavigationFixtureObservation =
+        activity.navigationFixtureObservation()
 
-    private fun routeGeneration(activity: MainActivity): Int =
-        (readField(activity, "routeRequestGeneration") as Number).toInt()
-
-    private fun pendingExplicitRouteStartOrNull(activity: MainActivity): Any? {
-        val holder = checkNotNull(readField(activity, "pendingExplicitRouteStart"))
-        val method = holder.javaClass.getDeclaredMethod("currentOrNull").apply {
-            isAccessible = true
+    /** UI action: the same visible, enabled button a user presses. */
+    private fun clickVisibleButton(activity: MainActivity, label: String) {
+        val buttons = mutableListOf<Button>()
+        fun visit(view: View) {
+            if (view.visibility != View.VISIBLE || !view.isShown) return
+            if (view is Button && view.text?.toString()?.trim() == label) buttons += view
+            if (view is ViewGroup) for (index in 0 until view.childCount) visit(view.getChildAt(index))
         }
-        return method.invoke(holder)
+        visit(activity.window.decorView)
+        val button = buttons.singleOrNull() ?: error("visible_button_count=${buttons.size} label=$label")
+        check(button.isEnabled) { "native_destination_start_button_disabled" }
+        check(button.performClick()) { "native_destination_start_click_not_dispatched" }
     }
 
     private fun collectText(root: View, visibleOnly: Boolean): List<String> {
@@ -309,38 +272,6 @@ class ActualActivityVoiceNavigationDeviceTest {
         }
         visit(root)
         return values
-    }
-
-    private fun invokeBoolean(target: Any, name: String): Boolean = invoke(target, name) as Boolean
-
-    private fun invoke(
-        target: Any,
-        name: String,
-        parameterTypes: Array<Class<*>> = emptyArray(),
-        arguments: Array<Any> = emptyArray(),
-    ): Any? {
-        val method = target.javaClass.getDeclaredMethod(name, *parameterTypes).apply {
-            isAccessible = true
-        }
-        return method.invoke(target, *arguments)
-    }
-
-    private fun readField(target: Any, name: String): Any? = findField(target, name).get(target)
-
-    private fun writeField(target: Any, name: String, value: Any?) {
-        findField(target, name).set(target, value)
-    }
-
-    private fun findField(target: Any, name: String): Field {
-        var type: Class<*>? = target.javaClass
-        while (type != null) {
-            try {
-                return type.getDeclaredField(name).apply { isAccessible = true }
-            } catch (_: NoSuchFieldException) {
-                type = type.superclass
-            }
-        }
-        error("missing_field=$name")
     }
 
     private fun <T> onMain(instrumentation: Instrumentation, action: () -> T): T {
@@ -379,7 +310,7 @@ class ActualActivityVoiceNavigationDeviceTest {
             Build.HARDWARE == "cutf_cuttlefish"
 
     private data class RouteAttemptObservation(
-        val epochBeforeRoute: Any?,
+        val epochBeforeRoute: Boolean,
         val generationBeforeRoute: Int,
         val generationAfterRoute: Int,
         val routeInFlight: Boolean,
@@ -406,5 +337,6 @@ class ActualActivityVoiceNavigationDeviceTest {
         const val PREFLIGHT_TIMEOUT_MS = 20_000L
         const val PREWALK_RESOLUTION_TIMEOUT_MS = 30_000L
         const val ROUTE_START_TIMEOUT_OBSERVATION_MS = 17_000L
+        const val START_GUIDANCE_LABEL = "안내 시작"
     }
 }

@@ -182,6 +182,26 @@ public final class AdminHighRiskActionGateTest {
     }
 
     @Test
+    public void nonceValidationMatchesTheBackendContractVectors() {
+        // Same table as backend/tests/test_s18_13_reconfirmation_nonce_contract.py.
+        String a21 = "A".repeat(21);
+        Object[][] vectors = {
+            {a21 + "A", true}, {a21 + "Q", true}, {a21 + "g", true}, {a21 + "w", true},
+            {"-_".repeat(10) + "A" + "w", true}, {a21, false}, {"A".repeat(23), false},
+            {"A".repeat(128), false}, {a21 + "B", false}, {a21 + "R", false},
+            {a21 + "h", false}, {a21 + "x", false}, {a21 + "=", false},
+            {a21 + "+", false}, {a21 + "/", false},
+        };
+        for (Object[] vector : vectors) {
+            assertEquals(
+                (String) vector[0],
+                vector[1],
+                AdminHighRiskActionGate.isCanonicalNonce((String) vector[0])
+            );
+        }
+    }
+
+    @Test
     public void reportRequestStatusRequiresExactStepUpBinding() {
         String requestId = "88888888-8888-4888-8888-888888888888";
         AdminHighRiskActionGate.Operation operation =
@@ -302,5 +322,32 @@ public final class AdminHighRiskActionGateTest {
             10_000L,
             true
         ).isAllowed());
+    }
+
+    @Test
+    public void s18_29_lostDeviceReportIsAnExactDeviceBoundHighRiskOperation() {
+        AdminHighRiskActionGate.Operation operation =
+            AdminHighRiskActionGate.deviceReportLost("android-device-0002");
+        assertEquals("device.report_lost", operation.reauthenticationAction());
+        assertEquals("POST", operation.method());
+        assertEquals("/admin/security/devices/android-device-0002/report-lost", operation.path());
+        for (String invalid : new String[] {null, "short", "../admin-device-1234", "device id 1234"}) {
+            assertThrows(IllegalArgumentException.class, () ->
+                AdminHighRiskActionGate.deviceReportLost(invalid));
+        }
+        // A grant for one device never authorizes reporting another device lost.
+        AdminHighRiskActionGate.Binding binding = new AdminHighRiskActionGate.Binding(
+            operation, "AAECAwQFBgcICQoLDA0ODw", 20_000L
+        );
+        AdminHighRiskActionGate.Decision mismatch = AdminHighRiskActionGate.evaluate(
+            AdminHighRiskActionGate.deviceReportLost("android-device-0003"),
+            AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED,
+            binding,
+            1_000L,
+            true
+        );
+        assertFalse(mismatch.isAllowed());
+        assertEquals("reconfirmation_binding_mismatch", mismatch.reason());
     }
 }

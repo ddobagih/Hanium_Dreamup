@@ -240,7 +240,7 @@ class UnknownObjectFeedbackPolicyTest {
         val first = coordinator.dispatchFeedback(frame(emptyList()), false, true, CAPTURED_MS + 500L,
             independentFreshOutputs = listOf(original))
         val action = requireNotNull(first.action)
-        assertTrue(policy.claimFeedbackDelivery(action.trackId, CAPTURED_MS + 500L))
+        assertTrue(policy.claimFeedbackDelivery(action.trackId, CAPTURED_MS + 500L, CAPTURED_MS + 500L))
         val retained = requireNotNull(original.retainRegions(setOf(action.trackId), CAPTURED_MS + 700L))
         val repeated = coordinator.dispatchFeedback(frame(emptyList()), false, true, CAPTURED_MS + 700L,
             independentFreshOutputs = listOf(retained))
@@ -274,6 +274,7 @@ class UnknownObjectFeedbackPolicyTest {
         userFacing = UserFacingDepth(null, MessageLevel.STOP, "FastSAM unnamed internal output"),
         trackAgeFrames = 4, trackStableMs = 1_000L, objectMotion = ObjectMotion.OBJECT_APPROACHING,
         motionEstimate = motion(),
+        sourceValidUntilElapsedRealtimeMs = CAPTURED_MS + 800L,
     )
 
     private fun confidence() = DepthConfidenceBreakdown(0.95f, 1f, 1f, 1f, 1f, 1f, 1f, 1f)

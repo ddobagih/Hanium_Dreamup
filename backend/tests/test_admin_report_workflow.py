@@ -6,10 +6,12 @@ from types import SimpleNamespace
 import uuid
 
 import pytest
-from fastapi import HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.requests import Request
+
+from asgi_client import ASGITestClient
 
 from backend.app.api import reports as reports_api
 from backend.app.models import (
@@ -395,6 +397,7 @@ def test_workflow_request_contracts_have_exact_fields_and_normalize_bounded_text
         "privacy_reviewed",
         "content_revision",
         "evidence_grant_id",
+        "expected_review_revision",
     }
     assert set(ReportInstitutionDeliveryRequest.model_fields) == {
         "institution",
@@ -1342,10 +1345,114 @@ def test_report_history_pages_enforce_utf8_response_budgets() -> None:
     assert delivery_page.next_cursor is not None
 
 
+def test_report_history_last_position_keeps_latest_ascending_and_new_snapshot() -> None:
+    review = list_report_review_decision_history_page(
+        _HistorySession(
+            aggregate=(REPORT_ID, 4, 4),
+            rows=[_history_decision(4), _history_decision(3)],
+        ),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=2,
+        cursor=None,
+        position="last",
+    )
+    assert [item.revision for item in review.items] == [3, 4]
+    assert review.snapshot_revision == review.total_count == 4
+    assert review.next_cursor is None
+
+    delivery = list_report_institution_delivery_history_page(
+        _HistorySession(
+            aggregate=(REPORT_ID, 5, 5),
+            rows=[_history_delivery(5), _history_delivery(4)],
+        ),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=2,
+        cursor=None,
+        position="last",
+    )
+    assert [item.revision for item in delivery.items] == [4, 5]
+    assert delivery.snapshot_revision == delivery.total_count == 5
+    assert delivery.next_cursor is None
+
+
+def test_report_history_last_position_keeps_newest_when_budget_shrinks() -> None:
+    review = list_report_review_decision_history_page(
+        _HistorySession(
+            aggregate=(REPORT_ID, 25, 25),
+            rows=[
+                _history_decision(revision, reason="🚶" * 500)
+                for revision in range(25, 0, -1)
+            ],
+        ),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=25,
+        cursor=None,
+        position="last",
+    )
+    assert 0 < len(review.items) < 25
+    assert [item.revision for item in review.items] == list(
+        range(26 - len(review.items), 26)
+    )
+    assert review.next_cursor is None
+    assert len(review.model_dump_json().encode("utf-8")) <= REPORT_HISTORY_RESPONSE_BUDGET_BYTES
+
+    delivery = list_report_institution_delivery_history_page(
+        _HistorySession(
+            aggregate=(REPORT_ID, 25, 25),
+            rows=[_history_delivery(revision, long_text=True) for revision in range(25, 0, -1)],
+        ),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=25,
+        cursor=None,
+        position="last",
+    )
+    assert 0 < len(delivery.items) < 25
+    assert [item.revision for item in delivery.items] == list(
+        range(26 - len(delivery.items), 26)
+    )
+    assert delivery.next_cursor is None
+    assert len(delivery.model_dump_json().encode("utf-8")) <= REPORT_HISTORY_RESPONSE_BUDGET_BYTES
+
+
+@pytest.mark.parametrize(
+    "history",
+    [list_report_review_decision_history_page, list_report_institution_delivery_history_page],
+)
+def test_report_history_last_position_rejects_cursor_and_gap_and_accepts_empty(history) -> None:
+    with pytest.raises(AdminReportWorkflowError) as conflict:
+        history(
+            _HistorySession(aggregate=(REPORT_ID, 2, 2), rows=[]),  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            limit=2,
+            cursor="bad",
+            position="last",
+        )
+    assert conflict.value.status_code == 422
+
+    with pytest.raises(AdminReportWorkflowError) as gap:
+        history(
+            _HistorySession(aggregate=(REPORT_ID, 2, 3), rows=[]),  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            limit=2,
+            cursor=None,
+            position="last",
+        )
+    assert (gap.value.code, gap.value.status_code) == ("report_history_integrity_invalid", 503)
+
+    empty = history(
+        _HistorySession(aggregate=(REPORT_ID, 0, None), rows=[]),  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        limit=2,
+        cursor=None,
+        position="last",
+    )
+    assert empty.items == [] and empty.next_cursor is None
+
+
 def test_versioned_report_history_routes_call_paged_services_and_audit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[tuple[str, uuid.UUID, int, str | None]] = []
+    calls: list[tuple[str, uuid.UUID, int, str | None, str | None]] = []
     audits: list[dict[str, object]] = []
     review_page = ReportReviewDecisionPageV1(
         schema_version="walksafe.report-review-decision-page.v1",
@@ -1370,8 +1477,9 @@ def test_versioned_report_history_routes_call_paged_services_and_audit(
         report_id: uuid.UUID,
         limit: int,
         cursor: str | None,
+        position: str | None,
     ) -> ReportReviewDecisionPageV1:
-        calls.append(("review", report_id, limit, cursor))
+        calls.append(("review", report_id, limit, cursor, position))
         return review_page
 
     def deliveries(
@@ -1380,8 +1488,9 @@ def test_versioned_report_history_routes_call_paged_services_and_audit(
         report_id: uuid.UUID,
         limit: int,
         cursor: str | None,
+        position: str | None,
     ) -> ReportInstitutionDeliveryPageV1:
-        calls.append(("delivery", report_id, limit, cursor))
+        calls.append(("delivery", report_id, limit, cursor, position))
         return delivery_page
 
     monkeypatch.setattr(
@@ -1401,9 +1510,9 @@ def test_versioned_report_history_routes_call_paged_services_and_audit(
     )
     identity = _identity()
     db = object()
-    for path_suffix, purpose, page in (
-        ("review-decisions/history", "report.review_decisions", review_page),
-        ("deliveries/history", "report.delivery_events", delivery_page),
+    for path_suffix, purpose, page, position in (
+        ("review-decisions/history", "report.review_decisions", review_page, None),
+        ("deliveries/history", "report.delivery_events", delivery_page, "last"),
     ):
         path = f"/reports/{REPORT_ID}/{path_suffix}"
         response = Response()
@@ -1422,11 +1531,12 @@ def test_versioned_report_history_routes_call_paged_services_and_audit(
                     action=None,
                     read_purpose=purpose,
                 ),
-                query=b"limit=2",
+                query=(b"limit=2" if position is None else b"limit=2&position=last"),
             ),
             response=response,
             limit=2,
             cursor=None,
+            position=position,
             db=db,
         )
         assert observed is page
@@ -1434,8 +1544,8 @@ def test_versioned_report_history_routes_call_paged_services_and_audit(
         assert response.headers["pragma"] == "no-cache"
 
     assert calls == [
-        ("review", REPORT_ID, 2, None),
-        ("delivery", REPORT_ID, 2, None),
+        ("review", REPORT_ID, 2, None, None),
+        ("delivery", REPORT_ID, 2, None, "last"),
     ]
     assert [audit["purpose"] for audit in audits] == [
         "report.review_decisions",
@@ -1489,6 +1599,7 @@ def test_versioned_report_history_routes_reject_duplicate_query_fields(
             response=Response(),
             limit=2,
             cursor=None,
+            position=None,
             db=object(),
         )
     assert captured.value.status_code == 422
@@ -1497,6 +1608,149 @@ def test_versioned_report_history_routes_reject_duplicate_query_fields(
         "Cache-Control": "no-store",
         "Pragma": "no-cache",
     }
+
+
+@pytest.mark.parametrize(
+    ("path_suffix", "purpose", "error_code"),
+    [
+        ("review-decisions/history", "report.review_decisions", "report_review_history_query_invalid"),
+        ("deliveries/history", "report.delivery_events", "report_delivery_history_query_invalid"),
+    ],
+)
+@pytest.mark.parametrize(
+    ("query", "cursor", "position"),
+    [
+        (b"position=first", None, "first"),
+        (b"position=last&position=last", None, "last"),
+        (b"position=last&cursor=bad", "bad", "last"),
+    ],
+)
+def test_versioned_report_history_routes_reject_invalid_last_query(
+    monkeypatch: pytest.MonkeyPatch,
+    path_suffix: str,
+    purpose: str,
+    error_code: str,
+    query: bytes,
+    cursor: str | None,
+    position: str,
+) -> None:
+    monkeypatch.setattr(reports_api, "record_admin_security_failure", lambda **_kwargs: None)
+    path = f"/reports/{REPORT_ID}/{path_suffix}"
+    with pytest.raises(HTTPException) as captured:
+        _route_endpoint(f"/reports/{{report_id}}/{path_suffix}", "GET")(
+            report_id=str(REPORT_ID),
+            request=_request(
+                "GET",
+                path,
+                identity=_identity(),
+                proof=_proof(method="GET", path=path, action=None, read_purpose=purpose),
+                query=query,
+            ),
+            response=Response(),
+            limit=25,
+            cursor=cursor,
+            position=position,
+            db=object(),
+        )
+    assert (captured.value.status_code, captured.value.detail["code"]) == (422, error_code)
+    assert captured.value.headers == {
+        "Cache-Control": "no-store",
+        "Pragma": "no-cache",
+    }
+
+
+@pytest.mark.parametrize(
+    ("path_suffix", "purpose", "error_code"),
+    [
+        ("review-decisions/history", "report.review_decisions", "report_review_history_query_invalid"),
+        ("deliveries/history", "report.delivery_events", "report_delivery_history_query_invalid"),
+    ],
+)
+def test_report_history_last_http_route_requires_bound_proof_and_rejects_cursor(
+    monkeypatch: pytest.MonkeyPatch,
+    path_suffix: str,
+    purpose: str,
+    error_code: str,
+) -> None:
+    calls: list[tuple[int, str | None, str | None]] = []
+    audits: list[dict[str, object]] = []
+    page = (
+        ReportReviewDecisionPageV1(
+            schema_version="walksafe.report-review-decision-page.v1",
+            report_id=REPORT_ID, snapshot_revision=1, total_count=1,
+            items=[_history_decision(1)], next_cursor=None,
+        )
+        if purpose == "report.review_decisions"
+        else ReportInstitutionDeliveryPageV1(
+            schema_version="walksafe.report-delivery-event-page.v1",
+            report_id=REPORT_ID, snapshot_revision=1, total_count=1,
+            items=[_history_delivery(1)], next_cursor=None,
+        )
+    )
+
+    def page_service(
+        _db: object, *, report_id: uuid.UUID, limit: int,
+        cursor: str | None, position: str | None,
+    ):
+        assert report_id == REPORT_ID
+        calls.append((limit, cursor, position))
+        return page
+
+    monkeypatch.setattr(
+        reports_api,
+        "list_report_review_decision_history_page"
+        if purpose == "report.review_decisions"
+        else "list_report_institution_delivery_history_page",
+        page_service,
+    )
+    monkeypatch.setattr(reports_api, "persist_report_read_audit", lambda _db, **kw: audits.append(kw))
+    monkeypatch.setattr(reports_api, "record_admin_security_failure", lambda **_kw: None)
+    app = FastAPI()
+    app.include_router(reports_api.create_router(
+        SimpleNamespace(admin_security_enabled=True, report_original_grant_ttl_seconds=120),
+        SimpleNamespace(),
+    ))
+    proof_purpose = purpose
+
+    @app.middleware("http")
+    async def bind_proof(request: Request, call_next):
+        request.state.admin_security_identity = _identity()
+        request.state.admin_device_proof = _proof(
+            method="GET", path=request.url.path, action=None,
+            read_purpose=proof_purpose,
+        )
+        return await call_next(request)
+
+    client = ASGITestClient(app)
+    path = f"/reports/{REPORT_ID}/{path_suffix}"
+    good = client.get(path + "?limit=2&position=last")
+    assert good.status_code == 200
+    assert [item["revision"] for item in good.json()["items"]] == [1]
+    assert good.json()["next_cursor"] is None
+    assert good.headers["cache-control"] == "no-store"
+    assert calls == [(2, None, "last")]
+    assert audits[0]["details"]["position"] == "last"
+
+    recent_default = client.get(path + "?position=last")
+    assert recent_default.status_code == 200
+    assert calls[-1] == (25, None, "last")
+
+    full_default = client.get(path)
+    assert full_default.status_code == 200
+    assert calls[-1] == (10, None, None)
+
+    conflict = client.get(path + "?limit=2&position=last&cursor=bad")
+    assert conflict.status_code == 422
+    assert conflict.json()["detail"]["code"] == error_code
+    assert conflict.headers["cache-control"] == "no-store"
+    assert calls == [(2, None, "last"), (25, None, "last"), (10, None, None)]
+
+    proof_purpose = "report.delivery_events" if purpose == "report.review_decisions" else "report.review_decisions"
+    denied = client.get(path + "?position=last")
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "admin_device_proof_invalid"
+    assert denied.headers["cache-control"] == "no-store"
+    assert calls == [(2, None, "last"), (25, None, "last"), (10, None, None)]
 
 
 def test_review_append_is_monotonic_and_does_not_change_legacy_authority() -> None:
@@ -1512,7 +1766,9 @@ def test_review_append_is_monotonic_and_does_not_change_legacy_authority() -> No
     decision = append_report_review_decision(
         db,  # type: ignore[arg-type]
         report_id=REPORT_ID,
-        payload=ReportReviewDecisionRequest.model_validate(_approved_request()),
+        payload=ReportReviewDecisionRequest.model_validate(
+            _approved_request(expected_review_revision=2)
+        ),
         identity=_identity(),
         correlation_id=CORRELATION_ID,
         now=decided_at,
@@ -1543,7 +1799,10 @@ def test_review_exact_replay_returns_the_original_non_postgres_row() -> None:
     replayed = append_report_review_decision(
         db,  # type: ignore[arg-type]
         report_id=REPORT_ID,
-        payload=ReportReviewDecisionRequest.model_validate(_approved_request()),
+        # The stored decision is revision 4, so it was decided against 3.
+        payload=ReportReviewDecisionRequest.model_validate(
+            _approved_request(expected_review_revision=3)
+        ),
         identity=replace(
             _identity(),
             session_id=uuid.uuid4(),
@@ -1593,7 +1852,7 @@ def test_review_decision_id_reuse_with_different_intent_report_or_actor_conflict
             db,  # type: ignore[arg-type]
             report_id=report_id,
             payload=ReportReviewDecisionRequest.model_validate(
-                _approved_request(**payload_overrides)
+                _approved_request(expected_review_revision=3, **payload_overrides)
             ),
             identity=identity,
             correlation_id=uuid.uuid4(),
@@ -1626,6 +1885,7 @@ def test_review_commit_race_replays_exact_intent_or_rejects_divergent_reuse(
         reason=existing_reason,
         user_visible_reason=payload.user_visible_reason,
         evidence_grant_id=None,
+        revision=1,
     )
     replay_identity = replace(
         _identity(),
@@ -1683,7 +1943,8 @@ def test_review_commit_race_replays_exact_intent_or_rejects_divergent_reuse(
             replayed.created_at,
         ) == (
             DECISION_ID,
-            4,
+            # The racing winner was the first decision (expected 0 -> revision 1).
+            1,
             CORRELATION_ID,
             datetime(2026, 8, 9, 3, 2, tzinfo=UTC),
             datetime(2026, 8, 9, 3, 2, tzinfo=UTC),
@@ -2017,9 +2278,12 @@ def test_delivery_append_uses_exact_transition_and_latest_typed_approval() -> No
         status="SUBMITTED",
         package_id=PACKAGE_ID,
         package_revision=1,
+        institution="서울시청",
+        review_decision_id=DECISION_ID,
     )
-    approval = _typed_decision()
-    db = _FakeSession([report, None, previous, approval, _package()])
+    # S18-41: a follow-up observation is bound to the submission it continues,
+    # so it does not read the latest review decision.
+    db = _FakeSession([report, None, previous, _package()])
     payload = ReportInstitutionDeliveryRequest.model_validate(
         _delivery_request(
             status="ACKNOWLEDGED",
@@ -2046,6 +2310,53 @@ def test_delivery_append_uses_exact_transition_and_latest_typed_approval() -> No
     assert report.payload == {"agency_review_verified": False}
     assert db.added == [event]
     assert db.commit_count == 1
+
+
+@pytest.mark.parametrize(
+    ("previous_status", "next_status", "receipt"),
+    [
+        ("SUBMITTED", "ACKNOWLEDGED", "receipt-001"),
+        ("SUBMITTED", "FAILED", None),
+        ("ACKNOWLEDGED", "RESOLVED", "receipt-001"),
+    ],
+)
+def test_delivery_observation_cannot_switch_institution_within_one_submission(
+    previous_status: str,
+    next_status: str,
+    receipt: str | None,
+) -> None:
+    # S18-39: renaming the institution must not continue another agency's flow.
+    previous = ReportInstitutionDeliveryEvent(
+        report_id=REPORT_ID,
+        revision=1,
+        status=previous_status,
+        package_id=PACKAGE_ID,
+        package_revision=1,
+        institution="부산시청",
+        review_decision_id=DECISION_ID,
+    )
+    db = _FakeSession([Report(id=REPORT_ID), None, previous, _package()])
+    payload = ReportInstitutionDeliveryRequest.model_validate(
+        _delivery_request(
+            status=next_status,
+            external_receipt_id=receipt,
+            expected_revision=1,
+        )
+    )
+
+    with pytest.raises(AdminReportWorkflowError) as rejected:
+        append_report_institution_delivery_event(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            payload=payload,
+            identity=_identity(),
+            correlation_id=CORRELATION_ID,
+        )
+
+    assert rejected.value.code == "delivery_institution_mismatch"
+    assert rejected.value.status_code == 409
+    assert db.added == []
+    assert db.commit_count == 0
 
 
 def test_delivery_new_content_package_starts_a_new_manual_delivery_cycle() -> None:
@@ -2409,9 +2720,13 @@ def test_delivery_rejects_stale_revision_or_invalid_transition(
         status=previous_status,
         package_id=PACKAGE_ID,
         package_revision=1,
+        review_decision_id=DECISION_ID,
     )
+    follow_up = previous_status in {"SUBMITTED", "ACKNOWLEDGED"}
     db = _FakeSession(
-        [Report(id=REPORT_ID), None, previous, _typed_decision(), _package()]
+        [Report(id=REPORT_ID), None, previous]
+        + ([] if follow_up else [_typed_decision()])
+        + [_package()]
     )
 
     with pytest.raises(AdminReportWorkflowError) as captured:
@@ -2426,3 +2741,147 @@ def test_delivery_rejects_stale_revision_or_invalid_transition(
     assert captured.value.code == error_code
     assert captured.value.status_code == 409
     assert db.rollback_count == 1
+
+
+def test_s18_35_review_revision_race_is_409_and_distinct_from_content_race() -> None:
+    """A late decision against a stale review revision must not stack on top."""
+
+    report = Report(id=REPORT_ID, status="new", payload={})
+    latest = ReportReviewDecision(revision=1)
+    db = _FakeSession([report, latest])
+    with pytest.raises(AdminReportWorkflowError) as review_race:
+        append_report_review_decision(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            payload=ReportReviewDecisionRequest.model_validate(
+                _approved_request(decision="REJECTED", expected_review_revision=0)
+            ),
+            identity=_identity(),
+            correlation_id=CORRELATION_ID,
+        )
+    assert (review_race.value.code, review_race.value.status_code) == (
+        "review_revision_conflict",
+        409,
+    )
+    assert db.added == [] and db.commit_count == 0
+
+    content_db = _FakeSession([Report(id=REPORT_ID, content_revision=2)])
+    with pytest.raises(AdminReportWorkflowError) as content_race:
+        append_report_review_decision(
+            content_db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            payload=ReportReviewDecisionRequest.model_validate(
+                _approved_request(decision="REJECTED", expected_review_revision=1)
+            ),
+            identity=_identity(),
+            correlation_id=CORRELATION_ID,
+        )
+    assert content_race.value.code == "report_content_revision_conflict"
+
+
+def test_s18_35_replay_must_repeat_the_review_revision_it_was_decided_against() -> None:
+    existing = _stored_review_decision()
+    db = _FakeSession([], get_results={(ReportReviewDecision, DECISION_ID): existing})
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        append_report_review_decision(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            payload=ReportReviewDecisionRequest.model_validate(
+                _approved_request(expected_review_revision=0)
+            ),
+            identity=_identity(),
+            correlation_id=uuid.uuid4(),
+        )
+    assert captured.value.code == "review_decision_idempotency_conflict"
+
+
+def test_s18_41_follow_up_after_re_review_binds_to_the_submitted_package() -> None:
+    """A reply to an existing submission is recorded even after re-review."""
+
+    report = Report(id=REPORT_ID, content_revision=1, status="new", payload={})
+    previous = ReportInstitutionDeliveryEvent(
+        report_id=REPORT_ID,
+        revision=1,
+        status="SUBMITTED",
+        package_id=PACKAGE_ID,
+        package_revision=1,
+        institution="서울시청",
+        review_decision_id=DECISION_ID,
+    )
+    # The submitted package was built from content revision 0; the report has
+    # since changed (content revision 1) and no current approval exists.
+    db = _FakeSession([report, None, previous, _package()])
+    event = append_report_institution_delivery_event(
+        db,  # type: ignore[arg-type]
+        report_id=REPORT_ID,
+        payload=ReportInstitutionDeliveryRequest.model_validate(
+            _delivery_request(
+                status="ACKNOWLEDGED",
+                external_receipt_id="receipt-001",
+                expected_revision=1,
+            )
+        ),
+        identity=_identity(),
+        correlation_id=CORRELATION_ID,
+    )
+    assert (event.status, event.revision, event.review_decision_id) == (
+        "ACKNOWLEDGED",
+        2,
+        DECISION_ID,
+    )
+    assert event.package_id == PACKAGE_ID
+
+
+def test_s18_41_follow_up_rejects_a_package_other_than_the_submitted_one() -> None:
+    previous = ReportInstitutionDeliveryEvent(
+        report_id=REPORT_ID,
+        revision=1,
+        status="SUBMITTED",
+        package_id=PREVIOUS_PACKAGE_ID,
+        package_revision=1,
+        institution="서울시청",
+        review_decision_id=DECISION_ID,
+    )
+    db = _FakeSession([Report(id=REPORT_ID), None, previous, _package()])
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        append_report_institution_delivery_event(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            payload=ReportInstitutionDeliveryRequest.model_validate(
+                _delivery_request(
+                    status="ACKNOWLEDGED",
+                    external_receipt_id="receipt-001",
+                    expected_revision=1,
+                )
+            ),
+            identity=_identity(),
+            correlation_id=CORRELATION_ID,
+        )
+    assert captured.value.code == "delivery_package_invalid"
+    assert db.added == []
+
+
+def test_s18_41_new_submission_still_requires_the_latest_approval() -> None:
+    previous = ReportInstitutionDeliveryEvent(
+        report_id=REPORT_ID,
+        revision=1,
+        status="FAILED",
+        package_id=PACKAGE_ID,
+        package_revision=1,
+        institution="서울시청",
+        review_decision_id=DECISION_ID,
+    )
+    db = _FakeSession(
+        [Report(id=REPORT_ID), None, previous, _typed_decision("REJECTED"), _package()]
+    )
+    with pytest.raises(AdminReportWorkflowError) as captured:
+        append_report_institution_delivery_event(
+            db,  # type: ignore[arg-type]
+            report_id=REPORT_ID,
+            payload=ReportInstitutionDeliveryRequest.model_validate(
+                _delivery_request(status="SUBMITTED", expected_revision=1)
+            ),
+            identity=_identity(),
+            correlation_id=CORRELATION_ID,
+        )
+    assert captured.value.code == "latest_review_approval_required"

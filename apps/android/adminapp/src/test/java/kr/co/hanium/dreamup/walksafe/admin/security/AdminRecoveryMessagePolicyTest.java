@@ -9,6 +9,17 @@ import org.junit.Test;
 
 public final class AdminRecoveryMessagePolicyTest {
     @Test
+    public void custodyVersionConflictGivesFreshStateGuidanceWithoutClaimingSuccess() {
+        String guidance = message(
+            AdminRecoveryMessagePolicy.Phase.CUSTODY_ATTESTATION,
+            AdminSecurityApiException.Code.CUSTODY_STATE_VERSION_CONFLICT
+        );
+        assertTrue(guidance.contains("이전 시도는 폐기"));
+        assertTrue(guidance.contains("다시 로그인"));
+        assertFalse(guidance.contains("기록했습니다"));
+    }
+
+    @Test
     public void recoveryStartErrorsGiveSafeNextActions() {
         String expired = message(
             AdminRecoveryMessagePolicy.Phase.RECOVERY_START,
@@ -86,6 +97,89 @@ public final class AdminRecoveryMessagePolicyTest {
     }
 
     @Test
+    public void s18_19TimeoutSaysOutcomeUnknownAndIsNotShownAsAnAuthenticationFailure() {
+        String generic = "요청을 확인하지 못했습니다. 안전을 위해 관리자 업무를 잠갔습니다.";
+        for (AdminRecoveryMessagePolicy.Phase phase : new AdminRecoveryMessagePolicy.Phase[] {
+            AdminRecoveryMessagePolicy.Phase.GENERAL,
+            AdminRecoveryMessagePolicy.Phase.RECOVERY_START,
+            AdminRecoveryMessagePolicy.Phase.RECOVERY_COMPLETE
+        }) {
+            String timeout = AdminRecoveryMessagePolicy.failureMessage(
+                phase, new java.net.SocketTimeoutException(AdminHttpRequestDeadline.DEADLINE_MESSAGE)
+            );
+            assertEquals(AdminRecoveryMessagePolicy.OUTCOME_UNKNOWN_TIMEOUT, timeout);
+            assertTrue(timeout.contains("처리했는지 알 수 없어"));
+            assertTrue(timeout.contains("자동으로 다시 보내지 않았고"));
+            assertFalse(timeout.contains("비밀번호"));
+            assertFalse(timeout.contains("server outcome"));
+            // A server rejection keeps the existing generic text (it is not "unknown").
+            assertEquals(generic, AdminRecoveryMessagePolicy.failureMessage(
+                phase, new IOException("administrator API request failed with status 401")
+            ));
+        }
+        // Phase-specific safety outcomes stay as they were.
+        assertFalse(AdminRecoveryMessagePolicy.failureMessage(
+            AdminRecoveryMessagePolicy.Phase.LOST_DEVICE_REPORT, new java.net.SocketTimeoutException("t")
+        ).equals(AdminRecoveryMessagePolicy.OUTCOME_UNKNOWN_TIMEOUT));
+        assertFalse(AdminRecoveryMessagePolicy.failureMessage(
+            AdminRecoveryMessagePolicy.Phase.CUSTODY_ATTESTATION, new java.net.SocketTimeoutException("t")
+        ).equals(AdminRecoveryMessagePolicy.OUTCOME_UNKNOWN_TIMEOUT));
+    }
+
+    @Test
+    public void s18_18FailedLogoutReportsTheLocalLockAndTheUnconfirmedServerRevokeSeparately() {
+        Throwable[] failures = {
+            new java.net.SocketTimeoutException(AdminHttpRequestDeadline.DEADLINE_MESSAGE),
+            new IOException("administrator HTTP request was cancelled; server outcome unknown"),
+            new IOException("administrator API request failed with status 401"),
+            new AdminSecurityApiException(AdminSecurityApiException.Code.RATE_LIMITED, 30L),
+            new IllegalStateException("administrator session is unavailable")
+        };
+        for (Throwable failure : failures) {
+            // adm-F6: the controller no longer retains a session (it cleared it on the failure).
+            String shown = AdminRecoveryMessagePolicy.failureMessage(
+                AdminRecoveryMessagePolicy.Phase.CURRENT_SESSION_LOGOUT, failure, false
+            );
+            assertEquals(AdminRecoveryMessagePolicy.LOGOUT_SERVER_REVOKE_UNCONFIRMED, shown);
+            assertTrue(shown.startsWith("이 기기에서는 로그아웃해 관리자 업무를 잠그고"));
+            assertTrue(shown.contains("서버 세션 폐기는 확인하지 못했습니다"));
+            assertTrue(shown.contains("세션 목록"));
+            assertFalse(shown.contains("30초"));
+        }
+    }
+
+    @Test
+    public void admF6LogoutTextNeverClaimsALocalDeletionWhileTheSessionIsRetained() {
+        // Before adm-F6 every logout failure, including a pre-check failure that left the
+        // session in place, claimed "보관하던 세션 값을 지웠습니다" (over-claim).
+        Throwable[] failures = {
+            new IllegalStateException("administrator access is locally locked"),
+            new IllegalStateException("administrator session is unavailable"),
+            new IOException("invalid_session_id"),
+            new IOException("invalid_admin_id"),
+            new java.net.SocketTimeoutException(AdminHttpRequestDeadline.DEADLINE_MESSAGE),
+            new AdminSecurityApiException(AdminSecurityApiException.Code.RATE_LIMITED, 30L)
+        };
+        for (Throwable failure : failures) {
+            String retained = AdminRecoveryMessagePolicy.failureMessage(
+                AdminRecoveryMessagePolicy.Phase.CURRENT_SESSION_LOGOUT, failure, true
+            );
+            assertEquals(failure.toString(), "요청을 확인하지 못했습니다. 안전을 위해 관리자 업무를 잠갔습니다.", retained);
+            assertFalse(retained.contains("세션 값을 지웠습니다"));
+            // Without the controller's answer the text must not claim the deletion either.
+            assertEquals(retained, AdminRecoveryMessagePolicy.failureMessage(
+                AdminRecoveryMessagePolicy.Phase.CURRENT_SESSION_LOGOUT, failure));
+        }
+        // Other phases do not depend on the flag.
+        IOException rejected = new IOException("administrator API request failed with status 401");
+        for (AdminRecoveryMessagePolicy.Phase phase : AdminRecoveryMessagePolicy.Phase.values()) {
+            if (phase == AdminRecoveryMessagePolicy.Phase.CURRENT_SESSION_LOGOUT) continue;
+            assertEquals(phase.name(), AdminRecoveryMessagePolicy.failureMessage(phase, rejected, true),
+                AdminRecoveryMessagePolicy.failureMessage(phase, rejected, false));
+        }
+    }
+
+    @Test
     public void unknownErrorsAndCodesUsedInTheWrongPhaseStayGeneric() {
         String generic = "요청을 확인하지 못했습니다. 안전을 위해 관리자 업무를 잠갔습니다.";
         assertEquals(
@@ -138,6 +232,92 @@ public final class AdminRecoveryMessagePolicyTest {
     }
 
     @Test
+    public void w20aR3LostDeviceReauthenticationFailureGivesReauthGuidance() {
+        String lost = message(
+            AdminRecoveryMessagePolicy.Phase.LOST_DEVICE_REPORT,
+            AdminSecurityApiException.Code.REAUTHENTICATION_FAILED
+        );
+
+        assertEquals(
+            message(
+                AdminRecoveryMessagePolicy.Phase.GENERAL,
+                AdminSecurityApiException.Code.REAUTHENTICATION_FAILED
+            ),
+            lost
+        );
+        assertTrue(lost.contains("비밀번호와 추가 인증 코드를 확인"));
+        assertTrue(lost.contains("새 코드가 표시된 뒤 입력"));
+        assertFalse(lost.contains("새로고침"));
+    }
+
+    @Test
+    public void w20aR3LostDeviceTotpReplayGivesFreshCodeGuidance() {
+        String lost = message(
+            AdminRecoveryMessagePolicy.Phase.LOST_DEVICE_REPORT,
+            AdminSecurityApiException.Code.TOTP_REPLAYED
+        );
+
+        assertEquals(
+            "이 추가 인증 코드는 이미 사용되었습니다. 새 코드가 표시된 뒤 입력하세요.",
+            lost
+        );
+    }
+
+    @Test
+    public void w20aR3LocalCustodyGateSendsTheAdminToRecoveryCodeRecovery() {
+        AdminRecoveryCustodyRequiredException localGate =
+            new AdminRecoveryCustodyRequiredException();
+
+        assertEquals("recovery custody is not attested", localGate.getMessage());
+        assertEquals(
+            LOST_DEVICE_CUSTODY_REQUIRED,
+            AdminRecoveryMessagePolicy.failureMessage(
+                AdminRecoveryMessagePolicy.Phase.LOST_DEVICE_REPORT,
+                localGate
+            )
+        );
+        // Other phases keep their existing wording; an untyped IllegalStateException with
+        // the same text is not treated as the custody gate.
+        assertEquals(
+            "요청을 확인하지 못했습니다. 안전을 위해 관리자 업무를 잠갔습니다.",
+            AdminRecoveryMessagePolicy.failureMessage(
+                AdminRecoveryMessagePolicy.Phase.GENERAL,
+                localGate
+            )
+        );
+        assertTrue(AdminRecoveryMessagePolicy.failureMessage(
+            AdminRecoveryMessagePolicy.Phase.LOST_DEVICE_REPORT,
+            new IllegalStateException("recovery custody is not attested")
+        ).contains("세션·키 폐기를 확인하지 못했습니다"));
+    }
+
+    @Test
+    public void w20aR3ServerCustodyRequiredSendsTheAdminToRecoveryCodeRecovery() {
+        assertEquals(
+            AdminSecurityApiException.Code.RECOVERY_CUSTODY_REQUIRED,
+            AdminSecurityApiException.Code.fromWireValue("admin_recovery_custody_required")
+        );
+        assertEquals(
+            LOST_DEVICE_CUSTODY_REQUIRED,
+            message(
+                AdminRecoveryMessagePolicy.Phase.LOST_DEVICE_REPORT,
+                AdminSecurityApiException.Code.RECOVERY_CUSTODY_REQUIRED
+            )
+        );
+        assertEquals(
+            "요청을 확인하지 못했습니다. 안전을 위해 관리자 업무를 잠갔습니다.",
+            message(
+                AdminRecoveryMessagePolicy.Phase.GENERAL,
+                AdminSecurityApiException.Code.RECOVERY_CUSTODY_REQUIRED
+            )
+        );
+    }
+
+    private static final String LOST_DEVICE_CUSTODY_REQUIRED =
+        "복구자료 보관이 확인되지 않아 분실 처리를 할 수 없습니다. "
+            + "휴대전화 밖에 보관한 복구코드로 분실 복구를 시작하세요.";
+
+    @Test
     public void exactLocalLoginValidationReasonsGiveInputGuidanceOnlyInGeneralPhase() {
         String[][] cases = {
             {"invalid_admin_id", "관리자 ID를 입력하고 형식을 확인한 뒤 다시 로그인하세요."},
@@ -184,6 +364,23 @@ public final class AdminRecoveryMessagePolicyTest {
             assertFalse(shown.contains("synthetic-private-data"));
             assertFalse(shown.contains("invalid_password"));
         }
+    }
+
+    @Test
+    public void challengeTimeFailureGivesOnlyGeneralPhaseClockGuidance() {
+        String guidance = AdminRecoveryMessagePolicy.failureMessage(
+            AdminRecoveryMessagePolicy.Phase.GENERAL,
+            new AdminDeviceProof.ChallengeTimeException()
+        );
+        assertEquals("기기의 자동 날짜·시간 설정을 확인하고 새 도전값으로 다시 시도하세요.", guidance);
+        assertEquals(
+            "요청을 확인하지 못했습니다. 안전을 위해 관리자 업무를 잠갔습니다.",
+            AdminRecoveryMessagePolicy.failureMessage(
+                AdminRecoveryMessagePolicy.Phase.RECOVERY_START,
+                new AdminDeviceProof.ChallengeTimeException()
+            )
+        );
+        assertFalse(guidance.contains("device challenge"));
     }
 
     private static String message(

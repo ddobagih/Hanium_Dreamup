@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 import hashlib
 import hmac
 import json
+import math
 import re
 import unicodedata
 from typing import Annotated, Any, Dict, List, Literal, Mapping, Optional
@@ -262,6 +263,63 @@ class AndroidDebugDepthLogRequest(BaseModel):
     entries: List[AndroidDebugDepthLogEntry] = Field(min_length=1, max_length=30)
 
 
+AndroidDebugModelName = Annotated[str, StringConstraints(min_length=1, max_length=80)]
+
+
+class AndroidDebugFrameCaptureDetection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    class_name: str = Field(min_length=1, max_length=80)
+    confidence: float = Field(ge=0, le=1)
+    bbox: AndroidDebugRect
+
+
+class AndroidDebugFrameCaptureEntry(BaseModel):
+    """Allow-listed detector fields of one explicit debug capture; no location, text or tokens."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    frame_timestamp_ms: int = Field(ge=0)
+    camera_image_width: Optional[int] = Field(default=None, gt=0, le=10000)
+    camera_image_height: Optional[int] = Field(default=None, gt=0, le=10000)
+    # Wall-clock difference on the device; a clock adjustment can make it negative.
+    detect_duration_ms: Optional[int] = None
+    # The detector parser accepts up to 300 detections per frame (max_detections=300).
+    detection_count: int = Field(ge=0, le=300)
+    capture_policy: Optional[str] = Field(default=None, max_length=80)
+    force_custom_tactile: Optional[bool] = None
+    detector_completed_models: List[AndroidDebugModelName] = Field(default_factory=list, max_length=4)
+    detector_skipped_models: List[AndroidDebugModelName] = Field(default_factory=list, max_length=4)
+    detector_partial: bool = False
+    detector_model_key: Optional[str] = Field(default=None, max_length=80)
+    detector_loaded_model_key: Optional[str] = Field(default=None, max_length=80)
+    detector_model_fallback_used: Optional[bool] = None
+    detector_model_load_reason: Optional[str] = Field(default=None, max_length=160)
+    detector_model_preprocess_ms: Optional[int] = Field(default=None, ge=0)
+    detector_model_inference_ms: Optional[int] = Field(default=None, ge=0)
+    detector_model_parse_ms: Optional[int] = Field(default=None, ge=0)
+    detector_custom_inference_ms: Optional[int] = Field(default=None, ge=0)
+    detector_coco_inference_ms: Optional[int] = Field(default=None, ge=0)
+    detections: List[AndroidDebugFrameCaptureDetection] = Field(default_factory=list, max_length=20)
+    top_detection_class_name: Optional[str] = Field(default=None, max_length=80)
+    top_detection_confidence: Optional[float] = Field(default=None, ge=0, le=1)
+    top_detection_bbox: Optional[AndroidDebugRect] = None
+    top_detection_threshold_used: Optional[float] = Field(default=None, ge=0, le=1)
+
+
+class AndroidDebugFrameCaptureMetadata(BaseModel):
+    """Versioned envelope written by the debug-only Android frame capture uploader."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["android.frame_capture.v1"]
+    session_id: str = Field(min_length=1, max_length=128)
+    device_model: Optional[str] = Field(default=None, max_length=128)
+    android_version: Optional[str] = Field(default=None, max_length=64)
+    app_version_name: Optional[str] = Field(default=None, max_length=64)
+    entry: AndroidDebugFrameCaptureEntry
+
+
 class GpsFix(BaseModel):
     model_config = ConfigDict(allow_inf_nan=False)
 
@@ -289,15 +347,35 @@ class WalkingRouteRequest(BaseModel):
     default_speed: Optional[float] = Field(default=None, gt=0, le=20)
 
 
+DestinationCoordinateKind = Literal["noor", "front", "lat", "new"]
+
+
+class DestinationCoordinateCandidate(BaseModel):
+    # Provider-labelled TMAP coordinate family (noorLat/Lon, frontLat/Lon, lat/lon,
+    # newLat/Lon). A label only: no family is verified as a walkable entrance,
+    # an arrival point, a building side or a floor.
+    kind: DestinationCoordinateKind
+    point: RoutePoint
+
+
 class DestinationSearchResult(BaseModel):
     id: str
     name: str
     point: RoutePoint
+    # Family that produced `point` (existing noor > front > lat > new priority);
+    # null when the result is not derived from TMAP POI coordinates.
+    coordinate_kind: Optional[DestinationCoordinateKind] = None
+    # Every complete, valid provider coordinate family in priority order; the first
+    # entry is `point`. Additive provenance only: route requests still use `point`.
+    coordinate_candidates: List[DestinationCoordinateCandidate] = Field(default_factory=list, max_length=4)
     address: Optional[str] = None
     road_address: Optional[str] = None
     category: Optional[str] = None
     result_type: Literal["poi", "address", "alias"] = "poi"
     distance_m: Optional[int] = Field(default=None, ge=0)
+    # Measured from the search origin, never along a walking route: the provider's
+    # reported radius or a straight-line fallback. Null exactly when distance_m is null.
+    distance_source: Optional[Literal["tmap_radius", "straight_line"]] = None
 
 
 class DestinationSearchResponse(BaseModel):
@@ -305,6 +383,10 @@ class DestinationSearchResponse(BaseModel):
     provider: DestinationSearchProvider
     query: str
     results: List[DestinationSearchResult]
+    # Provider-wide total before normalization; null when the provider did not report it.
+    total_count: Optional[int] = Field(default=None, ge=0)
+    # Provider paging progress, not the normalized unique count; null when unknown.
+    more_results_available: Optional[bool] = None
 
 
 class WalkingRouteSummary(BaseModel):
@@ -319,33 +401,355 @@ class WalkingRouteStep(BaseModel):
     points: List[RoutePoint]
     instruction: Optional[str] = None
     road_name: Optional[str] = None
-    turn_type: Optional[int] = None
-    facility_type: Optional[int] = None
+    turn_type: Optional[int] = Field(default=None, ge=0, le=2_147_483_647, strict=True)
+    facility_type: Optional[int] = Field(default=None, ge=0, le=2_147_483_647, strict=True)
 
 
 class WalkingRouteGuidePoint(BaseModel):
     index: int = Field(ge=0)
     point: RoutePoint
     instruction: Optional[str] = None
-    turn_type: Optional[int] = None
+    turn_type: Optional[int] = Field(default=None, ge=0, le=2_147_483_647, strict=True)
     point_type: Optional[str] = None
-    facility_type: Optional[int] = None
+    facility_type: Optional[int] = Field(default=None, ge=0, le=2_147_483_647, strict=True)
     distance_from_start_m: Optional[int] = Field(default=None, ge=0)
     remaining_distance_m: Optional[int] = Field(default=None, ge=0)
     bearing_deg: Optional[float] = Field(default=None, ge=0, lt=360)
+
+
+# Local navigation policy until representative TMAP turns can be measured:
+# require an instruction at a step boundary only for an obvious manoeuvre.
+# Short segments and small bends are common geometry/segmentation artefacts.
+_TURN_MIN_LEG_M = 10.0
+_TURN_MIN_EDGE_M = 1.0
+_TURN_MIN_ANGLE_DEG = 60.0
+_TURN_STRAIGHT_RUN_MAX_BEND_DEG = 60.0
+ROUTE_TURN_GUIDE_PROGRESS_TOLERANCE_M = 5.0
+ROUTE_TURN_GUIDE_CORNER_TOLERANCE_M = 5.0
+_SPOKEN_TURN_TYPES = frozenset({12, 13, 14, 16, 17, 18, 19})
+
+
+def route_turn_guide_speaks(guide: WalkingRouteGuidePoint) -> bool:
+    # Only an Android-mapped directional code proves a spoken corner cue.
+    # Provider prose cannot authorize movement for absent/unmapped codes.
+    return guide.turn_type in _SPOKEN_TURN_TYPES
+
+
+def route_required_turn_boundaries(
+    steps: List[WalkingRouteStep],
+) -> list[tuple[int, float, RoutePoint]]:
+    """Return (outgoing step, route fraction, corner) for clear step turns."""
+    step_lengths: list[float] = []
+    first_edges: list[tuple[float, float] | None] = []
+    last_edges: list[tuple[float, float] | None] = []
+    for step in steps:
+        length = 0.0
+        first = last = None
+        for start, end in zip(step.points, step.points[1:]):
+            latitude = math.radians((start.latitude + end.latitude) / 2)
+            east = math.radians(end.longitude - start.longitude) * 6_371_000.0 * math.cos(latitude)
+            north = math.radians(end.latitude - start.latitude) * 6_371_000.0
+            edge_m = math.hypot(east, north)
+            length += edge_m
+            if edge_m >= _TURN_MIN_EDGE_M:
+                if first is None:
+                    first = (east, north)
+                last = (east, north)
+        step_lengths.append(length)
+        first_edges.append(first)
+        last_edges.append(last)
+
+    total_m = sum(step_lengths)
+    if total_m <= 0:
+        return []
+    boundaries = []
+    progress_m = 0.0
+    for outgoing_index in range(1, len(steps)):
+        incoming_index = outgoing_index - 1
+        progress_m += step_lengths[incoming_index]
+        incoming, outgoing = last_edges[incoming_index], first_edges[outgoing_index]
+        if (
+            step_lengths[incoming_index] < _TURN_MIN_LEG_M
+            or step_lengths[outgoing_index] < _TURN_MIN_LEG_M
+            or incoming is None or outgoing is None
+        ):
+            continue
+        cosine = (incoming[0] * outgoing[0] + incoming[1] * outgoing[1]) / (
+            math.hypot(*incoming) * math.hypot(*outgoing)
+        )
+        if cosine <= math.cos(math.radians(_TURN_MIN_ANGLE_DEG)):
+            boundaries.append((outgoing_index, progress_m / total_m, steps[incoming_index].points[-1]))
+    return boundaries
+
+
+def route_required_geometry_turns(polyline: List[RoutePoint]) -> list[tuple[float, RoutePoint]]:
+    """Find clear turns inside a LineString as well as across feature seams."""
+    points: list[RoutePoint] = []
+    for point in polyline:
+        if not points or (point.latitude, point.longitude) != (points[-1].latitude, points[-1].longitude):
+            points.append(point)
+    raw_edges: list[tuple[int, float, float, float]] = []
+    prefixes = [0.0]
+    for index, (start, end) in enumerate(zip(points, points[1:])):
+        latitude = math.radians((start.latitude + end.latitude) / 2)
+        east = math.radians(end.longitude - start.longitude) * 6_371_000.0 * math.cos(latitude)
+        north = math.radians(end.latitude - start.latitude) * 6_371_000.0
+        length = math.hypot(east, north)
+        prefixes.append(prefixes[-1] + length)
+        if length > 0:
+            raw_edges.append((index, east, north, length))
+    total_m = prefixes[-1]
+    if total_m <= 0:
+        return []
+
+    def cosine_between(first: tuple[int, float, float, float], second: tuple[int, float, float, float]) -> float:
+        return (first[1] * second[1] + first[2] * second[2]) / (first[3] * second[3])
+
+    turns: list[tuple[float, RoutePoint]] = []
+    turn_cosine = math.cos(math.radians(_TURN_MIN_ANGLE_DEG))
+    run_cosine = math.cos(math.radians(_TURN_STRAIGHT_RUN_MAX_BEND_DEG))
+    # The raw pass catches a 12 m straight leg encoded as twenty 0.6 m
+    # segments. The material-edge pass ignores an isolated sub-metre spur
+    # that would otherwise split an obvious turn into two 45-degree bends.
+    for edges in (raw_edges, [edge for edge in raw_edges if edge[3] >= _TURN_MIN_EDGE_M]):
+        runs: list[tuple[int, int, float, float, float]] = []
+        previous_edge = None
+        for edge in edges:
+            if runs and previous_edge is not None and cosine_between(previous_edge, edge) > run_cosine:
+                start_index, _, length, east, north = runs[-1]
+                runs[-1] = (start_index, edge[0], length + edge[3], east + edge[1], north + edge[2])
+            else:
+                runs.append((edge[0], edge[0], edge[3], edge[1], edge[2]))
+            previous_edge = edge
+        material = [
+            index for index, run in enumerate(runs)
+            if run[2] >= _TURN_MIN_EDGE_M and math.hypot(run[3], run[4]) >= _TURN_MIN_EDGE_M
+        ]
+        for before_index, after_index in zip(material, material[1:]):
+            before, after = runs[before_index], runs[after_index]
+            skipped_m = sum(run[2] for run in runs[before_index + 1:after_index])
+            if skipped_m > _TURN_MIN_EDGE_M or before[2] < _TURN_MIN_LEG_M or after[2] < _TURN_MIN_LEG_M:
+                continue
+            cosine = (before[3] * after[3] + before[4] * after[4]) / (
+                math.hypot(before[3], before[4]) * math.hypot(after[3], after[4])
+            )
+            if cosine > turn_cosine:
+                continue
+            corner_index = before[1] + 1
+            progress = prefixes[corner_index]
+            if not any(abs(progress - fraction * total_m) <= 0.01 for fraction, _ in turns):
+                turns.append((progress / total_m, points[corner_index]))
+    return turns
 
 
 class WalkingRouteResponse(BaseModel):
     schema_version: Literal["walksafe.walking_route.v1"]
     provider: WalkingRouteProvider
     provider_route_id: Optional[str] = None
+    distance_source: Optional[Literal[
+        "provider_total_geometry_scaled", "provider_step_sum_geometry_scaled",
+    ]] = None
     priority: WalkingRoutePriority
     summary: WalkingRouteSummary
     polyline: List[RoutePoint]
     steps: List[WalkingRouteStep]
     guide_points: List[WalkingRouteGuidePoint] = Field(default_factory=list)
+    # S20-27: straight-line metres between the requested origin/destination and the first/last
+    # polyline point. The route ends at polyline[-1]; a client must keep the final approach to the
+    # destination separate from route progress. Null when a provider did not compute them.
+    start_gap_m: Optional[int] = Field(default=None, ge=0)
+    end_gap_m: Optional[int] = Field(default=None, ge=0)
     provider_result_code: int
     provider_result_message: str
+
+    @model_validator(mode="after")
+    def normalized_parts_form_one_route(self) -> "WalkingRouteResponse":
+        # Older responses can omit steps and distance provenance. Their distance
+        # totals were not guaranteed, but any steps they do carry must still form
+        # the displayed route in the stated order.
+        if not self.steps and self.distance_source is not None:
+            raise ValueError("route_steps_missing")
+
+        def coordinates(point: RoutePoint) -> tuple[float, float]:
+            return point.latitude, point.longitude
+
+        def without_adjacent_duplicates(points: List[RoutePoint]) -> list[tuple[float, float]]:
+            result: list[tuple[float, float]] = []
+            for point in points:
+                coordinate = coordinates(point)
+                if not result or result[-1] != coordinate:
+                    result.append(coordinate)
+            return result
+
+        route_shape = without_adjacent_duplicates(self.polyline)
+        if self.steps:
+            assembled: list[tuple[float, float]] = []
+            previous_end: tuple[float, float] | None = None
+            for expected_index, step in enumerate(self.steps):
+                if step.index != expected_index or not step.points:
+                    raise ValueError("route_step_order_invalid")
+                first = coordinates(step.points[0])
+                if previous_end is not None and previous_end != first:
+                    raise ValueError("route_step_geometry_disconnected")
+                for coordinate in without_adjacent_duplicates(step.points):
+                    if not assembled or assembled[-1] != coordinate:
+                        assembled.append(coordinate)
+                previous_end = coordinates(step.points[-1])
+            if assembled != route_shape:
+                raise ValueError("route_step_geometry_mismatch")
+
+        if self.distance_source is not None and (
+            self.summary.distance_m <= 0
+            or sum(step.distance_m for step in self.steps) != self.summary.distance_m
+        ):
+            raise ValueError("route_step_distance_total_invalid")
+
+        if not self.guide_points:
+            raise ValueError("route_guidance_incomplete")
+
+        # Guides are checked even on older responses with no distance source or
+        # no steps. Their physical visit must be unambiguous when progress is absent.
+        route_points = [RoutePoint(latitude=lat, longitude=lon) for lat, lon in route_shape]
+        if len(route_points) < 2:
+            raise ValueError("route_geometry_missing")
+
+        def distance_m(start: RoutePoint, end: RoutePoint) -> float:
+            lat1, lat2 = math.radians(start.latitude), math.radians(end.latitude)
+            d_lat = lat2 - lat1
+            d_lon = math.radians(end.longitude - start.longitude)
+            value = math.sin(d_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(d_lon / 2) ** 2
+            value = min(1.0, max(0.0, value))
+            return 6_371_000.0 * 2 * math.atan2(math.sqrt(value), math.sqrt(1 - value))
+
+        geometry_prefixes = [0.0]
+        for start, end in zip(route_points, route_points[1:]):
+            geometry_prefixes.append(geometry_prefixes[-1] + distance_m(start, end))
+        geometry_total = geometry_prefixes[-1]
+        if geometry_total <= 0:
+            raise ValueError("route_geometry_missing")
+
+        if self.summary.distance_m <= 0 or geometry_total <= 0:
+            raise ValueError("route_geometry_missing")
+
+        previous_projected_m = -10.0
+        previous_declared_m = -10.0
+        previous_remaining_m = self.summary.distance_m + 10.0
+        verified_guide_progress_m: list[float] = []
+        for expected_index, guide in enumerate(self.guide_points):
+            progress = guide.distance_from_start_m
+            remaining = guide.remaining_distance_m
+            if (
+                guide.index != expected_index
+                or (progress is not None and progress > self.summary.distance_m)
+                or (remaining is not None and remaining > self.summary.distance_m)
+            ):
+                raise ValueError("route_guide_progress_invalid")
+            if self.distance_source is not None and (
+                progress is None or remaining is None
+                or progress + remaining != self.summary.distance_m
+            ):
+                raise ValueError("route_guide_progress_invalid")
+            if progress is not None and remaining is not None and (
+                abs(progress + remaining - self.summary.distance_m) > 30.0
+            ):
+                raise ValueError("route_guide_progress_invalid")
+            declared_m = progress if progress is not None else (
+                self.summary.distance_m - remaining if remaining is not None else None
+            )
+
+            # Keep every spatial candidate so a declaration cannot select a
+            # much farther visit of the same coordinate on a returning route.
+            candidates: list[tuple[float, float, int, float, RoutePoint]] = []
+            for segment_index in range(len(route_points) - 1):
+                start, end = route_points[segment_index], route_points[segment_index + 1]
+                longitude_scale = max(0.01, math.cos(math.radians(
+                    (start.latitude + end.latitude + guide.point.latitude) / 3,
+                )))
+                dx = (end.longitude - start.longitude) * longitude_scale
+                dy = end.latitude - start.latitude
+                px = (guide.point.longitude - start.longitude) * longitude_scale
+                py = guide.point.latitude - start.latitude
+                denominator = dx * dx + dy * dy
+                if denominator <= 0.0:
+                    continue
+                fraction = max(0.0, min(1.0, (px * dx + py * dy) / denominator))
+                projected = RoutePoint(
+                    latitude=start.latitude + (end.latitude - start.latitude) * fraction,
+                    longitude=start.longitude + (end.longitude - start.longitude) * fraction,
+                )
+                projected_progress = geometry_prefixes[segment_index] + (
+                    geometry_prefixes[segment_index + 1] - geometry_prefixes[segment_index]
+                ) * fraction
+                gap_m = distance_m(guide.point, projected)
+                if gap_m <= 30.0:
+                    candidates.append((gap_m, projected_progress, segment_index, fraction, projected))
+            if not candidates:
+                raise ValueError("route_guide_step_mismatch")
+
+            nearest_m = min(candidate[0] for candidate in candidates)
+            # 3 m retains the existing valid 2.2 m offset on a declared repeat
+            # visit. Without progress, only effectively shortest candidates can
+            # establish the visit; two separate visits fail closed.
+            near_m = 3.0 if declared_m is not None else 1.0
+            nearest_candidates = [
+                candidate for candidate in candidates if candidate[0] <= nearest_m + near_m
+            ]
+            if declared_m is None:
+                ordered = sorted(nearest_candidates, key=lambda candidate: candidate[2])
+                previous_candidate: tuple[float, float, int, float, RoutePoint] | None = None
+                for candidate in ordered:
+                    if previous_candidate is not None:
+                        same_position = abs(candidate[1] - previous_candidate[1]) <= 0.01
+                        same_corner_visit = (
+                            candidate[2] == previous_candidate[2] + 1
+                            and previous_candidate[3] >= 0.5 and candidate[3] <= 0.5
+                            and abs(candidate[1] - previous_candidate[1]) <= (
+                                2 * distance_m(previous_candidate[4], candidate[4]) + 0.01
+                            )
+                        )
+                        if not (same_position or same_corner_visit):
+                            raise ValueError("route_guide_visit_ambiguous")
+                    previous_candidate = candidate
+                selected = min(ordered, key=lambda candidate: candidate[0])
+            else:
+                matching = [
+                    candidate for candidate in nearest_candidates
+                    if abs(candidate[1] * self.summary.distance_m / geometry_total - declared_m) <= 30.0
+                ]
+                if not matching:
+                    raise ValueError("route_guide_step_mismatch")
+                selected = min(matching, key=lambda candidate: (
+                    abs(candidate[1] * self.summary.distance_m / geometry_total - declared_m),
+                    candidate[0],
+                ))
+
+            projected_m = selected[1] * self.summary.distance_m / geometry_total
+            verified_guide_progress_m.append(selected[1])
+            actual_declared_m = declared_m if declared_m is not None else projected_m
+            if (
+                projected_m + 10.0 < previous_projected_m
+                or actual_declared_m + 10.0 < previous_declared_m
+                or (remaining is not None and remaining > previous_remaining_m + 10.0)
+            ):
+                raise ValueError("route_guide_order_invalid")
+            previous_projected_m = projected_m
+            previous_declared_m = actual_declared_m
+            if remaining is not None:
+                previous_remaining_m = remaining
+        required_turns = [
+            (fraction, corner) for _, fraction, corner in route_required_turn_boundaries(self.steps)
+        ]
+        required_turns.extend(route_required_geometry_turns(route_points))
+        for fraction, corner in required_turns:
+            corner_progress_m = fraction * geometry_total
+            if not any(
+                abs(progress_m - corner_progress_m) <= ROUTE_TURN_GUIDE_PROGRESS_TOLERANCE_M
+                and distance_m(guide.point, corner) <= ROUTE_TURN_GUIDE_CORNER_TOLERANCE_M
+                and route_turn_guide_speaks(guide)
+                for guide, progress_m in zip(self.guide_points, verified_guide_progress_m)
+            ):
+                raise ValueError("route_guidance_incomplete")
+        return self
 
 
 class ReportMetadata(BaseModel):
@@ -368,6 +772,8 @@ class ReportMetadata(BaseModel):
 
 
 class ReportStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: ReportStatus
     note: Optional[str] = Field(default=None, max_length=500)
     resolution_reason: Optional[str] = Field(default=None, max_length=500)
@@ -405,6 +811,13 @@ class ReportResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     transport_receipt: Optional[ReportTransportReceiptV1] = None
+
+
+ReportCreationOutcome = Literal["CREATED", "REPLAYED", "SUPPRESSED_BY_COOLDOWN"]
+
+
+class ReportCreationResponse(ReportResponse):
+    creation_outcome: ReportCreationOutcome
 
 
 class ReportTransportStatusV1(BaseModel):
@@ -894,6 +1307,11 @@ class AdminReportDetailV2(BaseModel):
     status_version: int = Field(ge=1)
     content_revision: int = Field(ge=0)
     latest_delivery_revision: int = Field(ge=0)
+    # Report-wide latest review revision across every content revision
+    # (0 = no decision). current_review is scoped to the current content, so
+    # it is null after a content correction; the next review decision binds
+    # expected_review_revision to this value (W20A-R1, S18-35).
+    latest_review_revision: int = Field(ge=0)
     allowed_next_statuses: List[ReportStatus] = Field(max_length=2)
     class_name: ClassName
     confidence: float = Field(ge=0, le=1, allow_inf_nan=False)
@@ -904,6 +1322,17 @@ class AdminReportDetailV2(BaseModel):
     current_review: AdminReportReviewSummaryV2 | None
     current_delivery: AdminReportDeliverySummaryV1 | None
     capabilities: AdminReportCapabilitiesV2
+
+    @model_validator(mode="after")
+    def latest_review_revision_covers_current_review(self) -> "AdminReportDetailV2":
+        if (
+            self.current_review is not None
+            and self.latest_review_revision < self.current_review.revision
+        ):
+            raise ValueError(
+                "latest_review_revision must not be older than current_review"
+            )
+        return self
 
 
 class AdminReportStatusUpdateV1(BaseModel):
@@ -1184,8 +1613,21 @@ class ReportReviewDecisionRequest(BaseModel):
     location_reviewed: bool = Field(strict=True)
     photo_reviewed: bool = Field(strict=True)
     privacy_reviewed: bool = Field(strict=True)
-    content_revision: int = Field(default=0, ge=0, strict=True)
+    # Upper bounds keep both revisions inside PostgreSQL bigint so an oversized
+    # value is a 422 instead of a CAST overflow reported as 503 (W20A-R9).
+    content_revision: int = Field(
+        default=0, ge=0, le=9_223_372_036_854_775_807, strict=True
+    )
     evidence_grant_id: uuid.UUID | None = None
+    # Report-wide latest review revision the administrator saw (0 = no
+    # decision yet); the admin report detail exposes it as
+    # latest_review_revision. A different latest revision is a review race and
+    # returns 409 review_revision_conflict, distinct from a content revision
+    # race. Like content_revision, omission means 0 and so conflicts with any
+    # existing decision instead of silently stacking a late one.
+    expected_review_revision: int = Field(
+        default=0, ge=0, le=9_223_372_036_854_775_807, strict=True
+    )
 
     @field_validator("reason", "user_visible_reason", mode="before")
     @classmethod
@@ -1345,6 +1787,67 @@ class ReportInstitutionDeliveryRequest(BaseModel):
         return self
 
 
+ReportDeliveryCorrectionReasonCode = Literal[
+    "WRONG_STATUS", "WRONG_REPORT", "DUPLICATE_ENTRY", "OTHER"
+]
+
+
+def _canonical_uuid_text(value: object, field: str) -> object:
+    if isinstance(value, uuid.UUID):
+        return value
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a canonical UUID")
+    try:
+        parsed = uuid.UUID(value)
+    except ValueError as exc:
+        raise ValueError(f"{field} must be a canonical UUID") from exc
+    if str(parsed) != value:
+        raise ValueError(f"{field} must be a canonical UUID")
+    return parsed
+
+
+class ReportInstitutionDeliveryCorrectionRequest(BaseModel):
+    """S18-40: marks the latest effective delivery event as wrongly recorded."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    correction_id: uuid.UUID
+    corrects_event_id: uuid.UUID
+    expected_revision: int = Field(ge=0, le=9_223_372_036_854_775_807, strict=True)
+    reason_code: ReportDeliveryCorrectionReasonCode
+    memo: ReportReviewReason
+
+    @field_validator("correction_id", "corrects_event_id", mode="before")
+    @classmethod
+    def require_canonical_ids(cls, value: object, info) -> object:
+        return _canonical_uuid_text(value, info.field_name)
+
+    @field_validator("memo", mode="before")
+    @classmethod
+    def reject_disallowed_text_controls(cls, value: object) -> object:
+        return _reject_disallowed_admin_text_controls(value)
+
+
+class ReportInstitutionDeliveryCorrectionV1(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    schema_version: Literal["walksafe.report-delivery-correction.v1"] = (
+        "walksafe.report-delivery-correction.v1"
+    )
+    id: uuid.UUID
+    report_id: uuid.UUID
+    corrects_event_id: uuid.UUID
+    corrected_revision: int = Field(ge=1)
+    expected_revision: int = Field(ge=1)
+    reason_code: ReportDeliveryCorrectionReasonCode
+    memo: str
+    admin_id: str
+    session_id: uuid.UUID
+    device_id: str
+    correlation_id: uuid.UUID
+    created_at: AwareDatetime
+
+
 class ReportInstitutionDeliveryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -1369,6 +1872,8 @@ class ReportInstitutionDeliveryResponse(BaseModel):
     device_id: str
     correlation_id: uuid.UUID
     recorded_at: AwareDatetime
+    # S18-40: the append-only correction that names this event, if any.
+    correction: ReportInstitutionDeliveryCorrectionV1 | None = None
 
 
 class ReportInstitutionDeliveryPageV1(BaseModel):
@@ -1503,6 +2008,9 @@ class ReportV2Metadata(DetectV2Detection):
     fallback_used: Optional[bool] = None
     loaded_model_key: Optional[str] = Field(default=None, min_length=1, max_length=80)
     model_load_reason: Optional[str] = Field(default=None, min_length=1, max_length=160)
+    # S15-14: `gps` is the phone position at capture time, not the damaged facility. Only this
+    # meaning is accepted; a facility-position estimate would need its own field and uncertainty.
+    location_kind: Optional[Literal["CAPTURE_DEVICE"]] = None
 
     @model_validator(mode="after")
     def trigger_matches_auto_reported(self) -> "ReportV2Metadata":
@@ -1521,10 +2029,13 @@ class AccountDeletionRequestV2(BaseModel):
     confirmation: Literal["DELETE_MY_ACCOUNT"]
 
 
-PRIVACY_CONSENT_POLICY_VERSION = "FP-013-1.1.0"
+# Owner decision R3 (2026-09-29): the RAW and automatic-reporting disclosures now
+# send after the walk ends, a substantive change, so both items and the document
+# are 1.2.0; mobile-network and training texts are unchanged and keep theirs.
+PRIVACY_CONSENT_POLICY_VERSION = "FP-013-1.2.0"
 PRIVACY_CONSENT_ITEM_VERSIONS = {
-    "raw_source_collection": "FP-013-RAW-1.1.0",
-    "automatic_reporting": "FP-013-AUTO-1.1.0",
+    "raw_source_collection": "FP-013-RAW-1.2.0",
+    "automatic_reporting": "FP-013-AUTO-1.2.0",
     "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
     "training_reuse": "FP-013-TRAINING-1.1.0",
 }
@@ -1533,8 +2044,8 @@ PRIVACY_CONSENT_ITEM_VERSIONS = {
 class PrivacyConsentItemVersionsV2(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    raw_source_collection: Literal["FP-013-RAW-1.1.0"]
-    automatic_reporting: Literal["FP-013-AUTO-1.1.0"]
+    raw_source_collection: Literal["FP-013-RAW-1.2.0"]
+    automatic_reporting: Literal["FP-013-AUTO-1.2.0"]
     mobile_network_transfer: Literal["FP-013-MOBILE-1.0.0"]
     training_reuse: Literal["FP-013-TRAINING-1.1.0"]
 
@@ -1546,7 +2057,7 @@ class PrivacyConsentEventV2(BaseModel):
     installation_id: PrivacyEvidenceId
     request_id: AccountDeletionRequestId
     client_revision: int = Field(ge=1, le=9_223_372_036_854_775_807)
-    policy_version: Literal["FP-013-1.1.0"]
+    policy_version: Literal["FP-013-1.2.0"]
     item_versions: PrivacyConsentItemVersionsV2
     raw_source_collection: StrictBool
     automatic_reporting: StrictBool
@@ -1571,7 +2082,7 @@ class PrivacyConsentBootstrapV1(BaseModel):
     status: Literal["READY", "RECONSENT_REQUIRED"]
     source: Literal["CURRENT_CONSENT", "SIGNUP_CONSENT", "NONE"]
     installation_id: PrivacyEvidenceId
-    policy_version: Literal["FP-013-1.1.0"]
+    policy_version: Literal["FP-013-1.2.0"]
     item_versions: PrivacyConsentItemVersionsV2
     client_revision_floor: int = Field(ge=0, le=9_223_372_036_854_775_807)
     selections: Optional[PrivacyConsentSelectionsV2]
@@ -1657,6 +2168,15 @@ class DeviceDeletionEvidenceV2(BaseModel):
         json_schema_extra={"pattern": _WHOLE_SECOND_UTC_PATTERN.pattern}
     )
     evidence_sha256: Sha256LowerHex
+    # S1617-52: base64url ECDSA P-256 (DER) signature by the evidence
+    # installation over "walksafe/device-deletion-evidence-signature/v1\0" +
+    # evidence_sha256. Required once that installation registered a key.
+    installation_signature: Optional[str] = Field(
+        default=None,
+        min_length=86,
+        max_length=100,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
 
     @field_validator("completed_at", mode="before")
     @classmethod
@@ -1762,6 +2282,78 @@ class AccountDeletionStatusV2(BaseModel):
             raise ValueError("COMPLETED requires a completion receipt exclusively")
         if self.updated_at < self.accepted_at:
             raise ValueError("updated_at cannot precede accepted_at")
+        return self
+
+
+ACCOUNT_DELETION_STATUS_VIEW_HEADER = "x-walksafe-deletion-status-view"
+ACCOUNT_DELETION_DEVICE_VERIFICATION_VIEW = "device-verification.v1"
+
+
+class AccountDeletionDeviceVerificationV1(BaseModel):
+    """Per-installation verification summary (S1617-51, FP-046 status receipt).
+
+    A frozen installation that has not answered by the 24-hour device deadline is
+    shown as unverifiable. It is never converted to NOT_FOUND and the request is
+    never COMPLETED on that basis; the deletion duty stays open for that device.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["walksafe.account-deletion-device-verification.v1"]
+    completion_view: Literal[
+        "COMPLETED",
+        "IN_PROGRESS",
+        "SERVER_COMPLETED_DEVICE_UNVERIFIED",
+    ]
+    target_count: int = Field(ge=0)
+    deleted_count: int = Field(ge=0)
+    not_found_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    pending_count: int = Field(ge=0)
+    unverifiable_count: int = Field(ge=0)
+    unverifiable_reason: Optional[Literal["SLA_ELAPSED_NO_CONTACT"]]
+    follow_up: Optional[Literal["DELETE_ON_NEXT_CONTACT_OR_REMOVE_APP"]]
+    device_clock_anomaly_count: int = Field(ge=0)
+    device_due_at: AwareDatetime
+    evaluated_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def require_consistent_counts(self) -> "AccountDeletionDeviceVerificationV1":
+        if self.target_count != (
+            self.deleted_count
+            + self.not_found_count
+            + self.failed_count
+            + self.pending_count
+            + self.unverifiable_count
+        ):
+            raise ValueError("device verification counts must cover every target")
+        unverifiable = self.unverifiable_count > 0
+        if unverifiable != (self.unverifiable_reason is not None) or unverifiable != (
+            self.follow_up is not None
+        ):
+            raise ValueError("unverifiable devices require a reason and follow-up exclusively")
+        if self.completion_view == "SERVER_COMPLETED_DEVICE_UNVERIFIED" and not unverifiable:
+            raise ValueError("server-completed view requires an unverifiable device")
+        if self.completion_view == "COMPLETED" and (
+            self.pending_count or self.unverifiable_count or self.failed_count
+        ):
+            raise ValueError("COMPLETED cannot contain an unresolved device")
+        return self
+
+
+class AccountDeletionStatusWithDeviceVerificationV2(AccountDeletionStatusV2):
+    """Opt-in status view; the base v2 status bytes stay unchanged for old callers."""
+
+    device_verification: AccountDeletionDeviceVerificationV1
+
+    @model_validator(mode="after")
+    def require_completion_view_matches_overall(
+        self,
+    ) -> "AccountDeletionStatusWithDeviceVerificationV2":
+        if (self.device_verification.completion_view == "COMPLETED") != (
+            self.overall_status == "COMPLETED"
+        ):
+            raise ValueError("completion_view COMPLETED must match overall COMPLETED")
         return self
 
 

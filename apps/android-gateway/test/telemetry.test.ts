@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { after, before, test } from "node:test";
 
 import {
   handleGatewayRequest,
@@ -9,7 +12,10 @@ import {
   GATEWAY_ROUTE_TEMPLATES,
   GATEWAY_TELEMETRY_MAX_LATENCY_MS,
   GATEWAY_TELEMETRY_SCHEMA,
-  recordGatewayRequestCompleted,
+  gatewayRouteTemplate,
+  observeGatewayResponseDelivery,
+  recordGatewayRequestFinished,
+  recordGatewayRequestPrepared,
   type GatewayRouteTemplate,
   type GatewayTelemetryEvent
 } from "../src/telemetry.js";
@@ -17,6 +23,32 @@ import {
 const CANONICAL_REQUEST_ID = "018f2b63-8fb8-7cc2-98a1-4a4fd27c3001";
 const GENERATED_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+test("S19-54 telemetry only classifies RAW chunk indexes accepted by routing", () => {
+  const id = "3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e";
+  const path = (index: number) =>
+    `http://gateway.invalid/api/raw-collections/${id}/objects/${id}/chunks/${index}`;
+  assert.equal(gatewayRouteTemplate(new Request(path(2047))),
+    "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}");
+  assert.equal(gatewayRouteTemplate(new Request(path(2048))), null);
+});
+
+// R19-GB-01: walking and report v2 routes run the walk-ownership gate; keep this
+// file's ledger (and its sibling lock) out of the shared default TMPDIR path.
+let stateDirectory = "";
+let previousLedgerPath: string | undefined;
+
+before(async () => {
+  stateDirectory = await mkdtemp(path.join(tmpdir(), "walksafe-telemetry-test-"));
+  previousLedgerPath = process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH;
+  process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH = path.join(stateDirectory, "field-walk-ledger.json");
+});
+
+after(async () => {
+  if (previousLedgerPath === undefined) delete process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH;
+  else process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH = previousLedgerPath;
+  await rm(stateDirectory, { recursive: true, force: true });
+});
 
 type RouteCase = {
   template: GatewayRouteTemplate;
@@ -300,9 +332,11 @@ test("every allowed method emits one bounded completion event and propagates req
       assert.equal(response.headers.get("x-request-id"), CANONICAL_REQUEST_ID);
     }
 
-    assert.equal(events.length, cases.length);
+    // S19-56: one "prepared" event per request; "finished" follows body delivery.
+    const prepared = events.filter(event => event.event_name === "walksafe.gateway.request.prepared");
+    assert.equal(prepared.length, cases.length);
     assert.deepEqual(
-      events.map(event => event.route_template),
+      prepared.map(event => event.route_template),
       cases.map(item => item.template)
     );
   } finally {
@@ -318,7 +352,10 @@ test("every allowed method emits one bounded completion event and propagates req
 
   for (const event of events) {
     assert.equal(event.schema_version, GATEWAY_TELEMETRY_SCHEMA);
-    assert.equal(event.event_name, "walksafe.gateway.request.completed");
+    assert.ok(
+      (event.event_name === "walksafe.gateway.request.prepared" && event.outcome === "prepared") ||
+      (event.event_name === "walksafe.gateway.request.finished" && event.outcome !== "prepared")
+    );
     assert.equal(event.correlation_id, CANONICAL_REQUEST_ID);
     assert.ok(Number.isInteger(event.http_status));
     assert.ok(event.http_status >= 200 && event.http_status <= 599);
@@ -330,9 +367,11 @@ test("every allowed method emits one bounded completion event and propagates req
       "capacity_level",
       "correlation_id",
       "event_name",
+      "first_byte_ms",
       "http_status",
       "is_5xx",
       "latency_ms",
+      "outcome",
       "route_template",
       "schema_version"
     ]);
@@ -356,6 +395,7 @@ test("invalid inbound request id is replaced and the event uses the response id"
   const responseId = response.headers.get("x-request-id") ?? "";
   assert.match(responseId, GENERATED_UUID);
   assert.equal(events.length, 1);
+  assert.equal(events[0]!.event_name, "walksafe.gateway.request.prepared");
   assert.equal(events[0]!.correlation_id, responseId);
   assert.doesNotMatch(JSON.stringify(events), /account-identifier|example\.org/);
 });
@@ -363,7 +403,7 @@ test("invalid inbound request id is replaced and the event uses the response id"
 test("completion latency is integer-clamped and 5xx is explicit", () => {
   const events: GatewayTelemetryEvent[] = [];
   const response = Response.json({}, { status: 503 });
-  recordGatewayRequestCompleted(
+  recordGatewayRequestPrepared(
     CANONICAL_REQUEST_ID,
     "/privacy/rights",
     response,
@@ -371,7 +411,7 @@ test("completion latency is integer-clamped and 5xx is explicit", () => {
     "UNKNOWN",
     event => events.push(event)
   );
-  recordGatewayRequestCompleted(
+  recordGatewayRequestPrepared(
     CANONICAL_REQUEST_ID,
     "/privacy/rights",
     response,
@@ -396,4 +436,84 @@ test("telemetry sink failure does not change the gateway response contract", asy
   });
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.match(response.headers.get("x-request-id") ?? "", GENERATED_UUID);
+});
+
+test("S19-56 telemetry separates response preparation from delivery completion", async () => {
+  const events: GatewayTelemetryEvent[] = [];
+  const response = await handleGatewayRequest(
+    new Request("http://127.0.0.1:8081/privacy/rights", {
+      headers: { "x-request-id": CANONICAL_REQUEST_ID }
+    }),
+    { telemetrySink: event => events.push(event) }
+  );
+  // Preparing the Response object is not delivery.
+  assert.deepEqual(
+    events.map(event => event.event_name),
+    ["walksafe.gateway.request.prepared"]
+  );
+  await response.json();
+  assert.deepEqual(
+    events.map(event => [event.event_name, (event as { outcome?: string }).outcome]),
+    [
+      ["walksafe.gateway.request.prepared", "prepared"],
+      ["walksafe.gateway.request.finished", "completed"]
+    ]
+  );
+  assert.ok(GATEWAY_TELEMETRY_MAX_LATENCY_MS >= 65_000, "TTS 65 s must not be clipped");
+});
+
+test("S19-56 delivery outcomes: stream failure after headers, consumer abort, unclipped 70 s latency", async () => {
+  const outcomes: Array<[string, number, number | null]> = [];
+  let clock = 1_000;
+  const record = (outcome: string, elapsedMs: number, firstByteMs: number | null) => {
+    outcomes.push([outcome, elapsedMs, firstByteMs]);
+  };
+  // A normal response object whose body fails after the first chunk.
+  let pulls = 0;
+  const failing = new Response(new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulls += 1;
+      clock += 5;
+      if (pulls === 1) controller.enqueue(new TextEncoder().encode("{\"partial\":"));
+      else controller.error(new Error("upstream stream failed"));
+    }
+  }), { status: 200, headers: { "content-type": "application/json" } });
+  const observedFailing = observeGatewayResponseDelivery(failing, 1_000, record, () => clock);
+  assert.equal(observedFailing.status, 200);
+  assert.equal(outcomes.length, 0, "status 200 alone is not a completed delivery");
+  await assert.rejects(observedFailing.text());
+  assert.equal(outcomes.length, 1);
+  assert.equal(outcomes[0]![0], "stream_error");
+  assert.equal(outcomes[0]![1], 10);
+  // The first byte reached the consumer before the failure.
+  assert.ok(outcomes[0]![2] !== null && outcomes[0]![2]! > 0 && outcomes[0]![2]! <= 10);
+
+  // The transport (node-adapter writeWebResponse) cancels the body when the client closes.
+  outcomes.length = 0;
+  let sourceCancelled: unknown = null;
+  const streaming = new Response(new ReadableStream<Uint8Array>({
+    pull(controller) { controller.enqueue(new Uint8Array([1, 2, 3])); },
+    cancel(reason) { sourceCancelled = reason; }
+  }));
+  const observedStreaming = observeGatewayResponseDelivery(streaming, 1_000, record, () => clock);
+  const reader = observedStreaming.body!.getReader();
+  await reader.read();
+  await reader.cancel("client response socket closed");
+  assert.equal(sourceCancelled, "client response socket closed");
+  assert.deepEqual(outcomes.map(entry => entry[0]), ["aborted"]);
+
+  // Bodyless responses finish immediately; completed bodies finish once.
+  outcomes.length = 0;
+  observeGatewayResponseDelivery(new Response(null, { status: 204 }), 1_000, record, () => clock);
+  const complete = observeGatewayResponseDelivery(Response.json({ ok: true }), 1_000, record, () => clock);
+  assert.deepEqual(await complete.json(), { ok: true });
+  assert.deepEqual(outcomes.map(entry => entry[0]), ["completed", "completed"]);
+
+  const events: GatewayTelemetryEvent[] = [];
+  recordGatewayRequestFinished(
+    CANONICAL_REQUEST_ID, "/api/speech/tts", Response.json({}), "completed",
+    70_000.4, 69_000, "UNKNOWN", event => events.push(event)
+  );
+  assert.equal(events[0]!.latency_ms, 70_000);
+  assert.equal(events[0]!.first_byte_ms, 69_000);
 });

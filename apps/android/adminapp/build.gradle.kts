@@ -21,6 +21,14 @@ fun normalizedAdminApiOriginOrNull(raw: String?, allowDebugLoopbackHttp: Boolean
         .takeIf { allowDebugLoopbackHttp && uri.scheme.equals("http", ignoreCase = true) && loopback }
 }
 
+// Same source-commit provenance contract as the user app (S21-24, FP-051 signed release bundle).
+val sourceCommitPattern = Regex("^[0-9a-fA-F]{40}$")
+val configuredSourceCommit = providers.gradleProperty("WALKSAFE_SOURCE_COMMIT")
+    .orElse(providers.environmentVariable("WALKSAFE_SOURCE_COMMIT"))
+    .orNull
+    ?.trim()
+val verifiedSourceCommit = configuredSourceCommit?.takeIf(sourceCommitPattern::matches)?.lowercase()
+
 val configuredAdminApiOrigin = providers.gradleProperty("WALKSAFE_ADMIN_API_ORIGIN")
     .orElse(providers.environmentVariable("WALKSAFE_ADMIN_API_ORIGIN"))
     .orNull
@@ -41,9 +49,19 @@ val validateWalkSafeAdminReleaseOrigin by tasks.registering {
         }
     }
 }
+val validateWalkSafeAdminSourceCommit by tasks.registering {
+    doLast {
+        check(verifiedSourceCommit != null) {
+            "Release builds require WALKSAFE_SOURCE_COMMIT as a 40-character hexadecimal commit id"
+        }
+    }
+}
 
 tasks.configureEach {
-    if (name == "preReleaseBuild") dependsOn(validateWalkSafeAdminReleaseOrigin)
+    if (name == "preReleaseBuild") {
+        dependsOn(validateWalkSafeAdminReleaseOrigin)
+        dependsOn(validateWalkSafeAdminSourceCommit)
+    }
 }
 
 android {
@@ -66,6 +84,8 @@ android {
 
     buildTypes {
         debug {
+            buildConfigField("String", "WALKSAFE_SOURCE_COMMIT", "\"${verifiedSourceCommit ?: "unverified"}\"")
+            buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walksafe-admin-debug-v1\"")
             buildConfigField("String", "WALKSAFE_ADMIN_API_ORIGIN", "\"$debugAdminApiOrigin\"")
             buildConfigField(
                 "boolean",
@@ -83,6 +103,8 @@ android {
             )
         }
         release {
+            buildConfigField("String", "WALKSAFE_SOURCE_COMMIT", "\"${verifiedSourceCommit ?: "unverified"}\"")
+            buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walksafe-admin-release-v1\"")
             buildConfigField("boolean", "ADMIN_OPERATIONAL_WORKFLOWS_ENABLED", "false")
             buildConfigField("String", "ADMIN_WORKFLOW_STATE", "\"SECURITY_CONTROL_ENABLED_OPERATIONS_LOCKED\"")
             buildConfigField(

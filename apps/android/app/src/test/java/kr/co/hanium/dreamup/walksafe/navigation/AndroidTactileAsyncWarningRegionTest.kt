@@ -17,7 +17,8 @@ class AndroidTactileAsyncWarningRegionTest {
   source=DepthSource.ARCORE_RAW_DEPTH,zDistanceM=1f,rayDistanceM=1f,groundDistanceM=1f,riskDistanceM=1f,
   validSampleCount=80,validSampleRatio=.9f,depthMedianM=1f,depthP20M=1f,depthIqrM=.05f,trend=Trend.STABLE,
   approachScore=0f,approachSpeedMps=null,timeToCollisionMs=null,
-  confidence=DepthConfidenceBreakdown(.95f,1f,1f,1f,1f,1f,1f,1f),userFacing=UserFacingDepth(null,level,message),trackAgeFrames=20,trackStableMs=1900L)
+  confidence=DepthConfidenceBreakdown(.95f,1f,1f,1f,1f,1f,1f,1f),userFacing=UserFacingDepth(null,level,message),trackAgeFrames=20,trackStableMs=1900L,
+  sourceValidUntilElapsedRealtimeMs=now+UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS)
  private fun frame(os:List<TrackedObjectDepth>)=MainActivity.TactileSnapshotFrameResult(null,emptyList(),false,TactileRouteGuidanceResult(os,null,TactileRouteDecision(LocalRouteMode.TMAP,null,"test",null)))
  private fun batch(now:Long, os:List<TrackedObjectDepth>)=UnknownObjectFeedbackBatch(now*1000000L,now,now*1000000L,now,WalkRuntimeEpoch("review",0),os)
  private fun coord(p:WalkSafeFeedbackPolicy)=AndroidTactileFrameCoordinator(AndroidTactileRouteGuidance(),p,TactileFrameFeedbackActuator {})
@@ -30,7 +31,7 @@ class AndroidTactileAsyncWarningRegionTest {
    val other=output("unknown:1:fixed",now-lagMs).let {if(separate)it.copy(bboxNorm=RectNorm(.7f,.3f,.2f,.4f))else it}
    val bs=listOf(batch(now-lagMs,listOf(other)))
    val d=c.dispatchFeedback(frame(listOf(primary)),false,true,now,independentFreshOutputs=bs,warningContext=context)
-   d.action?.let {a->assertTrue(p.claimFeedbackDelivery(a.trackId,now));pending=a to now;println("ASYNC_RESERVE lag="+lagMs+" separated="+separate+" at="+now+" track="+a.trackId+" primaryFrame="+primary.frameId+" auxiliaryFrame="+other.frameId)}
+   d.action?.let {a->assertTrue(p.claimFeedbackDelivery(a.trackId,now,now));pending=a to now;println("ASYNC_RESERVE lag="+lagMs+" separated="+separate+" at="+now+" track="+a.trackId+" primaryFrame="+primary.frameId+" auxiliaryFrame="+other.frameId)}
   }
   println("ASYNC_COMPLETE lag="+lagMs+" separated="+separate+" completed="+delivered)
   return delivered
@@ -97,7 +98,7 @@ class AndroidTactileAsyncWarningRegionTest {
  }
  @Test fun staleAndDeviceGateInterruptionBreakHistoryWithoutCancellingClaimedPrimary() {
   val action=requireNotNull(observe(start).action)
-  assertTrue(policy.claimFeedbackDelivery(action.trackId,start))
+  assertTrue(policy.claimFeedbackDelivery(action.trackId,start,start))
   observe(start+50,stale=true)
   assertEquals(setOf("p","unknown:1:u"),observe(start+100,batches=listOf(unknown())).activeRiskTrackIds)
   assertTrue(policy.confirmFeedbackDelivery(action.trackId,start,start+100))
@@ -119,21 +120,21 @@ class AndroidTactileAsyncWarningRegionTest {
  }
  @Test fun higherUnknownRiskCancelsLowerClaimAndRetainsOriginalDeadline() {
   val action=requireNotNull(observe(start,listOf(output("p",start,MessageLevel.WARNING))).action)
-  assertTrue(policy.claimFeedbackDelivery(action.trackId,start))
+  assertTrue(policy.claimFeedbackDelivery(action.trackId,start,start))
   val result=observe(start+100,listOf(output("p",start+100,MessageLevel.WARNING)),listOf(unknown()))
   assertEquals("unknown:1:u",result.action?.trackId)
   assertEquals(start+800,result.action?.validUntilMs)
   assertFalse(policy.confirmFeedbackDelivery(action.trackId,start,start+200))
-  assertTrue(policy.claimFeedbackDelivery("unknown:1:u",start+100))
+  assertTrue(policy.claimFeedbackDelivery("unknown:1:u",start+100,start+100))
  }
  @Test fun completedUnknownStopHistoryFollowsPrimarySeverityCatchupWithoutSecondStop() {
   val primary=output("p",start,MessageLevel.WARNING)
   val initial=requireNotNull(observe(start,listOf(primary)).action)
-  assertTrue(policy.claimFeedbackDelivery(initial.trackId,start))
+  assertTrue(policy.claimFeedbackDelivery(initial.trackId,start,start))
   assertTrue(policy.confirmFeedbackDelivery(initial.trackId,start,start))
   val elevated=requireNotNull(observe(start+100,listOf(primary.copy(frameId=(start+100)*1000000L,timestampMs=start+100)),listOf(unknown())).action)
   assertEquals("unknown:1:u",elevated.trackId)
-  assertTrue(policy.claimFeedbackDelivery(elevated.trackId,start+100))
+  assertTrue(policy.claimFeedbackDelivery(elevated.trackId,start+100,start+100))
   assertTrue(policy.confirmFeedbackDelivery(elevated.trackId,start+100,start+100))
   val caughtUp=observe(start+200,batches=listOf(unknown(start+100)))
   assertEquals(setOf("p"),caughtUp.activeRiskTrackIds)
@@ -157,7 +158,7 @@ class AndroidTactileAsyncWarningRegionTest {
         assertTrue(policy.confirmFeedbackDelivery(initial.trackId, start, start))
         val batches = listOf(unknown())
         val elevated = requireNotNull(observe(start + 100, listOf(output("p", start + 100, MessageLevel.WARNING)), batches).action)
-        assertTrue(policy.claimFeedbackDelivery(elevated.trackId, start + 100))
+        assertTrue(policy.claimFeedbackDelivery(elevated.trackId, start + 100, start + 100))
 
         val caughtUp = observe(start + 200, batches = batches)
         assertNull(caughtUp.action)
@@ -177,7 +178,7 @@ class AndroidTactileAsyncWarningRegionTest {
         val initial = requireNotNull(observe(start, listOf(output("p", start, MessageLevel.WARNING))).action)
         assertTrue(policy.confirmFeedbackDelivery(initial.trackId, start, start))
         val claimed = requireNotNull(observe(start + 100, listOf(output("p", start + 100, MessageLevel.WARNING)), listOf(unknown())).action)
-        assertTrue(policy.claimFeedbackDelivery(claimed.trackId, start + 100))
+        assertTrue(policy.claimFeedbackDelivery(claimed.trackId, start + 100, start + 100))
         for (now in start + 200..start + 800 step 100) {
             assertNull(observe(now, batches = listOf(unknown(now - 100))).action)
         }
@@ -195,7 +196,7 @@ class AndroidTactileAsyncWarningRegionTest {
         assertTrue(policy.confirmFeedbackDelivery(initial.trackId, start, start))
         val old = requireNotNull(observe(start + 100, listOf(output("p", start + 100, MessageLevel.CAUTION)),
             listOf(unknown(level = MessageLevel.WARNING))).action)
-        assertTrue(policy.claimFeedbackDelivery(old.trackId, start + 100))
+        assertTrue(policy.claimFeedbackDelivery(old.trackId, start + 100, start + 100))
         val higher = observe(start + 200, batches = listOf(unknown(start + 100)))
         assertEquals("p", higher.action?.trackId)
         assertEquals(MessageLevel.STOP, higher.action?.level)
@@ -205,7 +206,7 @@ class AndroidTactileAsyncWarningRegionTest {
     @Test
     fun claimedUnknownDoesNotHideASeparateEqualSeverityPrimaryRegion() {
         val claimed = requireNotNull(observe(start, emptyList(), listOf(unknown())).action)
-        assertTrue(policy.claimFeedbackDelivery(claimed.trackId, start))
+        assertTrue(policy.claimFeedbackDelivery(claimed.trackId, start, start))
         val separate = output("p", start + 100).copy(bboxNorm = RectNorm(.7f, .3f, .2f, .4f))
         val result = observe(start + 100, listOf(separate), listOf(unknown()))
         assertEquals(setOf("p", "unknown:1:u"), result.activeRiskTrackIds)
@@ -225,7 +226,7 @@ class AndroidTactileAsyncWarningRegionTest {
                 val ready = java.util.concurrent.CountDownLatch(1)
                 val claim = executor.submit<Boolean> {
                     ready.await()
-                    p.claimFeedbackDelivery(reserved.trackId, start)
+                    p.claimFeedbackDelivery(reserved.trackId, start, start + 100)
                 }
                 val selection = executor.submit<TactileFrameFeedbackDispatch> {
                     ready.await()

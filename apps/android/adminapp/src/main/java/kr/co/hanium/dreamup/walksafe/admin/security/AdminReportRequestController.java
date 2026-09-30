@@ -333,9 +333,19 @@ public final class AdminReportRequestController {
         } catch (AdminReportRepository.ReportRequestConflictException conflict) {
             return refreshAfterConflict(request);
         } catch (Exception error) {
+            String authenticationMessage = null;
+            if (request.kind == Request.Kind.STATUS
+                && error instanceof AdminSecurityApiException apiError
+                && (apiError.code() == AdminSecurityApiException.Code.REAUTHENTICATION_FAILED
+                    || apiError.code() == AdminSecurityApiException.Code.TOTP_REPLAYED)) {
+                authenticationMessage = AdminRecoveryMessagePolicy.failureMessage(
+                    AdminRecoveryMessagePolicy.Phase.GENERAL, error
+                );
+            }
             return applyFailure(
                 request,
-                error instanceof AdminReportRepository.ReportRequestNotFoundException
+                error instanceof AdminReportRepository.ReportRequestNotFoundException,
+                authenticationMessage
             );
         } finally {
             request.destroy();
@@ -527,10 +537,18 @@ public final class AdminReportRequestController {
     }
 
     private synchronized boolean applyFailure(Request request, boolean notFound) {
-        return applyFailureLocked(request, notFound);
+        return applyFailureLocked(request, notFound, null);
+    }
+
+    private synchronized boolean applyFailure(Request request, boolean notFound, String message) {
+        return applyFailureLocked(request, notFound, message);
     }
 
     private boolean applyFailureLocked(Request request, boolean notFound) {
+        return applyFailureLocked(request, notFound, null);
+    }
+
+    private boolean applyFailureLocked(Request request, boolean notFound, String message) {
         if (!isCurrentLocked(request)) return false;
         state = new State(
             Phase.ERROR,
@@ -539,7 +557,9 @@ public final class AdminReportRequestController {
             state.nextCursor,
             request.requestId == null ? state.selectedRequestId : request.requestId,
             null,
-            notFound
+            message != null
+                ? message
+                : notFound
                 ? "선택한 사용자 요청을 찾을 수 없습니다."
                 : request.kind == Request.Kind.STATUS
                     ? "요청 상태를 변경하지 못했습니다. 최신 상세를 다시 조회해 주세요."

@@ -144,14 +144,26 @@ class WalkSessionLifecycleFp018Test {
                 ),
             ).changed,
         )
-        assertFalse(
+        val cancelledToken = lifecycle.snapshot().confirmationToken!!
+        assertTrue(
             lifecycle.handle(
                 WalkSessionEvent.ResumeConfirmationReceived(
                     confirmation = WalkSessionResumeConfirmation.CANCEL,
-                    token = lifecycle.snapshot().confirmationToken!!,
+                    token = cancelledToken,
                 ),
             ).changed,
         )
+        assertNull(lifecycle.snapshot().confirmationToken)
+        assertFalse(lifecycle.handle(WalkSessionEvent.ResumeConfirmationReceived(
+            WalkSessionResumeConfirmation.START, cancelledToken,
+        )).changed)
+        lifecycle.handle(WalkSessionEvent.RecoveryRecheckCompleted(
+            readySnapshot(
+                epoch = lifecycle.snapshot().epoch,
+                action = WalkSessionAction.RESUME_WALK,
+                mode = WalkSessionMode.DISTANCE_LIMITED,
+            ),
+        ))
 
         lifecycle.handle(
             WalkSessionEvent.ResumeConfirmationReceived(
@@ -254,7 +266,7 @@ class WalkSessionLifecycleFp018Test {
                 ),
             )
         }
-        return collector.build(assessedAtEpochMs = 900)
+        return collector.build(assessedAtElapsedRealtimeMs = 900)
     }
 
     private fun blockedSnapshot(
@@ -283,6 +295,6 @@ class WalkSessionLifecycleFp018Test {
                 ),
             )
         }
-        return collector.build(assessedAtEpochMs = 901)
+        return collector.build(assessedAtElapsedRealtimeMs = 901)
     }
 }

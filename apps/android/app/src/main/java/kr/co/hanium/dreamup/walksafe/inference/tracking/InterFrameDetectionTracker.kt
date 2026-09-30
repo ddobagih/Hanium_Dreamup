@@ -277,8 +277,39 @@ class InterFrameDetectionTracker(
         }
         return result(sourceKey, targetKey, observations, started, edges, budget,
             previous === current && edges == 0 && budget.pixelComparisons == 0L && budgetFailure == null,
-            observedAtElapsedRealtimeMs)
+            observedAtElapsedRealtimeMs).copy(
+            redetectReasons = if (sourceKey == targetKey) emptySet() else redetectReasons(current, targetKey, incompleteBatch),
+        )
     }
+
+    /**
+     * Batch priority is fixed at admission; these states ask for an earlier fresh detection instead of
+     * re-ranking or reviving identities inside the current batch.
+     */
+    private fun redetectReasons(batch: Batch, target: VisualFrameKey, incompleteBatch: Boolean): Set<VisualRedetectReason> {
+        val reasons = mutableSetOf<VisualRedetectReason>()
+        batch.states.forEachIndexed { index, state ->
+            val failure = state.failure
+            when {
+                failure == VisualTrackingFailure.OBJECT_COMPETITION -> reasons += VisualRedetectReason.OCCLUSION_OR_COMPETITION
+                state.admitted && failure != null && failure !in NON_VISUAL_LOSS -> reasons += VisualRedetectReason.TRACK_LOST
+                !state.admitted && failure == null && index in batch.selectedIndexes -> reasons += VisualRedetectReason.UNTRACKED_CANDIDATES
+                state.admitted && failure == null && !incompleteBatch && state.lastKey == target -> {
+                    val original = batch.detections[index]
+                    if (!inWalkingZone(upright(original.bboxNorm, batch.uprightQuarterTurns)) &&
+                        inWalkingZone(upright(transform(original, state.transform).bboxNorm, batch.uprightQuarterTurns))
+                    ) reasons += VisualRedetectReason.WALKING_ZONE_ENTRY
+                }
+            }
+        }
+        return reasons
+    }
+
+    private fun upright(rect: RectNorm, turns: Int): RectNorm = UprightCameraImage.toSensor(rect, (4 - turns) % 4)
+
+    /** Screen heuristic shared with admission ranking; not metric depth or a calibrated risk score. */
+    private fun inWalkingZone(rect: RectNorm): Boolean =
+        rect.x < 0.65f && rect.x + rect.width > 0.35f && rect.y + rect.height >= 0.5f
 
     private fun result(
         source: VisualFrameKey, target: VisualFrameKey, observations: List<VisualTrackingObservation>,
@@ -365,12 +396,9 @@ class InterFrameDetectionTracker(
     ): List<Int> {
         val validIndexes = detections.indices.filter { valid(detections[it]) }
         // Screen geometry is a priority heuristic, not metric depth or a calibrated risk score.
-        val uprightRects = validIndexes.associateWith {
-            UprightCameraImage.toSensor(detections[it].bboxNorm, (4 - turns) % 4)
-        }
+        val uprightRects = validIndexes.associateWith { upright(detections[it].bboxNorm, turns) }
         val geometryRanked = validIndexes.sortedWith(compareByDescending<Int> {
-            val rect = uprightRects.getValue(it)
-            rect.x < 0.65f && rect.x + rect.width > 0.35f && rect.y + rect.height >= 0.5f
+            inWalkingZone(uprightRects.getValue(it))
         }.thenByDescending { uprightRects.getValue(it).let { rect -> rect.y + rect.height } }
             .thenByDescending { uprightRects.getValue(it).area }
             .thenByDescending { detections[it].detectionConfidence }
@@ -396,6 +424,15 @@ class InterFrameDetectionTracker(
         val area = (minOf(a.x + a.width, b.x + b.width) - maxOf(a.x, b.x)).coerceAtLeast(0f) *
             (minOf(a.y + a.height, b.y + b.height) - maxOf(a.y, b.y)).coerceAtLeast(0f)
         return area / (a.area + b.area - area).coerceAtLeast(0.00001f)
+    }
+
+    private companion object {
+        /** Budget/geometry outcomes are not evidence that an admitted object visually disappeared. */
+        val NON_VISUAL_LOSS = setOf(
+            VisualTrackingFailure.INVALID_GEOMETRY, VisualTrackingFailure.INPUT_BUDGET_EXCEEDED,
+            VisualTrackingFailure.OBJECT_BUDGET_EXCEEDED, VisualTrackingFailure.WORK_BUDGET_EXCEEDED,
+            VisualTrackingFailure.TIME_BUDGET_EXCEEDED,
+        )
     }
 
     private data class FrameDimensions(val width: Int, val height: Int, val sourceWidth: Int, val sourceHeight: Int)

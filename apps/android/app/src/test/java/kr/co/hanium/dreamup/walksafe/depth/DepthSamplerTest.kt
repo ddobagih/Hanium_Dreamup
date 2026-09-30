@@ -110,6 +110,254 @@ class DepthSamplerTest {
     }
 
     @Test
+    fun uniformDepthStatisticsRemainStableAcrossSamplingBudgetBoundary() {
+        val width = 503
+        val height = 2
+        val depth = DepthImage16(width, height, IntArray(width * height) { 1_200 })
+        val confidence = ConfidenceImage8(width, height, ByteArray(width * height) { 255.toByte() })
+        val options = DepthSampleOptions(polygonErosionRatio = 0f)
+
+        for (rightPixel in listOf(499.5f, 500.5f)) {
+            val right = rightPixel / (width - 1)
+            val stats = DepthSampler().sampleObjectDepth(
+                depthImage = depth,
+                confidenceImage = confidence,
+                polygonDepthNorm = listOf(
+                    Point2(0f, 0f), Point2(right, 0f), Point2(right, 0.5f), Point2(0f, 0.5f),
+                ),
+                options = options,
+            )
+
+            assertEquals(options.maxSamples, stats.validSampleCount)
+            assertEquals(1.2f, stats.medianM!!, 0.000001f)
+            assertEquals(1.2f, stats.p20M!!, 0.000001f)
+            assertEquals(1f, stats.validSampleRatio, 0.000001f)
+            assertEquals(1f, stats.confidenceMedian!!, 0.000001f)
+            assertEquals(0f, stats.outlierRatio, 0.000001f)
+            assertFalse(stats.foregroundAmbiguous)
+        }
+    }
+
+    @Test
+    fun validDepthIsNotLostAtThe500To501CandidateBoundary() {
+        val width = 503
+        val height = 2
+        val depth = DepthImage16(
+            width, height,
+            IntArray(width * height) { index -> if (index % width % 2 == 1) 1_200 else 0 },
+        )
+        val confidence = ConfidenceImage8(width, height, ByteArray(width * height) { 255.toByte() })
+        val options = DepthSampleOptions(polygonErosionRatio = 0f)
+
+        for (rightPixel in listOf(499.5f, 500.5f)) {
+            val right = rightPixel / (width - 1)
+            val stats = DepthSampler().sampleObjectDepth(
+                depthImage = depth,
+                confidenceImage = confidence,
+                polygonDepthNorm = listOf(
+                    Point2(0f, 0f), Point2(right, 0f), Point2(right, 0.5f), Point2(0f, 0.5f),
+                ),
+                options = options,
+            )
+
+            assertEquals(250, stats.validSampleCount)
+            assertEquals(0.5f, stats.validSampleRatio, 0.000001f)
+            assertEquals(1.2f, stats.medianM!!, 0.000001f)
+            assertEquals(1.2f, stats.p20M!!, 0.000001f)
+            assertEquals(1f, stats.confidenceMedian!!, 0.000001f)
+            assertFalse(stats.foregroundAmbiguous)
+        }
+    }
+
+    @Test
+    fun defaultOptionsDoNotReplaceNearDepthWithFarStripeAtBudgetBoundary() {
+        val width = 40
+        val height = 40
+        val depth = DepthImage16(
+            width, height,
+            IntArray(width * height) { index -> if (index % width % 2 == 1) 1_000 else 3_000 },
+        )
+        val confidence = ConfidenceImage8(width, height, ByteArray(width * height) { 255.toByte() })
+        val options = DepthSampleOptions()
+
+        for (rightPixel in listOf(20f, 21f)) {
+            val right = rightPixel / (width - 1)
+            val bottom = 25f / (height - 1)
+            val stats = DepthSampler().sampleObjectDepth(
+                depthImage = depth,
+                confidenceImage = confidence,
+                polygonDepthNorm = listOf(
+                    Point2(0f, 0f), Point2(right, 0f), Point2(right, bottom), Point2(0f, bottom),
+                ),
+                options = options,
+            )
+
+            assertTrue(stats.validSampleCount >= options.minValidSamples)
+            assertTrue(stats.validSampleCount <= options.maxSamples)
+            assertEquals(1f, stats.medianM!!, 0.000001f)
+            assertEquals(1f, stats.p20M!!, 0.000001f)
+            assertTrue(stats.outlierRatio > 0f)
+            assertFalse(stats.foregroundAmbiguous)
+        }
+    }
+
+    @Test
+    fun commensurateRectangleKeepsTwoDimensionalDepthStatistics() {
+        val width = 1_000
+        val height = 1_000
+        val confidence = ConfidenceImage8(width, height, ByteArray(width * height) { 255.toByte() })
+        val options = DepthSampleOptions(polygonErosionRatio = 0f)
+        val polygon = listOf(Point2(0f, 0f), Point2(1f, 0f), Point2(1f, 1f), Point2(0f, 1f))
+
+        for (horizontal in listOf(true, false)) {
+            val depth = DepthImage16(
+                width, height,
+                IntArray(width * height) { index ->
+                    1_000 + (if (horizontal) index % width else index / width)
+                },
+            )
+            val stats = DepthSampler().sampleObjectDepth(
+                depthImage = depth,
+                confidenceImage = confidence,
+                polygonDepthNorm = polygon,
+                options = options,
+            )
+
+            // Millimeter-ramp fixtures exercise public statistics, not a copied sampling algorithm.
+            assertEquals(options.maxSamples, stats.validSampleCount)
+            assertEquals(if (horizontal) 1.499f else 1.477f, stats.medianM!!, 0.001f)
+            assertEquals(if (horizontal) 1.195f else 1.204f, stats.p20M!!, 0.001f)
+            assertEquals(if (horizontal) 1.804f else 1.795f, stats.p80M!!, 0.001f)
+            assertEquals(1f, stats.validSampleRatio, 0.000001f)
+            assertEquals(0f, stats.outlierRatio, 0.000001f)
+            assertFalse(stats.foregroundAmbiguous)
+        }
+    }
+
+    @Test
+    fun thinFullPolygonsKeepUniformDepthAtDefaultAndMinimumSampleBudgets() {
+        val defaults = DepthSampleOptions()
+        val polygon = listOf(Point2(0f, 0f), Point2(1f, 0f), Point2(1f, 1f), Point2(0f, 1f))
+
+        for ((width, height) in listOf(1_000 to 2, 2 to 1_000)) {
+            val depth = DepthImage16(width, height, IntArray(width * height) { 1_200 })
+            val confidence = ConfidenceImage8(width, height, ByteArray(width * height) { 255.toByte() })
+
+            for (budget in listOf(defaults.maxSamples, defaults.minValidSamples)) {
+                val stats = DepthSampler().sampleObjectDepth(
+                    depthImage = depth,
+                    confidenceImage = confidence,
+                    polygonDepthNorm = polygon,
+                    options = defaults.copy(maxSamples = budget, polygonErosionRatio = 0f),
+                )
+
+                assertEquals(budget, stats.validSampleCount)
+                assertTrue(stats.validSampleCount >= defaults.minValidSamples)
+                assertNotNull(stats.medianM)
+                assertNotNull(stats.p20M)
+                assertNotNull(stats.confidenceMedian)
+                assertEquals(1.2f, stats.medianM!!, 0.000001f)
+                assertEquals(1.2f, stats.p20M!!, 0.000001f)
+                assertEquals(1f, stats.validSampleRatio, 0.000001f)
+                assertEquals(1f, stats.confidenceMedian!!, 0.000001f)
+                assertEquals(0f, stats.outlierRatio, 0.000001f)
+                assertFalse(stats.foregroundAmbiguous)
+            }
+        }
+    }
+
+    @Test
+    fun connectedNearRegionWithholdsBackgroundBelowAndAboveExistingSupportGate() {
+        val width = 25
+        val height = 20
+        val confidence = ConfidenceImage8(width, height, ByteArray(width * height) { 255.toByte() })
+        val polygon = bboxPolygon(RectNorm(0f, 0f, 1f, 1f), erosionRatio = 0f)
+
+        for (nearCount in listOf(29, 40)) {
+            val values = IntArray(width * height) { 4_000 }
+            repeat(nearCount) { index ->
+                val x = 5 + index % 8
+                val y = 5 + index / 8
+                values[y * width + x] = 800
+            }
+            val stats = DepthSampler().sampleObjectDepth(
+                depthImage = DepthImage16(width, height, values),
+                confidenceImage = confidence,
+                polygonDepthNorm = polygon,
+                options = DepthSampleOptions(polygonErosionRatio = 0f),
+            )
+
+            assertTrue(stats.foregroundAmbiguous)
+            assertNull(stats.medianM)
+            assertNull(stats.p20M)
+        }
+    }
+
+    @Test
+    fun singleNearSampleAndUniformBackgroundRemainQuantitative() {
+        val width = 25
+        val height = 20
+        val confidence = ConfidenceImage8(width, height, ByteArray(width * height) { 255.toByte() })
+        val polygon = bboxPolygon(RectNorm(0f, 0f, 1f, 1f), erosionRatio = 0f)
+
+        for (withNearNoise in listOf(false, true)) {
+            val values = IntArray(width * height) { 4_000 }
+            if (withNearNoise) values[10 * width + 10] = 800
+            val stats = DepthSampler().sampleObjectDepth(
+                depthImage = DepthImage16(width, height, values),
+                confidenceImage = confidence,
+                polygonDepthNorm = polygon,
+                options = DepthSampleOptions(polygonErosionRatio = 0f),
+            )
+
+            assertFalse(stats.foregroundAmbiguous)
+            assertEquals(4f, stats.medianM!!, 0.000001f)
+            assertEquals(4f, stats.p20M!!, 0.000001f)
+        }
+    }
+
+    @Test
+    fun adjacentSampledGridCellsWithholdEvenWhenRawPixelsDoNotTouch() {
+        val width = 50
+        val height = 40
+        val values = IntArray(width * height) { 4_000 }
+        values[10 * width + 10] = 800
+        values[10 * width + 12] = 800
+        val stats = DepthSampler().sampleObjectDepth(
+            depthImage = DepthImage16(width, height, values),
+            confidenceImage = ConfidenceImage8(width, height, ByteArray(width * height) { 255.toByte() }),
+            polygonDepthNorm = bboxPolygon(RectNorm(0f, 0f, 1f, 1f), erosionRatio = 0f),
+            options = DepthSampleOptions(polygonErosionRatio = 0f),
+        )
+
+        assertTrue(stats.foregroundAmbiguous)
+        assertNull(stats.medianM)
+        assertNull(stats.p20M)
+    }
+
+    @Test
+    fun confidenceRejectedNearPairDoesNotWithholdBackground() {
+        val width = 50
+        val height = 40
+        val values = IntArray(width * height) { 4_000 }
+        values[10 * width + 10] = 800
+        values[10 * width + 12] = 800
+        val confidence = ByteArray(width * height) { 255.toByte() }
+        confidence[10 * width + 10] = 0
+        confidence[10 * width + 12] = 0
+        val stats = DepthSampler().sampleObjectDepth(
+            depthImage = DepthImage16(width, height, values),
+            confidenceImage = ConfidenceImage8(width, height, confidence),
+            polygonDepthNorm = bboxPolygon(RectNorm(0f, 0f, 1f, 1f), erosionRatio = 0f),
+            options = DepthSampleOptions(polygonErosionRatio = 0f),
+        )
+
+        assertFalse(stats.foregroundAmbiguous)
+        assertEquals(4f, stats.medianM!!, 0.000001f)
+        assertEquals(4f, stats.p20M!!, 0.000001f)
+    }
+
+    @Test
     fun obstacleWarningUsesActionWithoutStepCountsAndPseudoCautionStaysQualitative() {
         val policy = MessagePolicy(stepLengthM = 0.6f)
         val metric = policy.buildUserFacing(

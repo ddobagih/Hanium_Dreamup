@@ -59,6 +59,45 @@ class VoskTranscriptTest {
         assertNull(transcript?.confidence)
     }
 
+    // S05-24 (05.txt:256): scores must belong to the text words, not only exist.
+    @Test
+    fun wordScoresThatDoNotMatchTheTextGiveNoSentenceScore() {
+        val mismatched = listOf(
+            // Words differ from the text: the scores were given to other words.
+            """{"result":[{"conf":0.99,"word":"길라잡이"},{"conf":0.99,"word":"3번"},{"conf":0.99,"word":"선택"}],"text":"길라잡이 2번 선택"}""",
+            // A text word has no score entry of its own.
+            """{"result":[{"conf":0.99,"word":"길라잡이"},{"conf":0.99,"word":"선택"}],"text":"길라잡이 2번 선택"}""",
+            // Only some entries name their word.
+            """{"result":[{"conf":0.99,"word":"길라잡이"},{"conf":0.99},{"conf":0.99,"word":"선택"}],"text":"길라잡이 2번 선택"}""",
+            // A blank word.
+            """{"result":[{"conf":0.99,"word":"길라잡이"},{"conf":0.99,"word":" "},{"conf":0.99,"word":"선택"}],"text":"길라잡이 2번 선택"}""",
+            // Without word fields the score count must still match the text words.
+            """{"result":[{"conf":0.99},{"conf":0.99}],"text":"길라잡이 2번 선택"}""",
+        )
+        for (payload in mismatched) {
+            val transcript = parseVoskTranscript(payload, isFinal = true)
+            assertEquals(payload, "길라잡이 2번 선택", transcript?.text)
+            assertNull(payload, transcript?.confidence)
+            assertNull(payload, transcript?.wordConfidences)
+            assertFalse(payload, transcript!!.isTrustedForCommand())
+            assertNull(payload, transcript.commandSpanOrNull("2번 선택"))
+        }
+    }
+
+    @Test
+    fun alignedWordScoresWithOrWithoutWordFieldsKeepTheirScores() {
+        val named = parseVoskTranscript(
+            """{"result":[{"conf":0.9,"word":"길라잡이"},{"conf":0.8,"word":"2번"},{"conf":0.7,"word":"선택"}],"text":" 길라잡이  2번 선택 "}""",
+            isFinal = true,
+        )!!
+        assertEquals(listOf(0.9f, 0.8f, 0.7f), named.wordConfidences)
+        assertEquals(0.8f, named.confidence!!, 0.0001f)
+        // The existing device fixture sends scores without word fields; the count still matches.
+        val unnamed = parseVoskTranscript("""{"text":"도움말","result":[{"conf":0.9}]}""", isFinal = true)!!
+        assertEquals(0.9f, unnamed.confidence!!, 0.0001f)
+        assertTrue(unnamed.isTrustedForCommand())
+    }
+
     @Test
     fun commandTrustRequiresFiniteConfidenceAtTheApprovedThreshold() {
         assertFalse(VoskTranscript("길라잡이", null, true).isTrustedForCommand())

@@ -80,14 +80,20 @@ class ObjectTrackerMaskAssociationTest {
         assertEquals(histories,old.map {it.track!!.distanceHistory.size})
         old.forEach {assertFalse(record(t,it.track!!,2750,1f));assertEquals(ObjectMovementDirection.UNKNOWN,ObjectMotionPolicy.estimate(it.track!!).direction)}
         val recovered=t.updateMaskAwareWithAssignments(listOf(input(0,3000,mask(10,50)),input(1,3000,mask(40,80))),3000)
-        assertEquals(ids,recovered.map {it.track!!.trackId})
+        // S11-19 / FP-019 design_rules[3]: after a crossing each object starts a new observation number.
+        assertTrue(recovered.none {it.track!!.trackId in ids});assertTrue(recovered.all {it.status==MaskAssociationStatus.NEW})
         recovered.forEach {assertTrue(it.track!!.distanceHistory.isEmpty());assertTrue(record(t,it.track!!,3000,2f));assertNull(t.approachKinematics(it.track!!,2f,DepthSource.ARCORE_RAW_DEPTH).timeToCollisionMs)}
     }
-    @Test fun missingObjectHoldsIdentityForBoundedGapAndRequiresNewMotionWarmup() {
+    @Test fun missingObjectReturnsWithANewObservationNumberAndRequiresNewMotionWarmup() {
+        // S11-19 / FP-019 design_rules[3]: an object seen again after a gap starts a new observation number.
         val t=ObjectTracker();val old=t.updateMaskAwareWithAssignments(listOf(input(0,1000,mask())),1000).single().track!!
         assertTrue(record(t,old,1000,5f));t.updateMaskAwareWithAssignments(emptyList(),1250)
-        val returned=t.updateMaskAwareWithAssignments(listOf(input(0,1500,mask())),1500).single().track!!
-        assertEquals(old.trackId,returned.trackId);assertTrue(returned.distanceHistory.isEmpty())
+        val back=t.updateMaskAwareWithAssignments(listOf(input(0,1500,mask())),1500).single()
+        val returned=back.track!!
+        assertNotEquals(old.trackId,returned.trackId);assertEquals(MaskAssociationStatus.NEW,back.status)
+        assertTrue(returned.distanceHistory.isEmpty());assertEquals(1,returned.ageFrames);assertFalse(returned.stable)
+        // The gap is not filled and the old approach/TTC is not restored.
+        assertTrue(record(t,returned,1500,4f));assertNull(t.approachKinematics(returned,4f,DepthSource.ARCORE_RAW_DEPTH).timeToCollisionMs)
         t.updateMaskAwareWithAssignments(emptyList(),1750)
         val expired=t.updateMaskAwareWithAssignments(listOf(input(0,3251,mask())),3251).single().track!!
         assertNotEquals(old.trackId,expired.trackId)

@@ -3,6 +3,10 @@ package kr.co.hanium.dreamup.walksafe.report
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.net.Socket
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
@@ -32,6 +36,91 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AndroidReportUploaderTest {
+    @Test
+    fun realBackendRequestBytesBindCreatedAndReplayReceiptsAndCooldownError() {
+        val fixtures = requireNotNull(javaClass.getResourceAsStream("/report/s20-6-transport-outcomes.json"))
+            .bufferedReader().use { JSONObject(it.readText()) }
+        listOf("created", "replayed").forEach { name ->
+            val fixture = fixtures.getJSONObject(name)
+            val request = fixture.getJSONObject("request")
+            val payload = requireNotNull(FrozenReportPayload.freeze(
+                request.getString("report_id"),
+                java.util.Base64.getDecoder().decode(request.getString("metadata_utf8_base64")),
+                java.util.Base64.getDecoder().decode(request.getString("image_jpeg_base64")),
+            ))
+            val report = queuedReport().copy(payload = payload)
+            val result = requireNotNull(parseQueuedUploadResultOrNull(fixture.getJSONObject("body").toString(), report))
+            assertEquals(name.uppercase(Locale.ROOT), result.creationOutcome?.name)
+            assertEquals(payload.payloadSha256, result.receipt.payloadSha256)
+            assertEquals(payload.payloadBytes, result.receipt.payloadBytes)
+        }
+        val suppressed = fixtures.getJSONObject("suppressed")
+        val error = ReportUploadError(
+            suppressed.getInt("status"), suppressed.getJSONObject("body").toString(),
+            parseReportRetryAfterMs(suppressed.getString("retry_after")),
+        )
+        assertTrue(error.isAutomaticCooldownSuppression())
+        assertEquals(600_000L, error.retryAfterMs)
+    }
+
+    @Test
+    fun exactReceiptRetainsCreatedAndReplayedWithoutInventingLegacyOutcome() {
+        val report = queuedReport()
+        listOf("CREATED", "REPLAYED", null, JSONObject.NULL).forEach { literal ->
+            val body = JSONObject().put("transport_receipt", transportReceipt(report))
+            if (literal != null) body.put("creation_outcome", literal)
+            val result = requireNotNull(parseQueuedUploadResultOrNull(body.toString(), report))
+            assertEquals(literal.takeIf { it is String }, result.creationOutcome?.name)
+            assertEquals(report.payload.reportId, result.receipt.reportId)
+        }
+    }
+
+    @Test
+    fun successOutcomeCannotHideMalformedUnknownOrSuppressedResult() {
+        val report = queuedReport()
+        listOf("UNKNOWN", "", true, 1, "SUPPRESSED_BY_COOLDOWN").forEach { literal ->
+            val body = JSONObject().put("transport_receipt", transportReceipt(report))
+                .put("creation_outcome", literal)
+            assertNull(parseQueuedUploadReceiptOrNull(body.toString(), report))
+            assertThrows(ReportUploadProtocolException::class.java) {
+                validatedReportUploadResponseOrNull(
+                    201, JSONObject(structuredSuccessBody()).put("creation_outcome", literal).toString(),
+                    receiptExpectation(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun createdMetadataNeverOverridesExactReceiptOrLegacyBindingChecks() {
+        val report = queuedReport()
+        val body = JSONObject().put("creation_outcome", "CREATED")
+            .put("transport_receipt", transportReceipt(report).put("payload_bytes", report.payload.payloadBytes + 1))
+        assertNull(parseQueuedUploadResultOrNull(body.toString(), report))
+        assertThrows(ReportUploadProtocolException::class.java) {
+            validatedReportUploadResponseOrNull(
+                201, JSONObject(structuredSuccessBody(traceId = OMITTED_RECEIPT_FIELD))
+                    .put("creation_outcome", "CREATED").toString(),
+                receiptExpectation(ReportTransferPurpose.AUTOMATIC),
+            )
+        }
+    }
+
+    @Test
+    fun cooldownClassificationRequiresExactStatusCodeAndOutcome() {
+        val detail = JSONObject().put("code", "automatic_report_cooldown_active")
+            .put("creation_outcome", "SUPPRESSED_BY_COOLDOWN")
+        val body = JSONObject().put("detail", detail).toString()
+        assertTrue(ReportUploadError(429, body, 600_000L).isAutomaticCooldownSuppression())
+        assertFalse(ReportUploadError(503, body, 600_000L).isAutomaticCooldownSuppression())
+        listOf("CREATED", "REPLAYED", "UNKNOWN", true, JSONObject.NULL).forEach { outcome ->
+            detail.put("creation_outcome", outcome)
+            assertFalse(ReportUploadError(429, JSONObject().put("detail", detail).toString()).isAutomaticCooldownSuppression())
+        }
+        detail.put("creation_outcome", "SUPPRESSED_BY_COOLDOWN").put("code", "rate_limited")
+        assertFalse(ReportUploadError(429, JSONObject().put("detail", detail).toString()).isAutomaticCooldownSuppression())
+    }
+
     @Test
     fun multipartBodyContainsMetadataAndJpegImageParts() {
         val uploader = AndroidReportUploader()
@@ -77,13 +166,76 @@ class AndroidReportUploaderTest {
     }
 
     @Test
-    fun retryBackoffIsBoundedAndHonorsAuthAndServerDelays() {
+    fun retryBackoffIsBoundedButLongServerDelaysArePreserved() {
         assertEquals(2_000L, reportRetryDelayMs(consecutiveFailures = 1))
         assertEquals(16_000L, reportRetryDelayMs(consecutiveFailures = 4))
         assertEquals(30_000L, reportRetryDelayMs(consecutiveFailures = 20))
         assertEquals(60_000L, reportRetryDelayMs(consecutiveFailures = 1, statusCode = 401))
         assertEquals(45_000L, reportRetryDelayMs(consecutiveFailures = 1, statusCode = 429, retryAfterMs = 45_000L))
-        assertEquals(300_000L, reportRetryDelayMs(consecutiveFailures = 1, retryAfterMs = 900_000L))
+        assertEquals(900_000L, reportRetryDelayMs(consecutiveFailures = 1, retryAfterMs = 900_000L))
+        assertEquals(3_600_000L, reportRetryDelayMs(consecutiveFailures = 1, statusCode = 429, retryAfterMs = 3_600_000L))
+    }
+
+    @Test
+    fun retryAfterParsesNumericSecondsAndHttpDateWithoutOverflow() {
+        assertEquals(3_600_000L, parseReportRetryAfterMs("3600"))
+        assertEquals(
+            3_600_000L,
+            parseReportRetryAfterMs("Wed, 21 Oct 2015 07:28:00 GMT", 1_445_408_880_000L),
+        )
+        assertEquals(Long.MAX_VALUE / 2L, parseReportRetryAfterMs("9".repeat(100)))
+        assertNull(parseReportRetryAfterMs("not-a-date"))
+    }
+
+    @Test
+    fun uploadErrorPreservesNumericAndDateRetryAfterHeaders() {
+        val dateHeader = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
+            .apply { timeZone = TimeZone.getTimeZone("GMT") }
+            .format(Date(System.currentTimeMillis() + 3_600_000L))
+        listOf("3600", dateHeader).forEach { header ->
+            LocalHttpTestServer { _, socket ->
+                socket.getOutputStream().apply {
+                    write(
+                        ("HTTP/1.1 429 Too Many Requests\r\n" +
+                            "Content-Type: application/json\r\n" +
+                            "Retry-After: $header\r\n" +
+                            "Content-Length: 2\r\nConnection: close\r\n\r\n{}").toByteArray(Charsets.US_ASCII),
+                    )
+                    flush()
+                }
+                socket.awaitPeerDisconnect(3_000)
+            }.use { server ->
+                val error = assertThrows(ReportUploadHttpException::class.java) {
+                    AndroidReportUploader().uploadCall(
+                        permit = uploadPermit(),
+                        session = session(server.baseUrl),
+                        consentConfirmation = consentConfirmation(),
+                        networkBinding = testNetworkBinding(),
+                        transferPurpose = ReportTransferPurpose.EXPLICIT,
+                        metadataJson = """{"auto_reported":false,"trace_id":"$TEST_TRACE_ID"}""",
+                        imageJpeg = TEST_IMAGE,
+                        stableTraceId = TEST_TRACE_ID,
+                        expectedGatewayActorId = TEST_ACTOR_ID,
+                    ).execute()
+                }.error
+                val delay = requireNotNull(error.retryAfterMs)
+                if (header == "3600") {
+                    assertEquals(3_600_000L, delay)
+                } else {
+                    assertTrue(delay in 3_590_000L..3_600_000L)
+                }
+                assertEquals(delay, reportRetryDelayMs(1, error.statusCode, delay))
+            }
+        }
+    }
+
+    @Test
+    fun automaticCooldownResponsePreservesTheFullServerRetryInterval() {
+        assertTrue(isTransientReportHttpStatus(429))
+        assertEquals(
+            AndroidReportCooldownPolicy.AUTOMATIC_COOLDOWN_MS,
+            reportRetryDelayMs(consecutiveFailures = 1, statusCode = 429, retryAfterMs = 600_000L),
+        )
     }
 
     @Test
@@ -529,7 +681,7 @@ class AndroidReportUploaderTest {
             FrozenReportPayload.freeze(
                 "123e4567-e89b-42d3-a456-426614174010",
                 "{}".toByteArray(),
-                byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte(), 0xd9.toByte()),
+                reportTestJpeg(),
             ),
         )
         return QueuedReport(

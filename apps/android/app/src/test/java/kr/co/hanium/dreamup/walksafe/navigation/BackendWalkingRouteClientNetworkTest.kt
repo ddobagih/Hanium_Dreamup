@@ -156,6 +156,46 @@ class BackendWalkingRouteClientNetworkTest {
         }
     }
 
+    @Test
+    fun malformedNonSuccessJsonIsAProtocolFailureInsteadOfUnknownHttpFailure() {
+        LocalHttpTestServer { _, socket ->
+            socket.writeFixedResponse(422, "{".toByteArray())
+        }.use { server ->
+            val error = assertThrows(GatewayResponseProtocolException::class.java) {
+                BackendWalkingRouteClient()
+                    .fetchRouteCall(session(server.baseUrl), ROUTE_REQUEST)
+                    .execute()
+            }
+            val failure = classifyNavigationBackendFailure(error)
+            assertEquals(NavigationBackendErrorKind.INVALID_RESPONSE, failure.kind)
+            assertEquals(NavigationFailureLayer.RESPONSE_PROTOCOL, failure.layer)
+            assertEquals(NavigationFailureReason.MALFORMED_JSON, failure.reason)
+            assertEquals(NavigationFailureRetryability.SERVICE_RECOVERY, failure.retryability)
+        }
+    }
+
+    @Test
+    fun emptyErrorBodiesRetainGatewayRateLimitAndTimeoutClassification() {
+        listOf(
+            429 to NavigationBackendErrorKind.RATE_LIMITED,
+            504 to NavigationBackendErrorKind.TIMEOUT,
+        ).forEach { (status, expectedKind) ->
+            LocalHttpTestServer { _, socket ->
+                socket.writeFixedResponse(status, byteArrayOf())
+            }.use { server ->
+                val error = assertThrows(GatewayProxyHttpException::class.java) {
+                    BackendWalkingRouteClient()
+                        .fetchRouteCall(session(server.baseUrl), ROUTE_REQUEST)
+                        .execute()
+                }
+                val failure = classifyNavigationBackendFailure(error)
+                assertEquals(expectedKind, failure.kind)
+                assertEquals(NavigationFailureLayer.GATEWAY, failure.layer)
+                assertTrue(!failure.routeUserMessage.contains("TMAP"))
+            }
+        }
+    }
+
     private fun session(baseUrl: String): GatewayFieldSession {
         return GatewayFieldSession.verified(
             gatewayBaseUrl = baseUrl,
@@ -192,7 +232,19 @@ class BackendWalkingRouteClientNetworkTest {
                 {"latitude":37.001,"longitude":127.0}
               ],
               "steps":[],
-              "guide_points":[],
+              "guide_points":[
+                {
+                  "bearing_deg":0.0,
+                  "distance_from_start_m":120,
+                  "facility_type":15,
+                  "index":0,
+                  "instruction":"목적지 도착",
+                  "point":{"latitude":37.001,"longitude":127.0,"name":null},
+                  "point_type":"E",
+                  "remaining_distance_m":0,
+                  "turn_type":201
+                }
+              ],
               "provider_result_code":0,
               "provider_result_message":"OK"
             }

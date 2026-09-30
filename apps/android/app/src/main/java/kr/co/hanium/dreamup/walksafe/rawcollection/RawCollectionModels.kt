@@ -23,6 +23,23 @@ internal enum class RawManifestState {
     COMPLETE,
 }
 
+internal enum class RawUploadDisposition {
+    READY,
+    QUARANTINED,
+    ACKNOWLEDGED,
+    /**
+     * S1617-18-F1: the server refused the segment's bound RAW consent (409). It is never sent
+     * again and is deleted; the marker only lets the next cleanup finish a failed delete.
+     */
+    CONSENT_REJECTED,
+    /**
+     * transfer-F8 (owner decision 3(b)): the Gateway will never accept the segment's walk (409
+     * raw_collection_walk_not_uploadable). Distinct from [CONSENT_REJECTED]; also never sent again
+     * and deleted, the marker only lets the next cleanup finish a failed delete.
+     */
+    WALK_REJECTED,
+}
+
 internal data class RawChunkMetadata(
     val ordinal: Int,
     val type: RawChunkType,
@@ -53,9 +70,13 @@ internal data class RawCollectionManifest(
     val expiresAtEpochMs: Long,
     val state: RawManifestState,
     val chunks: List<RawChunkMetadata>,
+    val uploadDisposition: RawUploadDisposition = RawUploadDisposition.READY,
 ) {
     val uploadReady: Boolean
-        get() = state == RawManifestState.COMPLETE && chunks.isCompleteRuntimeBatch()
+        get() = state == RawManifestState.COMPLETE && chunks.isCompleteRuntimeBatch() &&
+            uploadDisposition != RawUploadDisposition.QUARANTINED &&
+            uploadDisposition != RawUploadDisposition.CONSENT_REJECTED &&
+            uploadDisposition != RawUploadDisposition.WALK_REJECTED
 }
 
 internal data class RawCollectionReceipt(
@@ -108,8 +129,12 @@ internal data class BackendRawCommit(
 )
 
 internal enum class RawCollectionFence {
+    /** 16-17 #14: this receipt's RAW consent continued unbroken into a later receipt. */
+    CONSENT_CONTINUED,
     CONSENT_REVOKED,
     ACCOUNT_DELETED,
+    /** transfer-F1 (R3): continuity recorded before this consent policy version was ended. */
+    CONSENT_POLICY_ALIGNED,
 }
 
 internal fun encodeRawManifest(manifest: RawCollectionManifest): ByteArray = JSONObject()
@@ -124,6 +149,7 @@ internal fun encodeRawManifest(manifest: RawCollectionManifest): ByteArray = JSO
     .put("captured_ended_at_epoch_ms", manifest.capturedEndedAtEpochMs ?: JSONObject.NULL)
     .put("expires_at_epoch_ms", manifest.expiresAtEpochMs)
     .put("state", manifest.state.name)
+    .put("upload_disposition", manifest.uploadDisposition.name)
     .put("chunks", JSONArray().also { chunks ->
         manifest.chunks.forEach { chunk ->
             chunks.put(
@@ -141,7 +167,8 @@ internal fun encodeRawManifest(manifest: RawCollectionManifest): ByteArray = JSO
 
 internal fun decodeRawManifest(bytes: ByteArray): RawCollectionManifest? = runCatching {
     val root = JSONObject(String(bytes, Charsets.UTF_8))
-    require(root.keysAsSet() == RAW_MANIFEST_FIELDS)
+    require(root.keysAsSet() == RAW_MANIFEST_FIELDS ||
+        root.keysAsSet() == RAW_MANIFEST_FIELDS + "upload_disposition")
     require(root.getString("schema_version") == RAW_MANIFEST_SCHEMA)
     val collectionId = root.getString("collection_id")
     val owner = RawCollectionOwner(
@@ -207,6 +234,9 @@ internal fun decodeRawManifest(bytes: ByteArray): RawCollectionManifest? = runCa
         expiresAtEpochMs = expiresAt,
         state = state,
         chunks = chunks,
+        uploadDisposition = if (root.has("upload_disposition")) {
+            RawUploadDisposition.valueOf(root.getString("upload_disposition"))
+        } else RawUploadDisposition.READY,
     )
 }.getOrNull()
 

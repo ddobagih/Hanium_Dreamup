@@ -91,7 +91,11 @@ class ArCoreTactileProjectionContextFactoryTest {
             onDrawFrame.substringAfter("captureVisualTrackingFrame:").substringBefore(scheduleCall),
         )
         assertEquals(localLoad(onDrawFrame, "grayFrame", "a").replaceFirst("load", "store"), operation(scheduleSetup.first()))
-        val scheduleArguments = scheduleSetup.drop(1)
+        val unknownCallIndex = scheduleSetup.indexOfLast {
+            it.contains("scheduleUnknownDetectionIfDue:")
+        }
+        assertTrue(unknownCallIndex >= 0)
+        val scheduleArguments = scheduleSetup.drop(unknownCallIndex + 1)
         // The nullable visual key adds branches after the stable capture arguments;
         // do not count instructions backwards from the invocation.
         assertEquals(
@@ -127,10 +131,32 @@ class ArCoreTactileProjectionContextFactoryTest {
         // Start after the preceding identity construction, retaining their producers.
         val sourceEvidence = schedule.substringAfter("AndroidDetectionSnapshotFrameIdentity.\"<init>\"")
             .substringBefore("MainActivity\$DetectionFrameEvidence.\"<init>\"")
-        assertEvidenceInputs(sourceEvidence, scheduledFrameLoad, scheduledTimestampLoad, scheduledElapsedLoad, scheduledDepthLoad)
+        assertEvidenceInputs(
+            sourceEvidence, scheduledFrameLoad, scheduledTimestampLoad,
+            scheduledElapsedLoad, scheduledDepthLoad, allowMissingDepth = false,
+        )
+        val defaultMapper = compiledMethod(disassembly, "createFrozenDepthMapper\$default")
+        val defaultInstructions = bytecodeInstructions(defaultMapper)
+        assertEquals(
+            listOf("iload 8", "bipush 32", "iand"),
+            defaultInstructions.take(3).map(::operation),
+        )
+        assertEquals("ifeq", opcode(defaultInstructions[3]))
+        assertEquals(
+            listOf("iconst_0", "istore 7"),
+            defaultInstructions.drop(4).take(2).map(::operation),
+        )
+        assertEquals(
+            listOf("aload 0", "aload 1", "lload 2", "iload 4", "iload 5", "aload 6", "iload 7"),
+            defaultInstructions.drop(6).take(7).map(::operation),
+        )
+        assertTrue(defaultInstructions[13].contains("createFrozenDepthMapper:"))
         val currentEvidence = onDrawFrame.substringAfter("// class kr/co/hanium/dreamup/walksafe/MainActivity\$DetectionFrameEvidence")
             .substringBefore("MainActivity\$DetectionFrameEvidence.\"<init>\"")
-        assertEvidenceInputs(currentEvidence, frameLoad, timestampLoad, elapsedLoad, snapshotLoad)
+        assertEvidenceInputs(
+            currentEvidence, frameLoad, timestampLoad, elapsedLoad, snapshotLoad,
+            allowMissingDepth = true,
+        )
     }
 
     private fun assertEvidenceInputs(
@@ -139,16 +165,34 @@ class ArCoreTactileProjectionContextFactoryTest {
         timestampLoad: String,
         elapsedLoad: String,
         snapshotLoad: String,
+        allowMissingDepth: Boolean,
     ) {
         assertTrue(evidence.contains(FRAME_TIMESTAMP_CALL))
-        val frameIdentity = bytecodeInstructions(evidence.substringAfter(FRAME_TIMESTAMP_CALL)).take(2)
-        assertEquals(listOf(timestampLoad, snapshotLoad), frameIdentity.map(::operation))
-        val mapperCall = "createFrozenDepthMapper:(Lcom/google/ar/core/Frame;JIILkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;)Lkr/co/hanium/dreamup/walksafe/FrozenImageToTextureCoordinateMapper;"
+        // Constructor arguments may be spilled while optional visual evidence is built.
+        assertTrue(
+            bytecodeInstructions(evidence).map(::operation).windowed(2)
+                .any { it == listOf(timestampLoad, snapshotLoad) },
+        )
+        val mapperCall = if (allowMissingDepth) {
+            "createFrozenDepthMapper:(Lcom/google/ar/core/Frame;JIILkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;Z)Lkr/co/hanium/dreamup/walksafe/FrozenImageToTextureCoordinateMapper;"
+        } else {
+            "createFrozenDepthMapper\$default:(Lkr/co/hanium/dreamup/walksafe/MainActivity;Lcom/google/ar/core/Frame;JIILkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;ZILjava/lang/Object;)Lkr/co/hanium/dreamup/walksafe/FrozenImageToTextureCoordinateMapper;"
+        }
         assertTrue(evidence.contains(mapperCall))
-        val mapperArguments = bytecodeInstructions(evidence.substringAfter(FRAME_TIMESTAMP_CALL).substringBefore(mapperCall)).drop(2)
-        assertEquals(listOf("aload 0", frameLoad, frameLoad), mapperArguments.take(3).map(::operation))
-        assertTrue(mapperArguments[3].contains(FRAME_TIMESTAMP_CALL))
-        assertEquals(snapshotLoad, operation(mapperArguments[mapperArguments.lastIndex - 1]))
+        val mapperArguments = bytecodeInstructions(evidence.substringBefore(mapperCall))
+        assertTrue(mapperArguments.windowed(4).any {
+            it.take(3).map(::operation) == listOf("aload 0", frameLoad, frameLoad) &&
+                it[3].contains(FRAME_TIMESTAMP_CALL)
+        })
+        val expectedTail = if (allowMissingDepth) {
+            listOf(snapshotLoad, "iconst_1")
+        } else {
+            listOf(snapshotLoad, "iconst_0", "bipush 32", "aconst_null")
+        }
+        assertEquals(
+            expectedTail,
+            mapperArguments.dropLast(1).takeLast(expectedTail.size).map(::operation),
+        )
         val projectionCall = "buildTactileProjectionContext:(Lcom/google/ar/core/Frame;J)Lkr/co/hanium/dreamup/walksafe/navigation/TactileProjectionContext;"
         assertEquals(1, Regex(Regex.escape(projectionCall)).findAll(evidence).count())
         assertEquals(
@@ -157,9 +201,13 @@ class ArCoreTactileProjectionContextFactoryTest {
         )
         val afterProjection = evidence.substringAfter(projectionCall)
         assertFalse(afterProjection.contains("Method kr/co/hanium/dreamup/walksafe/navigation/TactileProjectionContext."))
-        val motionArguments = bytecodeInstructions(afterProjection).take(3)
-        assertEquals(listOf("aload 0", elapsedLoad), motionArguments.take(2).map(::operation))
-        assertTrue(motionArguments[2].contains("buildDepthMotionContext"))
+        val motionInstructions = bytecodeInstructions(afterProjection)
+        val motionIndex = motionInstructions.indexOfFirst { it.contains("buildDepthMotionContext") }
+        assertTrue(motionIndex >= 2)
+        assertEquals(
+            listOf("aload 0", elapsedLoad),
+            motionInstructions.subList(motionIndex - 2, motionIndex).map(::operation),
+        )
     }
 
     private fun assertFrameTimestampReceivers(method: String, expectedFrameLoad: String) {

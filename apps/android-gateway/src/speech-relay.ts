@@ -101,6 +101,20 @@ function boundedInteger(
     : fallback;
 }
 
+function speechUpstreamTimeoutMs(kind: SpeechKind): number {
+  return kind === "stt"
+    ? boundedInteger("WALKSAFE_VOICE_STT_TIMEOUT_MS", DEFAULT_STT_TIMEOUT_MS, 1000, 300_000)
+    : boundedInteger("WALKSAFE_VOICE_TTS_TIMEOUT_MS", DEFAULT_TTS_TIMEOUT_MS, 1000, 300_000);
+}
+
+/**
+ * S19-59: the longest a speech relay may take by its own limits (body read + configured Voice
+ * timeout). The Node adapter's whole-request deadline is set above this, never below it.
+ */
+export function speechRelayOwnLimitsMs(kind: SpeechKind): number {
+  return DEFAULT_BODY_READ_TIMEOUT_MS + speechUpstreamTimeoutMs(kind);
+}
+
 function speechLimit(kind: SpeechKind, suffix: string, fallback: number): number {
   const ranges: Record<string, readonly [number, number]> = {
     GLOBAL_RATE_LIMIT: [1, 100_000],
@@ -431,12 +445,7 @@ export async function relaySpeechStt(
       new Blob([ownedArrayBuffer(bounded.bytes)], { type: media.contentType }),
       media.filename
     );
-    const timeoutMs = boundedInteger(
-      "WALKSAFE_VOICE_STT_TIMEOUT_MS",
-      DEFAULT_STT_TIMEOUT_MS,
-      1000,
-      300_000
-    );
+    const timeoutMs = speechUpstreamTimeoutMs("stt");
     const upstream = await fetchVoice(
       request,
       `${config.baseUrl}/speech/stt`,
@@ -565,12 +574,7 @@ export async function relaySpeechTts(
     if (bounded.error) return bounded.error;
     if (!validTtsRequest(bounded.value)) return responseError(422, "speech_tts_request_invalid");
 
-    const timeoutMs = boundedInteger(
-      "WALKSAFE_VOICE_TTS_TIMEOUT_MS",
-      DEFAULT_TTS_TIMEOUT_MS,
-      1000,
-      300_000
-    );
+    const timeoutMs = speechUpstreamTimeoutMs("tts");
     const headers = voiceHeaders(config, admission.actorId, admission.clientIp, correlationId);
     headers.set("content-type", "application/json");
     const upstream = await fetchVoice(

@@ -25,9 +25,9 @@ class NavigationBackendFailureTest {
 
             assertEquals(NavigationBackendErrorKind.RATE_LIMITED, failure.kind)
             assertEquals(status, failure.statusCode)
-            assertTrue(failure.kind.userMessage.contains("사용 한도"))
-            assertTrue(failure.kind.userMessage.contains("목적지 검색"))
-            assertTrue(failure.kind.userMessage.contains("다시 시도"))
+            assertEquals(NavigationFailureLayer.PROVIDER, failure.layer)
+            assertTrue(failure.routeUserMessage.contains("사용 한도"))
+            assertTrue(failure.routeUserMessage.contains("다시 시도"))
         }
         assertEquals(NavigationBackendErrorKind.RATE_LIMITED, classify(429, null).kind)
     }
@@ -54,14 +54,15 @@ class NavigationBackendFailureTest {
     }
 
     @Test
-    fun gatewayAuthenticationFailuresStillRequireTheUserSessionToBeChecked() {
+    fun onlyUserSessionFailuresRequireTheUserSessionToBeChecked() {
         listOf(401, 403).forEach { status ->
             assertEquals(NavigationBackendErrorKind.AUTHENTICATION, classify(status, null).kind)
         }
         assertEquals(
-            NavigationBackendErrorKind.AUTHENTICATION,
+            NavigationBackendErrorKind.BACKEND_UNAVAILABLE,
             classify(502, "gateway_upstream_auth_failed").kind,
         )
+        assertFalse(classify(502, "gateway_upstream_auth_failed").isUserSessionAuthentication)
     }
 
     @Test
@@ -71,9 +72,15 @@ class NavigationBackendFailureTest {
             classify(422, "route_geometry_summary_mismatch").kind,
         )
         assertEquals(
-            NavigationBackendErrorKind.PROVIDER_UNAVAILABLE,
+            NavigationBackendErrorKind.ROUTE_UNAVAILABLE,
             classify(502, "route_unavailable").kind,
         )
+        val unavailableRoute = classify(422, "route_unavailable")
+        assertEquals(NavigationFailureLayer.PROVIDER, unavailableRoute.layer)
+        assertEquals(NavigationFailureReason.ROUTE_UNAVAILABLE, unavailableRoute.reason)
+        assertEquals(NavigationFailureRetryability.AFTER_DESTINATION_CHANGE, unavailableRoute.retryability)
+        assertTrue(unavailableRoute.routeUserMessage.contains("목적지"))
+        assertFalse(unavailableRoute.routeUserMessage.contains("연결 장애"))
         assertEquals(
             NavigationBackendErrorKind.BACKEND_UNAVAILABLE,
             classify(503, "gateway_unavailable").kind,

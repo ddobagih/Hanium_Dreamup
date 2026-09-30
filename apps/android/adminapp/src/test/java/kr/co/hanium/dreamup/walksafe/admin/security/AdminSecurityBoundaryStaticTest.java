@@ -85,6 +85,17 @@ public final class AdminSecurityBoundaryStaticTest {
     }
 
     @Test
+    public void loginAndRecoveryDoNotCaptureSecretStringsInQueuedOperations() {
+        assertFalse(activity.contains("passwordInput.getText().toString()"));
+        assertFalse(activity.contains("totpInput.getText().toString()"));
+        assertFalse(activity.contains("recoveryCodeInput.getText().toString()"));
+        assertFalse(activity.contains("newPasswordInput.getText().toString()"));
+        assertFalse(activity.contains("newTotpInput.getText().toString()"));
+        assertTrue(activity.contains("pendingSecurityCredentials.getAndSet(null)"));
+        assertTrue(activity.contains("credentials.takeForDispatch()"));
+    }
+
+    @Test
     public void recoveryCustodyAndLostDeviceControlsAreExplicitAndKeepNoRecoveryMaterial() {
         assertTrue(activity.contains("custodyConfirmationInput.isChecked()"));
         assertTrue(activity.contains("복구자료 외부 보관 확인 기록"));
@@ -96,7 +107,9 @@ public final class AdminSecurityBoundaryStaticTest {
         assertTrue(securityClient.contains("/admin/security/recovery-custody/attest"));
         assertTrue(securityClient.contains("/report-lost"));
         assertTrue(securityClient.contains("current device cannot be reported lost"));
-        assertTrue(securityClient.contains("AdminJava8Collections.set(\"sessions\", \"devices\")"));
+        assertTrue(securityClient.contains(
+            "\"sessions\", \"devices\", \"device_total\", \"devices_complete\""
+        ));
         assertTrue(activity.contains("활성 장치 키만 남은 기기"));
         assertFalse(activity.contains("putString(\"recovery"));
         assertTrue(readme.contains("서버 키, 앱 서명 키, 관리자 복구자료"));

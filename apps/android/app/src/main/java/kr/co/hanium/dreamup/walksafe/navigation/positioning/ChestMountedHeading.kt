@@ -39,6 +39,8 @@ data class ChestMountedRotationSample(
     val observedAtMs: Long,
     val headingAccuracyDegrees: Double,
     val accuracy: EarthOrientationAccuracy,
+    /** S09-32: measured rotation-vector angular rate (the S08-6 route-compass rate); null if unknown. */
+    val angularRateDegreesPerSecond: Double? = null,
 )
 
 data class ChestMountedMagneticFieldSample(
@@ -231,19 +233,38 @@ class ChestMountedHeading(
             return invalid(ChestMountedHeadingGateReason.FIELD_RECOVERING, rotation)
         }
 
+        // S09-32: the heading comes from the rotation vector, but the field checks above certify it
+        // with a magnetometer sample taken up to MAX_SENSOR_SKEW_MS apart. While the phone turns,
+        // the heading can move by |rate| x skew in between; that physical amount is added to the
+        // sensor error so the walking-heading accuracy is not reported as the sensor accuracy.
+        val angularRate = rotation.angularRateDegreesPerSecond
+        if (angularRate != null && (!angularRate.isFinite() || angularRate < 0.0)) {
+            return invalid(ChestMountedHeadingGateReason.HEADING_ACCURACY, rotation)
+        }
+        val sensorSkewMs = abs(rotation.observedAtMs - magneticField.observedAtMs)
+        val walkingHeadingAccuracyDegrees =
+            rotation.headingAccuracyDegrees + (angularRate ?: 0.0) * sensorSkewMs / MILLISECONDS_PER_SECOND
+        if (!walkingHeadingAccuracyDegrees.isFinite() || walkingHeadingAccuracyDegrees > MAX_OUTPUT_ACCURACY_DEGREES) {
+            return invalid(ChestMountedHeadingGateReason.HEADING_ACCURACY, rotation)
+        }
+
         val magneticHeadingDegrees = Math.toDegrees(atan2(forwardEast, forwardNorth))
         val trueHeadingDegrees = normalizeDegrees(
             magneticHeadingDegrees + geomagneticReference.declinationDegrees,
         )
         return ChestMountedHeadingResult(
             trueHeadingDegrees = trueHeadingDegrees,
-            accuracyDegrees = rotation.headingAccuracyDegrees,
+            accuracyDegrees = walkingHeadingAccuracyDegrees,
             observedAtMs = rotation.observedAtMs,
             gateReason = ChestMountedHeadingGateReason.VALID,
         )
     }
 
     private fun recordNormalRecoverySample(observedAtMs: Long): Boolean {
+        if (lastRecoverySampleAtMs?.let { observedAtMs - it > MAX_SAMPLE_AGE_MS } == true) {
+            // Recovery cannot bridge an interval longer than the existing evidence lifetime.
+            resetRecoveryEvidence()
+        }
         val lastSampleAtMs = lastRecoverySampleAtMs
         if (lastSampleAtMs == null || observedAtMs > lastSampleAtMs) {
             if (recoveryStartedAtMs == null) recoveryStartedAtMs = observedAtMs
@@ -270,12 +291,17 @@ class ChestMountedHeading(
     private fun invalid(
         reason: ChestMountedHeadingGateReason,
         rotation: ChestMountedRotationSample? = null,
-    ) = ChestMountedHeadingResult(
-        trueHeadingDegrees = null,
-        accuracyDegrees = rotation?.headingAccuracyDegrees?.takeIf(Double::isFinite),
-        observedAtMs = rotation?.observedAtMs,
-        gateReason = reason,
-    )
+    ): ChestMountedHeadingResult {
+        if (reason != ChestMountedHeadingGateReason.FIELD_RECOVERING) {
+            resetRecoveryEvidence()
+        }
+        return ChestMountedHeadingResult(
+            trueHeadingDegrees = null,
+            accuracyDegrees = rotation?.headingAccuracyDegrees?.takeIf(Double::isFinite),
+            observedAtMs = rotation?.observedAtMs,
+            gateReason = reason,
+        )
+    }
 
     private fun EarthOrientationAccuracy.isMediumOrBetter(): Boolean =
         this == EarthOrientationAccuracy.MEDIUM || this == EarthOrientationAccuracy.HIGH
@@ -295,5 +321,6 @@ class ChestMountedHeading(
         const val REQUIRED_NORMAL_RECOVERY_SAMPLES = 5
         const val REQUIRED_NORMAL_RECOVERY_DURATION_MS = 1_000L
         const val FULL_CIRCLE_DEGREES = 360.0
+        const val MILLISECONDS_PER_SECOND = 1_000.0
     }
 }

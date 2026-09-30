@@ -21,9 +21,14 @@ class MainActivityFp016StaticTest {
 
         assertTrue(
             policy.contains(
-                "controlsScroll.visibility = View.VISIBLE",
+                "controlsScroll.visibility = if (cameraScreenVisible) View.GONE else View.VISIBLE",
             ),
         )
+        val cameraScreen = compact(blockAt("private fun updateLiveCameraScreenVisibility()"))
+        assertTrue(cameraScreen.contains("controlsScroll.visibility = if (cameraScreenVisible) View.GONE else View.VISIBLE"))
+        assertTrue(cameraScreen.contains("cameraScreenControls.visibility = if (cameraScreenVisible) View.VISIBLE else View.GONE"))
+        assertTrue(policy.contains("renderMainUi()"))
+        assertTrue(blockAt("private fun renderMainUi()").contains("updateLiveCameraScreenVisibility()"))
         assertTrue(
             policy.contains(
                 "walkSafetyOverlay.visibility = View.GONE",

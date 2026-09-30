@@ -29,8 +29,11 @@ public final class AdminOperationModelsTest {
         assertEquals(Set.of(
             "decision", "reason", "user_visible_reason", "duplicate_of_report_id",
             "location_reviewed", "photo_reviewed", "privacy_reviewed", "content_revision",
-            "evidence_grant_id", "decision_id"
+            "evidence_grant_id", "decision_id", "expected_review_revision"
         ), keys(body));
+        // The legacy constructor states "no decision seen" (0), which the server rejects
+        // whenever a decision already exists (S18-35).
+        assertEquals(0L, body.getLong("expected_review_revision"));
         assertTrue(body.has("user_visible_reason"));
         assertTrue(body.isNull("user_visible_reason"));
         assertTrue(body.has("duplicate_of_report_id"));

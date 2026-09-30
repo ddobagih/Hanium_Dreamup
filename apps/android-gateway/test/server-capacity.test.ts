@@ -254,6 +254,71 @@ test("concurrent authenticated status requests share one capacity fetch", async 
   }
 });
 
+test("direct concurrent capacity callers share a fetch without abort", async () => {
+  await setupCapacityFixture();
+  const snapshot = capacitySnapshot({
+    version: 9,
+    level: "HOLD_NEW_RAW_COLLECTION_SESSIONS"
+  });
+  let calls = 0;
+  let releaseFetch: () => void = () => undefined;
+  const release = new Promise<void>((resolve) => { releaseFetch = resolve; });
+  const fetchImpl: GatewayFetch = async () => {
+    calls += 1;
+    await release;
+    return Response.json(snapshot);
+  };
+
+  const first = serverCapacityForFieldSession(fieldStatusRequest(), fetchImpl);
+  const second = serverCapacityForFieldSession(fieldStatusRequest(), fetchImpl);
+  releaseFetch();
+
+  assert.deepEqual(await Promise.all([first, second]), [snapshot, snapshot]);
+  assert.equal(calls, 1);
+});
+
+test("aborting the first caller leaves the shared capacity fetch for the second", async () => {
+  await setupCapacityFixture();
+  const snapshot = capacitySnapshot({
+    version: 10,
+    level: "HOLD_NEW_RAW_COLLECTION_SESSIONS"
+  });
+  const firstController = new AbortController();
+  let calls = 0;
+  let markStarted: () => void = () => undefined;
+  let releaseFetch: () => void = () => undefined;
+  const started = new Promise<void>((resolve) => { markStarted = resolve; });
+  const fetchImpl: GatewayFetch = async (_input, init) => {
+    calls += 1;
+    const signal = init?.signal;
+    assert.ok(signal instanceof AbortSignal);
+    return new Promise<Response>((resolve, reject) => {
+      if (signal.aborted) {
+        reject(signal.reason);
+        return;
+      }
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      releaseFetch = () => resolve(Response.json(snapshot));
+      markStarted();
+    });
+  };
+
+  const first = serverCapacityForFieldSession(
+    new Request("http://127.0.0.1:8081/api/field-session", {
+      signal: firstController.signal
+    }),
+    fetchImpl
+  );
+  await started;
+  const second = serverCapacityForFieldSession(fieldStatusRequest(), fetchImpl);
+  firstController.abort();
+
+  assert.equal(await first, null);
+  releaseFetch();
+  assert.deepEqual(await second, snapshot);
+  assert.equal(calls, 1);
+});
+
 test("an upstream failure returns the unexpired encrypted cache after restart", async () => {
   const fixture = await setupCapacityFixture();
   const snapshot = capacitySnapshot({

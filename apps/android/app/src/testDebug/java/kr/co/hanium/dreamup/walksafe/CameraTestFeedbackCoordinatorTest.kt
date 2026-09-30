@@ -398,6 +398,64 @@ class CameraTestFeedbackCoordinatorTest {
         }).copy(frameId = frame, capturedAtMs = NOW + deltaMs, completedAtMs = NOW + deltaMs)
     }
 
+    @Test fun capturedSampleBindsLegacyOutputBeforePolicyEvaluation() {
+        val coordinator = coordinator()
+        val legacy = output().copy(sourceValidUntilElapsedRealtimeMs = null)
+        assertTrue(coordinator.offer(sample(outputs = listOf(legacy))))
+        val delivery = requireNotNull(coordinator.next(NOW))
+        assertEquals(NOW + 800L, delivery.action.validUntilMs)
+        assertTrue(coordinator.isDeliverable(delivery, NOW + 800L))
+        assertFalse(coordinator.isDeliverable(delivery, NOW + 801L))
+    }
+
+    @Test fun shorterOutputDeadlineSurvivesSampleBindingAndRegionRetention() {
+        val coordinator = coordinator()
+        val original = output("unknown-short").copy(sourceValidUntilElapsedRealtimeMs = NOW + 200L)
+        assertTrue(coordinator.offer(sample(CameraTestFeedbackCoordinator.Source.UNKNOWN, listOf(original))))
+        val delivery = requireNotNull(coordinator.next(NOW))
+        assertEquals(NOW + 200L, delivery.action.validUntilMs)
+        assertTrue(coordinator.retainUnknownRegions(1, "portrait", setOf(original.trackId), NOW + 100L))
+        assertTrue(coordinator.isDeliverable(delivery, NOW + 200L))
+        assertFalse(coordinator.isDeliverable(delivery, NOW + 201L))
+        assertNull(coordinator.next(NOW + 201L))
+    }
+
+    @Test fun expiredPrimaryCannotHideFreshUnknownRegion() {
+        val coordinator = coordinator()
+        assertTrue(coordinator.offer(sample(outputs = listOf(
+            output().copy(sourceValidUntilElapsedRealtimeMs = NOW - 1L),
+        ))))
+        assertTrue(coordinator.offer(sample(CameraTestFeedbackCoordinator.Source.UNKNOWN, listOf(output("unknown-fresh")))))
+        assertEquals("unknown-fresh", requireNotNull(coordinator.next(NOW)).action.trackId)
+    }
+
+    @Test fun invalidCaptureCannotCreateAFeedbackLease() {
+        val coordinator = coordinator()
+        val captured = sample(outputs = listOf(output()))
+        assertFalse(coordinator.offer(captured.copy(capturedAtMs = -1L)))
+        assertFalse(coordinator.offer(captured.copy(capturedAtMs = NOW + 1L, completedAtMs = NOW + 1L), nowMs = NOW))
+        assertNull(coordinator.next(NOW))
+    }
+
+    @Test fun acceptedDeliveryMayCompleteAfterOriginalStartDeadline() {
+        val coordinator = coordinator()
+        assertTrue(coordinator.offer(sample(outputs = listOf(output()))))
+        val delivery = requireNotNull(coordinator.next(NOW))
+        assertTrue(coordinator.claim(delivery, NOW))
+        assertNull(coordinator.next(NOW + 801L))
+        assertFalse(coordinator.isDeliverable(delivery, NOW + 801L))
+        assertTrue(coordinator.complete(delivery, NOW + 1_000L))
+        assertFalse(coordinator.complete(delivery, NOW + 1_001L))
+    }
+
+    @Test fun longerOutputDeadlineCannotOutliveTheCapturedSample() {
+        val coordinator = coordinator()
+        assertTrue(coordinator.offer(sample(outputs = listOf(
+            output().copy(sourceValidUntilElapsedRealtimeMs = NOW + 2_000L),
+        ))))
+        assertEquals(NOW + 800L, requireNotNull(coordinator.next(NOW)).action.validUntilMs)
+    }
+
     private fun coordinator() = CameraTestFeedbackCoordinator().apply { start(1) }
 
     private fun sample(source: CameraTestFeedbackCoordinator.Source = CameraTestFeedbackCoordinator.Source.PRIMARY,

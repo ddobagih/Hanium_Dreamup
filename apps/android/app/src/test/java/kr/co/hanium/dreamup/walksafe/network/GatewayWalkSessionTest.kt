@@ -31,16 +31,203 @@ class GatewayWalkSessionTest {
         )
         val command = JSONObject(transport.body)
         assertEquals(
-            setOf("schema_version", "request_id", "action", "walk_id"),
+            setOf("schema_version", "request_id", "action", "walk_id", "issued_at_epoch_ms"),
             command.keySet(),
         )
-        assertEquals("walksafe.field-walk-command.v1", command.getString("schema_version"))
+        assertEquals("walksafe.field-walk-command.v2", command.getString("schema_version"))
         assertEquals("start", command.getString("action"))
+        assertTrue(command.getLong("issued_at_epoch_ms") > 0L)
         val lease = (result as GatewayWalkStartResult.Granted).lease
         assertEquals(4L, lease.fencingToken)
         assertTrue(lease.isLocallyUsable(94_999L))
         assertFalse(lease.isLocallyUsable(95_000L))
         assertFalse(lease.toString().contains("lease-0001"))
+    }
+
+    @Test
+    fun retriedRequestIdResendsTheSameIssuedAtAndNewIdsIncrease() {
+        val transport = FakeTransport().apply {
+            next = GatewayHttpResponse(201, leaseBody("ACQUIRED", "walk-0001", 4L))
+        }
+        var wall = 5_000L
+        val client = GatewayWalkSessionClient(transport, wallClockEpochMs = { wall })
+        client.start(session(), "walk-0001", "request-0001", 10_000L)
+        val first = JSONObject(transport.body).getLong("issued_at_epoch_ms")
+        wall = 9_000L
+        client.start(session(), "walk-0001", "request-0001", 10_000L)
+        assertEquals(first, JSONObject(transport.body).getLong("issued_at_epoch_ms"))
+        wall = 1_000L
+        client.start(session(), "walk-0001", "request-0002", 10_000L)
+        assertTrue(JSONObject(transport.body).getLong("issued_at_epoch_ms") > first)
+    }
+
+    @Test
+    fun idempotencyExpiredStartIsRejectedWithItsServerCode() {
+        val transport = FakeTransport().apply {
+            next = GatewayHttpResponse(
+                409,
+                JSONObject()
+                    .put("schema_version", "walksafe.field-walk-response.v1")
+                    .put("code", "idempotency_expired")
+                    .put("server_time_epoch_ms", 1_000L)
+                    .toString(),
+            )
+        }
+        try {
+            GatewayWalkSessionClient(transport).start(session(), "walk-0001", "request-0001", 10_000L)
+            throw AssertionError("expected idempotency_expired rejection")
+        } catch (error: GatewayWalkHttpException) {
+            assertEquals(409, error.statusCode)
+            assertEquals("idempotency_expired", error.serverCode)
+        }
+    }
+
+    @Test
+    fun deviceClockOff25HoursRetriesOnceWithTheGatewayClockAndThenFollowsIt() {
+        val server = 1_700_000_000_000L
+        for (offset in listOf(-25L * HOUR_MS, 25L * HOUR_MS)) {
+            var elapsed = 50_000L
+            val transport = SequenceTransport(
+                GatewayHttpResponse(409, expiredBody(server)),
+                GatewayHttpResponse(201, leaseBody("ACQUIRED", "walk-0001", 4L, server + 20L)),
+                GatewayHttpResponse(200, leaseBody("RENEWED", "walk-0001", 4L, server + 30_000L)),
+            )
+            val client = GatewayWalkSessionClient(
+                transport,
+                wallClockEpochMs = { server + offset },
+                elapsedRealtimeMs = { elapsed },
+                retryRequestIdFactory = { "request-retry-0001" },
+            )
+            val result = client.start(session(), "walk-0001", "request-0001", 10_000L)
+            assertTrue(result is GatewayWalkStartResult.Granted)
+            assertEquals(2, transport.bodies.size)
+            val first = JSONObject(transport.bodies[0])
+            val retry = JSONObject(transport.bodies[1])
+            assertEquals(server + offset, first.getLong("issued_at_epoch_ms"))
+            assertEquals("request-retry-0001", retry.getString("request_id"))
+            assertEquals("start", retry.getString("action"))
+            // Stamped by the refusal's server time, not by the wrong device clock.
+            assertTrue(kotlin.math.abs(retry.getLong("issued_at_epoch_ms") - server) <= 1_000L)
+            // Later commands follow the last Gateway time plus elapsedRealtime.
+            elapsed += 30_000L
+            val lease = (result as GatewayWalkStartResult.Granted).lease
+            client.renew(session(), lease, "request-renew-0001", 40_000L)
+            val renew = JSONObject(transport.bodies[2])
+            assertEquals(server + 20L + 30_000L, renew.getLong("issued_at_epoch_ms"))
+        }
+    }
+
+    @Test
+    fun aSecondRefusalReportsTheDeviceClockCheckAndIsNotRetriedAgain() {
+        val server = 1_700_000_000_000L
+        val transport = SequenceTransport(
+            GatewayHttpResponse(409, expiredBody(server)),
+            GatewayHttpResponse(409, expiredBody(server + 5L)),
+        )
+        val client = GatewayWalkSessionClient(
+            transport,
+            wallClockEpochMs = { server - 30L * HOUR_MS },
+            elapsedRealtimeMs = { 1_000L },
+            retryRequestIdFactory = { "request-retry-0002" },
+        )
+        try {
+            client.start(session(), "walk-0001", "request-0001", 10_000L)
+            throw AssertionError("expected the device clock check")
+        } catch (error: GatewayWalkHttpException) {
+            assertEquals(409, error.statusCode)
+            assertEquals(GatewayWalkSessionClient.DEVICE_CLOCK_CHECK_REQUIRED_REASON, error.reason)
+            assertEquals("idempotency_expired", error.serverCode)
+            assertEquals(
+                GatewayWalkRenewalFailure.DEVICE_CLOCK_CHECK_REQUIRED,
+                GatewayWalkRenewalFailurePolicy.classify(error),
+            )
+            assertTrue(
+                GatewayWalkRenewalFailurePolicy.detailKo(
+                    GatewayWalkRenewalFailurePolicy.classify(error),
+                ).contains("기기의 날짜와 시간"),
+            )
+        }
+        assertEquals(2, transport.bodies.size)
+    }
+
+    @Test
+    fun anAlreadySentRequestIdIsNotRetriedUnderANewId() {
+        val server = 1_700_000_000_000L
+        val transport = SequenceTransport(
+            GatewayHttpResponse(503, "{}"),
+            GatewayHttpResponse(409, expiredBody(server)),
+        )
+        val client = GatewayWalkSessionClient(
+            transport,
+            wallClockEpochMs = { server },
+            elapsedRealtimeMs = { 1_000L },
+            retryRequestIdFactory = { throw AssertionError("a re-sent id must not be re-issued") },
+        )
+        runCatching { client.start(session(), "walk-0001", "request-0001", 10_000L) }
+        try {
+            client.start(session(), "walk-0001", "request-0001", 10_000L)
+            throw AssertionError("expected idempotency_expired")
+        } catch (error: GatewayWalkHttpException) {
+            assertEquals("idempotency_expired", error.serverCode)
+            assertEquals("walk_start_conflict_rejected", error.reason)
+        }
+        assertEquals(2, transport.bodies.size)
+        assertEquals(
+            JSONObject(transport.bodies[0]).getLong("issued_at_epoch_ms"),
+            JSONObject(transport.bodies[1]).getLong("issued_at_epoch_ms"),
+        )
+    }
+
+    @Test
+    fun aForwardClockExcursionIsReleasedOnceTheClockIsCorrected() {
+        val wall = 1_700_000_000_000L
+        var now = wall + 48L * HOUR_MS
+        val transport = SequenceTransport(
+            GatewayHttpResponse(503, "{}"),
+            GatewayHttpResponse(503, "{}"),
+            GatewayHttpResponse(503, "{}"),
+        )
+        val client = GatewayWalkSessionClient(
+            transport,
+            wallClockEpochMs = { now },
+            elapsedRealtimeMs = { 1_000L },
+        )
+        runCatching { client.start(session(), "walk-0001", "request-0001", 10_000L) }
+        // A small backward step stays strictly increasing (bounded carry).
+        now = wall + 48L * HOUR_MS - 1_000L
+        runCatching { client.start(session(), "walk-0001", "request-0002", 10_000L) }
+        // The excursion is corrected: the next new id is stamped by the corrected clock.
+        now = wall + 60_000L
+        runCatching { client.start(session(), "walk-0001", "request-0003", 10_000L) }
+        val issued = transport.bodies.map { JSONObject(it).getLong("issued_at_epoch_ms") }
+        assertEquals(wall + 48L * HOUR_MS, issued[0])
+        assertEquals(wall + 48L * HOUR_MS + 1L, issued[1])
+        assertEquals(wall + 60_000L, issued[2])
+    }
+
+    @Test
+    fun the257thRequestIdEvictsTheEldestFixedIssuedAt() {
+        val transport = SequenceTransport(*Array(260) { GatewayHttpResponse(503, "{}") })
+        val client = GatewayWalkSessionClient(
+            transport,
+            wallClockEpochMs = { 5_000L },
+            elapsedRealtimeMs = { 1_000L },
+        )
+        fun send(index: Int): Long {
+            runCatching {
+                client.start(session(), "walk-0001", "request-%04d".format(index), 10_000L)
+            }
+            return JSONObject(transport.bodies.last()).getLong("issued_at_epoch_ms")
+        }
+        val first = (1..256).map(::send)
+        assertEquals((0 until 256).map { 5_000L + it }, first)
+        assertEquals(first[255], send(256))
+        send(257)
+        // request-0001 was the eldest and is evicted: it gets a new, larger value.
+        val reissued = send(1)
+        assertTrue(reissued > first.last())
+        // request-0003 is still remembered and resends its fixed value.
+        assertEquals(first[2], send(3))
     }
 
     @Test
@@ -463,17 +650,60 @@ class GatewayWalkSessionTest {
             localDeadlineElapsedMs = localDeadline,
         )
 
-    private fun leaseBody(result: String, walkId: String, fence: Long): String =
+    private fun leaseBody(
+        result: String,
+        walkId: String,
+        fence: Long,
+        serverTime: Long = 1_000_000L,
+    ): String =
         JSONObject()
             .put("schema_version", "walksafe.field-walk-response.v1")
             .put("result", result)
             .put("walk_id", walkId)
             .put("lease_id", "lease-0001")
             .put("fencing_token", fence)
-            .put("acquired_at_epoch_ms", 1_000_000L)
-            .put("lease_expires_at_epoch_ms", 1_090_000L)
-            .put("server_time_epoch_ms", 1_000_000L)
+            .put("acquired_at_epoch_ms", serverTime)
+            .put("lease_expires_at_epoch_ms", serverTime + 90_000L)
+            .put("server_time_epoch_ms", serverTime)
             .toString()
+
+    private fun expiredBody(serverTime: Long): String =
+        JSONObject()
+            .put("schema_version", "walksafe.field-walk-response.v1")
+            .put("code", "idempotency_expired")
+            .put("server_time_epoch_ms", serverTime)
+            .toString()
+
+    private class SequenceTransport(vararg responses: GatewayHttpResponse) : GatewaySessionTransport {
+        private val responses = responses.toList()
+        val bodies = mutableListOf<String>()
+
+        override fun postJson(url: String, body: String): GatewayHttpResponse =
+            throw AssertionError("unauthenticated request")
+
+        override fun postJson(
+            url: String,
+            headers: Map<String, String>,
+            body: String,
+        ): GatewayHttpResponse {
+            val response = responses[bodies.size]
+            bodies += body
+            return response
+        }
+
+        override fun get(url: String, headers: Map<String, String>): GatewayHttpResponse =
+            throw AssertionError("unexpected GET")
+
+        override fun delete(url: String, headers: Map<String, String>): GatewayHttpResponse =
+            throw AssertionError("unexpected DELETE")
+
+        override fun deleteJson(url: String, body: String): GatewayHttpResponse =
+            throw AssertionError("unexpected DELETE")
+    }
+
+    private companion object {
+        const val HOUR_MS = 60L * 60L * 1_000L
+    }
 
     private fun conflictBody(): String =
         JSONObject()

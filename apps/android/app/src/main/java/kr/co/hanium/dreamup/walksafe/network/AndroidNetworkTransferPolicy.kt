@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.network
 
+import kr.co.hanium.dreamup.walksafe.session.WalkSessionState
+import kr.co.hanium.dreamup.walksafe.session.allowsPostWalkTransfer
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
@@ -41,6 +43,8 @@ enum class ActivityOriginalUploadDecision(val uploadAllowed: Boolean) {
     WIFI_ALLOWED(true),
     APPROVED_CELLULAR_ALLOWED(true),
     QUEUED_UNTIL_WIFI(false),
+    /** FP-035-DETAIL-04 interim (owner decision 3(b)): after the walk, waits until charging. */
+    QUEUED_UNTIL_CHARGING(false),
     FAIL_CLOSED(false),
 }
 
@@ -162,6 +166,29 @@ object AndroidActivityOriginalUploadPolicy {
         }
     }
 
+    /**
+     * Owner decision 3(b): the admission rule for DEBUG activity originals. A walk in progress blocks
+     * (FP-035-DETAIL-01 interim), then consent, charging (unknown = not charging) and the network:
+     * transfer-F4, originals and training material after the walk go on Wi-Fi only
+     * (FP-035-DETAIL-04 interim, same as RAW), so cellular waits for Wi-Fi even when the user
+     * allowed mobile data for other transfers.
+     */
+    fun decideAfterWalk(
+        walkState: WalkSessionState,
+        consentAllowed: Boolean,
+        charging: () -> Boolean,
+        preference: MobileNetworkPreference,
+        transport: ActiveNetworkTransport,
+    ): ActivityOriginalUploadDecision {
+        if (!walkState.allowsPostWalkTransfer) return ActivityOriginalUploadDecision.BLOCKED_WHILE_WALKING
+        if (!consentAllowed) return ActivityOriginalUploadDecision.FAIL_CLOSED
+        if (!runCatching(charging).getOrDefault(false)) {
+            return ActivityOriginalUploadDecision.QUEUED_UNTIL_CHARGING
+        }
+        if (transport == ActiveNetworkTransport.CELLULAR) return ActivityOriginalUploadDecision.QUEUED_UNTIL_WIFI
+        return decide(ActivityOriginalMotionState.STATIONARY, preference, transport)
+    }
+
     fun shouldCancelInFlight(
         previous: ActivityOriginalMotionState,
         current: ActivityOriginalMotionState,
@@ -172,122 +199,45 @@ object AndroidActivityOriginalUploadPolicy {
     }
 }
 
-class ActivityOriginalUploadAdmissionController(
-    stationaryConfirmationMs: Long = 5_000L,
-) {
+/**
+ * Owner decision 3(b) (2026-09-29) / ADD-MOTION-043: DEBUG activity originals (frame and metadata
+ * captures) follow the RAW rule. A transfer is admitted only after the walk (ENDED or READY),
+ * while charging (FP-035-DETAIL-04 interim; unknown = not charging), on Wi-Fi only (transfer-F4). Once the walk is over no
+ * stillness evidence is consulted: the positioning estimator has no input then, and the physical
+ * stillness gate would fail every post-walk transfer closed. A walk that becomes ACTIVE or PAUSED
+ * again closes admission and cancels what is in flight ([onWalkStateChanged]).
+ */
+class ActivityOriginalUploadAdmissionController {
     private val lock = Any()
-    private val motionEvidence =
-        ActivityOriginalMotionEvidence(stationaryConfirmationMs)
-    private var sessionActive = false
     private var admissionClosed = true
     private var admissionGeneration = 0L
 
-    fun onSessionActiveChanged(
-        active: Boolean,
-        observedAtMs: Long,
+    fun onWalkStateChanged(
+        state: WalkSessionState,
         cancelActiveUploads: () -> Unit,
     ) = synchronized(lock) {
-        val previousMotionState = effectiveMotionStateLocked(observedAtMs)
-        sessionActive = active
-        motionEvidence.reset()
-        val currentMotionState = ActivityOriginalMotionState.UNKNOWN
-        if (
-            AndroidActivityOriginalUploadPolicy.shouldCancelInFlight(
-                previousMotionState,
-                currentMotionState,
-            )
-        ) {
-            closeAndCancelLocked(cancelActiveUploads)
-        }
-    }
-
-    fun onTrackingStarted(
-        observedAtMs: Long,
-        cancelActiveUploads: () -> Unit,
-    ) = synchronized(lock) {
-        val previousMotionState = effectiveMotionStateLocked(observedAtMs)
-        motionEvidence.beginObservation()
-        val currentMotionState = effectiveMotionStateLocked(observedAtMs)
-        if (
-            AndroidActivityOriginalUploadPolicy.shouldCancelInFlight(
-                previousMotionState,
-                currentMotionState,
-            )
-        ) {
-            closeAndCancelLocked(cancelActiveUploads)
-        }
-    }
-
-    fun onTrackingStopped(
-        cancelActiveUploads: () -> Unit,
-    ) = synchronized(lock) {
-        admissionClosed = true
-        admissionGeneration += 1L
-        motionEvidence.reset()
-        cancelActiveUploads()
-    }
-
-    fun onSensorSample(
-        stepCount: Int,
-        observedAtMs: Long,
-        cancelActiveUploads: () -> Unit,
-    ) = synchronized(lock) {
-        if (!sessionActive) {
-            closeAndCancelLocked(cancelActiveUploads)
-            return@synchronized
-        }
-        val previousMotionState = effectiveMotionStateLocked(observedAtMs)
-        val firstOrMovementSample =
-            motionEvidence.observeStepCount(stepCount, observedAtMs)
-        val currentMotionState = effectiveMotionStateLocked(observedAtMs)
-        if (
-            firstOrMovementSample ||
-            (
-                previousMotionState == ActivityOriginalMotionState.STATIONARY &&
-                    AndroidActivityOriginalUploadPolicy.shouldCancelInFlight(
-                        previousMotionState,
-                        currentMotionState,
-                    )
-            )
-        ) {
-            closeAndCancelLocked(cancelActiveUploads)
-        }
+        if (!state.allowsPostWalkTransfer) closeAndCancelLocked(cancelActiveUploads)
     }
 
     fun isAllowed(
+        walkState: WalkSessionState,
         consentAllowed: Boolean,
+        charging: () -> Boolean,
         preference: MobileNetworkPreference,
         transport: ActiveNetworkTransport,
-        observedAtMs: Long,
     ): Boolean = synchronized(lock) {
-        decisionLocked(
-            consentAllowed,
-            preference,
-            transport,
-            observedAtMs,
-        ).uploadAllowed
-    }
-
-    fun stationarySnapshot(
-        observedAtMs: Long,
-    ): ActivityOriginalStationarySnapshot? = synchronized(lock) {
-        if (!sessionActive) return@synchronized null
-        motionEvidence.stationarySnapshotAt(observedAtMs)
+        decisionLocked(walkState, consentAllowed, charging, preference, transport).uploadAllowed
     }
 
     fun admit(
+        walkState: WalkSessionState,
         consentAllowed: Boolean,
+        charging: () -> Boolean,
         preference: MobileNetworkPreference,
         transport: ActiveNetworkTransport,
-        observedAtMs: Long,
         action: () -> Unit,
     ): Boolean = synchronized(lock) {
-        val decision = decisionLocked(
-            consentAllowed,
-            preference,
-            transport,
-            observedAtMs,
-        )
+        val decision = decisionLocked(walkState, consentAllowed, charging, preference, transport)
         if (!decision.uploadAllowed) {
             admissionClosed = true
             return@synchronized false
@@ -299,28 +249,19 @@ class ActivityOriginalUploadAdmissionController(
     }
 
     private fun decisionLocked(
+        walkState: WalkSessionState,
         consentAllowed: Boolean,
+        charging: () -> Boolean,
         preference: MobileNetworkPreference,
         transport: ActiveNetworkTransport,
-        observedAtMs: Long,
-    ): ActivityOriginalUploadDecision {
-        if (!consentAllowed || !sessionActive) {
-            return ActivityOriginalUploadDecision.FAIL_CLOSED
-        }
-        return AndroidActivityOriginalUploadPolicy.decide(
-            effectiveMotionStateLocked(observedAtMs),
-            preference,
-            transport,
-        )
-    }
-
-    private fun effectiveMotionStateLocked(
-        observedAtMs: Long,
-    ): ActivityOriginalMotionState =
-        AndroidActivityOriginalUploadPolicy.effectiveMotionState(
-            sessionActive = sessionActive,
-            observedMotionState = motionEvidence.motionStateAt(observedAtMs),
-        )
+    ): ActivityOriginalUploadDecision = AndroidActivityOriginalUploadPolicy.decideAfterWalk(
+        walkState = walkState,
+        consentAllowed = consentAllowed,
+        // Read only after the walk and consent gates passed (no battery query per walk frame).
+        charging = charging,
+        preference = preference,
+        transport = transport,
+    )
 
     private fun closeAndCancelLocked(cancelActiveUploads: () -> Unit) {
         admissionClosed = true

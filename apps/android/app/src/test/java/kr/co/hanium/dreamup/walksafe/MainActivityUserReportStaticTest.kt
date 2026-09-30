@@ -67,8 +67,9 @@ class MainActivityUserReportStaticTest {
         listOf(
             "접수됨",
             "기각됨",
-            "기관 제출됨",
+            "기관 제출 기록",
             "처리 완료",
+            "관리자가 수동 기록한 전달 상태",
             "공개 기각 사유",
             "최신 ",
             "공개 답변",

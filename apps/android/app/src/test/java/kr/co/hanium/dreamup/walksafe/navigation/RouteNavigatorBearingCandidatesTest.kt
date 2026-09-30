@@ -77,12 +77,28 @@ class RouteNavigatorBearingCandidatesTest {
         val first = navigator.update(fix(500.0, accuracy = 30f), 1_000, false,
             facingObservation = facing(90.0))
         assertTrue(navigator.reserveInstruction(first))
+        // S08-23: an adjacent turn (ahead -> right) lets the sentence finish; see the reversal case below.
         val duringSpeech = navigator.update(fix(500.0, time = 2_000, accuracy = 30f), 2_000, false,
-            facingObservation = facing(270.0, 2_000))
+            facingObservation = facing(0.0, 2_000))
         assertEquals("guidance_in_flight", duringSpeech.reason)
         assertFalse(duringSpeech.cancelStaleNavigationSpeech)
         navigator.acknowledgeInstruction(first, 2_100)
-        assertTrue(navigator.currentGuidance(2_200, facing(270.0, 2_200))?.instruction?.contains("경로 진행 방향이 뒤쪽") == true)
+        assertTrue(navigator.currentGuidance(2_200, facing(0.0, 2_200))?.instruction?.contains("경로는 오른쪽") == true)
+    }
+
+    /** S08-23: turning around reverses "ahead" during the same guide sentence, so it is revoked. */
+    @Test fun turningAroundDuringTheSameGuideSentenceRevokesItWithTheFreshFacing() {
+        val navigator = navigator(straight())
+        val first = navigator.update(fix(500.0, accuracy = 30f), 1_000, false,
+            facingObservation = facing(90.0))
+        assertTrue(navigator.reserveInstruction(first))
+        val turned = navigator.update(fix(500.0, time = 2_000, accuracy = 30f), 2_000, false,
+            facingObservation = facing(270.0, 2_000))
+        assertEquals("route_guidance", turned.reason)
+        assertTrue(turned.cancelStaleNavigationSpeech)
+        assertTrue(turned.instruction?.contains("경로 진행 방향이 뒤쪽") == true)
+        assertFalse(navigator.reserveInstruction(first))
+        assertTrue(navigator.reserveInstruction(turned))
     }
 
     @Test fun candidatesUseUnsnappedFilteredPointAndUncertaintyWithoutARawAccuracyCutoff() {
@@ -148,14 +164,18 @@ class RouteNavigatorBearingCandidatesTest {
         assertTrue(turned.instruction?.contains("오른쪽 경로 방향으로 몸을 돌리세요") == true)
         assertSame(match, navigator.currentRouteMatch())
         assertFalse(navigator.reserveInstruction(first))
-        assertTrue(navigator.currentGuidance(1_200, facing(270.0, 1_200))?.instruction?.contains("약 6시 방향") == true)
+        // S08-5: a clock number change needs a second fresh sample; the coarse direction does not wait.
+        val behind = navigator.currentGuidance(1_200, facing(270.0, 1_200))?.instruction
+        assertTrue(behind?.contains("경로 진행 방향이 뒤쪽입니다") == true)
+        assertFalse(behind?.contains("시 방향") == true)
+        assertTrue(navigator.currentGuidance(1_300, facing(270.0, 1_300))?.instruction?.contains("약 6시 방향") == true)
     }
 
     @Test fun validRouteCandidatesDoNotReplaceMissingOrStaleCompassWithMovementCourse() {
         listOf<RouteFacingObservation?>(null, facing(90.0, 499)).forEach { observation ->
             val result = navigator(straight()).update(fix(500.0, accuracy = 40f), 1_000, false,
                 facingObservation = observation)
-            assertTrue(result.instruction?.contains("현재 바라보는 방향을 확인할 수 없습니다") == true)
+            assertTrue(result.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
             assertFalse(result.instruction?.contains("앞쪽이 경로") == true)
         }
     }

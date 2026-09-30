@@ -4,10 +4,42 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
+import android.media.AudioRecordingConfiguration
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.Process
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
+
+internal interface VoskPcmSource {
+    fun start()
+    fun stop()
+}
+
+/** S04-27: terminal input code for a capture the system silenced (distinct from AudioRecord errors). */
+internal const val PCM_INPUT_SILENCED_CODE = Int.MIN_VALUE
+
+/**
+ * Turns recording-configuration reports into one silenced edge. A silenced client still reads
+ * zero-filled buffers, so without this the stream looks exactly like a user who did not speak.
+ */
+internal class PcmInputSilencingGate(private val onSilenced: () -> Unit) {
+    private var fired = false
+
+    /** [clientSilenced] null means "no report" and never fires. */
+    fun observe(clientSilenced: Boolean?) {
+        val fire = synchronized(this) {
+            if (fired || clientSilenced != true) false else {
+                fired = true
+                true
+            }
+        }
+        if (fire) onSilenced()
+    }
+}
 
 /**
  * Captures 16 kHz mono PCM16 in memory. The caller must grant RECORD_AUDIO before [start].
@@ -21,7 +53,7 @@ internal class AndroidPcmAudioSource(
     private val onReadError: (Int) -> Unit,
     private val audioRecordFactory: (() -> AudioRecord)? = null,
     private val microphoneLease: VoiceMicrophoneLease = VoiceMicrophoneLease.process,
-) {
+) : VoskPcmSource {
     private enum class State {
         IDLE,
         RUNNING,
@@ -35,15 +67,33 @@ internal class AndroidPcmAudioSource(
     ) {
         val running = AtomicBoolean(true)
         val released = AtomicBoolean(false)
+        val releaseComplete = CountDownLatch(1)
         lateinit var worker: Thread
+        @Volatile
+        var unwatchSilencing: () -> Unit = {}
 
         fun releaseOnce() {
             if (released.compareAndSet(false, true)) {
                 try {
-                    record.release()
+                    try {
+                        record.release()
+                    } finally {
+                        releaseMicrophone()
+                    }
                 } finally {
-                    releaseMicrophone()
+                    releaseComplete.countDown()
                 }
+            } else {
+                var interrupted = false
+                while (true) {
+                    try {
+                        releaseComplete.await()
+                        break
+                    } catch (_: InterruptedException) {
+                        interrupted = true
+                    }
+                }
+                if (interrupted) Thread.currentThread().interrupt()
             }
         }
     }
@@ -55,7 +105,7 @@ internal class AndroidPcmAudioSource(
     private var activeSession: CaptureSession? = null
 
     /** Starts capture once. Calls made while running or stopping have no effect. */
-    fun start() {
+    override fun start() {
         synchronized(stateLock) {
             if (state != State.IDLE) return
 
@@ -90,6 +140,7 @@ internal class AndroidPcmAudioSource(
                     { capture(session) },
                     CAPTURE_THREAD_NAME,
                 )
+                watchSystemSilencing(session)
                 state = State.RUNNING
                 activeSession = session
                 session.worker.start()
@@ -105,10 +156,10 @@ internal class AndroidPcmAudioSource(
     }
 
     /**
-     * Requests stop and waits at most one second. If needed, it forces one release halfway
-     * through; a still-stuck session prevents restart until its worker actually exits.
+     * Stops capture on the caller's worker thread. The native stop/release can outlast the
+     * two bounded joins; return only after this session's microphone release is complete.
      */
-    fun stop() {
+    override fun stop() {
         val session = synchronized(stateLock) {
             if (state == State.IDLE) return
             state = State.STOPPING
@@ -118,11 +169,38 @@ internal class AndroidPcmAudioSource(
         runCatching { session.record.stop() }
         if (Thread.currentThread() === session.worker) return
 
-        session.worker.join(STOP_JOIN_TIMEOUT_MS)
-        if (session.worker.isAlive) {
+        try {
+            session.worker.join(STOP_JOIN_TIMEOUT_MS)
+            if (session.worker.isAlive) {
+                session.releaseOnce()
+                session.worker.join(RELEASE_JOIN_TIMEOUT_MS)
+            } else {
+                session.releaseOnce()
+            }
+        } catch (_: InterruptedException) {
             session.releaseOnce()
-            session.worker.join(RELEASE_JOIN_TIMEOUT_MS)
+            Thread.currentThread().interrupt()
         }
+    }
+
+    /** API 29+: the system reports when it silences this client's capture. */
+    private fun watchSystemSilencing(session: CaptureSession) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val gate = PcmInputSilencingGate {
+            if (session.running.compareAndSet(true, false)) onReadError(PCM_INPUT_SILENCED_CODE)
+        }
+        val callback = object : AudioManager.AudioRecordingCallback() {
+            override fun onRecordingConfigChanged(configs: MutableList<AudioRecordingConfiguration>?) {
+                gate.observe(configs?.any { it.isClientSilenced })
+            }
+        }
+        runCatching {
+            session.record.registerAudioRecordingCallback(Executor { it.run() }, callback)
+            session.unwatchSilencing = {
+                runCatching { session.record.unregisterAudioRecordingCallback(callback) }
+            }
+        }
+        gate.observe(runCatching { session.record.activeRecordingConfiguration?.isClientSilenced }.getOrNull())
     }
 
     private fun capture(session: CaptureSession) {
@@ -145,8 +223,14 @@ internal class AndroidPcmAudioSource(
                     break
                 }
             }
+        } catch (_: Exception) {
+            // A callback/AudioRecord exception has the same terminal ownership as a read error.
+            if (session.running.compareAndSet(true, false)) {
+                onReadError(AudioRecord.ERROR_INVALID_OPERATION)
+            }
         } finally {
             try {
+                session.unwatchSilencing()
                 runCatching { session.record.stop() }
                 session.releaseOnce()
             } finally {

@@ -85,6 +85,16 @@ class AndroidGatewaySessionStoreStaticTest {
     }
 
     @Test
+    fun serverExpiryIsOptionalForExistingEncryptedV4SessionsAndUnknownFieldsRemainRejected() {
+        assertTrue(source.contains("val SESSION_FIELDS_WITH_SERVER_EXPIRY = SESSION_FIELDS +"))
+        assertTrue(source.contains("keys == SESSION_FIELDS || keys == SESSION_FIELDS_WITH_SERVER_EXPIRY"))
+        assertTrue(source.contains("put(\"server_access_expires_at_epoch_ms\", it)"))
+        assertTrue(source.contains("session.has(\"server_access_expires_at_epoch_ms\")"))
+        assertTrue(source.contains("require(it >= persistence.accessExpiresAtEpochMs)"))
+        assertTrue(sessionSource.contains("snapshot.serverAccessExpiresAtEpochMs ?: snapshot.accessExpiresAtEpochMs"))
+    }
+
+    @Test
     fun pendingRevocationContainsOnlyTheRefreshProofAndIsRedacted() {
         val pendingFields = setOf(
             "payload_version",
@@ -115,18 +125,21 @@ class AndroidGatewaySessionStoreStaticTest {
     }
 
     @Test
-    fun restoreRebuildsCompleteFp010BeforeExposingAnUnverifiedSession() {
+    fun restoreRebuildsAuthenticatedHistoryBeforeExposingAnUnverifiedSession() {
         val firstRunRestore = source.indexOf("restoreAuthenticatedFirstRun(bundle)")
         val sessionRestore = source.indexOf("GatewayFieldSession.restore(")
         assertTrue(firstRunRestore >= 0)
         assertTrue(sessionRestore > firstRunRestore)
         assertTrue(source.contains("FirstRunOnboardingPolicy.restoreVerifiedReceiptPrefix("))
         assertTrue(source.contains("restored.fullyRestored"))
-        assertTrue(source.contains("it.isComplete"))
-        assertTrue(source.contains("it.mayEnterWalk"))
+        assertTrue(source.contains("hasCompletedFirstRunHistory(it)"))
+        assertTrue(source.contains("snapshot.isComplete && snapshot.mayEnterWalk"))
+        assertTrue(source.contains("snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4"))
+        assertTrue(source.contains("FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION"))
+        assertTrue(source.contains("FirstRunOnboardingStage.FP004_TRAINING in snapshot.completedReceiptHashes"))
         assertTrue(
             source.contains(
-                "it.reporterActorBinding?.value == bundle.session.actorId",
+                "it.verifiedActorBinding?.value == bundle.session.actorId",
             ),
         )
         assertTrue(source.contains("version.deviceId != installDeviceId"))

@@ -13,9 +13,8 @@ data class DepthFrameSnapshot(
     // Actual confidence Image clock; null preserves legacy callers without claiming a verified pair.
     val rawConfidenceTimestampNs: Long? = null,
 ) {
-    val hasMetricRawDepth: Boolean
-        get() = rawDepth != null && rawConfidence != null &&
-            (rawConfidenceTimestampNs == null || rawConfidenceMatchesRawDepth)
+    /** Metric Raw Depth requires a same-observation depth/confidence pair. */
+    val hasMetricRawDepth: Boolean get() = rawConfidenceMatchesRawDepth
     /** Strict same-observation evidence, independent of raw-versus-CPU freshness/reprojection. */
     val rawConfidenceMatchesRawDepth: Boolean
         get() {

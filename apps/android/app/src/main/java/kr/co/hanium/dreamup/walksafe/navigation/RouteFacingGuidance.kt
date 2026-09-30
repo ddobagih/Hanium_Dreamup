@@ -12,6 +12,8 @@ enum class RouteFacingSource {
 enum class RouteFacingSensorQuality {
     REPORTED_ANGULAR_ERROR,
     CALIBRATED_SENSOR_CHECKS,
+    /** Gravity/magnetic checks passed, but no contemporaneous raw acceleration could check motion. */
+    CALIBRATED_WITHOUT_MOTION_CHECK,
 }
 
 /** A rear-camera facing direction already projected onto the horizontal true-north plane. */
@@ -24,6 +26,14 @@ data class RouteFacingObservation(
     val sensorQuality: RouteFacingSensorQuality = RouteFacingSensorQuality.REPORTED_ANGULAR_ERROR,
     /** Original sensor angular error, before the rear-axis projection allowance. */
     val reportedHeadingAccuracyDegrees: Double? = headingAccuracyDegrees,
+    /**
+     * Recent device rotation speed measured by the sensor stream (a lower bound for fallback
+     * sources); null when no rate could be measured. It widens uncertainty with observation age;
+     * it never moves the observation time or the heading forward.
+     */
+    val angularRateDegreesPerSecond: Double? = null,
+    /** A fresh magnetometer sample disagreed strongly with the expected field for this place. */
+    val magneticFieldSuspect: Boolean = false,
 )
 
 /** The route's direction relative to the current facing, distinct from a route maneuver. */
@@ -39,10 +49,22 @@ data class RouteFacingGuidanceResult(
     val direction: RouteFacingDirection,
     /** Signed facing-to-route angle in [-180, 180); positive is clockwise/right. */
     val signedDifferenceDegrees: Double?,
+    val clockDirectionAllowed: Boolean = true,
+    /**
+     * The sensor evidence alone (error, rotation since the sample, route-bearing uncertainty,
+     * magnetic check) supports a clock number at a sector centre. A number withheld only because
+     * the angle is near a sector edge keeps this true.
+     */
+    val clockPrecisionAvailable: Boolean = false,
+    /**
+     * S08-23 (nav-F2): the angular margin [direction] was decided with (sensor, rotation since the
+     * sample and route-bearing uncertainty); null when no usable observation was classified.
+     */
+    val directionMarginDegrees: Double? = null,
 ) {
     /** A coarse clock position for a usable direction, never a new sensor accuracy claim. */
     val clockHour: Int?
-        get() = signedDifferenceDegrees?.takeIf { direction != RouteFacingDirection.UNKNOWN }?.let {
+        get() = signedDifferenceDegrees?.takeIf { direction != RouteFacingDirection.UNKNOWN && clockDirectionAllowed }?.let {
             ((it + 360.0) % 360.0 / 30.0).roundToInt().let { hour -> if (hour % 12 == 0) 12 else hour % 12 }
         }
 }
@@ -59,6 +81,7 @@ object RouteFacingGuidance {
     fun isUsableObservation(observation: RouteFacingObservation?, nowMs: Long): Boolean =
         observation != null && observation.degreesTrueNorth.isBearing() &&
             observation.hasAcceptedSourceQuality() &&
+            observation.angularRateDegreesPerSecond?.let { it.isFinite() && it >= 0.0 } != false &&
             nowMs >= 0L && observation.observedAtElapsedRealtimeMs >= 0L &&
             observation.observedAtElapsedRealtimeMs <= nowMs &&
             nowMs - observation.observedAtElapsedRealtimeMs <= MAXIMUM_OBSERVATION_AGE_MS
@@ -67,18 +90,30 @@ object RouteFacingGuidance {
         routeBearingDegreesTrueNorth: Double?,
         facingObservation: RouteFacingObservation?,
         nowElapsedRealtimeMs: Long,
+        /** Largest angle between the selected route bearing and other plausible route candidates. */
+        routeBearingUncertaintyDegrees: Double = 0.0,
     ): RouteFacingGuidanceResult {
         val observation = facingObservation
         if (routeBearingDegreesTrueNorth == null || !routeBearingDegreesTrueNorth.isBearing() ||
+            !routeBearingUncertaintyDegrees.isFinite() || routeBearingUncertaintyDegrees < 0.0 ||
             observation == null || !isUsableObservation(observation, nowElapsedRealtimeMs)
         ) return RouteFacingGuidanceResult(RouteFacingDirection.UNKNOWN, null)
 
         val difference = (routeBearingDegreesTrueNorth - observation.degreesTrueNorth + 540.0) % 360.0 - 180.0
+        // The phone may have turned since the sample: rotation speed times sample age is added
+        // as uncertainty (no forward correction), so fast turning withholds the direction.
+        val rotationSinceObservation = observation.angularRateDegreesPerSecond?.let {
+            it * (nowElapsedRealtimeMs - observation.observedAtElapsedRealtimeMs) / 1_000.0
+        } ?: 0.0
         // Include a small margin with the reported error before saying the route is ahead/behind.
         // Near a sector edge a consistent correction side is still useful, even for diagonal routes.
         // Do not retain a previous direction here: the user may have turned while standing still.
-        val margin = observation.headingAccuracyDegrees?.let { it + BOUNDARY_MARGIN_DEGREES }
+        val sensorMargin = observation.headingAccuracyDegrees
+            ?.let { it + BOUNDARY_MARGIN_DEGREES }
+            ?.let { if (observation.magneticFieldSuspect) maxOf(it, FALLBACK_SECTOR_MARGIN_DEGREES) else it }
             ?: FALLBACK_SECTOR_MARGIN_DEGREES
+        // A direction is kept only when every plausible route candidate requires the same action.
+        val margin = sensorMargin + rotationSinceObservation + routeBearingUncertaintyDegrees
         val direction = when {
             abs(difference) + margin < 45.0 -> RouteFacingDirection.FRONT
             abs(difference) - margin > 135.0 -> RouteFacingDirection.BEHIND
@@ -86,7 +121,12 @@ object RouteFacingGuidance {
             difference - margin > -180.0 && difference + margin < 0.0 -> RouteFacingDirection.LEFT
             else -> RouteFacingDirection.UNKNOWN
         }
-        return RouteFacingGuidanceResult(direction, difference)
+        val clockCenter = (difference / 30.0).roundToInt() * 30.0
+        val clockPrecisionError = observation.headingAccuracyDegrees
+            ?.takeUnless { observation.magneticFieldSuspect }
+            ?.let { error -> error + rotationSinceObservation + routeBearingUncertaintyDegrees + BOUNDARY_MARGIN_DEGREES }
+        val clockAllowed = clockPrecisionError?.let { abs(difference - clockCenter) + it < 15.0 } == true
+        return RouteFacingGuidanceResult(direction, difference, clockAllowed, clockPrecisionError?.let { it < 15.0 } == true, margin)
     }
 
     private fun RouteFacingObservation.hasAcceptedSourceQuality(): Boolean = when (source) {
@@ -94,7 +134,12 @@ object RouteFacingGuidance {
             sensorQuality == RouteFacingSensorQuality.REPORTED_ANGULAR_ERROR &&
                 headingAccuracyDegrees?.let { it.isFinite() && it in 0.0..MAXIMUM_HEADING_ACCURACY_DEGREES } == true &&
                 reportedHeadingAccuracyDegrees?.let { it.isFinite() && it in 0.0..MAXIMUM_HEADING_ACCURACY_DEGREES } == true
-        RouteFacingSource.GRAVITY_MAGNETIC, RouteFacingSource.ACCELEROMETER_MAGNETIC ->
+        RouteFacingSource.GRAVITY_MAGNETIC ->
+            (sensorQuality == RouteFacingSensorQuality.CALIBRATED_SENSOR_CHECKS ||
+                sensorQuality == RouteFacingSensorQuality.CALIBRATED_WITHOUT_MOTION_CHECK) &&
+                headingAccuracyDegrees == null && reportedHeadingAccuracyDegrees == null
+        // The raw-acceleration basis always runs its own short stability window.
+        RouteFacingSource.ACCELEROMETER_MAGNETIC ->
             sensorQuality == RouteFacingSensorQuality.CALIBRATED_SENSOR_CHECKS &&
                 headingAccuracyDegrees == null && reportedHeadingAccuracyDegrees == null
     }

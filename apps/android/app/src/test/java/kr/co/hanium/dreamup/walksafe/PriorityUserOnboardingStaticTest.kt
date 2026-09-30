@@ -354,12 +354,19 @@ class PriorityUserOnboardingStaticTest {
     fun strictTrainingSpeechCannotInferSuccessFromDispatchOrAFollowingUtterance() {
         val strictSpeech = feedback.substringAfter("fun speakPriorityUserTraining(")
             .substringBefore("/** Queues a low-priority camera advisory")
-        val listener = feedback.substringAfter("object : UtteranceProgressListener()")
-            .substringBefore("ready.set(true)")
+        val listener = feedback.substringAfter("object : FeedbackSpeechRuntime.Listener")
+            .substringBefore("if (listenerResult")
+        val platformListener = feedback.substringAfter("private fun installSpeechListener(")
+            .substringBefore("private enum class TtsState")
         val inference = feedback.substringAfter("private fun armUtteranceTerminalWatchdog(")
             .substringBefore("private fun scheduleUtteranceWatchdogLocked")
 
         assertTrue(strictSpeech.contains("requiresExplicitTerminalCallback = true"))
+        assertTrue(listener.contains("postUtteranceCallback(engineGeneration, utteranceId)"))
+        assertTrue(platformListener.contains("object : UtteranceProgressListener()"))
+        assertTrue(platformListener.contains("override fun onStart(utteranceId: String?) = listener.onStart(utteranceId)"))
+        assertTrue(platformListener.contains("override fun onDone(utteranceId: String?) = listener.onDone(utteranceId)"))
+        assertFalse(platformListener.contains("markUtteranceFinished(utteranceId, completed = true)"))
         assertTrue(listener.contains("override fun onDone(utteranceId: String?)"))
         assertTrue(listener.contains("markUtteranceFinished(utteranceId, completed = true)"))
         assertTrue(listener.contains("onError"))
@@ -406,7 +413,11 @@ class PriorityUserOnboardingStaticTest {
         val restore = functionBlock("private fun restorePriorityUserOnboardingFromPrefs()")
 
         assertTrue(create.contains("restorePriorityUserOnboardingFromPrefs()"))
-        assertTrue(create.contains("walkSessionLifecycle = WalkSessionLifecycle()"))
+        assertTrue(
+            create.contains(
+                "walkSessionLifecycle = WalkSessionLifecycle(elapsedRealtimeClock = SystemClock::elapsedRealtime)",
+            ),
+        )
         assertTrue(create.contains("PREF_WALK_SESSION_INTERRUPTED"))
         assertTrue(restore.contains("PriorityUserOnboardingSnapshot("))
         assertFalse(restore.contains("WalkSessionLifecycle"))

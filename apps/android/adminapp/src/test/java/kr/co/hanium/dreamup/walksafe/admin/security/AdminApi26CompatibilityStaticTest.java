@@ -101,8 +101,8 @@ public final class AdminApi26CompatibilityStaticTest {
 
         String securityPackageMethod = section(
             securityController,
-            "public synchronized AdminDeliveryPackage createAdminDeliveryPackage(",
-            "public synchronized AdminDeliveryPackage.Proof getAdminDeliveryPackageProof("
+            "public AdminDeliveryPackage createAdminDeliveryPackage(",
+            "public AdminDeliveryPackage.Proof getAdminDeliveryPackageProof("
         );
         assertTrue(securityPackageMethod.contains("char[] password"));
         assertTrue(securityPackageMethod.contains("char[] totpCode"));

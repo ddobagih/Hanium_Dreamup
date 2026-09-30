@@ -103,6 +103,56 @@ class BoundedRuntimeDiagnosticLogTest {
         }
     }
 
+    @Test
+    fun everyRecordCarriesAMemoryOnlyRunIdAndTheRunStartsWithAStartRecord() {
+        // S1617-38 (originals/16-17.txt:85): separate runs whose elapsed_ms restarts.
+        val directory = temporary.newFolder("runs")
+        val firstRunId = WriterHarness(directory).use { writer ->
+            writer.enqueueRunStart()
+            writer.enqueue("event=RUN_FIXTURE index=1")
+            writer.awaitIdle()
+            writer.runId
+        }
+        val secondRunId = WriterHarness(directory).use { writer ->
+            writer.enqueueRunStart()
+            writer.enqueue("event=RUN_FIXTURE index=2")
+            writer.awaitIdle()
+            writer.runId
+        }
+        assertTrue(firstRunId.matches(Regex("[0-9a-f]{16}")))
+        assertTrue(secondRunId.matches(Regex("[0-9a-f]{16}")))
+        assertFalse(firstRunId == secondRunId)
+        val lines = File(directory, "events.log").readLines()
+        assertEquals(4, lines.size)
+        lines.forEach { assertTrue(it, it.matches(Regex("run_id=[0-9a-f]{16} elapsed_ms=\\d+ .*"))) }
+        assertEquals(
+            listOf(
+                "run_id=$firstRunId elapsed_ms=123 dropped_total=0 " +
+                    "event=RUN_START clock=ELAPSED_REALTIME_SINCE_BOOT",
+                "run_id=$firstRunId elapsed_ms=123 dropped_total=0 event=RUN_FIXTURE index=1",
+                "run_id=$secondRunId elapsed_ms=123 dropped_total=0 " +
+                    "event=RUN_START clock=ELAPSED_REALTIME_SINCE_BOOT",
+                "run_id=$secondRunId elapsed_ms=123 dropped_total=0 event=RUN_FIXTURE index=2",
+            ),
+            lines,
+        )
+        // The run ID is never persisted outside the two bounded log files.
+        assertEquals(setOf("events.log"), directory.listFiles().orEmpty().map { it.name }.toSet())
+    }
+
+    @Test
+    fun initializeWritesTheStartRecordRightAfterCreatingTheWriter() {
+        val source = listOf(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/diagnostics/BoundedRuntimeDiagnosticLog.kt",
+            "app/src/main/java/kr/co/hanium/dreamup/walksafe/diagnostics/BoundedRuntimeDiagnosticLog.kt",
+        ).map(::File).first { it.isFile }.readText()
+        val initialize = source.substringAfter("fun initialize(context: Context)")
+            .substringBefore("fun recordState(")
+        assertTrue(initialize.contains("if (!BuildConfig.DEBUG || writer != null) return"))
+        val start = initialize.indexOf("created.enqueueRunStart(")
+        assertTrue(start >= 0 && start < initialize.indexOf("writer = created"))
+    }
+
     private class WriterHarness(directory: File) : Closeable {
         private val type = Class.forName(
             "kr.co.hanium.dreamup.walksafe.diagnostics.RuntimeDiagnosticFileWriter",
@@ -117,11 +167,20 @@ class BoundedRuntimeDiagnosticLogTest {
             .get(instance) as ThreadPoolExecutor
         private val droppedCounter = type.getDeclaredField("dropped").apply { isAccessible = true }
             .get(instance) as AtomicLong
+        private val runStartMethod = type.getDeclaredMethod(
+            "enqueueRunStart", Long::class.javaPrimitiveType,
+        ).apply { isAccessible = true }
+        val runId: String = type.getDeclaredField("runId").apply { isAccessible = true }
+            .get(instance) as String
         val current = File(directory, "events.log")
         val dropped: Long get() = droppedCounter.get()
 
         fun enqueue(metadata: String) {
             enqueueMethod.invoke(instance, 123L, metadata)
+        }
+
+        fun enqueueRunStart() {
+            runStartMethod.invoke(instance, 123L)
         }
 
         fun awaitIdle() {

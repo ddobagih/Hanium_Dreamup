@@ -12,39 +12,34 @@ class MainActivityReportQueueDrainStaticTest {
     ).readText()
 
     @Test
-    fun onlyActiveToExplicitRecheckPauseCanStartDrain() {
+    fun queuedReportsStartOnlyAfterTheWalkAndNeverFromAPauseTrigger() {
+        // Owner decision 3(b) / FP-032-DETAIL-02: no drain starts in ACTIVE or PAUSED.
         val transition = functionBlock("private fun transitionWalkSession(")
-
-        assertTrue(transition.contains("captureReportQueueDrainTriggerBeforeTransition(before, event)"))
-        assertTrue(transition.contains("startReportQueueDrainAfterTransition("))
+        assertFalse(source.contains("captureReportQueueDrainTriggerBeforeTransition"))
+        assertFalse(source.contains("startReportQueueDrainAfterTransition"))
+        assertFalse(source.contains("maybeStartPausedReportQueueRecoveryObservation"))
+        assertFalse(source.contains("schedulePausedReportQueueRecoveryStationaryCheck"))
+        assertTrue(transition.contains("transition.current.state.allowsPostWalkTransfer"))
         assertTrue(
-            transition.indexOf("captureReportQueueDrainTriggerBeforeTransition") <
+            transition.indexOf("maybeStartPostWalkReportQueueDrain()") >
                 transition.indexOf("walkSessionLifecycle.handle(event)"),
         )
-        assertTrue(
-            transition.indexOf("startReportQueueDrainAfterTransition") >
-                transition.indexOf("walkSessionLifecycle.handle(event)"),
-        )
-        assertEquals(2, source.split("startReportQueueDrainAfterTransition(").size - 1)
-
-        val capture = functionBlock("private fun captureReportQueueDrainTriggerBeforeTransition(")
+        val postWalk = functionBlock("private fun maybeStartPostWalkReportQueueDrain(")
+        assertTrue(postWalk.contains("!walk.state.allowsPostWalkTransfer"))
+        assertTrue(postWalk.contains("reportQueueRecoveryBaseGatesAvailable()"))
+        assertTrue(postWalk.contains("countForRecoveryDrain(reporter)"))
+        assertTrue(postWalk.contains("buildReportQueueDrainTrigger("))
+        assertTrue(postWalk.contains("startBoundedReportQueueDrain(trigger)"))
+        // Reports: no charging condition and no step window after the walk (owner confirmation).
+        assertFalse(postWalk.contains("charging"))
+        assertFalse(postWalk.contains("hasActivityRecognitionPermission()"))
+        val window = functionBlock("private fun schedulePostWalkTransfers(")
+        assertTrue(window.contains("maybeStartPostWalkReportQueueDrain()"))
         val builder = functionBlock("private fun buildReportQueueDrainTrigger(")
-        val start = functionBlock("private fun startReportQueueDrainAfterTransition(")
-        assertTrue(capture.contains("before.state != WalkSessionState.ACTIVE"))
-        assertTrue(capture.contains("event != WalkSessionEvent.RecheckRequested"))
-        assertFalse(capture.contains("WalkSessionEvent.EndRequested"))
-        assertTrue(start.contains("event != WalkSessionEvent.RecheckRequested"))
-        assertFalse(start.contains("WalkSessionEvent.EndRequested"))
-        assertTrue(start.contains("transition.current.state != WalkSessionState.PAUSED"))
-        assertTrue(
-            start.contains(
-                "transition.current.recoveryStage != WalkSessionRecoveryStage.RECHECK_REQUIRED",
-            ),
-        )
-        assertTrue(capture.contains("activityOriginalUploadAdmission.stationarySnapshot("))
         assertTrue(builder.contains("GatewaySessionScope.GENERAL"))
         assertTrue(builder.contains("currentIntegratedConsentBinding()"))
         assertTrue(builder.contains("approvedReportQueueGatewayOriginOrNull("))
+        assertTrue(builder.contains("AndroidNetworkTransferPolicy.isAllowed(networkPreference, networkTransport)"))
     }
 
     @Test
@@ -155,29 +150,29 @@ class MainActivityReportQueueDrainStaticTest {
     }
 
     @Test
-    fun trackerRetainsOnlySensorAndAnyBaselineChangeCancels() {
+    fun aWalkThatBecomesActiveOrPausedAgainCancelsTheDrain() {
         val stop = functionBlock("private fun stopStepTracking()")
-        val sample = functionBlock("private fun onReportQueueDrainStepSample(")
         val transition = functionBlock("private fun updateReportQueueDrainForTransition(")
 
         assertTrue(stop.contains("stepTrackingEpoch = null"))
         assertTrue(stop.contains("reportQueueDrainTrigger != null"))
         assertTrue(stop.contains("if (retainedForReportQueueDrain) return"))
-        assertTrue(source.contains("onReportQueueDrainStepSample(steps, observedAtMs)"))
-        assertTrue(sample.contains("stepCount == trigger.stationarySnapshot.stepCount"))
-        assertTrue(sample.contains("observedAtMs >= trigger.stationarySnapshot.observedAtMs"))
-        assertTrue(sample.contains("reportQueueDrainCoordinator.cancelActive()"))
-        assertTrue(sample.contains("stopStepTrackingNow()"))
-        assertTrue(transition.contains("transition.current.state != WalkSessionState.PAUSED"))
+        assertFalse(source.contains("onReportQueueDrainStepSample"))
+        assertTrue(transition.contains("!transition.current.state.allowsPostWalkTransfer"))
         assertTrue(transition.contains("transition.current.epoch.walkSessionId != active.walkSessionId"))
+        assertTrue(transition.contains("reportQueueDrainCoordinator.cancelActive()"))
         assertTrue(
             functionBlock("private fun ReportQueueDrainContext.allRequiredBaseGatesAllowed(")
-                .contains("walkState == WalkSessionState.PAUSED"),
+                .contains("walkState.allowsPostWalkTransfer"),
+        )
+        assertTrue(
+            functionBlock("private fun startBoundedReportQueueDrain(")
+                .contains("reportQueueDrainWalkState?.allowsPostWalkTransfer != true"),
         )
     }
 
     @Test
-    fun lifecycleChangesCancelAndPausedResumeCanSafelyRestartABoundedDrain() {
+    fun lifecycleChangesCancelAndAfterTheWalkRestartABoundedDrain() {
         assertTrue(functionBlock("override fun onPause()").contains("cancelReportQueueDrain()"))
         assertTrue(functionBlock("override fun onDestroy()").contains("cancelReportQueueDrain()"))
         assertTrue(
@@ -208,19 +203,15 @@ class MainActivityReportQueueDrainStaticTest {
         assertTrue(networkCallback.contains("override fun onCapabilitiesChanged"))
         assertTrue(networkCallback.contains("onReportQueueDrainNetworkChanged()"))
 
+        // Owner decision 3(b): app start, foreground return and network changes open the post-walk window.
         assertTrue(
             functionBlock("private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection(")
-                .contains("maybeStartPausedReportQueueRecoveryObservation()"),
+                .contains("schedulePostWalkTransfers()"),
         )
-        val observe = functionBlock("private fun maybeStartPausedReportQueueRecoveryObservation(")
-        assertTrue(observe.contains("walk.state != WalkSessionState.PAUSED"))
-        assertTrue(observe.contains("!walk.isForeground"))
-        assertTrue(observe.contains("hasActivityRecognitionPermission()"))
-        assertTrue(observe.contains("reportQueueRecoveryBaseGatesAvailable()"))
-        assertTrue(observe.contains("countForRecoveryDrain(reporter)"))
-        val stationary = functionBlock("private fun startPausedReportQueueRecoveryIfCurrent(")
-        assertTrue(stationary.contains("buildReportQueueDrainTrigger("))
-        assertTrue(stationary.contains("startBoundedReportQueueDrain(trigger)"))
+        assertTrue(
+            functionBlock("private fun onReportQueueDrainNetworkChanged(")
+                .contains("schedulePostWalkTransfers()"),
+        )
         val bounded = functionBlock("private fun startBoundedReportQueueDrain(")
         assertTrue(bounded.contains("reportQueueDrainTrigger != null"))
         assertTrue(bounded.contains("reportQueueDrainExecutor.execute"))

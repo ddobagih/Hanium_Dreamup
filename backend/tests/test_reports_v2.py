@@ -25,7 +25,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from backend.app.config import get_settings  # noqa: E402
 from backend.app.database import SessionLocal  # noqa: E402
-from backend.app.field_test_security import FieldTestAccess, create_actor_assertion  # noqa: E402
 from backend.app.main import app, settings as app_settings  # noqa: E402
 from backend.app.models import ReportExportAudit, ReportImageObject, ReportStatusAudit  # noqa: E402
 from backend.app.schemas import (  # noqa: E402
@@ -34,12 +33,16 @@ from backend.app.schemas import (  # noqa: E402
 )
 from backend.app.services.privacy_lifecycle import record_consent_event  # noqa: E402
 from asgi_client import ASGITestClient  # noqa: E402
+from actor_assertion_v4_signing import GatewayV4Signer, V4_SIGN_AT_SEND  # noqa: E402
 
 
 _JPEG_OUTPUT = io.BytesIO()
 Image.new("RGB", (4, 4), color=(180, 160, 40)).save(_JPEG_OUTPUT, format="JPEG")
 JPEG_BYTES = _JPEG_OUTPUT.getvalue()
 GATEWAY_SECRET = "gateway-actor-assertion-secret-for-report-tests"
+# w24 S20-41: writes need a request-bound v4 actor assertion (safe-methods default);
+# the test Gateway stand-in signs each marked request from the exact bytes sent.
+SIGNED_APP = GatewayV4Signer(app, GATEWAY_SECRET)
 
 
 @pytest.fixture(autouse=True)
@@ -63,7 +66,7 @@ def migrated_database() -> None:
 
 @pytest.fixture
 def client() -> ASGITestClient:
-    return ASGITestClient(app)
+    return ASGITestClient(SIGNED_APP)
 
 
 def sample_v2_metadata(**overrides: object) -> dict[str, object]:
@@ -105,12 +108,7 @@ def secured_field_headers(token: str, actor_id: str) -> dict[str, str]:
         "x-walksafe-field-test-token": token,
         "x-walksafe-actor-id": actor_id,
         "x-walksafe-account-generation": "1",
-        "x-walksafe-actor-assertion": create_actor_assertion(
-            actor_id,
-            FieldTestAccess.FIELD,
-            GATEWAY_SECRET,
-            account_generation=1,
-        ),
+        "x-walksafe-actor-assertion": V4_SIGN_AT_SEND,
     }
 
 
@@ -141,6 +139,49 @@ def post_report_v2(client: ASGITestClient, metadata: dict[str, object]):
         data={"metadata": json.dumps(metadata)},
         files={"image": ("sample.jpg", JPEG_BYTES, "image/jpeg")},
     )
+
+
+def jpeg_with_exif_orientation(orientation: int) -> bytes:
+    output = io.BytesIO()
+    exif = Image.Exif()
+    exif[274] = orientation
+    Image.new("RGB", (4, 4), color=(180, 160, 40)).save(output, format="JPEG", exif=exif)
+    return output.getvalue()
+
+
+@pytest.mark.parametrize("orientation", [2, 6, 8])
+def test_report_v2_rejects_oriented_bbox_before_persistence(orientation: int) -> None:
+    def unexpected_persistence(*_args, **_kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("oriented report reached persistence")
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("backend.app.api.reports._persist_v2_report", unexpected_persistence)
+        response = ASGITestClient(app).post(
+            "/reports/v2",
+            data={"metadata": json.dumps(sample_v2_metadata())},
+            files={"image": ("sample.jpg", jpeg_with_exif_orientation(orientation), "image/jpeg")},
+        )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": {"code": "report_bbox_exif_orientation_unsupported"}}
+
+
+@pytest.mark.parametrize("orientation", [None, 1])
+def test_report_v2_normal_orientation_reaches_persistence(orientation: int | None) -> None:
+    def persistence_reached(*_args, **_kwargs):  # noqa: ANN002, ANN003
+        raise HTTPException(status_code=503, detail={"code": "persistence_reached"})
+
+    image_bytes = JPEG_BYTES if orientation is None else jpeg_with_exif_orientation(orientation)
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("backend.app.api.reports._persist_v2_report", persistence_reached)
+        response = ASGITestClient(app).post(
+            "/reports/v2",
+            data={"metadata": json.dumps(sample_v2_metadata())},
+            files={"image": ("sample.jpg", image_bytes, "image/jpeg")},
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"code": "persistence_reached"}}
 
 
 def test_report_v2_persistence_does_not_block_the_event_loop(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -379,9 +420,11 @@ def test_secured_auto_report_rejects_server_gate_failures(
     )
     metadata.update(override)
 
+    actor_id = f"gate-failure-{uuid.uuid4().hex}"
+    record_report_consent(actor_id)
     response = client.post(
         "/reports/v2",
-        headers=secured_field_headers(field_token, "field.user@example.com"),
+        headers=secured_field_headers(field_token, actor_id),
         data={"metadata": json.dumps(metadata)},
         files={"image": ("sample.jpg", JPEG_BYTES, "image/jpeg")},
     )
@@ -391,20 +434,28 @@ def test_secured_auto_report_rejects_server_gate_failures(
     assert reason in response.json()["detail"]["reasons"]
 
 
+@pytest.mark.parametrize("transport_contract", [False, True], ids=["legacy", "transport"])
 def test_secured_auto_report_cooldown_is_authoritative_by_actor_class_radius_and_time(
     client: ASGITestClient,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    transport_contract: bool,
 ) -> None:
+    import base64
+    from backend.app.api import reports
+
     field_token = "field-token-for-cooldown-tests-123456"
     source_commit = "f" * 40
     monkeypatch.setattr(app_settings, "field_test_security_enabled", True)
     monkeypatch.setattr(app_settings, "field_test_token", field_token)
     monkeypatch.setattr(app_settings, "admin_token", "admin-token-for-cooldown-tests-123456")
     monkeypatch.setattr(app_settings, "walksafe_source_commit", source_commit)
-    actor_id = "cooldown.user@example.com"
+    actor_id = f"cooldown-{uuid.uuid4().hex}@example.com"
     record_report_consent(actor_id)
     headers = secured_field_headers(field_token, actor_id)
     captured_at = datetime.now(timezone.utc)
+    transport_ids: dict[str, uuid.UUID] = {}
+    requests: list[dict[str, object]] = []
 
     def submit(*, latitude: float, trigger: str = "auto", seconds: int = 0):
         metadata = sample_v2_metadata(
@@ -417,23 +468,67 @@ def test_secured_auto_report_cooldown_is_authoritative_by_actor_class_radius_and
             trigger=trigger,
             auto_reported=trigger == "auto",
         )
+        metadata_json = json.dumps(metadata)
+        request_headers = dict(headers)
+        if transport_contract:
+            report_id = transport_ids.setdefault(metadata_json, uuid.uuid4())
+            request_headers.update({
+                "x-walksafe-report-id": str(report_id),
+                "x-walksafe-report-payload-sha256": reports.report_transport_payload_sha256(
+                    report_id, metadata_json.encode(), JPEG_BYTES,
+                ),
+                "x-walksafe-report-payload-bytes": str(len(metadata_json.encode()) + len(JPEG_BYTES)),
+            })
+        requests.append({
+            "report_id": request_headers.get("x-walksafe-report-id"),
+            "metadata_utf8_base64": base64.b64encode(metadata_json.encode()).decode(),
+            "image_jpeg_base64": base64.b64encode(JPEG_BYTES).decode(),
+        })
         return client.post(
             "/reports/v2",
-            headers=headers,
-            data={"metadata": json.dumps(metadata)},
+            headers=request_headers,
+            data={"metadata": metadata_json},
             files={"image": ("sample.jpg", JPEG_BYTES, "image/jpeg")},
         )
 
     first = submit(latitude=37.5)
+    replayed = submit(latitude=37.5)
     inside_radius = submit(latitude=37.50021, seconds=1)
     outside_radius = submit(latitude=37.50025, seconds=2)
     voice_override = submit(latitude=37.5, trigger="voice", seconds=3)
 
     assert first.status_code == 201, first.text
-    assert inside_radius.status_code == 201, inside_radius.text
-    assert inside_radius.json()["id"] == first.json()["id"]
+    assert first.json()["creation_outcome"] == "CREATED"
+    assert replayed.status_code == 201, replayed.text
+    assert replayed.json()["creation_outcome"] == "REPLAYED"
+    assert replayed.json()["id"] == first.json()["id"]
+    assert replayed.json()["transport_receipt"] == first.json()["transport_receipt"]
+    if transport_contract:
+        assert inside_radius.status_code == 429, inside_radius.text
+        assert inside_radius.headers["Retry-After"] == "600"
+        assert inside_radius.json() == {"detail": {
+            "code": "automatic_report_cooldown_active",
+            "creation_outcome": "SUPPRESSED_BY_COOLDOWN",
+        }}
+    else:
+        assert inside_radius.status_code == 201, inside_radius.text
+        assert inside_radius.json()["id"] == first.json()["id"]
+        assert inside_radius.json()["creation_outcome"] == "SUPPRESSED_BY_COOLDOWN"
+        assert inside_radius.json()["transport_receipt"] is None
     assert outside_radius.status_code == 201, outside_radius.text
+    assert outside_radius.json()["creation_outcome"] == "CREATED"
     assert voice_override.status_code == 201, voice_override.text
+    assert voice_override.json()["creation_outcome"] == "CREATED"
+    fixtures = {
+        name: {"status": response.status_code, "body": response.json(),
+               "retry_after": response.headers.get("Retry-After"), "request": request}
+        for (name, response), request in zip(
+            (("created", first), ("replayed", replayed), ("suppressed", inside_radius)), requests,
+        )
+    }
+    fixture_path = tmp_path / "creation-outcomes.json"
+    fixture_path.write_text(json.dumps(fixtures, ensure_ascii=False, indent=2) + "\n")
+    print(f"S20_6_HTTP_FIXTURE={fixture_path}")
 
 
 def test_concurrent_secured_auto_reports_return_one_idempotent_cooldown_result(
@@ -451,7 +546,7 @@ def test_concurrent_secured_auto_reports_return_one_idempotent_cooldown_result(
     headers = secured_field_headers(field_token, actor_id)
 
     async def exercise() -> list[httpx.Response]:
-        transport = httpx.ASGITransport(app=app)
+        transport = httpx.ASGITransport(app=SIGNED_APP)
         async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as async_client:
             requests = []
             for seconds in (0, 1):
@@ -477,6 +572,148 @@ def test_concurrent_secured_auto_reports_return_one_idempotent_cooldown_result(
 
     assert [response.status_code for response in responses] == [201, 201]
     assert len({response.json()["id"] for response in responses}) == 1
+    assert {response.json()["creation_outcome"] for response in responses} == {
+        "CREATED", "SUPPRESSED_BY_COOLDOWN",
+    }
+
+
+def test_secured_auto_report_exact_retry_survives_capture_age_without_new_storage(
+    client: ASGITestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    field_token = "field-token-for-stale-retry-123456"
+    source_commit = "e" * 40
+    monkeypatch.setattr(app_settings, "field_test_security_enabled", True)
+    monkeypatch.setattr(app_settings, "field_test_token", field_token)
+    monkeypatch.setattr(app_settings, "admin_token", "admin-token-for-stale-retry-123456")
+    monkeypatch.setattr(app_settings, "walksafe_source_commit", source_commit)
+    actor_id = f"stale.retry.{uuid.uuid4().hex}@example.com"
+    record_report_consent(actor_id)
+    headers = secured_field_headers(field_token, actor_id)
+    captured_at = datetime.now(timezone.utc)
+    metadata = sample_v2_metadata(
+        source="android",
+        source_model="android/custom-tactile-contract",
+        source_commit=source_commit,
+        captured_at=captured_at.isoformat(),
+        coordinate_gate_status="pass",
+        gps={"latitude": 37.61, "longitude": 127.11, "accuracy_m": 5.0},
+    )
+
+    def submit(
+        value: dict[str, object], *,
+        request_headers: dict[str, str] | None = None,
+        image: bytes = JPEG_BYTES,
+    ):
+        return client.post(
+            "/reports/v2", headers=request_headers or headers,
+            data={"metadata": json.dumps(value)},
+            files={"image": ("sample.jpg", image, "image/jpeg")},
+        )
+
+    first = submit(metadata)
+    assert first.status_code == 201, first.text
+    with SessionLocal() as db:
+        stored_rows = db.execute(text("SELECT count(*) FROM reports")).scalar_one()
+    stored_images = set(app_settings.upload_dir.glob("*.wse"))
+
+    advanced_now = captured_at + timedelta(minutes=6)
+
+    class AdvancedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return advanced_now.replace(tzinfo=None) if tz is None else advanced_now.astimezone(tz)
+
+    monkeypatch.setattr("backend.app.api.reports.datetime", AdvancedDatetime)
+    retry = submit(metadata)
+    assert retry.status_code == 201, retry.text
+    assert retry.json()["id"] == first.json()["id"]
+    with SessionLocal() as db:
+        assert db.execute(text("SELECT count(*) FROM reports")).scalar_one() == stored_rows
+    assert set(app_settings.upload_dir.glob("*.wse")) == stored_images
+
+    new_stale_report = submit({
+        **metadata, "captured_at": (captured_at + timedelta(seconds=1)).isoformat(),
+    })
+    assert new_stale_report.status_code == 422, new_stale_report.text
+    assert "captured_at_stale" in new_stale_report.json()["detail"]["reasons"]
+
+    different_image = io.BytesIO()
+    Image.new("RGB", (4, 4), color=(40, 160, 180)).save(different_image, format="JPEG")
+    wrong_image = submit(metadata, image=different_image.getvalue())
+    wrong_metadata = submit({**metadata, "heading": 182.0})
+    other_actor = f"other.stale.retry.{uuid.uuid4().hex}@example.com"
+    record_report_consent(other_actor)
+    wrong_actor = submit(metadata, request_headers=secured_field_headers(field_token, other_actor))
+    assert wrong_image.status_code == 422, wrong_image.text
+    assert "captured_at_stale" in wrong_image.json()["detail"]["reasons"]
+    assert wrong_metadata.status_code == 409, wrong_metadata.text
+    assert wrong_actor.status_code == 422, wrong_actor.text
+    assert "captured_at_stale" in wrong_actor.json()["detail"]["reasons"]
+    with SessionLocal() as db:
+        assert db.execute(text("SELECT count(*) FROM reports")).scalar_one() == stored_rows
+    assert set(app_settings.upload_dir.glob("*.wse")) == stored_images
+
+
+@pytest.mark.parametrize("changed", [
+    {"gps": {"latitude": 37.5666, "longitude": 126.978, "accuracy_m": 9.5}},
+    {"bbox": {"x": 0.1, "y": 0.35, "width": 0.4, "height": 0.22}},
+    {"source_model": "fake/changed-model-contract"},
+    {"confidence": 0.90},
+    {"heading": 182.0},
+], ids=["gps", "bbox", "model", "confidence", "heading"])
+def test_legacy_report_replay_binds_sanitized_metadata(
+    client: ASGITestClient, changed: dict[str, object],
+) -> None:
+    metadata = sample_v2_metadata(trigger="on_screen", auto_reported=False)
+    headers = {"x-walksafe-actor-id": f"legacy-replay-{uuid.uuid4().hex}"}
+
+    def submit(value: dict[str, object]):
+        return client.post(
+            "/reports/v2", headers=headers,
+            data={"metadata": json.dumps(value)},
+            files={"image": ("sample.jpg", JPEG_BYTES, "image/jpeg")},
+        )
+
+    first = submit(metadata)
+    changed_metadata = {**metadata, **changed}
+    second = submit(changed_metadata)
+    retry = submit(changed_metadata)
+    assert first.status_code == 201, first.text
+    for response in (second, retry):
+        assert response.status_code == 409, response.text
+        assert response.json() == {"detail": {"code": "report_idempotency_conflict"}}
+
+    original_retry = submit(metadata)
+    assert original_retry.status_code == 201, original_retry.text
+    assert original_retry.json()["id"] == first.json()["id"]
+
+
+def test_legacy_report_replay_keeps_normalization_and_actor_generation_boundaries(
+    client: ASGITestClient,
+) -> None:
+    metadata = sample_v2_metadata(trigger="on_screen", auto_reported=False)
+    actor = f"legacy-boundary-{uuid.uuid4().hex}"
+
+    def submit(actor_id: str, generation: int, value: dict[str, object]):
+        return client.post(
+            "/reports/v2", headers={
+                "x-walksafe-actor-id": actor_id,
+                "x-walksafe-account-generation": str(generation),
+            }, data={"metadata": json.dumps(value)},
+            files={"image": ("sample.jpg", JPEG_BYTES, "image/jpeg")},
+        )
+
+    first = submit(actor, 1, metadata)
+    normalized_retry = submit(actor, 1, {
+        **metadata, "client_private_unused_field": "must-be-discarded"
+    })
+    other_actor = submit(f"other-{uuid.uuid4().hex}", 1, metadata)
+    other_generation = submit(actor, 2, metadata)
+    for response in (first, normalized_retry, other_actor, other_generation):
+        assert response.status_code == 201, response.text
+    assert normalized_retry.json()["id"] == first.json()["id"]
+    assert "client_private_unused_field" not in normalized_retry.json()["metadata"]
+    assert len({first.json()["id"], other_actor.json()["id"], other_generation.json()["id"]}) == 3
 
 
 def test_report_v2_retry_by_same_actor_is_idempotent(client: ASGITestClient) -> None:
@@ -534,7 +771,12 @@ def test_create_report_v2_rejects_trigger_auto_report_mismatch(
     )
 
     assert response.status_code == 422
-    assert "auto_reported must be true" in response.text
+    assert response.json() == {
+        "detail": {
+            "code": "report_metadata_invalid",
+            "errors": [{"field": ["metadata"], "type": "invalid_value"}],
+        },
+    }
 
 
 def test_create_report_v2_rejects_unknown_coordinate_gate_status(client: ASGITestClient) -> None:
@@ -587,6 +829,50 @@ def test_secured_android_report_requires_matching_source_commit(
 
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "android_provenance_gate_failed"
+
+
+@pytest.mark.parametrize(
+    ("security_enabled", "source", "report_commit", "backend_commit", "accepted"),
+    [
+        (True, "android", "d" * 40, "d" * 40, True),
+        (True, "android", "D" * 40, "d" * 40, True),
+        (True, "android", "e" * 40, "d" * 40, False),
+        (True, "android", None, "d" * 40, False),
+        (True, "android", "d" * 40, "", False),
+        (True, "server", "e" * 40, "d" * 40, True),
+        (False, "android", "e" * 40, "d" * 40, True),
+    ],
+    ids=[
+        "same-commit", "same-commit-case", "other-commit", "missing-commit",
+        "backend-commit-unset", "non-android-source", "security-disabled",
+    ],
+)
+def test_s20_7_secured_android_provenance_keeps_current_combination_only(
+    security_enabled: bool,
+    source: str,
+    report_commit: str | None,
+    backend_commit: str,
+    accepted: bool,
+) -> None:
+    # S20-7 / FP-039-DETAIL-03 interim: only the current approved app+server
+    # combination is active. Exact full-commit matching stays fail-closed until an
+    # approved previous-combination allowlist exists; this is not relaxed here.
+    from types import SimpleNamespace
+
+    from backend.app.api.reports import _enforce_secured_android_provenance
+
+    parsed = SimpleNamespace(source=source, source_commit=report_commit)
+    settings = SimpleNamespace(
+        field_test_security_enabled=security_enabled,
+        walksafe_source_commit=backend_commit,
+    )
+    if accepted:
+        assert _enforce_secured_android_provenance(parsed, settings) is None
+        return
+    with pytest.raises(HTTPException) as rejected:
+        _enforce_secured_android_provenance(parsed, settings)
+    assert rejected.value.status_code == 422
+    assert rejected.value.detail["code"] == "android_provenance_gate_failed"
 
 
 def test_create_report_v2_overwrites_client_provenance_fields(client: ASGITestClient) -> None:
@@ -989,7 +1275,7 @@ def test_export_reports_json_filters_v2_metadata(client: ASGITestClient) -> None
 
     assert response.status_code == 200, response.text
     assert response.headers["content-disposition"] == 'attachment; filename="walksafe-reports-demo-included.json"'
-    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["cache-control"] == "private, no-store"
     assert response.headers["x-walksafe-demo-filter"] == "all"
     row = next(row for row in response.json() if row["id"] == created_body["id"])
     assert row["latitude"] == 37.5665
@@ -1015,7 +1301,7 @@ def test_export_reports_geojson_filters_v2_metadata(client: ASGITestClient) -> N
 
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("application/geo+json")
-    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["cache-control"] == "private, no-store"
     body = response.json()
     assert body["type"] == "FeatureCollection"
     feature = next(feature for feature in body["features"] if feature["id"] == created_body["id"])
@@ -1110,6 +1396,9 @@ def test_export_reports_csv_bom_and_redacted_mode(client: ASGITestClient) -> Non
 
     assert response.status_code == 200, response.text
     assert response.text.startswith("\ufeff")
+    assert response.headers["x-walksafe-export-profile"] == "internal"
+    assert response.headers["x-walksafe-audit-id"]
+    assert response.headers["x-walksafe-actor-id"]
     row = next(row for row in csv_rows(response) if row["id"] == created.json()["id"])
     assert row["image_path"] == ""
     assert len(row["latitude"].split(".")[-1]) <= 4
@@ -1155,6 +1444,107 @@ def test_export_reports_minimum_profile_removes_internal_fields(client: ASGITest
         "review_flags",
     }:
         assert row[sensitive_field] == ""
+
+
+@pytest.mark.parametrize(
+    ("export_format", "include_manifest", "bundle"),
+    [
+        ("csv", False, False),
+        ("json", False, False),
+        ("geojson", False, False),
+        ("json", True, False),
+        ("csv", True, True),
+    ],
+)
+def test_export_reports_minimum_public_response_metadata_allowlist(
+    client: ASGITestClient,
+    export_format: str,
+    include_manifest: bool,
+    bundle: bool,
+) -> None:
+    actor_id = "minimum.public.actor@example.com"
+    audit_id = str(uuid.uuid4())
+    created_from = fresh_created_from()
+    created_to = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    created = post_report_v2(
+        client,
+        sample_v2_metadata(captured_at="2026-05-22T15:11:45.000Z"),
+    )
+    assert created.status_code == 201, created.text
+
+    response = client.get(
+        "/reports/export",
+        headers={"x-walksafe-actor-id": actor_id},
+        params={
+            "format": export_format,
+            "profile": "minimum",
+            "manifest": str(include_manifest).lower(),
+            "bundle": str(bundle).lower(),
+            "audit_id": audit_id,
+            "model_key": "custom_tactile",
+            "trigger": "auto",
+            "created_from": created_from,
+            "created_to": created_to,
+            "lat": 37.5665,
+            "lng": 126.978,
+            "radius_m": 100,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.headers["x-walksafe-export-profile"] == "minimum"
+    assert response.headers["x-walksafe-location-precision"] == "rounded"
+    assert "x-walksafe-audit-id" not in response.headers
+    assert "x-walksafe-actor-id" not in response.headers
+    assert "x-walksafe-demo-filter" not in response.headers
+    extension = "bundle.zip" if bundle else export_format
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="walksafe-reports-minimum.{extension}"'
+    )
+    assert actor_id not in str(response.headers)
+    assert audit_id not in str(response.headers)
+
+    if bundle:
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            assert set(archive.namelist()) == {"reports.csv", "manifest.json"}
+            assert all(member.date_time == (1980, 1, 1, 0, 0, 0) for member in archive.infolist())
+            csv_text = archive.read("reports.csv").decode("utf-8")
+            manifest_text = archive.read("manifest.json").decode("utf-8")
+        rows = list(csv.DictReader(io.StringIO(csv_text)))
+        body = json.loads(manifest_text)
+        public_texts = [csv_text, manifest_text]
+    elif export_format == "csv":
+        rows = csv_rows(response)
+        body = None
+        public_texts = [response.text]
+    else:
+        body = response.json()
+        rows = body.get("rows", []) if include_manifest else body
+        public_texts = [response.text]
+
+    for public_text in public_texts:
+        for private_value in (actor_id, audit_id, created_from, created_to, "custom_tactile", "37.5665", "126.978"):
+            assert private_value not in public_text
+
+    if export_format == "geojson":
+        assert body["type"] == "FeatureCollection"
+        assert body["properties"] == {"location_precision": "rounded"}
+        assert body["features"]
+        assert all(feature["id"] == "" for feature in body["features"])
+        assert all(feature["properties"]["trigger"] == "" for feature in body["features"])
+        assert any(feature["geometry"] == {"type": "Point", "coordinates": [126.98, 37.57]} for feature in body["features"])
+    else:
+        assert rows
+        assert all(row["id"] == "" and row["trigger"] == "" for row in rows)
+        assert any(float(row["latitude"]) == 37.57 and float(row["longitude"]) == 126.98 for row in rows)
+
+    if include_manifest:
+        assert set(body) == {"schema_version", "profile", "format", "count", "rows"}
+        assert body["schema_version"] == "walksafe.reports.export_manifest.v1"
+        assert body["profile"] == "minimum"
+        assert body["format"] == export_format
+        assert body["count"] == len(body["rows"])
+        assert body["rows"]
 
 
 def test_export_reports_agency_profile_keeps_exact_location_and_removes_internal_fields(
@@ -1650,3 +2040,260 @@ def test_report_status_history_note_reason_and_conflict(client: ASGITestClient) 
                 transaction.rollback()
     finally:
         engine.dispose()
+
+
+def _s20_7_table(*entries: dict[str, object], current: str = "d" * 40):
+    from backend.app.services.android_release_allowlist import parse_approved_android_releases
+    return parse_approved_android_releases(json.dumps(list(entries)), current_commit=current)
+
+
+@pytest.mark.parametrize(
+    ("report_commit", "apk", "model", "accepted"),
+    [
+        ("d" * 40, None, None, True),
+        ("d" * 40, "1" * 64, "2" * 64, True),
+        ("e" * 40, "b" * 64, "a" * 64, True),
+        ("E" * 40, "B" * 64, "A" * 64, True),
+        ("e" * 40, "b" * 64, "c" * 64, False),
+        ("e" * 40, "b" * 64, None, False),
+        ("e" * 40, "0" * 64, "a" * 64, False),
+        ("e" * 40, None, "a" * 64, False),
+        ("f" * 40, "b" * 64, "a" * 64, False),
+        (None, None, None, False),
+    ],
+    ids=[
+        "current-unpinned", "current-any-contract", "previous-bundle", "previous-bundle-case",
+        "previous-other-model", "previous-missing-model", "previous-other-apk",
+        "previous-missing-apk", "unlisted-commit", "missing-commit",
+    ],
+)
+def test_s20_7_approved_release_table_accepts_only_listed_bundles(
+    report_commit: str | None, apk: str | None, model: str | None, accepted: bool,
+) -> None:
+    from types import SimpleNamespace
+    from backend.app.api.reports import _enforce_secured_android_provenance
+    settings = SimpleNamespace(
+        field_test_security_enabled=True,
+        walksafe_source_commit="d" * 40,
+        approved_android_releases=_s20_7_table(
+            {"source_commit": "d" * 40, "report_schema": "reports.v2"},
+            {
+                "source_commit": "e" * 40, "report_schema": "reports.v2",
+                "apk_sha256": "b" * 64, "model_config_sha256": "a" * 64,
+            },
+        ),
+    )
+    parsed = SimpleNamespace(
+        source="android", source_commit=report_commit, apk_sha256=apk, model_config_sha256=model,
+    )
+    if accepted:
+        assert _enforce_secured_android_provenance(parsed, settings) is None
+        return
+    with pytest.raises(HTTPException) as rejected:
+        _enforce_secured_android_provenance(parsed, settings)
+    assert rejected.value.status_code == 422
+    assert rejected.value.detail["code"] == "android_provenance_gate_failed"
+
+
+@pytest.mark.parametrize("table", [[("d" * 40,)], ["not-a-table"], ({"source_commit": "d" * 40},)])
+def test_s20_7_malformed_runtime_table_fails_closed(table: object) -> None:
+    from types import SimpleNamespace
+    from backend.app.services.android_release_allowlist import approved_android_release
+    settings = SimpleNamespace(walksafe_source_commit="d" * 40, approved_android_releases=table)
+    assert approved_android_release(
+        settings, source_commit="d" * 40, apk_sha256=None, model_config_sha256=None,
+    ) is False
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "not json",
+        "{}",
+        "[]",
+        json.dumps([{"source_commit": "e" * 40, "report_schema": "reports.v2"}]),
+        json.dumps([{"source_commit": "d" * 40, "report_schema": "reports.v2"}] * 2),
+        json.dumps([{"source_commit": "D" * 40, "report_schema": "reports.v2"}]),
+        json.dumps([{"source_commit": "d" * 40}]),
+        json.dumps([{"source_commit": "d" * 40, "report_schema": "reports.v1"}]),
+        json.dumps([{"source_commit": "d" * 40, "report_schema": "reports.v2", "app": "1"}]),
+        json.dumps([{"source_commit": "d" * 40, "report_schema": "reports.v2", "apk_sha256": "A" * 64}]),
+        json.dumps([{"source_commit": "d" * 40, "report_schema": "reports.v2", "model_config_sha256": 1}]),
+        '[{"source_commit":"' + "d" * 40 + '","source_commit":"' + "d" * 40 + '","report_schema":"reports.v2"}]',
+        json.dumps(
+            [{"source_commit": "d" * 40, "report_schema": "reports.v2"}]
+            + [{"source_commit": f"{index:040x}", "report_schema": "reports.v2"} for index in range(8)]
+        ),
+    ],
+    ids=[
+        "not-json", "object", "empty", "missing-current", "duplicate-commit", "uppercase-commit",
+        "missing-schema", "other-schema", "unknown-key", "uppercase-digest", "non-string-digest",
+        "duplicate-json-key", "too-many",
+    ],
+)
+def test_s20_7_invalid_approved_release_table_refuses_startup(
+    monkeypatch: pytest.MonkeyPatch, raw: str,
+) -> None:
+    from backend.app.config import Settings
+    monkeypatch.setenv("WALKSAFE_SOURCE_COMMIT", "d" * 40)
+    monkeypatch.setenv("WALKSAFE_APPROVED_ANDROID_RELEASES", raw)
+    with pytest.raises(ValueError, match="WALKSAFE_APPROVED_ANDROID_RELEASES"):
+        Settings()
+
+
+def test_s20_7_unset_table_is_the_current_release_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    from backend.app.config import Settings
+    monkeypatch.setenv("WALKSAFE_SOURCE_COMMIT", "d" * 40)
+    monkeypatch.delenv("WALKSAFE_APPROVED_ANDROID_RELEASES", raising=False)
+    assert Settings().approved_android_releases is None
+    monkeypatch.setenv(
+        "WALKSAFE_APPROVED_ANDROID_RELEASES",
+        json.dumps([{"source_commit": "d" * 40, "report_schema": "reports.v2"}]),
+    )
+    configured = Settings().approved_android_releases
+    assert configured is not None and [entry.source_commit for entry in configured] == ["d" * 40]
+
+
+def test_s20_7_secured_http_accepts_approved_previous_bundle_and_keeps_commit_for_audit(
+    client: ASGITestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    field_token = "field-token-for-release-table-tests-123456"
+    current_commit, previous_commit = "d" * 40, "e" * 40
+    monkeypatch.setattr(app_settings, "field_test_security_enabled", True)
+    monkeypatch.setattr(app_settings, "field_test_token", field_token)
+    monkeypatch.setattr(app_settings, "admin_token", "admin-token-for-release-table-tests-123456")
+    monkeypatch.setattr(app_settings, "walksafe_source_commit", current_commit)
+    monkeypatch.setattr(app_settings, "approved_android_releases", _s20_7_table(
+        {"source_commit": current_commit, "report_schema": "reports.v2"},
+        {"source_commit": previous_commit, "report_schema": "reports.v2", "model_config_sha256": "a" * 64},
+    ))
+    actor_id = f"release-table-{uuid.uuid4().hex}@example.com"
+    record_report_consent(actor_id)
+
+    def submit(model_config_sha256: str, latitude: float):
+        metadata = sample_v2_metadata(
+            source="android",
+            source_model="android/custom-tactile-contract",
+            source_commit=previous_commit,
+            model_config_sha256=model_config_sha256,
+            captured_at=datetime.now(timezone.utc).isoformat(),
+            coordinate_gate_status="pass",
+            gps={"latitude": latitude, "longitude": 127.0, "accuracy_m": 5.0},
+            trigger="voice",
+            auto_reported=False,
+        )
+        return client.post(
+            "/reports/v2",
+            headers=secured_field_headers(field_token, actor_id),
+            data={"metadata": json.dumps(metadata)},
+            files={"image": ("sample.jpg", JPEG_BYTES, "image/jpeg")},
+        )
+
+    mismatched = submit("c" * 64, 37.41)
+    assert mismatched.status_code == 422, mismatched.text
+    assert mismatched.json()["detail"]["code"] == "android_provenance_gate_failed"
+    accepted = submit("a" * 64, 37.42)
+    assert accepted.status_code == 201, accepted.text
+    assert accepted.json()["metadata"]["source_commit"] == previous_commit
+    from backend.app.models import Report
+    with SessionLocal() as db:
+        stored = db.get(Report, uuid.UUID(str(accepted.json()["id"])))
+        assert stored is not None
+        assert stored.payload["source_commit"] == previous_commit
+
+
+# --- S20-7 follow-up (be-F4, be-F5) ---
+
+
+@pytest.mark.parametrize(
+    "previous",
+    [
+        {"source_commit": "e" * 40, "report_schema": "reports.v2"},
+        {"source_commit": "e" * 40, "report_schema": "reports.v2", "apk_sha256": "b" * 64},
+    ],
+    ids=["unpinned-previous", "apk-only-previous"],
+)
+def test_s20_7_previous_release_entries_must_pin_the_model_contract(
+    monkeypatch: pytest.MonkeyPatch, previous: dict[str, object],
+) -> None:
+    from backend.app.config import Settings
+    from backend.app.services.android_release_allowlist import parse_approved_android_releases
+
+    current = {"source_commit": "d" * 40, "report_schema": "reports.v2"}
+    with pytest.raises(ValueError, match="must pin model_config_sha256"):
+        parse_approved_android_releases(json.dumps([current, previous]), current_commit="d" * 40)
+    monkeypatch.setenv("WALKSAFE_SOURCE_COMMIT", "d" * 40)
+    monkeypatch.setenv("WALKSAFE_APPROVED_ANDROID_RELEASES", json.dumps([current, previous]))
+    with pytest.raises(ValueError, match="WALKSAFE_APPROVED_ANDROID_RELEASES"):
+        Settings()
+    # The current release may stay unpinned; a pinned previous bundle is accepted.
+    pinned = {**previous, "model_config_sha256": "a" * 64}
+    table = parse_approved_android_releases(json.dumps([current, pinned]), current_commit="d" * 40)
+    assert [(entry.source_commit, entry.model_config_sha256) for entry in table] == [
+        ("d" * 40, None), ("e" * 40, "a" * 64),
+    ]
+
+
+def test_s20_7_runtime_check_has_no_always_true_schema_comparison() -> None:
+    import inspect
+    from backend.app.services import android_release_allowlist as allowlist
+
+    assert "report_schema" not in inspect.signature(allowlist.approved_android_release).parameters
+    # The module states the trust boundary: compatibility, not authenticity.
+    assert "self-declared compatibility gate" in (allowlist.__doc__ or "")
+    assert "does not prove authenticity" in (allowlist.__doc__ or "")
+
+
+def _legacy_v1_metadata(**overrides: object) -> dict[str, object]:
+    metadata = {
+        "class_id": 0,
+        "class_name": "damaged_tactile_block",
+        "confidence": 0.91,
+        "bbox": {"x": 0.2, "y": 0.35, "width": 0.4, "height": 0.22},
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "source": "android",
+        "gps": {"latitude": 37.43, "longitude": 127.0, "accuracy_m": 5.0},
+        "heading": 181.0,
+    }
+    metadata.update(overrides)
+    return metadata
+
+
+def test_s20_7_secured_legacy_reports_endpoint_rejects_android_source(
+    client: ASGITestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from sqlalchemy import func
+
+    from backend.app.models import Report
+
+    field_token = "field-token-for-legacy-android-tests-123456"
+    monkeypatch.setattr(app_settings, "field_test_security_enabled", True)
+    monkeypatch.setattr(app_settings, "field_test_token", field_token)
+    monkeypatch.setattr(app_settings, "admin_token", "admin-token-for-legacy-android-tests-123456")
+    monkeypatch.setattr(app_settings, "walksafe_source_commit", "d" * 40)
+    actor_id = f"legacy-android-{uuid.uuid4().hex}@example.com"
+    record_report_consent(actor_id)
+
+    def submit(metadata: dict[str, object]):
+        return client.post(
+            "/reports",
+            headers=secured_field_headers(field_token, actor_id),
+            data={"metadata": json.dumps(metadata)},
+            files={"image": ("sample.jpg", JPEG_BYTES, "image/jpeg")},
+        )
+
+    with SessionLocal() as db:
+        before = db.scalar(select(func.count()).select_from(Report).where(Report.source == "android"))
+    # Even a bundle that /reports/v2 would approve cannot enter through v1.
+    rejected = submit(_legacy_v1_metadata(source_commit="d" * 40))
+    assert rejected.status_code == 422, rejected.text
+    assert rejected.json()["detail"]["code"] == "android_provenance_gate_failed"
+    with SessionLocal() as db:
+        after = db.scalar(select(func.count()).select_from(Report).where(Report.source == "android"))
+    assert after == before
+    # Other legacy sources keep their existing path.
+    other = submit(_legacy_v1_metadata(source="server"))
+    assert other.status_code != 422 or other.json()["detail"].get("code") != "android_provenance_gate_failed"
+    assert other.status_code == 201, other.text

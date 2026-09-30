@@ -107,7 +107,9 @@ class HeterogeneousRuntimeDeviceTest {
         val rawFailedComparisons = AtomicInteger()
         val rawAvailableComparisons = AtomicInteger()
         val cleanupFailures = linkedMapOf<String, String>()
-        val pipeline = ObjectDepthRuntimePipeline()
+        // Explicit, not the constructor default (S11-23). This harness keeps its historical
+        // Full-assisted motion mode; production callers pass rawDepthMotionOnly = true.
+        val pipeline = ObjectDepthRuntimePipeline(rawDepthMotionOnly = false)
         var comparisonConfig: ModelRuntimeConfig? = null
         var referenceConfig: ModelRuntimeConfig? = null
         var session: Session? = null
@@ -257,7 +259,8 @@ class HeterogeneousRuntimeDeviceTest {
                                         val pipelineStartedNs = System.nanoTime()
                                         val objects = if (discardReason == "NONE") {
                                             if (mapper != null) pipeline.process(snapshot, frameNs, frameNs / NANOS_PER_MS,
-                                                detections = result.detections, mapper = mapper) else emptyList()
+                                                detections = result.detections, mapper = mapper,
+                                                mapperFrameId = frameNs) else emptyList()
                                         } else emptyList()
                                         Completion(gateMs, frameDeltaMs, cameraDeltaMs, fresh, discardReason, objects,
                                             elapsedMs(pipelineStartedNs))
@@ -446,7 +449,9 @@ class HeterogeneousRuntimeDeviceTest {
         val sourceMismatches = AtomicInteger()
         val closeErrors = AtomicInteger()
         val gate = HeterogeneousResultGate()
-        val pipeline = ObjectDepthRuntimePipeline()
+        // Explicit, not the constructor default (S11-23). This harness keeps its historical
+        // Full-assisted motion mode; production callers pass rawDepthMotionOnly = true.
+        val pipeline = ObjectDepthRuntimePipeline(rawDepthMotionOnly = false)
         val sessionId = SystemClock.elapsedRealtimeNanos()
         var experiment: UnifiedFrameOverlapExperiment? = null
         var session: Session? = null
@@ -524,7 +529,8 @@ class HeterogeneousRuntimeDeviceTest {
                         val pipelineStart = System.nanoTime()
                         val objects = if (discard == "NONE" && result != null && source.mapper != null) {
                             pipeline.process(source.snapshot, key.arFrameTimestampNs, key.arFrameTimestampNs / NANOS_PER_MS,
-                                detections = result.detections, mapper = source.mapper)
+                                detections = result.detections, mapper = source.mapper,
+                                mapperFrameId = key.arFrameTimestampNs)
                         } else emptyList()
                         val pipelineMs = elapsedMs(pipelineStart)
                         val completedMs = SystemClock.elapsedRealtime()

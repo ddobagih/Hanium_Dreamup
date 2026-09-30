@@ -99,6 +99,7 @@ class AndroidIntegratedConsentClient {
         require(gatewayBaseUrl == session.gatewayBaseUrl) {
             "integrated consent bootstrap origin must match the authenticated session"
         }
+        val authenticationRequest = captureGatewayAuthenticationRequest(session)
         val query =
             "?control=integrated-consent-bootstrap" +
                 "&installation_id=${encoded(installationId)}" +
@@ -124,6 +125,8 @@ class AndroidIntegratedConsentClient {
                     cancellation,
                 )
                 if (response.statusCode !in 200..299) {
+                    cancellation.throwIfCancelled()
+                    consumeGatewayAuthenticationStaleResponse(authenticationRequest, session, response)
                     throw IntegratedConsentHttpException(response.statusCode, response.body)
                 }
                 validatedIntegratedConsentBootstrapOrNull(
@@ -173,6 +176,7 @@ class AndroidIntegratedConsentClient {
         require(gatewayBaseUrl == session.gatewayBaseUrl) {
             "integrated consent origin must match the authenticated session"
         }
+        val authenticationRequest = captureGatewayAuthenticationRequest(session)
         val requestBody = JSONObject()
             .put("schema_version", "walksafe.integrated-consent-request.v1")
             .put("installation_id", installationId)
@@ -220,6 +224,7 @@ class AndroidIntegratedConsentClient {
             controlSecret = controlSecret,
             session = session,
             requestBody = requestBody,
+            authenticationRequest = authenticationRequest,
         )
     }
 
@@ -230,6 +235,7 @@ class AndroidIntegratedConsentClient {
         controlSecret: String,
         session: GatewayFieldSession? = null,
         requestBody: String?,
+        authenticationRequest: GatewaySessionProcessSnapshot? = null,
     ): CancellableNetworkCall<IntegratedConsentConfirmation?> =
         cancellableHttpCall { cancellation ->
             val connection = URL(endpoint).openConnection() as HttpURLConnection
@@ -270,6 +276,8 @@ class AndroidIntegratedConsentClient {
                 )
                 if (method == "GET" && response.statusCode == 404) return@cancellableHttpCall null
                 if (response.statusCode !in 200..299) {
+                    cancellation.throwIfCancelled()
+                    consumeGatewayAuthenticationStaleResponse(authenticationRequest, session, response)
                     throw IntegratedConsentHttpException(response.statusCode, response.body)
                 }
                 validatedIntegratedConsentConfirmationOrNull(

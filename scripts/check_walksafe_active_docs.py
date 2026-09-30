@@ -30,6 +30,7 @@ FIXED_ACTIVE_DOCS = (
     Path("CONTRIBUTING.md"),
     Path("SECURITY.md"),
     Path("apps/README.md"),
+    Path("apps/android/README.md"),
     Path("backend/README.md"),
     Path("backend/app/README.md"),
     Path("backend/app/api/README.md"),
@@ -67,6 +68,8 @@ RUNNER_FILENAME_RE = re.compile(
 )
 RUNNER_FAMILY_RE = re.compile(r"run_walksafe_test_layers_")
 TABLE_SELECTOR_RE = re.compile(r"^\|\s*`([a-z][a-z0-9_-]*)`\s*\|", re.MULTILINE)
+TABLE_SEPARATOR_RE = re.compile(r"^\|(?:\s*:?-{3,}:?\s*\|)+\s*$")
+SELECTOR_TABLE_HEADERS = ("선택자", "selector", "계층", "layer")
 CASE_SELECTOR_RE = re.compile(r"^\s{2}([a-z][a-z0-9_-]*)\)\s*", re.MULTILINE)
 USAGE_SELECTORS_RE = re.compile(r"Usage:.*\{([a-z0-9_|-]+)\}")
 STATUS_CODE_RE = re.compile(r"`([A-Z][A-Z0-9_]*)`")
@@ -666,6 +669,26 @@ def _runner_commands(document: Path, text: str) -> tuple[list[str], set[str]]:
     return errors, documented
 
 
+def _documented_table_selectors(text: str) -> set[str]:
+    """Runner selectors from selector tables only, not every backticked first column.
+
+    Build-type or model-key tables in Android guides are not runner selector lists.
+    """
+    selectors: set[str] = set()
+    lines = text.splitlines()
+    for index, line in enumerate(lines[:-1]):
+        if not line.startswith("|") or not TABLE_SEPARATOR_RE.match(lines[index + 1]):
+            continue
+        first_header = line.strip("|").split("|", 1)[0].strip().lower()
+        if not any(marker in first_header for marker in SELECTOR_TABLE_HEADERS):
+            continue
+        for row in lines[index + 2:]:
+            if not row.startswith("|"):
+                break
+            selectors.update(TABLE_SELECTOR_RE.findall(row))
+    return selectors
+
+
 def _runner_contract(root: Path, documented: set[str]) -> tuple[list[str], tuple[str, ...]]:
     errors: list[str] = []
     runner_path = root / RUNNER
@@ -687,6 +710,33 @@ def _runner_contract(root: Path, documented: set[str]) -> tuple[list[str], tuple
     for selector in sorted(case_selectors - documented):
         errors.append(f"{selector}: runner selector is not documented in active guides")
     return errors, tuple(sorted(case_selectors))
+
+
+def _check_android_model_summary(root: Path) -> list[str]:
+    document = Path("apps/android/README.md")
+    try:
+        text = (root / document).read_text(encoding="utf-8")
+        config = json.loads((root / "apps/android/app/src/main/assets/model-config/two_model_runtime.json").read_text())
+        primary = config["primary_model"]
+        model = config["models"][primary]
+        compact = lambda value: json.dumps(value, separators=(",", ":"))
+        expected = {
+            "primary_model": primary,
+            "asset": model["asset"],
+            "class_count": str(len(model["classes"])),
+            "input_shape": compact(model["export"]["input_shape"]),
+            "output_shape": compact(model["export"]["output_shape"]),
+            "output_format": model["output_format"],
+            "fallback_model": compact(config["fallback_model"]),
+            "artifact_sha256": model["artifact_sha256"],
+        }
+        fields = re.findall(r"^\|\s*(\w+)\s*\|\s*`([^`]+)`\s*\|\s*$", text, re.MULTILINE)
+        actual = dict(fields)
+        if len(fields) != len(actual):
+            return [f"{document}: duplicate runtime summary fields"]
+        return [f"{document}: current model summary mismatch: {key}" for key, value in expected.items() if actual.get(key) != value]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return [f"{document}: cannot compare current model summary: {exc}"]
 
 
 def check_active_docs(root: Path, documents: tuple[Path, ...] | None = None) -> CheckResult:
@@ -711,11 +761,13 @@ def check_active_docs(root: Path, documents: tuple[Path, ...] | None = None) -> 
         runner_errors, runner_commands = _runner_commands(document, text)
         errors.extend(runner_errors)
         documented_selectors.update(runner_commands)
-        documented_selectors.update(TABLE_SELECTOR_RE.findall(text))
+        documented_selectors.update(_documented_table_selectors(text))
     runner_errors, runner_selectors = _runner_contract(root, documented_selectors)
     errors.extend(runner_errors)
     if documents is None:
         errors.extend(_check_current_status_contracts(root))
+    if Path("apps/android/README.md") in selected:
+        errors.extend(_check_android_model_summary(root))
     return CheckResult(
         errors=tuple(sorted(set(errors))),
         document_count=len(selected),

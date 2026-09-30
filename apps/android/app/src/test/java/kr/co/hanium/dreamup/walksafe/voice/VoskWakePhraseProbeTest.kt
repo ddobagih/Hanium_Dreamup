@@ -64,6 +64,9 @@ class VoskWakePhraseProbeTest {
         harness.listener.onTranscript(17L, transcript("길라잡이", confidence = 0.99f))
 
         assertTrue(harness.results.isEmpty())
+        // Observe readiness while the first run is still alive, before its terminal wake result.
+        harness.dispatcher.runPosted()
+        assertEquals(1, harness.readyCallbacks)
 
         harness.listener.onTranscript(13L, transcript("길라잡이", confidence = 0.99f))
         harness.dispatcher.runPosted()
@@ -84,6 +87,22 @@ class VoskWakePhraseProbeTest {
         harness.dispatcher.runPosted()
         assertEquals(1, harness.readyCallbacks)
         assertTrue(harness.readyCallbackWasOnMain)
+    }
+
+    @Test
+    fun successfulWakeBeforeQueuedReadyNeverReopensTheFinishedProbe() {
+        val harness = ProbeHarness()
+        harness.probe.start()
+        harness.listener.onReady(13L)
+        harness.listener.onReady(17L)
+        harness.listener.onTranscript(17L, transcript("길라잡이", confidence = 0.99f))
+        assertTrue(harness.results.isEmpty())
+        harness.listener.onTranscript(13L, transcript("길라잡이", confidence = 0.99f))
+        harness.dispatcher.runPosted()
+        assertEquals(VoskWakePhraseProbeAvailability.AVAILABLE, harness.results.single().availability)
+        assertEquals(0, harness.readyCallbacks)
+        assertEquals(1, harness.stream.stopCount)
+        assertEquals(1, harness.stream.closeCount)
     }
 
     @Test
@@ -463,6 +482,35 @@ class VoskWakePhraseProbeTest {
     }
 
     @Test
+    fun homeIgnoresALowWakePhraseEvenWhenTheCommandWordsAreClear() {
+        // S04-19: per-word scores [0.10, 1.0, 1.0] average 0.70, but the wake phrase itself is doubtful.
+        val harness = ProbeHarness(listenUntilWake = true)
+        harness.probe.start()
+        harness.listener.onReady(141L)
+        harness.dispatcher.runPosted()
+        val lowWake = checkNotNull(
+            parseVoskTranscript(
+                """{"result":[{"conf":0.10,"word":"길라잡이"},{"conf":1.0,"word":"서울역으로"},{"conf":1.0,"word":"안내해줘"}],"text":"길라잡이 서울역으로 안내해줘"}""",
+                isFinal = true,
+            ),
+        )
+        assertTrue(lowWake.isTrustedForCommand())
+        harness.listener.onTranscript(141L, lowWake)
+        harness.dispatcher.runPosted()
+        assertTrue(harness.results.isEmpty())
+        assertEquals(0, harness.stream.stopCount)
+        val clearWake = checkNotNull(
+            parseVoskTranscript(
+                """{"result":[{"conf":0.9,"word":"길라잡이"},{"conf":1.0,"word":"서울역으로"},{"conf":1.0,"word":"안내해줘"}],"text":"길라잡이 서울역으로 안내해줘"}""",
+                isFinal = true,
+            ),
+        )
+        harness.listener.onTranscript(141L, clearWake)
+        harness.dispatcher.runPosted()
+        assertEquals("서울역으로 안내해줘", harness.results.single().commandTranscript?.text)
+    }
+
+    @Test
     fun homeNeverHandsOffPartialLowConfidenceUnaddressedOrCancelledCommands() {
         val harness = ProbeHarness(listenUntilWake = true)
         harness.probe.start()
@@ -547,6 +595,126 @@ class VoskWakePhraseProbeTest {
         assertFalse(harness.probe.start())
     }
 
+    @Test
+    fun homeRejectsQueuedFinalAfterSuppressionStartsAndEndsBeforeDelivery() {
+        val harness = ProbeHarness(listenUntilWake = true)
+        harness.probe.start()
+        harness.listener.onReady(157L)
+        harness.dispatcher.runPosted()
+        harness.listener.onTranscript(157L, transcript("길라잡이 신고해줘", 0.95f), harness.inputGeneration)
+
+        harness.suppressed = true
+        harness.inputGeneration += 1L
+        harness.suppressed = false
+        harness.dispatcher.runPosted()
+
+        assertTrue("A completed suppression interval must retire its queued result", harness.results.isEmpty())
+        assertEquals(0, harness.stream.stopCount)
+        harness.listener.onTranscript(157L, transcript("길라잡이 도움말", 0.95f), harness.inputGeneration)
+        harness.dispatcher.runPosted()
+        assertEquals("도움말", harness.results.single().commandTranscript?.text)
+        assertEquals(1, harness.stream.stopCount)
+        assertEquals(1, harness.stream.closeCount)
+    }
+
+    @Test
+    fun homeRejectsCapturedOldGenerationEvenWhenCallbackArrivesAfterOutputEnds() {
+        val harness = ProbeHarness(listenUntilWake = true)
+        harness.probe.start()
+        harness.listener.onReady(163L)
+        harness.dispatcher.runPosted()
+        val capturedGeneration = harness.inputGeneration
+        harness.suppressed = true
+        harness.inputGeneration += 1L
+        harness.suppressed = false
+        harness.listener.onTranscript(163L, transcript("길라잡이 신고해줘", 0.95f), capturedGeneration)
+        harness.dispatcher.runPosted()
+
+        assertTrue("Use the decoder's generation instead of recapturing at callback time", harness.results.isEmpty())
+        assertEquals(0, harness.stream.stopCount)
+    }
+
+    @Test
+    fun homeStillRejectsQueuedFinalWhileSuppressedEvenWithTheSameGeneration() {
+        val harness = ProbeHarness(listenUntilWake = true)
+        harness.probe.start()
+        harness.listener.onReady(167L)
+        harness.dispatcher.runPosted()
+        harness.listener.onTranscript(167L, transcript("길라잡이 신고해줘", 0.95f), harness.inputGeneration)
+        harness.suppressed = true
+        harness.dispatcher.runPosted()
+
+        assertTrue(harness.results.isEmpty())
+        assertEquals(0, harness.stream.stopCount)
+        harness.suppressed = false
+        harness.listener.onTranscript(167L, transcript("길라잡이 도움말", 0.95f), harness.inputGeneration)
+        harness.dispatcher.runPosted()
+        assertEquals("도움말", harness.results.single().commandTranscript?.text)
+    }
+
+    @Test
+    fun homeLegacyCallbackCapturesGenerationBeforePosting() {
+        val harness = ProbeHarness(listenUntilWake = true)
+        harness.probe.start()
+        harness.listener.onReady(173L)
+        harness.dispatcher.runPosted()
+        harness.listener.onTranscript(173L, transcript("길라잡이 신고해줘", 0.95f))
+        harness.inputGeneration += 1L
+        harness.dispatcher.runPosted()
+
+        assertTrue(harness.results.isEmpty())
+        harness.listener.onTranscript(173L, transcript("길라잡이 도움말", 0.95f))
+        harness.dispatcher.runPosted()
+        assertEquals("도움말", harness.results.single().commandTranscript?.text)
+    }
+
+    @Test
+    fun homeFailsClosedForMissingOrUnreadableGenerationAndRecoversForFreshInput() {
+        val harness = ProbeHarness(listenUntilWake = true)
+        harness.probe.start()
+        harness.listener.onReady(179L)
+        harness.dispatcher.runPosted()
+        harness.listener.onTranscript(179L, transcript("길라잡이 신고해줘", 0.95f), null)
+        harness.generationReadFails = true
+        harness.listener.onTranscript(179L, transcript("길라잡이 신고해줘", 0.95f), harness.inputGeneration)
+        harness.listener.onTranscript(179L, transcript("길라잡이 신고해줘", 0.95f))
+        harness.generationReadFails = false
+        harness.dispatcher.runPosted()
+
+        assertTrue(harness.results.isEmpty())
+        assertEquals(0, harness.stream.stopCount)
+        harness.listener.onTranscript(179L, transcript("길라잡이 도움말", 0.95f), harness.inputGeneration)
+        harness.dispatcher.runPosted()
+        assertEquals("도움말", harness.results.single().commandTranscript?.text)
+    }
+
+    @Test
+    fun homeRechecksGenerationAndSuppressionAtTheFinalResultDelivery() {
+        for (generationChanges in listOf(false, true)) {
+            val harness = ProbeHarness(listenUntilWake = true)
+            harness.probe.start()
+            harness.listener.onReady(181L)
+            harness.dispatcher.runPosted()
+            harness.listener.onTranscript(181L, transcript("길라잡이 신고해줘", 0.95f), harness.inputGeneration)
+            harness.dispatcher.runNextPosted()
+            assertEquals(1, harness.stream.stopCount)
+            assertEquals(1, harness.stream.closeCount)
+            assertTrue(harness.results.isEmpty())
+
+            harness.suppressed = true
+            if (generationChanges) {
+                harness.inputGeneration += 1L
+                harness.suppressed = false
+            }
+            harness.dispatcher.runPosted()
+
+            assertEquals(VoskWakePhraseProbeFailure.CANCELLED, harness.results.single().failure)
+            assertNull(harness.results.single().commandTranscript)
+            assertEquals(1, harness.stream.stopCount)
+            assertEquals(1, harness.stream.closeCount)
+        }
+    }
+
     private class ProbeHarness(
         startFailure: RuntimeException? = null,
         listenUntilWake: Boolean = false,
@@ -557,6 +725,9 @@ class VoskWakePhraseProbeTest {
         val results = mutableListOf<VoskWakePhraseProbeResult>()
         val resultCallbacksWereOnMain = mutableListOf<Boolean>()
         val resourcesClosedAtResult = mutableListOf<Boolean>()
+        var suppressed = false
+        var inputGeneration = 1L
+        var generationReadFails = false
         var readyCallbacks = 0
         var readyCallbackWasOnMain = false
         val probe = VoskWakePhraseProbe(
@@ -573,6 +744,8 @@ class VoskWakePhraseProbeTest {
                 readyCallbackWasOnMain = dispatcher.runningPostedTask
             },
             listenUntilWake = listenUntilWake,
+            isInputSuppressed = { suppressed },
+            inputGeneration = { if (generationReadFails) error("generation unavailable") else inputGeneration },
         )
 
         val listener: VoskStreamingListener
@@ -662,13 +835,15 @@ class VoskWakePhraseProbeTest {
         }
 
         fun runPosted() {
-            while (posted.isNotEmpty()) {
-                runningPostedTask = true
-                try {
-                    posted.removeFirst().invoke()
-                } finally {
-                    runningPostedTask = false
-                }
+            while (posted.isNotEmpty()) runNextPosted()
+        }
+
+        fun runNextPosted() {
+            runningPostedTask = true
+            try {
+                posted.removeFirst().invoke()
+            } finally {
+                runningPostedTask = false
             }
         }
     }

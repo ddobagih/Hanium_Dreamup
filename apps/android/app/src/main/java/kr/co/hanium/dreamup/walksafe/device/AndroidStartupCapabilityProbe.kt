@@ -10,6 +10,7 @@ import android.os.VibratorManager
 import com.google.ar.core.ArCoreApk
 import java.io.Closeable
 import kr.co.hanium.dreamup.walksafe.voice.BundledVoskModelInstaller
+import kr.co.hanium.dreamup.walksafe.voice.OfflineKoreanSpeechUnavailableCause
 
 class AndroidStartupCapabilityProbe(
     context: Context,
@@ -46,6 +47,7 @@ class AndroidStartupCapabilityProbe(
     private val offlineKoreanTextToSpeechProbeState = OfflineKoreanTextToSpeechProbeState()
     private var koreanTextToSpeechProbe: AndroidKoreanTextToSpeechSynthesisProbe? = null
     private var metricDistanceAvailable: Boolean? = null
+    private var metricDistanceProbeFailure: WalkSafeMetricDistanceProbeFailure? = null
 
     fun start() {
         check(!closed) { "AndroidStartupCapabilityProbe is already closed" }
@@ -76,10 +78,15 @@ class AndroidStartupCapabilityProbe(
             metricDistanceAvailable = metricDistanceAvailable,
             approvedDesignatedDeviceProfile = approvedDeviceProfileMatch.approved,
             designatedDeviceProfileVersion = approvedDeviceProfileMatch.profileVersion,
+            metricDistanceProbeFailure = metricDistanceProbeFailure,
         )
     }
 
     fun deviceProfileMatch(): ApprovedDeviceProfileMatch = approvedDeviceProfileMatch
+
+    /** Cause of the latest completed unavailable probe; null while pending, available or unknown. */
+    fun offlineKoreanTextToSpeechUnavailableCause(): OfflineKoreanSpeechUnavailableCause? =
+        offlineKoreanTextToSpeechProbeState.unavailableCause
 
     fun decision(
         metricDistanceOverride: Boolean? = null,
@@ -111,20 +118,26 @@ class AndroidStartupCapabilityProbe(
     }
 
     private fun probeDistance(currentGeneration: Int) {
-        val availability = runCatching {
+        val availabilityResult = runCatching {
             ArCoreApk.getInstance().checkAvailability(appContext)
-        }.getOrNull()
+        }
+        val availability = availabilityResult.getOrNull()
         metricDistanceAvailable = distanceAvailableOrNull(availability)
+        metricDistanceProbeFailure = resolveRuntimeMetricDistanceProbeFailure(availabilityResult)
         if (availability?.isUnknown != true) return
 
         runCatching {
             ArCoreApk.getInstance().checkAvailabilityAsync(appContext) { resolvedAvailability ->
                 if (!isCurrent(currentGeneration)) return@checkAvailabilityAsync
                 metricDistanceAvailable = distanceAvailableOrNull(resolvedAvailability)
+                metricDistanceProbeFailure = resolveRuntimeMetricDistanceProbeFailure(
+                    Result.success(resolvedAvailability),
+                )
                 notifyChanged(currentGeneration)
             }
         }.onFailure {
             metricDistanceAvailable = null
+            metricDistanceProbeFailure = WalkSafeMetricDistanceProbeFailure.QUERY_EXCEPTION
         }
     }
 
@@ -148,6 +161,7 @@ class AndroidStartupCapabilityProbe(
                     !offlineKoreanTextToSpeechProbeState.complete(
                         currentKoreanTextToSpeechGeneration,
                         result.available,
+                        result.unavailableCause,
                     )
                 ) {
                     return@AndroidKoreanTextToSpeechSynthesisProbe
@@ -208,6 +222,17 @@ class AndroidStartupCapabilityProbe(
 
 }
 
+internal fun resolveRuntimeMetricDistanceProbeFailure(
+    result: Result<ArCoreApk.Availability?>,
+): WalkSafeMetricDistanceProbeFailure? {
+    if (result.isFailure) return WalkSafeMetricDistanceProbeFailure.QUERY_EXCEPTION
+    return when (result.getOrNull()) {
+        ArCoreApk.Availability.UNKNOWN_ERROR -> WalkSafeMetricDistanceProbeFailure.ARCORE_ERROR
+        ArCoreApk.Availability.UNKNOWN_TIMED_OUT -> WalkSafeMetricDistanceProbeFailure.ARCORE_TIMED_OUT
+        else -> null
+    }
+}
+
 /** Only a live ARCore Session may turn a supported ARCore candidate into metric-depth evidence. */
 internal fun resolveRuntimeMetricDistanceAvailability(
     availability: ArCoreApk.Availability?,
@@ -228,6 +253,8 @@ internal fun resolveRuntimeMetricDistanceAvailability(
 internal class OfflineKoreanTextToSpeechProbeState {
     var available: Boolean? = null
         private set
+    var unavailableCause: OfflineKoreanSpeechUnavailableCause? = null
+        private set
 
     private var generation = 0
     private var closed = false
@@ -235,6 +262,7 @@ internal class OfflineKoreanTextToSpeechProbeState {
     fun begin(): Int {
         check(!closed) { "Offline Korean TTS probe state is already closed" }
         available = null
+        unavailableCause = null
         generation += 1
         return generation
     }
@@ -242,9 +270,11 @@ internal class OfflineKoreanTextToSpeechProbeState {
     fun complete(
         currentGeneration: Int,
         available: Boolean,
+        unavailableCause: OfflineKoreanSpeechUnavailableCause? = null,
     ): Boolean {
         if (closed || currentGeneration != generation) return false
         this.available = available
+        this.unavailableCause = if (available) null else unavailableCause
         generation += 1
         return true
     }

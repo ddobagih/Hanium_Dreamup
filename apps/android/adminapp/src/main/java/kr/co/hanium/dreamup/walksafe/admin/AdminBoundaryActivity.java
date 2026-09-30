@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.admin;
 
 import android.app.Activity;
+import android.app.KeyguardManager;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -32,6 +33,8 @@ import java.time.Instant;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -44,12 +47,19 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeviceKeyStore;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeviceKeyPreparationException;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeviceKeyRotation;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeviceKeyUseAuthorization;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeviceKeyUseRetry;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeviceProof;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminAuditController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminAuditModels;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeliveryPackage;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeliveryPackageSaver;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminExternalCopyDeletionController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminExternalCopyDeletionModels;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeliveryCorrection;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminDeliveryCorrectionAttempt;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminInstitutionDelivery;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentHttpClient;
@@ -59,6 +69,7 @@ import kr.co.hanium.dreamup.walksafe.admin.security.AdminIncidentStatusAttempt;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOperationsApi;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOperationsHttpClient;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOriginalEvidence;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminPendingRecoveryState;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportHttpClient;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportModels;
@@ -69,17 +80,32 @@ import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportWorkflowControlle
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReviewDecisionAttempt;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryMessagePolicy;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryCustodyState;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryCustodyAttempt;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportDecision;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRawCollectionController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRawCollectionHttpClient;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRawCollectionModels;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRawCollectionRepository;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityApi;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminMutableCredentials;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityController;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityHttpClient;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityState;
 
 public final class AdminBoundaryActivity extends Activity {
+    /** S20-54: the audit's "열람 승인" is server approval and return preparation, not receipt. */
+    static final String ORIGINAL_EVIDENCE_AUDIT_MEANING =
+        "원본 열람 권한은 한 번만 쓰입니다. 서버 감사 기록의 원본 열람 승인은 '서버 반환 준비' 시점이며, "
+            + "이 기기가 원본을 실제로 받았다는 뜻이 아닙니다.";
+    /**
+     * w24 misc-F7: true whether or not the server consumed the grant (a lost response, a request
+     * cancelled before the server, a verification or a decoding failure): the token is gone.
+     */
+    static final String ORIGINAL_EVIDENCE_NOT_RECEIVED_STATUS =
+        "이 기기에서 원본을 받아 표시하지 못했습니다. 기존 원본 열람 권한은 더는 쓸 수 없습니다.";
+    static final String ORIGINAL_EVIDENCE_NEW_GRANT_NEXT_ACTION =
+        "다시 열람하려면 비밀번호와 새 6자리 인증번호를 입력하고 '정확한 위치·원본 사진 일회 열람'을 눌러 "
+            + "새 열람 권한을 받으세요. 자동 재시도하지 않습니다.";
     private static final String DEVICE_PREFS = "walksafe_admin_device_identity";
     private static final String DEVICE_ID_KEY = "device_id";
     private static final String REPORT_FILTER_ID_STATE = "admin_report_filter_id";
@@ -146,6 +172,19 @@ public final class AdminBoundaryActivity extends Activity {
         AdminInstitutionDelivery.Status.RESOLVED,
         AdminInstitutionDelivery.Status.FAILED
     };
+    // S18-40: reason codes of an append-only delivery correction (labels follow this order).
+    private static final String[] DELIVERY_CORRECTION_REASON_LABELS = {
+        "잘못된 상태를 기록함 (WRONG_STATUS)",
+        "다른 신고·건의 결과를 기록함 (WRONG_REPORT)",
+        "같은 관찰을 중복 기록함 (DUPLICATE_ENTRY)",
+        "기타, 메모에 설명 (OTHER)"
+    };
+    private static final AdminDeliveryCorrection.Reason[] DELIVERY_CORRECTION_REASONS = {
+        AdminDeliveryCorrection.Reason.WRONG_STATUS,
+        AdminDeliveryCorrection.Reason.WRONG_REPORT,
+        AdminDeliveryCorrection.Reason.DUPLICATE_ENTRY,
+        AdminDeliveryCorrection.Reason.OTHER
+    };
 
     private final ExecutorService networkExecutor = Executors.newSingleThreadExecutor();
     private AdminSecurityController controller;
@@ -157,14 +196,49 @@ public final class AdminBoundaryActivity extends Activity {
     private AdminIncidentController incidentController;
     private final AdminIncidentStatusAttempt incidentStatusAttempt =
         new AdminIncidentStatusAttempt();
+    // S18-36: the unresolved attempt's public identity survives process death for lookup.
     private final AdminReviewDecisionAttempt reviewDecisionAttempt =
-        new AdminReviewDecisionAttempt();
+        new AdminReviewDecisionAttempt(new PreferencesReviewAttemptStore());
+    // S18-1: a user-authentication-bound key asks for the device credential once, then retries
+    // only operations without one-time secrets (S18-1-F2).
+    private final AdminDeviceKeyUseAuthorization keyUseAuthorization =
+        new AdminDeviceKeyUseAuthorization();
+    private final AdminDeviceKeyUseRetry keyUseRetry = new AdminDeviceKeyUseRetry(keyUseAuthorization);
+    private boolean awaitingDeviceKeyUse;
+    private static final byte[] DEVICE_KEY_PREFLIGHT_PAYLOAD =
+        "walksafe.admin-device-key-preflight.v1".getBytes(StandardCharsets.UTF_8);
+    private static final String DEVICE_KEY_REENTER_CREDENTIALS_MESSAGE =
+        "기기 인증을 마쳤습니다. 비밀번호와 새 인증번호를 다시 입력해 주세요. "
+            + "입력했던 값은 지웠으며 자동으로 다시 보내지 않습니다.";
+    private static final String DEVICE_KEY_LOCK_SCREEN_MESSAGE =
+        "화면 잠금(PIN·패턴·비밀번호)이 없어 관리자 기기키를 만들 수 없습니다. "
+            + "기기 설정에서 화면 잠금을 켠 뒤 앱을 다시 실행하세요.";
+    // S18-3: two-phase device key rotation (pending key until the server confirms).
+    private AdminDeviceKeyStore deviceKeyStore;
+    private AdminDeviceKeyStore.Descriptor pendingDeviceKeyDescriptor;
+    // S18-1-F1: signer the clients were built with (active key, or the pinned replacement key).
+    private AdminDeviceProof.Signer deviceKeySigner;
+    // Survives recreate(): build the clients for the replacement (PENDING) key.
+    private static volatile boolean replacementKeyLoginRequested;
+    private AdminDeviceKeyStore.Descriptor replacementLoginDescriptor;
+    private boolean activeDeviceKeyUnavailable;
+    private LinearLayout deviceKeyReplacementGroup;
+    private TextView deviceKeyReplacementText;
+    private Button replacementLoginButton;
+    private Button activeKeyReturnButton;
+    private boolean deviceKeyReconcileInFlight;
+    private static volatile boolean deviceKeyRotationCompletedNotice;
+    private TextView deviceKeyRotationText;
+    private AdminPendingRecoveryState<Bundle> pendingMutationRecovery =
+        new AdminPendingRecoveryState<>(null, AdminBoundaryActivity::copyMutationRecoveryState);
     private boolean restoredReportStatusRecovery;
     private boolean restoredIncidentStatusRecovery;
     private boolean incidentRecoveryRefreshPending;
     private AdminRawCollectionController rawCollectionController;
     private String deviceId;
     private AdminDeviceKeyStore.Descriptor deviceKeyDescriptor;
+    private final AtomicReference<AdminMutableCredentials> pendingSecurityCredentials =
+        new AtomicReference<>();
     private String deviceKeyFailure;
     private boolean operationsClientConfigured;
 
@@ -188,6 +262,8 @@ public final class AdminBoundaryActivity extends Activity {
     private LinearLayout recoveryCompleteGroup;
     private LinearLayout sessionGroup;
     private LinearLayout sessionList;
+    private EditText lostDevicePasswordInput;
+    private EditText lostDeviceTotpInput;
     private LinearLayout custodyGroup;
     private Spinner custodyMaterialKindInput;
     private CheckBox custodyConfirmationInput;
@@ -230,11 +306,31 @@ public final class AdminBoundaryActivity extends Activity {
     private Button reconnectDeliveryPackageButton;
     private TextView reviewHistoryStatusText;
     private Button reviewHistoryNextButton;
+    private TextView reviewRecentStatusText;
     private TextView deliveryHistoryStatusText;
     private Button deliveryHistoryNextButton;
+    private TextView deliveryRecentStatusText;
+    // S18-40: correction of the latest effective delivery event (HIGH reauthentication).
+    private Spinner deliveryCorrectionReasonInput;
+    private EditText deliveryCorrectionMemoInput;
+    private EditText deliveryCorrectionPasswordInput;
+    private EditText deliveryCorrectionTotpInput;
+    private TextView deliveryCorrectionTargetText;
+    private final AdminDeliveryCorrectionAttempt deliveryCorrectionAttempt =
+        new AdminDeliveryCorrectionAttempt();
     private Button revokeCurrentButton;
     private LinearLayout contentRoot;
     private boolean operationInFlight;
+    private volatile boolean activityStarted;
+    private volatile long securityOperationGeneration;
+    private static final int CONFIRM_LOCAL_SESSION = 6100;
+    private static final int CONFIRM_DEVICE_KEY_USE = 6101;
+    private static final String REVIEW_ATTEMPT_PREFS = "walksafe_admin_review_attempt";
+    private static final String CUSTODY_ATTEMPT_PREFS = "walksafe_admin_custody_attempt";
+    private boolean awaitingLocalUnlock;
+    private long pendingLocalUnlockGeneration = -1L;
+    private long confirmedLocalUnlockGeneration = -1L;
+    private Button resumeLocalSessionButton;
     private boolean recordingDelivery;
     private final List<AdminOperationsApi.ReviewHistoryItem> reviewHistoryItems =
         new ArrayList<>();
@@ -242,14 +338,17 @@ public final class AdminBoundaryActivity extends Activity {
     private long reviewHistorySnapshotRevision = -1L;
     private long reviewHistoryTotalCount;
     private boolean reviewHistoryNeedsFirstPage;
+    private AdminOperationsApi.Result reviewRecentPreview;
     private final List<AdminOperationsApi.DeliveryHistoryItem> deliveryHistoryItems =
         new ArrayList<>();
     private String deliveryHistoryNextCursor;
     private long deliveryHistorySnapshotRevision = -1L;
     private long deliveryHistoryTotalCount;
     private boolean deliveryHistoryNeedsFirstPage;
+    private AdminOperationsApi.Result deliveryRecentPreview;
     private AdminDeliveryPackage pendingDeliveryPackage;
     private AdminDeliveryPackageSaver.Saved verifiedDeliveryPackage;
+    private AdminReportModels.DeliveryFollowUp pendingSafReconnectFollowUp;
     private AdminOriginalEvidence originalEvidence;
     private Bitmap originalEvidenceBitmap;
     private final Handler originalEvidenceExpiryHandler = new Handler(Looper.getMainLooper());
@@ -261,6 +360,9 @@ public final class AdminBoundaryActivity extends Activity {
     private String connectedOperationsReportId;
     private int connectedOperationsContentRevision = -1;
     private int connectedOperationsReviewRevision = -1;
+    // W20A-R1: report-wide latest review revision (all content revisions); the review
+    // decision CAS compares with this, not with the content-scoped current_review.
+    private int connectedOperationsLatestReviewRevision = -1;
     private String connectedOperationsReviewDecision;
     private int connectedOperationsLatestDeliveryRevision = -1;
     private int connectedOperationsDeliveryRevision = -1;
@@ -323,62 +425,194 @@ public final class AdminBoundaryActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
 
+        pendingMutationRecovery = new AdminPendingRecoveryState<>(
+            savedInstanceState, AdminBoundaryActivity::copyMutationRecoveryState
+        );
         deviceId = loadOrCreateDeviceId();
+        reviewDecisionAttempt.restore();
+        deviceKeyFailure = BuildConfig.ADMIN_SECURITY_WORKFLOWS_ENABLED
+            ? "기기 키 준비 중" : null;
+        setContentView(buildContent());
+        render();
         if (BuildConfig.ADMIN_SECURITY_WORKFLOWS_ENABLED) {
+            initializeDeviceKeyInBackground(savedInstanceState);
+        } else {
+            // Keep unapplied recovery for the next instance while security is unavailable.
+            restoreReportPanelState(savedInstanceState);
+        }
+    }
+
+    private void initializeDeviceKeyInBackground(Bundle savedInstanceState) {
+        networkExecutor.execute(() -> {
+            AdminDeviceKeyStore keyStore = null;
             try {
-                AdminDeviceKeyStore keyStore = new AdminDeviceKeyStore(this);
-                deviceKeyDescriptor = keyStore.ensureKey();
-                AdminSecurityHttpClient securityClient = new AdminSecurityHttpClient(
+                keyStore = new AdminDeviceKeyStore(getApplicationContext());
+                AdminDeviceKeyStore.Descriptor descriptor = null;
+                AdminDeviceKeyStore.Descriptor pending;
+                // Rotating Activities may overlap, but must not race to create the same key.
+                synchronized (AdminDeviceKeyStore.class) {
+                    try {
+                        descriptor = keyStore.ensureKey();
+                    } catch (AdminDeviceKeyRotation.ActiveKeyUnavailableException unavailable) {
+                        // S18-1-F1: keep the device identity; only the replacement path remains.
+                        descriptor = null;
+                    }
+                    pending = pendingDeviceKeyOrNull(keyStore);
+                }
+                AdminDeviceKeyStore readyKeyStore = keyStore;
+                AdminDeviceKeyStore.Descriptor active = descriptor;
+                boolean replacementLogin = replacementKeyLoginRequested && pending != null;
+                runOnUiThread(() -> {
+                    pendingDeviceKeyDescriptor = pending;
+                    if (replacementLogin) {
+                        completeSecurityInitialization(
+                            readyKeyStore,
+                            pending,
+                            payload -> readyKeyStore.rotation().signPinned(
+                                pending.version(), pending.marker(), payload
+                            ),
+                            savedInstanceState
+                        );
+                    } else if (active != null) {
+                        completeSecurityInitialization(
+                            readyKeyStore, active, readyKeyStore, savedInstanceState
+                        );
+                    } else {
+                        showActiveDeviceKeyUnavailable(readyKeyStore);
+                    }
+                });
+            } catch (Exception error) {
+                AdminDeviceKeyStore failedKeyStore = keyStore;
+                boolean lockScreenRequired = AdminDeviceKeyUseAuthorization.requiresLockScreen(error);
+                // S18-23/S18-21: the step that failed (metadata, key entry, key store) is shown
+                // as a secret-free code with one next action, never as the exception message.
+                AdminDeviceKeyPreparationException.Code failureCode =
+                    AdminDeviceKeyPreparationException.classify(error);
+                runOnUiThread(() -> {
+                    if (isDestroyed() || isFinishing()) return;
+                    deviceKeyFailure = "기기 키 초기화 실패(" + failureCode.name() + ")";
+                    resultText.setText(lockScreenRequired
+                        ? DEVICE_KEY_LOCK_SCREEN_MESSAGE
+                        : AdminDeviceKeyPreparationException.guidance(failureCode)
+                    );
+                    if (!lockScreenRequired) deviceKeyStore = failedKeyStore;
+                    render();
+                });
+            }
+        });
+    }
+
+    /**
+     * S18-1-F1: the registered key entry is gone; only the replacement key path remains.
+     * adm-F4: the first action is a device/app restart; replacement only if it persists.
+     */
+    private void showActiveDeviceKeyUnavailable(AdminDeviceKeyStore keyStore) {
+        if (isDestroyed() || isFinishing()) return;
+        deviceKeyStore = keyStore;
+        activeDeviceKeyUnavailable = true;
+        // S18-23: the same secret-free code family as the other preparation failures.
+        deviceKeyFailure = "기기 키 사용 불가("
+            + AdminDeviceKeyPreparationException.Code.REGISTERED_KEY_MISSING.name() + ")";
+        resultText.setText(AdminDeviceKeyPreparationException.guidance(
+            AdminDeviceKeyPreparationException.Code.REGISTERED_KEY_MISSING
+        ));
+        render();
+    }
+
+    private void completeSecurityInitialization(
+        AdminDeviceKeyStore keyStore,
+        AdminDeviceKeyStore.Descriptor descriptor,
+        AdminDeviceProof.Signer signer,
+        Bundle savedInstanceState
+    ) {
+        if (isDestroyed() || isFinishing()) return;
+        deviceKeyDescriptor = descriptor;
+        deviceKeyStore = keyStore;
+        deviceKeySigner = signer;
+        replacementLoginDescriptor = signer == keyStore ? null : descriptor;
+        deviceKeyFailure = null;
+        if (deviceKeyRotationCompletedNotice) {
+            deviceKeyRotationCompletedNotice = false;
+            resultText.setText("새 기기키로 교체했습니다. 이전 키는 서버와 기기에서 폐기되었습니다. 새 키로 다시 로그인하세요.");
+        } else if (replacementLoginDescriptor != null) {
+            resultText.setText("교체 키(버전 " + descriptor.version() + ")로 로그인합니다. "
+                + "서버가 이 키를 확인한 로그인에서만 기기의 기본 키로 전환합니다.");
+        }
+        try {
+            AdminSecurityHttpClient securityClient = new AdminSecurityHttpClient(
+                BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
+                BuildConfig.DEBUG,
+                deviceKeyDescriptor,
+                signer
+            );
+            AdminOperationsApi operationsApi = null;
+            AdminReportRepository reportRepository = null;
+            AdminIncidentRepository incidentRepository = null;
+            AdminRawCollectionRepository rawCollectionRepository = null;
+            if (BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED) {
+                operationsApi = new AdminOperationsHttpClient(
                     BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
                     BuildConfig.DEBUG,
                     deviceKeyDescriptor,
-                    keyStore
+                    signer
                 );
-                AdminOperationsApi operationsApi = null;
-                AdminReportRepository reportRepository = null;
-                AdminIncidentRepository incidentRepository = null;
-                AdminRawCollectionRepository rawCollectionRepository = null;
-                if (BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED) {
-                    operationsApi = new AdminOperationsHttpClient(
-                        BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
-                        BuildConfig.DEBUG,
-                        deviceKeyDescriptor,
-                        keyStore
+                reportRepository = new AdminReportHttpClient(
+                    BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
+                    BuildConfig.DEBUG,
+                    deviceKeyDescriptor,
+                    signer
+                );
+                incidentRepository = new AdminIncidentHttpClient(
+                    BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
+                    BuildConfig.DEBUG,
+                    deviceKeyDescriptor,
+                    signer
+                );
+                rawCollectionRepository = new AdminRawCollectionHttpClient(
+                    BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
+                    BuildConfig.DEBUG,
+                    deviceKeyDescriptor,
+                    signer
+                );
+                operationsClientConfigured = true;
+            }
+            controller = new AdminSecurityController(
+                securityClient,
+                operationsApi,
+                reportRepository,
+                incidentRepository,
+                rawCollectionRepository,
+                new PreferencesCustodyAttemptStore()
+            );
+            reportController = new AdminReportController(new AdminReportController.Loader() {
+                @Override
+                public AdminReportModels.Page loadPage(
+                    AdminReportModels.Filters filters,
+                    String cursor
+                ) throws Exception {
+                    return controller.listAdminReports(
+                        filters,
+                        cursor,
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                     );
-                    reportRepository = new AdminReportHttpClient(
-                        BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
-                        BuildConfig.DEBUG,
-                        deviceKeyDescriptor,
-                        keyStore
-                    );
-                    incidentRepository = new AdminIncidentHttpClient(
-                        BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
-                        BuildConfig.DEBUG,
-                        deviceKeyDescriptor,
-                        keyStore
-                    );
-                    rawCollectionRepository = new AdminRawCollectionHttpClient(
-                        BuildConfig.WALKSAFE_ADMIN_API_ORIGIN,
-                        BuildConfig.DEBUG,
-                        deviceKeyDescriptor,
-                        keyStore
-                    );
-                    operationsClientConfigured = true;
                 }
-                controller = new AdminSecurityController(
-                    securityClient,
-                    operationsApi,
-                    reportRepository,
-                    incidentRepository,
-                    rawCollectionRepository
-                );
-                reportController = new AdminReportController(new AdminReportController.Loader() {
+
+                @Override
+                public AdminReportModels.Detail loadDetail(String reportId) throws Exception {
+                    return controller.getAdminReportDetail(
+                        reportId,
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    );
+                }
+            });
+            reportRequestController = new AdminReportRequestController(
+                new AdminReportRequestController.Loader() {
                     @Override
-                    public AdminReportModels.Page loadPage(
-                        AdminReportModels.Filters filters,
+                    public AdminReportRequestModels.Page loadPage(
+                        AdminReportRequestModels.Filters filters,
                         String cursor
                     ) throws Exception {
-                        return controller.listAdminReports(
+                        return controller.listAdminReportRequests(
                             filters,
                             cursor,
                             BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
@@ -386,208 +620,204 @@ public final class AdminBoundaryActivity extends Activity {
                     }
 
                     @Override
-                    public AdminReportModels.Detail loadDetail(String reportId) throws Exception {
+                    public AdminReportRequestModels.Detail loadDetail(String requestId)
+                        throws Exception {
+                        return controller.getAdminReportRequestDetail(
+                            requestId,
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                        );
+                    }
+
+                    @Override
+                    public AdminReportRequestModels.StatusSnapshot updateStatus(
+                        String requestId,
+                        String requestType,
+                        String nextStatus,
+                        int expectedVersion,
+                        String publicResponse,
+                        String internalNote,
+                        char[] password,
+                        char[] totp
+                    ) throws Exception {
+                        return controller.updateAdminReportRequestStatus(
+                            requestId,
+                            requestType,
+                            nextStatus,
+                            expectedVersion,
+                            publicResponse,
+                            internalNote,
+                            password,
+                            totp,
+                            System.currentTimeMillis(),
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                        );
+                    }
+                }
+            );
+            externalCopyDeletionController = new AdminExternalCopyDeletionController(
+                new AdminExternalCopyDeletionController.Loader() {
+                    @Override
+                    public AdminExternalCopyDeletionModels.Page load(
+                        AdminExternalCopyDeletionModels.Filter filter,
+                        String cursor
+                    ) throws Exception {
+                        return controller.listAdminExternalCopyDeletions(
+                            filter,
+                            cursor,
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                        );
+                    }
+
+                    @Override
+                    public AdminExternalCopyDeletionModels.Item record(
+                        AdminExternalCopyDeletionModels.EventCommand command
+                    ) throws Exception {
+                        return controller.recordAdminExternalCopyDeletion(
+                            command,
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                        );
+                    }
+                }
+            );
+            reportWorkflowController = new AdminReportWorkflowController(
+                new AdminReportWorkflowController.Loader() {
+                    @Override
+                    public AdminReportModels.StatusSnapshot updateStatus(
+                        String reportId,
+                        String nextStatus,
+                        int expectedVersion,
+                        char[] password,
+                        char[] totp
+                    ) throws Exception {
+                        return controller.updateAdminReportStatus(
+                            reportId,
+                            nextStatus,
+                            expectedVersion,
+                            password,
+                            totp,
+                            System.currentTimeMillis(),
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                        );
+                    }
+
+                    @Override
+                    public AdminReportModels.StatusSnapshot updateStatus(
+                        String reportId,
+                        String nextStatus,
+                        int expectedVersion,
+                        char[] password,
+                        char[] totp,
+                        AdminReportWorkflowController.StatusDispatch dispatch
+                    ) throws Exception {
+                        return controller.updateAdminReportStatus(
+                            reportId,
+                            nextStatus,
+                            expectedVersion,
+                            password,
+                            totp,
+                            System.currentTimeMillis(),
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED,
+                            dispatch
+                        );
+                    }
+
+                    @Override
+                    public AdminDeliveryPackage createPackage(
+                        AdminDeliveryPackage.Eligibility eligibility,
+                        char[] password,
+                        char[] totp
+                    ) throws Exception {
+                        return controller.createAdminDeliveryPackage(
+                            eligibility,
+                            password,
+                            totp,
+                            System.currentTimeMillis(),
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                        );
+                    }
+
+                    @Override
+                    public AdminReportModels.Detail refreshDetail(String reportId) throws Exception {
                         return controller.getAdminReportDetail(
                             reportId,
                             BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                         );
                     }
-                });
-                reportRequestController = new AdminReportRequestController(
-                    new AdminReportRequestController.Loader() {
-                        @Override
-                        public AdminReportRequestModels.Page loadPage(
-                            AdminReportRequestModels.Filters filters,
-                            String cursor
-                        ) throws Exception {
-                            return controller.listAdminReportRequests(
-                                filters,
-                                cursor,
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                            );
-                        }
-
-                        @Override
-                        public AdminReportRequestModels.Detail loadDetail(String requestId)
-                            throws Exception {
-                            return controller.getAdminReportRequestDetail(
-                                requestId,
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                            );
-                        }
-
-                        @Override
-                        public AdminReportRequestModels.StatusSnapshot updateStatus(
-                            String requestId,
-                            String requestType,
-                            String nextStatus,
-                            int expectedVersion,
-                            String publicResponse,
-                            String internalNote,
-                            char[] password,
-                            char[] totp
-                        ) throws Exception {
-                            return controller.updateAdminReportRequestStatus(
-                                requestId,
-                                requestType,
-                                nextStatus,
-                                expectedVersion,
-                                publicResponse,
-                                internalNote,
-                                password,
-                                totp,
-                                System.currentTimeMillis(),
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                            );
-                        }
+                }
+            );
+            auditController = new AdminAuditController((filters, cursor) ->
+                controller.listAdminAudits(
+                    filters,
+                    cursor,
+                    BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                )
+            );
+            incidentController = new AdminIncidentController(
+                new AdminIncidentController.Loader() {
+                    @Override
+                    public AdminIncidentModels.Page loadPage(
+                        AdminIncidentModels.Filters filters,
+                        String cursor
+                    ) throws Exception {
+                        return controller.listAdminIncidents(
+                            filters,
+                            cursor,
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                        );
                     }
-                );
-                externalCopyDeletionController = new AdminExternalCopyDeletionController(
-                    new AdminExternalCopyDeletionController.Loader() {
-                        @Override
-                        public AdminExternalCopyDeletionModels.Page load(
-                            AdminExternalCopyDeletionModels.Filter filter,
-                            String cursor
-                        ) throws Exception {
-                            return controller.listAdminExternalCopyDeletions(
-                                filter,
-                                cursor,
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                            );
-                        }
 
-                        @Override
-                        public AdminExternalCopyDeletionModels.Item record(
-                            AdminExternalCopyDeletionModels.EventCommand command
-                        ) throws Exception {
-                            return controller.recordAdminExternalCopyDeletion(
-                                command,
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                            );
-                        }
+                    @Override
+                    public AdminIncidentModels.HistoryPage loadHistory(
+                        String incidentId,
+                        String cursor
+                    ) throws Exception {
+                        return controller.getAdminIncidentHistory(
+                            incidentId,
+                            cursor,
+                            BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                        );
                     }
-                );
-                reportWorkflowController = new AdminReportWorkflowController(
-                    new AdminReportWorkflowController.Loader() {
-                        @Override
-                        public AdminReportModels.StatusSnapshot updateStatus(
-                            String reportId,
-                            String nextStatus,
-                            int expectedVersion,
-                            char[] password,
-                            char[] totp
-                        ) throws Exception {
-                            return controller.updateAdminReportStatus(
-                                reportId,
-                                nextStatus,
-                                expectedVersion,
-                                password,
-                                totp,
-                                System.currentTimeMillis(),
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                            );
-                        }
-
-                        @Override
-                        public AdminReportModels.StatusSnapshot updateStatus(
-                            String reportId,
-                            String nextStatus,
-                            int expectedVersion,
-                            char[] password,
-                            char[] totp,
-                            AdminReportWorkflowController.StatusDispatch dispatch
-                        ) throws Exception {
-                            return controller.updateAdminReportStatus(
-                                reportId,
-                                nextStatus,
-                                expectedVersion,
-                                password,
-                                totp,
-                                System.currentTimeMillis(),
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED,
-                                dispatch
-                            );
-                        }
-
-                        @Override
-                        public AdminDeliveryPackage createPackage(
-                            AdminDeliveryPackage.Eligibility eligibility,
-                            char[] password,
-                            char[] totp
-                        ) throws Exception {
-                            return controller.createAdminDeliveryPackage(
-                                eligibility,
-                                password,
-                                totp,
-                                System.currentTimeMillis(),
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                            );
-                        }
-
-                        @Override
-                        public AdminReportModels.Detail refreshDetail(String reportId) throws Exception {
-                            return controller.getAdminReportDetail(
-                                reportId,
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                            );
-                        }
-                    }
-                );
-                auditController = new AdminAuditController((filters, cursor) ->
-                    controller.listAdminAudits(
-                        filters,
-                        cursor,
-                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                    )
-                );
-                incidentController = new AdminIncidentController(
-                    new AdminIncidentController.Loader() {
-                        @Override
-                        public AdminIncidentModels.Page loadPage(
-                            AdminIncidentModels.Filters filters,
-                            String cursor
-                        ) throws Exception {
-                            return controller.listAdminIncidents(
-                                filters,
-                                cursor,
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                            );
-                        }
-
-                        @Override
-                        public AdminIncidentModels.HistoryPage loadHistory(
-                            String incidentId,
-                            String cursor
-                        ) throws Exception {
-                            return controller.getAdminIncidentHistory(
-                                incidentId,
-                                cursor,
-                                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                            );
-                        }
-                    }
-                );
-                rawCollectionController = new AdminRawCollectionController((password, totp) ->
-                    controller.listAdminRawQuarantine(
-                        password,
-                        totp,
-                        System.currentTimeMillis(),
-                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                    )
-                );
-            } catch (Exception error) {
-                deviceKeyFailure = "키 사용 불가";
-                operationsClientConfigured = false;
-            }
+                }
+            );
+            rawCollectionController = new AdminRawCollectionController((password, totp) ->
+                controller.listAdminRawQuarantine(
+                    password,
+                    totp,
+                    System.currentTimeMillis(),
+                    BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                )
+            );
+        } catch (Exception error) {
+            if (controller != null) controller.close();
+            controller = null;
+            operationsClientConfigured = false;
+            resultText.setText(
+                "관리자 클라이언트·화면 상태 초기화에 실패했습니다. 기기 키 오류로 단정하지 않으며 관리자 기능을 잠금 상태로 유지합니다."
+            );
+            render();
+            return;
         }
-        setContentView(buildContent());
+        if (!activityStarted && controller != null) controller.suspendForBackground(false);
         render();
-        restorePendingMutationRecovery(savedInstanceState);
+        try {
+            pendingMutationRecovery.restore(this::restorePendingMutationRecovery);
+        } catch (RuntimeException error) {
+            if (controller != null) controller.close();
+            controller = null;
+            operationsClientConfigured = false;
+            render();
+            resultText.setText(
+                "이전 작업 복구 상태를 적용하지 못했습니다. 복구 정보를 유지하고 관리자 기능을 잠갔습니다."
+            );
+            return;
+        }
         restoreReportPanelState(savedInstanceState);
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
+        Bundle unappliedRecovery = pendingMutationRecovery.snapshot();
+        if (unappliedRecovery != null) outState.putAll(unappliedRecovery);
         if (!awaitingSafResult && reportWorkflowController != null) {
             reportWorkflowController.suspendForLifecycle();
             if (reportPanel != null) {
@@ -603,7 +833,7 @@ public final class AdminBoundaryActivity extends Activity {
             outState.putString(REPORT_FILTER_TO_STATE, draft.createdTo());
             outState.putString(REPORT_SELECTED_ID_STATE, reportPanel.selectedReportId());
         }
-        if (reportWorkflowController != null) {
+        if (reportWorkflowController != null && unappliedRecovery == null) {
             AdminReportWorkflowController.StatusDetailRecovery recovery =
                 reportWorkflowController.statusDetailRecovery();
             if (recovery != null) {
@@ -651,7 +881,7 @@ public final class AdminBoundaryActivity extends Activity {
         }
         AdminIncidentStatusAttempt.RecoverySnapshot incidentRecovery =
             incidentStatusAttempt.recoverySnapshot();
-        if (incidentRecovery != null) {
+        if (incidentRecovery != null && unappliedRecovery == null) {
             outState.putString(INCIDENT_RECOVERY_ID_STATE, incidentRecovery.incidentId());
             outState.putString(INCIDENT_RECOVERY_ACTOR_STATE, incidentRecovery.actorId());
             outState.putString(INCIDENT_RECOVERY_NEXT_STATE, incidentRecovery.nextState());
@@ -680,7 +910,32 @@ public final class AdminBoundaryActivity extends Activity {
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        activityStarted = true;
+        if (controller != null && controller.isLocallyLocked() && !controller.hasRetainedSession()) {
+            controller.allowFreshAuthentication();
+        }
+        setInteractiveEnabled(contentRoot, !operationInFlight);
+        render();
+        completeLocalUnlockIfReady();
+        runDeviceKeyUseRetryIfReady();
+    }
+
+    @Override
     protected void onStop() {
+        AdminMutableCredentials queuedCredentials = pendingSecurityCredentials.getAndSet(null);
+        if (queuedCredentials != null) queuedCredentials.close();
+        activityStarted = false;
+        securityOperationGeneration += 1L;
+        operationInFlight = false;
+        if (controller != null) {
+            controller.suspendForBackground(
+                awaitingSafResult || awaitingSafReconnectResult || awaitingLocalUnlock
+                    || awaitingDeviceKeyUse
+            );
+            if (controller.isLocallyLocked()) hideInteractiveGroups();
+        }
         clearOriginalEvidence("화면을 벗어나 원본 증거를 메모리에서 지웠습니다.");
         clear(originalEvidenceReasonInput);
         clear(originalEvidencePasswordInput);
@@ -720,7 +975,7 @@ public final class AdminBoundaryActivity extends Activity {
         pendingDeliveryPackage = null;
         verifiedDeliveryPackage = null;
         clearPendingSafReconnectBinding();
-        if (controller != null) networkExecutor.execute(controller::close);
+        if (controller != null) controller.close();
         networkExecutor.shutdown();
         super.onDestroy();
     }
@@ -728,6 +983,34 @@ public final class AdminBoundaryActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == CONFIRM_DEVICE_KEY_USE) {
+            boolean expected = awaitingDeviceKeyUse;
+            awaitingDeviceKeyUse = false;
+            AdminDeviceKeyUseAuthorization.Decision decision =
+                keyUseRetry.onCredentialResult(expected && resultCode == RESULT_OK);
+            if (decision == AdminDeviceKeyUseAuthorization.Decision.RETRY_ONCE) {
+                runDeviceKeyUseRetryIfReady();
+            } else if (decision == AdminDeviceKeyUseAuthorization.Decision.REENTER_CREDENTIALS) {
+                // S18-1-F2: the key is usable now; secrets are never replayed from memory.
+                resultText.setText(DEVICE_KEY_REENTER_CREDENTIALS_MESSAGE);
+            } else {
+                resultText.setText("기기 인증을 완료하지 않아 기기키 서명 작업을 다시 시도하지 않았습니다.");
+            }
+            return;
+        }
+        if (requestCode == CONFIRM_LOCAL_SESSION) {
+            boolean expected = awaitingLocalUnlock;
+            awaitingLocalUnlock = false;
+            if (expected && resultCode == RESULT_OK && controller != null
+                && controller.isLocalGenerationCurrent(pendingLocalUnlockGeneration)) {
+                confirmedLocalUnlockGeneration = pendingLocalUnlockGeneration;
+                completeLocalUnlockIfReady();
+            } else {
+                resultText.setText("기기 인증을 완료하지 않아 관리자 업무 잠금을 유지합니다.");
+            }
+            pendingLocalUnlockGeneration = -1L;
+            return;
+        }
         if (requestCode == OPEN_DELIVERY_PACKAGE_DOCUMENT) {
             handleExistingDeliveryPackageResult(
                 resultCode == RESULT_OK && data != null ? data.getData() : null
@@ -875,6 +1158,25 @@ public final class AdminBoundaryActivity extends Activity {
         loginGroup = group();
         content.addView(loginGroup, matchWrap());
 
+        // S18-1-F1: an invalidated or missing device key is replaced before login, without
+        // deleting app data (the device identity and the server audit trail stay the same).
+        deviceKeyReplacementGroup = group();
+        deviceKeyReplacementText = text("", 13);
+        deviceKeyReplacementText.setTextIsSelectable(true);
+        deviceKeyReplacementText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        deviceKeyReplacementGroup.addView(deviceKeyReplacementText, matchWrap());
+        Button prepareReplacementButton = button("교체용 새 기기키 준비(키 무효화·분실 시)");
+        prepareReplacementButton.setOnClickListener(view -> prepareReplacementDeviceKey());
+        deviceKeyReplacementGroup.addView(prepareReplacementButton, matchWrap());
+        replacementLoginButton = button("운영자가 등록한 교체 키로 로그인 전환");
+        replacementLoginButton.setOnClickListener(view -> switchReplacementKeyLogin(true));
+        deviceKeyReplacementGroup.addView(replacementLoginButton, matchWrap());
+        activeKeyReturnButton = button("기존 기기키로 돌아가기");
+        activeKeyReturnButton.setOnClickListener(view -> switchReplacementKeyLogin(false));
+        deviceKeyReplacementGroup.addView(activeKeyReturnButton, matchWrap());
+        deviceKeyReplacementGroup.setVisibility(View.GONE);
+        content.addView(deviceKeyReplacementGroup, matchWrap());
+
         securityDetailsGroup = group();
         Button securityDetailsToggle = button("서버·기기 보안 정보 펼치기");
         securityDetailsToggle.setOnClickListener(view -> {
@@ -910,6 +1212,10 @@ public final class AdminBoundaryActivity extends Activity {
         resultText.setPadding(0, 20, 0, 20);
         resultText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         content.addView(resultText, matchWrap());
+        resumeLocalSessionButton = button("기기 인증 후 기존 관리자 세션 재개");
+        resumeLocalSessionButton.setOnClickListener(view -> requestLocalSessionResume());
+        resumeLocalSessionButton.setVisibility(View.GONE);
+        content.addView(resumeLocalSessionButton, matchWrap());
 
         deviceLabelInput = input("이 기기의 알아보기 쉬운 이름", InputType.TYPE_CLASS_TEXT, false);
         deviceLabelInput.setText(defaultDeviceLabel());
@@ -990,8 +1296,39 @@ public final class AdminBoundaryActivity extends Activity {
         revokeCurrentButton = button("로그아웃");
         revokeCurrentButton.setOnClickListener(view -> revokeCurrentSession());
         sessionGroup.addView(revokeCurrentButton, matchWrap());
+        sessionGroup.addView(text(
+            "다른 기기를 분실 처리하면 그 기기의 모든 세션과 장치 키가 폐기됩니다. 처리 전 아래 비밀번호와 새 6자리 인증번호로 다시 인증합니다. 재인증을 할 수 없으면(복구자료 보관 미확인 포함) 복구코드로 분실 복구를 시작하세요. 복구는 기존 세션과 다른 기기 키를 모두 폐기합니다.",
+            15
+        ), matchWrap());
+        lostDevicePasswordInput = input(
+            "분실 처리 재인증 비밀번호",
+            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD,
+            true
+        );
+        lostDeviceTotpInput = input(
+            "분실 처리 새 6자리 추가 인증",
+            InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD,
+            true
+        );
+        lostDevicePasswordInput.setFilterTouchesWhenObscured(true);
+        lostDeviceTotpInput.setFilterTouchesWhenObscured(true);
+        sessionGroup.addView(lostDevicePasswordInput, matchWrap());
+        sessionGroup.addView(lostDeviceTotpInput, matchWrap());
         sessionList = group();
         sessionGroup.addView(sessionList, matchWrap());
+        deviceKeyRotationText = text("", 13);
+        deviceKeyRotationText.setTextIsSelectable(true);
+        deviceKeyRotationText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        sessionGroup.addView(deviceKeyRotationText, matchWrap());
+        Button prepareRotationButton = button("새 기기키 준비(기존 키는 확인 전까지 유지)");
+        prepareRotationButton.setOnClickListener(view -> prepareDeviceKeyRotation());
+        sessionGroup.addView(prepareRotationButton, matchWrap());
+        Button confirmRotationButton = button("등록한 새 기기키 확인 후 교체");
+        confirmRotationButton.setOnClickListener(view -> confirmDeviceKeyRotation());
+        sessionGroup.addView(confirmRotationButton, matchWrap());
+        Button abandonRotationButton = button("준비한 새 기기키 취소");
+        abandonRotationButton.setOnClickListener(view -> abandonDeviceKeyRotation());
+        sessionGroup.addView(abandonRotationButton, matchWrap());
         content.addView(sessionGroup, matchWrap());
 
         operationsGroup = buildOperationsGroup();
@@ -1023,6 +1360,14 @@ public final class AdminBoundaryActivity extends Activity {
         heading.setPadding(0, 36, 0, 8);
         markAccessibilityHeading(heading);
         group.addView(heading, matchWrap());
+        group.addView(text(
+            "검토 결정, 신고 처리 상태, 수동 기관 전달 상태는 별개입니다. 승인이 자동 전달이나 기관 접수를 뜻하지 않습니다.",
+            15
+        ), matchWrap());
+        group.addView(text(
+            "로그인이나 직전 재인증에 사용한 TOTP는 다시 쓰지 말고 새 코드가 표시된 뒤 입력하세요.",
+            15
+        ), matchWrap());
         group.addView(text(
             "1. 신고 상세 확인  →  2. 위치·사진·개인정보 검수  →  3. 제출본 저장  →  "
                 + "4. 앱 밖에서 기관에 수동 제출  →  5. 외부 접수번호 기록",
@@ -1330,6 +1675,7 @@ public final class AdminBoundaryActivity extends Activity {
             "APPROVED 결정에만 사용합니다. 비밀번호·6자리 추가 인증 후 정확한 위치와 원본 사진을 한 번 불러옵니다. 화면을 벗어나거나 시간이 만료되면 즉시 지우며 저장·복사·공유하지 않습니다.",
             15
         ), matchWrap());
+        reportOperationsFormGroup.addView(text(ORIGINAL_EVIDENCE_AUDIT_MEANING, 15), matchWrap());
         originalEvidenceReasonInput = input(
             "원본 열람 사유 (8자 이상, 내부 감사 기록)",
             InputType.TYPE_CLASS_TEXT,
@@ -1351,8 +1697,9 @@ public final class AdminBoundaryActivity extends Activity {
         reportOperationsFormGroup.addView(originalEvidencePasswordInput, matchWrap());
         reportOperationsFormGroup.addView(originalEvidenceTotpInput, matchWrap());
         originalEvidenceLoadButton = button("정확한 위치·원본 사진 일회 열람");
+        // w24 misc-F8: TalkBack reads the visible name first, as the next-action notice names it.
         originalEvidenceLoadButton.setContentDescription(
-            "승인 검토용 정확한 위치와 원본 사진을 재인증 후 한 번 불러오기"
+            "정확한 위치·원본 사진 일회 열람. 승인 검토용 정확한 위치와 원본 사진을 재인증 후 한 번 불러오기"
         );
         originalEvidenceLoadButton.setOnClickListener(view -> loadOriginalEvidence());
         reportOperationsFormGroup.addView(originalEvidenceLoadButton, matchWrap());
@@ -1394,6 +1741,12 @@ public final class AdminBoundaryActivity extends Activity {
         Button reviewButton = button("검토 결정 기록");
         reviewButton.setOnClickListener(view -> recordReviewDecision());
         reportOperationsFormGroup.addView(reviewButton, matchWrap());
+        Button reviewRecentButton = button("최근 검토 이력 보기");
+        reviewRecentButton.setOnClickListener(view -> readRecentHistory(true));
+        reportOperationsFormGroup.addView(reviewRecentButton, matchWrap());
+        reviewRecentStatusText = text("최근 검토 이력: 조회 전", 15);
+        reviewRecentStatusText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        reportOperationsFormGroup.addView(reviewRecentStatusText, matchWrap());
         Button reviewHistoryButton = button("검토 결정 이력 확인");
         reviewHistoryButton.setOnClickListener(view -> readReviewDecisions(false));
         reportOperationsFormGroup.addView(reviewHistoryButton, matchWrap());
@@ -1468,6 +1821,12 @@ public final class AdminBoundaryActivity extends Activity {
         Button deliveryButton = button("수동 전달 결과 기록");
         deliveryButton.setOnClickListener(view -> recordDelivery());
         reportOperationsFormGroup.addView(deliveryButton, matchWrap());
+        Button deliveryRecentButton = button("최근 수동 전달 이력 보기");
+        deliveryRecentButton.setOnClickListener(view -> readRecentHistory(false));
+        reportOperationsFormGroup.addView(deliveryRecentButton, matchWrap());
+        deliveryRecentStatusText = text("최근 수동 전달 이력: 조회 전", 15);
+        deliveryRecentStatusText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        reportOperationsFormGroup.addView(deliveryRecentStatusText, matchWrap());
         Button deliveryHistoryButton = button("수동 전달 상태 이력 확인");
         deliveryHistoryButton.setOnClickListener(view -> readDeliveries(false));
         reportOperationsFormGroup.addView(deliveryHistoryButton, matchWrap());
@@ -1478,6 +1837,48 @@ public final class AdminBoundaryActivity extends Activity {
         deliveryHistoryNextButton.setOnClickListener(view -> readDeliveries(true));
         deliveryHistoryNextButton.setVisibility(View.GONE);
         reportOperationsFormGroup.addView(deliveryHistoryNextButton, matchWrap());
+        TextView deliveryCorrectionHeading = text("잘못 기록한 전달 상태 정정", 18);
+        deliveryCorrectionHeading.setPadding(0, 20, 0, 4);
+        markAccessibilityHeading(deliveryCorrectionHeading);
+        reportOperationsFormGroup.addView(deliveryCorrectionHeading, matchWrap());
+        reportOperationsFormGroup.addView(text(
+            "기존 기록은 지우거나 고치지 않습니다. 현재 유효한 가장 최근 전달 기록 1건에 정정 기록(사유 코드와 메모)을 덧붙이고, "
+                + "그 기록은 현재 상태에서만 빠집니다. 더 이전 기록은 한 단계씩 차례로 정정합니다. "
+                + "먼저 수동 전달 상태 이력을 끝까지 불러오고, 비밀번호와 새 인증번호로 재인증합니다. "
+                + "실제로 해결된 뒤 다시 손상된 경우는 정정 대상이 아니며 새 신고로 접수됩니다.",
+            15
+        ), matchWrap());
+        deliveryCorrectionReasonInput = labeledSpinner(
+            DELIVERY_CORRECTION_REASON_LABELS,
+            "전달 기록 정정 사유 코드"
+        );
+        reportOperationsFormGroup.addView(deliveryCorrectionReasonInput, matchWrap());
+        deliveryCorrectionMemoInput = input(
+            "정정 메모 (필수, 500자 이하)",
+            InputType.TYPE_CLASS_TEXT,
+            false
+        );
+        deliveryCorrectionPasswordInput = input(
+            "정정 재인증 비밀번호",
+            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD,
+            true
+        );
+        deliveryCorrectionTotpInput = input(
+            "정정 재인증 6자리 추가 인증",
+            InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD,
+            true
+        );
+        deliveryCorrectionPasswordInput.setFilterTouchesWhenObscured(true);
+        deliveryCorrectionTotpInput.setFilterTouchesWhenObscured(true);
+        reportOperationsFormGroup.addView(deliveryCorrectionMemoInput, matchWrap());
+        reportOperationsFormGroup.addView(deliveryCorrectionPasswordInput, matchWrap());
+        reportOperationsFormGroup.addView(deliveryCorrectionTotpInput, matchWrap());
+        deliveryCorrectionTargetText = text("정정 대상: 전달 이력을 끝까지 불러온 뒤 표시", 15);
+        deliveryCorrectionTargetText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        reportOperationsFormGroup.addView(deliveryCorrectionTargetText, matchWrap());
+        Button deliveryCorrectionButton = button("최신 유효 전달 기록 정정 (재인증)");
+        deliveryCorrectionButton.setOnClickListener(view -> correctLatestDelivery());
+        reportOperationsFormGroup.addView(deliveryCorrectionButton, matchWrap());
         group.addView(reportOperationsFormGroup, matchWrap());
 
         TextView requiredParallelHeading = text("필수 병행 업무", 22);
@@ -1515,6 +1916,11 @@ public final class AdminBoundaryActivity extends Activity {
     private void recordReviewDecision() {
         try {
             String reportId = requireConnectedOperationsReportId();
+            if (reviewDecisionAttempt.needsLookup()) {
+                // S18-36: resolve the earlier decision_id before any new decision.
+                lookupRestoredReviewDecision();
+                return;
+            }
             AdminReportDecision.Decision selectedDecision =
                 REVIEW_DECISIONS[reviewDecisionInput.getSelectedItemPosition()];
             String evidenceGrantId = null;
@@ -1557,7 +1963,12 @@ public final class AdminBoundaryActivity extends Activity {
                 photoReviewedInput.isChecked(),
                 privacyReviewedInput.isChecked(),
                 connectedOperationsContentRevision,
-                evidenceGrantId
+                evidenceGrantId,
+                // S18-35/W20A-R1: bind the detail's report-wide latest review revision
+                // (0 = none). current_review is null after a content correction, but the
+                // server CAS still counts earlier decisions; a concurrent decision makes
+                // the server answer 409 and the app re-reads.
+                connectedOperationsLatestReviewRevision
             );
             if (selectedDecision == AdminReportDecision.Decision.APPROVED
                 && !retryingPendingDecision) {
@@ -1624,12 +2035,23 @@ public final class AdminBoundaryActivity extends Activity {
                         System.currentTimeMillis(),
                         BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                     );
+                    requestCredentials.clear();
+                    Bitmap decoded;
+                    try {
+                        decoded = decodeOriginalEvidence(loaded);
+                    } catch (RuntimeException error) {
+                        loaded.close();
+                        // w24 misc-F7: the grant was already used for these bytes, so an image
+                        // that cannot be decoded takes the same new-grant path as a lost one.
+                        throw new AdminOperationsApi.OriginalEvidenceNotReceivedException(error);
+                    }
                     runOnUiThread(() -> {
                         if (requestGeneration == originalEvidenceGeneration) {
                             originalEvidenceLoadTask = null;
                         }
                         applyLoadedOriginalEvidence(
                             loaded,
+                            decoded,
                             reportId,
                             contentRevision,
                             sessionId,
@@ -1645,6 +2067,12 @@ public final class AdminBoundaryActivity extends Activity {
                         if (isDestroyed() || requestGeneration != originalEvidenceGeneration) return;
                         operationInFlight = false;
                         setInteractiveEnabled(contentRoot, true);
+                        if (error instanceof AdminOperationsApi.OriginalEvidenceNotReceivedException) {
+                            // S20-54: the one-time grant is spent; only a new grant can re-open it.
+                            clearOriginalEvidence(ORIGINAL_EVIDENCE_NOT_RECEIVED_STATUS);
+                            resultText.setText(ORIGINAL_EVIDENCE_NEW_GRANT_NEXT_ACTION);
+                            return;
+                        }
                         clearOriginalEvidence("원본 증거를 불러오지 못했습니다. 서버 상태와 재인증 정보를 확인해 주세요.");
                         resultText.setText("원본 증거를 불러오지 못했습니다. 자동 재시도하지 않습니다.");
                     });
@@ -1662,41 +2090,13 @@ public final class AdminBoundaryActivity extends Activity {
         }
     }
 
-    private void applyLoadedOriginalEvidence(
-        AdminOriginalEvidence loaded,
-        String reportId,
-        int contentRevision,
-        String sessionId,
-        long sessionGeneration,
-        long requestGeneration
-    ) {
-        if (loaded == null) return;
-        boolean currentRequest = requestGeneration == originalEvidenceGeneration;
-        if (isDestroyed()
-            || !currentRequest
-            || sessionGeneration != operationsSessionGeneration
-            || !boundOperationsAccessActive
-            || !sessionId.equals(boundOperationsSessionId)
-            || !reportId.equals(connectedOperationsReportId)
-            || contentRevision != connectedOperationsContentRevision
-            || !loaded.matches(
-                reportId,
-                contentRevision,
-                sessionId,
-                deviceId,
-                System.currentTimeMillis()
-            )) {
-            loaded.close();
-            if (!isDestroyed() && currentRequest) {
-                operationInFlight = false;
-                setInteractiveEnabled(contentRoot, true);
-                resultText.setText("신고·콘텐츠 버전 또는 관리자 세션이 바뀌어 원본 증거를 표시하지 않았습니다.");
-            }
-            return;
-        }
+    private static Bitmap decodeOriginalEvidence(AdminOriginalEvidence loaded) {
         byte[] displayBytes = null;
         Bitmap decoded = null;
         try {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new IllegalStateException("original evidence decode was cancelled");
+            }
             displayBytes = loaded.copyImageBytes(System.currentTimeMillis());
             BitmapFactory.Options bounds = new BitmapFactory.Options();
             bounds.inJustDecodeBounds = true;
@@ -1716,19 +2116,59 @@ public final class AdminBoundaryActivity extends Activity {
             options.inSampleSize = sampleSize;
             decoded = BitmapFactory.decodeByteArray(displayBytes, 0, displayBytes.length, options);
             if (decoded == null) throw new IllegalStateException("원본 이미지를 표시할 수 없습니다.");
+            if (Thread.currentThread().isInterrupted()) {
+                throw new IllegalStateException("original evidence decode was cancelled");
+            }
             loaded.discardEncodedImageAfterDisplay();
-        } catch (RuntimeException error) {
-            if (decoded != null) destroyBitmap(decoded);
-            loaded.close();
-            operationInFlight = false;
-            setInteractiveEnabled(contentRoot, true);
-            clearOriginalEvidence("검증된 원본 이미지를 안전하게 표시하지 못했습니다.");
-            resultText.setText("원본 이미지를 표시하지 않았습니다. 다른 작업을 진행하지 마세요.");
-            return;
+            Bitmap result = decoded;
+            decoded = null;
+            return result;
         } finally {
             if (displayBytes != null) Arrays.fill(displayBytes, (byte) 0);
+            if (decoded != null) destroyBitmap(decoded);
         }
+    }
 
+    private void applyLoadedOriginalEvidence(
+        AdminOriginalEvidence loaded,
+        Bitmap decoded,
+        String reportId,
+        int contentRevision,
+        String sessionId,
+        long sessionGeneration,
+        long requestGeneration
+    ) {
+        if (loaded == null) {
+            if (decoded != null) destroyBitmap(decoded);
+            return;
+        }
+        boolean currentRequest = requestGeneration == originalEvidenceGeneration;
+        if (isDestroyed()
+            || !activityStarted
+            || controller == null
+            || controller.isLocallyLocked()
+            || !currentRequest
+            || sessionGeneration != operationsSessionGeneration
+            || !boundOperationsAccessActive
+            || !sessionId.equals(boundOperationsSessionId)
+            || !reportId.equals(connectedOperationsReportId)
+            || contentRevision != connectedOperationsContentRevision
+            || !loaded.matches(
+                reportId,
+                contentRevision,
+                sessionId,
+                deviceId,
+                System.currentTimeMillis()
+            )) {
+            loaded.close();
+            if (decoded != null) destroyBitmap(decoded);
+            if (!isDestroyed() && activityStarted && currentRequest) {
+                operationInFlight = false;
+                setInteractiveEnabled(contentRoot, true);
+                resultText.setText("신고·콘텐츠 버전 또는 관리자 세션이 바뀌어 원본 증거를 표시하지 않았습니다.");
+            }
+            return;
+        }
         originalEvidence = loaded;
         originalEvidenceBitmap = decoded;
         originalEvidenceImage.setImageBitmap(decoded);
@@ -1848,6 +2288,14 @@ public final class AdminBoundaryActivity extends Activity {
         }
     }
 
+    private void readRecentHistory(boolean review) {
+        try {
+            runRecentHistoryOperation(review, requireConnectedOperationsReportId());
+        } catch (IllegalStateException error) {
+            resultText.setText(error.getMessage());
+        }
+    }
+
     private void recordDelivery() {
         try {
             String reportId = requireConnectedOperationsReportId();
@@ -1867,17 +2315,28 @@ public final class AdminBoundaryActivity extends Activity {
             }
             long parsedPackageRevision = Long.parseLong(packageRevision);
             long parsedDeliveryRevision = Long.parseLong(revision);
-            if (verifiedDeliveryPackage == null
-                || !verifiedDeliveryPackage.matchesDelivery(
-                    reportId,
-                    parsedPackageRevision,
-                    connectedOperationsContentRevision
-                )
-                || !verifiedDeliveryPackage.matchesFreshDetail(
-                    reportController.snapshot().detail()
-                )) {
+            AdminReportModels.Detail detail = reportController.snapshot().detail();
+            AdminOperationsApi.DeliveryHistoryItem latest = latestEffectiveDeliveryForCorrection();
+            AdminReportModels.DeliveryFollowUp followUp =
+                AdminReportModels.DeliveryFollowUp.fromLatest(detail, latest);
+            boolean continuingSubmission = followUp != null && followUp.allows(deliveryStatus);
+            boolean packageMatches = continuingSubmission
+                ? followUp.matchesLatest(detail, latest)
+                    && followUp.matchesSavedPackage(verifiedDeliveryPackage)
+                    && followUp.matchesPackage(
+                        reportId, followUp.packageId(), parsedPackageRevision
+                    )
+                    && latest.institution().equals(normalized(institutionInput))
+                : (deliveryStatus == AdminInstitutionDelivery.Status.SUBMITTED
+                    || deliveryStatus == AdminInstitutionDelivery.Status.FAILED)
+                    && verifiedDeliveryPackage != null
+                    && verifiedDeliveryPackage.matchesDelivery(
+                        reportId, parsedPackageRevision, connectedOperationsContentRevision
+                    )
+                    && verifiedDeliveryPackage.matchesFreshDetail(detail);
+            if (!packageMatches) {
                 throw new IllegalArgumentException(
-                    "delivery package does not match report, package revision, and content revision"
+                    "delivery package does not match the new submission or prior submitted package"
                 );
             }
             if (parsedDeliveryRevision != connectedOperationsLatestDeliveryRevision
@@ -1930,6 +2389,118 @@ public final class AdminBoundaryActivity extends Activity {
         }
     }
 
+    /**
+     * S18-40: the only correctable event is the latest effective one of a fully loaded history
+     * whose snapshot is the report's current delivery revision.
+     */
+    private AdminOperationsApi.DeliveryHistoryItem latestEffectiveDeliveryForCorrection() {
+        if (deliveryHistoryNeedsFirstPage
+            || deliveryHistoryNextCursor != null
+            || deliveryHistorySnapshotRevision < 1L
+            || deliveryHistorySnapshotRevision != connectedOperationsLatestDeliveryRevision
+            || deliveryHistoryItems.size() != deliveryHistoryTotalCount) {
+            return null;
+        }
+        for (int index = deliveryHistoryItems.size() - 1; index >= 0; index--) {
+            AdminOperationsApi.DeliveryHistoryItem item = deliveryHistoryItems.get(index);
+            if (!item.corrected()) return item;
+        }
+        return null;
+    }
+
+    private void correctLatestDelivery() {
+        if (controller == null || operationInFlight) return;
+        char[] password = null;
+        char[] totp = null;
+        try {
+            String reportId = requireConnectedOperationsReportId();
+            AdminOperationsApi.DeliveryHistoryItem target = latestEffectiveDeliveryForCorrection();
+            if (target == null) {
+                resultText.setText(
+                    "정정하려면 먼저 수동 전달 상태 이력을 끝까지 불러와 현재 기록 버전과 맞춰 주세요."
+                );
+                return;
+            }
+            // Review F3: the same intent keeps its ID (a resend after an uncertain result);
+            // another target, revision, reason or memo gets a new ID.
+            AdminDeliveryCorrection correction = deliveryCorrectionAttempt.prepare(
+                target.id(),
+                connectedOperationsLatestDeliveryRevision,
+                DELIVERY_CORRECTION_REASONS[deliveryCorrectionReasonInput.getSelectedItemPosition()],
+                normalized(deliveryCorrectionMemoInput)
+            );
+            password = takeMutableInput(deliveryCorrectionPasswordInput);
+            totp = takeMutableInput(deliveryCorrectionTotpInput);
+            char[] requestPassword = password;
+            char[] requestTotp = totp;
+            password = null;
+            totp = null;
+            boolean resendOfUncertainAttempt = deliveryCorrectionAttempt.markSent(correction);
+            long generation = securityOperationGeneration;
+            long sessionGeneration = operationsSessionGeneration;
+            operationInFlight = true;
+            setInteractiveEnabled(contentRoot, false);
+            resultText.setText("재인증 후 최신 유효 전달 기록의 정정을 내부 기록하고 있습니다.");
+            networkExecutor.execute(() -> {
+                boolean recorded = false;
+                boolean idConflict = false;
+                String message;
+                try {
+                    controller.correctDelivery(
+                        reportId,
+                        correction,
+                        requestPassword,
+                        requestTotp,
+                        System.currentTimeMillis(),
+                        resendOfUncertainAttempt,
+                        BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    );
+                    recorded = true;
+                    message = "revision " + target.revision() + " 기록을 정정했습니다. 원래 기록은 이력에 그대로 남고 "
+                        + "현재 유효 상태에서만 빠집니다. 전달 이력을 다시 불러와 확인해 주세요.";
+                } catch (AdminOperationsApi.CorrectionIdConflictException conflict) {
+                    idConflict = true;
+                    message = "이 정정 ID는 이미 다른 정정 내용에 쓰였습니다. 새 정정 ID로 바꿨으니 "
+                        + "전달 이력을 처음부터 다시 불러와 앞선 정정이 기록됐는지 확인한 뒤 필요하면 다시 정정해 주세요.";
+                } catch (AdminOperationsApi.MutationConflictException conflict) {
+                    message = "다른 변경이 먼저 기록되어 정정하지 않았습니다. 이력을 다시 불러와 확인해 주세요.";
+                } catch (Exception error) {
+                    message = "정정을 기록하지 못했습니다. 재인증 정보와 서버 상태를 확인해 주세요. "
+                        + "자동 재시도하지 않으며 같은 정정을 다시 보내면 같은 정정 ID만 사용합니다.";
+                } finally {
+                    Arrays.fill(requestPassword, '\0');
+                    Arrays.fill(requestTotp, '\0');
+                }
+                boolean succeeded = recorded;
+                boolean renewId = idConflict;
+                String finalMessage = message;
+                runOnUiThread(() -> {
+                    if (isDestroyed() || generation != securityOperationGeneration
+                        || sessionGeneration != operationsSessionGeneration) return;
+                    operationInFlight = false;
+                    setInteractiveEnabled(contentRoot, true);
+                    resultText.setText(finalMessage);
+                    if (succeeded) {
+                        deliveryCorrectionAttempt.succeeded();
+                        clear(deliveryCorrectionMemoInput);
+                        // Review F6: the loaded history still shows the corrected event as
+                        // effective, whether or not the detail tuple changes.
+                        deliveryHistoryNeedsFirstPage = true;
+                        refreshConnectedReportDetail();
+                    } else if (renewId) {
+                        deliveryCorrectionAttempt.renewAfterIdConflict();
+                        deliveryHistoryNeedsFirstPage = true;
+                    }
+                    render();
+                });
+            });
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            if (password != null) Arrays.fill(password, '\0');
+            if (totp != null) Arrays.fill(totp, '\0');
+            resultText.setText("정정 사유 코드와 메모(500자 이하), 재인증 정보를 확인해 주세요.");
+        }
+    }
+
     private void runReportHistoryOperation(
         boolean review,
         boolean firstPage,
@@ -1938,6 +2509,9 @@ public final class AdminBoundaryActivity extends Activity {
     ) {
         if (controller == null || operationInFlight) return;
         long generation = reportHistoryGeneration;
+        // adm-F7: onStop advances securityOperationGeneration (reportHistoryGeneration does not),
+        // so a read that outlives a stop/restart cannot end a newer operation's progress state.
+        long securityGeneration = securityOperationGeneration;
         operationInFlight = true;
         setInteractiveEnabled(contentRoot, false);
         resultText.setText(review
@@ -1953,15 +2527,23 @@ public final class AdminBoundaryActivity extends Activity {
                         reportId, cursor, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                     );
                 runOnUiThread(() -> {
-                    if (isDestroyed() || generation != reportHistoryGeneration
+                    if (!isCurrentHistoryCallback(generation, securityGeneration)
                         || !reportId.equals(connectedOperationsReportId)) return;
                     operationInFlight = false;
                     setInteractiveEnabled(contentRoot, true);
                     try {
                         applyReportHistoryPage(review, firstPage, cursor, result);
-                        resultText.setText(review
+                        String refreshed = review
                             ? "검토 결정 이력을 갱신했습니다."
-                            : "수동 전달 상태 이력을 갱신했습니다.");
+                            : "수동 전달 상태 이력을 갱신했습니다.";
+                        // Review F3: an earlier correction whose result was lost is confirmed
+                        // by its ID in the history; the next correction gets a new ID.
+                        if (!review && deliveryCorrectionAttempt.confirmedBy(deliveryHistoryItems)) {
+                            clear(deliveryCorrectionMemoInput);
+                            refreshed = "수동 전달 상태 이력을 갱신했습니다. 앞서 결과를 확인하지 못한 정정이 "
+                                + "서버에 기록된 것을 이력에서 확인했습니다. 다음 정정은 새 정정 ID를 사용합니다.";
+                        }
+                        resultText.setText(refreshed);
                     } catch (IOException error) {
                         resultText.setText(
                             "이력 페이지 무결성을 확인하지 못했습니다. 기존 이력은 유지했습니다."
@@ -1971,12 +2553,12 @@ public final class AdminBoundaryActivity extends Activity {
                 });
             } catch (AdminOperationsApi.HistoryCursorException error) {
                 runOnUiThread(() -> finishHistoryFailure(
-                    generation, reportId, review, true,
+                    generation, securityGeneration, reportId, review, true,
                     "이력 페이지 기준이 만료되었습니다. 기존 이력은 유지했으며 첫 페이지부터 다시 조회해 주세요."
                 ));
             } catch (AdminOperationsApi.HistoryNotFoundException error) {
                 runOnUiThread(() -> {
-                    if (isDestroyed() || generation != reportHistoryGeneration) return;
+                    if (!isCurrentHistoryCallback(generation, securityGeneration)) return;
                     operationInFlight = false;
                     setInteractiveEnabled(contentRoot, true);
                     clearConnectedOperationsSelection();
@@ -1986,11 +2568,108 @@ public final class AdminBoundaryActivity extends Activity {
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> finishHistoryFailure(
-                    generation, reportId, review, false,
+                    generation, securityGeneration, reportId, review, false,
                     "이력 페이지를 불러오지 못했습니다. 기존 이력과 다음 페이지 위치는 유지했습니다."
                 ));
             }
         });
+    }
+
+    private void runRecentHistoryOperation(boolean review, String reportId) {
+        if (controller == null || operationInFlight) return;
+        long generation = reportHistoryGeneration;
+        long securityGeneration = securityOperationGeneration;
+        operationInFlight = true;
+        setInteractiveEnabled(contentRoot, false);
+        resultText.setText(review
+            ? "최근 검토 이력을 확인하고 있습니다."
+            : "최근 수동 전달 이력을 확인하고 있습니다.");
+        networkExecutor.execute(() -> {
+            try {
+                AdminOperationsApi.Result result = review
+                    ? controller.readRecentReviewDecisions(
+                        reportId, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    )
+                    : controller.readRecentDeliveries(
+                        reportId, BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                    );
+                runOnUiThread(() -> {
+                    if (!isCurrentHistoryCallback(generation, securityGeneration)
+                        || !reportId.equals(connectedOperationsReportId)) return;
+                    operationInFlight = false;
+                    setInteractiveEnabled(contentRoot, true);
+                    try {
+                        applyRecentHistoryPreview(review, result);
+                        resultText.setText("최근 이력을 확인했습니다. 정정 대상 판단에는 전체 이력을 끝까지 불러와야 합니다.");
+                    } catch (IOException invalid) {
+                        resultText.setText("최근 이력의 무결성을 확인하지 못했습니다. 기존 조회 결과는 유지했습니다.");
+                    }
+                    renderReportHistory();
+                });
+            } catch (AdminOperationsApi.HistoryNotFoundException missing) {
+                runOnUiThread(() -> {
+                    if (!isCurrentHistoryCallback(generation, securityGeneration)) return;
+                    operationInFlight = false;
+                    setInteractiveEnabled(contentRoot, true);
+                    clearConnectedOperationsSelection();
+                    resultText.setText("선택한 신고가 더 이상 존재하지 않아 업무 연결을 해제했습니다.");
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    if (!isCurrentHistoryCallback(generation, securityGeneration)
+                        || !reportId.equals(connectedOperationsReportId)) return;
+                    operationInFlight = false;
+                    setInteractiveEnabled(contentRoot, true);
+                    resultText.setText("최근 이력을 불러오지 못했습니다. 전체 이력과 기존 조회 결과는 유지했습니다.");
+                    renderReportHistory();
+                });
+            }
+        });
+    }
+
+    private void applyRecentHistoryPreview(boolean review, AdminOperationsApi.Result result)
+        throws IOException {
+        if (result == null || !java.util.Objects.equals(result.reportId(), connectedOperationsReportId)
+            || result.snapshotRevision() != result.totalCount() || result.nextCursor() != null
+            || result.kind() != (review
+                ? AdminOperationsApi.ResultKind.REVIEW_HISTORY
+                : AdminOperationsApi.ResultKind.DELIVERY_HISTORY)) {
+            throw new IOException("recent history report or snapshot is invalid");
+        }
+        long total = result.totalCount();
+        long minimumKnownRevision = review
+            ? connectedOperationsLatestReviewRevision : connectedOperationsLatestDeliveryRevision;
+        if (total < minimumKnownRevision) {
+            throw new IOException("recent history predates connected report detail");
+        }
+        int count = result.returnedItemCount();
+        if (count > 25 || (total == 0L) != (count == 0)
+            || (total > 0L && count > total)) {
+            throw new IOException("recent history item count is invalid");
+        }
+        long expectedRevision = total - count + 1L;
+        if (review) {
+            for (AdminOperationsApi.ReviewHistoryItem item : result.reviewHistory()) {
+                if (item.revision() != expectedRevision++) {
+                    throw new IOException("recent review history is not a contiguous suffix");
+                }
+            }
+            reviewRecentPreview = result;
+        } else {
+            for (AdminOperationsApi.DeliveryHistoryItem item : result.deliveryHistory()) {
+                if (item.revision() != expectedRevision++) {
+                    throw new IOException("recent delivery history is not a contiguous suffix");
+                }
+            }
+            deliveryRecentPreview = result;
+        }
+    }
+
+    /** adm-F7: a history-read result belongs to the started screen and both its generations. */
+    private boolean isCurrentHistoryCallback(long generation, long securityGeneration) {
+        return !isDestroyed() && activityStarted
+            && securityGeneration == securityOperationGeneration
+            && generation == reportHistoryGeneration;
     }
 
     private void applyReportHistoryPage(
@@ -2038,16 +2717,23 @@ public final class AdminBoundaryActivity extends Activity {
         if (!firstPage) combined.addAll(deliveryHistoryItems);
         long expectedRevision = combined.isEmpty()
             ? 1L : combined.get(combined.size() - 1).revision() + 1L;
-        AdminOperationsApi.DeliveryHistoryItem previous = combined.isEmpty()
-            ? null : combined.get(combined.size() - 1);
+        // S18-40: transitions follow the effective chain; corrected events carry no state.
+        AdminOperationsApi.DeliveryHistoryItem previous = null;
+        for (int index = combined.size() - 1; index >= 0; index--) {
+            if (!combined.get(index).corrected()) {
+                previous = combined.get(index);
+                break;
+            }
+        }
         for (AdminOperationsApi.DeliveryHistoryItem item : result.deliveryHistory()) {
             if (item.revision() != expectedRevision++
-                || !validDeliveryHistoryTransition(previous, item)) {
+                || (!item.corrected() && !validDeliveryHistoryTransition(previous, item))) {
                 throw new IOException("delivery history pages are not contiguous");
             }
             combined.add(item);
-            previous = item;
+            if (!item.corrected()) previous = item;
         }
+        AdminOperationsHttpClient.requireCorrectionsStepBack(combined);
         requireLoadedCount(combined.size(), result.totalCount(), result.nextCursor());
         deliveryHistoryItems.clear();
         deliveryHistoryItems.addAll(combined);
@@ -2067,12 +2753,13 @@ public final class AdminBoundaryActivity extends Activity {
 
     private void finishHistoryFailure(
         long generation,
+        long securityGeneration,
         String reportId,
         boolean review,
         boolean reloadFirstPage,
         String message
     ) {
-        if (isDestroyed() || generation != reportHistoryGeneration
+        if (!isCurrentHistoryCallback(generation, securityGeneration)
             || !reportId.equals(connectedOperationsReportId)) return;
         operationInFlight = false;
         setInteractiveEnabled(contentRoot, true);
@@ -2085,6 +2772,16 @@ public final class AdminBoundaryActivity extends Activity {
     }
 
     private void renderReportHistory() {
+        if (reviewRecentStatusText != null) {
+            reviewRecentStatusText.setText(reviewRecentPreview == null
+                ? "최근 검토 이력: 조회 전"
+                : historyText(
+                    "최근 검토 이력 미리보기 (전체 이력 아님)",
+                    reviewRecentPreview.reviewHistory(),
+                    reviewRecentPreview.totalCount(),
+                    true
+                ));
+        }
         if (reviewHistoryStatusText != null) {
             reviewHistoryStatusText.setText(historyText(
                 "검토 결정 이력",
@@ -2105,12 +2802,24 @@ public final class AdminBoundaryActivity extends Activity {
         if (deliveryHistoryStatusText != null) {
             deliveryHistoryStatusText.setText(deliveryHistoryText());
         }
+        if (deliveryRecentStatusText != null) {
+            deliveryRecentStatusText.setText(recentDeliveryHistoryText());
+        }
+        if (deliveryCorrectionTargetText != null) {
+            deliveryCorrectionTargetText.setText(deliveryCorrectionTargetMessage());
+        }
         if (deliveryHistoryNextButton != null) {
             deliveryHistoryNextButton.setText(
                 deliveryHistoryNeedsFirstPage ? "첫 페이지 다시 불러오기" : "다음 이력 불러오기"
             );
             deliveryHistoryNextButton.setVisibility(
                 deliveryHistoryNeedsFirstPage || deliveryHistoryNextCursor != null
+                    ? View.VISIBLE : View.GONE
+            );
+        }
+        if (reconnectDeliveryPackageButton != null && reportController != null) {
+            reconnectDeliveryPackageButton.setVisibility(
+                canReconnectDeliveryPackage(reportController.snapshot().detail())
                     ? View.VISIBLE : View.GONE
             );
         }
@@ -2154,8 +2863,52 @@ public final class AdminBoundaryActivity extends Activity {
                 .append("\n서버 기록시각: ").append(item.recordedAt())
                 .append("\n외부 접수번호: ")
                 .append(item.externalReceiptId() == null ? "없음" : item.externalReceiptId());
+            if (item.correction() != null) {
+                // Review F8: the Korean reason label (as in the reason picker), not the enum code.
+                message.append("\n정정됨, 현재 상태에서 제외: ")
+                    .append(deliveryCorrectionReasonLabel(item.correction().reason()))
+                    .append(" / ").append(item.correction().memo())
+                    .append("\n정정 기록시각: ").append(item.correction().createdAt());
+            }
         }
         return message.toString();
+    }
+
+    private String recentDeliveryHistoryText() {
+        if (deliveryRecentPreview == null) return "최근 수동 전달 이력: 조회 전";
+        StringBuilder message = new StringBuilder("최근 수동 전달 이력 미리보기 (전체 이력 아님) ")
+            .append(deliveryRecentPreview.deliveryHistory().size()).append("/")
+            .append(deliveryRecentPreview.totalCount()).append("건");
+        for (AdminOperationsApi.DeliveryHistoryItem item : deliveryRecentPreview.deliveryHistory()) {
+            message.append("\n\nrevision ").append(item.revision())
+                .append(" / status ").append(item.status())
+                .append(" / package revision ")
+                .append(item.packageRevision() == null ? "없음" : item.packageRevision())
+                .append("\n기관: ").append(item.institution())
+                .append("\n서버 기록시각: ").append(item.recordedAt());
+            if (item.corrected()) message.append("\n정정됨, 현재 상태에서 제외");
+        }
+        return message.toString();
+    }
+
+    private String deliveryCorrectionTargetMessage() {
+        AdminOperationsApi.DeliveryHistoryItem target = latestEffectiveDeliveryForCorrection();
+        if (target != null) {
+            return "정정 대상: revision " + target.revision() + " / status " + target.status()
+                + " (현재 유효한 가장 최근 기록)";
+        }
+        return deliveryHistorySnapshotRevision < 0L || deliveryHistoryNextCursor != null
+            ? "정정 대상: 전달 이력을 끝까지 불러온 뒤 표시"
+            : "정정 대상: 없음 (유효한 전달 기록이 없거나 이력이 현재 버전과 다릅니다)";
+    }
+
+    private static String deliveryCorrectionReasonLabel(AdminDeliveryCorrection.Reason reason) {
+        for (int index = 0; index < DELIVERY_CORRECTION_REASONS.length; index++) {
+            if (DELIVERY_CORRECTION_REASONS[index] == reason) {
+                return DELIVERY_CORRECTION_REASON_LABELS[index];
+            }
+        }
+        return "알 수 없는 정정 사유";
     }
 
     private static boolean validDeliveryHistoryTransition(
@@ -2180,7 +2933,8 @@ public final class AdminBoundaryActivity extends Activity {
     }
 
     private void runOperationalOperation(String pendingMessage, OperationalOperation operation) {
-        if (controller == null || operationInFlight) return;
+        if (controller == null || operationInFlight || !activityStarted || controller.isLocallyLocked()) return;
+        long generation = securityOperationGeneration;
         boolean deliveryMutation = recordingDelivery;
         String reportId = connectedOperationsReportId;
         operationInFlight = true;
@@ -2189,8 +2943,10 @@ public final class AdminBoundaryActivity extends Activity {
         networkExecutor.execute(() -> {
             try {
                 AdminOperationsApi.Result result = operation.run();
+                keyUseAuthorization.onSuccess();
                 runOnUiThread(() -> {
-                    if (isDestroyed()) return;
+                    if (isDestroyed() || !activityStarted
+                        || generation != securityOperationGeneration) return;
                     operationInFlight = false;
                     setInteractiveEnabled(contentRoot, true);
                     resultText.setText(operationalResultMessage(result));
@@ -2213,16 +2969,22 @@ public final class AdminBoundaryActivity extends Activity {
                     reportId,
                     deliveryMutation
                 );
-                runOnUiThread(() -> applyOperationalConflict(
-                    reportId,
-                    deliveryMutation,
-                    refresh
-                ));
+                runOnUiThread(() -> {
+                    if (isDestroyed() || !activityStarted
+                        || generation != securityOperationGeneration) return;
+                    applyOperationalConflict(reportId, deliveryMutation, refresh);
+                });
             } catch (Exception error) {
                 runOnUiThread(() -> {
-                    if (isDestroyed()) return;
+                    if (isDestroyed() || !activityStarted
+                        || generation != securityOperationGeneration) return;
                     operationInFlight = false;
                     setInteractiveEnabled(contentRoot, true);
+                    if (handleDeviceKeyUseFailure(error, () ->
+                        runOperationalOperation(pendingMessage, operation))) {
+                        recordingDelivery = false;
+                        return;
+                    }
                     resultText.setText(
                         !deliveryMutation && reviewDecisionAttempt.isPending()
                             ? "검토 결정 기록 결과를 확정할 수 없습니다. 자동 재전송하지 않으며 같은 입력으로 다시 시도하면 기존 decision_id만 재사용합니다."
@@ -2274,7 +3036,7 @@ public final class AdminBoundaryActivity extends Activity {
         boolean deliveryMutation,
         OperationalConflictRefresh refresh
     ) {
-        if (isDestroyed()) return;
+        if (isDestroyed() || !activityStarted) return;
         operationInFlight = false;
         setInteractiveEnabled(contentRoot, true);
         recordingDelivery = false;
@@ -2386,13 +3148,14 @@ public final class AdminBoundaryActivity extends Activity {
 
     private void login() {
         String adminId = adminIdInput.getText().toString();
-        String password = passwordInput.getText().toString();
-        String totp = totpInput.getText().toString();
+        AdminMutableCredentials credentials = takeSecurityCredentials(passwordInput, totpInput);
         String deviceLabel = deviceLabelInput.getText().toString();
         clearSensitiveInputs();
-        runSecurityOperation("로그인 정보를 확인하고 있습니다.", "관리자 로그인이 확인되었습니다.",
-            AdminRecoveryMessagePolicy.Phase.GENERAL, () ->
-            controller.login(adminId, password, totp, deviceId, deviceLabel)
+        runCredentialOperation("로그인 정보를 확인하고 있습니다.", "관리자 로그인이 확인되었습니다.",
+            AdminRecoveryMessagePolicy.Phase.GENERAL, credentials, true, (password, totp) -> {
+                controller.login(adminId, password, totp, deviceId, deviceLabel);
+                promoteReplacementKeyAfterServerLogin();
+            }
         );
     }
 
@@ -2403,24 +3166,85 @@ public final class AdminBoundaryActivity extends Activity {
 
     private void startRecovery() {
         String adminId = adminIdInput.getText().toString();
-        String recoveryCode = recoveryCodeInput.getText().toString();
+        AdminMutableCredentials credentials = takeSecurityCredentials(recoveryCodeInput, null);
         String deviceLabel = deviceLabelInput.getText().toString();
         clearSensitiveInputs();
-        runSecurityOperation("기존 세션을 폐기하고 복구를 시작하고 있습니다.", "복구가 시작되었습니다. 운영 업무는 계속 잠겨 있습니다.",
-            AdminRecoveryMessagePolicy.Phase.RECOVERY_START, () ->
+        // Recovery start signs nothing with the device key, so it is not preflighted.
+        runCredentialOperation("기존 세션을 폐기하고 복구를 시작하고 있습니다.", "복구가 시작되었습니다. 운영 업무는 계속 잠겨 있습니다.",
+            AdminRecoveryMessagePolicy.Phase.RECOVERY_START, credentials, false, (recoveryCode, unused) ->
             controller.startRecovery(adminId, recoveryCode, deviceId, deviceLabel)
         );
     }
 
     private void completeRecovery() {
-        String newPassword = newPasswordInput.getText().toString();
-        String newTotp = newTotpInput.getText().toString();
+        AdminMutableCredentials credentials = takeSecurityCredentials(newPasswordInput, newTotpInput);
         String deviceLabel = deviceLabelInput.getText().toString();
         clearSensitiveInputs();
-        runSecurityOperation("새 인증수단을 확인하고 있습니다.", "관리자 접근 복구가 완료되었습니다.",
-            AdminRecoveryMessagePolicy.Phase.RECOVERY_COMPLETE, () ->
-            controller.completeRecovery(newPassword, newTotp, deviceId, deviceLabel)
+        runCredentialOperation("새 인증수단을 확인하고 있습니다.", "관리자 접근 복구가 완료되었습니다.",
+            AdminRecoveryMessagePolicy.Phase.RECOVERY_COMPLETE, credentials, true, (newPassword, newTotp) -> {
+                controller.completeRecovery(newPassword, newTotp, deviceId, deviceLabel);
+                promoteReplacementKeyAfterServerLogin();
+            }
         );
+    }
+
+    private AdminMutableCredentials takeSecurityCredentials(EditText primary, EditText secondary) {
+        char[] first = takeMutableInput(primary);
+        try {
+            return new AdminMutableCredentials(
+                first,
+                secondary == null ? new char[0] : takeMutableInput(secondary)
+            );
+        } catch (RuntimeException error) {
+            Arrays.fill(first, '\0');
+            throw error;
+        }
+    }
+
+    private void runCredentialOperation(
+        String pendingMessage,
+        String successMessage,
+        AdminRecoveryMessagePolicy.Phase phase,
+        AdminMutableCredentials credentials,
+        boolean signsWithDeviceKey,
+        CredentialOperation operation
+    ) {
+        if (controller == null || !activityStarted || operationInFlight) {
+            credentials.close();
+            return;
+        }
+        pendingSecurityCredentials.set(credentials);
+        try {
+            // S18-1-F2: the credentials are consumed by this attempt, so it is never replayed
+            // after the device credential screen; the operator re-enters them instead.
+            runSecurityOperation(pendingMessage, successMessage, phase, () -> {
+                try {
+                    // Ask for the device credential before any secret or TOTP leaves the app.
+                    if (signsWithDeviceKey) preflightDeviceKeySignature();
+                    // S18-20: caller-owned char[] copies go all the way to the HTTP encoder; no
+                    // String of the secret is made, and both copies are zeroed after the attempt.
+                    char[][] values = credentials.takeForDispatch();
+                    try {
+                        operation.run(values[0], values[1]);
+                    } finally {
+                        Arrays.fill(values[0], '\0');
+                        Arrays.fill(values[1], '\0');
+                    }
+                } finally {
+                    credentials.close();
+                    pendingSecurityCredentials.compareAndSet(credentials, null);
+                }
+            }, true);
+        } catch (RuntimeException error) {
+            credentials.close();
+            pendingSecurityCredentials.compareAndSet(credentials, null);
+            throw error;
+        }
+    }
+
+    @FunctionalInterface
+    private interface CredentialOperation {
+        void run(char[] primary, char[] secondary) throws Exception;
     }
 
     private void attestRecoveryCustody() {
@@ -2435,7 +3259,7 @@ public final class AdminBoundaryActivity extends Activity {
         custodyConfirmationInput.setChecked(false);
         runSecurityOperation(
             "복구자료 보관 확인 상태를 갱신하고 있습니다.",
-            "복구자료가 휴대전화 밖에 분리 보관된 상태를 확인했습니다.",
+            "사용자의 복구자료 외부 보관 확인을 기록했습니다. 실제 백업 복원 여부는 별도 확인이 필요합니다.",
             AdminRecoveryMessagePolicy.Phase.CUSTODY_ATTESTATION,
             () -> controller.attestRecoveryCustody(materialKind)
         );
@@ -2456,17 +3280,83 @@ public final class AdminBoundaryActivity extends Activity {
                 ? "서버에서 현재 세션을 폐기하고 로그아웃하고 있습니다."
                 : "선택한 기기 세션을 폐기하고 있습니다.",
             currentSession ? "로그아웃했습니다." : "기기 세션을 폐기했습니다.",
-            AdminRecoveryMessagePolicy.Phase.GENERAL, () ->
+            // S18-18: a failed logout is still a completed local lock; only the server revoke
+            // is unconfirmed, and the failure text says so separately.
+            currentSession
+                ? AdminRecoveryMessagePolicy.Phase.CURRENT_SESSION_LOGOUT
+                : AdminRecoveryMessagePolicy.Phase.GENERAL, () ->
             controller.revokeSession(sessionId)
         );
     }
 
     private void reportLostDevice(String lostDeviceId) {
+        if (controller == null || !activityStarted || operationInFlight) return;
+        char[] password = takeMutableInput(lostDevicePasswordInput);
+        char[] totp = takeMutableInput(lostDeviceTotpInput);
+        if (password.length == 0 || totp.length == 0) {
+            Arrays.fill(password, '\0');
+            Arrays.fill(totp, '\0');
+            (password.length == 0 ? lostDevicePasswordInput : lostDeviceTotpInput).requestFocus();
+            resultText.setText("분실 처리 전 비밀번호와 새 6자리 인증번호를 입력해 주세요.");
+            return;
+        }
+        // The controller wipes both buffers after the reconfirmation attempt. S18-1-F2: the
+        // reauthentication consumes the TOTP, so this work is never replayed automatically.
         runSecurityOperation(
-            "분실 기기의 모든 세션과 장치 키를 폐기하고 있습니다.",
+            "재인증 후 분실 기기의 모든 세션과 장치 키를 폐기하고 있습니다.",
             "분실 기기의 모든 세션과 장치 키를 폐기했습니다.",
             AdminRecoveryMessagePolicy.Phase.LOST_DEVICE_REPORT,
-            () -> controller.reportLostDevice(lostDeviceId)
+            () -> {
+                try {
+                    preflightDeviceKeySignature();
+                } catch (Exception error) {
+                    Arrays.fill(password, '\0');
+                    Arrays.fill(totp, '\0');
+                    throw error;
+                }
+                controller.reportLostDevice(
+                    lostDeviceId,
+                    password,
+                    totp,
+                    System.currentTimeMillis()
+                );
+            },
+            true
+        );
+    }
+
+    private void requestLocalSessionResume() {
+        if (controller == null || !controller.isLocallyLocked() || awaitingLocalUnlock
+            || operationInFlight) return;
+        KeyguardManager keyguard = getSystemService(KeyguardManager.class);
+        Intent confirmation = keyguard == null || !keyguard.isDeviceSecure() ? null
+            : keyguard.createConfirmDeviceCredentialIntent(
+                "관리자 업무 잠금 해제", "기기 인증 후 기존 세션의 서버 상태를 다시 확인합니다."
+            );
+        if (confirmation == null) {
+            resultText.setText("기기 PIN·패턴·비밀번호를 설정해야 기존 관리자 세션을 재개할 수 있습니다.");
+            return;
+        }
+        pendingLocalUnlockGeneration = controller.localGeneration();
+        awaitingLocalUnlock = true;
+        try {
+            startActivityForResult(confirmation, CONFIRM_LOCAL_SESSION);
+        } catch (RuntimeException error) {
+            awaitingLocalUnlock = false;
+            pendingLocalUnlockGeneration = -1L;
+            resultText.setText("기기 인증 화면을 열지 못해 관리자 업무 잠금을 유지합니다.");
+        }
+    }
+
+    private void completeLocalUnlockIfReady() {
+        if (!activityStarted || confirmedLocalUnlockGeneration < 0L) return;
+        long generation = confirmedLocalUnlockGeneration;
+        confirmedLocalUnlockGeneration = -1L;
+        runSecurityOperation(
+            "기존 관리자 세션을 다시 확인하고 있습니다.",
+            "기기 인증과 세션 확인을 마쳤습니다. 민감 작업에는 새 작업별 인증이 필요합니다.",
+            AdminRecoveryMessagePolicy.Phase.GENERAL,
+            () -> controller.resumeLocalSession(generation)
         );
     }
 
@@ -2476,16 +3366,36 @@ public final class AdminBoundaryActivity extends Activity {
         AdminRecoveryMessagePolicy.Phase phase,
         SecurityOperation operation
     ) {
-        if (controller == null) return;
+        runSecurityOperation(pendingMessage, successMessage, phase, operation, false);
+    }
+
+    /**
+     * @param credentialBound true when the operation consumes one-time secrets (password, TOTP,
+     *     recovery code); such an operation is never replayed after the device credential screen
+     */
+    private void runSecurityOperation(
+        String pendingMessage,
+        String successMessage,
+        AdminRecoveryMessagePolicy.Phase phase,
+        SecurityOperation operation,
+        boolean credentialBound
+    ) {
+        if (controller == null || !activityStarted) return;
+        long generation = securityOperationGeneration;
+        long sessionGeneration = controller.localGeneration();
         if (operationInFlight) return;
         operationInFlight = true;
         setInteractiveEnabled(contentRoot, false);
         resultText.setText(pendingMessage);
         networkExecutor.execute(() -> {
             try {
+                if (!activityStarted || generation != securityOperationGeneration
+                    || !controller.isLocalGenerationCurrent(sessionGeneration)) return;
                 operation.run();
+                keyUseAuthorization.onSuccess();
                 runOnUiThread(() -> {
-                    if (isDestroyed()) return;
+                    if (isDestroyed() || !activityStarted
+                        || generation != securityOperationGeneration) return;
                     operationInFlight = false;
                     setInteractiveEnabled(contentRoot, true);
                     resultText.setText(successMessage);
@@ -2493,10 +3403,18 @@ public final class AdminBoundaryActivity extends Activity {
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> {
-                    if (isDestroyed()) return;
+                    if (isDestroyed() || !activityStarted
+                        || generation != securityOperationGeneration) return;
                     operationInFlight = false;
                     setInteractiveEnabled(contentRoot, true);
-                    resultText.setText(AdminRecoveryMessagePolicy.failureMessage(phase, error));
+                    if (handleDeviceKeyUseFailure(error, credentialBound ? null : () ->
+                        runSecurityOperation(pendingMessage, successMessage, phase, operation))) {
+                        return;
+                    }
+                    // adm-F6: the logout text claims the local deletion only if it happened.
+                    resultText.setText(AdminRecoveryMessagePolicy.failureMessage(
+                        phase, error, controller != null && controller.hasRetainedSession()
+                    ));
                     render();
                 });
             }
@@ -2504,6 +3422,16 @@ public final class AdminBoundaryActivity extends Activity {
     }
 
     private void render() {
+        boolean locallyLocked = controller != null && controller.isLocallyLocked();
+        resumeLocalSessionButton.setVisibility(locallyLocked ? View.VISIBLE : View.GONE);
+        if (locallyLocked) {
+            hideInteractiveGroups();
+            statusText.setText("화면 이탈로 관리자 업무가 잠겼습니다.");
+            operationalLockText.setText("기기 인증 후 기존 세션을 재확인하세요. 서버 로그아웃이나 자동 재전송은 수행하지 않습니다.");
+            // Do not turn a temporary local lock into a session change: confirmed
+            // mutation recovery and pending manual-delivery identity must survive.
+            return;
+        }
         if (deviceKeyDescriptor == null) {
             deviceKeyText.setText(getString(
                 R.string.admin_device_key_state,
@@ -2521,6 +3449,8 @@ public final class AdminBoundaryActivity extends Activity {
             metadataText.setText(BuildConfig.ADMIN_WORKFLOW_STATE);
             custodyText.setText("복구자료 외부 보관 상태를 확인할 수 없습니다.");
             hideInteractiveGroups();
+            // S18-1-F1: a missing/invalid key must not leave data deletion as the only way out.
+            renderDeviceKeyReplacement(true);
             operationsGroup.setVisibility(View.GONE);
             operationalLockText.setText("인증·복구·감사 기능을 승인하기 전에는 어떤 관리자 업무도 수행할 수 없습니다.");
             renderOriginalEvidenceConfirmationState();
@@ -2535,6 +3465,14 @@ public final class AdminBoundaryActivity extends Activity {
             valueOrPending(snapshot.observedAt())
         ));
         custodyText.setText(custodyLabel(snapshot));
+        AdminSecurityApi.RecoveryMaterialKind pendingCustodyMaterialKind =
+            controller.pendingRecoveryCustodyMaterialKind();
+        boolean custodyAttemptPending = pendingCustodyMaterialKind != null;
+        if (custodyAttemptPending) {
+            custodyMaterialKindInput.setSelection(pendingCustodyMaterialKind.ordinal());
+            custodyText.append("\n이전 보관 확인 결과가 확정되지 않았습니다. 같은 시도로 다시 확인해 주세요.");
+        }
+        custodyMaterialKindInput.setEnabled(!custodyAttemptPending);
 
         boolean accessActive = snapshot.isAccessSessionActive();
         boolean recoveryActive = snapshot.isRecoveryActive();
@@ -2552,13 +3490,16 @@ public final class AdminBoundaryActivity extends Activity {
         );
         recoveryCompleteGroup.setVisibility(recoveryActive ? View.VISIBLE : View.GONE);
         custodyGroup.setVisibility(
-            accessActive && snapshot.securityState() == AdminSecurityState.NORMAL && !custodyAttested
+            accessActive && snapshot.securityState() == AdminSecurityState.NORMAL
+                && (!custodyAttested || custodyAttemptPending)
                 ? View.VISIBLE
                 : View.GONE
         );
         sessionGroup.setVisibility(accessActive ? View.VISIBLE : View.GONE);
+        renderDeviceKeyReplacement(!accessActive);
         revokeCurrentButton.setEnabled(snapshot.currentSessionId() != null);
         renderDevices(snapshot.sessions(), snapshot.devices());
+        renderDeviceKeyRotation(accessActive, snapshot.devices());
 
         boolean operationsVisible = BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
             && operationsClientConfigured
@@ -2635,26 +3576,50 @@ public final class AdminBoundaryActivity extends Activity {
             revoke.setOnClickListener(view -> revokeSession(session.sessionId(), session.isCurrent()));
             sessionList.addView(revoke, matchWrap());
         }
+        String partialNotice = controller == null ? null
+            : AdminSecurityController.partialDeviceListNotice(
+                controller.deviceTotal(),
+                devices.size(),
+                controller.devicesComplete()
+            );
+        if (partialNotice != null) {
+            TextView partial = text(partialNotice, 15);
+            partial.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+            sessionList.addView(partial, matchWrap());
+        }
         for (AdminSecurityApi.DeviceInfo device : devices) {
             boolean keyOnly = !activeSessionDevices.contains(device.deviceId());
+            String identification = deviceIdentificationText(device);
             TextView description = text(
                 (keyOnly ? "활성 장치 키만 남은 기기" : "활성 장치 키가 있는 기기")
                     + (device.isCurrent() ? " (현재 기기)" : "")
-                    + "\n기기 ID: " + device.deviceId(),
+                    + "\n" + identification,
                 15
             );
             description.setPadding(0, 20, 0, 4);
             sessionList.addView(description, matchWrap());
             if (!device.isCurrent()) {
                 Button reportLost = button("이 기기를 분실 신고하고 모든 세션·키 폐기");
+                reportLost.setContentDescription(
+                    "재인증 후 분실 처리: " + identification.replace('\n', ' ')
+                );
                 reportLost.setOnClickListener(view -> reportLostDevice(device.deviceId()));
                 sessionList.addView(reportLost, matchWrap());
             }
         }
     }
 
+    static String deviceIdentificationText(AdminSecurityApi.DeviceInfo device) {
+        return "기기 이름: " + (device.deviceLabel() == null ? "세션 기록 없음" : device.deviceLabel())
+            + "\n최근 활동: " + (device.lastSeenAt() == null ? "기록 없음" : device.lastSeenAt())
+            + "\n키 버전: " + (device.keyVersion() < 1 ? "확인 불가" : Integer.toString(device.keyVersion()))
+            + ", 키 지문 앞 8자: " + (device.keyMarkerPrefix() == null ? "확인 불가" : device.keyMarkerPrefix())
+            + "\n기기 ID: " + device.deviceId();
+    }
+
     private void hideInteractiveGroups() {
         loginGroup.setVisibility(View.GONE);
+        deviceKeyReplacementGroup.setVisibility(View.GONE);
         loginButton.setVisibility(View.GONE);
         recoveryStartGroup.setVisibility(View.GONE);
         recoveryCompleteGroup.setVisibility(View.GONE);
@@ -2666,6 +3631,8 @@ public final class AdminBoundaryActivity extends Activity {
     private void clearSensitiveInputs() {
         clear(passwordInput);
         clear(totpInput);
+        clear(lostDevicePasswordInput);
+        clear(lostDeviceTotpInput);
         clear(recoveryCodeInput);
         clear(newPasswordInput);
         clear(newTotpInput);
@@ -2943,6 +3910,7 @@ public final class AdminBoundaryActivity extends Activity {
         connectedOperationsReportId = null;
         connectedOperationsContentRevision = -1;
         connectedOperationsReviewRevision = -1;
+        connectedOperationsLatestReviewRevision = -1;
         connectedOperationsReviewDecision = null;
         connectedOperationsLatestDeliveryRevision = -1;
         connectedOperationsDeliveryRevision = -1;
@@ -2974,7 +3942,8 @@ public final class AdminBoundaryActivity extends Activity {
             incidentPanel.clearSensitiveInputs();
             incidentPanel.clearSubmittedEvidence();
         }
-        reviewDecisionAttempt.clear();
+        // S18-36: an unresolved decision_id is kept for lookup after the next login.
+        reviewDecisionAttempt.suspendForSessionChange();
         if (!preserveIncidentRecovery) incidentStatusAttempt.clear();
         if (rawCollectionPanel != null) rawCollectionPanel.clearSessionBoundDrafts();
         if (reportController != null) reportController.clearSessionState();
@@ -2991,6 +3960,8 @@ public final class AdminBoundaryActivity extends Activity {
     }
 
     private void resetReportHistoryState() {
+        reviewRecentPreview = null;
+        deliveryRecentPreview = null;
         reviewHistoryItems.clear();
         reviewHistoryNextCursor = null;
         reviewHistorySnapshotRevision = -1L;
@@ -3012,6 +3983,7 @@ public final class AdminBoundaryActivity extends Activity {
         connectedOperationsReportId = null;
         connectedOperationsContentRevision = -1;
         connectedOperationsReviewRevision = -1;
+        connectedOperationsLatestReviewRevision = -1;
         connectedOperationsReviewDecision = null;
         connectedOperationsLatestDeliveryRevision = -1;
         connectedOperationsDeliveryRevision = -1;
@@ -3047,6 +4019,7 @@ public final class AdminBoundaryActivity extends Activity {
         String reviewDecision = detail.review() == null ? null : detail.review().decision();
         boolean reviewChanged = connectedOperationsContentRevision >= 0
             && (connectedOperationsReviewRevision != reviewRevision
+                || connectedOperationsLatestReviewRevision != detail.latestReviewRevision()
                 || !java.util.Objects.equals(connectedOperationsReviewDecision, reviewDecision));
         int deliveryRevision = detail.delivery() == null ? -1 : detail.delivery().revision();
         Integer packageRevision = detail.delivery() == null
@@ -3081,6 +4054,7 @@ public final class AdminBoundaryActivity extends Activity {
         connectedOperationsReportId = reportId;
         connectedOperationsContentRevision = detail.contentRevision();
         connectedOperationsReviewRevision = reviewRevision;
+        connectedOperationsLatestReviewRevision = detail.latestReviewRevision();
         connectedOperationsReviewDecision = reviewDecision;
         connectedOperationsLatestDeliveryRevision = detail.latestDeliveryRevision();
         connectedOperationsDeliveryRevision = deliveryRevision;
@@ -3090,7 +4064,9 @@ public final class AdminBoundaryActivity extends Activity {
         expectedRevisionInput.setText(Integer.toString(detail.latestDeliveryRevision()));
         packageRevisionInput.setText(
             verifiedDeliveryPackage != null
-                && verifiedDeliveryPackage.matchesFreshDetail(detail)
+                && (verifiedDeliveryPackage.matchesFreshDetail(detail)
+                    || (deliveryFollowUp(detail) != null
+                        && deliveryFollowUp(detail).matchesSavedPackage(verifiedDeliveryPackage)))
                 ? Integer.toString(verifiedDeliveryPackage.revision())
                 : ""
         );
@@ -3104,7 +4080,14 @@ public final class AdminBoundaryActivity extends Activity {
         reviewDecisionInput.requestFocus();
     }
 
-    private static boolean canReconnectDeliveryPackage(AdminReportModels.Detail detail) {
+    private AdminReportModels.DeliveryFollowUp deliveryFollowUp(AdminReportModels.Detail detail) {
+        return AdminReportModels.DeliveryFollowUp.fromLatest(
+            detail, latestEffectiveDeliveryForCorrection()
+        );
+    }
+
+    private boolean canReconnectDeliveryPackage(AdminReportModels.Detail detail) {
+        if (deliveryFollowUp(detail) != null) return true;
         try {
             AdminDeliveryPackage.Eligibility.fromDetail(detail);
             return true;
@@ -3136,6 +4119,11 @@ public final class AdminBoundaryActivity extends Activity {
         if (observedAtInput != null) observedAtInput.setText(Instant.now().toString());
         if (manualDeliveryCompletedInput != null) manualDeliveryCompletedInput.setChecked(false);
         if (idempotencyKeyInput != null) idempotencyKeyInput.setText(UUID.randomUUID().toString());
+        if (deliveryCorrectionReasonInput != null) deliveryCorrectionReasonInput.setSelection(0);
+        clear(deliveryCorrectionMemoInput);
+        clear(deliveryCorrectionPasswordInput);
+        clear(deliveryCorrectionTotpInput);
+        deliveryCorrectionAttempt.reset();
     }
 
     private void resetPackageBoundDeliveryDraft() {
@@ -3164,12 +4152,25 @@ public final class AdminBoundaryActivity extends Activity {
         if (reportWorkflowController != null) reportWorkflowController.invalidate();
     }
 
+    private static Bundle copyMutationRecoveryState(Bundle source) {
+        if (source == null) return null;
+        // Copy entries without getters/defaults so value types and absent keys stay unchanged.
+        Bundle copy = new Bundle(source);
+        for (String key : new ArrayList<>(copy.keySet())) {
+            if (!AdminPendingRecoveryState.isRecoveryKey(key)) copy.remove(key);
+        }
+        return copy.isEmpty() ? null : copy;
+    }
+
     private void restorePendingMutationRecovery(Bundle savedInstanceState) {
         if (savedInstanceState == null) return;
         String recoveryReportId = savedInstanceState.getString(
             REPORT_STATUS_RECOVERY_ID_STATE
         );
-        if (reportWorkflowController != null && recoveryReportId != null) {
+        if (recoveryReportId != null) {
+            if (reportWorkflowController == null) {
+                throw new IllegalStateException("report recovery controller is unavailable");
+            }
             try {
                 boolean patchConfirmed = savedInstanceState.getBoolean(
                     REPORT_STATUS_RECOVERY_CONFIRMED_STATE,
@@ -3187,8 +4188,9 @@ public final class AdminBoundaryActivity extends Activity {
                 );
                 restoredReportStatusRecovery = true;
                 reportPanel.renderWorkflow(reportWorkflowController.snapshot());
-            } catch (IllegalArgumentException ignored) {
+            } catch (IllegalArgumentException error) {
                 reportWorkflowController.clearSessionState();
+                throw new IllegalStateException("saved report recovery could not be restored", error);
             }
         }
         String recoveryIncidentId = savedInstanceState.getString(INCIDENT_RECOVERY_ID_STATE);
@@ -3209,8 +4211,9 @@ public final class AdminBoundaryActivity extends Activity {
             resultText.setText(
                 "이전 중대 사고 상태 기록 결과를 복원했습니다. 재로그인 후 최신 이력을 확인하며 새 멱등키를 만들지 않습니다."
             );
-        } catch (IllegalArgumentException ignored) {
+        } catch (IllegalArgumentException error) {
             incidentStatusAttempt.clear();
+            throw new IllegalStateException("saved incident recovery could not be restored", error);
         }
     }
 
@@ -3392,8 +4395,15 @@ public final class AdminBoundaryActivity extends Activity {
                     != connectedOperationsLatestDeliveryRevision) {
                 throw new IllegalStateException("현재 신고 상세를 다시 확인해 주세요.");
             }
-            AdminDeliveryPackage.Eligibility eligibility =
-                AdminDeliveryPackage.Eligibility.fromDetail(detail);
+            AdminReportModels.DeliveryFollowUp followUp = deliveryFollowUp(detail);
+            AdminDeliveryPackage.Eligibility currentEligibility;
+            try {
+                currentEligibility = AdminDeliveryPackage.Eligibility.fromDetail(detail);
+            } catch (IllegalArgumentException notApprovedForNewSubmission) {
+                if (followUp == null) throw notApprovedForNewSubmission;
+                currentEligibility = null;
+            }
+            AdminDeliveryPackage.Eligibility eligibility = currentEligibility;
             if (awaitingSafReconnectResult) {
                 throw new IllegalStateException("기존 제출본 선택 화면이 이미 열려 있습니다.");
             }
@@ -3401,6 +4411,7 @@ public final class AdminBoundaryActivity extends Activity {
             pendingSafReconnectSessionGeneration = operationsSessionGeneration;
             pendingSafReconnectSessionId = boundOperationsSessionId;
             pendingSafReconnectEligibility = eligibility;
+            pendingSafReconnectFollowUp = followUp;
             awaitingSafReconnectResult = true;
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT)
                 .addCategory(Intent.CATEGORY_OPENABLE)
@@ -3412,7 +4423,7 @@ public final class AdminBoundaryActivity extends Activity {
             );
         } catch (IllegalArgumentException | IllegalStateException error) {
             resultText.setText(
-                "현재 콘텐츠의 승인과 전달 상태를 먼저 새로 조회해 주세요. 완료된 전달은 다시 연결할 수 없습니다."
+                "새 제출은 현재 승인, 기존 제출 후속 기록은 수동 전달 이력 전체를 먼저 확인해 주세요."
             );
         } catch (RuntimeException error) {
             awaitingSafReconnectResult = false;
@@ -3427,13 +4438,14 @@ public final class AdminBoundaryActivity extends Activity {
         long sessionGeneration = pendingSafReconnectSessionGeneration;
         String sessionId = pendingSafReconnectSessionId;
         AdminDeliveryPackage.Eligibility eligibility = pendingSafReconnectEligibility;
+        AdminReportModels.DeliveryFollowUp followUp = pendingSafReconnectFollowUp;
         clearPendingSafReconnectBinding();
         if (uri == null) {
             resultText.setText("기존 제출본 선택을 취소했습니다. 원본 파일은 변경하지 않았습니다.");
             return;
         }
         if (!isCurrentSafReconnectBinding(
-            reconnectGeneration, sessionGeneration, sessionId, eligibility
+            reconnectGeneration, sessionGeneration, sessionId, eligibility, followUp
         )) {
             resultText.setText("로그인 또는 신고 상태가 바뀌어 선택한 파일을 사용하지 않았습니다.");
             return;
@@ -3447,14 +4459,33 @@ public final class AdminBoundaryActivity extends Activity {
                 if (locatorInput == null) throw new IOException("SAF locator input unavailable");
                 AdminDeliveryPackage.Reference reference =
                     AdminDeliveryPackageSaver.inspectUntrusted(locatorInput);
-                if (!eligibility.reportId().equals(reference.reportId())) {
-                    throw new IOException("selected package belongs to another report");
+                AdminReportModels.DeliveryPackageUse packageUse;
+                try {
+                    packageUse = AdminReportModels.deliveryPackageUse(
+                        eligibility, followUp, reference.reportId(), reference.packageRevision()
+                    );
+                } catch (IllegalArgumentException invalidReference) {
+                    throw new IOException("selected package belongs to another report or submission",
+                        invalidReference);
                 }
+                AdminDeliveryPackage.Eligibility selectedEligibility =
+                    packageUse == AdminReportModels.DeliveryPackageUse.NEW_SUBMISSION
+                        ? eligibility : null;
+                AdminReportModels.DeliveryFollowUp selectedFollowUp =
+                    packageUse == AdminReportModels.DeliveryPackageUse.FOLLOW_UP
+                        ? followUp : null;
+                if (!isCurrentSafReconnectBinding(
+                    reconnectGeneration, sessionGeneration, sessionId,
+                    selectedEligibility, selectedFollowUp
+                )) throw new IOException("report or submitted package changed during selection");
+                String reportId = reference.reportId();
                 AdminReportModels.Detail beforeRead = controller.getAdminReportDetail(
-                    eligibility.reportId(),
+                    reportId,
                     BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                 );
-                if (!eligibility.matchesExact(beforeRead)) {
+                if (selectedFollowUp == null
+                    ? !selectedEligibility.matchesExact(beforeRead)
+                    : !selectedFollowUp.matchesDetail(beforeRead)) {
                     throw new IOException("report eligibility changed before package verification");
                 }
                 AdminDeliveryPackage.Proof proof = controller.getAdminDeliveryPackageProof(
@@ -3462,7 +4493,8 @@ public final class AdminBoundaryActivity extends Activity {
                     reference.packageRevision(),
                     BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                 );
-                if (!proof.matchesReference(reference) || !proof.matchesFreshDetail(beforeRead)) {
+                if (!proof.matchesReference(reference)
+                    || (selectedFollowUp == null && !proof.matchesFreshDetail(beforeRead))) {
                     throw new IOException("package proof does not match the fresh report detail");
                 }
                 InputStream input = getContentResolver().openInputStream(uri);
@@ -3470,19 +4502,30 @@ public final class AdminBoundaryActivity extends Activity {
                 AdminDeliveryPackageSaver.Saved saved =
                     AdminDeliveryPackageSaver.verifyExisting(proof, input);
                 AdminReportModels.Detail afterRead = controller.getAdminReportDetail(
-                    eligibility.reportId(),
+                    reportId,
                     BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                 );
-                if (!eligibility.matchesExact(afterRead)
-                    || !proof.matchesFreshDetail(afterRead)
-                    || !saved.matchesProof(proof)
-                    || !saved.matchesFreshDetail(afterRead)) {
+                if (!saved.matchesProof(proof)
+                    || (selectedFollowUp == null
+                        ? !selectedEligibility.matchesExact(afterRead)
+                            || !proof.matchesFreshDetail(afterRead)
+                            || !saved.matchesFreshDetail(afterRead)
+                        : !selectedFollowUp.matchesDetail(afterRead)
+                            || !selectedFollowUp.matchesSavedPackage(saved))) {
                     throw new IOException("report state changed during package verification");
                 }
                 runOnUiThread(() -> {
                     if (isDestroyed() || !isCurrentSafReconnectBinding(
-                        reconnectGeneration, sessionGeneration, sessionId, eligibility
+                        reconnectGeneration, sessionGeneration, sessionId,
+                        selectedEligibility, selectedFollowUp
                     )) return;
+                    if (selectedFollowUp != null
+                        && (afterRead.contentRevision() != connectedOperationsContentRevision
+                            || afterRead.latestReviewRevision()
+                                != connectedOperationsLatestReviewRevision)) {
+                        resultText.setText("신고 내용이나 검수가 바뀌었습니다. 상세와 전달 이력을 다시 확인해 주세요.");
+                        return;
+                    }
                     reportController.replaceDetail(afterRead);
                     reportPanel.render(reportController.snapshot());
                     connectReportToOperations(afterRead);
@@ -3495,7 +4538,7 @@ public final class AdminBoundaryActivity extends Activity {
             } catch (Exception error) {
                 runOnUiThread(() -> {
                     if (isDestroyed() || !isCurrentSafReconnectBinding(
-                        reconnectGeneration, sessionGeneration, sessionId, eligibility
+                        reconnectGeneration, sessionGeneration, sessionId, eligibility, followUp
                     )) return;
                     resultText.setText(
                         "선택한 ZIP을 현재 신고에 연결하지 않았습니다. 기존 제출본 연결과 입력, 선택한 원본 파일은 그대로 유지했습니다."
@@ -3509,22 +4552,30 @@ public final class AdminBoundaryActivity extends Activity {
         long reconnectGeneration,
         long sessionGeneration,
         String sessionId,
-        AdminDeliveryPackage.Eligibility eligibility
+        AdminDeliveryPackage.Eligibility eligibility,
+        AdminReportModels.DeliveryFollowUp followUp
     ) {
-        if (eligibility == null
+        if ((eligibility == null && followUp == null)
             || reconnectGeneration < 0L
             || reconnectGeneration != safReconnectGeneration
             || sessionGeneration != operationsSessionGeneration
             || !boundOperationsAccessActive
             || !java.util.Objects.equals(sessionId, boundOperationsSessionId)
-            || !java.util.Objects.equals(eligibility.reportId(), connectedOperationsReportId)
-            || eligibility.contentRevision() != connectedOperationsContentRevision
-            || eligibility.reviewRevision() != connectedOperationsReviewRevision
-            || eligibility.latestDeliveryRevision()
-                != connectedOperationsLatestDeliveryRevision
             || controller == null) {
             return false;
         }
+        boolean currentSubmissionValid = eligibility != null
+            && java.util.Objects.equals(eligibility.reportId(), connectedOperationsReportId)
+            && eligibility.contentRevision() == connectedOperationsContentRevision
+            && eligibility.reviewRevision() == connectedOperationsReviewRevision
+            && eligibility.latestDeliveryRevision()
+                == connectedOperationsLatestDeliveryRevision;
+        boolean followUpValid = followUp != null
+            && java.util.Objects.equals(followUp.reportId(), connectedOperationsReportId)
+            && followUp.matchesLatest(
+                reportController.snapshot().detail(), latestEffectiveDeliveryForCorrection()
+            );
+        if (!currentSubmissionValid && !followUpValid) return false;
         AdminSecurityController.Snapshot snapshot = controller.snapshot();
         return snapshot.isAccessSessionActive()
             && java.util.Objects.equals(sessionId, snapshot.currentSessionId());
@@ -3565,6 +4616,7 @@ public final class AdminBoundaryActivity extends Activity {
         pendingSafReconnectSessionGeneration = -1L;
         pendingSafReconnectSessionId = null;
         pendingSafReconnectEligibility = null;
+        pendingSafReconnectFollowUp = null;
     }
 
     private int allocateSafRequestCode() {
@@ -3713,6 +4765,9 @@ public final class AdminBoundaryActivity extends Activity {
             operationInFlight = true;
             setInteractiveEnabled(contentRoot, false);
             resultText.setText("중대 사고 상태 기록을 저장하고 있습니다. 복구나 제어는 수행하지 않습니다.");
+            // S18-16: the result applies only to the same screen activity and session.
+            long generation = securityOperationGeneration;
+            long sessionGeneration = operationsSessionGeneration;
             networkExecutor.execute(() -> {
                 try {
                     controller.updateAdminIncidentStatus(
@@ -3725,7 +4780,7 @@ public final class AdminBoundaryActivity extends Activity {
                     );
                     incidentStatusAttempt.clear();
                     runOnUiThread(() -> {
-                        if (isDestroyed()) return;
+                        if (!isCurrentOperationCallback(generation, sessionGeneration)) return;
                         operationInFlight = false;
                         setInteractiveEnabled(contentRoot, true);
                         incidentPanel.clearSubmittedEvidence();
@@ -3738,7 +4793,7 @@ public final class AdminBoundaryActivity extends Activity {
                 } catch (AdminIncidentRepository.StatusConflictException conflict) {
                     incidentStatusAttempt.clear();
                     runOnUiThread(() -> {
-                        if (isDestroyed()) return;
+                        if (!isCurrentOperationCallback(generation, sessionGeneration)) return;
                         operationInFlight = false;
                         setInteractiveEnabled(contentRoot, true);
                         incidentPanel.renderPendingStatusRetry(null);
@@ -3749,7 +4804,7 @@ public final class AdminBoundaryActivity extends Activity {
                     });
                 } catch (Exception error) {
                     runOnUiThread(() -> {
-                        if (isDestroyed()) return;
+                        if (!isCurrentOperationCallback(generation, sessionGeneration)) return;
                         operationInFlight = false;
                         setInteractiveEnabled(contentRoot, true);
                         resultText.setText(
@@ -3859,6 +4914,8 @@ public final class AdminBoundaryActivity extends Activity {
             resultText.setText(
                 "원시자료 " + request.scope() + " 결정을 기록하고 있습니다. 자동 재제출하지 않습니다."
             );
+            long generation = securityOperationGeneration;
+            long sessionGeneration = operationsSessionGeneration;
             networkExecutor.execute(() -> {
                 try {
                     controller.decideAdminRawCollectionPurpose(
@@ -3870,14 +4927,17 @@ public final class AdminBoundaryActivity extends Activity {
                         BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                     );
                     runOnUiThread(() -> completeRawMutation(
+                        generation, sessionGeneration,
                         "원시자료 목적별 결정을 기록했습니다. 새 재인증으로 최신 revision을 조회해 주세요."
                     ));
                 } catch (AdminRawCollectionRepository.ConflictException conflict) {
                     runOnUiThread(() -> completeRawMutation(
+                        generation, sessionGeneration,
                         "다른 변경으로 결정 revision 또는 멱등 결속이 충돌했습니다. 재제출하지 말고 새 재인증으로 최신 목록을 조회해 주세요."
                     ));
                 } catch (Exception error) {
                     runOnUiThread(() -> completeRawMutation(
+                        generation, sessionGeneration,
                         "결정 결과를 확정할 수 없습니다. 재제출하지 말고 새 재인증으로 최신 목록에서 확인해 주세요."
                     ));
                 } finally {
@@ -3913,6 +4973,8 @@ public final class AdminBoundaryActivity extends Activity {
             resultText.setText(
                 "원시자료 법적 보존 기록을 저장하고 있습니다. 자동 재제출하지 않습니다."
             );
+            long generation = securityOperationGeneration;
+            long sessionGeneration = operationsSessionGeneration;
             networkExecutor.execute(() -> {
                 try {
                     controller.recordAdminRawCollectionLegalHold(
@@ -3924,14 +4986,17 @@ public final class AdminBoundaryActivity extends Activity {
                         BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
                     );
                     runOnUiThread(() -> completeRawMutation(
+                        generation, sessionGeneration,
                         "원시자료 법적 보존 기록을 저장했습니다. 새 재인증으로 최신 revision을 조회해 주세요."
                     ));
                 } catch (AdminRawCollectionRepository.ConflictException conflict) {
                     runOnUiThread(() -> completeRawMutation(
+                        generation, sessionGeneration,
                         "다른 변경으로 법적 보존 revision 또는 멱등 결속이 충돌했습니다. 재제출하지 말고 새 재인증으로 최신 목록을 조회해 주세요."
                     ));
                 } catch (Exception error) {
                     runOnUiThread(() -> completeRawMutation(
+                        generation, sessionGeneration,
                         "법적 보존 결과를 확정할 수 없습니다. 재제출하지 말고 새 재인증으로 최신 목록에서 확인해 주세요."
                     ));
                 } finally {
@@ -3946,8 +5011,19 @@ public final class AdminBoundaryActivity extends Activity {
         }
     }
 
-    private void completeRawMutation(String message) {
-        if (isDestroyed()) return;
+    /**
+     * S18-16: a network result may change the screen only while the Activity is started and
+     * still in the operation and session generation it was dispatched in. Leaving the screen
+     * (onStop) or a session change makes the late result a no-op; it never re-enables work.
+     */
+    private boolean isCurrentOperationCallback(long generation, long sessionGeneration) {
+        return !isDestroyed() && activityStarted
+            && generation == securityOperationGeneration
+            && sessionGeneration == operationsSessionGeneration;
+    }
+
+    private void completeRawMutation(long generation, long sessionGeneration, String message) {
+        if (!isCurrentOperationCallback(generation, sessionGeneration)) return;
         operationInFlight = false;
         setInteractiveEnabled(contentRoot, true);
         resultText.setText(message);
@@ -4035,12 +5111,473 @@ public final class AdminBoundaryActivity extends Activity {
         manualDeliveryCompletedInput.setChecked(false);
     }
 
+    // --- S18-1: device credential for a user-authentication-bound device key -------------
+
+    /**
+     * Returns true when the failure was a device-key authentication event it handled.
+     *
+     * @param retry the same operation to run once more after the device credential, or null
+     *     when the failed attempt consumed one-time secrets (S18-1-F2: never replayed)
+     */
+    private boolean handleDeviceKeyUseFailure(Throwable error, Runnable retry) {
+        AdminDeviceKeyUseAuthorization.Decision decision = keyUseRetry.onFailure(error, retry);
+        if (decision == AdminDeviceKeyUseAuthorization.Decision.STOP_KEY_INVALIDATED) {
+            // S18-1-F3: a time-bound key is invalidated by removing/resetting the lock screen.
+            resultText.setText("기기 화면 잠금(PIN·패턴·비밀번호)이 제거되거나 초기화되어 관리자 기기키를 더 쓸 수 없습니다. "
+                + "관리자 업무를 잠급니다. 로그인 화면의 '교체용 새 기기키 준비'로 새 키를 만들고 운영자가 "
+                + "--replace-active로 등록한 뒤 '교체 키로 로그인 전환'을 사용하세요. 앱 데이터는 지우지 마세요.");
+            render();
+            return true;
+        }
+        if (decision == AdminDeviceKeyUseAuthorization.Decision.STOP) {
+            resultText.setText("기기 인증 후에도 기기키 서명을 완료하지 못했습니다. 작업을 반복 전송하지 않습니다.");
+            render();
+            return true;
+        }
+        if (decision != AdminDeviceKeyUseAuthorization.Decision.REQUEST_DEVICE_CREDENTIAL) return false;
+        KeyguardManager keyguard = getSystemService(KeyguardManager.class);
+        Intent confirmation = keyguard == null || !keyguard.isDeviceSecure() ? null
+            : keyguard.createConfirmDeviceCredentialIntent(
+                "관리자 기기키 사용 확인",
+                retry != null
+                    ? "기기 인증 후 같은 작업을 한 번만 다시 시도합니다."
+                    : "기기 인증 후 비밀번호와 새 인증번호를 다시 입력해야 합니다."
+            );
+        if (confirmation == null) {
+            keyUseRetry.cancelPending();
+            resultText.setText("기기 PIN·패턴·비밀번호가 없어 관리자 기기키로 서명할 수 없습니다.");
+            render();
+            return true;
+        }
+        awaitingDeviceKeyUse = true;
+        try {
+            startActivityForResult(confirmation, CONFIRM_DEVICE_KEY_USE);
+            resultText.setText("관리자 기기키 사용을 위해 기기 인증이 필요합니다.");
+        } catch (RuntimeException launchError) {
+            awaitingDeviceKeyUse = false;
+            keyUseRetry.cancelPending();
+            resultText.setText("기기 인증 화면을 열지 못해 작업을 다시 시도하지 않았습니다.");
+        }
+        render();
+        return true;
+    }
+
+    private void runDeviceKeyUseRetryIfReady() {
+        if (!activityStarted) return;
+        Runnable retry = keyUseRetry.takeReady();
+        if (retry != null) retry.run();
+    }
+
+    /**
+     * S18-1-F2: signs a fixed local payload (never sent) so a key that needs the device
+     * credential asks for it before a password, TOTP or recovery material is dispatched.
+     */
+    private void preflightDeviceKeySignature() throws GeneralSecurityException {
+        AdminDeviceProof.Signer signer = deviceKeySigner;
+        if (signer != null) signer.sign(DEVICE_KEY_PREFLIGHT_PAYLOAD.clone());
+    }
+
+    // --- S18-3: two-phase device key rotation ------------------------------------------------
+
+    private static AdminDeviceKeyStore.Descriptor pendingDeviceKeyOrNull(AdminDeviceKeyStore keyStore) {
+        try {
+            return keyStore.rotation().pendingOrNull();
+        } catch (Exception ignored) {
+            // A pending key that cannot be read was never usable; the active key stays in use.
+            return null;
+        }
+    }
+
+    // --- S18-1-F1: replacement key when the active key is invalidated or missing ------------
+
+    /** Creates (or shows) the next-version key without a session; the active key is untouched. */
+    private void prepareReplacementDeviceKey() {
+        AdminDeviceKeyStore keyStore = deviceKeyStore;
+        if (keyStore == null || operationInFlight) return;
+        resultText.setText("교체용 새 기기키를 만들고 있습니다. 기존 키와 기기 ID는 그대로 둡니다.");
+        networkExecutor.execute(() -> {
+            try {
+                AdminDeviceKeyStore.Descriptor pending;
+                synchronized (AdminDeviceKeyStore.class) {
+                    pending = keyStore.rotation().preparePending();
+                }
+                runOnUiThread(() -> {
+                    if (isDestroyed() || isFinishing()) return;
+                    pendingDeviceKeyDescriptor = pending;
+                    resultText.setText("교체용 새 기기키를 준비했습니다. 아래 안내대로 운영자에게 등록을 요청하세요.");
+                    render();
+                });
+            } catch (Exception error) {
+                boolean lockScreenRequired = AdminDeviceKeyUseAuthorization.requiresLockScreen(error);
+                runOnUiThread(() -> {
+                    if (isDestroyed() || isFinishing()) return;
+                    resultText.setText(lockScreenRequired
+                        ? DEVICE_KEY_LOCK_SCREEN_MESSAGE
+                        : "교체용 새 기기키를 만들지 못했습니다. 기존 상태를 그대로 유지합니다.");
+                    render();
+                });
+            }
+        });
+    }
+
+    /** Rebuilds the clients for the replacement key, or back for the stored active key. */
+    private void switchReplacementKeyLogin(boolean replacement) {
+        if (operationInFlight) return;
+        if (replacement && pendingDeviceKeyDescriptor == null) {
+            resultText.setText("먼저 교체용 새 기기키를 준비하고 운영자 등록을 마치세요.");
+            return;
+        }
+        replacementKeyLoginRequested = replacement;
+        recreate();
+    }
+
+    private void renderDeviceKeyReplacement(boolean signedOut) {
+        if (deviceKeyReplacementGroup == null) return;
+        AdminDeviceKeyStore.Descriptor pending = pendingDeviceKeyDescriptor;
+        boolean replacementMode = replacementLoginDescriptor != null;
+        deviceKeyReplacementGroup.setVisibility(
+            signedOut && deviceKeyStore != null ? View.VISIBLE : View.GONE
+        );
+        replacementLoginButton.setVisibility(
+            pending != null && !replacementMode ? View.VISIBLE : View.GONE
+        );
+        activeKeyReturnButton.setVisibility(
+            replacementMode && !activeDeviceKeyUnavailable ? View.VISIBLE : View.GONE
+        );
+        if (replacementMode) {
+            deviceKeyReplacementText.setText(
+                "교체 키(버전 " + replacementLoginDescriptor.version() + ")로 로그인합니다. "
+                    + "서버가 이 키로 한 로그인을 받아들일 때만 기기의 기본 키로 전환합니다. "
+                    + "운영자 등록 전이면 로그인이 거부되며, 기존 기기키로 돌아갈 수 있습니다."
+            );
+        } else if (pending != null) {
+            deviceKeyReplacementText.setText(
+                "교체용 새 기기키(버전 " + pending.version() + ")를 준비했습니다. 운영자는 신뢰 CLI에 "
+                    + "--replace-active --key-version " + pending.version() + " --security-level "
+                    + pending.securityLevel() + " 과 아래 descriptor를 등록합니다(기존 키 즉시 폐기·"
+                    + "이 기기의 세션 종료). 등록 뒤 '교체 키로 로그인 전환'을 누르세요.\n"
+                    + pending.registrationDescriptor(deviceId)
+            );
+        } else {
+            deviceKeyReplacementText.setText(
+                "화면 잠금을 제거·초기화해 기기키가 무효화됐거나 키를 잃었다면 앱 데이터를 지우지 말고 "
+                    + "교체용 새 기기키를 준비하세요. 정상 교체는 로그인 후 세션 화면에서 합니다."
+            );
+        }
+    }
+
+    /**
+     * Worker thread, after controller.login/completeRecovery returned: the server accepted a
+     * LOGIN or RECOVERY_COMPLETE proof signed by the replacement key, which it issues and
+     * verifies only for its ACTIVE key. Only then does the replacement become the local key.
+     */
+    private void promoteReplacementKeyAfterServerLogin() {
+        AdminDeviceKeyStore keyStore = deviceKeyStore;
+        AdminDeviceKeyStore.Descriptor bound = replacementLoginDescriptor;
+        if (keyStore == null || bound == null) return;
+        int serverKeyVersion = 0;
+        String serverMarkerPrefix = null;
+        for (AdminSecurityApi.DeviceInfo device : controller.snapshot().devices()) {
+            if (!device.isCurrent()) continue;
+            serverKeyVersion = Math.max(0, device.keyVersion());
+            serverMarkerPrefix = device.keyMarkerPrefix();
+        }
+        boolean promoted;
+        try {
+            synchronized (AdminDeviceKeyStore.class) {
+                promoted = keyStore.rotation().promoteAfterReplacementLogin(
+                    bound.version(), bound.marker(), serverKeyVersion, serverMarkerPrefix
+                );
+            }
+        } catch (GeneralSecurityException | RuntimeException error) {
+            // The session is valid and the pinned signer keeps using the replacement key;
+            // the next replacement login retries the local switch.
+            promoted = false;
+        }
+        if (!promoted) return;
+        replacementKeyLoginRequested = false;
+        runOnUiThread(() -> {
+            if (isDestroyed() || isFinishing()) return;
+            replacementLoginDescriptor = null;
+            activeDeviceKeyUnavailable = false;
+            pendingDeviceKeyDescriptor = null;
+            render();
+        });
+    }
+
+    private void prepareDeviceKeyRotation() {
+        AdminDeviceKeyStore keyStore = deviceKeyStore;
+        if (keyStore == null || controller == null) return;
+        runSecurityOperation(
+            "새 기기키를 준비하고 있습니다. 기존 키는 계속 사용합니다.",
+            "새 기기키를 준비했습니다. 아래 descriptor를 운영자 CLI로 등록한 뒤 교체 확인을 누르세요.",
+            AdminRecoveryMessagePolicy.Phase.GENERAL,
+            () -> {
+                AdminDeviceKeyStore.Descriptor pending;
+                synchronized (AdminDeviceKeyStore.class) {
+                    pending = keyStore.rotation().preparePending();
+                }
+                runOnUiThread(() -> pendingDeviceKeyDescriptor = pending);
+            }
+        );
+    }
+
+    private void confirmDeviceKeyRotation() {
+        AdminDeviceKeyStore keyStore = deviceKeyStore;
+        AdminDeviceKeyStore.Descriptor active = deviceKeyDescriptor;
+        AdminDeviceKeyStore.Descriptor pending = pendingDeviceKeyDescriptor;
+        if (keyStore == null || controller == null || active == null) return;
+        if (pending == null) {
+            resultText.setText("먼저 새 기기키를 준비하고 운영자 CLI로 등록하세요.");
+            return;
+        }
+        runSecurityOperation(
+            "새 기기키의 소유를 서버에 증명하고 있습니다.",
+            "새 기기키로 교체했습니다.",
+            AdminRecoveryMessagePolicy.Phase.GENERAL,
+            () -> {
+                controller.confirmDeviceKeyRotation(new AdminSecurityApi.DeviceKeyRotationRequest(
+                    active.version(),
+                    active.marker(),
+                    pending.version(),
+                    pending.marker(),
+                    payload -> keyStore.rotation().signPending(payload)
+                ));
+                completeDeviceKeyRotation(keyStore);
+            }
+        );
+    }
+
+    private void abandonDeviceKeyRotation() {
+        AdminDeviceKeyStore keyStore = deviceKeyStore;
+        if (keyStore == null || controller == null || pendingDeviceKeyDescriptor == null) return;
+        runSecurityOperation(
+            "준비한 새 기기키를 지우고 있습니다.",
+            "준비한 새 기기키를 지웠습니다. 기존 기기키를 그대로 사용합니다.",
+            AdminRecoveryMessagePolicy.Phase.GENERAL,
+            () -> {
+                synchronized (AdminDeviceKeyStore.class) {
+                    keyStore.rotation().abandonPending();
+                }
+                runOnUiThread(() -> pendingDeviceKeyDescriptor = null);
+            }
+        );
+    }
+
+    /** Runs on the worker after the server confirmed; the clients hold the old descriptor. */
+    private void completeDeviceKeyRotation(AdminDeviceKeyStore keyStore) throws Exception {
+        synchronized (AdminDeviceKeyStore.class) {
+            keyStore.rotation().promotePending();
+        }
+        deviceKeyRotationCompletedNotice = true;
+        runOnUiThread(() -> {
+            if (!isDestroyed() && !isFinishing()) recreate();
+        });
+    }
+
+    private void renderDeviceKeyRotation(
+        boolean accessActive,
+        java.util.List<AdminSecurityApi.DeviceInfo> devices
+    ) {
+        if (deviceKeyRotationText == null) return;
+        AdminDeviceKeyStore.Descriptor pending = pendingDeviceKeyDescriptor;
+        if (pending == null) {
+            deviceKeyRotationText.setText("기기키 교체: 새 키를 준비하면 운영자 CLI 등록과 새 키 소유 확인이 끝날 때까지 기존 키를 유지합니다.");
+            return;
+        }
+        deviceKeyRotationText.setText(
+            "교체 대기 중인 새 기기키(버전 " + pending.version() + "). 운영자 CLI에 --key-version "
+                + pending.version() + " 과 아래 descriptor를 등록한 뒤 교체 확인을 누르세요. "
+                + "확인 전 실패하면 기존 키를 계속 사용합니다.\n"
+                + pending.registrationDescriptor(deviceId)
+        );
+        if (!accessActive || devices == null || deviceKeyReconcileInFlight) return;
+        for (AdminSecurityApi.DeviceInfo device : devices) {
+            if (!device.isCurrent()) continue;
+            String prefix = device.keyMarkerPrefix();
+            if (device.keyVersion() == pending.version() && prefix != null
+                && pending.marker().startsWith(prefix)) {
+                // The confirmation response was lost but the server already switched keys.
+                reconcileDeviceKeyRotation(device.keyVersion(), prefix);
+            }
+        }
+    }
+
+    private void reconcileDeviceKeyRotation(int serverKeyVersion, String serverMarkerPrefix) {
+        AdminDeviceKeyStore keyStore = deviceKeyStore;
+        if (keyStore == null) return;
+        deviceKeyReconcileInFlight = true;
+        networkExecutor.execute(() -> {
+            AdminDeviceKeyRotation.ReconcileOutcome outcome;
+            try {
+                synchronized (AdminDeviceKeyStore.class) {
+                    outcome = keyStore.rotation().reconcile(serverKeyVersion, serverMarkerPrefix);
+                }
+            } catch (Exception error) {
+                outcome = AdminDeviceKeyRotation.ReconcileOutcome.UNKNOWN;
+            }
+            AdminDeviceKeyRotation.ReconcileOutcome applied = outcome;
+            runOnUiThread(() -> {
+                if (isDestroyed() || isFinishing()) return;
+                if (applied == AdminDeviceKeyRotation.ReconcileOutcome.PROMOTED) {
+                    deviceKeyRotationCompletedNotice = true;
+                    recreate();
+                    return;
+                }
+                deviceKeyReconcileInFlight = false;
+            });
+        });
+    }
+
+    // --- S18-36: resolve a restored review attempt before any new decision -------------------
+
+    private void lookupRestoredReviewDecision() {
+        String restoredReportId = reviewDecisionAttempt.restoredReportId();
+        String restoredDecisionId = reviewDecisionAttempt.restoredDecisionId();
+        if (restoredReportId == null || restoredDecisionId == null) return;
+        if (controller == null || operationInFlight || !activityStarted || controller.isLocallyLocked()) {
+            return;
+        }
+        long generation = securityOperationGeneration;
+        operationInFlight = true;
+        setInteractiveEnabled(contentRoot, false);
+        resultText.setText("새 결정을 만들기 전에 이전 검토 결정(decision_id)의 서버 기록을 확인하고 있습니다.");
+        networkExecutor.execute(() -> {
+            try {
+                AdminOperationsApi.Result result = controller.lookupReviewDecision(
+                    restoredReportId,
+                    restoredDecisionId,
+                    BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
+                );
+                keyUseAuthorization.onSuccess();
+                AdminReviewDecisionAttempt.LookupOutcome outcome = result.mutationId() == null
+                    ? AdminReviewDecisionAttempt.LookupOutcome.NOT_RECORDED
+                    : AdminReviewDecisionAttempt.LookupOutcome.RECORDED;
+                runOnUiThread(() -> {
+                    if (isDestroyed() || !activityStarted
+                        || generation != securityOperationGeneration) return;
+                    operationInFlight = false;
+                    setInteractiveEnabled(contentRoot, !operationInFlight);
+                    reviewDecisionAttempt.applyLookup(restoredDecisionId, outcome);
+                    resultText.setText(outcome == AdminReviewDecisionAttempt.LookupOutcome.RECORDED
+                        ? "이전 검토 결정이 이미 기록되어 있습니다. 새 결정을 만들지 않았습니다."
+                        : "이전 검토 결정은 기록되지 않았습니다. 같은 입력이면 같은 decision_id로 다시 보내고, 입력이 다르면 새 결정으로 기록합니다.");
+                    render();
+                    if (outcome == AdminReviewDecisionAttempt.LookupOutcome.RECORDED
+                        && restoredReportId.equals(connectedOperationsReportId)) {
+                        refreshConnectedReportDetail();
+                    }
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    if (isDestroyed() || !activityStarted
+                        || generation != securityOperationGeneration) return;
+                    operationInFlight = false;
+                    setInteractiveEnabled(contentRoot, !operationInFlight);
+                    if (handleDeviceKeyUseFailure(error, this::lookupRestoredReviewDecision)) return;
+                    resultText.setText("이전 검토 결정 결과를 확인하지 못했습니다. 새 decision_id를 만들지 않으며 다시 확인해야 합니다.");
+                    render();
+                });
+            }
+        });
+    }
+
+    /** Only attempt identity and pending state; no recovery code, OTP, token or key is stored. */
+    private final class PreferencesCustodyAttemptStore
+        implements AdminRecoveryCustodyAttempt.Store {
+        private static final String ADMIN_ID = "admin_id";
+        private static final String DEVICE_ID = "device_id";
+        private static final String MATERIAL_KIND = "material_kind";
+        private static final String CUSTODY_REFERENCE = "custody_reference";
+        private static final String EXPECTED_STATE_VERSION = "expected_state_version";
+        private static final String STATUS = "status";
+
+        @Override
+        public AdminRecoveryCustodyAttempt.Snapshot load() {
+            var preferences = getSharedPreferences(CUSTODY_ATTEMPT_PREFS, MODE_PRIVATE);
+            String reference = preferences.getString(CUSTODY_REFERENCE, null);
+            if (reference == null) return null;
+            return new AdminRecoveryCustodyAttempt.Snapshot(
+                preferences.getString(ADMIN_ID, null),
+                preferences.getString(DEVICE_ID, null),
+                AdminSecurityApi.RecoveryMaterialKind.valueOf(
+                    preferences.getString(MATERIAL_KIND, "")
+                ),
+                reference,
+                preferences.getString(EXPECTED_STATE_VERSION, null),
+                preferences.getString(STATUS, null)
+            );
+        }
+
+        @Override
+        public boolean save(AdminRecoveryCustodyAttempt.Snapshot pending) {
+            return getSharedPreferences(CUSTODY_ATTEMPT_PREFS, MODE_PRIVATE).edit()
+                .putString(ADMIN_ID, pending.adminId())
+                .putString(DEVICE_ID, pending.deviceId())
+                .putString(MATERIAL_KIND, pending.materialKind().name())
+                .putString(CUSTODY_REFERENCE, pending.custodyReference())
+                .putString(EXPECTED_STATE_VERSION, pending.expectedStateVersion())
+                .putString(STATUS, pending.status())
+                .commit();
+        }
+
+        @Override
+        public boolean clear() {
+            return getSharedPreferences(CUSTODY_ATTEMPT_PREFS, MODE_PRIVATE)
+                .edit().clear().commit();
+        }
+    }
+
+    /** Non-secret attempt identity only; the reason text, image and credentials are never kept. */
+    private final class PreferencesReviewAttemptStore implements AdminReviewDecisionAttempt.Store {
+        private static final String REPORT_ID = "report_id";
+        private static final String DECISION_ID = "decision_id";
+        private static final String REQUEST_DIGEST = "request_digest";
+        private static final String CONTENT_REVISION = "content_revision";
+        private static final String EXPECTED_REVIEW_REVISION = "expected_review_revision";
+        private static final String EVIDENCE_GRANT_ID = "evidence_grant_id";
+
+        @Override
+        public AdminReviewDecisionAttempt.Snapshot load() {
+            var preferences = getSharedPreferences(REVIEW_ATTEMPT_PREFS, MODE_PRIVATE);
+            String decisionId = preferences.getString(DECISION_ID, null);
+            if (decisionId == null) return null;
+            return new AdminReviewDecisionAttempt.Snapshot(
+                preferences.getString(REPORT_ID, null),
+                decisionId,
+                preferences.getString(REQUEST_DIGEST, null),
+                preferences.getInt(CONTENT_REVISION, -1),
+                preferences.getLong(EXPECTED_REVIEW_REVISION, -1L),
+                preferences.getString(EVIDENCE_GRANT_ID, null)
+            );
+        }
+
+        @Override
+        public void save(AdminReviewDecisionAttempt.Snapshot snapshot) {
+            getSharedPreferences(REVIEW_ATTEMPT_PREFS, MODE_PRIVATE).edit()
+                .putString(REPORT_ID, snapshot.reportId())
+                .putString(DECISION_ID, snapshot.decisionId())
+                .putString(REQUEST_DIGEST, snapshot.requestDigest())
+                .putInt(CONTENT_REVISION, snapshot.contentRevision())
+                .putLong(EXPECTED_REVIEW_REVISION, snapshot.expectedReviewRevision())
+                .putString(EVIDENCE_GRANT_ID, snapshot.evidenceGrantId())
+                .commit();
+        }
+
+        @Override
+        public void clear() {
+            getSharedPreferences(REVIEW_ATTEMPT_PREFS, MODE_PRIVATE).edit().clear().commit();
+        }
+    }
+
     private String loadOrCreateDeviceId() {
         var preferences = getSharedPreferences(DEVICE_PREFS, MODE_PRIVATE);
         String existing = preferences.getString(DEVICE_ID_KEY, null);
         if (existing != null && existing.matches("admin-device-[0-9a-f-]{36}")) return existing;
         String created = "admin-device-" + UUID.randomUUID();
-        preferences.edit().putString(DEVICE_ID_KEY, created).apply();
+        if (!preferences.edit().putString(DEVICE_ID_KEY, created).commit()) {
+            throw new IllegalStateException("administrator device identity was not committed");
+        }
         return created;
     }
 
@@ -4181,7 +5718,7 @@ public final class AdminBoundaryActivity extends Activity {
 
     private static String custodyLabel(AdminSecurityController.Snapshot snapshot) {
         if (snapshot.recoveryCustodyState() == AdminRecoveryCustodyState.ATTESTED) {
-            return "복구자료 외부 보관 확인됨 · 확인시각 "
+            return "사용자의 복구자료 외부 보관 확인 기록됨 · 백업·복원 미검증 · 확인시각 "
                 + valueOrPending(snapshot.recoveryCustodyAttestedAt());
         }
         if (snapshot.recoveryCustodyState() == AdminRecoveryCustodyState.UNATTESTED) {

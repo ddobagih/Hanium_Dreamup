@@ -81,13 +81,121 @@ class GatewayWalkHttpException(
     val statusCode: Int,
     val reason: String,
     val serverCode: String? = null,
+    /**
+     * A lease the gateway granted to this start operation for its own walk after the operation
+     * became stale. It is never activated; the caller may only release it with the same session.
+     */
+    val abandonedLease: GatewayWalkLease? = null,
 ) : IllegalStateException(
     "gateway walk request failed: $reason status=$statusCode code=${serverCode ?: "none"}",
 )
 
+/**
+ * Deep-sleep-inclusive elapsed time on a device; JVM unit tests (no Android runtime) fall back
+ * to the monotonic nanoTime clock.
+ */
+internal val deviceElapsedRealtimeMs: () -> Long =
+    runCatching {
+        android.os.SystemClock.elapsedRealtime()
+        val clock: () -> Long = { android.os.SystemClock.elapsedRealtime() }
+        clock
+    }.getOrElse { { System.nanoTime() / 1_000_000L } }
+
 class GatewayWalkSessionClient(
     private val transport: GatewaySessionTransport = HttpUrlConnectionGatewaySessionTransport(),
+    private val wallClockEpochMs: () -> Long = System::currentTimeMillis,
+    private val elapsedRealtimeMs: () -> Long = deviceElapsedRealtimeMs,
+    private val retryRequestIdFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
+    // S19-17: v2 commands carry issued_at_epoch_ms fixed at the first send of a request id, so
+    // every retry of that id is byte-identical and the gateway can bound idempotency by time.
+    private val issuedAtLock = Any()
+    private var lastIssuedAtEpochMs = 0L
+    private val issuedAtByRequestId = object : LinkedHashMap<String, Long>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean =
+            size > MAX_REMEMBERED_REQUEST_IDS
+    }
+
+    // S19-17-F1: issued_at follows the Gateway clock, not the device wall clock. The last
+    // server_time_epoch_ms is kept with the elapsedRealtime at which it arrived; the device
+    // wall clock is used only before the first Gateway response of this client.
+    private var serverTimeAnchorEpochMs: Long? = null
+    private var serverTimeAnchorElapsedMs = 0L
+
+    private fun gatewayNowEpochMs(): Long {
+        val anchor = serverTimeAnchorEpochMs ?: return wallClockEpochMs()
+        val elapsed = (elapsedRealtimeMs() - serverTimeAnchorElapsedMs).coerceAtLeast(0L)
+        return anchor + elapsed
+    }
+
+    private fun observeServerTime(response: GatewayHttpResponse) {
+        val serverTime = runCatching {
+            (JSONObject(response.responseBody).opt("server_time_epoch_ms") as? Number)
+                ?.takeIf { it is Long || it is Int }
+                ?.toLong()
+        }.getOrNull() ?: return
+        if (serverTime <= 0L) return
+        synchronized(issuedAtLock) {
+            serverTimeAnchorEpochMs = serverTime
+            serverTimeAnchorElapsedMs = elapsedRealtimeMs()
+        }
+    }
+
+    private fun issuedAtFor(requestId: String): Long = synchronized(issuedAtLock) {
+        issuedAtByRequestId[requestId]?.let { return@synchronized it }
+        val now = maxOf(gatewayNowEpochMs(), 1L)
+        // S19-17-F2: strictly increasing only within a bounded carry. A clock that is now more
+        // than the bound behind the last value (a forward error that was corrected, or a new
+        // Gateway anchor) releases the carry instead of pinning every later request to it.
+        val issuedAt = if (lastIssuedAtEpochMs - now <= MAX_ISSUED_AT_CARRY_MS) {
+            maxOf(now, lastIssuedAtEpochMs + 1L)
+        } else {
+            now
+        }
+        lastIssuedAtEpochMs = issuedAt
+        issuedAtByRequestId[requestId] = issuedAt
+        issuedAt
+    }
+
+    private fun isRememberedRequestId(requestId: String): Boolean = synchronized(issuedAtLock) {
+        issuedAtByRequestId.containsKey(requestId)
+    }
+
+    /**
+     * Sends one command. S19-17-F1: a request id this client never sent before that the
+     * Gateway refuses as `idempotency_expired` was never executed; it is retried once with a
+     * new request id stamped by the server time that came with the refusal. A second refusal
+     * means the device clock cannot be reconciled and is reported as
+     * [DEVICE_CLOCK_CHECK_REQUIRED_REASON].
+     */
+    private fun sendCommand(
+        session: GatewayFieldSession,
+        requestId: String,
+        command: (requestId: String, issuedAtEpochMs: Long) -> JSONObject,
+    ): GatewayHttpResponse {
+        val fresh = !isRememberedRequestId(requestId)
+        val response = post(session, command(requestId, issuedAtFor(requestId)))
+        observeServerTime(response)
+        if (!fresh || !response.isIdempotencyExpired()) return response
+        val retryId = retryRequestIdFactory()
+        require(ID_PATTERN.matches(retryId)) { "retry requestId is invalid" }
+        val retried = post(session, command(retryId, issuedAtFor(retryId)))
+        observeServerTime(retried)
+        if (retried.isIdempotencyExpired()) {
+            throw GatewayWalkHttpException(
+                statusCode = retried.statusCode,
+                reason = DEVICE_CLOCK_CHECK_REQUIRED_REASON,
+                serverCode = "idempotency_expired",
+            )
+        }
+        return retried
+    }
+
+    private fun GatewayHttpResponse.isIdempotencyExpired(): Boolean =
+        statusCode == 409 && runCatching {
+            JSONObject(responseBody).optString("code") == "idempotency_expired"
+        }.getOrDefault(false)
+
     fun startWithOwnedWalkRecovery(
         session: GatewayFieldSession,
         walkId: String,
@@ -104,7 +212,17 @@ class GatewayWalkSessionClient(
         fun guardedStart(targetWalkId: String, commandRequestId: String): GatewayWalkStartResult {
             requireCurrent()
             val result = start(session, targetWalkId, commandRequestId, nowElapsedMs())
-            requireCurrent()
+            if (!isCurrent() || !session.isUsableFor(session.actorId)) {
+                // No further request is sent here; a lease granted for this operation's own walk is
+                // handed back so the caller can end exactly that lease instead of waiting for expiry.
+                throw GatewayWalkHttpException(
+                    statusCode = 0,
+                    reason = "walk_start_operation_stale",
+                    abandonedLease = (result as? GatewayWalkStartResult.Granted)
+                        ?.lease
+                        ?.takeIf { targetWalkId == walkId && it.walkId == walkId },
+                )
+            }
             return result
         }
 
@@ -159,14 +277,14 @@ class GatewayWalkSessionClient(
         localNowElapsedMs: Long,
     ): GatewayWalkStartResult {
         requireCommandBinding(session, walkId, requestId)
-        val response = post(
-            session,
+        val response = sendCommand(session, requestId) { id, issuedAt ->
             JSONObject()
                 .put("schema_version", COMMAND_SCHEMA_VERSION)
-                .put("request_id", requestId)
+                .put("request_id", id)
                 .put("action", "start")
-                .put("walk_id", walkId),
-        )
+                .put("walk_id", walkId)
+                .put("issued_at_epoch_ms", issuedAt)
+        }
         return when (response.statusCode) {
             200, 201 -> GatewayWalkStartResult.Granted(
                 GatewayWalkResponseParser.lease(
@@ -206,17 +324,17 @@ class GatewayWalkSessionClient(
         require(conflict.isLocallyCurrent(localNowElapsedMs)) {
             "walk conflict is no longer current"
         }
-        val response = post(
-            session,
+        val response = sendCommand(session, requestId) { id, issuedAt ->
             JSONObject()
                 .put("schema_version", COMMAND_SCHEMA_VERSION)
-                .put("request_id", requestId)
+                .put("request_id", id)
                 .put("action", "takeover")
                 .put("walk_id", walkId)
                 .put("expected_active_walk_id", conflict.activeWalkId)
                 .put("expected_fencing_token", conflict.fencingToken)
-                .put("confirmation", "voice_confirmed"),
-        )
+                .put("confirmation", "voice_confirmed")
+                .put("issued_at_epoch_ms", issuedAt)
+        }
         if (response.statusCode !in setOf(200, 201)) {
             throw response.toWalkException("walk_takeover_failed")
         }
@@ -239,16 +357,16 @@ class GatewayWalkSessionClient(
         require(lease.actorId == session.actorId && lease.deviceId == session.deviceId) {
             "walk lease is not bound to this gateway session"
         }
-        val response = post(
-            session,
+        val response = sendCommand(session, requestId) { id, issuedAt ->
             JSONObject()
                 .put("schema_version", COMMAND_SCHEMA_VERSION)
-                .put("request_id", requestId)
+                .put("request_id", id)
                 .put("action", "renew")
                 .put("walk_id", lease.walkId)
                 .put("lease_id", lease.leaseId)
-                .put("fencing_token", lease.fencingToken),
-        )
+                .put("fencing_token", lease.fencingToken)
+                .put("issued_at_epoch_ms", issuedAt)
+        }
         if (response.statusCode != 200) {
             throw response.toWalkException("walk_renew_failed")
         }
@@ -270,16 +388,16 @@ class GatewayWalkSessionClient(
         require(lease.actorId == session.actorId && lease.deviceId == session.deviceId) {
             "walk lease is not bound to this gateway session"
         }
-        val response = post(
-            session,
+        val response = sendCommand(session, requestId) { id, issuedAt ->
             JSONObject()
                 .put("schema_version", COMMAND_SCHEMA_VERSION)
-                .put("request_id", requestId)
+                .put("request_id", id)
                 .put("action", "end")
                 .put("walk_id", lease.walkId)
                 .put("lease_id", lease.leaseId)
-                .put("fencing_token", lease.fencingToken),
-        )
+                .put("fencing_token", lease.fencingToken)
+                .put("issued_at_epoch_ms", issuedAt)
+        }
         if (response.statusCode != 200) {
             throw response.toWalkException("walk_end_failed")
         }
@@ -328,11 +446,16 @@ class GatewayWalkSessionClient(
         return GatewayWalkHttpException(statusCode, reason, code)
     }
 
-    private companion object {
-        const val WALK_ENDPOINT = "/api/field-walk"
-        const val COMMAND_SCHEMA_VERSION = "walksafe.field-walk-command.v1"
-        val ID_PATTERN = Regex("[A-Za-z0-9][A-Za-z0-9._:-]{7,127}")
-        val WALK_ERROR_CODES = setOf(
+    companion object {
+        /** S19-17-F1: the Gateway refused a fresh command twice as outside its time window. */
+        const val DEVICE_CLOCK_CHECK_REQUIRED_REASON = "walk_device_clock_check_required"
+        private const val WALK_ENDPOINT = "/api/field-walk"
+        private const val COMMAND_SCHEMA_VERSION = "walksafe.field-walk-command.v2"
+        private const val MAX_REMEMBERED_REQUEST_IDS = 256
+        /** S19-17-F2: bound of the strictly-increasing carry of issued_at. */
+        internal const val MAX_ISSUED_AT_CARRY_MS = 120_000L
+        private val ID_PATTERN = Regex("[A-Za-z0-9][A-Za-z0-9._:-]{7,127}")
+        private val WALK_ERROR_CODES = setOf(
             "gateway_auth_required",
             "long_lived_session_required",
             "walk_command_invalid",
@@ -342,6 +465,10 @@ class GatewayWalkSessionClient(
             "walk_lease_stale",
             "walk_ledger_busy",
             "walk_ledger_unavailable",
+            // S19-17: an uncached request outside the idempotency guarantee; never executed.
+            "idempotency_expired",
+            // S19-20: gateway detected a wall-clock step; start/takeover fail closed briefly.
+            "field_walk_clock_unavailable",
         )
     }
 }
@@ -724,11 +851,28 @@ class GatewayWalkAuthorityController(
         minOf(maxIntervalMs, safeRemainingMs / 2L)
     }
 
+    /** Conservative local time left on the lease held for [epoch], or null when none is usable. */
+    fun safeRemainingMsOrNull(epoch: WalkRuntimeEpoch): Long? = synchronized(lock) {
+        val current = held?.takeIf { it.epoch == epoch } ?: return@synchronized null
+        val nowElapsedMs = elapsedClock()
+        if (!current.lease.isLocallyUsable(nowElapsedMs)) return@synchronized null
+        current.lease.localDeadlineElapsedMs - nowElapsedMs
+    }
+
     fun activeLeaseOrNull(epoch: WalkRuntimeEpoch): GatewayWalkLease? =
         synchronized(lock) {
             dropExpiredLocked()
             held?.takeIf { it.epoch == epoch }?.lease
         }
+
+    /**
+     * True while a start is pending or a lease is held for [walkSessionId]. A later start of the
+     * same walk can receive the very lease an abandoned start obtained (ALREADY_ACTIVE), so that
+     * lease must not be ended while this controller still tracks the walk.
+     */
+    fun tracksWalk(walkSessionId: String): Boolean = synchronized(lock) {
+        held?.epoch?.walkSessionId == walkSessionId || pending?.epoch?.walkSessionId == walkSessionId
+    }
 
     fun currentConflictOrNull(epoch: WalkRuntimeEpoch): GatewayWalkConflict? =
         synchronized(lock) {
@@ -789,6 +933,28 @@ class GatewayWalkAuthorityController(
         held = null
         pending = null
         conflict = null
+    }
+
+    /**
+     * S03-19: after an in-process configuration re-creation, take over [previous]'s held lease for
+     * the same logical walk. Nothing in flight or conflicting is carried and [previous] loses it.
+     */
+    fun adoptHeldLeaseFrom(previous: GatewayWalkAuthorityController): Boolean {
+        if (previous === this) return false
+        val lease = synchronized(previous.lock) {
+            previous.dropExpiredLocked()
+            previous.held.also {
+                previous.held = null
+                previous.pending = null
+                previous.conflict = null
+            }
+        } ?: return false
+        synchronized(lock) {
+            held = lease
+            pending = null
+            conflict = null
+        }
+        return true
     }
 
     private fun newOperation(

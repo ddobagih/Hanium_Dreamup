@@ -16,7 +16,11 @@ class RouteCompassFallbackTest {
     private val magnetic = sample(0.0, -40.0, -30.0)
 
     @Test fun gravityCompassCarriesSourceAndQualityWithoutInventingAngularError() {
-        val observation = requireNotNull(fallback().observation)
+        // 08.txt #12: without contemporaneous raw acceleration the motion check was not run.
+        val unchecked = requireNotNull(fallback().observation)
+        assertEquals(RouteFacingSensorQuality.CALIBRATED_WITHOUT_MOTION_CHECK, unchecked.sensorQuality)
+        assertTrue(RouteFacingGuidance.isUsableObservation(unchecked, now))
+        val observation = requireNotNull(fallback(acceleration = gravity).observation)
         assertEquals(0.0, observation.degreesTrueNorth, 0.00001)
         assertEquals(RouteFacingSource.GRAVITY_MAGNETIC, observation.source)
         assertEquals(RouteFacingSensorQuality.CALIBRATED_SENSOR_CHECKS, observation.sensorQuality)
@@ -25,8 +29,11 @@ class RouteCompassFallbackTest {
         assertTrue(RouteFacingGuidance.isUsableObservation(observation, now))
     }
 
+    // 08.txt #11: raw acceleration is used as gravity only over a short steady window.
+    private val steadyAccelerometer = listOf(900L, 950L, 1_000L).map { gravity.copy(observedAtMs = it) }
+
     @Test fun independentAccelerometerWorksWhenGravityHasNoEvents() {
-        val observation = requireNotNull(fallback(gravity = null, acceleration = gravity).observation)
+        val observation = requireNotNull(windowFallback(gravity = null, accelerometer = steadyAccelerometer).observation)
         assertEquals(RouteFacingSource.ACCELEROMETER_MAGNETIC, observation.source)
         assertEquals(0.0, observation.degreesTrueNorth, 0.00001)
     }
@@ -34,9 +41,17 @@ class RouteCompassFallbackTest {
     @Test fun invalidOrStaleGravityDoesNotHideValidIndependentAccelerometer() {
         listOf(gravity.copy(x = Double.NaN), gravity.copy(y = 0.0), gravity.copy(observedAtMs = 499L),
             gravity.copy(accuracy = EarthOrientationAccuracy.UNRELIABLE)).forEach {
-            assertEquals(RouteFacingSource.ACCELEROMETER_MAGNETIC, fallback(it, gravity).observation?.source)
+            assertEquals(RouteFacingSource.ACCELEROMETER_MAGNETIC,
+                windowFallback(it, steadyAccelerometer).observation?.source)
         }
     }
+
+    private fun windowFallback(
+        gravity: RouteCompassVectorSample?,
+        accelerometer: List<RouteCompassVectorSample>,
+        magnetic: List<RouteCompassVectorSample> = listOf(this.magnetic),
+        angularRate: Double? = null,
+    ) = RouteCompassHeading.evaluateFallback(gravity, accelerometer, magnetic, reference, now, angularRate)
 
     @Test fun freshGravityIsPreferredOverAcceleration() {
         assertEquals(RouteFacingSource.GRAVITY_MAGNETIC, fallback(acceleration = gravity).observation?.source)

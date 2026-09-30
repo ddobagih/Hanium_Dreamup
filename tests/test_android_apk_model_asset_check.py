@@ -13,6 +13,7 @@ from scripts.check_android_apk_model_asset_20260713 import verify_apk
 def write_fixture(tmp_path: Path, *, extra_entry: str | None = None, model_payload: bytes = b"model") -> tuple[Path, Path]:
     model_hash = hashlib.sha256(b"model").hexdigest()
     config = {
+        "primary_model": "unified_walksafe",
         "models": {
             "unified_walksafe": {
                 "asset": "models/walksafe.tflite",

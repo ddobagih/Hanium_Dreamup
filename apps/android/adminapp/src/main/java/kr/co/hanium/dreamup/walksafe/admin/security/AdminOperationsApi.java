@@ -15,9 +15,33 @@ public interface AdminOperationsApi {
         public HistoryNotFoundException() { super("administrator history resource was not found"); }
     }
 
+    /**
+     * S18-40 review F3: the correction ID was already used for a different correction
+     * (server 409 delivery_correction_idempotency_conflict). Only a new ID can proceed.
+     */
+    final class CorrectionIdConflictException extends IOException {
+        public CorrectionIdConflictException() {
+            super("administrator delivery correction id was used for a different correction");
+        }
+    }
+
     final class MutationConflictException extends IOException {
         public MutationConflictException() {
             super("administrator mutation conflicted with current server state");
+        }
+    }
+
+    /**
+     * S20-54: the image was not received and verified after the one-time original access
+     * token had already been taken from its grant. The server may have consumed the grant and
+     * audited "ACCESS_GRANTED" (server approval and return preparation, not client receipt).
+     * The token is never reused or reactivated; viewing again needs a new purpose-limited grant.
+     * w24 misc-F7: AdminBoundaryActivity also uses it when verified bytes cannot be decoded for
+     * display, since that grant is spent as well.
+     */
+    final class OriginalEvidenceNotReceivedException extends IOException {
+        public OriginalEvidenceNotReceivedException(Throwable cause) {
+            super("original evidence was not received after its one-time grant was used", cause);
         }
     }
 
@@ -180,7 +204,46 @@ public interface AdminOperationsApi {
         public String decidedAt() { return decidedAt; }
     }
 
+    /** S18-40: the append-only correction that names one delivery event. */
+    final class DeliveryCorrection {
+        private final String id;
+        private final long correctedRevision;
+        private final long expectedRevision;
+        private final AdminDeliveryCorrection.Reason reason;
+        private final String memo;
+        private final String adminId;
+        private final String createdAt;
+
+        DeliveryCorrection(
+            String id,
+            long correctedRevision,
+            long expectedRevision,
+            AdminDeliveryCorrection.Reason reason,
+            String memo,
+            String adminId,
+            String createdAt
+        ) {
+            this.id = id;
+            this.correctedRevision = correctedRevision;
+            this.expectedRevision = expectedRevision;
+            this.reason = reason;
+            this.memo = memo;
+            this.adminId = adminId;
+            this.createdAt = createdAt;
+        }
+
+        public String id() { return id; }
+        public long correctedRevision() { return correctedRevision; }
+        /** Highest delivery revision when the correction was recorded. */
+        public long expectedRevision() { return expectedRevision; }
+        public AdminDeliveryCorrection.Reason reason() { return reason; }
+        public String memo() { return memo; }
+        public String adminId() { return adminId; }
+        public String createdAt() { return createdAt; }
+    }
+
     final class DeliveryHistoryItem {
+        private final String id;
         private final long revision;
         private final String packageId;
         private final Long packageRevision;
@@ -189,8 +252,10 @@ public interface AdminOperationsApi {
         private final String institution;
         private final String observedAt;
         private final String recordedAt;
+        private final DeliveryCorrection correction;
 
         DeliveryHistoryItem(
+            String id,
             long revision,
             String packageId,
             Long packageRevision,
@@ -198,8 +263,10 @@ public interface AdminOperationsApi {
             String externalReceiptId,
             String institution,
             String observedAt,
-            String recordedAt
+            String recordedAt,
+            DeliveryCorrection correction
         ) {
+            this.id = id;
             this.revision = revision;
             this.packageId = packageId;
             this.packageRevision = packageRevision;
@@ -208,8 +275,13 @@ public interface AdminOperationsApi {
             this.institution = institution;
             this.observedAt = observedAt;
             this.recordedAt = recordedAt;
+            this.correction = correction;
         }
 
+        public String id() { return id; }
+        /** S18-40: null while the event is effective; corrected events carry no state. */
+        public DeliveryCorrection correction() { return correction; }
+        public boolean corrected() { return correction != null; }
         public long revision() { return revision; }
         public String packageId() { return packageId; }
         public Long packageRevision() { return packageRevision; }
@@ -231,6 +303,20 @@ public interface AdminOperationsApi {
         return readReviewDecisions(session, reportId, null);
     }
 
+    /** Latest verified suffix for display only; never a completed full-history traversal. */
+    default Result readRecentReviewDecisions(SessionContext session, String reportId)
+        throws IOException, GeneralSecurityException {
+        throw new IOException("recent review history is unavailable");
+    }
+
+    /**
+     * S18-36: GET /reports/{report_id}/review-decisions/{decision_id}. The result's mutationId is
+     * the decision id when it was recorded and null when the server has no such decision.
+     */
+    default Result lookupReviewDecision(SessionContext session, String reportId, String decisionId)
+        throws IOException, GeneralSecurityException {
+        throw new IOException("administrator review decision lookup is unavailable");
+    }
     Result recordDelivery(SessionContext session, String reportId, AdminInstitutionDelivery delivery)
         throws IOException, GeneralSecurityException;
 
@@ -242,6 +328,41 @@ public interface AdminOperationsApi {
         return readDeliveries(session, reportId, null);
     }
 
+    /** Latest verified suffix for display only; never a completed full-history traversal. */
+    default Result readRecentDeliveries(SessionContext session, String reportId)
+        throws IOException, GeneralSecurityException {
+        throw new IOException("recent delivery history is unavailable");
+    }
+
+    /**
+     * S18-40: HIGH-risk POST /reports/{report_id}/delivery-corrections. The result's mutationId
+     * is the stored correction id. This records a correction only; it sends nothing outside.
+     */
+    default Result recordDeliveryCorrection(
+        SessionContext session,
+        String reportId,
+        AdminDeliveryCorrection correction,
+        Map<String, String> reconfirmationHeaders
+    ) throws IOException, GeneralSecurityException {
+        throw new IOException("administrator delivery correction is unavailable");
+    }
+
+    /**
+     * Review F3: {@code resendOfUncertainAttempt} is true when this exact correction (same ID
+     * and intent) was sent before without a confirmed result. The server may then answer with
+     * the stored earlier record (EXISTING), which can carry an earlier session of the same
+     * administrator; a first send must match the current session.
+     */
+    default Result recordDeliveryCorrection(
+        SessionContext session,
+        String reportId,
+        AdminDeliveryCorrection correction,
+        Map<String, String> reconfirmationHeaders,
+        boolean resendOfUncertainAttempt
+    ) throws IOException, GeneralSecurityException {
+        return recordDeliveryCorrection(session, reportId, correction, reconfirmationHeaders);
+    }
+
     AdminOriginalEvidence loadOriginalEvidence(
         SessionContext session,
         String reportId,
@@ -249,4 +370,7 @@ public interface AdminOperationsApi {
         String reason,
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException;
+
+    /** S18-18: explicit, non-blocking cancellation of requests still in flight (no re-send). */
+    default void cancelInFlightRequests() {}
 }

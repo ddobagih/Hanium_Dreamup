@@ -16,6 +16,8 @@
     "waypoints": []
   },
   "response": {
+    "distance_source": null,
+    "end_gap_m": null,
     "guide_points": [
       {
         "bearing_deg": 0.0,
@@ -51,6 +53,7 @@
     "provider_result_message": "OK",
     "provider_route_id": "contract-route-1",
     "schema_version": "walksafe.walking_route.v1",
+    "start_gap_m": null,
     "steps": [
       {
         "distance_m": 120,

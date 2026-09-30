@@ -22,6 +22,7 @@ internal class GatewaySessionProcessSnapshot internal constructor(
     val storageBlocked: Boolean,
     val inFlightOperationId: String?,
     val deletionRecoveryOnly: Boolean,
+    val renewalRetryAtElapsedMs: Long? = null,
 ) {
     override fun toString(): String =
         "GatewaySessionProcessSnapshot(" +
@@ -58,6 +59,7 @@ internal object GatewaySessionProcessCoordinator {
     private var storageBlocked = false
     private var deletionRecoveryOnly = false
     private var inFlightOperation: GatewaySessionOperation? = null
+    private var renewalRetryAtElapsedMs: Long? = null
 
     fun attach(
         owner: Any,
@@ -85,6 +87,28 @@ internal object GatewaySessionProcessCoordinator {
     fun snapshot(): GatewaySessionProcessSnapshot = synchronized(lock) {
         snapshotLocked()
     }
+
+    /** Serialize a consent authority commit with session replacement, without starting an operation. */
+    fun <T : Any> withCurrentGeneralSession(
+        expectedGeneration: Long,
+        expectedSession: GatewayFieldSession,
+        action: () -> T,
+    ): T? = synchronized(lock) {
+        if (
+            generation != expectedGeneration ||
+            currentSession !== expectedSession ||
+            expectedSession.sessionScope != GatewaySessionScope.GENERAL ||
+            expectedSession.verificationState != GatewaySessionVerificationState.VERIFIED ||
+            !expectedSession.isUsableFor(expectedSession.actorId) ||
+            storageBlocked || deletionRecoveryOnly
+        ) return@synchronized null
+        action()
+    }
+
+    fun isCurrentGeneralSession(
+        expectedGeneration: Long,
+        expectedSession: GatewayFieldSession,
+    ): Boolean = withCurrentGeneralSession(expectedGeneration, expectedSession) { true } == true
 
     fun beginOperation(): GatewaySessionOperation? =
         beginOperationMatching(
@@ -311,6 +335,21 @@ internal object GatewaySessionProcessCoordinator {
         return true
     }
 
+    /** Called only after the exact renewal was durably rolled back as unapplied. */
+    fun deferRenewalAfterRollback(operation: GatewaySessionOperation, retryAtElapsedMs: Long): Boolean {
+        require(retryAtElapsedMs >= 0L)
+        val notification: Notification
+        synchronized(lock) {
+            if (inFlightOperation != operation) return false
+            clearStateLocked(blocked = false)
+            advanceGenerationLocked()
+            renewalRetryAtElapsedMs = retryAtElapsedMs
+            notification = notificationLocked()
+        }
+        notification.deliver()
+        return true
+    }
+
     fun clear(operation: GatewaySessionOperation): GatewaySessionProcessSnapshot? {
         val cleared: GatewaySessionProcessSnapshot
         val notification: Notification
@@ -356,6 +395,7 @@ internal object GatewaySessionProcessCoordinator {
     private fun advanceGenerationLocked(): Long {
         check(generation < Long.MAX_VALUE) { "gateway session generation exhausted" }
         generation += 1L
+        renewalRetryAtElapsedMs = null
         return generation
     }
 
@@ -380,6 +420,7 @@ internal object GatewaySessionProcessCoordinator {
             storageBlocked = storageBlocked,
             inFlightOperationId = inFlightOperation?.operationId,
             deletionRecoveryOnly = deletionRecoveryOnly,
+            renewalRetryAtElapsedMs = renewalRetryAtElapsedMs,
         )
 
     private fun notificationLocked(

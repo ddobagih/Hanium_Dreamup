@@ -726,7 +726,8 @@ class AdminSecurityAuthAttempt(Base):
     __tablename__ = "admin_security_auth_attempts"
     __table_args__ = (
         CheckConstraint(
-            "action IN ('login', 'reauthenticate', 'recovery_start', 'recovery_complete')",
+            "action IN ('login', 'reauthenticate', 'recovery_start', 'recovery_complete', "
+            "'challenge_login', 'challenge_recovery')",
             name="ck_admin_security_auth_attempts_action",
         ),
         CheckConstraint(
@@ -831,14 +832,22 @@ class AdminDeviceKey(Base):
             "octet_length(public_key_spki_der) BETWEEN 1 AND 4096",
             name="ck_admin_device_keys_public_key",
         ),
+        # S18-3: PENDING is a registered rotation key that cannot sign any proof
+        # until the ACTIVE key's session confirms possession of it.
         CheckConstraint(
-            "status IN ('ACTIVE', 'REVOKED')",
+            "status IN ('ACTIVE', 'PENDING', 'REVOKED')",
             name="ck_admin_device_keys_status",
         ),
         CheckConstraint(
-            "(status = 'ACTIVE' AND revoked_at IS NULL) OR "
+            "(status IN ('ACTIVE', 'PENDING') AND revoked_at IS NULL) OR "
             "(status = 'REVOKED' AND revoked_at IS NOT NULL)",
             name="ck_admin_device_keys_revocation_state",
+        ),
+        # S18-2: only hardware-backed KeyInfo levels are recorded; NULL = legacy.
+        CheckConstraint(
+            "security_level IS NULL OR security_level IN "
+            "('TRUSTED_ENVIRONMENT', 'STRONGBOX')",
+            name="ck_admin_device_keys_security_level",
         ),
         Index(
             "ix_admin_device_keys_active_lookup",
@@ -853,6 +862,13 @@ class AdminDeviceKey(Base):
             unique=True,
             postgresql_where=text("status = 'ACTIVE'"),
         ),
+        Index(
+            "uq_admin_device_keys_one_pending",
+            "admin_id",
+            "device_id",
+            unique=True,
+            postgresql_where=text("status = 'PENDING'"),
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -864,6 +880,7 @@ class AdminDeviceKey(Base):
     status = Column(String(16), nullable=False, default="ACTIVE", server_default="ACTIVE")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+    security_level = Column(String(32), nullable=True)
 
 
 class AdminDeviceProofChallenge(Base):
@@ -1274,6 +1291,74 @@ class ReportInstitutionDeliveryEvent(Base):
     device_id = Column(String(128), nullable=False)
     correlation_id = Column(UUID(as_uuid=True), nullable=False)
     recorded_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.clock_timestamp(),
+    )
+
+
+class ReportInstitutionDeliveryCorrection(Base):
+    """Append-only correction naming one earlier delivery event (S18-40).
+
+    The corrected event row is never changed; consumers skip corrected events
+    when they derive the effective delivery state (202609300005).
+    """
+
+    __tablename__ = "report_institution_delivery_corrections"
+    __table_args__ = (
+        UniqueConstraint("id", name="uq_report_delivery_correction_id"),
+        UniqueConstraint("proof_challenge_id", name="uq_report_delivery_correction_challenge"),
+        UniqueConstraint(
+            "reconfirmation_id", name="uq_report_delivery_correction_reconfirmation"
+        ),
+        ForeignKeyConstraint(
+            ["corrects_event_id"],
+            ["report_institution_delivery_events.id"],
+            name="fk_report_delivery_correction_event",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["proof_challenge_id"],
+            ["admin_device_proof_challenges.id"],
+            name="fk_report_delivery_correction_challenge",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["reconfirmation_id"],
+            ["admin_security_reconfirmations.id"],
+            name="fk_report_delivery_correction_reconfirmation",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "reason_code IN ('WRONG_STATUS', 'WRONG_REPORT', 'DUPLICATE_ENTRY', 'OTHER')",
+            name="ck_report_delivery_correction_reason_code",
+        ),
+        CheckConstraint(
+            "length(memo) BETWEEN 1 AND 500",
+            name="ck_report_delivery_correction_memo",
+        ),
+        CheckConstraint(
+            "corrected_revision >= 1 AND expected_revision >= corrected_revision",
+            name="ck_report_delivery_correction_revisions",
+        ),
+        Index("ix_report_delivery_corrections_report_id", "report_id"),
+    )
+
+    # One correction per event, so the corrected event id is the key.
+    corrects_event_id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(UUID(as_uuid=True), nullable=False, default=uuid.uuid4)
+    report_id = Column(UUID(as_uuid=True), nullable=False)
+    corrected_revision = Column(BigInteger, nullable=False)
+    expected_revision = Column(BigInteger, nullable=False)
+    reason_code = Column(String(32), nullable=False)
+    memo = Column(String(500), nullable=False)
+    admin_id = Column(String(64), nullable=False)
+    session_id = Column(UUID(as_uuid=True), nullable=False)
+    device_id = Column(String(128), nullable=False)
+    correlation_id = Column(UUID(as_uuid=True), nullable=False)
+    proof_challenge_id = Column(UUID(as_uuid=True), nullable=True)
+    reconfirmation_id = Column(UUID(as_uuid=True), nullable=True)
+    created_at = Column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.clock_timestamp(),
@@ -1730,6 +1815,11 @@ class PrivacyConsentEvent(Base):
             "'{\"automatic_reporting\": \"FP-013-AUTO-1.1.0\", "
             "\"mobile_network_transfer\": \"FP-013-MOBILE-1.0.0\", "
             "\"raw_source_collection\": \"FP-013-RAW-1.1.0\", "
+            "\"training_reuse\": \"FP-013-TRAINING-1.1.0\"}'::jsonb) OR "
+            "(policy_version = 'FP-013-1.2.0' AND item_versions = "
+            "'{\"automatic_reporting\": \"FP-013-AUTO-1.2.0\", "
+            "\"mobile_network_transfer\": \"FP-013-MOBILE-1.0.0\", "
+            "\"raw_source_collection\": \"FP-013-RAW-1.2.0\", "
             "\"training_reuse\": \"FP-013-TRAINING-1.1.0\"}'::jsonb)",
             name="ck_privacy_consent_approved_versions",
         ),
@@ -2382,6 +2472,10 @@ class AccountDeletionTombstone(Base):
             "request_receipt_sha256 ~ '^[0-9a-f]{64}$'",
             name="ck_account_deletion_tombstone_receipt_sha256",
         ),
+        CheckConstraint(
+            "hmac_key_version IS NULL OR hmac_key_version >= 1",
+            name="ck_account_deletion_tombstone_hmac_key_version",
+        ),
     )
 
     tombstone_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -2389,6 +2483,9 @@ class AccountDeletionTombstone(Base):
     account_generation = Column(BigInteger, nullable=False)
     request_receipt_sha256 = Column(String(64), nullable=False, unique=True)
     tombstoned_at = Column(DateTime(timezone=True), nullable=False)
+    # S1617-50: privacy HMAC key version of privacy_subject_hmac. NULL marks rows
+    # written before 202609300002 under the originally bound key.
+    hmac_key_version = Column(BigInteger, nullable=True)
 
 
 class AccountDeletionRequest(Base):
@@ -2723,6 +2820,20 @@ class AccountDeletionEvent(Base):
             "legal_hold_review_at IS NULL OR legal_hold_review_at > recorded_at",
             name="ck_account_deletion_event_review_time_order",
         ),
+        CheckConstraint(
+            "(device_observed_completed_at IS NULL AND device_clock_anomaly IS NULL) OR "
+            "(event_type = 'DEVICE_EVIDENCE' "
+            "AND device_observed_completed_at IS NOT NULL "
+            "AND device_clock_anomaly IS NOT NULL "
+            "AND terminal_at = recorded_at)",
+            name="ck_account_deletion_event_device_observed_time",
+        ),
+        CheckConstraint(
+            "installation_evidence_key_sha256 IS NULL OR "
+            "(event_type = 'DEVICE_EVIDENCE' "
+            "AND installation_evidence_key_sha256 ~ '^[0-9a-f]{64}$')",
+            name="ck_account_deletion_event_installation_key_sha256",
+        ),
         ForeignKeyConstraint(
             ["request_id", "item_key"],
             ["account_deletion_items.request_id", "account_deletion_items.item_key"],
@@ -2770,6 +2881,14 @@ class AccountDeletionEvent(Base):
         nullable=False,
         server_default=func.clock_timestamp(),
     )
+    # S1617-53: the device clock is an observation only; terminal_at is the
+    # server receipt time for evidence recorded after 202609300001.
+    device_observed_completed_at = Column(DateTime(timezone=True), nullable=True)
+    device_clock_anomaly = Column(Boolean, nullable=True)
+    # S1617-52-F1: fingerprint of the installation key that signed this
+    # DEVICE_EVIDENCE (202609300004). The key itself is purged when the
+    # deletion request completes; this column is outside every evidence digest.
+    installation_evidence_key_sha256 = Column(String(64), nullable=True)
 
 
 class AccountDeletionReceipt(Base):
@@ -2806,6 +2925,86 @@ class AccountDeletionReceipt(Base):
     result = Column(String(16), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
     receipt_sha256 = Column(String(64), nullable=False, unique=True)
+
+
+class PrivacyInstallationEvidenceKey(Base):
+    """S1617-52: per-installation P-256 key that signs device deletion evidence.
+
+    Evidence for an installation with a registered key must carry that
+    installation's signature, so another installation (or the requesting device)
+    cannot report deletion on its behalf. Rows cannot be updated; they are
+    deleted only by walksafe_purge_privacy_installation_evidence_keys once the
+    subject generation's deletion request is COMPLETED (202609300004).
+    """
+
+    __tablename__ = "privacy_installation_evidence_keys"
+    __table_args__ = (
+        CheckConstraint(
+            "privacy_subject_hmac ~ '^[0-9a-f]{64}$' AND "
+            "installation_subject_hmac ~ '^[0-9a-f]{64}$' AND "
+            "public_key_sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_privacy_installation_evidence_key_digests",
+        ),
+        CheckConstraint(
+            "account_generation >= 1",
+            name="ck_privacy_installation_evidence_key_generation",
+        ),
+        CheckConstraint(
+            "octet_length(public_key_der) BETWEEN 59 AND 158",
+            name="ck_privacy_installation_evidence_key_der",
+        ),
+    )
+
+    privacy_subject_hmac = Column(String(64), primary_key=True)
+    account_generation = Column(BigInteger, primary_key=True)
+    installation_subject_hmac = Column(String(64), primary_key=True)
+    public_key_der = Column(LargeBinary, nullable=False)
+    public_key_sha256 = Column(String(64), nullable=False)
+    registered_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.clock_timestamp(),
+    )
+
+
+class PrivacyHmacKeyringEntry(Base):
+    """S1617-50: bound privacy HMAC keys; one ACTIVE, older ones LOOKUP_ONLY.
+
+    Append-only pseudonymous rows are never re-keyed. Lookup-only keys stay bound
+    so tombstones created under an older key keep blocking the same account.
+    """
+
+    __tablename__ = "privacy_hmac_keyring"
+    __table_args__ = (
+        CheckConstraint("key_version >= 1", name="ck_privacy_hmac_keyring_version"),
+        CheckConstraint(
+            "secret_fingerprint ~ '^[0-9a-f]{64}$'",
+            name="ck_privacy_hmac_keyring_fingerprint",
+        ),
+        CheckConstraint(
+            "state IN ('ACTIVE', 'LOOKUP_ONLY')",
+            name="ck_privacy_hmac_keyring_state",
+        ),
+        UniqueConstraint(
+            "secret_fingerprint",
+            name="uq_privacy_hmac_keyring_fingerprint",
+        ),
+        Index(
+            "uq_privacy_hmac_keyring_single_active",
+            "state",
+            unique=True,
+            postgresql_where=text("state = 'ACTIVE'"),
+        ),
+    )
+
+    key_version = Column(BigInteger, primary_key=True, autoincrement=False)
+    secret_fingerprint = Column(String(64), nullable=False)
+    state = Column(String(16), nullable=False)
+    bound_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.clock_timestamp(),
+    )
 
 
 class AccountCryptoKeyBinding(Base):
@@ -2892,6 +3091,19 @@ class AccountEnrollment(Base):
             "(state <> 'CONSUMED' AND consumed_at IS NULL)",
             name="ck_account_enrollments_consumed",
         ),
+        CheckConstraint(
+            "(created_account_id IS NULL AND creation_binding_hmac IS NULL "
+            "AND creation_binding_key_version IS NULL) OR "
+            "(created_account_id IS NOT NULL AND creation_binding_hmac IS NOT NULL "
+            "AND creation_binding_key_version IS NOT NULL AND state = 'CONSUMED' "
+            "AND creation_binding_hmac ~ '^[0-9a-f]{64}$' "
+            "AND creation_binding_key_version > 0)",
+            name="ck_account_enrollments_creation_binding",
+        ),
+        UniqueConstraint(
+            "created_account_id",
+            name="uq_account_enrollments_created_account",
+        ),
         Index(
             "ix_account_enrollments_email_created_at",
             "email_lookup_hmac",
@@ -2924,6 +3136,9 @@ class AccountEnrollment(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
     resend_not_before = Column(DateTime(timezone=True), nullable=False)
     consumed_at = Column(DateTime(timezone=True), nullable=True)
+    created_account_id = Column(UUID(as_uuid=True), nullable=True)
+    creation_binding_hmac = Column(String(64), nullable=True)
+    creation_binding_key_version = Column(BigInteger, nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,

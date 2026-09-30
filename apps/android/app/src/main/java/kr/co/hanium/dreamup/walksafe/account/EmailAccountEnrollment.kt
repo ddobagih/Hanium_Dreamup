@@ -19,8 +19,8 @@ internal val SIGNUP_DOCUMENT_VERSIONS: Map<String, String> = linkedMapOf(
     "terms_of_service" to "walksafe.terms-of-service.v1",
     "privacy_notice" to "walksafe.privacy-notice.v1",
     "location_terms" to "walksafe.location-terms.v1",
-    "raw_original" to "FP-013-RAW-1.1.0",
-    "automatic_reporting" to "FP-013-AUTO-1.1.0",
+    "raw_original" to "FP-013-RAW-1.2.0",
+    "automatic_reporting" to "FP-013-AUTO-1.2.0",
     "training_reuse" to "FP-013-TRAINING-1.1.0",
 )
 
@@ -71,6 +71,8 @@ internal data class EmailEnrollmentPartial(
         require(validEnrollmentHandle(enrollmentHandle))
         require(expiresAtEpochMs > 0L)
         require(resendAvailableAtEpochMs > 0L)
+        // S01-9: the same order the server guarantees (resend never after expiry).
+        require(resendAvailableAtEpochMs <= expiresAtEpochMs)
         require(OWNER_BINDING.matches(ownerBindingSha256))
         require(documentVersions == SIGNUP_DOCUMENT_VERSIONS)
         require(selections.requiredGranted)
@@ -151,7 +153,7 @@ internal sealed interface EmailEnrollmentRestoreResult {
 internal class AndroidEmailEnrollmentStore(
     preferences: SharedPreferences,
     aead: LocalAead = AndroidKeyStoreAead(KEY_POLICY),
-) {
+) : kr.co.hanium.dreamup.walksafe.network.PendingEmailOtpRequestStore {
     private val sensitive = AndroidSensitivePreferenceStore(
         preferences = preferences,
         spec = SPEC,
@@ -201,9 +203,30 @@ internal class AndroidEmailEnrollmentStore(
 
     fun resetAfterConfirmedAccountDeletion(): Boolean = sensitive.destroyAndClear()
 
+    // S01-5: in-flight OTP send request (no OTP, password, email or birth date).
+    override fun loadPendingOtpRequest():
+        kr.co.hanium.dreamup.walksafe.network.PendingEmailOtpRequest? {
+        if (sensitive.isBlocked()) return null
+        val encoded = sensitive.getString(PENDING_OTP_REQUEST_KEY, null) ?: return null
+        return kr.co.hanium.dreamup.walksafe.network.PendingEmailOtpRequestCodec.decode(encoded)
+    }
+
+    override fun savePendingOtpRequest(
+        request: kr.co.hanium.dreamup.walksafe.network.PendingEmailOtpRequest,
+    ): Boolean = !sensitive.isBlocked() && sensitive.edit()
+        .putString(
+            PENDING_OTP_REQUEST_KEY,
+            kr.co.hanium.dreamup.walksafe.network.PendingEmailOtpRequestCodec.encode(request),
+        )
+        .commit()
+
+    override fun clearPendingOtpRequest(): Boolean =
+        !sensitive.isBlocked() && sensitive.edit().remove(PENDING_OTP_REQUEST_KEY).commit()
+
     companion object {
         private const val PARTIAL_KEY = "email_enrollment_partial_v4"
         private const val LEGACY_PARTIAL_KEY = "email_enrollment_partial_v3"
+        private const val PENDING_OTP_REQUEST_KEY = "email_otp_pending_request_v1"
         private val KEY_POLICY = AeadKeyPolicy(
             aliasPrefix = "walksafe.user.email_enrollment.aead.v",
             currentVersion = 1,
@@ -217,7 +240,7 @@ internal class AndroidEmailEnrollmentStore(
                 "kr.co.hanium.dreamup.walksafe|USER|email-enrollment|schema=4"
                     .toByteArray(Charsets.UTF_8),
             keyPolicy = KEY_POLICY,
-            exactKeys = setOf(PARTIAL_KEY, LEGACY_PARTIAL_KEY),
+            exactKeys = setOf(PARTIAL_KEY, LEGACY_PARTIAL_KEY, PENDING_OTP_REQUEST_KEY),
         )
     }
 }
@@ -261,9 +284,9 @@ internal class AccountRequestFence {
 
     @Synchronized
     fun completeIfCurrent(token: AccountRequestToken, stateBinding: String): Boolean {
-        if (!foreground || active !== token || token.stateBinding != stateBinding) return false
+        if (!foreground || active !== token) return false
         active = null
-        return true
+        return token.stateBinding == stateBinding
     }
 
     @Synchronized

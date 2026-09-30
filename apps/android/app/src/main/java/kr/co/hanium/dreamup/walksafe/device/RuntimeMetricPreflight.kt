@@ -95,6 +95,8 @@ enum class RuntimeMetricPreflightReason {
     GENERATION_MISMATCH,
     INVALID_FRAME_ORDER,
     INVALID_FRAME_EVIDENCE,
+    /** No profile is bound to this build; test-candidate thresholds are never substituted. */
+    PROFILE_UNAVAILABLE,
 }
 
 data class RuntimeMetricFrameEvidence(
@@ -135,32 +137,26 @@ data class RuntimeMetricPreflightResult(
         }
 }
 
+/**
+ * [profile] has no default: callers pass the profile bound to their build (for example the active
+ * environment bundle). A missing profile ends immediately as UNKNOWN and never becomes AVAILABLE.
+ */
 class RuntimeMetricPreflightSession(
     val generation: Long,
     val startedAtElapsedRealtimeMs: Long,
     private val depthSupport: RuntimeMetricDepthSupport,
-    private val profile: RuntimeMetricPreflightProfile,
+    private val profile: RuntimeMetricPreflightProfile?,
 ) {
-    constructor(
-        generation: Long,
-        startedAtElapsedRealtimeMs: Long,
-        depthSupport: RuntimeMetricDepthSupport,
-    ) : this(
-        generation = generation,
-        startedAtElapsedRealtimeMs = startedAtElapsedRealtimeMs,
-        depthSupport = depthSupport,
-        profile = RuntimeMetricPreflightPolicy.testCandidateProfile,
-    )
-
-    private var status = if (depthSupport == RuntimeMetricDepthSupport.UNSUPPORTED) {
-        RuntimeMetricPreflightStatus.UNSUPPORTED
-    } else {
-        RuntimeMetricPreflightStatus.IN_PROGRESS
+    private var status = when {
+        depthSupport == RuntimeMetricDepthSupport.UNSUPPORTED -> RuntimeMetricPreflightStatus.UNSUPPORTED
+        profile == null -> RuntimeMetricPreflightStatus.UNKNOWN
+        else -> RuntimeMetricPreflightStatus.IN_PROGRESS
     }
-    private var reason = if (depthSupport == RuntimeMetricDepthSupport.UNSUPPORTED) {
-        RuntimeMetricPreflightReason.EXPLICIT_DEPTH_UNSUPPORTED
-    } else {
-        RuntimeMetricPreflightReason.AWAITING_STABLE_EVIDENCE
+    private var reason = when {
+        depthSupport == RuntimeMetricDepthSupport.UNSUPPORTED ->
+            RuntimeMetricPreflightReason.EXPLICIT_DEPTH_UNSUPPORTED
+        profile == null -> RuntimeMetricPreflightReason.PROFILE_UNAVAILABLE
+        else -> RuntimeMetricPreflightReason.AWAITING_STABLE_EVIDENCE
     }
     private var distinctFrameCount = 0
     private var passingFrameCount = 0
@@ -168,7 +164,7 @@ class RuntimeMetricPreflightSession(
     private var firstFrameTimestampNanos: Long? = null
     private var lastFrameTimestampNanos: Long? = null
     private var lastObservedAtElapsedRealtimeMs: Long? = null
-    private var completedAtElapsedRealtimeMs: Long? = if (status == RuntimeMetricPreflightStatus.UNSUPPORTED) {
+    private var completedAtElapsedRealtimeMs: Long? = if (status != RuntimeMetricPreflightStatus.IN_PROGRESS) {
         startedAtElapsedRealtimeMs
     } else {
         null
@@ -193,10 +189,11 @@ class RuntimeMetricPreflightSession(
     @Synchronized
     fun observe(frame: RuntimeMetricFrameEvidence): RuntimeMetricPreflightResult {
         if (status != RuntimeMetricPreflightStatus.IN_PROGRESS) return result()
+        val criteria = profile ?: return result()
         if (frame.generation != generation) {
             return finishUnknown(RuntimeMetricPreflightReason.GENERATION_MISMATCH, null)
         }
-        if (hasReachedDeadline(frame.observedAtElapsedRealtimeMs)) {
+        if (hasReachedDeadline(frame.observedAtElapsedRealtimeMs, criteria)) {
             return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, frame.observedAtElapsedRealtimeMs)
         }
         if (!frame.isWellFormed()) {
@@ -219,20 +216,20 @@ class RuntimeMetricPreflightSession(
         lastFrameTimestampNanos = frame.frameTimestampNanos
         lastObservedAtElapsedRealtimeMs = frame.observedAtElapsedRealtimeMs
         distinctFrameCount += 1
-        if (frame.isPassing()) passingFrameCount += 1
+        if (frame.isPassing(criteria)) passingFrameCount += 1
         recentFrames.addLast(frame)
         while (
-            recentFrames.size > profile.minimumDistinctFrames &&
+            recentFrames.size > criteria.minimumDistinctFrames &&
             (frame.frameTimestampNanos - recentFrames[1].frameTimestampNanos) / 1_000_000L >=
-                profile.minimumObservationSpanMs
+                criteria.minimumObservationSpanMs
         ) {
             val expiredFrame = recentFrames.removeFirst()
             distinctFrameCount -= 1
-            if (expiredFrame.isPassing()) passingFrameCount -= 1
+            if (expiredFrame.isPassing(criteria)) passingFrameCount -= 1
         }
         firstFrameTimestampNanos = recentFrames.first().frameTimestampNanos
 
-        if (depthSupport == RuntimeMetricDepthSupport.SUPPORTED && hasStableEvidence()) {
+        if (depthSupport == RuntimeMetricDepthSupport.SUPPORTED && hasStableEvidence(criteria)) {
             status = RuntimeMetricPreflightStatus.AVAILABLE
             reason = RuntimeMetricPreflightReason.STABLE_METRIC_DEPTH
             completedAtElapsedRealtimeMs = frame.observedAtElapsedRealtimeMs
@@ -243,7 +240,8 @@ class RuntimeMetricPreflightSession(
     @Synchronized
     fun expire(nowElapsedRealtimeMs: Long): RuntimeMetricPreflightResult {
         if (status != RuntimeMetricPreflightStatus.IN_PROGRESS) return result()
-        if (hasReachedDeadline(nowElapsedRealtimeMs)) {
+        val criteria = profile ?: return result()
+        if (hasReachedDeadline(nowElapsedRealtimeMs, criteria)) {
             return finishUnknown(RuntimeMetricPreflightReason.TIMEOUT, nowElapsedRealtimeMs)
         }
         if (!isValidClock(nowElapsedRealtimeMs)) {
@@ -268,16 +266,16 @@ class RuntimeMetricPreflightSession(
             validMetricSamplesInRange >= 0 &&
             (metricDepthAvailable || validMetricSamplesInRange == 0)
 
-    private fun RuntimeMetricFrameEvidence.isPassing(): Boolean =
+    private fun RuntimeMetricFrameEvidence.isPassing(criteria: RuntimeMetricPreflightProfile): Boolean =
         tracking &&
             metricDepthAvailable &&
-            validMetricSamplesInRange >= profile.minimumValidSamplesPerPassingFrame
+            validMetricSamplesInRange >= criteria.minimumValidSamplesPerPassingFrame
 
-    private fun hasStableEvidence(): Boolean =
-        distinctFrameCount >= profile.minimumDistinctFrames &&
-            observationSpanMs() >= profile.minimumObservationSpanMs &&
+    private fun hasStableEvidence(criteria: RuntimeMetricPreflightProfile): Boolean =
+        distinctFrameCount >= criteria.minimumDistinctFrames &&
+            observationSpanMs() >= criteria.minimumObservationSpanMs &&
             passingFrameCount.toLong() * 100L >=
-            distinctFrameCount.toLong() * profile.minimumPassingPercent
+            distinctFrameCount.toLong() * criteria.minimumPassingPercent
 
     private fun observationSpanMs(): Long {
         val first = firstFrameTimestampNanos ?: return 0L
@@ -290,9 +288,12 @@ class RuntimeMetricPreflightSession(
             (lastObservedAtElapsedRealtimeMs == null ||
                 nowElapsedRealtimeMs >= checkNotNull(lastObservedAtElapsedRealtimeMs))
 
-    private fun hasReachedDeadline(nowElapsedRealtimeMs: Long): Boolean =
+    private fun hasReachedDeadline(
+        nowElapsedRealtimeMs: Long,
+        criteria: RuntimeMetricPreflightProfile,
+    ): Boolean =
         nowElapsedRealtimeMs >= startedAtElapsedRealtimeMs &&
-            nowElapsedRealtimeMs - startedAtElapsedRealtimeMs >= profile.maximumDurationMs
+            nowElapsedRealtimeMs - startedAtElapsedRealtimeMs >= criteria.maximumDurationMs
 
     private fun finishUnknown(
         terminalReason: RuntimeMetricPreflightReason,

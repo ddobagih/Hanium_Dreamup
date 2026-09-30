@@ -56,11 +56,40 @@ class AndroidReportQueueStoreTest {
         assertEquals(0, store.countForDrain(WALK_ID, CONSENT))
         assertNull(store.nextForRecoveryDrain(ACTOR_ID))
         assertEquals(0, store.countForRecoveryDrain(ACTOR_ID))
-        assertEquals(0, store.pruneExpired())
         assertFalse(store.deleteAfterReceipt(ACTOR_ID, receipt(REPORT_1, "a".repeat(64), 1L)))
         assertEquals(0, storageCalls)
         assertEquals(0, idCalls)
         assertEquals(0, aead.sealCalls + aead.openCalls)
+    }
+
+    @Test
+    fun disabledProfilePrunesOnlyExpiredReportsAlreadyStoredOnDisk() {
+        val root = temporaryFolder.newFolder("report-queue-disabled-prune")
+        val aead = FakeQueueAead()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2).map(UUID::fromString))
+        var now = 1_000L
+        val enabled = AndroidReportQueueStore(
+            rootDirectory = root,
+            capacityProfile = PROFILE,
+            aead = aead,
+            idFactory = { ids.removeFirst() },
+            nowMillis = { now },
+        )
+        assertTrue(enabled.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
+        now += 1L
+        assertTrue(enabled.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
+
+        val disabled = AndroidReportQueueStore(
+            rootDirectory = root,
+            capacityProfile = null,
+            aead = aead,
+            idFactory = { error("disabled queue must not create report IDs") },
+            nowMillis = { now },
+        )
+        now = 1_000L + REPORT_QUEUE_TTL_MS
+        assertEquals(1, disabled.pruneExpired())
+        assertEquals(setOf(REPORT_2), FileReportQueueStorage(root).listReportIds())
+        assertEquals(0, disabled.pruneExpired())
     }
 
     @Test
@@ -89,17 +118,45 @@ class AndroidReportQueueStoreTest {
     }
 
     @Test
+    fun lowOrUnknownAllocatableSpaceHoldsOnlyAutomaticCandidates() {
+        // 14 #39: the OS allocatable bytes must cover the largest stored entry plus its temp copy.
+        val storage = FakeReportQueueStorage()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2).map(UUID::fromString))
+        var allocatable: Long? = 2L * PROFILE.maxStoredEntryBytes - 1L
+        val store = AndroidReportQueueStore(
+            capacityProfile = PROFILE,
+            storageFactory = { storage },
+            aead = FakeQueueAead(),
+            idFactory = { ids.removeFirst() },
+            nowMillis = { 1_000L },
+            testOnly = Unit,
+            allocatableBytes = { allocatable },
+        )
+        val automatic = metadata(priority = ReportQueuePriority.AUTOMATIC)
+
+        assertNull(store.enqueue(ACTOR_ID, automatic, jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT))
+        allocatable = null
+        assertNull(store.enqueue(ACTOR_ID, automatic, jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT))
+        assertTrue(storage.values.isEmpty())
+        // Explicit reports are protected: never held for space by this check.
+        assertTrue(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null)
+        allocatable = 2L * PROFILE.maxStoredEntryBytes
+        assertTrue(store.enqueue(ACTOR_ID, automatic, jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null)
+        assertEquals(2, storage.values.size)
+    }
+
+    @Test
     fun encryptedEnvelopeSizeNotPlaintextSizeEnforcesStoredByteLimit() {
         val storage = FakeReportQueueStorage()
-        val aead = FakeQueueAead(envelopeBytes = 64)
+        val aead = FakeQueueAead(envelopeBytes = 256)
         val store = AndroidReportQueueStore(
             capacityProfile = ApprovedReportQueueCapacityProfile(
                 maxEntries = 2,
-                maxPayloadBytes = 32,
-                maxStoredEntryBytes = 63L,
-                maxTotalBytes = 126L,
+                maxPayloadBytes = 128,
+                maxStoredEntryBytes = 255L,
+                maxTotalBytes = 510L,
                 automaticMaxEntries = 1,
-                automaticMaxTotalBytes = 63L,
+                automaticMaxTotalBytes = 255L,
             ),
             storageFactory = { storage },
             aead = aead,
@@ -144,10 +201,10 @@ class AndroidReportQueueStoreTest {
         )
 
         assertTrue(
-            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
+            store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
         )
         assertNull(
-            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT),
+            store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT),
         )
         assertTrue(
             store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null,
@@ -161,18 +218,18 @@ class AndroidReportQueueStoreTest {
     @Test
     fun automaticAdmissionPreservesStoredByteReserveForExplicitReport() {
         val storage = FakeReportQueueStorage()
-        val aead = FakeQueueAead(envelopeBytes = 32)
+        val aead = FakeQueueAead(envelopeBytes = 128)
         val ids = ArrayDeque(
             listOf(REPORT_1, REPORT_2, REPORT_3).map(UUID::fromString),
         )
         val store = AndroidReportQueueStore(
             capacityProfile = ApprovedReportQueueCapacityProfile(
                 maxEntries = 3,
-                maxPayloadBytes = 32,
-                maxStoredEntryBytes = 32L,
-                maxTotalBytes = 96L,
+                maxPayloadBytes = 128,
+                maxStoredEntryBytes = 128L,
+                maxTotalBytes = 384L,
                 automaticMaxEntries = 2,
-                automaticMaxTotalBytes = 48L,
+                automaticMaxTotalBytes = 192L,
             ),
             storageFactory = { storage },
             aead = aead,
@@ -182,15 +239,15 @@ class AndroidReportQueueStoreTest {
         )
 
         assertTrue(
-            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
+            store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
         )
         assertNull(
-            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT),
+            store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT),
         )
         assertTrue(
             store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) != null,
         )
-        assertEquals(64L, requireNotNull(storage.measureUsage()).totalBytes)
+        assertEquals(256L, requireNotNull(storage.measureUsage()).totalBytes)
     }
 
     @Test
@@ -240,6 +297,31 @@ class AndroidReportQueueStoreTest {
     }
 
     @Test
+    fun pendingAutomaticEntryIsNeverMergedAndALaterObservationIsASeparateEntry() {
+        // S15-37: no on-device merge of location-based candidates (FP-032-DETAIL-01 interim).
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        var now = 1_000L
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2).map(UUID::fromString))
+        val store = store(storage, aead, { now }) { ids.removeFirst() }
+        val first = requireNotNull(store.enqueueAutomatic())
+        val firstEnvelope = requireNotNull(storage.values[REPORT_1])
+
+        now = 1_000L + AndroidReportCooldownPolicy.PENDING_AUTOMATIC_DUPLICATE_WINDOW_MS - 1L
+        assertNull(store.enqueueAutomatic(longitude = 127.00001))
+        assertEquals(firstEnvelope, storage.values[REPORT_1])
+
+        now = 1_000L + AndroidReportCooldownPolicy.PENDING_AUTOMATIC_DUPLICATE_WINDOW_MS
+        val second = requireNotNull(store.enqueueAutomatic(longitude = 127.00001))
+        assertEquals(REPORT_2, second.payload.reportId)
+        assertEquals(firstEnvelope, storage.values[REPORT_1])
+        val queued = store.queuedReports()
+        assertEquals(listOf(REPORT_1, REPORT_2), queued.map { it.payload.reportId })
+        assertTrue(queued[0].payload.contentEquals(first.payload))
+        assertEquals(1_000L, queued[0].createdAtEpochMs)
+    }
+
+    @Test
     fun pendingAutomaticScopeDoesNotBlockDifferentActorOutsideRadiusOrExplicit() {
         val storage = FakeReportQueueStorage()
         val aead = FakeQueueAead()
@@ -261,7 +343,7 @@ class AndroidReportQueueStoreTest {
         val aead = FakeQueueAead()
         var idCalls = 0
         var now = 1_000L
-        val originalMetadata = metadata()
+        val originalMetadata = metadata(priority = ReportQueuePriority.AUTOMATIC)
         val originalImage = jpeg()
         val store = store(storage, aead, { now }) {
             idCalls += 1
@@ -285,7 +367,10 @@ class AndroidReportQueueStoreTest {
         assertEquals(1, idCalls)
         assertEquals(REPORT_1, queued.payload.reportId)
         assertTrue(queued.payload.contentEquals(restored.payload))
-        assertArrayEquals(metadata(), restored.payload.metadataUtf8())
+        assertArrayEquals(
+            metadata(priority = ReportQueuePriority.AUTOMATIC),
+            restored.payload.metadataUtf8(),
+        )
         assertArrayEquals(jpeg(), restored.payload.imageJpeg())
     }
 
@@ -298,7 +383,7 @@ class AndroidReportQueueStoreTest {
         val store = store(storage, aead, { now }) { ids.removeFirst() }
 
         assertTrue(
-            store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
+            store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT) != null,
         )
         now += 1L
         assertTrue(
@@ -324,7 +409,7 @@ class AndroidReportQueueStoreTest {
         )
         val store = store(storage, aead, { now++ }) { ids.removeFirst() }
 
-        store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT)
+        store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT)
         store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, OTHER_WALK_ID, CONSENT)
         store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT)
         store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT)
@@ -347,7 +432,7 @@ class AndroidReportQueueStoreTest {
         )
         val store = store(storage, aead, { now++ }) { ids.removeFirst() }
 
-        store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT)
+        store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC), jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT)
         store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, OTHER_WALK_ID, CONSENT)
         store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, NEW_CONSENT)
         val restored = store(storage, aead, { now }) {
@@ -586,7 +671,7 @@ class AndroidReportQueueStoreTest {
         assertTrue(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = ReportQueuePriority.AUTOMATIC),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -596,7 +681,7 @@ class AndroidReportQueueStoreTest {
         assertTrue(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = ReportQueuePriority.AUTOMATIC),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -622,7 +707,7 @@ class AndroidReportQueueStoreTest {
         assertNull(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = ReportQueuePriority.AUTOMATIC),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -632,7 +717,7 @@ class AndroidReportQueueStoreTest {
         assertNull(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = ReportQueuePriority.AUTOMATIC),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -652,7 +737,7 @@ class AndroidReportQueueStoreTest {
         assertTrue(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = ReportQueuePriority.AUTOMATIC),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -674,7 +759,7 @@ class AndroidReportQueueStoreTest {
         requireNotNull(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = ReportQueuePriority.AUTOMATIC),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -710,7 +795,7 @@ class AndroidReportQueueStoreTest {
         requireNotNull(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = ReportQueuePriority.AUTOMATIC),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -753,7 +838,7 @@ class AndroidReportQueueStoreTest {
         requireNotNull(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = ReportQueuePriority.AUTOMATIC),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -763,7 +848,7 @@ class AndroidReportQueueStoreTest {
         requireNotNull(
             store.enqueue(
                 ACTOR_ID,
-                metadata(),
+                metadata(priority = ReportQueuePriority.AUTOMATIC),
                 jpeg(),
                 ReportQueuePriority.AUTOMATIC,
                 WALK_ID,
@@ -1314,6 +1399,64 @@ class AndroidReportQueueStoreTest {
     }
 
     @Test
+    fun crashLeftTemporaryFilesAreRemovedButEntriesAndForeignFilesStay() {
+        // S15-35: every atomic write holds the queue lock, so a temporary seen under it is a leftover.
+        val root = temporaryFolder.newFolder("report-queue-temporaries")
+        val now = 2_000_000_000_000L
+        val store = AndroidReportQueueStore(
+            rootDirectory = root,
+            capacityProfile = PROFILE,
+            aead = FakeQueueAead(),
+            idFactory = { UUID.fromString(REPORT_1) },
+            nowMillis = { now },
+        )
+        requireNotNull(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
+        val reports = root.resolve("report_queue_v1/reports")
+        val fences = root.resolve("report_queue_v1/fences").also { it.mkdirs() }
+        val leftover = reports.resolve(".$REPORT_2.aead.4242424242.tmp").also { it.writeText("x".repeat(90)) }
+        val fenceLeftover = fences.resolve(".consent-revoked-${"e".repeat(64)}.fence.77.tmp")
+            .also { it.writeText("x") }
+        val foreign = reports.resolve("crash-leftover.partial").also { it.writeText("y".repeat(10)) }
+        val before = requireNotNull(FileReportQueueStorage(root).measureUsage())
+
+        assertEquals(2, store.pruneExpired())
+
+        assertFalse(leftover.exists())
+        assertFalse(fenceLeftover.exists())
+        assertTrue("unknown files are not deleted", foreign.exists())
+        assertEquals(listOf(REPORT_1), store.queuedReports().map { it.payload.reportId })
+        val after = requireNotNull(FileReportQueueStorage(root).measureUsage())
+        assertEquals(before.reportFileCount - 1, after.reportFileCount)
+    }
+
+    @Test
+    fun unreadableEntryStaysEncryptedAndUnsentUntilThirtyDaysAfterItsLastWrite() {
+        val root = temporaryFolder.newFolder("report-queue-unreadable")
+        val now = 2_000_000_000_000L
+        val store = AndroidReportQueueStore(
+            rootDirectory = root,
+            capacityProfile = PROFILE,
+            aead = FakeQueueAead(),
+            idFactory = { UUID.fromString(REPORT_1) },
+            nowMillis = { now },
+        )
+        requireNotNull(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
+        val corrupt = root.resolve("report_queue_v1/reports/$REPORT_2.aead")
+        corrupt.writeText("not-an-envelope-from-this-key")
+
+        assertTrue(corrupt.setLastModified(now - REPORT_QUEUE_TTL_MS + 1_000L))
+        assertEquals(0, store.pruneExpired())
+        assertTrue("inside the 30-day cap the unreadable entry is kept", corrupt.exists())
+        assertEquals("not-an-envelope-from-this-key", corrupt.readText())
+        assertEquals(listOf(REPORT_1), store.queuedReports().map { it.payload.reportId })
+
+        assertTrue(corrupt.setLastModified(now - REPORT_QUEUE_TTL_MS))
+        assertEquals(1, store.pruneExpired())
+        assertFalse(corrupt.exists())
+        assertEquals(listOf(REPORT_1), store.queuedReports().map { it.payload.reportId })
+    }
+
+    @Test
     fun unrecognizedRegularFilesConsumeCapacityAndUnsafeEntriesFailClosed() {
         val root = temporaryFolder.newFolder("report-queue-usage")
         val reports = root.resolve("report_queue_v1/reports")
@@ -1380,7 +1523,7 @@ class AndroidReportQueueStoreTest {
         priority: ReportQueuePriority = ReportQueuePriority.AUTOMATIC,
     ): QueuedReport? = enqueue(
         expectedReporterActorId = actorId,
-        metadataUtf8 = automaticMetadata(actorId, latitude, longitude),
+        metadataUtf8 = automaticMetadata(actorId, latitude, longitude, priority),
         imageJpeg = jpeg(),
         priority = priority,
         walkSessionId = WALK_ID,
@@ -1395,17 +1538,32 @@ class AndroidReportQueueStoreTest {
         persistenceMarker: String = PERSISTENCE_MARKER,
     ) = ReportQueueReceipt(id, hash, bytes, marker, persistenceMarker)
 
-    private fun metadata(actorId: String = ACTOR_ID) =
-        "{\"reporter_user_id\":\"$actorId\"}".toByteArray()
+    private fun metadata(
+        actorId: String = ACTOR_ID,
+        priority: ReportQueuePriority = ReportQueuePriority.EXPLICIT,
+    ): ByteArray {
+        val automatic = priority == ReportQueuePriority.AUTOMATIC
+        val trigger = if (automatic) "auto" else "voice"
+        return ("{\"reporter_user_id\":\"$actorId\",\"trigger\":\"$trigger\"," +
+            "\"auto_reported\":$automatic}").toByteArray()
+    }
 
     private fun automaticMetadata(
         actorId: String = ACTOR_ID,
         latitude: Double = 37.0,
         longitude: Double = 127.0,
+        priority: ReportQueuePriority = ReportQueuePriority.AUTOMATIC,
     ): ByteArray = JSONObject()
         .put("schema_version", "detect.v2")
-        .put("trigger", AndroidReportCandidatePolicy.TRIGGER_AUTO)
-        .put("auto_reported", true)
+        .put(
+            "trigger",
+            if (priority == ReportQueuePriority.AUTOMATIC) {
+                AndroidReportCandidatePolicy.TRIGGER_AUTO
+            } else {
+                AndroidReportCandidatePolicy.TRIGGER_VOICE
+            },
+        )
+        .put("auto_reported", priority == ReportQueuePriority.AUTOMATIC)
         .put("reporter_user_id", actorId)
         .put("class_name", AndroidReportCandidatePolicy.DAMAGED_TACTILE_BLOCK)
         .put(
@@ -1417,8 +1575,7 @@ class AndroidReportQueueStoreTest {
         .toString()
         .toByteArray()
 
-    private fun jpeg() =
-        byteArrayOf(0xff.toByte(), 0xd8.toByte(), 1, 2, 0xff.toByte(), 0xd9.toByte())
+    private fun jpeg() = reportTestJpeg()
 
     private fun assertQueueFileLockHeld(root: File) {
         val lockFile = root.resolve("report_queue_v1/.queue.lock")

@@ -2,12 +2,14 @@ import {
   createCipheriv,
   createDecipheriv,
   createHash,
+  createHmac,
   randomBytes
 } from "node:crypto";
 import {
   closeSync,
   constants as fsConstants,
   fstatSync,
+  fsyncSync,
   lstatSync,
   openSync,
   readFileSync,
@@ -101,6 +103,61 @@ export class GatewayStateEncryptionError extends Error {
   ) {
     super(message, options);
     this.name = "GatewayStateEncryptionError";
+  }
+}
+
+/**
+ * S19-27: common "commit result unknown" failure of every Gateway state store. A store
+ * throws it only after the atomic rename of the new file (typically the directory fsync
+ * failed), so the new state may already be durable. Any other storage error means the new
+ * state was not committed. Routes project it as `<store>_outcome_unknown`: the client
+ * resends the same request (idempotent replay) or re-reads the state instead of treating
+ * the change as refused.
+ */
+export class GatewayStorageOutcomeUnknownError extends Error {
+  readonly committed = "unknown" as const;
+
+  constructor(readonly store: string, options?: ErrorOptions) {
+    super(`${store} storage outcome is unknown after rename`, options);
+    this.name = "GatewayStorageOutcomeUnknownError";
+  }
+}
+
+let commitFaultStoreForTests: string | null = null;
+
+/** Tests only (S19-27): fails the post-rename directory sync of one store. */
+export function setGatewayStateCommitFaultForTests(store: string | null): void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("gateway state commit faults are unavailable in production");
+  }
+  commitFaultStoreForTests = store;
+}
+
+/**
+ * S19-27: the directory fsync that follows a store's atomic rename. The new file is already
+ * in place, so any failure here is reported as GatewayStorageOutcomeUnknownError.
+ */
+export function syncGatewayStateDirectoryAfterRename(store: string, directory: string): void {
+  let descriptor: number | null = null;
+  try {
+    if (commitFaultStoreForTests === store) {
+      throw new Error(`injected ${store} post-rename directory fsync failure`);
+    }
+    descriptor = openSync(
+      directory,
+      fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
+    );
+    fsyncSync(descriptor);
+  } catch (error) {
+    throw new GatewayStorageOutcomeUnknownError(store, { cause: error });
+  } finally {
+    if (descriptor !== null) {
+      try {
+        closeSync(descriptor);
+      } catch {
+        // The rename already happened; the outcome is reported above.
+      }
+    }
   }
 }
 
@@ -264,7 +321,7 @@ function validateKeyringMetadata(
   }
 
   const mode = metadata.mode & 0o777;
-  if (environment.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" || environment.NODE_ENV === "production") {
     const currentGid = typeof process.getgid === "function" ? process.getgid() : -1;
     if (
       metadata.uid !== 0 ||
@@ -423,9 +480,15 @@ function loadKeyring(environment: NodeJS.ProcessEnv): LoadedKeyring {
   );
   let descriptor: number | null = null;
   try {
-    descriptor = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+    descriptor = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK);
     const metadata = fstatSync(descriptor);
     validateKeyringMetadata(filePath, metadata, environment);
+    if (metadata.size > KEYRING_MAX_BYTES) {
+      throw new GatewayStateEncryptionError(
+        "configuration",
+        "gateway state keyring exceeds its byte ceiling"
+      );
+    }
     const raw = readFileSync(descriptor, "utf8");
     if (Buffer.byteLength(raw, "utf8") > KEYRING_MAX_BYTES) {
       throw new GatewayStateEncryptionError(
@@ -464,9 +527,46 @@ export function initializeGatewayStateEncryption(
   loadedKeyring = loadKeyring(environment);
 }
 
-function keyring(): LoadedKeyring {
-  initializeGatewayStateEncryption();
+function keyring(environment: NodeJS.ProcessEnv = process.env): LoadedKeyring {
+  initializeGatewayStateEncryption(environment);
   return loadedKeyring!;
+}
+
+export function probeGatewayStateKeyringReady(
+  environment: NodeJS.ProcessEnv = process.env
+): boolean {
+  let fresh: ReturnType<typeof loadKeyring> | null = null;
+  try {
+    initializeGatewayStateEncryption(environment);
+    fresh = loadKeyring(environment);
+    const current = loadedKeyring;
+    if (
+      current === null ||
+      current.path !== fresh.path ||
+      current.active.keyId !== fresh.active.keyId ||
+      current.keys.size !== fresh.keys.size
+    ) return false;
+    for (const [keyId, entry] of fresh.keys) {
+      const loaded = current.keys.get(keyId);
+      if (!loaded || loaded.status !== entry.status) return false;
+      if (entry.status === "compromised") {
+        if (loaded.status !== "compromised" || loaded.fingerprint !== entry.fingerprint) {
+          return false;
+        }
+      } else if (loaded.status === "compromised" || !loaded.key.equals(entry.key)) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (fresh !== null) {
+      for (const entry of fresh.keys.values()) {
+        if (entry.status !== "compromised") entry.key.fill(0);
+      }
+    }
+  }
 }
 
 export function resetGatewayStateEncryptionForTests(): void {
@@ -549,10 +649,11 @@ function serializedPlaintext(value: unknown, maxPlaintextBytes: number): Buffer 
 export function encryptGatewayStateJson(
   context: GatewayStateContext,
   value: unknown,
-  maxPlaintextBytes: number
+  maxPlaintextBytes: number,
+  environment: NodeJS.ProcessEnv = process.env
 ): string {
   const plaintext = serializedPlaintext(value, maxPlaintextBytes);
-  const active = keyring().active;
+  const active = keyring(environment).active;
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", active.key, iv, { authTagLength: 16 });
   cipher.setAAD(associatedData(context, active.keyId), { plaintextLength: plaintext.byteLength });
@@ -635,8 +736,11 @@ function parseEnvelope(raw: string, maxPlaintextBytes: number): StateEnvelope {
   return envelope as unknown as StateEnvelope;
 }
 
-function envelopeKey(envelope: StateEnvelope): UsableGatewayStateKey {
-  const key = keyring().keys.get(envelope.key_id);
+function envelopeKey(
+  envelope: Pick<StateEnvelope, "key_id">,
+  environment: NodeJS.ProcessEnv = process.env
+): UsableGatewayStateKey {
+  const key = keyring(environment).keys.get(envelope.key_id);
   if (!key) {
     throw new GatewayStateEncryptionError(
       "unknown_key",
@@ -652,12 +756,35 @@ function envelopeKey(envelope: StateEnvelope): UsableGatewayStateKey {
   return key;
 }
 
+/** Capability keys are purpose-derived, never the session secret or raw AES key.
+ * Decrypt-only roots remain required while any deletion record references them.
+ */
+export function gatewayDeletionCapabilityKeyId(keyId?: string): string {
+  return keyId === undefined
+    ? keyring().active.keyId
+    : envelopeKey({ key_id: keyId }).keyId;
+}
+
+export function createDeletionCapabilityHmac(keyId: string): ReturnType<typeof createHmac> {
+  const root = envelopeKey({ key_id: keyId });
+  const derived = createHmac("sha256", root.key)
+    .update("walksafe/gateway-state/deletion-capability-key/v1\0", "utf8")
+    .update(keyId, "utf8")
+    .digest();
+  try {
+    return createHmac("sha256", derived);
+  } finally {
+    derived.fill(0);
+  }
+}
+
 export function inspectGatewayStateEnvelope(
   raw: string,
-  maxPlaintextBytes: number
+  maxPlaintextBytes: number,
+  environment: NodeJS.ProcessEnv = process.env
 ): GatewayStateEnvelopeMetadata {
   const envelope = parseEnvelope(raw, maxPlaintextBytes);
-  const key = keyring().keys.get(envelope.key_id);
+  const key = keyring(environment).keys.get(envelope.key_id);
   return {
     keyId: envelope.key_id,
     keyStatus: key?.status ?? "unknown"
@@ -667,10 +794,11 @@ export function inspectGatewayStateEnvelope(
 export function decryptGatewayStateJson(
   context: GatewayStateContext,
   raw: string,
-  maxPlaintextBytes: number
+  maxPlaintextBytes: number,
+  environment: NodeJS.ProcessEnv = process.env
 ): { value: unknown; keyId: string; keyStatus: UsableKeyStatus } {
   const envelope = parseEnvelope(raw, maxPlaintextBytes);
-  const key = envelopeKey(envelope);
+  const key = envelopeKey(envelope, environment);
   const iv = Buffer.from(envelope.iv_base64url, "base64url");
   const ciphertext = Buffer.from(envelope.ciphertext_base64url, "base64url");
   const tag = Buffer.from(envelope.tag_base64url, "base64url");

@@ -220,7 +220,8 @@ class GatewayWalkRestartRecoveryTest {
         assertEquals(ids.size, ids.toSet().size)
         assertTrue(ids.all { Regex("[A-Za-z0-9][A-Za-z0-9._:-]{7,127}").matches(it) })
         assertTrue(transport.commands.all {
-            it.getString("schema_version") == "walksafe.field-walk-command.v1"
+            it.getString("schema_version") == "walksafe.field-walk-command.v2" &&
+                it.getLong("issued_at_epoch_ms") > 0L
         })
     }
 

@@ -29,6 +29,10 @@ from backend.app.models import (  # noqa: E402
     TrainingDatasetMember,
     TrainingDatasetRevision,
 )
+from backend.app.services.privacy_lifecycle import (  # noqa: E402
+    TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC,
+    training_consent_allows,
+)
 
 
 DATABASE_URL_ENV = "WALKSAFE_TRAINING_LIFECYCLE_DATABASE_URL"
@@ -98,9 +102,11 @@ def _removal_reason(
         .order_by(desc(PrivacyConsentEvent.subject_revision))
         .limit(1)
     )
+    # S02-22: artifacts come from RAW collections, so a raw source collection
+    # withdrawal also removes them (shared per-source-kind rule).
     if (
         consent is None
-        or not consent.training_reuse
+        or not training_consent_allows(consent, TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC)
         or consent.receipt_sha256 != artifact.consent_receipt_sha256
     ):
         return "CONSENT_WITHDRAWN"

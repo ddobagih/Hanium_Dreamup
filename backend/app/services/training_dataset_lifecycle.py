@@ -24,7 +24,11 @@ from backend.app.models import (
     TrainingDatasetMember,
     TrainingDatasetRevision,
 )
-from backend.app.services.privacy_lifecycle import consent_event_is_current
+from backend.app.services.privacy_lifecycle import (
+    TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC,
+    consent_event_is_current,
+    training_consent_allows,
+)
 
 
 class TrainingDatasetLifecycleError(RuntimeError):
@@ -73,10 +77,13 @@ def _require_current_consent(
         .order_by(desc(PrivacyConsentEvent.subject_revision))
         .limit(1)
     )
+    # S02-22: every dataset source is an approved RAW collection decision, so
+    # raw source collection consent is required here too, not only through the
+    # receipt binding (decisions approved under the older rule stay covered).
     if (
         event is None
         or not consent_event_is_current(event)
-        or not event.training_reuse
+        or not training_consent_allows(event, TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC)
         or event.receipt_sha256 != receipt_sha256
     ):
         raise TrainingDatasetLifecycleError(

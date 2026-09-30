@@ -26,6 +26,20 @@ from dotenv import load_dotenv
 from model.two_model_runtime import load_threshold_config
 
 from backend.app.schemas import CLASS_ORDER
+from backend.app.services.signup_documents import (
+    SIGNUP_OPTIONAL_DOCUMENT_KEYS,
+    signup_document_keys_are_exact,
+)
+from backend.app.services.android_release_allowlist import (
+    ENVIRONMENT_NAME as ANDROID_RELEASES_ENVIRONMENT_NAME,
+    parse_approved_android_releases,
+)
+from backend.app.services.tmap_runtime import (
+    TMAP_CALL_BUDGET_PER_DAY_DEFAULT,
+    TMAP_CALL_BUDGET_PER_DAY_MAX,
+    TMAP_CALL_BUDGET_PER_MINUTE_DEFAULT,
+    TMAP_CALL_BUDGET_PER_MINUTE_MAX,
+)
 
 
 DEFAULT_MAX_UPLOAD_BYTES = 8 * 1024 * 1024
@@ -44,7 +58,8 @@ DEFAULT_TMAP_PEDESTRIAN_ROUTE_URL = "https://apis.openapi.sk.com/tmap/routes/ped
 DEFAULT_TMAP_POI_SEARCH_URL = "https://apis.openapi.sk.com/tmap/pois"
 DEFAULT_TMAP_PEDESTRIAN_API_VERSION = "1"
 DEFAULT_TMAP_TIMEOUT_SECONDS = 4.0
-MAX_TMAP_TIMEOUT_SECONDS = 30.0
+# Provider work must finish before the Gateway's five-second upstream budget.
+MAX_TMAP_TIMEOUT_SECONDS = 4.0
 DEFAULT_TMAP_READINESS_LIVE_PROBE_ENABLED = "false"
 DEFAULT_TMAP_READINESS_PROBE_TIMEOUT_SECONDS = 3.0
 DEFAULT_TMAP_READINESS_SUCCESS_MAX_AGE_SECONDS = 300.0
@@ -57,6 +72,10 @@ MAX_REPORT_METADATA_BYTES_LIMIT = 1024 * 1024
 DEFAULT_MAX_ANDROID_DEBUG_LOG_BYTES = 64 * 1024
 DEFAULT_ANDROID_DEBUG_LOG_RETENTION_DAYS = 7
 DEFAULT_ANDROID_DEBUG_LOG_ENABLED = "false"
+# Developer-only debug store bounds; the store is forbidden in deployment environments.
+DEFAULT_ANDROID_DEBUG_MAX_TOTAL_BYTES = 256 * 1024 * 1024
+DEFAULT_ANDROID_DEBUG_MAX_FRAME_CAPTURES = 1000
+DEFAULT_ANDROID_DEBUG_MAX_DAILY_BYTES = 64 * 1024 * 1024
 DEFAULT_INFERENCE_TIMEOUT_SECONDS = 2.0
 DEFAULT_INFERENCE_STARTUP_TIMEOUT_SECONDS = 30.0
 DEFAULT_DATABASE_CONNECT_TIMEOUT_SECONDS = 5
@@ -177,6 +196,40 @@ def _has_minimum_privacy_hmac_bytes(value: str) -> bool:
     return len(value.encode("utf-8")) >= MIN_PRIVACY_HMAC_SECRET_BYTES
 
 
+def _parse_privacy_hmac_lookup_keys(
+    raw_value: str,
+    *,
+    active_version: int,
+    active_secret: str,
+) -> dict[int, str]:
+    if not raw_value:
+        return {}
+    try:
+        decoded = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        raise ValueError("WALKSAFE_PRIVACY_HMAC_LOOKUP_KEYS must be a JSON object") from exc
+    if not isinstance(decoded, dict):
+        raise ValueError("WALKSAFE_PRIVACY_HMAC_LOOKUP_KEYS must be a JSON object")
+    keys: dict[int, str] = {}
+    for raw_version, secret in decoded.items():
+        if (
+            not isinstance(raw_version, str)
+            or not re.fullmatch(r"[1-9][0-9]{0,17}", raw_version)
+            or not isinstance(secret, str)
+            or not _has_minimum_privacy_hmac_bytes(secret)
+        ):
+            raise ValueError(
+                "WALKSAFE_PRIVACY_HMAC_LOOKUP_KEYS needs positive versions and 32-byte secrets"
+            )
+        version = int(raw_version)
+        if version >= active_version or secret == active_secret or secret in keys.values():
+            raise ValueError(
+                "WALKSAFE_PRIVACY_HMAC_LOOKUP_KEYS must hold distinct older keys only"
+            )
+        keys[version] = secret
+    return keys
+
+
 def _parse_model_class_order(raw_value: str) -> tuple[str, ...]:
     if not raw_value:
         return DEFAULT_MODEL_CLASS_ORDER
@@ -284,6 +337,74 @@ def _parse_signup_document_version(name: str, default: str) -> str:
             f"{name} must be a 1-64 character canonical document version"
         )
     return value
+
+
+def _parse_signup_version_list(name: str, raw: str, current: str) -> frozenset[str]:
+    values = [item.strip() for item in raw.split(",")]
+    if len(values) > 8 or any(
+        re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}", item) is None
+        for item in values
+    ):
+        raise ValueError(
+            f"{name} must list at most 8 comma-separated canonical document versions"
+        )
+    if current in values or len(set(values)) != len(values):
+        raise ValueError(
+            f"{name} must not repeat a version or include the current version"
+        )
+    return frozenset(values)
+
+
+def _parse_signup_equivalent_document_versions(
+    name: str,
+    current: str,
+) -> frozenset[str]:
+    """S01-3 / FP-013-DETAIL-02: earlier versions whose change was non-substantive.
+
+    The operator lists only revisions that did not change collected items, purpose,
+    required/optional status, third-party provision, retention, automatic-report scope
+    or user rights. Empty by default, so every other version stays outdated.
+
+    GWBE-05: the value is anchored to the current version it was declared for,
+    ``<current>=<v1>,<v2>``. When the current version is bumped and the list is left
+    in place, startup fails instead of carrying an old grant to a changed document.
+    """
+    raw = _env_text(name)
+    if not raw:
+        return frozenset()
+    anchor, separator, listed = raw.partition("=")
+    if not separator:
+        raise ValueError(
+            f"{name} must be '<current version>=<v1>,<v2>' anchored to its document version"
+        )
+    if anchor.strip() != current:
+        raise ValueError(
+            f"{name} was declared for {anchor.strip()!r}, not the configured current "
+            f"version {current!r}; review the list after a document version change"
+        )
+    return _parse_signup_version_list(name, listed, current)
+
+
+def _parse_signup_prior_document_versions(
+    name: str,
+    current: str,
+    equivalents: frozenset[str],
+) -> frozenset[str]:
+    """GWBE-04: earlier published versions of an optional signup document.
+
+    A signup showing one of these versions is accepted with that optional grant
+    recorded as not given; any version that is neither current, an equivalent nor
+    listed here fails closed with 409 signup_consent_outdated. Empty by default.
+    """
+    raw = _env_text(name)
+    if not raw:
+        return frozenset()
+    values = _parse_signup_version_list(name, raw, current)
+    if values & equivalents:
+        raise ValueError(
+            f"{name} must not list a version that is also a non-substantive equivalent"
+        )
+    return values
 
 
 def validate_admin_totp_secret(raw_secret: str) -> str:
@@ -495,6 +616,44 @@ class Settings:
         )
         if self.database_statement_timeout_ms > 120_000:
             raise ValueError("DATABASE_STATEMENT_TIMEOUT_MS must be at most 120000")
+        # Dedicated health policy; these are not inference or inventory budgets.
+        self.detect_v2_health_refresh_interval_seconds = float(
+            _env_text("WALKSAFE_DETECT_V2_HEALTH_REFRESH_INTERVAL_SECONDS", "5") or "5"
+        )
+        self.detect_v2_health_max_age_seconds = float(
+            _env_text("WALKSAFE_DETECT_V2_HEALTH_MAX_AGE_SECONDS", "10") or "10"
+        )
+        self.detect_v2_health_refresh_timeout_seconds = float(
+            _env_text("WALKSAFE_DETECT_V2_HEALTH_REFRESH_TIMEOUT_SECONDS", "5") or "5"
+        )
+        for name, value in (
+            ("WALKSAFE_DETECT_V2_HEALTH_REFRESH_INTERVAL_SECONDS", self.detect_v2_health_refresh_interval_seconds),
+            ("WALKSAFE_DETECT_V2_HEALTH_MAX_AGE_SECONDS", self.detect_v2_health_max_age_seconds),
+            ("WALKSAFE_DETECT_V2_HEALTH_REFRESH_TIMEOUT_SECONDS", self.detect_v2_health_refresh_timeout_seconds),
+        ):
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be finite and positive")
+        if self.detect_v2_health_max_age_seconds < max(
+            self.detect_v2_health_refresh_interval_seconds,
+            self.detect_v2_health_refresh_timeout_seconds,
+        ):
+            raise ValueError("detect v2 health max age must cover its refresh interval and timeout")
+        # Raw storage retains its existing opt-in inventory snapshot policy.
+        self.readiness_inventory_cache_seconds = float(
+            _env_text("WALKSAFE_READINESS_INVENTORY_CACHE_SECONDS", "0") or "0"
+        )
+        if (
+            not math.isfinite(self.readiness_inventory_cache_seconds)
+            or self.readiness_inventory_cache_seconds < 0
+        ):
+            raise ValueError("WALKSAFE_READINESS_INVENTORY_CACHE_SECONDS must be finite and nonnegative")
+        # Engineering defaults for report coverage, not a deployment latency SLA.
+        self.report_storage_refresh_seconds = float(_env_text("WALKSAFE_REPORT_STORAGE_REFRESH_SECONDS", "1") or "1")
+        self.report_storage_max_age_seconds = float(_env_text("WALKSAFE_REPORT_STORAGE_MAX_AGE_SECONDS", "30") or "30")
+        if any(not math.isfinite(value) or value <= 0 for value in (
+            self.report_storage_refresh_seconds, self.report_storage_max_age_seconds,
+        )) or self.report_storage_max_age_seconds < self.report_storage_refresh_seconds:
+            raise ValueError("report storage max age must be finite, positive, and cover its refresh interval")
         raw_upload_dir = Path(os.getenv("UPLOAD_DIR", str(backend_root / "uploads"))).expanduser()
         self._upload_dir_was_absolute = raw_upload_dir.is_absolute()
         self._configured_upload_dir = raw_upload_dir.absolute()
@@ -659,6 +818,27 @@ class Settings:
         )
         if self.tmap_readiness_success_max_age_seconds > 3600:
             raise ValueError("TMAP_READINESS_SUCCESS_MAX_AGE_SECONDS must be at most 3600")
+        # S20-29: common route+POI provider call budget (process-local windows).
+        self.tmap_call_budget_per_minute = _parse_positive_int(
+            "TMAP_CALL_BUDGET_PER_MINUTE",
+            TMAP_CALL_BUDGET_PER_MINUTE_DEFAULT,
+        )
+        if self.tmap_call_budget_per_minute > TMAP_CALL_BUDGET_PER_MINUTE_MAX:
+            raise ValueError(
+                f"TMAP_CALL_BUDGET_PER_MINUTE must be at most {TMAP_CALL_BUDGET_PER_MINUTE_MAX}"
+            )
+        self.tmap_call_budget_per_day = _parse_positive_int(
+            "TMAP_CALL_BUDGET_PER_DAY",
+            TMAP_CALL_BUDGET_PER_DAY_DEFAULT,
+        )
+        if self.tmap_call_budget_per_day > TMAP_CALL_BUDGET_PER_DAY_MAX:
+            raise ValueError(
+                f"TMAP_CALL_BUDGET_PER_DAY must be at most {TMAP_CALL_BUDGET_PER_DAY_MAX}"
+            )
+        if self.tmap_call_budget_per_day < self.tmap_call_budget_per_minute:
+            raise ValueError(
+                "TMAP_CALL_BUDGET_PER_DAY must be at least TMAP_CALL_BUDGET_PER_MINUTE"
+            )
         self.tmap_pedestrian_speed_kmh = _parse_positive_float(
             "TMAP_PEDESTRIAN_SPEED_KMH",
             DEFAULT_TMAP_PEDESTRIAN_SPEED_KMH,
@@ -693,6 +873,18 @@ class Settings:
         )
         if self.android_debug_log_retention_days > 30:
             raise ValueError("ANDROID_DEBUG_LOG_RETENTION_DAYS must be at most 30")
+        self.android_debug_max_total_bytes = _parse_positive_int(
+            "ANDROID_DEBUG_MAX_TOTAL_BYTES",
+            DEFAULT_ANDROID_DEBUG_MAX_TOTAL_BYTES,
+        )
+        self.android_debug_max_frame_captures = _parse_positive_int(
+            "ANDROID_DEBUG_MAX_FRAME_CAPTURES",
+            DEFAULT_ANDROID_DEBUG_MAX_FRAME_CAPTURES,
+        )
+        self.android_debug_max_daily_bytes = _parse_positive_int(
+            "ANDROID_DEBUG_MAX_DAILY_BYTES",
+            DEFAULT_ANDROID_DEBUG_MAX_DAILY_BYTES,
+        )
         self.cors_origins = [
             origin.strip()
             for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
@@ -817,10 +1009,28 @@ class Settings:
         self.field_test_token = _env_text("WALKSAFE_FIELD_TEST_TOKEN")
         self.admin_token = _env_text("WALKSAFE_ADMIN_TOKEN")
         self.gateway_session_secret = _env_text("WALKSAFE_GATEWAY_SESSION_SECRET")
+        # S19-52/S20-41: v1-v3 actor assertions are not request-bound. Owner
+        # decision 7 (2026-09-29): the default is "safe-methods" (every write needs
+        # a request-bound v4; v1-v3 only for GET/HEAD), then "reject" (v4 only).
+        # "accept" remains an explicit opt-in for legacy compatibility tests only.
+        self.actor_assertion_v3_policy = _env_text(
+            "WALKSAFE_ACTOR_ASSERTION_V3_POLICY", "safe-methods",
+        )
+        if self.actor_assertion_v3_policy not in {"accept", "safe-methods", "reject"}:
+            raise ValueError(
+                "WALKSAFE_ACTOR_ASSERTION_V3_POLICY must be accept, safe-methods or reject"
+            )
         self.privacy_hmac_secret = _env_text("WALKSAFE_PRIVACY_HMAC_SECRET")
         self.privacy_hmac_key_version = _parse_positive_int(
             "WALKSAFE_PRIVACY_HMAC_KEY_VERSION",
             1,
+        )
+        # S1617-50: lookup-only keys retired by a rotation, as a JSON object
+        # {"<version>": "<secret>"}. Each must match the database keyring.
+        self.privacy_hmac_lookup_keys = _parse_privacy_hmac_lookup_keys(
+            _env_text("WALKSAFE_PRIVACY_HMAC_LOOKUP_KEYS"),
+            active_version=self.privacy_hmac_key_version,
+            active_secret=self.privacy_hmac_secret,
         )
         maintenance_lock_path = _env_text("WALKSAFE_MAINTENANCE_LOCK_PATH")
         raw_maintenance_lock = Path(maintenance_lock_path).expanduser() if maintenance_lock_path else None
@@ -989,16 +1199,36 @@ class Settings:
             ),
             "raw_original": _parse_signup_document_version(
                 "WALKSAFE_SIGNUP_RAW_ORIGINAL_VERSION",
-                "FP-013-RAW-1.1.0",
+                "FP-013-RAW-1.2.0",
             ),
             "automatic_reporting": _parse_signup_document_version(
                 "WALKSAFE_SIGNUP_AUTOMATIC_REPORTING_VERSION",
-                "FP-013-AUTO-1.1.0",
+                "FP-013-AUTO-1.2.0",
             ),
             "training_reuse": _parse_signup_document_version(
                 "WALKSAFE_SIGNUP_TRAINING_REUSE_VERSION",
                 "FP-013-TRAINING-1.1.0",
             ),
+        }
+        if not signup_document_keys_are_exact(self.account_signup_document_versions):
+            raise ValueError(
+                "signup document versions must cover exactly the required and optional "
+                "signup documents"
+            )
+        self.account_signup_equivalent_document_versions = {
+            key: _parse_signup_equivalent_document_versions(
+                f"WALKSAFE_SIGNUP_{key.upper()}_EQUIVALENT_VERSIONS",
+                version,
+            )
+            for key, version in self.account_signup_document_versions.items()
+        }
+        self.account_signup_prior_document_versions = {
+            key: _parse_signup_prior_document_versions(
+                f"WALKSAFE_SIGNUP_{key.upper()}_PRIOR_VERSIONS",
+                self.account_signup_document_versions[key],
+                self.account_signup_equivalent_document_versions[key],
+            )
+            for key in SIGNUP_OPTIONAL_DOCUMENT_KEYS
         }
         self.account_smtp_host = _env_text("WALKSAFE_ACCOUNT_SMTP_HOST")
         self.account_smtp_port = _parse_positive_int(
@@ -1107,6 +1337,16 @@ class Settings:
         )
         if self.actor_rate_limit_store not in {"memory", "postgresql"}:
             raise ValueError("WALKSAFE_ACTOR_RATE_LIMIT_STORE must be memory or postgresql")
+        self.actor_rate_limit_max_in_flight = _parse_positive_int(
+            "WALKSAFE_ACTOR_RATE_LIMIT_MAX_IN_FLIGHT", 4,
+        )
+        if self.actor_rate_limit_max_in_flight > 64:
+            raise ValueError("WALKSAFE_ACTOR_RATE_LIMIT_MAX_IN_FLIGHT must be at most 64")
+        self.actor_rate_limit_budget_ms = _parse_positive_int(
+            "WALKSAFE_ACTOR_RATE_LIMIT_BUDGET_MS", 5000,
+        )
+        if self.actor_rate_limit_budget_ms > 120_000:
+            raise ValueError("WALKSAFE_ACTOR_RATE_LIMIT_BUDGET_MS must be at most 120000")
         default_process_isolation = "false" if self.walksafe_environment == "test" else "true"
         self.inference_process_isolation_enabled = _parse_bool(
             "INFERENCE_PROCESS_ISOLATION_ENABLED",
@@ -1129,6 +1369,11 @@ class Settings:
         self.walksafe_source_commit = _env_text("WALKSAFE_SOURCE_COMMIT").lower()
         if self.walksafe_source_commit and FULL_GIT_COMMIT.fullmatch(self.walksafe_source_commit) is None:
             raise ValueError("WALKSAFE_SOURCE_COMMIT must be a full lowercase Git commit SHA")
+        # S20-7: explicit approved Android release table; unset = current only.
+        self.approved_android_releases = parse_approved_android_releases(
+            _env_text(ANDROID_RELEASES_ENVIRONMENT_NAME),
+            current_commit=self.walksafe_source_commit,
+        )
         if self.walksafe_environment not in SUPPORTED_WALKSAFE_ENVIRONMENTS:
             raise ValueError("WALKSAFE_ENVIRONMENT has an unsupported value")
         self.allow_insecure_local_dev = _parse_bool("WALKSAFE_ALLOW_INSECURE_LOCAL_DEV", "false")
@@ -1180,6 +1425,13 @@ class Settings:
             if self.actor_rate_limit_store != "postgresql":
                 raise ValueError(
                     "deployment environments require WALKSAFE_ACTOR_RATE_LIMIT_STORE=postgresql"
+                )
+            # w24 misc-F3 / owner decision 7: "accept" would reopen request-unbound
+            # v1-v3 writes; it is a legacy compatibility-test value only.
+            if self.actor_assertion_v3_policy == "accept":
+                raise ValueError(
+                    "deployment environments require WALKSAFE_ACTOR_ASSERTION_V3_POLICY="
+                    "safe-methods or reject"
                 )
             if len(self.gateway_session_secret) < 32:
                 raise ValueError("WALKSAFE_GATEWAY_SESSION_SECRET must contain at least 32 characters")

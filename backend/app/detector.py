@@ -42,6 +42,13 @@ class ModelUnavailable(Exception):
         self.reason = reason
 
 
+class InvalidDetectionImage(RuntimeError):
+    """A request image failed decoding before model code was entered."""
+
+    def __init__(self) -> None:
+        super().__init__("image_decode_failed")
+
+
 @dataclass(frozen=True)
 class AdapterLoadResult:
     adapter: Optional["YoloPtAdapter"] = None
@@ -112,11 +119,21 @@ async def run_detection(
 
 def _run_detection_sync(image_bytes: bytes, content_type: str, context: DetectContext) -> DetectResponse:
     settings = get_settings()
+    image = _decode_image(image_bytes, _load_pillow_image_module())
     load_result = _adapter_load_result(settings)
     if load_result.adapter is None:
         raise RuntimeError(load_result.reason or MODEL_NOT_CONFIGURED_REASON)
 
-    return load_result.adapter.predict(image_bytes, settings, context)
+    return load_result.adapter.predict_image(image, settings, context)
+
+
+def _decode_image(image_bytes: bytes, image_module: Any) -> Any:
+    try:
+        image = image_module.open(BytesIO(image_bytes))
+        image.load()
+    except OSError as exc:
+        raise InvalidDetectionImage() from exc
+    return image.convert("RGB")
 
 
 def _adapter_load_result(settings: Any) -> AdapterLoadResult:
@@ -197,11 +214,10 @@ class YoloPtAdapter:
         return cls(model=model, image_module=image_module, class_id_map=class_id_map)
 
     def predict(self, image_bytes: bytes, settings: Any, context: DetectContext) -> DetectResponse:
-        try:
-            image = self._image_module.open(BytesIO(image_bytes)).convert("RGB")
-        except Exception as exc:
-            raise RuntimeError("image_decode_failed") from exc
+        image = _decode_image(image_bytes, self._image_module)
+        return self.predict_image(image, settings, context)
 
+    def predict_image(self, image: Any, settings: Any, context: DetectContext) -> DetectResponse:
         results = self._model(
             image,
             conf=settings.model_confidence_threshold,

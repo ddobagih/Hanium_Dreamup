@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckCameraSampleVerdict
+import kr.co.hanium.dreamup.walksafe.device.DeviceCheckCameraSamplingPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -112,7 +114,24 @@ class MainActivityPostLoginDeviceCheckStaticTest {
         assertTrue(preflight.contains("ProcessCameraProvider.getInstance(this)"))
         assertTrue(preflight.contains("frameClaimed.compareAndSet(false, true)"))
         assertTrue(preflight.contains("attemptedFrames.incrementAndGet()"))
-        assertTrue(preflight.contains("POST_LOGIN_CAMERA_PIPELINE_MAX_FRAMES"))
+        assertTrue(preflight.contains("DeviceCheckCameraSamplingPolicy.evaluate(attempts, passes)"))
+        assertTrue(preflight.contains("verdict != DeviceCheckCameraSampleVerdict.CONTINUE"))
+        assertTrue(preflight.contains("terminalClaim.compareAndSet(false, true)"))
+        assertEquals(10, DeviceCheckCameraSamplingPolicy.REQUIRED_FRAMES)
+        assertEquals(80, DeviceCheckCameraSamplingPolicy.MINIMUM_PASSING_PERCENT)
+        assertEquals(8, DeviceCheckCameraSamplingPolicy.REQUIRED_PASSES)
+        assertEquals(DeviceCheckCameraSampleVerdict.CONTINUE, DeviceCheckCameraSamplingPolicy.evaluate(7, 7))
+        assertEquals(DeviceCheckCameraSampleVerdict.PASSED, DeviceCheckCameraSamplingPolicy.evaluate(8, 8))
+        assertEquals(DeviceCheckCameraSampleVerdict.FAILED, DeviceCheckCameraSamplingPolicy.evaluate(3, 0))
+        assertEquals(DeviceCheckCameraSampleVerdict.FAILED, DeviceCheckCameraSamplingPolicy.evaluate(11, 8))
+        (0..DeviceCheckCameraSamplingPolicy.REQUIRED_FRAMES).forEach { passed ->
+            assertFalse(
+                DeviceCheckCameraSamplingPolicy.evaluate(
+                    DeviceCheckCameraSamplingPolicy.REQUIRED_FRAMES,
+                    passed,
+                ) == DeviceCheckCameraSampleVerdict.CONTINUE,
+            )
+        }
         assertTrue(preflight.contains("frameClaimed.set(false)"))
         assertTrue(preflight.contains("POST_LOGIN_CAMERA_PIPELINE_TIMEOUT_MS"))
         assertTrue(preflight.contains("frameDetector.detect("))

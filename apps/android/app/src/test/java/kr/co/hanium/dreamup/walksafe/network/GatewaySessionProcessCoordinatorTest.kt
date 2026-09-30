@@ -2,10 +2,14 @@ package kr.co.hanium.dreamup.walksafe.network
 
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingAttemptRequest
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingPolicy
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOpaqueActorBinding
 import kr.co.hanium.dreamup.walksafe.session.FirstRunReceiptHash
+import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentAuthorityGuard
+import kr.co.hanium.dreamup.walksafe.report.ReportPrivacyConsentSession
+import kr.co.hanium.dreamup.walksafe.report.ReportTransferPurpose
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,6 +24,108 @@ import org.junit.Test
 class GatewaySessionProcessCoordinatorTest {
     private val firstOwner = Any()
     private val secondOwner = Any()
+
+    @Test
+    fun consentCommitAndSessionReplacementCannotPassEachOther() {
+        val session = GatewayFieldSession.verified(
+            gatewayBaseUrl = "https://gateway.example.test",
+            actorId = "consent-commit-tester",
+            cookiePair = "walksafe_field_session=v2.test.session.cookie",
+            expiresAtEpochMs = Long.MAX_VALUE,
+        )
+        val operation = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        assertTrue(GatewaySessionProcessCoordinator.publishVerified(
+            operation, session, FirstRunOnboardingPolicy.initial(),
+        ))
+        val generation = GatewaySessionProcessCoordinator.snapshot().generation
+        val insideCommit = CountDownLatch(1)
+        val releaseCommit = CountDownLatch(1)
+        val replacementFinished = CountDownLatch(1)
+        val committed = AtomicBoolean(false)
+        val commit = Thread {
+            committed.set(GatewaySessionProcessCoordinator.withCurrentGeneralSession(
+                generation, session,
+            ) {
+                insideCommit.countDown()
+                releaseCommit.await(2, TimeUnit.SECONDS)
+            } == true)
+        }
+        val replacement = Thread {
+            GatewaySessionProcessCoordinator.clear(generation)
+            replacementFinished.countDown()
+        }
+        commit.start()
+        assertTrue(insideCommit.await(2, TimeUnit.SECONDS))
+        replacement.start()
+        assertFalse(replacementFinished.await(100, TimeUnit.MILLISECONDS))
+        releaseCommit.countDown()
+        commit.join(2_000)
+        replacement.join(2_000)
+        assertFalse(commit.isAlive)
+        assertFalse(replacement.isAlive)
+        assertTrue(committed.get())
+        assertFalse(GatewaySessionProcessCoordinator.isCurrentGeneralSession(generation, session))
+        assertNull(GatewaySessionProcessCoordinator.withCurrentGeneralSession(
+            generation, session,
+        ) { true })
+    }
+
+    @Test
+    fun reportPermitOpenerAndSessionReplacementAreSerializedByTheSameGuard() {
+        val session = GatewayFieldSession.verified(
+            gatewayBaseUrl = "https://gateway.example.test",
+            actorId = "consent-report-tester",
+            cookiePair = "walksafe_field_session=v2.test.session.cookie",
+            expiresAtEpochMs = Long.MAX_VALUE,
+        )
+        val operation = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        assertTrue(GatewaySessionProcessCoordinator.publishVerified(
+            operation, session, FirstRunOnboardingPolicy.initial(),
+        ))
+        val generation = GatewaySessionProcessCoordinator.snapshot().generation
+        val guard = object : IntegratedConsentAuthorityGuard {
+            override fun <T : Any> withCurrent(action: () -> T): T? =
+                GatewaySessionProcessCoordinator.withCurrentGeneralSession(
+                    generation, session, action,
+                )
+        }
+        ReportPrivacyConsentSession.resetForNewEnrollment()
+        try {
+            assertTrue(ReportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent(guard))
+            val permit = requireNotNull(
+                ReportPrivacyConsentSession.issueUploadPermit(ReportTransferPurpose.EXPLICIT),
+            )
+            val insideOpener = CountDownLatch(1)
+            val releaseOpener = CountDownLatch(1)
+            val replacementFinished = CountDownLatch(1)
+            val opened = AtomicBoolean(false)
+            val opener = Thread {
+                ReportPrivacyConsentSession.withLiveUploadPermit(
+                    permit, ReportTransferPurpose.EXPLICIT,
+                ) {
+                    insideOpener.countDown()
+                    releaseOpener.await(2, TimeUnit.SECONDS)
+                    opened.set(true)
+                }
+            }
+            val replacement = Thread {
+                GatewaySessionProcessCoordinator.clear(generation)
+                replacementFinished.countDown()
+            }
+            opener.start()
+            assertTrue(insideOpener.await(2, TimeUnit.SECONDS))
+            replacement.start()
+            assertFalse(replacementFinished.await(100, TimeUnit.MILLISECONDS))
+            releaseOpener.countDown()
+            opener.join(2_000)
+            replacement.join(2_000)
+            assertTrue(opened.get())
+            assertFalse(ReportPrivacyConsentSession.isGranted())
+            assertNull(ReportPrivacyConsentSession.issueUploadPermit(ReportTransferPurpose.EXPLICIT))
+        } finally {
+            ReportPrivacyConsentSession.withdraw()
+        }
+    }
 
     @Before
     fun clearProcessState() {
@@ -176,6 +282,9 @@ class GatewaySessionProcessCoordinatorTest {
         )
         val observed = mutableListOf<GatewaySessionProcessSnapshot>()
         val published = GatewaySessionProcessCoordinator.attach(firstOwner, observed::add)
+        assertTrue(GatewaySessionProcessCoordinator.isCurrentGeneralSession(
+            published.generation, session,
+        ))
         val advanced = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
             snapshot = firstRun,
             expectedEpoch = firstRun.epoch,
@@ -197,6 +306,9 @@ class GatewaySessionProcessCoordinatorTest {
         assertEquals(2, observed.size)
         assertEquals(observed.first().generation, observed.last().generation)
         assertSame(advanced, observed.last().restoredFirstRunSnapshot)
+        assertTrue(GatewaySessionProcessCoordinator.isCurrentGeneralSession(
+            published.generation, session,
+        ))
     }
 
     @Test

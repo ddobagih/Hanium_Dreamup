@@ -8,6 +8,31 @@ import org.junit.Test
 
 class GnssQualityObserverTest {
     @Test
+    fun newStatusCannotRepackageExpiredRawSignalWindow() {
+        val source = FakeGnssObservationSource()
+        val snapshots = mutableListOf<GnssQualitySnapshot>()
+        val observer = GnssQualityObserver(source = source, onSnapshot = snapshots::add)
+        observer.start()
+        source.emitMeasurements(epoch(1L, 30.0))
+        source.emitStatus(dualFrequencySignals(6_000_000_002L))
+        assertTrue(snapshots.last().isStale)
+        assertEquals(0, snapshots.last().epochCount)
+        assertNull(snapshots.last().medianCn0DbHz)
+    }
+
+    @Test
+    fun oldStatusIsIgnoredAndDoesNotOverwriteNewerSatelliteSummary() {
+        val source = FakeGnssObservationSource()
+        val snapshots = mutableListOf<GnssQualitySnapshot>()
+        val observer = GnssQualityObserver(source = source, onSnapshot = snapshots::add)
+        observer.start()
+        source.emitStatus(dualFrequencySignals(20L))
+        source.emitStatus(GnssSignalEpoch(10L, emptyList()))
+        assertEquals(1, snapshots.size)
+        assertEquals(DualFrequencyObservationState.DUAL_FREQUENCY_OBSERVED, observer.snapshot(20L).frequencySummary.state)
+    }
+
+    @Test
     fun registersStatusAndMeasurementsIndependently() {
         val source = FakeGnssObservationSource(measurementMode = RegistrationMode.REJECT)
         val snapshots = mutableListOf<GnssQualitySnapshot>()

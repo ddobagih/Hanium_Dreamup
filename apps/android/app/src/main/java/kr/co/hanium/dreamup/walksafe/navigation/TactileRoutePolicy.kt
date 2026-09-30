@@ -37,11 +37,23 @@ data class TactileRouteObservation(
     val stableFrames: Int,
     val stableMs: Long,
     val ageMs: Long,
+    /** Legacy camera-to-route angle, not evidence of the tactile block's own axis. */
     val routeHeadingDeltaDeg: Float?,
     val tmapCorridorProjection: TmapCorridorProjectionEvidence,
     val centerXNormalized: Float,
     val routeId: String? = null,
     val routeSegmentIndex: Int? = null,
+    /** Route install revision at capture ([ActiveRouteProjection.routeRevision]). */
+    val routeVersion: Long? = null,
+)
+
+/**
+ * S12-12: route progress at evaluation time. Null fields mean "unknown now" and reject every
+ * normal block; the caller passes null for the whole value only when it has no progress contract.
+ */
+data class TactileActiveRouteProgress(
+    val routeVersion: Long?,
+    val segmentIndex: Int?,
 )
 
 data class TactileRoutePolicyInput(
@@ -50,6 +62,7 @@ data class TactileRoutePolicyInput(
     val gpsAccuracyM: Float?,
     val tactile: TactileRouteObservation?,
     val activeRouteId: String? = null,
+    val activeRouteProgress: TactileActiveRouteProgress? = null,
 )
 
 data class TactileRouteDecision(
@@ -60,26 +73,37 @@ data class TactileRouteDecision(
 )
 
 /**
- * Keeps TMAP as the global route and admits a detected linear tactile block only as a short-range
- * walking corridor. Every missing or uncertain input fails back to TMAP.
+ * Keeps TMAP as the global route. Observation eligibility is not permission to follow a block:
+ * these inputs do not prove its axis, user-relative motion, or measured contact depth.
  */
 class TactileRoutePolicy(
     private val config: TactileRoutePolicyConfig = TactileRoutePolicyConfig(),
 ) {
     /** Damage or a dot warning tile in the corridor blocks a directional local-path choice. */
-    fun selectCandidate(candidates: List<TactileRouteObservation>): TactileRouteObservation? {
+    fun selectCandidate(
+        candidates: List<TactileRouteObservation>,
+        activeRouteId: String? = null,
+        activeRouteProgress: TactileActiveRouteProgress? = null,
+    ): TactileRouteObservation? {
         val inCorridor = candidates.filter {
             it.tmapCorridorProjection == TmapCorridorProjectionEvidence.OVERLAPS
+        }
+        // Rank normal observations only after eligibility. Blockers deliberately keep their
+        // existing conservative priority instead of inheriting normal-path acceptance gates.
+        val eligibleNormal = inCorridor.filter {
+            WalkMateClassPolicy.isTraversableTactileClass(it.className) &&
+                observationRejectionReason(it, activeRouteId, activeRouteProgress) == null
         }
         return inCorridor
             .filter { WalkMateClassPolicy.isTactileRouteBlockingClass(it.className) }
             .maxByOrNull(TactileRouteObservation::confidence)
-            ?: inCorridor
-                .filter { WalkMateClassPolicy.isTraversableTactileClass(it.className) }
-                .maxByOrNull(TactileRouteObservation::confidence)
+            ?: eligibleNormal.maxByOrNull(TactileRouteObservation::confidence)
             ?: candidates
                 .filter { WalkMateClassPolicy.isTactileRouteBlockingClass(it.className) }
                 .maxByOrNull(TactileRouteObservation::confidence)
+            // No eligible path observation remains. Keep a rejected observation for evaluate's
+            // diagnostic instead of reporting an observed block as absent. This fallback is
+            // not eligibility or movement authorization and cannot displace an eligible normal.
             ?: candidates
                 .filter { WalkMateClassPolicy.isTraversableTactileClass(it.className) }
                 .maxByOrNull(TactileRouteObservation::confidence)
@@ -93,51 +117,67 @@ class TactileRoutePolicy(
             return tmap("gps_untrusted")
         }
         val tactile = input.tactile ?: return tmap("tactile_not_visible")
+        observationRejectionReason(tactile, input.activeRouteId, input.activeRouteProgress)?.let { return tmap(it) }
+        // Camera alignment, image side and representative-depth association cannot authorize
+        // a walking maneuver. No producer currently supplies the missing independent evidence.
+        return tmap("tactile_motion_evidence_unavailable")
+    }
+
+    private fun observationRejectionReason(
+        tactile: TactileRouteObservation,
+        activeRouteId: String?,
+        activeRouteProgress: TactileActiveRouteProgress?,
+    ): String? {
         if (
-            (input.activeRouteId != null || tactile.routeId != null) &&
-            (input.activeRouteId == null || tactile.routeId != input.activeRouteId)
+            (activeRouteId != null || tactile.routeId != null) &&
+            (activeRouteId == null || tactile.routeId != activeRouteId)
         ) {
-            return tmap("tactile_route_identity_mismatch")
+            return "tactile_route_identity_mismatch"
         }
+        routeProgressRejectionReason(tactile, activeRouteProgress)?.let { return it }
         when (tactile.tmapCorridorProjection) {
-            TmapCorridorProjectionEvidence.UNAVAILABLE -> return tmap("tmap_corridor_projection_unavailable")
-            TmapCorridorProjectionEvidence.OUTSIDE -> return tmap("tactile_outside_tmap_corridor")
+            TmapCorridorProjectionEvidence.UNAVAILABLE -> return "tmap_corridor_projection_unavailable"
+            TmapCorridorProjectionEvidence.OUTSIDE -> return "tactile_outside_tmap_corridor"
             TmapCorridorProjectionEvidence.OVERLAPS -> Unit
         }
         if (!WalkMateClassPolicy.isTraversableTactileClass(tactile.className)) {
-            return tmap("tactile_not_traversable")
+            return "tactile_not_traversable"
         }
         if (!tactile.confidence.isFinite() || tactile.confidence < config.minimumConfidence) {
-            return tmap("tactile_confidence_low")
+            return "tactile_confidence_low"
         }
         if (tactile.stableFrames < config.minimumStableFrames || tactile.stableMs < config.minimumStableMs) {
-            return tmap("tactile_not_stable")
+            return "tactile_not_stable"
         }
-        if (tactile.ageMs !in 0L..config.maximumDetectionAgeMs) return tmap("tactile_stale")
+        if (tactile.ageMs !in 0L..config.maximumDetectionAgeMs) return "tactile_stale"
         val headingDelta = tactile.routeHeadingDeltaDeg
         if (headingDelta == null || !headingDelta.isFinite() || abs(headingDelta) > config.maximumRouteHeadingDeltaDeg) {
-            return tmap("route_heading_mismatch")
+            return "route_heading_mismatch"
         }
         if (!tactile.centerXNormalized.isFinite() || tactile.centerXNormalized !in 0f..1f) {
-            return tmap("tactile_geometry_invalid")
+            return "tactile_geometry_invalid"
         }
+        return null
+    }
 
-        val steering = when {
-            tactile.centerXNormalized < 0.5f - config.steeringDeadZone -> TactileSteering.LEFT
-            tactile.centerXNormalized > 0.5f + config.steeringDeadZone -> TactileSteering.RIGHT
-            else -> TactileSteering.STRAIGHT
+    /**
+     * Same route ID is not the same guidance segment. Only the current matched segment and the
+     * next one in travel direction are continuous; a previous or skipped segment is rejected.
+     */
+    private fun routeProgressRejectionReason(
+        tactile: TactileRouteObservation,
+        progress: TactileActiveRouteProgress?,
+    ): String? {
+        progress ?: return null
+        val activeVersion = progress.routeVersion
+        val activeSegment = progress.segmentIndex
+        if (activeVersion == null || activeSegment == null || activeSegment < 0) {
+            return "tactile_route_progress_unavailable"
         }
-        val instruction = when (steering) {
-            TactileSteering.LEFT -> "왼쪽 점자블록을 따라 이동하세요."
-            TactileSteering.RIGHT -> "오른쪽 점자블록을 따라 이동하세요."
-            TactileSteering.STRAIGHT -> "전방 점자블록을 따라 이동하세요."
-        }
-        return TactileRouteDecision(
-            mode = LocalRouteMode.TACTILE_LOCAL,
-            steering = steering,
-            reason = "stable_aligned_tactile",
-            instruction = instruction,
-        )
+        if (tactile.routeVersion != activeVersion) return "tactile_route_version_mismatch"
+        val observedSegment = tactile.routeSegmentIndex ?: return "tactile_segment_mismatch"
+        if (observedSegment - activeSegment !in 0..MAX_FORWARD_SEGMENT_STEP) return "tactile_segment_mismatch"
+        return null
     }
 
     private fun tmap(reason: String): TactileRouteDecision {
@@ -147,6 +187,11 @@ class TactileRoutePolicy(
             reason = reason,
             instruction = null,
         )
+    }
+
+    private companion object {
+        /** Adjacent-boundary continuity only; going back a segment is never continuous. */
+        const val MAX_FORWARD_SEGMENT_STEP = 1
     }
 }
 

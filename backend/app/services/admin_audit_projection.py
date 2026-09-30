@@ -17,6 +17,7 @@ from backend.app.models import (
     AdminOperationAudit,
     AdminSecurityAudit,
     ReportExportAudit,
+    ReportInstitutionDeliveryCorrection,
     ReportInstitutionDeliveryEvent,
     ReportReadAudit,
     ReportReviewDecision,
@@ -345,19 +346,62 @@ def query_admin_audit_events(
             rows.append(AdminAuditEventRow(str(item.audit_id), "EXPORT", f"report.export.{item.export_format}", "SUCCEEDED", item.actor_id, "report_export", str(item.audit_id), item.created_at, None))
 
     if "DELIVERY" in selected:
+        # S18-40-F1: a corrected event keeps its row and outcome; its action
+        # gains a ".corrected" suffix, and the correction itself is a separate
+        # DELIVERY row (source_rank 2) with its own actor, time and correlation.
         statement = select(
             ReportInstitutionDeliveryEvent.id, ReportInstitutionDeliveryEvent.status,
             ReportInstitutionDeliveryEvent.admin_id, ReportInstitutionDeliveryEvent.report_id,
             ReportInstitutionDeliveryEvent.recorded_at,
             ReportInstitutionDeliveryEvent.correlation_id,
+            ReportInstitutionDeliveryCorrection.id.label("correction_id"),
+        ).outerjoin(
+            ReportInstitutionDeliveryCorrection,
+            ReportInstitutionDeliveryCorrection.corrects_event_id
+            == ReportInstitutionDeliveryEvent.id,
+        )
+        correction = select(
+            ReportInstitutionDeliveryCorrection.id,
+            ReportInstitutionDeliveryCorrection.admin_id,
+            ReportInstitutionDeliveryCorrection.report_id,
+            ReportInstitutionDeliveryCorrection.created_at,
+            ReportInstitutionDeliveryCorrection.correlation_id,
         )
         if actor_id is not None:
             statement = statement.where(ReportInstitutionDeliveryEvent.admin_id == actor_id)
+            correction = correction.where(
+                ReportInstitutionDeliveryCorrection.admin_id == actor_id
+            )
         clause = _cursor_clause(ReportInstitutionDeliveryEvent.recorded_at, ReportInstitutionDeliveryEvent.id, "DELIVERY", cursor)
         if clause is not None:
             statement = statement.where(clause)
+        correction_clause = _cursor_clause(
+            ReportInstitutionDeliveryCorrection.created_at,
+            ReportInstitutionDeliveryCorrection.id,
+            "DELIVERY",
+            cursor,
+            2,
+        )
+        if correction_clause is not None:
+            correction = correction.where(correction_clause)
         for item in db.execute(statement.order_by(ReportInstitutionDeliveryEvent.recorded_at.desc(), ReportInstitutionDeliveryEvent.id.desc()).limit(limit + 1)).all():
-            rows.append(AdminAuditEventRow(str(item.id), "DELIVERY", f"report.delivery.{item.status}", "SUCCEEDED", item.admin_id, "report", str(item.report_id), item.recorded_at, item.correlation_id))
+            action = f"report.delivery.{item.status}"
+            if item.correction_id is not None:
+                action += ".corrected"
+            rows.append(AdminAuditEventRow(str(item.id), "DELIVERY", action, "SUCCEEDED", item.admin_id, "report", str(item.report_id), item.recorded_at, item.correlation_id))
+        for item in db.execute(
+            correction.order_by(
+                ReportInstitutionDeliveryCorrection.created_at.desc(),
+                ReportInstitutionDeliveryCorrection.id.desc(),
+            ).limit(limit + 1)
+        ).all():
+            rows.append(AdminAuditEventRow(
+                event_id=str(item.id), event_type="DELIVERY",
+                action="report.delivery.correct", outcome="SUCCEEDED",
+                actor_id=item.admin_id, resource_type="report",
+                resource_id=str(item.report_id), occurred_at=item.created_at,
+                correlation_id=item.correlation_id, source_rank=2,
+            ))
 
     rows = [row for row in rows if _after_cursor(row, cursor)]
     rows.sort(

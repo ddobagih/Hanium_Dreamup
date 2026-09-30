@@ -60,6 +60,27 @@ class GatewayPersistedLoginStateTest {
     }
 
     @Test
+    fun persistedServerExpiryParticipatesInExactBundleIdentity() {
+        val existing = GatewayPersistedLoginState.Active(bundle(rotation = 0L))
+        val withServerExpiry = bundle(rotation = 0L, serverAccessExpiresAtEpochMs = 2_050L)
+
+        val changed = GatewayPersistedLoginStatePolicy.saveInitialIfAbsent(
+            current = existing,
+            bundle = withServerExpiry,
+        )
+        assertEquals(GatewaySessionStoreResult.STALE, changed.result)
+        assertSame(existing, changed.nextState)
+
+        val exact = GatewayPersistedLoginState.Active(withServerExpiry)
+        val unchanged = GatewayPersistedLoginStatePolicy.saveInitialIfAbsent(
+            current = exact,
+            bundle = withServerExpiry,
+        )
+        assertEquals(GatewaySessionStoreResult.ALREADY_COMMITTED, unchanged.result)
+        assertSame(exact, unchanged.nextState)
+    }
+
+    @Test
     fun lateCommitCannotReplaceASecondSuccessfulRotation() {
         val rotationZero = bundle(rotation = 0L)
         val firstClaim = committedState(
@@ -228,6 +249,7 @@ class GatewayPersistedLoginStateTest {
     private fun bundle(
         rotation: Long,
         absoluteExpiresAtEpochMs: Long = 4_000L,
+        serverAccessExpiresAtEpochMs: Long? = null,
     ): GatewayPersistedLoginBundle =
         GatewayPersistedLoginBundle(
             firstRunEpoch = 12L,
@@ -244,6 +266,7 @@ class GatewayPersistedLoginStateTest {
                 accessExpiresAtEpochMs = 2_000L + rotation,
                 idleExpiresAtEpochMs = 3_000L + rotation,
                 absoluteExpiresAtEpochMs = absoluteExpiresAtEpochMs,
+                serverAccessExpiresAtEpochMs = serverAccessExpiresAtEpochMs,
             ),
         )
 

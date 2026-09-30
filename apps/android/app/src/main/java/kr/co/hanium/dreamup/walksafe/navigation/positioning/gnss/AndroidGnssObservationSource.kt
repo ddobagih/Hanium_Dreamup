@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.navigation.positioning.gnss
 import android.Manifest
 import android.location.GnssMeasurementsEvent
 import android.location.LocationManager
+import android.os.Build
 import android.os.SystemClock
 import androidx.annotation.RequiresPermission
 import androidx.core.location.GnssStatusCompat
@@ -21,6 +22,7 @@ internal class AndroidGnssObservationSource(
     override fun subscribeStatus(listener: GnssObservationListener): GnssObservationSubscription? {
         val callback = object : GnssStatusCompat.Callback() {
             override fun onSatelliteStatusChanged(status: GnssStatusCompat) {
+                val receivedAtNanos = elapsedRealtimeNanos()
                 val signals = buildList(status.satelliteCount) {
                     repeat(status.satelliteCount) { index ->
                         add(
@@ -39,7 +41,11 @@ internal class AndroidGnssObservationSource(
                         )
                     }
                 }
-                listener.onObservation(GnssSignalEpoch(elapsedRealtimeNanos(), signals))
+                val epoch = gnssSignalEpochOrNull(
+                    signals = signals,
+                    receivedAtElapsedRealtimeNanos = receivedAtNanos,
+                ) ?: return
+                listener.onObservation(epoch)
             }
         }
         if (!LocationManagerCompat.registerGnssStatusCallback(locationManager, executor, callback)) {
@@ -54,6 +60,14 @@ internal class AndroidGnssObservationSource(
     override fun subscribeMeasurements(listener: GnssObservationListener): GnssObservationSubscription? {
         val callback = object : GnssMeasurementsEvent.Callback() {
             override fun onGnssMeasurementsReceived(eventArgs: GnssMeasurementsEvent) {
+                val receivedAtNanos = elapsedRealtimeNanos()
+                val clock = eventArgs.clock
+                val measuredAtNanos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                    clock.hasElapsedRealtimeNanos()
+                ) clock.elapsedRealtimeNanos else null
+                val uncertaintyNanos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                    measuredAtNanos != null && clock.hasElapsedRealtimeUncertaintyNanos()
+                ) clock.elapsedRealtimeUncertaintyNanos else null
                 val signals = eventArgs.measurements.map { measurement ->
                     GnssSatelliteSignal(
                         constellation = measurement.constellationType,
@@ -68,7 +82,13 @@ internal class AndroidGnssObservationSource(
                         usedInFixKnown = false,
                     )
                 }
-                listener.onObservation(GnssSignalEpoch(elapsedRealtimeNanos(), signals))
+                val epoch = gnssSignalEpochOrNull(
+                    signals = signals,
+                    receivedAtElapsedRealtimeNanos = receivedAtNanos,
+                    measuredAtElapsedRealtimeNanos = measuredAtNanos,
+                    timestampUncertaintyNanos = uncertaintyNanos,
+                ) ?: return
+                listener.onObservation(epoch)
             }
         }
         if (!LocationManagerCompat.registerGnssMeasurementsCallback(locationManager, executor, callback)) {

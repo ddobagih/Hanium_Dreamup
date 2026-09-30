@@ -632,10 +632,10 @@ def test_capacity_route_uses_exact_field_token_classification() -> None:
     ) is FieldTestAccess.FIELD
     assert required_field_test_access(
         "/internal/capacity", "POST"
-    ) is FieldTestAccess.ADMIN
+    ).value == "unregistered"
     assert required_field_test_access(
         "/internal/capacity/extra", "GET"
-    ) is FieldTestAccess.ADMIN
+    ).value == "unregistered"
 
     state = CapacityState(clock=lambda: BASE_TIME)
     state.publish(
@@ -665,6 +665,14 @@ def test_capacity_route_uses_exact_field_token_classification() -> None:
         "/internal/capacity",
         headers={"x-walksafe-field-test-token": settings.field_test_token},
     ).status_code == 200
+    assert client.post(
+        "/internal/capacity",
+        headers={"x-walksafe-field-test-token": settings.field_test_token},
+    ).status_code == 403
+    assert client.get(
+        "/internal/capacity/extra",
+        headers={"x-walksafe-field-test-token": settings.field_test_token},
+    ).status_code == 403
 
 
 def test_main_wires_one_capacity_state_singleton(monkeypatch: pytest.MonkeyPatch) -> None:

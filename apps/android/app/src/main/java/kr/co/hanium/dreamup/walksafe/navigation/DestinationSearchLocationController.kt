@@ -55,6 +55,15 @@ class DestinationSearchLocationController(
         return DestinationSearchLocationPolicy.originOrNull(fix, nowElapsedRealtimeMs())
     }
 
+    /**
+     * S06-31: the accepted origin with its fix accuracy, so the list is never read more precisely,
+     * and its fix time, so a list read long after the search can say its distances may have changed.
+     */
+    fun searchOriginOrNull(expectedLease: DestinationSearchLocationLease): DestinationSearchOrigin? {
+        val point = originOrNull(expectedLease) ?: return null
+        return DestinationSearchOrigin(point, fix?.accuracyM, fix?.elapsedRealtimeMs)
+    }
+
     fun acquire(
         expectedLease: DestinationSearchLocationLease,
         stillAllowed: () -> Boolean,
@@ -73,7 +82,8 @@ class DestinationSearchLocationController(
         if (isAcquiring) return true
         isAcquiring = true
         val requestGeneration = ++generation
-        val cancellation = source.request { candidate ->
+        val cancellation = try {
+            source.request { candidate ->
             if (!isAcquiring || generation != requestGeneration || lease != expectedLease) return@request
             if (allowed?.invoke() != true) {
                 cancel()
@@ -87,6 +97,13 @@ class DestinationSearchLocationController(
             completion = null
             allowed = null
             callback?.invoke(origin)
+            }
+        } catch (error: Exception) {
+            if (generation != requestGeneration || !isAcquiring) throw error
+            val callback = completion
+            cancel()
+            callback?.invoke(null)
+            return false
         }
         if (isAcquiring && generation == requestGeneration) cancelRequest = cancellation else cancellation()
         return true
@@ -101,6 +118,10 @@ class DestinationSearchLocationController(
         allowed = null
         val cancellation = cancelRequest
         cancelRequest = null
-        cancellation?.invoke()
+        try {
+            cancellation?.invoke()
+        } catch (_: Exception) {
+            // Logical ownership is already revoked; cleanup must not restore it or block stop.
+        }
     }
 }

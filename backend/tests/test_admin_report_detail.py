@@ -85,6 +85,7 @@ def _report() -> Report:
         updated_at=datetime(2026, 8, 29, 1, 2, tzinfo=UTC),
     )
     report.latest_delivery_revision = 0
+    report.latest_review_revision = 0
     return report
 
 
@@ -197,6 +198,7 @@ def test_detail_projection_is_strict_minimum_and_uses_capability_links() -> None
         "status_version",
         "content_revision",
         "latest_delivery_revision",
+        "latest_review_revision",
         "allowed_next_statuses",
         "class_name",
         "confidence",
@@ -210,6 +212,7 @@ def test_detail_projection_is_strict_minimum_and_uses_capability_links() -> None
     }
     assert body["content_revision"] == 3
     assert body["latest_delivery_revision"] == 3
+    assert body["latest_review_revision"] == 2
     assert body["current_review"] == {
         "revision": 2,
         "decision": "APPROVED",
@@ -278,6 +281,7 @@ def test_detail_fixture_has_the_exact_contract() -> None:
         "status_version",
         "content_revision",
         "latest_delivery_revision",
+        "latest_review_revision",
         "allowed_next_statuses",
         "class_name",
         "confidence",
@@ -293,6 +297,7 @@ def test_detail_fixture_has_the_exact_contract() -> None:
     assert parsed.schema_version == "walksafe.admin-report-detail.v2"
     assert parsed.content_revision == 0
     assert parsed.latest_delivery_revision == 3
+    assert parsed.latest_review_revision == 2
     assert "latitude" not in fixture
     assert "metadata" not in fixture
     assert set(fixture["current_review"]) == {
@@ -319,6 +324,7 @@ def test_detail_fixture_has_the_exact_contract() -> None:
     [
         "status_version",
         "allowed_next_statuses",
+        "latest_review_revision",
     ],
 )
 def test_detail_v2_rejects_missing_required_top_level_keys(missing_key: str) -> None:
@@ -392,6 +398,8 @@ def test_verified_session_proof_failure_is_security_audited_without_header_corre
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     denials: list[dict[str, object]] = []
+    app = FastAPI()
+    app.include_router(admin_reports.create_router())
 
     def reject_proof(*_args: object, **_kwargs: object) -> None:
         raise AdminSecurityError(
@@ -429,6 +437,7 @@ def test_verified_session_proof_failure_is_security_audited_without_header_corre
         middleware(
             {
                 "type": "http",
+                "app": app,
                 "method": "GET",
                 "path": DETAIL_PATH,
                 "query_string": b"",
@@ -448,6 +457,7 @@ def test_verified_session_proof_failure_is_security_audited_without_header_corre
     )
 
     assert messages[0]["status"] == 403
+    assert json.loads(messages[1]["body"])["detail"]["code"] == "admin_device_proof_invalid"
     assert denials == [
         {
             "action": "admin.device_proof.verify",
@@ -642,3 +652,50 @@ def test_detail_audit_commit_failure_withholds_the_response() -> None:
     assert captured.value.status_code == 503
     assert captured.value.detail["code"] == "admin_operation_audit_unavailable"
     assert db.rollback_count == 1
+
+
+# --- W20A-R1: report-wide latest review revision ------------------------------
+
+
+def test_w20a_r1_detail_exposes_report_wide_review_revision_after_correction() -> None:
+    """After a content correction current_review is null, yet the next review
+    must bind the report-wide latest revision the server CAS compares with."""
+
+    report = _report()
+    report.latest_review_revision = 1
+
+    detail = _call_detail(_FakeSession(report, None, None))
+
+    assert detail.current_review is None
+    assert detail.latest_review_revision == 1
+
+
+def test_w20a_r1_projection_never_reports_less_than_the_current_review() -> None:
+    report = _report()
+    report.latest_review_revision = 0
+
+    detail = project_admin_report_detail(report, _review(), None)
+
+    assert detail.current_review is not None
+    assert detail.latest_review_revision == detail.current_review.revision == 2
+
+
+def test_w20a_r1_detail_query_counts_reviews_of_every_content_revision() -> None:
+    columns = {column.key: column for column in admin_report_detail_columns()}
+    compiled = str(columns["latest_review_revision"].compile())
+
+    assert "max(report_review_decisions.revision)" in compiled
+    assert "report_review_decisions.report_id = reports.id" in compiled
+    assert "content_revision" not in compiled
+
+
+@pytest.mark.parametrize("latest_review_revision", [1, -1])
+def test_w20a_r1_detail_schema_rejects_inconsistent_latest_review_revision(
+    latest_review_revision: int,
+) -> None:
+    fixture_path = Path(__file__).parents[2] / "contracts/fixtures/admin-report-detail-v2.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    fixture["latest_review_revision"] = latest_review_revision
+
+    with pytest.raises(ValidationError):
+        AdminReportDetailV2.model_validate(fixture)

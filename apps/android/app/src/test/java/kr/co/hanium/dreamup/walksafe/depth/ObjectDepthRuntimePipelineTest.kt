@@ -14,8 +14,9 @@ class ObjectDepthRuntimePipelineTest {
         val outputs = (0..8).map { index ->
             val atMs = 1_000L + index * 300L
             val cameraNs = atMs * 1_000_000L
-            pipeline.process(snapshot(0, 0, 2_000 - index * 100).copy(
+            pipeline.processPrealignedForTest(snapshot(0, 0, 2_000 - index * 100).copy(
                 frameTimestampNs = cameraNs, rawDepthTimestampNs = cameraNs,
+                rawConfidenceTimestampNs = cameraNs,
                 fullDepthTimestampNs = cameraNs, cameraImageTimestampNs = cameraNs),
                 frameId = cameraNs, timestampMs = atMs,
                 detections = listOf(DetectionCandidate("person", .95f, RectNorm(.25f, .25f, .50f, .50f))))
@@ -45,10 +46,11 @@ class ObjectDepthRuntimePipelineTest {
                 val frameNs = atMs * 1_000_000L
                 val cameraNs = frameNs + 400_000L
                 val depthMm = 4_000 - index * 500
-                pipeline.process(
+                pipeline.processPrealignedForTest(
                     snapshot = snapshot(depthMm, rawConfidence, depthMm).copy(
                         frameTimestampNs = frameNs,
                         rawDepthTimestampNs = cameraNs,
+                        rawConfidenceTimestampNs = cameraNs,
                         fullDepthTimestampNs = cameraNs,
                         cameraImageTimestampNs = cameraNs,
                         cameraPoseEvidence = CameraPoseEvidence(
@@ -86,7 +88,7 @@ class ObjectDepthRuntimePipelineTest {
         val pipeline = ObjectDepthRuntimePipeline()
         val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 2_000)
 
-        val outputs = pipeline.process(snapshot, frameId = 1L, timestampMs = 1_000L)
+        val outputs = pipeline.processPrealignedForTest(snapshot, frameId = 1L, timestampMs = 1_000L)
 
         assertTrue(outputs.isEmpty())
     }
@@ -96,7 +98,7 @@ class ObjectDepthRuntimePipelineTest {
         val pipeline = ObjectDepthRuntimePipeline()
         val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 2_000)
 
-        val outputs = pipeline.process(
+        val outputs = pipeline.processPrealignedForTest(
             snapshot = snapshot,
             frameId = 1L,
             timestampMs = 1_000L,
@@ -112,7 +114,7 @@ class ObjectDepthRuntimePipelineTest {
         val pipeline = ObjectDepthRuntimePipeline(detectionProvider = onePersonProvider())
         val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 2_000)
 
-        val outputs = pipeline.process(snapshot, frameId = 1L, timestampMs = 1_000L)
+        val outputs = pipeline.processPrealignedForTest(snapshot, frameId = 1L, timestampMs = 1_000L)
 
         assertEquals(1, outputs.size)
         assertEquals("person", outputs.first().className)
@@ -127,7 +129,7 @@ class ObjectDepthRuntimePipelineTest {
         val pipeline = ObjectDepthRuntimePipeline(detectionProvider = onePersonProvider())
         val snapshot = snapshot(rawMm = 1_200, rawConfidence = 0, fullMm = 1_800)
 
-        val output = pipeline.process(snapshot, frameId = 1L, timestampMs = 1_000L).single()
+        val output = pipeline.processPrealignedForTest(snapshot, frameId = 1L, timestampMs = 1_000L).single()
 
         assertEquals(DepthSource.ARCORE_FULL_DEPTH, output.source)
         assertEquals(1.8f, output.depthMedianM!!, 0.01f)
@@ -149,7 +151,7 @@ class ObjectDepthRuntimePipelineTest {
                 cameraImageTimestampNs = cameraTimestamp,
             )
 
-            val output = pipeline.process(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
+            val output = pipeline.processPrealignedForTest(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
 
             assertEquals(DepthSource.POLYGON_TREND_PSEUDO_DEPTH, output.source)
             assertNull(output.riskDistanceM)
@@ -165,11 +167,12 @@ class ObjectDepthRuntimePipelineTest {
         val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 1_800).copy(
             frameTimestampNs = 1_000_000_000L,
             rawDepthTimestampNs = 1_000_400_000L,
+            rawConfidenceTimestampNs = 1_000_400_000L,
             fullDepthTimestampNs = 1_000_399_999L,
             cameraImageTimestampNs = 1_000_400_000L,
         )
 
-        val output = pipeline.process(snapshot, frameId = 1_000_000_000L, timestampMs = 1_000L).single()
+        val output = pipeline.processPrealignedForTest(snapshot, frameId = 1_000_000_000L, timestampMs = 1_000L).single()
 
         assertEquals(DepthSource.ARCORE_RAW_DEPTH, output.source)
         assertEquals(1.2f, output.riskDistanceM!!, 0.01f)
@@ -185,15 +188,25 @@ class ObjectDepthRuntimePipelineTest {
             val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 1_800).copy(
                 frameTimestampNs = frameTimestamp,
                 rawDepthTimestampNs = rawTimestamp,
+                rawConfidenceTimestampNs = rawTimestamp,
                 cameraPoseEvidence = CameraPoseEvidence(1L, 1_000L, 0f, 0f, 0f, 0f, 0f, -1f),
                 cameraImageTimestampNs = cameraTimestamp,
             )
 
-            val output = pipeline.process(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
+            val output = pipeline.processPrealignedForTest(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
 
-            assertEquals(DepthSource.ARCORE_RAW_DEPTH, output.source)
             assertEquals(ObjectMotion.UNKNOWN, output.objectMotion)
-            assertNull(tracker.activeTracks().single().distanceHistory.single().cameraPoseEvidence)
+            val history = tracker.activeTracks().single().distanceHistory
+            if (rawTimestamp == null || rawTimestamp == 0L) {
+                assertEquals(DepthSource.POLYGON_TREND_PSEUDO_DEPTH, output.source)
+                assertNull(output.riskDistanceM)
+                assertNull(output.userFacing.stepsAhead)
+                assertTrue(history.isEmpty())
+            } else {
+                assertEquals(DepthSource.ARCORE_RAW_DEPTH, output.source)
+                assertEquals(1.2f, output.riskDistanceM!!, 0.01f)
+                assertNull(history.single().cameraPoseEvidence)
+            }
         }
     }
 
@@ -208,12 +221,13 @@ class ObjectDepthRuntimePipelineTest {
             val snapshot = snapshot(rawMm = 1_200, rawConfidence = rawConfidence, fullMm = 1_800).copy(
                 frameTimestampNs = frameTimestamp,
                 rawDepthTimestampNs = cameraTimestamp,
+                rawConfidenceTimestampNs = cameraTimestamp,
                 fullDepthTimestampNs = cameraTimestamp,
                 cameraPoseEvidence = pose,
                 cameraImageTimestampNs = cameraTimestamp,
             )
 
-            val output = pipeline.process(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
+            val output = pipeline.processPrealignedForTest(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
 
             assertEquals(
                 if (rawConfidence == 255) DepthSource.ARCORE_RAW_DEPTH else DepthSource.ARCORE_FULL_DEPTH,
@@ -237,12 +251,13 @@ class ObjectDepthRuntimePipelineTest {
                 val snapshot = snapshot(rawMm = 1_200, rawConfidence = rawConfidence, fullMm = 1_800).copy(
                     frameTimestampNs = frameTimestamp,
                     rawDepthTimestampNs = frameTimestamp,
+                    rawConfidenceTimestampNs = frameTimestamp,
                     fullDepthTimestampNs = frameTimestamp,
                     cameraPoseEvidence = CameraPoseEvidence(1L, 1_000L, 0f, 0f, 0f, 0f, 0f, -1f),
                     cameraImageTimestampNs = cameraTimestamp,
                 )
 
-                val output = pipeline.process(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
+                val output = pipeline.processPrealignedForTest(snapshot, frameId = frameTimestamp, timestampMs = 1_000L).single()
 
                 assertEquals(ObjectMotion.UNKNOWN, output.objectMotion)
                 val history = tracker.activeTracks().single().distanceHistory
@@ -270,6 +285,7 @@ class ObjectDepthRuntimePipelineTest {
             frameId = 1L,
             timestampMs = 1_000L,
             mapper = emptyDepthMapper(),
+            mapperFrameId = 1L,
         ).single()
 
         assertEquals(DepthSource.POLYGON_TREND_PSEUDO_DEPTH, output.source)
@@ -281,7 +297,7 @@ class ObjectDepthRuntimePipelineTest {
         val pipeline = ObjectDepthRuntimePipeline(detectionProvider = onePersonProvider())
         val snapshot = DepthFrameSnapshot(frameTimestampNs = 1L, rawDepth = null, rawConfidence = null, fullDepth = null)
 
-        val output = pipeline.process(snapshot, frameId = 1L, timestampMs = 1_000L).single()
+        val output = pipeline.processPrealignedForTest(snapshot, frameId = 1L, timestampMs = 1_000L).single()
 
         assertEquals(DepthSource.POLYGON_TREND_PSEUDO_DEPTH, output.source)
         assertNull(output.riskDistanceM)
@@ -293,7 +309,7 @@ class ObjectDepthRuntimePipelineTest {
         val pipeline = ObjectDepthRuntimePipeline(detectionProvider = onePersonProvider())
         val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 2_000)
 
-        val output = pipeline.process(
+        val output = pipeline.processPrealignedForTest(
             snapshot = snapshot,
             frameId = 1L,
             timestampMs = 1_000L,
@@ -309,9 +325,9 @@ class ObjectDepthRuntimePipelineTest {
         val pipeline = ObjectDepthRuntimePipeline(detectionProvider = oneThenMissProvider())
         val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 2_000)
 
-        assertEquals(1, pipeline.process(snapshot, frameId = 1L, timestampMs = 1_000L).size)
+        assertEquals(1, pipeline.processPrealignedForTest(snapshot, frameId = 1L, timestampMs = 1_000L).size)
 
-        val outputsAfterMiss = pipeline.process(snapshot, frameId = 2L, timestampMs = 1_100L)
+        val outputsAfterMiss = pipeline.processPrealignedForTest(snapshot, frameId = 2L, timestampMs = 1_100L)
 
         assertTrue(outputsAfterMiss.isEmpty())
     }
@@ -321,9 +337,9 @@ class ObjectDepthRuntimePipelineTest {
         val pipeline = ObjectDepthRuntimePipeline(detectionProvider = twoThenOneProvider())
         val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 2_000)
 
-        assertEquals(2, pipeline.process(snapshot, frameId = 1L, timestampMs = 1_000L).size)
+        assertEquals(2, pipeline.processPrealignedForTest(snapshot, frameId = 1L, timestampMs = 1_000L).size)
 
-        val outputsAfterPartialMiss = pipeline.process(snapshot, frameId = 2L, timestampMs = 1_100L)
+        val outputsAfterPartialMiss = pipeline.processPrealignedForTest(snapshot, frameId = 2L, timestampMs = 1_100L)
 
         assertEquals(1, outputsAfterPartialMiss.size)
         assertEquals("normal_tactile_block", outputsAfterPartialMiss.single().className)
@@ -335,14 +351,14 @@ class ObjectDepthRuntimePipelineTest {
         val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 2_000)
         val detection = onePersonProvider().detect(frameId = 10L, timestampMs = 1_000L)
 
-        val first = pipeline.process(
+        val first = pipeline.processPrealignedForTest(
             snapshot = snapshot,
             frameId = 1L,
             timestampMs = 1_000L,
             detections = detection,
             detectionSequenceId = 10L,
         ).single()
-        val repeated = pipeline.process(
+        val repeated = pipeline.processPrealignedForTest(
             snapshot = snapshot,
             frameId = 2L,
             timestampMs = 1_800L,
@@ -361,7 +377,7 @@ class ObjectDepthRuntimePipelineTest {
         val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 2_000)
         val detection = onePersonProvider().detect(frameId = 10L, timestampMs = 1_000L)
 
-        val partial = pipeline.process(
+        val partial = pipeline.processPrealignedForTest(
             snapshot = snapshot,
             frameId = 1L,
             timestampMs = 900L,
@@ -369,15 +385,43 @@ class ObjectDepthRuntimePipelineTest {
             detectionSequenceId = 10L,
             detectionCompleted = false,
         )
-        val first = pipeline.process(snapshot, 2L, 1_000L, detection, detectionSequenceId = 10L).single()
-        val second = pipeline.process(snapshot, 3L, 1_400L, detection, detectionSequenceId = 11L).single()
-        val third = pipeline.process(snapshot, 4L, 1_800L, detection, detectionSequenceId = 12L).single()
+        val first = pipeline.processPrealignedForTest(snapshot, 2L, 1_000L, detection, detectionSequenceId = 10L).single()
+        val second = pipeline.processPrealignedForTest(snapshot, 3L, 1_400L, detection, detectionSequenceId = 11L).single()
+        val third = pipeline.processPrealignedForTest(snapshot, 4L, 1_800L, detection, detectionSequenceId = 12L).single()
 
         assertTrue(partial.isEmpty())
         assertEquals(1, first.trackAgeFrames)
         assertEquals(2, second.trackAgeFrames)
         assertEquals(3, third.trackAgeFrames)
         assertEquals(800L, third.trackStableMs)
+    }
+
+    @Test
+    fun cameraPathRejectsAMapperOfAnotherCaptureWithoutAdvancingTheTracker() {
+        // S14-29 (originals/14.txt:75): the safety path requires the frozen mapper and its capture ID.
+        val pipeline = ObjectDepthRuntimePipeline(detectionProvider = onePersonProvider())
+        val snapshot = snapshot(rawMm = 1_200, rawConfidence = 255, fullMm = 2_000)
+        assertTrue(
+            pipeline.process(
+                snapshot = snapshot, frameId = 1L, timestampMs = 1_000L,
+                mapper = emptyDepthMapper(), mapperFrameId = 2L,
+            ).isEmpty(),
+        )
+        val accepted = pipeline.process(
+            snapshot = snapshot, frameId = 1L, timestampMs = 1_000L,
+            mapper = emptyDepthMapper(), mapperFrameId = 1L,
+        ).single()
+        // The rejected call did not count as the track's first completed observation.
+        assertEquals(1, accepted.trackAgeFrames)
+    }
+
+    @Test
+    fun theIdentityMappingIsNeverReachableFromProductionSources() {
+        val main = java.io.File("src/main/java").walkTopDown() + java.io.File("src/debug/java").walkTopDown()
+        val callers = main.filter { it.isFile && it.extension == "kt" }
+            .filter { it.readText().contains("processPrealignedForTest(") }
+            .map { it.name }.toList()
+        assertEquals(listOf("ObjectDepthRuntimePipeline.kt"), callers)
     }
 
     private fun onePersonProvider(): DetectionProvider {
@@ -445,6 +489,7 @@ class ObjectDepthRuntimePipelineTest {
             rawConfidence = ConfidenceImage8(40, 40, ByteArray(40 * 40) { rawConfidence.toByte() }),
             fullDepth = depthImage(fullMm),
             rawDepthTimestampNs = 1L,
+            rawConfidenceTimestampNs = 1L,
             fullDepthTimestampNs = 1L,
             cameraImageTimestampNs = 1L,
         )

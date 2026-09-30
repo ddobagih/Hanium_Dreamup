@@ -221,9 +221,20 @@ internal object AndroidPendingReportStore {
         }
     }
 
+    internal fun destroyLegacyKey(
+        containsAlias: () -> Boolean,
+        deleteAlias: () -> Unit,
+    ) {
+        if (containsAlias()) deleteAlias()
+        check(!containsAlias()) { "Legacy report key deletion could not be verified" }
+    }
+
     private fun destroyLegacyKey() {
         val keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER).apply { load(null) }
-        if (keyStore.containsAlias(KEY_ALIAS)) keyStore.deleteEntry(KEY_ALIAS)
+        destroyLegacyKey(
+            containsAlias = { keyStore.containsAlias(KEY_ALIAS) },
+            deleteAlias = { keyStore.deleteEntry(KEY_ALIAS) },
+        )
     }
 
     internal const val PURGE_PENDING_MARKER_FILE_NAME =

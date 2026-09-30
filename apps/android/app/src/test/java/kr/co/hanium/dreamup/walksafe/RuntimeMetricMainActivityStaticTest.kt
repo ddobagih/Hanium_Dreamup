@@ -179,7 +179,9 @@ class RuntimeMetricMainActivityStaticTest {
     fun runtimeMetricEvidenceFailsClosedBeforeDetectorReportFeedbackAndQueuedDelivery() {
         assertTrue(source.contains("runtimeMetricOutputAllowed"))
         val draw = functionBlock("override fun onDrawFrame(gl: GL10?)")
-        val failClosedGate = draw.indexOf("if (!runtimeMetricOutputAllowed)")
+        val failClosedGate = draw.indexOf(
+            "if (!currentRuntimeMetricOutputAllowsWork(arLease.generation))",
+        )
         val detector = draw.indexOf("scheduleDetectionIfDue(")
         val report = draw.indexOf("publishCurrentFrameReportState(")
         val feedback = draw.indexOf("dispatchTactileFrameFeedback(")
@@ -199,14 +201,21 @@ class RuntimeMetricMainActivityStaticTest {
             draw.substring(failClosedGate, report).contains("return"),
         )
         val scheduled = functionBlock("private fun scheduleDetectionIfDue(")
-        assertTrue(
-            scheduled.indexOf("observeOfficialEnvironmentCameraFrame(qualityObservation)") <
-                scheduled.indexOf("if (!currentRuntimeMetricOutputAllowsWork("),
-        )
-        assertTrue(
-            scheduled.indexOf("if (!currentRuntimeMetricOutputAllowsWork(") <
-                scheduled.indexOf("frameDetector.detect("),
-        )
+        val cameraObservation = scheduled.indexOf("observeOfficialEnvironmentCameraFrame(qualityObservation)")
+        val scheduledMetricGate = scheduled.indexOf("if (!currentRuntimeMetricOutputAllowsWork(")
+        val detectorInvocation = scheduled.indexOf("frameDetector.detectOriented(")
+        assertTrue(cameraObservation >= 0)
+        assertTrue(scheduledMetricGate >= 0)
+        assertTrue(detectorInvocation >= 0)
+        assertTrue(cameraObservation < scheduledMetricGate)
+        assertTrue(scheduledMetricGate < detectorInvocation)
+
+        val metricGate = functionBlock("private fun currentRuntimeMetricOutputAllowsWork(")
+        assertTrue(metricGate.contains("synchronized(runtimeMetricStateLock)"))
+        assertTrue(metricGate.contains("runtimeMetricOutputAllowed"))
+        assertTrue(metricGate.contains(
+            "expectedGeneration == null || arSessionGeneration == expectedGeneration",
+        ))
 
         val queuedFeedbackGate = functionBlock("private fun currentFeedbackDeviceGateAllowsAlerts()")
         assertTrue(

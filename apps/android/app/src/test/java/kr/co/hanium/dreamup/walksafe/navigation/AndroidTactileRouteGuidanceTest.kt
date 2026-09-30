@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.navigation
 import java.io.File
 import kr.co.hanium.dreamup.walksafe.MainActivity
 import kr.co.hanium.dreamup.walksafe.FrozenImageToTextureCoordinateMapper
+import kr.co.hanium.dreamup.walksafe.depth.ContactDepthEstimate
 import kr.co.hanium.dreamup.walksafe.depth.DepthConfidenceBreakdown
 import kr.co.hanium.dreamup.walksafe.depth.DepthSource
 import kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot
@@ -136,6 +137,36 @@ class AndroidTactileRouteGuidanceTest {
     }
 
     @Test
+    fun mainActivitySnapshotProcessBindsTheCaptureToTheLiveRouteInstallRevision() {
+        // S12-12-F2: a reinstall keeps the route ID but is a new install (revision 2).
+        val activity = MainActivity()
+        configureLiveRouteState(activity, navigationActive = true, tmapOnRoute = true)
+        configureLiveRouteState(activity, navigationActive = true, tmapOnRoute = true)
+        fun process(captureRouteInstalls: Int): MainActivity.TactileSnapshotFrameResult {
+            val snapshot = publishSnapshot(
+                activity = activity,
+                detectionFrameId = FRAME_ID,
+                evidence = detectionFrameEvidence(frameId = FRAME_ID, captureRouteInstalls = captureRouteInstalls),
+            )
+            return activity.processTactileSnapshotFrame(
+                detectionSnapshot = snapshot,
+                nowMs = NOW_MS,
+                currentFrameTimestampMs = NOW_MS,
+                maxDetectionSourceAgeMs = MAX_DETECTION_AGE_MS,
+                maxDetectionFrameDeltaMs = MAX_DETECTION_AGE_MS,
+                detectionAgeMs = 100L,
+            ) { _, _ -> listOf(tactileOutput()) }
+        }
+        val earlierInstall = process(captureRouteInstalls = 1)
+        assertEquals("route-1", routeNavigator(activity).currentRouteId())
+        assertEquals(LocalRouteMode.TMAP, earlierInstall.guidance.decision.mode)
+        assertEquals("tactile_route_version_mismatch", earlierInstall.guidance.decision.reason)
+        assertNull(earlierInstall.guidance.decision.steering)
+        val sameInstall = process(captureRouteInstalls = 2)
+        assertObservedWithoutMovement(sameInstall.guidance)
+    }
+
+    @Test
     fun mainActivitySnapshotProcessAppliesCapturedAndLiveRouteGates() {
         val activity = MainActivity()
         val activeSnapshot = publishSnapshot(
@@ -172,7 +203,8 @@ class AndroidTactileRouteGuidanceTest {
         val active = process(activeSnapshot)
         assertSame(activeSnapshot.frameEvidence, active.matchedEvidence)
         assertEquals(true, active.depthProcessingAttempted)
-        assertEquals(LocalRouteMode.TACTILE_LOCAL, active.guidance.decision.mode)
+        assertObservedWithoutMovement(active.guidance)
+        assertOrdinaryTmapRemainsAvailable(activity)
 
         val gated = listOf(
             process(inactiveAtCapture),
@@ -182,6 +214,8 @@ class AndroidTactileRouteGuidanceTest {
         )
         gated.forEach { result ->
             assertEquals(LocalRouteMode.TMAP, result.guidance.decision.mode)
+            assertNull(result.guidance.decision.steering)
+            assertNull(result.guidance.decision.instruction)
             assertEquals(MessageLevel.NONE, result.guidance.outputs.single().userFacing.messageLevel)
         }
     }
@@ -218,13 +252,12 @@ class AndroidTactileRouteGuidanceTest {
         )
 
         assertEquals(listOf("normal_tactile_block"), depthDetections.map(DetectionCandidate::className))
-        assertEquals(LocalRouteMode.TACTILE_LOCAL, frame.guidance.decision.mode)
-        assertEquals(MessageLevel.INFO, frame.guidance.outputs.single().userFacing.messageLevel)
-        assertEquals(MessageLevel.INFO, dispatch.action?.level)
-        assertEquals("fresh_metric_path_guidance", dispatch.action?.reason)
+        assertObservedWithoutMovement(frame.guidance)
+        assertNull(dispatch.action)
         assertEquals(1, actuator.dispatchCount)
         assertSame(dispatch, actuator.dispatches.single())
-        assertEquals(listOf("전방 점자블록을 따라 이동하세요."), actuator.navigationSpeech)
+        assertTrue(actuator.navigationSpeech.isEmpty())
+        assertOrdinaryTmapRemainsAvailable(activity)
     }
 
     @Test
@@ -257,11 +290,12 @@ class AndroidTactileRouteGuidanceTest {
             nowMs = NOW_MS,
         )
 
-        assertEquals(LocalRouteMode.TACTILE_LOCAL, frame.guidance.decision.mode)
-        assertEquals(MessageLevel.INFO, dispatch.action?.level)
+        assertObservedWithoutMovement(frame.guidance)
+        assertNull(dispatch.action)
         assertEquals(1, actuator.dispatchCount)
         assertSame(dispatch, actuator.dispatches.single())
-        assertEquals(listOf("전방 점자블록을 따라 이동하세요."), actuator.navigationSpeech)
+        assertTrue(actuator.navigationSpeech.isEmpty())
+        assertOrdinaryTmapRemainsAvailable(activity)
     }
 
     @Test
@@ -349,10 +383,8 @@ class AndroidTactileRouteGuidanceTest {
             productionFrameInput(context = context),
         )
 
-        assertEquals(LocalRouteMode.TACTILE_LOCAL, result.decision.mode)
-        assertEquals(TactileSteering.STRAIGHT, result.decision.steering)
+        assertObservedWithoutMovement(result)
         assertEquals("route-1", result.observation?.routeId)
-        assertEquals(MessageLevel.INFO, result.outputs.single().userFacing.messageLevel)
     }
 
     @Test
@@ -432,21 +464,25 @@ class AndroidTactileRouteGuidanceTest {
     fun productionAssemblyReachesRealLocalSteeringWithCurrentTmapSegment() {
         val context = productionContext()
         val output = tactileOutput()
+        val hazard = output.copy(
+            trackId = "person-control",
+            className = "person",
+            userFacing = UserFacingDepth(stepsAhead = 2, messageLevel = MessageLevel.WARNING, message = "앞에 사람 후보가 있습니다."),
+        )
 
         val result = AndroidTactileRouteGuidance().apply(
-            outputs = listOf(output),
+            outputs = listOf(output, hazard),
             context = context,
             navigationActive = true,
             tmapOnRoute = true,
         )
 
-        assertEquals(LocalRouteMode.TACTILE_LOCAL, result.decision.mode)
-        assertEquals(TactileSteering.STRAIGHT, result.decision.steering)
+        assertObservedWithoutMovement(result, original = output)
         assertEquals("route-1", result.observation?.routeId)
         assertEquals(0, result.observation?.routeSegmentIndex)
         assertEquals("normal-1", result.observation?.candidateId)
-        assertEquals(MessageLevel.INFO, result.outputs.single().userFacing.messageLevel)
-        assertNotNull(result.outputs.single().userFacing.message)
+        assertSame(hazard, result.outputs.last())
+        assertSame(hazard.userFacing, result.outputs.last().userFacing)
     }
 
     @Test
@@ -604,6 +640,15 @@ class AndroidTactileRouteGuidanceTest {
 
         assertEquals(LocalRouteMode.TMAP, result.decision.mode)
         assertEquals("route_heading_mismatch", result.decision.reason)
+        val observation = requireNotNull(result.observation)
+        assertEquals("normal-1", observation.candidateId)
+        assertEquals("route-1", observation.routeId)
+        assertEquals(TmapCorridorProjectionEvidence.OVERLAPS, observation.tmapCorridorProjection)
+        assertEquals(90f, requireNotNull(observation.routeHeadingDeltaDeg), 0.001f)
+        assertNull(result.decision.steering)
+        assertNull(result.decision.instruction)
+        assertEquals(MessageLevel.NONE, result.outputs.single().userFacing.messageLevel)
+        assertNull(result.outputs.single().userFacing.message)
     }
 
     @Test
@@ -630,8 +675,47 @@ class AndroidTactileRouteGuidanceTest {
             navigationActive = true,
             tmapOnRoute = true,
         )
-        assertEquals(LocalRouteMode.TACTILE_LOCAL, result.decision.mode)
+        assertObservedWithoutMovement(result, expectedRouteId = requireNotNull(context.expectedRouteId))
         assertEquals(true, result.observation?.routeId?.startsWith("tmap-local:") == true)
+    }
+
+    private fun assertObservedWithoutMovement(
+        result: TactileRouteGuidanceResult,
+        original: TrackedObjectDepth = tactileOutput(),
+        expectedRouteId: String = "route-1",
+    ) {
+        // Preserve the positive projection/control path from the legacy movement tests.
+        // Camera-route alignment and a representative-depth contact ray are observations,
+        // not independently measured block/user axes or contact-pixel depth.
+        val observation = requireNotNull(result.observation)
+        assertEquals(original.trackId, observation.candidateId)
+        assertEquals(expectedRouteId, observation.routeId)
+        assertEquals(0, observation.routeSegmentIndex)
+        assertEquals(TmapCorridorProjectionEvidence.OVERLAPS, observation.tmapCorridorProjection)
+        assertEquals(0.5f, observation.centerXNormalized, 0.00001f)
+        assertEquals(0f, requireNotNull(observation.routeHeadingDeltaDeg), 0.001f)
+        assertEquals(LocalRouteMode.TMAP, result.decision.mode)
+        assertEquals("tactile_motion_evidence_unavailable", result.decision.reason)
+        assertNull(result.decision.steering)
+        assertNull(result.decision.instruction)
+        val guided = result.outputs.single { it.trackId == original.trackId }
+        assertEquals(original.copy(userFacing = guided.userFacing), guided)
+        assertEquals(MessageLevel.NONE, guided.userFacing.messageLevel)
+        assertNull(guided.userFacing.message)
+        assertNull(guided.userFacing.stepsAhead)
+    }
+
+    private fun assertOrdinaryTmapRemainsAvailable(activity: MainActivity) {
+        val navigator = routeNavigator(activity)
+        assertTrue(navigator.hasRoute())
+        assertEquals("route-1", navigator.currentRouteId())
+        val update = navigator.update(
+            location = TrustedLocation(37.0, 127.0, 2f, NOW_MS),
+            nowMs = NOW_MS,
+            requestInFlight = false,
+        )
+        assertNotNull(update.instruction)
+        assertEquals("route-1", navigator.currentRouteId())
     }
 
     private fun publishSnapshot(
@@ -677,6 +761,7 @@ class AndroidTactileRouteGuidanceTest {
         navigationActive: Boolean = true,
         tmapOnRoute: Boolean = true,
         includeDepthMapper: Boolean = true,
+        captureRouteInstalls: Int = 1,
     ): MainActivity.DetectionFrameEvidence {
         val depthTransform = requireNotNull(
             FrozenImageToDepthTransform.create(
@@ -708,7 +793,7 @@ class AndroidTactileRouteGuidanceTest {
             } else {
                 null
             },
-            tactileContext = productionContextForFrame(frameId),
+            tactileContext = productionContextForFrame(frameId, captureRouteInstalls),
             motionContext = MotionContext(),
             navigationActive = navigationActive,
             tmapOnRoute = tmapOnRoute,
@@ -734,7 +819,11 @@ class AndroidTactileRouteGuidanceTest {
         }
         MainActivity::class.java.getDeclaredField("routeNavigator").apply {
             isAccessible = true
-            (get(activity) as RouteNavigator).setRoute(productionRoute())
+            (get(activity) as RouteNavigator).apply {
+                setRoute(productionRoute())
+                val fix = liveRouteFix()
+                update(fix, nowMs = fix.elapsedRealtimeMs, requestInFlight = false)
+            }
         }
     }
 
@@ -745,15 +834,17 @@ class AndroidTactileRouteGuidanceTest {
         }
     }
 
-    private fun productionContext(providerRouteId: String? = "route-1"): TactileProjectionContext {
-        val location = TrustedLocation(
-            latitude = 37.0,
-            longitude = 127.0,
-            accuracyM = 2f,
-            elapsedRealtimeMs = NOW_MS - 50L,
-        )
+    private fun liveRouteFix() = TrustedLocation(
+        latitude = 37.0,
+        longitude = 127.0,
+        accuracyM = 2f,
+        elapsedRealtimeMs = NOW_MS - 50L,
+    )
+
+    private fun productionContext(providerRouteId: String? = "route-1", routeInstalls: Int = 1): TactileProjectionContext {
+        val location = liveRouteFix()
         val navigator = RouteNavigator()
-        navigator.setRoute(productionRoute(providerRouteId))
+        repeat(routeInstalls) { navigator.setRoute(productionRoute(providerRouteId)) }
         navigator.update(location, nowMs = NOW_MS, requestInFlight = false)
         return TactileProjectionContext(
             captureFrameId = FRAME_ID,
@@ -806,8 +897,8 @@ class AndroidTactileRouteGuidanceTest {
         providerRouteId = providerRouteId,
     )
 
-    private fun productionContextForFrame(frameId: Long): TactileProjectionContext {
-        val context = productionContext()
+    private fun productionContextForFrame(frameId: Long, routeInstalls: Int = 1): TactileProjectionContext {
+        val context = productionContext(routeInstalls = routeInstalls)
         return context.copy(
             captureFrameId = frameId,
             cameraFrame = requireNotNull(context.cameraFrame).copy(frameId = frameId),
@@ -859,6 +950,10 @@ class AndroidTactileRouteGuidanceTest {
             userFacing = UserFacingDepth(stepsAhead = 3, messageLevel = MessageLevel.NONE, message = null),
             trackAgeFrames = 4,
             trackStableMs = 900L,
+            sourceValidUntilElapsedRealtimeMs = NOW_MS + MAX_DETECTION_AGE_MS,
+            // The supplier now projects only same-frame bottom-contact neighborhood depth
+            // (DepthSampler 5x5 window). Uniform 2 m keeps it equal to the object depth above.
+            contactDepth = ContactDepthEstimate(distanceM = 2f, spreadM = 0.05f, validSampleCount = 25),
         )
     }
 

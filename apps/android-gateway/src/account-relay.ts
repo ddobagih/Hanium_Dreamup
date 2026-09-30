@@ -26,6 +26,22 @@ const DEVICE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const EMAIL_LOCAL = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
 const DOMAIN_LABEL = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
 
+/**
+ * S01-20: Backend /accounts/authenticate 429/503 codes the password grant relays unchanged
+ * (each is a registered field-session-errors.ts row with this status). Any other 429/503
+ * code or status pairing becomes 502 gateway_account_upstream_invalid.
+ */
+export const PASSWORD_GRANT_UPSTREAM_ERRORS: ReadonlyArray<Readonly<{
+  code: string;
+  status: 429 | 503;
+}>> = Object.freeze([
+  Object.freeze({ code: "account_authentication_busy", status: 503 }),
+  Object.freeze({ code: "account_authentication_rate_limited", status: 429 }),
+  Object.freeze({ code: "account_authentication_unavailable", status: 503 }),
+  Object.freeze({ code: "account_crypto_key_binding_missing", status: 503 }),
+  Object.freeze({ code: "account_crypto_key_mismatch", status: 503 })
+] as const);
+
 export const SIGNUP_CONSENT_DOCUMENT_KEYS = Object.freeze([
   "terms_of_service",
   "privacy_notice",
@@ -111,7 +127,7 @@ function canonicalEmail(value: unknown): string | null {
   ) return null;
   const [local, rawDomain] = value.split("@") as [string, string];
   if (local.length < 1 || local.length > 64 || !EMAIL_LOCAL.test(local) ||
-    !rawDomain || rawDomain.endsWith(".")) return null;
+    !rawDomain || rawDomain.endsWith(".") || rawDomain.includes("%")) return null;
   const domain = domainToASCII(rawDomain);
   if (!domain || domain.endsWith(".")) return null;
   const labels = domain.split(".");
@@ -138,10 +154,21 @@ function validDate(value: unknown): value is string {
     parsed.getUTCDate() === day;
 }
 
-function validPassword(value: unknown): value is string {
+function validPasswordLength(value: unknown, minimum: number): value is string {
   if (typeof value !== "string" || value.includes("\0")) return false;
   const length = [...value].length;
-  return length >= 10 && length <= 128;
+  return length >= minimum && length <= 128;
+}
+
+// Login keeps the existing 10..128 range for accounts created before FP-010-DETAIL-02.
+function validPassword(value: unknown): value is string {
+  return validPasswordLength(value, 10);
+}
+
+// FP-010-DETAIL-02 (S01-13): new passwords need 12..128 code points. The Backend
+// is authoritative for refusing common values (400 account_password_too_common).
+function validNewPassword(value: unknown): value is string {
+  return validPasswordLength(value, 12);
 }
 
 function validBoundedVersion(value: unknown): value is string {
@@ -236,7 +263,7 @@ function accountCreateRequest(value: unknown): Record<string, unknown> | null {
   ]) || payload.schema_version !== "walksafe.account-create.v1" ||
     !validOpaqueHandle(payload.enrollment_handle) ||
     typeof payload.otp_code !== "string" || !EMAIL_OTP.test(payload.otp_code) ||
-    !validPassword(payload.password)) return null;
+    !validNewPassword(payload.password)) return null;
   const consent = signupConsent(payload.consent);
   return consent ? {
     schema_version: payload.schema_version,
@@ -408,6 +435,16 @@ async function relayAccountRequest(
   const decoded = await boundedUpstreamJson(upstream);
   if (decoded.timeout) return accountError(504, "gateway_upstream_response_timeout");
   if (decoded.error) return accountError(502, "gateway_account_upstream_invalid");
+  if (upstream.status === 422) {
+    const payload = objectPayload(decoded.value);
+    const detail = objectPayload(payload?.detail);
+    return payload && exactKeys(payload, ["detail"]) &&
+      detail && exactKeys(detail, ["code", "message"]) &&
+      detail.code === "account_request_validation_failed" &&
+      typeof detail.message === "string"
+      ? accountError(422, "account_request_validation_failed")
+      : accountError(502, "gateway_account_upstream_invalid");
+  }
   if (!successStatuses.has(upstream.status)) return projectedError(upstream, decoded.value);
   const sanitized = sanitizeSuccess(decoded.value);
   return sanitized
@@ -492,6 +529,16 @@ export async function authenticateBackendAccount(
   if (upstream.status !== 200) {
     if ([400, 401, 409].includes(upstream.status)) {
       return { error: accountError(401, "invalid_account_credentials") };
+    }
+    if (upstream.status === 429 || upstream.status === 503) {
+      // S01-20: the password grant answers on /api/field-session, so only the registered
+      // Backend codes (with their registered status) pass through.
+      const code = safeErrorCode(decoded.value);
+      if (!PASSWORD_GRANT_UPSTREAM_ERRORS.some(
+        (entry) => entry.code === code && entry.status === upstream.status
+      )) {
+        return { error: accountError(502, "gateway_account_upstream_invalid") };
+      }
     }
     return { error: projectedError(upstream, decoded.value) };
   }

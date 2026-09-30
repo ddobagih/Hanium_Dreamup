@@ -7,7 +7,8 @@ import os
 from pathlib import Path
 import socket
 import stat
-from threading import Thread
+from threading import Event, Thread
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -523,6 +524,161 @@ def test_kms_agent_provider_rejects_same_uid_as_backend(tmp_path: Path) -> None:
             expected_peer_uid=os.geteuid(),
             timeout_seconds=1,
         )
+
+
+
+def test_kms_agent_slow_drip_is_bounded_by_the_existing_exchange_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    endpoint = tmp_path / "kms-slow.sock"
+    response = _raw_keyring(
+        [{"id": "key-v1", "material": _material(1), "state": "active"}]
+    ) + b"\n"
+    stop = Event()
+    errors = []
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+        server.bind(str(endpoint))
+        server.listen(1)
+        server.settimeout(2)
+
+        def serve() -> None:
+            try:
+                connection, _address = server.accept()
+                with connection:
+                    connection.settimeout(2)
+                    connection.recv(4096)
+                    width = (len(response) + 3) // 4
+                    for start in range(0, len(response), width):
+                        if stop.wait(0.07):
+                            break
+                        try:
+                            connection.sendall(response[start:start + width])
+                        except (BrokenPipeError, ConnectionResetError):
+                            break
+            except Exception as exc:
+                errors.append(exc)
+
+        thread = Thread(target=serve, daemon=True)
+        thread.start()
+        uid = os.geteuid()
+        with monkeypatch.context() as constructor_context:
+            constructor_context.setattr(os, "geteuid", lambda: uid + 1)
+            provider = KmsAgentReportImageKeyProvider(
+                endpoint, expected_peer_uid=uid, timeout_seconds=0.15,
+            )
+        started = time.monotonic()
+        try:
+            with pytest.raises(ReportImageKeyUnavailable, match="provider is unavailable"):
+                provider.load()
+            elapsed = time.monotonic() - started
+            assert elapsed < 0.8
+            with pytest.raises(ReportImageKeyUnavailable, match="authority is unavailable"):
+                provider.authority_proof()
+        finally:
+            stop.set()
+            thread.join(timeout=2)
+
+    assert not thread.is_alive()
+    assert errors == []
+
+
+@pytest.mark.parametrize("costs,expected_timeouts", [
+    ((1.1, 0.0, 0.0), [1.0]),
+    ((0.0, 1.1, 0.0), [1.0, 1.0]),
+    ((0.0, 0.0, 1.1), [1.0, 1.0, 1.0]),
+    ((0.4, 0.4, 0.4), [1.0, 0.6, 0.2]),
+])
+def test_kms_exchange_budget_includes_connect_send_and_final_receive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    costs,
+    expected_timeouts,
+) -> None:
+    from backend.app.services import report_image_keys as key_module
+
+    endpoint = tmp_path / "kms-budget.sock"
+    response = _raw_keyring(
+        [{"id": "key-v1", "material": _material(1), "state": "active"}]
+    ) + b"\n"
+    clock = [0.0]
+    timeouts = []
+    errors = []
+    real_socket = socket.socket
+
+    class TimedSocket:
+        def __init__(self, *args):
+            self.client = real_socket(*args)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.client.close()
+
+        def settimeout(self, value):
+            timeouts.append(value)
+            self.client.settimeout(value)
+
+        def connect(self, address):
+            self.client.connect(address)
+            clock[0] += costs[0]
+
+        def getsockopt(self, *args):
+            return self.client.getsockopt(*args)
+
+        def sendall(self, data):
+            self.client.sendall(data)
+            clock[0] += costs[1]
+
+        def recv(self, size):
+            data = self.client.recv(size)
+            clock[0] += costs[2]
+            return data
+
+    with real_socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+        server.bind(str(endpoint))
+        server.listen(1)
+        server.settimeout(2)
+
+        def serve() -> None:
+            try:
+                connection, _address = server.accept()
+                with connection:
+                    connection.settimeout(2)
+                    if connection.recv(4096):
+                        try:
+                            connection.sendall(response)
+                        except (BrokenPipeError, ConnectionResetError):
+                            pass
+            except Exception as exc:
+                errors.append(exc)
+
+        thread = Thread(target=serve, daemon=True)
+        thread.start()
+        uid = os.geteuid()
+        with monkeypatch.context() as constructor_context:
+            constructor_context.setattr(os, "geteuid", lambda: uid + 1)
+            provider = KmsAgentReportImageKeyProvider(
+                endpoint, expected_peer_uid=uid, timeout_seconds=1,
+            )
+        monkeypatch.setattr(key_module, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(key_module, "socket", SimpleNamespace(
+            socket=TimedSocket,
+            AF_UNIX=socket.AF_UNIX,
+            SOCK_STREAM=socket.SOCK_STREAM,
+            SOL_SOCKET=socket.SOL_SOCKET,
+            SO_PEERCRED=socket.SO_PEERCRED,
+        ))
+        try:
+            with pytest.raises(ReportImageKeyUnavailable, match="provider is unavailable"):
+                provider.load()
+        finally:
+            thread.join(timeout=2)
+
+    assert not thread.is_alive()
+    assert errors == []
+    assert timeouts == pytest.approx(expected_timeouts)
 
 
 def test_production_secret_file_requires_root_service_group_authority(

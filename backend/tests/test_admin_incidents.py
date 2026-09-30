@@ -1381,8 +1381,54 @@ def test_migration_015_is_append_only_event_bound_and_least_privilege(
     raw_digest_successor = importlib.import_module(
         "backend.alembic.versions.202609010002_raw_collection_digest_rejection"
     )
-    head = importlib.import_module(
+    decision_successor = importlib.import_module(
         "backend.alembic.versions.202609010003_admin_report_decision_idempotency"
+    )
+    signup_successor = importlib.import_module(
+        "backend.alembic.versions.202609210001_account_creation_replay"
+    )
+    duplicate_successor = importlib.import_module(
+        "backend.alembic.versions.202609240001_admin_report_duplicate_cycle_guard"
+    )
+    rehash_successor = importlib.import_module(
+        "backend.alembic.versions.202609240002_admin_password_login_rehash"
+    )
+    review_delivery_v4_successor = importlib.import_module(
+        "backend.alembic.versions.202609280001_admin_review_delivery_v4"
+    )
+    allowlist_successor = importlib.import_module(
+        "backend.alembic.versions."
+        "202609280002_admin_high_risk_reconfirmation_allowlist"
+    )
+    rotation_successor = importlib.import_module(
+        "backend.alembic.versions.202609290001_admin_device_key_rotation"
+    )
+    pending_revocation_successor = importlib.import_module(
+        "backend.alembic.versions.202609290002_admin_device_key_pending_revocation"
+    )
+    device_evidence_successor = importlib.import_module(
+        "backend.alembic.versions.202609300001_device_evidence_server_clock"
+    )
+    keyring_successor = importlib.import_module(
+        "backend.alembic.versions.202609300002_privacy_hmac_keyring"
+    )
+    evidence_key_successor = importlib.import_module(
+        "backend.alembic.versions.202609300003_installation_evidence_keys"
+    )
+    evidence_key_purge_successor = importlib.import_module(
+        "backend.alembic.versions.202609300004_installation_evidence_key_purge"
+    )
+    delivery_correction_successor = importlib.import_module(
+        "backend.alembic.versions.202609300005_admin_delivery_event_corrections"
+    )
+    consent_v12_successor = importlib.import_module(
+        "backend.alembic.versions.202609300006_integrated_consent_v12"
+    )
+    copy_inventory_successor = importlib.import_module(
+        "backend.alembic.versions.202609300007_account_deletion_external_copy_inventory"
+    )
+    head = importlib.import_module(
+        "backend.alembic.versions.202609300008_admin_challenge_source_admission"
     )
     assert migration.revision == "202608290015"
     assert migration.down_revision == "202608290014"
@@ -1395,7 +1441,22 @@ def test_migration_015_is_append_only_event_bound_and_least_privilege(
     assert external_copy_successor.down_revision == integrity_successor.revision
     assert discovery_successor.down_revision == external_copy_successor.revision
     assert raw_digest_successor.down_revision == discovery_successor.revision
-    assert head.down_revision == raw_digest_successor.revision
+    assert decision_successor.down_revision == raw_digest_successor.revision
+    assert signup_successor.down_revision == decision_successor.revision
+    assert duplicate_successor.down_revision == signup_successor.revision
+    assert rehash_successor.down_revision == duplicate_successor.revision
+    assert review_delivery_v4_successor.down_revision == rehash_successor.revision
+    assert allowlist_successor.down_revision == review_delivery_v4_successor.revision
+    assert rotation_successor.down_revision == allowlist_successor.revision
+    assert pending_revocation_successor.down_revision == rotation_successor.revision
+    assert device_evidence_successor.down_revision == pending_revocation_successor.revision
+    assert keyring_successor.down_revision == device_evidence_successor.revision
+    assert evidence_key_successor.down_revision == keyring_successor.revision
+    assert evidence_key_purge_successor.down_revision == evidence_key_successor.revision
+    assert delivery_correction_successor.down_revision == evidence_key_purge_successor.revision
+    assert consent_v12_successor.down_revision == delivery_correction_successor.revision
+    assert copy_inventory_successor.down_revision == consent_v12_successor.revision
+    assert head.down_revision == copy_inventory_successor.revision
     assert health_api.EXPECTED_ALEMBIC_HEAD == head.revision
     alembic_config = Config(
         str(Path(__file__).resolve().parents[1] / "alembic.ini")

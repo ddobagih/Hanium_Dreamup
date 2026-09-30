@@ -12,14 +12,15 @@ import org.junit.Test
 class RouteNavigatorPeriodicGuidanceTest {
     @Test
     fun stoppedUserGetsTheSameDirectionTenSecondsAfterEachCompletedSentence() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         listOf(false, true).forEach { testMode ->
             val navigator = navigator(testMode)
-            val first = navigator.update(fix(0.00055, 1_000), 1_000, false)
+            val first = navigator.update(fix(0.00055, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
             assertTrue(navigator.reserveInstruction(first))
             navigator.acknowledgeInstruction(first, 4_000)
 
-            assertNull(navigator.update(fix(0.00055, 13_999), 13_999, false).instruction)
-            val repeat = requireNotNull(navigator.retryGuidance(14_000))
+            assertNull(navigator.update(fix(0.00055, 13_999), 13_999, false, facingObservation = RouteFacingObservation(90.0, 5.0, 13_999)).instruction)
+            val repeat = requireNotNull(navigator.retryGuidance(14_000, facingObservation = RouteFacingObservation(90.0, 5.0, 14_000)))
             assertEquals("route_guidance", repeat.reason)
             assertEquals(first.guideIndex, repeat.guideIndex)
             assertEquals(first.speechCueToken?.distanceBand, repeat.speechCueToken?.distanceBand)
@@ -31,8 +32,8 @@ class RouteNavigatorPeriodicGuidanceTest {
             assertTrue(navigator.reserveInstruction(repeat))
             navigator.acknowledgeInstruction(repeat, 17_000)
 
-            assertNull(navigator.update(fix(0.00055, 26_999), 26_999, false).instruction)
-            val third = requireNotNull(navigator.retryGuidance(27_000))
+            assertNull(navigator.update(fix(0.00055, 26_999), 26_999, false, facingObservation = RouteFacingObservation(90.0, 5.0, 26_999)).instruction)
+            val third = requireNotNull(navigator.retryGuidance(27_000, facingObservation = RouteFacingObservation(90.0, 5.0, 27_000)))
             assertEquals(repeat.instruction, third.instruction)
             assertNotEquals(repeat.speechCueToken, third.speechCueToken)
             assertTrue(navigator.reserveInstruction(third))
@@ -41,16 +42,17 @@ class RouteNavigatorPeriodicGuidanceTest {
 
     @Test
     fun periodicReminderUsesTheLatestDistanceEvenWithinTheSameApproachBand() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         listOf(false, true).forEach { testMode ->
             val navigator = navigator(testMode)
-            val first = navigator.update(fix(0.00055, 1_000), 1_000, false)
+            val first = navigator.update(fix(0.00055, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
             assertTrue(navigator.reserveInstruction(first))
             navigator.acknowledgeInstruction(first, 2_000)
-            val newer = navigator.update(fix(0.00064, 11_999), 11_999, false)
+            val newer = navigator.update(fix(0.00064, 11_999), 11_999, false, facingObservation = RouteFacingObservation(90.0, 5.0, 11_999))
             assertNull(newer.instruction)
             val match = navigator.currentRouteMatch()
 
-            val repeat = requireNotNull(navigator.retryGuidance(12_000))
+            val repeat = requireNotNull(navigator.retryGuidance(12_000, facingObservation = RouteFacingObservation(90.0, 5.0, 12_000)))
             assertTrue(repeat.instruction?.contains("40m 앞, 왼쪽으로 꺾으세요.") == true)
             assertEquals(first.speechCueToken?.distanceBand, repeat.speechCueToken?.distanceBand)
             assertSame(match, navigator.currentRouteMatch())
@@ -145,14 +147,15 @@ class RouteNavigatorPeriodicGuidanceTest {
 
     @Test
     fun repeatingFinalSegmentWithNoGuideDoesNotCreateArrivalEvidence() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         val navigator = RouteNavigator().apply {
             setRoute(route().copy(guidePoints = emptyList()))
         }
-        val first = navigator.update(fix(0.00055, 1_000), 1_000, false)
+        val first = navigator.update(fix(0.00055, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
         assertNull(first.guideIndex)
         assertTrue(navigator.reserveInstruction(first))
         navigator.acknowledgeInstruction(first, 2_000)
-        val repeat = navigator.update(fix(0.00055, 12_000), 12_000, false)
+        val repeat = navigator.update(fix(0.00055, 12_000), 12_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 12_000))
         assertTrue(repeat.instruction?.contains("목적지까지 약 272m 남았습니다.") == true)
         assertFalse(repeat.arrived)
         assertFalse(repeat.arrivalCandidate)
@@ -162,19 +165,20 @@ class RouteNavigatorPeriodicGuidanceTest {
 
     @Test
     fun urgentApproachStageAndNextGuideRemainEligibleBeforePeriodicDeadline() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         val navigator = navigator(true)
-        val first = navigator.update(fix(0.00055, 1_000), 1_000, false)
+        val first = navigator.update(fix(0.00055, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
         assertTrue(navigator.reserveInstruction(first))
         navigator.acknowledgeInstruction(first, 2_000)
-        val near = navigator.update(fix(0.00082, 3_000), 3_000, false)
+        val near = navigator.update(fix(0.00082, 3_000), 3_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 3_000))
         assertTrue(near.instruction?.contains("20m 앞, 왼쪽으로 꺾으세요.") == true)
         assertTrue(navigator.reserveInstruction(near))
-        val turnPassed = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 5_000), 5_000, false)
+        val turnPassed = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 5_000), 5_000, false, facingObservation = RouteFacingObservation(0.0, 5.0, 5_000))
         assertTrue(turnPassed.cancelStaleNavigationSpeech)
         assertTrue(turnPassed.instruction?.contains("오른쪽으로 꺾으세요.") == true)
         assertTrue(navigator.reserveInstruction(turnPassed))
         navigator.acknowledgeInstruction(near, 5_001)
-        assertEquals("guidance_in_flight", navigator.retryGuidance(5_002)?.reason)
+        assertEquals("guidance_in_flight", navigator.retryGuidance(5_002, facingObservation = RouteFacingObservation(0.0, 5.0, 5_002))?.reason)
     }
 
     @Test

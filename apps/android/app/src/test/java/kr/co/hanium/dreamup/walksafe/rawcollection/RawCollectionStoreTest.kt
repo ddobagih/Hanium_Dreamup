@@ -114,6 +114,63 @@ class RawCollectionStoreTest {
     }
 
     @Test
+    fun replaceActiveBatchWritesTheNewCollectionBeforeDroppingTheOld() {
+        val fixture = fixture()
+        assertTrue(fixture.open())
+        assertNotNull(fixture.appendBatch())
+        val original = requireNotNull(fixture.store.activePartialManifest(OWNER, WALK_ID))
+        fixture.now += 30_000L
+
+        assertNotNull(fixture.replaceActiveBatch(COLLECTION_2))
+
+        // RAW-CORE-F1: pointer switched, old deleted, retention not extended by the rewrite.
+        assertEquals(COLLECTION_2, fixture.storage.activeCollectionId)
+        assertEquals(setOf(COLLECTION_2), fixture.storage.manifests.keys)
+        assertTrue(fixture.storage.chunks.keys.none { it.first == COLLECTION_1 })
+        val replaced = requireNotNull(fixture.store.activePartialManifest(OWNER, WALK_ID))
+        assertEquals(original.capturedStartedAtEpochMs, replaced.capturedStartedAtEpochMs)
+        assertEquals(original.expiresAtEpochMs, replaced.expiresAtEpochMs)
+        assertEquals(fixture.now, replaced.chunks.first().capturedAtEpochMs)
+        assertNotNull(fixture.store.sealActiveSegment(OWNER, WALK_ID))
+        assertEquals(listOf(COLLECTION_2), fixture.store.readyManifests(OWNER).map { it.collectionId })
+    }
+
+    @Test
+    fun failedReplacementKeepsTheOldPartialActiveAndSealable() {
+        val fixture = fixture()
+        assertTrue(fixture.open())
+        assertNotNull(fixture.appendBatch())
+        fixture.now += 30_000L
+        fixture.storage.failChunkOrdinal = 1
+
+        assertNull(fixture.replaceActiveBatch(COLLECTION_2))
+
+        assertEquals(COLLECTION_1, fixture.storage.activeCollectionId)
+        assertEquals(setOf(COLLECTION_1), fixture.storage.manifests.keys)
+        assertTrue(fixture.storage.chunks.keys.none { it.first == COLLECTION_2 })
+        fixture.storage.failChunkOrdinal = null
+        // A clock stepped back behind the stored start, a reused id or another receipt never replace it.
+        val now = fixture.now
+        fixture.now = STARTED_AT - 1L
+        assertNull(fixture.replaceActiveBatch(COLLECTION_2))
+        fixture.now = now
+        assertNull(fixture.replaceActiveBatch(COLLECTION_1))
+        assertNull(fixture.replaceActiveBatch(COLLECTION_2, consentReceiptSha256 = "d".repeat(64)))
+        assertEquals(COLLECTION_1, fixture.storage.activeCollectionId)
+        assertNotNull(fixture.store.sealActiveSegment(OWNER, WALK_ID))
+        assertEquals(listOf(COLLECTION_1), fixture.store.readyManifests(OWNER).map { it.collectionId })
+    }
+
+    @Test
+    fun anIncompleteActivePartialIsNeverReplaced() {
+        val fixture = fixture()
+        assertTrue(fixture.open())
+        assertNull(fixture.replaceActiveBatch(COLLECTION_2))
+        assertEquals(COLLECTION_1, fixture.storage.activeCollectionId)
+        assertEquals(setOf(COLLECTION_1), fixture.storage.manifests.keys)
+    }
+
+    @Test
     fun pauseSealProducesTwoBackendObjectsAndExplicitOrdinalMappings() {
         val fixture = fixture()
         assertTrue(fixture.open())
@@ -370,6 +427,19 @@ private class Fixture(
         rawConsentGranted = true,
         walkState = RawWalkState.ACTIVE,
         items = items(types),
+    )
+
+    fun replaceActiveBatch(
+        newCollectionId: String,
+        consentReceiptSha256: String = "c".repeat(64),
+    ): List<RawChunkMetadata>? = store.replaceActiveBatch(
+        newCollectionId = newCollectionId,
+        owner = DEFAULT_OWNER,
+        walkSessionId = DEFAULT_WALK_ID,
+        consentReceiptSha256 = consentReceiptSha256,
+        rawConsentGranted = true,
+        walkState = RawWalkState.ACTIVE,
+        items = items(),
     )
 
     private companion object {

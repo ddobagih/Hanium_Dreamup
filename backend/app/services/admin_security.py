@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+from contextvars import ContextVar
 from typing import Any, NoReturn
 import uuid
 
@@ -117,17 +118,30 @@ REPORT_DELIVERY_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/deliveries$"
 )
+# S18-40: HIGH-risk append-only correction of the latest effective delivery event.
+REPORT_DELIVERY_CORRECTION_PATH_PATTERN = re.compile(
+    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
+    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/delivery-corrections$"
+)
 ADMIN_DEVICE_PROOF_CHALLENGE_PATH = "/admin/security/device-proof/challenges"
 ADMIN_RECOVERY_CUSTODY_ATTEST_PATH = "/admin/security/recovery-custody/attest"
+ADMIN_DEVICE_KEY_ROTATION_CONFIRM_PATH = "/admin/security/device-keys/rotation/confirm"
 RELEASE_APPROVAL_PATH = "/admin/operations/release-approvals"
 PRIVILEGE_CHANGE_PATH = "/admin/operations/privilege-changes"
 DATA_DELETE_PATH = "/admin/operations/data-deletions"
 ADMIN_UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _SCRYPT_N = 1 << 14
 _SCRYPT_R = 8
-_SCRYPT_P = 1
+_SCRYPT_P = 5
 _SCRYPT_DKLEN = 32
 _PASSWORD_ENCODING_PREFIX = "scrypt-v1"
+_LEGACY_SCRYPT_PARAMETERS = (1 << 14, 8, 1)
+# Every cost ever issued stays verifiable after the current cost is raised.
+# Add the outgoing current tuple here whenever _SCRYPT_* changes.
+_ISSUED_SCRYPT_PARAMETERS = frozenset({_LEGACY_SCRYPT_PARAMETERS, (1 << 14, 8, 5)})
+# Explicit ceiling: covers OWASP's N=2**17, r=8, p=1 profile (~128 MiB) and
+# rejects any larger derivation before scrypt runs.
+_SCRYPT_MAX_MEMORY_BYTES = 256 * 1024 * 1024
 _FORBIDDEN_AUDIT_KEY_PARTS = ("password", "token", "totp", "secret", "recovery_code")
 
 
@@ -320,6 +334,16 @@ def classify_admin_operation(method: str, path: str) -> AdminOperation | None:
         )
     if (
         normalized_method == "POST"
+        and REPORT_DELIVERY_CORRECTION_PATH_PATTERN.fullmatch(normalized_path)
+    ):
+        return AdminOperation(
+            "report.delivery.correct",
+            normalized_method,
+            normalized_path,
+            "HIGH",
+        )
+    if (
+        normalized_method == "POST"
         and REPORT_ORIGINAL_GRANT_PATH_PATTERN.fullmatch(normalized_path)
     ):
         return AdminOperation(
@@ -402,15 +426,78 @@ def classify_admin_operation(method: str, path: str) -> AdminOperation | None:
         )
     if (
         normalized_method == "POST"
-        and ADMIN_DEVICE_REPORT_LOST_PATH_PATTERN.fullmatch(normalized_path)
+        and normalized_path == ADMIN_DEVICE_KEY_ROTATION_CONFIRM_PATH
     ):
+        # S18-3: signed by the ACTIVE key (device proof) and by the PENDING key
+        # (rotation signature); it only replaces this device's own key.
         return AdminOperation(
-            "device.report_lost",
+            "device_key.rotation.confirm",
             normalized_method,
             normalized_path,
             "STANDARD",
         )
+    if (
+        normalized_method == "POST"
+        and ADMIN_DEVICE_REPORT_LOST_PATH_PATTERN.fullmatch(normalized_path)
+    ):
+        # Revoking another device's keys and sessions is sensitive work: it
+        # needs an exact-path reconfirmation. The emergency path when that is
+        # impossible is recovery-code recovery (NPC-SINGLE-ADMIN-RECOVERY).
+        return AdminOperation(
+            "device.report_lost",
+            normalized_method,
+            normalized_path,
+            "HIGH",
+        )
     return None
+
+
+# S18-7: a reconfirmation may be bound to the exact request body it approves.
+# The bound digest replaces the stored nonce digest, so the same nonce with any
+# other body finds no reconfirmation and is rejected before business work.
+ADMIN_RECONFIRMATION_INTENT_SCHEMA = "walksafe.admin-reconfirmation-intent.v1"
+_INTENT_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+# Actions whose route re-verifies the plain nonce digest inside its own
+# business transaction cannot use a body-bound reconfirmation yet. This is the
+# p_action IN (...) list of walksafe_claim_admin_report_mutation (202609010003);
+# binding them needs the route to pass the digest the middleware consumed.
+_RECONFIRMATION_INTENT_UNSUPPORTED_ACTIONS = frozenset(
+    {
+        "report.original.grant",
+        "admin.report.delivery_package.create",
+        # S18-40: the PG correction function checks the plain nonce digest.
+        "report.delivery.correct",
+    }
+)
+current_admin_request_body_sha256: ContextVar[str | None] = ContextVar(
+    "walksafe_admin_request_body_sha256",
+    default=None,
+)
+
+
+def reconfirmation_nonce_sha256(nonce: str, intent_sha256: str | None = None) -> str:
+    """Digest stored for one reconfirmation: plain, or bound to a body SHA-256."""
+
+    if intent_sha256 is None:
+        return sha256_text(nonce)
+    if not isinstance(intent_sha256, str) or _INTENT_SHA256_PATTERN.fullmatch(
+        intent_sha256
+    ) is None:
+        raise ValueError("intent_sha256 must be a lowercase SHA-256 hex digest")
+    return sha256_text(
+        f"{ADMIN_RECONFIRMATION_INTENT_SCHEMA}\0{nonce}\0{intent_sha256}"
+    )
+
+
+def _reconfirmation_nonce_candidates(nonce: str) -> list[str]:
+    """Body-bound digest for the current request first, then the unbound one."""
+
+    body_sha256 = current_admin_request_body_sha256.get()
+    candidates = []
+    if body_sha256 is not None and _INTENT_SHA256_PATTERN.fullmatch(body_sha256):
+        candidates.append(reconfirmation_nonce_sha256(nonce, body_sha256))
+    candidates.append(sha256_text(nonce))
+    return candidates
 
 
 def valid_reconfirmation_nonce(nonce: str) -> bool:
@@ -533,6 +620,8 @@ def hash_password(password: str) -> str:
             f"password must contain between {PASSWORD_MIN_LENGTH} and {PASSWORD_MAX_LENGTH} characters"
         )
     salt = secrets.token_bytes(16)
+    if not _scrypt_parameters_allowed(_SCRYPT_N, _SCRYPT_R, _SCRYPT_P):
+        raise ValueError("current scrypt parameters exceed the configured ceiling")
     derived = hashlib.scrypt(
         password.encode("utf-8"),
         salt=salt,
@@ -540,6 +629,7 @@ def hash_password(password: str) -> str:
         r=_SCRYPT_R,
         p=_SCRYPT_P,
         dklen=_SCRYPT_DKLEN,
+        maxmem=_scrypt_maxmem(_SCRYPT_N, _SCRYPT_R, _SCRYPT_P),
     )
     return "$".join(
         (
@@ -561,11 +651,15 @@ def verify_password(password: str, encoded: str) -> bool:
         if prefix != _PASSWORD_ENCODING_PREFIX:
             return False
         n, r, p = int(raw_n), int(raw_r), int(raw_p)
-        if (n, r, p) != (_SCRYPT_N, _SCRYPT_R, _SCRYPT_P):
+        if not _scrypt_parameters_allowed(n, r, p):
+            return False
+        if (raw_n, raw_r, raw_p) != (str(n), str(r), str(p)):
             return False
         salt = _decode_bytes(raw_salt)
         expected = _decode_bytes(raw_derived)
         if len(salt) != 16 or len(expected) != _SCRYPT_DKLEN:
+            return False
+        if _encode_bytes(salt) != raw_salt or _encode_bytes(expected) != raw_derived:
             return False
         actual = hashlib.scrypt(
             password.encode("utf-8"),
@@ -574,10 +668,40 @@ def verify_password(password: str, encoded: str) -> bool:
             r=r,
             p=p,
             dklen=len(expected),
+            maxmem=_scrypt_maxmem(n, r, p),
         )
     except (ValueError, TypeError, OverflowError):
         return False
     return secrets.compare_digest(actual, expected)
+
+
+def _scrypt_maxmem(n: int, r: int, p: int) -> int:
+    # OpenSSL needs 128*r*(N+2) for V plus 128*r*p for B; add 1 MiB headroom.
+    return 128 * r * (n + p + 2) + (1 << 20)
+
+
+def _password_hash_is_current(encoded: str) -> bool:
+    """True only for a canonical encoding at the current cost; anything else is re-hashed."""
+
+    try:
+        prefix, raw_n, raw_r, raw_p, _raw_salt, _raw_derived = encoded.split("$")
+        n, r, p = int(raw_n), int(raw_r), int(raw_p)
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return (
+        prefix == _PASSWORD_ENCODING_PREFIX
+        and (raw_n, raw_r, raw_p) == (str(n), str(r), str(p))
+        and (n, r, p) == (_SCRYPT_N, _SCRYPT_R, _SCRYPT_P)
+    )
+
+
+def _scrypt_parameters_allowed(n: int, r: int, p: int) -> bool:
+    """Accept only the current or a previously issued cost under the ceiling."""
+
+    return (
+        (n, r, p) == (_SCRYPT_N, _SCRYPT_R, _SCRYPT_P)
+        or (n, r, p) in _ISSUED_SCRYPT_PARAMETERS
+    ) and _scrypt_maxmem(n, r, p) <= _SCRYPT_MAX_MEMORY_BYTES
 
 
 def totp_secret_fingerprint(secret: str) -> str:
@@ -776,11 +900,18 @@ def _safe_audit_details(details: dict[str, Any]) -> dict[str, Any]:
         lowered = key.lower()
         if any(part in lowered for part in _FORBIDDEN_AUDIT_KEY_PARTS):
             raise ValueError(f"secret-bearing audit key is forbidden: {key}")
-        if isinstance(value, dict):
-            _safe_audit_details(value)
-        elif not isinstance(value, (str, int, float, bool, type(None), list)):
-            raise ValueError(f"unsupported audit detail type for {key}")
+        _validate_audit_detail_value(value, key=key)
     return details
+
+
+def _validate_audit_detail_value(value: Any, *, key: str) -> None:
+    if isinstance(value, dict):
+        _safe_audit_details(value)
+    elif isinstance(value, list):
+        for item in value:
+            _validate_audit_detail_value(item, key=key)
+    elif not isinstance(value, (str, int, float, bool, type(None))):
+        raise ValueError(f"unsupported audit detail type for {key}")
 
 
 def _audit_timestamp(value: datetime) -> str:
@@ -1334,37 +1465,42 @@ def _authorize_high_risk_bearer(
         now=observed_at,
     )
     verified_after = observed_at - timedelta(seconds=max_step_up_age_seconds)
+    nonce_candidates = _reconfirmation_nonce_candidates(nonce)
     if _is_postgresql_session(db):
         resolved_issuer_key = _resolve_admin_credential_issuer_key(
             db,
             credential_issuer_key,
         )
-        matched_verified_at = db.execute(
-            text(
-                "SELECT public.walksafe_consume_admin_reconfirmation("
-                "CAST(:admin_id AS text), CAST(:session_id AS uuid), "
-                "CAST(:device_id AS text), CAST(:action AS text), "
-                "CAST(:method AS text), CAST(:path AS text), "
-                "CAST(:nonce_sha256 AS text), "
-                "CAST(:verified_after AS timestamptz), "
-                "CAST(:observed_at AS timestamptz), "
-                "CAST(:runtime_totp_secret AS text), "
-                "CAST(:credential_issuer_key AS text))"
-            ),
-            {
-                "admin_id": identity.admin_id,
-                "session_id": identity.session_id,
-                "device_id": identity.device_id,
-                "action": operation.action,
-                "method": operation.method,
-                "path": operation.path,
-                "nonce_sha256": sha256_text(nonce),
-                "verified_after": verified_after,
-                "observed_at": observed_at,
-                "runtime_totp_secret": runtime_totp_secret,
-                "credential_issuer_key": resolved_issuer_key,
-            },
-        ).scalar_one_or_none()
+        matched_verified_at = None
+        for nonce_sha256 in nonce_candidates:
+            matched_verified_at = db.execute(
+                text(
+                    "SELECT public.walksafe_consume_admin_reconfirmation("
+                    "CAST(:admin_id AS text), CAST(:session_id AS uuid), "
+                    "CAST(:device_id AS text), CAST(:action AS text), "
+                    "CAST(:method AS text), CAST(:path AS text), "
+                    "CAST(:nonce_sha256 AS text), "
+                    "CAST(:verified_after AS timestamptz), "
+                    "CAST(:observed_at AS timestamptz), "
+                    "CAST(:runtime_totp_secret AS text), "
+                    "CAST(:credential_issuer_key AS text))"
+                ),
+                {
+                    "admin_id": identity.admin_id,
+                    "session_id": identity.session_id,
+                    "device_id": identity.device_id,
+                    "action": operation.action,
+                    "method": operation.method,
+                    "path": operation.path,
+                    "nonce_sha256": nonce_sha256,
+                    "verified_after": verified_after,
+                    "observed_at": observed_at,
+                    "runtime_totp_secret": runtime_totp_secret,
+                    "credential_issuer_key": resolved_issuer_key,
+                },
+            ).scalar_one_or_none()
+            if matched_verified_at is not None:
+                break
         reconfirmation = None
     else:
         reconfirmation = db.execute(
@@ -1376,7 +1512,7 @@ def _authorize_high_risk_bearer(
                 AdminSecurityReconfirmation.action == operation.action,
                 AdminSecurityReconfirmation.method == operation.method,
                 AdminSecurityReconfirmation.path == operation.path,
-                AdminSecurityReconfirmation.nonce_sha256 == sha256_text(nonce),
+                AdminSecurityReconfirmation.nonce_sha256.in_(nonce_candidates),
                 AdminSecurityReconfirmation.consumed_at.is_(None),
                 AdminSecurityReconfirmation.expires_at > observed_at,
             )
@@ -1828,6 +1964,7 @@ class AdminSecurityService:
         authentication_kind: str,
         expected_last_totp_timecode: int | None,
         next_last_totp_timecode: int,
+        password_rehash: tuple[str, str] | None = None,
     ) -> tuple[str, AdminSecuritySession]:
         raw_token = secrets.token_urlsafe(SESSION_TOKEN_BYTES)
         expires_at = now + timedelta(
@@ -1836,9 +1973,39 @@ class AdminSecurityService:
         if _is_postgresql_session(self.db):
             session_id = uuid.uuid4()
             self.db.flush()
+            function_name = (
+                "walksafe_issue_admin_session_with_password_rehash"
+                if password_rehash is not None
+                else "walksafe_issue_admin_session"
+            )
+            rehash_arguments = (
+                ", CAST(:expected_password_hash AS text), "
+                "CAST(:replacement_password_hash AS text)"
+                if password_rehash is not None
+                else ""
+            )
+            parameters = {
+                "session_id": session_id,
+                "admin_id": control.admin_id,
+                "device_id": device_id,
+                "device_label": device_label,
+                "token_sha256": sha256_text(raw_token),
+                "issued_at": now,
+                "expires_at": expires_at,
+                "step_up_verified_at": now,
+                "last_seen_at": now,
+                "authentication_kind": authentication_kind,
+                "expected_last_totp_timecode": expected_last_totp_timecode,
+                "next_last_totp_timecode": next_last_totp_timecode,
+                "runtime_totp_secret": self.settings.admin_totp_secret,
+                "credential_issuer_key": self._credential_issuer_key(),
+            }
+            if password_rehash is not None:
+                parameters["expected_password_hash"] = password_rehash[0]
+                parameters["replacement_password_hash"] = password_rehash[1]
             self.db.execute(
                 text(
-                    "SELECT public.walksafe_issue_admin_session("
+                    f"SELECT public.{function_name}("
                     "CAST(:session_id AS uuid), CAST(:admin_id AS text), "
                     "CAST(:device_id AS text), CAST(:device_label AS text), "
                     "CAST(:token_sha256 AS text), CAST(:issued_at AS timestamptz), "
@@ -1849,26 +2016,10 @@ class AdminSecurityService:
                     "CAST(:expected_last_totp_timecode AS bigint), "
                     "CAST(:next_last_totp_timecode AS bigint), "
                     "CAST(:runtime_totp_secret AS text), "
-                    "CAST(:credential_issuer_key AS text))"
+                    "CAST(:credential_issuer_key AS text)"
+                    f"{rehash_arguments})"
                 ),
-                {
-                    "session_id": session_id,
-                    "admin_id": control.admin_id,
-                    "device_id": device_id,
-                    "device_label": device_label,
-                    "token_sha256": sha256_text(raw_token),
-                    "issued_at": now,
-                    "expires_at": expires_at,
-                    "step_up_verified_at": now,
-                    "last_seen_at": now,
-                    "authentication_kind": authentication_kind,
-                    "expected_last_totp_timecode": (
-                        expected_last_totp_timecode
-                    ),
-                    "next_last_totp_timecode": next_last_totp_timecode,
-                    "runtime_totp_secret": self.settings.admin_totp_secret,
-                    "credential_issuer_key": self._credential_issuer_key(),
-                },
+                parameters,
             )
             session = self.db.execute(
                 select(AdminSecuritySession).where(
@@ -2041,6 +2192,11 @@ class AdminSecurityService:
                     details={"reason": "totp_replayed" if replayed else "credentials_invalid"},
                 )
             previous_totp_timecode = control.last_totp_timecode
+            password_rehash = None
+            # Any verified issued cost other than the current one moves to the current cost,
+            # so a later cost raise upgrades p=5 hashes too, not only the original p=1 ones.
+            if not _password_hash_is_current(control.password_hash):
+                password_rehash = (control.password_hash, hash_password(password))
             if not _is_postgresql_session(self.db):
                 control.last_totp_timecode = timecode
             raw_token, session = self._issue_session(
@@ -2051,7 +2207,10 @@ class AdminSecurityService:
                 authentication_kind="LOGIN",
                 expected_last_totp_timecode=previous_totp_timecode,
                 next_last_totp_timecode=timecode,
+                password_rehash=password_rehash,
             )
+            if password_rehash is not None and not _is_postgresql_session(self.db):
+                control.password_hash = password_rehash[1]
             self._record_attempt("login", principal_digest, source_digest, True, observed_at)
             self._audit(
                 "session.login",
@@ -2090,22 +2249,60 @@ class AdminSecurityService:
         identity: AdminSessionIdentity,
         *,
         now: datetime | None = None,
+        paged: bool = False,
+        after: uuid.UUID | None = None,
     ) -> list[dict[str, Any]]:
         observed_at = _as_utc(now or utc_now())
         try:
-            sessions = self.db.execute(
-                select(AdminSecuritySession)
-                .where(AdminSecuritySession.admin_id == identity.admin_id)
-                .order_by(
-                    case(
-                        (AdminSecuritySession.id == identity.session_id, 0),
-                        else_=1,
-                    ),
-                    AdminSecuritySession.issued_at.desc(),
-                    AdminSecuritySession.id,
+            if paged or after is not None:
+                current = self.db.execute(
+                    select(AdminSecuritySession).where(
+                        AdminSecuritySession.admin_id == identity.admin_id,
+                        AdminSecuritySession.id == identity.session_id,
+                    )
+                ).scalar_one_or_none()
+                if (
+                    current is None
+                    or current.revoked_at is not None
+                    or _as_utc(current.expires_at) <= observed_at
+                ):
+                    raise AdminSecurityError(
+                        "admin_session_invalid",
+                        "The administrator session is invalid or expired.",
+                        status_code=401,
+                    )
+                page_query = select(AdminSecuritySession).where(
+                    AdminSecuritySession.admin_id == identity.admin_id,
+                    AdminSecuritySession.id != identity.session_id,
                 )
-                .limit(100)
-            ).scalars().all()
+                if after is not None:
+                    page_query = page_query.where(AdminSecuritySession.id > after)
+                page = self.db.execute(
+                    page_query.order_by(AdminSecuritySession.id).limit(99)
+                ).scalars().all()
+                sessions = [current, *page]
+            else:
+                sessions = self.db.execute(
+                    select(AdminSecuritySession)
+                    .where(AdminSecuritySession.admin_id == identity.admin_id)
+                    .order_by(
+                        case(
+                            (AdminSecuritySession.id == identity.session_id, 0),
+                            else_=1,
+                        ),
+                        case(
+                            (
+                                AdminSecuritySession.revoked_at.is_(None)
+                                & (AdminSecuritySession.expires_at > observed_at),
+                                0,
+                            ),
+                            else_=1,
+                        ),
+                        AdminSecuritySession.issued_at.desc(),
+                        AdminSecuritySession.id,
+                    )
+                    .limit(100)
+                ).scalars().all()
             return [
                 {
                     "session_id": str(session.id),
@@ -2127,17 +2324,26 @@ class AdminSecurityService:
         self,
         identity: AdminSessionIdentity,
     ) -> list[dict[str, Any]]:
-        """List each active trusted device once in a stable order."""
+        """List each active trusted device once in a stable order.
+
+        Each item carries what a person needs to pick a lost device: the label
+        and last activity of its most recent session (null for key-only
+        devices), the key version and the first 8 hex of the key marker.
+        """
 
         try:
-            device_ids = self.db.execute(
-                select(AdminDeviceKey.device_id)
+            # uq_admin_device_keys_one_active keeps one ACTIVE key per device.
+            keys = self.db.execute(
+                select(
+                    AdminDeviceKey.device_id,
+                    AdminDeviceKey.key_version,
+                    AdminDeviceKey.key_marker,
+                )
                 .where(
                     AdminDeviceKey.admin_id == identity.admin_id,
                     AdminDeviceKey.status == "ACTIVE",
                     AdminDeviceKey.revoked_at.is_(None),
                 )
-                .group_by(AdminDeviceKey.device_id)
                 .order_by(
                     case(
                         (AdminDeviceKey.device_id == identity.device_id, 0),
@@ -2146,14 +2352,79 @@ class AdminSecurityService:
                     AdminDeviceKey.device_id,
                 )
                 .limit(100)
-            ).scalars().all()
-            return [
-                {
-                    "device_id": device_id,
-                    "current": device_id == identity.device_id,
-                }
-                for device_id in device_ids
-            ]
+            ).all()
+            device_ids = [row.device_id for row in keys]
+            latest_sessions: dict[str, Any] = {}
+            if device_ids:
+                # Rank inside the database so at most one session row per
+                # listed device is read, however many old or revoked sessions
+                # a device has accumulated (W20A-R6).
+                ranked_sessions = (
+                    select(
+                        AdminSecuritySession.device_id.label("device_id"),
+                        AdminSecuritySession.device_label.label("device_label"),
+                        AdminSecuritySession.last_seen_at.label("last_seen_at"),
+                        func.row_number()
+                        .over(
+                            partition_by=AdminSecuritySession.device_id,
+                            order_by=(
+                                AdminSecuritySession.last_seen_at.desc(),
+                                AdminSecuritySession.id,
+                            ),
+                        )
+                        .label("session_rank"),
+                    )
+                    .where(
+                        AdminSecuritySession.admin_id == identity.admin_id,
+                        AdminSecuritySession.device_id.in_(device_ids),
+                    )
+                    .subquery()
+                )
+                session_rows = self.db.execute(
+                    select(
+                        ranked_sessions.c.device_id,
+                        ranked_sessions.c.device_label,
+                        ranked_sessions.c.last_seen_at,
+                    ).where(ranked_sessions.c.session_rank == 1)
+                ).all()
+                for row in session_rows:
+                    latest_sessions.setdefault(row.device_id, row)
+            items = []
+            for row in keys:
+                session = latest_sessions.get(row.device_id)
+                items.append(
+                    {
+                        "device_id": row.device_id,
+                        "current": row.device_id == identity.device_id,
+                        "device_label": (
+                            session.device_label if session is not None else None
+                        ),
+                        "last_seen_at": (
+                            _as_utc(session.last_seen_at).isoformat()
+                            if session is not None
+                            else None
+                        ),
+                        "key_version": int(row.key_version),
+                        "key_marker_prefix": str(row.key_marker)[:8],
+                    }
+                )
+            return items
+        except SQLAlchemyError as exc:
+            self._rollback_store_error(exc)
+
+    def count_active_devices(self, identity: AdminSessionIdentity) -> int:
+        """Count all active trusted devices so a capped list can say it is partial."""
+
+        try:
+            return int(
+                self.db.execute(
+                    select(func.count(func.distinct(AdminDeviceKey.device_id))).where(
+                        AdminDeviceKey.admin_id == identity.admin_id,
+                        AdminDeviceKey.status == "ACTIVE",
+                        AdminDeviceKey.revoked_at.is_(None),
+                    )
+                ).scalar_one()
+            )
         except SQLAlchemyError as exc:
             self._rollback_store_error(exc)
 
@@ -2292,6 +2563,7 @@ class AdminSecurityService:
         material_kind: str,
         storage_location: str,
         separate_encrypted_backup_confirmed: bool,
+        expected_state_version: str | None = None,
         now: datetime | None = None,
     ) -> dict[str, Any]:
         """Persist only a digest and non-secret off-phone custody metadata."""
@@ -2301,6 +2573,13 @@ class AdminSecurityService:
             or material_kind not in {"RECOVERY_CODE", "SECURITY_KEY"}
             or storage_location != "OFF_PHONE"
             or separate_encrypted_backup_confirmed is not True
+            or (
+                expected_state_version is not None
+                and (
+                    not isinstance(expected_state_version, str)
+                    or re.fullmatch(r"[1-9][0-9]{0,18}", expected_state_version) is None
+                )
+            )
         ):
             raise AdminSecurityError(
                 "admin_recovery_custody_attestation_invalid",
@@ -2319,7 +2598,7 @@ class AdminSecurityService:
                         if _is_postgresql_session(self.db)
                         else None
                     ),
-                )
+                ).execution_options(populate_existing=True)
             ).scalar_one_or_none()
             if control is None or not _recovery_custody_is_consistent(control):
                 raise AdminSecurityStoreUnavailable()
@@ -2360,6 +2639,18 @@ class AdminSecurityService:
                 and control.recovery_custody_separate_backup_confirmed is True
             )
             if not idempotent:
+                if (
+                    expected_state_version is not None
+                    and expected_state_version != str(control.state_version)
+                ) or (
+                    expected_state_version is None
+                    and control.recovery_custody_state == RecoveryCustodyState.ATTESTED.value
+                ):
+                    raise AdminSecurityError(
+                        "admin_recovery_custody_state_version_conflict",
+                        "The recovery custody state changed before this attestation.",
+                        status_code=409,
+                    )
                 replaced = (
                     control.recovery_custody_state
                     == RecoveryCustodyState.ATTESTED.value
@@ -2522,6 +2813,11 @@ class AdminSecurityService:
                     device_id=target_device_id,
                     details={"reason": "device_not_found"},
                 )
+            pending_key_count = sum(
+                1
+                for device_key in device_keys
+                if device_key.status == "PENDING" and device_key.revoked_at is None
+            )
             if _is_postgresql_session(self.db):
                 result = self.db.execute(
                     text(
@@ -2559,6 +2855,11 @@ class AdminSecurityService:
                             revoked_key_count or revoked_session_count
                         ),
                         "revoked_device_key_count": revoked_key_count,
+                        # S18-3-F1 (202609290002): the PG function also revokes
+                        # PENDING keys; this is how many of them were pending.
+                        "revoked_pending_device_key_count": min(
+                            pending_key_count, revoked_key_count
+                        ),
                         "revoked_session_count": revoked_session_count,
                     },
                 )
@@ -2566,7 +2867,10 @@ class AdminSecurityService:
                 return _state_payload(control, observed_at)
             revoked_key_count = 0
             for device_key in device_keys:
-                if device_key.status == "ACTIVE" and device_key.revoked_at is None:
+                if (
+                    device_key.status in {"ACTIVE", "PENDING"}
+                    and device_key.revoked_at is None
+                ):
                     device_key.status = "REVOKED"
                     device_key.revoked_at = observed_at
                     revoked_key_count += 1
@@ -2587,11 +2891,266 @@ class AdminSecurityService:
                 details={
                     "idempotent": not (revoked_key_count or revoked_session_count),
                     "revoked_device_key_count": revoked_key_count,
+                    "revoked_pending_device_key_count": pending_key_count,
                     "revoked_session_count": revoked_session_count,
                 },
             )
             self._commit()
             return _state_payload(control, observed_at)
+        except AdminSecurityError:
+            self.db.rollback()
+            raise
+        except SQLAlchemyError as exc:
+            self._rollback_store_error(exc)
+
+    def confirm_device_key_rotation(
+        self,
+        identity: AdminSessionIdentity,
+        *,
+        proof_key_version: int,
+        proof_key_marker: str,
+        proof_correlation_id: uuid.UUID,
+        previous_key_version: int,
+        previous_key_marker: str,
+        key_version: int,
+        key_marker: str,
+        rotation_signature: str,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """S18-3: activate this device's PENDING key only after it proves possession.
+
+        The request is authenticated by a device proof signed with the ACTIVE key
+        (``proof_key_*``) and carries a signature by the PENDING key over the exact
+        rotation payload, bound to the same proof's correlation id. The old key is
+        revoked in the same transaction that activates the new one.
+        """
+
+        from backend.app.services.admin_device_proof import (
+            admin_device_key_marker,
+            admin_device_key_rotation_payload,
+            verify_admin_device_key_rotation_signature,
+        )
+
+        operation = classify_admin_operation("POST", ADMIN_DEVICE_KEY_ROTATION_CONFIRM_PATH)
+        if operation is None or operation.action != "device_key.rotation.confirm":
+            raise AdminSecurityStoreUnavailable()
+        if (
+            proof_key_version != previous_key_version
+            or not secrets.compare_digest(proof_key_marker, previous_key_marker)
+            or key_version <= previous_key_version
+            or secrets.compare_digest(key_marker, previous_key_marker)
+        ):
+            raise AdminSecurityError(
+                "admin_device_key_rotation_binding_invalid",
+                "The rotation must be signed by the current key for a newer key version.",
+                status_code=422,
+            )
+        observed_at = _as_utc(now or utc_now())
+        try:
+            control = self.db.execute(
+                _mutation_control_query(
+                    self.db,
+                    identity.admin_id,
+                    credential_issuer_key=(
+                        self._credential_issuer_key()
+                        if _is_postgresql_session(self.db)
+                        else None
+                    ),
+                )
+            ).scalar_one_or_none()
+            if control is None or not _recovery_custody_is_consistent(control):
+                raise AdminSecurityStoreUnavailable()
+            if control.security_state != SecurityState.NORMAL.value:
+                raise AdminSecurityError(
+                    "admin_security_state_blocks_operation",
+                    "Administrator recovery must complete before rotating a device key.",
+                    status_code=409,
+                )
+            caller = self.db.execute(_mutation_row_query(
+                self.db,
+                select(AdminSecuritySession)
+                .where(
+                    AdminSecuritySession.id == identity.session_id,
+                    AdminSecuritySession.admin_id == identity.admin_id,
+                ),
+            )).scalar_one_or_none()
+            if (
+                caller is None
+                or caller.revoked_at is not None
+                or _as_utc(caller.expires_at) <= observed_at
+                or not secrets.compare_digest(caller.device_id, identity.device_id)
+            ):
+                raise AdminSecurityError(
+                    "admin_session_invalid",
+                    "The administrator session is invalid or expired.",
+                    status_code=401,
+                )
+            keys = self.db.execute(_mutation_row_query(
+                self.db,
+                select(AdminDeviceKey)
+                .where(
+                    AdminDeviceKey.admin_id == identity.admin_id,
+                    AdminDeviceKey.device_id == identity.device_id,
+                    AdminDeviceKey.key_version.in_(
+                        [previous_key_version, key_version]
+                    ),
+                ),
+            )).scalars().all()
+            previous = next(
+                (
+                    item for item in keys
+                    if item.key_version == previous_key_version
+                    and secrets.compare_digest(item.key_marker, previous_key_marker)
+                ),
+                None,
+            )
+            pending = next(
+                (
+                    item for item in keys
+                    if item.key_version == key_version
+                    and secrets.compare_digest(item.key_marker, key_marker)
+                ),
+                None,
+            )
+            # S18-3-F2(a): not reachable over HTTP. The route requires an ACTION
+            # proof signed by the previous key, and the PostgreSQL proof function
+            # accepts only ACTIVE keys, so after a confirmation the previous
+            # (now REVOKED) key cannot reach this service. Lost confirmation
+            # responses are recovered by the app's session device list
+            # reconcile; this branch only keeps direct service calls idempotent.
+            already_confirmed = (
+                previous is not None
+                and pending is not None
+                and previous.status == "REVOKED"
+                and pending.status == "ACTIVE"
+            )
+            if not already_confirmed and (
+                previous is None
+                or pending is None
+                or previous.status != "ACTIVE"
+                or pending.status != "PENDING"
+            ):
+                self._deny_and_commit(
+                    code="admin_device_key_rotation_not_pending",
+                    message="No matching pending device key is registered for this device.",
+                    status_code=409,
+                    action="device_key.rotation.confirm",
+                    admin_id=identity.admin_id,
+                    session_id=identity.session_id,
+                    device_id=identity.device_id,
+                    details={
+                        "key_version": key_version,
+                        "previous_key_version": previous_key_version,
+                        "reason": "rotation_not_pending",
+                    },
+                )
+            pending_der = bytes(pending.public_key_spki_der)
+            if not secrets.compare_digest(admin_device_key_marker(pending_der), key_marker):
+                raise AdminSecurityStoreUnavailable()
+            payload = admin_device_key_rotation_payload(
+                admin_id=identity.admin_id,
+                device_id=identity.device_id,
+                session_id=identity.session_id,
+                correlation_id=proof_correlation_id,
+                previous_key_version=previous_key_version,
+                previous_key_marker=previous_key_marker,
+                key_version=key_version,
+                key_marker=key_marker,
+            )
+            try:
+                verify_admin_device_key_rotation_signature(
+                    pending_der, payload, rotation_signature
+                )
+            except AdminSecurityError as exc:
+                self._deny_and_commit(
+                    code=exc.code,
+                    message=exc.message,
+                    status_code=exc.status_code,
+                    action="device_key.rotation.confirm",
+                    admin_id=identity.admin_id,
+                    session_id=identity.session_id,
+                    device_id=identity.device_id,
+                    details={
+                        "key_version": key_version,
+                        "previous_key_version": previous_key_version,
+                        "reason": "rotation_signature_invalid",
+                    },
+                )
+            if _is_postgresql_session(self.db):
+                result = self.db.execute(
+                    text(
+                        "SELECT * FROM "
+                        "public.walksafe_confirm_admin_device_key_rotation("
+                        "CAST(:admin_id AS text), "
+                        "CAST(:current_session_id AS uuid), "
+                        "CAST(:device_id AS text), "
+                        "CAST(:previous_key_version AS bigint), "
+                        "CAST(:previous_key_marker AS text), "
+                        "CAST(:key_version AS bigint), "
+                        "CAST(:key_marker AS text), "
+                        "CAST(:observed_at AS timestamptz), "
+                        "CAST(:runtime_totp_secret AS text), "
+                        "CAST(:credential_issuer_key AS text))"
+                    ),
+                    {
+                        "admin_id": identity.admin_id,
+                        "current_session_id": identity.session_id,
+                        "device_id": identity.device_id,
+                        "previous_key_version": previous_key_version,
+                        "previous_key_marker": previous_key_marker,
+                        "key_version": key_version,
+                        "key_marker": key_marker,
+                        "observed_at": observed_at,
+                        "runtime_totp_secret": self.settings.admin_totp_secret,
+                        "credential_issuer_key": self._credential_issuer_key(),
+                    },
+                ).one()
+                if result.result_status not in {"CONFIRMED", "EXISTING"}:
+                    self._deny_and_commit(
+                        code="admin_device_key_rotation_not_pending",
+                        message="No matching pending device key is registered for this device.",
+                        status_code=409,
+                        action="device_key.rotation.confirm",
+                        admin_id=identity.admin_id,
+                        session_id=identity.session_id,
+                        device_id=identity.device_id,
+                        details={
+                            "key_version": key_version,
+                            "previous_key_version": previous_key_version,
+                            "reason": "rotation_not_pending",
+                        },
+                    )
+                idempotent = result.result_status == "EXISTING"
+            else:
+                idempotent = already_confirmed
+                if not idempotent:
+                    previous.status = "REVOKED"
+                    previous.revoked_at = observed_at
+                    self.db.flush()
+                    pending.status = "ACTIVE"
+                    control.state_version += 1
+            self._audit(
+                "device_key.rotation.confirm",
+                "SUCCESS",
+                admin_id=identity.admin_id,
+                session_id=identity.session_id,
+                device_id=identity.device_id,
+                details={
+                    "idempotent": idempotent,
+                    "key_version": key_version,
+                    "previous_key_version": previous_key_version,
+                    "security_level": pending.security_level,
+                },
+            )
+            self._commit()
+            return {
+                "device_id": identity.device_id,
+                "key_version": key_version,
+                "key_marker": key_marker,
+                "previous_key_version": previous_key_version,
+                "status": "ACTIVE",
+                "idempotent": idempotent,
+            }
         except AdminSecurityError:
             self.db.rollback()
             raise
@@ -2610,6 +3169,7 @@ class AdminSecurityService:
         nonce: str,
         source: str = "unknown",
         now: datetime | None = None,
+        intent_sha256: str | None = None,
     ) -> ReconfirmationGrant:
         observed_at = _as_utc(now or utc_now())
         operation = classify_admin_operation(method, path)
@@ -2618,6 +3178,14 @@ class AdminSecurityService:
             or operation.risk != "HIGH"
             or operation.action != action
             or not valid_reconfirmation_nonce(nonce)
+            or (
+                intent_sha256 is not None
+                and (
+                    not isinstance(intent_sha256, str)
+                    or _INTENT_SHA256_PATTERN.fullmatch(intent_sha256) is None
+                    or operation.action in _RECONFIRMATION_INTENT_UNSUPPORTED_ACTIONS
+                )
+            )
         ):
             self._deny_and_commit(
                 code="admin_reconfirmation_binding_invalid",
@@ -2773,7 +3341,9 @@ class AdminSecurityService:
                         "action": operation.action,
                         "method": operation.method,
                         "path": operation.path,
-                        "nonce_sha256": sha256_text(nonce),
+                        "nonce_sha256": reconfirmation_nonce_sha256(
+                            nonce, intent_sha256
+                        ),
                         "verified_at": observed_at,
                         "expires_at": until,
                         "expected_last_totp_timecode": (
@@ -2804,7 +3374,9 @@ class AdminSecurityService:
                         action=operation.action,
                         method=operation.method,
                         path=operation.path,
-                        nonce_sha256=sha256_text(nonce),
+                        nonce_sha256=reconfirmation_nonce_sha256(
+                            nonce, intent_sha256
+                        ),
                         verified_at=observed_at,
                         expires_at=until,
                     )
@@ -2824,6 +3396,7 @@ class AdminSecurityService:
                 device_id=identity.device_id,
                 details={
                     "action": operation.action,
+                    "intent_bound": intent_sha256 is not None,
                     "method": operation.method,
                     "path_sha256": sha256_text(operation.path),
                 },
@@ -3092,15 +3665,23 @@ class AdminSecurityService:
                     device_id=device_id,
                     details={"reason": "already_in_progress"},
                 )
-            active_device_keys = self.db.execute(_mutation_row_query(
+            live_device_keys = self.db.execute(_mutation_row_query(
                 self.db,
                 select(AdminDeviceKey)
                 .where(
                     AdminDeviceKey.admin_id == control.admin_id,
-                    AdminDeviceKey.status == "ACTIVE",
+                    AdminDeviceKey.status.in_(("ACTIVE", "PENDING")),
                     AdminDeviceKey.revoked_at.is_(None),
                 ),
             )).scalars().all()
+            active_device_keys = [
+                key for key in live_device_keys if key.status == "ACTIVE"
+            ]
+            # S18-3-F1 (202609290002): every PENDING key, including the recovery
+            # device's, is revoked with the other devices' keys.
+            pending_device_keys = [
+                key for key in live_device_keys if key.status == "PENDING"
+            ]
             recovery_device_keys = [
                 key
                 for key in active_device_keys
@@ -3150,6 +3731,9 @@ class AdminSecurityService:
                         device_key.device_id, device_id
                     ):
                         continue
+                    device_key.status = "REVOKED"
+                    device_key.revoked_at = observed_at
+                for device_key in pending_device_keys:
                     device_key.status = "REVOKED"
                     device_key.revoked_at = observed_at
             raw_token = secrets.token_urlsafe(RECOVERY_TOKEN_BYTES)
@@ -3254,10 +3838,15 @@ class AdminSecurityService:
                 details={
                     "all_sessions_revoked": True,
                     "custody_reset": True,
+                    # S18-31: the recovery-code emergency start is attributable
+                    # to its source and the device that asked for it.
+                    "device_label": device_label,
+                    "source_sha256": source_digest,
                     "other_device_keys_revoked": True,
                     "previous_custody_state": previous_custody_state,
                     "recovery_device_key_preserved": preserve_recovery_device_key,
                     "revoked_device_key_count": revoked_device_key_count,
+                    "revoked_pending_device_key_count": len(pending_device_keys),
                 },
             )
             self._commit()

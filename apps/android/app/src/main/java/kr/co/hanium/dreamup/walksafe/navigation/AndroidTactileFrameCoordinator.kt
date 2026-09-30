@@ -71,6 +71,7 @@ internal class AndroidTactileFrameCoordinator(
         navigationActiveNow: Boolean,
         tmapOnRouteNow: Boolean,
         activeRouteId: String?,
+        activeRouteProgress: TactileActiveRouteProgress? = null,
         processDepth: (MainActivity.DetectionFrameEvidence, List<DetectionCandidate>) -> List<TrackedObjectDepth>,
     ): MainActivity.TactileSnapshotFrameResult {
         val candidateEvidence = detectionSnapshot.frameEvidence
@@ -109,6 +110,7 @@ internal class AndroidTactileFrameCoordinator(
                 navigationActiveNow = navigationActiveNow,
                 tmapOnRouteNow = tmapOnRouteNow,
                 activeRouteId = activeRouteId,
+                activeRouteProgress = activeRouteProgress,
             ),
         )
         return MainActivity.TactileSnapshotFrameResult(
@@ -130,6 +132,7 @@ internal class AndroidTactileFrameCoordinator(
         navigationActive = input.navigationActiveAtCapture && input.navigationActiveNow,
         tmapOnRoute = input.tmapOnRouteAtCapture && input.tmapOnRouteNow,
         activeRouteId = input.activeRouteId,
+        activeRouteProgress = input.activeRouteProgress,
     )
 
     /** Uses a verified current observation without publishing it as another detector snapshot. */
@@ -139,6 +142,7 @@ internal class AndroidTactileFrameCoordinator(
         navigationActiveNow: Boolean,
         tmapOnRouteNow: Boolean,
         activeRouteId: String?,
+        activeRouteProgress: TactileActiveRouteProgress? = null,
         processDepth: (CurrentTrackedFrameObservation, MainActivity.DetectionFrameEvidence) -> List<TrackedObjectDepth>,
     ): MainActivity.TactileSnapshotFrameResult {
         val current = frame?.takeIf { it.observation.isFreshAt(nowElapsedRealtimeMs) }
@@ -152,6 +156,7 @@ internal class AndroidTactileFrameCoordinator(
             navigationActive = evidence?.navigationActive == true && navigationActiveNow,
             tmapOnRoute = evidence?.tmapOnRoute == true && tmapOnRouteNow,
             activeRouteId = activeRouteId,
+            activeRouteProgress = activeRouteProgress,
         )
         return MainActivity.TactileSnapshotFrameResult(
             matchedEvidence = evidence,
@@ -170,19 +175,31 @@ internal class AndroidTactileFrameCoordinator(
         independentFreshOutputs: List<UnknownObjectFeedbackBatch> = emptyList(),
         warningContext: WarningRegionContext? = null,
     ): TactileFrameFeedbackDispatch {
-        val currentCandidates = AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(frame.guidance.outputs).mapNotNull { output ->
-            output.toFeedbackCandidate(stale = stale)?.let { SourcedFeedbackCandidate(output, it) }
+        // Expired evidence cannot own a representative region or suppress another source.
+        // Missing per-output capture leases remain fail-closed; dispatch time cannot create one.
+        // Resolve same-capture state conflicts at dispatch time: per-output leases can expire
+        // between frame composition and delivery, and a still-live warning must not disappear.
+        val currentOutputs = AndroidRiskSelectionPolicy.resolveConflictingStateFeedback(
+            frame.guidance.outputs, nowElapsedRealtimeMs = nowMs,
+        )
+        val currentCandidates = AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(currentOutputs).mapNotNull { output ->
+            output.toFeedbackCandidate(stale = stale)
+                ?.takeIf { nowMs <= it.validUntilMs }
+                ?.let { SourcedFeedbackCandidate(output, it) }
         }
         val independentCandidates = independentFreshOutputs.filter { it.isFreshAt(nowMs) }.flatMap { batch ->
             AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(batch.outputs).mapNotNull { output ->
-                output.toFeedbackCandidate()?.let { SourcedFeedbackCandidate(output, it, batch) }
+                output.toFeedbackCandidate()
+                    ?.let { it.copy(validUntilMs = minOf(it.validUntilMs, batch.validUntilElapsedRealtimeMs)) }
+                    ?.takeIf { nowMs <= it.validUntilMs }
+                    ?.let { SourcedFeedbackCandidate(output, it, batch) }
             }
         }
         recordWarningObservation(currentCandidates, warningContext, stale || !deviceGateAllowsAlerts, nowMs)
         // A callback must not claim a reservation between representative selection and its
         // cancellation. Policy entry points synchronize on this same reentrant monitor.
         val dispatch = synchronized(feedbackPolicy) {
-            val regions = coalesceCurrentWarningRegions(currentCandidates, independentCandidates)
+            val regions = coalesceCurrentWarningRegions(currentCandidates, independentCandidates, nowMs)
             val selected = regions.candidates
             val selectedTrackIds = selected.mapTo(hashSetOf()) { it.feedback.trackId }
             val suppressedTrackIds = (currentCandidates + independentCandidates).mapTo(hashSetOf()) { it.feedback.trackId }
@@ -195,23 +212,17 @@ internal class AndroidTactileFrameCoordinator(
             }
             val candidates = selected.map { it.feedback }
                 .sortedWith(compareByDescending<FeedbackCandidate> { it.level.ordinal }.thenByDescending { it.confidence })
-            val sourceDeadlines = selected.mapNotNull { candidate ->
-                candidate.independentBatch?.let { candidate.feedback.deliveryKey to it.validUntilElapsedRealtimeMs }
-            }.groupBy({ it.first }, { it.second })
-                .mapValues { (_, deadlines) -> deadlines.min() }
-            val action = feedbackPolicy.evaluateCandidates(candidates, deviceGateAllowsAlerts, nowMs)?.let { selected ->
-                sourceDeadlines[selected.deliveryKey]?.let { sourceDeadline ->
-                    selected.copy(validUntilMs = minOf(selected.validUntilMs, sourceDeadline))
-                } ?: selected
-            }
+            val action = feedbackPolicy.evaluateCandidates(candidates, deviceGateAllowsAlerts, nowMs)
             TactileFrameFeedbackDispatch(
                 activeRiskTrackIds = feedbackPolicy.activeRiskTrackIds(
                     candidates = candidates,
                     deviceGateAllowsAlerts = deviceGateAllowsAlerts,
+                    nowMs = nowMs,
                 ),
                 activeFeedbackDeliveryKeys = feedbackPolicy.activeFeedbackDeliveryKeys(
                     candidates = candidates,
                     deviceGateAllowsAlerts = deviceGateAllowsAlerts,
+                    nowMs = nowMs,
                 ),
                 deviceGateAllowsAlerts = deviceGateAllowsAlerts,
                 action = action,
@@ -225,13 +236,14 @@ internal class AndroidTactileFrameCoordinator(
     private fun coalesceCurrentWarningRegions(
         primary: List<SourcedFeedbackCandidate>,
         independent: List<SourcedFeedbackCandidate>,
+        nowMs: Long,
     ): WarningRegionSelection {
         val all = primary + independent
-        val eligibleKeys = feedbackPolicy.activeFeedbackDeliveryKeys(all.map { it.feedback }, true)
+        val eligibleKeys = feedbackPolicy.activeFeedbackDeliveryKeys(all.map { it.feedback }, true, nowMs)
         val pairs = primary.flatMap { first ->
             independent.filter { second ->
                 first.feedback.deliveryKey in eligibleKeys && second.feedback.deliveryKey in eligibleKeys &&
-                    (sameCapturedWarningRegion(first, second) || sameContinuouslyObservedWarningRegion(first, second))
+                    (sameCapturedWarningRegion(first, second) || sameContinuouslyObservedWarningRegion(first, second, nowMs))
             }.map { second -> first to second }
         }
         val primaryMatchCounts = pairs.groupingBy { it.first }.eachCount()
@@ -287,6 +299,7 @@ internal class AndroidTactileFrameCoordinator(
     private fun sameContinuouslyObservedWarningRegion(
         primary: SourcedFeedbackCandidate,
         independent: SourcedFeedbackCandidate,
+        nowMs: Long,
     ): Boolean {
         val context = warningContext ?: return false
         val batch = independent.independentBatch ?: return false
@@ -306,7 +319,7 @@ internal class AndroidTactileFrameCoordinator(
         for (observation in history) {
             val candidate = observation.candidates.singleOrNull { it.feedback.trackId == primary.feedback.trackId }
                 ?: return false
-            if (candidate.feedback.deliveryKey !in feedbackPolicy.activeFeedbackDeliveryKeys(listOf(candidate.feedback), true) ||
+            if (candidate.feedback.deliveryKey !in feedbackPolicy.activeFeedbackDeliveryKeys(listOf(candidate.feedback), true, nowMs) ||
                 candidate.feedback.stale ||
                 !candidate.feedback.alertableLevel || !hasCurrentMetricRegion(candidate.output) ||
                 candidate.output.timestampMs != candidate.output.frameId / 1_000_000L ||

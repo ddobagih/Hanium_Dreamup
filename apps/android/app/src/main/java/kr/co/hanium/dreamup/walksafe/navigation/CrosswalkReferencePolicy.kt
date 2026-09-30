@@ -16,7 +16,7 @@ object CrosswalkReferencePolicy {
         return className.trim().lowercase() in detectorClassNames
     }
 
-    private fun isCrosswalkGuide(guide: WalkingRouteGuidePoint): Boolean {
+    internal fun isCrosswalkGuide(guide: WalkingRouteGuidePoint): Boolean {
         return guide.turnType in tmapCrosswalkTurnTypes ||
             containsCrosswalkMarker(guide.instruction) ||
             containsCrosswalkMarker(guide.pointType) ||

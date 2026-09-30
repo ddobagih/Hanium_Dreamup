@@ -80,10 +80,18 @@ class MainActivityWalkScreenPortStaticTest {
         val voiceSelection = blockAt("private fun selectVoiceDestinationCandidate(oneBasedIndex: Int)")
         val routeAction = blockAt("private fun onRouteButtonClicked()")
         val voiceNavigationActions = listOf(
-            blockAt("private fun requestRerouteFromVoice()"),
-            blockAt("private fun recheckLocationFromVoice()"),
+            blockAt("private fun requestRerouteFromVoice(expectedToken: RouteNavigatorDecisionToken?)"),
+            blockAt("private fun recheckLocationFromVoice(expectedToken: RouteNavigatorDecisionToken?)"),
             blockAt("private fun speakNextNavigationInstruction()"),
         )
+        listOf("requestRerouteFromVoice", "recheckLocationFromVoice").forEach { action ->
+            assertTrue(
+                blockAt("private fun $action()").contains("$action(routeNavigator.pendingDecisionToken())"),
+            )
+            val tokenAction = blockAt("private fun $action(expectedToken: RouteNavigatorDecisionToken?)")
+            assertTrue(tokenAction.contains("if (expectedToken == null)"))
+            assertFalse(tokenAction.contains("pendingDecisionToken()"))
+        }
 
         assertTrue(availability.contains("currentNavigationCollectionAllowsWork()"))
         assertTrue(availability.contains("currentDestinationSearchAllowsWork()"))
@@ -156,10 +164,12 @@ class MainActivityWalkScreenPortStaticTest {
             voiceSelection.indexOf("currentVoiceDestinationDialogState()") in
                 0 until voiceSelection.indexOf("state?.onCommand("),
         )
+        // S06-40: while walking the number only selects the place; "길안내 시작" requests the route.
         assertTrue(
-            voiceSelection.indexOf("if (!onDestinationSelected(selected)) {") in
+            voiceSelection.indexOf("walkingDestinationChange.offer(selected, owner,") in
                 0 until voiceSelection.lastIndexOf("destinationSearchVoiceState = null"),
         )
+        assertFalse(voiceSelection.contains("onDestinationSelected("))
         val homeSelection = voiceSelection
             .substringAfterLast("if (nativeHomeFeatureContextAvailable()) {")
             .substringBefore("if (!onDestinationSelected(selected)) {")
@@ -183,17 +193,24 @@ class MainActivityWalkScreenPortStaticTest {
     }
 
     @Test
-    fun guidanceHasOneStatusWriterAndEntersBeforePreflight() {
+    fun guidanceHasOneStatusWriterAndHomePreparationPreservesDestination() {
         val render = blockAt("private fun renderMainUi()")
         val assignments = Regex("nativeGuidanceStatusText\\.text\\s*=")
         assertTrue("Styling must not overwrite the measured preparation message", assignments.findAll(source).count() == 1)
         assertTrue("The sole guidance writer must remain in the renderer", assignments.containsMatchIn(render))
         assertTrue(render.contains("nativeGuidanceStatusText.text = nativeGuidanceStatusMessage(presentation)"))
-        val message = blockAt("private fun nativeGuidanceStatusMessage(")
+        // This is expression-bodied; braces in interpolated strings are not a function body.
+        val message = source.substringAfter("private fun nativeGuidanceStatusMessage(")
+            .substringBefore("\n    private ")
         assertTrue(message.contains("nativeDestinationPreparationMessage()"))
         assertTrue(message.contains("officialEnvironmentMeasurementDetail(currentOfficialEnvironmentAssessment())"))
         val start = blockAt("private fun startNativeDestinationGuidance()")
-        assertTrue(start.indexOf("showNativeUiPage(NativeUiPage.GUIDANCE)") in 0 until start.indexOf("beginNativeWalkFromHome()"))
+        assertTrue(start.indexOf("nativeUiPage = NativeUiPage.HOME") in 0 until start.indexOf("beginNativeWalkFromHome()"))
+        assertTrue(start.contains("val destination = pendingUiDestination ?: return"))
+        assertTrue(start.contains("pendingNativeUiPage = NativeUiPage.DESTINATION_CONFIRM"))
+        assertTrue(start.contains("retainExplicitStartUntilTrustedLocation = true"))
+        assertFalse(start.contains("clearNativeDestinationSearchState("))
+        assertFalse(start.contains("showNativeUiPage(NativeUiPage.GUIDANCE)"))
         assertFalse(start.contains("showNativeUiPage(NativeUiPage.HOME)"))
         val styling = blockAt("private fun applyNativePreviewPresentation(")
         assertTrue(styling.contains("val showPhysicalPreparation = !guidanceVisible"))
@@ -202,9 +219,12 @@ class MainActivityWalkScreenPortStaticTest {
 
     @Test
     fun pausingOrResettingTheWalkClearsAnyPendingExplicitRouteStart() {
-        val cancelOutputs = blockAt("private fun cancelWalkSessionOutputs(")
+        val cancelEntry = blockAt("private fun cancelWalkSessionOutputs(")
+        val cancelOutputs = blockAt("private fun cancelWalkSessionOutputsInternal(")
         val resetRoute = blockAt("private fun resetRouteState(")
 
+        assertTrue(cancelEntry.contains("cancelWalkSessionOutputsInternal(reason, null)"))
+        assertTrue(cancelOutputs.contains("WalkSessionState.PAUSED"))
         assertTrue(cancelOutputs.contains("resetRouteState(purgeRouteSnapshot = false)"))
         assertTrue(resetRoute.contains("clearPendingExplicitRouteStart()"))
     }

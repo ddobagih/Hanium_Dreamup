@@ -34,7 +34,12 @@ internal class GatewayAccountHttpException(
 
 internal class GatewayAccountClient(
     private val transport: GatewaySessionTransport = HttpUrlConnectionGatewaySessionTransport(),
+    approvedReleaseOrigin: String = kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_GATEWAY_ORIGIN,
+    allowDebugOrigin: Boolean = kr.co.hanium.dreamup.walksafe.BuildConfig.DEBUG,
+    private val clockEpochMs: () -> Long = System::currentTimeMillis,
 ) {
+    private val originGuard = GatewayAccountOriginGuard(approvedReleaseOrigin, allowDebugOrigin)
+
     fun requestEmailOtp(
         gatewayBaseUrl: String,
         email: String,
@@ -71,7 +76,11 @@ internal class GatewayAccountClient(
             !validEnrollmentHandle(handle) ||
             expiresAt == null ||
             resendAt == null ||
-            resendAt > expiresAt
+            resendAt > expiresAt ||
+            // S01-9: server TTL cap and clock skew, not only format and order.
+            !kr.co.hanium.dreamup.walksafe.account.EmailOtpResponseBounds.accepts(
+                clockEpochMs(), expiresAt, resendAt,
+            )
         ) throw GatewayAccountHttpException(0, "invalid_email_otp_response")
         return EmailOtpEnrollmentResponse(handle, expiresAt, resendAt)
     }
@@ -87,7 +96,7 @@ internal class GatewayAccountClient(
         if (
             !validEnrollmentHandle(enrollmentHandle) ||
             !OTP.matches(otpCode) ||
-            !GatewayAccountInputPolicy.validPassword(password) ||
+            !GatewayAccountInputPolicy.validNewPassword(password) ||
             !selections.requiredGranted
         ) throw GatewayAccountHttpException(0, "invalid_account_create_input")
         val consent = JSONObject()
@@ -127,10 +136,23 @@ internal class GatewayAccountClient(
     }
 
     private fun requireApprovedRequestOrigin(gatewayBaseUrl: String) {
-        val approved = GatewayEndpointPolicy.debugOriginOrNull(gatewayBaseUrl)
-        if (approved == null || approved != gatewayBaseUrl.trimEnd('/')) {
+        if (originGuard.originOrNull(gatewayBaseUrl) == null) {
             throw GatewayAccountHttpException(0, "invalid_gateway_url")
         }
+    }
+}
+
+internal class GatewayAccountOriginGuard(
+    private val approvedReleaseOrigin: String,
+    private val allowDebugOrigin: Boolean,
+) {
+    fun originOrNull(raw: String): String? {
+        val origin = if (allowDebugOrigin) {
+            GatewayEndpointPolicy.debugOriginOrNull(raw)
+        } else {
+            GatewayEndpointPolicy.approvedReleaseOriginOrNull(raw, approvedReleaseOrigin)
+        }
+        return origin?.takeIf { it == raw.trimEnd('/') }
     }
 }
 
@@ -154,14 +176,23 @@ internal object GatewayAccountInputPolicy {
         return domain.length in 1..253 &&
             local.length + domain.length + 1 <= 254 &&
             labels.size >= 2 &&
-            labels.all(DOMAIN_LABEL::matches)
+            labels.all { label ->
+                DOMAIN_LABEL.matches(label) &&
+                    (label.startsWith("xn--") || label.drop(2).take(2) != "--")
+            }
     }
 
     fun validDateOfBirth(value: String): Boolean =
         value.length == 10 && runCatching { LocalDate.parse(value, DATE) }.isSuccess
 
+    // Login keeps the existing 10..128 range for accounts created before FP-010-DETAIL-02.
     fun validPassword(value: String): Boolean =
         value.codePointCount(0, value.length) in 10..128 && '\u0000' !in value
+
+    // FP-010-DETAIL-02 (S01-13): new passwords need 12..128 code points. Common or
+    // leaked values are refused by the Backend (account_password_too_common).
+    fun validNewPassword(value: String): Boolean =
+        value.codePointCount(0, value.length) in 12..128 && '\u0000' !in value
 }
 
 private fun GatewayHttpResponse.exactJsonOrNull(fields: Set<String>): JSONObject? = runCatching {

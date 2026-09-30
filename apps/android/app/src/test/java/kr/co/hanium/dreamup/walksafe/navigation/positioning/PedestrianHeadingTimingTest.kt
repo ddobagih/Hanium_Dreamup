@@ -29,6 +29,21 @@ class PedestrianHeadingTimingTest {
         )
     }
 
+    @Test
+    fun smoothingResidualIsIncludedOnceInTheHeadingErrorBudget() {
+        val selector = PedestrianHeadingSelector()
+        selector.select(input(1_000L, 1_000L, 0.0))
+
+        // S09-28: 0.35 is the gain per nominal magnetic interval (500 ms), not per call.
+        val smoothed = requireNotNull(selector.select(input(1_500L, 1_500L, 10.0)))
+        val repeated = requireNotNull(selector.select(input(1_600L, 1_500L, 10.0)))
+
+        assertEquals(3.5, smoothed.headingDegreesTrueNorth, 1e-12)
+        assertEquals(11.5, requireNotNull(smoothed.accuracyDegrees), 1e-12)
+        assertEquals(smoothed.accuracyDegrees, repeated.accuracyDegrees)
+        assertEquals(smoothed.sourceObservationAtElapsedRealtimeMs, repeated.sourceObservationAtElapsedRealtimeMs)
+    }
+
     private fun input(now: Long, time: Long, heading: Double) = PedestrianHeadingInput(
         nowElapsedRealtimeMs = now,
         speed = WalkingSpeedObservation(0.2, 0.2, now),

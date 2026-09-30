@@ -30,6 +30,67 @@ import org.junit.Test
 
 class AndroidRawCollectionClientNetworkTest {
     @Test
+    fun preservesIntegerRetryAfterAndBoundedErrorBodyWithoutParsing() {
+        assertHttpFailurePreservesResponse(429, "600")
+        assertHttpFailurePreservesResponse(429, "000600")
+    }
+
+    @Test
+    fun preservesHttpDateRetryAfterWithoutInterpretingIt() {
+        assertHttpFailurePreservesResponse(503, "Wed, 21 Oct 2015 07:28:00 GMT")
+    }
+
+    @Test
+    fun preservesMalformedRetryAfterWithoutInventingAFallback() {
+        assertHttpFailurePreservesResponse(503, "not-a-retry-delay")
+    }
+
+    @Test
+    fun preservesAbsentRetryAfterAsNull() {
+        assertHttpFailurePreservesResponse(429, null)
+    }
+
+    @Test
+    fun statusOnlyHttpExceptionConstructionRemainsCompatible() {
+        val error = RawCollectionHttpException(429)
+        assertEquals(429, error.statusCode)
+        assertEquals("", error.errorBody)
+        org.junit.Assert.assertNull(error.retryAfterHeader)
+    }
+
+    @Test
+    fun errorResponseSizeRemainsBoundedBeforeHttpFailureIsExposed() {
+        val releaseServer = CountDownLatch(1)
+        val local = localManifest()
+        val backend = requireNotNull(local.toBackendManifest())
+        LocalHttpTestServer { _, socket ->
+            socket.writeFixedResponse(
+                statusCode = 429,
+                body = byteArrayOf(),
+                declaredLength = 512L * 1_024L + 1L,
+                headers = mapOf("Retry-After" to "600"),
+            )
+            releaseServer.await(3, TimeUnit.SECONDS)
+        }.use { server ->
+            try {
+                assertThrows(NetworkResponseTooLargeException::class.java) {
+                    AndroidRawCollectionClient().uploadCall(
+                        session = v7Session(server.baseUrl),
+                        consent = confirmation(),
+                        networkBinding = wifiBinding(),
+                        localManifest = local,
+                        backendManifest = backend,
+                        chunks = plaintextChunks(local),
+                        isCurrent = { true },
+                    ).execute()
+                }
+            } finally {
+                releaseServer.countDown()
+            }
+        }
+    }
+
+    @Test
     fun bindingChangesDuringConnectionAndBodyPreparationStopFurtherIo() {
         listOf("connection", "output", "write").forEach { invalidationPoint ->
             val local = localManifest()
@@ -137,7 +198,9 @@ class AndroidRawCollectionClientNetworkTest {
     }
 
     @Test
-    fun resumesByUploadingOnlyTheOneMissingObject() {
+    fun resendsTheWholeSegmentFromItsFirstChunkUntilResumeIsVerified() {
+        // FP-035-DETAIL-02 interim (owner decision 3(b)): although the server already stores chunk 0,
+        // the post-walk attempt sends both chunks again; only the last ack must be complete.
         val local = localManifest()
         val backend = requireNotNull(local.toBackendManifest())
         val observed = mutableListOf<Int>()
@@ -145,13 +208,14 @@ class AndroidRawCollectionClientNetworkTest {
             synchronized(observed) { observed += index }
             val response = when (index) {
                 0, 1 -> statusJson(backend, receivedOrdinals = setOf(0))
-                2 -> chunkAckJson(backend, localOrdinal = 1, state = "READY_TO_COMMIT")
-                3 -> statusJson(backend, receivedOrdinals = setOf(0, 1))
-                4 -> receiptJson(exactClientReceipt(backend))
+                2 -> chunkAckJson(backend, localOrdinal = 0, state = "RECEIVING")
+                3 -> chunkAckJson(backend, localOrdinal = 1, state = "READY_TO_COMMIT")
+                4 -> statusJson(backend, receivedOrdinals = setOf(0, 1))
+                5 -> receiptJson(exactClientReceipt(backend))
                 else -> error("unexpected raw request $index")
             }.toString().toByteArray(Charsets.UTF_8)
             socket.writeFixedResponse(
-                statusCode = if (index == 2) 201 else 200,
+                statusCode = if (index == 3) 201 else 200,
                 body = response,
                 headers = mapOf("Cache-Control" to "no-store"),
             )
@@ -167,7 +231,7 @@ class AndroidRawCollectionClientNetworkTest {
             ).execute()
 
             assertEquals(exactClientReceipt(backend), receipt)
-            assertEquals(listOf(0, 1, 2, 3, 4), synchronized(observed) { observed.toList() })
+            assertEquals(listOf(0, 1, 2, 3, 4, 5), synchronized(observed) { observed.toList() })
         }
     }
 
@@ -314,6 +378,43 @@ class AndroidRawCollectionClientNetworkTest {
         assertTrue(source.contains("method = \"GET\""))
     }
 
+    private fun assertHttpFailurePreservesResponse(statusCode: Int, retryAfterHeader: String?) {
+        val local = localManifest()
+        val backend = requireNotNull(local.toBackendManifest())
+        val body = "raw-error-body-must-not-appear-in-exception-message"
+        val observed = mutableListOf<Int>()
+        LocalHttpTestServer { index, socket ->
+            synchronized(observed) { observed += index }
+            socket.writeFixedResponse(
+                statusCode = statusCode,
+                body = body.toByteArray(Charsets.UTF_8),
+                headers = retryAfterHeader?.let { mapOf("Retry-After" to it) }.orEmpty(),
+            )
+        }.use { server ->
+            val error = assertThrows(RawCollectionHttpException::class.java) {
+                AndroidRawCollectionClient().uploadCall(
+                    session = v7Session(server.baseUrl),
+                    consent = confirmation(),
+                    networkBinding = wifiBinding(),
+                    localManifest = local,
+                    backendManifest = backend,
+                    chunks = plaintextChunks(local),
+                    isCurrent = { true },
+                ).execute()
+            }
+            assertEquals(statusCode, error.statusCode)
+            assertEquals(body, error.errorBody)
+            assertEquals(retryAfterHeader, error.retryAfterHeader)
+            assertEquals(RawCollectionHttpException(statusCode).message, error.message)
+            assertEquals(RawCollectionHttpException(statusCode).toString(), error.toString())
+            org.junit.Assert.assertFalse(error.message.orEmpty().contains(body))
+            retryAfterHeader?.let { value ->
+                org.junit.Assert.assertFalse(error.message.orEmpty().contains(value))
+            }
+            assertEquals(listOf(0), synchronized(observed) { observed.toList() })
+        }
+    }
+
     private fun assertMalformedManifestStatusIsRejected(
         local: RawCollectionManifest,
         backend: BackendRawManifest,
@@ -400,7 +501,7 @@ class AndroidRawCollectionClientNetworkTest {
         clientRevision = 1L,
         revision = 1L,
         selections = IntegratedConsentSelections(rawSourceCollection = true),
-        confirmedAt = "2026-08-29T00:00:00Z",
+        confirmedAt = "2026-08-29T00:00:00.000Z",
         gatewayAuditRecordSha256 = "a".repeat(64),
         backendConsentReceiptSha256 = CONSENT_SHA,
         controlSecret = "b".repeat(64),

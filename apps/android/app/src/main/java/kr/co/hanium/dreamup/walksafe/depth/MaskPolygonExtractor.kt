@@ -62,6 +62,11 @@ class MaskPolygonExtractor(
     }
 
     private fun normalizeRect(rect: RectNorm): RectNorm {
+        // An in-range detector box is returned bit-for-bit. Rebuilding width as (x + w) - x rounds
+        // to x's float grid, and downstream exact class+bbox index hints would no longer match.
+        if (rect.x in 0f..1f && rect.y in 0f..1f && rect.width >= 0f && rect.height >= 0f &&
+            rect.x + rect.width <= 1f && rect.y + rect.height <= 1f
+        ) return rect
         val left = rect.x.coerceIn(0f, 1f)
         val top = rect.y.coerceIn(0f, 1f)
         val right = (rect.x + rect.width).coerceIn(0f, 1f)

@@ -24,6 +24,8 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     static final String READ_PURPOSE_HEADER = "X-WalkSafe-Read-Purpose";
     static final String REVIEW_ACTION = "report.review.decide";
     static final String DELIVERY_ACTION = "report.delivery.create";
+    static final String DELIVERY_CORRECTION_ACTION = "report.delivery.correct";
+    static final String DELIVERY_CORRECTION_ID_CONFLICT = "delivery_correction_idempotency_conflict";
     static final String ORIGINAL_GRANT_ACTION = "report.original.grant";
     static final String ORIGINAL_ACCESS_GRANT_HEADER = "X-WalkSafe-Original-Access-Grant";
     static final String REVIEW_READ_PURPOSE = "report.review_decisions";
@@ -35,11 +37,14 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     private enum HistoryType {
         NONE,
         REVIEW,
-        DELIVERY
+        DELIVERY,
+        DECISION_LOOKUP
     }
 
     interface Clock {
         long nowEpochMs();
+
+        default long monotonicNanos() { return System.nanoTime(); }
     }
 
     interface Transport {
@@ -53,6 +58,9 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         ) throws IOException {
             throw new IOException("binary administrator transport is unavailable");
         }
+
+        /** S18-18: explicit cancellation of requests still in flight; never waits. */
+        default void cancelInFlight() {}
     }
 
     static final class Response {
@@ -181,6 +189,43 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     }
 
     @Override
+    public Result readRecentReviewDecisions(SessionContext session, String reportId)
+        throws IOException, GeneralSecurityException {
+        String safeReportId = canonicalHistoryUuid(reportId);
+        Result result = executeProtected(
+            requireSession(session),
+            "GET",
+            "/reports/" + safeReportId + "/review-decisions/history",
+            recentHistoryQuery(),
+            null,
+            REVIEW_READ_PURPOSE,
+            null,
+            HistoryType.REVIEW,
+            null
+        );
+        requireRecentHistoryWindow(result);
+        return result;
+    }
+
+    @Override
+    public Result lookupReviewDecision(SessionContext session, String reportId, String decisionId)
+        throws IOException, GeneralSecurityException {
+        String safeReportId = canonicalHistoryUuid(reportId);
+        String safeDecisionId = AdminReportDecision.canonicalUuid(decisionId, "decision_id");
+        return executeProtected(
+            requireSession(session),
+            "GET",
+            "/reports/" + safeReportId + "/review-decisions/" + safeDecisionId,
+            "",
+            null,
+            REVIEW_READ_PURPOSE,
+            null,
+            HistoryType.DECISION_LOOKUP,
+            safeDecisionId
+        );
+    }
+
+    @Override
     public Result recordDelivery(SessionContext session, String reportId, AdminInstitutionDelivery delivery)
         throws IOException, GeneralSecurityException {
         if (delivery == null) throw new IllegalArgumentException("delivery record is required");
@@ -216,6 +261,148 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         );
         requireFirstHistoryRevision(result, cursor);
         return result;
+    }
+
+    @Override
+    public Result readRecentDeliveries(SessionContext session, String reportId)
+        throws IOException, GeneralSecurityException {
+        String safeReportId = canonicalHistoryUuid(reportId);
+        Result result = executeProtected(
+            requireSession(session),
+            "GET",
+            "/reports/" + safeReportId + "/deliveries/history",
+            recentHistoryQuery(),
+            null,
+            DELIVERY_READ_PURPOSE,
+            null,
+            HistoryType.DELIVERY,
+            null
+        );
+        requireRecentHistoryWindow(result);
+        return result;
+    }
+
+    /**
+     * S18-40: records a manual delivery correction (HIGH: device proof + one reconfirmation).
+     * This call only records that an earlier observation was wrong; nothing is sent to an
+     * institution and the corrected event stays in the history.
+     */
+    @Override
+    public Result recordDeliveryCorrection(
+        SessionContext session,
+        String reportId,
+        AdminDeliveryCorrection correction,
+        Map<String, String> reconfirmationHeaders
+    ) throws IOException, GeneralSecurityException {
+        return recordDeliveryCorrection(session, reportId, correction, reconfirmationHeaders, false);
+    }
+
+    @Override
+    public Result recordDeliveryCorrection(
+        SessionContext session,
+        String reportId,
+        AdminDeliveryCorrection correction,
+        Map<String, String> reconfirmationHeaders,
+        boolean resendOfUncertainAttempt
+    ) throws IOException, GeneralSecurityException {
+        if (correction == null) throw new IllegalArgumentException("delivery correction is required");
+        SessionContext safeSession = requireSession(session);
+        String safeReportId = canonicalHistoryUuid(reportId);
+        Map<String, String> safeReconfirmation = requireReconfirmation(reconfirmationHeaders);
+        String correctionPath = "/reports/" + safeReportId + "/delivery-corrections";
+        byte[] body = correction.requestBody();
+        String correlationId = UUID.randomUUID().toString();
+        String emptyQuery = AdminCanonicalEncoding.canonicalQuery(AdminJava8Collections.list());
+        AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
+            DELIVERY_CORRECTION_ACTION,
+            safeSession.adminId(),
+            AdminCanonicalEncoding.sha256Hex(body),
+            correlationId,
+            safeSession.deviceId(),
+            deviceKeyMarker,
+            deviceKeyVersion,
+            "POST",
+            correctionPath,
+            AdminDeviceProof.Purpose.ACTION,
+            AdminCanonicalEncoding.sha256Hex(emptyQuery.getBytes(StandardCharsets.UTF_8)),
+            null,
+            safeSession.sessionId()
+        );
+        Response challengeResponse = transport.execute(
+            "POST",
+            origin + CHALLENGE_PATH,
+            jsonHeaders(protectedHeaders(safeSession, correlationId, null)),
+            intent.challengeRequestBytes()
+        );
+        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
+        requireExactStatus(challengeResponse.statusCode, 200, "device challenge request");
+        AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
+            challengeResponse.body,
+            intent,
+            challengeTime.estimatedNowEpochMs(clock.monotonicNanos()),
+            signer
+        );
+        Map<String, String> correctionHeaders = new LinkedHashMap<>(
+            protectedHeaders(safeSession, correlationId, null)
+        );
+        correctionHeaders.putAll(proof.proofHeaders());
+        correctionHeaders.putAll(safeReconfirmation);
+        Response response = transport.execute(
+            "POST",
+            origin + correctionPath,
+            jsonHeaders(correctionHeaders),
+            body
+        );
+        if (response.statusCode == 409) {
+            // Review F3: an ID reused for another intent is not a state conflict; only a new
+            // ID can proceed, so the caller must be able to tell the two apart.
+            if (DELIVERY_CORRECTION_ID_CONFLICT.equals(errorCode(response.body))) {
+                throw new CorrectionIdConflictException();
+            }
+            throw new MutationConflictException();
+        }
+        requireExactStatus(response.statusCode, 201, "delivery correction request");
+        return new Result(
+            correlationId,
+            response.statusCode,
+            requireDeliveryCorrectionResponse(
+                response.body, safeReportId, correction, safeSession, resendOfUncertainAttempt
+            )
+        );
+    }
+
+    /**
+     * The stored correction must carry exactly the requested intent and administrator. The
+     * session must be the current one for a first send; a resend of an uncertain attempt may
+     * receive the earlier stored record (EXISTING) from an earlier session (review F3).
+     */
+    private static String requireDeliveryCorrectionResponse(
+        String body,
+        String reportId,
+        AdminDeliveryCorrection correction,
+        SessionContext session,
+        boolean resendOfUncertainAttempt
+    ) throws IOException {
+        if (body.getBytes(StandardCharsets.UTF_8).length > MAX_HISTORY_RESPONSE_BYTES) {
+            throw new IOException("delivery correction response is too large");
+        }
+        Map<String, Object> root = AdminStrictJson.parseObject(body);
+        long correctedRevision = requiredLong(root, "corrected_revision", 1L);
+        DeliveryCorrection stored = parseDeliveryCorrection(
+            root, reportId, correction.correctsEventId(), correctedRevision
+        );
+        if (!correction.correctionId().equals(stored.id())
+            || stored.expectedRevision() != correction.expectedRevision()
+            || stored.reason() != correction.reason()
+            || !correction.memo().equals(stored.memo())
+            || !session.adminId().equals(stored.adminId())) {
+            throw new IOException("delivery correction response does not match the request");
+        }
+        String storedSessionId = requiredUuid(root, "session_id");
+        if (!resendOfUncertainAttempt && !session.sessionId().equals(storedSessionId)) {
+            throw new IOException("delivery correction response does not match the session");
+        }
+        return stored.id();
     }
 
     @Override
@@ -263,12 +450,13 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             jsonHeaders(protectedHeaders(safeSession, correlationId, null)),
             intent.challengeRequestBytes()
         );
+        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
         requireOriginalEvidenceRequestActive();
         requireExactStatus(challengeResponse.statusCode, 200, "device challenge request");
         AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
             challengeResponse.body,
             intent,
-            clock.nowEpochMs(),
+            challengeTime.estimatedNowEpochMs(clock.monotonicNanos()),
             signer
         );
         Map<String, String> grantHeaders = new LinkedHashMap<>(
@@ -318,6 +506,10 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                         clock.nowEpochMs()
                     );
                 }
+            } catch (IOException | RuntimeException error) {
+                // S20-54: the token is spent from here on. A lost or rejected image response
+                // never revives it; the caller must obtain a new purpose-limited grant.
+                throw new AdminOperationsApi.OriginalEvidenceNotReceivedException(error);
             } finally {
                 Arrays.fill(accessToken, '\0');
             }
@@ -360,11 +552,12 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             jsonHeaders(challengeHeaders),
             intent.challengeRequestBytes()
         );
+        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
         requireExactStatus(challengeResponse.statusCode, 200, "device challenge request");
         AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
             challengeResponse.body,
             intent,
-            clock.nowEpochMs(),
+            challengeTime.estimatedNowEpochMs(clock.monotonicNanos()),
             signer
         );
 
@@ -385,6 +578,13 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             finalHeaders,
             body
         );
+        if (historyType == HistoryType.DECISION_LOOKUP && operationResponse.statusCode == 404) {
+            // Only the explicit "no such decision" answer resolves the attempt as absent.
+            if ("review_decision_not_found".equals(errorCode(operationResponse.body))) {
+                return new Result(correlationId, 404, null);
+            }
+            throw new HistoryNotFoundException();
+        }
         if (historyType != HistoryType.NONE && operationResponse.statusCode == 404) {
             throw new HistoryNotFoundException();
         }
@@ -420,7 +620,29 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 operationResponse.body, reportIdFromPath(path),
                 correlationId, operationResponse.statusCode
             );
+            case DECISION_LOOKUP -> new Result(
+                correlationId,
+                operationResponse.statusCode,
+                requireReviewDecisionResponseId(
+                    operationResponse.body,
+                    reportIdFromPath(path),
+                    expectedReviewDecisionId,
+                    session.adminId()
+                )
+            );
         };
+    }
+
+    private static String errorCode(String body) {
+        try {
+            Map<String, Object> root = AdminStrictJson.parseObject(body);
+            Object detail = root.get("detail");
+            if (!(detail instanceof Map<?, ?> detailMap)) return null;
+            Object code = detailMap.get("code");
+            return code instanceof String text ? text : null;
+        } catch (IOException | RuntimeException ignored) {
+            return null;
+        }
     }
 
     private static String historyQuery(String cursor) {
@@ -435,6 +657,32 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             parameters.add(new AdminCanonicalEncoding.QueryParameter("cursor", cursor));
         }
         return AdminCanonicalEncoding.canonicalQuery(parameters);
+    }
+
+    private static String recentHistoryQuery() {
+        return AdminCanonicalEncoding.canonicalQuery(AdminJava8Collections.list(
+            new AdminCanonicalEncoding.QueryParameter("limit", Integer.toString(HISTORY_PAGE_SIZE)),
+            new AdminCanonicalEncoding.QueryParameter("position", "last")
+        ));
+    }
+
+    private static void requireRecentHistoryWindow(Result result) throws IOException {
+        if (result.nextCursor() != null) {
+            throw new IOException("recent history must have no next cursor");
+        }
+        long total = result.totalCount();
+        long count = result.returnedItemCount();
+        if (count > HISTORY_PAGE_SIZE || (total == 0L) != (count == 0L)
+            || (total > 0L && count > total)) {
+            throw new IOException("recent history size is inconsistent");
+        }
+        if (count == 0L) return;
+        long first = result.kind() == ResultKind.REVIEW_HISTORY
+            ? result.reviewHistory().get(0).revision()
+            : result.deliveryHistory().get(0).revision();
+        if (first != result.snapshotRevision() - count + 1L) {
+            throw new IOException("recent history does not start at latest suffix");
+        }
     }
 
     private static AdminOriginalEvidence.IssuedGrant parseOriginalGrant(
@@ -500,6 +748,12 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         return AdminJava8Collections.map(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER, nonce);
     }
 
+    /** S18-18: not synchronized; it only signals the transport, which never waits. */
+    @Override
+    public void cancelInFlightRequests() {
+        transport.cancelInFlight();
+    }
+
     private static void requireOriginalEvidenceRequestActive() throws IOException {
         if (Thread.currentThread().isInterrupted()) {
             throw new IOException("original evidence request was cancelled");
@@ -507,6 +761,15 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     }
 
     static byte[] readOriginalEvidenceBody(InputStream input, int expectedByteCount) throws IOException {
+        return readOriginalEvidenceBody(input, expectedByteCount, null);
+    }
+
+    /** {@code deadline} is the request's overall deadline (S18-19), checked around every read. */
+    private static byte[] readOriginalEvidenceBody(
+        InputStream input,
+        int expectedByteCount,
+        AdminHttpRequestDeadline.Owner deadline
+    ) throws IOException {
         if (input == null
             || expectedByteCount < 1
             || expectedByteCount > AdminOriginalEvidence.MAX_IMAGE_BYTES) {
@@ -520,8 +783,10 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             int zeroReads = 0;
             while (offset < content.length) {
                 requireOriginalEvidenceRequestActive();
+                if (deadline != null) deadline.check();
                 int read = input.read(buffer, 0, Math.min(buffer.length, content.length - offset));
                 requireOriginalEvidenceRequestActive();
+                if (deadline != null) deadline.check();
                 if (read < 0) throw new IOException("original evidence response ended early");
                 if (read == 0) {
                     if (++zeroReads > MAX_CONSECUTIVE_ZERO_READS) {
@@ -534,8 +799,10 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 offset += read;
             }
             requireOriginalEvidenceRequestActive();
+            if (deadline != null) deadline.check();
             int trailing = input.read();
             requireOriginalEvidenceRequestActive();
+            if (deadline != null) deadline.check();
             if (trailing != -1) {
                 throw new IOException("original evidence response is longer than declared");
             }
@@ -548,14 +815,24 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     }
 
     static String readBoundedResponse(InputStream input) throws IOException {
+        return readBoundedResponse(input, null);
+    }
+
+    /** {@code deadline} is the request's overall deadline (S18-19), checked around every read. */
+    private static String readBoundedResponse(
+        InputStream input,
+        AdminHttpRequestDeadline.Owner deadline
+    ) throws IOException {
         byte[] buffer = new byte[4_096];
         try (input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             int zeroReads = 0;
             try {
                 while (true) {
                     requireResponseReadActive();
+                    if (deadline != null) deadline.check();
                     int read = input.read(buffer);
                     requireResponseReadActive();
+                    if (deadline != null) deadline.check();
                     if (read < 0) break;
                     if (read == 0) {
                         if (++zeroReads > MAX_CONSECUTIVE_ZERO_READS) {
@@ -816,9 +1093,11 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         );
         List<Map<String, Object>> array = envelope.items;
         List<DeliveryHistoryItem> result = new ArrayList<>(array.size());
+        // S18-40: transitions are checked along the effective chain (uncorrected events).
         AdminInstitutionDelivery.Status previousStatus = null;
         String previousPackageId = null;
         Long previousPackageRevision = null;
+        boolean previousEffectiveInPage = false;
         long previousRevision = 0L;
         for (int index = 0; index < array.size(); index++) {
             Map<String, Object> item = array.get(index);
@@ -827,9 +1106,9 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 "revision", "institution", "channel",
                 "recipient", "status", "external_receipt_id", "reason", "evidence_sha256",
                 "observed_at", "expected_revision", "idempotency_key", "admin_id", "session_id",
-                "device_id", "correlation_id", "recorded_at"
+                "device_id", "correlation_id", "recorded_at", "correction"
             ));
-            requiredUuid(item, "id");
+            String eventId = requiredUuid(item, "id");
             String reportId = requiredUuid(item, "report_id");
             if (!expectedReportId.equals(reportId)) throw new IOException("delivery history report binding is invalid");
             requiredUuid(item, "review_decision_id");
@@ -846,20 +1125,26 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             requiredText(item, "channel", 32);
             requiredText(item, "recipient", 255);
             AdminInstitutionDelivery.Status status = deliveryStatus(requiredText(item, "status", 16));
-            if (revision == 1L && !validDeliveryTransition(null, status)) {
-                throw new IOException("delivery history initial status is invalid");
-            }
-            if (index > 0) {
-                AdminInstitutionDelivery.Status transitionBase = sameDeliveryPackage(
-                    previousPackageId, previousPackageRevision, packageId, packageRevision
-                ) ? previousStatus : null;
-                if (!validDeliveryTransition(transitionBase, status)) {
-                    throw new IOException("delivery history transition is invalid");
+            DeliveryCorrection correction = parseDeliveryCorrection(
+                item.get("correction"), expectedReportId, eventId, revision
+            );
+            if (correction == null) {
+                if (previousEffectiveInPage) {
+                    AdminInstitutionDelivery.Status transitionBase = sameDeliveryPackage(
+                        previousPackageId, previousPackageRevision, packageId, packageRevision
+                    ) ? previousStatus : null;
+                    if (!validDeliveryTransition(transitionBase, status)) {
+                        throw new IOException("delivery history transition is invalid");
+                    }
+                } else if (revision - index == 1L && !validDeliveryTransition(null, status)) {
+                    // First effective event of a history page that starts at revision 1.
+                    throw new IOException("delivery history initial status is invalid");
                 }
+                previousStatus = status;
+                previousPackageId = packageId;
+                previousPackageRevision = packageRevision;
+                previousEffectiveInPage = true;
             }
-            previousStatus = status;
-            previousPackageId = packageId;
-            previousPackageRevision = packageRevision;
             previousRevision = revision;
             String receipt = nullableText(item, "external_receipt_id", 160);
             if ((status == AdminInstitutionDelivery.Status.ACKNOWLEDGED
@@ -883,6 +1168,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             requiredUuid(item, "correlation_id");
             String recordedAt = requiredInstant(item, "recorded_at", false);
             result.add(new DeliveryHistoryItem(
+                eventId,
                 revision,
                 packageId,
                 packageRevision,
@@ -890,14 +1176,80 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 receipt,
                 institution,
                 observedAt,
-                recordedAt
+                recordedAt,
+                correction
             ));
         }
+        requireCorrectionsStepBack(result);
         validateHistoryTail(envelope, previousRevision);
         return Result.deliveryHistory(
             correlationId, statusCode, envelope.reportId, envelope.snapshotRevision,
             envelope.totalCount, envelope.nextCursor, result
         );
+    }
+
+    /**
+     * S18-40: the nullable correction object of one delivery item. It must name exactly this
+     * event and revision, and it was recorded when the delivery history was at
+     * expected_revision (never before the corrected event).
+     */
+    private static DeliveryCorrection parseDeliveryCorrection(
+        Object raw,
+        String expectedReportId,
+        String eventId,
+        long revision
+    ) throws IOException {
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?> map)) {
+            throw new IOException("delivery correction is invalid");
+        }
+        Map<String, Object> value = stringObject(map);
+        requireExactKeys(value, AdminJava8Collections.set(
+            "schema_version", "id", "report_id", "corrects_event_id", "corrected_revision",
+            "expected_revision", "reason_code", "memo", "admin_id", "session_id", "device_id",
+            "correlation_id", "created_at"
+        ));
+        if (!AdminDeliveryCorrection.SCHEMA_VERSION.equals(requiredText(value, "schema_version", 64))) {
+            throw new IOException("delivery correction schema is unsupported");
+        }
+        String id = requiredUuid(value, "id");
+        if (!expectedReportId.equals(requiredUuid(value, "report_id"))
+            || !eventId.equals(requiredUuid(value, "corrects_event_id"))
+            || requiredLong(value, "corrected_revision", 1L) != revision) {
+            throw new IOException("delivery correction binding is invalid");
+        }
+        long expectedRevision = requiredLong(value, "expected_revision", revision);
+        AdminDeliveryCorrection.Reason reason;
+        try {
+            reason = AdminDeliveryCorrection.reasonFromWire(requiredText(value, "reason_code", 32));
+        } catch (IllegalArgumentException error) {
+            throw new IOException("delivery correction reason is invalid", error);
+        }
+        String memo = requiredText(value, "memo", AdminDeliveryCorrection.MAX_MEMO_LENGTH);
+        String adminId = requiredAdminId(value, "admin_id");
+        requiredUuid(value, "session_id");
+        requiredDeviceId(value, "device_id");
+        requiredUuid(value, "correlation_id");
+        String createdAt = requiredInstant(value, "created_at", false);
+        return new DeliveryCorrection(id, revision, expectedRevision, reason, memo, adminId, createdAt);
+    }
+
+    /**
+     * S18-40: only the latest effective event can be corrected, so every event between a
+     * corrected event and the history revision at correction time must be corrected too.
+     */
+    public static void requireCorrectionsStepBack(List<DeliveryHistoryItem> items) throws IOException {
+        for (DeliveryHistoryItem corrected : items) {
+            if (corrected.correction() == null) continue;
+            long until = corrected.correction().expectedRevision();
+            for (DeliveryHistoryItem later : items) {
+                if (later.revision() > corrected.revision()
+                    && later.revision() <= until
+                    && later.correction() == null) {
+                    throw new IOException("delivery correction skipped a later effective event");
+                }
+            }
+        }
     }
 
     private static HistoryEnvelope historyEnvelope(
@@ -1176,31 +1528,61 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         }
     }
 
-    private static final class UrlConnectionTransport implements Transport {
+    /**
+     * S18-19: every request, including the one-time original image GET, has the overall
+     * deadline of {@link AdminHttpRequestDeadline} on top of the connect/read phase limits
+     * (20 s; the original image GET has the R14 size-based budget).
+     * A timeout fails as "server outcome unknown" and is never re-sent automatically.
+     */
+    static final class UrlConnectionTransport implements Transport {
+        private final AdminHttpRequestDeadline deadlines;
+
+        UrlConnectionTransport() {
+            this(AdminHttpRequestDeadline.system());
+        }
+
+        UrlConnectionTransport(AdminHttpRequestDeadline deadlines) {
+            if (deadlines == null) throw new IllegalArgumentException("request deadline is required");
+            this.deadlines = deadlines;
+        }
+
+        /** Explicit cancellation of every request still in flight (it does not wait). */
+        @Override
+        public void cancelInFlight() {
+            deadlines.cancelInFlight();
+        }
+
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body) throws IOException {
-            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setRequestMethod(method);
-            connection.setConnectTimeout(8_000);
-            connection.setReadTimeout(12_000);
-            connection.setInstanceFollowRedirects(false);
-            connection.setUseCaches(false);
-            connection.setDoInput(true);
-            connection.setDoOutput(body != null);
-            headers.forEach(connection::setRequestProperty);
+            AdminHttpRequestDeadline.Owner owner = deadlines.open(url);
             try {
+                HttpURLConnection connection = owner.connection();
+                connection.setRequestMethod(method);
+                connection.setInstanceFollowRedirects(false);
+                connection.setUseCaches(false);
+                connection.setDoInput(true);
+                connection.setDoOutput(body != null);
+                // adm-F5: stream the exact body; the platform keeps no retryable copy to re-send.
+                if (body != null) connection.setFixedLengthStreamingMode(body.length);
+                headers.forEach(connection::setRequestProperty);
+                owner.check();
                 if (body != null) {
                     try (var output = connection.getOutputStream()) {
+                        owner.check();
                         output.write(body);
+                        owner.check();
                     }
                 }
+                owner.check();
                 int status = connection.getResponseCode();
+                owner.check();
                 InputStream stream = status >= 200 && status <= 299
                     ? connection.getInputStream()
                     : connection.getErrorStream();
-                return new Response(status, stream == null ? "" : readBoundedResponse(stream));
+                owner.check();
+                return new Response(status, stream == null ? "" : readBoundedResponse(stream, owner));
             } finally {
-                connection.disconnect();
+                owner.close();
             }
         }
 
@@ -1217,31 +1599,44 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 || expectedByteCount > AdminOriginalEvidence.MAX_IMAGE_BYTES) {
                 throw new IOException("original evidence request is invalid");
             }
-            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(8_000);
-            connection.setReadTimeout(12_000);
-            connection.setInstanceFollowRedirects(false);
-            connection.setUseCaches(false);
-            connection.setDoInput(true);
-            connection.setDoOutput(false);
-            headers.forEach(connection::setRequestProperty);
+            // R14 (adm-F1): 20 s + expected size at 64 KiB/s (at most 150 s) for this GET only.
+            AdminHttpRequestDeadline.Owner owner = deadlines.open(
+                url,
+                AdminHttpRequestDeadline.originalEvidenceBudgetNanos(expectedByteCount)
+            );
             byte[] content = null;
+            BinaryResponse response = null;
             try {
+                HttpURLConnection connection = owner.connection();
+                connection.setRequestMethod("GET");
+                connection.setInstanceFollowRedirects(false);
+                connection.setUseCaches(false);
+                connection.setDoInput(true);
+                connection.setDoOutput(false);
+                headers.forEach(connection::setRequestProperty);
+                owner.check();
                 int status = connection.getResponseCode();
                 requireOriginalEvidenceRequestActive();
+                owner.check();
                 String contentType = connection.getHeaderField("Content-Type");
                 long declaredLength = connection.getContentLengthLong();
+                owner.check();
                 if (status != 200 || declaredLength != expectedByteCount) {
-                    return new BinaryResponse(status, contentType, declaredLength, new byte[0]);
+                    response = new BinaryResponse(status, contentType, declaredLength, new byte[0]);
+                } else {
+                    content = readOriginalEvidenceBody(connection.getInputStream(), expectedByteCount, owner);
+                    response = new BinaryResponse(status, contentType, declaredLength, content);
+                    content = null;
                 }
-                content = readOriginalEvidenceBody(connection.getInputStream(), expectedByteCount);
-                BinaryResponse response = new BinaryResponse(status, contentType, declaredLength, content);
-                content = null;
-                return response;
+                owner.close();
+                BinaryResponse completed = response;
+                response = null;
+                return completed;
             } finally {
                 if (content != null) Arrays.fill(content, (byte) 0);
-                connection.disconnect();
+                // The deadline or a cancellation won after the body arrived: zeroize it.
+                if (response != null) response.close();
+                owner.close();
             }
         }
 

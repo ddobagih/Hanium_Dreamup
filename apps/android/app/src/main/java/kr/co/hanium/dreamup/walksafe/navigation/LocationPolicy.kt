@@ -105,6 +105,9 @@ fun reliableMovementHeadingDegrees(
     val bearingAccuracyTrusted = bearingAccuracyDeg == null ||
         (bearingAccuracyDeg.isFinite() && bearingAccuracyDeg in 0f..maximumBearingAccuracyDeg)
     if (bearing != null && speed != null && bearingAccuracyTrusted) return bearing
+    // A reported stop contradicts a position-only movement heading; positive slow movement
+    // may still accumulate enough displacement for the fallback below.
+    if (speedMps == 0f) return null
     val baseline = previous ?: return null
     val movedM = haversineMeters(
         baseline.latitude,
@@ -112,7 +115,9 @@ fun reliableMovementHeadingDegrees(
         current.latitude,
         current.longitude,
     )
-    val minimumMovementM = maxOf(3.0, baseline.accuracyM.toDouble(), current.accuracyM.toDouble())
+    // Either fix may be displaced within its reported uncertainty. Require movement beyond
+    // both radii before treating a position delta as a direction of travel.
+    val minimumMovementM = maxOf(3.0, baseline.accuracyM.toDouble() + current.accuracyM.toDouble())
     if (movedM < minimumMovementM) return null
     return bearingDegrees(baseline.latitude, baseline.longitude, current.latitude, current.longitude)
 }

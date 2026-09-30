@@ -3,13 +3,14 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import importlib
+from threading import Barrier
 
 import pytest
 from sqlalchemy import text
 
 from backend.app.database import SessionLocal
 from backend.app.field_test_security import ACTOR_RATE_LIMITS
-from backend.app.services.actor_rate_limit import PostgresActorRateLimiter
+from backend.app.services.actor_rate_limit import ActorRateLimitExecution, PostgresActorRateLimiter
 
 
 def _clear_rate_limit_events() -> None:
@@ -156,17 +157,27 @@ def test_postgres_rate_limit_admission_is_atomic_across_workers() -> None:
     _clear_rate_limit_events()
     actor_id = "concurrent-limit@example.com"
     attempt_count = ACTOR_RATE_LIMITS["report"] + 8
+    worker_count = 4
+    start = Barrier(worker_count, timeout=10)
 
-    with ThreadPoolExecutor(max_workers=attempt_count) as executor:
-        results = list(
-            executor.map(
-                lambda _index: PostgresActorRateLimiter(ACTOR_RATE_LIMITS).check(
-                    actor_id,
-                    "report",
-                ),
-                range(attempt_count),
-            )
-        )
+    def check_worker(worker_index: int) -> list[int | None]:
+        execution = ActorRateLimitExecution(1, 10_000, 5_000)
+        try:
+            limiter = PostgresActorRateLimiter(ACTOR_RATE_LIMITS, execution=execution)
+            start.wait()
+            return [
+                limiter.check(actor_id, "report")
+                for _index in range(worker_index, attempt_count, worker_count)
+            ]
+        finally:
+            execution.shutdown()
+
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        results = [
+            result
+            for worker_results in executor.map(check_worker, range(worker_count))
+            for result in worker_results
+        ]
 
     assert sum(result is None for result in results) == ACTOR_RATE_LIMITS["report"]
     assert sum(result is not None for result in results) == 8

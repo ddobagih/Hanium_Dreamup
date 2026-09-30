@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   mkdir,
@@ -10,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   SHORT_DEVICE_SESSION_LIMIT,
@@ -31,13 +33,22 @@ import {
   withExclusiveFileLockAsync
 } from "../src/exclusive-file-lock.js";
 import { FIELD_LONG_SESSION_MAX_STATE_FILE_BYTES } from "../src/field-long-session.js";
-import { DEFAULT_MAX_LEDGER_BYTES } from "../src/field-walk-ledger.js";
-import { INTEGRATED_CONSENT_MAX_STATE_BYTES } from "../src/integrated-consent.js";
+import {
+  commandFieldWalk,
+  DEFAULT_MAX_LEDGER_BYTES,
+  parseFieldWalkCommand,
+  readFieldWalkAuditHistory,
+  setFieldWalkLedgerTestLimits
+} from "../src/field-walk-ledger.js";
+import {
+  INTEGRATED_CONSENT_MAX_STATE_BYTES
+} from "../src/integrated-consent.js";
 import { PRIVACY_DELETION_V2_MAX_BYTES } from "../src/privacy-deletion-v2.js";
 import { PRIVACY_LEDGER_MAX_BYTES } from "../src/privacy-rights.js";
 import { SERVER_CAPACITY_MAX_PLAINTEXT_BYTES } from "../src/server-capacity.js";
 import {
   assertGatewayManagedStateReady,
+  fieldWalkAuditSegmentUsage,
   runGatewayStateMaintenance
 } from "../src/state-encryption-maintenance.js";
 import {
@@ -409,6 +420,350 @@ test("rotation rewrites all seven decrypt-only stores with the active key", asyn
       state.value
     );
   }
+});
+
+test("S19-13 rotation rewrites sealed walk audit segments and keeps their chain", async () => {
+  const { keyringPath, fieldWalkLedgerPath } = await createMaintenanceEnvironment();
+  const binding = {
+    actorId: "account-1", accountId: "account-1", deviceId: "device-1",
+    familyId: "family-1", sessionRotation: 1
+  };
+  setFieldWalkLedgerTestLimits({ maxRequestsPerAccount: 16, maxAuditEntries: 2, maxLedgerBytes: 1024 * 1024 });
+  try {
+    const started = commandFieldWalk(binding, parseFieldWalkCommand({
+      schema_version: "walksafe.field-walk-command.v1", request_id: "request-000001",
+      action: "start", walk_id: "walk-000001"
+    })!, { ledgerPath: fieldWalkLedgerPath, nowEpochMs: 1_000 }).body;
+    for (let index = 2; index <= 5; index += 1) {
+      commandFieldWalk(binding, parseFieldWalkCommand({
+        schema_version: "walksafe.field-walk-command.v1",
+        request_id: `request-00000${index}`, action: "renew", walk_id: "walk-000001",
+        lease_id: String(started.lease_id), fencing_token: 1
+      })!, { ledgerPath: fieldWalkLedgerPath, nowEpochMs: index * 1_000 });
+    }
+    const history = readFieldWalkAuditHistory({ ledgerPath: fieldWalkLedgerPath });
+    assert.equal(history.length, 5);
+    await writeTestStateKeyring(keyringPath, [
+      { keyId: "new-key", status: "active", fillByte: 0x32 },
+      { keyId: "old-key", status: "decrypt-only", fillByte: 0x31 }
+    ]);
+    resetGatewayStateEncryptionForTests();
+    const segments = (await runGatewayStateMaintenance("inspect"))
+      .filter((result) => /\.audit-\d{8}$/.test(result.file));
+    assert.equal(segments.length, 2);
+    assert.ok(segments.every((result) => result.statusBefore === "encrypted-decrypt-only"));
+    const rotated = await runGatewayStateMaintenance("rotate");
+    assert.ok(rotated.every((result) => result.action === "rotated"));
+    assert.equal(rotated.filter((result) => /\.audit-\d{8}$/.test(result.file)).length, 2);
+    for (const result of rotated) {
+      assert.equal(
+        inspectGatewayStateEnvelope(await readFile(result.file, "utf8"), 64 * 1024 * 1024).keyStatus,
+        "active"
+      );
+    }
+    assert.deepEqual(readFieldWalkAuditHistory({ ledgerPath: fieldWalkLedgerPath }), history);
+    assert.equal(assertGatewayManagedStateReady().length, rotated.length);
+  } finally {
+    setFieldWalkLedgerTestLimits(null);
+  }
+});
+
+test("gw-F4 S19-13 startup checks sealed audit segments by envelope only and inspect reports a damaged one", async () => {
+  const { fieldWalkLedgerPath } = await createMaintenanceEnvironment();
+  const binding = {
+    actorId: "account-1", accountId: "account-1", deviceId: "device-1",
+    familyId: "family-1", sessionRotation: 1
+  };
+  const segment = (file: string) => /\.audit-\d{8}$/.test(file);
+  setFieldWalkLedgerTestLimits({
+    maxRequestsPerAccount: 4_096, maxAuditEntries: 8_192, maxLedgerBytes: 16 * 1024 * 1024, auditSegmentEntries: 1
+  });
+  try {
+    const started = commandFieldWalk(binding, parseFieldWalkCommand({
+      schema_version: "walksafe.field-walk-command.v1", request_id: "request-000000",
+      action: "start", walk_id: "walk-000001"
+    })!, { ledgerPath: fieldWalkLedgerPath, nowEpochMs: 1_000 }).body;
+    const renew = (index: number) => commandFieldWalk(binding, parseFieldWalkCommand({
+      schema_version: "walksafe.field-walk-command.v1",
+      request_id: `request-${String(index).padStart(6, "0")}`, action: "renew", walk_id: "walk-000001",
+      lease_id: String(started.lease_id), fencing_token: 1
+    })!, { ledgerPath: fieldWalkLedgerPath, nowEpochMs: 1_000 + index * 10 }).body.result;
+    for (let index = 1; index <= 40; index += 1) assert.equal(renew(index), "RENEWED");
+    const segmentFiles = (await runGatewayStateMaintenance("inspect"))
+      .map((result) => result.file)
+      .filter(segment)
+      .sort();
+    assert.ok(segmentFiles.length >= 40, String(segmentFiles.length));
+    // Damage every sealed segment's body: the envelope stays well formed, but the ciphertext
+    // no longer authenticates, so any decryption of any segment would fail.
+    for (const file of segmentFiles) {
+      const envelope = JSON.parse(await readFile(file, "utf8")) as Record<string, string>;
+      const body = Buffer.from(envelope.ciphertext_base64url!, "base64url");
+      body[0] = body[0]! ^ 0xff;
+      envelope.ciphertext_base64url = body.toString("base64url");
+      await writeFile(file, JSON.stringify(envelope), { mode: 0o600 });
+    }
+
+    const written: string[] = [];
+    const realWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      written.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    let startup: ReturnType<typeof assertGatewayManagedStateReady>;
+    try {
+      startup = assertGatewayManagedStateReady();
+    } finally {
+      process.stderr.write = realWrite;
+    }
+    // The service starts: segments are checked for file safety, envelope and key only.
+    const startupSegments = startup.filter((result) => segment(result.file));
+    assert.equal(startupSegments.length, segmentFiles.length);
+    assert.ok(startupSegments.every((result) =>
+      result.statusBefore === "encrypted-active" && result.keyId === "old-key"));
+    const usage = fieldWalkAuditSegmentUsage();
+    let bytes = 0;
+    for (const file of segmentFiles) bytes += (await readFile(file)).byteLength;
+    assert.deepEqual(usage, { count: segmentFiles.length, bytes });
+    assert.deepEqual(written, [
+      `walksafe gateway state: field walk audit segments ${usage.count}, ${usage.bytes} bytes ` +
+        "(kept until a retention period is decided; decrypted only by inspect and rotate)\n"
+    ]);
+    // A damaged history does not affect the live walk.
+    assert.equal(renew(41), "RENEWED");
+
+    // Decryption and structure checks stay in maintenance: inspect and rotate refuse, and the
+    // CLI report names every damaged segment and exits non-zero.
+    const integrity = (error: unknown) =>
+      error instanceof GatewayStateEncryptionError && error.code === "integrity";
+    await assert.rejects(runGatewayStateMaintenance("inspect"), integrity);
+    await assert.rejects(runGatewayStateMaintenance("rotate"), integrity);
+    const report = await runGatewayStateMaintenance("inspect", process.env, { reportIntegrityFailures: true });
+    assert.deepEqual(
+      report.filter((result) => result.statusBefore === "integrity-failed").map((result) => result.file).sort(),
+      segmentFiles
+    );
+    assert.ok(report.every((result) => result.statusBefore !== "integrity-failed" || result.keyId === "old-key"));
+    const cli = spawnSync(process.execPath, [
+      fileURLToPath(new URL("../src/state-encryption-maintenance.js", import.meta.url)),
+      "inspect"
+    ], { encoding: "utf8", env: process.env, timeout: 30_000 });
+    assert.equal(cli.status, 2, cli.stderr);
+    const output = JSON.parse(cli.stdout) as {
+      results: Array<{ file: string; statusBefore: string }>;
+      field_walk_audit_segments: { count: number; bytes: number };
+      legacy_deletion_capabilities: unknown;
+    };
+    assert.deepEqual(
+      output.results.filter((result) => result.statusBefore === "integrity-failed").map((result) => result.file).sort(),
+      segmentFiles
+    );
+    assert.deepEqual(output.field_walk_audit_segments, fieldWalkAuditSegmentUsage());
+    assert.equal(output.field_walk_audit_segments.count, segmentFiles.length + 1);
+    assert.deepEqual(output.legacy_deletion_capabilities, { active: 0, archived: 0, total: 0 });
+  } finally {
+    setFieldWalkLedgerTestLimits(null);
+  }
+});
+
+test("custom maintenance environment uses its own keyring in an isolated process", async () => {
+  const { directory, root, keyringPath, fieldWalkLedgerPath } =
+    await createMaintenanceEnvironment();
+  const fixtures = fixtureStates(root, fieldWalkLedgerPath);
+  const state = fixtures[0]!;
+  const consent = fixtures.find((fixture) => fixture.context.kind === "integrated-consent");
+  assert.ok(consent);
+  for (const fixture of [state, consent]) {
+    await mkdir(path.dirname(fixture.filePath), { recursive: true, mode: 0o700 });
+    await writeFile(
+      fixture.filePath,
+      encryptGatewayStateJson(fixture.context, fixture.value, fixture.maxPlaintextBytes),
+      { mode: 0o600 }
+    );
+  }
+  await writeTestStateKeyring(keyringPath, [
+    { keyId: "new-key", status: "active", fillByte: 0x32 },
+    { keyId: "old-key", status: "decrypt-only", fillByte: 0x31 }
+  ]);
+  const otherKeyringPath = path.join(directory, "other-keyring.json");
+  await writeTestStateKeyring(otherKeyringPath, [
+    { keyId: "new-key", status: "active", fillByte: 0x42 }
+  ]);
+  const otherRoot = path.join(directory, "other-state");
+  await mkdir(otherRoot, { mode: 0o700 });
+
+  const childScript = `
+    import assert from "node:assert/strict";
+    import { readFileSync } from "node:fs";
+    import {
+      assertGatewayManagedStateReady,
+      runGatewayStateMaintenance
+    } from ${JSON.stringify(new URL("../src/state-encryption-maintenance.js", import.meta.url).href)};
+    import {
+      GatewayStateEncryptionError,
+      inspectGatewayStateEnvelope
+    } from ${JSON.stringify(new URL("../src/encrypted-json-store.js", import.meta.url).href)};
+    import { withIntegratedConsentStateFileLockForMaintenance } from
+      ${JSON.stringify(new URL("../src/integrated-consent.js", import.meta.url).href)};
+
+    const mode = process.argv[1];
+    const environmentA = {
+      ...process.env,
+      WALKSAFE_GATEWAY_STATE_KEYRING_FILE: ${JSON.stringify(keyringPath)},
+      WALKSAFE_GATEWAY_RATE_LIMIT_DIR: ${JSON.stringify(root)},
+      WALKSAFE_FIELD_WALK_LEDGER_PATH: ${JSON.stringify(fieldWalkLedgerPath)}
+    };
+    const managedFiles = ${JSON.stringify([state, consent].map((fixture) => ({
+      file: fixture.filePath,
+      maxBytes: fixture.maxPlaintextBytes
+    })))};
+    const wrongConsentFile = ${JSON.stringify(path.join(
+      otherRoot,
+      "integrated-consent",
+      path.basename(consent.filePath)
+    ))};
+    const isError = (code) => (error) =>
+      error instanceof GatewayStateEncryptionError && error.code === code;
+
+    if (mode === "custom") {
+      const inspected = await runGatewayStateMaintenance("inspect", environmentA);
+      assert.equal(inspected.length, 2);
+      assert.ok(inspected.every((result) => result.statusBefore === "encrypted-decrypt-only"));
+      const rotated = await runGatewayStateMaintenance("rotate", environmentA);
+      assert.equal(rotated.length, 2);
+      assert.ok(rotated.every((result) => result.action === "rotated"));
+      assert.ok(assertGatewayManagedStateReady(environmentA).every(
+        (result) => result.statusBefore === "encrypted-active"
+      ));
+      for (const { file, maxBytes } of managedFiles) {
+        assert.deepEqual(
+          inspectGatewayStateEnvelope(readFileSync(file, "utf8"), maxBytes, environmentA),
+          { keyId: "new-key", keyStatus: "active" }
+        );
+      }
+      await assert.rejects(
+        withIntegratedConsentStateFileLockForMaintenance(
+          wrongConsentFile,
+          () => {},
+          environmentA
+        ),
+        /integrated consent maintenance state path is invalid/
+      );
+      await assert.rejects(runGatewayStateMaintenance("inspect"), isError("configuration"));
+      await assert.rejects(
+        runGatewayStateMaintenance("inspect", {
+          ...environmentA,
+          WALKSAFE_GATEWAY_STATE_KEYRING_FILE: undefined
+        }),
+        isError("configuration")
+      );
+      assert.equal(process.env.WALKSAFE_GATEWAY_STATE_KEYRING_FILE, ${JSON.stringify(otherKeyringPath)});
+    } else if (mode === "wrong-key") {
+      await assert.rejects(
+        runGatewayStateMaintenance("inspect", {
+          ...process.env,
+          WALKSAFE_GATEWAY_RATE_LIMIT_DIR: ${JSON.stringify(root)},
+          WALKSAFE_FIELD_WALK_LEDGER_PATH: ${JSON.stringify(fieldWalkLedgerPath)}
+        }),
+        isError("integrity")
+      );
+    } else {
+      throw new Error("unexpected child test mode");
+    }
+  `;
+  const childEnvironment = {
+    ...process.env,
+    WALKSAFE_GATEWAY_STATE_KEYRING_FILE: otherKeyringPath,
+    WALKSAFE_GATEWAY_RATE_LIMIT_DIR: otherRoot,
+    WALKSAFE_FIELD_WALK_LEDGER_PATH: path.join(otherRoot, "field-walk-ledger.json")
+  };
+  for (const mode of ["custom", "wrong-key"]) {
+    execFileSync(process.execPath, ["--input-type=module", "--eval", childScript, mode], {
+      env: childEnvironment,
+      encoding: "utf8"
+    });
+  }
+});
+
+test("actual production process rejects a custom environment permission downgrade", async () => {
+  const { directory, keyringPath } = await createMaintenanceEnvironment();
+  const childScript = `
+    import assert from "node:assert/strict";
+    import {
+      GatewayStateEncryptionError,
+      initializeGatewayStateEncryption
+    } from ${JSON.stringify(new URL("../src/encrypted-json-store.js", import.meta.url).href)};
+
+    assert.equal(process.env.NODE_ENV, "production");
+    const environmentA = {
+      ...process.env,
+      WALKSAFE_GATEWAY_STATE_KEYRING_FILE: ${JSON.stringify(keyringPath)}
+    };
+    for (const nodeEnv of ["test", undefined]) {
+      assert.throws(
+        () => initializeGatewayStateEncryption({ ...environmentA, NODE_ENV: nodeEnv }),
+        (error) => error instanceof GatewayStateEncryptionError &&
+          error.code === "configuration" &&
+          /production gateway state keyring/.test(error.message)
+      );
+    }
+  `;
+  execFileSync(process.execPath, ["--input-type=module", "--eval", childScript], {
+    env: {
+      ...process.env,
+      NODE_ENV: "production",
+      WALKSAFE_GATEWAY_STATE_KEYRING_FILE: path.join(directory, "unused-keyring.json")
+    },
+    encoding: "utf8"
+  });
+});
+
+test("actual production process rejects omitted custom state paths before an invalid keyring", async () => {
+  const { directory, root, fieldWalkLedgerPath } = await createMaintenanceEnvironment();
+  const childScript = `
+    import assert from "node:assert/strict";
+    import {
+      assertGatewayManagedStateReady,
+      runGatewayStateMaintenance
+    } from ${JSON.stringify(new URL("../src/state-encryption-maintenance.js", import.meta.url).href)};
+    import { withIntegratedConsentStateFileLockForMaintenance } from
+      ${JSON.stringify(new URL("../src/integrated-consent.js", import.meta.url).href)};
+
+    assert.equal(process.env.NODE_ENV, "production");
+    const consentFile = ${JSON.stringify(path.join(root, "integrated-consent", `${"a".repeat(64)}.json`))};
+    for (const nodeEnv of ["test", undefined]) {
+      for (const [missingPath, expectedPath] of [
+        ["WALKSAFE_GATEWAY_RATE_LIMIT_DIR", "WALKSAFE_GATEWAY_RATE_LIMIT_DIR"],
+        ["WALKSAFE_FIELD_WALK_LEDGER_PATH", "WALKSAFE_FIELD_WALK_LEDGER_PATH"]
+      ]) {
+        const environmentA = { ...process.env, NODE_ENV: nodeEnv, [missingPath]: undefined };
+        assert.throws(
+          () => assertGatewayManagedStateReady(environmentA),
+          (error) => error instanceof Error && error.message.includes(expectedPath)
+        );
+        await assert.rejects(
+          runGatewayStateMaintenance("inspect", environmentA),
+          (error) => error instanceof Error && error.message.includes(expectedPath)
+        );
+        if (missingPath === "WALKSAFE_GATEWAY_RATE_LIMIT_DIR") {
+          await assert.rejects(
+            withIntegratedConsentStateFileLockForMaintenance(consentFile, () => {}, environmentA),
+            (error) => error instanceof Error && error.message.includes(expectedPath)
+          );
+        }
+      }
+    }
+  `;
+  execFileSync(process.execPath, ["--input-type=module", "--eval", childScript], {
+    env: {
+      ...process.env,
+      NODE_ENV: "production",
+      WALKSAFE_GATEWAY_RATE_LIMIT_DIR: root,
+      WALKSAFE_FIELD_WALK_LEDGER_PATH: fieldWalkLedgerPath,
+      WALKSAFE_GATEWAY_STATE_KEYRING_FILE: path.join(directory, "missing-keyring.json")
+    },
+    encoding: "utf8"
+  });
 });
 
 for (const fault of [

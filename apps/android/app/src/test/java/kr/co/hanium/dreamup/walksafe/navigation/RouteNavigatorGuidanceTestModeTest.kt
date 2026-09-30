@@ -31,11 +31,12 @@ class RouteNavigatorGuidanceTestModeTest {
 
     @Test
     fun testModeProjectsLowCornerFixToExistingNextTurnWithoutPromotingMatchEvidence() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         val navigator = navigator()
-        val first = navigator.update(fix(0.0, 0.00082, 1_000), 1_000, false)
+        val first = navigator.update(fix(0.0, 0.00082, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
         assertTrue(navigator.reserveInstruction(first))
         val location = fix(0.00018, 0.001, 11_000)
-        val corner = navigator.update(location, 11_000, false)
+        val corner = navigator.update(location, 11_000, false, facingObservation = RouteFacingObservation(0.0, 5.0, 11_000))
 
         assertEquals(RouteMatchQuality.LOW, navigator.currentRouteMatch()?.quality)
         assertNull(navigator.currentAcceptedRouteMatchFor(11_000))
@@ -50,7 +51,30 @@ class RouteNavigatorGuidanceTestModeTest {
         assertTrue(navigator.reserveInstruction(corner))
         navigator.acknowledgeInstruction(first, 11_001)
         navigator.acknowledgeInstruction(corner, 11_002)
-        assertEquals("guidance_already_completed", navigator.update(fix(0.00018, 0.001, 12_000), 12_000, false).reason)
+        assertEquals("guidance_already_completed", navigator.update(fix(0.00018, 0.001, 12_000), 12_000, false, facingObservation = RouteFacingObservation(0.0, 5.0, 12_000)).reason)
+    }
+
+    @Test
+    fun oneLowProjectedJumpDisplaysOnlyFirstOfTwoPassedTurns() {
+        val base = route()
+        val navigator = navigator().apply {
+            setRoute(base.copy(guidePoints = base.guidePoints.mapIndexed { index, guide ->
+                if (index == 1) guide.copy(distanceFromStartM = 120, remainingDistanceM = 213) else guide
+            }))
+        }
+        navigator.update(fix(0.0, 0.00082, 1_000), 1_000, false)
+
+        val corner = navigator.update(
+            fix(0.00018, 0.001, 11_000), 11_000, false,
+            facingObservation = RouteFacingObservation(0.0, 5.0, 11_000),
+        )
+
+        assertEquals(RouteMatchQuality.LOW, navigator.currentRouteMatch()?.quality)
+        assertNull(navigator.currentAcceptedRouteMatchFor(11_000))
+        assertEquals(1, corner.guideIndex)
+        assertTrue(corner.instruction?.contains("오른쪽으로 꺾으세요") == true)
+        val repeated = navigator.update(fix(0.00018, 0.001, 12_000), 12_000, false)
+        assertEquals(1, repeated.guideIndex)
     }
 
     @Test
@@ -59,7 +83,12 @@ class RouteNavigatorGuidanceTestModeTest {
         val coarse = fix(0.00054, 0.001, 1_000).copy(accuracyM = 80f)
         val update = navigator.update(coarse, 1_000, false)
         assertEquals(1, update.guideIndex)
-        assertTrue(update.instruction?.contains("오른쪽으로 꺾으세요") == true)
+        // Keep the 80 m uncertainty: guide progress is not proof of a relative movement direction.
+        assertFalse(update.instruction?.contains("꺾으세요") == true)
+        assertTrue(update.instruction?.contains("경로의 진행 방향을 정확히 구분하기 어렵습니다") == true)
+        // Accepted position matching and reliable relative direction are separate contracts.
+        assertEquals(RouteMatchQuality.HIGH, navigator.currentAcceptedRouteMatchFor(1_000)?.quality)
+        assertEquals(1, navigator.currentAcceptedRouteMatchFor(1_000)?.segmentIndex)
         assertEquals(RoutePoint(coarse.latitude, coarse.longitude), navigator.currentRouteMatch()?.filteredPoint)
         assertTrue(navigator.reserveInstruction(update))
     }
@@ -235,15 +264,16 @@ class RouteNavigatorGuidanceTestModeTest {
 
     @Test
     fun crosswalkMarkerKeepsMappedTurnAndRepeatsFromOneHundredToTwentyMeters() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         listOf(false, true).forEach { testMode ->
             val navigator = navigator(testMode, "횡단보도 방면 좌회전 후 94m 이동")
-            val far = navigator.update(fix(0.0, 0.0001, 1_000), 1_000, false)
+            val far = navigator.update(fix(0.0, 0.0001, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
             assertTrue(far.instruction?.contains("100m 앞, 왼쪽으로 꺾으세요.") == true)
             assertTrue(far.instruction?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
             assertEquals(3, far.speechCueToken?.distanceBand)
             assertTrue(navigator.reserveInstruction(far))
             navigator.acknowledgeInstruction(far, 1_001)
-            val near = navigator.update(fix(0.0, 0.00082, 20_000), 20_000, false)
+            val near = navigator.update(fix(0.0, 0.00082, 20_000), 20_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 20_000))
             assertTrue(near.instruction?.contains("20m 앞, 왼쪽으로 꺾으세요.") == true)
             assertTrue(near.instruction?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
             assertFalse(near.instruction?.contains("94m") == true)
@@ -254,19 +284,20 @@ class RouteNavigatorGuidanceTestModeTest {
 
     @Test
     fun explicitCrosswalkPointKeepsDistanceWithoutRepeatingUnsafeProviderCommand() {
+        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         listOf(211, 212, 213, 999).forEach { turnType ->
             val navigator = navigator().apply {
                 setRoute(route("횡단보도가 초록색이니 지금 건너세요.").let { route ->
                     route.copy(guidePoints = route.guidePoints.map { it.copy(turnType = turnType) })
                 })
             }
-            val far = navigator.update(fix(0.0, 0.0001, 1_000), 1_000, false)
+            val far = navigator.update(fix(0.0, 0.0001, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
             assertTrue(far.instruction?.contains("100m 앞, 횡단보도 안내 지점입니다.") == true)
             assertTrue(far.instruction?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
             assertFalse(far.instruction?.contains("지금 건너세요") == true)
             assertTrue(navigator.reserveInstruction(far))
             navigator.acknowledgeInstruction(far, 1_001)
-            val near = navigator.update(fix(0.0, 0.00082, 20_000), 20_000, false)
+            val near = navigator.update(fix(0.0, 0.00082, 20_000), 20_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 20_000))
             assertTrue(near.instruction?.contains("20m 앞, 횡단보도 안내 지점입니다.") == true)
             assertNotEquals(far.speechCueToken?.distanceBand, near.speechCueToken?.distanceBand)
         }

@@ -102,6 +102,29 @@ class MainActivityStartupCapabilityStaticTest {
     }
 
     @Test
+    fun postLoginFeatureRestrictionsCannotReopenACapabilityBlockedStart() {
+        val restrictions = activity
+            .substringAfter("private fun applyPostLoginDeviceFeatureRestrictions(")
+            .substringBefore("/** Active route/risk work")
+        val tierCondition = restrictions.substringAfter("val tier = if (")
+            .substringBefore("WalkSafeStartupCapabilityTier.BLOCKED")
+        assertTrue(
+            tierCondition.contains(
+                "WalkSafeStartupCapabilityResolver.blocksWalkStart(decision.unavailableRequirements)",
+            ),
+        )
+        val transcriberFailure = activity
+            .substringAfter("is HandsFreeVoiceTerminalFailure.Transcriber ->")
+            .substringBefore("HandsFreeVoiceTerminalFailure.CommandDispatchFailed,")
+        assertTrue(
+            transcriberFailure.contains(
+                "val walkStartStillAllowed = startupCapabilityDecision?.mayConfirmAndStart == true",
+            ),
+        )
+        assertTrue(transcriberFailure.contains("보행을 시작하거나 계속할 수 없습니다"))
+    }
+
+    @Test
     fun homeCommandsPreferInstalledKoreanPlatformAndWalkFlowsRequireVosk() {
         val voiceStart = ReportStaticSourceInspector.functionBlock(
             activity,
@@ -147,8 +170,21 @@ class MainActivityStartupCapabilityStaticTest {
             ),
         )
         assertTrue(preferred.contains("SpeechRecognizer.createOnDeviceSpeechRecognizer(context)"))
-        assertTrue(preferred.contains("recognitionSupport.installedOnDeviceLanguages.any"))
-        assertTrue(preferred.contains("tag == \"ko\" || tag.startsWith(\"ko-\")"))
+        val platformAdapter = preferred.substringAfter("private class AndroidPlatformSpeechBackend")
+        val queryPlatform = ReportStaticSourceInspector.functionBlock(
+            preferred,
+            "private fun queryPlatform",
+        )
+        assertTrue(platformAdapter.contains(
+            "onInstalledLanguages { recognitionSupport.installedOnDeviceLanguages }",
+        ))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            queryPlatform,
+            "if (!accepts(current) || current.selected) return@support",
+            "installedLanguages().any",
+            "tag == \"ko\" || tag.startsWith(\"ko-\")",
+            "select(current, installed)",
+        ))
         assertTrue(preferred.contains("OfflineSpeechSelection.VOSK ->"))
         assertFalse(preferred.contains("SpeechRecognizer.createSpeechRecognizer("))
     }

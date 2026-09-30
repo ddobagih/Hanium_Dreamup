@@ -1,18 +1,21 @@
 """Validate and sanitize untrusted image uploads before persistence.
 
 MIME type, filename extension, size, and file signature are checked at the
-HTTP trust boundary. Pillow decode and metadata-free re-encoding are mandatory;
+HTTP trust boundary. Pillow decode and source-metadata-free re-encoding are mandatory;
 signature-looking but undecodable input is rejected instead of stored raw.
 """
 
 from __future__ import annotations
 
+import asyncio
 import io
 import grp
 import os
 from pathlib import Path
 import stat
 import uuid
+from collections.abc import Callable
+from concurrent.futures import Executor
 
 from fastapi import HTTPException, UploadFile, status
 from starlette.concurrency import run_in_threadpool
@@ -125,6 +128,14 @@ def upload_file_metadata_is_safe(
         expected_mode = expected_upload_file_mode(directory_metadata)
     except ValueError:
         return False
+    return _file_metadata_matches_mode(file_metadata, directory_metadata, expected_mode)
+
+
+def _file_metadata_matches_mode(
+    file_metadata: os.stat_result,
+    directory_metadata: os.stat_result,
+    expected_mode: int,
+) -> bool:
     return (
         stat.S_ISREG(file_metadata.st_mode)
         and file_metadata.st_uid == directory_metadata.st_uid
@@ -166,8 +177,14 @@ def matches_image_signature(content: bytes, content_type: str) -> bool:
 
 
 def strip_image_metadata(content: bytes, content_type: str) -> bytes:
+    """Apply EXIF orientation and drop source ancillary metadata.
+
+    ICC, EXIF, XMP, text, comments and source density are not carried forward.
+    Encoders may generate structural headers. This does not color-manage pixels;
+    the existing encoding policy stays.
+    """
     try:
-        from PIL import Image  # type: ignore[import-not-found]
+        from PIL import Image, ImageOps  # type: ignore[import-not-found]
     except ModuleNotFoundError as exc:
         raise RuntimeError("Pillow is required for privacy-safe image uploads") from exc
 
@@ -183,17 +200,31 @@ def strip_image_metadata(content: bytes, content_type: str) -> bytes:
             ):
                 raise ImageDimensionsTooLarge("image dimensions exceed the configured safety boundary")
             image.load()
-            output = io.BytesIO()
-            if content_type == "image/jpeg":
-                image.convert("RGB").save(output, format="JPEG", quality=92, optimize=True)
-            elif content_type == "image/png":
-                image.save(output, format="PNG", optimize=True)
-            elif content_type == "image/webp":
-                image.save(output, format="WEBP", quality=90, method=4)
-            else:
-                return content
-            sanitized = output.getvalue()
+            with ImageOps.exif_transpose(image) as oriented:
+                output = io.BytesIO()
+                # Transfer only display-oriented pixels, never source metadata.
+                with Image.frombytes(oriented.mode, oriented.size, oriented.tobytes()) as pixels:
+                    if oriented.mode == "P":
+                        palette = oriented.getpalette()
+                        if palette is not None:
+                            pixels.putpalette(palette)
+                    if content_type == "image/jpeg":
+                        with pixels.convert("RGB") as rgb:
+                            rgb.save(output, format="JPEG", quality=92, optimize=True)
+                    elif content_type == "image/png":
+                        # Palette/transparency are rendering data, not ancillary metadata.
+                        png_options = {}
+                        if "transparency" in image.info:
+                            png_options["transparency"] = image.info["transparency"]
+                        pixels.save(output, format="PNG", optimize=True, **png_options)
+                    elif content_type == "image/webp":
+                        pixels.save(output, format="WEBP", quality=90, method=4)
+                    else:
+                        return content
+                sanitized = output.getvalue()
     except ImageDimensionsTooLarge:
+        raise
+    except MemoryError:
         raise
     except Exception as exc:
         raise ValueError("image could not be decoded and sanitized") from exc
@@ -203,7 +234,13 @@ def strip_image_metadata(content: bytes, content_type: str) -> bytes:
     return sanitized
 
 
-async def read_image_upload(upload: UploadFile, settings: Settings) -> tuple[bytes, str]:
+async def read_image_upload(
+    upload: UploadFile,
+    settings: Settings,
+    *,
+    validate_original: Callable[[bytes], None] | None = None,
+    sanitization_executor: Executor | None = None,
+) -> tuple[bytes, str]:
     content_type = upload.content_type or "application/octet-stream"
     supported_content_types = set(IMAGE_SUFFIXES)
     allowed_content_types = settings.allowed_image_content_types & supported_content_types
@@ -240,8 +277,20 @@ async def read_image_upload(upload: UploadFile, settings: Settings) -> tuple[byt
             },
         )
 
+    # Transport receipts bind the bytes received, not the metadata-free storage
+    # representation. Reject a mismatched transport before image decoding.
+    if validate_original is not None:
+        validate_original(content)
     try:
-        sanitized = await run_in_threadpool(strip_image_metadata, content, content_type)
+        if sanitization_executor is None:
+            sanitized = await run_in_threadpool(strip_image_metadata, content, content_type)
+        else:
+            sanitized = await asyncio.get_running_loop().run_in_executor(
+                sanitization_executor,
+                strip_image_metadata,
+                content,
+                content_type,
+            )
     except ImageDimensionsTooLarge as exc:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
@@ -268,6 +317,15 @@ async def read_image_upload(upload: UploadFile, settings: Settings) -> tuple[byt
 
 
 def write_image_file(destination: Path, content: bytes) -> None:
+    _write_file(destination, content, private_journal=False)
+
+
+def write_private_journal_file(destination: Path, content: bytes) -> None:
+    """Write an owner-only journal without relaxing deployed image permissions."""
+    _write_file(destination, content, private_journal=True)
+
+
+def _write_file(destination: Path, content: bytes, *, private_journal: bool) -> None:
     try:
         destination.parent.mkdir(parents=True, mode=PRIVATE_UPLOAD_DIRECTORY_MODE)
     except FileExistsError:
@@ -290,7 +348,15 @@ def write_image_file(destination: Path, content: bytes) -> None:
             or not descriptor_acl_is_absent(directory_descriptor)
         ):
             raise OSError("upload directory identity or ACL differs")
-        file_mode = expected_upload_file_mode(directory_metadata)
+        if private_journal:
+            if (
+                directory_metadata.st_uid != os.geteuid()
+                or stat.S_IMODE(directory_metadata.st_mode) != PRIVATE_UPLOAD_DIRECTORY_MODE
+            ):
+                raise ValueError("journal directory must be owner-only")
+            file_mode = PRIVATE_UPLOAD_FILE_MODE
+        else:
+            file_mode = expected_upload_file_mode(directory_metadata)
         temporary_name = f".{destination.name}.{uuid.uuid4().hex}.tmp"
         flags = (
             os.O_WRONLY
@@ -310,9 +376,10 @@ def write_image_file(destination: Path, content: bytes) -> None:
             temporary_created = True
             try:
                 os.fchmod(descriptor, file_mode)
-                if not upload_file_metadata_is_safe(
+                if not _file_metadata_matches_mode(
                     os.fstat(descriptor),
                     directory_metadata,
+                    file_mode,
                 ) or not descriptor_acl_is_absent(descriptor):
                     raise OSError("upload temporary file permissions or ACL differ")
                 remaining = memoryview(content)
@@ -328,9 +395,10 @@ def write_image_file(destination: Path, content: bytes) -> None:
                     follow_symlinks=False
                 )
                 if (
-                    not upload_file_metadata_is_safe(
+                    not _file_metadata_matches_mode(
                         final_file_metadata,
                         final_directory_metadata,
+                        file_mode,
                     )
                     or (
                         final_directory_metadata.st_dev,

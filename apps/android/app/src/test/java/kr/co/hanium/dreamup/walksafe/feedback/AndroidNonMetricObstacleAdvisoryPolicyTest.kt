@@ -115,6 +115,85 @@ class AndroidNonMetricObstacleAdvisoryPolicyTest {
     }
 
     @Test
+    fun repeatedFrameIdDoesNotRefreshObservationOrWarnAfterCooldown() {
+        val policy = AndroidNonMetricObstacleAdvisoryPolicy()
+        val candidate = detection(centerX = 0.5f)
+
+        assertNull(policy.evaluate(listOf(candidate), gate, frameId = 1L, nowMs = 1_000L))
+        assertNull(policy.evaluate(listOf(candidate), gate, frameId = 2L, nowMs = 1_400L))
+        val first = policy.evaluate(listOf(candidate), gate, frameId = 3L, nowMs = 1_700L)
+        requireNotNull(first)
+        assertTrue(policy.claimDelivery(first))
+        assertTrue(policy.confirmDelivery(first, 1_700L))
+
+        listOf(3_000L, 4_500L, 6_000L, 7_500L, 9_000L, 9_700L).forEach { nowMs ->
+            assertNull(policy.evaluate(listOf(candidate), gate, frameId = 3L, nowMs = nowMs))
+        }
+
+        assertNull(policy.evaluate(listOf(candidate), gate, frameId = 4L, nowMs = 9_800L))
+        assertNull(policy.evaluate(listOf(candidate), gate, frameId = 5L, nowMs = 10_200L))
+        val fresh = policy.evaluate(listOf(candidate), gate, frameId = 6L, nowMs = 10_500L)
+        requireNotNull(fresh)
+        assertEquals(first.key, fresh.key)
+        assertEquals(10_500L, fresh.observedAtMs)
+    }
+
+    @Test
+    fun olderFramesCannotStabilizeAnotherCandidateKey() {
+        val policy = AndroidNonMetricObstacleAdvisoryPolicy(
+            NonMetricObstacleAdvisoryConfig(globalIntervalMs = 0L, perKeyIntervalMs = 0L),
+        )
+        val current = detection(centerX = 0.5f)
+        val older = detection(centerX = 0.18f, className = "person")
+
+        assertNull(policy.evaluate(listOf(current), gate, 10L, 1_000L))
+        assertNull(policy.evaluate(listOf(current), gate, 11L, 1_400L))
+        val first = policy.evaluate(listOf(current), gate, 12L, 1_700L)
+        requireNotNull(first)
+        assertTrue(policy.claimDelivery(first))
+        assertTrue(policy.confirmDelivery(first, 1_700L))
+
+        assertNull(policy.evaluate(listOf(older), gate, 1L, 2_000L))
+        assertNull(policy.evaluate(listOf(older), gate, 2L, 2_400L))
+        assertNull(policy.evaluate(listOf(older), gate, 3L, 2_700L))
+        assertNull(policy.evaluate(listOf(older), gate, 13L, 3_000L))
+        assertNull(policy.evaluate(listOf(older), gate, 14L, 3_400L))
+        val fresh = policy.evaluate(listOf(older), gate, 15L, 3_700L)
+        requireNotNull(fresh)
+        assertEquals("person|LEFT", fresh.key)
+    }
+
+    @Test
+    fun olderEmptyFrameCannotCancelCurrentDelivery() {
+        val policy = immediatePolicy()
+        val candidate = detection(centerX = 0.5f)
+        val current = policy.evaluate(listOf(candidate), gate, 10L, 1_000L)
+        requireNotNull(current)
+        assertTrue(policy.claimDelivery(current))
+
+        assertNull(policy.evaluate(emptyList(), gate, 9L, 1_001L))
+        assertTrue(policy.isDeliveryCurrent(current))
+        assertTrue(policy.confirmDelivery(current, 1_002L))
+    }
+
+    @Test
+    fun duplicateFrameCanExpireReservationButCannotCreateItsReplacement() {
+        val policy = immediatePolicy(actionTtlMs = 1_500L)
+        val candidate = detection(centerX = 0.5f)
+        val expired = policy.evaluate(listOf(candidate), gate, 1L, 1_700L)
+        requireNotNull(expired)
+
+        assertNull(policy.evaluate(listOf(candidate), gate, 1L, 3_201L))
+        assertFalse(policy.isDeliveryCurrent(expired))
+        assertFalse(policy.claimDelivery(expired))
+        assertNull(policy.evaluate(listOf(candidate), gate, 1L, 3_300L))
+
+        val fresh = policy.evaluate(listOf(candidate), gate, 2L, 3_301L)
+        requireNotNull(fresh)
+        assertEquals(3_301L, fresh.observedAtMs)
+    }
+
+    @Test
     fun rejectsMissingCapabilityDistantBoxesAndNonObstacleClasses() {
         val policy = AndroidNonMetricObstacleAdvisoryPolicy()
         val closeObstacle = detection(centerX = 0.5f)

@@ -6,8 +6,246 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import org.json.JSONArray
+import org.json.JSONObject
 
 class TwoModelRuntimeConfigTest {
+    @Test
+    fun selectedUnifiedJsonRejectsEmptyAndPartialThresholdCoverage() {
+        for (thresholds in listOf("{}", """{"person":0.5}""")) {
+            val json = thresholdFixtureJson()
+            json.getJSONObject("models").getJSONObject("unified_walksafe")
+                .put("allowlist", JSONArray("""["person","excluded"]"""))
+                .put("thresholds", JSONObject(thresholds))
+
+            assertThrows(IllegalArgumentException::class.java) {
+                TwoModelRuntimeConfig.parse(json.toString())
+            }
+        }
+    }
+
+    @Test
+    fun selectedLegacyPrimaryAndFallbackRequireBothModelsDespiteDisabledFlags() {
+        for (primary in listOf(TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY, TwoModelRuntimeConfig.UNIFIED_MODEL_KEY)) {
+            for (missingModel in listOf("custom_tactile", "coco_general")) {
+                val json = thresholdFixtureJson().put("primary_model", primary)
+                if (primary == TwoModelRuntimeConfig.UNIFIED_MODEL_KEY) {
+                    json.put("fallback_model", TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY)
+                }
+                json.getJSONObject("models").getJSONObject(missingModel)
+                    .put("thresholds", JSONObject())
+
+                assertThrows(IllegalArgumentException::class.java) {
+                    TwoModelRuntimeConfig.parse(json.toString())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun unselectedModelCoverageDoesNotRejectJsonConfiguration() {
+        val unifiedJson = thresholdFixtureJson()
+        for (key in listOf("custom_tactile", "coco_general")) {
+            unifiedJson.getJSONObject("models").getJSONObject(key).put("thresholds", JSONObject())
+        }
+        val unified = TwoModelRuntimeConfig.parse(unifiedJson.toString())
+        assertNull(requireNotNull(unified.customTactile).thresholdForClassOrNull("person"))
+        assertNull(requireNotNull(unified.cocoGeneral).thresholdForClassOrNull("person"))
+
+        val legacyJson = thresholdFixtureJson().put("primary_model", TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY)
+        legacyJson.getJSONObject("models").getJSONObject("unified_walksafe").put("thresholds", JSONObject())
+        val legacy = TwoModelRuntimeConfig.parse(legacyJson.toString())
+        assertNull(requireNotNull(legacy.unifiedWalksafe).thresholdForClassOrNull("person"))
+    }
+
+    @Test
+    fun disabledUnifiedJsonDoesNotRequireCoverageButSelectedFallbackStillDoes() {
+        val json = thresholdFixtureJson().put("fallback_model", TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY)
+        json.getJSONObject("models").getJSONObject("unified_walksafe")
+            .put("enabled", false)
+            .put("thresholds", JSONObject())
+        val config = TwoModelRuntimeConfig.parse(json.toString())
+        assertEquals(false, requireNotNull(config.unifiedWalksafe).enabled)
+
+        json.getJSONObject("models").getJSONObject("coco_general").put("thresholds", JSONObject())
+        assertThrows(IllegalArgumentException::class.java) {
+            TwoModelRuntimeConfig.parse(json.toString())
+        }
+    }
+
+    @Test
+    fun selectedRootConstructorRejectsMissingCoverage() {
+        assertThrows(IllegalArgumentException::class.java) {
+            thresholdRoot(unified = thresholdModel(thresholds = emptyMap()))
+        }
+        for (primary in listOf(TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY, TwoModelRuntimeConfig.UNIFIED_MODEL_KEY)) {
+            for (missingModel in listOf("custom_tactile", "coco_general")) {
+                assertThrows(IllegalArgumentException::class.java) {
+                    thresholdRoot(
+                        primaryKey = primary,
+                        fallbackKey = if (primary == TwoModelRuntimeConfig.UNIFIED_MODEL_KEY) {
+                            TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY
+                        } else null,
+                        custom = thresholdModel(
+                            key = "custom_tactile",
+                            thresholds = if (missingModel == "custom_tactile") emptyMap() else mapOf("person" to 0.5f),
+                            enabled = false,
+                        ),
+                        coco = thresholdModel(
+                            key = "coco_general",
+                            thresholds = if (missingModel == "coco_general") emptyMap() else mapOf("person" to 0.5f),
+                            enabled = false,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun rootConstructorDoesNotRequireCoverageForUnselectedOrDisabledUnifiedModels() {
+        val unified = thresholdRoot(
+            custom = thresholdModel(key = "custom_tactile", thresholds = emptyMap()),
+            coco = thresholdModel(key = "coco_general", thresholds = emptyMap()),
+        )
+        assertNull(requireNotNull(unified.customTactile).thresholdForClassOrNull("person"))
+        val legacy = thresholdRoot(
+            primaryKey = TwoModelRuntimeConfig.LEGACY_TWO_MODEL_KEY,
+            unified = thresholdModel(thresholds = emptyMap()),
+        )
+        assertNull(requireNotNull(legacy.unifiedWalksafe).thresholdForClassOrNull("person"))
+        val disabled = thresholdRoot(unified = thresholdModel(thresholds = emptyMap(), enabled = false))
+        assertEquals(false, requireNotNull(disabled.unifiedWalksafe).enabled)
+    }
+
+    @Test
+    fun standaloneMissingLookupIsDistinctFromExplicitClassOrDefaultOne() {
+        val missing = thresholdModel(thresholds = emptyMap())
+        assertNull(missing.thresholdForClassOrNull("person"))
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            missing.thresholdForClass("person")
+        }
+        assertTrue(error.message.orEmpty().contains("person"))
+        assertTrue(error.message.orEmpty().contains(missing.key))
+
+        for (thresholds in listOf(mapOf("person" to 1f), mapOf("default" to 1f))) {
+            val model = thresholdModel(thresholds = thresholds)
+            assertEquals(1f, model.thresholdForClass("person"), 0f)
+            assertEquals(1f, requireNotNull(model.thresholdForClassOrNull("person")), 0f)
+            thresholdRoot(unified = model)
+        }
+        for (thresholds in listOf("""{"person":1.0}""", """{"default":1.0}""")) {
+            val json = thresholdFixtureJson()
+            json.getJSONObject("models").getJSONObject("unified_walksafe")
+                .put("thresholds", JSONObject(thresholds))
+            val model = requireNotNull(TwoModelRuntimeConfig.parse(json.toString()).unifiedWalksafe)
+            assertEquals(1f, model.thresholdForClass("person"), 0f)
+        }
+    }
+
+    @Test
+    fun lookupPriorityAndExcludedClassCoverageArePreserved() {
+        val priority = thresholdModel(
+            thresholds = mapOf("Person" to 0.25f, "person" to 0.35f, "default" to 0.5f),
+        ).copy(classes = listOf("Person", "excluded"))
+        thresholdRoot(unified = priority)
+        assertEquals(0.25f, priority.thresholdForClass("Person"), 0f)
+        assertEquals(0.35f, priority.thresholdForClass("PERSON"), 0f)
+        assertEquals(0.5f, priority.thresholdForClass("unknown"), 0f)
+
+        val excluded = thresholdModel(thresholds = mapOf("person" to 1f))
+        val root = thresholdRoot(unified = excluded)
+        assertTrue(!excluded.isAllowedClass("excluded"))
+        assertNull(excluded.thresholdForClassOrNull("excluded"))
+        assertNull(root.thresholdForReportClass(TwoModelRuntimeConfig.UNIFIED_MODEL_KEY, "excluded"))
+        assertThrows(IllegalArgumentException::class.java) { excluded.thresholdForClass("excluded") }
+    }
+
+    @Test
+    fun existingThresholdRangeValidationStillAppliesToSelectedAndUnselectedJsonModels() {
+        for (key in listOf("unified_walksafe", "custom_tactile", "coco_general")) {
+            for (invalid in listOf(-0.1, 1.1)) {
+                val json = thresholdFixtureJson()
+                json.getJSONObject("models").getJSONObject(key)
+                    .put("thresholds", JSONObject().put("person", invalid))
+                assertThrows(IllegalArgumentException::class.java) {
+                    TwoModelRuntimeConfig.parse(json.toString())
+                }
+            }
+        }
+    }
+
+    private fun thresholdModel(
+        key: String = TwoModelRuntimeConfig.UNIFIED_MODEL_KEY,
+        thresholds: Map<String, Float> = mapOf("person" to 0.5f),
+        enabled: Boolean = true,
+    ) = ModelRuntimeConfig(
+        key = key,
+        asset = "models/threshold-test.tflite",
+        inputSize = 640,
+        classes = listOf("person", "excluded"),
+        allowlist = setOf("person"),
+        thresholds = thresholds,
+        enabled = enabled,
+    )
+
+    private fun thresholdRoot(
+        primaryKey: String = TwoModelRuntimeConfig.UNIFIED_MODEL_KEY,
+        fallbackKey: String? = null,
+        unified: ModelRuntimeConfig? = thresholdModel(),
+        custom: ModelRuntimeConfig? = thresholdModel(key = "custom_tactile", enabled = false),
+        coco: ModelRuntimeConfig? = thresholdModel(key = "coco_general", enabled = false),
+    ) = TwoModelRuntimeConfig(
+        bundleVersion = "threshold-test",
+        runtimeSourceModel = null,
+        primaryModelKey = primaryKey,
+        fallbackModelKey = fallbackKey,
+        unifiedWalksafe = unified,
+        customTactile = custom,
+        cocoGeneral = coco,
+    )
+
+    private fun thresholdFixtureJson() = JSONObject(
+        """
+        {
+          "version": "threshold-test",
+          "primary_model": "unified_walksafe",
+          "fallback_model": null,
+          "models": {
+            "unified_walksafe": {
+              "enabled": true,
+              "asset": "models/threshold-test.tflite",
+              "source_model": "threshold-test.pt",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+              "source_model_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "input_size": 640,
+              "classes": ["person", "excluded"],
+              "allowlist": ["person"],
+              "thresholds": {"person": 0.5}
+            },
+            "custom_tactile": {
+              "enabled": false,
+              "asset": "models/threshold-custom.tflite",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+              "input_size": 640,
+              "classes": ["person", "excluded"],
+              "allowlist": ["person"],
+              "thresholds": {"person": 0.5}
+            },
+            "coco_general": {
+              "enabled": false,
+              "asset": "models/threshold-coco.tflite",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+              "input_size": 640,
+              "classes": ["person", "excluded"],
+              "allowlist": ["person"],
+              "thresholds": {"person": 0.5}
+            }
+          }
+        }
+        """.trimIndent(),
+    )
+
     @Test
     fun runtimeThreadsAcceptEntirePositiveIntDomainWithoutADeviceLimit() {
         val json = File("src/main/assets/model-config/two_model_runtime.json").readText()

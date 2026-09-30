@@ -284,6 +284,67 @@ class HandsFreeVoiceStateMachineTest {
         }
     }
 
+    /** S04-11 review: a silent wait for a command's result reopens the wake phrase with a new generation. */
+    @Test
+    fun silentCommandWorkAcceptsTheWakePhraseWithoutReusingTheSpeakingGeneration() {
+        val machine = speakingMachine()
+        val speaking = machine.snapshot()
+        assertFalse(machine.onWakeWordDetected(speaking.generation).accepted)
+
+        val waiting = machine.onCommandWorkSilent(speaking.generation)
+        assertTrue(waiting.accepted)
+        assertTrue(waiting.state is HandsFreeVoiceState.WaitingForCommandResult)
+        assertTrue(waiting.state.generation > speaking.generation)
+        assertTrue(waiting.effects.isEmpty())
+        // Stale or repeated signals change nothing.
+        assertFalse(machine.onCommandWorkSilent(speaking.generation).accepted)
+        assertFalse(machine.onCommandWorkSilent(waiting.state.generation).accepted)
+        assertFalse(machine.onWakeWordDetected(speaking.generation).accepted)
+
+        val acknowledging = machine.onWakeWordDetected(waiting.state.generation)
+        assertTrue(acknowledging.accepted)
+        assertTrue(acknowledging.state is HandsFreeVoiceState.AcknowledgingWake)
+        assertEquals(
+            HandsFreeVoiceEffect.AcknowledgeWake(acknowledging.state.generation),
+            acknowledging.effects.single(),
+        )
+    }
+
+    @Test
+    fun outputDuringTheResultWaitSuppressesInputAgainAndThenEndsNormally() {
+        val machine = speakingMachine()
+        val waiting = machine.onCommandWorkSilent(machine.snapshot().generation)
+
+        val resumedSpeaking = machine.onCommandResultOutputStarted(waiting.state.generation)
+        assertTrue(resumedSpeaking.accepted)
+        assertTrue(resumedSpeaking.state is HandsFreeVoiceState.Speaking)
+        assertTrue(resumedSpeaking.state.generation > waiting.state.generation)
+        // Audio captured in the silent window is fenced off by the new generation.
+        assertFalse(machine.onWakeWordDetected(waiting.state.generation).accepted)
+        assertFalse(machine.onCommandResultOutputStarted(waiting.state.generation).accepted)
+        assertFalse(machine.onCommandResultOutputStarted(resumedSpeaking.state.generation).accepted)
+
+        val back = machine.onTtsFinished(resumedSpeaking.state.generation)
+        assertTrue(back.state is HandsFreeVoiceState.WaitingForWakeWord)
+        assertFalse(machine.onCommandWorkSilent(back.state.generation).accepted)
+    }
+
+    @Test
+    fun aSilentResultWaitEndsLikeSpeechAndFailsClosedOnError() {
+        val finished = speakingMachine()
+        val waiting = finished.onCommandWorkSilent(finished.snapshot().generation)
+        val back = finished.onTtsFinished(waiting.state.generation)
+        assertTrue(back.accepted)
+        assertTrue(back.state is HandsFreeVoiceState.WaitingForWakeWord)
+
+        val failed = speakingMachine()
+        val waitingForFailure = failed.onCommandWorkSilent(failed.snapshot().generation)
+        val stopped = failed.onError(waitingForFailure.state.generation)
+        assertTrue(stopped.state is HandsFreeVoiceState.Stopped)
+        assertFalse(failed.onWakeWordDetected(waitingForFailure.state.generation).accepted)
+        assertFalse(failed.onCommandResultOutputStarted(waitingForFailure.state.generation).accepted)
+    }
+
     private fun eligibleMachine() = HandsFreeVoiceStateMachine().also(::startEligible)
 
     private fun openCommandWindow(machine: HandsFreeVoiceStateMachine): HandsFreeVoiceTransition {

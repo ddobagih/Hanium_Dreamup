@@ -92,12 +92,19 @@ class RuntimeMeasuredQualityGateTest {
     }
 
     @Test
-    fun futureStaleAndOutOfOrderFailureMeasurementsCannotRetainAPass() {
-        listOf(NOW_MS + 2L, NOW_MS - 1L, NOW_MS - 10_000L).forEach { observedAtMs ->
+    fun futureFailureRevokesPassButOlderFailuresCannotReplaceNewerPass() {
+        run {
             val gate = RuntimeMeasuredQualityGate()
             gate.observe(evidence(), NOW_MS)
-            val failed = failure(observedAtMs)
+            val failed = failure(NOW_MS + 2L)
             assertEquals(failed, gate.observe(failed, NOW_MS + 1L))
+        }
+        listOf(NOW_MS - 1L, NOW_MS - 10_000L).forEach { observedAtMs ->
+            val gate = RuntimeMeasuredQualityGate()
+            val pass = evidence()
+            gate.observe(pass, NOW_MS)
+            assertEquals(pass, gate.observe(failure(observedAtMs), NOW_MS + 1L))
+            assertEquals(pass, gate.current(NOW_MS + 1L))
         }
     }
 
@@ -150,6 +157,118 @@ class RuntimeMeasuredQualityGateTest {
         gate.reset()
         val failed = failure(NOW_MS + 1L)
         assertEquals(failed, gate.observe(failed, NOW_MS + 1L))
+    }
+
+    @Test
+    fun olderFreshPassCannotReplaceLatestFailure() {
+        val gate = RuntimeMeasuredQualityGate()
+        val failed = failure(NOW_MS + 100L)
+        assertEquals(failed, gate.observe(failed, NOW_MS + 100L))
+
+        assertEquals(failed, gate.observe(evidence(), NOW_MS + 101L))
+        assertEquals(failed, gate.current(NOW_MS + 102L))
+    }
+
+    @Test
+    fun sameTimestampPassCannotClearFailureInEitherArrivalOrder() {
+        listOf(false, true).forEach { passArrivesFirst ->
+            val gate = RuntimeMeasuredQualityGate()
+            val pass = evidence()
+            val failed = failure(NOW_MS).copy(detail = "FRAME_UNAVAILABLE")
+            if (passArrivesFirst) gate.observe(pass, NOW_MS)
+            assertEquals(failed, gate.observe(failed, NOW_MS))
+
+            assertEquals(failed, gate.observe(pass, NOW_MS))
+            assertEquals(failed, gate.current(NOW_MS + 1L))
+        }
+    }
+
+    @Test
+    fun delayedOrSameTimestampPassCannotRestartTransientFailureWindow() {
+        val gate = RuntimeMeasuredQualityGate()
+        val pass = evidence()
+        val failed = failure(NOW_MS + 100L)
+        gate.observe(pass, NOW_MS)
+        assertEquals(pass, gate.observe(failed, NOW_MS + 100L))
+        val deadline = NOW_MS + 1_600L
+
+        assertEquals(pass, gate.observe(evidence(NOW_MS + 50L), NOW_MS + 200L))
+        assertEquals(deadline, gate.pendingFailureDeadlineElapsedRealtimeMs())
+        assertEquals(pass, gate.observe(evidence(NOW_MS + 100L), NOW_MS + 300L))
+        assertEquals(deadline, gate.pendingFailureDeadlineElapsedRealtimeMs())
+        assertEquals(failed, gate.current(deadline))
+        assertEquals(failed, gate.observe(pass, deadline + 1L))
+    }
+
+    @Test
+    fun olderFailureCannotLowerThePassRecoveryWatermark() {
+        val gate = RuntimeMeasuredQualityGate()
+        val pass = evidence()
+        gate.observe(pass, NOW_MS)
+        val olderFailure = failure(NOW_MS - 1L)
+        assertEquals(pass, gate.observe(olderFailure, NOW_MS + 1L))
+
+        assertEquals(pass, gate.observe(evidence(NOW_MS - 1L), NOW_MS + 2L))
+        assertEquals(pass, gate.observe(pass, NOW_MS + 3L))
+        val recovered = evidence(NOW_MS + 1L)
+        assertEquals(recovered, gate.observe(recovered, NOW_MS + 4L))
+    }
+
+    @Test
+    fun epochProfileAndFactorChangesResetOrderingEvenWithoutAPass() {
+        val failed = failure(NOW_MS + 100L)
+        listOf(
+            evidence().copy(epoch = WalkRuntimeEpoch("walk", 2L)),
+            evidence().copy(epoch = WalkRuntimeEpoch("another", 1L)),
+            evidence().copy(measurementProfileId = "another"),
+            evidence().copy(factor = OfficialEnvironmentFactor.GPS_QUALITY),
+        ).forEach { newContext ->
+            val gate = RuntimeMeasuredQualityGate()
+            gate.observe(failed, NOW_MS + 100L)
+
+            assertEquals(newContext, gate.observe(newContext, NOW_MS + 101L))
+            assertEquals(newContext, gate.current(NOW_MS + 102L))
+        }
+    }
+
+    @Test
+    fun explicitResetClearsFailureAndSourceOrdering() {
+        val gate = RuntimeMeasuredQualityGate()
+        gate.observe(failure(NOW_MS + 100L), NOW_MS + 100L)
+        gate.reset()
+        assertEquals(null, gate.current(NOW_MS + 101L))
+
+        val pass = evidence()
+        assertEquals(pass, gate.observe(pass, NOW_MS + 101L))
+    }
+
+    @Test
+    fun newerPassRecoversWithoutRenewingItsTimestampOnDuplicateDelivery() {
+        val gate = RuntimeMeasuredQualityGate()
+        gate.observe(failure(NOW_MS), NOW_MS)
+        val recovered = evidence(NOW_MS + 1L).copy(maximumEvidenceAgeMs = 100L)
+
+        assertEquals(recovered, gate.observe(recovered, NOW_MS + 1L))
+        assertEquals(recovered, gate.observe(recovered, NOW_MS + 100L))
+        val expired = gate.current(NOW_MS + 102L)
+        assertEquals(EnvironmentEvidenceStatus.UNKNOWN, expired?.status)
+        assertEquals(NOW_MS + 1L, expired?.observedAtElapsedRealtimeMs)
+    }
+
+    @Test
+    fun invalidFuturePassCannotEraseLatestFailureOrder() {
+        val gate = RuntimeMeasuredQualityGate()
+        val failed = failure(NOW_MS + 100L).copy(detail = "FRAME_UNAVAILABLE")
+        assertEquals(failed, gate.observe(failed, NOW_MS + 100L))
+        val future = evidence(NOW_MS + 200L)
+        val unavailable = gate.observe(future, NOW_MS + 150L)
+        assertEquals(EnvironmentEvidenceStatus.UNKNOWN, unavailable.status)
+        assertEquals("STALE_OR_INVALID_TIMESTAMP", unavailable.detail)
+        assertEquals(failed, gate.observe(evidence(NOW_MS + 100L), NOW_MS + 160L))
+        assertEquals(failed, gate.current(NOW_MS + 200L))
+        // The invalid future input must not impose a future recovery watermark either.
+        val recovered = evidence(NOW_MS + 101L)
+        assertEquals(recovered, gate.observe(recovered, NOW_MS + 201L))
     }
 
     private fun failure(observedAtMs: Long) = evidence(observedAtMs).copy(

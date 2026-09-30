@@ -174,3 +174,6 @@ ai_tasks/**/components/labels_final/
 ai_tasks/**/components/crops/
 ai_tasks/**/components/overlays/
 ai_tasks/**/components/contact_sheets/
+
+# Local build, test and analysis scratch files stay on the workstation.
+/work/

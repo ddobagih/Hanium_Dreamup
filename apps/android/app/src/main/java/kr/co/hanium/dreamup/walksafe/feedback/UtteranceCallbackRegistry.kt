@@ -15,6 +15,7 @@ internal class UtteranceCallbackRegistry {
         val onCompleted: (() -> Unit)?,
         val onFailed: (() -> Unit)?,
         val protectsFromFollowingSpeech: Boolean,
+        val onCancelled: (() -> Unit)?,
     )
 
     private val callbacks = mutableMapOf<String, Callbacks>()
@@ -25,9 +26,10 @@ internal class UtteranceCallbackRegistry {
         onCompleted: (() -> Unit)?,
         onFailed: (() -> Unit)?,
         protectsFromFollowingSpeech: Boolean = false,
+        onCancelled: (() -> Unit)? = onFailed,
     ) {
-        if (onCompleted != null || onFailed != null) {
-            callbacks[utteranceId] = Callbacks(onCompleted, onFailed, protectsFromFollowingSpeech)
+        if (onCompleted != null || onFailed != null || onCancelled != null) {
+            callbacks[utteranceId] = Callbacks(onCompleted, onFailed, protectsFromFollowingSpeech, onCancelled)
         }
     }
 
@@ -79,9 +81,15 @@ internal class UtteranceCallbackRegistry {
         utteranceId: String?,
         completed: Boolean,
         notifyFailure: Boolean,
+        cancelled: Boolean = false,
     ): (() -> Unit)? {
         val registered = utteranceId?.let(callbacks::remove) ?: return null
-        return if (completed) registered.onCompleted else registered.onFailed.takeIf { notifyFailure }
+        return when {
+            completed -> registered.onCompleted
+            cancelled -> registered.onCancelled
+            notifyFailure -> registered.onFailed
+            else -> null
+        }
     }
 
     @Synchronized

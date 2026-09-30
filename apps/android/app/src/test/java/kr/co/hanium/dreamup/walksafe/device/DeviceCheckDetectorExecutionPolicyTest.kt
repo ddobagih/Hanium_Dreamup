@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.device
 
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectionResult
+import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectionStatus
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectorTiming
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -51,6 +52,24 @@ class DeviceCheckDetectorExecutionPolicyTest {
                 ),
             ),
         )
+    }
+
+    /** S10-1: complete-looking timing cannot turn an unavailable/failed call into an empty scene. */
+    @Test
+    fun unavailableOrFailedStatusCannotPassEvenWithCompleteTiming() {
+        val timing = AndroidDetectorTiming(
+            yuvDecodeMs = 2L,
+            modelInferenceMs = 12L,
+            totalMs = 18L,
+            completedModels = listOf("walksafe_unified"),
+        )
+        assertTrue(DeviceCheckDetectorExecutionPolicy.passes(AndroidDetectionResult(emptyList(), timing)))
+        for (status in listOf(AndroidDetectionStatus.UNAVAILABLE, AndroidDetectionStatus.FAILED)) {
+            assertFalse(DeviceCheckDetectorExecutionPolicy.passes(
+                AndroidDetectionResult(emptyList(), timing, status = status),
+            ))
+        }
+        assertFalse(DeviceCheckDetectorExecutionPolicy.passes(AndroidDetectionResult.unavailable()))
     }
 
     @Test

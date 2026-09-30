@@ -58,6 +58,31 @@ class OutdoorPositionTestActivity : Activity() {
     private data class GpsHeading(val timeMs: Long, val speed: WalkingSpeedObservation?, val course: HeadingObservation?)
     private data class ExportRequest(val sessionId: String, val rawFile: File?, val title: String)
 
+    /** Main-thread readiness, distinct from the lease that owns an unfinished session. */
+    internal class RecordingReadiness {
+        private var generation = 0L
+        var isReady = false
+            private set
+
+        fun begin(): Long {
+            isReady = false
+            return ++generation
+        }
+
+        fun finish(token: Long, resetSteps: () -> Unit): Boolean {
+            if (token != generation || isReady) return false
+            resetSteps()
+            if (token != generation) return false
+            isReady = true
+            return true
+        }
+
+        fun stop() {
+            generation++
+            isReady = false
+        }
+    }
+
     private val handler = Handler(Looper.getMainLooper())
     private val exportExecutor = Executors.newSingleThreadExecutor()
     private val binding: RecorderBinding by lazy {
@@ -88,6 +113,8 @@ class OutdoorPositionTestActivity : Activity() {
     private var stopping = false
     private var storageReady = false
     private var lease: PositionFieldSessionLease? = null
+    private val recordingReadiness = RecordingReadiness()
+    private val recordingReady: Boolean get() = lease != null && recordingReadiness.isReady
     private var pendingFinalization: PositionFieldSessionLease? = null
     private var completedSessionId: String? = null
     private var completedRawFile: File? = null
@@ -124,7 +151,7 @@ class OutdoorPositionTestActivity : Activity() {
         override fun run() {
             if (!collecting) return
             val nowMs = SystemClock.elapsedRealtime()
-            if (lease != null) {
+            if (recordingReady) {
                 val freshStationary = stationary == PositionStationaryState.STATIONARY &&
                     nowMs - motionObservedAtMs in 0L..1_500L
                 val snapshot = if (freshStationary) coordinator.observeZupt(ZuptObservation(nowMs)) else null
@@ -196,7 +223,10 @@ class OutdoorPositionTestActivity : Activity() {
         storageConsent = CheckBox(this).apply {
             text = "이동 좌표와 위성 원시 파일을 이 기기에 저장하고 선택한 위치로 내보내는 데 동의합니다."
             textSize = 17f; setTextColor(Color.BLACK); column.addView(this)
-            setOnCheckedChangeListener { _, _ -> renderStatus() }
+            setOnCheckedChangeListener { _, checked ->
+                if (!checked && (collecting || lease != null)) stopEverything("저장 동의 철회로 신규 관측 수집을 중단했습니다.")
+                else renderStatus()
+            }
         }
         previewButton = button("2. 신호 확인 · 저장 안 함") { startSignalCheck() }
         startButton = button("3. 기록 시작") { requestStartRecording() }
@@ -230,7 +260,7 @@ class OutdoorPositionTestActivity : Activity() {
     }
 
     private fun startSignalCheck() {
-        if (collecting || pendingFinalization != null || !permissionsGranted() || !mountConsent.isChecked || !storageConsent.isChecked) return
+        if (collecting || stopping || pendingFinalization != null || !permissionsGranted() || !mountConsent.isChecked || !storageConsent.isChecked) return
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
             message = "휴대폰 위치 기능을 켠 뒤 신호 확인을 다시 누르세요."
@@ -256,6 +286,7 @@ class OutdoorPositionTestActivity : Activity() {
             if (collecting && generation == owner && decision.accepted) {
                 val nowMs = SystemClock.elapsedRealtime()
                 stationary = when (decision.state) {
+                    PedestrianStationaryState.UNKNOWN -> PositionStationaryState.UNKNOWN
                     PedestrianStationaryState.MOVING -> PositionStationaryState.MOVING
                     PedestrianStationaryState.CANDIDATE -> PositionStationaryState.CANDIDATE
                     PedestrianStationaryState.STATIONARY -> PositionStationaryState.STATIONARY
@@ -301,7 +332,7 @@ class OutdoorPositionTestActivity : Activity() {
     } == true
 
     private fun requestStartRecording() {
-        if (!collecting || lease != null || !fixReady() || !storageReady) return
+        if (!collecting || stopping || lease != null || !fixReady() || !storageReady || !storageConsent.isChecked) return
         val rawObserved = latestQuality?.let { !it.isStale && it.finiteSignalCount > 0 } == true
         if (!rawObserved) {
             AlertDialog.Builder(this).setTitle("위성 원시 신호 미확인")
@@ -312,7 +343,8 @@ class OutdoorPositionTestActivity : Activity() {
     }
 
     private fun startRecording() {
-        if (!collecting || lease != null || pendingFinalization != null || !fixReady() || !permissionsGranted()) return
+        if (!collecting || stopping || lease != null || pendingFinalization != null || !fixReady() || !permissionsGranted() || !storageConsent.isChecked) return
+        val recordingGeneration = recordingReadiness.begin()
         coordinator = PositioningCoordinator()
         calibration.reset()
         gpsHistory.clear()
@@ -337,21 +369,29 @@ class OutdoorPositionTestActivity : Activity() {
         rawStatus = null
         rawSessionId = started.sessionId
         val rawFile = rawFileFor(started.sessionId)
-        rawRecorder = OutdoorRawGnssRecorder(this, rawFile) { status ->
+        val raw = OutdoorRawGnssRecorder(this, rawFile) { status ->
             if (rawSessionId != started.sessionId) return@OutdoorRawGnssRecorder
             rawStatus = status
-            if (status.state == OutdoorRawGnssRecorder.State.ERROR && lease != null && !stopping) {
+            if (status.errorMessage != null && lease != null && !stopping) {
                 stopEverything("Raw 저장 오류로 기록을 종료했습니다: ${status.errorMessage ?: "저장 실패"}")
             } else renderStatus()
         }
-        if (rawRecorder?.start() != true) {
-            stopEverything("Raw 기록을 시작하지 못해 시험 기록을 종료했습니다. 권한·위치·저장 공간을 확인하세요.")
-            return
-        }
-        stepTracker?.resetForNewWalk()
-        stepTracker?.start()
-        message = "기록 중입니다. 출발 전 같은 기준점에서 3초 정지 후 기준점 표시를 누르세요."
+        rawRecorder = raw
+        message = "Raw 파일을 준비 중입니다. 시작 완료 표시를 기다리세요."
         renderStatus()
+        raw.start { startedRaw ->
+            if (rawRecorder !== raw || rawSessionId != started.sessionId || lease != started || !collecting) return@start
+            if (!startedRaw || !storageConsent.isChecked) {
+                stopEverything("Raw 기록을 시작하지 못해 시험 기록을 종료합니다. 권한·위치·동의·저장 공간을 확인하세요.")
+            } else if (recordingReadiness.finish(recordingGeneration) {
+                stepTracker?.resetForNewWalk()
+                totalSteps = 0
+                stepTracker?.start()
+            }) {
+                message = "기록 중입니다. 출발 전 같은 기준점에서 3초 정지 후 기준점 표시를 누르세요."
+                renderStatus()
+            }
+        }
     }
 
     private fun onLocation(location: Location) {
@@ -367,9 +407,11 @@ class OutdoorPositionTestActivity : Activity() {
         gnssCount++
         val quality = qualityObserver?.snapshot(SystemClock.elapsedRealtimeNanos()) ?: latestQuality
         val reportedAccuracy = location.accuracy.toDouble().takeIf { location.hasAccuracy() && it.isFinite() && it >= 0.0 }
-        val effectiveAccuracy = reportedAccuracy?.times(sqrt(quality?.measurementNoiseMultiplier ?: 1.0))
+        val noiseMultiplier = quality?.measurementNoiseMultiplier?.takeIf { it.isFinite() && it >= 1.0 } ?: 1.0
+        val effectiveAccuracy = reportedAccuracy?.times(sqrt(noiseMultiplier))
+        // The signal weight travels separately so a missing accuracy is weighted on the default sigma.
         var snapshot = coordinator.observeGnss(GnssPositionObservation(location.latitude, location.longitude,
-            effectiveAccuracy, observedAtMs, receivedAtMs, location.isFromMockProvider))
+            reportedAccuracy, observedAtMs, receivedAtMs, location.isFromMockProvider, noiseMultiplier))
         if (quality != null) snapshot = snapshot.copy(gnssQuality = quality,
             raw = snapshot.raw?.copy(reportedHorizontalAccuracyM = reportedAccuracy, effectiveHorizontalAccuracyM = effectiveAccuracy))
         latestSnapshot = snapshot
@@ -382,7 +424,7 @@ class OutdoorPositionTestActivity : Activity() {
                 location.altitude.takeIf { location.hasAltitude() && it.isFinite() } ?: 0.0,
                 location.time.takeIf { it > 0L } ?: System.currentTimeMillis())
         }
-        if (lease == null) { renderStatus(); return }
+        if (!recordingReady) { renderStatus(); return }
         if (disposition == GnssObservationDisposition.REINITIALIZED) calibration.reset()
         if (accepted && validReference && (gpsHistory.lastOrNull()?.timeMs ?: -1L) < observedAtMs) {
             gpsHistory.addLast(gps)
@@ -401,7 +443,7 @@ class OutdoorPositionTestActivity : Activity() {
 
     private fun onStep(event: StepEvent) {
         motionTracker?.recordStep(event.timestampMs)
-        if (lease == null) return
+        if (!recordingReady) return
         calibration.onStep(event.timestampMs, event.deltaSteps,
             event.source == StepEventSource.STEP_DETECTOR && event.confidence == StepEventConfidence.HIGH,
             SystemClock.elapsedRealtime()).forEach { coordinator.calibrateProfile(it) }
@@ -421,6 +463,7 @@ class OutdoorPositionTestActivity : Activity() {
     }
 
     private fun appendGnss(snapshot: PositioningSnapshot, location: Location) {
+        if (!recordingReady) return
         val measurementNs = location.elapsedRealtimeNanos
         if (measurementNs < 0L || measurementNs > SystemClock.elapsedRealtimeNanos() || location.time < 0L) return
         if (utcAnchorNs == null) { utcAnchorNs = measurementNs / NANOS_PER_MS * NANOS_PER_MS; utcAnchorEpochMs = location.time }
@@ -452,7 +495,7 @@ class OutdoorPositionTestActivity : Activity() {
     }
 
     private fun appendMotion(snapshot: PositioningSnapshot?, measurementMs: Long, stepDetected: Boolean, zuptApplied: Boolean) {
-        if (lease == null || measurementMs < 0L || measurementMs > SystemClock.elapsedRealtime()) return
+        if (!recordingReady || measurementMs < 0L || measurementMs > SystemClock.elapsedRealtime()) return
         val measurementNs = measurementMs * NANOS_PER_MS
         val utcMs = utcFor(measurementNs)
         val heading = snapshot?.selectedHeading
@@ -495,12 +538,14 @@ class OutdoorPositionTestActivity : Activity() {
     }
 
     private fun append(record: PositioningTraceRecord) {
+        if (!recordingReady) return
         val active = lease ?: return
         if (runCatching { recorder.append(active, record) }.getOrDefault(false)) traceCount++
         else stopEverything("위치 파일 저장 오류로 기록을 종료했습니다. 저장 공간과 내보내기 상태를 확인하세요.")
     }
 
     private fun markCheckpoint() {
+        if (!recordingReady) return
         val active = lease ?: return
         val nowMs = SystemClock.elapsedRealtime()
         if (stationary != PositionStationaryState.STATIONARY || nowMs - motionObservedAtMs !in 0L..1_500L ||
@@ -524,6 +569,7 @@ class OutdoorPositionTestActivity : Activity() {
     private fun stopEverything(reason: String) {
         if (stopping) return
         stopping = true
+        recordingReadiness.stop()
         val active = lease
         lease = null
         collecting = false
@@ -538,24 +584,38 @@ class OutdoorPositionTestActivity : Activity() {
         calibration.reset()
         gpsHistory.clear()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        val raw = rawRecorder
+        message = "Raw 종료 저장 중입니다. 파일 닫기가 끝날 때까지 새 기록·내보내기는 대기합니다."
+        renderStatus()
+        if (active != null && raw != null) {
+            raw.stop { rawStopped -> finishStoppedSession(active, raw, reason, rawStopped) }
+        } else finishStoppedSession(active, raw, reason, raw == null)
+    }
+
+    private fun finishStoppedSession(active: PositionFieldSessionLease?, raw: OutdoorRawGnssRecorder?, reason: String, rawStopped: Boolean) {
         var finalMessage = reason
         if (active != null) {
-            val raw = rawRecorder
-            val rawStopped = runCatching { raw?.stop() == true }.getOrDefault(false)
+            // Trace completion makes this session discoverable after recreation: do it only
+            // after RAW close/publication has actually finished, even when RAW failed.
             val traceStopped = runCatching { recorder.stop(active) }.getOrDefault(false)
             if (traceStopped) completedSessionId = active.sessionId
             else pendingFinalization = active
-            if (rawStopped) completedRawFile = raw?.status?.file
             if (!traceStopped || !rawStopped) finalMessage += " 일부 파일 완료 처리에 실패했습니다. 저장 가능 버튼과 오류 상태를 확인하세요."
             refreshCompletedSessions()
+            if (!rawStopped) {
+                completedRawFile = null
+                finalMessage += " 불완전 Raw는 기기 내 .part 파일로 보존되며 완료 파일로 내보내지 않습니다."
+            }
         }
+        rawStatus = raw?.status ?: rawStatus
         rawRecorder = null
         message = finalMessage
         stopping = false
-        renderStatus()
+        if (!isDestroyed) renderStatus()
     }
 
     private fun retryFinalization() {
+        if (stopping) return
         val unfinished = pendingFinalization ?: return
         if (runCatching { recorder.stop(unfinished) }.getOrDefault(false)) {
             pendingFinalization = null
@@ -569,7 +629,7 @@ class OutdoorPositionTestActivity : Activity() {
     }
 
     private fun requestExport(raw: Boolean) {
-        if (lease != null || exporting || pendingExport != null) return
+        if (lease != null || stopping || rawRecorder?.status?.closed == false || exporting || pendingExport != null) return
         val sessionId = completedSessionId ?: return
         val file = if (raw) completedRawFile ?: return else null
         val title = exportTitle(sessionId, raw)
@@ -596,7 +656,7 @@ class OutdoorPositionTestActivity : Activity() {
     }
 
     private fun selectCompletedSession() {
-        if (lease != null || exporting) return
+        if (lease != null || stopping || exporting) return
         refreshCompletedSessions()
         if (completedSessions.isEmpty()) { message = "완료된 기록이 없습니다."; renderStatus(); return }
         val choices = completedSessions.toList()
@@ -674,25 +734,33 @@ class OutdoorPositionTestActivity : Activity() {
         val accuracy = latestLocation?.accuracy?.takeIf { it.isFinite() }?.let { String.format(Locale.US, "%.1f", it) } ?: "미확인"
         val signal = when { !collecting -> "수신 중지"; ready -> "출발 가능 · 추정 반경 ${accuracy}m"; else -> "아직 출발하지 마세요 · 실외 위치 수신 대기" }
         val rawWarning = when {
+            raw?.errorMessage != null || (raw?.droppedMeasurementCount ?: 0L) > 0L -> "Raw 불완전 · 관측 누락/저장 실패: PPK 연속성을 보장하지 않습니다."
             (raw?.rawMeasurementCount ?: 0L) == 0L -> "Raw 미수신: PPK 정답 자료가 부족할 수 있습니다."
             (raw?.adrValidCount ?: 0L) == 0L -> "기록 가능 · ADR 유효 자료 없음: PPK 정답이 부족할 수 있습니다."
             else -> "Raw·ADR 관측 있음 · PPK 가능 여부는 사후 검사 필요"
         }
-        statusText.text = "${if (active) "● 기록 중" else "기록 안 함"}\n$signal\n" +
+        val recordingLabel = when {
+            recordingReady -> "● 기록 중"
+            stopping -> "기록 종료 저장 중"
+            active -> "Raw 준비 중 · 위치 trace/기준점 저장 대기"
+            else -> "기록 안 함"
+        }
+        statusText.text = "$recordingLabel\n$signal\n" +
             "GNSS $gnssCount · Raw ${raw?.rawMeasurementCount ?: 0L} · epoch ${raw?.epochCount ?: 0L} · ADR valid ${raw?.adrValidCount ?: 0L}\n" +
+            "Raw 상태 ${raw?.state?.name ?: "IDLE"} · 대기 ${raw?.pendingEpochCount ?: 0} · 누락/미확인 ${raw?.droppedMeasurementCount ?: 0L}\n" +
             "걸음 $totalSteps · trace $traceCount · 기준점 $checkpointOrdinal\n" +
             "정지 상태 ${stationary.name} · 시험 보폭 ${String.format(Locale.US, "%.2f", profile.stepLengthM)}m · 학습 ${profile.acceptedSampleCount}\n" +
             "$rawWarning\n${raw?.warningMessage ?: ""}\n${raw?.errorMessage ?: ""}\n\n$message"
-        mountConsent.isEnabled = !collecting && !exporting
-        storageConsent.isEnabled = !collecting && !exporting
-        previewButton.isEnabled = !collecting && !exporting && pendingFinalization == null && storageReady && permissionsGranted() && mountConsent.isChecked && storageConsent.isChecked
-        startButton.isEnabled = collecting && !active && ready && !exporting
-        checkpointButton.isEnabled = active
+        mountConsent.isEnabled = !collecting && !stopping && !exporting
+        storageConsent.isEnabled = !stopping && !exporting
+        previewButton.isEnabled = !collecting && !stopping && !exporting && pendingFinalization == null && storageReady && permissionsGranted() && mountConsent.isChecked && storageConsent.isChecked
+        startButton.isEnabled = collecting && !stopping && !active && ready && !exporting && storageConsent.isChecked
+        checkpointButton.isEnabled = recordingReady
         stopButton.isEnabled = collecting || active
-        exportTraceButton.isEnabled = !active && !exporting && pendingExport == null && completedSessionId != null
+        exportTraceButton.isEnabled = !active && !stopping && !exporting && pendingExport == null && completedSessionId != null
         exportRawButton.isEnabled = exportTraceButton.isEnabled && completedRawFile != null
-        completedButton.isEnabled = !active && !exporting && pendingExport == null && completedSessions.isNotEmpty()
-        retryFinishButton.isEnabled = pendingFinalization != null && !exporting
+        completedButton.isEnabled = !active && !stopping && !exporting && pendingExport == null && completedSessions.isNotEmpty()
+        retryFinishButton.isEnabled = pendingFinalization != null && !stopping && !exporting
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

@@ -24,7 +24,11 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
     private static final int MAX_HISTORY_RESPONSE_BYTES = 96 * 1024;
     private static final byte[] EMPTY_BODY = new byte[0];
 
-    interface Clock { long nowEpochMs(); }
+    interface Clock {
+        long nowEpochMs();
+
+        default long monotonicNanos() { return System.nanoTime(); }
+    }
 
     interface Transport {
         Response execute(String method, String url, Map<String, String> headers, byte[] body)
@@ -238,9 +242,10 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
             jsonHeaders(protectedHeaders(session, correlationId, null)),
             intent.challengeRequestBytes()
         );
+        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
         requireStatus(challenge, 200);
         AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
-            jsonBody(challenge), intent, clock.nowEpochMs(), signer
+            jsonBody(challenge), intent, challengeTime.estimatedNowEpochMs(clock.monotonicNanos()), signer
         );
         Map<String, String> headers = new LinkedHashMap<>(
             protectedHeaders(session, correlationId, readPurpose)

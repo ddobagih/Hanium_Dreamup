@@ -43,6 +43,71 @@ class MetadataCaptureLogTest {
     }
 
     @Test
+    fun storedEntriesCapEveryTextAndListField() {
+        // S1617-35 (originals/16-17.txt:82): 30 entries must also bound the bytes per entry.
+        val log = MetadataCaptureLog(maxEntries = 3)
+        val long = "x".repeat(10_000)
+        val models = List(100) { "model-$it-" + "m".repeat(200) }
+        log.append(
+            entry(frameTimestampMs = 1L, staleReason = long).copy(
+                detectorModelKey = long,
+                detectorLoadedModelKey = long,
+                detectorModelLoadReason = long,
+                detectorCompletedModels = models,
+                detectorSkippedModels = models,
+                overlaySelection = long,
+                overlayStaleReason = long,
+                topDetectionClassName = long,
+                bestDepthClassName = long,
+                bestDepthTrackId = long,
+                bestDepthSource = long,
+                overlayTransformPath = long,
+                depthTransformPath = long,
+                transformPath = long,
+                fallbackReason = long,
+            ),
+        )
+
+        val stored = log.recentEntries().single()
+        val text = MetadataCaptureLog.MAX_TEXT_CHARS
+        listOf(
+            stored.detectorModelKey, stored.detectorLoadedModelKey, stored.detectorModelLoadReason,
+            stored.overlaySelection, stored.overlayStaleReason, stored.staleReason,
+            stored.topDetectionClassName, stored.bestDepthClassName, stored.bestDepthTrackId,
+            stored.bestDepthSource, stored.overlayTransformPath, stored.depthTransformPath,
+            stored.transformPath, stored.fallbackReason,
+        ).forEach { assertEquals(text, it?.length) }
+        listOf(stored.detectorCompletedModels, stored.detectorSkippedModels).forEach { list ->
+            assertEquals(MetadataCaptureLog.MAX_LIST_ITEMS, list.size)
+            assertTrue(list.all { it.length <= MetadataCaptureLog.MAX_LIST_ITEM_CHARS })
+            assertTrue(list.first().startsWith("model-0-"))
+        }
+        assertTrue(log.summaryText().length < 4_000)
+    }
+
+    @Test
+    fun ordinaryEntriesAreStoredUnchanged() {
+        val log = MetadataCaptureLog(maxEntries = 3)
+        val ordinary = entry(frameTimestampMs = 1L, staleReason = "age>2500ms").copy(
+            detectorCompletedModels = listOf("coco", "custom"),
+            detectorModelLoadReason = "detector_assets_unavailable:HASH_MISMATCH",
+        )
+        log.append(ordinary)
+        assertEquals(ordinary, log.recentEntries().single())
+    }
+
+    @Test
+    fun cappingNeverLeavesHalfASurrogatePair() {
+        val log = MetadataCaptureLog(maxEntries = 1)
+        val emoji = "\uD83D\uDEB6"
+        val value = "a".repeat(MetadataCaptureLog.MAX_TEXT_CHARS - 1) + emoji
+        log.append(entry(frameTimestampMs = 1L, staleReason = value))
+        val stored = log.recentEntries().single().staleReason!!
+        assertEquals(MetadataCaptureLog.MAX_TEXT_CHARS - 1, stored.length)
+        assertTrue(!Character.isHighSurrogate(stored.last()))
+    }
+
+    @Test
     fun clearRemovesSessionLocalMetadata() {
         val log = MetadataCaptureLog(maxEntries = 3)
         log.append(entry(frameTimestampMs = 1L))

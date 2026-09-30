@@ -108,6 +108,13 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         assertFalse(stepTracking.contains("cameraEnvironmentOutputsAllowed()"))
     }
 
+    /**
+     * Rewritten for S03-6/S03-7 (w20 review "tests"): the name is kept so the baseline entry reads as
+     * fixed. Dependent resources still stop first and recovery from settings is unchanged, but a lost
+     * camera or location no longer continues a camera-less walk: the capability refresh (which runs
+     * applyRuntimeReadinessIfActive and safety-stops an ACTIVE walk) comes before any continuation or
+     * "나머지 기능은 계속" notice, and both are skipped once the walk has stopped.
+     */
     @Test
     fun permissionLossStopsOnlyDependentResourcesAndCanBeRecoveredFromSettings() {
         val observed = functionBlock("private fun applyObservedPermissionStateChange(")
@@ -117,25 +124,41 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         val settingsUi = source.substringAfter("postLoginDeviceCheckSettingsButton.apply {")
             .substringBefore("postLoginDeviceCheckWakePhraseInstructionText.visibility")
         val focus = functionBlock("override fun onWindowFocusChanged(hasFocus: Boolean)")
+        val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
 
+        // Dependent resources stop at once.
         assertTrue(observed.contains("stopDepthSession(closeSession = true)"))
         assertTrue(observed.contains("stopCameraFallbackSession(updateUi = false)"))
         assertTrue(observed.contains("stopLocationUpdates()"))
         assertFalse(locationRevocation.contains("stopStepTracking()"))
         assertTrue(observed.contains("stopHandsFreeVoiceService()"))
-        assertFalse(observed.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
-        assertTrue(observed.contains("activatePhoneMountingRuntime()"))
-        assertTrue(observed.contains("startWalkSessionRuntimeWithoutCamera()"))
-        assertTrue(observed.contains("applyCurrentOfficialEnvironmentRuntimeAssessment()"))
-        assertTrue(observed.contains("startNavigationServicesIfNeeded()"))
+        // Losing both core permissions stops the whole walk behind the recovery barrier.
+        val wholeStop = observed.indexOf("enterWalkSessionSafetyStopAndCancelOutputs(\"core_guidance_permissions_unavailable\")")
+        assertTrue(wholeStop >= 0)
+        assertTrue(wholeStop < observed.indexOf("enterPermissionRecoveryBarrier("))
+        // S03-6: the refresh (readiness re-evaluation) runs before any notice or continuation.
+        assertTrue(refresh.contains("applyRuntimeReadinessIfActive(decision)"))
+        val refreshAt = observed.indexOf("if (::startupCapabilityProbe.isInitialized) refreshStartupCapabilityUi()")
+        assertTrue(refreshAt > wholeStop)
+        assertTrue(refreshAt < observed.indexOf("\"일부 기능 제한\""))
+        assertTrue(refreshAt < observed.indexOf("startWalkSessionRuntimeWithoutCamera()"))
+        assertTrue(refreshAt < observed.indexOf("activatePhoneMountingRuntime()"))
+        assertTrue(Regex("refreshStartupCapabilityUi\\(\\)").findAll(observed).count() == 1)
+        // The "나머지 기능은 계속" notice only while the walk is still running after the refresh.
+        val notice = observed.substringBefore("\"일부 기능 제한\"")
+        assertTrue(notice.contains("val stateAfterRefresh = walkSessionLifecycle.snapshot().state"))
+        assertTrue(notice.contains("stateAfterRefresh in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)"))
+        // The camera-less continuation only for a walk that is still ACTIVE after the refresh.
+        val continuation = observed.substringAfter("// The refresh above may have safety-stopped the walk")
         assertTrue(
-            observed.indexOf("activatePhoneMountingRuntime()") <
-                observed.indexOf("startWalkSessionRuntimeWithoutCamera()"),
+            continuation.indexOf("if (walkSessionLifecycle.snapshot().state == WalkSessionState.ACTIVE) {") in
+                0 until continuation.indexOf("startWalkSessionRuntimeWithoutCamera()"),
         )
         assertTrue(
-            observed.indexOf("startWalkSessionRuntimeWithoutCamera()") <
-                observed.indexOf("} else {"),
+            continuation.indexOf("activatePhoneMountingRuntime()") <
+                continuation.indexOf("startWalkSessionRuntimeWithoutCamera()"),
         )
+        // Recovery from settings is unchanged.
         assertTrue(settingsUi.contains("transientRestriction"))
         assertTrue(focus.contains("postLoginDeviceCheckSnapshot.passesFeatureGate"))
         assertTrue(focus.contains("refreshStartupCapabilityUi()"))
@@ -312,68 +335,83 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
             ),
         )
         assertTrue(readiness.contains("mode = effectiveDecision.effectiveWalkSessionMode()"))
-        assertTrue(readiness.contains("!cameraAnalysisFeaturesEnabled() || detectorAvailable"))
+        // S03-6: FP-017-DETAIL-01 requires the model in both modes; disabled camera is not READY.
+        assertTrue(readiness.contains("cameraGuidanceEnabled = cameraAnalysisFeaturesEnabled()"))
+        assertFalse(readiness.contains("!cameraAnalysisFeaturesEnabled() || detectorAvailable"))
     }
 
+    /**
+     * Rewritten for S03-6/S03-7 (w20 review "tests"): the name is kept so the baseline entry reads as
+     * fixed. Runtime metric loss still closes only the depth session and asks for the fallback, but
+     * an ACTIVE walk never adopts the distance-limited mode silently: the refresh re-evaluates
+     * readiness, the lifecycle safety-stops the mode change (WalkSessionActiveModeChangeTest), and
+     * the fallback request then returns without starting a camera or a camera-less continuation.
+     */
     @Test
     fun runtimeMetricLossLimitsOnlyDistanceAndKeepsTheActiveSession() {
         val metricLoss = functionBlock("private fun handleRuntimeMetricLoss(")
         val fallback = functionBlock("private fun requestCameraFallbackStart(")
-        val fallbackStart = functionBlock("private fun startCameraFallbackSession(")
+        val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
+        val readiness = functionBlock("private fun applyRuntimeReadinessIfActive(")
 
         assertTrue(metricLoss.contains("stopDepthSession(closeSession = true)"))
         assertTrue(metricLoss.contains("CameraFallbackStartReason.RUNTIME_METRIC_LOST"))
         assertFalse(metricLoss.contains("invalidateRuntimeMetricEvidence("))
         assertFalse(metricLoss.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
-        assertTrue(fallback.contains("automaticallyContinueMetricOnlyDowngrade"))
-        assertTrue(fallback.contains("confirmedStartupCapabilityDecision"))
-        assertTrue(fallback.contains("WalkSafeStartupRequirement.METRIC_DISTANCE"))
-        assertTrue(fallback.contains("WalkSessionMode.DISTANCE_LIMITED"))
+        // No "다른 기능은 계속" notice right before the stop (S03-6 P3).
+        assertFalse(metricLoss.contains("updateStatus("))
+        assertFalse(metricLoss.contains("다른 기능은 계속됩니다"))
+
         assertTrue(
             fallback.indexOf("metricDistanceCapabilityOverride = false") <
                 fallback.indexOf("val distanceLimitedDecision"),
         )
+        assertTrue(fallback.contains("automaticallyContinueMetricOnlyDowngrade"))
+        assertTrue(fallback.contains("WalkSafeStartupRequirement.METRIC_DISTANCE"))
+        // The refresh runs the readiness path that stops an ACTIVE walk on a mode change (S03-7).
+        assertTrue(refresh.contains("applyRuntimeReadinessIfActive(decision)"))
+        assertTrue(readiness.contains("WalkSessionEvent.RuntimeReadinessChanged(readiness)"))
+        assertTrue(readiness.contains("transition.current.state == WalkSessionState.SAFE_STOP"))
+        val refreshAt = fallback.indexOf("refreshStartupCapabilityUi()")
+        val stoppedAt = fallback.indexOf("walkAfterChange.state == WalkSessionState.SAFE_STOP")
+        assertTrue(refreshAt in 0 until stoppedAt)
         assertTrue(
-            fallback.indexOf("enterWalkSessionForegroundRecheckAndCancelOutputs(") <
-                fallback.indexOf(
-                    "pendingCameraFallbackStart = PendingCameraFallbackStart(reason, availability)",
-                ),
+            fallback.substring(0, stoppedAt).substringAfterLast("if (")
+                .contains("walkBeforeChange.state == WalkSessionState.ACTIVE &&"),
         )
-        assertTrue(fallback.contains("startWalkSessionRuntimeWithoutCamera()"))
-        assertTrue(fallbackStart.contains("미터 거리 안내와 거리 수치가 필요한 자동 위험 판정만 제한"))
-        assertTrue(fallbackStart.contains("위치·경로·걸음 수·음성·진동 기능은 계속"))
-        val fallbackFailure = functionBlock(
-            "private fun continueAfterCameraFallbackFailure(",
-        )
+        val stopped = fallback.substring(stoppedAt).substringBefore("val automaticTransitionReady")
+        assertTrue(stopped.contains("pendingCameraFallbackStart = null"))
+        assertTrue(stopped.contains("return"))
+        // Nothing starts before that return: neither the fallback camera nor a camera-less walk.
+        val beforeStopReturn = fallback.substringBefore("val automaticTransitionReady")
+        assertFalse(beforeStopReturn.contains("startCameraFallbackSession("))
+        assertFalse(beforeStopReturn.contains("startWalkSessionRuntimeWithoutCamera()"))
+
+        // A fallback failure (camera or detector) also leaves the stop to the readiness path.
+        val fallbackFailure = functionBlock("private fun continueAfterCameraFallbackFailure(")
         assertFalse(fallbackFailure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
-        assertTrue(fallbackFailure.contains("startWalkSessionRuntimeWithoutCamera()"))
         assertTrue(fallbackFailure.contains("runtimeObstacleDetectionCapabilityOverride = false"))
         assertTrue(fallbackFailure.contains("metricDistanceCapabilityOverride = false"))
+        assertTrue(
+            fallbackFailure.indexOf("refreshStartupCapabilityUi()") in
+                0 until fallbackFailure.indexOf(
+                    "if (walkSessionLifecycle.snapshot().state != WalkSessionState.ACTIVE) return",
+                ),
+        )
+        assertTrue(
+            fallbackFailure.indexOf("if (walkSessionLifecycle.snapshot().state != WalkSessionState.ACTIVE) return") <
+                fallbackFailure.indexOf("startWalkSessionRuntimeWithoutCamera()"),
+        )
 
-        val fallbackSessionStart = functionBlock("private fun startCameraFallbackSession(")
-        assertFalse(fallbackSessionStart.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
-        val fallbackBind = functionBlock("private fun bindCameraFallbackSession()")
-        assertFalse(fallbackBind.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         val fallbackStop = functionBlock("private fun stopCameraFallbackSession(")
         assertTrue(fallbackStop.contains("val stoppedWalkEpoch"))
-        assertTrue(fallbackStop.contains("walkSessionLifecycle.currentRuntimeEpochOrNull()"))
         assertFalse(fallbackStop.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
-        assertTrue(
-            fallbackStop.contains("onReleased != null || !cameraFallbackCleanupPending"),
-        )
-        assertFalse(fallbackStop.contains("replacementActiveWalk"))
-        assertTrue(
-            fallbackStop.contains(
-                "walkSessionLifecycle.isRuntimeEpochCurrent(stoppedWalkEpoch)",
-            ),
-        )
+        assertTrue(fallbackStop.contains("walkSessionLifecycle.isRuntimeEpochCurrent(stoppedWalkEpoch)"))
 
-        val transition = functionBlock("private fun transitionWalkSession(")
-        assertTrue(transition.contains("transition.previous.state != transition.current.state"))
+        // "새 보행 준비" clears the runtime overrides, so the stop is not sticky.
         val newWalk = functionBlock("private fun resetWalkTransientStateForNewWalk()")
         assertTrue(newWalk.contains("runtimeObstacleDetectionCapabilityOverride = null"))
         assertTrue(newWalk.contains("metricDistanceCapabilityOverride ="))
-        assertTrue(newWalk.contains("postLoginDeviceCheckSnapshot.disabledFeatures"))
     }
 
     @Test
@@ -416,10 +454,17 @@ class MainActivityDeviceCheckFeatureIsolationStaticTest {
         assertTrue(
             Regex(
                 """phoneMountingChestConfirmButton\.visibility\s*=\s*""" +
-                    """if \(showPhoneMountingPreparation &&\s*""" +
+                    """if \(showPhoneMountingPreparation &&\s*!developmentGuidanceStartBypassEnabled &&\s*""" +
                     """\(!developmentQuickStartEnabled \|\| walkState != WalkSessionState.READY\)\s*""" +
                     """\) View\.VISIBLE else View\.GONE""",
             ).containsMatchIn(firstRunUi),
+        )
+        assertTrue(
+            Regex(
+                """private val developmentGuidanceStartBypassEnabled:\s*Boolean\s+""" +
+                    """get\(\)\s*=\s*BuildConfig\.DEBUG\s*&&\s*""" +
+                    """BuildConfig\.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS\s*&&""",
+            ).containsMatchIn(source),
         )
         assertTrue(
             firstRunUi.contains("phoneMountingNecklaceConfirmButton.visibility = View.GONE"),
