@@ -4,7 +4,7 @@
 
 ## 정본 우선순위
 
-1. 동적 현재 작업·출시 경계: [continuation checkpoint](control/walksafe-project-continuation-checkpoint.json)
+1. 현재 기능 개선·분담: [2026-09-30 인계](handoff/2026-09-30/README.md), [최근 daylog](../daylog/2026-09-30.md). 정식 승인·출시 경계는 [continuation checkpoint](control/walksafe-project-continuation-checkpoint.json)의 별도 기록을 확인한다.
 2. 승인 정책: [PB-WALKSAFE-FEATURE-POLICY-1.0.1](control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json)
 3. 산출물 승인 상태: [artifact current notice](deliverables/00-control/artifact-register-current-notice-20260728-r001.md)에서 연결하는 DOC-01·DOC-05·COMMITTED 영수증
 4. 구현 사실: 현재 코드, OpenAPI, lockfile와 실행 가능한 자동검사
@@ -32,13 +32,11 @@
 
 ## 현재 상태
 
-기준일 2026-08-13의 요약이며 checkpoint가 우선합니다.
+최신 기능 상태는 [rev119 인계 현황](handoff/2026-09-30/status.md), 남은377개 분담은 [두 사람 인계](handoff/2026-09-30/README.md)를 확인합니다. 아래 정식 시험·출시 값은 기존 승인 기록이며 기능 DONE 집계와 별개입니다.
 
 - 제품: Android 사용자 앱과 별도 Android 관리자 앱
 - 지원: Android Gateway, Backend, 모델·데이터·계약·배포 도구
 - Web/PWA: `LEGACY_REFERENCE_ONLY`
-- `NPC-SINGLE-ADMIN-RECOVERY / GAP-008`: 저장소 내부 구현·자동검증 `COMPLETE_AT_TARGET`, Gap `PARTIAL`
-- 다음 통제 작업: `EPIC-03` workstream 완료 조건 평가; 다음 구현 후보는 `FP-022 / GAP-031`
 - 정식 시험: 279/279 `NOT_RUN`
 - 출시 gate: 5/5 `NOT_RUN`, 미면제
 - 출시: `NOT_ELIGIBLE`
@@ -61,7 +59,7 @@
 
 - `control/goals/walksafe-completion-graph-v2-4/README.md` 등 package 내부 설명은 당시 활성화 상태를 byte-exact하게 보존합니다. 그 문구가 현재 checkpoint와 달라도 직접 수정하지 않습니다.
 - 현재 v2.4 package는 checkpoint 기준 `ACTIVE`입니다.
-- 최신 Gap·Backlog는 [r026 Gap](control/audits/walksafe-implementation-gap-analysis-20260812-r026.json)과 [r026 Backlog](control/audits/walksafe-implementation-remediation-backlog-20260812-r026.json)입니다.
+- 2026-08-12 당시 Gap·Backlog는 [r026 Gap](control/audits/walksafe-implementation-gap-analysis-20260812-r026.json)과 [r026 Backlog](control/audits/walksafe-implementation-remediation-backlog-20260812-r026.json)입니다.
 - frozen Goal·기존 gate 원출력·완료 영수증·canonical binding은 경로와 bytes를 보존합니다.
 
 ## 역사 문서 사용 규칙
@@ -77,4 +75,4 @@
 
 ## Git에 넣지 않는 자료
 
-원본 데이터셋, 사용자 영상·음성·정확 위치, 비밀값, 운영 로그, 임시 build/cache, 신규 대형 모델 산출물은 Git에 넣지 않습니다. 현재 추적 중인 TFLite 3개와 모델 후보 PT 1개는 검증 가능한 기존 예외이며 신규 반입 허가가 아닙니다. 세부 기준은 [데이터·AI 가이드](guides/data-ai-guide.md)와 [보안·개인정보 가이드](guides/security-privacy-guide.md)를 따릅니다.
+원본 데이터셋, 사용자 영상·음성·정확 위치, 비밀값, 운영 로그, 임시 build/cache, 신규 대형 모델 산출물은 Git에 넣지 않습니다. 현재 추적 모델은 기존 명시적 예외이며 신규 반입 허가가 아닙니다. 사용 모델과 빌드 asset은 runtime config·Gradle 계약으로 확인합니다. 세부 기준은 [데이터·AI 가이드](guides/data-ai-guide.md)와 [보안·개인정보 가이드](guides/security-privacy-guide.md)를 따릅니다.

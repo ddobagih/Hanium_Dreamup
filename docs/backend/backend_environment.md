@@ -50,16 +50,22 @@ python -m uvicorn backend.app.main:app --reload --port 8000
 | `TMAP_PEDESTRIAN_API_VERSION` | `1` | TMAP 보행자 경로안내 API version query |
 | `TMAP_POI_SEARCH_URL` | `https://apis.openapi.sk.com/tmap/pois` | TMAP 목적지 POI 검색 endpoint |
 | `TMAP_POI_PROVIDER` | `live` | 목적지 검색 mode. `live` 또는 로컬 fixture용 `mock` |
-| `TMAP_TIMEOUT_SECONDS` | `4.0` | TMAP 보행자 경로안내 요청 timeout |
+| `TMAP_TIMEOUT_SECONDS` | `4.0` | TMAP 경로·검색 전체 처리 timeout. 최대 4초로 Gateway의 5초 upstream 제한보다 먼저 종료 |
+| `TMAP_CALL_BUDGET_PER_MINUTE` | `60` | 사용자 경로·목적지 검색이 함께 쓰는 TMAP 호출 예산, 60초 고정 창. 1~6000. 소진 시 제공자 호출 전에 `503 tmap_rate_limited`로 거절하고 자동 재시도하지 않는다. readiness live probe는 이 예산을 쓰지 않는다. 계약 할당량 확인 전 보수적 임시값. 창 의미·한계는 아래 [TMAP 호출 예산과 readiness probe](#tmap-호출-예산과-readiness-probe) |
+| `TMAP_CALL_BUDGET_PER_DAY` | `5000` | 같은 사용자 예산의 24시간 고정 창. 1~5000000이며 분당 값 이상이어야 한다. 두 창 모두 프로세스 로컬(현 1 worker)이라 여러 worker에서는 공유 저장소가 필요하다 |
 | `TMAP_PEDESTRIAN_SPEED_KMH` | `4.0` | TMAP 보행자 경로 요청 기본 보행 속도(km/h) |
 | `MAX_REPORT_METADATA_BYTES` | `65536` | `/reports`, `/reports/v2` metadata JSON 최대 크기 |
 | `ANDROID_DEBUG_LOG_ENABLED` | `false` | local/dev Android depth log와 frame capture API 활성화 |
-| `ANDROID_DEBUG_LOG_DIR` | `backend/android_debug_logs` | Android debug JSONL/이미지 저장 폴더 |
+| `ANDROID_DEBUG_LOG_DIR` | `backend/android_debug_logs` | Android debug SQLite(`android_debug.sqlite3`)·이미지 저장 폴더. 이전 `*.jsonl`은 legacy import 입력으로만 읽는다 |
 | `MAX_ANDROID_DEBUG_LOG_BYTES` | `65536` | Android debug payload 또는 frame metadata 최대 크기 |
 | `ANDROID_DEBUG_LOG_RETENTION_DAYS` | `7` | debug log 보존일, 최대 30일 |
+| `ANDROID_DEBUG_MAX_TOTAL_BYTES` | `268435456` | debug 저장소 총량 상한(SQLite 사용 페이지 + frame 이미지 바이트). 초과하는 새 쓰기는 `507 android_debug_storage_quota_exceeded`(`quota=total_bytes`)로 거부하고 기존 자료는 지우지 않는다 |
+| `ANDROID_DEBUG_MAX_FRAME_CAPTURES` | `1000` | 보관 중인 frame capture 최대 개수. 초과 시 이미지 기록 전에 `507`(`quota=frame_captures`)로 거부 |
+| `ANDROID_DEBUG_MAX_DAILY_BYTES` | `67108864` | UTC 하루 동안 새로 기록할 수 있는 debug 바이트 상한. 초과 시 `507`(`quota=daily_bytes`)로 거부 |
 | `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | 허용할 프론트엔드 origin 목록 |
 | `WALKSAFE_ENVIRONMENT` | `development` | `development`, `test`, `field`, `staging`, `production` |
 | `WALKSAFE_SOURCE_COMMIT` | 빈 값 | 배포 환경에서 필수인 정확한 lowercase 40자리 Git SHA |
+| `WALKSAFE_APPROVED_ANDROID_RELEASES` | 빈 값 | 보안 모드 Android 신고(`/reports/v2`)가 받아들여지는 승인 출시 묶음 표(JSON 배열, 1~8개). 항목은 `source_commit`(40자리 lowercase)·`report_schema`(`reports.v2`, 승인 당시 신고 계약 기록)와 선택 `apk_sha256`·`model_config_sha256`(64자리 lowercase)이며, 값이 있는 항목은 신고 값과 같아야 한다. 현재 `WALKSAFE_SOURCE_COMMIT` 항목이 반드시 있어야 하고, 현재가 아닌 항목은 `model_config_sha256`을 반드시 고정해야 하며, 형식 오류는 시작 거부. 빈 값이면 현재 Backend 출시 1개만 승인(FP-039-DETAIL-03 interim). 직전 조합은 단계 배포 승인 때만 추가한다. 비교 값은 모두 client 자기 신고라 이 표는 호환성 gate이고 앱 진위는 기기 증명이 맡는다. 보안 모드 legacy `POST /reports`는 `source=android`를 거부한다. 신고의 `source_commit`은 감사용으로 그대로 저장된다 |
 | `WALKSAFE_FIELD_TEST_SECURITY_ENABLED` | `true` | field/admin 역할 보호 활성화 |
 | `WALKSAFE_FIELD_TEST_TOKEN` | 빈 값 | field 역할 service token, 활성 시 최소 24자 |
 | `WALKSAFE_ADMIN_TOKEN` | 빈 값 | 관리자 DB 인증을 끈 development/test에서만 쓰는 legacy service token. `WALKSAFE_ADMIN_SECURITY_ENABLED=true`이면 우회 수단으로 인정하지 않음 |
@@ -74,6 +80,7 @@ python -m uvicorn backend.app.main:app --reload --port 8000
 | `WALKSAFE_GATEWAY_SESSION_SECRET` | 빈 값 | named actor 30초 assertion HMAC secret. 배포 환경 최소 32자·두 token과 달라야 함 |
 | `WALKSAFE_PRIVACY_HMAC_SECRET` | 빈 값 | privacy subject 전용 HMAC secret. UTF-8 인코딩 기준 최소 32바이트. FP-046 Alembic도 legacy named-actor report를 generation 1 pseudonymous binding으로 바꾼 뒤 raw actor metadata를 제거할 때 같은 값을 사용하므로 migration/runtime 사이에 바꾸면 안 됨 |
 | `WALKSAFE_PRIVACY_HMAC_KEY_VERSION` | `1` | DB singleton key binding과 대조할 양의 key version. 명시적 keyring migration 없이 변경하면 startup/readiness가 fail closed |
+| `WALKSAFE_PRIVACY_HMAC_LOOKUP_KEYS` | 빈 값 | S1617-50: 소유자 회전(`rotate_privacy_hmac_key`) 뒤 이전 키를 `{"<version>": "<secret>"}` JSON으로 lookup 전용 등록. 집합이 DB keyring LOOKUP_ONLY와 정확히 같아야 하며(누락·추가·잘못된 비밀은 503 `privacy_hmac_key_mismatch`), 재키잉은 하지 않는다. 회전 전 자료가 있는 actor generation은 그 자료를 만든 키의 subject·HMAC(설치·삭제 접근)을 계속 쓰고, 새 actor는 ACTIVE 키를 쓴다. 한 actor generation 자료가 두 subject에 나뉘면 동의·신고·RAW·삭제 경로가 503 `privacy_hmac_rotation_continuity_incomplete`로 멈춘다. 이전 키는 그 키로 만든 자료가 남아 있는 동안 제거할 수 없다. 복제 환경 회전·복구 훈련과 키 에스크로 승인은 운영 몫(FP-048-DETAIL-01) |
 | `WALKSAFE_ALLOW_INSECURE_LOCAL_DEV` | `false` | 보안 비활성 local development/test를 명시적으로 허용하는 opt-in |
 | `WALKSAFE_MAINTENANCE_LOCK_PATH` | 빈 값 | 보존·backup 작업이 공유하는 service-owned exclusive lock 파일. parent는 기존 current-user 0700 real directory이고 parent 위의 모든 조상은 `/`까지 root-owned·group/other non-writable·service UID 비가용이어야 한다. production 예시는 `/run/walksafe-backend/maintenance.lock`; field launcher는 검증된 `/run/user/$UID`의 `walksafe.lock`을 기본 사용한다 |
 
@@ -103,6 +110,13 @@ python3 scripts/check_tmap_pedestrian_route_smoke_20260524.py
 ```
 
 `WALKING_ROUTE_PROVIDER`는 `tmap_pedestrian`만 허용한다. 다른 값은 시작 설정 또는 요청 처리에서 거부하며 자동·수동 provider 전환은 없다.
+
+### TMAP 호출 예산과 readiness probe
+
+- 사용자 예산(`TMAP_CALL_BUDGET_PER_MINUTE`·`TMAP_CALL_BUDGET_PER_DAY`): 사용자 route·POI 요청이 제공자 I/O 전에 1단위씩 쓴다. 두 창은 각 창의 첫 호출 시각에 시작하는 고정 창이며 프로세스 메모리에만 있다. 그래서 Backend를 재시작하면 두 창이 0으로 돌아가고, 창이 제공자의 달력일·분 경계와 맞지 않아 한 달력일에 최대 2×`PER_DAY`, 분 경계 앞뒤 60초 안에 최대 2×`PER_MINUTE` 호출이 나갈 수 있다. worker를 늘리면 worker마다 창을 따로 가진다(현 1 worker). 계약 할당량에 맞출 때는 이 2× 상한과 재시작을 고려해 할당량의 절반 이하로 잡는다. 거절 응답은 `Retry-After` 헤더를 보내지 않는다(제공자 429 유예 경로와 같음). 달력일 정렬과 공유 저장소는 다중 worker 도입 때 다룬다.
+- readiness live probe(`TMAP_READINESS_LIVE_PROBE_ENABLED=true`): 사용자 예산과 분리된 고정 허용치(60초에 probe 1회 = route 1 + POI 1 호출, 설정값 아님)만 쓴다. probe는 사용자 창을 줄이지 않고, 사용자 창 소진 때문에 거절되지도 않는다. 60초 안의 다음 `/ready`는 제공자 호출 없이 navigation `tmap_live_probe_deferred`를 준다. 제공자 429 유예(최대 300초)는 probe에도 적용된다. 장애 중 `/ready`를 자주 불러도 제공자 호출은 분당 1회를 넘지 않는다.
+- 사용자 예산 소진: 최근 성공 기록(`TMAP_READINESS_SUCCESS_MAX_AGE_SECONDS`)이 없으면 navigation readiness는 probe를 돌리지 않고 `tmap_call_budget_exhausted`(`exhausted_windows`, `resets_in_seconds`)를 준다. 제공자 실패 `tmap_live_probe_failed`와 구분된다. 사용자 요청은 자기 예산이 소진됐을 때만 `503 tmap_rate_limited`를 받는다.
+- 전체 `/ready`: navigation도 다른 항목처럼 전체 판정에 들어가므로 navigation이 not ready(예산 소진 포함)이면 `/ready` 전체가 503이다. 기능별 readiness 분리는 S20-49 결정 전까지 현행 유지한다.
 
 프론트 테스트용 목적지 좌표는 `apps/web/.env.local` 같은 프론트 env에 둔다. 이 값은 브라우저 번들에 포함되므로 secret을 넣지 않는다.
 
@@ -193,7 +207,7 @@ image/webp
 
 ## Android debug API
 
-`ANDROID_DEBUG_LOG_ENABLED=false`가 기본이다. local/dev evidence 수집 때만 명시적으로 켠다. field/staging/production에서는 `true` 설정을 시작 단계에서 거부하고, 보안 활성 local profile에서도 endpoint는 admin 역할만 접근한다. debug directory는 `0700`, JSONL/image는 `0600`으로 만들며 symlink와 경로 이탈을 거부한다. depth log는 metadata-only지만 frame capture는 실제 이미지를 저장할 수 있다.
+`ANDROID_DEBUG_LOG_ENABLED=false`가 기본이다. local/dev evidence 수집 때만 명시적으로 켠다. field/staging/production에서는 `true` 설정을 시작 단계에서 거부하고, 보안 활성 local profile에서도 endpoint는 admin 역할만 접근한다. debug directory는 `0700`, SQLite DB/image는 `0600`으로 만들며 symlink와 경로 이탈을 거부한다. depth log는 metadata-only지만 frame capture는 실제 이미지를 저장할 수 있다. 저장 내용은 앱 계층 암호화(AEAD)가 없는 평문이므로 개발 환경의 비민감 자료만 허용한다(S1617-31 결정 A). 현장·운영 사용자 자료와 실제 보행 카메라 이미지는 이 저장소에 넣지 않는다.
 
 ## 테스트 DB preflight
 
@@ -205,3 +219,16 @@ WALKSAFE_TEST_DATABASE_URL='postgresql+psycopg://.../walksafe_test' \
 ```
 
 검사는 URL driver, test 이름, 보호된 운영 DB명과의 불일치, 5초 이내 연결과 실제 `current_database()` 일치를 확인한다. 이후 migration을 적용하고 advisory lock을 획득한 상태에서 no-skip 회귀를 실행한다.
+
+## Backend 빠른 개별 실행
+
+공식 검증 경로는 [테스트 가이드](../guides/testing-guide.md)의 계층 runner(Linux x86_64, 잠금 Node·Gradle·CPython 3.14.6 백업 환경 필요)다. 변경한 Backend 기능만 먼저 확인할 때는 저장소 루트에서 해당 시험 파일만 직접 실행한다. 이 결과는 runner·CI의 PASS를 대신하지 않는다.
+
+```bash
+unset DATABASE_URL
+python -B -m pytest -p no:cacheprovider -q backend/tests/test_navigation_routes.py
+```
+
+- PostgreSQL을 쓰지 않는 시험은 `WALKSAFE_TEST_DATABASE_URL` 없이 실행된다. PostgreSQL을 쓰는 시험은 이 값이 없으면 건너뛰지 않고 ERROR로 끝난다.
+- PostgreSQL 시험에는 위 preflight를 통과한 전용 test DB를 `WALKSAFE_TEST_DATABASE_URL`로 주고, 먼저 `DATABASE_URL="${WALKSAFE_TEST_DATABASE_URL}" python -m alembic -c backend/alembic.ini upgrade head`로 migration을 적용한다.
+- test DB 하나에는 pytest 프로세스 하나만 붙는다. advisory lock을 이미 다른 프로세스가 잡았으면 즉시 실패한다.

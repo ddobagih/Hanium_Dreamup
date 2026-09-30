@@ -1,5 +1,11 @@
 # Backend
 
+## 2026-09-30 현재 작업 안내
+
+[인수인계 시작 문서](../docs/handoff/2026-09-30/README.md), [Part B: 계정·신고·개인정보·관리자·서버](../docs/handoff/2026-09-30/part-b.md), [현재 상태·검증 범위](../docs/handoff/2026-09-30/status.md)를 먼저 확인한다. 현재 코드의 실행 진입점은 [`app/main.py`](app/main.py), provider 계약은 [`contracts/walksafe.openapi.json`](../contracts/walksafe.openapi.json)이다. 사용자 앱은 [Android Gateway](../apps/android-gateway/README.md)를 통해 연결하며 별도 관리자 앱은 Backend 관리자 API를 사용한다.
+
+최근 실제 Android HTTP 클라이언트의 JVM→Gateway→Backend 연동과 전용 PostgreSQL 확인은 로컬 연동 근거다. 실제 Activity·프로세스 재시작·기기·외부 TMAP·기관 응답·운영 배포를 검증한 결과로 확대하지 않는다. 아래 운영 전환·복구 절차는 구현 계약과 실행 전제를 설명하며 해당 운영 작업을 수행했다는 기록이 아니다.
+
 Android 사용자 앱과 별도 Android 관리자 앱에 FastAPI 및 PostgreSQL/PostGIS 기반 보행 경로 조회, 신고 저장·검토·내보내기와 관리자 API를 제공한다. 현행 Android 위험 탐지는 앱 내 TFLite가 담당한다.
 
 ## 책임 경계
@@ -41,6 +47,10 @@ Kakao 사용자는 [공식 서버 설정 안내](https://www.dktechin.com/inquir
 
 마이그레이션 후 신뢰할 수 있는 로컬 관리 절차에서 `backend.app.services.admin_security.provision_admin_security`를 한 번 호출해 관리자 비밀번호, TOTP seed, 생성된 고엔트로피 복구코드(각 24자 이상), 별도 issuer key를 함께 등록한다. PostgreSQL provisioning은 일반 runtime 역할이 아닌 DB owner 절차여야 하며 control과 issuer key SHA-256 지문을 같은 transaction에서 결속한다. `admin_security_controls.singleton_scope`의 check·unique 제약은 전체 데이터베이스를 최대 한 행으로 제한하고, provisioning과 보호 작업은 정확히 한 행이 아니면 fail-closed 한다. 이전 migration은 여러 행을 허용했으므로 upgrade 전에 기존 행 수가 0 또는 1인지 확인하고, 여러 행이면 운영자가 먼저 정리해야 한다. 데이터베이스에는 scrypt 인코딩 또는 SHA-256 지문만 남고 평문 비밀번호·TOTP·복구코드·세션 토큰·issuer key는 저장하지 않는다.
 
+현재 관리자 인증은 `WALKSAFE_ADMIN_ID` 하나와 그 비밀번호·TOTP seed·복구코드 한 벌만 지원하는 1인 운영 구성이다. 감사 기록의 관리자 ID는 이 설정값 하나이므로, 여러 사람이 같은 자격증명을 나눠 쓰면 실제 행위자를 구분할 수 없다. 따라서 자격증명을 공유하는 다인 운영에는 사용하지 않는다. 다인 운영이 필요해지면 개인별 계정·권한·퇴직 시 폐기를 별도로 설계해 도입해야 한다.
+
+비밀번호 scrypt 비용은 현재 `N=2^14, r=8, p=5`다. 과거에 발급한 `N=2^14, r=8, p=1` 해시도 계속 검증하며, 정상 로그인 뒤에만 현재 비용으로 다시 해시한다. 허용 목록에 없는 비용이나 256 MiB 상한을 넘는 비용은 scrypt를 실행하기 전에 거부한다. 비용을 올릴 때는 직전 현재값을 허용 목록에 남기고, PostgreSQL 재해시 함수의 허용 형식도 새 migration으로 함께 바꾼다. 운영 서버의 메모리·지연·동시 로그인 부하는 별도로 측정해야 한다.
+
 `POST /admin/security/recovery-custody/attest`는 휴대전화 밖 복구코드 또는 보안키와 별도 암호화 백업을 확인한 뒤 canonical unpadded Base64url 32바이트 opaque 참조의 SHA-256과 자료 종류·`OFF_PHONE`·별도 백업 확인·서버 시각만 저장한다. 원 복구자료·백업 비밀·opaque 참조 원문은 앱 저장소·DB·Git·감사로그에 넣지 않는다. 이 자기확인 상태는 `UNATTESTED` 또는 `ATTESTED`이며 실제 외부 보관, 새 기기 복구, 분실 복구훈련의 실행 증거를 대신하지 않는다.
 
 `WALKSAFE_ADMIN_TOTP_SECRET`은 공백·padding 없는 canonical Base32이며 디코딩 결과가 최소 20바이트여야 한다. 로그인·재인증은 ±1 시간구간을 허용하되 이미 사용한 TOTP timecode를 다시 받지 않는다. 로그인, 재인증, 복구 시작, 복구 완료는 PostgreSQL의 출처별·관리자 전체 기록을 함께 기준으로 제한하므로 토큰·출처·프로세스·replica를 바꿔도 시도 횟수가 쉽게 초기화되지 않는다.
@@ -80,7 +90,7 @@ Kakao 사용자는 [공식 서버 설정 안내](https://www.dktechin.com/inquir
 5. 설치한 systemd unit의 실제 `FragmentPath`가 root 소유이고 group/other 쓰기 불가인지 확인하고 `systemctl daemon-reload`를 실행한다. Backend는 migration만 자동 요구하며 issuer bind를 자동 실행하지 않는다는 점을 확인한다.
 6. 관리자 ingress에서 신규 요청을 차단하고 진행 중 요청을 배출한 다음 `walksafe-backend.service`를 명시적으로 정지한다. `walksafe-admin-issuer-bind.service`의 `Conflicts=`에 정지를 맡기지 않는다.
 7. 과거 `/etc/walksafe/backend.env`를 API가 읽었던 배치라면 거기에 있던 migration credential을 재사용하지 않는다. API를 정지한 상태에서 기존 credential·세션을 폐기 또는 회전하고, 새 maintenance 전용 credential은 `backend-migration.env`에만 넣는다.
-8. `walksafe-backend-migrate.service`를 수동 실행해 성공과 예상 Alembic head `202609010003`를 확인한다. migration 완료부터 issuer bind 성공 전까지 새 backend의 startup/readiness가 fail-closed하는 것이 정상이며 API를 시작하지 않는다. migration이 실패해도 API와 ingress를 정지한 채 원인을 해결하며 구 backend를 새 schema 위에서 시작하지 않는다.
+8. `walksafe-backend-migrate.service`를 수동 실행해 성공과 해당 release candidate의 실제 Alembic head([migration source](alembic/versions/))를 확인한다. migration 완료부터 issuer bind 성공 전까지 새 backend의 startup/readiness가 fail-closed하는 것이 정상이며 API를 시작하지 않는다. migration이 실패해도 API와 ingress를 정지한 채 원인을 해결하며 구 backend를 새 schema 위에서 시작하지 않는다.
 9. `walksafe-admin-issuer-bind.service`를 `walksafe-issuer-bind` 비권한 계정으로 수동 실행해 `BOUND`를 확인한다. 이 oneshot은 enable하지 않는다. migration 성공만으로 bind가 실행됐다고 가정하지 않는다.
 10. 결속에 사용한 migration credential을 다시 회전하거나 더 이상 필요 없으면 폐기하고 DB session을 무효화한다. 새 값은 계속 migration 환경에만 둔다. 기존 `/etc/walksafe/backend.env`의 정확한 대상·소유권·파일 종류를 확인한 뒤 삭제하며, 읽을 수 있는 백업이나 다른 서비스 환경으로 옮기지 않는다. 보존할 전환 증거에는 비밀값 대신 receipt와 지문만 남긴다.
 11. 아래 점검에서 파일·계정 분리가 모두 확인된 뒤에만 `walksafe-backend.service`를 시작한다. issuer 원본은 API가 계속 사용하므로 유지한다.
@@ -134,7 +144,7 @@ python scripts/provision_walksafe_admin_device_key.py \
 
 명령은 SPKI에서 계산한 SHA-256 marker가 descriptor marker와 일치하는지 DB 연결 전에 검증한다. 일반 API runtime 계정이 아닌 통제된 로컬 운영/마이그레이션 계정으로 실행한다. DB ACL은 `walksafe_backend_runtime`의 `admin_device_keys` INSERT를 거부하고 UPDATE trigger는 기존 active 키의 revoke 전이만 허용하므로, 네트워크 runtime이 신뢰 키를 직접 생성·교체·재활성화할 수 없다.
 
-로그인, 복구 완료, custody 확인, 분실 기기 신고, 신고 검토·전달 이력 API는 `POST /admin/security/device-proof/challenges`에서 120초 단일사용 challenge를 받은 뒤 같은 요청 바이트에 대한 ECDSA-SHA256 서명을 함께 보낸다. 보호 요청은 `X-WalkSafe-Device-Challenge-Id`, `X-WalkSafe-Device-Signature`, `X-WalkSafe-Correlation-Id`를 사용하며, 이력 GET은 정확한 `X-WalkSafe-Read-Purpose`도 요구한다. 서명은 HTTP method, path, canonical query, 원문 body SHA-256, 관리자·기기·세션과 목적에 결속된다.
+로그인, 복구 완료, custody 확인, 분실 기기 신고, 신고 검토·전달 이력 API는 `POST /admin/security/device-proof/challenges`에서 120초 단일사용 challenge를 받은 뒤 같은 요청 바이트에 대한 ECDSA-SHA256 서명을 함께 보낸다. 보호 요청은 `X-WalkSafe-Device-Challenge-Id`, `X-WalkSafe-Device-Signature`, `X-WalkSafe-Correlation-Id`를 사용하며, 이력 GET은 정확한 `X-WalkSafe-Read-Purpose`도 요구한다. 서명은 HTTP method, path, canonical query, 원문 body SHA-256, 관리자·기기·세션과 목적에 결속된다. 미사용 challenge는 기기 키마다 세션 없이 발급하는 로그인·복구 완료용과 세션에 결속된 작업(ACTION)용을 따로 세어 각각 최대 8개까지 둔다. 따라서 공개 식별자로 로그인 challenge를 채워도 세션 작업의 발급 여유는 줄지 않는다. 세션 없는 challenge 발급 경로에는 아직 출처별 발급 제한이 없다.
 
 `POST /admin/security/devices/{device_id}/report-lost`는 호출 중인 현재 기기를 대상으로 받지 않으며, 다른 대상 기기의 active 공개키와 모든 미폐기 세션을 같은 DB transaction에서 폐기하고 감사한다. 이후 그 키는 challenge 발급·검증과 로그인을 통과할 수 없다. 출시 승인·권한 변경·데이터 삭제의 정책 gate는 관리자 control이 `NORMAL`이고 custody가 `ATTESTED`이며 기기 결속 세션과 단일사용 재확인이 유효할 때만 통과한다. 이 세 경로 문자열은 offline 정책 결속자이며 공개 HTTP endpoint가 아니다. offline helper는 재확인 nonce와 감사를 caller mutation 전에 commit하므로 caller가 실패해도 nonce는 사용 처리된다.
 

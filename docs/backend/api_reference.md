@@ -35,6 +35,8 @@ FP-046 개인정보 API는 다음 네 경로만 제공한다. 모든 요청에�
 
 삭제 API의 actor, account generation, request ID, access-pre digest, tombstone ID는 서로 결속되어야 한다. 동의와 삭제 요청은 `request_id` 기반 멱등성을 제공하며 같은 ID로 다른 내용을 보내면 `409`로 거부한다. 공통 오류 상태는 `400`, `401`, `404`, `409`, `413`, `422`, `429`, `503`이고 본문은 `{ "detail": { "code": "...", "message": "..." } }` 형태다. 개인정보 API의 성공·오류 응답에는 모두 `Cache-Control: no-store`와 `Pragma: no-cache`가 적용된다.
 
+서버 삭제 항목(S1617-55·59): 수동 삭제 worker가 커밋 뒤 DB 재조회와 업로드·신고 격리(`.retention-quarantine`, `.report-deletion-quarantine`)·RAW 저장소 재스캔을 모두 통과해야 manifest를 게시한다. 저널 밖에 삭제 대상 신고·RAW의 파일이 남아 있으면 서버 4항목은 열린 채로 남는다. `server_quarantine`은 준비 시점에 격리(QUARANTINED) RAW가 있었으면 `COMPLETED`, 없으면 재조회 근거를 적은 `NOT_APPLICABLE`이다. `server_copies`는 삭제 대상 신고의 기관 전달 기록(패키지 또는 전달 이벤트 1건 = 사본 1건)이 없을 때만 `NOT_APPLICABLE`이고, 1건이라도 있으면 `EXTERNAL_PENDING`으로 남아 요청 전체가 `COMPLETED`가 되지 않는다. 계정 삭제 요청의 기관 사본 삭제 확인을 기록해 이 항목을 닫는 경로는 아직 없다.
+
 ## Android 관리자 인증·복구
 
 field/staging/production은 `WALKSAFE_ADMIN_SECURITY_ENABLED=true`가 필수다. 이때 정적 `X-WalkSafe-Admin-Token`은 관리자 권한을 주지 않는다. 모든 관리자 앱 요청은 다음 네 문맥 헤더를 정확히 보내며, 보호 API는 기기별 opaque Bearer 세션도 함께 보낸다.
@@ -158,6 +160,10 @@ dependency-aware readiness다. 단순 liveness인 `/health`와 달리 다음 항
 - 신고 저장소의 DB·파일 inventory 일치와 원본 평문·고아 파일 부재
 
 모두 통과하면 `200 status=ready`, 하나라도 실패하면 `503 status=not_ready`와 항목별 sanitized reason을 반환한다. inference worker가 이미 warm 상태로 다른 요청을 처리 중이면 readiness가 그 작업 뒤에서 무기한 대기하지 않는다.
+
+항목별 검사는 검사 하나당 작업 스레드 하나만 쓰는 single-flight다. 요청마다 최대 5초 기다린 뒤 `check_timeout`을 주고, 같은 검사가 30초(detector warm-up 검사는 정상 cold warm-up 상한을 고려해 `max(30, INFERENCE_STARTUP_TIMEOUT_SECONDS + 5)`초) 넘게 끝나지 않으면 기다리지 않고 바로 `probe_stuck`(`stuck_seconds` 포함)을 준다. 두 경우 모두 not ready이며 시간 초과 때 새 스레드를 만들거나 멈춘 스레드를 강제로 끝내지 않는다. 멈춘 검사가 끝나야 다음 검사가 시작되므로 계속 `probe_stuck`이면 process supervisor가 재시작을 판단한다. DB 검사는 연결 timeout과 `statement_timeout`(probe 1.5초, 일반 session은 `DATABASE_STATEMENT_TIMEOUT_MS`)으로, TMAP live probe는 HTTP timeout으로 끝나지만 일반 파일 I/O(`fsync` 등)는 Python에서 중단할 수 없다.
+
+`navigation` 항목은 최근 route·POI 성공 기록이 있으면 ready다. 없으면 live probe(`TMAP_READINESS_LIVE_PROBE_ENABLED=true`)를 쓰는데, probe는 사용자 TMAP 호출 예산과 분리된 60초 1회 허용치만 쓰며 사용자 예산을 줄이지도, 사용자 예산 소진 때문에 거절되지도 않는다. 주요 reason: 제공자 실패 `tmap_live_probe_failed`(`error_type`), 60초 안에 이미 probe를 한 경우 제공자 호출 없이 `tmap_live_probe_deferred`(`next_probe_in_seconds`), 사용자 예산 소진 `tmap_call_budget_exhausted`(`exhausted_windows`, `resets_in_seconds`; 이때는 probe를 돌리지 않는다), live probe를 끈 경우 `tmap_recent_success_unavailable`. 전체 `/ready`는 기능별로 나누지 않고 모든 항목이 ready여야 200이므로(S20-49 결정 전까지 현행 유지) navigation이 not ready이면 예산 소진이어도 전체가 503이다. 예산 창의 한계는 [Backend 환경](backend_environment.md#tmap-호출-예산과-readiness-probe)을 따른다.
 
 ## GET /detect/health
 
@@ -408,6 +414,10 @@ TMAP 보행 경로를 WalkSafe 앱 전용 schema로 정규화한다. TMAP key는
 
 `guide_points`는 TMAP Point feature의 안내 지점이다. `bearing_deg`는 route polyline의 다음 segment 방향에서 계산한 0 이상 360 미만의 보조 heading이다. 프론트는 `distance_from_start_m`/`remaining_distance_m`와 현재 진행 거리, 보행 속도/보폭 추정값을 비교해 “10초 뒤 좌회전 준비”, “약 15보 앞”, “지금 좌회전하세요” 같은 안내를 만들 수 있다.
 
+신규 응답의 최상위 `distance_source`는 `provider_total_geometry_scaled` 또는 `provider_step_sum_geometry_scaled`이다. 앞의 값은 선택된 TMAP 전체 거리를, 뒤의 값은 전체 거리 부재 시 검증한 TMAP 구간 거리 합을 기준으로 삼았음을 뜻한다. 누락 또는 `null`은 출처를 제공하지 않는 기존 응답이며 새 출처로 추정하지 않는다.
+
+두 출처 모두 전체 거리 S와 전체 형상 길이 G에 대해 동일한 형상 누적거리 g를 `floor(S * g / G + 0.5)`로 변환한다. 구간 거리는 변환한 끝·시작 누적거리의 차이이므로 구간 합은 S와 같고, 모든 안내점의 누적거리와 잔여거리 합도 S와 같다. 공급자 원본 구간 거리는 형식·형상 검증에 사용하며 응답의 구간 거리와 달라질 수 있다. 공급자 순서와 형상 투영으로 안내점의 방문 위치를 확정하지 못하거나 안내 순서가 역전되면 응답 전체를 502로 거부한다.
+
 Android client는 위 schema와 provider/result/`STAIR_AVOID` 외에도 distance·duration이 양수인지, 요청 origin/destination과 polyline 양끝이 각각 100m 이내인지, polyline geometry와 summary distance의 비율이 허용 범위인지, guide index·route 투영·선언 거리가 진행 순서대로 단조인지 확인한다. 한 항목이라도 실패하면 부분 geometry/guide를 사용하지 않고 응답 전체를 거부한다.
 
 오류:
@@ -456,7 +466,7 @@ Android client는 위 schema와 provider/result/`STAIR_AVOID` 외에도 distance
 }
 ```
 
-응답은 `ReportResponse`이며 주요 필드는 다음과 같다.
+생성 응답은 `ReportCreationResponse`이며 주요 필드는 다음과 같다.
 
 | 필드 | 의미 |
 | --- | --- |
@@ -466,6 +476,13 @@ Android client는 위 schema와 provider/result/`STAIR_AVOID` 외에도 distance
 | `location_quality` | `missing`, `low`, `medium`, `high` |
 | `review_flags` | 검토 필요 사유 목록 |
 | `duplicate_report_ids` | 저장 직전 발견한 중복 후보 ID |
+| `creation_outcome` | `CREATED`(새로 저장), `REPLAYED`(동일 요청의 기존 신고), `SUPPRESSED_BY_COOLDOWN`(최근 신고로 추가 생성 생략) |
+
+field 보안이 켜진 서버에서 이 legacy endpoint는 `source=android`를 `422 android_provenance_gate_failed`로 거부한다. Android 신고는 승인 출시 묶음 검사가 있는 `/reports/v2`로만 받는다(Android 앱·Gateway는 v2만 사용).
+
+이 결과 구분은 `/reports/v2`에도 적용된다. 기존 요청 방식에서는 쿨다운으로 생성을 생략해도 `201`을 반환할 수 있으므로 HTTP 상태만으로 새 신고 생성을 안내하지 않는다. 전송 영수증을 사용하는 요청은 기존처럼 `429`, `detail.code=automatic_report_cooldown_active`, `Retry-After: 600`을 반환하며, `detail.creation_outcome=SUPPRESSED_BY_COOLDOWN`으로 생략 이유를 명시한다. 이 응답은 성공 영수증이 아니므로 클라이언트는 저장된 재시도 시각까지 대기한다.
+
+새로 생성한 경우에는 접수 완료를, 재전송은 이전 접수 확인을, 쿨다운은 최근 같은 위치의 신고 때문에 이번 추가 접수를 생략했음을 구분한다. 자동 신고 결과는 기존 무음 정책을 유지하며, 수동 신고 결과의 음성 안내와 구분한다. 이전 서버 응답에서 이 필드가 없거나 `null`이면 새 생성으로 추정하지 않는다. 조회·목록·상태 응답과 `transport_receipt` 내부 형식은 그대로 유지한다.
 
 
 ## POST /reports/v2
@@ -489,7 +506,7 @@ v2 탐지 metadata와 이미지를 신고로 저장한다. 저장 대상은 `uni
 | `unified_walksafe` | `damaged_tactile_block` |
 | `custom_tactile` | `damaged_tactile_block` |
 
-표에 없는 model/class 조합은 `422`로 거부된다. v2 손상 점자블록 신고는 GPS가 있어야 저장된다. 명시 allowlist 밖의 추가 metadata 필드는 오류 없이 버리며 저장하지 않는다. `source=android`, `reporter_user_id`, gate 값은 현재 client가 보낸 값이지 인증된 서버 판정이 아니다.
+표에 없는 model/class 조합은 `422`로 거부된다. v2 손상 점자블록 신고는 GPS가 있어야 저장된다. 명시 allowlist 밖의 추가 metadata 필드는 오류 없이 버리며 저장하지 않는다. `source=android`, `reporter_user_id`, gate 값은 현재 client가 보낸 값이지 인증된 서버 판정이 아니다. field 보안이 켜진 서버는 `source=android` 신고의 `source_commit`·`apk_sha256`·`model_config_sha256`을 승인 출시 묶음 표(`WALKSAFE_APPROVED_ANDROID_RELEASES`)와 대조하고 맞지 않으면 `422 android_provenance_gate_failed`로 거부한다. 이 값도 client 자기 신고라 이 검사는 호환성 gate이며 앱 진위 확인은 기기 증명이 맡는다.
 
 저장 시 서버는 payload/image SHA-256과 `data_origin`, `performance_excluded`를 보강한다. fake/demo source이거나 `coordinate_gate_status`가 없거나 `pass`가 아니면 성능 근거에서 제외하지만, coordinate gate만으로 데이터를 fake/demo로 바꾸지는 않는다.
 
@@ -522,7 +539,7 @@ v2 탐지 metadata와 이미지를 신고로 저장한다. 저장 대상은 `uni
 
 `GET /reports`와 같은 필터 조건으로 전체 신고 수, 상태/source count, 위치 있음/없음, grid cluster 요약을 반환한다. Admin 목록 limit와 별개로 현재 필터 전체를 요약하되 최대 10,000행까지만 허용한다. 10,000행을 넘으면 잘라서 왜곡하지 않고 `413 report_summary_too_large`와 `max_rows=10000`을 반환한다.
 
-주요 query는 `GET /reports`와 동일하며 `source=android`, `model_key`, `trigger`, `auto_reported`, `demo_filter`를 함께 사용할 수 있다. `grid_size_degrees`와 `top_limit`으로 표시용 grid 크기와 반환 cluster 수를 조절한다.
+주요 query는 `GET /reports`와 동일하며 `source=android`, `model_key`, `trigger`, `auto_reported`, `demo_filter`를 함께 사용할 수 있다. `grid_size_degrees`와 `top_limit`으로 표시용 grid 크기와 반환 cluster 수를 조절한다. `grid_size_degrees`는 `0.0001`(위도 약 11 m) 이상 `1` 이하만 받고 범위 밖·비유한 값은 `422`다(S20-38). 좌표 x의 셀은 float64 `floor(x / size)`이며 그 float 경계가 `lower <= x < upper`를 만족하면 그대로 쓰고, 반올림 때문에 모순되면 입력 float의 정확한 유리수 값으로 셀을 정한다. 응답 `bounds`는 표시용 반올림 값이라 그 예외 경우에만 x가 `max_*`와 같을 수 있다(예: `0.29`, `0.01` → 셀 28, `[0.28, 0.29]`).
 
 
 ## GET /reports/export
@@ -620,9 +637,11 @@ new, reviewed, resolved
 
 | Method | Path | 역할 |
 |---|---|---|
-| `POST` | `/android/debug/depth-logs` | 검증된 depth/detection metadata를 JSONL로 추가 |
+| `POST` | `/android/debug/depth-logs` | 검증된 depth/detection metadata를 debug SQLite 저장소에 추가 |
 | `GET` | `/android/debug/depth-logs/recent` | 최근 depth log 조회 |
 | `POST` | `/android/debug/frame-captures` | image와 JSON metadata를 debug 폴더에 저장 |
 | `GET` | `/android/debug/frame-captures/recent` | 최근 frame capture record 조회 |
 
-depth log schema는 raw RGB/depth media 참조 같은 미허용 필드를 거부한다. JSONL·image 파일은 `0600`, 저장 디렉터리는 `0700`으로 만들고 symlink/경로 이탈을 거부한다. frame capture는 실제 이미지를 저장하므로 운영 telemetry나 신고 evidence로 자동 승격하지 않는다. field/staging/production에서는 `ANDROID_DEBUG_LOG_ENABLED=true` 자체를 시작 단계에서 거부한다.
+depth log schema는 raw RGB/depth media 참조 같은 미허용 필드를 거부한다. 기록은 `android_debug.sqlite3`(SQLite) 한 파일에, frame 이미지는 별도 image 파일에 저장한다. 두 파일은 `0600`, 저장 디렉터리는 `0700`으로 만들고 symlink/경로 이탈을 거부한다. 이전 버전의 `*.jsonl` 파일은 변경 없이 한 번 SQLite로 가져오는 legacy 입력일 뿐 새로 쓰지 않는다. frame capture는 실제 이미지를 저장하므로 운영 telemetry나 신고 evidence로 자동 승격하지 않는다. field/staging/production에서는 `ANDROID_DEBUG_LOG_ENABLED=true` 자체를 시작 단계에서 거부한다.
+
+자료 분류(S1617-31, 결정 A): 이 저장소는 앱 계층 암호화(AEAD)를 쓰지 않는 평문 저장소이며 파일 권한으로만 보호한다. 따라서 개발 환경의 비민감 자료(합성·개발자 본인 시험 입력)만 저장한다. 현장 시험·운영 사용자 자료, 실제 보행 중 카메라 이미지, 정확한 위치·계정 정보는 이 경로에 보내지 않는다. 현장 자료는 암호화 신고·RAW 경로만 사용한다. 이 경로를 현장 자료까지 넓히려면 별도 암호화·조회 감사·삭제 정책·디스크 암호화 확인이 먼저 필요하다.

@@ -1,5 +1,7 @@
 # Android 앱 빌드와 테스트 사용 가이드
 
+현재 앱 빌드·JVM·연동 결과와 기기 미검증 범위는 [2026-09-30 현황](../handoff/2026-09-30/status.md)을 확인합니다. 새 clone은 SDK와 [Vosk 모델](#모델-자산-준비)을 준비해야 하며 APK 생성·AndroidTest 컴파일과 실제 기기 실행을 구분합니다.
+
 이 문서는 현재 소스의 앱 구분과 실행 준비를 설명합니다. 빌드 성공, 자동 테스트 통과, 실기기 검증은 서로 다른 결과이며, 이 가이드 자체는 테스트 완료나 보행 안전성·거리 정확도를 증명하지 않습니다. 공통 검사 절차는 [테스트 가이드](testing-guide.md)를 참고합니다.
 
 ## 공통 준비
@@ -97,13 +99,12 @@ adb install -r apps/android/positionevalapp/build/outputs/apk/debug/positioneval
 
 ## 모델 자산 준비
 
-사용자 앱 모델 선택·class·tensor·hash의 기준은 [two_model_runtime.json](../../apps/android/app/src/main/assets/model-config/two_model_runtime.json)입니다. 현재 설정은 `unified_walksafe`를 primary로, `legacy_two_model`을 fallback으로 지정합니다.
+사용자 앱 모델 선택·class·tensor·hash의 기준은 [two_model_runtime.json](../../apps/android/app/src/main/assets/model-config/two_model_runtime.json)입니다. 현재 `unified_walksafe` 키의 primary는 **WalkMate YOLO11n 21클래스 768**이며 `fallback_model`은 `null`입니다. 키 이름만 보고 이전 YOLO26 모델로 해석하지 않습니다. release 모델 allowlist는 실제 [사용자 앱 Gradle](../../apps/android/app/build.gradle.kts)을 함께 확인합니다.
 
 | 설정 이름 | `app/src/main/assets/` 아래 자산 |
 |---|---|
-| `unified_walksafe` | `models/walksafe_unified_yolo26n_768_float32.tflite` |
-| `custom_tactile` | `models/custom_tactile_yolo26s_float32.tflite` |
-| `coco_general` | `models/coco_yolo26n_float32.tflite` |
+| `unified_walksafe` primary | `models/walkmate_yolo11n_21cls_768_float32.tflite` |
+| 보조 분할 모델 | `models/fastsam_s_768_float32.tflite` |
 
 기존 모델 자산은 버전 관리되는 파일을 사용합니다. 모델을 교체할 때는 파일명뿐 아니라 runtime config의 `artifact_sha256`, 입력 크기·dtype, 출력 구조·class 대응도 함께 맞춰야 합니다. 미커밋 모델이나 로컬 전용 자산은 `HEAD` 기반 visualTest 작업폴더에 자동으로 포함되지 않으므로 해당 폴더에서 별도로 준비합니다.
 

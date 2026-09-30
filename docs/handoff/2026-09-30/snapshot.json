@@ -1,0 +1,3795 @@
+{
+  "snapshot_date": "2026-09-30",
+  "canonical_revision": 119,
+  "canonical_csv_sha256": "7fb025aa7cb29cc86fc610ae92538229660f8bd9297ec2c2badf088e362f94f1",
+  "canonical_summary_sha256": "b78aa5ed8166663e1337f0a3a4f148e2b77b8337e8f4dee81df38de9a41738e7",
+  "counts": {
+    "DONE": 553,
+    "PARTIAL": 282,
+    "UNRECONCILED": 95,
+    "NOT_APPLICABLE": 12,
+    "all_rows": 942,
+    "remaining_rows": 377
+  },
+  "partition_counts": {
+    "A": {
+      "PARTIAL": 127,
+      "UNRECONCILED": 62
+    },
+    "B": {
+      "PARTIAL": 155,
+      "UNRECONCILED": 33
+    }
+  },
+  "interpretation": "942개는 원문 항목872개와 추가 요구70개다. 미정합은 현재 상태 미판정이며 확정 버그나 자동 실기기 필수 목록이 아니다. 이 snapshot은 협업 인계 자료이며 원장 상태를 변경하지 않았다.",
+  "all_statuses": [
+    {
+      "source_id": "S01-1",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-3",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-5",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-7",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S01-8",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-9",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-10",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-11",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S01-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-13",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-14",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-15",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-16",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-21",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-25",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-26",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-27",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S01-29",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S01-30",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S01-31",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-4",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-5",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S02-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-8",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-9",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-11",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-13",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-15",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-16",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-17",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-19",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-20",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-21",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-23",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-25",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-26",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-27",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-28",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-30",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S02-31",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S02-32",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-33",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S02-34",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S02-35",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-36",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S02-37",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S02-38",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-1",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-2",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-8",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-9",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-11",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-12",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-13",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-14",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-15",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-16",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-19",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S03-23",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-24",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-25",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-26",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-27",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S03-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-2",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S04-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-8",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S04-9",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-11",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S04-12",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S04-13",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S04-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-15",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S04-16",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S04-17",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S04-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-25",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S04-26",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S04-27",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S04-28",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S04-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-30",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S04-31",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S04-32",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S05-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-9",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-11",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-15",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-16",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-19",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S05-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-22",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S05-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-25",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-26",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S05-27",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S05-28",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S05-29",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S05-30",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S05-31",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S05-33",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S05-34",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S05-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-3",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S06-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-9",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-11",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-15",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S06-16",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-24",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S06-25",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-26",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S06-27",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-30",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-31",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-33",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-34",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-37",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S06-38",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-39",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-40",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-41",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S06-42",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-3",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S07-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-9",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-11",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S07-12",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S07-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-15",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-16",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-22",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S07-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-24",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S07-25",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S07-26",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S07-27",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-30",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-31",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S07-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-33",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-34",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-37",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S07-38",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S07-39",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-40",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-41",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-42",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-43",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S07-44",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-45",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-46",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-47",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-48",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-49",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S07-50",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-7",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S08-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-9",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S08-10",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S08-11",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S08-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-14",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S08-15",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S08-16",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S08-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-20",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S08-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-25",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S08-26",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-27",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-28",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S08-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-30",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S08-31",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S08-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-33",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S08-34",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S08-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S08-36",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S09-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-9",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-11",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-15",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S09-16",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S09-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-25",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-26",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-27",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-30",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S09-31",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-33",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S09-34",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-37",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-38",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S09-39",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S09-40",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-41",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S09-42",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-43",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-44",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-45",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-46",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-47",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-48",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-49",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-50",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-51",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S09-52",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S09-53",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-54",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-55",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-56",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S09-57",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S09-58",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-7",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S10-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-9",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S10-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-11",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-15",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-16",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-18",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-19",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-20",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-23",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-24",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S10-25",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S10-26",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-27",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-30",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-31",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-32",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-33",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-34",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S10-35",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S10-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-3",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S11-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-7",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S11-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-9",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S11-10",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S11-11",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S11-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-15",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-16",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S11-17",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S11-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-20",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S11-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-22",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S11-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-25",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S11-26",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S11-27",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S11-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-30",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-31",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S11-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-33",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-34",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S11-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-37",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S11-38",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S11-39",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S11-40",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-1",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-2",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S12-3",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-4",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S12-6",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S12-8",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S12-9",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-10",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-11",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S12-13",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S12-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S12-15",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S12-16",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S12-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S12-18",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S12-19",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S12-20",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S12-21",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-22",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S12-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S12-24",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-25",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-26",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S12-27",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-28",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S12-29",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-30",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S12-31",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S12-32",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-3",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-5",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-6",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-7",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-9",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-11",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-12",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-13",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-14",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S13-15",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-16",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-17",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-18",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-22",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-24",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-25",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S13-26",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S13-27",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-28",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S13-30",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-31",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-32",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-33",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-34",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S13-35",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S13-36",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S13-37",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-38",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-39",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S13-40",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-2",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-5",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-9",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-10",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-11",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-12",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-14",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-15",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-16",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-17",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-19",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-21",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-23",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-24",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-25",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-26",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-27",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-30",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-31",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-33",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-34",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-35",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-37",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-38",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-39",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-40",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S14-41",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-42",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-43",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-44",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S14-45",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-46",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S14-47",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-48",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S14-49",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S14-50",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-4",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-7",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S15-8",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-9",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-11",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-12",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-13",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-15",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-16",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-17",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-18",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-20",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-21",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "S15-22",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-24",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-25",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S15-26",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-27",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-28",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-29",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-30",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-31",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-33",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S15-34",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-37",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-38",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-39",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-40",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-41",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S15-42",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S15-43",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S15-44",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S15-45",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-2",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-3",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-4",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-5",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-7",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-9",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-11",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-13",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-15",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-16",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-18",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-19",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-21",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-25",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-26",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-27",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-30",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-31",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-33",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-34",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-36",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-37",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-38",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-39",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-40",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-41",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-42",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-43",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-44",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-45",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-46",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-47",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-48",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-49",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-50",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-51",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-52",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-53",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-54",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S1617-55",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-56",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-57",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-58",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-59",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S1617-60",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-1",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-5",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-7",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-9",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-11",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-15",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-16",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-18",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-25",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-26",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-27",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-28",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-30",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-31",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-32",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-33",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-34",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-37",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-38",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-39",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-40",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-41",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-42",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-43",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-44",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-45",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S18-46",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-47",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S18-48",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S19-1",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S19-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-6",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S19-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-9",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-11",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-12",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S19-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-15",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-16",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-18",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-25",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-26",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-27",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-30",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-31",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-33",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-34",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-37",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-38",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-39",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-40",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-41",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-42",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-43",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-44",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S19-45",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-46",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-47",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-48",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-49",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S19-50",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-51",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-52",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-53",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-54",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-55",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-56",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-57",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-58",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-59",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S19-60",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S20-1",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S20-2",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-3",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-4",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-5",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-6",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-7",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-9",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-10",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-11",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-12",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-13",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-14",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-15",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-16",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-17",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-18",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S20-19",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-20",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-22",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-23",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-24",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-25",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-26",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-27",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S20-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-29",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-30",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-31",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-32",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-33",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-34",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-35",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-37",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-38",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-39",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-40",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-41",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-42",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-43",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-44",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-45",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S20-46",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-47",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-48",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S20-49",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S20-50",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S20-51",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-52",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S20-53",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S20-54",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-1",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-2",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-3",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-4",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-5",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-6",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-7",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-8",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-9",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-10",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-11",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-12",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-13",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-14",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-15",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-16",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-17",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-18",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-19",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-20",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-21",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-22",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-23",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-24",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-25",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-26",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-27",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-28",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-29",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-30",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-31",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-32",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-33",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-34",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-35",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-36",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-37",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-38",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-39",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-40",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-41",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-42",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-43",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-44",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-45",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-46",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "S21-47",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-48",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-49",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-50",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-51",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-52",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-53",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-54",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-55",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "S21-56",
+      "status": "DONE"
+    },
+    {
+      "source_id": "S21-57",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-001",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-002",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-003",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-004",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-005",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-006",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-007",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-008",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-009",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-010",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-011",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-012",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "source_id": "ADD-MOTION-013",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-014",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-015",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-016",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-017",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-018",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-019",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-020",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-021",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-022",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-023",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-024",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-025",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-026",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-027",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-028",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-029",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-030",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-031",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-032",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-033",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-034",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-035",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-036",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-037",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-038",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-039",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-040",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-041",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-042",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-043",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-044",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-045",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-046",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-047",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-048",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-049",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-050",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-051",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-052",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-053",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-054",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-055",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-056",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-057",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-058",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "ADD-MOTION-059",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-060",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-061",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-062",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-063",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-064",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-065",
+      "status": "DONE"
+    },
+    {
+      "source_id": "ADD-MOTION-066",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-067",
+      "status": "PARTIAL"
+    },
+    {
+      "source_id": "ADD-MOTION-068",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "ADD-MOTION-069",
+      "status": "UNRECONCILED"
+    },
+    {
+      "source_id": "ADD-MOTION-070",
+      "status": "UNRECONCILED"
+    }
+  ]
+}

@@ -2,7 +2,11 @@
 
 상태: `CURRENT_PRODUCT`
 
-진입점은 [`MainActivity.kt`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt), runtime 정본은 버전 관리되는 Gradle 설정과 asset config입니다. [Android README](../../../apps/android/README.md)는 완료 증거에 결속된 과거 snapshot이므로 그 안의 절대 APK 경로와 dated hash를 현행 명령으로 사용하지 않습니다. 이 문서는 패키지를 찾기 위한 안내이며 기능 정책과 완료 상태를 새로 정하지 않습니다.
+기준일: 2026-09-30. [인수인계 시작 문서](../../handoff/2026-09-30/README.md), [현재 상태·검증 범위](../../handoff/2026-09-30/status.md), [Part A](../../handoff/2026-09-30/part-a.md), [Part B](../../handoff/2026-09-30/part-b.md)를 먼저 확인합니다.
+
+진입점은 [`MainActivity.kt`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt), runtime 정본은 버전 관리되는 Gradle 설정과 asset config입니다. [Android README](../../../apps/android/README.md)는 현재 소스 안내와 표시된 과거 기록을 함께 담습니다. 과거 절대 APK 경로·dated hash·smoke 결과는 해당 버전의 이력으로만 사용합니다. 이 문서는 패키지를 찾기 위한 안내이며 기능 정책과 완료 상태를 새로 정하지 않습니다.
+
+`MainActivity`는 로그인·동의·보행 상태와 센서·카메라·추론·음성·길안내·출력 연결을 조립합니다. Part A가 이 파일의 단일 수정 담당이며 Part B가 연결 변경을 필요로 하면 Part A에 요청합니다. 세부 담당 항목과 인수 조건은 위 분담 문서를 따릅니다.
 
 ## 패키지 책임
 
@@ -16,19 +20,22 @@
 | [`navigation/`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/) | GPS·방향·걸음, TMAP 경로, 이탈·도착·점자블록 안내 |
 | [`network/`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/) | Gateway 로그인·세션·동의·계정 삭제와 전송 정책 |
 | [`report/`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/) | 신고 후보·동의·cooldown·업로드 |
-| [`session/`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/) | 최초 실행·교육·권한·보행 생명주기·개인정보 상태 |
+| [`session/`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/) | 최초 실행·교육·권한·보행 생명주기, 통합 동의·Backend 권한 재확인·CAS journal |
 | [`security/`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/) | AndroidKeyStore 기반 민감 설정 암호화 |
 | [`fieldlog/`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/) | debug 현장 session의 암호화 metadata-only 기록 |
 | [`debuglog/`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/debuglog/) | debug source set 진단 전송; release는 no-op |
 
 Android가 직접 사용하는 모델 선택·class·tensor·hash는 [`two_model_runtime.json`](../../../apps/android/app/src/main/assets/model-config/two_model_runtime.json), 서버 요청 표면은 [Gateway OpenAPI](../../../apps/android-gateway/openapi.json)를 기준으로 봅니다.
 
-저장소 루트에서 debug APK를 만들고 설치할 때는 현재 checkout 기준 상대경로를 사용합니다.
+새 clone에서는 [Vosk 모델 준비 스크립트](../../../scripts/prepare_vosk_ko_small_model.py)를 먼저 실행합니다. JDK·SDK·로컬 설정은 [개발 환경 가이드](../development-environment-guide.md#android-사용자관리자-앱), 앱별 실행·기기시험은 [Android 앱별 테스트 가이드](../android-apps-testing-guide.md)를 따릅니다. 저장소 루트에서 debug APK를 만들고 시험 전용 단말에 설치할 때는 현재 checkout 기준 상대경로를 사용합니다.
 
 ```bash
+python3 scripts/prepare_vosk_ko_small_model.py
 (cd apps/android && ./gradlew :app:assembleDebug --no-daemon)
 adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk
 ```
+
+통합 동의의 저장된 확인서 복원은 [`IntegratedConsentPolicy.kt`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt)의 현재 Backend 권한 확인과 분리되며, 서버 재확인 전에는 전송을 허용하지 않습니다. CAS 충돌의 거부 선택 보존과 production V2 압축 journal은 [`RejectedConsentCasJournalCodec.kt`](../../../apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/RejectedConsentCasJournalCodec.kt), 실제 prefs 저장·HTTP 연결은 `MainActivity`에서 확인합니다. 현재 연동 근거는 JVM 클라이언트→Gateway→Backend이며 실제 Activity·encrypted prefs 프로세스 재시작·최신 APK 설치는 미검증입니다.
 
 ## 변경 시 확인
 

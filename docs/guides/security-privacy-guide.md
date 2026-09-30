@@ -22,6 +22,20 @@
 
 데이터 항목·보존·삭제의 상세 기준은 [데이터 관리 산출물](../deliverables/08-ai-ml-data/data-management.md)과 보안·개인정보 계획의 SEC-05~09를 따른다.
 
+### Android 수집 경로별 보존·반출 요약 (비정본 안내)
+
+수집 경로마다 항목과 수명주기가 다르므로 한 규칙으로 묶지 않는다. 아래 표는 현행 코드의 위치와 시험만 안내한다. 수집 목적·항목·동의·보존의 정본은 [기능 정책](../control/decision-interview/walksafe-feature-policy-comprehensive-draft.json)의 FP-034와 NPC-RAW-ORIGINAL-COLLECTION이다.
+
+| 경로 | 빌드 | 동의·게이트 | 휴대폰 저장 | 종료 | 철회 | 전체 삭제 | 반출 |
+|---|---|---|---|---|---|---|---|
+| RAW 런타임 집계 (`rawcollection/`) | 전체 | RAW 원본 동의, 보행 ACTIVE, 동의 영수증(연속은 바로 다음 revision만) | 앱 전용 저장소 암호화 세그먼트, 코드상 30일 만료. 용량 프로필이 없으면 보행마다 올릴 수 있는 세그먼트 2개(봉인 1 + 진행 1)만 받고, 이전 보행분은 칸에서 빼 만료까지 보관, 판독 불가 격리본은 2개에서 새 수집 보류 | 봉인 안 된 집계 폐기 | 영수증 fence(연속 영수증 포함), 선택 중지, 그 영수증 체인의 미전송 세그먼트 즉시 삭제. 서버가 동의를 거절(409)한 세그먼트와 연속을 입증하지 못한 영수증 세그먼트도 삭제 | 전체 삭제와 키 폐기 | 일시정지 재확인, Wi-Fi, Gateway 보행 lease(현재 보행 id)일 때만 업로드 |
+| 서버 metadata 로그 (`debuglog/`) | debug만(release는 Noop) | RAW 원본 동의 | 메모리 큐만 | 보행 출력 취소 시 진행 중 전송 취소 | 비활성화와 큐 폐기 | 비활성화 | 개발 서버 전용 |
+| 프레임 JPEG (`debuglog/`) | debug만(release는 Noop) | RAW 원본 동의, 전송 정지 판정 | 메모리 1건만, 끝나면 0으로 지움 | 보행 출력 취소 시 진행 중 전송 취소 | 진행 중 전송 취소 | 진행 중 전송 취소 | 개발 서버 전용 |
+| 현장 세션 로그 (`fieldlog/`) | debug만(release는 Noop) | 명시 시작, RAW 동의 철회 시 차단 | 암호화 archive, 앱 안 통계 요약 | 명시 종료 | 차단 | 차단 후 전체 삭제 | 암호문 회수만, 평문 요약은 앱 안에서만 |
+| 실외 위치 시험 raw GNSS (`fieldtest/`) | debug 시험 화면만 | 시험 화면 명시 시작 | `outdoor_position_test/` | 시험 종료 시 파일 닫음 | 해당 없음(보행 밖 시험) | 계정 삭제 정리에서 폴더 삭제 | 사용자가 고른 문서 제공자로만 내보냄 |
+
+경로별 시험은 `CollectionPathLifecycleStaticTest`, `DebugCollectionArtifactsTest`, `RawCollectionRuntimeWalkCoverageTest`에서 확인한다. 서명된 release APK에서 실제 네트워크 요청이 없는지는 별도의 실기기 확인이 필요하다.
+
 ## 취약점 발견·신고
 
 공개 issue에 취약점 세부정보, 개인정보 또는 비밀값을 올리지 않는다.

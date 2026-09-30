@@ -1,14 +1,14 @@
 # WalkSafe 팀 작업 흐름
 
-이 문서는 기능 분담부터 검토·인수인계까지의 공통 절차입니다. Goal 활성화, 정책 승인, 산출물 상태 전환의 정본이 아니며 저장소 [`AGENTS.md`](../../AGENTS.md), [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)와 checkpoint가 가리키는 focus Goal 계약이 우선합니다. hash로 봉인된 과거 재개 안내서의 상태·gate 명령은 현행 절차로 실행하지 않습니다.
+이 문서는 기능 분담부터 검토·인수인계까지의 공통 절차입니다. Goal 활성화, 정책 승인, 산출물 상태 전환의 정본이 아니며 저장소 [`AGENTS.md`](../../AGENTS.md)의 현재 기능 우선 원칙과 [2026-09-30 두 사람 인계](../handoff/2026-09-30/README.md)가 현행 기능 작업의 시작점입니다. hash로 봉인된 과거 재개 안내서의 상태·gate 명령은 현행 절차로 실행하지 않습니다.
 
 ## 1. 작업 선택
 
 1. [프로젝트 가이드](project-guide.md)에서 제품 경계와 완료 판단을 확인합니다.
-2. [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)의 focus, ready frontier, `next_action`을 확인합니다.
-3. [수정 백로그 r026](../control/audits/walksafe-implementation-remediation-backlog-20260812-r026.json)에서 선행 의존성과 남은 Gap을 확인합니다.
-4. [기능 구현·분담 목록](../planning/walksafe_feature_implementation_catalog.html)에서 분야·우선순위·상태를 좁히고 담당 충돌을 확인합니다.
-5. 현재 실행 권한이 없는 Goal이나 외부 증거가 필요한 항목은 구현 완료로 잡지 않습니다.
+2. [사용자 A](../handoff/2026-09-30/part-a.md) / [팀원 B](../handoff/2026-09-30/part-b.md)의 담당 ID와 파일 소유를 확인합니다.
+3. [상세 원문·잔여](../handoff/2026-09-30/remaining-items.json)를 현행 코드·기존 시험과 대조해 작은 묶음을 고릅니다.
+4. MainActivity는 A, 공통 build/manifest와 서버 계약은 B가 단독 수정하며 교차 연결은 최소 패치를 인계합니다.
+5. 원문상 기기·외부 증거가 필요한 항목은 해당 증거 없이 완료로 올리지 않습니다. 미정합은 원문·현행 대조 전 확정 버그로 취급하지 않습니다.
 
 기능 목록의 상태는 팀 탐색용 요약입니다. 정책과 현재 실행 leaf를 바꾸지 않습니다.
 
@@ -37,12 +37,12 @@
 
 ## 4. 브랜치와 변경
 
-- 시작 전에 원격 `current`와 로컬 기준을 확인하고 기존 사용자 변경을 보존합니다.
+- 공통 통합 브랜치는 `temp`입니다. 시작 전에 원격·로컬 기준과 기존 변경을 확인합니다. 각 담당은 별도 브랜치에서 구현하고 작은 묶음을 순차 통합합니다.
 - 한 브랜치는 하나의 기능 또는 결합이 필수인 작은 변경 묶음을 다룹니다.
 - 브랜치 이름은 기능 ID를 알 수 있게 `feature/<기능-ID>-<짧은-설명>`, 결함은 `fix/<기능-ID>-<짧은-설명>`, 문서는 `docs/<주제>` 형태를 권장합니다.
 - 주변 코드 정리나 unrelated refactor를 섞지 않습니다.
 - 비밀값, 사용자 원자료, 운영 로그, 로컬 환경 파일을 커밋하지 않습니다.
-- 통제 파일이나 기존 승인 산출물을 바꿔야 하면 먼저 [`AGENTS.md`](../../AGENTS.md), 현재 checkpoint와 focus Goal의 event-scoped 결속 계약을 확인합니다.
+- 통제 파일이나 기존 승인 산출물을 바꿔야 하면 먼저 [`AGENTS.md`](../../AGENTS.md), 해당 승인·불변 자료의 변경 절차를 확인합니다. 일반 기능 개선에 과거 통제 복구를 새 시작 조건으로 붙이지 않습니다.
 
 폴더와 파일 배치는 [저장소 가이드](repository-guide.md), 도구 준비는 [개발 환경 가이드](development-environment-guide.md)를 따릅니다.
 

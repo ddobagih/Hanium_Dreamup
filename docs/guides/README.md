@@ -7,11 +7,15 @@
 가이드와 실제 기록이 다르면 다음 순서로 확인합니다.
 
 1. 승인 정책은 [정책 기준선 1.0.1](../control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json)을 따릅니다.
-2. 현재 작업과 다음 행동은 [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)를 따릅니다. hash로 봉인된 [과거 재개 안내서](../control/walksafe-project-resumption-runbook.md)의 상태·focus·활성화 문구와 v2.3·전환 준비 시점 v2.4 gate 명령은 현행 지시로 실행하지 않습니다.
+2. 현재 기능 개선·분담·잔여는 [2026-09-30 인계](../handoff/2026-09-30/README.md), [최근 daylog](../../daylog/2026-09-30.md), [실행 계획](../planning/walksafe-feature-improvement-execution-20260926.md)을 확인합니다. [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)는 기존 통제·승인 경계를 확인하는 별도 자료입니다. hash로 봉인된 [과거 재개 안내서](../control/walksafe-project-resumption-runbook.md)의 상태·focus·활성화 문구와 v2.3·전환 준비 시점 v2.4 gate 명령은 현행 지시로 실행하지 않습니다.
 3. 산출물 상태는 [current notice](../deliverables/00-control/artifact-register-current-notice-20260728-r001.md)에서 연결하는 [산출물 관리대장](../deliverables/00-control/artifact-register.json)과 [변경이력](../deliverables/00-control/artifact-change-log.json)을 따릅니다.
 4. 코드별 실행·설정은 실제 source, OpenAPI, lock, runtime config를 따릅니다. 날짜가 있거나 hash로 결속된 모듈 README가 이 계약과 충돌하면 역사 snapshot으로 봅니다.
 
 중앙 가이드가 위 자료의 값을 복제해 새 기준으로 사용되어서는 안 됩니다.
+
+## 현재 두 사람 작업
+
+잔여 항목은 [A 사용자189개](../handoff/2026-09-30/part-a.md), [B 팀원188개](../handoff/2026-09-30/part-b.md)로 나눴습니다. 원문·최신 잔여·첫 작업은 [항목 상세](../handoff/2026-09-30/remaining-items.json), 실제 시험 수치와 미검증 범위는 [현황](../handoff/2026-09-30/status.md)을 확인합니다. 기능 변경은 `AGENTS.md`의 기능 우선 원칙과 파일 단독 담당을 따릅니다.
 
 ## 시작 안내
 
@@ -39,10 +43,10 @@
 ## 분야별 실제 안내
 
 - 애플리케이션 경계: [apps 안내](../../apps/README.md)
-- Android 사용자 앱: [현재 코드 지도](code/android-user.md) · [결속된 과거 Android README](../../apps/android/README.md)
+- Android 사용자 앱: [현재 코드 지도](code/android-user.md) · [Android 사용자 앱 README](../../apps/android/README.md)
 - 별도 시각화 테스트 앱: [격리 소스 안내](../../tools/visual-test/README.md). 원본 앱을 덮어쓰지 않고 커밋된 소스로 별도 작업 폴더를 구성합니다.
 - Android 관리자 앱: [관리자 앱 안내](../../apps/android/adminapp/README.md)
-- Android Gateway: [현재 코드 지도](code/android-gateway.md) · [결속된 과거 Gateway README](../../apps/android-gateway/README.md)
+- Android Gateway: [현재 코드 지도](code/android-gateway.md) · [Gateway README](../../apps/android-gateway/README.md)
 - Backend: [Backend 안내](../../backend/README.md)
 - 모델과 데이터: [모델 안내](../../model/README.md), [데이터 소스 안내](../../data_sources/README.md)
 - API 계약과 설정: [계약 안내](../../contracts/README.md), [설정 안내](../../configs/README.md)
@@ -59,5 +63,5 @@
 - 중앙 가이드에는 탐색 경로와 반복 가능한 절차만 둡니다.
 - 정책값, 현재 목표, 시험 수치처럼 바뀌는 값은 정본을 링크하고 필요한 최소 경계만 요약합니다.
 - 링크한 경로를 옮길 때는 참조 검사와 통제 파일 결속을 먼저 확인합니다.
-- 새 세부사항은 source 가까운 README에 두되, hash로 봉인돼 직접 고칠 수 없는 과거 README는 중앙 코드 지도에서 현행 계약과 차이를 명시합니다.
+- 새 세부사항은 현행 source 가까운 README에 둡니다. 날짜형 검증 섹션·과거 실행 증거·protected Goal 문서는 역사 자료로 보존하고 현재 결과와 구분합니다.
 - 실행하지 않은 시험, 배포, 외부 검토를 문서 작성만으로 완료 처리하지 않습니다.

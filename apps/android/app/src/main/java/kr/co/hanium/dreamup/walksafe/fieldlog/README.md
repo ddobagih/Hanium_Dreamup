@@ -17,13 +17,15 @@
 
 실제 미지원 기기 gate는 같은 source commit을 주입한 고정 debug field APK와 그 APK의 SHA-256을 사용한다. 서명 release APK는 별도 SHA로 검증되며, debug field 세션은 release APK 자체를 실기기에서 실행했다는 근거가 아니다. 15분 continuity는 정확한 1 Hz를 주장하지 않고 표본 60개 이상, span 900초 이상, 표본 간격 1~30초를 확인한다.
 
+debug APK의 `debuglog` HTTP 업로더(depth log·frame capture)는 이 field session log와 별개이며 Backend의 평문 debug 저장소(`ANDROID_DEBUG_LOG_ENABLED`)로만 보낸다. 그 저장소는 앱 계층 암호화가 없어 개발 환경의 비민감 자료만 허용하고 field/staging/production Backend는 켜진 설정을 시작 단계에서 거부한다(S1617-31 결정 A). 현장 시험 중 실제 보행 카메라 이미지를 frame capture로 개발 서버에 보내지 않는다.
+
 앱 또는 model-config hash가 active session의 manifest와 달라지면 이전 세션을 `app_or_model_provenance_changed`로 종료하고 새 세션을 자동 시작한다. 서로 다른 APK의 record가 한 session에 섞이지 않는다.
 
 활성 field session 동안 `MainActivity`는 `FLAG_KEEP_SCREEN_ON`을 설정하고 명시 종료 시 해제한다. 이는 화면이 켜진 foreground 수집만 보조하며 background ARCore·위치·걸음 수집을 구현하는 foreground service가 아니다.
 
 field session 시작은 Android 위치·신체 활동 권한을 요청하고 허용된 GPS·step service를 시작한다. 저장소에는 정확한 좌표 대신 위치 신뢰 여부·accuracy·age만 기록한다.
 
-주기 telemetry는 ARCore `onDrawFrame()`에서 생성되므로 ARCore session이 시작되지 않으면 GPS·step service가 활성화돼도 주기 표본은 쌓이지 않는다.
+주기 telemetry는 ARCore `onDrawFrame()`에서 생성되므로 ARCore session이 시작되지 않으면 GPS·step service가 활성화돼도 주기 telemetry 표본은 쌓이지 않는다. 대신 debug build는 렌더링과 독립된 `walksafe-field-heartbeat` 타이머(1 s)로 `field_heartbeat` event를 남긴다. `state`는 `RENDERING_STOPPED`(3 s 넘게 onDrawFrame 없음)·`NO_FRAME`(렌더 루프는 돌지만 telemetry frame 없음)·`SENSOR_NOT_READY`(신뢰 위치 없음)·`FRAMES_FLOWING`이며, 걸음 수·위치 신뢰 여부·age·경로 활성만 담는다(좌표 없음). 공백 상태는 매 주기, `FRAMES_FLOWING`은 재개될 때 한 번만 기록한다.
 
 암호문 원문 회수(정상적으로 summary unavailable/종료코드 1):
 

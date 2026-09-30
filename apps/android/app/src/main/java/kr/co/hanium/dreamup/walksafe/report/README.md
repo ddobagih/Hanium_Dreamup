@@ -4,20 +4,27 @@
 
 ## 허용 조건
 
-- class는 `damaged_tactile_block`
-- model key는 `custom_tactile` 또는 `unified_walksafe`
+- 전송 class는 공통 `damaged_tactile_block`(모델 class: `custom_tactile`·`unified_walksafe`의
+  `damaged_tactile_block`, `walkmate_21cls`의 손상 선형 ID 1·손상 점형 ID 3)
+- model key는 `custom_tactile`, `unified_walksafe`, `walkmate_21cls`
 - fresh metric depth와 Device Gate PASS
 - 자동 trigger는 서로 다른 완료 추론 3개, 700ms 안정성, detection confidence 0.70 이상을 모두 충족
 - trusted GPS와 report JPEG
 - 검증된 첫 실행 actor binding에서 유도되고 활성 Gateway session actor와 일치하는 `reporter_user_id`
 
-`AndroidReportCandidatePolicy`가 allowlist metadata를 만들고 `AndroidReportUploader`가 `metadata`와 `image` part를 전송한다. 자동 신고 성공 후 같은 named actor/class의 실제 GPS 25m 반경에는 10분 cooldown을 적용한다. 성공 cooldown만 app-private preferences에 저장해 Activity/process 재생성 후 복원하고, 만료 정리와 최대 512개 제한을 적용한다. cell 경계와 tracker ID 변경으로 우회하지 않으며 명시적 voice trigger만 cooldown을 우회한다. 이 client gate가 backend 중복 판정이나 병합을 대체하지는 않는다.
+`AndroidReportCandidatePolicy`가 allowlist metadata를 만들고 `AndroidReportUploader`가 `metadata`와 `image` part를 전송한다. 자동 신고 성공 후 같은 named actor/class의 실제 GPS 25m 반경에는 10분 cooldown을 적용한다. 성공 cooldown만 app-private preferences에 저장해 Activity/process 재생성 후 복원하고, 만료 정리와 최대 512개 제한을 적용한다. cell 경계와 tracker ID 변경으로 우회하지 않는다. 직접 신고(`voice`·`on_screen`)는 cooldown과 자동
+신고의 3회·700ms·0.70 기준을 적용받지 않는 대신 건별 전송 확인을 거친다. 이 client gate가 backend 중복 판정이나 병합을 대체하지는 않는다.
 
 `reporter_user_id` metadata는 인증 credential 자체가 아니다. Android가 검증된 actor와 일치하는 Gateway session으로 요청하고 Gateway가 Backend report API로 중계하며, 이 흐름은 공공기관 자동 제출 기능이 아니다.
 
 실패한 전송은 생성 보행 ID나 선택 동의 receipt가 바뀌어도 생성 당시 reporter actor와 현재
-로그인 actor가 정확히 같은 경우에만 현재 서버 확인 receipt로 다시 승인한 다음 정지·일시정지·종료
-전송 기회에 복구한다. actor binding이 없는 v1 queue envelope는 v2에서 전송하지 않는
+로그인 actor가 정확히 같은 경우에만 현재 서버 확인 receipt로 다시 승인한 다음, 보행을 끝낸 뒤(소유자
+결정 3(b), FP-032-DETAIL-02: 명시 종료 ENDED와 새 보행 준비·앱 재시작의 READY. 시스템 안전정지 SAFE_STOP은 명시
+종료가 아니므로(Root 결정 R4) 사용자가 끝내거나 새 보행을 시작할 때까지 보내지 않는다) 앱 전경과 허용 네트워크(Wi-Fi, 또는
+이동통신망 전송을 선택한 경우 이동통신망) 조건에서만 복구 전송한다. 신고에는 충전 조건이 없다. 보행 중·일시정지
+중에는 새 전송을 시작하지 않고, 새 보행이 시작되면 진행 중 전송도 다음 확인 지점에서 멈추며, 남은 신고는 다음
+보행 종료 뒤 전송 기회(보행 종료 직후, 앱 시작·전경 복귀, 로그인 세션 변경, 네트워크 변경)까지 암호화 보관된다.
+Gateway도 같은 기기의 active 보행 중 `/api/reports/v2`를 409 `report_walk_in_progress`로 거부한다. actor binding이 없는 v1 queue envelope는 v2에서 전송하지 않는
 fail-closed 자료다. queue에 저장된 생성 시 receipt는 감사 provenance로 유지한다. 자동 신고는 현재
 자동신고 선택을 추가로 확인하고, 정확한
 성공 receipt 후 cooldown을 내구 저장한 뒤에만 queue 원본을 삭제한다.
@@ -72,7 +79,9 @@ fail-closed된다. account 삭제는 terminal 우선순위라 이후 consent 변
 전송을 재검증하도록 취소하지만 명시 신고 queue를 삭제하지 않는다.
 
 capacity profile이 없는 build도 이전 활성 build의 잔존 자료를 없애기 위한 consent/account privacy
-purge는 실행한다. 비활성 build에서는 신규 저장·조회·만료정리는 storage를 열지 않는다. consent
+purge는 실행한다. 비활성 build에서는 신규 저장·조회를 위해 storage를 열지 않지만, 하루 1회
+`ReportQueueCleanupJobService`가 통신 없이 `pruneExpired()`로 이미 남아 있는 만료 항목을 정리한다.
+JobScheduler는 best-effort라 30일 TTL이 정확히 30일 시점의 물리 삭제를 뜻하지는 않는다. consent
 purge는 key generation tombstone 뒤 향후 승인된 활성 build로 전환할 수 있도록 빈 fresh key를
 만들지만, terminal account 삭제 뒤에는 새 키를 만들지 않는다.
 
@@ -82,3 +91,14 @@ production 승인값은 기본값으로 넣지 않았으므로 현재 production
 새 queue 활성 flag가 아니다. 활성화 전에는 지원 기기에서 포화·강제종료 복구와 별도 process의
 file-lock 경쟁을 포함한 계측 시험을 통과해야 한다. app-private storage를 바꿀 수 있는 비협조
 동일-UID 주체에 대한 handle-relative I/O 방어는 현재 보장 범위가 아니다.
+
+## 결과 의미와 시험 범위
+
+queue의 `DELETED_AFTER_STATUS`·`DELETED_AFTER_UPLOAD`는 report ID·payload SHA-256·byte 수가 일치하는
+WalkSafe 서버 접수 영수증을 확인했다는 뜻이다. 관리자 검토나 공공기관 전달 완료가 아니며 이 client는
+기관에 제출하지 않는다. `RETRY_DEFERRED`+`SUPPRESSED_BY_COOLDOWN`은 서버 중복 제한으로 원본을 보관한
+상태이고, `QUARANTINED`는 400·413·415·422로 재전송하지 않도록 격리해 TTL/개인정보 정리까지 암호화
+보관한 상태다.
+
+report 단위 시험의 JPEG fixture는 앞뒤 marker(`FF D8 … FF D9`)만 가진 작은 바이트라 정책·queue 계약만
+검증한다. 실제 JPEG 디코딩, Gateway 중계와 Backend 재인코딩을 잇는 계약 시험은 별도로 필요하다.

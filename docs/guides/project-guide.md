@@ -16,15 +16,15 @@ WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프
 | Backend | 계정·신고·공간·감사 데이터와 내부 API 제공 | 지원 서비스, 운영 준비와 출시 승인은 별도 |
 | Web/PWA | 과거 동작과 회귀를 위한 참고 코드 | 제품 경계 `LEGACY_REFERENCE_ONLY`·저장소 분류 `LEGACY_REFERENCE`, 현재 제품·출시 근거로 사용 금지 |
 
-제품 경계의 상세 설명은 [애플리케이션 안내](../../apps/README.md), 사용자 앱은 [현재 Android 코드 지도](code/android-user.md), 관리자 앱은 [관리자 앱 안내](../../apps/android/adminapp/README.md), Gateway는 [현재 Gateway 코드 지도](code/android-gateway.md), 서버는 [Backend 안내](../../backend/README.md)에서 확인합니다. hash로 결속된 Android·Gateway README는 과거 snapshot으로만 봅니다.
+제품 경계의 상세 설명은 [애플리케이션 안내](../../apps/README.md), 사용자 앱은 [현재 Android 코드 지도](code/android-user.md), 관리자 앱은 [관리자 앱 안내](../../apps/android/adminapp/README.md), Gateway는 [현재 Gateway 코드 지도](code/android-gateway.md), 서버는 [Backend 안내](../../backend/README.md)에서 확인합니다. 모듈 README는 현행 안내이며, 그 안의 날짜형 검증과 과거 실행 증거는 해당 시점의 기록으로 구분합니다.
 
 ## 무엇이 정본인가
 
 | 판단 | 확인할 자료 |
 |---|---|
 | 승인된 기능·안전·운영 정책 | [정책 기준선 1.0.1](../control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json) |
-| 현재 목표·focus·다음 행동 | [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json) |
-| 현행 작업 시작·종료·증거 결속 절차 | 저장소 [`AGENTS.md`](../../AGENTS.md), [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json), checkpoint가 가리키는 focus Goal 계약 |
+| 현재 기능 개선·분담·다음 행동 | [2026-09-30 인계](../handoff/2026-09-30/README.md), [최근 daylog](../../daylog/2026-09-30.md), [기능 개선 실행 계획](../planning/walksafe-feature-improvement-execution-20260926.md) |
+| 현행 기능 작업·파일 소유·완료 판정 | 저장소 [`AGENTS.md`](../../AGENTS.md)의 기능 우선 원칙, [팀 작업 흐름](team-workflow.md), 자기 파트 원문 성공 조건 |
 | 과거 재개 절차 감사 자료 | [hash로 봉인된 재개 안내서](../control/walksafe-project-resumption-runbook.md). 상태·focus·활성화·gate 명령을 현행으로 실행하지 않음 |
 | 산출물별 현재 상태 | [산출물 current notice](../deliverables/00-control/artifact-register-current-notice-20260728-r001.md)에서 연결하는 DOC-01 |
 | 요구사항과 예정 시험 연결 | [요구사항 추적표](../deliverables/03-requirements/rtm.json) |
@@ -40,7 +40,7 @@ WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프
 - 출시 gate 5개는 모두 `NOT_RUN`·미면제입니다.
 - 현재 출시는 `NOT_ELIGIBLE`입니다.
 
-최신 focus와 다음 행동은 이 문서에 복사하지 않고 [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)의 `goal_execution.focus_goal_id`와 `current_work.next_action`을 직접 확인합니다.
+최신 기능 상태와 다음 행동은 [인계 현황](../handoff/2026-09-30/status.md)과 자기 파트에서 확인합니다. 과거 checkpoint의 focus를 현재 기능 분담으로 재사용하지 않습니다. 필수 기기·외부 증거가 남은 항목은 PARTIAL로 유지합니다.
 
 ## 기능 계획과 분담
 
@@ -48,10 +48,10 @@ WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프
 
 작업을 고를 때는 다음 순서를 지킵니다.
 
-1. [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)에서 현재 focus와 실행 가능 경계를 확인합니다.
-2. [수정 백로그 r026](../control/audits/walksafe-implementation-remediation-backlog-20260812-r026.json)에서 의존성과 남은 작업을 확인합니다.
-3. [기능 구현·분담 목록](../planning/walksafe_feature_implementation_catalog.html)에서 담당과 충돌 여부를 조정합니다.
-4. 현재 코드 지도, 실제 source·OpenAPI·lock·runtime config와 관련 테스트를 확인한 뒤 범위를 확정합니다. 날짜형·hash 결속 README는 역사 snapshot으로 구분합니다.
+1. [두 사람 인계](../handoff/2026-09-30/README.md)에서 자기 담당 ID와 파일 소유를 확인합니다.
+2. [항목 상세](../handoff/2026-09-30/remaining-items.json)의 원문·잔여·의존성을 현행 코드와 대조합니다. 미정합은 이 대조부터 수행합니다.
+3. 같은 원인의 작은 묶음을 선택하고 상대 담당과 연결 계약·통합 순서를 맞춥니다.
+4. 실제 source·OpenAPI·lock·runtime config와 관련 시험으로 범위를 확정합니다. 과거 카탈로그·r026은 당시 참고 자료이며 최신 잔여를 대신하지 않습니다.
 
 구체적인 협업 순서는 [팀 작업 흐름](team-workflow.md)을 따릅니다.
 

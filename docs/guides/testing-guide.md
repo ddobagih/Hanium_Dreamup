@@ -1,5 +1,20 @@
 # 테스트 가이드
 
+현재 기능 개선의 실행별 결과·기존 실패·후속 검증은 [2026-09-30 현황](../handoff/2026-09-30/status.md)에 있다. 기능 변경은 관련 직접 시험을 먼저 실행하고 필요한 범위만 넓힌다. 전체 계층 runner의 inventory·외부 환경 실패를 해당 기능 직접 시험의 성공과 혼동하지 않는다.
+
+## 기능별 직접 시험
+
+저장소 루트 기준 예시다. 실제 변경에 맞는 클래스/파일로 좁혀 실행한다.
+
+```bash
+(cd apps/android && ./gradlew :app:testDebugUnitTest --tests '*RejectedConsentCasJournalCodecTest')
+(cd apps/android && ./gradlew :adminapp:testDebugUnitTest)
+npm --prefix apps/android-gateway run typecheck
+.venv-backend/bin/python -m pytest backend/tests/test_tmap_call_budget.py -q
+```
+
+Gateway 전체 `npm test`는 build 과정에서 해당 checkout의 `dist`를 다시 만든다. 공유 checkout에서 동시에 실행하지 않는다. 실제 PostgreSQL·TCP·기기 시험은 해당 파일의 선택형 환경과 전제를 준비하며 skip·환경 실패를 PASS로 집계하지 않는다. 계층 runner는 전체 묶음과 inventory 확인용으로 아래 안내를 사용한다.
+
 이 문서는 저장소의 개발 자동 테스트를 실행하고 결과를 해석하는 입구다. 정식 시험의 계획·판정 정본은 [시험계획](../deliverables/06-testing/test-plan.md)과 [279개 시험 케이스 원장](../deliverables/06-testing/registers/test-cases.json)이며, 이 문서가 그 내용을 복제하거나 바꾸지 않는다.
 
 ## 먼저 구분할 것
@@ -30,7 +45,7 @@
 
 백업 무결성 테스트는 `BACKUP_INTEGRITY_PYTHON_TESTS`에 한 번만 등록되어 `integration`과 `all`에서 실행된다. 일반 `PYTHON_BIN`은 CPython 3.12 환경으로 유지하고, Linux memfd sealing preflight와 전용 최소 lock을 통과한 정확한 CPython 3.14.6 venv의 절대경로를 `WALKSAFE_BACKUP_PYTHON_BIN`에 지정한다. 이 값이 없거나 preflight가 실패하면 runner는 일반 Python으로 대신 실행하지 않고 실패한다.
 
-연결된 emulator·실기기 instrumentation은 `integration`에 `WALKSAFE_RUN_ANDROID_DEVICE_TESTS=true`를 명시할 때만 `connectedDebugAndroidTest`로 실행된다. TFLite host invoke도 `WALKSAFE_TFLITE_SMOKE_IMAGE`와 필요 시 `WALKSAFE_TFLITE_PYTHON`을 지정한 경우에만 추가된다. 이 opt-in이 없으면 해당 결과는 `NOT_RUN`이다.
+연결된 emulator·실기기 instrumentation은 `integration`에 `WALKSAFE_RUN_ANDROID_DEVICE_TESTS=true`를 명시할 때만 `connectedDebugAndroidTest`로 실행된다. TFLite host invoke는 integration에서 실행되며 `WALKSAFE_TFLITE_SMOKE_IMAGE`가 없으면 합성 회색 입력을 사용한다. 실제 이미지 입력은 이 옵션으로 지정하고 Python 실행환경은 `WALKSAFE_TFLITE_PYTHON`으로 선택한다. 합성 입력 invoke 성공은 실제 탐지 정확도·실기기 성능 증거가 아니다. 기기 instrumentation opt-in이 없으면 기기 결과는 `NOT_RUN`이다.
 
 Integration의 unsigned release 정적 빌드는 사용자 Gateway와 관리자 API에 예약된 `.invalid` HTTPS origin을 주입한다. 필요하면 `WALKSAFE_RELEASE_TEST_GATEWAY_ORIGIN`과 `WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN`으로 정확한 테스트 origin을 바꿀 수 있지만, 이 값과 unsigned APK는 실제 배포 endpoint·서명·출시 증거가 아니다.
 
