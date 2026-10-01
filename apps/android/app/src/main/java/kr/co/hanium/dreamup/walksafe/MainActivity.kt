@@ -1409,6 +1409,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val reportQueueDrainCoordinator by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         ReportQueueDrainCoordinator(reportQueueStore)
     }
+    private val automaticReportWithdrawalRecovery by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        kr.co.hanium.dreamup.walksafe.report.AutomaticReportWithdrawalRecovery(
+            readPending = {
+                check(!sensitivePrefs.isBlocked())
+                sensitivePrefs.getString(PREF_PENDING_AUTOMATIC_REPORT_WITHDRAWALS, null)
+            },
+            writePending = { marker ->
+                if (sensitivePrefs.isBlocked()) false else {
+                    val editor = sensitivePrefs.edit()
+                    if (marker == null) editor.remove(PREF_PENDING_AUTOMATIC_REPORT_WITHDRAWALS)
+                    else editor.putString(PREF_PENDING_AUTOMATIC_REPORT_WITHDRAWALS, marker)
+                    editor.commit()
+                }
+            },
+            revoke = reportQueueDrainCoordinator::onAutomaticReportingRevoked,
+        )
+    }
     private val reportQueueDrainExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "walksafe-report-queue-drain").apply {
             priority = Thread.NORM_PRIORITY - 1
@@ -8704,7 +8721,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         updatePriorityUserOnboardingUi()
         updateFirstRunOnboardingUi()
         updateNavigationStatus("login=logged_out independent_preferences_retained")
-        speakInteraction("로그아웃했습니다. 운영체제 권한과 신고 동의, 통신 설정은 그대로 유지됩니다.")
+        speakInteraction("로그아웃했습니다. 다시 로그인한 계정의 동의를 확인한 뒤 기능을 사용할 수 있습니다.")
         if (::startupCapabilityProbe.isInitialized) refreshStartupCapabilityUi()
     }
 
@@ -8899,6 +8916,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun reapplyActorBoundIntegratedConsent() {
+        val automaticWithdrawalResolved = automaticReportWithdrawalRecovery.recover()
         val process = GatewaySessionProcessCoordinator.snapshot()
         val session = process.session
         val confirmation = integratedConsentSession.currentConfirmationOrNull()
@@ -8914,7 +8932,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 rawSourceCollection = integratedConsentSession.isAllowed(
                     IntegratedConsentItem.RAW_SOURCE_COLLECTION,
                 ),
-                automaticReporting = integratedConsentSession.isAllowed(
+                automaticReporting = automaticWithdrawalResolved && integratedConsentSession.isAllowed(
                     IntegratedConsentItem.AUTOMATIC_REPORTING,
                 ),
                 mobileNetworkTransfer = integratedConsentSession.isAllowed(
@@ -8952,17 +8970,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         items: Set<IntegratedConsentItem>,
         recordLocalWithdrawal: Boolean = true,
     ) {
+        val previousReceipt = integratedConsentSession
+            .cachedConfirmationOrNull()
+            ?.backendConsentReceiptSha256
         if (items.isNotEmpty()) {
-            val previousReceipt = integratedConsentSession
-                .cachedConfirmationOrNull()
-                ?.backendConsentReceiptSha256
             cancelReportQueueDrain()
-            if (
-                previousReceipt != null &&
-                IntegratedConsentItem.AUTOMATIC_REPORTING in items
-            ) {
-                reportQueueDrainCoordinator.onAutomaticReportingRevoked(previousReceipt)
-            }
             // S21-50: an in-flight debug JPEG/metadata transfer stops with the RAW withdrawal.
             if (IntegratedConsentItem.RAW_SOURCE_COLLECTION in items) cancelActivityOriginalUploads()
             if (
@@ -9024,6 +9036,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 IntegratedConsentItem.TRAINING_REUSE ->
                     permissionSessionPolicy.setTrainingReuseConsent(false)
             }
+        }
+        if (previousReceipt != null && IntegratedConsentItem.AUTOMATIC_REPORTING in items &&
+            !automaticReportWithdrawalRecovery.recordWithdrawal(previousReceipt)) {
+            updateNavigationStatus("automaticReport=blocked:withdrawal_cleanup_pending")
         }
         postIntegratedConsentUiRefresh()
     }
@@ -27179,7 +27195,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             networkAllowed = networkAllowed,
             consentAllowed = consentAllowed,
             automaticReportingAllowed =
-                consentAllowed &&
+                consentAllowed && automaticReportWithdrawalRecovery.isReady() &&
                     currentConfirmation?.selections?.automaticReporting == true &&
                     integratedConsentSession.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING),
             authorityAllowed = authorityAllowed,
@@ -36385,7 +36401,8 @@ generation != cameraFallbackGeneration
         if (
             !explicitRequest &&
             (
-                !permissionSessionPolicy.snapshot().mayCreateAutomaticReport ||
+                !automaticReportWithdrawalRecovery.isReady() ||
+                    !permissionSessionPolicy.snapshot().mayCreateAutomaticReport ||
                     !integratedConsentSession.isAllowed(
                         IntegratedConsentItem.AUTOMATIC_REPORTING,
                     )
@@ -36524,7 +36541,8 @@ generation != cameraFallbackGeneration
         // Automatic creation follows the effective consent, including local withdrawal.
         if (
             !explicitRequest &&
-            !integratedConsentSession.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING)
+            (!automaticReportWithdrawalRecovery.isReady() ||
+                !integratedConsentSession.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
         ) {
             return "reportCandidate=blocked:automatic_report_consent_required"
         }
@@ -44479,6 +44497,8 @@ generation != cameraFallbackGeneration
         const val MAX_AUTOMATIC_REJECTED_CAS_RECOVERIES = 1
         const val PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION =
             "integrated_consent_server_confirmation_v2"
+        const val PREF_PENDING_AUTOMATIC_REPORT_WITHDRAWALS =
+            "pending_automatic_report_withdrawals_v1"
         const val PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED =
             "local_withdrawal_fail_closed_v1"
         const val PREF_RAW_SOURCE_FIELD_LOG_BLOCKED =
@@ -44569,6 +44589,7 @@ generation != cameraFallbackGeneration
                 PREF_REJECTED_CONSENT_CAS_JOURNAL,
                 PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION,
                 PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED,
+                PREF_PENDING_AUTOMATIC_REPORT_WITHDRAWALS,
                 PREF_ACCOUNT_DELETION_JOURNAL,
                 PREF_ACCOUNT_DELETION_ACTOR_HASH,
                 PREF_ACCOUNT_DELETION_FAIL_CLOSED_MARKER,

@@ -19,6 +19,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -744,6 +745,62 @@ class AndroidReportQueueStoreTest {
                 LATEST_CONSENT,
             ) != null,
         )
+        assertEquals(0, aead.destroyCalls)
+    }
+
+    @Test
+    fun automaticWithdrawalWriteFailureBlocksAutomaticReadsAndNewEntries() {
+        val storage = FakeReportQueueStorage()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2, REPORT_3).map(UUID::fromString))
+        val store = store(storage, FakeQueueAead(), { 1_000L }) { ids.removeFirst() }
+        requireNotNull(store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT))
+        requireNotNull(store.enqueue(ACTOR_ID, metadata(), jpeg(),
+            ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
+        storage.failBeforeAutomaticFence = true
+        assertFalse(store.onAutomaticReportingRevoked(CONSENT))
+        assertTrue(storage.fences.isEmpty())
+        assertEquals(listOf(ReportQueuePriority.EXPLICIT), store.queuedReports().map(QueuedReport::priority))
+        assertNull(store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, LATEST_CONSENT))
+        storage.failBeforeAutomaticFence = false
+        assertTrue(store.onAutomaticReportingRevoked(CONSENT))
+        assertNotNull(store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, LATEST_CONSENT))
+    }
+
+    @Test
+    fun restartRetriesUnfinishedAutomaticWithdrawalBeforeRegrantWithoutDeletingExplicitReports() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2, REPORT_3).map(UUID::fromString))
+        val first = store(storage, aead, { 1_000L }) { ids.removeFirst() }
+        requireNotNull(first.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT))
+        requireNotNull(first.enqueue(ACTOR_ID, metadata(), jpeg(),
+            ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
+        var durable: String? = null
+        storage.failBeforeAutomaticFence = true
+        val firstRecovery = AutomaticReportWithdrawalRecovery({ durable }, { durable = it; true },
+            first::onAutomaticReportingRevoked)
+        assertFalse(firstRecovery.recordWithdrawal(CONSENT))
+
+        // A recreated queue has no in-memory fence; the independent marker still denies regrant.
+        val restored = store(storage, aead, { 1_000L }) { ids.removeFirst() }
+        val restoredRecovery = AutomaticReportWithdrawalRecovery({ durable }, { durable = it; true },
+            restored::onAutomaticReportingRevoked)
+        assertFalse(restoredRecovery.isReady())
+        assertFalse(restoredRecovery.recover())
+        assertNull(restored.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, LATEST_CONSENT))
+
+        storage.failBeforeAutomaticFence = false
+        assertTrue(restoredRecovery.recover())
+        assertTrue(restoredRecovery.isReady())
+        assertNull(durable)
+        assertEquals(listOf(ReportQueuePriority.EXPLICIT), restored.queuedReports().map(QueuedReport::priority))
+        assertNotNull(restored.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, LATEST_CONSENT))
         assertEquals(0, aead.destroyCalls)
     }
 
@@ -1623,6 +1680,7 @@ private class FakeReportQueueStorage(
     private val deleteMatchingEntries: Boolean = true,
     private val deleteMatchingResult: Boolean = true,
 ) : ReportQueueStorage {
+    var failBeforeAutomaticFence = false
     val values = mutableMapOf<String, String>()
     val fences = mutableSetOf<String>()
     private val pendingIntents = mutableSetOf<String>()
@@ -1702,6 +1760,7 @@ private class FakeReportQueueStorage(
         initialPermanentFences: Set<String>,
         permanentFenceForMatch: (reportId: String, envelope: String) -> String?,
     ): Boolean {
+        if (failBeforeAutomaticFence) return false
         fences += pendingFence
         fences += initialPermanentFences
         if (deleteMatchingEntries) {

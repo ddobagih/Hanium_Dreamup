@@ -30,6 +30,7 @@ internal class AndroidReportQueueStore private constructor(
     private val allocatableBytes: () -> Long?,
 ) {
     private val storage by lazy(storageFactory)
+    private var automaticRevocationPending = false
 
     constructor(
         rootDirectory: File,
@@ -97,6 +98,7 @@ internal class AndroidReportQueueStore private constructor(
             (
                 priority == ReportQueuePriority.AUTOMATIC &&
                     (
+                        automaticRevocationPending ||
                         storage.hasFence(AUTOMATIC_REVOCATION_PENDING_FENCE) ||
                             storage.hasFence(
                                 automaticConsentRevokeFence(consentReceiptSha256),
@@ -353,7 +355,8 @@ internal class AndroidReportQueueStore private constructor(
     @Synchronized
     fun onAutomaticReportingRevoked(consentReceiptSha256: String): Boolean {
         if (!REPORT_SHA256_HEX.matches(consentReceiptSha256)) return false
-        return runCatching {
+        automaticRevocationPending = true
+        val completed = runCatching {
             storage.deleteMatchingWithFences(
                 pendingFence = AUTOMATIC_REVOCATION_PENDING_FENCE,
                 initialPermanentFences = setOf(
@@ -365,6 +368,8 @@ internal class AndroidReportQueueStore private constructor(
                     .takeIf { report.priority == ReportQueuePriority.AUTOMATIC }
             }
         }.getOrDefault(false)
+        if (completed) automaticRevocationPending = false
+        return completed
     }
 
     @Synchronized
@@ -445,6 +450,7 @@ internal class AndroidReportQueueStore private constructor(
                 (
                     it.priority != ReportQueuePriority.AUTOMATIC ||
                         (
+                            !automaticRevocationPending &&
                             !access.hasFence(AUTOMATIC_REVOCATION_PENDING_FENCE) &&
                                 !access.hasFence(
                                     automaticConsentRevokeFence(it.consentReceiptSha256),
