@@ -38,6 +38,23 @@ class PlatformVoiceCandidatePolicyTest {
     }
 
     @Test
+    fun agreedZeroConfidenceSettingsCanOpenTheScreen() {
+        val result = assess(listOf("설정", "설정 열어줘", "설정으로 이동"))
+        assertEquals(PlatformVoiceCandidateDisposition.PREVIEW_ONLY, result.disposition)
+        assertEquals(AndroidVoiceAction.OpenSettings, result.previewAction)
+    }
+
+    @Test
+    fun settingsWithConflictingOrUnparsedAlternativesCannotOpenTheScreen() {
+        for (other in listOf("신고해", "도움말", "설정을 변경하지 마")) {
+            val result = assess(listOf("설정", other))
+            assertEquals(PlatformVoiceCandidateDisposition.AMBIGUOUS, result.disposition)
+            assertNull(result.previewAction)
+        }
+        assertNull(assess(listOf("설정"), additionalAlternatives = true).previewAction)
+    }
+
+    @Test
     fun naturalDestinationWithoutParticleCanOnlyOpenSearchCandidates() {
         val result = assess(listOf("편의점 안내해줘"))
         assertEquals(PlatformVoiceCandidateDisposition.PREVIEW_ONLY, result.disposition)

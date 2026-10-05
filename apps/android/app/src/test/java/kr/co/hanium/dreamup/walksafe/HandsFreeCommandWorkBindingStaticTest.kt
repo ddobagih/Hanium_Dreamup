@@ -63,6 +63,23 @@ class HandsFreeCommandWorkBindingStaticTest {
     }
 
     @Test
+    fun locationWaitRemainsOwnedUntilItsSuccessorSearchOrCancellation() {
+        val bind = block("private fun bindHandsFreeCommandWork")
+        assertTrue(bind.contains("it.isAcquiring && it.completionGeneration != before.third"))
+        val pending = block("private fun isHandsFreeCommandWorkPending")
+        assertTrue(pending.contains("it.isAcquiring && it.completionGeneration == work.searchLocationGeneration"))
+        val acquire = block("private fun requestDestinationSearchLocation")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            acquire,
+            "it.searchLocationGeneration == controller.completionGeneration",
+            "performDestinationSearch(reset)",
+            "handsFreeCommandWork === locationWork",
+            "searchGeneration = destinationSearchGeneration",
+            "searchLocationGeneration = null",
+        ))
+    }
+
+    @Test
     fun aCommandResultTimeoutRestartsListeningLikeOtherControllerFailures() {
         val terminal = block("private fun handleHandsFreeVoiceTerminalFailure")
         assertTrue(

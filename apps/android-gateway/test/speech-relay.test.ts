@@ -5,7 +5,7 @@ import path from "node:path";
 import { after, before, beforeEach, test } from "node:test";
 
 import { establishBackendGatewaySession } from "../src/auth.js";
-import { handleGatewayRequest } from "../src/routes.js";
+import { handleGatewayRequest as routeRequest, type GatewayDependencies } from "../src/routes.js";
 import {
   resetSpeechAdmissionForTests,
   SPEECH_STT_RESPONSE_SCHEMA,
@@ -23,6 +23,22 @@ const ACTOR_ID = "account-user-voice";
 const CLIENT_IP = "198.51.100.77";
 
 let stateDirectory = "";
+let backendSessionStatus = 204;
+
+// The router revalidates Backend account sessions before voice admission. Model that boundary
+// separately from the Voice service mock so relay assertions actually reach the voice route.
+function handleGatewayRequest(request: Request, dependencies: GatewayDependencies = {}): Promise<Response> {
+  return routeRequest(request, {
+    ...dependencies,
+    fetchImpl: async (input, init) => {
+      if (String(input) === "http://127.0.0.1:8000/accounts/session-current") {
+        return new Response(null, { status: backendSessionStatus });
+      }
+      assert.ok(dependencies.fetchImpl, "unexpected upstream request");
+      return dependencies.fetchImpl(input, init);
+    }
+  });
+}
 
 before(async () => {
   stateDirectory = await mkdtemp(path.join(tmpdir(), "walksafe-speech-relay-test-"));
@@ -33,6 +49,7 @@ before(async () => {
     WALKSAFE_GATEWAY_SESSION_SECRET: SESSION_SECRET,
     WALKSAFE_GATEWAY_TRUSTED_IP_HEADER: "cf-connecting-ip",
     WALKSAFE_GATEWAY_RATE_LIMIT_DIR: stateDirectory,
+    WALKSAFE_FIELD_WALK_LEDGER_PATH: path.join(stateDirectory, "field-walk-ledger.json"),
     WALKSAFE_VOICE_ENABLED: "true",
     WALKSAFE_VOICE_API_BASE_URL: "http://127.0.0.1:9001",
     WALKSAFE_VOICE_SERVICE_TOKEN: VOICE_TOKEN
@@ -47,6 +64,7 @@ after(async () => {
 
 beforeEach(() => {
   resetSpeechAdmissionForTests();
+  backendSessionStatus = 204;
   for (const name of [
     "WALKSAFE_VOICE_STT_ACTOR_RATE_LIMIT",
     "WALKSAFE_VOICE_STT_MAX_BODY_BYTES",
@@ -229,7 +247,9 @@ test("STT replaces spoofable headers and projects only transcript and acoustic e
     },
     model_revision: MODEL_REVISION
   });
-  assert.equal(telemetry.length, 1);
+  assert.deepEqual(telemetry.map(event => event.event_name), [
+    "walksafe.gateway.request.prepared", "walksafe.gateway.request.finished"
+  ]);
   const serialized = JSON.stringify(telemetry);
   for (const sensitive of ["주변을 설명해줘", VOICE_TOKEN, CLIENT_IP, "execute", "segments"]) {
     assert.equal(serialized.includes(sensitive), false);
@@ -250,6 +270,7 @@ test("STT rejects unknown upstream fields and cumulative oversized request bodie
   assert.equal(malformed.status, 502);
 
   resetSpeechAdmissionForTests();
+  backendSessionStatus = 204;
   process.env.WALKSAFE_VOICE_STT_MAX_BODY_BYTES = "1024";
   const oversized = await handleGatewayRequest(
     new Request("http://127.0.0.1:8081/api/speech/stt", {
@@ -312,6 +333,7 @@ test("STT enforces actor rate and in-flight capacity before another body is read
 
   delete process.env.WALKSAFE_VOICE_STT_ACTOR_RATE_LIMIT;
   resetSpeechAdmissionForTests();
+  backendSessionStatus = 204;
   let releaseFetch!: (response: Response) => void;
   let markStarted!: () => void;
   const started = new Promise<void>(resolve => { markStarted = resolve; });
@@ -402,6 +424,7 @@ test("TTS rejects controls, wrong upstream types, and declared oversize without 
   assert.equal(fetches, 0);
 
   resetSpeechAdmissionForTests();
+  backendSessionStatus = 204;
   const wrongType = await handleGatewayRequest(
     new Request("http://127.0.0.1:8081/api/speech/tts", {
       method: "POST",
@@ -417,6 +440,7 @@ test("TTS rejects controls, wrong upstream types, and declared oversize without 
   assert.equal(wrongType.status, 502);
 
   resetSpeechAdmissionForTests();
+  backendSessionStatus = 204;
   const missingRevision = await handleGatewayRequest(
     new Request("http://127.0.0.1:8081/api/speech/tts", {
       method: "POST",
@@ -436,6 +460,7 @@ test("TTS rejects controls, wrong upstream types, and declared oversize without 
   assert.equal(missingRevision.status, 502);
 
   resetSpeechAdmissionForTests();
+  backendSessionStatus = 204;
   process.env.WALKSAFE_VOICE_TTS_RESPONSE_MAX_BYTES = "1024";
   const oversized = await handleGatewayRequest(
     new Request("http://127.0.0.1:8081/api/speech/tts", {
@@ -454,4 +479,18 @@ test("TTS rejects controls, wrong upstream types, and declared oversize without 
     }
   );
   assert.equal(oversized.status, 502);
+});
+
+
+test("revoked or unavailable Backend account session never reaches Voice", async () => {
+  const cookie = backendSessionCookie();
+  for (const status of [401, 503]) {
+    backendSessionStatus = status;
+    let voiceRequests = 0;
+    const response = await handleGatewayRequest(new Request("http://127.0.0.1:8081/api/speech/stt", {
+      method: "POST", headers: speechHeaders(cookie, "audio/wav"), body: ownedBuffer(wavBytes())
+    }), { fetchImpl: async () => { voiceRequests++; return jsonVoiceStt(); } });
+    assert.equal(response.status, status);
+    assert.equal(voiceRequests, 0);
+  }
 });

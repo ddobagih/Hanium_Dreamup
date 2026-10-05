@@ -205,9 +205,10 @@ class MainActivityVoiceIntegrationStaticTest {
         val start = method("startVoiceCommandRecognition")
         val handsFree = method("handleHandsFreeVoiceCommandListeningStarted")
         assertFalse(start.contains("showNativeUiPage(NativeUiPage.VOICE_COMMAND"))
-        assertTrue(handsFree.contains("nativeUiPage != NativeUiPage.DESTINATION_SEARCH"))
+        assertFalse(handsFree.contains("showNativeUiPage("))
+        assertTrue(handsFree.contains("isInWalkInteractionArea()"))
         assertTrue(source.contains(
-            "if (featureVisible && nativeUiPage.isVoiceInteractionPage()) View.VISIBLE else View.GONE",
+            "if (featureVisible && nativeUiPage == NativeUiPage.DESTINATION_SEARCH) View.VISIBLE else View.GONE",
         ))
         assertTrue(method("speakHomeDestinationVoicePrompt").contains("nativeUiPage.isVoiceInteractionPage()"))
     }

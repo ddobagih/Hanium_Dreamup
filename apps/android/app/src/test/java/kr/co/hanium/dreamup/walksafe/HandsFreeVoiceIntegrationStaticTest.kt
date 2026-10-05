@@ -211,13 +211,13 @@ class HandsFreeVoiceIntegrationStaticTest {
     }
 
     @Test
-    fun homeWakeCommandUsesTheSameHandlerWithoutStartingASecondRecording() {
+    fun homeWakeUsesFreshServerCaptureOrTheExistingLocalInlineHandler() {
         val home = functionBlock("private fun refreshForegroundHomeWakeListening")
         val available = home.substringAfter("result.availability == VoskWakePhraseProbeAvailability.AVAILABLE")
             .substringBefore("// A passive render")
         val acknowledgement = functionBlock("private fun acknowledgeForegroundHomeWake")
         val command = acknowledgement.substringAfter("} else {")
-        assertTrue(acknowledgement.contains("if (command == null)"))
+        assertTrue(acknowledgement.contains("if (command == null || BuildConfig.WALKSAFE_SERVER_STT_ENABLED)"))
         assertTrue(acknowledgement.contains("startVoiceCommandRecognition()"))
         assertTrue(command.contains("handleVoiceCommandPhrases("))
         assertTrue(command.contains("phrases = listOf(command.text)"))
@@ -250,7 +250,7 @@ class HandsFreeVoiceIntegrationStaticTest {
             "val isCurrent =",
             "player.play",
             "if (!isCurrent()) return@play",
-            "if (command == null)",
+            "if (command == null || BuildConfig.WALKSAFE_SERVER_STT_ENABLED)",
         ))
     }
 
@@ -392,7 +392,7 @@ class HandsFreeVoiceIntegrationStaticTest {
     }
 
     @Test
-    fun automaticVoicePageCanRecoverWithoutTakingOverAnExplicitButtonCapture() {
+    fun walkWakeKeepsTheCurrentPageWithoutTakingOverAnExplicitButtonCapture() {
         val start = functionBlock("private fun maybeStartHandsFreeVoiceService")
         val automaticPage = functionBlock("private fun handleHandsFreeVoiceCommandListeningStarted")
         val manualPage = functionBlock("private fun showNativeUiPage")
@@ -404,11 +404,9 @@ class HandsFreeVoiceIntegrationStaticTest {
             "(nativeUiPage==NativeUiPage.VOICE_COMMAND&&!handsFreeVoiceOwnsCommandPage)",
         ))
         assertTrue(start.contains("voiceCommandPromptPending"))
-        assertTrue(ReportStaticSourceInspector.appearsInOrder(
-            automaticPage,
-            "handsFreeVoiceOwnsCommandPage = true",
-            "showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)",
-        ))
+        assertTrue(automaticPage.contains("if (!isInWalkInteractionArea()) return"))
+        assertFalse(automaticPage.contains("showNativeUiPage("))
+        assertTrue(automaticPage.contains("startVoiceCommandRecognition()"))
         assertTrue(manualPage.contains("handsFreeVoiceOwnsCommandPage = false"))
         assertTrue(capture.contains("handsFreeVoiceOwnsCommandPage = false"))
         assertTrue(close.contains("handsFreeVoiceOwnsCommandPage = false"))

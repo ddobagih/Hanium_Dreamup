@@ -90,6 +90,8 @@ class LocalSTTEngine:
         model_revision: str | None = None,
         model_manifest_path: str | Path | None = None,
         model_manifest_sha256: str | None = None,
+        hotwords: str | None = None,
+        initial_prompt: str | None = None,
     ) -> None:
         self.model_size = model_size
         self.model_revision = model_revision
@@ -98,6 +100,8 @@ class LocalSTTEngine:
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.compute_type = compute_type or ("float16" if self.device == "cuda" else "int8")
         self.language = language
+        self.hotwords = (hotwords or "").strip() or None
+        self.initial_prompt = (initial_prompt or "").strip() or None
         self._model = None
         self._loaded_revision: str | None = None
         self._load_lock = Lock()
@@ -139,6 +143,8 @@ class LocalSTTEngine:
             language=self.language,
             beam_size=beam_size,
             vad_filter=True,
+            **({"hotwords": self.hotwords} if self.hotwords else {}),
+            **({"initial_prompt": self.initial_prompt} if self.initial_prompt else {}),
         )
         segments = []
         transcript_parts = []

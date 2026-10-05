@@ -74,6 +74,7 @@ const backendFetch: GatewayFetch = async (input) => {
 
 type LongSession = {
   actor_id: string;
+  account_generation: number;
   device_id: string;
   family_id: string;
   rotation: number;
@@ -115,7 +116,7 @@ async function longSession(response: Response): Promise<LongSession> {
   assert.match(setCookie, /^walksafe_field_session=v6\.[^;]+; Path=\/; HttpOnly; SameSite=Strict; Max-Age=60; Secure$/);
   const body = await response.json() as Omit<LongSession, "cookie">;
   assert.deepEqual(Object.keys(body).sort(), [
-    "absolute_expires_at_epoch_ms", "access_expires_at_epoch_ms", "actor_id", "device_id", "family_id",
+    "absolute_expires_at_epoch_ms", "access_expires_at_epoch_ms", "account_generation", "actor_id", "device_id", "family_id",
     "idle_expires_at_epoch_ms", "refresh_token", "rotation", "session_scope"
   ]);
   return { ...body, cookie: setCookie.split(";", 1)[0]! };
@@ -166,6 +167,7 @@ test("decision 2 email login opts into an unlimited device-bound refresh family"
     required: true,
     authenticated: true,
     actor_id: BACKEND_ACTOR,
+    account_generation: 1,
     session_scope: "general",
     session_mode: "long_lived",
     device_id: "email-long-device-a",
@@ -193,6 +195,7 @@ test("decision 2 email login opts into an unlimited device-bound refresh family"
 
   const rotated = await longSession(await refresh(session));
   assert.equal(rotated.rotation, 1);
+  assert.equal(rotated.account_generation, session.account_generation);
   assert.equal(rotated.family_id, session.family_id);
   assert.equal(rotated.absolute_expires_at_epoch_ms, null);
   assert.deepEqual(gatewayFieldLongSessionBinding(withCookie(rotated.cookie)), binding);

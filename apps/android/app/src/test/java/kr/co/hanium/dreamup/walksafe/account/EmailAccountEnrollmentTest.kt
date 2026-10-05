@@ -17,6 +17,23 @@ import org.junit.Test
 
 class EmailAccountEnrollmentTest {
     @Test
+    fun intermediatePasswordLoginCheckKeepsFenceUntilFinalResponseAndBackgroundCancelsIt() {
+        val fence = AccountRequestFence()
+        fence.enteredForeground()
+        val token = requireNotNull(fence.begin(AccountRemoteAction.PASSWORD_LOGIN, "state-1"))
+        assertTrue(fence.isCurrent(token, "state-1"))
+        assertFalse(fence.isCurrent(token, "state-2"))
+        assertTrue(fence.isInFlight())
+        assertTrue(fence.completeIfCurrent(token, "state-1"))
+        assertFalse(fence.isCurrent(token, "state-1"))
+        val late = requireNotNull(fence.begin(AccountRemoteAction.PASSWORD_LOGIN, "state-1"))
+        fence.enteredBackground()
+        fence.enteredForeground()
+        assertFalse(fence.isCurrent(late, "state-1"))
+        assertFalse(fence.completeIfCurrent(late, "state-1"))
+    }
+
+    @Test
     fun signupDocumentVersionsMatchTheBackendCanonicalDefaults() {
         assertEquals(
             linkedMapOf(

@@ -130,8 +130,10 @@ class MainActivityWalkScreenPortStaticTest {
         assertTrue(nativePrewalk.contains("nativePhoneMountingCheckRequest"))
         val startupActionIndex = nativePrewalk.indexOf("handleStartupCapabilityConfirmAction()")
         listOf(
-            "officialEnvironmentReadiness(expectedEpoch).first != WalkSessionReadinessStatus.READY",
-            "phoneMountingReadiness(expectedEpoch).first != WalkSessionReadinessStatus.READY",
+            "val environmentReadiness = officialEnvironmentReadiness(expectedEpoch)",
+            "environmentReadiness.first != WalkSessionReadinessStatus.READY",
+            "val mountingReadiness = phoneMountingReadiness(expectedEpoch)",
+            "mountingReadiness.first != WalkSessionReadinessStatus.READY",
             "!decision.mayConfirmAndStart",
             "walk.confirmationToken == null",
             "walkSessionReadinessBlockReason(decision) != null",
@@ -198,14 +200,16 @@ class MainActivityWalkScreenPortStaticTest {
         val assignments = Regex("nativeGuidanceStatusText\\.text\\s*=")
         assertTrue("Styling must not overwrite the measured preparation message", assignments.findAll(source).count() == 1)
         assertTrue("The sole guidance writer must remain in the renderer", assignments.containsMatchIn(render))
-        assertTrue(render.contains("nativeGuidanceStatusText.text = nativeGuidanceStatusMessage(presentation)"))
+        assertTrue(render.contains("val detailedGuidance = nativeGuidanceStatusMessage(presentation)"))
+        assertTrue(render.contains("nativeGuidanceStatusText.text = compactGuidance.text"))
+        assertTrue(render.contains("nativeGuidanceStatusText.contentDescription = detailedGuidance"))
         // This is expression-bodied; braces in interpolated strings are not a function body.
         val message = source.substringAfter("private fun nativeGuidanceStatusMessage(")
             .substringBefore("\n    private ")
-        assertTrue(message.contains("nativeDestinationPreparationMessage()"))
-        assertTrue(message.contains("officialEnvironmentMeasurementDetail(currentOfficialEnvironmentAssessment())"))
+        assertTrue(message.contains("nativeGuidancePreflightSummary()"))
+        assertTrue(blockAt("private fun nativeGuidancePreflightSummary()").contains("officialEnvironmentGpsDiagnosticDetail"))
         val start = blockAt("private fun startNativeDestinationGuidance()")
-        assertTrue(start.indexOf("nativeUiPage = NativeUiPage.HOME") in 0 until start.indexOf("beginNativeWalkFromHome()"))
+        assertTrue(start.indexOf("nativeUiPage = NativeUiPage.GUIDANCE") in 0 until start.indexOf("beginNativeWalkFromHome()"))
         assertTrue(start.contains("val destination = pendingUiDestination ?: return"))
         assertTrue(start.contains("pendingNativeUiPage = NativeUiPage.DESTINATION_CONFIRM"))
         assertTrue(start.contains("retainExplicitStartUntilTrustedLocation = true"))

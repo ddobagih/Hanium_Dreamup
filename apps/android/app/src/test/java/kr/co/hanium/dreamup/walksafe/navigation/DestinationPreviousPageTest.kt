@@ -64,7 +64,7 @@ class DestinationPreviousPageTest {
         val dispatch = source.substringAfter("private fun executeVoiceAction(").substringBefore("private fun unrecognizedCommandHintKo()")
         assertTrue(dispatch.contains("AndroidVoiceAction.PreviousDestinationCandidates,"))
         assertTrue(dispatch.contains("AndroidVoiceAction.PreviousDestinationCandidates -> previousVoiceDestinationCandidates()"))
-        assertTrue(dispatch.contains("더 듣기, 이전 후보, 목적지 취소"))
+        assertTrue(VoiceHelpPolicy.descriptions.joinToString(" ").contains("더 듣기, 이전 후보, 목적지 취소"))
         val previous = source.substringAfter("private fun previousVoiceDestinationCandidates() {")
             .substringBefore("private fun startVoiceDestinationSearch(")
         assertTrue(previous.contains("state.onCommand(DestinationSearchVoiceCommand.PreviousPage)"))

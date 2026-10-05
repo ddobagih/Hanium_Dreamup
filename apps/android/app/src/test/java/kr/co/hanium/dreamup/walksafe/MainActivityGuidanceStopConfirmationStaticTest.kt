@@ -96,7 +96,7 @@ class MainActivityGuidanceStopConfirmationStaticTest {
         assertTrue(invalidation.contains("guidanceStopConfirmation.invalidate()"))
         assertTrue(source.substringAfter("private fun resetRouteState(").substringBefore("\n    }\n")
             .contains("invalidateGuidanceStopConfirmation()"))
-        assertTrue(source.substringAfter("private fun showNativeUiPage(page: NativeUiPage, preserveVoiceInteraction: Boolean) {")
+        assertTrue(source.substringAfter("private fun showNativeUiPage(requestedPage: NativeUiPage, preserveVoiceInteraction: Boolean) {")
             .substringBefore("\n    }\n").contains("if (nativeUiPage != page && !preserveVoiceInteraction) invalidateGuidanceStopConfirmation()"))
         assertTrue(source.substringAfter("private fun transitionWalkSession(").substringBefore("\n    }\n")
             .contains("if (transition.changed) invalidateGuidanceStopConfirmation()"))

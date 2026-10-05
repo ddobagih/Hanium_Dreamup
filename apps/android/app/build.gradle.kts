@@ -407,11 +407,22 @@ val verifyBundledVoskModelAssetsRegression by tasks.registering {
     }
 }
 
+val verifyMobileSamAssets by tasks.registering {
+    doLast {
+        listOf("mobile_sam_encoder.onnx", "mobile_sam_decoder.onnx", "mobile_sam_manifest.json").forEach {
+            check(file("src/mobileSam/assets/models/mobilesam/$it").isFile) {
+                "MobileSAM asset $it is missing. See src/mobileSam/README.md for the export command."
+            }
+        }
+    }
+}
+
 tasks.configureEach {
     if (name == "preReleaseBuild") dependsOn(validateWalkSafeSourceCommit)
-    if (name == "mergeDebugAssets" || name == "mergeReleaseAssets") {
+    if (name == "mergeDebugAssets" || name == "mergeReleaseAssets" || name == "mergeMobileSamAssets") {
         dependsOn(verifyBundledVoskModelAssets)
     }
+    if (name == "mergeMobileSamAssets") dependsOn(verifyMobileSamAssets)
 }
 
 android {
@@ -426,6 +437,9 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "WALKSAFE_DEBUG_GATEWAY_ORIGIN_PINNED", "false")
+        buildConfigField("boolean", "WALKSAFE_SERVER_STT_ENABLED",
+            "${providers.gradleProperty("walksafe.serverSttEnabled").orNull == "true"}")
         buildConfigField("String", "WALKSAFE_PRODUCT_ROLE", "\"USER\"")
         buildConfigField("boolean", "WALKSAFE_REPORT_QUEUE_ENABLED", "$reportQueueEnabled")
         buildConfigField(
@@ -490,6 +504,9 @@ android {
             }
             buildConfigField("String", "WALKSAFE_SOURCE_COMMIT", "\"${verifiedSourceCommit ?: "unverified"}\"")
             buildConfigField("String", "WALKSAFE_GATEWAY_ORIGIN", "\"$debugGatewayOrigin\"")
+            // Explicit HTTPS test builds must not silently reuse a saved USB origin.
+            buildConfigField("boolean", "WALKSAFE_DEBUG_GATEWAY_ORIGIN_PINNED",
+                "${!developmentQuickStart && verifiedReleaseGatewayOrigin != null}")
             buildConfigField(
                 "String",
                 "WALKSAFE_BUILD_MARKER",
@@ -536,7 +553,19 @@ android {
                 "proguard-rules.pro"
             )
         }
+        create("mobileSam") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".mobilesam"
+            versionNameSuffix = "-mobilesam-v1.1"
+            matchingFallbacks += "debug"
+            buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walkmate-mobilesam-v1.1\"")
+        }
     }
+
+    if (providers.gradleProperty("mobileSamDeviceTests").orNull == "true") {
+        testBuildType = "mobileSam"
+    }
+    sourceSets.getByName("mobileSam").kotlin.directories.add("src/debug/java")
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
@@ -545,6 +574,7 @@ android {
 
     androidResources {
         noCompress += "tflite"
+        noCompress += "onnx"
     }
 
     buildFeatures {
@@ -704,6 +734,9 @@ androidComponents {
 }
 
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    // macOS exposes /var through a symlink. Test fixtures need a real path so the production
+    // storage symlink rejection is tested, rather than rejecting every TemporaryFolder at /var.
+    systemProperty("java.io.tmpdir", File(System.getProperty("java.io.tmpdir")).canonicalPath)
     systemProperty(
         "walksafe.guidanceStartBypass",
         providers.gradleProperty("walksafe.guidanceStartBypass").orNull.orEmpty(),
@@ -711,6 +744,7 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
 }
 
 dependencies {
+    "mobileSamImplementation"("com.microsoft.onnxruntime:onnxruntime-android:1.30.0")
     implementation("com.google.ar:core:1.54.0")
     implementation("androidx.activity:activity:1.7.0")
     implementation("androidx.camera:camera-camera2:1.6.1")

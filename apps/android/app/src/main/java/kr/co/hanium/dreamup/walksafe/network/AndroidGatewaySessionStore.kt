@@ -47,6 +47,25 @@ internal class AndroidGatewaySessionStore(
         }
     }
 
+    /** Explicit HTTPS debug build switch: discard credentials, preserve a verified installation ID.
+     * Never rebind an existing token to a different server, or recover a corrupt installation key.
+     */
+    fun prepareDebugEndpointSwitch(origin: String): Boolean = synchronized(PROCESS_LOCK) {
+        if (!kr.co.hanium.dreamup.walksafe.BuildConfig.DEBUG ||
+            !kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_DEBUG_GATEWAY_ORIGIN_PINNED ||
+            origin != kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_GATEWAY_ORIGIN ||
+            !origin.startsWith("https://")) return false
+        val marker = "gateway_debug_applied_origin_v1"
+        if (preferences.getString(marker, null) == origin) return true
+        if (!reconcileKeyResetLocked()) return false
+        val verifiedId = runCatching { readInstallDeviceIdLocked(createIfMissing = true, endpointSwitch = true) }.getOrNull()
+        if (verifiedId == null) return false
+        if (!stageKeyResetLocked(KEY_RESET_SCOPE_SESSION) || !reconcileKeyResetLocked()) return false
+        val saved = preferences.edit().putString(marker, origin).commit()
+        if (!saved) markFailClosedLocked()
+        saved
+    }
+
     fun saveInitialIfAbsent(
         session: GatewayFieldSession,
         firstRunSnapshot: FirstRunOnboardingSnapshot,
@@ -1147,6 +1166,7 @@ internal class AndroidGatewaySessionStore(
             .put("idle_expires_at_epoch_ms", session.idleExpiresAtEpochMs)
             .put("absolute_expires_at_epoch_ms", session.absoluteExpiresAtEpochMs)
             .apply {
+                session.backendAccountGeneration?.let { put("backend_account_generation", it) }
                 session.serverAccessExpiresAtEpochMs?.let {
                     put("server_access_expires_at_epoch_ms", it)
                 }
@@ -1154,10 +1174,16 @@ internal class AndroidGatewaySessionStore(
 
     private fun decodeSession(session: JSONObject): GatewayFieldSessionPersistence {
         val keys = session.jsonKeys()
-        require(keys == SESSION_FIELDS || keys == SESSION_FIELDS_WITH_SERVER_EXPIRY)
+        val legacyKeys = keys - "backend_account_generation"
+        require(legacyKeys == SESSION_FIELDS || legacyKeys == SESSION_FIELDS_WITH_SERVER_EXPIRY)
         val persistence = GatewayFieldSessionPersistence(
             gatewayBaseUrl = session.getString("gateway_base_url"),
             actorId = session.getString("actor_id"),
+            backendAccountGeneration = if (session.has("backend_account_generation")) {
+                val value = session.get("backend_account_generation")
+                require(value is Int || value is Long)
+                (value as Number).toLong().also { require(it > 0L) }
+            } else null,
             accessCookiePair = session.getString("access_cookie_pair"),
             refreshToken = session.getString("refresh_token"),
             deviceId = session.getString("device_id"),
@@ -1216,9 +1242,9 @@ internal class AndroidGatewaySessionStore(
         )
     }
 
-    private fun readInstallDeviceIdLocked(createIfMissing: Boolean): String? {
+    private fun readInstallDeviceIdLocked(createIfMissing: Boolean, endpointSwitch: Boolean = false): String? {
         if (!reconcileKeyResetLocked()) return null
-        if (failClosedMarkerPresentLocked()) return null
+        if (!endpointSwitch && failClosedMarkerPresentLocked()) return null
         val encoded = preferences.getString(INSTALL_ID_PREF_KEY, null)
         if (encoded != null) {
             val opened = installIdAead.open(encoded, INSTALL_ID_AAD, INSTALL_ID_LIMITS)

@@ -1,0 +1,17 @@
+{
+  "protocol": "Fixed rectangles chosen before inference; human target names are not model predictions or ground truth.",
+  "cases": [
+    {"id": "japan_crosswalk", "targets": [
+      {"name": "차도 위 유도 띠", "box": [0.4, 0.5, 0.7, 0.95]},
+      {"name": "가까운 점자블록 영역", "box": [0.0, 0.79, 1.0, 1.0]}
+    ]},
+    {"id": "tactile_crosswalk", "targets": [
+      {"name": "어두운 점형 블록 띠", "box": [0.17, 0.32, 0.94, 0.90]},
+      {"name": "횡단보도 쪽 지면", "box": [0.02, 0.06, 0.99, 0.50]}
+    ]},
+    {"id": "driveway", "targets": [
+      {"name": "가운데 차량 진출입로 표면", "box": [0.19, 0.20, 0.90, 0.68]},
+      {"name": "가까운 인도", "box": [0.14, 0.50, 0.99, 1.0]}
+    ]}
+  ]
+}

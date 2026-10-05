@@ -700,13 +700,38 @@ class AndroidFeedbackActuator private constructor(
         message: String,
         onCompleted: () -> Unit,
         onFailed: () -> Unit,
-    ): NavigationSpeechDispatchResult = speak(
-        message = message,
-        priority = SpeechPriority.INTERACTION,
-        onCompleted = onCompleted,
-        onFailed = onFailed,
-        requiresExplicitTerminalCallback = true,
-    )
+    ): NavigationSpeechDispatchResult {
+        if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
+        val chunks = trainingSpeechChunks(message)
+        var ended = false
+        fun fail() {
+            if (ended) return
+            ended = true
+            onFailed()
+        }
+        fun play(index: Int): NavigationSpeechDispatchResult = speak(
+            message = chunks[index],
+            priority = SpeechPriority.INTERACTION,
+            onCompleted = {
+                if (!ended) {
+                    if (index == chunks.lastIndex) {
+                        ended = true
+                        onCompleted()
+                    } else if (play(index + 1) != NavigationSpeechDispatchResult.ACCEPTED) fail()
+                }
+            },
+            onFailed = ::fail,
+            requiresExplicitTerminalCallback = true,
+        )
+        return play(0)
+    }
+
+    /** Only an explicit user retry may reopen an engine that exhausted automatic recovery. */
+    fun retryFailedSpeechInitialization() {
+        if (ttsState == TtsState.FAILED || ttsState == TtsState.LANGUAGE_UNSUPPORTED) {
+            initializeTextToSpeech()
+        }
+    }
 
     /** Queues a low-priority camera advisory without interrupting navigation or risk speech. */
     fun speakAdvisory(

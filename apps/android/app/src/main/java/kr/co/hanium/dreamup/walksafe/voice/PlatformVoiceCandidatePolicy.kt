@@ -64,6 +64,7 @@ internal fun assessPlatformVoiceCandidate(
         return decision(PlatformVoiceCandidateDisposition.AMBIGUOUS)
     }
     val preview = when (candidate) {
+        AndroidVoiceCommand.OpenSettings -> AndroidVoiceAction.OpenSettings
         AndroidVoiceCommand.Help -> AndroidVoiceAction.SpeakVoiceHelp
         is AndroidVoiceCommand.SetDestination -> AndroidVoiceAction.SearchDestination(candidate.placeName)
         is AndroidVoiceCommand.SelectDestinationCandidate -> destinationDialogState

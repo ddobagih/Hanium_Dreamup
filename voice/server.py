@@ -296,6 +296,8 @@ def get_stt_engine() -> LocalSTTEngine:
         device=os.getenv("VOICE_STT_DEVICE") or None,
         compute_type=os.getenv("VOICE_STT_COMPUTE_TYPE") or None,
         language=os.getenv("VOICE_STT_LANGUAGE", "ko"),
+        hotwords=os.getenv("VOICE_STT_HOTWORDS") or None,
+        initial_prompt=os.getenv("VOICE_STT_INITIAL_PROMPT") or None,
     )
 
 

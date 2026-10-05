@@ -283,6 +283,10 @@ internal class AccountRequestFence {
     }
 
     @Synchronized
+    fun isCurrent(token: AccountRequestToken, stateBinding: String): Boolean =
+        foreground && active === token && token.stateBinding == stateBinding
+
+    @Synchronized
     fun completeIfCurrent(token: AccountRequestToken, stateBinding: String): Boolean {
         if (!foreground || active !== token) return false
         active = null

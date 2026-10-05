@@ -49,11 +49,15 @@ class AndroidIntegratedConsentCasLiveHandoffTest {
             approvedAccountOrigin = origin,
             allowDebugAccountOrigin = true,
         )
+        // A long-session Gateway keeps both device sessions alive for this two-device CAS test.
+        val longSessions = fixture.optBoolean("long_lived_sessions", false)
         val sessionA = sessionClient.loginWithPassword(
-            origin, fixture.getString("email"), fixture.getString("password"), false,
+            origin, fixture.getString("email"), fixture.getString("password"), longSessions,
+            enableLongLivedSession = longSessions,
         )
         val sessionB = sessionClient.loginWithPassword(
-            origin, fixture.getString("email"), fixture.getString("password"), false,
+            origin, fixture.getString("email"), fixture.getString("password"), longSessions,
+            enableLongLivedSession = longSessions,
         )
         val client = AndroidIntegratedConsentClient()
         val initialChoices = IntegratedConsentSelections(

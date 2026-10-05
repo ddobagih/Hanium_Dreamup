@@ -427,7 +427,7 @@ test("completion latency is integer-clamped and 5xx is explicit", () => {
 test("telemetry sink failure does not change the gateway response contract", async () => {
   const response = await handleGatewayRequest(
     new Request("http://127.0.0.1:8081/privacy/rights"),
-    { telemetrySink: () => { throw new Error("monitor unavailable"); } }
+    { privacyRightsRequestUrl: "", telemetrySink: () => { throw new Error("monitor unavailable"); } }
   );
 
   assert.equal(response.status, 503);
@@ -444,7 +444,7 @@ test("S19-56 telemetry separates response preparation from delivery completion",
     new Request("http://127.0.0.1:8081/privacy/rights", {
       headers: { "x-request-id": CANONICAL_REQUEST_ID }
     }),
-    { telemetrySink: event => events.push(event) }
+    { privacyRightsRequestUrl: "", telemetrySink: event => events.push(event) }
   );
   // Preparing the Response object is not delivery.
   assert.deepEqual(

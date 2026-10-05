@@ -5,6 +5,31 @@ from types import SimpleNamespace
 from voice.stt import LocalSTTEngine, summarize_acoustic_evidence
 
 
+def test_server_hints_are_independently_optional(monkeypatch):
+    from voice.server import get_stt_engine
+
+    for hotwords, prompt in (("왕십리역, 도움말", ""), ("", "한국어 보행 안내 음성입니다."), ("", ""), ("  ", "  ")):
+        monkeypatch.setenv("VOICE_STT_HOTWORDS", hotwords)
+        monkeypatch.setenv("VOICE_STT_INITIAL_PROMPT", prompt)
+        get_stt_engine.cache_clear()
+        try:
+            engine = get_stt_engine()
+            captured = {}
+
+            def transcribe(_path, **kwargs):
+                captured.update(kwargs)
+                return iter(()), SimpleNamespace(language="ko")
+
+            engine._model = SimpleNamespace(transcribe=transcribe)
+            engine._loaded_revision = "a" * 40
+            assert engine.transcribe_file("unused.wav").transcript == ""
+            assert captured.get("hotwords") == (hotwords.strip() or None)
+            assert captured.get("initial_prompt") == (prompt.strip() or None)
+            assert captured["vad_filter"] is True
+        finally:
+            get_stt_engine.cache_clear()
+
+
 def test_clear_spoken_segments_allow_intent_execution():
     evidence = summarize_acoustic_evidence(
         [

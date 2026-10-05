@@ -87,7 +87,8 @@ class AndroidGatewaySessionStoreStaticTest {
     @Test
     fun serverExpiryIsOptionalForExistingEncryptedV4SessionsAndUnknownFieldsRemainRejected() {
         assertTrue(source.contains("val SESSION_FIELDS_WITH_SERVER_EXPIRY = SESSION_FIELDS +"))
-        assertTrue(source.contains("keys == SESSION_FIELDS || keys == SESSION_FIELDS_WITH_SERVER_EXPIRY"))
+        assertTrue(source.contains("val legacyKeys = keys - \"backend_account_generation\""))
+        assertTrue(source.contains("legacyKeys == SESSION_FIELDS || legacyKeys == SESSION_FIELDS_WITH_SERVER_EXPIRY"))
         assertTrue(source.contains("put(\"server_access_expires_at_epoch_ms\", it)"))
         assertTrue(source.contains("session.has(\"server_access_expires_at_epoch_ms\")"))
         assertTrue(source.contains("require(it >= persistence.accessExpiresAtEpochMs)"))

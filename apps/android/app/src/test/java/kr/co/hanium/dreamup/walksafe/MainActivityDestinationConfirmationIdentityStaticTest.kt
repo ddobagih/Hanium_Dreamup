@@ -34,7 +34,10 @@ class MainActivityDestinationConfirmationIdentityStaticTest {
             "private fun selectVoiceDestinationCandidate(oneBasedIndex: Int) {",
             "private fun explainRouteCommandUnavailable(",
         )
-        assertEquals(2, Regex("selectedDestinationSpeechKo\\(selected\\)").findAll(selection).count())
+        assertEquals(1, Regex("selectedDestinationSpeechKo\\(selected\\)").findAll(selection).count())
+        assertTrue(selection.contains("openNativeDestinationConfirmation(selected)"))
+        val confirmation = block("private fun openNativeDestinationConfirmation(", "private fun nativeDestinationConfirmationMessage(")
+        assertTrue(confirmation.contains("selectedDestinationSpeechKo(result)"))
         assertFalse(selection.contains("\"\${selected.name} 목적지를 선택했습니다."))
         val speech = block(
             "private fun selectedDestinationSpeechKo(selected: DestinationSearchResult): String =",

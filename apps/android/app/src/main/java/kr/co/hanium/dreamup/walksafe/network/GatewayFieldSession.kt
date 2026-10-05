@@ -158,6 +158,7 @@ class GatewayFieldSession private constructor(
             idleExpiresAtEpochMs = idleExpiresAtEpochMs,
             absoluteExpiresAtEpochMs = absoluteExpiresAtEpochMs,
             serverAccessExpiresAtEpochMs = serverAccessExpiresAtEpochMs,
+            backendAccountGeneration = backendAccountGeneration,
         )
     }
 
@@ -312,6 +313,7 @@ class GatewayFieldSession private constructor(
             idleExpiresAtEpochMs: Long,
             absoluteExpiresAtEpochMs: Long,
             serverAccessExpiresAtEpochMs: Long,
+            backendAccountGeneration: Long?,
         ): GatewayFieldSession = GatewayFieldSession(
             gatewayBaseUrl = gatewayBaseUrl,
             actorId = actorId,
@@ -324,6 +326,7 @@ class GatewayFieldSession private constructor(
             idleExpiresAtEpochMs = idleExpiresAtEpochMs,
             absoluteExpiresAtEpochMs = absoluteExpiresAtEpochMs,
             serverAccessExpiresAtEpochMs = serverAccessExpiresAtEpochMs,
+            backendAccountGeneration = backendAccountGeneration,
             verificationState = GatewaySessionVerificationState.VERIFIED,
             sessionScope = GatewaySessionScope.GENERAL,
         )
@@ -353,6 +356,7 @@ class GatewayFieldSession private constructor(
                 return null
             }
             if (snapshot.rotation < 0L) return null
+            if (snapshot.backendAccountGeneration?.let { it <= 0L } == true) return null
             if (
                 nowEpochMs >= snapshot.idleExpiresAtEpochMs ||
                 nowEpochMs >= snapshot.absoluteExpiresAtEpochMs ||
@@ -403,6 +407,7 @@ class GatewayFieldSession private constructor(
                 idleExpiresAtEpochMs = snapshot.idleExpiresAtEpochMs,
                 absoluteExpiresAtEpochMs = snapshot.absoluteExpiresAtEpochMs,
                 serverAccessExpiresAtEpochMs = serverAccessExpiry,
+                backendAccountGeneration = snapshot.backendAccountGeneration,
                 verificationState = GatewaySessionVerificationState.RESTORED_UNVERIFIED,
                 sessionScope = GatewaySessionScope.GENERAL,
             )
@@ -465,6 +470,7 @@ class GatewayFieldSession private constructor(
             idleExpiresAtEpochMs: Long,
             absoluteExpiresAtEpochMs: Long,
             serverAccessExpiresAtEpochMs: Long = accessExpiresAtEpochMs,
+            backendAccountGeneration: Long? = null,
         ): GatewayFieldSession = longLivedVerified(
             gatewayBaseUrl,
             actorId,
@@ -477,6 +483,7 @@ class GatewayFieldSession private constructor(
             idleExpiresAtEpochMs,
             absoluteExpiresAtEpochMs,
             serverAccessExpiresAtEpochMs,
+            backendAccountGeneration,
         )
 
         internal fun backendAccountDeviceSession(
@@ -515,6 +522,7 @@ internal class GatewayFieldSessionPersistence(
     val idleExpiresAtEpochMs: Long,
     val absoluteExpiresAtEpochMs: Long,
     val serverAccessExpiresAtEpochMs: Long? = null,
+    val backendAccountGeneration: Long? = null,
 ) {
     override fun toString(): String =
         "GatewayFieldSessionPersistence(actorId=$actorId, deviceId=$deviceId, rotation=$rotation, credentials=redacted)"
@@ -800,6 +808,7 @@ class GatewayFieldSessionClient(
         rememberMe: Boolean,
         deviceId: String = GatewayCredentialPolicy.newDeviceId(),
         nowEpochMs: Long = System.currentTimeMillis(),
+        enableLongLivedSession: Boolean = false,
     ): GatewayFieldSession {
         if (
             !GatewayAccountInputPolicy.validEmail(email) ||
@@ -819,6 +828,9 @@ class GatewayFieldSessionClient(
         }.getOrElse {
             throw GatewaySessionHttpException(0, "invalid_gateway_url")
         }
+        if (enableLongLivedSession && !rememberMe) {
+            throw GatewaySessionHttpException(0, "gateway_refresh_not_allowed")
+        }
         val endpoint = "$approvedOrigin/api/field-session"
         val loginStartedAtNanos = elapsedRealtimeNanos()
         val login = transport.postJson(
@@ -829,6 +841,7 @@ class GatewayFieldSessionClient(
                 .put("password", password)
                 .put("remember_me", rememberMe)
                 .put("device_id", device)
+                .apply { if (enableLongLivedSession) put("session_mode", "long_lived") }
                 .toString(),
         )
         val responseNowEpochMs = runCatching {
@@ -839,6 +852,32 @@ class GatewayFieldSessionClient(
         }.getOrElse { throw GatewaySessionHttpException(0, "invalid_gateway_cookie") }
         if (login.statusCode != 200) {
             throw login.toSessionException("account_password_login_failed")
+        }
+        if (enableLongLivedSession) {
+            val actor = runCatching { JSONObject(login.responseBody).strictStringOrNull("actor_id") }
+                .getOrNull()?.takeIf { BACKEND_ACCOUNT_ACTOR_ID.matches(it) }
+                ?: throw GatewaySessionHttpException(0, "gateway_actor_binding_failed")
+            val session = parseLongLivedSession(
+                response = login, gatewayBaseUrl = approvedOrigin,
+                expectedActorId = actor, expectedDeviceId = device,
+                expectedFamilyId = null, expectedRotation = 0L,
+                expectedAbsoluteExpiresAtEpochMs = null,
+                forbiddenCredential = password, forbiddenAccessCredential = null,
+                nowEpochMs = nowEpochMs, requestStartedAtNanos = loginStartedAtNanos,
+                requireBackendAccountGeneration = true,
+            )
+            try {
+                val status = transport.get(endpoint, session.requestHeaders(responseNowEpochMs))
+                val json = runCatching { JSONObject(status.responseBody) }.getOrNull()
+                if (status.statusCode != 200 || json == null ||
+                    json.strictStringOrNull("actor_id") != actor || !statusMatchesLease(json, session)
+                ) throw GatewaySessionHttpException(0, "gateway_actor_binding_failed")
+            } catch (error: Exception) {
+                runCatching { transport.delete(endpoint, session.logoutHeaders()) }
+                session.invalidate()
+                throw error
+            }
+            return session
         }
         val loginJson = runCatching { JSONObject(login.responseBody) }.getOrNull()
         if (
@@ -1026,6 +1065,8 @@ class GatewayFieldSessionClient(
                 forbiddenAccessCredential = proof.accessToken,
                 nowEpochMs = nowEpochMs,
                 requestStartedAtNanos = refreshStartedAtNanos,
+                expectedBackendAccountGeneration = session.backendAccountGeneration,
+                requireBackendAccountGeneration = session.backendAccountGeneration != null,
             )
         } catch (error: RuntimeException) {
             session.invalidate()
@@ -1210,6 +1251,8 @@ class GatewayFieldSessionClient(
         forbiddenAccessCredential: String?,
         nowEpochMs: Long,
         requestStartedAtNanos: Long,
+        expectedBackendAccountGeneration: Long? = null,
+        requireBackendAccountGeneration: Boolean = false,
     ): GatewayFieldSession {
         val responseNowEpochMs = runCatching {
             Math.addExact(
@@ -1228,10 +1271,15 @@ class GatewayFieldSessionClient(
             ?: throw GatewaySessionHttpException(statusCode = 0, reason = "invalid_gateway_cookie")
         val json = runCatching { JSONObject(response.responseBody) }.getOrNull()
             ?: throw GatewaySessionHttpException(statusCode = 0, reason = "invalid_gateway_login_response")
+        val responseFields = LONG_LIVED_SESSION_RESPONSE_FIELDS +
+            if (requireBackendAccountGeneration) setOf("account_generation") else emptySet()
+        val accountGeneration = json.strictLongOrNull("account_generation")
         // Long-lived session protocol: exactly the Gateway sessionResponse fields, JSON integers
         // only (no string or decimal coercion) and the general scope.
         if (
-            json.jsonKeySet() != LONG_LIVED_SESSION_RESPONSE_FIELDS ||
+            json.jsonKeySet() != responseFields ||
+            (requireBackendAccountGeneration && (accountGeneration == null || accountGeneration <= 0L)) ||
+            (expectedBackendAccountGeneration != null && accountGeneration != expectedBackendAccountGeneration) ||
             json.strictStringOrNull("session_scope") != GatewaySessionScope.GENERAL.wireValue
         ) {
             throw GatewaySessionHttpException(
@@ -1320,6 +1368,7 @@ class GatewayFieldSessionClient(
             idleExpiresAtEpochMs = idleExpiresAtEpochMs,
             absoluteExpiresAtEpochMs = absoluteExpiresAtEpochMs,
             serverAccessExpiresAtEpochMs = accessExpiresAtEpochMs,
+            backendAccountGeneration = accountGeneration,
         )
     }
 
@@ -1329,16 +1378,20 @@ class GatewayFieldSessionClient(
     ): Boolean {
         if (!session.isLongLived) return true
         val fields = statusJson.jsonKeySet()
+        val expectedFields = LONG_LIVED_STATUS_FIELDS +
+            if (session.backendAccountGeneration != null) setOf("account_generation") else emptySet()
         if (
-            fields != LONG_LIVED_STATUS_FIELDS &&
-            fields != LONG_LIVED_STATUS_FIELDS + "capacity"
+            fields != expectedFields &&
+            fields != expectedFields + "capacity"
         ) {
             return false
         }
         if (GatewayCapacityParser.fromSessionStatus(statusJson) == GatewayCapacityParseResult.Malformed) {
             return false
         }
-        return statusJson.opt("required") == true &&
+        return (session.backendAccountGeneration == null ||
+            statusJson.strictLongOrNull("account_generation") == session.backendAccountGeneration) &&
+            statusJson.opt("required") == true &&
             statusJson.opt("authenticated") == true &&
             statusJson.strictStringOrNull("session_scope") == GatewaySessionScope.GENERAL.wireValue &&
             statusJson.strictStringOrNull("session_mode") == "long_lived" &&

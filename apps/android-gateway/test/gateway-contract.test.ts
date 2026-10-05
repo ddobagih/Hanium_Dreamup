@@ -282,7 +282,7 @@ const EXPECTED_GATEWAY_METHODS: Readonly<Record<string, readonly string[]>> = {
   "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}": ["put"],
   "/api/raw-collections/{collection_id}": ["get"],
   "/api/raw-collections/{collection_id}/commit": ["post"],
-  "/privacy/rights": ["get", "put"],
+  "/privacy/rights": ["get", "head", "put"],
   "/privacy/account-deletions": ["post"],
   "/privacy/account-deletions/{request_id}/status": ["get"],
   "/privacy/account-deletions/{request_id}/device-evidence": ["post"]

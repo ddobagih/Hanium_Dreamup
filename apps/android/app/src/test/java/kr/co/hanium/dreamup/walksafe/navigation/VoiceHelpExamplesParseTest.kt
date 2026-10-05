@@ -17,9 +17,7 @@ class VoiceHelpExamplesParseTest {
 
     @Test
     fun everySpokenHelpExampleParsesToItsIntendedCommand() {
-        val help = literals(
-            source.substringAfter("AndroidVoiceAction.SpeakVoiceHelp -> {").substringBefore("speakInteraction(help)"),
-        )
+        val help = VoiceHelpPolicy.descriptions.take(2).joinToString(" ")
         val examples = sentences(help).flatMap(::examplesIn)
         assertTrue("help examples found: $examples", examples.size >= 18)
         for (example in examples) assertIntended(example)

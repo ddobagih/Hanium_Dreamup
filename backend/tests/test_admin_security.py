@@ -2776,6 +2776,7 @@ def test_deployment_requires_database_backed_admin_security(
     monkeypatch.setenv("UPLOAD_DIR", str(upload_dir.resolve()))
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://walksafe:test@127.0.0.1/walksafe")
     monkeypatch.setenv("WALKSAFE_ENVIRONMENT", "field")
+    monkeypatch.setenv("INFERENCE_PROCESS_ISOLATION_ENABLED", "true")
     monkeypatch.setenv("WALKSAFE_SOURCE_COMMIT", "a" * 40)
     monkeypatch.setenv("WALKSAFE_FIELD_TEST_SECURITY_ENABLED", "true")
     monkeypatch.setenv("WALKSAFE_FIELD_TEST_TOKEN", "field-token-for-admin-security-tests")
@@ -2783,6 +2784,7 @@ def test_deployment_requires_database_backed_admin_security(
     monkeypatch.setenv("WALKSAFE_GATEWAY_SESSION_SECRET", "gateway-session-secret-for-tests-1234567890")
     monkeypatch.setenv("WALKSAFE_ACTOR_RATE_LIMIT_STORE", "postgresql")
     monkeypatch.setenv("TMAP_APP_KEY", "test-tmap-key")
+    monkeypatch.setenv("TMAP_POI_PROVIDER", "live")
     monkeypatch.setenv(
         "WALKSAFE_MAINTENANCE_LOCK_GROUP",
         config_module.MAINTENANCE_LOCK_GROUP,

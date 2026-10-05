@@ -1183,13 +1183,14 @@ function notifyAllDevicesRevoked(
 function sessionResponse(
   request: Request,
   actorId: string,
-  family: FieldSessionFamily,
+  family: FieldSessionFamily | BackendFieldSessionFamily,
   refreshToken: string,
   accessCookie: string,
   config: FieldLongSessionConfig
 ): Response {
   const serialized = JSON.stringify({
     session_scope: "general",
+    ...("binding" in family ? { account_generation: family.binding.accountGeneration } : {}),
     actor_id: actorId,
     device_id: family.device_id,
     family_id: family.family_id,
@@ -1734,7 +1735,8 @@ export async function refreshPublicFieldLongSession(
 function currentLongSessionIdentity(
   request: Request,
   nowEpochMs: number
-): { identity: FieldLongSessionIdentity; backend: boolean } | null {
+): { identity: FieldLongSessionIdentity; backend: false } |
+   { identity: BackendFieldLongSessionIdentity; backend: true } | null {
   if (hasFieldLongSessionCookie(request)) {
     const identity = fieldLongSessionIdentity(request, nowEpochMs);
     return identity ? { identity, backend: false } : null;
@@ -1749,18 +1751,20 @@ function longSessionFamilies(state: FieldSessionActorState, backend: boolean): F
 
 export function fieldLongSessionStatus(request: Request, nowEpochMs = Date.now()): Response | null {
   if (!hasFieldLongSessionCookie(request) && !isBackendFieldLongSessionCookie(request)) return null;
-  const identity = currentLongSessionIdentity(request, nowEpochMs)?.identity ?? null;
-  if (!identity) {
+  const current = currentLongSessionIdentity(request, nowEpochMs);
+  if (!current) {
     return Response.json(
       { required: true, authenticated: false, actor_id: null, session_scope: null },
       { headers: { "cache-control": "no-store" } }
     );
   }
+  const { identity } = current;
   return Response.json(
     {
       required: true,
       authenticated: true,
       actor_id: identity.actorId,
+      ...(current.backend ? { account_generation: current.identity.binding.accountGeneration } : {}),
       session_scope: "general",
       session_mode: "long_lived",
       device_id: identity.deviceId,

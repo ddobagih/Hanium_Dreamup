@@ -128,31 +128,35 @@ class MainActivityFp016StaticTest {
 
         val handler = blockAt("private fun handleWalkScreenBackPressed()")
         val featureBack = handler.indexOf("if (handleNativeFeatureBackPressed()) return true")
-        val end = handler.indexOf("transitionWalkSession(WalkSessionEvent.EndRequested)")
-        val marker = handler.indexOf("persistWalkSessionInterruptionMarker()")
-        val cancellation = handler.indexOf("cancelWalkSessionOutputs(\"system_back_exit_confirmed\")")
-        val finish = handler.indexOf("finish()")
         assertTrue(featureBack >= 0)
-        assertTrue(handler.contains("state != WalkSessionState.ACTIVE && state != WalkSessionState.PAUSED"))
-        assertTrue(end > featureBack)
-        assertTrue(marker > end)
-        assertTrue(cancellation > marker)
-        assertTrue(finish > cancellation)
+        assertTrue(handler.contains("showWalkExitConfirmationDialog()"))
+        assertFalse(handler.contains("transitionWalkSession(WalkSessionEvent.EndRequested)"))
+        val confirmation = blockAt("private fun finishWalkExitConfirmation(end: Boolean)")
+        assertTrue(confirmation.contains("if (end && current)"))
+        assertTrue(confirmation.contains("executeWalkSessionVoiceAction(WalkSessionVoiceAction.CONFIRM_END, epoch)"))
         val features = blockAt("private fun handleNativeFeatureBackPressed()")
         assertTrue(features.contains("cancelNativeDestinationSearchAndReturnHome()"))
         assertTrue(features.contains("cancelNativeVoiceCommandAndReturnHome()"))
-        assertTrue(features.contains("showNativeUiPage(NativeUiPage.HOME)"))
+        assertTrue(features.contains("returnToCurrentInteractionArea()"))
     }
 
     @Test
     fun appOwnedSpeechStatusRemainsDiscoverableWithoutDuplicateLiveAnnouncements() {
-        listOf("safetySummaryText", "statusText", "gatewayVoiceStatusText", "walkSafetyVoiceStatusText").forEach { name ->
+        listOf("safetySummaryText", "statusText", "walkSafetyVoiceStatusText").forEach { name ->
             val block = blockAt("$name = TextView(this).apply {")
             assertTrue(block.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
             assertTrue(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE"))
             assertFalse(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"))
             assertFalse(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE"))
         }
+    }
+
+    @Test
+    fun spokenTranscriptStaysHiddenFromVisualAndAccessibilityOutput() {
+        val transcript = blockAt("gatewayVoiceStatusText = TextView(this).apply {")
+        assertTrue(transcript.contains("visibility = View.GONE"))
+        assertTrue(transcript.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
+        assertTrue(transcript.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE"))
     }
 
     private fun assertOnlyInsideDebugBlocks(anchor: String, debugBlocks: List<IntRange>) {

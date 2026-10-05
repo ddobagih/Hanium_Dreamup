@@ -1521,6 +1521,16 @@
       }
     },
     "/privacy/rights": {
+      "head": {
+        "operationId": "headPrivacyRightsPage",
+        "description": "Returns headers for the public privacy-rights HTML page with an empty body. This method is supported only without consent control query parameters; the integrated-consent control API permits GET and PUT.",
+        "security": [],
+        "responses": {
+          "200": { "description": "Public privacy-rights page headers; empty body. Cache-Control: no-store." },
+          "405": { "description": "HEAD is not supported by the integrated-consent control API." },
+          "503": { "description": "Privacy-rights page destination is not configured." }
+        }
+      },
       "get": {
         "operationId": "getIntegratedConsentControl",
         "description": "Returns either the authenticated actor/generation- and installation-secret-bound current consent record for control=integrated-consent or the authenticated actor/generation-bound Backend bootstrap projection for control=integrated-consent-bootstrap. Both forms require exactly control, installation_id, and policy_version. An actor-binding mismatch returns integrated_consent_actor_reconsent_required without exposing another actor's selections. S19-31: control=integrated-consent returns the local confirmation (current: true) only after the Backend bootstrap reports READY/CURRENT_CONSENT with the same selections and item versions as the confirmation; a newer receipt from another installation of the account that re-recorded the same selections stays current (S19-31-F1), while different selections or RECONSENT_REQUIRED return 409 integrated_consent_reconsent_required, and a Backend failure fails closed with the Backend or gateway error. A GET without control parameters serves the separate public privacy-rights HTML page.",
@@ -2916,6 +2926,11 @@
           "actor_id": {
             "type": "string"
           },
+          "account_generation": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Required for Backend email long sessions, absent for legacy actor/token sessions. Immutable across refresh and retained by Android encrypted persistence and restore."
+          },
           "device_id": {
             "type": "string"
           },
@@ -3057,6 +3072,11 @@
           },
           "actor_id": {
             "type": "string"
+          },
+          "account_generation": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Required for Backend email long sessions, absent for legacy actor/token sessions. Immutable across refresh and retained by Android encrypted persistence and restore."
           },
           "session_scope": {
             "type": "string",

@@ -23,6 +23,83 @@ import org.junit.Test
 /** Runs the actual actuator with deterministic platform effects, not a second speech policy. */
 class AndroidFeedbackActuatorRuntimeRegressionTest {
     @Test
+    fun longPracticeKeepsEverySentenceAndCompletesOnlyAfterAllChunks() {
+        val message = kr.co.hanium.dreamup.walksafe.session.PriorityUserEducationPresentation.speechText(
+            kr.co.hanium.dreamup.walksafe.session.PriorityUserEducationPlayback.APP_USAGE,
+        )
+        val chunks = trainingSpeechChunks(message)
+        assertTrue(chunks.size > 1)
+        assertEquals(message, chunks.joinToString(" "))
+        assertTrue(chunks.all { it.length <= 240 && it.endsWith(".") })
+        val (runtime, actuator) = readyActuator()
+        val events = Events()
+        assertEquals(NavigationSpeechDispatchResult.ACCEPTED, actuator.speakPriorityUserTraining(
+            message, { events.completed++ }, { events.failed++ },
+        ))
+        var elapsed = 0L
+        chunks.forEachIndexed { index, chunk ->
+            assertEquals(index + 1, runtime.spoken.size)
+            assertEquals(chunk, runtime.spoken.last().message)
+            assertEquals(0, events.completed)
+            val id = runtime.spoken.last().id
+            runtime.start(id)
+            val duration = utteranceTerminalTimeoutMs(chunk.length) - 1
+            runtime.advanceBy(duration)
+            elapsed += duration
+            runtime.done(id)
+        }
+        assertTrue(elapsed > 120_000L)
+        assertEquals(1, events.completed)
+        assertEquals(0, events.failed)
+        assertFalse(actuator.isAppSpeechActive())
+    }
+
+    @Test
+    fun cancelledPracticeDoesNotStartLaterChunksOrCompleteOnLateDone() {
+        val (runtime, actuator) = readyActuator()
+        var completed = 0
+        var failed = 0
+        val message = "첫 번째 설명입니다. ".repeat(30) + "마지막 설명입니다."
+        actuator.speakPriorityUserTraining(message, { completed++ }, { failed++ })
+        val id = runtime.spoken.single().id
+        runtime.start(id)
+        actuator.cancelPriorityUserTrainingFeedback()
+        runtime.done(id)
+        assertEquals(1, runtime.spoken.size)
+        assertEquals(0, completed)
+        assertEquals(1, failed)
+    }
+
+    @Test
+    fun failedPracticeNeedsExplicitRetryAndDoesNotResumeTheOldReading() {
+        val (runtime, actuator) = readyActuator()
+        var completed = 0
+        var failed = 0
+        actuator.speakPriorityUserTraining("첫 설명입니다. ".repeat(30), { completed++ }, { failed++ })
+        val old = runtime.spoken.single().id
+        runtime.start(old)
+        runtime.error(old, TextToSpeech.ERROR_SERVICE)
+        runtime.advanceBy(150_000L)
+        assertEquals("tts=init_failed", actuator.statusText())
+        assertEquals(1, runtime.engines.size)
+        assertEquals(1, failed)
+        assertEquals(0, completed)
+        actuator.retryFailedSpeechInitialization()
+        actuator.retryFailedSpeechInitialization()
+        assertEquals(2, runtime.engines.size)
+        runtime.ready()
+        runtime.done(old)
+        assertEquals(1, runtime.spoken.size)
+        assertEquals(NavigationSpeechDispatchResult.ACCEPTED, actuator.speakPriorityUserTraining(
+            "명시적으로 다시 듣습니다.", { completed++ }, { failed++ },
+        ))
+        runtime.start(runtime.spoken.last().id)
+        runtime.done(runtime.spoken.last().id)
+        assertEquals(1, completed)
+        assertEquals(1, failed)
+    }
+
+    @Test
     fun initializingFalseNeverReplaysAnUnownedInteraction() {
         val runtime = FakeRuntime()
         val actuator = AndroidFeedbackActuator(runtime = runtime)

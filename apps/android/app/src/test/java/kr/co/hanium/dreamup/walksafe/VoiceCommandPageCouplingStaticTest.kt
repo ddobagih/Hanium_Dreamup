@@ -26,14 +26,16 @@ class VoiceCommandPageCouplingStaticTest {
                     "                else NativeUiPage.VOICE_COMMAND",
             ),
         )
-        assertTrue(pageSelection.contains("commandPage?.let { showNativeUiPage(it, preserveVoiceInteraction = true) }"))
+        assertTrue(pageSelection.contains("commandPage?.let { page ->"))
+        assertTrue(pageSelection.contains("if (!isInWalkInteractionArea() || page != NativeUiPage.VOICE_COMMAND)"))
+        assertTrue(pageSelection.contains("showNativeUiPage(page, preserveVoiceInteraction = true)"))
         assertFalse(pageSelection.contains("showNativeUiPage(commandPage, preserveVoiceInteraction = true)"))
     }
 
     @Test
     fun aSkippedPageChangeAlsoSkipsTheDestinationLocationRequestAndReRender() {
         val show = activity
-            .substringAfter("private fun showNativeUiPage(page: NativeUiPage, preserveVoiceInteraction: Boolean) {")
+            .substringAfter("private fun showNativeUiPage(requestedPage: NativeUiPage, preserveVoiceInteraction: Boolean) {")
             .substringBefore("private fun updateNativeHomeGeometry")
         // These side effects live only inside showNativeUiPage, which a read-only answer no longer calls.
         assertTrue(show.contains("if (page == NativeUiPage.DESTINATION_SEARCH) requestDestinationSearchLocation()"))
@@ -43,12 +45,8 @@ class VoiceCommandPageCouplingStaticTest {
     @Test
     fun wakingTheAssistantKeepsTheWalkingGuidancePage() {
         val listening = ReportStaticSourceInspector.functionBlock(activity, "private fun handleHandsFreeVoiceCommandListeningStarted")
-        assertTrue(
-            listening.contains(
-                "if (nativeUiPage != NativeUiPage.DESTINATION_SEARCH && nativeUiPage != NativeUiPage.GUIDANCE) {\n" +
-                    "                showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)",
-            ),
-        )
-        assertFalse(listening.contains("showNativeUiPage(NativeUiPage.GUIDANCE"))
+        assertTrue(listening.contains("if (!isInWalkInteractionArea()) return"))
+        assertTrue(listening.contains("handsFreeVoiceOwnsCommandPage = false"))
+        assertFalse(listening.contains("showNativeUiPage("))
     }
 }

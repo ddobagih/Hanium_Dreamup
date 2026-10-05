@@ -24,6 +24,16 @@ import org.junit.Test
  */
 class ExplicitReportRejectionNoticeTest {
     @Test
+    fun unverifiedCoordinatesHaveASpokenReasonAndRetryAction() {
+        val notice = ExplicitReportRejectionNotice
+        assertEquals(notice.STATUS_COORDINATE_UNVERIFIED,
+            notice.explicitStatus(notice.STATUS_COORDINATE_UNVERIFIED, true))
+        assertEquals(notice.COORDINATE_UNVERIFIED_KO, notice.messageFor(notice.STATUS_COORDINATE_UNVERIFIED))
+        assertTrue(notice.COORDINATE_UNVERIFIED_KO.contains("신고를 저장하지 않았습니다"))
+        assertTrue(notice.COORDINATE_UNVERIFIED_KO.contains("다시 신고해 주세요"))
+    }
+
+    @Test
     fun damageWithoutReportGradeDistanceIsDistinguishedFromNoDamage() {
         val cases = listOf(
             damage("pseudo", source = DepthSource.OBJECT_SIZE_PRIOR),

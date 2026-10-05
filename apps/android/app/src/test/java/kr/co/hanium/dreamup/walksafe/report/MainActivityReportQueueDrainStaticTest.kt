@@ -184,10 +184,14 @@ class MainActivityReportQueueDrainStaticTest {
         assertTrue(withdrawal.contains("cancelReportQueueDrain()"))
         assertTrue(
             withdrawal.contains(
-                "reportQueueDrainCoordinator.onAutomaticReportingRevoked(previousReceipt)",
+                "automaticReportWithdrawalRecovery.recordWithdrawal(previousReceipt)",
             ),
         )
-        val reportRevocation = withdrawal.substringBefore("items.forEach")
+        // Revocation is journaled after the immediate local permission fence; its recovery
+        // provider owns the durable queue purge and blocks draining until that succeeds.
+        assertTrue(source.contains("revoke = reportQueueDrainCoordinator::onAutomaticReportingRevoked"))
+        assertTrue(source.contains("automaticReportWithdrawalRecovery.isReady()"))
+        val reportRevocation = withdrawal
         assertTrue(reportRevocation.contains("IntegratedConsentItem.AUTOMATIC_REPORTING in items"))
         assertFalse(
             reportRevocation.contains(
