@@ -272,6 +272,8 @@ import kr.co.hanium.dreamup.walksafe.voice.BundledVoskModelInstaller
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceController
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceEligibility
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceTerminalFailure
+import kr.co.hanium.dreamup.walksafe.voice.MICROPHONE_INPUT_SILENCED_GUIDANCE
+import kr.co.hanium.dreamup.walksafe.voice.SPEECH_ERROR_INPUT_SILENCED
 import kr.co.hanium.dreamup.walksafe.voice.VoskStreamingError
 import kr.co.hanium.dreamup.walksafe.voice.WalkSafeApplication
 import kr.co.hanium.dreamup.walksafe.voice.WalkVoiceForegroundService
@@ -367,7 +369,11 @@ import kr.co.hanium.dreamup.walksafe.navigation.ROUTE_SNAPSHOT_TTL_MS
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchResult
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceCommand
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState
+import kr.co.hanium.dreamup.walksafe.feedback.CommandSpeechSequence
+import kr.co.hanium.dreamup.walksafe.voice.CommandSpeechTracker
+import kr.co.hanium.dreamup.walksafe.voice.CommandSpeechState
 import kr.co.hanium.dreamup.walksafe.navigation.displayAddressOrNull
+import kr.co.hanium.dreamup.walksafe.navigation.toSpokenDestinationAddressKo
 import kr.co.hanium.dreamup.walksafe.navigation.destinationSearchCanRequestMore
 import kr.co.hanium.dreamup.walksafe.navigation.HomeDestinationVoiceDialogLease
 import kr.co.hanium.dreamup.walksafe.navigation.EarthOrientationAccuracy
@@ -469,6 +475,7 @@ import kr.co.hanium.dreamup.walksafe.network.AccountDeletionRev0RecoveryBinding
 import kr.co.hanium.dreamup.walksafe.network.accountDeletionHttpFailureDisposition
 import kr.co.hanium.dreamup.walksafe.network.executeAccountDeletionCall
 import kr.co.hanium.dreamup.walksafe.network.exactAccountDeletionRev0RecoveryBindingOrNull
+import kr.co.hanium.dreamup.walksafe.network.requiresDeletionReauthentication
 import kr.co.hanium.dreamup.walksafe.network.exactLegacyAccountDeletionRev0ActorBindingOrNull
 import kr.co.hanium.dreamup.walksafe.network.exactLegacyAccountDeletionRev0ActorCandidateOrNull
 import kr.co.hanium.dreamup.walksafe.network.exactLegacyAccountDeletionRev0MarkerBindingOrNull
@@ -573,10 +580,11 @@ import kr.co.hanium.dreamup.walksafe.report.UserReportStatus
 import kr.co.hanium.dreamup.walksafe.report.UserReportSummary
 import kr.co.hanium.dreamup.walksafe.report.UserReportUiPhase
 import kr.co.hanium.dreamup.walksafe.report.UserReportUiState
+import kr.co.hanium.dreamup.walksafe.report.ReportQuarantineReview
+import kr.co.hanium.dreamup.walksafe.report.QuarantineAction
 import kr.co.hanium.dreamup.walksafe.report.automaticCooldownScopeOrNull
 import kr.co.hanium.dreamup.walksafe.report.automaticReportCooldownScopeOrNull
 import kr.co.hanium.dreamup.walksafe.report.canonicalUserReportCorrectionDescriptionOrNull
-import kr.co.hanium.dreamup.walksafe.report.reportRetryDelayMs
 import kr.co.hanium.dreamup.walksafe.report.validUserReportRequestText
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionRuntimeContext
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionRuntimeCoordinator
@@ -584,6 +592,7 @@ import kr.co.hanium.dreamup.walksafe.rawcollection.RawCollectionUploadOutcome
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawConsentSupersede
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawDetectorRuntimeIdentity
 import kr.co.hanium.dreamup.walksafe.rawcollection.rawConsentSupersede
+import kr.co.hanium.dreamup.walksafe.rawcollection.RawMetadataTaskAdmission
 import kr.co.hanium.dreamup.walksafe.rawcollection.RawRuntimeWindowAccumulator
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
 import kr.co.hanium.dreamup.walksafe.security.AndroidKeyStoreAead
@@ -645,6 +654,7 @@ import kr.co.hanium.dreamup.walksafe.session.AccountDeletionIntentAuthorityState
 import kr.co.hanium.dreamup.walksafe.session.FileAccountDeletionIntentAuthority
 import kr.co.hanium.dreamup.walksafe.session.PreparedAccountDeletionConfirmationRecovery
 import kr.co.hanium.dreamup.walksafe.session.PreparedConfirmationRecoveryResult
+import kr.co.hanium.dreamup.walksafe.session.deviceVerificationNoticeFor
 import kr.co.hanium.dreamup.walksafe.session.AccountDeletionJournal
 import kr.co.hanium.dreamup.walksafe.session.AccountDeletionNetworkCallLease
 import kr.co.hanium.dreamup.walksafe.session.AccountDeletionPhase
@@ -1143,6 +1153,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val foregroundHomeWakeInputGeneration = AtomicLong(0L)
     private val commandSpeechResponseCallbacks = UtteranceCallbackRegistry()
     private var commandSpeechResponseGeneration = 0L
+    private val commandSpeechTracker = CommandSpeechTracker()
+    private var commandSpeechOwner: CommandSpeechTracker.Owner? = null
+    private var commandSpeechAttempt: CommandSpeechTracker.Attempt? = null
+
+    private inline fun <T> withCommandSpeechOwner(owner: CommandSpeechTracker.Owner?, block: () -> T): T {
+        val previous = commandSpeechOwner
+        commandSpeechOwner = owner
+        return try { block() } finally { commandSpeechOwner = previous }
+    }
+
+    private fun runOnUiThreadForCommand(owner: CommandSpeechTracker.Owner?, block: () -> Unit) {
+        runOnUiThread { withCommandSpeechOwner(owner, block) }
+    }
     private var voiceCommandPromptPending = false
     private var voiceCommandPromptReadyGeneration: Int? = null
     private var deferredVoiceRecognitionStart: Runnable? = null
@@ -1340,6 +1363,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var emailEnrollmentPartial: EmailEnrollmentPartial? = null
     private var emailEnrollmentOwnerBindingSha256: String? = null
     private var emailEnrollmentStorageBlocked = false
+    private val accountCreationRecoveryPending: Boolean
+        get() = ::emailEnrollmentStore.isInitialized && emailEnrollmentStore.hasUnconfirmedCreation()
+
+    private val accountCreationRecoveryMessage =
+        "이전 가입 요청의 완료 여부를 확인하지 못했습니다. 계정이 이미 만들어졌을 수 있습니다. " +
+            "로그인 버튼을 눌러 가입에 사용한 이메일과 비밀번호로 확인하세요."
     private var accountAccessNotice: String? = null
     private var passwordLoginFailureNotice: String? = null
     private val accountRequestFence = AccountRequestFence()
@@ -1419,7 +1448,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private val walkingRouteClient = BackendWalkingRouteClient()
     private val reportQueueStore by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         AndroidReportQueueStore(
-            applicationContext.filesDir,
+            applicationContext.filesDir.canonicalFile,
             allocatableBytes = AndroidAllocatableBytes(applicationContext, applicationContext.filesDir),
         )
     }
@@ -1456,6 +1485,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var rawCollectionRuntimeCoordinator: RawCollectionRuntimeCoordinator
     // Raw collection executor only (16-17 #2, #4): counters, max and fixed buckets per window.
     private val rawRuntimeWindow = RawRuntimeWindowAccumulator()
+    private val rawMetadataTaskAdmission = RawMetadataTaskAdmission()
     private val rawDetectionDueButInFlightDropCount = AtomicInteger(0)
     @Volatile
     private var rawCollectionUploadWalkId: String? = null
@@ -1611,6 +1641,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
 
     private var accountDeletionRequestGeneration = 0L
     private var accountDeletionRequestInFlight = false
+    // Fresh server view only; a restart requires another status query.
+    @Volatile private var accountDeletionDisplayStatus: AccountDeletionStatus? = null
     private var accountDeletionCall: CancellableNetworkCall<AccountDeletionStatus>? = null
     @Volatile
     private var accountDeletionRev0ReauthenticationRequestId: String? = null
@@ -2358,7 +2390,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             inspect = inspection@{
                 val noBackupRoot = noBackupFilesDir
                 rawCollectionRuntimeCoordinator = RawCollectionRuntimeCoordinator(
-                    File(noBackupRoot, "raw_collections"),
+                    // Android may expose /data/user/0 through a system-owned symlink.
+                    // Resolve only the OS-provided base; RAW descendants stay NOFOLLOW checked.
+                    File(noBackupRoot.canonicalFile, "raw_collections"),
                     elapsedRealtimeMs = SystemClock::elapsedRealtime,
                     allocatableBytes = AndroidAllocatableBytes(applicationContext, noBackupRoot),
                 )
@@ -4597,52 +4631,56 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
     }
 
+    @Volatile private var accountDeletionRuntimeFenceApplied = false
+
     private fun purgeAccountDeletionLocalDataOnCleanupThread(): Boolean {
-        val routeSnapshotPurged = retryAccountDeletionPurgeOnCleanupThread {
-            purgeEncryptedRouteSnapshotForAccount()
-        }
-        val legacyQueuePurged = purgeLegacyPendingReportQueueOnCleanupThread()
-        // The unsent report queue and RAW collections are device-unsent data as well. Each
-        // purge writes its durable fence before deleting files and keys, and its verified
-        // result must gate DELETED evidence instead of an unobserved asynchronous task.
-        val reportQueuePurged = retryAccountDeletionPurgeOnCleanupThread {
-            reportQueueDrainCoordinator.onAccountDeleted()
-        }
-        val rawCollectionsPurged =
-            ::rawCollectionRuntimeCoordinator.isInitialized &&
-                retryAccountDeletionPurgeOnCleanupThread {
+        val inventory = AccountDeletionLocalInventory(mapOf(
+            AccountDeletionLocalStore.RUNTIME_MEMORY_AND_POSITION_SCOPE to { accountDeletionRuntimeFenceApplied },
+            AccountDeletionLocalStore.DIAGNOSTIC_LOGS to {
+                BoundedRuntimeDiagnosticLog.purgeForAccountDeletion(cacheDir)
+            },
+            AccountDeletionLocalStore.ROUTE_SNAPSHOT to {
+                retryAccountDeletionPurgeOnCleanupThread { purgeEncryptedRouteSnapshotForAccount() }
+            },
+            AccountDeletionLocalStore.LEGACY_REPORTS to { purgeLegacyPendingReportQueueOnCleanupThread() },
+            AccountDeletionLocalStore.REPORT_QUEUE to {
+                retryAccountDeletionPurgeOnCleanupThread { reportQueueDrainCoordinator.onAccountDeleted() }
+            },
+            AccountDeletionLocalStore.RAW_COLLECTIONS to {
+                ::rawCollectionRuntimeCoordinator.isInitialized && retryAccountDeletionPurgeOnCleanupThread {
                     rawCollectionRuntimeCoordinator.onAccountDeleted()
                 }
-        val profileKeys = sensitivePrefs.keys().filter { key ->
-            key == PREF_REPORT_COOLDOWNS_KEY ||
-                key == PREF_REPORT_ATTEMPT_STATE_V2 ||
-                key == PREF_REPORTER_USER_ID_KEY ||
-                key.startsWith(PREF_PRIORITY_USER_PROFILE_PREFIX) ||
-                key.startsWith(PREF_PRIORITY_USER_PROFILE_INVALID_PREFIX)
-        }
-        val editor = sensitivePrefs.edit()
-        profileKeys.forEach(editor::remove)
-        val preferencesPurged = editor.commit()
-        val fieldSessionsPurged =
-            if (::fieldSessionLog.isInitialized) {
-                fieldSessionLog.blockForAccountDeletion()
-                fieldSessionLog.purgeAll()
-            } else {
-                true
-            }
-        // S21-50: the debug outdoor test keeps raw GNSS text outside every other purge.
-        val outdoorPositionTestPurged = DebugCollectionArtifacts.purgeOutdoorPositionTest(noBackupFilesDir)
-        // S09-56: the explicit profile reset path; stored step profiles are account data as well.
-        // pos-F2: queued saves are dropped and the reset runs on the serial profile I/O thread after a save
-        // being written, so no save can recreate a profile after the reset; the purge waits for it.
-        val pedestrianProfilesPurged = !::stepLengthPrefs.isInitialized ||
-            kr.co.hanium.dreamup.walksafe.navigation.positioning.SerialPedestrianProfileWriter.shared
-                .clearPendingAndRun {
-                    (pedestrianProfileStore ?: runCatching { AndroidPedestrianProfileStore(stepLengthPrefs) }.getOrNull())
-                        ?.resetAllProfiles() == true
+            },
+            AccountDeletionLocalStore.ACCOUNT_PREFERENCES to {
+                val profileKeys = sensitivePrefs.keys().filter { key ->
+                    key == PREF_REPORT_COOLDOWNS_KEY || key == PREF_REPORT_ATTEMPT_STATE_V2 ||
+                        key == PREF_REPORTER_USER_ID_KEY || key.startsWith(PREF_PRIORITY_USER_PROFILE_PREFIX) ||
+                        key.startsWith(PREF_PRIORITY_USER_PROFILE_INVALID_PREFIX)
                 }
-        return routeSnapshotPurged && legacyQueuePurged && reportQueuePurged && rawCollectionsPurged &&
-            preferencesPurged && fieldSessionsPurged && outdoorPositionTestPurged && pedestrianProfilesPurged
+                val editor = sensitivePrefs.edit()
+                profileKeys.forEach(editor::remove)
+                editor.commit() && profileKeys.none { it in sensitivePrefs.keys() }
+            },
+            AccountDeletionLocalStore.FIELD_SESSIONS to {
+                if (::fieldSessionLog.isInitialized) {
+                    fieldSessionLog.blockForAccountDeletion()
+                    fieldSessionLog.purgeAll()
+                } else true
+            },
+            AccountDeletionLocalStore.OUTDOOR_POSITION_TEST to {
+                DebugCollectionArtifacts.purgeOutdoorPositionTest(noBackupFilesDir)
+            },
+            AccountDeletionLocalStore.PEDESTRIAN_PROFILES to {
+                // Serial reset waits for an in-flight save and drops queued saves before deletion.
+                !::stepLengthPrefs.isInitialized ||
+                    kr.co.hanium.dreamup.walksafe.navigation.positioning.SerialPedestrianProfileWriter.shared
+                        .clearPendingAndRun {
+                            (pedestrianProfileStore ?: runCatching { AndroidPedestrianProfileStore(stepLengthPrefs) }.getOrNull())
+                                ?.resetAllProfiles() == true
+                        }
+            },
+        ))
+        return inventory.purge().isEmpty()
     }
 
     private fun isCurrentAccountDeletionPreparation(generation: Long): Boolean =
@@ -4720,6 +4758,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         refreshAccountDeletionStatus(workerAttempt = null)
     }
 
+    private fun onAccountDeletionRefreshClicked() {
+        if (accountDeletionRequestInFlight) return
+        if (accountDeletionRev0RecoveryBindingOrNull() != null &&
+            accountDeletionRecoveryGatewaySessionOrNull() == null
+        ) {
+            // Reuse the existing recovery-only authentication surface; never create a new deletion.
+            renderMainUi()
+            updateBackendAuthButtonText()
+            backendFieldTokenInput.requestFocus()
+            backendFieldTokenInput.performAccessibilityAction(
+                AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null,
+            )
+            speakInteraction("삭제 요청은 유지됩니다. 삭제를 요청한 계정의 복구 인증이 필요합니다. 현재 복구 화면은 계정 토큰 입력 방식입니다.")
+            return
+        }
+        refreshAccountDeletionStatus()
+    }
+
     private fun refreshAccountDeletionStatusAllowed(
         journal: AccountDeletionJournal,
         workerAttempt: AccountDeletionWorkerAttempt,
@@ -4771,6 +4827,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     ?.takeIf { it.journal == journal }
             val recoverySession = recoveryBinding?.let {
                 accountDeletionRecoveryGatewaySessionOrNull()
+            }
+            if ((recoveryBinding != null || journal.requiresDeletionReauthentication()) &&
+                recoverySession == null
+            ) {
+                // The same stale credentials cannot resolve reauthentication. Keep the journal and
+                // privacy fence, and wait for an explicit recovery login instead of another POST.
+                postAccountDeletionUiRefresh()
+                return
             }
             if (recoveryBinding != null && recoverySession != null) {
                 startAccountDeletionCall(
@@ -4894,6 +4958,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                 AccountDeletionApplyResult.APPLIED,
                                 AccountDeletionApplyResult.DUPLICATE,
                                 -> {
+                                    accountDeletionDisplayStatus = status
                                     val snapshot =
                                         accountDeletionStateMachine.snapshotOrNull()
                                             ?: return@completion
@@ -6365,6 +6430,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun applyAccountDeletionRuntimeFence(): Boolean {
+        accountDeletionRuntimeFenceApplied = false
         val positionFieldPurged = purgeAndRotatePositionFieldScope()
         cancelReportQueueDrain()
         reportQueueDrainCoordinator.onAccountDeleted()
@@ -6409,6 +6475,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (!positionFieldPurged) {
             updateNavigationStatus("accountDeletion=blocked:position_field_purge")
         }
+        accountDeletionRuntimeFenceApplied = positionFieldPurged
         return positionFieldPurged
     }
 
@@ -7918,42 +7985,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         null
     }
 
-    private fun persistTransientReportAttemptFailure(
-        stateKey: String,
-        nowMs: Long,
-        statusCode: Int? = null,
-        retryAfterMs: Long? = null,
-    ): Long = synchronized(reportAttemptStateLock) {
-        val previous = persistedReportAttemptStates[stateKey]
-        val failures =
-            ((previous?.consecutiveFailures ?: 0) + 1)
-                .coerceAtMost(REPORT_ATTEMPT_MAX_FAILURES)
-        val delayMs =
-            if (statusCode == null) {
-                reportRetryDelayMs(failures)
-            } else {
-                reportRetryDelayMs(failures, statusCode, retryAfterMs)
-            }
-        if (
-            previous == null &&
-            persistedReportAttemptStates.size >= REPORT_ATTEMPT_STATE_MAX_ENTRIES
-        ) {
-            reportAttemptStateStorageBlocked = true
-            return@synchronized delayMs
-        }
-        persistedReportAttemptStates[stateKey] =
-            PersistedReportAttemptState(
-                consecutiveFailures = failures,
-                retryNotBeforeMs = nowMs + delayMs,
-                terminalStatus = null,
-                terminalUntilMs = 0L,
-            )
-        if (!persistReportAttemptStatesLocked()) {
-            reportAttemptStateStorageBlocked = true
-        }
-        delayMs
-    }
-
     private fun persistTerminalReportAttemptState(
         stateKey: String,
         statusCode: Int?,
@@ -8148,7 +8179,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val otpAttempt = emailOtpRequestRetryPolicy.begin(otpPayload)
         if (otpAttempt == null) {
             accountRequestFence.cancel(token)
-            showAccountMessage("이메일 인증 요청을 처리 중입니다. 결과를 확인한 뒤 다시 요청하세요.")
+            showAccountMessage(
+                if (emailOtpRequestRetryPolicy.storageFailure) {
+                    "인증 요청 정보를 안전하게 저장하거나 복원하지 못해 요청을 보내지 않았습니다. 앱을 다시 실행한 뒤 같은 가입 정보로 요청하세요."
+                } else "이메일 인증 요청을 처리 중입니다. 결과를 확인한 뒤 다시 요청하세요.",
+            )
             updateFirstRunOnboardingUi()
             return
         }
@@ -8166,13 +8201,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         if (!accountRequestFence.completeIfCurrent(token, accountStateBinding())) {
                             return@runOnUiThread
                         }
-                        if (!emailOtpRequestRetryPolicy.recordSuccess(
-                                otpAttempt,
-                                currentEmailOtpRetryPayload(),
-                            )) {
-                            updateFirstRunOnboardingUi()
-                            return@runOnUiThread
-                        }
                         val partial = runCatching {
                             EmailEnrollmentPartial(
                                 enrollmentHandle = response.enrollmentHandle,
@@ -8182,9 +8210,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                 selections = selections,
                             )
                         }.getOrNull()
-                        if (partial == null || !emailEnrollmentStore.save(partial)) {
-                            emailEnrollmentStorageBlocked = true
-                            showAccountMessage("인증 상태를 안전하게 저장하지 못해 가입을 중단했습니다.")
+                        if (partial == null) {
+                            emailOtpRequestRetryPolicy.suspendForLifecycle()
+                            showAccountMessage("인증 응답을 확인하지 못했습니다. 같은 가입 정보로 다시 요청하세요.")
+                            updateFirstRunOnboardingUi()
+                            return@runOnUiThread
+                        }
+                        if (!emailOtpRequestRetryPolicy.recordSuccess(
+                                otpAttempt, currentEmailOtpRetryPayload(),
+                                persistResult = { emailEnrollmentStore.save(partial) },
+                            )) {
+                            if (emailOtpRequestRetryPolicy.storageFailure) {
+                                emailEnrollmentStorageBlocked = true
+                                showAccountMessage("인증 상태를 안전하게 저장하지 못했습니다. 앱을 다시 실행한 뒤 같은 가입 정보로 요청하세요.")
+                            }
                             updateFirstRunOnboardingUi()
                             return@runOnUiThread
                         }
@@ -8250,7 +8289,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             firstRunOnboardingSnapshot = FirstRunOnboardingPolicy.initialEmailAccount(
                 epoch = nextFirstRunEpoch(),
             )
-            showAccountMessage("인증번호가 만료되었거나 안전하게 복원되지 않아 다시 발급해야 합니다.")
+            showAccountMessage(
+                if (accountCreationRecoveryPending) accountCreationRecoveryMessage
+                else "인증번호가 만료되었거나 안전하게 복원되지 않아 다시 발급해야 합니다.",
+            )
             updateFirstRunOnboardingUi()
             return
         }
@@ -8306,6 +8348,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             AccountRemoteAction.CREATE_ACCOUNT,
             accountStateBinding(),
         ) ?: return
+        // Persist before dispatch; process death or a rejected foreground callback can lose the result.
+        val creationWasPending = accountCreationRecoveryPending
+        if (!emailEnrollmentStore.markCreationPending()) {
+            accountRequestFence.cancel(token)
+            emailEnrollmentStorageBlocked = true
+            showAccountMessage("가입 결과 확인 상태를 안전하게 저장하지 못해 요청을 보내지 않았습니다.")
+            updateFirstRunOnboardingUi()
+            return
+        }
         updateFirstRunOnboardingUi()
         try {
             gatewaySessionExecutor.execute {
@@ -8325,7 +8376,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             firstRunOnboardingSnapshot,
                             FirstRunReceiptHash.fromSha256Hex(created.signupReceiptSha256),
                         )
-                        if (!transition.accepted || !emailEnrollmentStore.clear()) {
+                        if (!transition.accepted || !emailEnrollmentStore.clear(creationConfirmed = true)) {
                             emailEnrollmentStorageBlocked = true
                             showAccountMessage("계정은 생성됐지만 로컬 가입 상태를 정리하지 못했습니다. 앱을 다시 시작하지 말고 로그인하세요.")
                             updateFirstRunOnboardingUi()
@@ -8343,13 +8394,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         )
                     }
                 } catch (error: GatewayAccountHttpException) {
-                    postAccountFailure(token, error.serverCode, error.statusCode, error.retryAfterMs)
+                    postAccountFailure(
+                        token, error.serverCode, error.statusCode, error.retryAfterMs,
+                        creationWasPending = creationWasPending,
+                    )
                 } catch (_: Exception) {
                     postAccountFailure(token, null, 0)
                 }
             }
         } catch (_: RejectedExecutionException) {
             accountRequestFence.cancel(token)
+            if (!creationWasPending) emailEnrollmentStore.clearUnconfirmedCreation()
             showAccountMessage("계정 생성을 시작할 수 없습니다. 잠시 후 다시 시도하세요.")
             updateFirstRunOnboardingUi()
         }
@@ -8570,7 +8625,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 permissionSessionPolicy.rememberActor(session.actorId)
             }
             reapplyActorBoundIntegratedConsent()
-            emailEnrollmentStore.clear()
+            emailEnrollmentStore.clear(creationConfirmed = true)
             emailEnrollmentPartial = null
             accountEmailInput.text?.clear()
             accountPasswordInput.text?.clear()
@@ -8626,9 +8681,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         statusCode: Int,
         retryAfterMs: Long? = null,
         otpAttempt: kr.co.hanium.dreamup.walksafe.network.EmailOtpRequestRetryPolicy.Attempt? = null,
+        creationWasPending: Boolean = true,
     ) {
         runOnUiThread {
             if (!accountRequestFence.completeIfCurrent(token, accountStateBinding())) return@runOnUiThread
+            // A rejected first request has no lost success to recover. A previous uncertain
+            // request must survive even if the user's later, changed request is rejected.
+            if (token.action == AccountRemoteAction.CREATE_ACCOUNT && !creationWasPending &&
+                statusCode in 400..499 && statusCode != 408 && statusCode != 409 && serverCode != null
+            ) {
+                emailEnrollmentStore.clearUnconfirmedCreation()
+            }
             if (otpAttempt != null && !emailOtpRequestRetryPolicy.recordFailure(
                     otpAttempt, currentEmailOtpRetryPayload(), statusCode, serverCode, retryAfterMs,
                 )) {
@@ -8652,8 +8715,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             } else if (otpAttempt != null && statusCode == 409 &&
                 serverCode == "account_enrollment_idempotency_conflict") {
                 "이전 인증 요청을 사용할 수 없습니다. 가입 정보를 확인한 뒤 인증번호 요청 버튼을 다시 누르세요. 새 요청으로 시작합니다."
+            } else if (otpAttempt != null &&
+                (statusCode == 0 || statusCode == 408 || statusCode >= 500)) {
+                "인증 메일 처리 결과를 확인하지 못했습니다. 잠시 후 같은 가입 정보로 요청 버튼을 눌러 확인하세요. 자동으로 다시 보내지 않습니다."
             } else if (token.action == AccountRemoteAction.CREATE_ACCOUNT &&
-                statusCode == 0 && serverCode == null) {
+                (statusCode == 0 || statusCode == 408 || statusCode >= 500)) {
                 "가입 결과를 확인하지 못했습니다. 계정이 이미 만들어졌을 수 있습니다. " +
                     "같은 가입 정보로 다시 시도하거나 이메일과 비밀번호로 로그인하세요."
             } else when (serverCode) {
@@ -8902,7 +8968,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         updateNavigationStatus("rawDiagnostics=withdrawn reason=$reason")
         if (announce) {
             speakInteraction(
-                "선택 원본·진단수집 동의를 즉시 철회했습니다. 직접 신고는 건별 확인 후 계속 사용할 수 있습니다.",
+                "선택 진단·성능 정보 수집 동의를 즉시 철회했습니다. 직접 신고는 건별 확인 후 계속 사용할 수 있습니다.",
             )
         }
         persistIntegratedConsentDraft(announce = announce)
@@ -9063,7 +9129,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun integratedConsentHttpBlocked(): Boolean =
-        accountDeletionStateMachine.processingBlocked() ||
+        !::sensitivePrefs.isInitialized || sensitivePrefs.isBlocked() ||
+            accountDeletionStateMachine.processingBlocked() ||
             IntegratedConsentItem.entries.any { item ->
                 integratedConsentSession.status(item) ==
                     PurposeConsentSyncState.FAIL_CLOSED
@@ -9919,6 +9986,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             }
                             return@runOnUiThread
                         }
+                        // A receipt refresh may restore the CAS base for a local withdrawal
+                        // whose immutable request was not saved. Re-send only after that fresh
+                        // actor-bound confirmation; never infer a receipt or re-enable a grant.
+                        if (integratedConsentSession.withdrawalRecoverySelectionsOrNull() != null) {
+                            persistIntegratedConsentDraft(announce = false)
+                            return@runOnUiThread
+                        }
                         if (completeOnboarding) {
                             completeFirstRunIntegratedConsentIfReady(
                                 appliedConfirmation,
@@ -10193,14 +10267,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 evaluation == IntegratedConsentApplyResult.DUPLICATE &&
                 previousReceipt == confirmation.backendConsentReceiptSha256 &&
                 previousConfirmedActorSha256 == expectedActorSha256
-        synchronized(reportUploadSafetyLock) {
-            if (!unchangedReportAuthority || !reportPrivacyConsentSession.isGranted()) {
-                reportUploadSafetyGeneration += 1L
-                automaticReportUploadSafetyGeneration += 1L
-                reportPrivacyConsentSession.cancelActiveCalls()
-            }
-            reportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent(authorityGuard)
-        }
+        applyReportConsentAuthority(unchangedReportAuthority, authorityGuard)
         reapplyActorBoundIntegratedConsent()
         integratedConsentDraft =
             if (pending != null && !exactPending) pending.desiredSelections
@@ -10242,6 +10309,22 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
         }
         return true
+    }
+
+    internal fun applyReportConsentAuthority(
+        unchangedReportAuthority: Boolean,
+        authorityGuard: IntegratedConsentAuthorityGuard,
+    ) {
+        synchronized(reportUploadSafetyLock) {
+            if (!unchangedReportAuthority || !reportPrivacyConsentSession.isGranted()) {
+                reportUploadSafetyGeneration += 1L
+                automaticReportUploadSafetyGeneration += 1L
+                reportPrivacyConsentSession.cancelActiveCalls()
+                reportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent(authorityGuard)
+            }
+            // A duplicate response creates a new guard object for the same Gateway session.
+            // Keep the still-live guard and permits; replacing it would cancel active uploads.
+        }
     }
 
     private fun persistedIntegratedConsentSelections(): IntegratedConsentSelections =
@@ -10867,6 +10950,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun clearUserReportRequestUiForAuthorityFence() {
+        if (quarantineContent != null) closeReportPanel()
         renderedUserReportAuthority = null
         renderedUserReportInputReportId = null
         renderedUserReportRequestId = null
@@ -12473,6 +12557,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection() {
+        if (accountCreationRecoveryPending) {
+            updateEmailAccountAccessUi(firstRunOnboardingSnapshot)
+        }
         retryPendingGatewayRenewal()
         retryPendingBackendDeviceRestore()
         if (permissionRecoveryGate.blocksAutomaticResourceStart) {
@@ -14911,7 +14998,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                 "event=HOME_WAKE_TERMINAL failure=" + result.failure?.name,
                             )
                         }
-                        updateNavigationStatus("voice_home=retry_on_home_reentry_use_voice_button")
+                        if (result.streamingError == VoskStreamingError.AUDIO_SILENCED) {
+                            updateNavigationStatus("voice_home=microphone_input_silenced_retry_required")
+                            updateStatus("마이크 입력 제한", MICROPHONE_INPUT_SILENCED_GUIDANCE)
+                            speakInteraction(MICROPHONE_INPUT_SILENCED_GUIDANCE)
+                        } else {
+                            updateNavigationStatus("voice_home=retry_on_home_reentry_use_voice_button")
+                        }
                     }
                 }
             },
@@ -17027,7 +17120,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
      */
     private fun selectedDestinationSpeechKo(selected: DestinationSearchResult): String =
         listOfNotNull(
-            selected.displayAddressOrNull()?.let { "${selected.name}, ${it}에 있는 장소를 선택했습니다." }
+            selected.displayAddressOrNull()?.let {
+                "${selected.name}, ${it.toSpokenDestinationAddressKo()}에 있는 장소를 선택했습니다."
+            }
                 ?: "${selected.name} 목적지를 선택했습니다.",
             kr.co.hanium.dreamup.walksafe.navigation.selectedDestinationDistanceSentenceKo(
                 selected,
@@ -17924,7 +18019,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
                 val clause = consentClauseOrNull(
                     when (item) {
-                        IntegratedConsentItem.RAW_SOURCE_COLLECTION -> "원본·진단수집 raw v2"
+                        IntegratedConsentItem.RAW_SOURCE_COLLECTION -> "진단·성능 정보 수집"
                         IntegratedConsentItem.AUTOMATIC_REPORTING -> "자동신고"
                         IntegratedConsentItem.MOBILE_NETWORK_TRANSFER -> "이동통신 전송"
                         IntegratedConsentItem.TRAINING_REUSE -> "학습 재사용"
@@ -18082,20 +18177,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 "확인에 사용합니다. 생년월일은 만 14세 이상인지 자기입력으로 확인할 뿐, " +
                 "본인인증이나 공적 연령 인증이 아니며, 거부하면 가입할 수 없습니다. " +
                 "[필수] 위치기반서비스: 길안내와 신고를 위해 기능 사용 중 위치정보를 처리하며, " +
-                "거부하면 가입할 수 없습니다. [선택] 원본·진단수집 raw v2: 탐지·성능 메타데이터와 " +
-                "chunk 시각·크기·hash를 " +
-                "품질 진단에 사용합니다. 영상·음성·이미지·정확한 위치·이동경로·개별 frame·bbox는 " +
+                "거부하면 가입할 수 없습니다. [선택] 진단·성능 정보 수집: 물체 인식·앱 성능 통계와 " +
+                "기록 묶음의 시각·용량·무결성 확인값을 " +
+                "품질 진단에 사용합니다. 영상·음성·이미지·정확한 위치·이동경로·개별 카메라 화면·물체의 화면상 영역은 " +
                 "이 경로에서 수집하지 않습니다. 기기에는 최대 30일 암호화 저장하고, 보행을 끝낸 뒤 " +
                 "Wi-Fi에 연결되어 충전 중일 때만 원래 보행 기록 그대로 전송하며, 보행 중·일시정지 중에는 " +
-                "전송하지 않습니다. 서버 검역은 receipt commit부터 최대 " +
-                "14일입니다. 거부하면 raw 수집만 꺼지며, 신고 사진과 정확한 위치를 건별 확인하는 " +
+                "전송하지 않습니다. 서버의 검증 대기 보관은 접수 확정일부터 최대 " +
+                "14일입니다. 거부하면 진단·성능 정보 수집만 꺼지며, 신고 사진과 정확한 위치를 건별 확인하는 " +
                 "직접 신고에는 영향이 없습니다. " +
-                "[선택] 자동 신고: JPEG 신고 사진, 정확한 위치·방향과 탐지 metadata를 보행 중에는 " +
+                "[선택] 자동 신고: JPEG 신고 사진, 정확한 위치·방향과 물체 인식 부가 정보를 보행 중에는 " +
                 "보내지 않고 휴대전화에 암호화해 보관했다가, 보행을 끝낸 뒤 허용된 연결(Wi-Fi, 또는 " +
                 "이동통신망 전송을 선택한 경우 이동통신망)에서 자동 전송합니다. 후보별 취소는 없으며 " +
                 "설정에서 앞으로의 자동 신고를 끌 수 있습니다. 거부하면 자동 신고만 꺼집니다. " +
                 "[선택] 학습 재사용: 사람이 승인하고 " +
-                "비식별 처리한 정제 이미지·라벨·metadata만 dataset 승인일부터 최대 3년 모델 개선에 " +
+                "비식별 처리한 정제 이미지·라벨·부가 정보만 학습 자료 승인일부터 최대 3년 모델 개선에 " +
                 "사용하고, 정확한 위치·원본 음성·식별 가능한 얼굴은 제외합니다. 거부하면 학습 재사용만 " +
                 "꺼집니다. " +
                 "선택 동의는 나중에 설정에서 철회할 수 있습니다."
@@ -18123,8 +18218,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             "location_terms" to
                 ("[필수] 위치기반서비스 이용약관 동의" to "[필수] 위치기반서비스:"),
             "raw_original" to
-                ("[선택] 원본·진단수집 raw v2 자료 처리 동의" to
-                    "[선택] 원본·진단수집 raw v2:"),
+                ("[선택] 진단·성능 정보 수집 동의" to
+                    "[선택] 진단·성능 정보 수집:"),
             "automatic_reporting" to
                 ("[선택] 자동 신고 동의" to "[선택] 자동 신고:"),
             "training_reuse" to
@@ -18956,7 +19051,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         )
         accountDeletionRefreshButton = accessiblePriorityUserButton(
             label = "삭제 진행 상태 새로고침",
-            onClick = ::refreshAccountDeletionStatus,
+            onClick = ::onAccountDeletionRefreshClicked,
         )
         accountDeletionItemTexts.clear()
         DeletionInventoryItem.entries.forEach { item ->
@@ -19252,6 +19347,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 })
                 addView(automaticReportConsentButton)
                 addView(reportPrivacyConsentButton)
+                addView(accessiblePriorityUserButton(
+                    label = "보관된 신고 확인",
+                    spokenLabel = "전송이 중단되어 휴대전화에 보관된 신고를 듣거나 삭제합니다.",
+                    onClick = { openReportPanel(openStored = true) },
+                ))
             }
             accountDeletionControls = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -23492,12 +23592,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (onConsentStep) View.VISIBLE else View.GONE
         accountDetailsStepControls.visibility =
             if (onDetailsStep) View.VISIBLE else View.GONE
-        val credentialFieldsVisible = !onConsentStep
+        val credentialFieldsVisible = !onConsentStep || accountCreationRecoveryPending
         wsFieldGroupOf(accountEmailInput).visibility =
             if (credentialFieldsVisible) View.VISIBLE else View.GONE
         wsFieldGroupOf(accountPasswordInput).visibility =
             if (credentialFieldsVisible) View.VISIBLE else View.GONE
-        accountLoginButton.visibility = if (signupVisible) View.GONE else View.VISIBLE
+        accountLoginButton.visibility =
+            if (signupVisible && !accountCreationRecoveryPending) View.GONE else View.VISIBLE
         accountSignupToggleButton.visibility = when {
             verifiedLogin || reauthenticationRequired -> View.GONE
             signupVisible -> View.GONE
@@ -23572,6 +23673,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             accountAccessNotice != null -> requireNotNull(accountAccessNotice)
             emailEnrollmentStorageBlocked ->
                 "가입 임시 상태를 안전하게 저장할 수 없습니다. 기존 계정 로그인만 가능합니다."
+            accountCreationRecoveryPending -> accountCreationRecoveryMessage
             signupVisible && creating && partial != null -> null
             snapshot.stage == FirstRunOnboardingStage.VERIFIED_LOGIN ->
                 "계정 생성이 완료되었습니다."
@@ -27523,7 +27625,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val gateway = GatewaySessionProcessCoordinator.snapshot()
         val walk = walkSessionLifecycle.snapshot()
         val session = gateway.session?.takeUnless {
-            gateway.storageBlocked ||
+            !::sensitivePrefs.isInitialized || sensitivePrefs.isBlocked() ||
+                gateway.storageBlocked ||
                 gateway.deletionRecoveryOnly ||
                 accountDeletionStateMachine.processingBlocked()
         }
@@ -27599,7 +27702,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 runningDetectorVerification.allowsOutput(frameDetector, verifiedDetector)
         }
         val dueButInFlightDropCount = rawDetectionDueButInFlightDropCount.getAndSet(0)
-        executeRawCollectionTask {
+        if (!::rawCollectionRuntimeCoordinator.isInitialized || rawCollectionExecutor.isShutdown) return
+        rawMetadataTaskAdmission.submit(rawCollectionExecutor, resetWindow = {
+            clearRawDetectionWindow(clearPendingDropCount = false)
+        }) {
             val context = currentRawCollectionRuntimeContextOrNull()
             if (
                 context == null ||
@@ -27607,7 +27713,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 context.walk.epoch != expectedWalkEpoch
             ) {
                 clearRawDetectionWindow()
-                return@executeRawCollectionTask
+                return@submit
             }
             rawRuntimeWindow.recordCompletedInference(
                 walkSessionId = expectedWalkEpoch.walkSessionId,
@@ -27636,18 +27742,14 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             )
             val elapsedWindowMs = rawRuntimeWindow.windowElapsedMs(observedAtElapsedMs)
             if (elapsedWindowMs < RAW_COLLECTION_CAPTURE_INTERVAL_MS) {
-                return@executeRawCollectionTask
+                return@submit
             }
             val capturedWindowStartedAtEpochMs =
                 (observedAtEpochMs - elapsedWindowMs).coerceAtLeast(0L)
-            val detectionSample = rawRuntimeWindow.detectionSample(
+            val runtimeSnapshot = rawRuntimeWindow.snapshot(
                 windowStartedAtEpochMs = capturedWindowStartedAtEpochMs,
                 capturedAtEpochMs = observedAtEpochMs,
                 detectorAvailable = detectorWasAvailable,
-            )
-            val performanceSample = rawRuntimeWindow.performanceSample(
-                windowStartedAtEpochMs = capturedWindowStartedAtEpochMs,
-                capturedAtEpochMs = observedAtEpochMs,
                 thermalThrottled = if (::walkSessionResourceProbe.isInitialized) {
                     runCatching {
                         walkSessionResourceProbe.snapshot().thermalThrottled
@@ -27661,8 +27763,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             rawRuntimeWindow.resetWindow()
             rawCollectionRuntimeCoordinator.captureMetadataBatch(
                 context,
-                detectionSample,
-                performanceSample,
+                runtimeSnapshot.detection,
+                runtimeSnapshot.performance,
                 observedAtElapsedRealtimeMs = observedAtElapsedMs,
             )
         }
@@ -28137,6 +28239,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun reportQueueRecoveryBaseGatesAvailable(): Boolean {
+        if (!::sensitivePrefs.isInitialized || sensitivePrefs.isBlocked()) return false
         if (
             PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE == null ||
             !reportPrivacyConsentSession.isGranted() ||
@@ -28190,7 +28293,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val currentConfirmation = integratedConsentSession.currentConfirmationOrNull()
         val consentAllowed =
-            runtime.triggerCurrent &&
+            ::sensitivePrefs.isInitialized && !sensitivePrefs.isBlocked() &&
+                runtime.triggerCurrent &&
                 reportPrivacyConsentSession.isGranted() &&
                 currentConfirmation == trigger.consentConfirmation
         val currentGateway = GatewaySessionProcessCoordinator.snapshot()
@@ -28266,15 +28370,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         trigger: ReportQueueDrainTrigger,
         initialCount: Int,
     ) {
+        val activityLease = accountDeletionActivityLease
+        val walkEpoch = walkSessionLifecycle.snapshot().epoch
+        var uploadNoticePosted = false
         val transport = AndroidReportQueueTransport(
             uploader = AndroidReportUploader(),
             session = trigger.gatewaySession,
             consentConfirmation = trigger.consentConfirmation,
             networkBinding = trigger.networkBinding,
             permitProvider = reportPrivacyConsentSession::issueUploadPermit,
+            onUploadStarting = { report ->
+                if (report.priority == ReportQueuePriority.EXPLICIT && !uploadNoticePosted) {
+                    uploadNoticePosted = true
+                    val message = kr.co.hanium.dreamup.walksafe.report.ExplicitReportSubmissionNotice.UPLOADING_KO
+                    postReportQueueDrainNotice(
+                        trigger, activityLease, walkEpoch, message, message, afterCompletion = false,
+                    )
+                }
+            },
         )
-        val activityLease = accountDeletionActivityLease
-        val walkEpoch = walkSessionLifecycle.snapshot().epoch
         val notices = linkedSetOf<String>()
         val spokenNotices = linkedSetOf<String>()
         var remaining = initialCount
@@ -28297,7 +28411,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 if (result.walkInProgress) schedulePostWalkRetryAfterWalkInProgress()
                 reportQueueDrainResultMessage(result)?.let { message ->
                     notices.add(message)
-                    if (result.reportPriority == ReportQueuePriority.EXPLICIT) spokenNotices.add(message)
+                    if (result.reportPriority == ReportQueuePriority.EXPLICIT ||
+                        result.outcome == ReportQueueDrainOutcome.QUARANTINED) spokenNotices.add(message)
                 }
                 val outcome = result.outcome
                 if (
@@ -28329,10 +28444,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         ReportQueueDrainOutcome.RETRY_DEFERRED -> if (
             result.creationOutcome == ReportCreationOutcome.SUPPRESSED_BY_COOLDOWN
-        ) "최근 같은 위치의 신고가 있어 이번에는 추가 접수하지 않았습니다." else null
-        // The isolated entry stays encrypted on the device; later reports keep draining.
-        ReportQueueDrainOutcome.QUARANTINED ->
-            "서버가 받을 수 없는 신고는 다시 보내지 않고 기기에 보관했습니다. 다른 신고는 계속 확인합니다."
+        ) "최근 같은 위치의 신고가 있어 이번에는 추가 접수하지 않았습니다." else
+            kr.co.hanium.dreamup.walksafe.report.ExplicitReportSubmissionNotice.RECEIPT_UNCONFIRMED_KO
+        ReportQueueDrainOutcome.RECEIPT_REJECTED ->
+            kr.co.hanium.dreamup.walksafe.report.ExplicitReportSubmissionNotice.RECEIPT_UNCONFIRMED_KO
+        ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED,
+        ReportQueueDrainOutcome.LOCAL_DELETE_FAILED ->
+            "신고 처리 기록을 정리하지 못했습니다. 신고는 휴대전화에 보관했으며, 다음 전송 시 접수 여부를 다시 확인합니다."
+        // One deduplicated notice per completed drain batch, including automatic entries.
+        ReportQueueDrainOutcome.QUARANTINED -> ReportQuarantineReview.QUARANTINED_NOTICE
+        ReportQueueDrainOutcome.AUTHENTICATION_REQUIRED ->
+            "로그인 확인이 필요해 신고 전송을 멈췄습니다. 로그인 상태를 확인해 주세요. 신고는 기기에 보관했습니다."
+        ReportQueueDrainOutcome.PERMISSION_BLOCKED ->
+            "신고 전송 권한을 확인할 수 없어 전송을 멈췄습니다. 설정에서 신고 동의 상태를 확인해 주세요. 신고는 기기에 보관했습니다."
         else -> null
     }
 
@@ -28342,16 +28466,24 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         walkEpoch: WalkRuntimeEpoch,
         message: String,
         spokenMessage: String?,
+        afterCompletion: Boolean = true,
+        speechRetryDeadlineElapsedRealtimeMs: Long? = null,
     ) {
         postGatewayActivityCallback(activityLease) {
             val walk = walkSessionLifecycle.snapshot()
             val gateway = GatewaySessionProcessCoordinator.snapshot()
-            val drainCompletedWithoutReplacement = synchronized(reportQueueDrainLock) {
-                reportQueueDrainTrigger == null &&
-                    reportQueueDrainMovementGeneration == trigger.movementGeneration + 1L &&
-                    reportQueueDrainNetworkGeneration == trigger.networkGeneration
+            val noticeStillCurrent = synchronized(reportQueueDrainLock) {
+                if (afterCompletion) {
+                    reportQueueDrainTrigger == null &&
+                        reportQueueDrainMovementGeneration == trigger.movementGeneration + 1L &&
+                        reportQueueDrainNetworkGeneration == trigger.networkGeneration
+                } else {
+                    reportQueueDrainTrigger === trigger &&
+                        reportQueueDrainMovementGeneration == trigger.movementGeneration &&
+                        reportQueueDrainNetworkGeneration == trigger.networkGeneration
+                }
             }
-            if (!drainCompletedWithoutReplacement || !isActivityForeground ||
+            if (!noticeStillCurrent || !isActivityForeground ||
                 walk.epoch != walkEpoch || !walk.state.allowsPostWalkTransfer || !walk.isForeground ||
                 currentReporterUserId() != trigger.reporterActorId ||
                 gateway.generation != trigger.gatewaySessionGeneration || gateway.session !== trigger.gatewaySession ||
@@ -28360,10 +28492,26 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 !reportPrivacyConsentSession.isGranted() ||
                 integratedConsentSession.currentConfirmationOrNull() != trigger.consentConfirmation
             ) return@postGatewayActivityCallback
-            // Automatic reporting stays silent; an explicit receipt cannot interrupt active output.
-            if (spokenMessage != null && !isHandsFreeVoiceOutputActive()) speakStatusExplanation(spokenMessage)
-            // Command speech also updates this view. Restore the full mixed-batch result afterwards.
-            showWalkLastResult(message)
+            // Do not lose the final result just because our own "transmitting" notice is playing.
+            // Retries keep the same deadline and recheck this activity/account/walk/drain fence.
+            val speechBusy = isHandsFreeVoiceOutputActive() || voiceRecognitionActive ||
+                gatewayVoiceRecorder?.isRecording == true
+            var delivered = false
+            if (spokenMessage != null && !speechBusy) {
+                delivered = speakStatusExplanation(spokenMessage)
+            } else if (spokenMessage != null && afterCompletion) {
+                val now = SystemClock.elapsedRealtime()
+                val deadline = speechRetryDeadlineElapsedRealtimeMs ?: (now +
+                    kr.co.hanium.dreamup.walksafe.feedback.utteranceTerminalTimeoutMs(Int.MAX_VALUE))
+                if (now < deadline) reportCleanupCallbackHandler.postDelayed({
+                    postReportQueueDrainNotice(
+                        trigger, activityLease, walkEpoch, message, spokenMessage,
+                        afterCompletion = true, speechRetryDeadlineElapsedRealtimeMs = deadline,
+                    )
+                }, DEFERRED_VOICE_INPUT_POLL_MS)
+            }
+            // Refresh the visible result once, not on every poll (TalkBack live region).
+            if (speechRetryDeadlineElapsedRealtimeMs == null || delivered) showWalkLastResult(message)
         }
     }
 
@@ -28799,7 +28947,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             conflictTitle,
             "이전 보행 종료 여부를 음성으로 확인합니다.",
         )
-        val accepted = ensureFeedbackActuator().speakInteraction(
+        val accepted = dispatchOwnedInteractionSpeech(
             message = prompt,
             onCompleted = delivered,
             onFailed = failed,
@@ -29997,7 +30145,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
             }
         }
-        val accepted = ensureFeedbackActuator().speakInteraction(
+        val accepted = dispatchOwnedInteractionSpeech(
             message = prompt,
             onCompleted = delivered,
             onFailed = failed,
@@ -30785,7 +30933,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 if (feedbackLifecycleGeneration == generation) onFailed()
             }
         }
-        return ensureFeedbackActuator().speakInteraction(
+        return dispatchOwnedInteractionSpeech(
             message = decision.noticeKo,
             onCompleted = deliveredOnMain,
             onFailed = failedOnMain,
@@ -33398,6 +33546,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         it.cameraTimestampNs == capturedDepthSnapshot.cameraImageTimestampNs
                 },
                 geometryVersion = requestGeometryVersion,
+                reportLocation = latestTrustedLocation?.takeIf {
+                    currentNavigationCollectionAllowsWork() && it.elapsedRealtimeMs <= elapsedRealtimeMs
+                },
             )
             detectorExecutor.execute {
                 var detectorInvoked = false
@@ -35785,6 +35936,7 @@ generation != cameraFallbackGeneration
         isInstructionStillCurrent: () -> Boolean = { true },
     ): Boolean {
         // Capture before posting to UI, not when a stale queued request is eventually run.
+        val speechAttempt = commandSpeechTracker.start(commandSpeechOwner)
         val generation = feedbackLifecycleGeneration
         val expectedWalkEpoch = if (::walkSessionLifecycle.isInitialized) {
             walkSessionLifecycle.currentRuntimeEpochOrNull()
@@ -35804,7 +35956,10 @@ generation != cameraFallbackGeneration
                 deferredVoiceRecognitionStart == null &&
                 !shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)
         fun failOnce() {
-            if (terminal.compareAndSet(false, true)) onFailed?.invoke()
+            if (terminal.compareAndSet(false, true)) {
+                commandSpeechTracker.finish(speechAttempt, if (cancelled.get()) CommandSpeechState.CANCELLED else CommandSpeechState.FAILED)
+                onFailed?.invoke()
+            }
         }
         val deliver: () -> Boolean = delivery@{
             if (!outputCurrent()) {
@@ -35815,6 +35970,7 @@ generation != cameraFallbackGeneration
                 message = message,
                 onCompleted = {
                     if (outputCurrent() && terminal.compareAndSet(false, true)) {
+                        commandSpeechTracker.finish(speechAttempt, CommandSpeechState.COMPLETED)
                         onCompleted?.invoke()
                     } else {
                         failOnce()
@@ -35880,6 +36036,34 @@ generation != cameraFallbackGeneration
         }
     }
 
+    /** Confirmation/reprompt callers with their own UI callbacks still report their command's outcome. */
+    private fun dispatchOwnedInteractionSpeech(
+        message: String,
+        onCompleted: (() -> Unit)?,
+        onFailed: (() -> Unit)?,
+    ): NavigationSpeechDispatchResult {
+        val attempt = commandSpeechTracker.start(commandSpeechOwner)
+        val result = ensureFeedbackActuator().speakInteraction(
+            message,
+            onCompleted = { runOnUiThread {
+                commandSpeechTracker.finish(attempt, CommandSpeechState.COMPLETED)
+                onCompleted?.invoke()
+            } },
+            onFailed = { runOnUiThread {
+                commandSpeechTracker.finish(attempt, CommandSpeechState.FAILED)
+                onFailed?.invoke()
+            } },
+            onCancelled = { runOnUiThread {
+                commandSpeechTracker.finish(attempt, CommandSpeechState.CANCELLED)
+                onFailed?.invoke()
+            } },
+        )
+        if (result != NavigationSpeechDispatchResult.ACCEPTED) {
+            commandSpeechTracker.finish(attempt, CommandSpeechState.FAILED)
+        }
+        return result
+    }
+
     private fun speakInteraction(message: String): Boolean = speakCommandResponse(message)
 
     private fun speakStatusExplanation(message: String): Boolean =
@@ -35891,20 +36075,29 @@ generation != cameraFallbackGeneration
         onCompleted: (() -> Unit)? = null,
         onFailed: (() -> Unit)? = null,
         statusExplanation: Boolean = false,
+        parts: List<String> = listOf(message),
+        onPartCompleted: (Int) -> Unit = {},
+        sequenceCurrent: () -> Boolean = { true },
     ): Boolean {
+        val speechOwner = commandSpeechOwner
         val lifecycleGeneration = feedbackLifecycleGeneration
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            runOnUiThread {
+            runOnUiThreadForCommand(speechOwner) {
                 if (!isFeedbackLifecycleCurrent(lifecycleGeneration)) {
                     onFailed?.invoke()
-                    return@runOnUiThread
+                    return@runOnUiThreadForCommand
                 }
-                speakCommandResponse(message, preparingInput, onCompleted, onFailed, statusExplanation)
+                speakCommandResponse(message, preparingInput, onCompleted, onFailed, statusExplanation, parts, onPartCompleted, sequenceCurrent)
             }
             return true
         }
-        if (!isFeedbackLifecycleCurrent(lifecycleGeneration)) {
+        val speechAttempt = commandSpeechTracker.start(speechOwner)
+        fun failResponse(state: CommandSpeechState = CommandSpeechState.FAILED) {
+            commandSpeechTracker.finish(speechAttempt, state)
             onFailed?.invoke()
+        }
+        if (!isFeedbackLifecycleCurrent(lifecycleGeneration)) {
+            failResponse()
             return false
         }
         showWalkLastResult(message)
@@ -35921,12 +36114,14 @@ generation != cameraFallbackGeneration
                 isRisk = false,
             )
         ) {
-            onFailed?.invoke()
+            failResponse()
             return false
         }
         // New output owns the visible response; cancellation of an older TTS cannot overwrite it.
         invalidateForegroundHomeWakeInput()
         val responseGeneration = ++commandSpeechResponseGeneration
+        commandSpeechTracker.finish(commandSpeechAttempt, CommandSpeechState.CANCELLED)
+        commandSpeechAttempt = speechAttempt
         // registerLatest retires old callbacks silently. Preserve retry for an interrupted
         // route decision before its callback is retired, without changing other response policy.
         failInterruptedRouteDecisionSpeech(responseGeneration - 1L)
@@ -35945,6 +36140,7 @@ generation != cameraFallbackGeneration
         voiceCommandPromptPending = preparingInput
         if (!preparingInput) voiceCommandPromptReadyGeneration = null
         fun responseCurrent(): Boolean =
+            sequenceCurrent() &&
             responseGeneration == commandSpeechResponseGeneration &&
                 isFeedbackLifecycleCurrent(lifecycleGeneration) && isActivityForeground &&
                 recognitionGeneration == voiceRecognitionGeneration &&
@@ -35968,11 +36164,12 @@ generation != cameraFallbackGeneration
                 }
                 updateVoiceCommandButton(active = voiceRecognitionActive)
                 if (current) {
+                    commandSpeechTracker.finish(speechAttempt, CommandSpeechState.COMPLETED)
                     updateNavigationStatus("voice=feedback_completed")
                     logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.OUTPUT_DONE)
                     onCompleted?.invoke()
                 } else {
-                    onFailed?.invoke()
+                    failResponse(CommandSpeechState.CANCELLED)
                 }
             },
             onFailed = {
@@ -35990,7 +36187,7 @@ generation != cameraFallbackGeneration
                     updateNavigationStatus("voice=feedback_retry_required")
                     logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.OUTPUT_FAILED)
                 }
-                onFailed?.invoke()
+                failResponse(if (responseCurrent()) CommandSpeechState.FAILED else CommandSpeechState.CANCELLED)
             },
         )
         updateVoiceCommandButton(active = voiceRecognitionActive)
@@ -36051,16 +36248,39 @@ generation != cameraFallbackGeneration
                 CommandSpeechReadiness.DISPATCH -> Unit
             }
             cancelForegroundHomeWakeListening()
-            val dispatch = if (homeResponse || statusExplanation || walkStatusResponse) {
-                actuator.speakHomeCommandInteraction(message, onFailed = failed, onCompleted = completed)
-            } else {
-                actuator.speakInteraction(message, onCompleted = completed, onFailed = failed)
-            }
-            if (BuildConfig.DEBUG) {
-                android.util.Log.d("WalkSafeVoiceInput", "event=OUTPUT_DISPATCH result=${dispatch.name}")
-            }
-            if (dispatch != NavigationSpeechDispatchResult.ACCEPTED) failed()
-            return dispatch == NavigationSpeechDispatchResult.ACCEPTED
+            return CommandSpeechSequence(
+                parts = parts,
+                isCurrent = { responseCurrent() && commandSpeechResponseCallbacks.size() > 0 },
+                speak = { text, done, failedPart ->
+                    val cancelledPart = {
+                        runOnUiThread {
+                            commandSpeechTracker.finish(speechAttempt, CommandSpeechState.CANCELLED)
+                            failedPart()
+                        }
+                    }
+                    val dispatch = if (homeResponse || statusExplanation || walkStatusResponse) {
+                        actuator.speakHomeCommandInteraction(
+                            text, onFailed = { runOnUiThread { failedPart() } },
+                            onCompleted = { runOnUiThread { done() } }, onCancelled = cancelledPart,
+                        )
+                    } else {
+                        actuator.speakInteraction(
+                            text, onCompleted = { runOnUiThread { done() } },
+                            onFailed = { runOnUiThread { failedPart() } }, onCancelled = cancelledPart,
+                        )
+                    }
+                    if (BuildConfig.DEBUG) android.util.Log.d(
+                        "WalkSafeVoiceInput", "event=OUTPUT_DISPATCH result=${dispatch.name}",
+                    )
+                    dispatch == NavigationSpeechDispatchResult.ACCEPTED
+                },
+                onPartCompleted = {
+                    commandSpeechTracker.partCompleted(speechAttempt)
+                    onPartCompleted(it)
+                },
+                onCompleted = completed,
+                onFailed = failed,
+            ).start()
         }
         return dispatchWhenReady()
     }
@@ -36422,15 +36642,18 @@ generation != cameraFallbackGeneration
                     capture.sessionGeneration != GatewaySessionProcessCoordinator.snapshot().generation ||
                     capture.walkEpoch != walkSessionLifecycle.snapshot().epoch
                 ) return@command
-                val workBefore = handsFreeCommandWorkGenerations()
-                handleVoiceCommandPhrases(
-                    phrases = listOf(text),
-                    confidenceScores = floatArrayOf(confidence ?: Float.NaN),
-                    expectedNavigationDecisionToken = capture.decisionToken,
-                    includeRecognizedTextInStatus = false,
-                    redactedRecognitionSource = "on_device_hands_free",
-                )
-                bindHandsFreeCommandWork(workBefore)
+                val owner = commandSpeechTracker.begin(checkNotNull(handsFreeVoiceController?.dispatchingCommandId()))
+                withCommandSpeechOwner(owner) {
+                    val workBefore = handsFreeCommandWorkGenerations()
+                    handleVoiceCommandPhrases(
+                        phrases = listOf(text),
+                        confidenceScores = floatArrayOf(confidence ?: Float.NaN),
+                        expectedNavigationDecisionToken = capture.decisionToken,
+                        includeRecognizedTextInStatus = false,
+                        redactedRecognitionSource = "on_device_hands_free",
+                    )
+                    bindHandsFreeCommandWork(workBefore)
+                }
             },
             onStatus = ::updateNavigationStatus,
             onCommandListeningStarted = ::handleHandsFreeVoiceCommandListeningStarted,
@@ -36438,6 +36661,7 @@ generation != cameraFallbackGeneration
             onSessionEnded = ::handleHandsFreeVoiceSessionEnded,
             isSpeechRecognitionBlocked = ::isHandsFreeVoiceRecognitionBlocked,
             isCommandWorkPending = ::isHandsFreeCommandWorkPending,
+            commandSpeechProgress = commandSpeechTracker::progress,
             speakLowConfidenceReprompt = ::speakHandsFreeLowConfidenceReprompt,
         )
         handsFreeVoiceController = controller
@@ -36594,7 +36818,7 @@ generation != cameraFallbackGeneration
         updateNavigationStatus("voice_hands_free=reprompt_low_confidence")
         showWalkLastResult(kr.co.hanium.dreamup.walksafe.voice.HANDS_FREE_LOW_CONFIDENCE_REPROMPT_KO)
         val accepted = runCatching {
-            ensureFeedbackActuator().speakInteraction(
+            dispatchOwnedInteractionSpeech(
                 message = kr.co.hanium.dreamup.walksafe.voice.HANDS_FREE_LOW_CONFIDENCE_REPROMPT_KO,
                 onCompleted = { finish(kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.COMPLETED) },
                 onFailed = { finish(kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.FAILED) },
@@ -37482,6 +37706,9 @@ generation != cameraFallbackGeneration
         explicitConfirmationRequestedAtElapsedRealtimeMs: Long? = null,
         coordinateEvidence: kr.co.hanium.dreamup.walksafe.report.ReportCoordinateEvidence? = null,
     ): String {
+        if (!::sensitivePrefs.isInitialized || sensitivePrefs.isBlocked()) {
+            return "reportCandidate=blocked:sensitive_storage"
+        }
         if (!reportPermissionsAllowWork()) {
             return "reportCandidate=blocked:permission_unavailable"
         }
@@ -37540,7 +37767,13 @@ generation != cameraFallbackGeneration
             return "reportCandidate=blocked:device_resources_${deviceResources.readinessStatus.name.lowercase(Locale.US)}"
         }
         val requestElapsedRealtimeMs = SystemClock.elapsedRealtime()
-        val trustedLocation = freshTrustedLocationOrNull(requestElapsedRealtimeMs)
+        val captureElapsedMs = coordinateEvidence?.capturedAtElapsedRealtimeMs
+        val locationOwner = locationCollectionOwner
+        val trustedLocation = if (locationOwner != null &&
+            currentLocationCollectionOwnerOrNull() == locationOwner
+        ) LocationTrustPolicy.freshOrNull(
+            coordinateEvidence?.captureLocation, requestElapsedRealtimeMs,
+        ) else null
         if (trustedLocation == null) {
             if (explicitRequest) {
                 ensureNavigationPermissionForReport()
@@ -37573,7 +37806,8 @@ generation != cameraFallbackGeneration
                 deviceGateAllowsReports = gateState.reportCandidatesAllowed,
                 depthSampleCount = output.validSampleCount,
                 depthValidSampleRatio = output.validSampleRatio,
-                detectionAgeMs = (nowMs - capturedAtMs).coerceAtLeast(0L),
+                capturedAtElapsedRealtimeMs = captureElapsedMs,
+                detectionAgeMs = captureElapsedMs?.let { requestElapsedRealtimeMs - it },
                 coordinateGateStatus = coordinateEvidence?.statusFor(
                     output, reportImage, capturedAtMs, visualGeometryVersion,
                 ) ?: "unknown",
@@ -37612,6 +37846,9 @@ generation != cameraFallbackGeneration
         explicitConfirmationContext: ExplicitReportConfirmationContext?,
         explicitConfirmationRequestedAtElapsedRealtimeMs: Long?,
     ): String {
+        if (!::sensitivePrefs.isInitialized || sensitivePrefs.isBlocked()) {
+            return "reportCandidate=blocked:sensitive_storage"
+        }
         if (!reportPermissionsAllowWork()) {
             return "reportCandidate=blocked:permission_unavailable"
         }
@@ -37643,6 +37880,9 @@ generation != cameraFallbackGeneration
             return "reportCandidate=blocked:automatic_report_consent_required"
         }
         val imageJpeg = reportImage ?: return "reportCandidate=blocked:no_report_image"
+        if (!kr.co.hanium.dreamup.walksafe.report.AndroidReportImageValidator.isDecodable(imageJpeg)) {
+            return "reportCandidate=blocked:unreadable_report_image"
+        }
         val automaticAttemptLease = if (explicitRequest) {
             null
         } else {
@@ -37662,6 +37902,11 @@ generation != cameraFallbackGeneration
             }
         }
         val metadataUtf8 = candidate.metadata.toString().toByteArray(Charsets.UTF_8)
+        if (reportQueueStore.payloadExceedsLimit(metadataUtf8.size, imageJpeg.size)) {
+            metadataUtf8.fill(0)
+            automaticAttemptLease?.let(reportAttemptStore::release)
+            return kr.co.hanium.dreamup.walksafe.report.ExplicitReportRejectionNotice.STATUS_PAYLOAD_TOO_LARGE
+        }
         if (explicitConfirmationContext != null) {
             val requestedAt = explicitConfirmationRequestedAtElapsedRealtimeMs
             if (requestedAt == null) {
@@ -37719,8 +37964,10 @@ generation != cameraFallbackGeneration
         if (queued == null) {
             return "reportCandidate=queue_disabled_or_rejected"
         }
-        if (explicitRequest) speakInteraction(kr.co.hanium.dreamup.walksafe.report.ExplicitReportSubmissionNotice.SAVED_NOT_SUBMITTED_KO)
-        return "reportCandidate=queued id=${queued.payload.reportId.take(12)}"
+        return queued.use {
+            if (explicitRequest) speakInteraction(kr.co.hanium.dreamup.walksafe.report.ExplicitReportSubmissionNotice.SAVED_NOT_SUBMITTED_KO)
+            "reportCandidate=queued id=${it.payload.reportId.take(12)}"
+        }
     }
 
     private fun requestExplicitReport(source: ExplicitReportRequestSource) {
@@ -37781,6 +38028,13 @@ generation != cameraFallbackGeneration
     }
 
     private fun ensureExplicitReportAuthorityPreconditions(): Boolean {
+        if (!::sensitivePrefs.isInitialized || sensitivePrefs.isBlocked()) {
+            latestReportCandidateStatus = "reportCandidate=blocked:sensitive_storage"
+            updateNavigationStatus(latestReportCandidateStatus)
+            kr.co.hanium.dreamup.walksafe.report.ExplicitReportRejectionNotice
+                .messageFor(latestReportCandidateStatus)?.let(::speakInteraction)
+            return false
+        }
         if (PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE == null) {
             val message = "현재 앱 빌드에서는 신고 저장 기능을 사용할 수 없습니다."
             latestReportCandidateStatus = "reportCandidate=blocked:queue_disabled"
@@ -37833,6 +38087,7 @@ generation != cameraFallbackGeneration
 
     private fun currentExplicitReportConfirmationContextOrNull():
         ExplicitReportConfirmationContext? {
+        if (!::sensitivePrefs.isInitialized || sensitivePrefs.isBlocked()) return null
         val epoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return null
         val reporter = currentReporterUserId() ?: return null
         val confirmation = integratedConsentSession.currentConfirmationOrNull() ?: return null
@@ -37872,6 +38127,9 @@ generation != cameraFallbackGeneration
                     if (queueGateway.generation != confirmed.context.gatewaySessionGeneration ||
                         queueGateway.session?.actorId != confirmed.context.reporterId
                     ) return@useExactBytes "reportCandidate=blocked:confirmation_context_changed"
+                    if (reportQueueStore.payloadExceedsLimit(metadataUtf8.size, imageJpeg.size)) {
+                        return@useExactBytes kr.co.hanium.dreamup.walksafe.report.ExplicitReportRejectionNotice.STATUS_PAYLOAD_TOO_LARGE
+                    }
                     reportQueueStore.enqueue(
                         expectedReporterActorId = confirmed.context.reporterId,
                         metadataUtf8 = metadataUtf8,
@@ -37880,7 +38138,7 @@ generation != cameraFallbackGeneration
                         walkSessionId = confirmed.context.walkSessionId,
                         consentReceiptSha256 = confirmed.context.consentReceiptSha256,
                         accountGeneration = queueGateway.session?.backendAccountGeneration,
-                    )?.let { queued ->
+                    )?.use { queued ->
                         "reportCandidate=queued id=${queued.payload.reportId.take(12)}"
                     } ?: "reportCandidate=queue_disabled_or_rejected"
                 }
@@ -37894,7 +38152,9 @@ generation != cameraFallbackGeneration
         } else {
             null
         }
-        renderExplicitReportConfirmationIdle(savedNotice)
+        val rejectionNotice = kr.co.hanium.dreamup.walksafe.report.ExplicitReportRejectionNotice.messageFor(status)
+        renderExplicitReportConfirmationIdle(savedNotice ?: rejectionNotice)
+        rejectionNotice?.let(::speakInteraction)
         latestReportCandidateStatus = status
         reportPanelSaved = status.startsWith("reportCandidate=queued ")
         if (reportPanelDialog != null) refreshReportPanel()
@@ -38224,7 +38484,21 @@ generation != cameraFallbackGeneration
             expectedPage = nativeUiPage,
         )
         cancelForegroundHomeWakeListening(resetFailure = false)
-        val recorder = ForegroundAacRecorder(cacheDir) {
+        val recorder = ForegroundAacRecorder(cacheDir, onInputSilenced = {
+            if (activeGatewaySpeechInteraction === active) {
+                foregroundHomeWakeFailed = true
+                cancelGatewaySpeechInteraction("microphone_input_silenced")
+                reportWalkVoiceStartFailure(WalkVoiceStartFailure.INPUT_SILENCED)
+                val message = MICROPHONE_INPUT_SILENCED_GUIDANCE
+                when {
+                    nativeGuidanceConfirmationScreen != null -> Unit
+                    reportPanelDialog != null -> reportPanelStatus?.append("\n\n$message")
+                    voiceHelpScreen != null -> showVoiceHelpRecovery(message)
+                    else -> showVoiceCommandError(message, "다시 시도", ::ensureVoicePermissionThenListen)
+                }
+                speakInteraction(message)
+            }
+        }) {
             runOnUiThread { stopGatewayVoiceCapture(interactionGeneration) }
         }
         activeGatewaySpeechInteraction = active
@@ -38830,6 +39104,8 @@ generation != cameraFallbackGeneration
         cancelDeferredVoiceRecognitionStart()
         commandSpeechResponseGeneration += 1L
         failInterruptedRouteDecisionSpeech(commandSpeechResponseGeneration - 1L)
+        commandSpeechTracker.finish(commandSpeechAttempt, CommandSpeechState.CANCELLED)
+        commandSpeechAttempt = null
         commandSpeechResponseCallbacks.clear()
         destinationSearchVoiceState?.invalidateVoicePrompt()
         voiceCommandPromptPending = false
@@ -38920,6 +39196,30 @@ generation != cameraFallbackGeneration
                 updateVoiceCommandButton(active = false)
                 updateNavigationStatus("voice=recognition_failed code=$error")
                 logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.ONE_SHOT_UI_ERROR, errorCode = error)
+                if (error == SPEECH_ERROR_INPUT_SILENCED) {
+                    // Preserve the cause before generic recognition-error handlers can relabel it.
+                    // Block passive home/hands-free restarts; recovery remains a user action.
+                    foregroundHomeWakeFailed = true
+                    speechRecognizer?.destroy()
+                    speechRecognizer = null
+                    reportWalkVoiceStartFailure(WalkVoiceStartFailure.INPUT_SILENCED)
+                    val message = MICROPHONE_INPUT_SILENCED_GUIDANCE
+                    when {
+                        nativeGuidanceConfirmationScreen != null -> Unit // Keep start/cancel controls.
+                        reportPanelDialog != null -> reportPanelStatus?.append("\n\n$message")
+                        voiceHelpScreen != null -> showVoiceHelpRecovery(message)
+                        purpose == VoiceRecognitionPurpose.WALK_SESSION_RESUME ->
+                            handleWalkSessionResumeRecognizerNotStarted()
+                        purpose == VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER ->
+                            handleGatewayWalkTakeoverRecognition(emptyList())
+                        else -> {
+                            clearVoiceEndConfirmation()
+                            showVoiceCommandError(message, "다시 시도", ::ensureVoicePermissionThenListen)
+                        }
+                    }
+                    speakInteraction(message)
+                    return
+                }
                 if (nativeGuidanceConfirmationAction != null && nativeGuidanceConfirmationScreen != null) {
                     if (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                         handleNativeGuidanceConfirmationUnrecognized()
@@ -39448,7 +39748,7 @@ generation != cameraFallbackGeneration
                 }
             }
         }
-        val accepted = ensureFeedbackActuator().speakInteraction(
+        val accepted = dispatchOwnedInteractionSpeech(
             message = prompt,
             onCompleted = delivered,
             onFailed = failed,
@@ -39516,6 +39816,11 @@ generation != cameraFallbackGeneration
         val dialog = reportPanelDialog ?: return
         reportPanelDialog = null
         reportPanelGeneration++
+        quarantineGeneration++
+        quarantineReview = null
+        quarantineAuthority = null
+        quarantineContent = null
+        quarantineBusy = false
         voiceHelpCue?.cancel()
         reportPanelStatus = null
         dialog.dismiss()
@@ -39531,6 +39836,7 @@ generation != cameraFallbackGeneration
 
     private fun refreshReportPanel() {
         if (reportPanelDialog == null) return
+        if (quarantineContent != null) { renderQuarantinedReports(); return }
         val state = kr.co.hanium.dreamup.walksafe.report.reportScreenPresentation(
             PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE != null, isWalkSessionRuntimeActive(),
             if (reportPanelSaved) "reportCandidate=queued id=current" else latestReportCandidateStatus,
@@ -39547,7 +39853,7 @@ generation != cameraFallbackGeneration
         reportPanelLastText = state.message
     }
 
-    private fun openReportPanel() {
+    private fun openReportPanel(openStored: Boolean = false) {
         if (reportPanelDialog != null) return
         closeVoiceHelp(announce = false)
         cancelVoiceCommandRecognition()
@@ -39595,6 +39901,7 @@ generation != cameraFallbackGeneration
                     "$EXPLICIT_REPORT_CONFIRMATION_SUMMARY_KO 신고 확인 또는 취소라고 말씀해 주세요."
                     else reportPanelLastText)
             })
+            addView(voiceHelpButton("보관된 신고 확인") { openQuarantinedReports() })
             reportPanelRecovery = voiceHelpButton("설정 열기") {
                 when {
                     PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE == null -> {
@@ -39637,7 +39944,8 @@ generation != cameraFallbackGeneration
                 (resources.displayMetrics.heightPixels * 0.85f).roundToInt())
         }
         refreshReportPanel()
-        speakReportPanel(reportPanelLastText + " 다시 듣기 또는 닫기라고 말씀해 주세요.")
+        if (openStored) openQuarantinedReports()
+        else speakReportPanel(reportPanelLastText + " 보관된 신고 확인, 다시 듣기 또는 닫기라고 말씀해 주세요.")
     }
 
     private fun requestReportFromPanel() {
@@ -39655,7 +39963,17 @@ generation != cameraFallbackGeneration
     }
 
     private fun handleReportPanelInput(phrases: List<String>, confidence: Float?, extraAlternatives: Boolean) {
+        if (quarantineContent != null) {
+            val action = ReportQuarantineReview.voiceAction(phrases, confidence, extraAlternatives)
+            if (action == null) speakReportPanel(
+                if (quarantineReview?.confirmingDelete == true)
+                    "삭제 확인을 확정하지 못했습니다. 보관본 삭제 확인 버튼을 누르거나 다시 말씀해 주세요."
+                else "명령을 확인하지 못했습니다. " + quarantineSpeech())
+            else handleQuarantineAction(action)
+            return
+        }
         fun choice(raw: String): Int? = when (raw.replace(Regex("[\\s.!?。]"), "")) {
+            "보관된신고확인", "보관된신고", "신고보관함" -> 4
             "신고확인", "확인", "신고보내기" -> 1
             "다시듣기", "다시말해줘" -> 2
             "신고대상확인", "신고해줘", "이거신고해줘", "다시시도" -> 3
@@ -39668,6 +39986,7 @@ generation != cameraFallbackGeneration
             return
         }
         when (selected) {
+            4 -> openQuarantinedReports()
             1 -> {
                 if (!reportPanelConfirmationArmed) {
                     speakReportPanel("아직 보낼 신고가 확인되지 않았습니다. " + reportPanelLastText)
@@ -39682,6 +40001,180 @@ generation != cameraFallbackGeneration
             } else requestReportFromPanel()
             0 -> { closeReportPanel(); speakStatusExplanation("신고 창을 닫았습니다.") }
         }
+    }
+
+    private var quarantineReview: ReportQuarantineReview? = null
+    private var quarantineAuthority: UserReportAuthority? = null
+    private var quarantineContent: LinearLayout? = null
+    private var quarantineBusy = false
+    private var quarantineNotice = ""
+    @Volatile private var quarantineGeneration = 0L
+
+    private fun quarantineAuthorityCurrent(authority: UserReportAuthority, generation: Long): Boolean =
+        quarantineGeneration == generation && isActivityForeground &&
+            !accountDeletionStateMachine.processingBlocked() &&
+            ::sensitivePrefs.isInitialized && !sensitivePrefs.isBlocked() &&
+            GatewaySessionProcessCoordinator.snapshot().let {
+                !it.storageBlocked && !it.deletionRecoveryOnly && it.matchesUserReportAuthority(authority)
+            } &&
+            authority.session.isUsableFor(authority.session.actorId)
+
+    private fun openQuarantinedReports() {
+        val dialog = reportPanelDialog ?: return
+        if (!walkSessionLifecycle.snapshot().state.allowsPostWalkTransfer) {
+            speakReportPanel("보관된 신고는 길안내를 종료한 뒤 확인할 수 있습니다.")
+            return
+        }
+        val authority = currentUserReportAuthorityOrNull()
+        if (authority == null || sensitivePrefs.isBlocked()) {
+            speakReportPanel("현재 계정 정보를 확인할 수 없습니다. 로그인 상태를 확인한 뒤 다시 시도해 주세요.")
+            return
+        }
+        invalidatePendingExplicitReport()
+        quarantineAuthority = authority
+        quarantineReview = null
+        quarantineBusy = true
+        quarantineNotice = "보관된 신고를 확인하고 있습니다."
+        quarantineContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val inset = (24 * resources.displayMetrics.density).roundToInt()
+            setPadding(inset, inset, inset, inset)
+            setBackgroundColor(WS_COLOR_GROUND)
+        }
+        dialog.setContentView(ScrollView(this).apply { addView(quarantineContent) })
+        dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        renderQuarantinedReports()
+        speakReportPanel(quarantineNotice)
+        val generation = ++quarantineGeneration
+        try {
+            reportCleanupExecutor.execute {
+                if (!quarantineAuthorityCurrent(authority, generation)) return@execute
+                val reports = runCatching {
+                    reportQueueStore.quarantinedReports(authority.session.actorId,
+                        requireNotNull(authority.session.backendAccountGeneration))
+                }.getOrNull()
+                runOnUiThread {
+                    if (!quarantineAuthorityCurrent(authority, generation)) return@runOnUiThread
+                    quarantineBusy = false
+                    quarantineReview = reports?.let(::ReportQuarantineReview)
+                    quarantineNotice = if (reports == null) "보관된 신고를 읽지 못했습니다. 잠시 후 다시 확인해 주세요." else ""
+                    renderQuarantinedReports()
+                    speakReportPanel(quarantineSpeech())
+                }
+            }
+        } catch (_: RejectedExecutionException) {
+            quarantineBusy = false
+            quarantineNotice = "보관된 신고를 읽지 못했습니다. 잠시 후 다시 확인해 주세요."
+            renderQuarantinedReports()
+            speakReportPanel(quarantineSpeech())
+        }
+    }
+
+    private fun quarantineSpeech(): String {
+        if (quarantineBusy || quarantineReview == null) return quarantineNotice
+        val review = requireNotNull(quarantineReview)
+        if (review.current == null) return quarantineNotice + " 전송이 중단되어 보관된 신고가 없습니다. 닫기라고 말씀해 주세요."
+        if (review.confirmingDelete) return "선택한 신고의 휴대전화 보관본을 삭제할까요? " +
+            "삭제하면 되돌릴 수 없습니다. 서버 자료를 삭제하는 기능은 아닙니다. 삭제 확인 또는 유지라고 말씀해 주세요."
+        val current = requireNotNull(review.current)
+        val whenCreated = java.text.SimpleDateFormat("M월 d일 HH시 mm분", Locale.KOREAN)
+            .format(java.util.Date(current.createdAtEpochMs))
+        val kind = if (current.priority == ReportQueuePriority.AUTOMATIC) "자동 신고" else "직접 신고"
+        return quarantineNotice + " ${review.count}개 중 ${review.position}번째, $whenCreated 저장한 $kind 입니다. " +
+            "서버가 받을 수 없어 자동으로 다시 보내지 않습니다. 다음, 이전, 다시 듣기, 삭제 또는 닫기라고 말씀해 주세요."
+    }
+
+    private fun renderQuarantinedReports() {
+        val content = quarantineContent ?: return
+        content.removeAllViews()
+        content.addView(TextView(this).apply {
+            text = "보관된 신고"
+            textSize = 26f
+            setTextColor(WS_COLOR_EMPHASIS)
+            ViewCompat.setAccessibilityHeading(this, true)
+        })
+        // Detailed description is spoken; retain a concise accessible position on screen.
+        val review = quarantineReview
+        reportPanelStatus = TextView(this).apply {
+            text = when {
+                quarantineBusy || review == null -> quarantineNotice
+                review.confirmingDelete -> "휴대전화 보관본을 삭제할까요?"
+                review.count == 0 -> "보관된 신고 없음"
+                else -> "${review.count}개 중 ${review.position}번째 신고"
+            }
+            textSize = 24f
+            setTextColor(WS_COLOR_EMPHASIS)
+        }.also { content.addView(it) }
+        fun action(label: String, action: QuarantineAction, enabled: Boolean = true) {
+            content.addView(voiceHelpButton(label) { handleQuarantineAction(action) }.apply { isEnabled = enabled })
+        }
+        if (review?.confirmingDelete == true) {
+            action("보관본 삭제 확인", QuarantineAction.CONFIRM_DELETE, !quarantineBusy)
+            action("유지하기", QuarantineAction.KEEP, !quarantineBusy)
+        } else {
+            action("다음 신고", QuarantineAction.NEXT, !quarantineBusy && review != null && review.position < review.count)
+            action("이전 신고", QuarantineAction.PREVIOUS, !quarantineBusy && review != null && review.position > 1)
+            action("이 신고 삭제", QuarantineAction.DELETE, !quarantineBusy && review?.current != null)
+        }
+        action("다시 듣기", QuarantineAction.REPEAT)
+        action("목록 다시 확인", QuarantineAction.REFRESH, !quarantineBusy)
+        action("닫기", QuarantineAction.CLOSE)
+    }
+
+    private fun handleQuarantineAction(action: QuarantineAction) {
+        if (action == QuarantineAction.CLOSE) { closeReportPanel(); speakStatusExplanation("보관된 신고 창을 닫았습니다."); return }
+        val authority = quarantineAuthority ?: return
+        if (!quarantineAuthorityCurrent(authority, quarantineGeneration)) {
+            closeReportPanel()
+            speakStatusExplanation("계정 상태가 변경되어 보관된 신고 창을 닫았습니다.")
+            return
+        }
+        if (action == QuarantineAction.REPEAT) { speakReportPanel(quarantineSpeech()); return }
+        if (quarantineBusy) { speakReportPanel(quarantineNotice); return }
+        if (action == QuarantineAction.REFRESH) { openQuarantinedReports(); return }
+        val review = quarantineReview ?: return
+        quarantineNotice = ""
+        when (action) {
+            QuarantineAction.NEXT -> review.move(1)
+            QuarantineAction.PREVIOUS -> review.move(-1)
+            QuarantineAction.DELETE -> review.requestDelete()
+            QuarantineAction.KEEP -> review.keep()
+            QuarantineAction.CONFIRM_DELETE -> {
+                val target = review.deletionTarget()
+                if (target == null) { speakReportPanel("먼저 삭제할 신고를 선택한 뒤 이 신고 삭제를 눌러 주세요."); return }
+                quarantineBusy = true
+                quarantineNotice = "선택한 보관본을 삭제하고 있습니다."
+                renderQuarantinedReports()
+                val generation = ++quarantineGeneration
+                try {
+                    reportCleanupExecutor.execute {
+                        val deleted = runCatching {
+                            reportQueueStore.deleteQuarantinedReport(authority.session.actorId,
+                                requireNotNull(authority.session.backendAccountGeneration), target,
+                                authorityCurrent = { quarantineAuthorityCurrent(authority, generation) })
+                        }.getOrDefault(false)
+                        runOnUiThread {
+                            if (!quarantineAuthorityCurrent(authority, generation)) return@runOnUiThread
+                            quarantineBusy = false
+                            review.finishDelete(target, deleted)
+                            quarantineNotice = if (deleted) "휴대전화 보관본을 삭제했습니다." else "삭제하지 못했습니다. 보관본을 다시 확인해 주세요."
+                            renderQuarantinedReports()
+                            speakReportPanel(quarantineSpeech())
+                        }
+                    }
+                } catch (_: RejectedExecutionException) {
+                    quarantineBusy = false
+                    review.keep()
+                    quarantineNotice = "삭제를 시작하지 못했습니다. 잠시 후 다시 시도해 주세요."
+                    renderQuarantinedReports()
+                    speakReportPanel(quarantineSpeech())
+                }
+                return
+            }
+            else -> return
+        }
+        renderQuarantinedReports()
+        speakReportPanel(quarantineSpeech())
     }
 
     private fun speakReportPanel(message: String) {
@@ -39929,6 +40422,7 @@ generation != cameraFallbackGeneration
         if (nativeHomeFeatureContextAvailable() &&
             action !is AndroidVoiceAction.SearchDestination &&
             action !is AndroidVoiceAction.SelectDestinationCandidate &&
+            action !is AndroidVoiceAction.DescribeDestinationCandidate &&
             action !in setOf(
                 AndroidVoiceAction.RepeatDestinationCandidates,
                 AndroidVoiceAction.HearMoreDestinationCandidates,
@@ -39987,6 +40481,7 @@ generation != cameraFallbackGeneration
             }
             is AndroidVoiceAction.SearchDestination -> startVoiceDestinationSearch(action.query)
             is AndroidVoiceAction.SelectDestinationCandidate -> selectVoiceDestinationCandidate(action.oneBasedIndex)
+            is AndroidVoiceAction.DescribeDestinationCandidate -> describeVoiceDestinationCandidate(action.oneBasedIndex)
             AndroidVoiceAction.RepeatDestinationCandidates -> repeatVoiceDestinationCandidates()
             AndroidVoiceAction.HearMoreDestinationCandidates -> hearMoreVoiceDestinationCandidates()
             AndroidVoiceAction.PreviousDestinationCandidates -> previousVoiceDestinationCandidates()
@@ -40296,6 +40791,14 @@ generation != cameraFallbackGeneration
         } else {
             "$message $pagePrompt"
         }
+        val pageParts = state.voicePromptParts(originAgeNotice)
+        val extraBefore = if (message.contains(candidatePrompt)) message.substringBefore(candidatePrompt).trim() else message.trim()
+        val extraAfter = if (message.contains(candidatePrompt)) message.substringAfter(candidatePrompt).trim() else ""
+        val speechParts = listOfNotNull(
+            extraBefore.takeIf { it.isNotBlank() }?.let { kr.co.hanium.dreamup.walksafe.navigation.DestinationVoicePromptPart(it) },
+        ) + pageParts + listOfNotNull(
+            extraAfter.takeIf { it.isNotBlank() }?.let { kr.co.hanium.dreamup.walksafe.navigation.DestinationVoicePromptPart(it) },
+        )
         val attempt = state.beginVoicePrompt()
         val preparationGeneration = voiceRecognitionGeneration
         val responseGeneration = commandSpeechResponseGeneration + 1L
@@ -40307,6 +40810,11 @@ generation != cameraFallbackGeneration
                     currentVoiceDestinationDialogState() === state))
         return speakCommandResponse(
             message = completePrompt,
+            parts = speechParts.map { it.message },
+            sequenceCurrent = ::pageCurrent,
+            onPartCompleted = { index ->
+                speechParts[index].candidateNumber?.let { state.completeVoiceCandidate(attempt, it) }
+            },
             preparingInput = listenAfterPrompt,
             onCompleted = {
                 val current = pageCurrent() && voiceRecognitionGeneration == preparationGeneration &&
@@ -40387,6 +40895,45 @@ generation != cameraFallbackGeneration
         }
         destinationSearchVoiceState = transition.state
         speakHomeDestinationVoicePrompt(transition.state)
+    }
+
+    private fun describeVoiceDestinationCandidate(oneBasedIndex: Int) {
+        val state = activeVoiceCandidateDialogOrNull()
+        val message = state?.candidateDetailPrompt(oneBasedIndex)
+        if (state == null || message == null) {
+            val reason = state?.selectionRejectionMessage(oneBasedIndex) ?: noVoiceDestinationCandidatesMessage()
+            if (!retryHomeDestinationVoiceDialog(reason)) speakInteraction(reason)
+            return
+        }
+        val detailLease = if (nativeHomeFeatureContextAvailable()) {
+            HomeDestinationVoiceDialogLease(
+                actorId = reporterUserId ?: return,
+                sessionGeneration = GatewaySessionProcessCoordinator.snapshot().generation,
+                searchGeneration = destinationSearchGeneration,
+                state = state,
+                nowElapsedRealtimeMs = SystemClock::elapsedRealtime,
+                answerWindowStartsAfterPrompt = true,
+            ).also { homeDestinationVoiceDialogLease = it }
+        } else null
+        val preparationGeneration = voiceRecognitionGeneration
+        val listenAfter = nativeHomeFeatureContextAvailable() && nativeUiPage.isVoiceInteractionPage()
+        speakCommandResponse(
+            message = message,
+            parts = kr.co.hanium.dreamup.walksafe.feedback.trainingSpeechChunks(message),
+            preparingInput = listenAfter,
+            sequenceCurrent = { activeVoiceCandidateDialogOrNull() === state },
+            onFailed = {
+                detailLease?.openAnswerWindow()
+            },
+            onCompleted = {
+                detailLease?.openAnswerWindow()
+                if (listenAfter && voiceRecognitionGeneration == preparationGeneration && voiceCommandPromptPending) {
+                    voiceCommandPromptPending = false
+                    voiceCommandPromptReadyGeneration = preparationGeneration
+                    if (!startVoiceCommandRecognition()) voiceCommandPromptReadyGeneration = null
+                }
+            },
+        )
     }
 
     private fun startVoiceDestinationSearch(query: String) {
@@ -42663,6 +43210,7 @@ generation != cameraFallbackGeneration
     }
 
     private fun requestDestinationSearchLocation(query: String? = null, reset: Boolean = true): Boolean {
+        val speechOwner = commandSpeechOwner
         val lease = destinationSearchLocationLeaseOrNull()
         val controller = destinationSearchLocationControllerOrNull()
         if (lease == null || controller == null) {
@@ -42680,40 +43228,43 @@ generation != cameraFallbackGeneration
             lease,
             stillAllowed = { destinationSearchLocationLeaseOrNull() == lease },
         ) { origin ->
-            if (destinationSearchLocationLeaseOrNull() != lease) return@acquire
-            destinationSearchLocationMessage = if (origin == null) {
-                "현재 위치를 확인하지 못했습니다. 위치 서비스를 확인하고 검색을 다시 눌러 주세요."
-            } else null
-            if (origin == null) {
-                pendingVoiceDestinationQuery = null
-                pendingVoiceDestinationPageIndex = null
-                updateNavigationStatus("navigation=destination_search_location_unavailable")
-                if (query != null) speakInteraction(requireNotNull(destinationSearchLocationMessage))
-            }
-            updateDestinationSearchUi()
-            if (origin != null && query != null &&
-                canonicalDestinationSearchQueryOrNull(destinationQueryInput.text?.toString().orEmpty()) == query
-            ) {
-                // GPS completion and its successor search belong to the same command. The GPS
-                // controller is already no longer acquiring; transfer ownership before polling.
-                val locationWork = handsFreeCommandWork?.takeIf {
-                    it.searchLocationGeneration == controller.completionGeneration
+            withCommandSpeechOwner(speechOwner) {
+                if (destinationSearchLocationLeaseOrNull() != lease) return@acquire
+                destinationSearchLocationMessage = if (origin == null) {
+                    "현재 위치를 확인하지 못했습니다. 위치 서비스를 확인하고 검색을 다시 눌러 주세요."
+                } else null
+                if (origin == null) {
+                    pendingVoiceDestinationQuery = null
+                    pendingVoiceDestinationPageIndex = null
+                    updateNavigationStatus("navigation=destination_search_location_unavailable")
+                    if (query != null) speakInteraction(requireNotNull(destinationSearchLocationMessage))
                 }
-                val searchBefore = destinationSearchGeneration
-                performDestinationSearch(reset)
-                if (locationWork != null && handsFreeCommandWork === locationWork &&
-                    destinationSearchInFlight && destinationSearchGeneration != searchBefore
+                updateDestinationSearchUi()
+                if (origin != null && query != null &&
+                    canonicalDestinationSearchQueryOrNull(destinationQueryInput.text?.toString().orEmpty()) == query
                 ) {
-                    handsFreeCommandWork = locationWork.copy(
-                        searchGeneration = destinationSearchGeneration,
-                        searchLocationGeneration = null,
-                    )
+                    // GPS completion and its successor search belong to the same command. The GPS
+                    // controller is already no longer acquiring; transfer ownership before polling.
+                    val locationWork = handsFreeCommandWork?.takeIf {
+                        it.searchLocationGeneration == controller.completionGeneration
+                    }
+                    val searchBefore = destinationSearchGeneration
+                    performDestinationSearch(reset)
+                    if (locationWork != null && handsFreeCommandWork === locationWork &&
+                        destinationSearchInFlight && destinationSearchGeneration != searchBefore
+                    ) {
+                        handsFreeCommandWork = locationWork.copy(
+                            searchGeneration = destinationSearchGeneration,
+                            searchLocationGeneration = null,
+                        )
+                    }
                 }
             }
         }
     }
 
     private fun performDestinationSearch(reset: Boolean): Boolean {
+        val speechOwner = commandSpeechOwner
         if (!currentDestinationSearchAllowsWork()) {
             explainNavigationFeatureUnavailable()
             return false
@@ -42830,10 +43381,10 @@ generation != cameraFallbackGeneration
                     if (revalidation.status != GatewaySessionRevalidationStatus.READY) {
                         completeDestinationSearchRequest(searchCall)
                         searchCall.cancel()
-                        runOnUiThread {
+                        runOnUiThreadForCommand(speechOwner) {
                             if (
                                 !isCurrentSearchRequest()
-                            ) return@runOnUiThread
+                            ) return@runOnUiThreadForCommand
                             if (
                                 revalidation.status ==
                                 GatewaySessionRevalidationStatus.NOT_READY
@@ -42871,10 +43422,10 @@ generation != cameraFallbackGeneration
                     val result = searchCall.execute()
                     if (!isCurrentGatewaySession(gatewaySession)) {
                         completeDestinationSearchRequest(searchCall)
-                        runOnUiThread {
+                        runOnUiThreadForCommand(speechOwner) {
                             if (
                                 !isCurrentSearchRequest()
-                            ) return@runOnUiThread
+                            ) return@runOnUiThreadForCommand
                             destinationSearchInFlight = false
                             destinationSearchButton.isEnabled = true
                             destinationCancelButton.isEnabled = false
@@ -42888,10 +43439,10 @@ generation != cameraFallbackGeneration
                         return@execute
                     }
                     completeDestinationSearchRequest(searchCall)
-                    runOnUiThread {
+                    runOnUiThreadForCommand(speechOwner) {
                         if (
                             !isCurrentSearchRequest()
-                        ) return@runOnUiThread
+                        ) return@runOnUiThreadForCommand
                         if (!isCurrentGatewaySession(gatewaySession)) {
                             destinationSearchInFlight = false
                             destinationSearchButton.isEnabled = true
@@ -42902,7 +43453,7 @@ generation != cameraFallbackGeneration
                                 pendingVoiceDestinationQuery = null
                                 pendingVoiceDestinationPageIndex = null
                             }
-                            return@runOnUiThread
+                            return@runOnUiThreadForCommand
                         }
                         destinationSearchInFlight = false
                         destinationSearchButton.isEnabled = true
@@ -42963,10 +43514,10 @@ generation != cameraFallbackGeneration
                     }
                 } catch (_: CancellationException) {
                     completeDestinationSearchRequest(searchCall)
-                    runOnUiThread {
+                    runOnUiThreadForCommand(speechOwner) {
                         if (
                             !isCurrentSearchRequest()
-                        ) return@runOnUiThread
+                        ) return@runOnUiThreadForCommand
                         destinationSearchInFlight = false
                         destinationSearchButton.isEnabled = true
                         destinationCancelButton.isEnabled = false
@@ -42977,10 +43528,10 @@ generation != cameraFallbackGeneration
                 } catch (error: Exception) {
                     if (error is InterruptedException) Thread.currentThread().interrupt()
                     completeDestinationSearchRequest(searchCall)
-                    runOnUiThread {
+                    runOnUiThreadForCommand(speechOwner) {
                         if (
                             !isCurrentSearchRequest()
-                        ) return@runOnUiThread
+                        ) return@runOnUiThreadForCommand
                         val failureGuard = gatewayFailureUiGuardOrNull(
                             session = gatewaySession,
                             expectedAuthenticationFailure =
@@ -42997,7 +43548,7 @@ generation != cameraFallbackGeneration
                             pendingVoiceDestinationPageIndex = null
                         }
                         if (failureGuard == null || !isGatewayFailureUiGuardCurrent(gatewaySession, failureGuard)) {
-                            return@runOnUiThread
+                            return@runOnUiThreadForCommand
                         }
                         val failure = classifyNavigationBackendFailure(error)
                         // Shared error kinds, search wording: a search failure is not a route failure,
@@ -43312,6 +43863,7 @@ generation != cameraFallbackGeneration
         reason: String,
         retainExplicitStartUntilTrustedLocation: Boolean = false,
     ) {
+        val speechOwner = commandSpeechOwner
         if (!currentNavigationCollectionAllowsWork()) return
         if (reason != "off_route" && blockRouteMutationWhileDeviationChoicePending()) return
         if (!routeSnapshotPurgeFenceAllowsRoute()) return
@@ -43442,8 +43994,8 @@ generation != cameraFallbackGeneration
                     if (revalidation.status != GatewaySessionRevalidationStatus.READY) {
                         completeRouteRequest(routeCall)
                         routeCall.cancel()
-                        runOnUiThread {
-                            if (!isCurrentRouteRequest()) return@runOnUiThread
+                        runOnUiThreadForCommand(speechOwner) {
+                            if (!isCurrentRouteRequest()) return@runOnUiThreadForCommand
                             if (
                                 revalidation.status ==
                                 GatewaySessionRevalidationStatus.NOT_READY
@@ -43488,8 +44040,8 @@ generation != cameraFallbackGeneration
                     routeProviderCallInProgress = false
                     if (!isCurrentGatewaySession(gatewaySession)) {
                         completeRouteRequest(routeCall)
-                        runOnUiThread {
-                            if (!isCurrentRouteRequest()) return@runOnUiThread
+                        runOnUiThreadForCommand(speechOwner) {
+                            if (!isCurrentRouteRequest()) return@runOnUiThreadForCommand
                             isRouteActive = false
                             latestTmapOnRoute = false
                             currentDestination = null
@@ -43504,9 +44056,9 @@ generation != cameraFallbackGeneration
                         return@execute
                     }
                     completeRouteRequest(routeCall)
-                    runOnUiThread {
+                    runOnUiThreadForCommand(speechOwner) {
                         if (!routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)) {
-                            return@runOnUiThread
+                            return@runOnUiThreadForCommand
                         }
                         if (!isCurrentGatewaySession(gatewaySession)) {
                             isRouteActive = false
@@ -43515,12 +44067,12 @@ generation != cameraFallbackGeneration
                             routeRequestInFlight.set(false)
                             updateRouteButtonText()
                             updateNavigationStatus("navigation=route_cancelled session_changed")
-                            return@runOnUiThread
+                            return@runOnUiThreadForCommand
                         }
-                        if (!isRouteActive) return@runOnUiThread
-                        if (!routeSnapshotPurgeFenceAllowsRoute()) return@runOnUiThread
+                        if (!isRouteActive) return@runOnUiThreadForCommand
+                        if (!routeSnapshotPurgeFenceAllowsRoute()) return@runOnUiThreadForCommand
                         val installLocation = currentRouteLocationOrNull()
-                        if (!isCurrentRouteRequest() || !isRouteActive) return@runOnUiThread
+                        if (!isCurrentRouteRequest() || !isRouteActive) return@runOnUiThreadForCommand
                         val installLocationStatus = routeResponseInstallLocationStatus(
                             route,
                             origin,
@@ -43547,7 +44099,7 @@ generation != cameraFallbackGeneration
                                 "위치를 확인한 뒤 길안내를 다시 요청해 주세요."
                             if (preserveExistingRoute) retainExistingRouteAfterFailure(detail)
                             else speakInteraction(detail)
-                            return@runOnUiThread
+                            return@runOnUiThreadForCommand
                         }
                         val connectedInstallLocation = requireNotNull(installLocation)
                         val storedRouteSnapshot = runCatching {
@@ -43574,7 +44126,7 @@ generation != cameraFallbackGeneration
                             )
                             updateNavigationStatus("navigation=safety_stopped reason=route_snapshot_store_failed")
                             speakInteraction(detail)
-                            return@runOnUiThread
+                            return@runOnUiThreadForCommand
                         }
                         if (storedRouteSnapshot != null) {
                             routeSnapshotPurgeFailed = false
@@ -43655,8 +44207,8 @@ generation != cameraFallbackGeneration
                     }
                 } catch (_: CancellationException) {
                     completeRouteRequest(routeCall)
-                    runOnUiThread {
-                        if (!isCurrentRouteRequest()) return@runOnUiThread
+                    runOnUiThreadForCommand(speechOwner) {
+                        if (!isCurrentRouteRequest()) return@runOnUiThreadForCommand
                         routeRequestInFlight.set(false)
                         if (!preserveExistingRoute) isRouteActive = false
                         if (!preserveExistingRoute || reason == "off_route") latestTmapOnRoute = false
@@ -43672,8 +44224,8 @@ generation != cameraFallbackGeneration
                     val navigationFailure = classifyNavigationBackendFailure(error)
                     val countableRouteFailure = routeProviderCallInProgress &&
                         !navigationFailure.isUserSessionAuthentication
-                    runOnUiThread {
-                        if (!isCurrentRouteRequest()) return@runOnUiThread
+                    runOnUiThreadForCommand(speechOwner) {
+                        if (!isCurrentRouteRequest()) return@runOnUiThreadForCommand
                         val failureGuard = gatewayFailureUiGuardOrNull(
                             session = gatewaySession,
                             expectedAuthenticationFailure =
@@ -43682,12 +44234,12 @@ generation != cameraFallbackGeneration
                         routeRequestInFlight.set(false)
                         updateRouteButtonText()
                         if (failureGuard == null || !isGatewayFailureUiGuardCurrent(gatewaySession, failureGuard)) {
-                            return@runOnUiThread
+                            return@runOnUiThreadForCommand
                         }
                         if (navigationFailure.isUserSessionAuthentication) {
                             updateNavigationStatus("navigation=route_failed ${navigationFailure.statusMetadata}")
                             speakInteraction(navigationFailure.routeUserMessage)
-                            return@runOnUiThread
+                            return@runOnUiThreadForCommand
                         }
                         if (
                             countableRouteFailure &&
@@ -43708,7 +44260,7 @@ generation != cameraFallbackGeneration
                                     navigationFailure.statusMetadata,
                             )
                             speakInteraction(safetyStopDetail)
-                            return@runOnUiThread
+                            return@runOnUiThreadForCommand
                         }
                         if (!preserveExistingRoute) isRouteActive = false
                         if (!preserveExistingRoute || reason == "off_route") latestTmapOnRoute = false
@@ -44239,15 +44791,15 @@ generation != cameraFallbackGeneration
         )
         reportPrivacyConsentButton.text = when (state) {
             PurposeConsentSyncState.CONFIRMED_GRANTED ->
-                "진단 메타데이터 수집 동의 켜짐 · 끄기"
+                "진단·성능 정보 수집 동의 켜짐 · 끄기"
             PurposeConsentSyncState.GRANT_PENDING ->
-                "진단 메타데이터 수집 동의 확인 중 (아직 활성 아님)"
+                "진단·성능 정보 수집 동의 확인 중 (아직 활성 아님)"
             PurposeConsentSyncState.WITHDRAWAL_PENDING,
             PurposeConsentSyncState.WITHDRAWAL_RETRY,
-            -> "진단 메타데이터 수집 동의 철회 확인 중"
-            PurposeConsentSyncState.FAIL_CLOSED -> "진단 메타데이터 수집 동의 변경 불가"
-            PurposeConsentSyncState.UNCONFIRMED -> "진단 메타데이터 수집 동의 확인"
-            PurposeConsentSyncState.CONFIRMED_DENIED -> "진단 메타데이터 수집 동의 꺼짐 · 켜기"
+            -> "진단·성능 정보 수집 동의 철회 확인 중"
+            PurposeConsentSyncState.FAIL_CLOSED -> "진단·성능 정보 수집 동의 변경 불가"
+            PurposeConsentSyncState.UNCONFIRMED -> "진단·성능 정보 수집 동의 확인"
+            PurposeConsentSyncState.CONFIRMED_DENIED -> "진단·성능 정보 수집 동의 꺼짐 · 켜기"
         }
         reportPrivacyConsentButton.contentDescription = reportPrivacyConsentButton.text
         reportPrivacyConsentButton.isEnabled =
@@ -44380,7 +44932,7 @@ generation != cameraFallbackGeneration
         if (::privacyConsentStatusText.isInitialized) {
             val summary = IntegratedConsentItem.entries.joinToString(separator = " · ") { item ->
                 val label = when (item) {
-                    IntegratedConsentItem.RAW_SOURCE_COLLECTION -> "진단 메타데이터 수집"
+                    IntegratedConsentItem.RAW_SOURCE_COLLECTION -> "진단·성능 정보 수집"
                     IntegratedConsentItem.AUTOMATIC_REPORTING -> "자동신고"
                     IntegratedConsentItem.MOBILE_NETWORK_TRANSFER -> "이동통신망 전송"
                     IntegratedConsentItem.TRAINING_REUSE -> "학습 재사용"
@@ -44406,7 +44958,7 @@ generation != cameraFallbackGeneration
             IntegratedConsentItem.entries.forEach { item ->
                 val button = firstRunIntegratedConsentButtons.getValue(item)
                 val label = when (item) {
-                    IntegratedConsentItem.RAW_SOURCE_COLLECTION -> "진단 메타데이터 수집"
+                    IntegratedConsentItem.RAW_SOURCE_COLLECTION -> "진단·성능 정보 수집"
                     IntegratedConsentItem.AUTOMATIC_REPORTING -> "자동신고"
                     IntegratedConsentItem.MOBILE_NETWORK_TRANSFER -> "이동통신망 전송"
                     IntegratedConsentItem.TRAINING_REUSE -> "학습 재사용"
@@ -44496,13 +45048,12 @@ generation != cameraFallbackGeneration
             AccountDeletionPhase.IN_PROGRESS -> "계정과 개인정보 삭제를 처리 중입니다."
             AccountDeletionPhase.RETRY_WAIT ->
                 if (rev0ReauthenticationRequired) {
-                    "삭제 요청 복구를 위해 현장 게이트웨이에 다시 로그인해야 합니다."
+                    "삭제 요청은 유지됩니다. 삭제 복구 인증을 눌러 같은 계정으로 다시 인증하세요."
                 } else if (
                     accountDeletionStateMachine.snapshotOrNull()?.lastErrorCode ==
                     kr.co.hanium.dreamup.walksafe.network.ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE
                 ) {
-                    // S19-44: the new deletion was not accepted; a fresh password login is needed.
-                    "보안을 위해 비밀번호로 다시 로그인한 뒤 계정 삭제를 다시 요청하세요."
+                    "삭제 요청은 유지되지만 복구 계정 정보를 확인하지 못했습니다. 인증 정보 복구가 필요합니다."
                 } else {
                     "삭제 상태 확인을 재시도해야 합니다."
                 }
@@ -44523,6 +45074,9 @@ generation != cameraFallbackGeneration
             AccountDeletionPhase.REENROLLMENT_REQUIRED ->
                 "새 계정과 새 동의로 등록해야 합니다."
         }
+        accountDeletionDisplayStatus?.deviceVerificationNoticeFor(
+            accountDeletionStateMachine.snapshotOrNull(),
+        )?.let { accountDeletionStatusText.text = it }
         accountDeletionStatusText.contentDescription = accountDeletionStatusText.text
         accountDeletionRequestButton.text =
             if (
@@ -44581,8 +45135,17 @@ generation != cameraFallbackGeneration
                 )
         accountDeletionRefreshButton.visibility =
             if (refreshable) View.VISIBLE else View.GONE
+        accountDeletionRefreshButton.text =
+            if (rev0ReauthenticationRequired && !durableRecoverySessionReady) {
+                "삭제 복구 인증"
+            } else {
+                "삭제 진행 상태 새로고침"
+            }
+        accountDeletionRefreshButton.contentDescription = accountDeletionRefreshButton.text
         accountDeletionRefreshButton.isEnabled =
-            refreshable && !accountDeletionRequestInFlight
+            refreshable && !accountDeletionRequestInFlight &&
+                (accountDeletionStateMachine.snapshotOrNull()?.requiresDeletionReauthentication() != true ||
+                    rev0ReauthenticationRequired)
         val journal = accountDeletionStateMachine.snapshotOrNull()
         DeletionInventoryItem.entries.forEach { item ->
             val view = accountDeletionItemTexts.getValue(item)
@@ -45747,6 +46310,8 @@ generation != cameraFallbackGeneration
         val imageQuarterTurns: Int = 0,
         /** S10-2: display geometry (visualGeometryVersion) the detection was requested under. */
         val geometryVersion: Long? = null,
+        /** Location observed before this capture; never replaced after inference. */
+        val reportLocation: TrustedLocation? = null,
     ) {
         fun tactileFrameIdentity(): AndroidTactileEvidenceFrameIdentity = AndroidTactileEvidenceFrameIdentity(
             frameId = frameId,
@@ -46371,7 +46936,7 @@ generation != cameraFallbackGeneration
         const val DEBUG_FRAME_CAPTURE_MAX_DIMENSION = 640
         const val DEBUG_FRAME_CAPTURE_JPEG_QUALITY = 90
         const val FIELD_STATUS_MAX_LENGTH = 96
-        const val REPORT_FRAME_CAPTURE_MAX_DIMENSION = 320
+        const val REPORT_FRAME_CAPTURE_MAX_DIMENSION = kr.co.hanium.dreamup.walksafe.report.AndroidReportImageValidator.MAX_DIMENSION
         const val REPORT_FRAME_CAPTURE_JPEG_QUALITY = 80
     }
 

@@ -102,7 +102,7 @@ class HeterogeneousPositiveFixtureDeviceTest {
         try {
             val config = TwoModelRuntimeConfig.load(instrumentation.targetContext)
             val reference = requireNotNull(config.unifiedWalksafe).copy(
-                asset = "models/walksafe_unified_yolo26n_768_float32.tflite",
+                asset = "runtime-candidates/walksafe_unified_yolo26n_768_float32.tflite",
                 artifactSha256 = ORIGINAL_SHA,
             )
             val candidate = requireNotNull(HeterogeneousModelCandidates.select(config, "gpu_compatible_768").unifiedWalksafe)
@@ -125,7 +125,7 @@ class HeterogeneousPositiveFixtureDeviceTest {
                 .put("gtAnnotationIdChangeInterpretation", "ASSIGNMENT_CHANGE_NOT_AUTOMATIC_COUNT_REGRESSION")
                 .put("unmappedPredictions", "EXCLUDED_FROM_GT_SANITY_RETAINED_IN_OUTPUT_AGREEMENT"))
             stage = "cpu_create"
-            val cpuHandle = createInterpreter(instrumentation.targetContext, reference, useGpu = false).also { cpu = it }
+            val cpuHandle = createInterpreter(instrumentation.context, reference, useGpu = false).also { cpu = it }
             emit("runtime", cpuHandle.json("cpu", reference))
             stage = "gpu_create"
             val gpuHandle = createInterpreter(instrumentation.context, candidate, useGpu = true).also { gpu = it }

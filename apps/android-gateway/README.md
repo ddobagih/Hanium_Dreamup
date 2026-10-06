@@ -173,6 +173,8 @@ S07-30: 내비게이션은 v7 계정 세션 확인·요청 본문 읽기·Backen
 
 - `POST /privacy/account-deletions`은 `walksafe.account-deletion-request.v2`, 요청 ID, 단조 증가 client revision, `DELETE_MY_ACCOUNT` 확인값을 사용합니다. 새 요청에는 `general` 또는 `account_deletion_recovery` field session과 32-byte client capability가 모두 필요하고, 정확한 replay에는 capability만 필요합니다.
 - `GET /privacy/account-deletions/{request_id}/status`와 `POST /privacy/account-deletions/{request_id}/device-evidence`는 field session에 의존하지 않고 요청에 결속된 capability만 요구합니다. capability는 `x-walksafe-deletion-access-secret`에 43자리 unpadded base64url로 전달하며 원문은 저장하거나 backend로 전달하지 않습니다.
+- 상태 조회에 `X-WalkSafe-Deletion-Status-View: device-verification.v1`을 보내면 Backend의 기기 확인 요약을 검증하여 `device_verification`으로 전달합니다. 헤더가 없는 기존 앱에는 기본 v2 형식을 유지합니다. 이 시간 의존 요약은 삭제 revision·원장·완료 영수증에 합치지 않습니다. `SERVER_COMPLETED_DEVICE_UNVERIFIED`는 서버 자료만 완료되고 일부 기기는 미확인인 상태이며, 전체 완료나 재등록 허용 근거가 아닙니다. Android는 새 조회 결과만 표시하며 재시작 뒤에는 다시 조회해야 합니다.
+
 - 잘못된 capability와 알 수 없는 요청은 동일한 404/no-store로 숨깁니다. 세 경로 모두 recovery cookie 동반을 허용하지만 status/evidence 권한은 capability에서만 나옵니다.
 - 새 요청 접수는 actor generation을 먼저 durable fence한 뒤 기존 단기·장기 field session을 폐기합니다. gateway는 서버·학습·백업 삭제 완료를 추정하지 않고 backend의 canonical v2 상태와 durable evidence만 반영합니다.
 - 단말 삭제 증거의 `evidence_sha256`은 단말이 제출한 요청·설치 ID·결과·시각 문장을 다시 계산해 전송 내용의 정합성만 확인합니다. gateway는 이를 "단말이 제출한 삭제 결과"로만 보관·전달하며, 단말 저장소에서 자료가 물리적으로 삭제됐다는 독립 증명으로 취급하지 않습니다.

@@ -137,6 +137,10 @@ class HandsFreeVoiceCommandPhaseTimeoutRegressionTest {
                 )
             },
             isAppSpeechActive = { appSpeechActive },
+            commandSpeechProgress = {
+                CommandSpeechProgress(if (appSpeechActive) CommandSpeechState.PENDING else CommandSpeechState.COMPLETED,
+                    if (appSpeechActive) 1 else 2)
+            },
             onCommand = { text, _ ->
                 commands += text
                 appSpeechActive = true

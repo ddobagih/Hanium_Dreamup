@@ -11,6 +11,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalAeadTest {
+    @Test
+    fun retiredUnreadableKeyIsStillPurgedAndDeletionFailureRemainsRetryable() {
+        val provider = FakeKeyProvider()
+        val original = aead(provider, current = 1, readable = setOf(1))
+        val oldEnvelope = original.seal("old data".toByteArray(), aad, limits).sealed()
+        val policy = AeadKeyPolicy(
+            aliasPrefix = "walksafe.test.aead.v", currentVersion = 2,
+            readableVersions = setOf(2), retiredVersions = setOf(1),
+        )
+        val current = VersionedLocalAead(policy, provider)
+        current.seal("new data".toByteArray(), aad, limits).sealed()
+        assertEquals(AeadBlockReason.UNKNOWN_KEY_VERSION,
+            (current.open(oldEnvelope, aad, limits) as AeadOpenResult.Blocked).reason)
+        assertTrue(provider.keys.containsKey(policy.alias(1)))
+        provider.failedDeletes = setOf(policy.alias(1))
+        assertFalse(current.destroyKnownVersions())
+        assertTrue(provider.keys.containsKey(policy.alias(1)))
+        assertFalse(provider.keys.containsKey(policy.alias(2)))
+        provider.failedDeletes = emptySet()
+        assertTrue(current.destroyKnownVersions())
+        assertTrue(provider.keys.isEmpty())
+        assertTrue(current.destroyKnownVersions())
+    }
+
     private val limits = AeadLimits(
         maxPlaintextBytes = 4_096,
         maxCiphertextBytes = 4_112,

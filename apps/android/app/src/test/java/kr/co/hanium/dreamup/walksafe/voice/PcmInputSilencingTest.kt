@@ -152,7 +152,7 @@ class PcmInputSilencingTest {
         val recognizer = source("voice/VoskSpeechRecognizer.kt")
         val mapping = recognizer.substringAfter("override fun onError(runId: Long, error: VoskStreamingError)")
             .substringBefore("fun setRecognitionListener(")
-        assertTrue(mapping.substringAfter("VoskStreamingError.AUDIO_SILENCED,").trimStart().startsWith("-> SpeechRecognizer.ERROR_AUDIO"))
+        assertTrue(mapping.contains("VoskStreamingError.AUDIO_SILENCED -> SPEECH_ERROR_INPUT_SILENCED"))
 
         val activity = source("MainActivity.kt")
         val terminal = activity.substringAfter("private fun handleHandsFreeVoiceTerminalFailure(")
@@ -165,6 +165,29 @@ class PcmInputSilencingTest {
         assertFalse(branch.contains("scheduleHandsFreeVoiceRestart"))
         assertFalse(branch.contains("onDeviceSpeechRecognitionCapabilityOverride"))
         assertTrue(terminal.indexOf("VoskStreamingError.AUDIO_SILENCED") < terminal.indexOf("handsFreeTranscriberFailureCount += 1"))
+    }
+
+    @Test
+    fun activityKeepsSilencingOutOfGenericNoMatchAndAutomaticRetryPaths() {
+        val activity = source("MainActivity.kt")
+        val home = activity.substringAfter("event=HOME_WAKE_TERMINAL")
+            .substringBefore("foregroundHomeWakeProbe = probe")
+        assertTrue(home.contains("result.streamingError == VoskStreamingError.AUDIO_SILENCED"))
+        assertTrue(home.contains("speakInteraction(MICROPHONE_INPUT_SILENCED_GUIDANCE)"))
+        val listener = activity.substringAfter("private fun buildVoiceCommandRecognitionListener(")
+        val error = listener.substringAfter("override fun onError(error: Int)")
+            .substringBefore("override fun onResults(results: Bundle?)")
+        val silenced = error.substringAfter("if (error == SPEECH_ERROR_INPUT_SILENCED) {")
+            .substringBefore("if (nativeGuidanceConfirmationAction != null")
+        assertTrue(silenced.contains("foregroundHomeWakeFailed = true"))
+        assertTrue(silenced.contains("reportWalkVoiceStartFailure(WalkVoiceStartFailure.INPUT_SILENCED)"))
+        assertTrue(silenced.contains("showVoiceHelpRecovery(message)"))
+        assertTrue(silenced.contains("handleWalkSessionResumeRecognizerNotStarted()"))
+        assertTrue(silenced.contains("handleGatewayWalkTakeoverRecognition(emptyList())"))
+        assertTrue(silenced.contains("speakInteraction(message)"))
+        assertTrue(silenced.contains("return"))
+        assertFalse(silenced.contains("scheduleHandsFreeVoiceRestart"))
+        assertFalse(silenced.contains("permanentlyLimit"))
     }
 
     private fun listener(

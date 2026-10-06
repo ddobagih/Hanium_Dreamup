@@ -59,7 +59,7 @@ class PriorityUserOnboardingStaticTest {
         val restore = functionBlock("private fun restoreGatewaySessionFromPrefs()")
         assertInOrder(
             restore,
-            "val actorId = restored.firstRunSnapshot.reporterActorBinding?.value",
+            "val actorId = restored.firstRunSnapshot.verifiedActorBinding?.value",
             "actorId == null || actorId != restored.session.actorId",
             "restorePriorityUserOnboardingFromPrefs()",
             "priorityUserOnboardingActorId != actorId",
@@ -188,9 +188,9 @@ class PriorityUserOnboardingStaticTest {
         ).substringBefore("priorityUserResetButton")
         val education = functionBlock("private fun reviewPriorityUserSafetyEducation()")
         val practice = functionBlock("private fun performPriorityUserPractice(")
-        val hapticDelivery = practice.substringAfter("if (hapticFeedbackEnabled) {")
-            .substringBefore("if (voiceGuidanceEnabled) {")
-        val speechDelivery = practice.substringAfter("if (voiceGuidanceEnabled) {")
+        val deliver = ReportStaticSourceInspector.functionBlock(practice, "fun deliver")
+        val hapticDelivery = ReportStaticSourceInspector.blockAfter(deliver, "if (hapticFeedbackEnabled)")
+        val speechDelivery = ReportStaticSourceInspector.blockAfter(deliver, "if (voiceGuidanceEnabled)")
 
         assertFalse(practiceButtons.contains("environment.offlineKoreanVoiceAvailable"))
         assertFalse(practiceButtons.contains("environment.vibrationAvailable"))
@@ -506,7 +506,10 @@ class PriorityUserOnboardingStaticTest {
         assertTrue(update.contains("PriorityUserEducationPresentation.screenText(state)"))
         assertTrue(update.contains("PriorityUserEducationPresentation.progressNotice("))
         assertTrue(playback.contains("PriorityUserEducationPresentation.speechText(playback)"))
-        assertTrue(playback.contains("AndroidFeedbackActuator.INITIALIZATION_READINESS_TIMEOUT_MS"))
+        assertTrue(playback.contains("preparePriorityUserTrainingFeedback(generation, actorId, policy, failed)"))
+        val readiness = functionBlock("private fun preparePriorityUserTrainingFeedback(")
+        assertTrue(readiness.contains("AndroidFeedbackActuator.INITIALIZATION_READINESS_TIMEOUT_MS"))
+        assertTrue(readiness.contains("isPriorityUserTrainingDeliveryCurrent(generation, actorId, policy)"))
         assertFalse(playback.contains("+ 8_000L"))
         assertTrue(body.contains("ViewGroup.LayoutParams.WRAP_CONTENT"))
         assertTrue(body.contains("textSize = 18f"))

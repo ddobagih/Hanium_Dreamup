@@ -63,7 +63,9 @@ class MainActivityGlRenderLifecycleStaticTest {
         val fallback = functionBlock("private fun startCameraFallbackSession(")
         val activityResume = functionBlock("override fun onResume()")
         val pause = functionBlock("internal fun pauseWalkSafeRuntime()")
-        val cancelOutputs = functionBlock("private fun cancelWalkSessionOutputs(")
+        assertTrue(functionBlock("private fun cancelWalkSessionOutputs(")
+            .contains("cancelWalkSessionOutputsInternal(reason, null)"))
+        val cancelOutputs = functionBlock("private fun cancelWalkSessionOutputsInternal(")
 
         assertTrue(afterCameraRelease.contains("val arSessionReady ="))
         assertTrue(afterCameraRelease.contains("if (arSessionReady) surfaceView.onResume()"))

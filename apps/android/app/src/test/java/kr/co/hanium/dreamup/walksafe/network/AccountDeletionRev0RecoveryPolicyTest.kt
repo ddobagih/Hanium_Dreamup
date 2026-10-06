@@ -12,6 +12,37 @@ import org.junit.Test
 
 class AccountDeletionRev0RecoveryPolicyTest {
     @Test
+    fun persistedReauthenticationSurvivesLosingTheInMemoryRequestIdWithoutRelaxingBinding() {
+        val original = fixture()
+        val waiting = original.copy(journal = original.journal.copy(
+            phase = AccountDeletionPhase.RETRY_WAIT,
+            lastErrorCode = ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE,
+        ))
+        val recovered = binding(waiting, reauthenticationRequestId = null, requireReauthentication = true)
+        assertNotNull(recovered)
+        assertEquals(original.journal.requestId, recovered?.journal?.requestId)
+        assertEquals(original.marker.accessSecret, recovered?.markerRecord?.accessSecret)
+        assertEquals(ACTOR_ID, recovered?.actorId)
+        // A stored error grants no authority by itself: the marker and actor still have to match.
+        assertNull(binding(waiting.copy(marker = waiting.marker.copy(
+            recoveryActorId = "other-actor",
+        )), null, true))
+        assertNull(binding(waiting.copy(marker = waiting.marker.copy(
+            installationId = "other-installation",
+        )), null, true))
+        assertNull(binding(waiting.copy(journal = waiting.journal.copy(
+            lastErrorCode = "http_401",
+        )), null, true))
+        assertNull(binding(waiting.copy(journal = waiting.journal.copy(
+            serverRevision = 1L,
+            acceptedAt = "2026-08-10T00:00:00Z",
+            accountGeneration = 1L,
+            tombstoneId = "tombstone-0001",
+            requestReceiptSha256 = "1".repeat(64),
+        )), null, true))
+    }
+
+    @Test
     fun exactRev0TupleIsHiddenUntilCapabilityReplayRequiresReauthentication() {
         val fixture = fixture()
 

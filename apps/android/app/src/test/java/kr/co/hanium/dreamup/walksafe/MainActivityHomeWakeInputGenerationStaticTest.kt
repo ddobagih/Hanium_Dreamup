@@ -21,7 +21,7 @@ class MainActivityHomeWakeInputGenerationStaticTest {
     @Test fun everyActuatorSpeechUsesTheMainInvalidationBoundary() {
         assertTrue(method("ensureFeedbackActuator").contains("speechAllowed = ::authorizeActuatorSpeechForHomeWakeInput"))
         val authorize = method("authorizeActuatorSpeechForHomeWakeInput")
-        before(authorize, "if (!navigationSpeechCapabilityAllowed()) return false", "invalidateForegroundHomeWakeInput()")
+        before(authorize, "if (!navigationSpeechCapabilityAllowed() && !educationSpeechAllowed) return false", "invalidateForegroundHomeWakeInput()")
         before(authorize, "invalidateForegroundHomeWakeInput()", "return true")
         // Both speech submission and progress beep consult the injected Main boundary.
         assertTrue(actuator.contains("if (!speechAllowed()) return NavigationSpeechDispatchResult.UNAVAILABLE"))

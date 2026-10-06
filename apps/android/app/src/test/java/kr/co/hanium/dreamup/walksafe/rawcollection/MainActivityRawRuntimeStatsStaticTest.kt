@@ -17,8 +17,9 @@ class MainActivityRawRuntimeStatsStaticTest {
     fun frameDurationIsNotTheInferenceAverageAndWindowsUseTheSharedAccumulator() {
         assertFalse(capture.contains("averageFrameDurationMs = averageProcessingFrameMs"))
         assertTrue(capture.contains("rawRuntimeWindow.recordCompletedInference("))
-        assertTrue(capture.contains("rawRuntimeWindow.detectionSample("))
-        assertTrue(capture.contains("rawRuntimeWindow.performanceSample("))
+        assertTrue(capture.contains("rawRuntimeWindow.snapshot("))
+        assertTrue(capture.contains("runtimeSnapshot.detection"))
+        assertTrue(capture.contains("runtimeSnapshot.performance"))
         assertTrue(capture.contains("rawRuntimeWindow.resetWindow()"))
         assertTrue(capture.contains("busyDroppedSincePrevious = dueButInFlightDropCount"))
     }

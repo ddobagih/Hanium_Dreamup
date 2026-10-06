@@ -149,4 +149,7 @@ public interface AdminReportRepository {
         AdminOperationsApi.SessionContext session,
         AdminExternalCopyDeletionModels.EventCommand command
     ) throws IOException, GeneralSecurityException;
+
+    /** Permanently closes this client and cancels its pending requests. */
+    default void cancelInFlightRequests() {}
 }

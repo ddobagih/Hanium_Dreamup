@@ -1254,7 +1254,7 @@ public final class AdminBoundaryActivity extends Activity {
         content.addView(recoveryStartGroup, matchWrap());
 
         recoveryCompleteGroup = group();
-        recoveryCompleteGroup.addView(text("별도 관리 경로에서 교체한 비밀번호와 새 TOTP 코드를 확인합니다.", 16), matchWrap());
+        recoveryCompleteGroup.addView(text(AdminRecoveryMessagePolicy.RECOVERY_PREPARATION_KO, 16), matchWrap());
         newPasswordInput = input(
             "새 비밀번호",
             InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD,
@@ -2741,6 +2741,7 @@ public final class AdminBoundaryActivity extends Activity {
         deliveryHistoryTotalCount = result.totalCount();
         deliveryHistoryNextCursor = result.nextCursor();
         deliveryHistoryNeedsFirstPage = false;
+        prefillDeliveryInstitution();
     }
 
     private static void requireLoadedCount(int loaded, long total, String nextCursor)
@@ -2972,7 +2973,7 @@ public final class AdminBoundaryActivity extends Activity {
                 runOnUiThread(() -> {
                     if (isDestroyed() || !activityStarted
                         || generation != securityOperationGeneration) return;
-                    applyOperationalConflict(reportId, deliveryMutation, refresh);
+                    applyOperationalConflict(reportId, deliveryMutation, refresh, conflict.institutionMismatch());
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> {
@@ -3034,7 +3035,8 @@ public final class AdminBoundaryActivity extends Activity {
     private void applyOperationalConflict(
         String reportId,
         boolean deliveryMutation,
-        OperationalConflictRefresh refresh
+        OperationalConflictRefresh refresh,
+        boolean institutionMismatch
     ) {
         if (isDestroyed() || !activityStarted) return;
         operationInFlight = false;
@@ -3069,8 +3071,24 @@ public final class AdminBoundaryActivity extends Activity {
             if (deliveryMutation) deliveryHistoryNeedsFirstPage = true;
             else reviewHistoryNeedsFirstPage = true;
         }
+        boolean institutionRestored = false;
+        if (institutionMismatch && deliveryMutation && detailApplied && historyApplied
+            && deliveryFollowUp(refresh.detail) != null) {
+            institutionInput.setText(latestEffectiveDeliveryForCorrection().institution());
+            institutionRestored = true;
+        }
         renderReportHistory();
         render();
+        if (institutionMismatch && deliveryMutation) {
+            resultText.setText(
+                "기존 전달 기록과 기관명이 다릅니다. 후속 처리에는 기존 전달 기관을 사용해야 합니다. "
+                    + (institutionRestored
+                        ? "최신 기록의 기관명을 입력란에 반영했습니다. 내용을 확인한 뒤 직접 다시 제출하세요."
+                        : "최신 상세와 전달 이력을 다시 조회해 기관명을 확인하세요.")
+                    + " 자동으로 다시 제출하지 않았습니다."
+            );
+            return;
+        }
         resultText.setText(
             detailApplied && historyApplied
                 ? "다른 관리자의 변경과 충돌했습니다. 자동 재제출하지 않고 최신 상세와 이력을 반영했습니다."
@@ -3170,7 +3188,7 @@ public final class AdminBoundaryActivity extends Activity {
         String deviceLabel = deviceLabelInput.getText().toString();
         clearSensitiveInputs();
         // Recovery start signs nothing with the device key, so it is not preflighted.
-        runCredentialOperation("기존 세션을 폐기하고 복구를 시작하고 있습니다.", "복구가 시작되었습니다. 운영 업무는 계속 잠겨 있습니다.",
+        runCredentialOperation("기존 세션을 폐기하고 복구를 시작하고 있습니다.", "복구가 시작되었습니다. " + AdminRecoveryMessagePolicy.RECOVERY_PREPARATION_KO,
             AdminRecoveryMessagePolicy.Phase.RECOVERY_START, credentials, false, (recoveryCode, unused) ->
             controller.startRecovery(adminId, recoveryCode, deviceId, deviceLabel)
         );
@@ -3275,6 +3293,11 @@ public final class AdminBoundaryActivity extends Activity {
     }
 
     private void revokeSession(String sessionId, boolean currentSession) {
+        if (controller == null || !activityStarted || operationInFlight) return;
+        if (currentSession) {
+            hideInteractiveGroups();
+            clearSensitiveInputs();
+        }
         runSecurityOperation(
             currentSession
                 ? "서버에서 현재 세션을 폐기하고 로그아웃하고 있습니다."
@@ -3633,6 +3656,8 @@ public final class AdminBoundaryActivity extends Activity {
         clear(totpInput);
         clear(lostDevicePasswordInput);
         clear(lostDeviceTotpInput);
+        clear(deliveryCorrectionPasswordInput);
+        clear(deliveryCorrectionTotpInput);
         clear(recoveryCodeInput);
         clear(newPasswordInput);
         clear(newTotpInput);
@@ -4060,6 +4085,7 @@ public final class AdminBoundaryActivity extends Activity {
         connectedOperationsDeliveryRevision = deliveryRevision;
         connectedOperationsPackageRevision = packageRevision;
         connectedOperationsDeliveryStatus = deliveryStatus;
+        prefillDeliveryInstitution();
         reportIdInput.setText(reportId);
         expectedRevisionInput.setText(Integer.toString(detail.latestDeliveryRevision()));
         packageRevisionInput.setText(
@@ -4078,6 +4104,14 @@ public final class AdminBoundaryActivity extends Activity {
         );
         reportOperationsFormGroup.setVisibility(View.VISIBLE);
         reviewDecisionInput.requestFocus();
+    }
+
+    private void prefillDeliveryInstitution() {
+        if (institutionInput != null && normalized(institutionInput).isEmpty()
+            && reportController != null
+            && deliveryFollowUp(reportController.snapshot().detail()) != null) {
+            institutionInput.setText(latestEffectiveDeliveryForCorrection().institution());
+        }
     }
 
     private AdminReportModels.DeliveryFollowUp deliveryFollowUp(AdminReportModels.Detail detail) {

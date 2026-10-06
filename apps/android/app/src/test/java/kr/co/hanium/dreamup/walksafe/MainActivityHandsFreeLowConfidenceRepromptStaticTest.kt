@@ -27,7 +27,7 @@ class MainActivityHandsFreeLowConfidenceRepromptStaticTest {
     fun theReaskIsSpokenAndItsEndIsReportedOnce() {
         val reprompt = source.substringAfter("private fun speakHandsFreeLowConfidenceReprompt(")
             .substringBefore("\n    }\n")
-        assertTrue(reprompt.contains("ensureFeedbackActuator().speakInteraction("))
+        assertTrue(reprompt.contains("dispatchOwnedInteractionSpeech("))
         assertTrue(reprompt.contains("message = kr.co.hanium.dreamup.walksafe.voice.HANDS_FREE_LOW_CONFIDENCE_REPROMPT_KO,"))
         assertTrue(reprompt.contains("onCompleted = { finish(kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.COMPLETED) }"))
         assertTrue(reprompt.contains("onFailed = { finish(kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.FAILED) }"))

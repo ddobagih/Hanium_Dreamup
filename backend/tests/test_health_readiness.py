@@ -743,6 +743,7 @@ def test_readiness_returns_503_when_tmap_key_is_missing(monkeypatch) -> None:
         lambda _settings: {"status": "ready", "mode": "fake", "reason": None, "configured_runtime": None},
     )
     monkeypatch.setattr(app_settings, "walking_route_provider", "tmap_pedestrian")
+    monkeypatch.setattr(app_settings, "tmap_poi_provider", "live")
     monkeypatch.setattr(app_settings, "tmap_app_key", "")
 
     response = ASGITestClient(app).get("/ready")

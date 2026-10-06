@@ -228,6 +228,23 @@ export type AccountDeletionStatusV2 = {
   overall_status: AccountDeletionOverallStatusV2;
   items: AccountDeletionItemV2[];
   completion_receipt_sha256: string | null;
+  device_verification?: AccountDeletionDeviceVerificationV1;
+};
+
+export type AccountDeletionDeviceVerificationV1 = {
+  schema_version: "walksafe.account-deletion-device-verification.v1";
+  completion_view: "COMPLETED" | "IN_PROGRESS" | "SERVER_COMPLETED_DEVICE_UNVERIFIED";
+  target_count: number;
+  deleted_count: number;
+  not_found_count: number;
+  failed_count: number;
+  pending_count: number;
+  unverifiable_count: number;
+  unverifiable_reason: "SLA_ELAPSED_NO_CONTACT" | null;
+  follow_up: "DELETE_ON_NEXT_CONTACT_OR_REMOVE_APP" | null;
+  device_clock_anomaly_count: number;
+  device_due_at: string;
+  evaluated_at: string;
 };
 
 export type DeviceDeletionEvidenceResultV2 =
@@ -769,7 +786,8 @@ export function parseAccountDeletionStatusV2(
     !exactKeys(status, [
       "schema_version", "request_id", "client_revision", "revision", "accepted_at",
       "updated_at", "account_generation", "tombstone_id", "request_receipt_sha256",
-      "overall_status", "items", "completion_receipt_sha256"
+      "overall_status", "items", "completion_receipt_sha256",
+      ...("device_verification" in status ? ["device_verification"] : [])
     ]) ||
     status.schema_version !== ACCOUNT_DELETION_STATUS_SCHEMA_V2 ||
     typeof status.request_id !== "string" || !REQUEST_ID.test(status.request_id) ||
@@ -800,10 +818,38 @@ export function parseAccountDeletionStatusV2(
   if ((overall === "COMPLETED") !== (typeof status.completion_receipt_sha256 === "string")) {
     return null;
   }
+  if ("device_verification" in status && !validDeviceVerification(status.device_verification, overall, parsedItems)) {
+    return null;
+  }
   return {
     ...(status as unknown as AccountDeletionStatusV2),
     items: parsedItems
   };
+}
+
+function validDeviceVerification(value: unknown, overall: string, items: AccountDeletionItemV2[]): boolean {
+  const view = objectValue(value);
+  const counts = ["target_count", "deleted_count", "not_found_count", "failed_count",
+    "pending_count", "unverifiable_count", "device_clock_anomaly_count"];
+  if (!view || !exactKeys(view, ["schema_version", "completion_view", ...counts,
+    "unverifiable_reason", "follow_up", "device_due_at", "evaluated_at"]) ||
+    view.schema_version !== "walksafe.account-deletion-device-verification.v1" ||
+    !["COMPLETED", "IN_PROGRESS", "SERVER_COMPLETED_DEVICE_UNVERIFIED"].includes(String(view.completion_view)) ||
+    counts.some(key => !Number.isSafeInteger(view[key]) || (view[key] as number) < 0) ||
+    !validInstant(view.device_due_at) || !validInstant(view.evaluated_at)) return false;
+  const typed = view as unknown as AccountDeletionDeviceVerificationV1;
+  const total = typed.deleted_count + typed.not_found_count + typed.failed_count + typed.pending_count + typed.unverifiable_count;
+  if (!Number.isSafeInteger(total) || total !== typed.target_count ||
+    ((overall === "COMPLETED") !== (typed.completion_view === "COMPLETED")) ||
+    typed.unverifiable_reason !== (typed.unverifiable_count > 0 ? "SLA_ELAPSED_NO_CONTACT" : null) ||
+    typed.follow_up !== (typed.unverifiable_count > 0 ? "DELETE_ON_NEXT_CONTACT_OR_REMOVE_APP" : null)) return false;
+  if (typed.completion_view === "COMPLETED" &&
+    (typed.failed_count || typed.pending_count || typed.unverifiable_count)) return false;
+  if (typed.completion_view === "SERVER_COMPLETED_DEVICE_UNVERIFIED" &&
+    (!typed.unverifiable_count || typed.failed_count || typed.pending_count ||
+      items.some(item => item.key !== "device_untransmitted_data" &&
+        item.status !== "COMPLETED" && item.status !== "NOT_APPLICABLE"))) return false;
+  return true;
 }
 
 function emptyLedger(): DeletionLedger {
@@ -2460,6 +2506,7 @@ async function refreshCanonicalBackendAccountDeletionStatusV2(
     return forwardAccountDeletionRequestV2(requestId, clientRequest, fetchImpl);
   }
   const backendPath = `/privacy/account-deletions/${requestId}/status`;
+  const includeDeviceVerification = clientRequest.headers.get("x-walksafe-deletion-status-view") === "device-verification.v1";
   const headers = deletionBackendHeaders({
     actorId: record.actor_id,
     accountGeneration: record.account_generation,
@@ -2469,7 +2516,8 @@ async function refreshCanonicalBackendAccountDeletionStatusV2(
     method: "GET",
     path: backendPath,
     bodySha256: EMPTY_BODY_SHA256
-  }, { accept: "application/json" });
+  }, { accept: "application/json", ...(includeDeviceVerification
+    ? { "x-walksafe-deletion-status-view": "device-verification.v1" } : {}) });
   if (!headers) throw new PrivacyDeletionV2Error("integrity", "backend status assertion failed");
   const response = fetchImpl
     ? await fetchBackend(clientRequest, backendUrl(backendPath), {
@@ -2481,7 +2529,13 @@ async function refreshCanonicalBackendAccountDeletionStatusV2(
   if (response.status === 200) {
     const decoded = await boundedResponseJson(response);
     const status = parseAccountDeletionStatusV2(decoded, requestId);
-    if (status) return { kind: "ok", status: mergeBackendStatus(requestId, null, status), upstreamStatus: 200 };
+    if (status) {
+      // This time-dependent view is not part of the canonical revision or deletion receipt.
+      const { device_verification, ...canonical } = status;
+      const merged = mergeBackendStatus(requestId, null, canonical);
+      return { kind: "ok", status: includeDeviceVerification && device_verification && merged.revision === status.revision
+        ? { ...merged, device_verification } : merged, upstreamStatus: 200 };
+    }
   }
   void response.body?.cancel("account deletion status upstream unavailable").catch(() => undefined);
   return { kind: "pending", retryAfterSeconds: 5 };

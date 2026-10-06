@@ -27,6 +27,8 @@ data class AndroidReportCandidateInput(
     val depthSampleCount: Int? = null,
     val depthValidSampleRatio: Float? = null,
     val detectionAgeMs: Long? = null,
+    /** Same elapsed-realtime clock as TrustedLocation; wall-clock changes cannot authorize a fix. */
+    val capturedAtElapsedRealtimeMs: Long? = null,
     val coordinateGateStatus: String? = null,
     val heading: Float? = null,
     val apkSha256: String? = null,
@@ -60,6 +62,8 @@ enum class AndroidReportCandidateRejection(val diagnosticCode: String) {
     MODEL_NOT_ALLOWED("model_not_allowed"),
     DETECTION_AGE_INVALID("detection_age"),
     LOCATION_UNTRUSTED("location_untrusted"),
+    CAPTURE_TIME_INVALID("capture_time_invalid"),
+    LOCATION_CAPTURE_MISMATCH("location_capture_mismatch"),
     THRESHOLD_MISSING("threshold_missing"),
     SOURCE_MODEL_MISSING("source_model_missing"),
     MODEL_CLASS_UNMAPPED("model_class_unmapped"),
@@ -104,6 +108,12 @@ class AndroidReportCandidatePolicy {
             ?: return rejected(AndroidReportCandidateRejection.MODEL_NOT_ALLOWED)
         val detectionAgeMs = input.detectionAgeMs?.takeIf { it in 0L..REPORT_MAX_DETECTION_AGE_MS }
             ?: return rejected(AndroidReportCandidateRejection.DETECTION_AGE_INVALID)
+        val captureElapsed = input.capturedAtElapsedRealtimeMs
+            ?.takeIf { it >= 0L && it <= input.requestElapsedRealtimeMs }
+            ?: return rejected(AndroidReportCandidateRejection.CAPTURE_TIME_INVALID)
+        if (input.requestElapsedRealtimeMs - captureElapsed != detectionAgeMs) {
+            return rejected(AndroidReportCandidateRejection.CAPTURE_TIME_INVALID)
+        }
         val location = LocationTrustPolicy.freshOrNull(
             location = input.location,
             nowElapsedRealtimeMs = input.requestElapsedRealtimeMs,
@@ -114,6 +124,9 @@ class AndroidReportCandidatePolicy {
                 location.accuracyM.isFinite() && location.accuracyM >= 0f &&
                 location.accuracyM <= REPORT_LOCATION_CONFIG.maxAccuracyM
         } ?: return rejected(AndroidReportCandidateRejection.LOCATION_UNTRUSTED)
+        if (location.elapsedRealtimeMs < 0L || LocationTrustPolicy.freshOrNull(
+                location, captureElapsed, REPORT_LOCATION_CONFIG,
+            ) == null) return rejected(AndroidReportCandidateRejection.LOCATION_CAPTURE_MISMATCH)
         val threshold = input.threshold
             ?: return rejected(AndroidReportCandidateRejection.THRESHOLD_MISSING)
         val sourceModel = input.sourceModel?.takeIf { it.isNotBlank() }

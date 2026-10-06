@@ -2262,20 +2262,23 @@ _S21_OWNER_SCOPED_ROUTE_TESTS = {
     ("GET", "/reports/mine/deletions/{request_id}"):
         ("test_report_physical_deletion", "test_user_deletion_status_route_is_no_store_and_owner_bound"),
 }
-_S21_OWNER_SCOPED_ROUTE_GAPS = frozenset({
-    ("POST", "/reports/mine/{report_id}/requests"),
-    ("POST", "/reports/mine/{report_id}/corrections"),
-    ("GET", "/reports/v2/{report_id}/status"),
-    ("GET", "/privacy/account-deletions/{request_id}/status"),
-    ("POST", "/privacy/account-deletions/{request_id}/device-evidence"),
-    ("HEAD", "/raw-collections/{collection_id}/manifest"),
-    ("HEAD", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
-    ("HEAD", "/raw-collections/{collection_id}/commit"),
-    ("PUT", "/raw-collections/{collection_id}/manifest"),
-    ("PUT", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
-    ("GET", "/raw-collections/{collection_id}"),
-    ("POST", "/raw-collections/{collection_id}/commit"),
+# Real PostgreSQL route tests below start with a verified Gateway identity. The
+# middleware suite above independently checks missing/invalid/revoked authentication.
+_S21_OWNER_SCOPED_ROUTE_TESTS.update({
+    ('POST', '/reports/mine/{report_id}/requests'): ("test_owner_routes_postgres", 'test_foreign_report_routes_conceal_and_do_not_mutate'),
+    ('POST', '/reports/mine/{report_id}/corrections'): ("test_owner_routes_postgres", 'test_foreign_report_routes_conceal_and_do_not_mutate'),
+    ('GET', '/reports/v2/{report_id}/status'): ("test_owner_routes_postgres", 'test_foreign_report_routes_conceal_and_do_not_mutate'),
+    ('GET', '/privacy/account-deletions/{request_id}/status'): ("test_owner_routes_postgres", 'test_foreign_deletion_routes_conceal_even_with_the_owners_capability'),
+    ('POST', '/privacy/account-deletions/{request_id}/device-evidence'): ("test_owner_routes_postgres", 'test_foreign_deletion_routes_conceal_even_with_the_owners_capability'),
+    ('HEAD', '/raw-collections/{collection_id}/manifest'): ("test_owner_routes_postgres", 'test_foreign_raw_routes_hide_resources_and_preflight_has_no_existence_oracle'),
+    ('HEAD', '/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}'): ("test_owner_routes_postgres", 'test_foreign_raw_routes_hide_resources_and_preflight_has_no_existence_oracle'),
+    ('HEAD', '/raw-collections/{collection_id}/commit'): ("test_owner_routes_postgres", 'test_foreign_raw_routes_hide_resources_and_preflight_has_no_existence_oracle'),
+    ('PUT', '/raw-collections/{collection_id}/manifest'): ("test_owner_routes_postgres", 'test_foreign_raw_routes_hide_resources_and_preflight_has_no_existence_oracle'),
+    ('PUT', '/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}'): ("test_owner_routes_postgres", 'test_foreign_raw_routes_hide_resources_and_preflight_has_no_existence_oracle'),
+    ('GET', '/raw-collections/{collection_id}'): ("test_owner_routes_postgres", 'test_foreign_raw_routes_hide_resources_and_preflight_has_no_existence_oracle'),
+    ('POST', '/raw-collections/{collection_id}/commit'): ("test_owner_routes_postgres", 'test_foreign_raw_routes_hide_resources_and_preflight_has_no_existence_oracle'),
 })
+_S21_OWNER_SCOPED_ROUTE_GAPS = frozenset()
 
 
 def test_s21_41_owner_scoped_field_routes_have_other_user_decisions() -> None:

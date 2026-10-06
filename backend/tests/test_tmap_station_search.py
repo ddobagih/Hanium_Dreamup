@@ -21,7 +21,9 @@ def test_station_relevance_before_provider_page(query, expected_sort, with_origi
     sort = expected_sort if with_origin else "A"
 
     def handler(request):
-        assert request.url.params["searchKeyword"] == query
+        assert request.url.params["searchKeyword"] == (
+            "지하철역" if with_origin and query == "근처 지하철역" else query
+        )
         assert request.url.params["searchtypCd"] == sort
         if with_origin:
             assert request.url.params["centerLat"] == "36.2"

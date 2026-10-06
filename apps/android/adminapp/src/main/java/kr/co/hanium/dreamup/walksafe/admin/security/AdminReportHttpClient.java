@@ -44,6 +44,8 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     interface Transport {
         Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException;
+
+        default void cancelInFlight() {}
     }
 
     static final class Response {
@@ -118,6 +120,41 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         this.signer = signer;
         this.clock = clock;
         this.transport = transport;
+    }
+
+    static byte[] statusBody(String nextStatus, int expectedVersion) {
+        if (!AdminJava8Collections.set("new", "reviewed", "resolved").contains(nextStatus)) {
+            throw new IllegalArgumentException("next status is invalid");
+        }
+        if (expectedVersion < 1) throw new IllegalArgumentException("expected_version must be positive");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("expected_version", expectedVersion);
+        fields.put("status", nextStatus);
+        return AdminCanonicalEncoding.canonicalJsonBytes(fields);
+    }
+
+
+    static byte[] requestStatusBody(String requestType, String nextStatus, int expectedVersion, String publicResponse, String internalNote) {
+        String safeType = AdminReportRequestModels.requestType(requestType);
+        if (!AdminJava8Collections.set("ACKNOWLEDGED", "RESOLVED", "REJECTED").contains(nextStatus)) {
+            throw new IllegalArgumentException("next report request status is invalid");
+        }
+        if ("DELETE".equals(safeType) && "RESOLVED".equals(nextStatus)) {
+            throw new IllegalArgumentException("DELETE report requests cannot be resolved");
+        }
+        if (expectedVersion < 1) throw new IllegalArgumentException("expected_version must be positive");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("status", nextStatus);
+        fields.put("expected_version", expectedVersion);
+        fields.put(
+            "public_response",
+            AdminReportRequestModels.optionalResponse(publicResponse, "public_response")
+        );
+        fields.put(
+            "internal_note",
+            AdminReportRequestModels.optionalResponse(internalNote, "internal_note")
+        );
+        return AdminCanonicalEncoding.canonicalJsonBytes(fields);
     }
 
     @Override
@@ -195,14 +232,7 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     ) throws IOException, GeneralSecurityException {
         if (dispatch == null) throw new IllegalArgumentException("status dispatch is required");
         String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
-        if (!AdminJava8Collections.set("new", "reviewed", "resolved").contains(nextStatus)) {
-            throw new IllegalArgumentException("next status is invalid");
-        }
-        if (expectedVersion < 1) throw new IllegalArgumentException("expected_version must be positive");
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("expected_version", expectedVersion);
-        fields.put("status", nextStatus);
-        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
+        byte[] body = statusBody(nextStatus, expectedVersion);
         Response response = executeProtected(
             requireSession(session),
             "PATCH",
@@ -379,25 +409,7 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     ) throws IOException, GeneralSecurityException {
         String safeId = AdminReportRequestModels.canonicalUuid(requestId, "request_id");
         String safeType = AdminReportRequestModels.requestType(requestType);
-        if (!AdminJava8Collections.set("ACKNOWLEDGED", "RESOLVED", "REJECTED").contains(nextStatus)) {
-            throw new IllegalArgumentException("next report request status is invalid");
-        }
-        if ("DELETE".equals(safeType) && "RESOLVED".equals(nextStatus)) {
-            throw new IllegalArgumentException("DELETE report requests cannot be resolved");
-        }
-        if (expectedVersion < 1) throw new IllegalArgumentException("expected_version must be positive");
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("status", nextStatus);
-        fields.put("expected_version", expectedVersion);
-        fields.put(
-            "public_response",
-            AdminReportRequestModels.optionalResponse(publicResponse, "public_response")
-        );
-        fields.put(
-            "internal_note",
-            AdminReportRequestModels.optionalResponse(internalNote, "internal_note")
-        );
-        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
+        byte[] body = requestStatusBody(safeType, nextStatus, expectedVersion, publicResponse, internalNote);
         Response response = executeProtected(
             requireSession(session),
             "PATCH",
@@ -702,11 +714,21 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         }
     }
 
+    @Override
+    public void cancelInFlightRequests() {
+        transport.cancelInFlight();
+    }
+
     private static final class OkHttpTransport implements Transport {
+        private final AdminOkHttpTransport requests = new AdminOkHttpTransport();
+
+        @Override
+        public void cancelInFlight() { requests.cancelInFlight(); }
+
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException {
-            AdminOkHttpTransport.Result response = AdminOkHttpTransport.execute(
+            AdminOkHttpTransport.Result response = requests.execute(
                 method,
                 url,
                 headers,

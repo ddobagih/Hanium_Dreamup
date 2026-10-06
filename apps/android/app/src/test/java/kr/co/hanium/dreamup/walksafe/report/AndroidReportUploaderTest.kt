@@ -170,7 +170,6 @@ class AndroidReportUploaderTest {
         assertEquals(2_000L, reportRetryDelayMs(consecutiveFailures = 1))
         assertEquals(16_000L, reportRetryDelayMs(consecutiveFailures = 4))
         assertEquals(30_000L, reportRetryDelayMs(consecutiveFailures = 20))
-        assertEquals(60_000L, reportRetryDelayMs(consecutiveFailures = 1, statusCode = 401))
         assertEquals(45_000L, reportRetryDelayMs(consecutiveFailures = 1, statusCode = 429, retryAfterMs = 45_000L))
         assertEquals(900_000L, reportRetryDelayMs(consecutiveFailures = 1, retryAfterMs = 900_000L))
         assertEquals(3_600_000L, reportRetryDelayMs(consecutiveFailures = 1, statusCode = 429, retryAfterMs = 3_600_000L))

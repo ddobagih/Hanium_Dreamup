@@ -84,7 +84,9 @@ class HomeDestinationVoiceDialogAnswerWindowRegressionTest {
         val failed = prompt.substringAfter("onFailed = {")
         assertTrue(completed.indexOf("state.completeVoicePrompt(attempt)") < completed.indexOf("lease?.openAnswerWindow()"))
         assertTrue(failed.indexOf("state.failVoicePrompt(attempt)") < failed.indexOf("lease?.openAnswerWindow()"))
-        assertEquals("no other caller may start the answer time", 2,
+        val detail = source.substringAfter("private fun describeVoiceDestinationCandidate(").substringBefore("\n    private fun ")
+        assertEquals(2, Regex("""detailLease\?\.openAnswerWindow\(\)""").findAll(detail).count())
+        assertEquals("only page/detail terminal callbacks start answer time", 4,
             Regex("""openAnswerWindow\(\)""").findAll(source).count())
     }
 

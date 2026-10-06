@@ -33,6 +33,8 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
     interface Transport {
         Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException;
+
+        default void cancelInFlight() {}
     }
 
     static final class Response {
@@ -98,6 +100,18 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
         this.signer = signer;
         this.clock = clock;
         this.transport = transport;
+    }
+
+    static byte[] statusBody(AdminIncidentModels.StatusRequest request) {
+        if (request == null) throw new IllegalArgumentException("incident status request is required");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("expected_version", request.expectedVersion());
+        fields.put("idempotency_key", request.idempotencyKey());
+        fields.put("reason", request.reason());
+        fields.put("observation", request.observation());
+        fields.put("evidence_sha256", request.evidenceSha256());
+        fields.put("next_state", request.nextState());
+        return AdminCanonicalEncoding.canonicalJsonBytes(fields);
     }
 
     @Override
@@ -190,15 +204,7 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException {
         String safeId = AdminIncidentModels.canonicalUuid(incidentId, "incident_id");
-        if (request == null) throw new IllegalArgumentException("incident status request is required");
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("expected_version", request.expectedVersion());
-        fields.put("idempotency_key", request.idempotencyKey());
-        fields.put("reason", request.reason());
-        fields.put("observation", request.observation());
-        fields.put("evidence_sha256", request.evidenceSha256());
-        fields.put("next_state", request.nextState());
-        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
+        byte[] body = statusBody(request);
         Response response = executeProtected(
             requireSession(session), "PATCH", LIST_PATH + "/" + safeId + "/status", "",
             STATUS_ACTION, null, body, requireReconfirmation(reconfirmationHeaders)
@@ -349,11 +355,21 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
         return canonical;
     }
 
+    @Override
+    public void cancelInFlightRequests() {
+        transport.cancelInFlight();
+    }
+
     private static final class OkHttpTransport implements Transport {
+        private final AdminOkHttpTransport requests = new AdminOkHttpTransport();
+
+        @Override
+        public void cancelInFlight() { requests.cancelInFlight(); }
+
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException {
-            AdminOkHttpTransport.Result response = AdminOkHttpTransport.execute(
+            AdminOkHttpTransport.Result response = requests.execute(
                 method,
                 url,
                 headers,

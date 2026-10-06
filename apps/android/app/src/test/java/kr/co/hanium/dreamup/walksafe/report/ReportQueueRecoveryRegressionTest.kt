@@ -1,6 +1,9 @@
 package kr.co.hanium.dreamup.walksafe.report
 
 import java.io.File
+import java.net.SocketTimeoutException
+import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentAuthorityGuard
 import java.util.Base64
 import java.util.UUID
 import java.util.concurrent.CancellationException
@@ -119,18 +122,20 @@ class ReportQueueRecoveryRegressionTest {
 
     @Test
     fun permanentHeadIsRetainedAndSkippedAfterStoreRecreation() {
-        val f = fixture()
-        val rejected = f.enqueue()
-        val good = f.enqueue()
-        assertEquals(ReportQueueDrainOutcome.QUARANTINED,
-            requireNotNull(f.coordinator.startNext({ context() }, failingTransport(422))).execute())
-        val restored = f.reopen()
-        assertEquals(good.payload.reportId, restored.nextForRecoveryDrain(ACTOR)?.payload?.reportId)
-        assertTrue(restored.queuedReports().single { it.payload.reportId == rejected.payload.reportId }.quarantined)
-        assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_STATUS,
-            requireNotNull(ReportQueueDrainCoordinator(restored).startNext({ context() }, successfulTransport())).execute())
-        assertEquals(1, restored.queuedReports().size)
-        assertNull(restored.nextForRecoveryDrain(ACTOR))
+        for (status in listOf(400, 413, 415, 422)) {
+            val f = fixture()
+            val rejected = f.enqueue()
+            val good = f.enqueue()
+            assertEquals(ReportQueueDrainOutcome.QUARANTINED,
+                requireNotNull(f.coordinator.startNext({ context() }, failingTransport(status))).execute())
+            val restored = f.reopen()
+            assertEquals(good.payload.reportId, restored.nextForRecoveryDrain(ACTOR)?.payload?.reportId)
+            assertTrue(restored.queuedReports().single { it.payload.reportId == rejected.payload.reportId }.quarantined)
+            assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_STATUS,
+                requireNotNull(ReportQueueDrainCoordinator(restored).startNext({ context() }, successfulTransport())).execute())
+            assertEquals(1, restored.queuedReports().size)
+            assertNull(restored.nextForRecoveryDrain(ACTOR))
+        }
     }
 
     @Test
@@ -150,13 +155,20 @@ class ReportQueueRecoveryRegressionTest {
     }
 
     @Test
-    fun authenticationFailureNeverQuarantinesPayload() {
-        val f = fixture()
-        f.enqueue()
-        assertEquals(ReportQueueDrainOutcome.AUTHORITY_BLOCKED,
-            requireNotNull(f.coordinator.startNext({ context() }, failingTransport(403))).execute())
-        assertFalse(f.store.queuedReports().single().quarantined)
-        assertNotNull(f.store.nextForRecoveryDrain(ACTOR))
+    fun authenticationAndPermissionFailuresAreDistinctAndNeverQuarantinePayload() {
+        for ((status, expected) in listOf(
+            401 to ReportQueueDrainOutcome.AUTHENTICATION_REQUIRED,
+            403 to ReportQueueDrainOutcome.PERMISSION_BLOCKED,
+        )) {
+            val f = fixture()
+            val original = f.enqueue()
+            assertEquals(expected,
+                requireNotNull(f.coordinator.startNext({ context() }, failingTransport(status))).execute())
+            val stored = f.reopen().queuedReports().single()
+            assertFalse(stored.quarantined)
+            assertEquals(0L, stored.retryNotBeforeEpochMs)
+            assertTrue(original.payload.contentEquals(stored.payload))
+        }
     }
 
     @Test
@@ -225,6 +237,105 @@ class ReportQueueRecoveryRegressionTest {
         assertEquals(ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED,
             requireNotNull(f.coordinator.startNext({ context() }, successfulTransport())).execute())
         assertEquals(1, f.store.queuedReports().size)
+    }
+
+    @Test
+    fun temporaryErrorsWithoutRetryAfterPersistDelayAndPreserveExactPayload() {
+        for ((status, delay) in listOf(500 to 2_000L, 503 to 2_000L, 429 to 30_000L)) {
+            val f = fixture()
+            val failed = f.enqueue()
+            val next = f.enqueue()
+            assertEquals(ReportQueueDrainOutcome.RETRY_DEFERRED,
+                requireNotNull(f.coordinator.startNext({ context() }, failingTransport(status))).execute())
+            val restored = f.reopen()
+            assertEquals(next.payload.reportId, restored.nextForRecoveryDrain(ACTOR)?.payload?.reportId)
+            assertTrue(restored.deleteAfterReceipt(ACTOR, receipt(next)))
+            f.now += delay - 1L
+            assertNull(restored.nextForRecoveryDrain(ACTOR))
+            f.now++
+            assertTrue(failed.payload.contentEquals(requireNotNull(restored.nextForRecoveryDrain(ACTOR)).payload))
+        }
+    }
+
+    @Test
+    fun timeoutAfterUploadIsDeferredAndRetryChecksReceiptBeforePostingAgain() {
+        val f = fixture()
+        val failed = f.enqueue()
+        var posts = 0
+        var statusCalls = 0
+        val transport = object : ReportQueueTransport {
+            override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> {
+                statusCalls++
+                if (posts > 0) receipt(report) else null
+            }
+            override fun uploadCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt> {
+                posts++
+                throw SocketTimeoutException("response lost after acceptance")
+            }
+        }
+        assertEquals(ReportQueueDrainOutcome.RETRY_DEFERRED,
+            requireNotNull(f.coordinator.startNext({ context() }, transport)).execute())
+        val reopened = f.reopen()
+        assertNull(reopened.nextForRecoveryDrain(ACTOR))
+        assertTrue(failed.payload.contentEquals(reopened.queuedReports().single().payload))
+        f.now += 2_000L
+        assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_STATUS,
+            requireNotNull(ReportQueueDrainCoordinator(reopened).startNext({ context() }, transport)).execute())
+        assertEquals(1, posts)
+        assertEquals(2, statusCalls)
+        assertTrue(reopened.queuedReports().isEmpty())
+    }
+
+    @Test
+    fun freshGuardForIdenticalConfirmationKeepsAnExecutingDrain() {
+        exerciseConsentRedelivery(unchanged = true, oldAuthorityLive = true)
+    }
+
+    @Test
+    fun differentConfirmationCancelsAnExecutingDrainAndKeepsPayload() {
+        exerciseConsentRedelivery(unchanged = false, oldAuthorityLive = true)
+    }
+
+    @Test
+    fun replacedAccountCancelsEvenIfConfirmationWasReportedAsDuplicate() {
+        exerciseConsentRedelivery(unchanged = true, oldAuthorityLive = false)
+    }
+
+    private fun exerciseConsentRedelivery(unchanged: Boolean, oldAuthorityLive: Boolean) {
+        val consent = ReportPrivacyConsentSession
+        consent.resetForNewEnrollment()
+        val activity = MainActivity()
+        var live = true
+        fun freshGuard() = object : IntegratedConsentAuthorityGuard {
+            override fun <T : Any> withCurrent(action: () -> T): T? = if (live) action() else null
+        }
+        try {
+            activity.applyReportConsentAuthority(false, freshGuard())
+            val permit = requireNotNull(consent.issueUploadPermit(ReportTransferPurpose.EXPLICIT))
+            val f = fixture()
+            f.enqueue()
+            lateinit var upload: CancellableNetworkCall<ReportQueueReceipt>
+            val transport = object : ReportQueueTransport {
+                override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> { null }
+                override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> {
+                    upload = CancellableNetworkCall.blocking {
+                        // MainActivity creates a fresh guard object for every server response.
+                        live = oldAuthorityLive
+                        activity.applyReportConsentAuthority(unchanged, freshGuard())
+                        if (upload.isCancelled()) throw CancellationException()
+                        consent.withLiveUploadPermit(permit, ReportTransferPurpose.EXPLICIT) { receipt(report) }
+                    }
+                    return requireNotNull(consent.trackIfLive(permit, upload, ReportTransferPurpose.EXPLICIT))
+                }
+            }
+            val result = requireNotNull(f.coordinator.startNext({ context() }, transport)).execute()
+            val keepGoing = unchanged && oldAuthorityLive
+            assertEquals(if (keepGoing) ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD else ReportQueueDrainOutcome.CANCELLED, result)
+            assertEquals(!keepGoing, upload.isCancelled())
+            assertEquals(if (keepGoing) 0 else 1, f.reopen().queuedReports().size)
+        } finally {
+            consent.resetForNewEnrollment()
+        }
     }
 
     private fun fixture() = Fixture(temporary.newFolder())

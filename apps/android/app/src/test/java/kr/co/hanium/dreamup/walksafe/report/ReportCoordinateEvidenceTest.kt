@@ -16,12 +16,12 @@ class ReportCoordinateEvidenceTest {
             val status = proof.statusFor(f.output, f.snapshot.reportImage, CAPTURED, GEOMETRY)
             assertEquals("pass", status)
             val input = AndroidReportCandidateInput(
-                depth = f.output, location = TrustedLocation(37.0, 127.0, 5f, 1_000L),
+                depth = f.output, location = proof.captureLocation,
                 modelKey = "custom_tactile", sourceModel = "android/custom_tactile", runtimeMode = "android",
                 modelConfigSha256 = "a".repeat(64), modelVersion = "test", sourceCommit = "unverified",
                 threshold = 0.35f, capturedAtMs = CAPTURED, requestElapsedRealtimeMs = 1_050L,
                 trigger = "voice", traceId = "test", deviceGateAllowsReports = true,
-                detectionAgeMs = 50L, coordinateGateStatus = status,
+                detectionAgeMs = 50L, capturedAtElapsedRealtimeMs = proof.capturedAtElapsedRealtimeMs, coordinateGateStatus = status,
             )
             val policy = AndroidReportCandidatePolicy()
             assertEquals("pass", requireNotNull(policy.prepare(input)).metadata.getString("coordinate_gate_status"))
@@ -87,6 +87,19 @@ class ReportCoordinateEvidenceTest {
             frame = f.frame.copy(matchedEvidence = missingPair))))
     }
 
+    @Test fun evidenceRetainsTheLocationAndMonotonicTimeOfItsCapture() {
+        val f = fixture()
+        val proof = requireNotNull(capture(f))
+        assertEquals(1_000L, proof.capturedAtElapsedRealtimeMs)
+        assertEquals(TrustedLocation(37.0, 127.0, 5f, 950L), proof.captureLocation)
+        val later = requireNotNull(f.snapshot.frameEvidence).copy(
+            reportLocation = TrustedLocation(38.0, 128.0, 2f, 1_025L))
+        val nextProof = requireNotNull(capture(f.copy(
+            snapshot = f.snapshot.copy(frameEvidence = later), frame = f.frame.copy(matchedEvidence = later))))
+        assertEquals(38.0, nextProof.captureLocation!!.latitude, 0.0)
+        assertEquals(37.0, proof.captureLocation!!.latitude, 0.0)
+    }
+
     @Test fun mainUsesFrozenReportEvidenceAtBothAutomaticAndExplicitBoundaries() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
         assertFalse(source.contains("coordinateGateStatus = \"pass\""))
@@ -94,6 +107,24 @@ class ReportCoordinateEvidenceTest {
         assertTrue(source.contains("detectionSnapshot, frozenPreparedFrame?.frame, automaticReportOutput"))
         assertTrue(source.contains("detectionSnapshot, frozenPreparedFrame?.frame, reportOutput"))
         assertTrue(source.contains("coordinateEvidence = latestExplicitReportCoordinateEvidence"))
+        val preparation = source.substringAfter("private fun prepareReportCandidate(").substringBefore("private fun ")
+        assertTrue(preparation.contains("coordinateEvidence?.captureLocation"))
+        assertTrue(preparation.contains("locationOwner != null"))
+        assertTrue(preparation.contains("currentLocationCollectionOwnerOrNull() == locationOwner"))
+        assertTrue(preparation.contains("requestElapsedRealtimeMs - it"))
+        assertFalse(preparation.contains("freshTrustedLocationOrNull("))
+        assertFalse(preparation.contains("latestTrustedLocation"))
+        assertTrue(source.contains("it.elapsedRealtimeMs <= elapsedRealtimeMs"))
+    }
+
+    @Test fun imageDecodePrecedesBothExplicitFreezeAndAutomaticQueue() {
+        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        val process = source.substringAfter("private fun processReportCandidate(").substringBefore("private fun ")
+        val decode = process.indexOf("AndroidReportImageValidator.isDecodable(imageJpeg)")
+        assertTrue(decode >= 0)
+        assertTrue(decode < process.indexOf("ExplicitReportFrozenPayload.freeze("))
+        assertTrue(decode < process.indexOf("reportQueueStore.enqueue("))
+        assertTrue(ExplicitReportRejectionNotice.messageFor("reportCandidate=blocked:unreadable_report_image")!!.contains("다시 신고"))
     }
 
     private data class Fixture(val snapshot: MainActivity.DetectionSnapshot,
@@ -117,9 +148,10 @@ class ReportCoordinateEvidenceTest {
             mapper = mapper, mapperFrameId = FRAME).single()
         val context = TactileProjectionContext(FRAME, null, null, null, null, null, null, 0L, 1_000L)
         val evidence = MainActivity.DetectionFrameEvidence(FRAME, 1_000L, depth, mapper, context,
-            MotionContext(), false, false, geometryVersion = GEOMETRY)
+            MotionContext(), false, false, geometryVersion = GEOMETRY,
+            reportLocation = TrustedLocation(37.0, 127.0, 5f, 950L))
         val snapshot = MainActivity.DetectionSnapshot(detections, AndroidDetectionSnapshotFrameIdentity(FRAME, 1_000L),
-            CAPTURED, CAPTURED, CAPTURED + 1, 640, 480, 1, null, byteArrayOf(1, 2, 3), false, evidence)
+            CAPTURED, CAPTURED, CAPTURED + 1, 640, 480, 1, null, byteArrayOf(1, 2, 3), false, evidence, capturedAtElapsedRealtimeMs = 1_000L)
         val frame = MainActivity.TactileSnapshotFrameResult(evidence, detections, true,
             TactileRouteGuidanceResult(listOf(output), null, TactileRouteDecision(LocalRouteMode.TMAP, null, "test", null)))
         return Fixture(snapshot, frame, output)

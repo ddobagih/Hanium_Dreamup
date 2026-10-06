@@ -592,6 +592,7 @@ test("S19-59 route deadlines stay above each route's own body and upstream limit
   ] as const) {
     assert.equal(gatewayRequestDeadlineMs(request(method, pathname)), 35_000, pathname);
   }
+  assert.equal(gatewayRequestDeadlineMs(request("POST", "/api/account-enrollments/email-otp")), 65_000);
   assert.equal(gatewayRequestDeadlineMs(request("POST", "/api/navigation/walking")), 8_000);
   assert.equal(gatewayRequestDeadlineMs(request("GET", "/api/navigation/destinations/search")), 7_000);
   // Uploads and speech keep their own limits (unchanged) plus the gate and a 5 s margin.

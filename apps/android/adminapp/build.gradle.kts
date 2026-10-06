@@ -74,6 +74,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.2.0-security"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "WALKSAFE_PRODUCT_ROLE", "\"ADMIN\"")
         buildConfigField("String", "ADMIN_AUTHENTICATION_MODE", "\"PASSWORD_TOTP\"")
@@ -135,4 +136,12 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.squareup.okhttp3:mockwebserver3:5.4.0")
     testImplementation("org.json:json:20240303")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver3:5.4.0")
+}
+
+// Check the generated debug constants against the requested matrix configuration.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty("walksafe.test.expectedAdminOperations", operationalDebugEnabled)
 }

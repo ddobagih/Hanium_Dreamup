@@ -14,6 +14,10 @@ export const ACCOUNT_CREATE_BODY_LIMIT_BYTES = 16 * 1024;
 export const ACCOUNT_UPSTREAM_RESPONSE_LIMIT_BYTES = 16 * 1024;
 
 const ACCOUNT_UPSTREAM_RESPONSE_TIMEOUT_MS = 5_000;
+// SMTP total send budget <= 30 s, plus database work; OTP is slower than other account calls.
+export const ACCOUNT_ENROLLMENT_UPSTREAM_TIMEOUT_MS = 40_000;
+export const ACCOUNT_ENROLLMENT_OWN_LIMITS_MS =
+  10_000 + ACCOUNT_ENROLLMENT_UPSTREAM_TIMEOUT_MS + ACCOUNT_UPSTREAM_RESPONSE_TIMEOUT_MS;
 const BACKEND_ACCOUNT_CLIENT_IP_HEADER = "x-walksafe-client-ip";
 const SAFE_ERROR_STATUSES = new Set([400, 401, 409, 429, 503]);
 const SAFE_ERROR_CODE = /^[a-z][a-z0-9_]{0,63}$/;
@@ -127,7 +131,7 @@ function canonicalEmail(value: unknown): string | null {
   ) return null;
   const [local, rawDomain] = value.split("@") as [string, string];
   if (local.length < 1 || local.length > 64 || !EMAIL_LOCAL.test(local) ||
-    !rawDomain || rawDomain.endsWith(".") || rawDomain.includes("%")) return null;
+    !rawDomain || rawDomain.endsWith(".") || /[\u0000-\u0020\u007f%/\\?#:]/u.test(rawDomain)) return null;
   const domain = domainToASCII(rawDomain);
   if (!domain || domain.endsWith(".")) return null;
   const labels = domain.split(".");
@@ -419,7 +423,8 @@ async function relayAccountRequest(
   successStatuses: ReadonlySet<number>,
   sanitizeSuccess: (value: unknown) => Record<string, unknown> | null,
   fetchImpl?: GatewayFetch,
-  initialHeaders?: HeadersInit
+  initialHeaders?: HeadersInit,
+  timeoutMs = 15_000
 ): Promise<Response> {
   const headers = serviceHeaders(initialHeaders);
   if (headers instanceof Response) return headers;
@@ -429,9 +434,9 @@ async function relayAccountRequest(
     body: JSON.stringify(body),
     cache: "no-store"
   };
-  const upstream = fetchImpl
-    ? await fetchBackend(request, backendUrl(backendPath), init, 15_000, fetchImpl)
-    : await fetchBackend(request, backendUrl(backendPath), init);
+  const upstream = await fetchBackend(
+    request, backendUrl(backendPath), init, timeoutMs, fetchImpl ?? globalThis.fetch
+  );
   const decoded = await boundedUpstreamJson(upstream);
   if (decoded.timeout) return accountError(504, "gateway_upstream_response_timeout");
   if (decoded.error) return accountError(502, "gateway_account_upstream_invalid");
@@ -472,7 +477,8 @@ export async function relayAccountEnrollment(
     new Set([202]),
     enrollmentResponse,
     fetchImpl,
-    { [BACKEND_ACCOUNT_CLIENT_IP_HEADER]: clientIp }
+    { [BACKEND_ACCOUNT_CLIENT_IP_HEADER]: clientIp },
+    ACCOUNT_ENROLLMENT_UPSTREAM_TIMEOUT_MS
   );
 }
 

@@ -243,7 +243,7 @@ class MainActivityPhoneMountingStaticTest {
             "private fun onAccountLogoutClicked()" to "priority_user_account_logged_out",
             "private fun resetPriorityUserTraining()" to "priority_user_training_reset",
             "private fun startFreshWalk(" to "new_walk:",
-            "private fun enterWalkSessionSafetyStopAndCancelOutputs(" to "safety_stop:",
+            "private fun performWalkSessionSafetyStopCleanup(" to "safety_stop:",
             "private fun applyRuntimeReadinessIfActive(" to "runtime_readiness_changed",
         )
         invalidations.forEach { (signature, reason) ->
@@ -499,7 +499,7 @@ class MainActivityPhoneMountingStaticTest {
             drain,
             "val context = reportQueueDrainContext(trigger)",
             "if (!context.allRequiredBaseGatesAllowed()) break",
-            "reportQueueDrainCoordinator.startNext(",
+            "reportQueueDrainCoordinator.startNextWithResult(",
             "call.execute()",
         )
         val drainContext = functionBlock("private fun reportQueueDrainContext(")
@@ -521,9 +521,10 @@ class MainActivityPhoneMountingStaticTest {
         assertTrue(immediateConsentWithdrawals.contains("cancelReportQueueDrain()"))
         assertTrue(
             immediateConsentWithdrawals.contains(
-                "reportQueueDrainCoordinator.onAutomaticReportingRevoked(previousReceipt)",
+                "automaticReportWithdrawalRecovery.recordWithdrawal(previousReceipt)",
             ),
         )
+        assertTrue(source.contains("revoke = reportQueueDrainCoordinator::onAutomaticReportingRevoked"))
         assertFalse(automaticConsent.contains("\n                reportUploadSafetyGeneration += 1L"))
     }
 

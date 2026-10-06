@@ -106,6 +106,7 @@ internal class HandsFreeVoiceController internal constructor(
      * "No speech right now" is not "command finished": wake listening waits until this turns false.
      */
     private val isCommandWorkPending: (commandId: Long) -> Boolean = { false },
+    private val commandSpeechProgress: (Long) -> CommandSpeechProgress = { CommandSpeechProgress(CommandSpeechState.NONE, 0) },
 ) : WalkVoiceSessionController, Closeable {
     constructor(
         context: Context,
@@ -125,6 +126,7 @@ internal class HandsFreeVoiceController internal constructor(
         ),
         isSpeechRecognitionBlocked: () -> Boolean = isAppSpeechActive,
         isCommandWorkPending: (commandId: Long) -> Boolean = { false },
+        commandSpeechProgress: (Long) -> CommandSpeechProgress = { CommandSpeechProgress(CommandSpeechState.NONE, 0) },
         speakLowConfidenceReprompt: ((onFinished: (WakeAcknowledgementResult) -> Unit) -> Unit)? = null,
     ) : this(
         dependencies = HandsFreeVoiceDependencies(
@@ -168,6 +170,7 @@ internal class HandsFreeVoiceController internal constructor(
         onSessionEnded = onSessionEnded,
         isSpeechRecognitionBlocked = isSpeechRecognitionBlocked,
         isCommandWorkPending = isCommandWorkPending,
+        commandSpeechProgress = commandSpeechProgress,
     )
 
     private val stateMachine = HandsFreeVoiceStateMachine()
@@ -669,6 +672,8 @@ internal class HandsFreeVoiceController internal constructor(
         outputQuietSinceMs = null
         outputActiveAtLastPoll = false
         outputProgressAtMs = dispatchedAtMs
+        var lastSpeechRevision: Long? = null
+        var terminalState: CommandSpeechState? = null
         var commandWorkWasPending = false
         var workQuietSinceMs: Long? = null
         // S04-11: the wait moves between Speaking (output on, input suppressed) and
@@ -687,9 +692,22 @@ internal class HandsFreeVoiceController internal constructor(
                 return@Runnable
             }
             val nowMs = dependencies.runtime.nowMs()
-            val outputActive = runCatching(isAppSpeechActive).getOrDefault(true)
-            // S04-12/S05-29: a new utterance starting is progress; only output that stays on without
-            // any new start beyond the feedback layer's own per-utterance terminal limit is a stall.
+            val speech = runCatching { commandSpeechProgress(commandId) }.getOrElse {
+                CommandSpeechProgress(CommandSpeechState.PENDING, lastSpeechRevision ?: 0)
+            }
+            val outputActive = speech.state == CommandSpeechState.PENDING
+            if (speech.revision != lastSpeechRevision) {
+                lastSpeechRevision = speech.revision
+                outputProgressAtMs = nowMs
+                outputQuietSinceMs = null
+            }
+            // Shared output suppresses microphone input elsewhere; it cannot finish this command.
+            if (!outputActive && speech.state != CommandSpeechState.NONE && terminalState != speech.state) {
+                terminalState = speech.state
+                onStatus("voice_hands_free=command_output_${speech.state.name.lowercase()}")
+                outputObserved = true
+            }
+            // A completed part advances the revision even when consecutive parts have no quiet gap.
             if (outputActive && !outputActiveAtLastPoll) outputProgressAtMs = nowMs
             outputActiveAtLastPoll = outputActive
             if (awaitingResult && outputActive) {
@@ -711,7 +729,7 @@ internal class HandsFreeVoiceController internal constructor(
                     failClosed(pollGeneration, HandsFreeVoiceTerminalFailure.CommandResultTimeout)
                     return@Runnable
                 }
-                if (outputActive) {
+                if (outputActive || runCatching(isSpeechRecognitionBlocked).getOrDefault(true)) {
                     workQuietSinceMs = null
                 } else {
                     val quietSince = workQuietSinceMs ?: nowMs.also { workQuietSinceMs = it }

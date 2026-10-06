@@ -41,7 +41,16 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(AndroidJUnit4::class)
 class RuntimeCalibrationSessionDeviceTest {
     @Test
-    fun realMetricSessionThenCameraCancellationAndReentry() {
+    fun realMetricSessionThenCameraCancellationAndReentry() = runSessionTest(expectBaselineRejection = false)
+
+    /** Separate negative-path regression, never counted as successful live inference coverage. */
+    @Test
+    fun baselineFixtureRejectionClosesWithoutCandidateAdoption() {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("allowBaselineRejectionTest") == "true")
+        runSessionTest(expectBaselineRejection = true)
+    }
+
+    private fun runSessionTest(expectBaselineRejection: Boolean) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         assumeTrue("Explicit real-device opt-in required", InstrumentationRegistry.getArguments()
             .getString("allowRuntimeCalibrationSessionDeviceTest") == "true")
@@ -49,9 +58,9 @@ class RuntimeCalibrationSessionDeviceTest {
         assumeTrue("Existing target CAMERA permission required; test never changes permission",
             context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
         val report = JSONObject().put("schemaVersion", 1)
-            .put("test", "actual_runtime_calibration_session")
-            .put("metricBudgetMs", METRIC_BUDGET_MS)
-            .put("supplementalScope", "camera_only_cancel_drain_reentry")
+            .put("test", if (expectBaselineRejection) "baseline_fixture_rejection_cleanup" else "actual_runtime_calibration_session")
+            .put("metricBudgetMs", if (expectBaselineRejection) JSONObject.NULL else METRIC_BUDGET_MS)
+            .put("supplementalScope", if (expectBaselineRejection) "camera_only_rejection_cleanup" else "camera_only_cancel_drain_reentry")
             .put("performancePassIsNotLifecyclePass", true)
             .put("availableProcessors", Runtime.getRuntime().availableProcessors())
         val attempts = mutableListOf<Attempt>()
@@ -63,7 +72,6 @@ class RuntimeCalibrationSessionDeviceTest {
         scenario.onActivity { host = it }
         val currentCandidate = AtomicReference(RuntimeCandidate(RuntimeBackend.CPU,
             minOf(4, Runtime.getRuntime().availableProcessors().coerceAtLeast(1))))
-        var allSessionsClosed = true
         val detectorInstalled = AtomicBoolean(false)
         try {
             val setupStart = now()
@@ -103,7 +111,6 @@ class RuntimeCalibrationSessionDeviceTest {
                 return Attempt(name, context, host, config, currentCandidate, baselineExecutor,
                     callbackExecutor, binding, scope, budgetMs).also { attempt ->
                     attempts += attempt
-                    allSessionsClosed = false
                     scenario.onActivity {
                         it.onHostUnavailable = { attempt.cancel("test_host_paused") }
                         attempt.session.start()
@@ -111,12 +118,26 @@ class RuntimeCalibrationSessionDeviceTest {
                 }
             }
 
-            val metric = newAttempt("metric_300s", RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH, METRIC_BUDGET_MS)
-            waitFor(metric, METRIC_BUDGET_MS + NATIVE_DRAIN_ALLOWANCE_MS, report, attempts, context) { metric.isClosed() }
+            val metric = if (expectBaselineRejection)
+                newAttempt("baseline_rejection", RuntimeFeatureScope.CAMERA_TRACKING, CANCELLATION_BUDGET_MS)
+            else newAttempt("metric_300s", RuntimeFeatureScope.CAMERA_TRACKING_METRIC_DEPTH, METRIC_BUDGET_MS)
+            waitFor(metric, metric.budgetMs + NATIVE_DRAIN_ALLOWANCE_MS, report, attempts, context) { metric.isClosed() }
             metric.verifyClosed()
-            allSessionsClosed = true
             metric.verifyDecisionEvidence()
 
+            if (expectBaselineRejection) {
+                val result = metric.json()
+                assertEquals("baseline_fixture_role_mismatch", result.getString("reason"))
+                assertEquals(RuntimeSelectionStatus.INCONCLUSIVE.name, result.getString("status"))
+                assertEquals(0, result.getInt("selectionOffers"))
+                assertEquals(0, result.getInt("actualReferenceAdoptions"))
+                assertTrue("No challenger should be created after baseline failure",
+                    result.getJSONArray("stages").let { stages -> (0 until stages.length()).all {
+                        stages.getJSONObject(it).optJSONObject("candidate")?.optString("backend") != "GPU"
+                    } })
+                report.put("rejectionAssertions", "PASS")
+                report.put("lifecycleAssertions", "LIVE_INFERENCE_NOT_EXERCISED")
+            } else {
             // 90 s leaves no candidate-screening budget: exercises the real baseline fixtures/live
             // path without loading a succession of GPU challengers solely to test cancellation.
             val paused = newAttempt("camera_inflight_pause", RuntimeFeatureScope.CAMERA_TRACKING, CANCELLATION_BUDGET_MS)
@@ -127,7 +148,6 @@ class RuntimeCalibrationSessionDeviceTest {
             scenario.moveToState(Lifecycle.State.CREATED)
             waitFor(paused, NATIVE_DRAIN_ALLOWANCE_MS, report, attempts, context) { paused.isClosed() }
             paused.verifyClosed()
-            allSessionsClosed = true
             assertTrue("Host onPause must cancel with an actual in-flight image", paused.cancelledWithImage.get())
 
             scenario.moveToState(Lifecycle.State.RESUMED)
@@ -139,9 +159,9 @@ class RuntimeCalibrationSessionDeviceTest {
             reentry.cancel("test_explicit_cancel")
             waitFor(reentry, NATIVE_DRAIN_ALLOWANCE_MS, report, attempts, context) { reentry.isClosed() }
             reentry.verifyClosed()
-            allSessionsClosed = true
             assertTrue("Explicit cancellation must observe image ownership", reentry.cancelledWithImage.get())
             report.put("lifecycleAssertions", "PASS")
+            }
         } catch (error: Throwable) {
             report.put("lifecycleAssertions", "FAIL").put("failureType", error.javaClass.simpleName)
             throw error
@@ -149,13 +169,15 @@ class RuntimeCalibrationSessionDeviceTest {
             // Cancellation is not preemption. Do not close borrowed A or re-open a camera until
             // the real session callback has proved runner/image/camera draining completed.
             attempts.filterNot { it.isClosed() }.forEach { it.cancel("test_finally_cleanup") }
-            attempts.filterNot { it.isClosed() }.forEach { attempt ->
+            // A failed coverage assertion can skip verifyClosed after the close callback already
+            // arrived. Verify those sessions too; callback arrival alone does not prove cleanup.
+            attempts.filterNot { it.closeVerified.get() }.forEach { attempt ->
                 runCatching {
                     waitFor(attempt, NATIVE_DRAIN_ALLOWANCE_MS, report, attempts, context) { attempt.isClosed() }
                     attempt.verifyClosed()
                 }.onFailure { report.put("cleanupFailureType", it.javaClass.simpleName) }
             }
-            allSessionsClosed = allSessionsClosed || attempts.all { it.isClosed() && it.closeVerified.get() }
+            val allSessionsClosed = attempts.all { it.isClosed() && it.closeVerified.get() }
             report.put("allSessionsClosed", allSessionsClosed)
             runCatching { scenario.onActivity { it.onHostUnavailable = null } }
                 .onFailure { report.put("hostCallbackDetachFailureType", it.javaClass.simpleName) }

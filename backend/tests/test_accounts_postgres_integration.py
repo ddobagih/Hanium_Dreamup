@@ -781,6 +781,59 @@ def test_same_otp_request_concurrently_returns_delivery_lease_without_duplicate_
         engine.dispose()
 
 
+def test_smtp_accepted_but_activation_commit_failed_does_not_resend_same_request(monkeypatch):
+    engine, SessionFactory = _session_factory()
+    service = AccountService(settings)
+    clock = utc_now()
+    monkeypatch.setattr(accounts_service, "utc_now", lambda: clock)
+    suffix = uuid.uuid4().hex
+    payload = _request(email=f"activation-loss-{suffix}@example.com", request_id=f"activation_loss_{suffix}")
+    sends = []
+    original_mark_sent = service.mark_delivery_sent
+
+    def fail_activation(db, delivery):
+        def fail_commit():
+            raise SQLAlchemyError("synthetic activation commit failure")
+        with monkeypatch.context() as patch:
+            patch.setattr(db, "commit", fail_commit)
+            original_mark_sent(db, delivery)
+
+    monkeypatch.setattr(service, "mark_delivery_sent", fail_activation)
+    app = FastAPI()
+    app.include_router(create_router(
+        settings, service=service, sender=SimpleNamespace(send=lambda **_: sends.append(True)),
+        rate_limiter=SimpleNamespace(check_source=lambda **_: None, check_email=lambda **_: None),
+    ))
+
+    def database():
+        with SessionFactory() as db:
+            yield db
+    app.dependency_overrides[get_db] = database
+
+    def issue():
+        return ASGITestClient(app).post("/account-enrollments/email-otp", json=payload.model_dump(mode="json"))
+
+    try:
+        result = issue()
+        assert result.status_code == 503
+        assert len(sends) == 1
+        with SessionFactory() as db:
+            row = db.scalar(select(AccountEnrollment).where(AccountEnrollment.request_id == payload.request_id))
+            assert row.state == "PENDING_DELIVERY"
+            before = tuple(getattr(row, col.name) for col in AccountEnrollment.__table__.columns)
+        assert issue().json()["detail"]["code"] == "account_enrollment_in_progress"
+        clock += timedelta(seconds=settings.account_otp_delivery_lease_seconds + 1)
+        retry = issue()
+        assert retry.status_code == 409
+        assert retry.json()["detail"]["code"] == "account_enrollment_idempotency_conflict"
+        assert len(sends) == 1
+        with SessionFactory() as db:
+            row = db.scalar(select(AccountEnrollment).where(AccountEnrollment.request_id == payload.request_id))
+            assert tuple(getattr(row, col.name) for col in AccountEnrollment.__table__.columns) == before
+    finally:
+        engine.dispose()
+
+
 def test_otp_flush_failure_rolls_back_encrypted_row_and_same_request_can_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -868,7 +921,7 @@ def test_otp_flush_failure_rolls_back_encrypted_row_and_same_request_can_retry(
         engine.dispose()
 
 
-def test_stale_pending_delivery_reissues_same_handle_with_new_code() -> None:
+def test_stale_pending_delivery_preserves_code_and_requires_new_request() -> None:
     engine, SessionFactory = _session_factory()
     service = AccountService(settings)
     suffix = uuid.uuid4().hex
@@ -898,11 +951,27 @@ def test_stale_pending_delivery_reissues_same_handle_with_new_code() -> None:
         seconds=settings.account_otp_delivery_lease_seconds + 1
     )
     with SessionFactory() as db:
-        retried = service.issue_email_otp(db, request, now=retry_at)
+        before = db.get(AccountEnrollment, original.delivery.enrollment_id)
+        original_state = tuple(getattr(before, col.name) for col in AccountEnrollment.__table__.columns)
+    with SessionFactory() as db:
+        with pytest.raises(AccountServiceError) as ambiguous:
+            service.issue_email_otp(db, request, now=retry_at)
+        assert ambiguous.value.code == "account_enrollment_idempotency_conflict"
+        assert ambiguous.value.status_code == 409
+    with SessionFactory() as db:
+        unchanged = db.get(AccountEnrollment, original.delivery.enrollment_id)
+        assert tuple(getattr(unchanged, col.name) for col in AccountEnrollment.__table__.columns) == original_state
+    # A possibly delivered code is never silently replaced for the same request.
+    # The user's new request after cooldown gets a new handle and fences old callbacks.
+    retry_at = started_at + timedelta(seconds=max(
+        settings.account_otp_resend_cooldown_seconds,
+        settings.account_otp_delivery_lease_seconds,
+    ) + 1)
+    fresh_request = request.model_copy(update={"request_id": f"delivery_new_{suffix}"})
+    with SessionFactory() as db:
+        retried = service.issue_email_otp(db, fresh_request, now=retry_at)
     assert retried.delivery is not None
-    assert retried.response.enrollment_handle == original.response.enrollment_handle
-    assert retried.delivery.issue_count == original.delivery.issue_count + 1
-    assert retried.delivery.code != original.delivery.code
+    assert retried.response.enrollment_handle != original.response.enrollment_handle
 
     with SessionFactory() as db:
         with pytest.raises(AccountServiceError) as stale_ack:

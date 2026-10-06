@@ -94,7 +94,10 @@ public final class AdminHighRiskActionGate {
     }
 
     public static final class Binding {
-        private final Operation action;
+        private final String action;
+        private final String method;
+        private final String path;
+        private final String intentSha256;
         private final String nonce;
         private final long expiresAtEpochMs;
 
@@ -102,7 +105,10 @@ public final class AdminHighRiskActionGate {
             if (action == null || !isCanonicalNonce(nonce)) {
                 throw new IllegalArgumentException("invalid reauthentication binding");
             }
-            this.action = action;
+            this.action = action.reauthenticationAction();
+            this.method = action.method();
+            this.path = action.path();
+            this.intentSha256 = action.intentSha256();
             this.nonce = nonce;
             this.expiresAtEpochMs = expiresAtEpochMs;
         }
@@ -113,6 +119,21 @@ public final class AdminHighRiskActionGate {
     }
 
     private AdminHighRiskActionGate() {}
+
+    /** Freeze the exact serialized body before password/TOTP reauthentication. */
+    public static Operation bindBody(Operation operation, byte[] body) {
+        if (operation == null || body == null) throw new IllegalArgumentException("operation and body are required");
+        String action = operation.reauthenticationAction();
+        String method = operation.method();
+        String path = operation.path();
+        String digest = AdminCanonicalEncoding.sha256Hex(body);
+        return new Operation() {
+            @Override public String reauthenticationAction() { return action; }
+            @Override public String method() { return method; }
+            @Override public String path() { return path; }
+            @Override public String intentSha256() { return digest; }
+        };
+    }
 
     public static Operation reportStatus(String reportId) {
         String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
@@ -278,9 +299,10 @@ public final class AdminHighRiskActionGate {
         if (!operationalWorkflowsEnabled) return denied("operational_workflows_locked");
         if (binding == null) return denied("reconfirmation_binding_required");
         if (binding.expiresAtEpochMs <= nowEpochMs) return denied("recent_reauthentication_required");
-        if (!binding.action.reauthenticationAction().equals(action.reauthenticationAction())
-            || !binding.action.method().equals(action.method())
-            || !binding.action.path().equals(action.path())) {
+        if (!binding.action.equals(action.reauthenticationAction())
+            || !binding.method.equals(action.method())
+            || !binding.path.equals(action.path())
+            || !java.util.Objects.equals(binding.intentSha256, action.intentSha256())) {
             return denied("reconfirmation_binding_mismatch");
         }
         return new Decision(

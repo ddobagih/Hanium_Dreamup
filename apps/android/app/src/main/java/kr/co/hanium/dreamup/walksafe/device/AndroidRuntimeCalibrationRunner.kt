@@ -205,6 +205,20 @@ class AndroidRuntimeCalibrationRunner(
             val required = manifest.fixtures.filter { it.required }
             require(required.isNotEmpty() && manifest.coverage.positiveFixtureIds.isNotEmpty() &&
                 manifest.coverage.emptyFixtureIds.isNotEmpty() && manifest.coverage.nearThresholdFixtureIds.isNotEmpty())
+            // A baseline that cannot satisfy the fixtures cannot establish a challenger's
+            // correctness. Detect that before expensive delegate creation, without relaxing roles.
+            currentCandidate = baselineCandidate
+            progress(RuntimeCalibrationStage.OUTPUT_CHECK)
+            for (fixture in required) {
+                val input = fixturePreprocessor.preprocessBilinear(fixtures.loadArgb(fixture), unified.inputSize)
+                val reference = correctnessOutput(input, baselineDetector, baselineCandidate, true)
+                if (!RuntimeCalibrationOutputGate.matchesFixtureRoles(
+                        reference.result.detections, reference.result.detections,
+                        RuntimeCalibrationFixtureRole.POSITIVE in fixture.roles,
+                        RuntimeCalibrationFixtureRole.EMPTY in fixture.roles,
+                        fixture.groundTruth.filter { !it.isCrowd }.map { it.className to it.bboxNorm },
+                    )) throw CandidateInconclusive("baseline_fixture_role_mismatch")
+            }
             queue = RuntimeSelectionPolicy.createCandidateQueue(
                 availableProcessors(), baselineCandidate, gpuSupported, restored = restoredQueue,
             )

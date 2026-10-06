@@ -19,7 +19,7 @@ class MainActivityMotionPeekStaticTest {
         val record = source.substringAfter("private fun recordRawCollectionDetectionMetadata(")
             .substringBefore("private fun revalidateRawCollectionRuntime(")
         assertFalse(record.contains("currentUserMotion("))
-        val task = record.indexOf("executeRawCollectionTask {")
+        val task = record.indexOf("rawMetadataTaskAdmission.submit(rawCollectionExecutor,")
         val activeCheck = record.indexOf("context.walk.state != WalkSessionState.ACTIVE")
         val epochCheck = record.indexOf("context.walk.epoch != expectedWalkEpoch")
         val consent = record.indexOf("val motionCollectionAllowed = context.consentSession.currentConfirmationOrNull(")

@@ -21,6 +21,7 @@ fun AndroidVoiceAction.uiDestination(): VoiceCommandUiDestination {
         AndroidVoiceAction.StartNavigation,
         -> VoiceCommandUiDestination.DESTINATION_SEARCH
         AndroidVoiceAction.OpenSettings -> VoiceCommandUiDestination.SETTINGS
+        is AndroidVoiceAction.DescribeDestinationCandidate,
         AndroidVoiceAction.RepeatDestinationCandidates,
         AndroidVoiceAction.SpeakCurrentGuidance,
         AndroidVoiceAction.SpeakVoiceHelp,

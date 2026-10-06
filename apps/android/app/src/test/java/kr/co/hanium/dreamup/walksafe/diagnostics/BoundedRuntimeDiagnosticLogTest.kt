@@ -141,6 +141,63 @@ class BoundedRuntimeDiagnosticLogTest {
     }
 
     @Test
+    fun accountDeletionRemovesExistingLogsDropsQueuedWritesAndRejectsLateRecords() {
+        val directory = temporary.newFolder("delete")
+        WriterHarness(directory).use { writer ->
+            writer.enqueue("event=BEFORE_DELETION")
+            writer.awaitIdle()
+            assertTrue(writer.current.exists())
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            writer.executor.execute { entered.countDown(); release.await(5L, TimeUnit.SECONDS) }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            try {
+                repeat(16) { writer.enqueue("event=QUEUED") }
+                assertTrue(writer.purge())
+                assertFalse(directory.exists())
+                writer.enqueue("event=LATE")
+            } finally { release.countDown() }
+            assertTrue(writer.executor.awaitTermination(5L, TimeUnit.SECONDS))
+            assertFalse(directory.exists())
+            assertTrue(writer.purge())
+        }
+    }
+
+    @Test
+    fun aWriteAlreadyStartedButWaitingForTheFileLockCannotRecreateDeletedFiles() {
+        val directory = temporary.newFolder("in-flight-delete")
+        WriterHarness(directory).use { writer ->
+            synchronized(writer.writeLock) {
+                writer.enqueue("event=IN_FLIGHT")
+                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+                while (writer.executor.activeCount == 0 && System.nanoTime() < deadline) Thread.yield()
+                assertEquals(1, writer.executor.activeCount)
+                assertTrue(writer.purge())
+            }
+            assertTrue(writer.executor.awaitTermination(5L, TimeUnit.SECONDS))
+            assertFalse(directory.exists())
+        }
+    }
+
+    @Test
+    fun deletionFailureIsReportedAndRetryRemainsPossibleWhileWritesStayBlocked() {
+        val directory = temporary.newFolder("delete-failure")
+        WriterHarness(directory).use { writer ->
+            writer.enqueue("event=BEFORE_DELETION")
+            writer.awaitIdle()
+            // Unknown leftover prevents declaring the directory deleted.
+            val leftover = File(directory, "leftover").apply { writeText("synthetic") }
+            assertFalse(writer.purge())
+            writer.enqueue("event=LATE")
+            assertTrue(writer.executor.awaitTermination(5L, TimeUnit.SECONDS))
+            assertFalse(writer.current.exists())
+            assertTrue(leftover.delete())
+            assertTrue(writer.purge())
+            assertFalse(directory.exists())
+        }
+    }
+
+    @Test
     fun initializeWritesTheStartRecordRightAfterCreatingTheWriter() {
         val source = listOf(
             "src/main/java/kr/co/hanium/dreamup/walksafe/diagnostics/BoundedRuntimeDiagnosticLog.kt",
@@ -163,6 +220,7 @@ class BoundedRuntimeDiagnosticLogTest {
         private val enqueueMethod = type.getDeclaredMethod(
             "enqueue", Long::class.javaPrimitiveType, String::class.java,
         ).apply { isAccessible = true }
+        val writeLock = type.getDeclaredField("writeLock").apply { isAccessible = true }.get(instance)
         val executor = type.getDeclaredField("executor").apply { isAccessible = true }
             .get(instance) as ThreadPoolExecutor
         private val droppedCounter = type.getDeclaredField("dropped").apply { isAccessible = true }
@@ -182,6 +240,10 @@ class BoundedRuntimeDiagnosticLogTest {
         fun enqueueRunStart() {
             runStartMethod.invoke(instance, 123L)
         }
+
+        fun purge(): Boolean = type.getDeclaredMethod("blockAndPurge").apply {
+            isAccessible = true
+        }.invoke(instance) as Boolean
 
         fun awaitIdle() {
             executor.submit {}.get(5L, TimeUnit.SECONDS)

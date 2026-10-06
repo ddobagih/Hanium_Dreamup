@@ -50,6 +50,23 @@ class PermissionRecoveryGateExplicitResumeTest {
         assertEquals(PermissionRecoveryGateState.CLEAR, gate.state)
     }
 
+    @Test
+    fun revokingAnyRequiredPermissionAfterRecheckBlocksResume() {
+        val required = WalkStartPermissionPolicy.required(activityRecognitionRequired = true)
+        for (revoked in required) {
+            val current = ObservedPermissionSnapshot(
+                cameraGranted = revoked != ObservedPermission.CAMERA,
+                preciseLocationGranted = revoked != ObservedPermission.PRECISE_LOCATION,
+                microphoneGranted = revoked != ObservedPermission.MICROPHONE,
+                activityRecognitionGranted = revoked != ObservedPermission.ACTIVITY_RECOGNITION,
+            )
+            val gate = awaitingGate().acknowledgeExplicitResume(current, required)
+            assertEquals(PermissionRecoveryGateState.BLOCKED, gate.state)
+            assertEquals(setOf(revoked), gate.affectedPermissions)
+            assertTrue(gate.blocksAutomaticResourceStart)
+        }
+    }
+
     private fun awaitingGate(): PermissionRecoveryGate =
         PermissionRecoveryGate().blocked(required).recheckRequired().completeFullRecheck(
             observed = observed(camera = true, location = true),

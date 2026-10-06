@@ -49,4 +49,7 @@ public interface AdminIncidentRepository {
         AdminIncidentModels.StatusRequest request,
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException;
+
+    /** Permanently closes this client and cancels its pending requests. */
+    default void cancelInFlightRequests() {}
 }

@@ -638,6 +638,7 @@ class AndroidFeedbackActuator private constructor(
         message: String,
         onFailed: () -> Unit,
         onCompleted: (() -> Unit)? = null,
+        onCancelled: (() -> Unit)? = onFailed,
     ): NavigationSpeechDispatchResult {
         if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
         if (ttsState != TtsState.READY) return NavigationSpeechDispatchResult.UNAVAILABLE
@@ -646,6 +647,7 @@ class AndroidFeedbackActuator private constructor(
             priority = SpeechPriority.INTERACTION,
             onCompleted = onCompleted,
             onFailed = onFailed,
+            onCancelled = onCancelled,
             requiresExplicitTerminalCallback = true,
             protectsFromFollowingSpeech = false,
         )
@@ -658,11 +660,13 @@ class AndroidFeedbackActuator private constructor(
         message: String,
         onCompleted: (() -> Unit)?,
         onFailed: (() -> Unit)?,
+        onCancelled: (() -> Unit)? = onFailed,
     ): NavigationSpeechDispatchResult = speak(
         message = message,
         priority = SpeechPriority.INTERACTION,
         onCompleted = onCompleted,
         onFailed = onFailed,
+        onCancelled = onCancelled,
         requiresExplicitTerminalCallback = true,
         protectsFromFollowingSpeech = false,
     )

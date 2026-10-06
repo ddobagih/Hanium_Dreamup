@@ -244,7 +244,9 @@ class MainActivityWalkScreenPortStaticTest {
 
     @Test
     fun lastSpokenInteractionStaysVisibleWithoutDuplicateLiveAnnouncement() {
-        val speak = blockAt("private fun speakInteraction(message: String): Boolean")
+        assertTrue(source.contains("private fun speakInteraction(message: String): Boolean = speakCommandResponse(message)"))
+        val speak = source.substringAfter("private fun speakCommandResponse(")
+            .substringBefore("\n    private fun ")
         val result = blockAt("private fun showWalkLastResult(message: String)")
         val view = blockAt("walkLastResultText = TextView(this).apply {")
 

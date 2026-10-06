@@ -58,11 +58,14 @@ class UnifiedTfliteAssetContractTest {
             "custom_tactile" to "custom_tactile_yolo26s_float32.tflite",
             "coco_general" to "coco_yolo26n_float32.tflite",
         )
+        val referencesRoot = File("src/androidTest/assets/runtime-candidates")
         val originalReference = "walksafe_unified_yolo26n_768_float32.tflite"
-        assertEquals("92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19", File(modelsRoot, originalReference).sha256())
+        assertEquals("92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19", File(referencesRoot, originalReference).sha256())
         val rollback = "walksafe_unified_yolo26n_768_float32_gpu_compatible.tflite"
-        assertEquals("25ef119d4f07e1bffbd4ac6827fa46a44a0fa3deaaedfb0c867e7c655f813559", File(modelsRoot, rollback).sha256())
-        assertTrue(modelsRoot.listFiles().orEmpty().map { it.name }.containsAll(expected.values + originalReference + rollback))
+        assertEquals("25ef119d4f07e1bffbd4ac6827fa46a44a0fa3deaaedfb0c867e7c655f813559", File(referencesRoot, rollback).sha256())
+        assertTrue(modelsRoot.listFiles().orEmpty().map { it.name }.containsAll(expected.values))
+        assertTrue("Historical references must not ship in the product APK",
+            listOf(originalReference, rollback).none { File(modelsRoot, it).exists() })
 
         expected.forEach { (modelKey, fileName) ->
             val configured = configuredModels.getJSONObject(modelKey)

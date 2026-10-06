@@ -16,6 +16,14 @@ internal fun rawRuntimeLatencyBucket(valueMs: Long): Int {
     return if (index < 0) RAW_RUNTIME_LATENCY_BUCKET_COUNT - 1 else index
 }
 
+/** Local producer identity, deliberately not serialized into the server payload. */
+class RawRuntimeWindowIdentity internal constructor(val sequence: Long)
+
+internal data class RawRuntimeWindowSnapshot(
+    val detection: RawDetectionMetadataSample,
+    val performance: RawPerformanceMetadataSample,
+)
+
 /**
  * One capture window of runtime counters for the raw PERFORMANCE/DETECTION pair.
  *
@@ -29,6 +37,7 @@ internal fun rawRuntimeLatencyBucket(valueMs: Long): Int {
  * Not thread-safe: MainActivity only touches it from the single raw collection executor.
  */
 internal class RawRuntimeWindowAccumulator {
+    private var snapshotSequence = 0L
     var walkSessionId: String? = null
         private set
     var windowStartedAtElapsedMs: Long = 0L
@@ -111,6 +120,23 @@ internal class RawRuntimeWindowAccumulator {
 
     fun windowElapsedMs(nowElapsedMs: Long): Long =
         if (windowOpen) nowElapsedMs - windowStartedAtElapsedMs else 0L
+
+    /** Both samples are frozen in one call on the owning raw executor, before its next update. */
+    fun snapshot(
+        windowStartedAtEpochMs: Long,
+        capturedAtEpochMs: Long,
+        detectorAvailable: Boolean,
+        thermalThrottled: Boolean?,
+    ): RawRuntimeWindowSnapshot {
+        snapshotSequence = Math.incrementExact(snapshotSequence)
+        val identity = RawRuntimeWindowIdentity(snapshotSequence)
+        return RawRuntimeWindowSnapshot(
+            detectionSample(windowStartedAtEpochMs, capturedAtEpochMs, detectorAvailable)
+                .copy(windowIdentity = identity),
+            performanceSample(windowStartedAtEpochMs, capturedAtEpochMs, thermalThrottled)
+                .copy(windowIdentity = identity),
+        )
+    }
 
     fun detectionSample(
         windowStartedAtEpochMs: Long,

@@ -1447,7 +1447,17 @@ def test_s18_7_middleware_exposes_the_high_risk_body_digest_to_the_authorizer() 
 
 
 @_PG
+@pytest.mark.parametrize(("action", "method", "path"), [
+    ("device.report_lost", "POST", "/admin/security/devices/android-device-0002/report-lost"),
+    ("admin.report.status.update", "PATCH", f"/admin/reports/{REPORT_ID}/status"),
+    ("admin.report_request.status.update", "PATCH", f"/admin/report-requests/{REPORT_ID}/status"),
+    ("admin.incident.status.update", "PATCH", f"/admin/incidents/{REPORT_ID}/status"),
+    ("admin.raw_collection.list", "GET", "/admin/raw-collections/quarantine"),
+    ("admin.raw_collection.purpose_decide", "POST", f"/admin/raw-collections/{REPORT_ID}/decisions"),
+    ("admin.raw_collection.legal_hold", "POST", f"/admin/raw-collections/{REPORT_ID}/legal-holds"),
+])
 def test_s18_7_postgres_bound_reconfirmation_is_consumed_only_by_its_exact_body(
+    action: str, method: str, path: str,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     clean_test_storage,
@@ -1466,8 +1476,7 @@ def test_s18_7_postgres_bound_reconfirmation_is_consumed_only_by_its_exact_body(
     )
     monkeypatch.setattr(database_api, "SessionLocal", SessionFactory)
     started_at = datetime.now(timezone.utc).replace(microsecond=0)
-    action = "device.report_lost"
-    path = "/admin/security/devices/android-device-0002/report-lost"
+    approved_body = b"" if method == "GET" else b"{}"
     try:
         with SessionFactory() as db:
             provision_admin_security(
@@ -1506,7 +1515,7 @@ def test_s18_7_postgres_bound_reconfirmation_is_consumed_only_by_its_exact_body(
                 lambda db: AdminSecurityService(db, settings).reauthenticate(
                     identity, password="s18-7 correct horse",
                     totp_code=pyotp.TOTP(totp_secret).at(at), action=action,
-                    method="POST", path=path, nonce=nonce, source="198.51.100.50",
+                    method=method, path=path, nonce=nonce, source="198.51.100.50",
                     now=at, intent_sha256=intent,
                 )
             )
@@ -1518,7 +1527,7 @@ def test_s18_7_postgres_bound_reconfirmation_is_consumed_only_by_its_exact_body(
                 )
                 try:
                     consumed = authorize_database_bound_high_risk_bearer(
-                        db, grant.access_token, action, at, method="POST", path=path,
+                        db, grant.access_token, action, at, method=method, path=path,
                         nonce=nonce, runtime_totp_secret=totp_secret,
                         credential_issuer_key=issuer_key, device_id=DEVICE_ID,
                     )
@@ -1539,24 +1548,24 @@ def test_s18_7_postgres_bound_reconfirmation_is_consumed_only_by_its_exact_body(
 
         bound_nonce = "AAECAwQFBgcICQoLDA0ODw"
         t1 = started_at + timedelta(seconds=30)
-        reauth(bound_nonce, t1, raw_body_sha256(b"{}"))
-        bound_digest = reconfirmation_nonce_sha256(bound_nonce, raw_body_sha256(b"{}"))
+        reauth(bound_nonce, t1, raw_body_sha256(approved_body))
+        bound_digest = reconfirmation_nonce_sha256(bound_nonce, raw_body_sha256(approved_body))
         # A different body (or no body digest at all) cannot use the bound approval.
         for other in (b'{"device_id":"android-device-0009"}', None):
             with pytest.raises(AdminSecurityError) as mismatch:
                 consume(bound_nonce, t1 + timedelta(seconds=1), other)
             assert mismatch.value.code == "admin_reconfirmation_required"
             assert consumed_at(bound_digest) is None
-        assert consume(bound_nonce, t1 + timedelta(seconds=2), b"{}").session_id == identity.session_id
+        assert consume(bound_nonce, t1 + timedelta(seconds=2), approved_body).session_id == identity.session_id
         assert consumed_at(bound_digest) is not None
         with pytest.raises(AdminSecurityError):
-            consume(bound_nonce, t1 + timedelta(seconds=3), b"{}")
+            consume(bound_nonce, t1 + timedelta(seconds=3), approved_body)
 
         # An unbound (legacy) reconfirmation keeps working for the exact path.
         legacy_nonce = "EBESExQVFhcYGRobHB0eHw"
         t2 = started_at + timedelta(seconds=60)
         reauth(legacy_nonce, t2, None)
-        consume(legacy_nonce, t2 + timedelta(seconds=1), b"{}")
+        consume(legacy_nonce, t2 + timedelta(seconds=1), approved_body)
         assert consumed_at(sha256_text(legacy_nonce)) is not None
     finally:
         clean_test_storage()

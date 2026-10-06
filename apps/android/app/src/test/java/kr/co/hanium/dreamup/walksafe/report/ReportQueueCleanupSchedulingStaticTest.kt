@@ -29,8 +29,9 @@ class ReportQueueCleanupSchedulingStaticTest {
     @Test
     fun jobPrunesWithoutReportActivityOrNetworkAndCanBeStopped() {
         assertTrue(service.contains("executor.submit {"))
-        assertTrue(service.contains("AndroidReportQueueStore(applicationContext.filesDir).pruneExpired()"))
+        assertTrue(service.contains("AndroidReportQueueStore(applicationContext.filesDir.canonicalFile).pruneExpired()"))
         assertTrue(service.contains("jobFinished(params, needsReschedule)"))
+        assertTrue(service.contains("needsReschedule = true"))
         assertTrue(service.contains("override fun onStopJob(params: JobParameters)"))
         assertTrue(service.contains("job.future?.cancel(true)"))
         assertFalse(service.contains("setRequiredNetworkType"))

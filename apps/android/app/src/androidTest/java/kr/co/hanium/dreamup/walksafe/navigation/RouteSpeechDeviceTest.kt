@@ -37,7 +37,8 @@ class RouteSpeechDeviceTest {
                 assertEquals("route_guidance", cue.reason)
                 assertEquals(1, cue.guideIndex)
                 assertTrue(cue.instruction?.contains("전체 경로는 약 333m") == true)
-                assertTrue(cue.instruction?.contains("왼쪽으로 꺾으세요") == true)
+                // No heading is supplied: current policy gives a recovery instruction, not a turn command.
+                assertTrue(cue.instruction?.contains("방향과 위치를 확인") == true)
                 dispatch(actuator, navigator, cue, terminal, terminalRouteTimeMs = 2_000L)
 
                 // Android TTS callbacks are posted to this main looper, which is still occupied.
@@ -160,6 +161,11 @@ class RouteSpeechDeviceTest {
                 terminal.received.countDown()
             },
             onFailed = {
+                terminal.failed.incrementAndGet()
+                navigator.releaseInstruction(cue, failedAtMs = terminalRouteTimeMs)
+                terminal.received.countDown()
+            },
+            onCancelled = {
                 terminal.failed.incrementAndGet()
                 navigator.releaseInstruction(cue, failedAtMs = terminalRouteTimeMs)
                 terminal.received.countDown()

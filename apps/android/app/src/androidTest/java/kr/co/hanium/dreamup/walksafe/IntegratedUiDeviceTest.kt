@@ -58,6 +58,69 @@ class IntegratedUiDeviceTest {
         }
     }
 
+    /** Synthetic candidates, real MainActivity/actuator/TTS callbacks. No route or report submitted. */
+    @Test fun candidateSpeechCancellationRetryAndDetailKeepSelectionAuthority() = withHome {
+        val state = kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState(
+            "시험 후보", (1..6).map {
+                kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchResult(
+                    "$it", "시험 후보 $it", kr.co.hanium.dreamup.walksafe.navigation.RoutePoint(37.5, 127.0),
+                    null, "시험로 12-$it", null, 100,
+                )
+            }, pageIndex = 1,
+        )
+        fun set(name: String, value: Any?) = MainActivity::class.java.getDeclaredField(name).apply {
+            isAccessible = true
+        }.set(activity, value)
+        fun selectable() = state.onCommand(
+            kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceCommand.SelectCandidate(4),
+        ).accepted
+        lateinit var tracker: kr.co.hanium.dreamup.walksafe.voice.CommandSpeechTracker
+        main {
+            assertFalse(call("isWalkSessionRuntimeActive") == true)
+            call("cancelVoiceCommandRecognition")
+            val page = field("nativeUiPage") as Enum<*>
+            call("showNativeUiPage", page.javaClass.enumConstants!!.first { (it as Enum<*>).name == "VOICE_COMMAND" })
+            set("destinationSearchQuery", state.query)
+            set("destinationSearchVoiceState", state)
+            tracker = field("commandSpeechTracker") as kr.co.hanium.dreamup.walksafe.voice.CommandSpeechTracker
+            set("commandSpeechOwner", tracker.begin(101))
+            try { assertTrue(call("speakHomeDestinationVoicePrompt", state, state.voicePrompt(), false) as Boolean) }
+            finally { set("commandSpeechOwner", null) }
+        }
+        waitUntil("First real candidate did not finish", 45_000L) { state.completedCandidateNumbers().contains(4) }
+        main {
+            assertFalse("A partly read page is not selectable", selectable())
+            call("cancelCommandSpeechResponse")
+            assertFalse(selectable())
+            assertEquals(kr.co.hanium.dreamup.walksafe.voice.CommandSpeechState.CANCELLED, tracker.progress(101).state)
+        }
+        SystemClock.sleep(500L)
+        main {
+            assertFalse("Late callbacks must not authorize the cancelled page", selectable())
+            set("commandSpeechOwner", tracker.begin(102))
+            try { assertTrue(call("speakHomeDestinationVoicePrompt", state, state.voicePrompt(), false) as Boolean) }
+            finally { set("commandSpeechOwner", null) }
+        }
+        waitUntil("Retry did not complete the real page", 75_000L) { selectable() }
+        val before = field("pendingUiDestination")
+        main {
+            assertEquals(setOf(4, 5, 6), state.completedCandidateNumbers())
+            assertEquals(kr.co.hanium.dreamup.walksafe.voice.CommandSpeechState.COMPLETED, tracker.progress(102).state)
+            set("commandSpeechOwner", tracker.begin(103))
+            try { call("describeVoiceDestinationCandidate", 4) }
+            finally { set("commandSpeechOwner", null) }
+        }
+        waitUntil("Detail did not complete real TTS", 45_000L) {
+            tracker.progress(103).state == kr.co.hanium.dreamup.walksafe.voice.CommandSpeechState.COMPLETED
+        }
+        main {
+            assertEquals("Detail must not select a destination", before, field("pendingUiDestination"))
+            call("cancelVoiceCommandRecognition")
+            call("clearNativeDestinationSearchState")
+        }
+        report("CANDIDATE_SEQUENCE real_tts=true cancelled_page_blocked=true retry_completed=true detail_read_only=true candidates=synthetic")
+    }
+
     @Test fun logoutFixtureAccountThroughRealHandler() {
         val expected = InstrumentationRegistry.getArguments().getString("logoutExpectedActorSha256")
         assumeTrue(expected != null)
@@ -103,6 +166,42 @@ class IntegratedUiDeviceTest {
         }
     }
 
+    @Test fun serverCandidateCompletionOpensMicrophoneAndPageExitPreventsReopen() = withHome {
+        assertTrue("This probe targets the shipped server STT configuration", BuildConfig.WALKSAFE_SERVER_STT_ENABLED)
+        val state = kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState(
+            "시험 목적지", listOf(kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchResult(
+                "test-1", "시험역", kr.co.hanium.dreamup.walksafe.navigation.RoutePoint(37.5, 127.0),
+                null, "시험로 12-3", null, 100)),
+        )
+        fun set(name: String, value: Any?) = MainActivity::class.java.getDeclaredField(name)
+            .apply { isAccessible = true }.set(activity, value)
+        fun prompt() {
+            val page = field("nativeUiPage") as Enum<*>
+            call("showNativeUiPage", page.javaClass.enumConstants!!.single { (it as Enum<*>).name == "DESTINATION_SEARCH" })
+            set("destinationSearchQuery", state.query)
+            set("destinationSearchVoiceState", state)
+            assertTrue(call("speakHomeDestinationVoicePrompt", state, state.voicePrompt(), true) as Boolean)
+        }
+        main { call("cancelVoiceCommandRecognition"); prompt() }
+        waitUntil("Real server capture did not follow candidate TTS completion", 65000) {
+            field("gatewayVoiceRecorder") != null && field("voiceRecognitionActive") == true
+        }
+        main {
+            assertEquals(setOf(1), state.completedCandidateNumbers())
+            assertEquals("DESTINATION_SEARCH", field("nativeUiPage").toString())
+            call("cancelVoiceCommandRecognition")
+            prompt()
+            call("cancelNativeVoiceCommandAndReturnHome")
+            assertEquals("HOME", field("nativeUiPage").toString())
+        }
+        val until = SystemClock.elapsedRealtime() + 10000
+        while (SystemClock.elapsedRealtime() < until) {
+            main { assertNull(field("gatewayVoiceRecorder")); assertFalse(field("voiceRecognitionActive") as Boolean) }
+            SystemClock.sleep(100)
+        }
+        report("SERVER_CANDIDATE real_tts_done_before_capture=true real_recorder=true results_page_preserved=true explicit_exit_no_reopen_10s=true candidates=synthetic human_stt_accuracy=NOT_TESTED")
+    }
+
     @Test fun fullScreenHelpButtonsAndBackRestoreHome() = withHome {
         main { assertTrue(views(activity.window.decorView).filterIsInstance<Button>().single { it.isShown && it.text == "도움말" }.performClick()) }
         waitUntil("Help overlay absent") { (field("voiceHelpScreen") as? View)?.isShown == true }
@@ -119,6 +218,42 @@ class IntegratedUiDeviceTest {
         }
         main { activity.onBackPressed(); assertNull(field("voiceHelpScreen")); assertEquals("HOME", field("nativeUiPage").toString()) }
         report("HELP full_screen=true four_topic_buttons=true back_restores_home=true; spoken_content=NOT_HUMAN_VERIFIED")
+    }
+
+    @Test fun serverInputSilencingShowsCauseAndManualRetry() = withHome {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("allowRecorderAppOpTest") == "true")
+        val original = requireNotNull(InstrumentationRegistry.getArguments().getString("originalRecordAudioUidMode"))
+        require(original in setOf("foreground", "allow", "default"))
+        fun mode(value: String) {
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
+                "cmd appops set --uid ${activity.packageName} RECORD_AUDIO $value",
+            )).use { assertTrue(it.readBytes().toString(Charsets.UTF_8).isBlank()) }
+        }
+        try {
+            waitUntil("Home microphone not ready") { call("homeVoiceCommandAvailable") == true }
+            main { views(activity.window.decorView).filterIsInstance<Button>().single { it.isShown && it.text == "음성 명령" }.performClick() }
+            waitUntil("Actual server microphone did not start") { field("gatewayVoiceRecorder") != null && field("voiceRecognitionActive") == true }
+            mode("ignore")
+            waitUntil("Silenced recording did not expose recovery", 10000) {
+                field("gatewayVoiceRecorder") == null && (field("voiceCommandErrorPanel") as View).isShown
+            }
+            main {
+                assertFalse(field("voiceRecognitionActive") as Boolean)
+                assertEquals(kr.co.hanium.dreamup.walksafe.voice.MICROPHONE_INPUT_SILENCED_GUIDANCE,
+                    (field("voiceCommandErrorText") as android.widget.TextView).text.toString())
+                assertEquals("다시 시도", (field("voiceCommandErrorAction") as Button).text.toString())
+            }
+            screenshot("full-review-microphone-silenced")
+            mode(original)
+            waitUntil("Cause speech never finished", 30000) { call("isHandsFreeVoiceOutputActive") != true }
+            main {
+                assertNull("Restoring permission alone must not resume capture", field("gatewayVoiceRecorder"))
+                (field("voiceCommandErrorAction") as Button).performClick()
+            }
+            waitUntil("Explicit retry did not reopen real capture", 20000) { field("gatewayVoiceRecorder") != null && field("voiceRecognitionActive") == true }
+            main { call("cancelVoiceCommandRecognition") }
+            report("SERVER_SILENCED_UI native_appop=true cause_visible=true manual_retry=true no_passive_restart=true")
+        } finally { mode(original) }
     }
 
     @Test fun guidancePreviewShieldRequiresContinuousThreeSecondHold() = withHome {
@@ -185,7 +320,8 @@ class IntegratedUiDeviceTest {
         main {
             call("cancelVoiceCommandRecognition")
             call("speakCommandResponse", "현재 위치와 휴대전화 상태를 확인하고 있습니다.", false,
-                { statusSpoken = true }, { statusFailed = true }, false)
+                { statusSpoken = true }, { statusFailed = true }, false,
+                listOf("현재 위치와 휴대전화 상태를 확인하고 있습니다."), { _: Int -> }, { true })
         }
         waitUntil("Preparation status speech did not complete", 20000) { statusSpoken || statusFailed }
         main { assertTrue("A pending sensor check must not block real status TTS", statusSpoken && !statusFailed) }
@@ -244,7 +380,7 @@ class IntegratedUiDeviceTest {
     }
 
     @Test fun reportRecoveryCannotOverlapCloseOrSendWithoutWalk() = withHome {
-        main { call("openReportPanel") }
+        main { call("openReportPanel", false) }
         waitUntil("Report dialog absent") { (field("reportPanelDialog") as? android.app.Dialog)?.isShowing == true }
         instrumentation.waitForIdleSync()
         main {

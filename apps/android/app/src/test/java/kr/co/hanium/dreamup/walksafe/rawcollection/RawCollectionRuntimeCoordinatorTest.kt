@@ -48,6 +48,43 @@ import org.junit.Test
 
 class RawCollectionRuntimeCoordinatorTest {
     @Test
+    fun withdrawingRuntimeAuthorityBlocksCaptureAndTransferDespiteCachedConsent() {
+        val fixture = fixture()
+        val active = fixture.context(WalkSessionState.ACTIVE).copy(session = null)
+        assertEquals(RawMetadataCaptureResult.GATE_BLOCKED,
+            fixture.coordinator.captureMetadataBatch(active, detectionSample(), performanceSample()))
+        val ended = fixture.context(WalkSessionState.ENDED).copy(session = null)
+        assertEquals(RawReadyStatus.GateBlocked(RawCollectionGateReason.SESSION),
+            fixture.coordinator.readyStatus(ended))
+        assertNull(fixture.coordinator.startNextUpload { ended })
+    }
+
+    @Test
+    fun sameTimesAndCountsCannotJoinTwoDifferentProducerSnapshots() {
+        val fixture = fixture()
+        fun snapshot(): RawRuntimeWindowSnapshot {
+            val accumulator = RawRuntimeWindowAccumulator()
+            accumulator.recordCompletedInference(
+                WALK_ID, 0L, 1, 20L, 0, "model-v1", detectionSample().runtimeIdentity,
+            )
+            return accumulator.snapshot(NOW_EPOCH_MS - 30_000L, NOW_EPOCH_MS, true, false)
+        }
+        val first = snapshot()
+        val second = snapshot()
+        // Both independent producers start at sequence 1. Compare identity, not just that number.
+        assertEquals(first.detection.windowIdentity!!.sequence, second.performance.windowIdentity!!.sequence)
+        assertEquals(RawMetadataCaptureResult.INVALID_WINDOW, fixture.coordinator.captureMetadataBatch(
+            fixture.context(WalkSessionState.ACTIVE), first.detection, second.performance,
+        ))
+        assertEquals(RawMetadataCaptureResult.INVALID_WINDOW, fixture.coordinator.captureMetadataBatch(
+            fixture.context(WalkSessionState.ACTIVE), first.detection.copy(windowIdentity = null), first.performance,
+        ))
+        assertEquals(RawMetadataCaptureResult.CAPTURED, fixture.coordinator.captureMetadataBatch(
+            fixture.context(WalkSessionState.ACTIVE), first.detection, first.performance,
+        ))
+    }
+
+    @Test
     fun captureNeedsV7DeviceConsentAndActiveWalkThenSealsOnlyAfterTheWalk() {
         val fixture = fixture()
         val sample = detectionSample()
@@ -551,6 +588,14 @@ class RawCollectionRuntimeCoordinatorTest {
     }
 
     @Test
+    fun endedWalkListingFailureDoesNotCrashOrClaimSuccessfulCleanup() {
+        val f = fixture()
+        f.storage.failListing = true
+        assertEquals(-1, f.coordinator.discardEndedPartials(f.context(WalkSessionState.ENDED)))
+        assertEquals(0, f.client.calls)
+    }
+
+    @Test
     fun captureListingFailureIsAStorageFailureNotAnEmptyNewSegment() {
         val f = fixture()
         f.storage.failListing = true
@@ -559,9 +604,87 @@ class RawCollectionRuntimeCoordinatorTest {
         assertEquals(0, f.storage.collectionCount)
     }
 
+    @Test
+    fun retryAfterHoldsTheOwnerUntilMonotonicDeadlineWithoutDeletingTheSegment() {
+        var elapsed = NOW_ELAPSED_MS
+        val f = fixture(elapsedClock = { elapsed })
+        prepareUpload(f)
+        f.client.httpFailure = 429
+        f.client.retryAfterHeader = "60"
+        assertEquals(RawCollectionUploadOutcome.RETRYABLE_FAILURE,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(1, f.storage.collectionCount)
+        elapsed += 59_999L
+        assertNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        assertEquals(RawReadyStatus.GateBlocked(RawCollectionGateReason.RETRY_DELAY),
+            f.coordinator.uploadStatus(f.context(WalkSessionState.ENDED)))
+        assertEquals(1, f.client.calls)
+        elapsed += 1L
+        f.client.httpFailure = null
+        assertEquals(RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(0, f.storage.collectionCount)
+    }
+
+    @Test
+    fun unexpectedClientFailureReleasesUploadAndErasesPlaintextForRetry() {
+        for (duringFactory in listOf(true, false)) {
+            val f = fixture()
+            prepareUpload(f)
+            f.client.factoryFails = duringFactory
+            if (!duringFactory) f.client.beforeReturn = { throw IllegalStateException("synthetic failure") }
+            assertEquals(RawCollectionUploadOutcome.RETRYABLE_FAILURE,
+                requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+            assertTrue(f.client.lastPlaintexts.isNotEmpty())
+            assertTrue(f.client.lastPlaintexts.all { bytes -> bytes.all { it == 0.toByte() } })
+            assertEquals(1, f.storage.collectionCount)
+            f.client.factoryFails = false
+            f.client.beforeReturn = null
+            assertEquals(RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT,
+                requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        }
+    }
+
+    @Test
+    fun localReceiptWriteExceptionIsNotReportedAsSuccessfulDeletion() {
+        val f = fixture()
+        prepareUpload(f)
+        f.storage.throwOnManifestWrite = true
+        assertEquals(RawCollectionUploadOutcome.LOCAL_READ_FAILED,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(1, f.storage.collectionCount)
+        assertTrue(f.client.lastPlaintexts.all { bytes -> bytes.all { it == 0.toByte() } })
+        f.storage.throwOnManifestWrite = false
+        assertEquals(RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+    }
+
+    @Test
+    fun onePruneRemovesExpiredCompleteCollectionAndFailedDeleteRemainsRetryable() {
+        for (failFirst in listOf(false, true)) {
+            var now = NOW_EPOCH_MS
+            val f = fixture(clock = { now })
+            prepareUpload(f)
+            now = f.store.readyManifests(OWNER).single().expiresAtEpochMs - 1L
+            assertEquals(0, f.coordinator.pruneExpired())
+            assertEquals(1, f.storage.collectionCount)
+            now += 1L
+            f.storage.failDelete = failFirst
+            assertEquals(if (failFirst) 0 else 1, f.coordinator.pruneExpired())
+            assertEquals(if (failFirst) 1 else 0, f.storage.collectionCount)
+            if (failFirst) {
+                f.storage.failDelete = false
+                assertEquals(1, f.coordinator.pruneExpired())
+            }
+            assertEquals(0, f.coordinator.pruneExpired())
+            assertEquals(0, f.storage.collectionCount)
+        }
+    }
+
     private fun fixture(
         storeNowEpochMs: Long = NOW_EPOCH_MS,
         clock: () -> Long = { storeNowEpochMs },
+        elapsedClock: () -> Long = { NOW_ELAPSED_MS },
     ): RuntimeFixture {
         val storage = RuntimeFakeStorage()
         val aead = RuntimeFakeAead()
@@ -571,7 +694,7 @@ class RawCollectionRuntimeCoordinatorTest {
             store = store,
             client = client,
             idFactory = { UUID.fromString(COLLECTION_ID) },
-            elapsedRealtimeMs = { NOW_ELAPSED_MS },
+            elapsedRealtimeMs = elapsedClock,
             minimumCaptureIntervalMs = 30_000L,
             testOnly = Unit,
         )
@@ -590,6 +713,7 @@ class RawCollectionRuntimeCoordinatorTest {
     }
 
     private fun detectionSample() = RawDetectionMetadataSample(
+        windowIdentity = fixtureRawCollectionRuntimeCoordinatorTestWindowIdentity,
         runtimeIdentity = RawDetectorRuntimeIdentity(
             modelArtifactSha256 = "1".repeat(64),
             runtimeConfigSha256 = "2".repeat(64),
@@ -609,6 +733,7 @@ class RawCollectionRuntimeCoordinatorTest {
     private fun performanceSample(
         thermalThrottled: Boolean? = false,
     ) = RawPerformanceMetadataSample(
+        windowIdentity = fixtureRawCollectionRuntimeCoordinatorTestWindowIdentity,
         windowStartedAtEpochMs = NOW_EPOCH_MS - 30_000L,
         capturedAtEpochMs = NOW_EPOCH_MS,
         processedFrameCount = 30,
@@ -763,6 +888,8 @@ private class RuntimeFakeClient : RawCollectionNetworkClient {
     var calls = 0
     var beforeReturn: (() -> Unit)? = null
     var httpFailure: Int? = null
+    var retryAfterHeader: String? = null
+    var factoryFails = false
     var lastPlaintexts: List<ByteArray> = emptyList()
     var lastPayloadSnapshots: List<ByteArray> = emptyList()
     var lastChunkMetadata: List<RawChunkMetadata> = emptyList()
@@ -780,10 +907,11 @@ private class RuntimeFakeClient : RawCollectionNetworkClient {
         lastPlaintexts = chunks.map(RawPlaintextChunk::plaintext)
         lastPayloadSnapshots = chunks.map { it.plaintext.copyOf() }
         lastChunkMetadata = chunks.map(RawPlaintextChunk::metadata)
+        if (factoryFails) throw IllegalStateException("synthetic factory failure")
         return CancellableNetworkCall.blocking {
             check(isCurrent())
             beforeReturn?.invoke()
-            httpFailure?.let { throw RawCollectionHttpException(it) }
+            httpFailure?.let { throw RawCollectionHttpException(it, retryAfterHeader = retryAfterHeader) }
             exactRuntimeReceipt(backendManifest)
         }
     }
@@ -813,6 +941,7 @@ private fun exactRuntimeReceipt(manifest: BackendRawManifest): RawCollectionRece
 }
 
 private class RuntimeFakeStorage : RawCollectionStorage {
+    var throwOnManifestWrite = false
     private var activeId: String? = null
     private val manifests = mutableMapOf<String, String>()
     private val chunks = mutableMapOf<Pair<String, Int>, String>()
@@ -836,6 +965,7 @@ private class RuntimeFakeStorage : RawCollectionStorage {
     }
     override fun readManifest(collectionId: String): String? = manifests[collectionId]
     override fun writeManifestAtomically(collectionId: String, envelope: String): Boolean {
+        if (throwOnManifestWrite) throw IllegalStateException("synthetic local write failure")
         manifests[collectionId] = envelope
         return true
     }
@@ -895,3 +1025,5 @@ private class RuntimeFakeAead : LocalAead {
     }
     override fun createFreshAfterVerifiedPurge(): Boolean = true
 }
+
+private val fixtureRawCollectionRuntimeCoordinatorTestWindowIdentity = RawRuntimeWindowIdentity(1L)

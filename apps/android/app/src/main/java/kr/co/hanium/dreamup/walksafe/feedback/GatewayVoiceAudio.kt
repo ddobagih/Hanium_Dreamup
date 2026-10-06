@@ -6,10 +6,12 @@ import android.media.MediaRecorder
 import android.os.SystemClock
 import android.os.Handler
 import android.os.Looper
+import android.os.Build
 import java.io.File
 
 internal class ForegroundAacRecorder(
     private val cacheDirectory: File,
+    private val onInputSilenced: (() -> Unit)? = null,
     private val onLimitReached: () -> Unit,
 ) {
     private data class ActiveRecording(
@@ -27,6 +29,14 @@ internal class ForegroundAacRecorder(
         val poll = object : Runnable {
             override fun run() {
                 if (active !== recording) return
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                    runCatching { recording.recorder.activeRecordingConfiguration?.isClientSilenced }.getOrNull() == true
+                ) {
+                    // Never upload OS-silenced audio as if the user simply did not speak.
+                    cancel()
+                    onInputSilenced?.invoke()
+                    return
+                }
                 val amplitude = runCatching { recording.recorder.maxAmplitude }.getOrDefault(0)
                 if (endpoint.shouldStop(SystemClock.elapsedRealtime(), amplitude)) {
                     silencePoll = null
@@ -114,8 +124,8 @@ internal class ForegroundAacRecorder(
     private companion object {
         const val AUDIO_SAMPLE_RATE_HZ = 16_000
         const val AUDIO_BIT_RATE = 64_000
-        const val MAX_RECORDING_DURATION_MS = 12_000
-        const val MAX_RECORDING_DURATION_WITH_STOP_GRACE_MS = 14_000L
+        const val MAX_RECORDING_DURATION_MS = SpeechEndpointPolicy.MAX_RECORDING_DURATION_MS
+        const val MAX_RECORDING_DURATION_WITH_STOP_GRACE_MS = MAX_RECORDING_DURATION_MS + 2_000L
         const val MAX_RECORDING_BYTES = 1 * 1024 * 1024
     }
 }

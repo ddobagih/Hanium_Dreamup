@@ -445,7 +445,7 @@ class MainActivityFirstRunRegistrationStaticTest {
             functionBlock("private fun drainInitialExactReportQueue("),
             "val context = reportQueueDrainContext(trigger)",
             "if (!context.allRequiredBaseGatesAllowed()) break",
-            "reportQueueDrainCoordinator.startNext(",
+            "reportQueueDrainCoordinator.startNextWithResult(",
             "call.execute()",
         )
     }

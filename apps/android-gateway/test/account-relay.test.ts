@@ -8,6 +8,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 
 import {
   ACCOUNT_UPSTREAM_RESPONSE_LIMIT_BYTES,
+  ACCOUNT_ENROLLMENT_UPSTREAM_TIMEOUT_MS,
   SIGNUP_CONSENT_DOCUMENT_KEYS,
   parsePasswordGrant,
   relayAccountCreation,
@@ -1957,5 +1958,57 @@ test("S19-51 signup relays allow only the bounded backend validation 422", async
         detail: { code: "gateway_account_upstream_invalid" }
       }, name);
     }
+  }
+});
+
+
+test("OTP relay allows a slow SMTP result but bounds a stalled send without retrying", async (t) => {
+  const originalTimeout = AbortSignal.timeout.bind(AbortSignal);
+  const budgets: number[] = [];
+  // Scale fetch deadlines: a 20 s send is 200 ms and the 40 s limit is 400 ms.
+  t.mock.method(AbortSignal, "timeout", (ms: number) => {
+    budgets.push(ms);
+    return originalTimeout(ms === 40_000 || ms === 15_000 ? ms / 100 : ms);
+  });
+  for (const [delayMs, expectedStatus] of [[200, 202], [700, 504]] as const) {
+    let calls = 0;
+    const response = await relayAccountEnrollment(
+      postJson("/api/account-enrollments/email-otp", enrollmentBody(), {
+        "cf-connecting-ip": "198.51.100.222"
+      }),
+      async (_input, init) => {
+        calls++;
+        return new Promise<Response>((resolve, reject) => {
+          const signal = init!.signal!;
+          const timer = setTimeout(() => {
+            signal.removeEventListener("abort", abort);
+            resolve(Response.json({
+              schema_version: "walksafe.account-enrollment-email-otp-response.v1",
+              enrollment_handle: ENROLLMENT_HANDLE,
+              expires_at: "2026-08-29T12:10:00Z",
+              resend_available_at: "2026-08-29T12:01:00Z"
+            }, { status: 202 }));
+          }, delayMs);
+          function abort() { clearTimeout(timer); reject(signal.reason); }
+          signal.addEventListener("abort", abort, { once: true });
+        });
+      }
+    );
+    assert.equal(response.status, expectedStatus);
+    assert.equal(calls, 1, "timeouts must not silently send a second OTP request");
+    if (expectedStatus === 504) {
+      assert.deepEqual(await response.json(), { detail: { code: "gateway_upstream_timeout" } });
+    }
+  }
+  assert.equal(ACCOUNT_ENROLLMENT_UPSTREAM_TIMEOUT_MS, 40_000);
+  assert.ok(budgets.includes(40_000));
+  assert.ok(!budgets.includes(15_000));
+});
+
+test("S01-8 shared email vectors preserve canonical account identity", async () => {
+  const fixture = JSON.parse(await readFile(path.resolve("../../contracts/test-vectors/account-email.json"), "utf8"));
+  for (const { input, canonical } of fixture.vectors) {
+    assert.equal(parsePasswordGrant({ grant_type: "password", email: input,
+      password: "valid long passphrase", remember_me: false })?.email ?? null, canonical, input);
   }
 });

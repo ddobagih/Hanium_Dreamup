@@ -566,6 +566,7 @@ android {
         testBuildType = "mobileSam"
     }
     sourceSets.getByName("mobileSam").kotlin.directories.add("src/debug/java")
+    sourceSets.getByName("androidTest").assets.srcDir("../../../contracts/test-vectors")
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
@@ -734,6 +735,9 @@ androidComponents {
 }
 
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty("walksafe.test.expectedQueue", developmentReportQueue || reportQueueEnabled)
+    systemProperty("walksafe.test.expectedQuickStart", developmentQuickStart)
+    systemProperty("walksafe.test.expectedBypass", debugGuidanceStartBypass)
     // macOS exposes /var through a symlink. Test fixtures need a real path so the production
     // storage symlink rejection is tested, rather than rejecting every TemporaryFolder at /var.
     systemProperty("java.io.tmpdir", File(System.getProperty("java.io.tmpdir")).canonicalPath)
@@ -760,6 +764,8 @@ dependencies {
     implementation("org.opencv:opencv:4.13.0")
 
     testImplementation("junit:junit:4.13.2")
+    // Host tests bridge Android ICU IDNA to the real ICU4J implementation; not bundled in the APK.
+    testImplementation("com.ibm.icu:icu4j:76.1")
     testImplementation("org.json:json:20240303")
     testImplementation("org.tensorflow:tensorflow-lite-metadata:0.2.0")
 

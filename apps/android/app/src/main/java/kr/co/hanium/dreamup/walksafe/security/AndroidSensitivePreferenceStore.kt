@@ -202,7 +202,7 @@ internal class AndroidSensitivePreferenceStore private constructor(
             updates.forEach { (key, value) ->
                 if (value == null) next.remove(key) else next[key] = value
             }
-            persist(next)
+            if (!clearRequested && next == values) true else persist(next)
         }
     }
 

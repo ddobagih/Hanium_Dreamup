@@ -50,7 +50,8 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(navigation.contains("return deliver()"))
         assertFalse(source.contains("private fun dispatchNavigationTalkBackFallback("))
         val interaction = functionBlock("private fun speakInteraction(")
-        val commandResponse = functionBlock("private fun speakCommandResponse(")
+        val commandResponse = source.substringAfter("private fun speakCommandResponse(")
+            .substringBefore("\n    private fun ")
         assertTrue(interaction.contains("speakCommandResponse(message)"))
         assertFalse(interaction.contains("announceForTalkBack("))
         assertTrue(commandResponse.contains("commandSpeechResponseCallbacks.registerLatest("))
@@ -58,14 +59,19 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(commandResponse.contains("val failed: () -> Unit = {"))
         assertTrue(
             commandResponse.contains(
-                "actuator.speakHomeCommandInteraction(message, onFailed = failed, onCompleted = completed)",
+                "actuator.speakHomeCommandInteraction(",
             ),
         )
         assertTrue(
             commandResponse.contains(
-                "actuator.speakInteraction(message, onCompleted = completed, onFailed = failed)",
+                "actuator.speakInteraction(",
             ),
         )
+        assertTrue(commandResponse.contains("CommandSpeechSequence("))
+        assertTrue(commandResponse.contains("onCompleted = { runOnUiThread { done() } }"))
+        assertTrue(commandResponse.contains("onFailed = { runOnUiThread { failedPart() } }"))
+        assertTrue(commandResponse.contains("onCompleted = completed"))
+        assertTrue(commandResponse.contains("onFailed = failed"))
         assertFalse(commandResponse.contains("isScreenReaderActive()"))
         assertFalse(commandResponse.contains("announceForTalkBack("))
     }
@@ -171,12 +177,16 @@ class MainActivityAccessibilityStaticTest {
             assertTrue(reasons.contains(reasonText))
         }
 
-        val item = presentation.indexOf("permission.labelKo()")
-        val reason = presentation.indexOf("permission.denialReasonKo()")
+        val explanation = presentation.indexOf("PermissionExplanationPolicy.withoutResult(")
+        val message = presentation.indexOf(").messageKo()")
         val actions = presentation.indexOf("permissionDenialConfirmButton.text")
-        assertTrue(item >= 0)
-        assertTrue(reason > item)
-        assertTrue(actions > reason)
+        assertTrue(explanation >= 0)
+        assertTrue(message > explanation)
+        assertTrue(actions > message)
+        val messageBody = functionBlock("private fun PermissionExplanation.messageKo()")
+        assertTrue(messageBody.contains("unavailablePermissions"))
+        assertTrue(messageBody.contains("reRequestabilityByPermission[permission]"))
+        assertTrue(messageBody.contains("PermissionLocationState.APPROXIMATE_ONLY"))
         assertTrue(presentation.contains("permissionDenialSummaryText.contentDescription = message"))
         assertFalse(presentation.contains("원인: \$reason"))
         assertFalse(presentation.contains("permission_result_walk_session"))
@@ -380,7 +390,8 @@ class MainActivityAccessibilityStaticTest {
             .substringAfter("private fun speakNavigation(message: String, onCompleted: (() -> Unit)? = null)")
             .substringBefore("private fun speakInteraction(message: String)")
         val interaction = functionBlock("private fun speakInteraction(")
-        val commandResponse = functionBlock("private fun speakCommandResponse(")
+        val commandResponse = source.substringAfter("private fun speakCommandResponse(")
+            .substringBefore("\n    private fun ")
 
         assertTrue(source.contains("private var feedbackLifecycleGeneration = 0"))
         assertTrue(lifecycle.contains("feedbackLifecycleGeneration += 1\n        isActivityForeground = true"))

@@ -44,7 +44,7 @@ class GatewaySessionServerCodePreservationTest {
             ),
         )
         val error = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).loginWithPassword(
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).loginWithPassword(
                 gatewayBaseUrl = "http://127.0.0.1:8081",
                 email = "walker@example.test",
                 password = "Valid-password-123!",
@@ -123,7 +123,7 @@ class GatewaySessionServerCodePreservationTest {
                 headers = mapOf("Retry-After" to "1"),
             ),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val source = session()
         val first = assertThrows(GatewaySessionHttpException::class.java) {
             client.renew(source, ACTOR_ID, nowEpochMs = NOW + 1L)
@@ -166,7 +166,7 @@ class GatewaySessionServerCodePreservationTest {
             ),
         )
         val error = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).loginWithPassword(
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).loginWithPassword(
                 gatewayBaseUrl = "http://127.0.0.1:8081",
                 email = "walker@example.test",
                 password = "Valid-password-123!",
@@ -202,7 +202,7 @@ class GatewaySessionServerCodePreservationTest {
 
     private fun refreshFailure(transport: ErrorTransport): GatewaySessionHttpException =
         assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).renew(
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).renew(
                 session(),
                 ACTOR_ID,
                 nowEpochMs = NOW + 1L,

@@ -120,6 +120,38 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
         this.transport = transport;
     }
 
+    static byte[] purposeBody(AdminRawCollectionModels.PurposeDecisionRequest request) {
+        if (request == null) throw new IllegalArgumentException("decision request is required");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("scope", request.scope());
+        fields.put("decision", request.decision());
+        fields.put("expected_revision", request.expectedRevision());
+        fields.put("idempotency_key", request.idempotencyKey());
+        fields.put("reason", request.reason());
+        fields.put("training_consent_receipt_sha256", request.trainingConsentReceiptSha256());
+        fields.put("deidentification_receipt_sha256", request.deidentificationReceiptSha256());
+        fields.put("sanitized_manifest_sha256", request.sanitizedManifestSha256());
+        fields.put("target_dataset_id", request.targetDatasetId());
+        fields.put("exact_location_excluded", request.exactLocationExcluded());
+        fields.put("raw_audio_excluded", request.rawAudioExcluded());
+        fields.put("third_party_faces_excluded", request.thirdPartyFacesExcluded());
+        return AdminCanonicalEncoding.canonicalJsonBytes(fields);
+    }
+
+    static byte[] legalHoldBody(AdminRawCollectionModels.LegalHoldRequest request) {
+        if (request == null) throw new IllegalArgumentException("legal hold request is required");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("action", request.action());
+        fields.put("expected_revision", request.expectedRevision());
+        fields.put("idempotency_key", request.idempotencyKey());
+        fields.put("reason", request.reason());
+        fields.put("legal_basis", request.legalBasis());
+        fields.put("authority_reference", request.authorityReference());
+        fields.put("contact", request.contact());
+        fields.put("expires_at", request.expiresAt());
+        return AdminCanonicalEncoding.canonicalJsonBytes(fields);
+    }
+
     @Override
     public AdminRawCollectionModels.Page listQuarantine(
         AdminOperationsApi.SessionContext session,
@@ -152,21 +184,7 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
         String safeId = AdminRawCollectionModels.canonicalUuid(
             source.collectionId(), "collection_id"
         );
-        if (request == null) throw new IllegalArgumentException("decision request is required");
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("scope", request.scope());
-        fields.put("decision", request.decision());
-        fields.put("expected_revision", request.expectedRevision());
-        fields.put("idempotency_key", request.idempotencyKey());
-        fields.put("reason", request.reason());
-        fields.put("training_consent_receipt_sha256", request.trainingConsentReceiptSha256());
-        fields.put("deidentification_receipt_sha256", request.deidentificationReceiptSha256());
-        fields.put("sanitized_manifest_sha256", request.sanitizedManifestSha256());
-        fields.put("target_dataset_id", request.targetDatasetId());
-        fields.put("exact_location_excluded", request.exactLocationExcluded());
-        fields.put("raw_audio_excluded", request.rawAudioExcluded());
-        fields.put("third_party_faces_excluded", request.thirdPartyFacesExcluded());
-        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
+        byte[] body = purposeBody(request);
         Response response = executeProtected(
             boundSession,
             "POST",
@@ -194,17 +212,7 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
     ) throws IOException, GeneralSecurityException {
         AdminOperationsApi.SessionContext boundSession = requireSession(session);
         String safeId = AdminRawCollectionModels.canonicalUuid(collectionId, "collection_id");
-        if (request == null) throw new IllegalArgumentException("legal hold request is required");
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("action", request.action());
-        fields.put("expected_revision", request.expectedRevision());
-        fields.put("idempotency_key", request.idempotencyKey());
-        fields.put("reason", request.reason());
-        fields.put("legal_basis", request.legalBasis());
-        fields.put("authority_reference", request.authorityReference());
-        fields.put("contact", request.contact());
-        fields.put("expires_at", request.expiresAt());
-        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
+        byte[] body = legalHoldBody(request);
         Response response = executeProtected(
             boundSession,
             "POST",

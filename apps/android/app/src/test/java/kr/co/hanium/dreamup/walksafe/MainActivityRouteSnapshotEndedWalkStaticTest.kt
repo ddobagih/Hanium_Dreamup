@@ -13,7 +13,7 @@ class MainActivityRouteSnapshotEndedWalkStaticTest {
         val request = functionBlock("private fun requestRoute(")
         val save = request.indexOf("routeSnapshotStore.saveFirstRoute(")
         val call = request.substring(save, request.indexOf(")", save) + 1)
-        val uiCommit = request.lastIndexOf("runOnUiThread {", save)
+        val uiCommit = request.lastIndexOf("runOnUiThreadForCommand(speechOwner) {", save)
         val lease = request.indexOf(
             "routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)", uiCommit,
         )

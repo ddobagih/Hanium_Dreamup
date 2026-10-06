@@ -28,9 +28,9 @@ class MainActivityRouteSnapshotOwnershipStaticTest {
     @Test
     fun deviceDeletionEvidenceIncludesSnapshotDeletionFailure() {
         val purge = function("private fun purgeAccountDeletionLocalDataOnCleanupThread()")
-        assertTrue(purge.contains("val routeSnapshotPurged = retryAccountDeletionPurgeOnCleanupThread"))
+        assertTrue(purge.contains("AccountDeletionLocalStore.ROUTE_SNAPSHOT to {"))
         assertTrue(purge.contains("purgeEncryptedRouteSnapshotForAccount()"))
-        assertTrue(purge.contains("return routeSnapshotPurged && legacyQueuePurged"))
+        assertTrue(purge.contains("return inventory.purge().isEmpty()"))
         assertTrue(source.contains("result = if (purgeSucceeded) \"DELETED\" else \"FAILED\""))
     }
 

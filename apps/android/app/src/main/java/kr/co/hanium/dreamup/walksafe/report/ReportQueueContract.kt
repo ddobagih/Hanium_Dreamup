@@ -59,23 +59,38 @@ internal fun approvedReportQueueCapacityProfile(
     }.getOrNull()
 }
 
+/** Owns plaintext copies. The caller must close after its last use; getters return caller-owned copies. */
 internal class FrozenReportPayload private constructor(
     val reportId: String,
     metadataUtf8: ByteArray,
     imageJpeg: ByteArray,
     val payloadSha256: String,
-) {
+) : java.io.Closeable {
     private val frozenMetadata = metadataUtf8.copyOf()
     private val frozenImage = imageJpeg.copyOf()
 
     val payloadBytes: Long = frozenMetadata.size.toLong() + frozenImage.size.toLong()
 
-    fun metadataUtf8(): ByteArray = frozenMetadata.copyOf()
+    private var closed = false
 
-    fun imageJpeg(): ByteArray = frozenImage.copyOf()
+    fun metadataUtf8(): ByteArray {
+        check(!closed) { "report payload is closed" }
+        return frozenMetadata.copyOf()
+    }
+
+    fun imageJpeg(): ByteArray {
+        check(!closed) { "report payload is closed" }
+        return frozenImage.copyOf()
+    }
+
+    override fun close() {
+        frozenMetadata.fill(0)
+        frozenImage.fill(0)
+        closed = true
+    }
 
     internal fun contentEquals(other: FrozenReportPayload): Boolean =
-        reportId == other.reportId &&
+        !closed && !other.closed && reportId == other.reportId &&
             payloadSha256 == other.payloadSha256 &&
             frozenMetadata.contentEquals(other.frozenMetadata) &&
             frozenImage.contentEquals(other.frozenImage)
@@ -111,7 +126,10 @@ internal data class QueuedReport(
     val accountGeneration: Long? = null,
     val quarantined: Boolean = false,
     val retryNotBeforeEpochMs: Long = 0L,
-)
+) : java.io.Closeable {
+    // copy() shares the payload owner; it does not create a separate plaintext snapshot.
+    override fun close() = payload.close()
+}
 
 internal fun reportActorIdFromMetadataOrNull(metadataUtf8: ByteArray): String? = runCatching {
     val root = JSONObject(String(metadataUtf8, Charsets.UTF_8))

@@ -120,7 +120,7 @@ class GatewayCapacityMainActivityStaticTest {
         assertTrue(context.contains("trigger.gatewaySession.isUsableFor(reporter)"))
         val drain = functionBlock("private fun drainInitialExactReportQueue(")
         val contextGate = drain.indexOf("reportQueueDrainContext(trigger)")
-        val startNext = drain.indexOf("reportQueueDrainCoordinator.startNext(")
+        val startNext = drain.indexOf("reportQueueDrainCoordinator.startNextWithResult(")
         val execute = drain.indexOf("call.execute()")
         assertTrue(contextGate >= 0 && startNext > contextGate)
         assertTrue(execute > startNext)

@@ -108,6 +108,7 @@ class AndroidReportCandidateRejectionTest {
         traceId = "trace-1",
         deviceGateAllowsReports = true,
         detectionAgeMs = 100L,
+        capturedAtElapsedRealtimeMs = 1_900L,
         coordinateGateStatus = "pass",
         heading = 181f,
     )

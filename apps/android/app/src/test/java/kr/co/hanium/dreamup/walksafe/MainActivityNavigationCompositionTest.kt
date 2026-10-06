@@ -227,7 +227,7 @@ class MainActivityNavigationCompositionTest {
         val retainedFailure = functionBlock("private fun retainRouteAfterRerouteFailure(")
         val purgeFence = functionBlock("private fun routeSnapshotPurgeFenceAllowsRoute(")
         val snapshotSave = request.indexOf("routeSnapshotStore.saveFirstRoute(")
-        val uiCommit = request.lastIndexOf("runOnUiThread {", snapshotSave)
+        val uiCommit = request.lastIndexOf("runOnUiThreadForCommand(speechOwner) {", snapshotSave)
         val leaseCheck = request.lastIndexOf(
             "routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)", snapshotSave,
         )
@@ -248,7 +248,7 @@ class MainActivityNavigationCompositionTest {
         assertTrue(snapshotSave < request.indexOf("routeNavigator.setRoute("))
         assertTrue(uiCommit >= 0)
         assertTrue(leaseCheck > uiCommit)
-        assertTrue(request.indexOf("if (!isRouteActive) return@runOnUiThread", uiCommit) < snapshotSave)
+        assertTrue(request.indexOf("if (!isRouteActive) return@runOnUiThreadForCommand", uiCommit) < snapshotSave)
         assertEquals(2, Regex("routeSnapshotPurgeFenceAllowsRoute\\(\\)").findAll(request).count())
         assertTrue(firstPurgeFence < request.indexOf("walkingRouteClient.fetchRouteCall("))
         assertTrue(secondPurgeFence > leaseCheck)

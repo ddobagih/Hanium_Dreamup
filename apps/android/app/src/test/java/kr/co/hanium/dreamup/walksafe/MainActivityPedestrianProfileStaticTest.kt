@@ -46,7 +46,8 @@ class MainActivityPedestrianProfileStaticTest {
     fun accountDeletionResetsStoredStepProfilesAndGatesItsEvidenceOnIt() {
         val purge = block("private fun purgeAccountDeletionLocalDataOnCleanupThread(")
         assertTrue(purge.contains("?.resetAllProfiles() == true"))
-        assertTrue(purge.contains("outdoorPositionTestPurged && pedestrianProfilesPurged"))
+        assertTrue(purge.contains("AccountDeletionLocalStore.PEDESTRIAN_PROFILES to"))
+        assertTrue(purge.contains("return inventory.purge().isEmpty()"))
     }
 
     /** w25 review pos-F2: the reset is ordered after queued and in-flight saves on the profile I/O thread. */

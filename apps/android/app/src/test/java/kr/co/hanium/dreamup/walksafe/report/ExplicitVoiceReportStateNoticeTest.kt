@@ -22,6 +22,31 @@ class ExplicitVoiceReportStateNoticeTest {
         source.substringAfter(start).substringBefore(end)
 
     @Test
+    fun uploadAndUnconfirmedResultDoNotClaimAcceptanceAndProgressIsFenced() {
+        assertFalse(ExplicitReportSubmissionNotice.UPLOADING_KO.contains("접수"))
+        assertTrue(ExplicitReportSubmissionNotice.RECEIPT_UNCONFIRMED_KO.contains("확인하지 못했습니다"))
+        assertTrue(ExplicitReportSubmissionNotice.RECEIPT_UNCONFIRMED_KO.contains("휴대전화에 보관"))
+        val drain = block("private fun drainInitialExactReportQueue(", "private fun reportQueueDrainResultMessage(")
+        assertTrue(drain.contains("onUploadStarting ="))
+        assertTrue(drain.contains("report.priority == ReportQueuePriority.EXPLICIT && !uploadNoticePosted"))
+        assertTrue(drain.contains("afterCompletion = false"))
+        assertTrue(drain.contains("if (result.reportPriority == ReportQueuePriority.EXPLICIT ||"))
+        assertTrue(drain.contains("result.outcome == ReportQueueDrainOutcome.QUARANTINED) spokenNotices.add(message)"))
+        val outcome = block("private fun reportQueueDrainResultMessage(", "private fun postReportQueueDrainNotice(")
+        assertTrue(outcome.substringAfter("ReportQueueDrainOutcome.RETRY_DEFERRED ->")
+            .substringBefore("ReportQueueDrainOutcome.RECEIPT_REJECTED ->").contains("RECEIPT_UNCONFIRMED_KO"))
+        val notice = block("private fun postReportQueueDrainNotice(", "private fun persistAutomaticReportCooldownBeforeQueueDelete(")
+        assertTrue(notice.contains("reportQueueDrainTrigger === trigger"))
+        assertTrue(notice.contains("if (!noticeStillCurrent"))
+        assertTrue(notice.contains("gateway.generation != trigger.gatewaySessionGeneration"))
+        assertTrue(notice.contains("val speechBusy = isHandsFreeVoiceOutputActive() || voiceRecognitionActive"))
+        assertTrue(notice.contains("if (spokenMessage != null && !speechBusy)"))
+        assertTrue(notice.contains("if (now < deadline) reportCleanupCallbackHandler.postDelayed"))
+        assertTrue(notice.contains("speechRetryDeadlineElapsedRealtimeMs = deadline"))
+        assertTrue(notice.contains("if (speechRetryDeadlineElapsedRealtimeMs == null || delivered) showWalkLastResult(message)"))
+    }
+
+    @Test
     fun savedNoticeSaysNotYetAcceptedAndSentAfterTheWalk() {
         val saved = ExplicitReportSubmissionNotice.SAVED_NOT_SUBMITTED_KO
         assertTrue(saved.contains("휴대전화에 저장했습니다"))
@@ -61,7 +86,9 @@ class ExplicitVoiceReportStateNoticeTest {
             "private fun prepareExplicitReportCandidateIfCurrent(",
         )
         assertTrue(submit.contains("ExplicitReportSubmissionNotice.SAVED_NOT_SUBMITTED_KO"))
-        assertTrue(submit.contains("renderExplicitReportConfirmationIdle(savedNotice)"))
+        assertTrue(submit.contains("renderExplicitReportConfirmationIdle(savedNotice ?: rejectionNotice)"))
+        assertTrue(submit.contains("ExplicitReportRejectionNotice.messageFor(status)"))
+        assertTrue(submit.contains("rejectionNotice?.let(::speakInteraction)"))
         assertTrue(submit.contains("speakInteraction(savedNotice)"))
         assertTrue(
             "the save notice is decided only from a queued status",

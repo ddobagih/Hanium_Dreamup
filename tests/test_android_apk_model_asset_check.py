@@ -45,6 +45,26 @@ def test_rejects_model_hash_mismatch(tmp_path: Path) -> None:
         verify_apk(apk, config)
 
 
+@pytest.mark.parametrize("mutation", ["missing_hash", "invalid_hash", "shared_asset"])
+def test_primary_hash_cannot_be_removed_or_shadowed(tmp_path: Path, mutation: str) -> None:
+    apk, config_path = write_fixture(tmp_path)
+    config = json.loads(config_path.read_text())
+    primary = config["models"]["unified_walksafe"]
+    if mutation == "missing_hash":
+        del primary["artifact_sha256"]
+    elif mutation == "invalid_hash":
+        primary["artifact_sha256"] = "not-a-sha256"
+    else:
+        # A later model must not overwrite the primary asset's mandatory hash with None.
+        config["models"]["legacy"] = {"asset": primary["asset"]}
+    config_path.write_text(json.dumps(config))
+    with zipfile.ZipFile(apk, "w") as archive:
+        archive.writestr("assets/model-config/two_model_runtime.json", config_path.read_bytes())
+        archive.writestr("assets/models/walksafe.tflite", b"modeL")
+    with pytest.raises(ValueError):
+        verify_apk(apk, config_path)
+
+
 @pytest.mark.parametrize("entry", ["assets/models/unused.tflite", "assets/logs/session.jsonl", "assets/.env"])
 def test_rejects_unconfigured_model_or_forbidden_payload(tmp_path: Path, entry: str) -> None:
     apk, config = write_fixture(tmp_path, extra_entry=entry)

@@ -442,7 +442,7 @@ class PriorityUserOnboardingPolicyTest {
     }
 
     @Test
-    fun legacySafetyCompletionMigratesOnlyNewUsageStepWithoutReenteringDeviceCheck() {
+    fun legacySafetyCompletionRequiresFreshDeviceChecksBeforeUsageStepMigration() {
         val legacyEducation = PriorityUserOnboardingSnapshot(
             ageBand = PriorityUserAgeBand.VERIFIED_14_PLUS,
             phonePostureAcknowledged = true,
@@ -470,7 +470,20 @@ class PriorityUserOnboardingPolicyTest {
         )
         assertEquals(null, restoration.rejection)
         assertEquals(5, restoration.restoredEvidenceCount)
-        val completed = restoration.snapshot
+        val restored = restoration.snapshot
+        assertFalse(restored.isComplete)
+        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, restored.stage)
+        assertFalse(FirstRunOnboardingPolicy.restartFp004Training(restored).accepted)
+        val permission = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            restored, restored.epoch, restored.revision,
+        )
+        assertTrue(permission.accepted)
+        assertFalse(permission.current.isComplete)
+        val checked = FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(
+            permission.current, permission.current.epoch, permission.current.revision,
+        )
+        assertTrue(checked.accepted)
+        val completed = checked.current
         assertTrue(completed.isComplete)
         val migrated = FirstRunOnboardingPolicy.restartFp004Training(completed)
         assertTrue(migrated.accepted)

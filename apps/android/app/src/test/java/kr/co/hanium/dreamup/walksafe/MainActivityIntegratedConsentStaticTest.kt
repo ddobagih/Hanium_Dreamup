@@ -195,8 +195,13 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(controls.contains("contentDescription = accountConsentDisclosure"))
         assertTrue(controls.contains("textSize = 18f"))
         assertTrue(controls.contains("View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
-        assertTrue(source.contains("[선택] 원본·진단수집 raw v2 자료 처리 동의"))
+        assertTrue(source.contains("[선택] 진단·성능 정보 수집 동의"))
         assertTrue(controls.contains("직접 신고에는 영향이 없습니다"))
+        listOf("raw v2", "receipt commit", "chunk", "bbox", "dataset", "metadata").forEach {
+            assertFalse("user disclosure contains implementation term: $it", controls.contains(it))
+        }
+        assertTrue(source.contains("\"raw_original\" to")) // The wire field stays compatible.
+
     }
 
     @Test
@@ -238,7 +243,7 @@ class MainActivityIntegratedConsentStaticTest {
             "src/main/java/kr/co/hanium/dreamup/walksafe/report/" +
                 "ReportQueueDrainCoordinator.kt",
         ).readText()
-        val startNext = ReportStaticSourceInspector.functionBlock(coordinator, "fun startNext")
+        val startNext = ReportStaticSourceInspector.functionBlock(coordinator, "fun startNextWithResult")
         assertTrue(startNext.contains("finally"))
         assertTrue(startNext.contains("policy.release(lease)"))
         assertTrue(

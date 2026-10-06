@@ -78,7 +78,15 @@ class PermissionSessionLifecycleStaticTest {
         assertTrue(application.contains("cancelVoiceCommandRecognition()"))
         assertTrue(application.contains("stopStepTracking()"))
         assertTrue(application.contains("해당 기능만 중지하고 나머지 기능은 계속 사용합니다."))
-        assertFalse(application.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            application,
+            "PermissionDependencyPolicy.evaluate(",
+            ").requiresWholeWalkSafetyStop",
+            "enterWalkSessionSafetyStopAndCancelOutputs(\"core_guidance_permissions_unavailable\")",
+            "enterPermissionRecoveryBarrier(",
+            "return",
+            "val stateAfterRefresh = walkSessionLifecycle.snapshot().state",
+        ))
         assertFalse(application.contains("permissionSessionPolicy"))
         assertFalse(application.contains("withdrawReportPrivacyConsent"))
     }
@@ -155,8 +163,13 @@ class PermissionSessionLifecycleStaticTest {
         assertTrue(create.contains("restorePermissionRecoveryGateFromPrefs()"))
         assertTrue(create.contains("fieldSessionLog.blockActiveSessionRestore()"))
         assertTrue(request.indexOf("persistPermissionRecoveryGate()") < request.indexOf("requestPermissions("))
-        assertTrue(callback.contains("lease.requestedPermissions"))
-        assertTrue(callback.contains("filterNot(observed::isGranted)"))
+        assertTrue(callback.contains("if (permission !in lease.requestedAndroidPermissions) return@mapNotNull null"))
+        assertTrue(callback.contains("PermissionExplanationPolicy.afterRequest("))
+        assertTrue(callback.contains("shouldShowRequestPermissionRationale(permission)"))
+        val panel = functionBlock("private fun showPermissionDenialPanel(")
+        assertTrue(panel.contains(")).messageKo()"))
+        assertTrue(panel.contains("permissionDenialSummaryText.text = message"))
+        assertTrue(panel.contains("permissionDenialSummaryText.contentDescription = message"))
         assertFalse(callback.contains("enterPermissionRecoveryBarrier("))
         assertTrue(callback.contains("showPermissionDenialPanel("))
         assertTrue(callback.contains("permissionRecoveryGate = PermissionRecoveryGate()"))
@@ -185,7 +198,7 @@ class PermissionSessionLifecycleStaticTest {
         assertFalse(process.contains("uploadCall("))
         assertTrue(drain.contains("AndroidReportQueueTransport("))
         val baseGate = drain.indexOf("if (!context.allRequiredBaseGatesAllowed()) break")
-        val startNext = drain.indexOf("reportQueueDrainCoordinator.startNext(")
+        val startNext = drain.indexOf("reportQueueDrainCoordinator.startNextWithResult(")
         val execute = drain.indexOf("call.execute()")
         assertTrue(baseGate >= 0 && startNext > baseGate)
         assertTrue(execute > startNext)

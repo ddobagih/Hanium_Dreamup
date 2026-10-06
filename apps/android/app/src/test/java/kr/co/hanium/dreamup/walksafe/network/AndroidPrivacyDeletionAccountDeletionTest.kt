@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.network
 
+import org.json.JSONObject
+import kr.co.hanium.dreamup.walksafe.session.deviceVerificationNoticeFor
 import java.io.File
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
@@ -457,6 +459,65 @@ class AndroidPrivacyDeletionAccountDeletionTest {
             .findAll(block)
             .map { it.groupValues[1] }
             .toSet()
+    }
+
+    @Test
+    fun deviceVerificationViewIsValidatedAndCannotCompleteDeletion() {
+        fun statusWithView(): JSONObject {
+            val root = JSONObject(validStatusJson())
+            val items = root.getJSONArray("items")
+            for (index in 0 until items.length()) {
+                val item = items.getJSONObject(index)
+                if (item.getString("key") != "device_untransmitted_data") {
+                    item.put("status", "COMPLETED").put("evidence_sha256", "b".repeat(64))
+                        .put("terminal_at", root.getString("updated_at"))
+                }
+            }
+            root.put("overall_status", "PARTIAL")
+            return root.put("device_verification", JSONObject("""{
+                "schema_version":"walksafe.account-deletion-device-verification.v1",
+                "completion_view":"SERVER_COMPLETED_DEVICE_UNVERIFIED",
+                "target_count":2,"deleted_count":1,"not_found_count":0,
+                "failed_count":0,"pending_count":0,"unverifiable_count":1,
+                "unverifiable_reason":"SLA_ELAPSED_NO_CONTACT",
+                "follow_up":"DELETE_ON_NEXT_CONTACT_OR_REMOVE_APP",
+                "device_clock_anomaly_count":0,
+                "device_due_at":"2026-07-26T12:00:00Z","evaluated_at":"2026-07-27T12:00:00Z"
+            }"""))
+        }
+        fun parse(root: JSONObject) = validatedAccountDeletionStatusOrNull(root.toString(), INSTALLATION_ID, REQUEST_ID)
+        val status = requireNotNull(parse(statusWithView()))
+        val machine = AccountDeletionStateMachine()
+        assertTrue(machine.requestConfirmation())
+        assertTrue(machine.begin(AccountDeletionJournal.pending(
+            "https://gateway.example.test", INSTALLATION_ID, REQUEST_ID, status.requestedAt,
+        )))
+        machine.apply(status)
+        val journal = requireNotNull(machine.snapshotOrNull())
+        assertTrue(status.deviceVerificationNoticeFor(journal)!!.contains("전체 삭제 완료는 아닙니다"))
+        assertEquals(AccountDeletionPhase.IN_PROGRESS, machine.phase())
+        assertTrue(machine.processingBlocked())
+        assertNull(status.deviceVerificationNoticeFor(journal.copy(requestId = "other_delete_request_0001")))
+        assertNull(status.copy(revision = 2L).deviceVerificationNoticeFor(journal))
+        assertNull(status.deviceVerificationNoticeFor(journal.copy(
+            phase = AccountDeletionPhase.RETRY_WAIT, lastErrorCode = "http_503",
+        )))
+        for ((key, value) in listOf(
+            "target_count" to 3, "pending_count" to -1, "deleted_count" to "1",
+            "unverifiable_reason" to JSONObject.NULL, "follow_up" to "UNKNOWN",
+            "completion_view" to "COMPLETED", "evaluated_at" to "not-a-date", "extra" to true,
+        )) {
+            val invalid = statusWithView()
+            invalid.getJSONObject("device_verification").put(key, value)
+            assertNull(key, parse(invalid))
+        }
+        val premature = statusWithView()
+        premature.getJSONArray("items").getJSONObject(1)
+            .put("status", "IN_PROGRESS").put("terminal_at", JSONObject.NULL)
+        assertNull(parse(premature))
+        // Clock-based display changes at one canonical revision must remain harmless duplicates.
+        val refreshed = status.copy(deviceVerification = status.deviceVerification!!.copy(unverifiableCount = 2))
+        assertEquals(kr.co.hanium.dreamup.walksafe.session.AccountDeletionApplyResult.DUPLICATE, machine.apply(refreshed))
     }
 
     private fun validStatusJson(): String {

@@ -149,7 +149,7 @@ class MainActivityOfficialEnvironmentStaticTest {
                 .contains("invalidateOfficialEnvironmentEvidence(\"new_walk:\$reason\")"),
         )
         assertTrue(
-            functionBlock("private fun enterWalkSessionSafetyStopAndCancelOutputs(")
+            functionBlock("private fun performWalkSessionSafetyStopCleanup(")
                 .contains("invalidateOfficialEnvironmentEvidence(\"safety_stop:\$reason\")"),
         )
         assertTrue(
@@ -219,7 +219,8 @@ class MainActivityOfficialEnvironmentStaticTest {
             .substringBefore("\n    private fun ")
         val ordinaryInteraction = functionBlock("private fun speakInteraction(")
             .substringBefore("\n    private fun ")
-        val response = functionBlock("private fun speakCommandResponse(")
+        val response = source.substringAfter("private fun speakCommandResponse(")
+            .substringBefore("\n    private fun ")
         assertTrue(explanation.contains("speakCommandResponse(message, statusExplanation = true)"))
         assertFalse(explanation.contains("OutputsAllowed = true"))
         assertFalse(ordinaryInteraction.contains("statusExplanation = true"))
@@ -227,7 +228,10 @@ class MainActivityOfficialEnvironmentStaticTest {
         assertTrue(response.contains("if (homeResponse || statusExplanation || walkStatusResponse)"))
         assertTrue(response.contains("val walkStatusResponse = isInWalkInteractionArea() && firstRunOnboardingComplete()"))
         assertTrue(response.contains("walkSessionLifecycle.snapshot().state != WalkSessionState.ACTIVE"))
-        assertTrue(response.contains("actuator.speakInteraction(message, onCompleted = completed, onFailed = failed)"))
+        assertTrue(response.contains("CommandSpeechSequence("))
+        assertTrue(response.contains("actuator.speakInteraction("))
+        assertTrue(response.contains("onCompleted = { runOnUiThread { done() } }"))
+        assertTrue(response.contains("onCompleted = completed"))
         assertFalse(functionBlock("private fun speakNextNavigationInstruction(").contains("speakStatusExplanation("))
         assertFalse(functionBlock("private fun emitFeedbackAction(").contains("speakStatusExplanation("))
         assertTrue(
@@ -284,7 +288,7 @@ class MainActivityOfficialEnvironmentStaticTest {
     @Test
     fun centralSafetyStopClosesBothCameraPipelines() {
         val safetyStop =
-            functionBlock("private fun enterWalkSessionSafetyStopAndCancelOutputs(")
+            functionBlock("private fun performWalkSessionSafetyStopCleanup(")
 
         assertInOrder(
             safetyStop,
@@ -478,7 +482,7 @@ class MainActivityOfficialEnvironmentStaticTest {
     }
 
     @Test
-    fun activeLocationPermissionRevocationStopsOnlyLocationFeatures() {
+    fun permissionRevocationStopsDependentFeaturesAndRespectsWholeWalkSafetyStop() {
         val permissionChange =
             functionBlock("private fun applyObservedPermissionStateChange(")
 
@@ -490,7 +494,10 @@ class MainActivityOfficialEnvironmentStaticTest {
         assertTrue(permissionChange.contains("navigationRequests.cancelRoute()"))
         assertTrue(permissionChange.contains("resetRouteState()"))
         assertTrue(permissionChange.contains("해당 기능만 중지하고 나머지 기능은 계속 사용합니다."))
-        assertFalse(permissionChange.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertTrue(permissionChange.contains("requiresWholeWalkSafetyStop"))
+        assertTrue(permissionChange.contains("enterWalkSessionSafetyStopAndCancelOutputs(\"core_guidance_permissions_unavailable\")"))
+        assertTrue(permissionChange.indexOf("refreshStartupCapabilityUi()") < permissionChange.indexOf("val stateAfterRefresh"))
+        assertTrue(permissionChange.contains("stateAfterRefresh in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)"))
         assertFalse(permissionChange.contains("WalkSessionEvent.Resume"))
     }
 

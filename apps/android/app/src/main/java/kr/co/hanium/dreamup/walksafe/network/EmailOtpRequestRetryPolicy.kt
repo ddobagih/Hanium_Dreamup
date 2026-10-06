@@ -8,7 +8,7 @@ internal class EmailOtpRequestRetryPolicy(
     private val elapsedRealtimeMs: () -> Long,
     private val createRequestId: () -> String,
     // S01-5: encrypted minimal record so a restarted process resends the same request ID.
-    private val pendingStore: () -> PendingEmailOtpRequestStore? = { null },
+    private val pendingStore: () -> PendingEmailOtpRequestStore?,
     private val wallClockMs: () -> Long = System::currentTimeMillis,
 ) {
     internal data class Payload(
@@ -34,6 +34,8 @@ internal class EmailOtpRequestRetryPolicy(
     private var requestId: String? = null
     private var activeAttempt: Attempt? = null
     private var retryAvailableAtMs = 0L
+    var storageFailure: Boolean = false
+        private set
 
     fun remainingWaitMs(currentPayload: Payload): Long =
         if (currentPayload == payload) {
@@ -43,17 +45,32 @@ internal class EmailOtpRequestRetryPolicy(
         }
 
     fun begin(currentPayload: Payload): Attempt? {
+        storageFailure = false
+        if (runCatching { pendingStore() }.getOrNull() == null) {
+            storageFailure = true
+            return null
+        }
         if (payload != currentPayload) {
             // A fresh process (no payload yet) may continue a persisted in-flight request.
             val restoring = payload == null && requestId == null
-            cancel(clearPersisted = !restoring)
+            // Replacing the record is one write; do not erase the old recovery point first.
+            cancel(clearPersisted = false)
             payload = currentPayload
             if (restoring) requestId = restorePendingRequestId(currentPayload)
         }
+        if (storageFailure) {
+            payload = null // retry the durable read, not a fresh ID, on the next explicit request
+            return null
+        }
         if (activeAttempt != null || remainingWaitMs(currentPayload) > 0L) return null
-        val wireId = requestId ?: createRequestId().also {
+        val wireId = requestId ?: createRequestId().let {
+            if (!persistPendingRequest(currentPayload, it)) {
+                storageFailure = true
+                payload = null
+                return null
+            }
             requestId = it
-            persistPendingRequest(currentPayload, it)
+            it
         }
         return Attempt(wireId, currentPayload, ++sequence).also { activeAttempt = it }
     }
@@ -68,7 +85,7 @@ internal class EmailOtpRequestRetryPolicy(
         if (!accepts(attempt, currentPayload)) return false
         activeAttempt = null
         val pending = statusCode == 409 && serverCode == "account_enrollment_in_progress"
-        val retryable = statusCode == 0 || statusCode in 500..599 || statusCode == 429 || pending
+        val retryable = statusCode == 0 || statusCode == 408 || statusCode in 500..599 || statusCode == 429 || pending
         if (!retryable) {
             requestId = null
             retryAvailableAtMs = 0L
@@ -81,8 +98,18 @@ internal class EmailOtpRequestRetryPolicy(
         return true
     }
 
-    fun recordSuccess(attempt: Attempt, currentPayload: Payload?): Boolean {
+    fun recordSuccess(
+        attempt: Attempt,
+        currentPayload: Payload?,
+        persistResult: () -> Boolean = { true },
+    ): Boolean {
         if (!accepts(attempt, currentPayload)) return false
+        // Keep the replay ID until the returned enrollment is durably saved.
+        if (!runCatching(persistResult).getOrDefault(false)) {
+            activeAttempt = null
+            storageFailure = true
+            return false
+        }
         cancel()
         return true
     }
@@ -103,14 +130,18 @@ internal class EmailOtpRequestRetryPolicy(
 
     private fun restorePendingRequestId(currentPayload: Payload): String? {
         val store = pendingStore() ?: return null
-        val pending = runCatching { store.loadPendingOtpRequest() }.getOrNull() ?: return null
+        val pending = try {
+            store.loadPendingOtpRequest()
+        } catch (_: Exception) {
+            storageFailure = true
+            return null
+        } ?: return null
         if (pending.reusableFor(currentPayload, wallClockMs())) return pending.requestId
-        runCatching { store.clearPendingOtpRequest() }
         return null
     }
 
-    private fun persistPendingRequest(currentPayload: Payload, wireId: String) {
-        val store = pendingStore() ?: return
+    private fun persistPendingRequest(currentPayload: Payload, wireId: String): Boolean {
+        val store = pendingStore() ?: return false
         val pending = runCatching {
             PendingEmailOtpRequest(
                 requestId = wireId,
@@ -118,9 +149,8 @@ internal class EmailOtpRequestRetryPolicy(
                 payloadSha256 = pendingEmailOtpPayloadSha256(currentPayload, wireId),
                 startedAtEpochMs = wallClockMs(),
             )
-        }.getOrNull() ?: return
-        // Best effort: without the record the in-memory retry rule still applies.
-        runCatching { store.savePendingOtpRequest(pending) }
+        }.getOrNull() ?: return false
+        return runCatching { store.savePendingOtpRequest(pending) }.getOrDefault(false)
     }
 
     private fun clearPendingRequest() {

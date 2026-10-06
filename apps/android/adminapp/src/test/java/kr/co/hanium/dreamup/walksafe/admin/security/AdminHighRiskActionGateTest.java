@@ -9,6 +9,29 @@ import org.junit.Test;
 
 public final class AdminHighRiskActionGateTest {
     @Test
+    public void changedOrMissingBodyCannotReuseTheSameActionApproval() {
+        var base = AdminHighRiskActionGate.reportStatus("11111111-1111-4111-8111-111111111111");
+        byte[] body = AdminReportHttpClient.statusBody("reviewed", 1);
+        var approved = AdminHighRiskActionGate.bindBody(base, body);
+        var binding = new AdminHighRiskActionGate.Binding(approved, "AAECAwQFBgcICQoLDA0ODw", 20_000L);
+        body[0] = 0; // Mutating a caller buffer cannot change the approved digest.
+        for (var candidate : new AdminHighRiskActionGate.Operation[] {
+            base,
+            AdminHighRiskActionGate.bindBody(base, AdminReportHttpClient.statusBody("resolved", 1)),
+            AdminHighRiskActionGate.bindBody(base, AdminReportHttpClient.statusBody("reviewed", 2))
+        }) {
+            var result = AdminHighRiskActionGate.evaluate(candidate, AdminSecurityState.NORMAL,
+                AdminRecoveryCustodyState.ATTESTED, binding, 10_000L, true);
+            assertFalse(result.isAllowed());
+            assertEquals("reconfirmation_binding_mismatch", result.reason());
+        }
+        assertTrue(AdminHighRiskActionGate.evaluate(
+            AdminHighRiskActionGate.bindBody(base, AdminReportHttpClient.statusBody("reviewed", 1)),
+            AdminSecurityState.NORMAL, AdminRecoveryCustodyState.ATTESTED,
+            binding, 10_000L, true).isAllowed());
+    }
+
+    @Test
     public void actionCatalogIsExactlyTheThreeCanonicalTriples() {
         String[][] expected = {
             {"RELEASE_APPROVAL", "release.approval", "POST", "/admin/operations/release-approvals"},

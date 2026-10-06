@@ -33,6 +33,8 @@ class PriorityUserEducationPresentationTest {
         assertTrue(spoken.contains("지금 멈춰야 하면 발걸음을 멈추고 주변을 확인한 뒤 보행 일시정지라고 말하세요"))
         assertTrue(spoken.contains("보행을 아예 끝내려면 보행 종료라고 말하고 종료 확인 안내에 응답하세요"))
         assertTrue(spoken.contains("보행 일시정지로 보행 전체를 잠시 멈추고"))
+        assertTrue(spoken.contains("보행 중 화면을 끄거나 다른 앱으로 이동하면 일시정지됩니다"))
+        assertTrue(spoken.contains("돌아온 뒤에는 자동으로 재개하지 않으며, 재점검과 재개 확인이 필요합니다"))
         assertTrue(spoken.contains("보행 종료는 종료 확인 안내를 거쳐 전체 보행을 끝냅니다"))
         assertTrue(spoken.contains("앱이 자동으로 안전정지한 경우 현재 보행 안내와 출력을 중단하며 자동으로 재개하지 않습니다"))
         assertTrue(spoken.contains("실제 보행에서 안전정지를 직접 실행하는 버튼이나 음성 명령은 없습니다"))

@@ -71,6 +71,9 @@ internal fun assessPlatformVoiceCandidate(
             ?.onCommand(DestinationSearchVoiceCommand.SelectCandidate(candidate.oneBasedIndex))
             ?.takeIf { it.accepted }
             ?.let { AndroidVoiceAction.SelectDestinationCandidate(candidate.oneBasedIndex) }
+        is AndroidVoiceCommand.DescribeDestinationCandidate -> destinationDialogState
+            ?.candidateDetailPrompt(candidate.oneBasedIndex)
+            ?.let { AndroidVoiceAction.DescribeDestinationCandidate(candidate.oneBasedIndex) }
         AndroidVoiceCommand.RepeatDestinationCandidates -> destinationDialogState
             ?.onCommand(DestinationSearchVoiceCommand.RepeatPage)
             ?.takeIf { it.accepted }

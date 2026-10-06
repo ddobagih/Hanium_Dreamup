@@ -49,6 +49,21 @@ class AccountDeletionReauthenticationDispositionTest {
             .substringBefore("AccountDeletionPhase.RESTRICTED ->")
         val retryWait = ui.substringAfter("AccountDeletionPhase.RETRY_WAIT ->")
         assertTrue(retryWait.contains("ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE"))
-        assertTrue(retryWait.contains("비밀번호로 다시 로그인한 뒤 계정 삭제를 다시 요청하세요."))
+        assertTrue(retryWait.contains("삭제 복구 인증을 눌러 같은 계정으로 다시 인증하세요."))
+        assertTrue(source.contains("onClick = ::onAccountDeletionRefreshClicked"))
+        val click = source.substringAfter("private fun onAccountDeletionRefreshClicked()")
+            .substringBefore("private fun refreshAccountDeletionStatusAllowed(")
+        assertTrue(click.contains("accountDeletionRecoveryGatewaySessionOrNull() == null"))
+        assertTrue(click.contains("backendFieldTokenInput.requestFocus()"))
+        assertTrue(click.contains("계정 토큰 입력 방식"))
+        assertTrue(click.indexOf("return") < click.lastIndexOf("refreshAccountDeletionStatus()"))
+        val refresh = source.substringAfter("private fun refreshAccountDeletionStatusAllowed(")
+            .substringBefore("private fun startAccountDeletionCall(")
+        val gate = refresh.substringAfter("if ((recoveryBinding != null || journal.requiresDeletionReauthentication())")
+            .substringBefore("if (recoveryBinding != null && recoverySession != null)")
+        assertTrue(gate.contains("recoverySession == null"))
+        assertTrue(gate.contains("return"))
+        assertTrue(refresh.indexOf("journal.requiresDeletionReauthentication()") <
+            refresh.indexOf("accountDeletionClient.replayDeletionRequestCall("))
     }
 }

@@ -298,7 +298,7 @@ class MainActivityEmailAccountStaticTest {
         assertTrue(update.contains("accountConsentDisclosureText.visibility = View.GONE"))
         assertTrue(
             update.contains(
-                "accountLoginButton.visibility = if (signupVisible) View.GONE else View.VISIBLE",
+                "if (signupVisible && !accountCreationRecoveryPending) View.GONE else View.VISIBLE",
             ),
         )
         assertTrue(update.contains("로그인 화면으로 돌아가기"))

@@ -9,6 +9,8 @@ import java.net.URL
 import java.util.Base64
 import java.util.Collections
 import java.util.UUID
+import java.util.concurrent.CancellationException
+import org.junit.Assert.assertThrows
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import javax.crypto.KeyGenerator
@@ -159,27 +161,98 @@ class AndroidReportPostcommitRecoveryTest {
         }
     }
 
+    @Test
+    fun queuedTransportStreamsFourMiBWithExactLengthAndReceiptBeforeDeletion() {
+        assumeTrue(BuildConfig.DEBUG && BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED)
+        val fixture = Fixture(temporary.newFolder(), payloadLimit = 4 * 1_024 * 1_024)
+        val original = fixture.report.payload
+        assertEquals(4L * 1_024 * 1_024, original.payloadBytes)
+        PostcommitHttpServer { index ->
+            when (index) {
+                0 -> 404 to """{"detail":{"code":"report_transport_status_not_found"}}"""
+                1 -> 201 to JSONObject(persistedStatus(fixture.report)).put("creation_outcome", "CREATED").toString()
+                else -> error("unexpected duplicate request")
+            }
+        }.use { server ->
+            ReportPrivacyConsentSession.resetForNewEnrollment()
+            assertTrue(ReportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent())
+            try {
+                var starts = 0
+                val result = requireNotNull(ReportQueueDrainCoordinator(fixture.store).startNextWithResult(
+                    { context() }, transport(binding(server, AtomicInteger()), confirmation(automatic = true)) {
+                        starts++
+                        assertEquals(listOf("GET"), server.requests.map { it.method })
+                        assertEquals(original.reportId, it.payload.reportId)
+                    },
+                    beforeDeleteAfterReceipt = { true },
+                )).execute()
+                assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD, result.outcome)
+                assertEquals(ReportCreationOutcome.CREATED, result.creationOutcome)
+                assertEquals(1, starts)
+                assertEquals(listOf("GET", "POST"), server.requests.map { it.method })
+                val request = server.requests.last()
+                assertEquals(request.body.size.toString(), request.headers["content-length"])
+                assertFalse(request.headers.containsKey("transfer-encoding"))
+                assertMultipartIsFrozen(request, original)
+                assertTransportIdentity(server.requests, original)
+                assertTrue(fixture.reopen().queuedReports().isEmpty())
+                server.assertHealthy()
+            } finally { ReportPrivacyConsentSession.resetForNewEnrollment() }
+        }
+    }
+
+    @Test
+    fun cancelledUploadNeverAnnouncesTransferOrOpensConnection() {
+        val fixture = fixture()
+        var starts = 0
+        var connections = 0
+        ReportPrivacyConsentSession.resetForNewEnrollment()
+        assertTrue(ReportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent())
+        try {
+            val binding = IntegratedConsentNetworkBinding.forTest(IntegratedConsentNetworkTransport.WIFI) {
+                connections++
+                error("cancelled upload must not connect")
+            }
+            val call = transport(binding, confirmation(automatic = true)) { starts++ }
+                .uploadResultCall(fixture.report)
+            assertEquals(0, starts)
+            call.cancel()
+            assertThrows(CancellationException::class.java) { call.execute() }
+            assertEquals(0, starts)
+            assertEquals(0, connections)
+            assertEquals(1, fixture.reopen().queuedReports().size)
+        } finally { ReportPrivacyConsentSession.resetForNewEnrollment() }
+    }
+
     private fun fixture(): Fixture {
         assumeTrue("Actual queued transport requires the existing enabled DEBUG queue profile",
             BuildConfig.DEBUG && BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED)
         return Fixture(temporary.newFolder())
     }
 
-    private class Fixture(val root: File) {
+    private class Fixture(val root: File, private val payloadLimit: Int = 1_024) {
         private val aead = VersionedLocalAead(AeadKeyPolicy("test.report.postcommit.aead.v", 1, setOf(1)),
             PostcommitKeys())
         fun reopen() = AndroidReportQueueStore(
             rootDirectory = root,
-            capacityProfile = ApprovedReportQueueCapacityProfile(8, 1_024, 4_096L, 32_768L, 6, 24_576L),
+            capacityProfile = ApprovedReportQueueCapacityProfile(8, payloadLimit, payloadLimit * 4L, payloadLimit * 32L, 6, payloadLimit * 24L),
             aead = aead,
             idFactory = { UUID.fromString(REPORT_ID) },
             nowMillis = { 1_000L },
         )
         val store = reopen()
+        private val metadata = """{"reporter_user_id":"$ACTOR","trigger":"auto","auto_reported":true}""".toByteArray()
+        // Structurally valid transport fixture, not a camera/decoder quality or heap benchmark.
+        private val image = reportTestJpeg().let { jpeg ->
+            if (payloadLimit == 1_024) jpeg else
+                jpeg.copyOfRange(0, jpeg.size - 2) +
+                    ByteArray(payloadLimit - metadata.size - jpeg.size) { 1 } +
+                    jpeg.takeLast(2).toByteArray()
+        }
         val report = requireNotNull(store.enqueue(
             expectedReporterActorId = ACTOR,
-            metadataUtf8 = """{"reporter_user_id":"$ACTOR","trigger":"auto","auto_reported":true}""".toByteArray(),
-            imageJpeg = reportTestJpeg(),
+            metadataUtf8 = metadata,
+            imageJpeg = image,
             priority = ReportQueuePriority.AUTOMATIC,
             walkSessionId = WALK,
             consentReceiptSha256 = ORIGINAL_RECEIPT,
@@ -197,9 +270,12 @@ class AndroidReportPostcommitRecoveryTest {
             URL(server.baseUrl + approvedUrl.file).openConnection()
         }
 
-    private fun transport(binding: IntegratedConsentNetworkBinding, confirmed: IntegratedConsentConfirmation) =
-        AndroidReportQueueTransport(AndroidReportUploader(), session(), confirmed, binding,
-            ReportPrivacyConsentSession::issueUploadPermit)
+    private fun transport(
+        binding: IntegratedConsentNetworkBinding,
+        confirmed: IntegratedConsentConfirmation,
+        onUploadStarting: (QueuedReport) -> Unit = {},
+    ) = AndroidReportQueueTransport(AndroidReportUploader(), session(), confirmed, binding,
+        ReportPrivacyConsentSession::issueUploadPermit, onUploadStarting)
 
     private fun session(): GatewayFieldSession {
         val origin = requireNotNull(approvedReportQueueGatewayOriginOrNull(BuildConfig.WALKSAFE_REPORT_QUEUE_TEST_ORIGIN))
@@ -308,7 +384,7 @@ private class PostcommitHttpServer(private val response: (Int) -> Pair<Int, Stri
         }
         check(!headers.containsKey("transfer-encoding")) { "Uploader fixture expects its fixed-length multipart" }
         val length = headers["content-length"]?.toInt() ?: 0
-        check(length in 0..(128 * 1_024))
+        check(length in 0..(4 * 1_024 * 1_024 + 2_048))
         val body = ByteArray(length)
         var offset = 0
         while (offset < length) {

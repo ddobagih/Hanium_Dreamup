@@ -9,6 +9,7 @@ from ipaddress import ip_address
 import socketserver
 import ssl
 from threading import Thread
+from time import monotonic, sleep
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -55,7 +56,7 @@ def smtp_tls_context(tmp_path, monkeypatch):
 
 
 @contextmanager
-def _smtp_server(context, security, *, reject_message):
+def _smtp_server(context, security, *, reject_message, command_delay=0):
     received = {}
 
     class Handler(socketserver.BaseRequestHandler):
@@ -70,6 +71,8 @@ def _smtp_server(context, security, *, reject_message):
             try:
                 while command := stream.readline():
                     verb = command.split(b" ", 1)[0].strip().upper()
+                    if command_delay:
+                        sleep(command_delay)
                     if verb == b"EHLO":
                         stream.write(
                             b"250-localhost\r\n250 AUTH PLAIN\r\n"
@@ -109,6 +112,9 @@ def _smtp_server(context, security, *, reject_message):
                         stream.write(b"250 Reset\r\n")
                     else:
                         stream.write(b"500 Unknown command\r\n")
+            except (OSError, ssl.SSLError):
+                # Deadline tests intentionally disconnect while the server is replying.
+                pass
             finally:
                 stream.close()
                 connection.close()
@@ -158,3 +164,20 @@ def test_otp_delivery_over_authenticated_tls_smtp(
     assert "012345" in message.get_content()
     assert "10 minutes" in message.get_content()
     assert not message.defects
+
+
+@pytest.mark.parametrize("security", ["implicit_tls", "starttls"])
+def test_smtp_steps_share_one_deadline_instead_of_restarting_timeout(smtp_tls_context, security):
+    with _smtp_server(
+        smtp_tls_context, security, reject_message=False, command_delay=0.12,
+    ) as (port, received):
+        sender = SmtpOtpSender(
+            host="127.0.0.1", port=port, security=security,
+            username="test", password="test", from_address="no-reply@example.com",
+            timeout_seconds=0.45,
+        )
+        started = monotonic()
+        with pytest.raises(OtpDeliveryError):
+            sender.send(email="recipient@example.com", code="012345", expires_in_seconds=600)
+        assert monotonic() - started < 0.9
+        assert "message" not in received

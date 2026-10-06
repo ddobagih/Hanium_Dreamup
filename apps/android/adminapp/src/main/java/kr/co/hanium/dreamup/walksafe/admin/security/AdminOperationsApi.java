@@ -26,9 +26,16 @@ public interface AdminOperationsApi {
     }
 
     final class MutationConflictException extends IOException {
-        public MutationConflictException() {
+        private final boolean institutionMismatch;
+
+        public MutationConflictException() { this(false); }
+
+        public MutationConflictException(boolean institutionMismatch) {
             super("administrator mutation conflicted with current server state");
+            this.institutionMismatch = institutionMismatch;
         }
+
+        public boolean institutionMismatch() { return institutionMismatch; }
     }
 
     /**

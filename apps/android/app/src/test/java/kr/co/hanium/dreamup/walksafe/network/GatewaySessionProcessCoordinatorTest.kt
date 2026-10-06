@@ -8,6 +8,13 @@ import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingPolicy
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOpaqueActorBinding
 import kr.co.hanium.dreamup.walksafe.session.FirstRunReceiptHash
 import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentAuthorityGuard
+import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentSession
+import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentConfirmation
+import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentSelections
+import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentItemVersions
+import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentItem
+import kr.co.hanium.dreamup.walksafe.session.INTEGRATED_CONSENT_CONFIRMATION_SCHEMA_VERSION
+import kr.co.hanium.dreamup.walksafe.session.INTEGRATED_CONSENT_POLICY_VERSION
 import kr.co.hanium.dreamup.walksafe.report.ReportPrivacyConsentSession
 import kr.co.hanium.dreamup.walksafe.report.ReportTransferPurpose
 import org.junit.After
@@ -24,6 +31,49 @@ import org.junit.Test
 class GatewaySessionProcessCoordinatorTest {
     private val firstOwner = Any()
     private val secondOwner = Any()
+
+    @Test
+    fun lateConsentResponseCannotOverwriteReplacementAccountOrSession() {
+        for (replacementActor in listOf("actor-B", "actor-A")) {
+            fun publish(actor: String): GatewaySessionProcessSnapshot {
+                val session = GatewayFieldSession.verified(
+                    gatewayBaseUrl = "https://gateway.example.test", actorId = actor,
+                    cookiePair = "walksafe_field_session=v2.test.session.cookie", expiresAtEpochMs = Long.MAX_VALUE,
+                )
+                val operation = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+                assertTrue(GatewaySessionProcessCoordinator.publishVerified(operation, session, FirstRunOnboardingPolicy.initial()))
+                return GatewaySessionProcessCoordinator.snapshot()
+            }
+            fun guard(snapshot: GatewaySessionProcessSnapshot) = object : IntegratedConsentAuthorityGuard {
+                override fun <T : Any> withCurrent(action: () -> T): T? =
+                    GatewaySessionProcessCoordinator.withCurrentGeneralSession(snapshot.generation, requireNotNull(snapshot.session), action)
+            }
+            val old = publish("actor-A")
+            val consent = IntegratedConsentSession()
+            val confirmation = IntegratedConsentConfirmation(
+                INTEGRATED_CONSENT_CONFIRMATION_SCHEMA_VERSION, INTEGRATED_CONSENT_POLICY_VERSION,
+                "test-installation-0001", "initial_confirmation_0001", IntegratedConsentItemVersions(),
+                1L, 1L, IntegratedConsentSelections(), "2026-09-26T00:00:00.000Z",
+                "1".repeat(64), "2".repeat(64), "3".repeat(64),
+            )
+            var lateWrites = 0
+            val delayedResponse = {
+                GatewaySessionProcessCoordinator.withCurrentGeneralSession(old.generation, requireNotNull(old.session)) {
+                    lateWrites++
+                    consent.applyConfirmation(confirmation.copy(revision = 9L, clientRevision = 9L,
+                        selections = IntegratedConsentSelections(true, true, true, true)), guard(old))
+                }
+            }
+            val replacement = publish(replacementActor)
+            assertNotNull(GatewaySessionProcessCoordinator.withCurrentGeneralSession(
+                replacement.generation, requireNotNull(replacement.session),
+            ) { consent.applyConfirmation(confirmation, guard(replacement)) })
+            assertNull(delayedResponse())
+            assertEquals(0, lateWrites)
+            assertEquals(confirmation, consent.currentConfirmationOrNull())
+            IntegratedConsentItem.entries.forEach { assertFalse(consent.isAllowed(it)) }
+        }
+    }
 
     @Test
     fun consentCommitAndSessionReplacementCannotPassEachOther() {

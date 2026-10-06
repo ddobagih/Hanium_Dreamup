@@ -8,6 +8,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,6 +27,7 @@ class UnifiedTfliteDeviceSmokeTest {
         invokeNeutralInput(context, model)
     }
 
+    // Compatibility of the old assets only. This forced config is not the product fallback policy.
     @Test
     fun declaredLegacyFallbackAssetsPassHashAndInterpreterLoadContracts() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -41,6 +44,34 @@ class UnifiedTfliteDeviceSmokeTest {
         result.detector?.close()
         invokeNeutralInput(context, requireNotNull(config.customTactile))
         invokeNeutralInput(context, requireNotNull(config.cocoGeneral))
+    }
+
+    @Test
+    fun currentProductRejectsMissingOrMismatchedPrimaryWithoutSelectingLegacy() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val config = TwoModelRuntimeConfig.load(context)
+        assertEquals(TwoModelRuntimeConfig.UNIFIED_MODEL_KEY, config.primaryModelKey)
+        assertNull("This test must use the actual no-fallback product policy", config.fallbackModelKey)
+        val primary = requireNotNull(config.unifiedWalksafe?.takeIf { it.enabled })
+        val failures = listOf(
+            primary.copy(asset = "models/nonexistent-primary-for-test.tflite") to DetectorLoadFailureCode.ASSET_MISSING,
+            primary.copy(artifactSha256 = "0".repeat(64)) to DetectorLoadFailureCode.HASH_MISMATCH,
+        )
+        for ((failedPrimary, expectedFailure) in failures) {
+            // Change only this in-memory test configuration; bundled assets remain untouched.
+            val result = TfliteAndroidFrameDetector.createWithStatus(
+                context, config.copy(unifiedWalksafe = failedPrimary),
+            )
+            try {
+                assertTrue(result.configLoaded)
+                assertFalse(result.detectorAvailable)
+                assertFalse(result.fallbackUsed)
+                assertNull(result.detector)
+                assertNull(result.modelKey)
+                assertEquals(expectedFailure, result.failureCode)
+                assertEquals("detector_assets_unavailable:${expectedFailure.name}", result.reason)
+            } finally { result.detector?.close() }
+        }
     }
 
     private fun invokeNeutralInput(context: Context, model: ModelRuntimeConfig) {

@@ -57,6 +57,14 @@ internal object BoundedRuntimeDiagnosticLog {
         }
     }
 
+    /** Called on the account cleanup worker. Keep this process's writer closed after deletion. */
+    @Synchronized
+    fun purgeForAccountDeletion(cacheDirectory: File): Boolean {
+        val target = writer ?: RuntimeDiagnosticFileWriter(File(cacheDirectory, "runtime-diagnostics"))
+            .also { writer = it }
+        return target.blockAndPurge()
+    }
+
     fun recordState(
         domain: RuntimeDiagnosticDomain,
         stage: Enum<*>,
@@ -100,11 +108,26 @@ internal object BoundedRuntimeDiagnosticLog {
     }
 }
 
-/** All filesystem work runs on this single bounded worker, never the recognition/UI caller. */
+/** Appends use one bounded worker; account cleanup purges under the same lock on its own worker. */
 private class RuntimeDiagnosticFileWriter(private val directory: File) {
     private val current = File(directory, "events.log")
     private val previous = File(directory, "events.previous.log")
     private val dropped = AtomicLong()
+    private val writeLock = Any()
+    private var deletionBlocked = false
+
+    fun blockAndPurge(): Boolean = synchronized(writeLock) {
+        deletionBlocked = true
+        executor.queue.clear()
+        executor.shutdown()
+        // A running write holds this same lock. No old write can recreate files after this point.
+        runCatching {
+            val currentDeleted = !current.exists() || current.delete()
+            val previousDeleted = !previous.exists() || previous.delete()
+            val directoryDeleted = !directory.exists() || directory.delete()
+            currentDeleted && previousDeleted && directoryDeleted && !directory.exists()
+        }.getOrDefault(false)
+    }
 
     /**
      * Random per process and kept only in memory: separates runs whose elapsed_ms restarts
@@ -128,41 +151,44 @@ private class RuntimeDiagnosticFileWriter(private val directory: File) {
     fun enqueue(elapsedMs: Long, metadata: String) {
         try {
             executor.execute {
-                try {
-                    val bytes = (
-                        "run_id=" + runId + " elapsed_ms=" + elapsedMs.coerceAtLeast(0L) +
-                            " dropped_total=" + dropped.get() + " " + metadata + "\n"
-                        ).toByteArray(Charsets.UTF_8)
-                    if (bytes.size > MAX_RECORD_BYTES) {
-                        dropped.incrementAndGet()
-                        return@execute
-                    }
-                    if (!directory.isDirectory && !directory.mkdirs()) {
-                        dropped.incrementAndGet()
-                        return@execute
-                    }
-                    // Only this logger's two fixed files are ever removed or replaced.
-                    if (previous.length() > MAX_FILE_BYTES && !previous.delete()) {
-                        dropped.incrementAndGet()
-                        return@execute
-                    }
-                    if (current.length() > MAX_FILE_BYTES && !current.delete()) {
-                        dropped.incrementAndGet()
-                        return@execute
-                    }
-                    if (current.length() + bytes.size > MAX_FILE_BYTES) {
-                        if (previous.exists() && !previous.delete()) {
+                synchronized(writeLock) {
+                    if (deletionBlocked) return@execute
+                    try {
+                        val bytes = (
+                            "run_id=" + runId + " elapsed_ms=" + elapsedMs.coerceAtLeast(0L) +
+                                " dropped_total=" + dropped.get() + " " + metadata + "\n"
+                            ).toByteArray(Charsets.UTF_8)
+                        if (bytes.size > MAX_RECORD_BYTES) {
                             dropped.incrementAndGet()
                             return@execute
                         }
-                        if (current.exists() && !current.renameTo(previous)) {
+                        if (!directory.isDirectory && !directory.mkdirs()) {
                             dropped.incrementAndGet()
                             return@execute
                         }
+                        // Only this logger's two fixed files are ever removed or replaced.
+                        if (previous.length() > MAX_FILE_BYTES && !previous.delete()) {
+                            dropped.incrementAndGet()
+                            return@execute
+                        }
+                        if (current.length() > MAX_FILE_BYTES && !current.delete()) {
+                            dropped.incrementAndGet()
+                            return@execute
+                        }
+                        if (current.length() + bytes.size > MAX_FILE_BYTES) {
+                            if (previous.exists() && !previous.delete()) {
+                                dropped.incrementAndGet()
+                                return@execute
+                            }
+                            if (current.exists() && !current.renameTo(previous)) {
+                                dropped.incrementAndGet()
+                                return@execute
+                            }
+                        }
+                        current.appendBytes(bytes)
+                    } catch (_: Throwable) {
+                        dropped.incrementAndGet()
                     }
-                    current.appendBytes(bytes)
-                } catch (_: Throwable) {
-                    dropped.incrementAndGet()
                 }
             }
         } catch (_: Throwable) {

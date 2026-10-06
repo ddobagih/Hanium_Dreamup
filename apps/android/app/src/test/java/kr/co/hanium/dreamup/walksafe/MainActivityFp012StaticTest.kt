@@ -54,8 +54,10 @@ class MainActivityFp012StaticTest {
 
     @Test
     fun centralSafetyStopEndsTheServerLeaseBestEffort() {
+        assertTrue(functionBlock("private fun enterWalkSessionSafetyStopAndCancelOutputs(")
+            .contains("performWalkSessionSafetyStopCleanup(reason, persistInterruptionMarker, null, null)"))
         val safetyStop =
-            functionBlock("private fun enterWalkSessionSafetyStopAndCancelOutputs(")
+            functionBlock("private fun performWalkSessionSafetyStopCleanup(")
 
         assertTrue(safetyStop.contains("gatewayWalkAuthorityController.beginEnd(it.epoch)"))
         assertTrue(safetyStop.contains("endGatewayWalkBestEffort("))

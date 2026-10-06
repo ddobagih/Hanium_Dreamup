@@ -16,8 +16,10 @@ import json
 import re
 import secrets
 import smtplib
+import socket
 import ssl
-from threading import BoundedSemaphore, Lock
+from threading import BoundedSemaphore, Lock, Timer
+from time import monotonic
 from typing import Any, Protocol
 import uuid
 from zoneinfo import ZoneInfo
@@ -603,30 +605,74 @@ class SmtpOtpSender:
             "If you did not request this, you can ignore this message."
         )
         context = ssl.create_default_context()
+        client = None
+        timer = None
         try:
             if self.security == "implicit_tls":
                 client_factory = smtplib.SMTP_SSL
             else:
                 client_factory = smtplib.SMTP
-            with client_factory(
-                self.host,
-                self.port,
+            client = client_factory(
                 timeout=self.timeout_seconds,
+                local_hostname=self.from_address.rsplit("@", 1)[1],
                 context=context,
             ) if self.security == "implicit_tls" else client_factory(
-                self.host,
-                self.port,
                 timeout=self.timeout_seconds,
-            ) as client:
+                local_hostname=self.from_address.rsplit("@", 1)[1],
+            )
+            deadline = monotonic() + self.timeout_seconds
+
+            def interrupt_delivery() -> None:
+                # A socket's per-read timeout alone lets a slow stream extend the send forever.
+                # DNS resolution is OS-managed; after it returns, budget() blocks further work.
+                connection = client.sock
+                if connection is not None:
+                    try:
+                        connection.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        pass
+
+            def budget() -> None:
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("SMTP delivery deadline exceeded")
+                client.timeout = remaining
+                if client.sock is not None:
+                    client.sock.settimeout(remaining)
+
+            timer = Timer(self.timeout_seconds, interrupt_delivery)
+            timer.daemon = True
+            timer.start()
+            budget()
+            # smtplib keeps the TLS SNI/verification hostname in _host, not connect().
+            client._host = self.host
+            greeting, reply = client.connect(self.host, self.port)
+            if greeting != 220:
+                raise smtplib.SMTPConnectError(greeting, reply)
+            budget()
+            client.ehlo()
+            if self.security == "starttls":
+                budget()
+                client.starttls(context=context)
+                budget()
                 client.ehlo()
-                if self.security == "starttls":
-                    client.starttls(context=context)
-                    client.ehlo()
-                if self.username:
-                    client.login(self.username, self.password)
-                client.send_message(message)
+            if self.username:
+                budget()
+                client.login(self.username, self.password)
+            budget()
+            client.send_message(message)
         except (OSError, TimeoutError, smtplib.SMTPException, ssl.SSLError) as exc:
             raise OtpDeliveryError("secure SMTP delivery failed") from exc
+        finally:
+            if timer is not None:
+                timer.cancel()
+                timer.join()
+            if client is not None:
+                # DATA acceptance is the result. A slow/failing QUIT must not undo it.
+                try:
+                    client.close()
+                except (OSError, smtplib.SMTPException):
+                    pass
 
 
 class UnavailableOtpSender:

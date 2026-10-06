@@ -21,13 +21,18 @@ class MainActivityRawCollectionRuntimeStaticTest {
             "private fun scheduleDetectionIfDue(",
         ).substringBefore("private fun encodeDebugFrameJpeg(")
 
-        assertTrue(source.contains("File(noBackupRoot, \"raw_collections\")"))
+        assertTrue(source.contains("File(noBackupRoot.canonicalFile, \"raw_collections\")"))
         assertTrue(source.contains("Thread(runnable, \"walksafe-raw-collection\")"))
         assertTrue(capture.contains("RAW_COLLECTION_CAPTURE_INTERVAL_MS"))
+        assertTrue(capture.contains("rawMetadataTaskAdmission.submit(rawCollectionExecutor"))
+        assertTrue(capture.contains("clearRawDetectionWindow(clearPendingDropCount = false)"))
         assertTrue(capture.contains("observedAtEpochMs - elapsedWindowMs"))
         assertFalse(capture.contains("epochWindowMs"))
-        assertTrue(capture.contains("rawRuntimeWindow.detectionSample("))
-        assertTrue(capture.contains("rawRuntimeWindow.performanceSample("))
+        assertTrue(capture.contains("val runtimeSnapshot = rawRuntimeWindow.snapshot("))
+        assertTrue(capture.contains("runtimeSnapshot.detection,"))
+        assertTrue(capture.contains("runtimeSnapshot.performance,"))
+        assertFalse(capture.contains("rawRuntimeWindow.detectionSample("))
+        assertFalse(capture.contains("rawRuntimeWindow.performanceSample("))
         assertTrue(capture.contains("rawDetectionDueButInFlightDropCount.getAndSet(0)"))
         assertTrue(capture.contains("busyDroppedSincePrevious = dueButInFlightDropCount"))
         // 16-17 #4: the frame duration is the completion interval, not the inference average.

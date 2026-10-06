@@ -16,6 +16,7 @@ enum class RawCollectionGateReason {
     /** FP-035-DETAIL-04 interim: RAW originals are sent only while charging (unknown = not charging). */
     CHARGING,
     SERVER_DISABLED,
+    RETRY_DELAY,
 }
 
 /** Separates "the queue is empty" from "the queue could not be checked" (16-17 #12, #60). */

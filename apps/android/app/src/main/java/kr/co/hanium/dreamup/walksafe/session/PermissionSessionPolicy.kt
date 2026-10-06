@@ -243,13 +243,6 @@ data class PermissionRecoveryGate(
         }
     }
 
-    fun acknowledgeExplicitResume(): PermissionRecoveryGate =
-        if (state == PermissionRecoveryGateState.AWAITING_EXPLICIT_RESUME) {
-            PermissionRecoveryGate()
-        } else {
-            this
-        }
-
     /**
      * Accepts the user's explicit resume only against a permission observation taken at that
      * moment. An awaiting state computed earlier never releases resources when a required

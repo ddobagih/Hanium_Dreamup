@@ -810,8 +810,9 @@ class GatewayFieldSessionClient(
         nowEpochMs: Long = System.currentTimeMillis(),
         enableLongLivedSession: Boolean = false,
     ): GatewayFieldSession {
+        val canonicalEmail = GatewayAccountInputPolicy.canonicalEmailOrNull(email)
         if (
-            !GatewayAccountInputPolicy.validEmail(email) ||
+            canonicalEmail == null ||
             !GatewayAccountInputPolicy.validPassword(password)
         ) {
             throw GatewaySessionHttpException(0, "invalid_account_credentials")
@@ -837,7 +838,7 @@ class GatewayFieldSessionClient(
             endpoint,
             JSONObject()
                 .put("grant_type", "password")
-                .put("email", email)
+                .put("email", canonicalEmail)
                 .put("password", password)
                 .put("remember_me", rememberMe)
                 .put("device_id", device)
@@ -1570,7 +1571,9 @@ private fun parseGatewayCookie(
     return ParsedGatewayCookie("${GatewayFieldSession.COOKIE_NAME}=$value", maxAge)
 }
 
-class HttpUrlConnectionGatewaySessionTransport : GatewaySessionTransport {
+class HttpUrlConnectionGatewaySessionTransport(
+    private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
+) : GatewaySessionTransport {
     override fun postJson(url: String, body: String): GatewayHttpResponse {
         return postJson(url, emptyMap(), body)
     }
@@ -1617,10 +1620,14 @@ class HttpUrlConnectionGatewaySessionTransport : GatewaySessionTransport {
         headers: Map<String, String>,
         body: ByteArray? = null,
     ): GatewayHttpResponse {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+        val endpoint = URL(url)
+        val connection = openConnection(endpoint).apply {
             requestMethod = method
             connectTimeout = 8_000
-            readTimeout = 12_000
+            // OTP: Gateway body + SMTP/DB + response + whole-handler margin is 65 s.
+            readTimeout = if (method == "POST" && endpoint.path == "/api/account-enrollments/email-otp") {
+                75_000
+            } else 12_000
             instanceFollowRedirects = false
             doInput = true
             doOutput = body != null

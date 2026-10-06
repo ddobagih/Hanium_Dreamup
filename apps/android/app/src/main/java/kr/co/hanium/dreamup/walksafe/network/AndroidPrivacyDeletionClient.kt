@@ -203,6 +203,9 @@ class AndroidPrivacyDeletionClient {
                     doInput = true
                     instanceFollowRedirects = false
                     setRequestProperty("Accept", "application/json")
+                    if (method == "GET") {
+                        setRequestProperty("X-WalkSafe-Deletion-Status-View", "device-verification.v1")
+                    }
                     setRequestProperty("Connection", "close")
                     setRequestProperty(ACCOUNT_DELETION_ACCESS_SECRET_HEADER, accessSecret)
                     session?.requestHeaders()?.forEach(::setRequestProperty)
@@ -313,7 +316,7 @@ internal fun validatedAccountDeletionStatusOrNull(
     return runCatching {
         val root = JSONObject(body)
         if (
-            root.deletionJsonKeys() != setOf(
+            root.deletionJsonKeys() - "device_verification" != setOf(
                 "schema_version",
                 "request_id",
                 "client_revision",
@@ -386,8 +389,43 @@ internal fun validatedAccountDeletionStatusOrNull(
             ) ?: return null,
             items = parsed,
             receiptSha256 = root.nullableString("completion_receipt_sha256"),
+            deviceVerification = if (root.has("device_verification")) {
+                parseDeviceVerification(root.getJSONObject("device_verification"), root.getString("overall_status"), parsed)
+                    ?: return null
+            } else null,
         )
     }.getOrNull()
+}
+
+private fun parseDeviceVerification(
+    view: JSONObject,
+    overall: String,
+    items: Map<DeletionInventoryItem, DeletionItemStatus>,
+): kr.co.hanium.dreamup.walksafe.session.AccountDeletionDeviceVerification? {
+    val counts = listOf("target_count", "deleted_count", "not_found_count", "failed_count",
+        "pending_count", "unverifiable_count", "device_clock_anomaly_count")
+    if (view.deletionJsonKeys() != (counts + listOf("schema_version", "completion_view",
+            "unverifiable_reason", "follow_up", "device_due_at", "evaluated_at")).toSet() ||
+        view.getString("schema_version") != "walksafe.account-deletion-device-verification.v1"
+    ) return null
+    val numbers = counts.associateWith { view.strictLong(it) }
+    if (numbers.values.any { it < 0 || it > 9_007_199_254_740_991L }) return null
+    if (listOf("deleted_count", "not_found_count", "failed_count", "pending_count", "unverifiable_count")
+            .sumOf { numbers.getValue(it) } != numbers.getValue("target_count")) return null
+    java.time.Instant.parse(view.getString("device_due_at"))
+    java.time.Instant.parse(view.getString("evaluated_at"))
+    val completion = view.getString("completion_view")
+    val unverifiable = numbers.getValue("unverifiable_count")
+    if (completion !in setOf("COMPLETED", "IN_PROGRESS", "SERVER_COMPLETED_DEVICE_UNVERIFIED") ||
+        (completion == "COMPLETED") != (overall == "COMPLETED") ||
+        view.nullableString("unverifiable_reason") != (if (unverifiable > 0) "SLA_ELAPSED_NO_CONTACT" else null) ||
+        view.nullableString("follow_up") != (if (unverifiable > 0) "DELETE_ON_NEXT_CONTACT_OR_REMOVE_APP" else null)
+    ) return null
+    if (completion != "IN_PROGRESS" && (numbers.getValue("failed_count") != 0L || numbers.getValue("pending_count") != 0L)) return null
+    if (completion == "COMPLETED" && unverifiable != 0L) return null
+    if (completion == "SERVER_COMPLETED_DEVICE_UNVERIFIED" && (unverifiable == 0L ||
+        items.any { (key, item) -> key != DeletionInventoryItem.DEVICE_UNSENT && !item.state.isComplete })) return null
+    return kr.co.hanium.dreamup.walksafe.session.AccountDeletionDeviceVerification(completion, unverifiable)
 }
 
 private fun JSONObject.deletionJsonKeys(): Set<String> {

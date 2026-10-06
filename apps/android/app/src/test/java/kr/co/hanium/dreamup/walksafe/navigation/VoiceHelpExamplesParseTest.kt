@@ -77,6 +77,7 @@ class VoiceHelpExamplesParseTest {
             "서울역으로 안내해줘" to AndroidVoiceCommand.SetDestination("서울역"),
             "1번" to AndroidVoiceCommand.SelectDestinationCandidate(1),
             "첫 번째" to AndroidVoiceCommand.SelectDestinationCandidate(1),
+            "2번 자세히" to AndroidVoiceCommand.DescribeDestinationCandidate(2),
             "더 듣기" to AndroidVoiceCommand.HearMoreDestinationCandidates,
             "이전 후보" to AndroidVoiceCommand.PreviousDestinationCandidates,
             "목적지 취소" to AndroidVoiceCommand.CancelDestination,

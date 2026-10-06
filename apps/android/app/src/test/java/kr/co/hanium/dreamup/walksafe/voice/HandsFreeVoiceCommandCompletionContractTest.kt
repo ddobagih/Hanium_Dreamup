@@ -192,11 +192,17 @@ class HandsFreeVoiceCommandCompletionContractTest {
     }
 
     @Test
-    fun anUnrelatedHazardAlertInsideTheResponseExtendsButDoesNotFailIt() = withFixture { f ->
+    fun unrelatedHazardDoesNotExtendCommandCompletionButStillBlocksInput() = withFixture { f ->
         val dispatchedAt = f.dispatchCommand("다음 안내 알려줘")
         f.speak(from = dispatchedAt, untilMs = dispatchedAt + 20_000L)
         // Hazard alert starts right after the response (a new utterance start) and runs 15 s.
-        f.speak(from = dispatchedAt + 20_300L, untilMs = dispatchedAt + 35_300L)
+        f.speak(from = dispatchedAt + 20_300L, untilMs = dispatchedAt + 35_300L, owned = false)
+        f.runtime.advanceTo(dispatchedAt + 21_000L)
+        assertTrue(f.returnedToWakeSinceLastDispatch())
+        f.stream.transcript("길라잡이", isFinal = true)
+        f.runtime.drain()
+        assertEquals(1, f.dispatchedCommandIds.size)
+        assertEquals("voice_hands_free=waiting_wake_phrase", f.statuses.last())
         f.runtime.advanceTo(dispatchedAt + 35_700L)
         assertTrue(f.failures.isEmpty())
         f.runtime.advanceTo(dispatchedAt + 36_000L)
@@ -222,6 +228,32 @@ class HandsFreeVoiceCommandCompletionContractTest {
         assertNull(f.controller.dispatchingCommandId())
     }
 
+    @Test fun silenceOrUnrelatedAudioCannotCompleteAnOwnedPendingResponse() = withFixture { f ->
+        val at = f.dispatchCommand("도움말")
+        f.speechOverride = CommandSpeechProgress(CommandSpeechState.PENDING, 1)
+        f.speak(at + 100L, at + 500L, owned = false)
+        f.runtime.advanceTo(at + 3_000L)
+        assertFalse(f.returnedToWakeSinceLastDispatch())
+        f.speechOverride = CommandSpeechProgress(CommandSpeechState.FAILED, 2)
+        f.runtime.advanceTo(at + 3_700L)
+        assertTrue(f.returnedToWakeSinceLastDispatch())
+        assertTrue(f.statuses.entries.any { it.second == "voice_hands_free=command_output_failed" })
+    }
+
+    @Test fun explicitPartProgressKeepsALongSequenceAliveWithoutAudioGaps() = withFixture { f ->
+        val at = f.dispatchCommand("도움말")
+        f.speechOverride = CommandSpeechProgress(CommandSpeechState.PENDING, 1)
+        f.runtime.advanceTo(at + 100_000L)
+        f.speechOverride = CommandSpeechProgress(CommandSpeechState.PENDING, 2)
+        f.runtime.advanceTo(at + 200_000L)
+        assertTrue(f.failures.isEmpty())
+        assertFalse(f.returnedToWakeSinceLastDispatch())
+        f.speechOverride = CommandSpeechProgress(CommandSpeechState.CANCELLED, 3)
+        f.runtime.advanceTo(at + 200_700L)
+        assertTrue(f.returnedToWakeSinceLastDispatch())
+        assertTrue(f.statuses.entries.any { it.second == "voice_hands_free=command_output_cancelled" })
+    }
+
     private fun withFixture(test: (Fixture) -> Unit) {
         val fixture = Fixture()
         try {
@@ -239,7 +271,9 @@ class HandsFreeVoiceCommandCompletionContractTest {
         val work = mutableMapOf<Long, Boolean>()
         val workQueries = mutableListOf<Long>()
         var workThrows = false
+        var speechOverride: CommandSpeechProgress? = null
         private val speech = mutableListOf<LongRange>()
+        private val ownedSpeech = mutableMapOf<Long, MutableList<LongRange>>()
         lateinit var stream: FakeStream
 
         val controller: HandsFreeVoiceController = HandsFreeVoiceController(
@@ -261,6 +295,18 @@ class HandsFreeVoiceCommandCompletionContractTest {
                 )
             },
             isAppSpeechActive = { speech.any { runtime.nowMs() in it } },
+            commandSpeechProgress = progress@{ id ->
+                speechOverride?.let { return@progress it }
+                val parts = ownedSpeech[id].orEmpty()
+                val now = runtime.nowMs()
+                val started = parts.count { now >= it.first }
+                val finished = parts.count { now > it.last }
+                CommandSpeechProgress(when {
+                    parts.any { now in it } -> CommandSpeechState.PENDING
+                    finished > 0 -> CommandSpeechState.COMPLETED
+                    else -> CommandSpeechState.NONE
+                }, (started + finished).toLong())
+            },
             onCommand = { _, _ ->
                 dispatchedCommandIds += checkNotNull(controller.dispatchingCommandId())
             },
@@ -280,8 +326,9 @@ class HandsFreeVoiceCommandCompletionContractTest {
         }
 
         /** Speech is active on [from, untilMs). */
-        fun speak(from: Long, untilMs: Long) {
+        fun speak(from: Long, untilMs: Long, owned: Boolean = true) {
             speech += from until untilMs
+            if (owned) ownedSpeech.getOrPut(dispatchedCommandIds.last()) { mutableListOf() }.add(from until untilMs)
         }
 
         fun dispatchCommand(text: String): Long {

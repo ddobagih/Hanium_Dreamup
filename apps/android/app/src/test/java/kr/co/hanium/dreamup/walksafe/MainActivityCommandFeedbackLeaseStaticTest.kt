@@ -21,7 +21,9 @@ class MainActivityCommandFeedbackLeaseStaticTest {
         assertTrue(response.contains("GatewaySessionProcessCoordinator.snapshot().generation == gatewayGeneration"))
         assertTrue(response.contains("walkSessionLifecycle.snapshot().epoch == responseEpoch"))
         assertTrue(response.contains("commandSpeechResponseCallbacks.takeTerminalCallback("))
-        assertTrue(response.contains("if (dispatch != NavigationSpeechDispatchResult.ACCEPTED) failed()"))
+        assertTrue(response.contains("CommandSpeechSequence("))
+        assertTrue(response.contains("dispatch == NavigationSpeechDispatchResult.ACCEPTED"))
+        assertTrue(response.contains("onFailed = failed"))
         assertFalse(response.contains("announceForAccessibility("))
         assertFalse(response.contains("startVoiceCommandRecognition("))
     }

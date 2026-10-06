@@ -195,10 +195,23 @@ internal class AndroidEmailEnrollmentStore(
         return EmailEnrollmentRestoreResult.Restored(partial)
     }
 
-    fun clear(): Boolean =
+    // Advisory only: never a receipt, credential, or permission to advance onboarding.
+    // Keep it across OTP expiry/cleanup until a creation or login result is confirmed.
+    fun hasUnconfirmedCreation(): Boolean =
+        !sensitive.isBlocked() && sensitive.getBoolean(CREATION_PENDING_KEY, false)
+
+    fun markCreationPending(): Boolean =
+        !sensitive.isBlocked() && sensitive.edit()
+            .putBoolean(CREATION_PENDING_KEY, true).commit()
+
+    fun clearUnconfirmedCreation(): Boolean =
+        !sensitive.isBlocked() && sensitive.edit().remove(CREATION_PENDING_KEY).commit()
+
+    fun clear(creationConfirmed: Boolean = false): Boolean =
         !sensitive.isBlocked() && sensitive.edit()
             .remove(PARTIAL_KEY)
             .remove(LEGACY_PARTIAL_KEY)
+            .apply { if (creationConfirmed) remove(CREATION_PENDING_KEY) }
             .commit()
 
     fun resetAfterConfirmedAccountDeletion(): Boolean = sensitive.destroyAndClear()
@@ -227,6 +240,7 @@ internal class AndroidEmailEnrollmentStore(
         private const val PARTIAL_KEY = "email_enrollment_partial_v4"
         private const val LEGACY_PARTIAL_KEY = "email_enrollment_partial_v3"
         private const val PENDING_OTP_REQUEST_KEY = "email_otp_pending_request_v1"
+        private const val CREATION_PENDING_KEY = "account_creation_unconfirmed_v1"
         private val KEY_POLICY = AeadKeyPolicy(
             aliasPrefix = "walksafe.user.email_enrollment.aead.v",
             currentVersion = 1,
@@ -240,7 +254,7 @@ internal class AndroidEmailEnrollmentStore(
                 "kr.co.hanium.dreamup.walksafe|USER|email-enrollment|schema=4"
                     .toByteArray(Charsets.UTF_8),
             keyPolicy = KEY_POLICY,
-            exactKeys = setOf(PARTIAL_KEY, LEGACY_PARTIAL_KEY, PENDING_OTP_REQUEST_KEY),
+            exactKeys = setOf(PARTIAL_KEY, LEGACY_PARTIAL_KEY, PENDING_OTP_REQUEST_KEY, CREATION_PENDING_KEY),
         )
     }
 }

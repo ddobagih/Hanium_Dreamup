@@ -10,6 +10,7 @@ import {
   type GatewayFetch
 } from "./backend.js";
 import { gatewayTrustedClientIp } from "./auth.js";
+import { ACCOUNT_ENROLLMENT_OWN_LIMITS_MS } from "./account-relay.js";
 import { resolveVoiceServiceConfig } from "./config.js";
 import { RAW_COLLECTION_OWN_LIMITS_MS } from "./raw-collection-relay.js";
 import { handleGatewayRequest, type GatewayDependencies } from "./routes.js";
@@ -51,7 +52,9 @@ export function gatewayRequestDeadlineMs(request: Request): number {
   if (request.method === "POST" && route?.deadline === "walking") return 8_000;
   if (request.method === "GET" && route?.deadline === "search") return 7_000;
   let ownLimitsMs = 0;
-  if (request.method === "POST" && route?.template === "/api/speech/stt") {
+  if (request.method === "POST" && route?.template === "/api/account-enrollments/email-otp") {
+    ownLimitsMs = ACCOUNT_ENROLLMENT_OWN_LIMITS_MS;
+  } else if (request.method === "POST" && route?.template === "/api/speech/stt") {
     ownLimitsMs = speechRelayOwnLimitsMs("stt");
   } else if (request.method === "POST" && route?.template === "/api/speech/tts") {
     ownLimitsMs = speechRelayOwnLimitsMs("tts");

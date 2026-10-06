@@ -592,7 +592,9 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             throw new HistoryCursorException();
         }
         if (historyType == HistoryType.NONE && operationResponse.statusCode == 409) {
-            throw new MutationConflictException();
+            throw new MutationConflictException(
+                "delivery_institution_mismatch".equals(errorCode(operationResponse.body))
+            );
         }
         requireExactStatus(
             operationResponse.statusCode,

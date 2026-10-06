@@ -52,7 +52,9 @@ class MainActivityForegroundLocationWarmupStaticTest {
 
     @Test
     fun newWalkAndCameraOutputCancellationRetainOnlyFreshForegroundLocation() {
-        val cancel = functionSection("private fun cancelWalkSessionOutputs(")
+        val entry = functionSection("private fun cancelWalkSessionOutputs(")
+        assertTrue(entry.contains("cancelWalkSessionOutputsInternal(reason, null)"))
+        val cancel = functionSection("private fun cancelWalkSessionOutputsInternal(")
         val reset = functionSection("private fun resetWalkTransientStateForNewWalk(")
         val preserve = reset.substringAfter("if (currentLocationCollectionAllowsWork())")
             .substringBefore("} else {")

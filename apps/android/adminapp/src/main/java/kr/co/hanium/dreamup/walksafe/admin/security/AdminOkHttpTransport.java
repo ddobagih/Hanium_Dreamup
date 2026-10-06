@@ -31,9 +31,15 @@ final class AdminOkHttpTransport {
         .retryOnConnectionFailure(false)
         .build();
 
-    private AdminOkHttpTransport() {}
+    private final java.util.Set<Call> inFlight = new java.util.HashSet<>();
+    private boolean closed;
 
-    static Result execute(
+    synchronized void cancelInFlight() {
+        closed = true;
+        for (Call call : inFlight) call.cancel();
+    }
+
+    Result execute(
         String method,
         String url,
         Map<String, String> headers,
@@ -48,63 +54,74 @@ final class AdminOkHttpTransport {
         headers.forEach(request::header);
         request.method(method, body == null ? null : RequestBody.create(body, null));
         Call call = CLIENT.newCall(request.build());
-        CountDownLatch completed = new CountDownLatch(1);
-        AtomicReference<Result> result = new AtomicReference<>();
-        AtomicReference<Throwable> failure = new AtomicReference<>();
-        call.enqueue(new Callback() {
-            @Override
-            public void onFailure(Call ignored, IOException error) {
-                failure.set(error);
-                completed.countDown();
-            }
-
-            @Override
-            public void onResponse(Call ignored, okhttp3.Response response) {
-                try (response) {
-                    if (call.isCanceled()) throw new IOException(cancelledMessage);
-                    byte[] responseBytes = response.body() == null
-                        ? new byte[0]
-                        : readBounded(
-                            response.body().byteStream(),
-                            call,
-                            maximumResponseBytes,
-                            cancelledMessage,
-                            noProgressMessage,
-                            tooLargeMessage
-                        );
-                    Map<String, String> responseHeaders = new LinkedHashMap<>();
-                    response.headers().toMultimap().forEach((name, values) -> {
-                        if (name != null && values != null && values.size() == 1) {
-                            responseHeaders.put(name, values.get(0));
-                        }
-                    });
-                    result.set(new Result(response.code(), responseBytes, responseHeaders));
-                } catch (Throwable error) {
+        synchronized (this) {
+            if (closed) throw new IOException(cancelledMessage);
+            inFlight.add(call);
+        }
+        try {
+            CountDownLatch completed = new CountDownLatch(1);
+            AtomicReference<Result> result = new AtomicReference<>();
+            AtomicReference<Throwable> failure = new AtomicReference<>();
+            call.enqueue(new Callback() {
+                @Override
+                public void onFailure(Call ignored, IOException error) {
                     failure.set(error);
-                } finally {
                     completed.countDown();
                 }
-            }
-        });
-        try {
-            if (!completed.await(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+
+                @Override
+                public void onResponse(Call ignored, okhttp3.Response response) {
+                    try (response) {
+                        if (call.isCanceled()) throw new IOException(cancelledMessage);
+                        byte[] responseBytes = response.body() == null
+                            ? new byte[0]
+                            : readBounded(
+                                response.body().byteStream(),
+                                call,
+                                maximumResponseBytes,
+                                cancelledMessage,
+                                noProgressMessage,
+                                tooLargeMessage
+                            );
+                        Map<String, String> responseHeaders = new LinkedHashMap<>();
+                        response.headers().toMultimap().forEach((name, values) -> {
+                            if (name != null && values != null && values.size() == 1) {
+                                responseHeaders.put(name, values.get(0));
+                            }
+                        });
+                        result.set(new Result(response.code(), responseBytes, responseHeaders));
+                    } catch (Throwable error) {
+                        failure.set(error);
+                    } finally {
+                        completed.countDown();
+                    }
+                }
+            });
+            try {
+                if (!completed.await(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    call.cancel();
+                    throw new SocketTimeoutException("administrator API request timed out; server outcome unknown");
+                }
+            } catch (InterruptedException error) {
                 call.cancel();
-                throw new SocketTimeoutException("administrator API request timed out; server outcome unknown");
+                Thread.currentThread().interrupt();
+                throw new IOException(cancelledMessage, error);
             }
-        } catch (InterruptedException error) {
-            call.cancel();
-            Thread.currentThread().interrupt();
-            throw new IOException(cancelledMessage, error);
+            Throwable error = failure.get();
+            if (error instanceof IOException ioError) throw ioError;
+            if (error instanceof RuntimeException runtimeError) throw runtimeError;
+            if (error instanceof Error fatalError) throw fatalError;
+            Result completedResult = result.get();
+            if (completedResult == null) {
+                throw new IOException("administrator response did not complete");
+            }
+            synchronized (this) {
+                if (closed) throw new IOException(cancelledMessage);
+            }
+            return completedResult;
+        } finally {
+            synchronized (this) { inFlight.remove(call); }
         }
-        Throwable error = failure.get();
-        if (error instanceof IOException ioError) throw ioError;
-        if (error instanceof RuntimeException runtimeError) throw runtimeError;
-        if (error instanceof Error fatalError) throw fatalError;
-        Result completedResult = result.get();
-        if (completedResult == null) {
-            throw new IOException("administrator response did not complete");
-        }
-        return completedResult;
     }
 
     private static byte[] readBounded(

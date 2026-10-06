@@ -53,7 +53,10 @@ def configured_model_entries(config: dict[str, object]) -> dict[str, str | None]
             not isinstance(artifact_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", artifact_hash)
         ):
             raise ValueError(f"invalid artifact SHA-256 for {model_key!r}")
-        expected[f"assets/{asset_path.as_posix()}"] = artifact_hash
+        entry = f"assets/{asset_path.as_posix()}"
+        if entry in expected:
+            raise ValueError(f"runtime model asset is declared twice: {asset!r}")
+        expected[entry] = artifact_hash
     return expected
 
 

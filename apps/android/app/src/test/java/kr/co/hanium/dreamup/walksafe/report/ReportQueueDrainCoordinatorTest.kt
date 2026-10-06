@@ -23,6 +23,65 @@ import org.junit.Test
 
 class ReportQueueDrainCoordinatorTest {
     @Test
+    fun cancelBeforeExecuteReleasesTheReservedSnapshotAndAllowsAFreshAttempt() {
+        val fixture = fixture()
+        val call = requireNotNull(fixture.coordinator.startNextWithResult(
+            { context() }, transport(fixture.report) { error("must not execute") },
+        ))
+        val block = call.javaClass.getDeclaredField("executeBlock").apply { isAccessible = true }.get(call)
+        val owned = block.javaClass.declaredFields.first { it.type == QueuedReport::class.java }
+            .apply { isAccessible = true }.get(block) as QueuedReport
+        assertTrue(owned.payload.imageJpeg().isNotEmpty())
+        call.cancel()
+        assertThrows(IllegalStateException::class.java) { owned.payload.imageJpeg() }
+        assertThrows(CancellationException::class.java) { call.execute() }
+        val retry = requireNotNull(fixture.coordinator.startNextWithResult(
+            { context() }, transport(fixture.report) {},
+        ))
+        assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD, retry.execute().outcome)
+        fixture.report.close()
+    }
+
+    @Test
+    fun drainReleasesItsOwnedSnapshotAfterReceiptFailureAndCancellation() {
+        for (mode in listOf("receipt", "io", "cancel", "unexpected")) {
+            val fixture = fixture()
+            var selected: QueuedReport? = null
+            lateinit var call: CancellableNetworkCall<ReportQueueDrainResult>
+            val transport = object : ReportQueueTransport {
+                override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> {
+                    selected = report
+                    assertTrue(report.payload.imageJpeg().isNotEmpty())
+                    when (mode) {
+                        "io" -> throw java.io.IOException("response lost")
+                        "unexpected" -> error("transport setup failed")
+                        "cancel" -> {
+                            call.cancel()
+                            assertTrue("running transport still owns the bytes", report.payload.imageJpeg().isNotEmpty())
+                            null
+                        }
+                        else -> receipt(report)
+                    }
+                }
+                override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> =
+                    error("must not upload")
+            }
+            call = requireNotNull(fixture.coordinator.startNextWithResult({ context() }, transport))
+            if (mode == "unexpected") assertThrows(IllegalStateException::class.java) { call.execute() }
+            else call.execute()
+            assertThrows(IllegalStateException::class.java) { requireNotNull(selected).payload.imageJpeg() }
+            // The enqueue caller's independent snapshot is still theirs; failed calls retain disk data.
+            assertTrue(fixture.report.payload.imageJpeg().isNotEmpty())
+            fixture.report.close()
+            val remaining = fixture.store.queuedReports()
+            try {
+                assertEquals(if (mode == "receipt") 0 else 1, remaining.size)
+                remaining.forEach { assertTrue(it.payload.imageJpeg().isNotEmpty()) }
+            } finally { remaining.forEach { it.close() } }
+        }
+    }
+
+    @Test
     fun createdAndReplayedReturnDistinctMetadataOnlyAfterReceiptCommitAndDelete() {
         listOf(ReportCreationOutcome.CREATED, ReportCreationOutcome.REPLAYED, null).forEach { creation ->
             val fixture = fixture(ReportQueuePriority.AUTOMATIC)

@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.report
 
 import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
 import kr.co.hanium.dreamup.walksafe.depth.DepthSource
 import kr.co.hanium.dreamup.walksafe.depth.MaskPolygonExtractor
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
@@ -13,6 +14,8 @@ internal class ReportCoordinateEvidence private constructor(
     private val image: ByteArray,
     private val capturedAtMs: Long,
     private val geometryVersion: Long,
+    val capturedAtElapsedRealtimeMs: Long?,
+    val captureLocation: TrustedLocation?,
 ) {
     fun statusFor(output: TrackedObjectDepth, image: ByteArray?, capturedAtMs: Long, geometryVersion: Long): String =
         if (this.output === output && this.image === image && this.capturedAtMs == capturedAtMs &&
@@ -56,7 +59,8 @@ internal class ReportCoordinateEvidence private constructor(
                 else -> false
             }
             if (!sensorAvailable) return null
-            return ReportCoordinateEvidence(output, image, capturedAt, geometryVersion)
+            return ReportCoordinateEvidence(output, image, capturedAt, geometryVersion,
+                snapshot.capturedAtElapsedRealtimeMs, evidence.reportLocation)
         }
     }
 }

@@ -4,10 +4,6 @@ import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
-import java.text.ParsePosition
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
 import java.util.UUID
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
 import kr.co.hanium.dreamup.walksafe.network.BoundedHttpResponse
@@ -131,32 +127,7 @@ private fun BoundedHttpResponse.toUploadException(
 internal fun parseReportRetryAfterMs(
     header: String?,
     nowEpochMs: Long = System.currentTimeMillis(),
-): Long? {
-    val value = header?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-    if (value.all { it in '0'..'9' }) {
-        val seconds = value.toLongOrNull() ?: return MAX_SAFE_RETRY_DELAY_MS
-        return if (seconds > MAX_SAFE_RETRY_DELAY_MS / 1_000L) {
-            MAX_SAFE_RETRY_DELAY_MS
-        } else {
-            seconds * 1_000L
-        }
-    }
-    val position = ParsePosition(0)
-    val deadlineEpochMs = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
-        .apply {
-            isLenient = false
-            timeZone = TimeZone.getTimeZone("GMT")
-        }
-        .parse(value, position)?.time ?: return null
-    if (position.index != value.length) return null
-    if (deadlineEpochMs <= nowEpochMs) return 0L
-    val delayMs = if (nowEpochMs < 0L && deadlineEpochMs > Long.MAX_VALUE + nowEpochMs) {
-        Long.MAX_VALUE
-    } else {
-        deadlineEpochMs - nowEpochMs
-    }
-    return delayMs.coerceAtMost(MAX_SAFE_RETRY_DELAY_MS)
-}
+): Long? = kr.co.hanium.dreamup.walksafe.network.parseHttpRetryAfterMs(header, nowEpochMs)
 
 private fun JSONObject.keysAsSet(): Set<String> = buildSet { keys().forEach(::add) }
 
@@ -376,14 +347,6 @@ internal class AndroidReportUploader internal constructor() {
         require(expectedGatewayActorId == session.actorId) {
             "expected gateway actor id does not match verified session"
         }
-        val imageSnapshot = imageJpeg.copyOf()
-        val receiptExpectation =
-            reportUploadReceiptExpectation(
-                stableTraceId = stableTraceId,
-                expectedGatewayActorId = session.actorId,
-                imageJpeg = imageSnapshot,
-                transferPurpose = transferPurpose,
-            )
         val metadata = runCatching { JSONObject(metadataJson) }.getOrNull()
         val automaticReport = metadata?.optBoolean("auto_reported")
         require(automaticReport == (transferPurpose == ReportTransferPurpose.AUTOMATIC)) {
@@ -393,92 +356,104 @@ internal class AndroidReportUploader internal constructor() {
             "report trace id does not match request payload"
         }
         val authenticationRequest = captureGatewayAuthenticationRequest(session)
-        return cancellableHttpCall(deadlineMs = REPORT_UPLOAD_DEADLINE_MS) { cancellation ->
-        val endpoint = session.gatewayBaseUrl.trimEnd('/') + "/api/reports/v2"
-        val boundary = "----walksafe-${System.currentTimeMillis()}"
-        val connection =
-            ReportPrivacyConsentSession.withLiveUploadPermit(
-                permit = permit,
-                expectedPurpose = transferPurpose,
-            ) {
-                networkBinding.openConnection(URL(endpoint)) as HttpURLConnection
-            }
-        cancellation.attach(connection)
-        try {
-            connection.apply {
-                requestMethod = "POST"
-                connectTimeout = REPORT_CONNECT_TIMEOUT_MS
-                readTimeout = REPORT_READ_TIMEOUT_MS
-                doOutput = true
-                doInput = true
-                instanceFollowRedirects = false
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("Connection", "close")
-                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-                setRequestProperty(
-                    CONSENT_INSTALLATION_HEADER,
-                    consentConfirmation.installationId,
-                )
-                setRequestProperty(
-                    CONSENT_CONTROL_SECRET_HEADER,
-                    consentConfirmation.controlSecret,
-                )
-                setRequestProperty(
-                    CONSENT_NETWORK_TRANSPORT_HEADER,
-                    networkBinding.transport.wireValue,
-                )
-                setRequestProperty(REPORT_PURPOSE_HEADER, transferPurpose.wireValue)
-                setRequestProperty(CONSENT_POLICY_HEADER, consentConfirmation.policyVersion)
-                setRequestProperty(
-                    CONSENT_REVISION_HEADER,
-                    consentConfirmation.revision.toString(),
-                )
-                setRequestProperty(
-                    CONSENT_RECEIPT_HEADER,
-                    consentConfirmation.backendConsentReceiptSha256,
-                )
-                session.requestHeaders().forEach(::setRequestProperty)
-            }
-            val metadataUtf8 = metadataJson.toByteArray(Charsets.UTF_8)
-            try {
-                connection.setFixedLengthStreamingMode(
-                    reportMultipartContentLength(boundary, metadataUtf8.size, imageSnapshot.size),
-                )
-                connection.outputStream.use { output ->
-                    cancellation.attach(output)
-                    try {
-                        writeMultipart(output, boundary, metadataUtf8, imageSnapshot)
-                    } finally {
-                        cancellation.detach(output)
-                    }
-                }
-            } finally {
-                metadataUtf8.fill(0)
-            }
-            val response = connection.readBoundedResponse(REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation)
-            if (response.statusCode !in 200..299) {
-                val error = ReportUploadHttpException(
-                    ReportUploadError(
-                        statusCode = response.statusCode,
-                        errorBody = response.body,
-                        retryAfterMs = parseReportRetryAfterMs(connection.getHeaderField("Retry-After")),
-                    ),
-                )
-                cancellation.throwIfCancelled()
-                consumeGatewayAuthenticationStaleResponse(authenticationRequest, session, response)
-                throw error
-            }
-            validatedReportUploadResponseOrNull(
-                statusCode = response.statusCode,
-                body = response.body,
-                receiptExpectation = receiptExpectation,
+        val imageSnapshot = imageJpeg.copyOf()
+        val receiptExpectation = try {
+            reportUploadReceiptExpectation(
+                stableTraceId = stableTraceId,
+                expectedGatewayActorId = session.actorId,
+                imageJpeg = imageSnapshot,
+                transferPurpose = transferPurpose,
             )
-                ?: throw ReportUploadProtocolException()
-        } finally {
-            cancellation.detach(connection)
-            connection.disconnect()
+        } catch (error: Throwable) {
+            imageSnapshot.fill(0)
+            throw error
         }
-    }
+        return cancellableHttpCall(deadlineMs = REPORT_UPLOAD_DEADLINE_MS) { cancellation ->
+            val endpoint = session.gatewayBaseUrl.trimEnd('/') + "/api/reports/v2"
+            val boundary = "----walksafe-${System.currentTimeMillis()}"
+            val connection =
+                ReportPrivacyConsentSession.withLiveUploadPermit(
+                    permit = permit,
+                    expectedPurpose = transferPurpose,
+                ) {
+                    networkBinding.openConnection(URL(endpoint)) as HttpURLConnection
+                }
+            cancellation.attach(connection)
+            try {
+                connection.apply {
+                    requestMethod = "POST"
+                    connectTimeout = REPORT_CONNECT_TIMEOUT_MS
+                    readTimeout = REPORT_READ_TIMEOUT_MS
+                    doOutput = true
+                    doInput = true
+                    instanceFollowRedirects = false
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty("Connection", "close")
+                    setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                    setRequestProperty(
+                        CONSENT_INSTALLATION_HEADER,
+                        consentConfirmation.installationId,
+                    )
+                    setRequestProperty(
+                        CONSENT_CONTROL_SECRET_HEADER,
+                        consentConfirmation.controlSecret,
+                    )
+                    setRequestProperty(
+                        CONSENT_NETWORK_TRANSPORT_HEADER,
+                        networkBinding.transport.wireValue,
+                    )
+                    setRequestProperty(REPORT_PURPOSE_HEADER, transferPurpose.wireValue)
+                    setRequestProperty(CONSENT_POLICY_HEADER, consentConfirmation.policyVersion)
+                    setRequestProperty(
+                        CONSENT_REVISION_HEADER,
+                        consentConfirmation.revision.toString(),
+                    )
+                    setRequestProperty(
+                        CONSENT_RECEIPT_HEADER,
+                        consentConfirmation.backendConsentReceiptSha256,
+                    )
+                    session.requestHeaders().forEach(::setRequestProperty)
+                }
+                val metadataUtf8 = metadataJson.toByteArray(Charsets.UTF_8)
+                try {
+                    connection.setFixedLengthStreamingMode(
+                        reportMultipartContentLength(boundary, metadataUtf8.size, imageSnapshot.size),
+                    )
+                    connection.outputStream.use { output ->
+                        cancellation.attach(output)
+                        try {
+                            writeMultipart(output, boundary, metadataUtf8, imageSnapshot)
+                        } finally {
+                            cancellation.detach(output)
+                        }
+                    }
+                } finally {
+                    metadataUtf8.fill(0)
+                }
+                val response = connection.readBoundedResponse(REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation)
+                if (response.statusCode !in 200..299) {
+                    val error = ReportUploadHttpException(
+                        ReportUploadError(
+                            statusCode = response.statusCode,
+                            errorBody = response.body,
+                            retryAfterMs = parseReportRetryAfterMs(connection.getHeaderField("Retry-After")),
+                        ),
+                    )
+                    cancellation.throwIfCancelled()
+                    consumeGatewayAuthenticationStaleResponse(authenticationRequest, session, response)
+                    throw error
+                }
+                validatedReportUploadResponseOrNull(
+                    statusCode = response.statusCode,
+                    body = response.body,
+                    receiptExpectation = receiptExpectation,
+                )
+                    ?: throw ReportUploadProtocolException()
+            } finally {
+                cancellation.detach(connection)
+                connection.disconnect()
+            }
+        }.clearingOwnedReportImage(imageSnapshot)
     }
 
     private fun writeMultipart(
@@ -543,7 +518,6 @@ fun reportRetryDelayMs(
     retryAfterMs: Long? = null,
 ): Long {
     val defaultDelayMs = when {
-        statusCode in setOf(401, 403, 422) -> AUTH_OR_INPUT_RETRY_DELAY_MS
         statusCode == 429 -> RATE_LIMIT_RETRY_DELAY_MS
         else -> {
             val exponent = (consecutiveFailures.coerceAtLeast(1) - 1).coerceAtMost(4)
@@ -556,7 +530,6 @@ fun reportRetryDelayMs(
 private const val MIN_RETRY_DELAY_MS = 2_000L
 private const val MAX_RETRY_DELAY_MS = 30_000L
 private const val RATE_LIMIT_RETRY_DELAY_MS = 30_000L
-private const val AUTH_OR_INPUT_RETRY_DELAY_MS = 60_000L
 // Callers persist now + delay; a far-future wait must not overflow that timestamp.
 private const val MAX_SAFE_RETRY_DELAY_MS = Long.MAX_VALUE / 2L
 internal const val REPORT_UPLOAD_MAX_RESPONSE_BYTES = 512 * 1024
@@ -702,4 +675,25 @@ private fun JSONArray?.toStringList(): List<String> {
         if (value.isNotBlank()) values += value
     }
     return values
+}
+
+/** Call owns [image] from creation. Cancellation must not wipe it while a writer is using it. */
+internal fun <T> CancellableNetworkCall<T>.clearingOwnedReportImage(image: ByteArray): CancellableNetworkCall<T> {
+    val lock = Any()
+    var started = false
+    lateinit var ownedCall: CancellableNetworkCall<T>
+    ownedCall = CancellableNetworkCall(
+        executeBlock = {
+            synchronized(lock) {
+                if (ownedCall.isCancelled()) throw java.util.concurrent.CancellationException()
+                started = true
+            }
+            try { execute() } finally { image.fill(0) }
+        },
+        cancelBlock = {
+            synchronized(lock) { if (!started) image.fill(0) }
+            cancel()
+        },
+    )
+    return ownedCall
 }

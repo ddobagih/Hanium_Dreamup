@@ -44,6 +44,31 @@ import org.junit.Test
 /** 16-17 #1 (walk coverage), #2/#4 (v2 runtime stats), #8 (clocks), #12/#60 (outcome reasons). */
 class RawCollectionRuntimeWalkCoverageTest {
     @Test
+    fun missingThermalObservationDoesNotBecomeAnAllClearAfterMerging() {
+        for (windows in listOf(
+            listOf(null, false, false), listOf(false, null, false),
+            listOf(false, false, null), listOf(null, null),
+            listOf(false, false), listOf(null, true, false), listOf(true, null),
+        )) {
+            val f = CoverageFixture()
+            windows.forEachIndexed { index, thermal ->
+                assertEquals(RawMetadataCaptureResult.CAPTURED, f.capture(index, thermal = thermal))
+            }
+            assertEquals(RawSegmentSealResult.SEALED,
+                f.coordinator.sealActiveSegment(f.context(WalkSessionState.ENDED)))
+            val performance = f.payload(f.store.readyManifests(OWNER).single(), 1)
+            val expected = when {
+                true in windows -> true
+                null in windows -> null
+                else -> false
+            }
+            assertEquals("Thermal observations: $windows", expected,
+                if (performance.isNull("thermal_throttled")) null else performance.getBoolean("thermal_throttled"))
+            assertEquals(windows.count { it == true }, performance.getInt("thermal_throttled_window_count"))
+        }
+    }
+
+    @Test
     fun laterWindowsOfOneActivePeriodAreKeptInOneSegment() {
         val f = CoverageFixture()
         assertEquals(RawMetadataCaptureResult.CAPTURED, f.capture(window = 0))
@@ -689,6 +714,7 @@ class RawCollectionRuntimeWalkCoverageTest {
             identity: RawDetectorRuntimeIdentity? = RUNTIME_IDENTITY,
         ) =
             RawDetectionMetadataSample(
+                windowIdentity = fixtureRawCollectionRuntimeWalkCoverageTestWindowIdentity,
                 windowStartedAtEpochMs = start,
                 capturedAtEpochMs = end,
                 processedFrameCount = 30,
@@ -706,6 +732,7 @@ class RawCollectionRuntimeWalkCoverageTest {
             )
 
         fun performance(start: Long, end: Long, thermal: Boolean? = false) = RawPerformanceMetadataSample(
+            windowIdentity = fixtureRawCollectionRuntimeWalkCoverageTestWindowIdentity,
             windowStartedAtEpochMs = start,
             capturedAtEpochMs = end,
             processedFrameCount = 30,
@@ -978,3 +1005,5 @@ private fun coverageActiveWalk(epoch: WalkRuntimeEpoch): WalkSessionSnapshot {
         readiness = WalkSessionReadinessSnapshot(epoch, plan, 1L, observations),
     )
 }
+
+private val fixtureRawCollectionRuntimeWalkCoverageTestWindowIdentity = RawRuntimeWindowIdentity(1L)

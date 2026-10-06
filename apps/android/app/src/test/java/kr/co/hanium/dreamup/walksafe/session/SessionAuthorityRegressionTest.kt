@@ -5,14 +5,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SessionAuthorityRegressionTest {
-    @Test fun accountChangeDropsEveryFormerOwnersGrant() {
+    @Test fun accountChangeDropsFormerConsentButKeepsTheDeviceNetworkPreference() {
         for (rememberOnly in listOf(false, true)) {
             val policy = grantedPolicy()
             val current = if (rememberOnly) policy.rememberActor("other") else policy.authenticated("other")
             assertFalse(current.rawCollectionConsentGranted)
             assertFalse(current.automaticReportConsentGranted)
             assertFalse(current.trainingReuseConsentGranted)
-            assertEquals(MobileNetworkPreference.WIFI_ONLY, current.mobileNetworkPreference)
+            // Local network preference is device-wide; server consent is separately actor-bound.
+            assertEquals(MobileNetworkPreference.ALLOW_CELLULAR, current.mobileNetworkPreference)
         }
     }
 
@@ -92,10 +93,11 @@ class SessionAuthorityRegressionTest {
         rawCollectionConsentGranted = true, automaticReportConsentGranted = true,
         mobileNetworkPreference = MobileNetworkPreference.ALLOW_CELLULAR, trainingReuseConsentGranted = true,
     ))
-    private fun foregroundLifecycle() = WalkSessionLifecycle().apply { handle(WalkSessionEvent.EnteredForeground) }
+    private fun foregroundLifecycle() = WalkSessionLifecycle(clock = { 100L }).apply { handle(WalkSessionEvent.EnteredForeground) }
     private fun activeLifecycle() = foregroundLifecycle().apply {
         handle(WalkSessionEvent.InitialCheckCompleted(readiness(this)))
         handle(WalkSessionEvent.StartRequested(requireNotNull(snapshot().confirmationToken)))
+        assertEquals(WalkSessionState.ACTIVE, snapshot().state)
     }
     private fun readiness(
         lifecycle: WalkSessionLifecycle,

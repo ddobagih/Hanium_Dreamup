@@ -33,7 +33,9 @@ class MainActivityConsentRedeliveryStaticTest {
         val overwrite = apply.indexOf("integratedConsentConfirmedActorSha256 = expectedActorSha256")
         assertTrue(capture in 0 until overwrite)
 
-        val lockBlock = ReportStaticSourceInspector.blockAfter(apply, "synchronized(reportUploadSafetyLock)")
+        assertTrue(apply.contains("applyReportConsentAuthority(unchangedReportAuthority, authorityGuard)"))
+        val authority = ReportStaticSourceInspector.functionBlock(source, "internal fun applyReportConsentAuthority")
+        val lockBlock = ReportStaticSourceInspector.blockAfter(authority, "synchronized(reportUploadSafetyLock)")
         val cancellation = ReportStaticSourceInspector.blockAfter(
             lockBlock,
             "if (!unchangedReportAuthority || !reportPrivacyConsentSession.isGranted())",
@@ -41,15 +43,15 @@ class MainActivityConsentRedeliveryStaticTest {
         assertTrue(cancellation.contains("reportUploadSafetyGeneration += 1L"))
         assertTrue(cancellation.contains("automaticReportUploadSafetyGeneration += 1L"))
         assertTrue(cancellation.contains("reportPrivacyConsentSession.cancelActiveCalls()"))
-        assertFalse(cancellation.contains("grantFromServerConfirmedIntegratedConsent"))
-        assertTrue(
+        assertTrue(cancellation.contains("grantFromServerConfirmedIntegratedConsent"))
+        assertFalse(
             lockBlock.substringAfter(cancellation)
                 .contains("reportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent(authorityGuard)"),
         )
         // No other unconditional report cancellation remains in this confirmation path.
         assertEquals(
             1,
-            Regex("reportPrivacyConsentSession\\.cancelActiveCalls\\(\\)").findAll(apply).count(),
+            Regex("reportPrivacyConsentSession\\.cancelActiveCalls\\(\\)").findAll(apply + authority).count(),
         )
     }
 

@@ -129,6 +129,71 @@ class EmailOtpPendingRequestRecoveryTest {
     }
 
     @Test
+    fun unavailableOrFailedStorageNeverStartsAnUnrecoverableRequest() {
+        val unavailable = EmailOtpRequestRetryPolicy({ 0L }, { ID }, { null }, { START })
+        assertNull(unavailable.begin(payload()))
+        assertTrue(unavailable.storageFailure)
+        for (throws in listOf(false, true)) {
+            val store = MemoryStore().apply { failSave = true; throwOnSave = throws }
+            val policy = policy(store, { START }, ID)
+            assertNull(policy.begin(payload()))
+            assertTrue(policy.storageFailure)
+            assertNull(store.value)
+            store.failSave = false
+            assertNotNull(policy.begin(payload()))
+            assertNotNull(store.value)
+            assertFalse(policy.storageFailure)
+        }
+    }
+
+    @Test
+    fun failedReadAndFailedReplacementKeepTheEarlierRequestRecoverable() {
+        val store = MemoryStore()
+        requireNotNull(policy(store, { START }, ID).begin(payload()))
+        val saved = store.value
+        store.failLoad = true
+        val restarted = policy(store, { START + 100L }, "request_new_000000001")
+        assertNull(restarted.begin(payload()))
+        assertEquals(saved, store.value)
+        store.failLoad = false
+        assertEquals(ID, requireNotNull(restarted.begin(payload())).requestId)
+        store.failSave = true
+        assertNull(restarted.begin(payload(email = "changed@example.com")))
+        assertEquals(saved, store.value)
+        store.failSave = false
+        assertEquals(ID, requireNotNull(policy(store, { START + 200L }, "request_new_000000001")
+            .begin(payload())).requestId)
+    }
+
+    @Test
+    fun resultStorageMustSucceedBeforeTheReplayIdCanBeForgotten() {
+        val store = MemoryStore()
+        val first = policy(store, { START }, ID)
+        val attempt = requireNotNull(first.begin(payload()))
+        assertFalse(first.recordSuccess(attempt, payload()) { false })
+        assertTrue(first.storageFailure)
+        assertNotNull(store.value)
+        val restarted = policy(store, { START + 100L }, "request_new_000000001")
+        val retry = requireNotNull(restarted.begin(payload(signupAttempt = "restart")))
+        assertEquals(ID, retry.requestId)
+        assertTrue(restarted.recordSuccess(retry, retry.payload) {
+            assertNotNull("ID must still exist while saving the returned enrollment", store.value)
+            true
+        })
+        assertNull(store.value)
+    }
+
+    @Test
+    fun httpTimeoutKeepsTheSameIdAcrossRestart() {
+        val store = MemoryStore()
+        val first = policy(store, { START }, ID)
+        val attempt = requireNotNull(first.begin(payload()))
+        assertTrue(first.recordFailure(attempt, payload(), 408, null, null))
+        assertEquals(ID, requireNotNull(policy(store, { START + 100L }, "request_new_000000001")
+            .begin(payload())).requestId)
+    }
+
+    @Test
     fun mainActivityWiresTheEncryptedEnrollmentStore() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt")
             .readText(Charsets.UTF_8)
@@ -136,6 +201,12 @@ class EmailOtpPendingRequestRecoveryTest {
             .substringBefore("private val gatewayAccountClient")
         assertTrue(construction.contains("pendingStore = {"))
         assertTrue(construction.contains("::emailEnrollmentStore.isInitialized && !emailEnrollmentStorageBlocked"))
+        val send = source.substringAfter("private fun requestEmailAccountOtp() {")
+            .substringBefore("private fun createEmailAccount() {")
+        assertTrue(send.contains("persistResult = { emailEnrollmentStore.save(partial) }"))
+        assertTrue(send.indexOf("emailOtpRequestRetryPolicy.begin(otpPayload)") <
+            send.indexOf("gatewayAccountClient.requestEmailOtp("))
+        assertTrue(send.contains("if (emailOtpRequestRetryPolicy.storageFailure)"))
     }
 
     private fun unsaltedV1Digest(value: EmailOtpRequestRetryPolicy.Payload): String =
@@ -167,9 +238,16 @@ class EmailOtpPendingRequestRecoveryTest {
     private class MemoryStore : PendingEmailOtpRequestStore {
         var value: String? = null
         var corrupt = false
+        var failSave = false
+        var throwOnSave = false
+        var failLoad = false
         override fun loadPendingOtpRequest(): PendingEmailOtpRequest? =
-            if (corrupt) PendingEmailOtpRequestCodec.decode("{\"schema_version\":1}") else value?.let(PendingEmailOtpRequestCodec::decode)
+            if (failLoad) error("storage unavailable") else if (corrupt) PendingEmailOtpRequestCodec.decode("{\"schema_version\":1}") else value?.let(PendingEmailOtpRequestCodec::decode)
         override fun savePendingOtpRequest(request: PendingEmailOtpRequest): Boolean {
+            if (failSave) {
+                if (throwOnSave) error("storage unavailable")
+                return false
+            }
             corrupt = false
             value = PendingEmailOtpRequestCodec.encode(request)
             return true

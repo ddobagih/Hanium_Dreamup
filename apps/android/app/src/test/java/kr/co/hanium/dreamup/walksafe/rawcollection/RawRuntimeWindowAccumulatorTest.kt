@@ -8,6 +8,23 @@ import org.junit.Test
 /** 16-17 #2 (slow tail beside the mean) and #4 (fixed counter meanings). */
 class RawRuntimeWindowAccumulatorTest {
     @Test
+    fun oneSnapshotRetainsBothCountersAfterProducerAdvancesAndResets() {
+        val accumulator = window(listOf(10L, 20L))
+        val first = accumulator.snapshot(0L, 30_000L, true, false)
+        assertTrue(first.detection.windowIdentity === first.performance.windowIdentity)
+        accumulator.resetWindow()
+        accumulator.recordCompletedInference(WALK, 40_000L, 8, 90L, 2, "model-v1")
+        val second = accumulator.snapshot(0L, 30_000L, true, false)
+        assertTrue(first.detection.windowIdentity !== second.detection.windowIdentity)
+        assertTrue(second.detection.windowIdentity!!.sequence > first.detection.windowIdentity!!.sequence)
+        assertEquals(2, first.detection.processedFrameCount)
+        assertEquals(2, first.performance.processedFrameCount)
+        assertEquals(1, second.detection.processedFrameCount)
+        assertEquals(1, second.performance.processedFrameCount)
+        assertEquals(2, requireNotNull(first.detection.inferenceMsHistogram).sum())
+    }
+
+    @Test
     fun equalMeanInputsWithOneLongInferenceAreDistinguishedByMaxAndHistogram() {
         val steady = window(inferences = listOf(100L, 100L, 100L, 100L))
         val spiky = window(inferences = listOf(25L, 25L, 25L, 325L))

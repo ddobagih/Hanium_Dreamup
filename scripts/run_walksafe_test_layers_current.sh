@@ -361,6 +361,7 @@ FUNCTIONAL_PYTHON_TESTS=(
   backend/tests/test_fp008_postgres_integration.py
   backend/tests/test_fp046_postgres_integration.py
   backend/tests/test_raw_collection_postgres_integration.py
+  backend/tests/test_owner_routes_postgres.py
   backend/tests/test_raw_collection_retention_postgres_integration.py
   backend/tests/test_report_user_requests_postgres_integration.py
   tests/test_agency_submission_receipt.py
@@ -741,6 +742,19 @@ run_integration() {
       --web-root "${REPO_ROOT}/apps/web" \
       --build-dir "${web_dist_dir}"
   )
+  # Supported feature combinations only. This synthetic password is never used for a login.
+  local enabled
+  for enabled in false true; do
+    (
+      cd "${REPO_ROOT}/apps/android"
+      WALKSAFE_DEVELOPMENT_TEST_PASSWORD=matrix-only-not-a-real-password ./gradlew \
+        :app:testDebugUnitTest --tests '*BuildVariantIsolationTest' --tests '*ReportQueueContractTest' \
+        :adminapp:testDebugUnitTest --tests '*AdminBuildVariantIsolationTest' \
+        -PdevelopmentReportQueue="${enabled}" -PdevelopmentQuickStart="${enabled}" \
+        -PWALKSAFE_REPORT_QUEUE_ENABLED=false -PWALKSAFE_ADMIN_OPERATIONAL_DEBUG="${enabled}" \
+        -Pwalksafe.guidanceStartBypass="${enabled}" --no-daemon
+    )
+  done
   (cd "${REPO_ROOT}/apps/android" && ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon)
   "${PYTHON_BIN}" "${REPO_ROOT}/scripts/check_android_apk_model_asset_20260713.py"
   local source_commit="${WALKSAFE_SOURCE_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse HEAD)}"
@@ -749,7 +763,15 @@ run_integration() {
       WALKSAFE_SOURCE_COMMIT="${source_commit}" \
       WALKSAFE_GATEWAY_ORIGIN="${WALKSAFE_RELEASE_TEST_GATEWAY_ORIGIN:-https://walksafe.invalid}" \
       WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-https://admin.walksafe.invalid}" \
-      ./gradlew testReleaseUnitTest lintRelease assembleRelease --no-daemon
+      WALKSAFE_DEVELOPMENT_TEST_PASSWORD=matrix-only-not-a-real-password \
+      ./gradlew testReleaseUnitTest lintRelease assembleRelease \
+        -PdevelopmentQuickStart=true -Pwalksafe.guidanceStartBypass=true \
+        -PWALKSAFE_ADMIN_OPERATIONAL_DEBUG=true -PWALKSAFE_REPORT_QUEUE_ENABLED=true \
+        -PWALKSAFE_REPORT_QUEUE_TEST_ORIGIN=http://127.0.0.1:8081 \
+        -PWALKSAFE_REPORT_QUEUE_MAX_ENTRIES=8 -PWALKSAFE_REPORT_QUEUE_MAX_PAYLOAD_BYTES=4194304 \
+        -PWALKSAFE_REPORT_QUEUE_MAX_STORED_ENTRY_BYTES=12582912 -PWALKSAFE_REPORT_QUEUE_MAX_TOTAL_BYTES=67108864 \
+        -PWALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_ENTRIES=6 -PWALKSAFE_REPORT_QUEUE_AUTOMATIC_MAX_TOTAL_BYTES=50331648 \
+        -PWALKSAFE_RAW_QUEUE_MAX_SEGMENTS=2 -PWALKSAFE_RAW_QUEUE_MAX_TOTAL_BYTES=1048576 --no-daemon
   )
   "${PYTHON_BIN}" "${REPO_ROOT}/scripts/check_android_apk_model_asset_20260713.py" \
     --apk "${REPO_ROOT}/apps/android/app/build/outputs/apk/release/app-release-unsigned.apk"

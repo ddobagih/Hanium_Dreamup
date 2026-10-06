@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.report
 
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.LinkOption
@@ -60,6 +61,13 @@ internal class AndroidReportQueueStore private constructor(
         allocatableBytes: () -> Long? = { Long.MAX_VALUE },
     ) : this(capacityProfile, storageFactory, aead, idFactory, nowMillis, allocatableBytes)
 
+    /** Image plus metadata must fit the active profile; no storage or image copies needed. */
+    fun payloadExceedsLimit(metadataBytes: Int, imageBytes: Int): Boolean {
+        require(metadataBytes >= 0 && imageBytes >= 0)
+        val profile = capacityProfile ?: return false // Disabled is reported separately.
+        return metadataBytes.toLong() + imageBytes.toLong() > profile.maxPayloadBytes
+    }
+
     @Synchronized
     fun enqueue(
         expectedReporterActorId: String,
@@ -71,6 +79,7 @@ internal class AndroidReportQueueStore private constructor(
         accountGeneration: Long? = null,
     ): QueuedReport? {
         val profile = capacityProfile ?: return null
+        if (payloadExceedsLimit(metadataUtf8.size, imageJpeg.size)) return null
         val now = nowMillis()
         val reporterActorId = reportActorIdFromMetadataOrNull(metadataUtf8) ?: return null
         if (
@@ -80,13 +89,11 @@ internal class AndroidReportQueueStore private constructor(
         ) return null
         // Priority drives reserve, withdrawal and transfer purpose; it must match the metadata.
         if (reportQueuePriorityFromMetadataOrNull(metadataUtf8) != priority) return null
-        val incomingPayloadBytes = metadataUtf8.size.toLong() + imageJpeg.size.toLong()
         if (
             now < 0L ||
             (accountGeneration != null && accountGeneration <= 0L) ||
             !isCanonicalReportUuid(walkSessionId) ||
-            !REPORT_SHA256_HEX.matches(consentReceiptSha256) ||
-            incomingPayloadBytes > profile.maxPayloadBytes
+            !REPORT_SHA256_HEX.matches(consentReceiptSha256)
         ) {
             return null
         }
@@ -140,9 +147,9 @@ internal class AndroidReportQueueStore private constructor(
             return null
         }
         val reportId = newCanonicalReportId(idFactory)
-        val payload = FrozenReportPayload.freeze(reportId, metadataUtf8, imageJpeg) ?: return null
         val expiresAt = now + REPORT_QUEUE_TTL_MS
         if (expiresAt < now) return null
+        val payload = FrozenReportPayload.freeze(reportId, metadataUtf8, imageJpeg) ?: return null
         val report = QueuedReport(
             payload = payload,
             priority = priority,
@@ -153,51 +160,60 @@ internal class AndroidReportQueueStore private constructor(
             expiresAtEpochMs = expiresAt,
             accountGeneration = accountGeneration,
         )
-        val outcome = run {
-            storage.writeAtomicallyWithOutcome(
-                reportId = reportId,
-                storedEntryByteLimit = profile.maxStoredEntryBytes,
-                entryLimit = entryLimit,
-                storedByteLimit = storedByteLimit,
-                blockingFences = setOf(
-                    ACCOUNT_DELETE_FENCE,
-                    LIFECYCLE_PENDING_FENCE,
-                    consentRevokeFence(consentReceiptSha256),
-                ) + if (priority == ReportQueuePriority.AUTOMATIC) {
-                    setOf(
-                        AUTOMATIC_REVOCATION_PENDING_FENCE,
-                        automaticConsentRevokeFence(consentReceiptSha256),
-                    )
-                } else {
-                    emptySet()
-                },
-                envelopeFactory = {
-                    // Recheck inside the final OS lock, without re-entering the lock.
-                    val duplicate = priority == ReportQueuePriority.AUTOMATIC &&
-                        hasRecentPendingAutomaticReport(
-                            metadataUtf8,
-                            now,
-                            storage.listReportIds().mapNotNull { id ->
-                                storage.read(id)?.let { openReport(it, id) }
-                            },
+        var returnedToCaller = false
+        try {
+            val outcome = run {
+                storage.writeAtomicallyWithOutcome(
+                    reportId = reportId,
+                    storedEntryByteLimit = profile.maxStoredEntryBytes,
+                    entryLimit = entryLimit,
+                    storedByteLimit = storedByteLimit,
+                    blockingFences = setOf(
+                        ACCOUNT_DELETE_FENCE,
+                        LIFECYCLE_PENDING_FENCE,
+                        consentRevokeFence(consentReceiptSha256),
+                    ) + if (priority == ReportQueuePriority.AUTOMATIC) {
+                        setOf(
+                            AUTOMATIC_REVOCATION_PENDING_FENCE,
+                            automaticConsentRevokeFence(consentReceiptSha256),
                         )
-                    if (duplicate) null else sealReport(report)
-                },
-            )
-        }
-        // S15-36 / FP-032: a published file whose sync failed is not a plain failure. Confirm
-        // it under the same report ID and payload hash instead of letting a retry make a new ID.
-        return when (outcome) {
-            ReportQueueWriteOutcome.STORED -> report
-            ReportQueueWriteOutcome.FAILED -> null
-            ReportQueueWriteOutcome.UNCERTAIN -> report.takeIf { confirmStoredEntry(it) }
+                    } else {
+                        emptySet()
+                    },
+                    envelopeFactory = {
+                        // Recheck inside the final OS lock, without re-entering the lock.
+                        val duplicate = priority == ReportQueuePriority.AUTOMATIC &&
+                            hasRecentPendingAutomaticReport(
+                                metadataUtf8,
+                                now,
+                                storage.listReportIds().readOwnedReports { id ->
+                                    storage.read(id)?.let { openReport(it, id) }
+                                },
+                            )
+                        if (duplicate) null else sealReport(report)
+                    },
+                )
+            }
+            // S15-36 / FP-032: a published file whose sync failed is not a plain failure. Confirm
+            // it under the same report ID and payload hash instead of letting a retry make a new ID.
+            val result = when (outcome) {
+                ReportQueueWriteOutcome.STORED -> report
+                ReportQueueWriteOutcome.FAILED -> null
+                ReportQueueWriteOutcome.UNCERTAIN -> report.takeIf { confirmStoredEntry(it) }
+            }
+            returnedToCaller = result != null
+            return result
+        } finally {
+            if (!returnedToCaller) report.close()
         }
     }
 
     private fun confirmStoredEntry(report: QueuedReport): Boolean = storage.withLockedAccess { access ->
         val stored = readAllowedReport(access, report.payload.reportId)
             ?: return@withLockedAccess false
-        stored.payload.contentEquals(report.payload) && stored.copy(payload = report.payload) == report
+        stored.use {
+            it.payload.contentEquals(report.payload) && it.copy(payload = report.payload) == report
+        }
     } == true
 
     private fun hasRecentPendingAutomaticReport(
@@ -205,25 +221,30 @@ internal class AndroidReportQueueStore private constructor(
         nowMs: Long,
         reports: List<QueuedReport> = readAllLocked(),
     ): Boolean {
-        val candidateScope = runCatching {
-            automaticReportCooldownScopeOrNull(
-                JSONObject(String(metadataUtf8, Charsets.UTF_8)),
-            )
-        }.getOrNull() ?: return false
-        return reports.any { report ->
-            AndroidReportCooldownPolicy.pendingAutomaticDuplicateSuppressed(
-                queuedAtMs = report.createdAtEpochMs,
-                nowMs = nowMs,
-            ) &&
-                report.automaticCooldownScopeOrNull()?.let { pendingScope ->
-                    AndroidReportCooldownPolicy.isSameCooldownArea(
-                        candidateScope,
-                        pendingScope,
-                    )
-                } == true
+        try {
+            val candidateScope = runCatching {
+                automaticReportCooldownScopeOrNull(
+                    JSONObject(String(metadataUtf8, Charsets.UTF_8)),
+                )
+            }.getOrNull() ?: return false
+            return reports.any { report ->
+                AndroidReportCooldownPolicy.pendingAutomaticDuplicateSuppressed(
+                    queuedAtMs = report.createdAtEpochMs,
+                    nowMs = nowMs,
+                ) &&
+                    report.automaticCooldownScopeOrNull()?.let { pendingScope ->
+                        AndroidReportCooldownPolicy.isSameCooldownArea(
+                            candidateScope,
+                            pendingScope,
+                        )
+                    } == true
+            }
+        } finally {
+            reports.forEach { it.close() }
         }
     }
 
+    /** Returned reports own plaintext snapshots; callers must close every returned entry. */
     @Synchronized
     fun queuedReports(): List<QueuedReport> {
         if (capacityProfile == null) return emptyList()
@@ -231,24 +252,30 @@ internal class AndroidReportQueueStore private constructor(
         if (now < 0L) return emptyList()
         pruneExpiredLocked(now)
         return readAllLocked()
-            .filter { now >= it.createdAtEpochMs && now < it.expiresAtEpochMs }
+            .retaining { now >= it.createdAtEpochMs && now < it.expiresAtEpochMs }
             .sortedWith(REPORT_ORDER)
     }
 
     @Synchronized
-    fun nextForDrain(): QueuedReport? = queuedReports().firstOrNull(::isTransferReady)
+    fun nextForDrain(): QueuedReport? = selectForDrain { true }
 
     @Synchronized
     fun nextForDrain(
         walkSessionId: String,
         consentReceiptSha256: String,
-    ): QueuedReport? = reportsForDrain(walkSessionId, consentReceiptSha256).firstOrNull()
+    ): QueuedReport? {
+        if (!isCanonicalReportUuid(walkSessionId) || !REPORT_SHA256_HEX.matches(consentReceiptSha256)) return null
+        return selectForDrain { it.walkSessionId == walkSessionId && it.consentReceiptSha256 == consentReceiptSha256 }
+    }
 
     @Synchronized
     fun countForDrain(
         walkSessionId: String,
         consentReceiptSha256: String,
-    ): Int = reportsForDrain(walkSessionId, consentReceiptSha256).size
+    ): Int {
+        if (!isCanonicalReportUuid(walkSessionId) || !REPORT_SHA256_HEX.matches(consentReceiptSha256)) return 0
+        return countForDrainMatching { it.walkSessionId == walkSessionId && it.consentReceiptSha256 == consentReceiptSha256 }
+    }
 
     /**
      * A failed upload may outlive both the walk and the optional-consent receipt that existed when
@@ -260,9 +287,57 @@ internal class AndroidReportQueueStore private constructor(
         reporterActorId: String,
         accountGeneration: Long? = null,
         automaticReportingAllowed: Boolean = true,
-    ): QueuedReport? = reportsForRecoveryDrain(reporterActorId).firstOrNull {
-        it.accountGeneration == accountGeneration &&
-            (it.priority != ReportQueuePriority.AUTOMATIC || automaticReportingAllowed)
+    ): QueuedReport? {
+        if (GatewayCredentialPolicy.normalizedActorIdOrNull(reporterActorId) != reporterActorId) return null
+        return selectForDrain {
+            it.reporterActorId == reporterActorId && it.accountGeneration == accountGeneration &&
+                (it.priority != ReportQueuePriority.AUTOMATIC || automaticReportingAllowed)
+        }
+    }
+
+    /** Null means unavailable, not an empty inbox. Only this account incarnation is visible. */
+    @Synchronized
+    fun quarantinedReports(reporterActorId: String, accountGeneration: Long): List<QuarantinedReportSummary>? {
+        if (capacityProfile == null || accountGeneration <= 0L ||
+            GatewayCredentialPolicy.normalizedActorIdOrNull(reporterActorId) != reporterActorId) return null
+        return storage.withLockedAccess { access ->
+            if (access.measureUsage() == null || access.hasGlobalReadBarrier()) return@withLockedAccess null
+            val summaries = mutableListOf<QuarantinedReportSummary>()
+            for (id in access.listReportIds()) {
+                val envelope = access.read(id) ?: return@withLockedAccess null
+                val report = openReport(envelope, id) ?: return@withLockedAccess null
+                report.use {
+                    if (reportReadable(access, it) && it.quarantined && it.reporterActorId == reporterActorId &&
+                        it.accountGeneration == accountGeneration) summaries += it.quarantineSummary()
+                }
+            }
+            summaries.sortedWith(compareBy({ it.createdAtEpochMs }, { it.reportId }))
+        }
+    }
+
+    /** Delete only the exact, still-quarantined local entry the user confirmed. No server request. */
+    @Synchronized
+    fun deleteQuarantinedReport(
+        reporterActorId: String,
+        accountGeneration: Long,
+        expected: QuarantinedReportSummary,
+        authorityCurrent: () -> Boolean,
+    ): Boolean {
+        if (capacityProfile == null || accountGeneration <= 0L ||
+            !isCanonicalReportUuid(expected.reportId) ||
+            GatewayCredentialPolicy.normalizedActorIdOrNull(reporterActorId) != reporterActorId) return false
+        return storage.withLockedAccess { access ->
+            if (!authorityCurrent() || access.measureUsage() == null || access.hasGlobalReadBarrier()) {
+                return@withLockedAccess false
+            }
+            val envelope = access.read(expected.reportId) ?: return@withLockedAccess false
+            val report = openReport(envelope, expected.reportId) ?: return@withLockedAccess false
+            report.use {
+                reportReadable(access, it) && it.quarantined && it.reporterActorId == reporterActorId &&
+                    it.accountGeneration == accountGeneration && it.quarantineSummary() == expected &&
+                    authorityCurrent() && access.delete(expected.reportId)
+            }
+        } == true
     }
 
     /** Keep failed payloads encrypted for TTL/privacy cleanup instead of deleting them. */
@@ -279,28 +354,32 @@ internal class AndroidReportQueueStore private constructor(
             if (access.hasGlobalReadBarrier()) return@withLockedAccess false
             val current = readAllowedReport(access, report.payload.reportId)
                 ?: return@withLockedAccess false
-            if (!current.payload.contentEquals(report.payload) ||
-                current.copy(payload = report.payload) != report
-            ) return@withLockedAccess false
-            val delay = retryAfterMs?.coerceAtLeast(0L) ?: 0L
-            val notBefore = if (delay > Long.MAX_VALUE - now) Long.MAX_VALUE else now + delay
-            val envelope = sealReport(current.copy(
-                quarantined = current.quarantined || permanent,
-                retryNotBeforeEpochMs = maxOf(current.retryNotBeforeEpochMs, notBefore),
-            )) ?: return@withLockedAccess false
-            access.replace(
-                report.payload.reportId, envelope,
-                profile.maxStoredEntryBytes, profile.maxTotalBytes,
-            )
+            current.use {
+                if (!current.payload.contentEquals(report.payload) ||
+                    current.copy(payload = report.payload) != report
+                ) return@withLockedAccess false
+                val delay = retryAfterMs?.coerceAtLeast(0L) ?: 0L
+                val notBefore = if (delay > Long.MAX_VALUE - now) Long.MAX_VALUE else now + delay
+                val envelope = sealReport(current.copy(
+                    quarantined = current.quarantined || permanent,
+                    retryNotBeforeEpochMs = maxOf(current.retryNotBeforeEpochMs, notBefore),
+                )) ?: return@withLockedAccess false
+                access.replace(
+                    report.payload.reportId, envelope,
+                    profile.maxStoredEntryBytes, profile.maxTotalBytes,
+                )
+            }
         } == true
     }
 
     @Synchronized
-    fun countForRecoveryDrain(reporterActorId: String): Int =
-        reportsForRecoveryDrain(reporterActorId).size
+    fun countForRecoveryDrain(reporterActorId: String): Int {
+        if (GatewayCredentialPolicy.normalizedActorIdOrNull(reporterActorId) != reporterActorId) return 0
+        return countForDrainMatching { it.reporterActorId == reporterActorId }
+    }
 
     @Synchronized
-    fun pruneExpired(): Int = pruneExpiredLocked(nowMillis())
+    fun pruneExpired(): Int = pruneExpiredLocked(nowMillis(), requireComplete = true)
 
     @Synchronized
     fun deleteAfterReceipt(
@@ -323,15 +402,17 @@ internal class AndroidReportQueueStore private constructor(
                 return@withLockedAccess false
             }
             val report = readAllowedReport(access, receipt.reportId) ?: return@withLockedAccess false
-            if (
-                report.reporterActorId != reporterActorId ||
-                report.payload.reportId != receipt.reportId ||
-                report.payload.payloadSha256 != receipt.payloadSha256 ||
-                report.payload.payloadBytes != receipt.payloadBytes
-            ) {
-                return@withLockedAccess false
+            report.use {
+                if (
+                    report.reporterActorId != reporterActorId ||
+                    report.payload.reportId != receipt.reportId ||
+                    report.payload.payloadSha256 != receipt.payloadSha256 ||
+                    report.payload.payloadBytes != receipt.payloadBytes
+                ) {
+                    return@withLockedAccess false
+                }
+                access.delete(receipt.reportId)
             }
-            access.delete(receipt.reportId)
         } == true
     }
 
@@ -364,8 +445,10 @@ internal class AndroidReportQueueStore private constructor(
                 ),
             ) { reportId, envelope ->
                 val report = checkNotNull(openReport(envelope, reportId))
-                automaticConsentRevokeFence(report.consentReceiptSha256)
-                    .takeIf { report.priority == ReportQueuePriority.AUTOMATIC }
+                report.use { current ->
+                    automaticConsentRevokeFence(current.consentReceiptSha256)
+                        .takeIf { current.priority == ReportQueuePriority.AUTOMATIC }
+                }
             }
         }.getOrDefault(false)
         if (completed) automaticRevocationPending = false
@@ -379,61 +462,97 @@ internal class AndroidReportQueueStore private constructor(
         }
     }
 
-    private fun pruneExpiredLocked(now: Long): Int {
-        if (now < 0L) return 0
+    // The scheduled maintenance caller must distinguish unavailable/failed cleanup from zero work.
+    // Opportunistic cleanup during enqueue/read retains its existing best-effort behavior.
+    private fun pruneExpiredLocked(now: Long, requireComplete: Boolean = false): Int {
+        fun unavailable(): Int {
+            if (requireComplete) throw IOException("Report queue expiry cleanup incomplete")
+            return 0
+        }
+        if (now < 0L) return unavailable()
         return storage.withLockedAccess { access ->
-            if (access.measureUsage() == null || access.hasGlobalReadBarrier()) {
-                return@withLockedAccess 0
-            }
-            // S15-35: temporary files are never published entries (every write holds this lock).
+            if (access.measureUsage() == null) return@withLockedAccess unavailable()
+            if (access.hasGlobalReadBarrier()) return@withLockedAccess 0
+            var incomplete = false
             var deleted = access.deleteOrphanTemporaries()
+            fun deleteExpired(reportId: String) {
+                if (access.delete(reportId)) deleted++ else incomplete = true
+            }
             access.listReportIds().forEach { reportId ->
                 val envelope = access.read(reportId)
-                if (envelope != null && openReport(envelope, reportId) == null) {
-                    // Unreadable entries stay encrypted and are never sent. Their expiry cannot be
-                    // read, so the 30-day absolute cap runs from the last write, never earlier than
-                    // from creation (NPC-DATA-LIFECYCLE rules[6], FP-032 prohibited_behaviors[2]).
-                    val lastWrite = access.lastModifiedEpochMs(reportId) ?: return@forEach
-                    if (now - lastWrite >= REPORT_QUEUE_TTL_MS && access.delete(reportId)) deleted += 1
+                if (envelope == null) {
+                    incomplete = true
                     return@forEach
                 }
-                val report = readAllowedReport(access, reportId) ?: return@forEach
-                if (now >= report.expiresAtEpochMs && access.delete(reportId)) deleted += 1
+                val report = openReport(envelope, reportId)
+                if (report == null) {
+                    // Keep unreadable ciphertext until the existing last-write retention cap.
+                    val lastWrite = access.lastModifiedEpochMs(reportId)
+                    if (lastWrite == null) incomplete = true
+                    else if (now >= lastWrite && now - lastWrite >= REPORT_QUEUE_TTL_MS) deleteExpired(reportId)
+                } else report.use {
+                    if (reportReadable(access, it) && now >= it.expiresAtEpochMs) deleteExpired(reportId)
+                }
             }
+            if (incomplete && requireComplete) unavailable()
             deleted
-        } ?: 0
+        } ?: unavailable()
     }
 
     private fun readAllLocked(): List<QueuedReport> = storage.withLockedAccess { access ->
         if (access.measureUsage() == null || access.hasGlobalReadBarrier()) {
             return@withLockedAccess emptyList()
         }
-        access.listReportIds().mapNotNull { readAllowedReport(access, it) }
+        access.listReportIds().readOwnedReports { readAllowedReport(access, it) }
     }.orEmpty()
 
-    private fun reportsForDrain(
-        walkSessionId: String,
-        consentReceiptSha256: String,
-    ): List<QueuedReport> {
-        if (
-            !isCanonicalReportUuid(walkSessionId) ||
-            !REPORT_SHA256_HEX.matches(consentReceiptSha256)
-        ) {
-            return emptyList()
-        }
-        return queuedReports().filter {
-            it.walkSessionId == walkSessionId &&
-                it.consentReceiptSha256 == consentReceiptSha256 && isTransferReady(it)
+    /** Decrypt sequentially; retain only the best candidate, never a list of photos. */
+    private fun selectForDrain(predicate: (QueuedReport) -> Boolean): QueuedReport? {
+        var selected: QueuedReport? = null
+        var handedOff = false
+        return try {
+            val completed = visitAvailableReports { report ->
+                val earlier = selected
+                if (isTransferReady(report) && predicate(report) &&
+                    (earlier == null || REPORT_ORDER.compare(report, earlier) < 0)) {
+                    earlier?.close()
+                    selected = report
+                    true // Transfer ownership of this snapshot to the selector.
+                } else false
+            }
+            handedOff = completed
+            selected.takeIf { completed }
+        } finally {
+            if (!handedOff) selected?.close()
         }
     }
 
-    private fun reportsForRecoveryDrain(reporterActorId: String): List<QueuedReport> {
-        if (GatewayCredentialPolicy.normalizedActorIdOrNull(reporterActorId) != reporterActorId) {
-            return emptyList()
+    private fun countForDrainMatching(predicate: (QueuedReport) -> Boolean): Int {
+        var count = 0
+        val completed = visitAvailableReports { report ->
+            if (isTransferReady(report) && predicate(report)) count++
+            false // Counts never retain the decrypted entry.
         }
-        return queuedReports().filter {
-            it.reporterActorId == reporterActorId && isTransferReady(it)
-        }
+        return if (completed) count else 0
+    }
+
+    /** Returning true transfers one snapshot to the visitor; false releases it immediately. */
+    private fun visitAvailableReports(visit: (QueuedReport) -> Boolean): Boolean {
+        if (capacityProfile == null) return false
+        val now = nowMillis()
+        if (now < 0L) return false
+        pruneExpiredLocked(now)
+        return storage.withLockedAccess { access ->
+            if (access.measureUsage() == null || access.hasGlobalReadBarrier()) return@withLockedAccess false
+            for (id in access.listReportIds()) {
+                val report = readAllowedReport(access, id) ?: continue
+                var retained = false
+                try {
+                    if (now >= report.createdAtEpochMs && now < report.expiresAtEpochMs) retained = visit(report)
+                } finally { if (!retained) report.close() }
+            }
+            true
+        } == true
     }
 
     private fun isTransferReady(report: QueuedReport): Boolean =
@@ -445,27 +564,21 @@ internal class AndroidReportQueueStore private constructor(
     ): QueuedReport? {
         val envelope = access.read(reportId) ?: return null
         val report = openReport(envelope, reportId) ?: return null
-        return report.takeIf {
-            !access.hasFence(consentRevokeFence(it.consentReceiptSha256)) &&
-                (
-                    it.priority != ReportQueuePriority.AUTOMATIC ||
-                        (
-                            !automaticRevocationPending &&
-                            !access.hasFence(AUTOMATIC_REVOCATION_PENDING_FENCE) &&
-                                !access.hasFence(
-                                    automaticConsentRevokeFence(it.consentReceiptSha256),
-                                )
-                        )
-                )
-        }
+        return report.takeIfOwned { reportReadable(access, it) }
     }
+
+    private fun reportReadable(access: LockedReportQueueStorage, report: QueuedReport): Boolean =
+        !access.hasFence(consentRevokeFence(report.consentReceiptSha256)) &&
+            (report.priority != ReportQueuePriority.AUTOMATIC ||
+                (!automaticRevocationPending && !access.hasFence(AUTOMATIC_REVOCATION_PENDING_FENCE) &&
+                    !access.hasFence(automaticConsentRevokeFence(report.consentReceiptSha256))))
 
     private fun openReport(envelope: String, reportId: String): QueuedReport? {
         val opened = aead.open(envelope, reportAad(reportId), REPORT_LIMITS)
             as? AeadOpenResult.Opened
             ?: return null
         return try {
-            decodeReport(opened.plaintext)?.takeIf {
+            decodeReport(opened.plaintext)?.takeIfOwned {
                 it.payload.reportId == reportId
             }
         } finally {
@@ -478,9 +591,12 @@ internal class AndroidReportQueueStore private constructor(
 
     private fun sealReport(report: QueuedReport): String? {
         val plaintext = encodeReport(report)
-        val sealed = aead.seal(plaintext, reportAad(report.payload.reportId), REPORT_LIMITS)
-        plaintext.fill(0)
-        return (sealed as? AeadSealResult.Sealed)?.envelope
+        return try {
+            (aead.seal(plaintext, reportAad(report.payload.reportId), REPORT_LIMITS)
+                as? AeadSealResult.Sealed)?.envelope
+        } finally {
+            plaintext.fill(0)
+        }
     }
 
     private companion object {
@@ -509,6 +625,42 @@ internal class AndroidReportQueueStore private constructor(
     }
 }
 
+private fun QueuedReport.quarantineSummary() = QuarantinedReportSummary(
+    payload.reportId, payload.payloadSha256, payload.payloadBytes, createdAtEpochMs, priority,
+)
+
+/** A storage failure midway through enumeration must also release the entries already decoded. */
+private inline fun Set<String>.readOwnedReports(read: (String) -> QueuedReport?): List<QueuedReport> {
+    val reports = mutableListOf<QueuedReport>()
+    return try {
+        forEach { id -> read(id)?.let(reports::add) }
+        reports
+    } catch (error: Throwable) {
+        reports.forEach { it.close() }
+        throw error
+    }
+}
+
+/** A rejected decoded snapshot must not keep its photo alive. */
+private inline fun QueuedReport.takeIfOwned(predicate: (QueuedReport) -> Boolean): QueuedReport? {
+    var retained = false
+    return try {
+        retained = predicate(this)
+        if (retained) this else null
+    } finally {
+        if (!retained) close()
+    }
+}
+
+private inline fun List<QueuedReport>.retaining(predicate: (QueuedReport) -> Boolean): List<QueuedReport> =
+    try { mapNotNull { it.takeIfOwned(predicate) } } catch (error: Throwable) {
+        forEach { it.close() }
+        throw error
+    }
+
+private fun encodeBase64AndClear(bytes: ByteArray): String =
+    try { Base64.getEncoder().encodeToString(bytes) } finally { bytes.fill(0) }
+
 private fun encodeReport(report: QueuedReport): ByteArray = JSONObject()
     .put("schema_version", REPORT_QUEUE_SCHEMA)
     .put("report_id", report.payload.reportId)
@@ -523,8 +675,8 @@ private fun encodeReport(report: QueuedReport): ByteArray = JSONObject()
     .put("retry_not_before_epoch_ms", report.retryNotBeforeEpochMs)
     .put("payload_sha256", report.payload.payloadSha256)
     .put("payload_bytes", report.payload.payloadBytes)
-    .put("metadata_base64", Base64.getEncoder().encodeToString(report.payload.metadataUtf8()))
-    .put("image_jpeg_base64", Base64.getEncoder().encodeToString(report.payload.imageJpeg()))
+    .put("metadata_base64", encodeBase64AndClear(report.payload.metadataUtf8()))
+    .put("image_jpeg_base64", encodeBase64AndClear(report.payload.imageJpeg()))
     .toString()
     .toByteArray(Charsets.UTF_8)
 
@@ -557,18 +709,21 @@ private fun decodeReport(bytes: ByteArray): QueuedReport? = runCatching {
     require(createdAt >= 0L && expiresAt - createdAt == REPORT_QUEUE_TTL_MS)
     val priority = ReportQueuePriority.valueOf(root.getString("priority"))
     val metadata = Base64.getDecoder().decode(root.getString("metadata_base64"))
-    val image = Base64.getDecoder().decode(root.getString("image_jpeg_base64"))
+    var image: ByteArray? = null
     val payload = try {
+        image = Base64.getDecoder().decode(root.getString("image_jpeg_base64"))
         require(reportActorIdFromMetadataOrNull(metadata) == reporterActorId)
         require(reportQueuePriorityFromMetadataOrNull(metadata) == priority)
         FrozenReportPayload.freeze(reportId, metadata, image)
     } finally {
         metadata.fill(0)
-        image.fill(0)
+        image?.fill(0)
     }
     requireNotNull(payload)
-    require(payload.payloadSha256 == declaredSha)
-    require(payload.payloadBytes == declaredBytes)
+    if (payload.payloadSha256 != declaredSha || payload.payloadBytes != declaredBytes) {
+        payload.close()
+        return@runCatching null
+    }
     QueuedReport(
         payload = payload,
         priority = priority,
@@ -1118,9 +1273,9 @@ internal class FileReportQueueStorage(
                 if (
                     ATOMIC_WRITE_TEMPORARY.matches(entry.name) &&
                     metadata.isRegularFile &&
-                    !metadata.isSymbolicLink &&
-                    deleteAndSync(entry)
+                    !metadata.isSymbolicLink
                 ) {
+                    if (!deleteAndSync(entry)) throw IOException("Report queue temporary cleanup incomplete")
                     deleted += 1
                 }
             }

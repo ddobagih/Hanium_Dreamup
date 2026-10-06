@@ -29,7 +29,7 @@ internal class ReportQueueCleanupJobService : JobService() {
         job.future = executor.submit {
             var needsReschedule = false
             try {
-                AndroidReportQueueStore(applicationContext.filesDir).pruneExpired()
+                AndroidReportQueueStore(applicationContext.filesDir.canonicalFile).pruneExpired()
             } catch (failure: Exception) {
                 Log.w(TAG, "Report queue expiry cleanup failed", failure)
                 needsReschedule = true

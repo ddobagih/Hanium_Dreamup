@@ -6,6 +6,7 @@ import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kr.co.hanium.dreamup.walksafe.device.FeatureStorageAllowance
 import kr.co.hanium.dreamup.walksafe.device.FeatureStorageHoldReason
 import kr.co.hanium.dreamup.walksafe.device.FeatureStorageHolds
@@ -60,6 +61,8 @@ data class RawDetectionMetadataSample(
     override val windowStartedAtEpochMs: Long,
     override val capturedAtEpochMs: Long,
     val processedFrameCount: Int,
+    /** Missing or different producer identities cannot form a capture batch. */
+    val windowIdentity: RawRuntimeWindowIdentity? = null,
     val detectionCount: Int,
     val averageInferenceMs: Long,
     val detectorAvailable: Boolean,
@@ -104,6 +107,8 @@ data class RawPerformanceMetadataSample(
     override val windowStartedAtEpochMs: Long,
     override val capturedAtEpochMs: Long,
     val processedFrameCount: Int,
+    /** Missing or different producer identities cannot form a capture batch. */
+    val windowIdentity: RawRuntimeWindowIdentity? = null,
     val droppedFrameCount: Int,
     val averageFrameDurationMs: Long,
     val thermalThrottled: Boolean?,
@@ -182,6 +187,10 @@ enum class RawCollectionUploadOutcome {
 
 /**
  * Small integration surface for active-walk capture and the post-walk upload.
+ *
+ * DETECTION/PERFORMANCE aggregates diagnose runtime performance and availability only.
+ * They have no ground-truth labels and cannot establish detection accuracy, recall, or mAP;
+ * those require a separately approved, labeled evaluation dataset.
  *
  * The runtime shape is fixed at one DETECTION object and one PERFORMANCE object. One segment
  * covers one uninterrupted ACTIVE period: every later capture window is merged into it, so the
@@ -280,7 +289,10 @@ class RawCollectionRuntimeCoordinator private constructor(
         val elapsedRealtimeMs: Long,
     )
 
-    private var activeUpload: ActiveUpload? = null
+    private var retryOwner: RawCollectionOwner? = null
+    private var retryNotBeforeElapsedMs = 0L
+    private val activeUpload = AtomicReference<ActiveUpload?>()
+    private val uploadCancellationGeneration = AtomicLong()
     private var aggregate: RuntimeAggregate? = null
     private var lastCapture: LastCapture? = null
 
@@ -378,6 +390,8 @@ class RawCollectionRuntimeCoordinator private constructor(
             is AdmissionResult.Admitted -> gate.admission
         }
         if (
+            detectionSample.windowIdentity == null ||
+            detectionSample.windowIdentity !== performanceSample.windowIdentity ||
             detectionSample.windowStartedAtEpochMs != performanceSample.windowStartedAtEpochMs ||
             detectionSample.capturedAtEpochMs != performanceSample.capturedAtEpochMs ||
             detectionSample.windowCount != 1 ||
@@ -688,7 +702,9 @@ class RawCollectionRuntimeCoordinator private constructor(
         }
         return when (val gate = uploadAdmission(context)) {
             is AdmissionResult.Blocked -> RawReadyStatus.GateBlocked(gate.reason)
-            is AdmissionResult.Admitted -> readyStatus(context)
+            is AdmissionResult.Admitted -> if (retryDelayed(gate.admission.owner)) {
+                RawReadyStatus.GateBlocked(RawCollectionGateReason.RETRY_DELAY)
+            } else readyStatus(context)
         }
     }
 
@@ -715,7 +731,8 @@ class RawCollectionRuntimeCoordinator private constructor(
     fun startNextUpload(
         contextProvider: () -> RawCollectionRuntimeContext,
     ): CancellableNetworkCall<RawCollectionUploadOutcome>? {
-        if (activeUpload != null) return null
+        if (activeUpload.get() != null) return null
+        val cancellationGeneration = uploadCancellationGeneration.get()
         if (serverIngestDisabled) {
             outcomeCounters.recordUploadGate(RawCollectionGateReason.SERVER_DISABLED)
             return null
@@ -727,6 +744,10 @@ class RawCollectionRuntimeCoordinator private constructor(
                 return null
             }
             is AdmissionResult.Admitted -> gate.admission
+        }
+        if (retryDelayed(admission.owner)) {
+            outcomeCounters.recordUploadGate(RawCollectionGateReason.RETRY_DELAY)
+            return null
         }
         val ready = try {
             store.readyManifests(admission.owner)
@@ -769,11 +790,13 @@ class RawCollectionRuntimeCoordinator private constructor(
         lateinit var outer: CancellableNetworkCall<RawCollectionUploadOutcome>
         outer = CancellableNetworkCall(
             executeBlock = execute@{
-                synchronized(this) {
-                    if (outer.isCancelled()) return@execute RawCollectionUploadOutcome.CANCELLED
-                    executionStarted.set(true)
+                executionStarted.set(true)
+                if (outer.isCancelled()) {
+                    clearActiveUpload(outer)
+                    return@execute RawCollectionUploadOutcome.CANCELLED
                 }
                 val plaintextChunks = mutableListOf<RawPlaintextChunk>()
+                var localWork = true
                 try {
                     if (!isLeaseCurrent(lease, contextProvider())) {
                         return@execute RawCollectionUploadOutcome.CANCELLED
@@ -802,6 +825,7 @@ class RawCollectionRuntimeCoordinator private constructor(
                         }
                         plaintextChunks += chunk
                     }
+                    localWork = false
                     val uploadCall = client.uploadCall(
                         session = lease.session,
                         // The segment's own (earlier, continued) receipt is sent unchanged; the
@@ -825,6 +849,7 @@ class RawCollectionRuntimeCoordinator private constructor(
                         return@execute RawCollectionUploadOutcome.CANCELLED
                     }
                     val receipt = uploadCall.execute()
+                    localWork = true
                     nested.compareAndSet(uploadCall, null)
                     if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
                         return@execute RawCollectionUploadOutcome.CANCELLED
@@ -877,6 +902,17 @@ class RawCollectionRuntimeCoordinator private constructor(
                         } else RawCollectionUploadOutcome.RETRYABLE_FAILURE
                         else -> RawCollectionUploadOutcome.RETRYABLE_FAILURE
                     }.also { outcome ->
+                        if (outcome == RawCollectionUploadOutcome.RETRYABLE_FAILURE ||
+                            outcome == RawCollectionUploadOutcome.WALK_IN_PROGRESS) {
+                            kr.co.hanium.dreamup.walksafe.network.parseHttpRetryAfterMs(error.retryAfterHeader)
+                                ?.takeIf { it > 0L }?.let { delay ->
+                                    synchronized(this) {
+                                        retryOwner = lease.owner
+                                        val now = elapsedRealtimeMs().coerceAtLeast(0L)
+                                        retryNotBeforeElapsedMs = now + delay.coerceAtMost(Long.MAX_VALUE - now)
+                                    }
+                                }
+                        }
                         when (outcome) {
                             RawCollectionUploadOutcome.CANCELLED -> Unit
                             RawCollectionUploadOutcome.SERVER_DISABLED -> outcomeCounters.record(
@@ -896,28 +932,40 @@ class RawCollectionRuntimeCoordinator private constructor(
                     else RawCollectionUploadOutcome.RETRYABLE_FAILURE.also {
                         outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
                     }
-                } finally {
-                    plaintextChunks.forEach { it.plaintext.fill(0) }
-                    synchronized(this) {
-                        if (activeUpload?.call === outer) activeUpload = null
+                } catch (_: RuntimeException) {
+                    if (outer.isCancelled()) RawCollectionUploadOutcome.CANCELLED
+                    else {
+                        outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
+                        if (localWork) RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                        else RawCollectionUploadOutcome.RETRYABLE_FAILURE
                     }
+                } finally {
+                    runCatching { nested.getAndSet(null)?.cancel() }
+                    plaintextChunks.forEach { it.plaintext.fill(0) }
+                    clearActiveUpload(outer)
                 }
             },
             cancelBlock = {
-                synchronized(this) {
-                    if (!executionStarted.get() && activeUpload?.call === outer) activeUpload = null
-                }
+                if (!executionStarted.get()) clearActiveUpload(outer)
                 nested.getAndSet(null)?.cancel()
             },
         )
-        activeUpload = ActiveUpload(lease, outer)
+        activeUpload.set(ActiveUpload(lease, outer))
+        // A UI cancellation can arrive while the store is being read, before publication.
+        if (uploadCancellationGeneration.get() != cancellationGeneration) {
+            outer.cancel()
+            return null
+        }
         return outer
     }
 
-    @Synchronized
+    private fun retryDelayed(owner: RawCollectionOwner): Boolean =
+        retryOwner == owner && elapsedRealtimeMs() < retryNotBeforeElapsedMs
+
+    // Called from the UI: compare authority in memory, never wait for storage/fsync.
     fun revalidate(context: RawCollectionRuntimeContext): Boolean {
-        val active = activeUpload ?: return false
-        if (isLeaseCurrent(active.lease, context)) return true
+        val active = activeUpload.get() ?: return false
+        if (isLeaseContextCurrent(active.lease, context)) return true
         active.call.cancel()
         return false
     }
@@ -936,7 +984,7 @@ class RawCollectionRuntimeCoordinator private constructor(
             sealActiveSegment(context)
         }
 
-    /** Deletes this ended walk's remaining PARTIAL copies (never a sealed segment). */
+    /** Deletes remaining PARTIAL copies; -1 means storage failure, never an empty successful purge. */
     @Synchronized
     fun discardEndedPartials(context: RawCollectionRuntimeContext): Int {
         if (!context.walk.state.isWalkEnd()) return 0
@@ -945,12 +993,16 @@ class RawCollectionRuntimeCoordinator private constructor(
             context.sessionGeneration,
             context.deviceCheck,
         ) ?: return 0
-        return store.discardPartials(owner, context.walk.epoch.walkSessionId)
+        return try {
+            store.discardPartials(owner, context.walk.epoch.walkSessionId)
+        } catch (_: RawCollectionStorageReadException) {
+            -1
+        }
     }
 
     @Synchronized
     fun onConsentRevoked(consentReceiptSha256: String): Boolean {
-        activeUpload?.takeIf {
+        activeUpload.get()?.takeIf {
             it.lease.confirmation.backendConsentReceiptSha256 == consentReceiptSha256
         }?.call?.cancel()
         return try {
@@ -1004,9 +1056,14 @@ class RawCollectionRuntimeCoordinator private constructor(
         return store.resetForNewEnrollment(owner)
     }
 
-    @Synchronized
     fun cancelActiveUpload() {
-        cancelActiveLocked()
+        uploadCancellationGeneration.incrementAndGet()
+        activeUpload.get()?.call?.cancel()
+    }
+
+    private fun clearActiveUpload(call: CancellableNetworkCall<RawCollectionUploadOutcome>) {
+        val active = activeUpload.get()
+        if (active?.call === call) activeUpload.compareAndSet(active, null)
     }
 
     /**
@@ -1129,15 +1186,32 @@ class RawCollectionRuntimeCoordinator private constructor(
         expected: UploadLease,
         context: RawCollectionRuntimeContext,
     ): Boolean {
-        val admission = uploadAdmissionOrNull(context) ?: return false
+        // Worker-side checks retain the persisted policy/consent barrier.
+        if (uploadAdmissionOrNull(context) == null) return false
+        return isLeaseContextCurrent(expected, context)
+    }
+
+    private fun isLeaseContextCurrent(
+        expected: UploadLease,
+        context: RawCollectionRuntimeContext,
+    ): Boolean {
+        val session = context.session ?: return false
         val binding = context.networkBinding ?: return false
-        return admission.owner == expected.owner &&
-            admission.session === expected.session &&
-            admission.session.lease.instanceId == expected.sessionInstanceId &&
+        val confirmation = context.consentSession.currentConfirmationOrNull(
+            setOf(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+        ) ?: return false
+        return context.walk.state.allowsPostWalkTransfer &&
+            context.gatewayWalkLease == null &&
+            context.charging &&
+            context.networkTransport == ActiveNetworkTransport.WIFI &&
+            binding.transport == IntegratedConsentNetworkTransport.WIFI &&
+            ownerOrNull(session, context.sessionGeneration, context.deviceCheck) == expected.owner &&
+            session === expected.session &&
+            session.lease.instanceId == expected.sessionInstanceId &&
             context.sessionGeneration == expected.sessionGeneration &&
             context.deviceCheck.attemptGeneration == expected.deviceAttemptGeneration &&
             context.consentSession === expected.consentSession &&
-            admission.confirmation == expected.confirmation &&
+            confirmation == expected.confirmation &&
             // The runtime walk id is not compared: after the walk it may move on (ENDED -> READY);
             // a walk that becomes ACTIVE again fails the post-walk gate above and cancels.
             binding.isSameNetworkBinding(expected.networkBinding)
@@ -1147,8 +1221,7 @@ class RawCollectionRuntimeCoordinator private constructor(
         this == WalkSessionState.ENDED || this == WalkSessionState.SAFE_STOP
 
     private fun cancelActiveLocked() {
-        val active = activeUpload ?: return
-        active.call.cancel()
+        cancelActiveUpload()
     }
 }
 
@@ -1248,7 +1321,8 @@ private fun mergeRuntimeWindow(
         ),
         thermalThrottled = when {
             previousPerformance.thermalThrottled == true || performance.thermalThrottled == true -> true
-            previousPerformance.thermalThrottled == null && performance.thermalThrottled == null -> null
+            // An unobserved window cannot establish that the whole segment was unthrottled.
+            previousPerformance.thermalThrottled == null || performance.thermalThrottled == null -> null
             else -> false
         },
         maxFrameDurationMs = maxOrNull(

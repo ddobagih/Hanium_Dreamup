@@ -128,23 +128,26 @@ class VoskWakePhraseProbeTest {
 
     @Test
     fun streamErrorAfterReadyIsReportedOnceWithItsBoundedCategory() {
-        val harness = ProbeHarness()
+        for (error in listOf(VoskStreamingError.AUDIO_READ_FAILED, VoskStreamingError.AUDIO_SILENCED)) {
+            val harness = ProbeHarness()
 
-        harness.probe.start()
-        harness.listener.onReady(23L)
-        harness.listener.onError(23L, VoskStreamingError.AUDIO_READ_FAILED)
-        harness.listener.onError(23L, VoskStreamingError.INFERENCE_FAILED)
-        harness.listener.onTranscript(23L, transcript("길라잡이", confidence = 0.99f))
-        harness.dispatcher.fireTimeout()
-        harness.probe.cancel()
-        harness.dispatcher.runPosted()
+            harness.probe.start()
+            harness.listener.onReady(23L)
+            harness.listener.onError(23L, error)
+            harness.listener.onError(23L, VoskStreamingError.INFERENCE_FAILED)
+            harness.listener.onTranscript(23L, transcript("길라잡이", confidence = 0.99f))
+            harness.dispatcher.fireTimeout()
+            harness.probe.cancel()
+            harness.dispatcher.runPosted()
 
-        val result = harness.results.single()
-        assertEquals(VoskWakePhraseProbeAvailability.UNAVAILABLE, result.availability)
-        assertEquals(VoskWakePhraseProbeFailure.STREAM_ERROR, result.failure)
-        assertEquals(VoskStreamingError.AUDIO_READ_FAILED, result.streamingError)
-        assertEquals(1, harness.stream.stopCount)
-        assertEquals(1, harness.stream.closeCount)
+            val result = harness.results.single()
+            assertEquals(VoskWakePhraseProbeAvailability.UNAVAILABLE, result.availability)
+            assertEquals(VoskWakePhraseProbeFailure.STREAM_ERROR, result.failure)
+            assertEquals(error, result.streamingError)
+            assertEquals(1, harness.stream.stopCount)
+            assertEquals(1, harness.stream.closeCount)
+            assertFalse(harness.probe.start())
+        }
     }
 
     @Test

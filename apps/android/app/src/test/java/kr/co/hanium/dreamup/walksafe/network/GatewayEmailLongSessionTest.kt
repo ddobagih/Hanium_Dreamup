@@ -47,7 +47,7 @@ class GatewayEmailLongSessionTest {
         put("required", true); put("authenticated", true); put("session_mode", "long_lived")
     }
 
-    private fun login(transport: Transport) = GatewayFieldSessionClient(transport, elapsedRealtimeNanos = { 0L })
+    private fun login(transport: Transport) = GatewayFieldSessionClient(transport, elapsedRealtimeNanos = { 0L }, allowDebugAccountOrigin = true)
         .loginWithPassword(origin, "person@example.com", "correct horse battery", true, device, now,
             enableLongLivedSession = true)
 
@@ -66,7 +66,7 @@ class GatewayEmailLongSessionTest {
         assertEquals(7L, restored.lease.backendAccountGeneration)
         assertThrows(IllegalStateException::class.java) { restored.requestHeaders(later) }
         transport.response = response(payload(later, 1))
-        val renewed = GatewayFieldSessionClient(transport, elapsedRealtimeNanos = { 0L }).renew(restored, actor, later).session
+        val renewed = GatewayFieldSessionClient(transport, elapsedRealtimeNanos = { 0L }, allowDebugAccountOrigin = true).renew(restored, actor, later).session
         assertTrue(renewed.isUsableFor(actor, later))
         assertEquals(7L, renewed.lease.backendAccountGeneration)
         assertEquals(1L, renewed.rotation)
@@ -96,7 +96,7 @@ class GatewayEmailLongSessionTest {
             val original = login(transport)
             transport.response = response(wrong)
             assertThrows(GatewaySessionHttpException::class.java) {
-                GatewayFieldSessionClient(transport, elapsedRealtimeNanos = { 0L }).renew(original, actor, now + 1000L)
+                GatewayFieldSessionClient(transport, elapsedRealtimeNanos = { 0L }, allowDebugAccountOrigin = true).renew(original, actor, now + 1000L)
             }
             assertFalse(original.isUsableFor(actor, now + 1000L))
         }
@@ -105,7 +105,7 @@ class GatewayEmailLongSessionTest {
     @Test fun longLoginRequiresRememberMeAndRestoreRequiresSameOriginActorAndDevice() {
         val transport = Transport().apply { response = response(payload()); status = GatewayHttpResponse(200, status(payload()).toString()) }
         assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).loginWithPassword(origin, "person@example.com", "correct horse battery", false, device, now, true)
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).loginWithPassword(origin, "person@example.com", "correct horse battery", false, device, now, true)
         }
         val snapshot = requireNotNull(login(transport).persistenceSnapshotOrNull())
         assertNull(GatewayFieldSession.restore(snapshot, "https://another.example", actor, device, now))

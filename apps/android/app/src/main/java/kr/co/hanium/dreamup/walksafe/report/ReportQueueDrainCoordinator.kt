@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.report
 
+import java.io.IOException
 import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -21,6 +22,7 @@ internal class AndroidReportQueueTransport(
     private val consentConfirmation: IntegratedConsentConfirmation,
     private val networkBinding: IntegratedConsentNetworkBinding,
     private val permitProvider: (ReportTransferPurpose) -> ReportUploadPermit?,
+    private val onUploadStarting: (QueuedReport) -> Unit = {},
 ) : ReportQueueTransport {
     private val approvedGatewayOrigin = requireNotNull(
         approvedReportQueueGatewayOriginOrNull(session.gatewayBaseUrl),
@@ -39,8 +41,8 @@ internal class AndroidReportQueueTransport(
     override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> =
         uploadResultCall(report).map { it.receipt }
 
-    override fun uploadResultCall(report: QueuedReport): CancellableNetworkCall<ReportQueueUploadResult> =
-        uploader.queuedUploadResultCall(
+    override fun uploadResultCall(report: QueuedReport): CancellableNetworkCall<ReportQueueUploadResult> {
+        val call = uploader.queuedUploadResultCall(
             permit = permitFor(report),
             session = session,
             consentConfirmation = consentConfirmation,
@@ -48,6 +50,14 @@ internal class AndroidReportQueueTransport(
             report = report,
             approvedGatewayOrigin = approvedGatewayOrigin,
         )
+        return CancellableNetworkCall(
+            executeBlock = {
+                onUploadStarting(report)
+                call.execute()
+            },
+            cancelBlock = call::cancel,
+        )
+    }
 
     private fun QueuedReport.purpose(): ReportTransferPurpose =
         if (priority == ReportQueuePriority.EXPLICIT) {
@@ -73,7 +83,8 @@ internal enum class ReportQueueDrainOutcome {
     LOCAL_DELETE_FAILED,
     QUARANTINED,
     RETRY_DEFERRED,
-    AUTHORITY_BLOCKED,
+    AUTHENTICATION_REQUIRED,
+    PERMISSION_BLOCKED,
     CANCELLED,
 }
 
@@ -133,7 +144,12 @@ internal class ReportQueueDrainCoordinator(
             initialContext.reporterActorId,
             initialContext.accountGeneration,
         ) ?: return null
-        val lease = policy.acquire(report, initialContext).lease ?: return null
+        val lease = try {
+            policy.acquire(report, initialContext).lease
+        } catch (error: Throwable) {
+            report.close()
+            throw error
+        } ?: run { report.close(); return null }
         val nested = AtomicReference<CancellableNetworkCall<*>?>()
         val executionStarted = AtomicBoolean(false)
         lateinit var outer: CancellableNetworkCall<ReportQueueDrainResult>
@@ -208,10 +224,15 @@ internal class ReportQueueDrainCoordinator(
                         400, 413, 415, 422 -> (if (store.recordUploadFailure(report, permanent = true)) {
                             ReportQueueDrainOutcome.QUARANTINED
                         } else ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED).withCreationOutcome(report.priority)
-                        401, 403 -> ReportQueueDrainOutcome.AUTHORITY_BLOCKED.withCreationOutcome(report.priority)
+                        401 -> ReportQueueDrainOutcome.AUTHENTICATION_REQUIRED.withCreationOutcome(report.priority)
+                        403 -> ReportQueueDrainOutcome.PERMISSION_BLOCKED.withCreationOutcome(report.priority)
                         else -> {
-                            val deferred = if (error.error.retryAfterMs != null &&
-                                !store.recordUploadFailure(report, false, error.error.retryAfterMs)
+                            val retryDelay = if (error.error.statusCode == 408 ||
+                                error.error.statusCode == 429 || error.error.statusCode in 500..599
+                            ) reportRetryDelayMs(1, error.error.statusCode, error.error.retryAfterMs)
+                            else error.error.retryAfterMs
+                            val deferred = if (retryDelay != null &&
+                                !store.recordUploadFailure(report, false, retryDelay)
                             ) ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED
                             else ReportQueueDrainOutcome.RETRY_DEFERRED
                             deferred.withCreationOutcome(
@@ -225,7 +246,16 @@ internal class ReportQueueDrainCoordinator(
                             ).copy(walkInProgress = error.error.isReportWalkInProgress())
                         }
                     }
+                } catch (_: IOException) {
+                    // A lost response may follow server acceptance. Retain the exact payload and
+                    // defer the next status-first attempt across process restarts.
+                    (if (outer.isCancelled() || !policy.isCurrent(lease, contextProvider())) {
+                        ReportQueueDrainOutcome.CANCELLED
+                    } else if (store.recordUploadFailure(report, false, reportRetryDelayMs(1))) {
+                        ReportQueueDrainOutcome.RETRY_DEFERRED
+                    } else ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED).withCreationOutcome(report.priority)
                 } finally {
+                    report.close()
                     policy.release(lease)
                     synchronized(this) {
                         if (activeDrain?.call === outer) activeDrain = null
@@ -235,7 +265,10 @@ internal class ReportQueueDrainCoordinator(
             cancelBlock = {
                 synchronized(this) {
                     policy.release(lease)
-                    if (!executionStarted.get() && activeDrain?.call === outer) activeDrain = null
+                    if (!executionStarted.get()) {
+                        report.close()
+                        if (activeDrain?.call === outer) activeDrain = null
+                    }
                 }
                 nested.getAndSet(null)?.cancel()
             },

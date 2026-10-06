@@ -1713,7 +1713,10 @@ def _mock_poi_search_response(
     origin_lng: float | None = None,
 ) -> DestinationSearchResponse:
     normalized_query = normalize_destination_query(query)
-    compact_query = normalized_query.replace(" ", "")
+    keyword = _destination_search_intent(normalized_query)[0] if (
+        origin_lat is not None and origin_lng is not None
+    ) else normalized_query
+    compact_query = keyword.replace(" ", "")
     results: list[DestinationSearchResult] = []
 
     for item in MOCK_POI_ITEMS:
@@ -1752,6 +1755,17 @@ def _mock_poi_search_response(
         total_count=len(results),
         more_results_available=len(results) > limit,
     )
+
+
+def _destination_search_intent(query: str) -> tuple[str, bool]:
+    # Only an explicit modifier + generic category is unambiguous. Preserve names
+    # such as "가까운약국", branches and "서울역 근처 편의점" (a different search origin).
+    match = re.fullmatch(
+        r"(?:가장 가까운|가까운|근처|주변|인근)\s+"
+        r"(편의점|약국|병원|카페|식당|음식점|화장실|지하철역|기차역|은행|마트|도서관|공원)",
+        query,
+    )
+    return (match.group(1), True) if match else (query, False)
 
 
 def _is_named_university_query(query: str) -> bool:
@@ -1820,9 +1834,14 @@ async def fetch_tmap_poi_search(
             http_status=503,
         )
 
+    keyword, nearby = _destination_search_intent(normalized_query)
+    # Without a search origin we cannot promise nearby results. Preserve the
+    # original query; the app's location retry remains responsible for that case.
+    if origin_lat is None:
+        keyword, nearby = normalized_query, False
     params = {
         "version": settings.tmap_pedestrian_api_version,
-        "searchKeyword": normalized_query,
+        "searchKeyword": keyword,
         "searchType": "all",
         "searchtypCd": "A",
         "radius": 0,
@@ -1836,8 +1855,8 @@ async def fetch_tmap_poi_search(
     if origin_lat is not None and origin_lng is not None:
         # Named institutions and stations need relevance before the bounded provider page.
         # Keep nearby/category and explicitly qualified facility searches unchanged.
-        params["searchtypCd"] = "A" if (
-            _is_named_university_query(normalized_query) or _is_named_station_query(normalized_query)
+        params["searchtypCd"] = "A" if not nearby and (
+            _is_named_university_query(keyword) or _is_named_station_query(keyword)
         ) else "R"
         params["centerLat"] = origin_lat
         params["centerLon"] = origin_lng

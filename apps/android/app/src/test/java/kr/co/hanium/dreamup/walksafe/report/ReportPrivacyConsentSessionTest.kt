@@ -421,7 +421,7 @@ class ReportPrivacyConsentSessionTest {
         assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("영상·이미지·정확한 위치를 수집하지 않는 별도 경로"))
         assertTrue(REPORT_PRIVACY_DISCLOSURE_KO.contains("직접 신고는 사용할 수 있습니다"))
         assertTrue(REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO.contains("이번 손상 점자블록 직접 신고"))
-        assertTrue(REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO.contains("선택 원본·진단수집 raw v2나 학습 재사용에는"))
+        assertTrue(REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO.contains("선택 진단·성능 정보 수집이나 학습 재사용에는"))
         assertFalse(REPORT_PRIVACY_DISCLOSURE_KO.contains("180일"))
         assertFalse(REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO.contains("180일"))
     }

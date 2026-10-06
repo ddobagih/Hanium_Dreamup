@@ -1,6 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.network
 
-import java.net.IDN
+import android.icu.text.IDNA
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
@@ -47,14 +47,15 @@ internal class GatewayAccountClient(
         requestId: String,
     ): EmailOtpEnrollmentResponse {
         requireApprovedRequestOrigin(gatewayBaseUrl)
+        val canonicalEmail = GatewayAccountInputPolicy.canonicalEmailOrNull(email)
         if (
-            !GatewayAccountInputPolicy.validEmail(email) ||
+            canonicalEmail == null ||
             !GatewayAccountInputPolicy.validDateOfBirth(dateOfBirth) ||
             !REQUEST_ID.matches(requestId)
         ) throw GatewayAccountHttpException(0, "invalid_account_enrollment_input")
         val body = JSONObject()
             .put("schema_version", EMAIL_ENROLLMENT_SCHEMA)
-            .put("email", email)
+            .put("email", canonicalEmail)
             .put("date_of_birth", dateOfBirth)
             .put("request_id", requestId)
         val response = transport.postJson(
@@ -164,22 +165,53 @@ internal object GatewayAccountInputPolicy {
     private val DATE = DateTimeFormatter.ofPattern("uuuu-MM-dd")
         .withResolverStyle(ResolverStyle.STRICT)
 
-    fun validEmail(value: String): Boolean {
-        if (value != value.trim() || value.length !in 3..254 || value.count { it == '@' } != 1) {
-            return false
-        }
+    private val emailIdna by lazy {
+        // Same non-transitional UTS #46 mapping and contextual checks as Gateway domainToASCII.
+        IDNA.getUTS46Instance(IDNA.CHECK_BIDI or IDNA.CHECK_CONTEXTJ or IDNA.NONTRANSITIONAL_TO_ASCII)
+    }
+
+    fun validEmail(value: String): Boolean = canonicalEmailOrNull(value) != null
+
+    fun canonicalEmailOrNull(value: String): String? {
+        if (value != value.trim() || value.length !in 3..254 || value.count { it == '@' } != 1) return null
         val local = value.substringBefore('@')
         val rawDomain = value.substringAfter('@')
-        if (local.length !in 1..64 || !LOCAL.matches(local) || rawDomain.endsWith('.')) return false
-        val domain = runCatching { IDN.toASCII(rawDomain).lowercase() }.getOrNull() ?: return false
+        if (local.length !in 1..64 || !LOCAL.matches(local) || rawDomain.endsWith('.') || rawDomain.any { it <= ' ' || it == '\u007f' || it in "%/\\?#:" }) return null
+        val info = IDNA.Info()
+        val asciiDomain = runCatching {
+            emailIdna.nameToASCII(rawDomain, StringBuilder(), info).toString()
+        }.getOrNull() ?: return null
+        if (info.hasErrors() || asciiDomain.endsWith('.')) return null
+        val domain = canonicalNumericHostOrNull(asciiDomain) ?: return null
         val labels = domain.split('.')
-        return domain.length in 1..253 &&
-            local.length + domain.length + 1 <= 254 &&
-            labels.size >= 2 &&
-            labels.all { label ->
-                DOMAIN_LABEL.matches(label) &&
-                    (label.startsWith("xn--") || label.drop(2).take(2) != "--")
+        if (domain.length !in 1..253 || local.length + domain.length + 1 > 254 || labels.size < 2 ||
+            labels.any { !DOMAIN_LABEL.matches(it) || (!it.startsWith("xn--") && it.drop(2).take(2) == "--") }
+        ) return null
+        return "$local@$domain"
+    }
+
+    // Node's domainToASCII uses URL host rules, including legacy IPv4 spelling.
+    // Preserve that existing account identity (e.g. 127.1 -> 127.0.0.1).
+    private fun canonicalNumericHostOrNull(domain: String): String? {
+        val parts = domain.split('.')
+        val last = parts.last()
+        val numeric = last.all { it in '0'..'9' } || Regex("0x[0-9a-f]*").matches(last)
+        if (!numeric) return domain
+        if (parts.size > 4) return null
+        val numbers = parts.map { part ->
+            val (digits, radix) = when {
+                part.startsWith("0x") -> part.drop(2) to 16
+                part.length > 1 && part.startsWith('0') -> part.drop(1) to 8
+                else -> part to 10
             }
+            if (digits.isEmpty()) 0L else digits.toLongOrNull(radix) ?: return null
+        }
+        if (numbers.dropLast(1).any { it !in 0..255 } ||
+            numbers.last() !in 0 until (1L shl (8 * (5 - numbers.size)))) return null
+        val address = numbers.dropLast(1).foldIndexed(numbers.last()) { index, value, number ->
+            value + (number shl (8 * (3 - index)))
+        }
+        return (3 downTo 0).joinToString(".") { ((address shr (8 * it)) and 255).toString() }
     }
 
     fun validDateOfBirth(value: String): Boolean =

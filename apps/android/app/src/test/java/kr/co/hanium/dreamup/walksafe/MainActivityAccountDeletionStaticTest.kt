@@ -140,6 +140,13 @@ class MainActivityAccountDeletionStaticTest {
             ),
         )
         assertTrue(runtimeFence.contains("persistInterruptionMarker = false"))
+        assertTrue(appearsInOrder(runtimeFence,
+            "accountDeletionRuntimeFenceApplied = false",
+            "purgeAndRotatePositionFieldScope()",
+            "invalidateFrameStateForPause()",
+            "persistedReportAttemptStates.clear()",
+            "accountDeletionRuntimeFenceApplied = positionFieldPurged",
+        ))
         val safetyStop = ReportStaticSourceInspector.functionBlock(
             source,
             "private fun enterWalkSessionSafetyStopAndCancelOutputs",
@@ -171,21 +178,13 @@ class MainActivityAccountDeletionStaticTest {
                 "fieldSessionLog.purgeAll()",
             ),
         )
-        // DELETED evidence for device-unsent data must include the report queue and RAW
-        // store purge results; a failure in either one keeps the evidence at FAILED.
-        assertTrue(
-            appearsInOrder(
-                durableCleanup,
-                "purgeLegacyPendingReportQueueOnCleanupThread()",
-                "val reportQueuePurged = retryAccountDeletionPurgeOnCleanupThread {",
-                "reportQueueDrainCoordinator.onAccountDeleted()",
-                "::rawCollectionRuntimeCoordinator.isInitialized &&",
-                "retryAccountDeletionPurgeOnCleanupThread {\n",
-                "rawCollectionRuntimeCoordinator.onAccountDeleted()",
-                "return routeSnapshotPurged && legacyQueuePurged && reportQueuePurged && rawCollectionsPurged &&",
-                "preferencesPurged && fieldSessionsPurged",
-            ),
-        )
+        // Inventory omissions and per-store failures are exercised by AccountDeletionLocalInventoryTest.
+        for (store in AccountDeletionLocalStore.entries) {
+            assertTrue(durableCleanup.contains("AccountDeletionLocalStore.${store.name} to"))
+        }
+        assertTrue(durableCleanup.contains("return inventory.purge().isEmpty()"))
+        assertTrue(durableCleanup.contains("reportQueueDrainCoordinator.onAccountDeleted()"))
+        assertTrue(durableCleanup.contains("rawCollectionRuntimeCoordinator.onAccountDeleted()"))
         // A transient failure is retried a bounded number of times, never forever.
         val retry = ReportStaticSourceInspector.functionBlock(
             source,
