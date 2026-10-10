@@ -742,12 +742,12 @@ run_integration() {
       --web-root "${REPO_ROOT}/apps/web" \
       --build-dir "${web_dist_dir}"
   )
-  # Supported feature combinations only. This synthetic password is never used for a login.
+  # Supported feature combinations only; credentials are entered at runtime.
   local enabled
   for enabled in false true; do
     (
       cd "${REPO_ROOT}/apps/android"
-      WALKSAFE_DEVELOPMENT_TEST_PASSWORD=matrix-only-not-a-real-password ./gradlew \
+      ./gradlew \
         :app:testDebugUnitTest --tests '*BuildVariantIsolationTest' --tests '*ReportQueueContractTest' \
         :adminapp:testDebugUnitTest --tests '*AdminBuildVariantIsolationTest' \
         -PdevelopmentReportQueue="${enabled}" -PdevelopmentQuickStart="${enabled}" \
@@ -763,7 +763,6 @@ run_integration() {
       WALKSAFE_SOURCE_COMMIT="${source_commit}" \
       WALKSAFE_GATEWAY_ORIGIN="${WALKSAFE_RELEASE_TEST_GATEWAY_ORIGIN:-https://walksafe.invalid}" \
       WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-https://admin.walksafe.invalid}" \
-      WALKSAFE_DEVELOPMENT_TEST_PASSWORD=matrix-only-not-a-real-password \
       ./gradlew testReleaseUnitTest lintRelease assembleRelease \
         -PdevelopmentQuickStart=true -Pwalksafe.guidanceStartBypass=true \
         -PWALKSAFE_ADMIN_OPERATIONAL_DEBUG=true -PWALKSAFE_REPORT_QUEUE_ENABLED=true \

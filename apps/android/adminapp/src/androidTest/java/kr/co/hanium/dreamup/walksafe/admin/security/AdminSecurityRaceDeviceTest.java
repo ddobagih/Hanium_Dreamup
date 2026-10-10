@@ -31,6 +31,96 @@ public final class AdminSecurityRaceDeviceTest {
     @Test public void logoutDropsLocalAuthorityBeforeDelayedServerSuccess() throws Exception { logout(false); }
     @Test public void logoutDropsLocalAuthorityBeforeDelayedServerFailure() throws Exception { logout(true); }
 
+    /** Actual Activity and executor; harmless callbacks only, no synthetic login or remote mutation. */
+    @Test public void queuedSecurityWorkCannotRunAfterScreenExitAndReturn() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            awaitInitialized(scenario);
+            ExecutorService[] executor = new ExecutorService[1];
+            scenario.onActivity(activity -> {
+                assertTrue(activity.hasWindowFocus());
+                executor[0] = get(activity, "networkExecutor");
+                executor[0].execute(() -> {
+                    entered.countDown();
+                    try { assertTrue(release.await(10, TimeUnit.SECONDS)); }
+                    catch (InterruptedException e) { throw new AssertionError(e); }
+                });
+            });
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            scenario.onActivity(activity -> {
+                startOperation(activity, () -> calls.incrementAndGet());
+                assertTrue((Boolean) get(activity, "operationInFlight"));
+            });
+            scenario.moveToState(Lifecycle.State.CREATED);
+            scenario.moveToState(Lifecycle.State.RESUMED);
+            release.countDown();
+            executor[0].submit(() -> {}).get(5, TimeUnit.SECONDS);
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+            scenario.onActivity(activity -> {
+                assertEquals("old queued work must not execute", 0, calls.get());
+                assertFalse((Boolean) get(activity, "operationInFlight"));
+                assertNotEquals(SUCCESS, ((TextView) get(activity, "resultText")).getText().toString());
+                // Positive control: the new visible screen can submit its own harmless callback.
+                startOperation(activity, () -> calls.incrementAndGet());
+            });
+            executor[0].submit(() -> {}).get(5, TimeUnit.SECONDS);
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+            scenario.onActivity(activity -> {
+                assertEquals(1, calls.get());
+                assertFalse((Boolean) get(activity, "operationInFlight"));
+                assertEquals(SUCCESS, ((TextView) get(activity, "resultText")).getText().toString());
+            });
+        } finally { release.countDown(); }
+    }
+
+    @Test public void rejectedExecutorReturnsVisibleFailureWithoutRunningWork() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            awaitInitialized(scenario);
+            ExecutorService[] executor = new ExecutorService[1];
+            scenario.onActivity(activity -> executor[0] = get(activity, "networkExecutor"));
+            executor[0].submit(() -> {}).get(5, TimeUnit.SECONDS);
+            executor[0].shutdown();
+            assertTrue(executor[0].awaitTermination(5, TimeUnit.SECONDS));
+            scenario.onActivity(activity -> {
+                assertTrue(activity.hasWindowFocus());
+                startOperation(activity, () -> calls.incrementAndGet());
+                assertEquals(0, calls.get());
+                assertFalse("rejected dispatch must release busy UI", (Boolean) get(activity, "operationInFlight"));
+                String text = ((TextView) get(activity, "resultText")).getText().toString();
+                assertFalse(text.isBlank());
+                assertNotEquals("합성 인증 응답 대기", text);
+                assertNotEquals(SUCCESS, text);
+                assertTrue(((View) get(activity, "contentRoot")).isEnabled());
+            });
+        }
+    }
+
+    @Test public void destroyedActivityDoesNotExecuteItsQueuedWork() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        ExecutorService[] executor = new ExecutorService[1];
+        try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            awaitInitialized(scenario);
+            scenario.onActivity(activity -> {
+                executor[0] = get(activity, "networkExecutor");
+                executor[0].execute(() -> {
+                    entered.countDown();
+                    try { assertTrue(release.await(10, TimeUnit.SECONDS)); }
+                    catch (InterruptedException e) { throw new AssertionError(e); }
+                });
+            });
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            scenario.onActivity(activity -> startOperation(activity, () -> calls.incrementAndGet()));
+            scenario.moveToState(Lifecycle.State.DESTROYED);
+            assertTrue(executor[0].isShutdown());
+            release.countDown();
+            assertTrue(executor[0].awaitTermination(5, TimeUnit.SECONDS));
+            assertEquals(0, calls.get());
+        } finally { release.countDown(); }
+    }
+
     private void lateAuthentication(boolean recovery, boolean returnFirst) throws Exception {
         Fixture fixture = new Fixture(recovery ? "startRecovery" : "login", false);
         try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {

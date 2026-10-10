@@ -35,6 +35,62 @@ public final class AdminAuthenticatedTransportDeviceTest {
     private int businessCount;
     private int signatureCount;
     private String approvedDigest;
+    private byte[] originalImage;
+    private String originalToken;
+    private String originalMode = "valid";
+    private int originalReads;
+
+    @Test public void lostOriginalBodyRequiresNewGrantOverActualAndroidHttp() throws Exception {
+        originalMode = "truncated";
+        var client = new AdminOperationsHttpClient(origin(), true, descriptor, AdminAuthenticatedTransportDeviceTest::sign);
+        var first = approveOriginal();
+        assertThrows(AdminOperationsApi.OriginalEvidenceNotReceivedException.class,
+            () -> client.loadOriginalEvidence(SESSION, REPORT_ID, 3, "synthetic device receipt check", first));
+        assertEquals("No implicit retry of a consumed grant", 1, originalReads);
+        assertEquals(1, businessCount);
+        String oldToken = originalToken;
+        originalMode = "valid";
+        var second = approveOriginal();
+        assertNotEquals(oldToken, originalToken);
+        try (var evidence = client.loadOriginalEvidence(SESSION, REPORT_ID, 3, "synthetic device receipt check", second)) {
+            assertTrue(evidence.matches(REPORT_ID, 3, SESSION_ID, DEVICE_ID, System.currentTimeMillis()));
+        }
+        assertEquals(2, originalReads);
+        assertEquals(2, businessCount);
+        assertEquals(12, server.getRequestCount());
+    }
+
+    @Test public void originalMimeMismatchIsNotTreatedAsDeliveredOnAndroid() throws Exception {
+        originalMode = "wrong-mime";
+        var headers = approveOriginal();
+        var client = new AdminOperationsHttpClient(origin(), true, descriptor, AdminAuthenticatedTransportDeviceTest::sign);
+        assertThrows(AdminOperationsApi.OriginalEvidenceNotReceivedException.class,
+            () -> client.loadOriginalEvidence(SESSION, REPORT_ID, 3, "synthetic device receipt check", headers));
+        assertEquals(1, originalReads);
+        assertEquals(1, businessCount);
+    }
+
+    private Map<String, String> approveOriginal() throws Exception {
+        var bitmap = android.graphics.Bitmap.createBitmap(2, 2, android.graphics.Bitmap.Config.ARGB_8888);
+        try (var output = new java.io.ByteArrayOutputStream()) {
+            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output));
+            originalImage = output.toByteArray();
+        } finally { bitmap.recycle(); }
+        byte[] tokenBytes = new byte[32];
+        Arrays.fill(tokenBytes, (byte) businessCount);
+        originalToken = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+        var image = Map.of("resource_path", "/uploads/" + REPORT_ID + ".png", "content_type", "image/png",
+            "sha256", AdminCanonicalEncoding.sha256Hex(originalImage), "byte_count", originalImage.length,
+            "access_token", originalToken);
+        var grant = Map.of("schema_version", AdminOriginalEvidence.SCHEMA_VERSION,
+            "grant_id", UUID.randomUUID().toString(), "content_revision", 3,
+            "expires_at", java.time.Instant.ofEpochMilli(System.currentTimeMillis() + 120000).toString(),
+            "exact_location", Map.of("lat", 37.5665, "lon", 126.978, "accuracy", 4.5), "image", image);
+        var body = AdminCanonicalEncoding.canonicalJsonBytes(Map.of("purpose", AdminOriginalEvidence.PURPOSE,
+            "reason", "synthetic device receipt check", "expected_content_revision", 3));
+        return approve(AdminHighRiskActionGate.originalEvidence(REPORT_ID), body,
+            new org.json.JSONObject(grant).toString());
+    }
 
     @BeforeClass public static void createSyntheticSigningKey() throws Exception {
         // This tests the wire contract, not AndroidKeyStore or device-authentication assurance.
@@ -141,6 +197,17 @@ public final class AdminAuthenticatedTransportDeviceTest {
     private MockResponse serve(RecordedRequest request) throws Exception {
         String target = request.getTarget();
         byte[] body = request.getBody() == null ? new byte[0] : request.getBody().toByteArray();
+        if (target.equals("/uploads/" + REPORT_ID + ".png")) {
+            assertEquals("GET", request.getMethod());
+            assertEquals(originalToken, request.getHeaders().get(AdminOperationsHttpClient.ORIGINAL_ACCESS_GRANT_HEADER));
+            assertEquals("no-store", request.getHeaders().get("Cache-Control"));
+            originalReads++;
+            byte[] delivered = originalMode.equals("truncated")
+                ? Arrays.copyOf(originalImage, originalImage.length - 1) : originalImage;
+            return new MockResponse.Builder().code(200)
+                .setHeader("Content-Type", originalMode.equals("wrong-mime") ? "image/jpeg" : "image/png")
+                .setHeader("Cache-Control", "no-store").body(new okio.Buffer().write(delivered)).build();
+        }
         if (target.equals(AdminReportHttpClient.CHALLENGE_PATH)) {
             Map<String, Object> fields = new LinkedHashMap<>(AdminStrictJson.parseObject(new String(body, StandardCharsets.UTF_8)));
             String id = UUID.randomUUID().toString(); long now = System.currentTimeMillis();
@@ -183,7 +250,7 @@ public final class AdminAuthenticatedTransportDeviceTest {
         assertEquals(NONCE, request.getHeaders().get(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER));
         assertEquals(approvedDigest, AdminCanonicalEncoding.sha256Hex(body));
         assertArrayEquals(expectedBody, body); businessCount++;
-        return json(200, response);
+        return json(target.endsWith("/original-access-grants") ? 201 : 200, response);
     }
     private static MockResponse json(int code, String body) {
         return new MockResponse.Builder().code(code).setHeader("Content-Type", "application/json")

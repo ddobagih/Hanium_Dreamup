@@ -55,6 +55,8 @@ adb install -r "$VISUAL_TEST_WORKSPACE/apps/android/app/build/outputs/apk/visual
 
 설치 후 실제 테스트 계정으로 로그인하고 권한·앱 상태에 따른 안내를 따릅니다. `DEVELOPMENT_QUICK_START`를 켜는 절차는 사용하지 않습니다. 화면에 박스나 거리값이 보인다는 사실만으로 거리 오차나 보행 위험 안내의 정확도를 판단하지 말고, 실측 거리와 촬영 조건을 분리해 비교해야 합니다.
 
+별도 로컬 기능 시험에서 `developmentQuickStart=true`를 사용하는 경우에도 계정 정보는 APK에 넣지 않습니다. 앱의 기존 로그인 화면에서 직접 로그인한 뒤 개발 기능 테스트를 시작합니다. 이전 `developmentQuickStartEmail`과 `WALKSAFE_DEVELOPMENT_TEST_PASSWORD` 빌드 입력은 더 이상 사용하지 않습니다. 이 옵션은 실외 보행 검증용이 아니며, 시험 계정 권한·수명 관리는 별도로 적용해야 합니다.
+
 ## 관리자 앱
 
 `adminapp`은 applicationId `kr.co.hanium.dreamup.walksafe.admin`의 별도 앱입니다. [관리자 빌드 설정](../../apps/android/adminapp/build.gradle.kts)은 비밀번호·TOTP 인증과 보안 제어 화면을 사용하며, 신고 검토·수동 기관 전달 기록 같은 운영 워크플로는 기본적으로 잠급니다.

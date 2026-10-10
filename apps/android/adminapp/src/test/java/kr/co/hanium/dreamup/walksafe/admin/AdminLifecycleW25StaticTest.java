@@ -54,9 +54,8 @@ public final class AdminLifecycleW25StaticTest {
         String security = section(activity, "private void runSecurityOperation(\n        String pendingMessage,\n"
             + "        String successMessage,\n        AdminRecoveryMessagePolicy.Phase phase,\n"
             + "        SecurityOperation operation,\n        boolean credentialBound", "private void render()");
-        assertTrue(security.contains("resultText.setText(AdminRecoveryMessagePolicy.failureMessage(\n"
-            + "                        phase, error, controller != null && controller.hasRetainedSession()\n"
-            + "                    ));"));
+        assertTrue(security.contains("resultText.setText(AdminRecoveryMessagePolicy.failureMessage("));
+        assertTrue(security.contains("phase, error, controller != null && controller.hasRetainedSession()"));
         assertFalse(security.contains("AdminRecoveryMessagePolicy.failureMessage(phase, error)"));
     }
 
@@ -92,7 +91,9 @@ public final class AdminLifecycleW25StaticTest {
                     || guard.contains("isCurrentHistoryCallback(")
                     || guard.contains("requestGeneration == originalEvidenceGeneration"));
         }
-        assertTrue(checked >= 10);
+        // Three runner-owned operations now use the tested shared pre-dispatch/result fence.
+        assertTrue(checked >= 9);
+        assertEquals(3, count(activity, "AdminOperationRunner.execute(networkExecutor, this::runOnUiThread,"));
         String helper = section(activity, "private boolean isCurrentOperationCallback(",
             "private void completeRawMutation(");
         assertTrue(helper.contains("!isDestroyed() && activityStarted"));
@@ -125,10 +126,10 @@ public final class AdminLifecycleW25StaticTest {
         String security = section(activity, "private void runSecurityOperation(\n        String pendingMessage,\n"
             + "        String successMessage,\n        AdminRecoveryMessagePolicy.Phase phase,\n"
             + "        SecurityOperation operation,\n        boolean credentialBound", "private void render()");
-        assertTrue(security.contains("if (!activityStarted || generation != securityOperationGeneration\n"
-            + "                    || !controller.isLocalGenerationCurrent(sessionGeneration)) return;"));
-        assertEquals(2, count(security, "if (isDestroyed() || !activityStarted\n"
-            + "                        || generation != securityOperationGeneration) return;"));
+        assertTrue(security.contains("AdminOperationRunner.execute(networkExecutor, this::runOnUiThread,"));
+        assertTrue(security.contains("() -> activityStarted && generation == securityOperationGeneration"));
+        assertTrue(security.indexOf("!controller.isLocalGenerationCurrent(sessionGeneration)")
+            < security.indexOf("operation.run()"));
     }
 
     @Test

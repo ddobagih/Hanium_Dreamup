@@ -35,6 +35,45 @@ public final class AdminBoundaryLifecycleDeviceTest {
             });
         }
     }
+    @Test public void recreationDoesNotRestoreSecretInputsAndKeepsCaptureProtection() {
+        try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            long until = android.os.SystemClock.elapsedRealtime() + 5000L;
+            boolean[] focused = {false};
+            while (!focused[0] && android.os.SystemClock.elapsedRealtime() < until) {
+                scenario.onActivity(activity -> focused[0] = activity.hasWindowFocus());
+                if (!focused[0]) android.os.SystemClock.sleep(50L);
+            }
+            assertTrue("actual window focus is required", focused[0]);
+            List<EditText> oldFields = new ArrayList<>();
+            final AdminBoundaryActivity[] oldActivity = new AdminBoundaryActivity[1];
+            scenario.onActivity(activity -> {
+                oldActivity[0] = activity;
+                assertTrue(activity.hasWindowFocus());
+                collect(activity.getWindow().getDecorView(), oldFields);
+                assertTrue(oldFields.size() >= 2);
+                for (EditText field : oldFields) {
+                    assertFalse("secrets must not participate in OS view-state restoration", field.isSaveEnabled());
+                    field.setText("synthetic-recreation-secret");
+                    assertEquals("synthetic-recreation-secret", field.getText().toString());
+                }
+            });
+            scenario.recreate();
+            scenario.onActivity(activity -> {
+                assertNotSame(oldActivity[0], activity);
+                assertTrue(oldActivity[0].isDestroyed());
+                assertTrue((activity.getWindow().getAttributes().flags & WindowManager.LayoutParams.FLAG_SECURE) != 0);
+                List<EditText> freshFields = new ArrayList<>();
+                collect(activity.getWindow().getDecorView(), freshFields);
+                assertEquals(oldFields.size(), freshFields.size());
+                for (EditText field : oldFields) assertEquals("old views must be wiped", "", field.getText().toString());
+                for (EditText field : freshFields) {
+                    assertEquals("new views must not restore secrets", "", field.getText().toString());
+                    assertFalse(field.isSaveEnabled());
+                }
+            });
+        }
+    }
+
     private static void collect(View view, List<EditText> fields) {
         if (view instanceof EditText) {
             EditText field = (EditText) view;

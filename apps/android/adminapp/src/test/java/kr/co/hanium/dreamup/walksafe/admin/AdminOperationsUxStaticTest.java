@@ -975,8 +975,8 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(occurrences(operational, "setInteractiveEnabled(contentRoot, true)") == 3);
         assertTrue(occurrences(security, "setInteractiveEnabled(contentRoot, true)") == 2);
         assertTrue(occurrences(incident, "setInteractiveEnabled(contentRoot, true)") == 4);
-        // Recent review/delivery previews add three callbacks through the same evidence boundary.
-        assertTrue(occurrences(activity, "setInteractiveEnabled(contentRoot, true)") == 20);
+        // Restored-decision success/failure now explicitly enable through the same boundary.
+        assertTrue(occurrences(activity, "setInteractiveEnabled(contentRoot, true)") == 22);
 
         assertFalse(activity.contains("private static void setInteractiveEnabled("));
         assertTrue(interactive.contains("if (view == originalEvidenceConfirmedInput)"));

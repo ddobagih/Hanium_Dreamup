@@ -538,6 +538,24 @@ class InfraTests(unittest.TestCase):
         (self.root / "missing.xml").write_text('<testsuite><testcase name="stale"/></testsuite>')
         self.assertEqual([row["status"] for row in summarize(self.root)], ["PASS", "FAIL", "NOT_RUN", "EXCLUDED"])
 
+    def test_report_all_skipped_is_not_pass_and_failures_keep_precedence(self):
+        (self.root / "scope.tsv").write_text("group\tselected\tcase.py\n")
+        (self.root / "group.started").touch()
+        cases = [
+            ('<testcase><skipped/></testcase>', 0, "SKIPPED"),
+            ('<testcase><skipped/></testcase><testcase/>', 0, "PASS"),
+            ('<testcase><skipped/></testcase><testcase><failure/></testcase>', 0, "FAIL"),
+            ('<testcase><skipped/></testcase>', 1, "FAIL"),
+            ('', 0, "FAIL"),
+        ]
+        for body, exit_code, expected in cases:
+            with self.subTest(body=body, exit_code=exit_code):
+                (self.root / "group.exit").write_text(str(exit_code))
+                (self.root / "group.xml").write_text(f"<testsuite>{body}</testsuite>")
+                row = summarize(self.root)[0]
+                self.assertEqual(row["status"], expected)
+                self.assertEqual(row["skipped"], body.count("<skipped/>"))
+
     def test_node_recursive_discovery_and_junit(self):
         self.run_node_fixture("import {test} from 'node:test'; test('nested test', () => {});", expected=0)
         inventory = json.loads((self.root / "reports/node-gateway-inventory.json").read_text())

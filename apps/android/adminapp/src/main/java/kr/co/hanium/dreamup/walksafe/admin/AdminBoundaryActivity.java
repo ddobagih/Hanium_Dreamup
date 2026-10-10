@@ -2941,62 +2941,55 @@ public final class AdminBoundaryActivity extends Activity {
         operationInFlight = true;
         setInteractiveEnabled(contentRoot, false);
         resultText.setText(pendingMessage);
-        networkExecutor.execute(() -> {
-            try {
-                AdminOperationsApi.Result result = operation.run();
+        long sessionGeneration = controller.localGeneration();
+        AdminOperationRunner.execute(networkExecutor, this::runOnUiThread,
+            () -> activityStarted && generation == securityOperationGeneration
+                && controller.isLocalGenerationCurrent(sessionGeneration),
+            () -> {
+                try {
+                    return new OperationalCompletion(operation.run(), null, null);
+                } catch (AdminOperationsApi.MutationConflictException conflict) {
+                    return new OperationalCompletion(null, conflict,
+                        refreshOperationalConflict(reportId, deliveryMutation));
+                }
+            },
+            completion -> {
+                if (completion.conflict() != null) {
+                    if (!deliveryMutation) reviewDecisionAttempt.clear();
+                    applyOperationalConflict(reportId, deliveryMutation, completion.refresh(),
+                        completion.conflict().institutionMismatch());
+                    return;
+                }
                 keyUseAuthorization.onSuccess();
-                runOnUiThread(() -> {
-                    if (isDestroyed() || !activityStarted
-                        || generation != securityOperationGeneration) return;
-                    operationInFlight = false;
-                    setInteractiveEnabled(contentRoot, true);
-                    resultText.setText(operationalResultMessage(result));
-                    if (recordingDelivery && result.kind() == AdminOperationsApi.ResultKind.MUTATION) {
-                        rotateDeliveryRecordInputsAfterSuccess();
-                    }
-                    if (!deliveryMutation
-                        && result.kind() == AdminOperationsApi.ResultKind.MUTATION) {
-                        reviewDecisionAttempt.clear();
-                    }
+                AdminOperationsApi.Result result = completion.result();
+                operationInFlight = false;
+                setInteractiveEnabled(contentRoot, true);
+                resultText.setText(operationalResultMessage(result));
+                if (deliveryMutation && result.kind() == AdminOperationsApi.ResultKind.MUTATION)
+                    rotateDeliveryRecordInputsAfterSuccess();
+                if (!deliveryMutation && result.kind() == AdminOperationsApi.ResultKind.MUTATION)
+                    reviewDecisionAttempt.clear();
+                recordingDelivery = false;
+                render();
+                if (result.kind() == AdminOperationsApi.ResultKind.MUTATION) refreshConnectedReportDetail();
+            },
+            error -> {
+                operationInFlight = false;
+                setInteractiveEnabled(contentRoot, true);
+                if (handleDeviceKeyUseFailure(error, () -> runOperationalOperation(pendingMessage, operation))) {
                     recordingDelivery = false;
-                    render();
-                    if (result.kind() == AdminOperationsApi.ResultKind.MUTATION) {
-                        refreshConnectedReportDetail();
-                    }
-                });
-            } catch (AdminOperationsApi.MutationConflictException conflict) {
-                if (!deliveryMutation) reviewDecisionAttempt.clear();
-                OperationalConflictRefresh refresh = refreshOperationalConflict(
-                    reportId,
-                    deliveryMutation
-                );
-                runOnUiThread(() -> {
-                    if (isDestroyed() || !activityStarted
-                        || generation != securityOperationGeneration) return;
-                    applyOperationalConflict(reportId, deliveryMutation, refresh, conflict.institutionMismatch());
-                });
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    if (isDestroyed() || !activityStarted
-                        || generation != securityOperationGeneration) return;
-                    operationInFlight = false;
-                    setInteractiveEnabled(contentRoot, true);
-                    if (handleDeviceKeyUseFailure(error, () ->
-                        runOperationalOperation(pendingMessage, operation))) {
-                        recordingDelivery = false;
-                        return;
-                    }
-                    resultText.setText(
-                        !deliveryMutation && reviewDecisionAttempt.isPending()
-                            ? "검토 결정 기록 결과를 확정할 수 없습니다. 자동 재전송하지 않으며 같은 입력으로 다시 시도하면 기존 decision_id만 재사용합니다."
-                            : "관리자 내부 업무를 완료하지 못했습니다. 입력과 서버 상태를 확인해 주세요."
-                    );
-                    recordingDelivery = false;
-                    render();
-                });
-            }
-        });
+                    return;
+                }
+                resultText.setText(!deliveryMutation && reviewDecisionAttempt.isPending()
+                    ? "검토 결정 기록 결과를 확정할 수 없습니다. 자동 재전송하지 않으며 같은 입력으로 다시 시도하면 기존 decision_id만 재사용합니다."
+                    : "관리자 내부 업무를 완료하지 못했습니다. 입력과 서버 상태를 확인해 주세요.");
+                recordingDelivery = false;
+                render();
+            });
     }
+
+    private record OperationalCompletion(AdminOperationsApi.Result result,
+        AdminOperationsApi.MutationConflictException conflict, OperationalConflictRefresh refresh) {}
 
     private OperationalConflictRefresh refreshOperationalConflict(
         String reportId,
@@ -3410,38 +3403,30 @@ public final class AdminBoundaryActivity extends Activity {
         operationInFlight = true;
         setInteractiveEnabled(contentRoot, false);
         resultText.setText(pendingMessage);
-        networkExecutor.execute(() -> {
-            try {
-                if (!activityStarted || generation != securityOperationGeneration
-                    || !controller.isLocalGenerationCurrent(sessionGeneration)) return;
-                operation.run();
+        AdminOperationRunner.execute(networkExecutor, this::runOnUiThread,
+            () -> activityStarted && generation == securityOperationGeneration,
+            () -> {
+                if (!controller.isLocalGenerationCurrent(sessionGeneration))
+                    throw new IllegalStateException("Administrator session changed before execution");
+                operation.run(); return null;
+            },
+            ignored -> {
                 keyUseAuthorization.onSuccess();
-                runOnUiThread(() -> {
-                    if (isDestroyed() || !activityStarted
-                        || generation != securityOperationGeneration) return;
-                    operationInFlight = false;
-                    setInteractiveEnabled(contentRoot, true);
-                    resultText.setText(successMessage);
-                    render();
-                });
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    if (isDestroyed() || !activityStarted
-                        || generation != securityOperationGeneration) return;
-                    operationInFlight = false;
-                    setInteractiveEnabled(contentRoot, true);
-                    if (handleDeviceKeyUseFailure(error, credentialBound ? null : () ->
-                        runSecurityOperation(pendingMessage, successMessage, phase, operation))) {
-                        return;
-                    }
-                    // adm-F6: the logout text claims the local deletion only if it happened.
-                    resultText.setText(AdminRecoveryMessagePolicy.failureMessage(
-                        phase, error, controller != null && controller.hasRetainedSession()
-                    ));
-                    render();
-                });
-            }
-        });
+                operationInFlight = false;
+                setInteractiveEnabled(contentRoot, true);
+                resultText.setText(successMessage);
+                render();
+            },
+            error -> {
+                operationInFlight = false;
+                setInteractiveEnabled(contentRoot, true);
+                if (handleDeviceKeyUseFailure(error, credentialBound ? null : () ->
+                    runSecurityOperation(pendingMessage, successMessage, phase, operation))) return;
+                resultText.setText(AdminRecoveryMessagePolicy.failureMessage(
+                    phase, error, controller != null && controller.hasRetainedSession()
+                ));
+                render();
+            });
     }
 
     private void render() {
@@ -5476,44 +5461,34 @@ public final class AdminBoundaryActivity extends Activity {
         operationInFlight = true;
         setInteractiveEnabled(contentRoot, false);
         resultText.setText("새 결정을 만들기 전에 이전 검토 결정(decision_id)의 서버 기록을 확인하고 있습니다.");
-        networkExecutor.execute(() -> {
-            try {
-                AdminOperationsApi.Result result = controller.lookupReviewDecision(
-                    restoredReportId,
-                    restoredDecisionId,
-                    BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
-                );
+        long sessionGeneration = controller.localGeneration();
+        AdminOperationRunner.execute(networkExecutor, this::runOnUiThread,
+            () -> activityStarted && generation == securityOperationGeneration
+                && controller.isLocalGenerationCurrent(sessionGeneration),
+            () -> controller.lookupReviewDecision(restoredReportId, restoredDecisionId,
+                BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED),
+            result -> {
                 keyUseAuthorization.onSuccess();
                 AdminReviewDecisionAttempt.LookupOutcome outcome = result.mutationId() == null
                     ? AdminReviewDecisionAttempt.LookupOutcome.NOT_RECORDED
                     : AdminReviewDecisionAttempt.LookupOutcome.RECORDED;
-                runOnUiThread(() -> {
-                    if (isDestroyed() || !activityStarted
-                        || generation != securityOperationGeneration) return;
-                    operationInFlight = false;
-                    setInteractiveEnabled(contentRoot, !operationInFlight);
-                    reviewDecisionAttempt.applyLookup(restoredDecisionId, outcome);
-                    resultText.setText(outcome == AdminReviewDecisionAttempt.LookupOutcome.RECORDED
-                        ? "이전 검토 결정이 이미 기록되어 있습니다. 새 결정을 만들지 않았습니다."
-                        : "이전 검토 결정은 기록되지 않았습니다. 같은 입력이면 같은 decision_id로 다시 보내고, 입력이 다르면 새 결정으로 기록합니다.");
-                    render();
-                    if (outcome == AdminReviewDecisionAttempt.LookupOutcome.RECORDED
-                        && restoredReportId.equals(connectedOperationsReportId)) {
-                        refreshConnectedReportDetail();
-                    }
-                });
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    if (isDestroyed() || !activityStarted
-                        || generation != securityOperationGeneration) return;
-                    operationInFlight = false;
-                    setInteractiveEnabled(contentRoot, !operationInFlight);
-                    if (handleDeviceKeyUseFailure(error, this::lookupRestoredReviewDecision)) return;
-                    resultText.setText("이전 검토 결정 결과를 확인하지 못했습니다. 새 decision_id를 만들지 않으며 다시 확인해야 합니다.");
-                    render();
-                });
-            }
-        });
+                operationInFlight = false;
+                setInteractiveEnabled(contentRoot, true);
+                reviewDecisionAttempt.applyLookup(restoredDecisionId, outcome);
+                resultText.setText(outcome == AdminReviewDecisionAttempt.LookupOutcome.RECORDED
+                    ? "이전 검토 결정이 이미 기록되어 있습니다. 새 결정을 만들지 않았습니다."
+                    : "이전 검토 결정은 기록되지 않았습니다. 같은 입력이면 같은 decision_id로 다시 보내고, 입력이 다르면 새 결정으로 기록합니다.");
+                render();
+                if (outcome == AdminReviewDecisionAttempt.LookupOutcome.RECORDED
+                    && restoredReportId.equals(connectedOperationsReportId)) refreshConnectedReportDetail();
+            },
+            error -> {
+                operationInFlight = false;
+                setInteractiveEnabled(contentRoot, true);
+                if (handleDeviceKeyUseFailure(error, this::lookupRestoredReviewDecision)) return;
+                resultText.setText("이전 검토 결정 결과를 확인하지 못했습니다. 새 decision_id를 만들지 않으며 다시 확인해야 합니다.");
+                render();
+            });
     }
 
     /** Only attempt identity and pending state; no recovery code, OTP, token or key is stored. */
