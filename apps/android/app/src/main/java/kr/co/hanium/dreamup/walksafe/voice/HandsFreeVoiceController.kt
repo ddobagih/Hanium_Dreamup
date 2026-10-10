@@ -24,6 +24,7 @@ internal sealed interface HandsFreeVoiceTerminalFailure {
             VoskStreamingError.AUDIO_START_FAILED -> "audio_start_failed"
             VoskStreamingError.AUDIO_READ_FAILED -> "audio_read_failed"
             VoskStreamingError.AUDIO_SILENCED -> "audio_input_silenced"
+            VoskStreamingError.AUDIO_ROUTE_CHANGED -> "audio_input_route_changed"
             VoskStreamingError.INFERENCE_FAILED -> "inference_failed"
         }
     }

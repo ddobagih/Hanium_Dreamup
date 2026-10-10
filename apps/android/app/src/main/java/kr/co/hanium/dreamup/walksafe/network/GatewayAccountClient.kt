@@ -40,6 +40,15 @@ internal class GatewayAccountClient(
 ) {
     private val originGuard = GatewayAccountOriginGuard(approvedReleaseOrigin, allowDebugOrigin)
 
+    fun signupUnavailableOptionalDocuments(gatewayBaseUrl: String): Set<String> {
+        requireApprovedRequestOrigin(gatewayBaseUrl)
+        val response = transport.get(gatewayBaseUrl.trimEnd('/') + "/api/account-signup-policy", emptyMap())
+        if (response.statusCode != 200) throw response.toAccountException("signup_policy_unavailable")
+        val value = response.exactJsonOrNull(setOf("schema_version", "documents"))
+            ?: throw GatewayAccountHttpException(0, "invalid_signup_policy")
+        return kr.co.hanium.dreamup.walksafe.account.SignupPolicyPreflight.unavailableOptional(value)
+    }
+
     fun requestEmailOtp(
         gatewayBaseUrl: String,
         email: String,

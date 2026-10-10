@@ -13,7 +13,8 @@ internal object GuidanceStartVoicePolicy {
         }
         val top = phrases.firstOrNull()?.let(::choice) ?: return null
         if (extraAlternatives || phrases.drop(1).any { choice(it) != top }) return null
-        if (confidence != null && (!confidence.isFinite() || confidence < 0.55f) &&
+        if (confidence != null && (!confidence.isFinite() || confidence !in 0f..1f)) return null
+        if (confidence != null && confidence < 0.55f &&
             !(platform && confidence == 0f)) return null
         return top
     }

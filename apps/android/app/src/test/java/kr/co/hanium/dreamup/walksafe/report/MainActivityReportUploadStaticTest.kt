@@ -35,10 +35,10 @@ class MainActivityReportUploadStaticTest {
         assertTrue(prepare.contains("!explicitRequest &&"))
         assertTrue(prepare.contains("GatewayCapacityProcessState.admission("))
         assertTrue(prepare.contains("automaticReportCandidateAllowed"))
-        // S14-39: same filesDir root; the OS allocatable bytes of that volume gate automatic candidates.
+        // Same volume after resolving Android's /data/user/0 alias; capacity still uses filesDir.
         assertTrue(source.contains(
             "AndroidReportQueueStore(\n" +
-                "            applicationContext.filesDir,\n" +
+                "            applicationContext.filesDir.canonicalFile,\n" +
                 "            allocatableBytes = AndroidAllocatableBytes(applicationContext, applicationContext.filesDir),\n" +
                 "        )",
         ))

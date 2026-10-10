@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.voice
 
 import android.app.Application
+import android.util.Log
+import kr.co.hanium.dreamup.walksafe.feedback.clearPreviousProcessVoiceAudio
 import kr.co.hanium.dreamup.walksafe.report.ReportQueueCleanupJobService
 
 internal class WalkSafeApplication : Application(), WalkVoiceSessionControllerProvider {
@@ -20,6 +22,10 @@ internal class WalkSafeApplication : Application(), WalkVoiceSessionControllerPr
 
     override fun onCreate() {
         super.onCreate()
+        // No recorder survives process death; Activity recreation must not run this cleanup.
+        if (!clearPreviousProcessVoiceAudio(cacheDir)) {
+            Log.w("VoiceAudioCleanup", "Previous-process temporary audio cleanup was incomplete")
+        }
         ReportQueueCleanupJobService.schedule(this)
     }
 
@@ -204,7 +210,8 @@ internal class WalkVoiceStartRecovery {
     ): WalkVoiceStartFailurePresentation {
         retryBlocked = (failure == WalkVoiceStartFailure.SECURITY && microphoneGranted) ||
             failure == WalkVoiceStartFailure.FOREGROUND_START_RESTRICTED ||
-            failure == WalkVoiceStartFailure.INPUT_SILENCED
+            failure == WalkVoiceStartFailure.INPUT_SILENCED ||
+            failure == WalkVoiceStartFailure.INPUT_ROUTE_CHANGED
         stoppedAfterFailure = retryBlocked && !appInForeground && failure == WalkVoiceStartFailure.INPUT_SILENCED
         if (stoppedAfterFailure) {
             return WalkVoiceStartFailurePresentation(
@@ -241,6 +248,11 @@ internal class WalkVoiceStartRecovery {
                     "통화나 다른 앱이 마이크를 사용하고 있어 호출어와 음성 명령을 들을 수 없습니다. " +
                         "자동 재시도를 중단했습니다. 통화나 녹음을 끝낸 뒤 앱을 나갔다 다시 화면으로 돌아와 " +
                         "재시도하세요. 화면 버튼은 계속 사용할 수 있습니다.",
+                )
+            WalkVoiceStartFailure.INPUT_ROUTE_CHANGED ->
+                WalkVoiceStartFailurePresentation(
+                    "microphone_route_changed_retry_required",
+                    MICROPHONE_INPUT_ROUTE_CHANGED_GUIDANCE,
                 )
             WalkVoiceStartFailure.CONTROLLER_REJECTED,
             WalkVoiceStartFailure.RUNTIME,

@@ -234,6 +234,7 @@ internal fun parseGatewaySpeechTranscript(
     body: String,
     expectedRequestId: String,
 ): GatewaySpeechTranscript? = runCatching {
+    if (!strictJsonObjectDocument(body)) return@runCatching null
     val root = JSONObject(body)
     if (root.exactKeys() != STT_RESPONSE_KEYS) return@runCatching null
     if (root.optString("schema_version") != SPEECH_STT_RESPONSE_SCHEMA) return@runCatching null

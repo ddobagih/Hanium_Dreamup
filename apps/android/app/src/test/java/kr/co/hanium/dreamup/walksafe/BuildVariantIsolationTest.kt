@@ -11,8 +11,12 @@ class BuildVariantIsolationTest {
         assertEquals(java.lang.Boolean.getBoolean("walksafe.test.expectedQueue"), BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED)
         assertEquals(java.lang.Boolean.getBoolean("walksafe.test.expectedQuickStart"), BuildConfig.DEVELOPMENT_QUICK_START)
         assertEquals(java.lang.Boolean.getBoolean("walksafe.test.expectedBypass"), BuildConfig.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS)
-        assertEquals(BuildConfig.DEVELOPMENT_QUICK_START, BuildConfig.DEVELOPMENT_QUICK_START_PASSWORD.isNotBlank())
-        assertEquals(BuildConfig.DEVELOPMENT_QUICK_START, BuildConfig.DEVELOPMENT_QUICK_START_EMAIL.isNotBlank())
+    }
+
+    @Test fun noBuildVariantEmbedsQuickLoginCredentials() {
+        val names = BuildConfig::class.java.declaredFields.map { it.name }
+        assertFalse(names.contains("DEVELOPMENT_QUICK_START_EMAIL"))
+        assertFalse(names.contains("DEVELOPMENT_QUICK_START_PASSWORD"))
     }
 
     @Test fun releaseDefaultAccountClientsRejectUnapprovedOriginBeforeTransport() {
@@ -37,8 +41,6 @@ class BuildVariantIsolationTest {
         if (BuildConfig.DEBUG) return
         assertFalse(BuildConfig.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS)
         assertFalse(BuildConfig.DEVELOPMENT_QUICK_START)
-        assertEquals("", BuildConfig.DEVELOPMENT_QUICK_START_EMAIL)
-        assertEquals("", BuildConfig.DEVELOPMENT_QUICK_START_PASSWORD)
         assertFalse(BuildConfig.WALKSAFE_REPORT_QUEUE_ENABLED)
         assertEquals("disabled", BuildConfig.WALKSAFE_REPORT_QUEUE_TEST_ORIGIN)
         assertEquals(0, BuildConfig.WALKSAFE_RAW_QUEUE_MAX_SEGMENTS)

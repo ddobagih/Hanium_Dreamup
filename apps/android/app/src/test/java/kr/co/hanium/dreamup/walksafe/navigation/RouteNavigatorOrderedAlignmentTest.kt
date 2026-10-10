@@ -166,6 +166,20 @@ class RouteNavigatorOrderedAlignmentTest {
         assertEquals(RouteAlignmentReason.DEPARTURE_SEGMENT, departure.routeAlignmentDiagnostic?.reason)
     }
 
+    @Test fun providerAcceptedLargeStartGapDoesNotAuthorizeAnUnmappedWalkingDirection() {
+        // S20-27: server acceptance up to 100 m is not evidence of a walkable connector.
+        // This guards the current safe refusal; a usable start-approach flow remains pending.
+        listOf(36.0, 60.0, 99.0).forEach { gapM ->
+            val offset = fix(0.0, gapM)
+            val update = navigator(route(point(0.0), point(200.0)), offset)
+                .update(offset, 1_000, false, facingObservation = facing(180.0))
+            assertEquals("gap=$gapM", RouteAlignmentReason.ROUTE_TOO_FAR, update.routeAlignmentDiagnostic?.reason)
+            assertNoClock(update)
+            assertFalse(update.arrivalCandidate)
+            assertFalse(update.instruction?.contains("경로 시작점은") == true)
+        }
+    }
+
     @Test fun lateralStartOffsetStillUsesTheConnectorWhenProjectionIsInsideTheFirstSegment() {
         val route = route(point(0.0), point(100.0))
         val offset = fix(5.0, 15.0)

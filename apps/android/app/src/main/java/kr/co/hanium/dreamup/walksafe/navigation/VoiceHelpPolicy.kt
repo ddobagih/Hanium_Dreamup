@@ -19,7 +19,7 @@ internal object VoiceHelpPolicy {
             "다시듣기", "다시말해줘" -> 5
             "도움말닫기", "도움말닫아줘", "도움말닫아주세요", "도움말종료", "도움말종료해줘",
             "도움말종료해주세요", "닫기", "닫아줘", "닫아주세요" -> 0
-            else -> null
+            else -> if (compactVoicePhrase(raw) in HELP_COMMANDS) 4 else null
         }
         val first = phrases.firstOrNull()?.let(::one) ?: return null
         return first.takeIf { phrases.mapNotNull(::one).all { it == first } }

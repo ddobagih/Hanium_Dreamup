@@ -5,6 +5,15 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class GuidanceStartVoicePolicyTest {
+    @Test fun outOfRangeConfidenceCannotConfirmAnyChoice() {
+        for (score in listOf(1.0001f, 2f, -1f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            for (phrase in listOf("시작", "취소", "다시 듣기")) {
+                for (platform in listOf(false, true)) {
+                    assertNull(GuidanceStartVoicePolicy.parse(listOf(phrase), score, platform, false))
+                }
+            }
+        }
+    }
     @Test fun explicitStartAndCancel() {
         assertEquals(GuidanceStartVoicePolicy.Choice.START,
             GuidanceStartVoicePolicy.parse(listOf("시작"), 0.9f, false, false))

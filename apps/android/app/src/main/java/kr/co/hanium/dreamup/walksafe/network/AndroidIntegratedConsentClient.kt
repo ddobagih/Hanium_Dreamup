@@ -90,7 +90,7 @@ data class IntegratedConsentBootstrap(
     }
 }
 
-class AndroidIntegratedConsentClient {
+class AndroidIntegratedConsentClient(private val installationPublicKey: ((String) -> String)? = null) {
     fun fetchBootstrapCall(
         gatewayBaseUrl: String,
         session: GatewayFieldSession,
@@ -280,11 +280,35 @@ class AndroidIntegratedConsentClient {
                     consumeGatewayAuthenticationStaleResponse(authenticationRequest, session, response)
                     throw IntegratedConsentHttpException(response.statusCode, response.body)
                 }
-                validatedIntegratedConsentConfirmationOrNull(
+                val confirmation = validatedIntegratedConsentConfirmationOrNull(
                     body = response.body,
                     expectedInstallationId = installationId,
                     expectedControlSecret = controlSecret,
                 ) ?: throw IntegratedConsentProtocolException()
+                if (session != null && installationPublicKey != null) {
+                    cancellation.throwIfCancelled()
+                    cancellation.detach(connection)
+                    connection.disconnect()
+                    val key = installationPublicKey.invoke(installationId)
+                    val registration = URL(session.gatewayBaseUrl.trimEnd('/') +
+                        "/privacy/rights?control=installation-evidence-key").openConnection() as HttpURLConnection
+                    cancellation.attach(registration)
+                    try {
+                        registration.apply {
+                            requestMethod = "PUT"; connectTimeout = 8_000; readTimeout = 12_000
+                            instanceFollowRedirects = false; doOutput = true
+                            setRequestProperty("Content-Type", "application/json")
+                            setRequestProperty(CONSENT_CONTROL_SECRET_HEADER, controlSecret)
+                            session.requestHeaders().forEach(::setRequestProperty)
+                        }
+                        registration.outputStream.use { it.write(JSONObject()
+                            .put("installation_id", installationId).put("public_key", key)
+                            .toString().toByteArray(Charsets.UTF_8)) }
+                        val registered = registration.readBoundedResponse(4096, cancellation)
+                        if (registered.statusCode != 204) throw IntegratedConsentHttpException(registered.statusCode, registered.body)
+                    } finally { cancellation.detach(registration); registration.disconnect() }
+                }
+                confirmation
             } finally {
                 cancellation.detach(connection)
                 connection.disconnect()

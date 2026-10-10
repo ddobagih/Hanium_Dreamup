@@ -40,17 +40,6 @@ val configuredGatewayOrigin = providers.gradleProperty("WALKSAFE_GATEWAY_ORIGIN"
 val verifiedReleaseGatewayOrigin = normalizedHttpsOriginOrNull(configuredGatewayOrigin)
 val developmentReportQueue = providers.gradleProperty("developmentReportQueue").orNull == "true"
 val developmentQuickStart = providers.gradleProperty("developmentQuickStart").orNull == "true"
-val developmentQuickStartEmail = if (developmentQuickStart) {
-    providers.gradleProperty("developmentQuickStartEmail").orNull ?: "test0905@example.com"
-} else ""
-val developmentQuickStartPassword = if (developmentQuickStart) {
-    providers.environmentVariable("WALKSAFE_DEVELOPMENT_TEST_PASSWORD").orNull.orEmpty()
-} else ""
-if (developmentQuickStart) {
-    check(developmentQuickStartPassword.isNotBlank()) {
-        "Development quick start requires WALKSAFE_DEVELOPMENT_TEST_PASSWORD for a local test account"
-    }
-}
 fun buildConfigString(value: String): String = "\"" + value
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
@@ -520,8 +509,6 @@ android {
             )
             buildConfigField("boolean", "WALKSAFE_DEBUG_GUIDANCE_START_BYPASS", "$debugGuidanceStartBypass")
             buildConfigField("boolean", "DEVELOPMENT_QUICK_START", "$developmentQuickStart")
-            buildConfigField("String", "DEVELOPMENT_QUICK_START_EMAIL", buildConfigString(developmentQuickStartEmail))
-            buildConfigField("String", "DEVELOPMENT_QUICK_START_PASSWORD", buildConfigString(developmentQuickStartPassword))
         }
         release {
             // The development report queue is DEBUG-gated at runtime; keep its build-time
@@ -545,8 +532,6 @@ android {
             buildConfigField("boolean", "WALKSAFE_POST_LOGIN_DEVICE_CHECK_REQUIRED", "true")
             buildConfigField("boolean", "WALKSAFE_DEBUG_GUIDANCE_START_BYPASS", "false")
             buildConfigField("boolean", "DEVELOPMENT_QUICK_START", "false")
-            buildConfigField("String", "DEVELOPMENT_QUICK_START_EMAIL", "\"\"")
-            buildConfigField("String", "DEVELOPMENT_QUICK_START_PASSWORD", "\"\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

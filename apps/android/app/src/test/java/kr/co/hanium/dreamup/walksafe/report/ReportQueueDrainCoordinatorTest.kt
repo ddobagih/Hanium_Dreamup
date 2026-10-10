@@ -23,6 +23,76 @@ import org.junit.Test
 
 class ReportQueueDrainCoordinatorTest {
     @Test
+    fun malformedStatusAndUploadReturnUnconfirmedOnlyWhileRequestIsCurrent() {
+        for (stage in listOf("status", "upload")) for (boundary in listOf("current", "cancel", "account")) {
+            val fixture=fixture()
+            var current=context()
+            var held:QueuedReport?=null
+            lateinit var call:CancellableNetworkCall<ReportQueueDrainResult>
+            fun reject(report:QueuedReport):Nothing {
+                held=report
+                if(boundary=="cancel") call.cancel()
+                if(boundary=="account") current=context(reporterActorId=OTHER_ACTOR_ID)
+                throw ReportUploadProtocolException()
+            }
+            try {
+                call=requireNotNull(fixture.coordinator.startNextWithResult({current},object:ReportQueueTransport {
+                    override fun statusCall(report:QueuedReport)=CancellableNetworkCall.blocking<ReportQueueReceipt?> {
+                        if(stage=="status") reject(report) else null
+                    }
+                    override fun uploadCall(report:QueuedReport)=CancellableNetworkCall.blocking<ReportQueueReceipt> {reject(report)}
+                }))
+                val result=call.execute()
+                assertEquals("$stage / $boundary",if(boundary=="current") ReportQueueDrainOutcome.RECEIPT_REJECTED
+                    else ReportQueueDrainOutcome.CANCELLED,result.outcome)
+                assertEquals(ReportQueuePriority.EXPLICIT,result.reportPriority)
+                assertThrows(IllegalStateException::class.java){requireNotNull(held).payload.imageJpeg()}
+                val remaining=fixture.store.queuedReports()
+                try {assertEquals(1,remaining.size);assertEquals(fixture.report.payload.payloadSha256,remaining.single().payload.payloadSha256)}
+                finally {remaining.forEach{it.close()}}
+            } finally {fixture.report.close()}
+        }
+    }
+
+    @Test
+    fun deletionRemainsIncompleteUntilCancelledUploadReleasesOwnedPayload() {
+        val fixture = fixture()
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        var held: QueuedReport? = null
+        val call = requireNotNull(fixture.coordinator.startNextWithResult({ context() }, object : ReportQueueTransport {
+            override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> { null }
+            override fun uploadCall(report: QueuedReport) = CancellableNetworkCall.blocking {
+                held = report
+                entered.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+                receipt(report)
+            }
+        }))
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val result = executor.submit<ReportQueueDrainResult> { call.execute() }
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            assertFalse("cancel request is not plaintext release", fixture.coordinator.onAccountDeleted())
+            assertTrue(call.isCancelled())
+            val recreatedCoordinator = ReportQueueDrainCoordinator(fixture.store)
+            assertFalse("a recreated screen must still see the old worker", recreatedCoordinator.onAccountDeleted())
+            assertTrue("files must still be purged while worker is pending", fixture.store.queuedReports().isEmpty())
+            assertTrue(requireNotNull(held).payload.imageJpeg().isNotEmpty())
+            release.countDown()
+            assertEquals(ReportQueueDrainOutcome.CANCELLED, result.get(2, TimeUnit.SECONDS).outcome)
+            assertThrows(IllegalStateException::class.java) { requireNotNull(held).payload.imageJpeg() }
+            assertTrue(fixture.coordinator.onAccountDeleted())
+            assertTrue(recreatedCoordinator.onAccountDeleted())
+            assertTrue(fixture.store.queuedReports().isEmpty())
+        } finally {
+            release.countDown()
+            executor.shutdownNow()
+            fixture.report.close()
+        }
+    }
+
+    @Test
     fun cancelBeforeExecuteReleasesTheReservedSnapshotAndAllowsAFreshAttempt() {
         val fixture = fixture()
         val call = requireNotNull(fixture.coordinator.startNextWithResult(

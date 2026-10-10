@@ -17,6 +17,7 @@ class HandsFreeVoiceTerminalFailureTest {
             VoskStreamingError.AUDIO_START_FAILED to "audio_start_failed",
             VoskStreamingError.AUDIO_READ_FAILED to "audio_read_failed",
             VoskStreamingError.AUDIO_SILENCED to "audio_input_silenced",
+            VoskStreamingError.AUDIO_ROUTE_CHANGED to "audio_input_route_changed",
             VoskStreamingError.INFERENCE_FAILED to "inference_failed",
         )
 

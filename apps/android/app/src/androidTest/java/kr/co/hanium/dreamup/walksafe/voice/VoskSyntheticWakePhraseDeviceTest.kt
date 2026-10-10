@@ -48,7 +48,11 @@ class VoskSyntheticWakePhraseDeviceTest {
         }
         val scratch = File(context.cacheDir, "vosk-synthetic-wake-" + SystemClock.elapsedRealtimeNanos())
         assertTrue("Cannot create test-owned cache directory", scratch.mkdir())
-        val files = Fixture.entries.associateWith { File(scratch, it.name.lowercase() + ".wav") }
+        val variants = InstrumentationRegistry.getArguments().getString("naturalWakeVariants") == "true"
+        val fixtures = if (variants) listOf(Fixture.WAKE, Fixture.SPACED, Fixture.VOCATIVE,
+            Fixture.POLITE_CALL, Fixture.PREFIXED, Fixture.WAKE_COMMAND, Fixture.NON_WAKE, Fixture.CONFUSABLE)
+            else listOf(Fixture.WAKE, Fixture.WAKE_SLOW, Fixture.WAKE_FAST, Fixture.NON_WAKE)
+        val files = fixtures.associateWith { File(scratch, it.name.lowercase() + ".wav") }
         var speech: TextToSpeech? = null
         try {
             val initialized = CountDownLatch(1)
@@ -84,10 +88,12 @@ class VoskSyntheticWakePhraseDeviceTest {
             val observations = linkedMapOf<Fixture, DecodeSummary>()
             val model = Model(directory.absolutePath)
             try {
-                for (fixture in Fixture.entries) {
+                for (fixture in fixtures) {
                     val file = files.getValue(fixture)
                     synthesize(instrumentation, tts, fixture, file)
-                    val wav = readMonoPcm16(file)
+                    val original = readMonoPcm16(file)
+                    val wav = if (InstrumentationRegistry.getArguments().getString("nativeCaptureRate") == "true")
+                        atCaptureRate(original) else original
                     val decoded = decode(model, wav)
                     observations[fixture] = decoded
                     report(
@@ -95,6 +101,16 @@ class VoskSyntheticWakePhraseDeviceTest {
                         "SYNTHETIC_WAKE fixture=" + fixture.name + " rate=" + wav.sampleRate +
                             " samples=" + wav.samples.size + " rms=" + wav.rms.toInt() + " " + decoded,
                     )
+                    if (variants) {
+                        val direct = WakePhraseCommandExtractor.extractFinalTranscript(fixture.text)
+                        report(instrumentation, "NATURAL_WAKE " + org.json.JSONObject()
+                            .put("fixture", fixture.name).put("syntheticText", fixture.text)
+                            .put("directParser", direct.javaClass.simpleName)
+                            .put("endpointAccepted", decoded.acceptedEndpoints > 0)
+                            .put("eofAccepted", decoded.acceptedEof > 0)
+                            .put("finals", org.json.JSONArray(decoded.finals))
+                            .put("sampleRate", wav.sampleRate).put("humanAccuracy", false))
+                    }
                 }
             } finally {
                 model.close()
@@ -169,9 +185,24 @@ class VoskSyntheticWakePhraseDeviceTest {
         assertEquals("Synthetic file did not complete", "DONE", terminal.get())
     }
 
+    /** Test fixture conversion only; actual microphone capture already supplies 16 kHz. */
+    private fun atCaptureRate(wav: PcmWav): PcmWav {
+        val rate = 16_000 // Matches AndroidPcmAudioSource capture configuration.
+        if (wav.sampleRate == rate) return wav
+        val samples = ShortArray((wav.samples.size.toLong() * rate / wav.sampleRate).toInt()) { index ->
+            val position = index.toDouble() * wav.sampleRate / rate
+            val lower = position.toInt().coerceAtMost(wav.samples.lastIndex)
+            val upper = (lower + 1).coerceAtMost(wav.samples.lastIndex)
+            (wav.samples[lower] + (wav.samples[upper] - wav.samples[lower]) * (position - lower)).toInt().toShort()
+        }
+        return PcmWav(rate, samples, sqrt(samples.map { it.toDouble() * it }.average()))
+    }
+
     private fun decode(model: Model, wav: PcmWav): DecodeSummary {
         val recognizer = Recognizer(model, wav.sampleRate.toFloat())
         val summary = DecodeSummary()
+        val decodeMs = mutableListOf<Double>()
+        var overChunkBudget = 0
         try {
             // Match the production streaming decoder configuration, without a grammar.
             recognizer.setWords(true)
@@ -182,7 +213,12 @@ class VoskSyntheticWakePhraseDeviceTest {
             val frameSize = (wav.sampleRate / 50).coerceAtLeast(1)
             fun feed(samples: ShortArray) {
                 assertTrue("Native fixture inference exceeded its time bound", SystemClock.elapsedRealtime() < deadline)
-                if (recognizer.acceptWaveForm(samples, samples.size)) {
+                val began = SystemClock.elapsedRealtimeNanos()
+                val endpoint = recognizer.acceptWaveForm(samples, samples.size)
+                val elapsedMs = (SystemClock.elapsedRealtimeNanos() - began) / 1_000_000.0
+                decodeMs += elapsedMs
+                if (elapsedMs > samples.size * 1000.0 / wav.sampleRate) overChunkBudget++
+                if (endpoint) {
                     recordFinal(recognizer.result, endpoint = true, summary = summary)
                 }
             }
@@ -202,6 +238,12 @@ class VoskSyntheticWakePhraseDeviceTest {
             }
             // EOF output is diagnostic only, never promoted to streaming wake success.
             recordFinal(recognizer.finalResult, endpoint = false, summary = summary)
+            val sorted = decodeMs.sorted()
+            report(InstrumentationRegistry.getInstrumentation(),
+                "VOSK_DECODE chunks=${sorted.size} chunk_ms=20 median_ms=${sorted[sorted.size / 2]} " +
+                    "p95_ms=${sorted[((sorted.size - 1) * 0.95).toInt()]} max_ms=${sorted.last()} " +
+                    "over_chunk_budget=$overChunkBudget total_ms=${sorted.sum()} " +
+                    "synthetic_pcm=true no_microphone=true no_camera_load=true")
             return summary
         } finally {
             recognizer.close()
@@ -221,6 +263,10 @@ class VoskSyntheticWakePhraseDeviceTest {
             is WakePhraseCommandExtraction.Command -> true
         }
         val trusted = transcript.isFinal && transcript.isTrustedForCommand()
+        // This diagnostic accepts only generated fixture audio, never user microphone recordings.
+        summary.finals.add(org.json.JSONObject().put("text", transcript.text)
+            .put("endpoint", endpoint).put("trusted", trusted).put("addressed", addressed)
+            .put("confidence", transcript.confidence).put("extraction", extraction.toString()))
         if (addressed) summary.phraseMatches++
         if (trusted) summary.trustedFinals++
         transcript.confidence?.takeIf { it.isFinite() }?.let {
@@ -300,6 +346,12 @@ class VoskSyntheticWakePhraseDeviceTest {
         WAKE_SLOW("길라잡이", 0.85f),
         WAKE_FAST("길라잡이", 1.15f),
         NON_WAKE("도움말"),
+        SPACED("길라 잡이"),
+        VOCATIVE("길라잡이야"),
+        POLITE_CALL("길라잡이님"),
+        PREFIXED("저기 길라잡이"),
+        WAKE_COMMAND("길라잡이 도움말 열어줘"),
+        CONFUSABLE("길을 찾아 줘"),
     }
 
     private data class PcmWav(val sampleRate: Int, val samples: ShortArray, val rms: Double)
@@ -312,5 +364,6 @@ class VoskSyntheticWakePhraseDeviceTest {
         var acceptedEndpoints: Int = 0,
         var acceptedEof: Int = 0,
         var maxConfidence: Float? = null,
+        val finals: MutableList<org.json.JSONObject> = mutableListOf(),
     )
 }

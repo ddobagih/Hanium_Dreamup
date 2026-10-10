@@ -6,6 +6,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PriorityUserOnboardingStaticTest {
+    @Test
+    fun developmentQuickStartRequiresRuntimeLoginAndKeepsLoginControlsAvailable() {
+        assertFalse(source.contains("DEVELOPMENT_QUICK_START_PASSWORD"))
+        assertFalse(source.contains("DEVELOPMENT_QUICK_START_EMAIL"))
+        assertFalse(source.contains("loginDevelopmentQuickStartAccount"))
+        val session = functionBlock("private fun developmentQuickStartSessionOrNull()")
+        assertFalse(session.contains("developmentQuickStartAuthenticatedActorId"))
+        assertTrue(session.contains("GatewaySessionVerificationState.VERIFIED"))
+        assertTrue(session.contains("GatewaySessionScope.GENERAL"))
+        assertTrue(session.contains("!process.storageBlocked && !process.deletionRecoveryOnly"))
+        assertTrue(session.contains("it.gatewayBaseUrl == configuredGatewayOriginOrNull()"))
+        val advance = functionBlock("private fun advanceDevelopmentQuickStart()")
+        assertTrue(advance.contains("val session = developmentQuickStartSessionOrNull()"))
+        assertTrue(advance.contains("로그인 화면에서 테스트 계정으로 로그인한 뒤"))
+        assertFalse(advance.contains("loginEmailAccount("))
+        assertTrue(source.contains("(developmentQuickStartEnabled && developmentQuickStartSessionOrNull() != null) || walkScreenVisible"))
+    }
+
     private val source =
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
     private val feedback =

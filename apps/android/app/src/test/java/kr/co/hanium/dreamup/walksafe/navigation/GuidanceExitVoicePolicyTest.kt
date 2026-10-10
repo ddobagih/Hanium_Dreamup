@@ -5,6 +5,13 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class GuidanceExitVoicePolicyTest {
+    @Test fun outOfRangeConfidenceCannotConfirmAnyChoice() {
+        for (score in listOf(1.0001f, 2f, -1f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            for (phrase in listOf("안내 종료", "돌아가기")) {
+                assertNull(GuidanceExitVoicePolicy.parse(listOf(phrase), score, false))
+            }
+        }
+    }
     @Test fun explicitChoicesAllowSpacingAndPunctuation() {
         assertEquals(GuidanceExitVoicePolicy.Choice.RETURN,
             GuidanceExitVoicePolicy.parse(listOf("안내로 돌아가기."), 0.8f, false))

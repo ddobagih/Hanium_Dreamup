@@ -5,6 +5,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MainActivityWalkVoiceControlStaticTest {
+    @Test
+    fun readinessRetryAndReportConfirmationRejectScoresAboveOne() {
+        val commands = ReportStaticSourceInspector.functionBlock(source, "private fun handleVoiceCommandPhrases")
+        val report = ReportStaticSourceInspector.functionBlock(source, "private fun handleReportPanelInput")
+        assertTrue(commands.contains("score in 0.55f..1f"))
+        assertTrue(report.contains("confidence !in 0.55f..1f"))
+    }
+
     private val source = File(
         "src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
     ).readText()

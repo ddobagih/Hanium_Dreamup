@@ -17,11 +17,16 @@ internal enum class VoskStreamingError {
     AUDIO_READ_FAILED,
     /** S04-27: the system silenced this capture; not a user who stayed quiet. */
     AUDIO_SILENCED,
+    AUDIO_ROUTE_CHANGED,
     INFERENCE_FAILED,
 }
 
 internal fun voskAudioInputFailure(code: Int): VoskStreamingError =
-    if (code == PCM_INPUT_SILENCED_CODE) VoskStreamingError.AUDIO_SILENCED else VoskStreamingError.AUDIO_READ_FAILED
+    when (code) {
+        PCM_INPUT_SILENCED_CODE -> VoskStreamingError.AUDIO_SILENCED
+        PCM_INPUT_ROUTE_CHANGED_CODE -> VoskStreamingError.AUDIO_ROUTE_CHANGED
+        else -> VoskStreamingError.AUDIO_READ_FAILED
+    }
 
 internal interface VoskStreamingListener {
     fun onReady(runId: Long)

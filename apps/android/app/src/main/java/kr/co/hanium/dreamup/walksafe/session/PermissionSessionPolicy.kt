@@ -203,6 +203,14 @@ data class PermissionRecoveryGate(
     val blocksAutomaticResourceStart: Boolean
         get() = state != PermissionRecoveryGateState.CLEAR
 
+    /** Main navigation can recover without certifying walking readiness or clearing this gate. */
+    fun blocksInteraction(
+        inWalkArea: Boolean,
+        observed: ObservedPermissionSnapshot,
+        requiredPermissions: Set<ObservedPermission>,
+    ): Boolean = blocksAutomaticResourceStart &&
+        (inWalkArea || PermissionDependencyPolicy.missing(requiredPermissions, observed).isNotEmpty())
+
     fun requestPending(
         requestedPermissions: Set<ObservedPermission>,
     ): PermissionRecoveryGate = copy(

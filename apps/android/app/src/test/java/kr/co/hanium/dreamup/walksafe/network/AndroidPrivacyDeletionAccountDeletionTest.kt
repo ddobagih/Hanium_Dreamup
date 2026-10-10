@@ -118,6 +118,9 @@ class AndroidPrivacyDeletionAccountDeletionTest {
                 )
             }
         }
+        val signed = evidence.copy(evidenceSha256 = hash, installationSignature = "a".repeat(96))
+        assertEquals(hash, deviceDeletionEvidenceSha256(signed))
+        assertEquals("a".repeat(96), org.json.JSONObject(deviceDeletionEvidenceBody(signed)).getString("installation_signature"))
         val body = deviceDeletionEvidenceBody(evidence.copy(evidenceSha256 = hash))
         assertEquals(
             "{\"schema_version\":\"walksafe.device-deletion-evidence.v2\"," +

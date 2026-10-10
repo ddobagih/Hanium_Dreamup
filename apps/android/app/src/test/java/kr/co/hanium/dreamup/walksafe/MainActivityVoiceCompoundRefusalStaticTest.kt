@@ -30,7 +30,7 @@ class MainActivityVoiceCompoundRefusalStaticTest {
         assertTrue(scoredMiss.contains("navigation.isCompoundVoiceCommand(recognized)"))
         assertTrue(scoredMiss.contains("kr.co.hanium.dreamup.walksafe.navigation.COMPOUND_VOICE_COMMAND_REFUSAL_KO"))
         assertTrue(scoredMiss.contains("if (!retryHomeDestinationVoiceDialog(retryMessage)) {"))
-        assertTrue(scoredMiss.contains("speakInteraction(unrecognizedCommandMessageKo(recognized))"))
+        assertTrue(scoredMiss.contains("speakInteraction(if (parsedButUntrusted) retryMessage else unrecognizedCommandMessageKo(recognized))"))
     }
 
     @Test

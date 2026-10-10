@@ -329,7 +329,8 @@ class MainActivityOfficialEnvironmentStaticTest {
         assertTrue(guidance.contains("ACTION_ACCESSIBILITY_FOCUS"))
         assertFalse(guidance.contains("requestFocus()"))
         assertFalse(guidance.contains("announceForAccessibility("))
-        assertTrue(guidance.contains("환경과 장착 점검 통과. 보행 시작 확인"))
+        assertTrue(guidance.contains("currentOfficialEnvironmentAssessment(epoch).preparationNoticeKo()"))
+        assertTrue(guidance.contains("장착 점검 통과. 보행 시작 확인"))
         assertInOrder(
             readiness,
             "addView(priorityUserOnboardingControls)",
@@ -499,6 +500,22 @@ class MainActivityOfficialEnvironmentStaticTest {
         assertTrue(permissionChange.indexOf("refreshStartupCapabilityUi()") < permissionChange.indexOf("val stateAfterRefresh"))
         assertTrue(permissionChange.contains("stateAfterRefresh in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)"))
         assertFalse(permissionChange.contains("WalkSessionEvent.Resume"))
+    }
+
+    @Test
+    fun conditionalEnvironmentNoticeReachesStartResumeAndAccessibilitySummaries() {
+        val start = functionBlock("private fun speakNativeGuidanceConfirmation(")
+        val resume = functionBlock("private fun requestWalkSessionResumeConfirmation()")
+        listOf(start, resume).forEach {
+            assertTrue(it.contains("takeIf { it.conditionallyAllowed }"))
+            assertTrue(it.contains("it.preparationNoticeKo()"))
+            assertTrue(it.contains("environmentNotice +"))
+        }
+        val summary = functionBlock("private fun updateWalkReadinessSection()")
+        assertTrue(summary.contains("assessment.preparationNoticeKo()"))
+        assertTrue(summary.contains("!assessment.canStartWalk"))
+        assertFalse(summary.contains("환경 점검을 통과"))
+        assertFalse(summary.contains("점검을 모두 통과"))
     }
 
     private fun functionBlock(signature: String): String {

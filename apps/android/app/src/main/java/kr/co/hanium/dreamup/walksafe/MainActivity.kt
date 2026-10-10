@@ -273,6 +273,8 @@ import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceController
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceEligibility
 import kr.co.hanium.dreamup.walksafe.voice.HandsFreeVoiceTerminalFailure
 import kr.co.hanium.dreamup.walksafe.voice.MICROPHONE_INPUT_SILENCED_GUIDANCE
+import kr.co.hanium.dreamup.walksafe.voice.SPEECH_ERROR_INPUT_ROUTE_CHANGED
+import kr.co.hanium.dreamup.walksafe.voice.MICROPHONE_INPUT_ROUTE_CHANGED_GUIDANCE
 import kr.co.hanium.dreamup.walksafe.voice.SPEECH_ERROR_INPUT_SILENCED
 import kr.co.hanium.dreamup.walksafe.voice.VoskStreamingError
 import kr.co.hanium.dreamup.walksafe.voice.WalkSafeApplication
@@ -684,6 +686,7 @@ import kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentFactor
 import kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentPolicy
 import kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentRuntimeAction
 import kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentRuntimeGuard
+import kr.co.hanium.dreamup.walksafe.session.preparationNoticeKo
 import kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentSupport
 import kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentUserConfirmation
 import kr.co.hanium.dreamup.walksafe.session.ObservedPermission
@@ -868,6 +871,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var accountPasswordConfirmationInput: EditText
     private lateinit var accountOtpInput: EditText
     private lateinit var accountConsentDisclosureText: TextView
+    private var unavailableSignupOptionalDocuments: Set<String> = emptySet()
     private val accountConsentChecks = mutableMapOf<String, CheckBox>()
     private val accountConsentCards = linkedMapOf<String, LinearLayout>()
     private val accountConsentClauseTexts = linkedMapOf<String, TextView>()
@@ -1568,8 +1572,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var explicitReportConfirmationTimeoutGeneration = 0L
     private val reportPrivacyConsentSession = ReportPrivacyConsentSession
     private val integratedConsentSession = IntegratedConsentSession()
-    private val integratedConsentClient = AndroidIntegratedConsentClient()
-    private val accountDeletionClient = AndroidPrivacyDeletionClient()
+    private val integratedConsentClient = AndroidIntegratedConsentClient { installation ->
+        kr.co.hanium.dreamup.walksafe.network.AndroidInstallationEvidenceKey(this).publicKey(installation)
+    }
+    private val accountDeletionClient = AndroidPrivacyDeletionClient { installation, digest ->
+        kr.co.hanium.dreamup.walksafe.network.AndroidInstallationEvidenceKey(this).signIfPresent(installation, digest)
+    }
     private val accountDeletionProcessCoordinator =
         AccountDeletionProcessCoordinator.shared
     private val accountDeletionCleanupExecutor
@@ -2223,8 +2231,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var developmentQuickStartButton: Button? = null
     private var developmentQuickStartRequested = false
     private var developmentQuickStartDeadlineMs = 0L
-    private var developmentQuickStartLoginAttempted = false
-    private var developmentQuickStartAuthenticatedActorId: String? = null
     private var developmentQuickStartPermissionsRequested = false
     private var developmentQuickStartConsentRequested = false
     private val developmentQuickStartRunnable = Runnable { advanceDevelopmentQuickStart() }
@@ -2642,9 +2648,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     status = "ARCore Depth 대기",
                     detail = "목적지 없이 위험 인식 모드를 시작할 수 있습니다. TFLite는 카메라 권한과 기기 기능 확인 후 로드합니다.",
                 )
-                if (developmentQuickStartEnabled) {
-                    window.decorView.post { loginDevelopmentQuickStartAccount() }
-                }
             },
         )
     }
@@ -6855,7 +6858,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 }
             },
             resetSensitivePreferences = {
-                ::sensitivePrefs.isInitialized && sensitivePrefs.destroyAndClear()
+                kr.co.hanium.dreamup.walksafe.network.AndroidInstallationEvidenceKey(this)
+                    .resetAfterConfirmedDeletion() &&
+                    ::sensitivePrefs.isInitialized && sensitivePrefs.destroyAndClear()
             },
             resetPlainPreferences = ::clearAccountDeletionPlainResetArtifacts,
             resetFieldStorage = {
@@ -8191,6 +8196,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         try {
             gatewaySessionExecutor.execute {
                 try {
+                    val unavailable = gatewayAccountClient.signupUnavailableOptionalDocuments(gatewayOrigin)
+                    if (!accountRequestFence.isCurrent(token, token.stateBinding)) return@execute
+                    val acceptedSelections = kr.co.hanium.dreamup.walksafe.account.SignupPolicyPreflight.restrict(selections, unavailable)
                     val response = gatewayAccountClient.requestEmailOtp(
                         gatewayBaseUrl = gatewayOrigin,
                         email = email,
@@ -8207,7 +8215,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                                 expiresAtEpochMs = response.expiresAtEpochMs,
                                 resendAvailableAtEpochMs = response.resendAvailableAtEpochMs,
                                 ownerBindingSha256 = ownerBinding,
-                                selections = selections,
+                                selections = acceptedSelections,
                             )
                         }.getOrNull()
                         if (partial == null) {
@@ -8245,9 +8253,11 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                         )
                         firstRunOnboardingSnapshot = transition.current
                         accountSignupExpanded = true
-                        applyAccountConsentSelections(selections)
+                        unavailableSignupOptionalDocuments = unavailable
+                        applyAccountConsentSelections(acceptedSelections)
                         updateFirstRunOnboardingUi()
-                        speakInteraction("이메일 인증번호를 보냈습니다. 인증번호를 입력하세요.")
+                        speakInteraction(if (unavailable.isEmpty()) "이메일 인증번호를 보냈습니다. 인증번호를 입력하세요."
+                            else "바뀐 선택 약관은 동의하지 않은 상태로 진행합니다. 가입 후 새 약관을 확인하세요. 이메일 인증번호를 입력하세요.")
                         accountOtpInput.post {
                             accountOtpInput.requestFocus()
                             accountOtpInput.requestRectangleOnScreen(
@@ -8361,12 +8371,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         try {
             gatewaySessionExecutor.execute {
                 try {
+                    val unavailable = gatewayAccountClient.signupUnavailableOptionalDocuments(gatewayOrigin)
+                    if (!accountRequestFence.isCurrent(token, token.stateBinding)) return@execute
+                    val acceptedSelections = kr.co.hanium.dreamup.walksafe.account.SignupPolicyPreflight.restrict(selections, unavailable)
                     val created = gatewayAccountClient.createAccount(
                         gatewayBaseUrl = gatewayOrigin,
                         enrollmentHandle = updatedPartial.enrollmentHandle,
                         otpCode = otp,
                         password = password,
-                        selections = selections,
+                        selections = acceptedSelections,
                     )
                     runOnUiThread {
                         if (!accountRequestFence.completeIfCurrent(token, accountStateBinding())) {
@@ -8568,9 +8581,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     return
                 }
                 transition.current
-            }
-            if (developmentQuickStartEnabled) {
-                developmentQuickStartAuthenticatedActorId = session.actorId
             }
             val stored = if (session.isLongLived) {
                 gatewaySessionStore.saveInitialIfAbsent(session, nextFirstRunSnapshot, gatewayOrigin)
@@ -15002,6 +15012,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                             updateNavigationStatus("voice_home=microphone_input_silenced_retry_required")
                             updateStatus("마이크 입력 제한", MICROPHONE_INPUT_SILENCED_GUIDANCE)
                             speakInteraction(MICROPHONE_INPUT_SILENCED_GUIDANCE)
+                        } else if (result.streamingError == VoskStreamingError.AUDIO_ROUTE_CHANGED) {
+                            updateNavigationStatus("voice_home=microphone_route_changed_retry_required")
+                            updateStatus("마이크 연결 변경", MICROPHONE_INPUT_ROUTE_CHANGED_GUIDANCE)
+                            speakInteraction(MICROPHONE_INPUT_ROUTE_CHANGED_GUIDANCE)
                         } else {
                             updateNavigationStatus("voice_home=retry_on_home_reentry_use_voice_button")
                         }
@@ -15050,7 +15064,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private fun nativeHomeFeatureContextAvailable(): Boolean {
         if (!::walkSessionLifecycle.isInitialized || isInWalkInteractionArea() || !shouldShowNativeHome() ||
             !firstRunOnboardingComplete() || !isActivityForeground ||
-            (permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled)
+            (permissionRecoveryBlocksCurrentInteraction() && !developmentGuidanceStartBypassEnabled)
         ) return false
         val snapshot = walkSessionLifecycle.snapshot()
         return snapshot.isForeground && snapshot.state in setOf(
@@ -15422,6 +15436,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             }
             applyNativePreviewPresentation(homeAvailable, homeVisible, settingsVisible, forceSettings)
             if (nativeUiPage == NativeUiPage.GUIDANCE) styleGuidanceScreen()
+            if (permissionRecoveryGate.blocksAutomaticResourceStart) updatePermissionRecoveryUi()
             updateNativeHomeGeometry()
         } finally {
             nativeUiRendering = false
@@ -16999,8 +17014,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             recoveryAnnounced = true
             announceNativeGuidanceConfirmationError("음성 입력 또는 안내를 완료하지 못했습니다. 마이크 권한과 한국어 음성 설정을 확인하거나 다시 듣기를 눌러 주세요.\n시작·취소 버튼으로도 선택할 수 있습니다.")
         }
+        val environmentNotice = currentOfficialEnvironmentAssessment()
+            .takeIf { it.conditionallyAllowed }?.let { it.preparationNoticeKo() + " " }.orEmpty()
         val started = speakCommandResponse(
-            "${destination.name}까지 안내를 시작할까요? 시작 또는 취소라고 말씀해 주세요.",
+            environmentNotice + "${destination.name}까지 안내를 시작할까요? 시작 또는 취소라고 말씀해 주세요.",
             preparingInput = true,
             onCompleted = {
                 if (current()) {
@@ -18276,7 +18293,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             setOnClickListener {
                 val grantAll = isChecked
-                accountConsentChecks.values.forEach { check -> check.isChecked = grantAll }
+                accountConsentChecks.forEach { (key, check) -> check.isChecked = grantAll && key !in unavailableSignupOptionalDocuments }
                 refreshAccountConsentSummary()
                 refreshAccountActionAvailability()
             }
@@ -19626,7 +19643,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (developmentQuickStartEnabled) {
                 addView(TextView(this@MainActivity).apply {
                     text = "개발 전용 기능 테스트 · 실외 보행 안전 검증용이 아닙니다.\n" +
-                        "초기 로그인 화면·기기 점검·최초 장착 확인만 생략합니다. " +
+                        "로그인 화면에서 테스트 계정으로 직접 로그인하세요. 기기 점검·최초 장착 확인만 생략합니다. " +
                         "최초 장착 확인은 개발용 가정이며, 환경 확인과 실제 센서 판정·사용 중 재점검은 유지합니다. " +
                         "테스트 시작 시 사진·위치·자동 신고를 로컬 테스트 서버에 전송하도록 설정합니다."
                     textSize = 18f
@@ -19634,7 +19651,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     setPadding(0, 16, 0, 16)
                 })
                 developmentQuickStartStatusText = TextView(this@MainActivity).apply {
-                    text = "실제 테스트 계정 연결을 준비합니다."
+                    text = "테스트 계정으로 로그인한 뒤 시작하세요."
                     textSize = 18f
                     setTextColor(WS_COLOR_NOTICE_TEXT)
                 }
@@ -19978,35 +19995,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             !process.storageBlocked && !process.deletionRecoveryOnly &&
                 !accountDeletionStateMachine.processingBlocked() &&
                 it.sessionScope == GatewaySessionScope.GENERAL &&
-                it.actorId == developmentQuickStartAuthenticatedActorId &&
                 it.verificationState == GatewaySessionVerificationState.VERIFIED &&
                 it.isUsableFor(it.actorId) &&
                 it.gatewayBaseUrl == configuredGatewayOriginOrNull()
         }
-    }
-
-    private fun loginDevelopmentQuickStartAccount() {
-        if (!developmentQuickStartEnabled || !isActivityForeground ||
-            accountRequestFence.isInFlight()
-        ) return
-        if (developmentQuickStartSessionOrNull() != null) return
-        developmentQuickStartLoginAttempted = true
-        if (BuildConfig.DEVELOPMENT_QUICK_START_EMAIL.isBlank() ||
-            BuildConfig.DEVELOPMENT_QUICK_START_PASSWORD.isBlank()
-        ) {
-            showAccountMessage("개발 APK에 테스트 계정 설정이 없습니다. 계정 설정을 포함해 다시 빌드하세요.")
-            return
-        }
-        developmentQuickStartAuthenticatedActorId = null
-        if (gatewayFieldSession != null) clearGatewaySession(logoutRemote = false)
-        firstRunOnboardingSnapshot = FirstRunOnboardingPolicy.initialEmailAccount(
-            epoch = nextFirstRunEpoch(),
-        )
-        developmentQuickStartStatusText?.text = "로컬 서버의 실제 테스트 계정에 연결하고 있습니다."
-        loginEmailAccount(
-            emailOverride = BuildConfig.DEVELOPMENT_QUICK_START_EMAIL,
-            passwordOverride = BuildConfig.DEVELOPMENT_QUICK_START_PASSWORD,
-        )
     }
 
     private fun startDevelopmentQuickStart() {
@@ -20027,7 +20019,6 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         developmentQuickStartRequested = true
         developmentQuickStartDeadlineMs = SystemClock.elapsedRealtime() + 45_000L
-        developmentQuickStartLoginAttempted = false
         developmentQuickStartPermissionsRequested = false
         developmentQuickStartConsentRequested = false
         advanceDevelopmentQuickStart()
@@ -20059,11 +20050,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         val session = developmentQuickStartSessionOrNull()
         if (session == null) {
-            if (!developmentQuickStartLoginAttempted && !accountRequestFence.isInFlight()) {
-                loginDevelopmentQuickStartAccount()
-            }
             if (!accountRequestFence.isInFlight()) {
-                finish(accountAccessNotice ?: "테스트 계정 연결 실패. 로컬 서버 연결을 확인하고 다시 시도하세요.")
+                finish(accountAccessNotice ?: "로그인 화면에서 테스트 계정으로 로그인한 뒤 개발 기능 테스트를 시작하세요.")
             } else {
                 awaitStep("로컬 서버의 실제 테스트 계정 로그인을 확인하고 있습니다.")
             }
@@ -23646,7 +23634,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         accountConsentCards.values.forEach { card ->
             card.visibility = if (onConsentStep) View.VISIBLE else View.GONE
         }
-        accountConsentChecks.values.forEach { check -> check.isEnabled = !busy }
+        accountConsentChecks.forEach { (key, check) -> check.isEnabled = !busy && key !in unavailableSignupOptionalDocuments }
         accountConsentAllCheck.isEnabled = !busy
         accountRequestOtpButton.visibility =
             if (
@@ -23733,18 +23721,20 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             if (walkReadinessExpanded) View.VISIBLE else View.GONE
         walkReadinessSummaryText.visibility =
             if (walkReadinessExpanded) View.GONE else View.VISIBLE
-        val summary = if (hasCurrentPostLoginDeviceRestrictions()) {
-            val preparation = if (cameraAnalysisFeaturesEnabled()) {
-                "장착과 사용 중인 기능 범위의 환경 점검을 통과했습니다."
-            } else {
-                "사용 중인 기능 범위의 환경 점검을 통과했고, " +
-                    "제한된 카메라 장착 점검은 생략했습니다."
-            }
-            "기기 준비 완료. $preparation 현재 제한 기능: " +
-                "${postLoginDeviceCheckDisabledFeatureText()}. " +
-                "나머지 기능은 사용할 수 있습니다."
+        val assessment = currentOfficialEnvironmentAssessment()
+        val environmentNotice = assessment.preparationNoticeKo()
+        val summary = if (!assessment.canStartWalk) {
+            environmentNotice
         } else {
-            "기기 준비 완료. 장착, 환경, 기기 점검을 모두 통과했습니다."
+            val mountingNotice = if (cameraAnalysisFeaturesEnabled()) {
+                "장착 점검을 마쳤습니다."
+            } else {
+                "제한된 카메라 장착 점검은 생략했습니다."
+            }
+            "기기 준비 완료. $environmentNotice $mountingNotice" +
+                if (hasCurrentPostLoginDeviceRestrictions()) {
+                    " 현재 제한 기능: ${postLoginDeviceCheckDisabledFeatureText()}."
+                } else ""
         }
         walkReadinessSummaryText.text = summary
         walkReadinessSummaryText.contentDescription = summary
@@ -23910,7 +23900,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             WalkSessionState.PAUSED,
         )
         firstRunOnboardingControls.visibility =
-            if (developmentQuickStartEnabled || walkScreenVisible) View.GONE else View.VISIBLE
+            if ((developmentQuickStartEnabled && developmentQuickStartSessionOrNull() != null) || walkScreenVisible) View.GONE else View.VISIBLE
         if (::priorityUserOnboardingControls.isInitialized) {
             priorityUserOnboardingControls.visibility =
                 if (mayTrain) View.VISIBLE else View.GONE
@@ -25671,9 +25661,10 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (!target.isShown || !target.isEnabled) return
         prewalkGuidanceStage = nextStage
-        target.contentDescription = when (nextStage) {
-            1 -> "환경 측정 통과. 휴대전화를 정면으로 고정한 뒤 확인하세요."
-            else -> "환경과 장착 점검 통과. 보행 시작 확인"
+        val environmentNotice = currentOfficialEnvironmentAssessment(epoch).preparationNoticeKo()
+        target.contentDescription = environmentNotice + " " + when (nextStage) {
+            1 -> "휴대전화를 정면으로 고정한 뒤 확인하세요."
+            else -> "장착 점검 통과. 보행 시작 확인"
         }
         target.post {
             if (
@@ -29790,6 +29781,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         Manifest.permission.ACCESS_COARSE_LOCATION -> "대략적 위치"
         Manifest.permission.RECORD_AUDIO -> "마이크"
         Manifest.permission.ACTIVITY_RECOGNITION -> "보행 센서"
+        Manifest.permission.POST_NOTIFICATIONS -> "알림"
         else -> this
     }
 
@@ -30105,7 +30097,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val expectedWalkEpoch = snapshot.epoch
         walkSessionResumeConfirmationToken = confirmationToken
         walkSessionResumePromptPending = true
-        val prompt = "보행 안내를 다시 시작할까요? 시작 또는 취소라고 말해 주세요"
+        val environmentNotice = currentOfficialEnvironmentAssessment(expectedWalkEpoch)
+            .takeIf { it.conditionallyAllowed }?.let { it.preparationNoticeKo() + " " }.orEmpty()
+        val prompt = environmentNotice + "보행 안내를 다시 시작할까요? 시작 또는 취소라고 말해 주세요"
         val generation = feedbackLifecycleGeneration
         val delivered = {
             runOnUiThread {
@@ -31748,8 +31742,23 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         updatePermissionRecoveryUi()
     }
 
+    private fun permissionRecoveryBlocksCurrentInteraction(): Boolean =
+        permissionRecoveryGate.blocksInteraction(
+            inWalkArea = isInWalkInteractionArea(),
+            observed = currentObservedPermissionSnapshot(),
+            requiredPermissions = requiredStartWalkObservedPermissions(),
+        )
+
     private fun updatePermissionRecoveryUi() {
         if (!::permissionDenialPanel.isInitialized) return
+        // A pending walk recheck must not cover the permission-restored main menu.
+        // The persisted gate and every walk start/resume/transfer check remain unchanged.
+        if (permissionRecoveryGate.blocksAutomaticResourceStart &&
+            !permissionRecoveryBlocksCurrentInteraction()
+        ) {
+            permissionDenialPanel.visibility = View.GONE
+            return
+        }
         when (permissionRecoveryGate.state) {
             PermissionRecoveryGateState.CLEAR,
             PermissionRecoveryGateState.REQUEST_PENDING,
@@ -36862,6 +36871,11 @@ generation != cameraFallbackGeneration
                     speakInteraction("통화나 다른 앱이 마이크를 쓰고 있어 음성 명령을 들을 수 없습니다.")
                     return
                 }
+                if (failure.error == VoskStreamingError.AUDIO_ROUTE_CHANGED) {
+                    reportWalkVoiceStartFailure(WalkVoiceStartFailure.INPUT_ROUTE_CHANGED)
+                    speakInteraction(MICROPHONE_INPUT_ROUTE_CHANGED_GUIDANCE)
+                    return
+                }
                 // FP-025: only a persistent recognizer failure disables on-device STT (and so blocks walks);
                 // a single transient audio/inference error restarts hands-free listening first.
                 handsFreeTranscriberFailureCount += 1
@@ -38484,12 +38498,12 @@ generation != cameraFallbackGeneration
             expectedPage = nativeUiPage,
         )
         cancelForegroundHomeWakeListening(resetFailure = false)
-        val recorder = ForegroundAacRecorder(cacheDir, onInputSilenced = {
+        fun handleCaptureInterrupted(routeChanged: Boolean) {
             if (activeGatewaySpeechInteraction === active) {
                 foregroundHomeWakeFailed = true
-                cancelGatewaySpeechInteraction("microphone_input_silenced")
-                reportWalkVoiceStartFailure(WalkVoiceStartFailure.INPUT_SILENCED)
-                val message = MICROPHONE_INPUT_SILENCED_GUIDANCE
+                cancelGatewaySpeechInteraction(if (routeChanged) "microphone_route_changed" else "microphone_input_silenced")
+                reportWalkVoiceStartFailure(if (routeChanged) WalkVoiceStartFailure.INPUT_ROUTE_CHANGED else WalkVoiceStartFailure.INPUT_SILENCED)
+                val message = if (routeChanged) MICROPHONE_INPUT_ROUTE_CHANGED_GUIDANCE else MICROPHONE_INPUT_SILENCED_GUIDANCE
                 when {
                     nativeGuidanceConfirmationScreen != null -> Unit
                     reportPanelDialog != null -> reportPanelStatus?.append("\n\n$message")
@@ -38498,7 +38512,25 @@ generation != cameraFallbackGeneration
                 }
                 speakInteraction(message)
             }
-        }) {
+        }
+        val recorder = ForegroundAacRecorder(
+            cacheDir,
+            onInputSilenced = { handleCaptureInterrupted(routeChanged = false) },
+            onInputRouteChanged = { handleCaptureInterrupted(routeChanged = true) },
+            onCaptureLimitExceeded = {
+                if (activeGatewaySpeechInteraction === active) {
+                    cancelGatewaySpeechInteraction("recording_limit_exceeded")
+                    val message = "녹음 제한을 넘어 명령을 실행하지 않았습니다. 짧게 다시 말씀해 주세요."
+                    when {
+                        nativeGuidanceConfirmationScreen != null -> Unit
+                        reportPanelDialog != null -> reportPanelStatus?.append("\n\n$message")
+                        voiceHelpScreen != null -> showVoiceHelpRecovery(message)
+                        else -> showVoiceCommandError(message, "다시 시도", ::ensureVoicePermissionThenListen)
+                    }
+                    speakInteraction(message)
+                }
+            },
+        ) {
             runOnUiThread { stopGatewayVoiceCapture(interactionGeneration) }
         }
         activeGatewaySpeechInteraction = active
@@ -38508,7 +38540,7 @@ generation != cameraFallbackGeneration
             gatewayVoiceRecorder = null
             gatewaySpeechInteractionGeneration += 1L
             updateGatewayVoiceStatus("녹음을 시작하지 못했습니다.")
-            speakInteraction("음성 녹음을 시작하지 못했습니다.")
+            reportGatewaySpeechFailure("음성 녹음을 시작하지 못했습니다. 다시 시도해 주세요.")
             updateVoiceCommandButton(active = false)
             scheduleHandsFreeVoiceRestart()
             return false
@@ -38534,11 +38566,12 @@ generation != cameraFallbackGeneration
         gatewayVoiceRecorder = null
         voiceRecognitionActive = false
         val audioFile = recorder.stop()
+        if (activeGatewaySpeechInteraction !== active) return // Route change cancelled this capture.
         runCatching { ensureFeedbackActuator().playVoiceListeningEndVibration() }
         if (audioFile == null) {
             finishGatewaySpeechInteraction(active)
             updateGatewayVoiceStatus("녹음이 너무 짧거나 올바르지 않습니다.")
-            speakInteraction("음성을 녹음하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요.")
+            reportGatewaySpeechFailure("음성을 녹음하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요.")
             return
         }
         updateGatewayVoiceStatus("음성을 처리하고 있습니다.")
@@ -38564,7 +38597,7 @@ generation != cameraFallbackGeneration
         }.getOrElse {
             audioFile.delete()
             finishGatewaySpeechInteraction(active)
-            speakInteraction("서버 음성 인식을 시작하지 못했습니다. 잠시 뒤 다시 시도해 주세요.")
+            reportGatewaySpeechFailure("서버 음성 인식을 시작하지 못했습니다. 잠시 뒤 다시 시도해 주세요.")
             return
         }
         gatewayVoiceUploadFile = audioFile
@@ -38582,7 +38615,9 @@ generation != cameraFallbackGeneration
                     }
                     result.onSuccess { transcript ->
                         if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeVoiceInput",
-                            "event=SERVER_STT_RESULT backend=WHISPER allowed=${transcript.acoustic.executionAllowed}")
+                            "event=SERVER_STT_RESULT backend=WHISPER allowed=${transcript.acoustic.executionAllowed} " +
+                                "confidence=${transcript.acoustic.confidence} avg_logprob=${transcript.acoustic.avgLogprob} " +
+                                "no_speech=${transcript.acoustic.noSpeechProbability}")
                         handleGatewaySpeechTranscript(active, transcript)
                     }.onFailure {
                         if (call.isCancelled()) return@onFailure
@@ -38590,7 +38625,7 @@ generation != cameraFallbackGeneration
                             "event=SERVER_STT_FAILED type=${it.javaClass.simpleName}")
                         finishGatewaySpeechInteraction(active)
                         updateGatewayVoiceStatus("서버 음성 인식을 사용할 수 없습니다.")
-                        speakInteraction("서버 음성 인식을 사용할 수 없습니다. 잠시 뒤 다시 시도해 주세요.")
+                        reportGatewaySpeechFailure("서버 음성 인식을 사용할 수 없습니다. 잠시 뒤 다시 시도해 주세요.")
                     }
                 }
             }
@@ -38599,6 +38634,18 @@ generation != cameraFallbackGeneration
             audioFile.delete()
             if (gatewayVoiceUploadFile === audioFile) gatewayVoiceUploadFile = null
             finishGatewaySpeechInteraction(active)
+            reportGatewaySpeechFailure("서버 음성 인식을 시작하지 못했습니다. 잠시 뒤 다시 시도해 주세요.")
+        }
+    }
+
+    private fun reportGatewaySpeechFailure(message: String) {
+        if (voiceHelpScreen != null) {
+            // A rejected recording ends the listening turn. Keep an explicit recovery control
+            // visible even if TTS fails; otherwise this overlay looks ready but cannot hear.
+            showVoiceHelpRecovery(message)
+            speakStatusExplanation(message)
+        } else {
+            speakInteraction(message)
         }
     }
 
@@ -38609,7 +38656,7 @@ generation != cameraFallbackGeneration
         if (!speechTranscript.acoustic.executionAllowed) {
             updateGatewayVoiceStatus("음성 품질이 낮아 명령을 실행하지 않았습니다.")
             finishGatewaySpeechInteraction(active)
-            speakInteraction("음성을 확실히 확인하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요.")
+            reportGatewaySpeechFailure("음성을 확실히 확인하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요.")
             return
         }
         finishGatewaySpeechInteraction(active)
@@ -39196,14 +39243,15 @@ generation != cameraFallbackGeneration
                 updateVoiceCommandButton(active = false)
                 updateNavigationStatus("voice=recognition_failed code=$error")
                 logVoiceInputDiagnostic(VoiceInputDiagnosticEvent.ONE_SHOT_UI_ERROR, errorCode = error)
-                if (error == SPEECH_ERROR_INPUT_SILENCED) {
+                if (error == SPEECH_ERROR_INPUT_SILENCED || error == SPEECH_ERROR_INPUT_ROUTE_CHANGED) {
                     // Preserve the cause before generic recognition-error handlers can relabel it.
                     // Block passive home/hands-free restarts; recovery remains a user action.
                     foregroundHomeWakeFailed = true
                     speechRecognizer?.destroy()
                     speechRecognizer = null
-                    reportWalkVoiceStartFailure(WalkVoiceStartFailure.INPUT_SILENCED)
-                    val message = MICROPHONE_INPUT_SILENCED_GUIDANCE
+                    val routeChanged = error == SPEECH_ERROR_INPUT_ROUTE_CHANGED
+                    reportWalkVoiceStartFailure(if (routeChanged) WalkVoiceStartFailure.INPUT_ROUTE_CHANGED else WalkVoiceStartFailure.INPUT_SILENCED)
+                    val message = if (routeChanged) MICROPHONE_INPUT_ROUTE_CHANGED_GUIDANCE else MICROPHONE_INPUT_SILENCED_GUIDANCE
                     when {
                         nativeGuidanceConfirmationScreen != null -> Unit // Keep start/cancel controls.
                         reportPanelDialog != null -> reportPanelStatus?.append("\n\n$message")
@@ -39442,7 +39490,7 @@ generation != cameraFallbackGeneration
         if (isInWalkInteractionArea() && snapshot.state in setOf(WalkSessionState.READY, WalkSessionState.SAFE_STOP)) {
             val score = confidenceScores?.getOrNull(0)
             val command = recognized.replace(Regex("[\\s.!?。]"), "")
-            if (score != null && score.isFinite() && score >= 0.55f &&
+            if (score != null && score.isFinite() && score in 0.55f..1f &&
                 !hasAdditionalAlternatives && phrases.size == 1) {
                 when (command) {
                     "취소", "안내취소", "준비취소" -> {
@@ -39609,6 +39657,10 @@ generation != cameraFallbackGeneration
             return
         }
         if (action == null) {
+            // A supported phrase can still fail the unchanged recognition-confidence gate.
+            val parsedButUntrusted = kr.co.hanium.dreamup.walksafe.navigation.parseAndroidVoiceCommand(
+                recognized, allowBareDestinationIndex = allowBareDestinationIndex,
+            ) != null
             updateNavigationStatus(
                 if (includeRecognizedTextInStatus) {
                     "voice=command_unmatched phrase=${recognized.toStatusToken(maxLength = 48)}"
@@ -39620,11 +39672,13 @@ generation != cameraFallbackGeneration
                 kr.co.hanium.dreamup.walksafe.navigation.COMPOUND_VOICE_COMMAND_REFUSAL_KO
             } else if (kr.co.hanium.dreamup.walksafe.navigation.isLocationDescriptionRequest(recognized)) {
                 kr.co.hanium.dreamup.walksafe.navigation.LOCATION_DESCRIPTION_UNSUPPORTED_KO
+            } else if (parsedButUntrusted) {
+                "음성을 확실히 확인하지 못해 실행하지 않았습니다. 다시 말씀해 주세요."
             } else {
                 "명령을 이해하지 못했습니다."
             }
             if (!retryHomeDestinationVoiceDialog(retryMessage)) {
-                speakInteraction(unrecognizedCommandMessageKo(recognized))
+                speakInteraction(if (parsedButUntrusted) retryMessage else unrecognizedCommandMessageKo(recognized))
             }
             return
         }
@@ -39990,7 +40044,7 @@ generation != cameraFallbackGeneration
             1 -> {
                 if (!reportPanelConfirmationArmed) {
                     speakReportPanel("아직 보낼 신고가 확인되지 않았습니다. " + reportPanelLastText)
-                } else if (confidence != null && (!confidence.isFinite() || confidence < 0.55f)) {
+                } else if (confidence != null && (!confidence.isFinite() || confidence !in 0.55f..1f)) {
                     speakReportPanel("보내기 명령을 확정하지 못했습니다. 다시 말씀하거나 방금 고정한 신고 보내기 버튼을 눌러 주세요.")
                 } else requestReportFromPanel()
             }
@@ -40800,6 +40854,7 @@ generation != cameraFallbackGeneration
             extraAfter.takeIf { it.isNotBlank() }?.let { kr.co.hanium.dreamup.walksafe.navigation.DestinationVoicePromptPart(it) },
         )
         val attempt = state.beginVoicePrompt()
+        var deliveredSpeechPart = false
         val preparationGeneration = voiceRecognitionGeneration
         val responseGeneration = commandSpeechResponseGeneration + 1L
         fun pageCurrent(): Boolean =
@@ -40813,6 +40868,7 @@ generation != cameraFallbackGeneration
             parts = speechParts.map { it.message },
             sequenceCurrent = ::pageCurrent,
             onPartCompleted = { index ->
+                deliveredSpeechPart = true
                 speechParts[index].candidateNumber?.let { state.completeVoiceCandidate(attempt, it) }
             },
             preparingInput = listenAfterPrompt,
@@ -40869,6 +40925,16 @@ generation != cameraFallbackGeneration
                         "후보 안내를 완료하지 못했습니다. 음성 명령 버튼을 눌러 다시 시도해 주세요.",
                     )
                     updateVoiceCommandButton(active = voiceRecognitionActive)
+                    // A delivered part proves this attempt had working TTS. An interruption needs
+                    // a fresh full-page replay, not an unconditional trip to voice-data settings.
+                    // Initialization failures keep the settings recovery from speakCommandResponse.
+                    if (deliveredSpeechPart && pageCurrent()) {
+                        showVoiceCommandError(
+                            "후보 안내가 끝까지 재생되지 않았습니다. 다시 듣기를 눌러 처음부터 들어 주세요.",
+                            "다시 듣기",
+                            ::repeatVoiceDestinationCandidates,
+                        )
+                    }
                 }
             },
         )
@@ -43187,7 +43253,7 @@ generation != cameraFallbackGeneration
     private fun destinationSearchLocationLeaseOrNull(): DestinationSearchLocationLease? {
         if (!isActivityForeground || !currentDestinationSearchAllowsWork() ||
             !hasLocationPermission() || !isLocationServiceEnabledForDeviceCheck() ||
-            (permissionRecoveryGate.blocksAutomaticResourceStart &&
+            (permissionRecoveryBlocksCurrentInteraction() &&
                 !(BuildConfig.DEBUG && BuildConfig.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS))
         ) return null
         val actorId = currentReporterUserId()?.takeIf { it.isNotBlank() } ?: return null

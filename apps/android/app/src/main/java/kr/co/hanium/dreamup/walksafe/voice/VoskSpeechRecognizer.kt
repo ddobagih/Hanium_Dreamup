@@ -117,6 +117,7 @@ internal class VoskSpeechRecognizer internal constructor(
                             VoskStreamingError.AUDIO_READ_FAILED,
                             -> SpeechRecognizer.ERROR_AUDIO
                             VoskStreamingError.AUDIO_SILENCED -> SPEECH_ERROR_INPUT_SILENCED
+                            VoskStreamingError.AUDIO_ROUTE_CHANGED -> SPEECH_ERROR_INPUT_ROUTE_CHANGED
                         },
                     )
                 }

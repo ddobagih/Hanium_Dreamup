@@ -67,6 +67,28 @@ class PermissionRecoveryGateExplicitResumeTest {
         }
     }
 
+    @Test
+    fun mainInteractionRecoversWithoutClearingWalkGateAndRevocationBlocksAgain() {
+        val required = WalkStartPermissionPolicy.required(activityRecognitionRequired = false)
+        val granted = observed(camera = true, location = true)
+        for (state in PermissionRecoveryGateState.entries.filter { it != PermissionRecoveryGateState.CLEAR }) {
+            val gate = PermissionRecoveryGate(state)
+            assertFalse(gate.blocksInteraction(false, granted, required))
+            assertTrue(gate.blocksInteraction(true, granted, required))
+            for (permission in required) {
+                val revoked = ObservedPermissionSnapshot(
+                    cameraGranted = permission != ObservedPermission.CAMERA,
+                    preciseLocationGranted = permission != ObservedPermission.PRECISE_LOCATION,
+                    microphoneGranted = permission != ObservedPermission.MICROPHONE,
+                    activityRecognitionGranted = true,
+                )
+                assertTrue(gate.blocksInteraction(false, revoked, required))
+            }
+            assertEquals(state, gate.state)
+            assertTrue("Interaction access never certifies walk readiness", gate.blocksAutomaticResourceStart)
+        }
+    }
+
     private fun awaitingGate(): PermissionRecoveryGate =
         PermissionRecoveryGate().blocked(required).recheckRequired().completeFullRecheck(
             observed = observed(camera = true, location = true),

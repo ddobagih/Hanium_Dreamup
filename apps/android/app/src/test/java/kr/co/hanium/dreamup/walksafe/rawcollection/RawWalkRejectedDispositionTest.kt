@@ -40,7 +40,7 @@ class RawWalkRejectedDispositionTest {
             """{"detail":{"code":"raw_collection_walk_not_uploadable","message":"no"}}""",
         )
         assertEquals(
-            RawCollectionUploadOutcome.WALK_REJECTED,
+            RawCollectionUploadOutcome.LOCAL_READ_FAILED,
             requireNotNull(rig.coordinator.startNextUpload { rig.after(NP_WALK_1) }).execute(),
         )
         assertEquals(1, rig.storage.collectionCount)

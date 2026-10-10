@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.report
 
 import java.io.IOException
 import java.util.concurrent.CancellationException
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
@@ -120,6 +121,11 @@ internal class ReportQueueDrainCoordinator(
 
     private var activeDrain: ActiveDrain? = null
 
+    private companion object {
+        // Activity recreation must not hide a previous coordinator's running plaintext owner.
+        val runningDrains = AtomicInteger()
+    }
+
     @Synchronized
     fun startNext(
         contextProvider: () -> ReportQueueDrainContext,
@@ -158,6 +164,7 @@ internal class ReportQueueDrainCoordinator(
                 synchronized(this) {
                     if (outer.isCancelled()) return@execute ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
                     executionStarted.set(true)
+                    runningDrains.incrementAndGet()
                 }
                 var uploadAttempted = false
                 try {
@@ -217,6 +224,12 @@ internal class ReportQueueDrainCoordinator(
                     ).withCreationOutcome(report.priority, uploadResult.creationOutcome)
                 } catch (_: CancellationException) {
                     ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
+                } catch (_: ReportUploadProtocolException) {
+                    // A successful HTTP status is not proof of a matching persistence receipt.
+                    // Retain the payload and return the existing user-visible unconfirmed outcome.
+                    (if (outer.isCancelled() || !policy.isCurrent(lease, contextProvider())) {
+                        ReportQueueDrainOutcome.CANCELLED
+                    } else ReportQueueDrainOutcome.RECEIPT_REJECTED).withCreationOutcome(report.priority)
                 } catch (error: ReportUploadHttpException) {
                     if (outer.isCancelled() || !policy.isCurrent(lease, contextProvider())) {
                         ReportQueueDrainOutcome.CANCELLED.withCreationOutcome(report.priority)
@@ -256,6 +269,7 @@ internal class ReportQueueDrainCoordinator(
                     } else ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED).withCreationOutcome(report.priority)
                 } finally {
                     report.close()
+                    runningDrains.decrementAndGet()
                     policy.release(lease)
                     synchronized(this) {
                         if (activeDrain?.call === outer) activeDrain = null
@@ -300,7 +314,10 @@ internal class ReportQueueDrainCoordinator(
     @Synchronized
     fun onAccountDeleted(): Boolean {
         cancelActiveLocked()
-        return store.onAccountDeleted()
+        val purged = store.onAccountDeleted()
+        // A running transport still owns plaintext until its finally block closes the report.
+        // Keep the durable fence/purge even while cleanup is pending; callers may retry.
+        return purged && activeDrain == null && runningDrains.get() == 0
     }
 
     @Synchronized

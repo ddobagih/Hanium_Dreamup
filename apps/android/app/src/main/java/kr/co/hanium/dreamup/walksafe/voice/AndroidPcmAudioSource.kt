@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
+import android.media.AudioRouting
+import android.os.Handler
+import android.os.Looper
 import android.media.AudioRecordingConfiguration
 import android.media.MediaRecorder
 import android.os.Build
@@ -21,6 +24,7 @@ internal interface VoskPcmSource {
 
 /** S04-27: terminal input code for a capture the system silenced (distinct from AudioRecord errors). */
 internal const val PCM_INPUT_SILENCED_CODE = Int.MIN_VALUE
+internal const val PCM_INPUT_ROUTE_CHANGED_CODE = Int.MIN_VALUE + 1
 
 /**
  * Turns recording-configuration reports into one silenced edge. A silenced client still reads
@@ -71,6 +75,8 @@ internal class AndroidPcmAudioSource(
         lateinit var worker: Thread
         @Volatile
         var unwatchSilencing: () -> Unit = {}
+        var unwatchRoute: () -> Unit = {}
+        val routeGuard = VoiceInputRouteGuard()
 
         fun releaseOnce() {
             if (released.compareAndSet(false, true)) {
@@ -140,12 +146,15 @@ internal class AndroidPcmAudioSource(
                     { capture(session) },
                     CAPTURE_THREAD_NAME,
                 )
-                watchSystemSilencing(session)
-                state = State.RUNNING
                 activeSession = session
+                watchSystemSilencing(session)
+                watchInputRoute(session)
+                state = State.RUNNING
                 session.worker.start()
             } catch (failure: Throwable) {
                 activeSession?.running?.set(false)
+                activeSession?.unwatchRoute?.invoke()
+                activeSession?.unwatchSilencing?.invoke()
                 state = State.IDLE
                 activeSession = null
                 runCatching { record.release() }
@@ -203,17 +212,37 @@ internal class AndroidPcmAudioSource(
         gate.observe(runCatching { session.record.activeRecordingConfiguration?.isClientSilenced }.getOrNull())
     }
 
+    private fun checkInputRoute(session: CaptureSession) {
+        if (!session.running.get()) return
+        val deviceId = runCatching { session.record.routedDevice?.id }.getOrNull()
+        if (session.routeGuard.observe(deviceId) && session.running.compareAndSet(true, false)) {
+            onReadError(PCM_INPUT_ROUTE_CHANGED_CODE)
+        }
+    }
+
+    private fun watchInputRoute(session: CaptureSession) {
+        checkInputRoute(session)
+        val callback = AudioRouting.OnRoutingChangedListener { checkInputRoute(session) }
+        session.record.addOnRoutingChangedListener(callback, Handler(Looper.getMainLooper()))
+        session.unwatchRoute = {
+            runCatching { session.record.removeOnRoutingChangedListener(callback) }
+        }
+    }
+
     private fun capture(session: CaptureSession) {
         val readBuffer = ShortArray(READ_CHUNK_SAMPLES)
         try {
             Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO)
             while (session.running.get()) {
+                checkInputRoute(session)
+                if (!session.running.get()) break
                 val read = session.record.read(
                     readBuffer,
                     0,
                     readBuffer.size,
                     AudioRecord.READ_BLOCKING,
                 )
+                checkInputRoute(session)
                 if (!session.running.get()) break
                 if (read > 0) {
                     onPcm16(readBuffer.copyOf(read))
@@ -230,6 +259,7 @@ internal class AndroidPcmAudioSource(
             }
         } finally {
             try {
+                session.unwatchRoute()
                 session.unwatchSilencing()
                 runCatching { session.record.stop() }
                 session.releaseOnce()

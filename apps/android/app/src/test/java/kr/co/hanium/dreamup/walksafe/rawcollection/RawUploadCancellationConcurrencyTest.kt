@@ -8,6 +8,43 @@ import org.junit.Test
 
 class RawUploadCancellationConcurrencyTest {
     @Test
+    fun deletionRemainsIncompleteUntilOldUploadZeroesPlaintext() {
+        val rig = PostWalkRawRig()
+        rig.capture(NP_WALK_1)
+        val context = rig.after(NP_WALK_1)
+        rig.coordinator.onWalkEnded(context)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        rig.client.beforeReturn = {
+            entered.countDown()
+            check(release.await(5, TimeUnit.SECONDS))
+        }
+        val call = requireNotNull(rig.coordinator.startNextUpload { context })
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val result = executor.submit<RawCollectionUploadOutcome> { call.execute() }
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            assertFalse("cancel request is not plaintext release", rig.coordinator.onAccountDeleted())
+            assertTrue(call.isCancelled())
+            // Same process, new coordinator (as with Activity recreation), same encrypted store.
+            rig.restartProcess()
+            assertFalse("new coordinator must still see old plaintext", rig.coordinator.onAccountDeleted())
+            assertEquals(0, rig.storage.collectionCount)
+            assertTrue(rig.client.heldChunks.any { chunk -> chunk.plaintext.any { it != 0.toByte() } })
+            assertFalse("new enrollment must not clear the fence during old upload cleanup",
+                rig.coordinator.resetForNewEnrollment(requireNotNull(context.session), context.sessionGeneration, context.deviceCheck))
+            release.countDown()
+            assertEquals(RawCollectionUploadOutcome.CANCELLED, result.get(2, TimeUnit.SECONDS))
+            assertTrue(rig.client.heldChunks.all { chunk -> chunk.plaintext.all { it == 0.toByte() } })
+            assertTrue(rig.coordinator.onAccountDeleted())
+            assertEquals(0, rig.storage.collectionCount)
+        } finally {
+            release.countDown()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun cancellationAndRevalidationDoNotWaitForCoordinatorOrStoreLocks() {
         for (invalidate in listOf(false, true)) {
             val rig = PostWalkRawRig()

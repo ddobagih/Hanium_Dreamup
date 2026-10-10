@@ -5,6 +5,7 @@ import java.util.UUID
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kr.co.hanium.dreamup.walksafe.device.FeatureStorageAllowance
@@ -795,6 +796,7 @@ class RawCollectionRuntimeCoordinator private constructor(
                     clearActiveUpload(outer)
                     return@execute RawCollectionUploadOutcome.CANCELLED
                 }
+                runningRawUploads.incrementAndGet()
                 val plaintextChunks = mutableListOf<RawPlaintextChunk>()
                 var localWork = true
                 try {
@@ -880,14 +882,16 @@ class RawCollectionRuntimeCoordinator private constructor(
                             in RAW_CONSENT_REJECTION_CODES -> {
                                 // S1617-18-F1: the server will not accept this consent binding; the
                                 // segment is deleted instead of holding the queue until it expires.
-                                store.discardConsentRejected(lease.owner, localManifest.collectionId)
-                                RawCollectionUploadOutcome.CONSENT_REJECTED
+                                if (store.discardConsentRejected(lease.owner, localManifest.collectionId)) {
+                                    RawCollectionUploadOutcome.CONSENT_REJECTED
+                                } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
                             }
                             RAW_WALK_NOT_UPLOADABLE_CODE -> {
                                 // Owner decision 3(b): the Gateway will never accept this walk, so it
                                 // must not hold the queue either (transfer-F8: its own marker).
-                                store.discardWalkRejected(lease.owner, localManifest.collectionId)
-                                RawCollectionUploadOutcome.WALK_REJECTED
+                                if (store.discardWalkRejected(lease.owner, localManifest.collectionId)) {
+                                    RawCollectionUploadOutcome.WALK_REJECTED
+                                } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
                             }
                             // transfer-F7: kept; the caller retries once after the Gateway lease TTL.
                             RAW_WALK_IN_PROGRESS_CODE -> RawCollectionUploadOutcome.WALK_IN_PROGRESS
@@ -942,6 +946,7 @@ class RawCollectionRuntimeCoordinator private constructor(
                 } finally {
                     runCatching { nested.getAndSet(null)?.cancel() }
                     plaintextChunks.forEach { it.plaintext.fill(0) }
+                    runningRawUploads.decrementAndGet()
                     clearActiveUpload(outer)
                 }
             },
@@ -1032,7 +1037,10 @@ class RawCollectionRuntimeCoordinator private constructor(
     @Synchronized
     fun onAccountDeleted(): Boolean {
         cancelActiveLocked()
-        return store.onAccountDeleted()
+        val purged = store.onAccountDeleted()
+        // Cancellation can return while the transport still holds decrypted chunks. The slot
+        // clears only after its finally block zeroes them; do not attest deletion before that.
+        return purged && activeUpload.get() == null && runningRawUploads.get() == 0
     }
 
     private fun selectableReceipts(current: IntegratedConsentConfirmation): Set<String> =
@@ -1052,6 +1060,7 @@ class RawCollectionRuntimeCoordinator private constructor(
         deviceCheck: PostLoginDeviceCheckSnapshot,
     ): Boolean {
         cancelActiveLocked()
+        if (activeUpload.get() != null || runningRawUploads.get() != 0) return false
         val owner = ownerOrNull(session, sessionGeneration, deviceCheck) ?: return false
         return store.resetForNewEnrollment(owner)
     }
@@ -1494,3 +1503,6 @@ private val RAW_CONSENT_REJECTION_CODES = setOf(
     "raw_source_collection_consent_required",
     "raw_source_collection_consent_interrupted",
 )
+
+// Process-wide: a recreated Activity must also wait for old decrypted upload buffers.
+private val runningRawUploads = AtomicInteger()

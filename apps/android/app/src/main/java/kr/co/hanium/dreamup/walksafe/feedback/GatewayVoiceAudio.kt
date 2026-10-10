@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.feedback
 
+import android.media.AudioRouting
+import kr.co.hanium.dreamup.walksafe.voice.VoiceInputRouteGuard
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.MediaRecorder
@@ -12,12 +14,16 @@ import java.io.File
 internal class ForegroundAacRecorder(
     private val cacheDirectory: File,
     private val onInputSilenced: (() -> Unit)? = null,
-    private val onLimitReached: () -> Unit,
+    private val onInputRouteChanged: (() -> Unit)? = null,
+    private val onCaptureLimitExceeded: (() -> Unit)? = null,
+    private val onSpeechEnded: () -> Unit,
 ) {
     private data class ActiveRecording(
         val recorder: MediaRecorder,
         val file: File,
         val startedAtElapsedRealtimeMs: Long,
+        val routeGuard: VoiceInputRouteGuard = VoiceInputRouteGuard(),
+        var unwatchRoute: () -> Unit = {},
     )
 
     private var active: ActiveRecording? = null
@@ -28,7 +34,11 @@ internal class ForegroundAacRecorder(
         val endpoint = SpeechEndpointPolicy(recording.startedAtElapsedRealtimeMs)
         val poll = object : Runnable {
             override fun run() {
-                if (active !== recording) return
+                if (active !== recording || rejectChangedRoute(recording)) return
+                if (endpoint.captureLimitExceeded(SystemClock.elapsedRealtime())) {
+                    rejectCaptureLimit(recording)
+                    return
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                     runCatching { recording.recorder.activeRecordingConfiguration?.isClientSilenced }.getOrNull() == true
                 ) {
@@ -40,7 +50,7 @@ internal class ForegroundAacRecorder(
                 val amplitude = runCatching { recording.recorder.maxAmplitude }.getOrDefault(0)
                 if (endpoint.shouldStop(SystemClock.elapsedRealtime(), amplitude)) {
                     silencePoll = null
-                    onLimitReached()
+                    onSpeechEnded()
                 } else handler.postDelayed(this, 100L)
             }
         }
@@ -48,9 +58,36 @@ internal class ForegroundAacRecorder(
         handler.postDelayed(poll, 100L)
     }
 
+    private fun rejectChangedRoute(recording: ActiveRecording): Boolean {
+        if (active !== recording || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
+        val deviceId = runCatching { recording.recorder.routedDevice?.id }.getOrNull()
+        if (!recording.routeGuard.observe(deviceId)) return false
+        cancel()
+        onInputRouteChanged?.invoke()
+        return true
+    }
+
+    private fun watchInputRoute(recording: ActiveRecording) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        recording.routeGuard.observe(recording.recorder.routedDevice?.id)
+        val callback = AudioRouting.OnRoutingChangedListener {
+            if (active === recording) rejectChangedRoute(recording)
+        }
+        recording.recorder.addOnRoutingChangedListener(callback, handler)
+        recording.unwatchRoute = {
+            runCatching { recording.recorder.removeOnRoutingChangedListener(callback) }
+        }
+    }
+
     private fun cancelSilencePoll() {
         silencePoll?.let(handler::removeCallbacks)
         silencePoll = null
+    }
+
+    private fun rejectCaptureLimit(recording: ActiveRecording) {
+        if (active !== recording) return
+        cancel()
+        onCaptureLimitExceeded?.invoke()
     }
 
     val isRecording: Boolean
@@ -75,15 +112,22 @@ internal class ForegroundAacRecorder(
                 if (
                     what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED ||
                     what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED
-                ) onLimitReached()
+                ) {
+                    val recording = active
+                    if (recording?.recorder === recorder && !rejectChangedRoute(recording)) rejectCaptureLimit(recording)
+                }
             }
             recorder.prepare()
             recorder.start()
             val recording = ActiveRecording(recorder, file, SystemClock.elapsedRealtime())
             active = recording
+            watchInputRoute(recording)
             watchSpeechEnd(recording)
             true
         }.getOrElse {
+            active?.unwatchRoute?.invoke()
+            active = null
+            cancelSilencePoll()
             runCatching { recorder.release() }
             file.delete()
             false
@@ -93,15 +137,21 @@ internal class ForegroundAacRecorder(
     /** Caller owns the returned cache file and must delete it after upload. */
     fun stop(): File? {
         val recording = active ?: return null
+        if (rejectChangedRoute(recording)) return null
+        if (SpeechEndpointPolicy(recording.startedAtElapsedRealtimeMs).captureLimitExceeded(SystemClock.elapsedRealtime())) {
+            rejectCaptureLimit(recording)
+            return null
+        }
         active = null
         cancelSilencePoll()
+        recording.unwatchRoute()
         recording.recorder.setOnInfoListener(null)
         val stopped = runCatching { recording.recorder.stop() }.isSuccess
         runCatching { recording.recorder.release() }
         val elapsed = SystemClock.elapsedRealtime() - recording.startedAtElapsedRealtimeMs
         if (
             !stopped ||
-            elapsed !in 1..MAX_RECORDING_DURATION_WITH_STOP_GRACE_MS ||
+            elapsed !in 1L until MAX_RECORDING_DURATION_MS.toLong() ||
             !recording.file.isFile ||
             recording.file.length() !in 1..MAX_RECORDING_BYTES.toLong()
         ) {
@@ -115,6 +165,7 @@ internal class ForegroundAacRecorder(
         val recording = active ?: return
         active = null
         cancelSilencePoll()
+        recording.unwatchRoute()
         recording.recorder.setOnInfoListener(null)
         runCatching { recording.recorder.stop() }
         runCatching { recording.recorder.release() }
@@ -125,7 +176,6 @@ internal class ForegroundAacRecorder(
         const val AUDIO_SAMPLE_RATE_HZ = 16_000
         const val AUDIO_BIT_RATE = 64_000
         const val MAX_RECORDING_DURATION_MS = SpeechEndpointPolicy.MAX_RECORDING_DURATION_MS
-        const val MAX_RECORDING_DURATION_WITH_STOP_GRACE_MS = MAX_RECORDING_DURATION_MS + 2_000L
         const val MAX_RECORDING_BYTES = 1 * 1024 * 1024
     }
 }

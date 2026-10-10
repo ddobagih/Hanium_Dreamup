@@ -5,6 +5,14 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class VoiceHelpPolicyTest {
+    @Test fun openingHelpAgainRepeatsItsMenuWithoutExecutingOtherCommands() {
+        listOf("도움말 열어줘", "도움말을 열어 주세요.", "도움말 알려주세요", "도움말 보여줘").forEach {
+            assertEquals(4, VoiceHelpPolicy.parse(listOf(it)))
+        }
+        assertNull(VoiceHelpPolicy.parse(listOf("도움말 열지 마")))
+        assertNull(VoiceHelpPolicy.parse(listOf("도움말 열어줘", "도움말 닫기")))
+        assertNull(VoiceHelpPolicy.parse(listOf("토마일")))
+    }
     @Test fun numberedAlternativesAgreeAfterNormalization() {
         assertEquals(1, VoiceHelpPolicy.parse(listOf("1번.", "일 번", "첫 번째")))
         assertEquals(2, VoiceHelpPolicy.parse(listOf("2번", "두 번째")))

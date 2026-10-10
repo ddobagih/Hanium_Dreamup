@@ -30,6 +30,108 @@ import org.junit.Test
  * Store recreation is tested, not Android process death. Retry time advances only an injected clock.
  */
 class ReportQueueHttpRecoveryDeviceTest {
+    @Test fun consentWithdrawalCancelsNativeQueueWhileServerHoldsResponse() {
+        Fixture().use { f -> Server().use { server ->
+            f.enqueue()
+            server.postEntered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            server.releasePost = release
+            server.dropPostResponse = true
+            val coordinator = ReportQueueDrainCoordinator(f.reopen())
+            val call = f.start(server, coordinator = coordinator)
+            val executor = Executors.newSingleThreadExecutor()
+            try {
+                val result = executor.submit<ReportQueueDrainOutcome> { call.execute() }
+                assertTrue("Native POST must be waiting on the fixture response", server.postEntered!!.await(10, TimeUnit.SECONDS))
+                f.context.set(f.context.get().copy(consentAllowed = false))
+                val began = android.os.SystemClock.elapsedRealtime()
+                assertTrue(ReportPrivacyConsentSession.withdraw())
+                assertTrue(coordinator.onConsentRevoked(RECEIPT))
+                // startNext returns a mapped handle; cancellation is owned by the underlying drain.
+                // Assert the actual outcome and native unblock, not the wrapper cancellation flag.
+                // The server has not replied or closed its socket: cancellation must unblock native HTTP.
+                assertEquals(ReportQueueDrainOutcome.CANCELLED, result.get(5, TimeUnit.SECONDS))
+                val elapsed = android.os.SystemClock.elapsedRealtime() - began
+                assertEquals(1L, release.count)
+                assertNull(ReportPrivacyConsentSession.issueUploadPermit(ReportTransferPurpose.EXPLICIT))
+                f.inspect(f.reopen()) { assertTrue(it.isEmpty()) }
+                assertEquals(1, server.requests.count { it.method == "POST" })
+                emit("consent_withdrawal=true native_response_wait_cancelled=true cancellation_ms=$elapsed queue_purged=true new_permit_blocked=true authority=SYNTHETIC main_consent_ui=false")
+            } finally {
+                call.cancel()
+                release.countDown()
+                executor.shutdown()
+                assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS))
+            }
+        } }
+    }
+
+    @Test fun repeatedSameConsentAuthorityDoesNotCancelNativeQueueUpload() {
+        Fixture().use { f -> Server().use { server ->
+            f.enqueue()
+            server.postEntered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            server.releasePost = release
+            val call = f.start(server)
+            val executor = Executors.newSingleThreadExecutor()
+            try {
+                val result = executor.submit<ReportQueueDrainOutcome> { call.execute() }
+                assertTrue(server.postEntered!!.await(10, TimeUnit.SECONDS))
+                repeat(3) {
+                    assertFalse("Same authority must not create a new permit generation",
+                        ReportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent())
+                }
+                assertFalse("Duplicate confirmation must not finish the in-flight request", result.isDone)
+                release.countDown()
+                assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_UPLOAD, result.get(10, TimeUnit.SECONDS))
+                f.inspect(f.reopen()) { assertTrue(it.isEmpty()) }
+                assertEquals(1, server.requests.count { it.method == "POST" })
+                emit("same_authority_repeated=3 native_upload_preserved=true receipt_accepted=true post_count=1 authority=SYNTHETIC main_consent_ui=false")
+            } finally {
+                call.cancel()
+                release.countDown()
+                executor.shutdown()
+                assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS))
+            }
+        } }
+    }
+
+    @Test fun deletionWaitsForNativeHttpReceiptOwnerAndLateReceiptCannotRestoreFiles() {
+        Fixture().use { f -> Server().use { server ->
+            f.enqueue()
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val executor = Executors.newSingleThreadExecutor()
+            val coordinator = ReportQueueDrainCoordinator(f.reopen())
+            var held: QueuedReport? = null
+            val call = f.start(server, coordinator = coordinator, afterUpload = {
+                held = it
+                entered.countDown()
+                check(release.await(15, TimeUnit.SECONDS))
+            })
+            try {
+                val result = executor.submit<ReportQueueDrainOutcome> { call.execute() }
+                assertTrue(entered.await(10, TimeUnit.SECONDS))
+                assertEquals(1, server.requests.count { it.method == "POST" })
+                assertFalse("HTTP completed but its worker still owns plaintext", coordinator.onAccountDeleted())
+                val recreated = ReportQueueDrainCoordinator(f.reopen())
+                assertFalse("New screen coordinator must see the previous worker", recreated.onAccountDeleted())
+                f.inspect(f.reopen()) { assertTrue(it.isEmpty()) }
+                assertTrue(requireNotNull(held).payload.imageJpeg().isNotEmpty())
+                release.countDown()
+                assertEquals(ReportQueueDrainOutcome.CANCELLED, result.get(10, TimeUnit.SECONDS))
+                assertThrows(IllegalStateException::class.java) { requireNotNull(held).payload.imageJpeg() }
+                assertTrue(coordinator.onAccountDeleted())
+                assertTrue(recreated.onAccountDeleted())
+                f.inspect(f.reopen()) { assertTrue(it.isEmpty()) }
+                emit("S1617-46 native_http=true delayed_callback=INJECTED late_receipt_rejected=true plaintext_released=true files_remain_absent=true")
+            } finally {
+                release.countDown()
+                executor.shutdown()
+                assertTrue(executor.awaitTermination(20, TimeUnit.SECONDS))
+            }
+        } }
+    }
     /** Host invokes write/read in separate instrumentation processes with the same unique token. */
     @Test fun restartPhasesPreserveQuarantineAndRetryState() {
         val args = InstrumentationRegistry.getArguments()
@@ -165,6 +267,42 @@ class ReportQueueHttpRecoveryDeviceTest {
         } }
     }
 
+    @Test fun malformedSuccessReceiptsRetainPayloadAndStatusRecoveryAvoidsDuplicatePost() {
+        val edits=listOf<Pair<String,(JSONObject)->Unit>>(
+            "wrong_report_id" to {it.put("report_id","123e4567-e89b-42d3-a456-426614174099");Unit},
+            "wrong_payload_hash" to {it.put("payload_sha256","f".repeat(64));Unit},
+            "wrong_byte_count" to {it.put("payload_bytes",it.getLong("payload_bytes")+1);Unit},
+            "wrong_marker" to {it.put("marker","unknown");Unit},
+            "invalid_persistence_id" to {it.put("persistence_marker","invalid");Unit},
+            "extra_field" to {it.put("extra",true);Unit},
+            "missing_field" to {it.remove("payload_sha256");Unit})
+        for((name,edit) in edits) Fixture().use { f -> Server().use { server ->
+            val id=f.enqueue();val second=f.enqueue()
+            var hash="";var bytes=0L
+            f.inspect(f.reopen()){rows->val row=rows.single{it.payload.reportId==id};hash=row.payload.payloadSha256;bytes=row.payload.payloadBytes}
+            server.postReceiptEdit=edit
+            assertEquals("Malformed POST must return a visible failure outcome: $name",
+                ReportQueueDrainOutcome.RECEIPT_REJECTED,f.drain(server))
+            fun assertRetained()=f.inspect(f.reopen()){rows->
+                assertEquals(2,rows.size)
+                val row=rows.single{it.payload.reportId==id}
+                assertEquals(hash,row.payload.payloadSha256);assertEquals(bytes,row.payload.payloadBytes)
+                assertFalse(row.quarantined)
+            }
+            assertRetained()
+            server.postReceiptEdit=null;server.statusReceiptEdit=edit
+            assertEquals("Malformed GET must also return a visible failure outcome: $name",
+                ReportQueueDrainOutcome.RECEIPT_REJECTED,f.drain(server,f.reopen()))
+            assertRetained()
+            server.statusReceiptEdit=null
+            assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_STATUS,f.drain(server,f.reopen()))
+            f.inspect(f.reopen()){assertEquals(listOf(second),it.map{row->row.payload.reportId})}
+            assertEquals(listOf("GET","POST","GET","GET"),server.requests.map{it.method})
+            assertEquals(1,server.requests.count{it.method=="POST"})
+            emit("malformed_receipt=$name post_and_status_rejected=true exact_payload_retained=true later_status_deletes_owner_only=true posts=1 authority=SYNTHETIC actual_main_ui_not_tested=true")
+        } }
+    }
+
     @Test fun lateReceiptCannotDeleteAfterAccountSessionOrConsentChanges() {
         for (boundary in listOf("account", "session", "consent")) Fixture().use { f -> Server().use { server ->
             val id = f.enqueue()
@@ -226,6 +364,11 @@ class ReportQueueHttpRecoveryDeviceTest {
             try { check(rows) } finally { rows.forEach { it.close() } }
         }
         fun drain(server: Server, source: AndroidReportQueueStore = store): ReportQueueDrainOutcome {
+            return start(server, source).execute()
+        }
+        fun start(server: Server, source: AndroidReportQueueStore = store,
+            coordinator: ReportQueueDrainCoordinator = ReportQueueDrainCoordinator(source),
+            afterUpload: ((QueuedReport) -> Unit)? = null): CancellableNetworkCall<ReportQueueDrainOutcome> {
             val origin = requireNotNull(approvedReportQueueGatewayOriginOrNull(BuildConfig.WALKSAFE_REPORT_QUEUE_TEST_ORIGIN))
             val session = GatewayFieldSession.backendAccountDeviceSession(origin,
                 BackendAccountDeviceCookieBinding(ACTOR, GENERATION, 1L, "device-http-probe", WALK, Long.MAX_VALUE),
@@ -239,9 +382,17 @@ class ReportQueueHttpRecoveryDeviceTest {
                 check(url.toString().startsWith(origin + "/"))
                 URL(server.baseUrl + url.file).openConnection()
             }
-            return requireNotNull(ReportQueueDrainCoordinator(source).startNext(context::get,
-                AndroidReportQueueTransport(AndroidReportUploader(), session, confirmation, binding,
-                    ReportPrivacyConsentSession::issueUploadPermit))).execute()
+            val native = AndroidReportQueueTransport(AndroidReportUploader(), session, confirmation, binding,
+                ReportPrivacyConsentSession::issueUploadPermit)
+            val transport = if (afterUpload == null) native else object : ReportQueueTransport by native {
+                override fun uploadResultCall(report: QueuedReport): CancellableNetworkCall<ReportQueueUploadResult> {
+                    val call = native.uploadResultCall(report)
+                    return CancellableNetworkCall(executeBlock = {
+                        call.execute().also { afterUpload(report) }
+                    }, cancelBlock = call::cancel)
+                }
+            }
+            return requireNotNull(coordinator.startNext(context::get, transport))
         }
         override fun close() {
             ReportPrivacyConsentSession.resetForNewEnrollment()
@@ -259,6 +410,8 @@ class ReportQueueHttpRecoveryDeviceTest {
         val baseUrl = "http://127.0.0.1:${socket.localPort}"
         val requests = Collections.synchronizedList(mutableListOf<Request>())
         @Volatile var status = 201
+        @Volatile var postReceiptEdit: ((JSONObject)->Unit)? = null
+        @Volatile var statusReceiptEdit: ((JSONObject)->Unit)? = null
         @Volatile var dropPostResponse = false
         @Volatile var postEntered: CountDownLatch? = null
         @Volatile var releasePost: CountDownLatch? = null
@@ -278,7 +431,7 @@ class ReportQueueHttpRecoveryDeviceTest {
                         if (request.method == "GET") {
                             code = if (id in persisted) 200 else 404
                             body = persisted[id]?.let { receipt -> JSONObject().put("persistence_state", "PERSISTED")
-                                .put("user_status", "RECEIVED").put("transport_receipt", receipt).toString() } ?: "{}"
+                                .put("user_status", "RECEIVED").put("transport_receipt", JSONObject(receipt.toString()).also{statusReceiptEdit?.invoke(it)}).toString() } ?: "{}"
                         } else {
                             check(request.method == "POST")
                             postEntered?.countDown()
@@ -291,7 +444,7 @@ class ReportQueueHttpRecoveryDeviceTest {
                                     .put("payload_bytes", request.headers.getValue(REPORT_PAYLOAD_BYTES_HEADER).toLong())
                                     .put("persistence_marker", "123e4567-e89b-42d3-a456-426614174002")
                                 persisted[id] = receipt
-                                body = JSONObject().put("transport_receipt", receipt).toString()
+                                body = JSONObject().put("transport_receipt", JSONObject(receipt.toString()).also{postReceiptEdit?.invoke(it)}).toString()
                                 if (dropPostResponse) return@use // Actual socket EOF after synthetic server persistence.
                             }
                         }

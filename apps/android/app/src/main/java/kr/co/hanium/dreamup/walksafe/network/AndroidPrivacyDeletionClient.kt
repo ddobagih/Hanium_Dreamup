@@ -27,9 +27,10 @@ data class DeviceDeletionEvidence(
     val result: String,
     val completedAt: String,
     val evidenceSha256: String,
+    val installationSignature: String? = null,
 )
 
-class AndroidPrivacyDeletionClient {
+class AndroidPrivacyDeletionClient(private val signEvidence: ((String, String) -> String?)? = null) {
     fun requestDeletionCall(
         gatewayBaseUrl: String,
         trustedGatewayOrigin: String,
@@ -176,7 +177,9 @@ class AndroidPrivacyDeletionClient {
             accessSecret = accessSecret,
             requestId = journal.requestId,
             session = null,
-            requestBody = deviceDeletionEvidenceBody(evidence),
+            requestBody = null,
+            prepareBody = { deviceDeletionEvidenceBody(evidence.copy(installationSignature =
+                evidence.installationSignature ?: signEvidence?.invoke(evidence.installationId, evidence.evidenceSha256))) },
             acceptedResponseCodes = setOf(200),
         )
     }
@@ -191,8 +194,10 @@ class AndroidPrivacyDeletionClient {
         requestBody: String?,
         acceptedResponseCodes: Set<Int>,
         reauthenticationRequiredOnNotFound: Boolean = false,
+        prepareBody: (() -> String)? = null,
     ): CancellableNetworkCall<AccountDeletionStatus> =
         cancellableHttpCall { cancellation ->
+            val outgoingBody = prepareBody?.invoke() ?: requestBody
             val connection = URL(endpoint).openConnection() as HttpURLConnection
             cancellation.attach(connection)
             try {
@@ -209,16 +214,16 @@ class AndroidPrivacyDeletionClient {
                     setRequestProperty("Connection", "close")
                     setRequestProperty(ACCOUNT_DELETION_ACCESS_SECRET_HEADER, accessSecret)
                     session?.requestHeaders()?.forEach(::setRequestProperty)
-                    if (requestBody != null) {
+                    if (outgoingBody != null) {
                         doOutput = true
                         setRequestProperty("Content-Type", "application/json")
                     }
                 }
-                if (requestBody != null) {
+                if (outgoingBody != null) {
                     connection.outputStream.use { output ->
                         cancellation.attach(output)
                         try {
-                            output.write(requestBody.toByteArray(Charsets.UTF_8))
+                            output.write(outgoingBody.toByteArray(Charsets.UTF_8))
                             output.flush()
                         } finally {
                             cancellation.detach(output)
@@ -270,7 +275,11 @@ internal fun deviceDeletionEvidenceSha256(evidence: DeviceDeletionEvidence): Str
 
 internal fun deviceDeletionEvidenceBody(evidence: DeviceDeletionEvidence): String =
     deviceDeletionEvidenceStatement(evidence).dropLast(1) +
-        ",\"evidence_sha256\":${JSONObject.quote(evidence.evidenceSha256)}}"
+        ",\"evidence_sha256\":${JSONObject.quote(evidence.evidenceSha256)}" +
+        (evidence.installationSignature?.let {
+            require(Regex("[A-Za-z0-9_-]{86,100}").matches(it))
+            ",\"installation_signature\":${JSONObject.quote(it)}"
+        } ?: "") + "}"
 
 private fun deviceDeletionEvidenceStatement(evidence: DeviceDeletionEvidence): String {
     require(REQUEST_ID.matches(evidence.requestId))

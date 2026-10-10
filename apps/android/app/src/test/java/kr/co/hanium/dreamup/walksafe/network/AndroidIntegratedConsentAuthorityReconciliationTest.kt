@@ -111,6 +111,29 @@ class AndroidIntegratedConsentAuthorityReconciliationTest {
         }
     }
 
+    @Test
+    fun confirmedConsentRegistersInstallationKeyAndRejectsRegistrationFailure() {
+        for (registrationStatus in listOf(204, 409)) {
+            val requests = AtomicInteger()
+            LocalHttpTestServer { index, socket ->
+                requests.incrementAndGet()
+                socket.writeFixedResponse(if (index == 0) 200 else registrationStatus,
+                    (if (index == 0) confirmation(receipt = SAVED_RECEIPT, clientRevision = 3)
+                     else if (registrationStatus == 204) "" else "{\"detail\":{\"code\":\"installation_evidence_key_conflict\"}}")
+                        .toByteArray(Charsets.UTF_8))
+            }.use { server ->
+                val client = AndroidIntegratedConsentClient { installation ->
+                    assertEquals(INSTALLATION_ID, installation)
+                    "a".repeat(122)
+                }
+                val call = client.fetchCurrentCall(server.baseUrl, session(server.baseUrl), INSTALLATION_ID, CONTROL_SECRET)
+                if (registrationStatus == 204) assertEquals(SAVED_RECEIPT, call.execute()?.backendConsentReceiptSha256)
+                else assertEquals(409, assertThrows(IntegratedConsentHttpException::class.java) { call.execute() }.statusCode)
+                assertEquals(2, requests.get())
+            }
+        }
+    }
+
     private fun session(baseUrl: String): GatewayFieldSession = GatewayFieldSession.verified(
         gatewayBaseUrl = baseUrl,
         actorId = "consent-reconcile-tester",

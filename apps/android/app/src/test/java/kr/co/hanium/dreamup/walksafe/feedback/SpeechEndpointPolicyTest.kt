@@ -26,4 +26,13 @@ class SpeechEndpointPolicyTest {
     @Test fun invalidClockStopsCapture() {
         assertTrue(SpeechEndpointPolicy(1000).shouldStop(999, 0))
     }
+    @Test fun durationLimitMustBeDistinguishedFromAnOrdinarySpeechEnd() {
+        val endpoint = SpeechEndpointPolicy(1000)
+        assertFalse(endpoint.shouldStop(1100, 1200))
+        assertTrue(endpoint.shouldStop(2600, 0))
+        assertFalse(endpoint.captureLimitExceeded(2600))
+        assertFalse(endpoint.captureLimitExceeded(20_999))
+        assertTrue(endpoint.captureLimitExceeded(21_000))
+        assertTrue(endpoint.captureLimitExceeded(999))
+    }
 }

@@ -136,6 +136,7 @@ internal class PostWalkRawRig {
 internal class RecordingPostWalkClient : RawCollectionNetworkClient {
     var failure: RawCollectionHttpException? = null
     var beforeReturn: (() -> Unit)? = null
+    var heldChunks: List<RawPlaintextChunk> = emptyList()
     val sentWalkIds = mutableListOf<String>()
     val sentManifestWalkIds = mutableListOf<String>()
     val sentConsentReceipts = mutableListOf<String>()
@@ -150,6 +151,7 @@ internal class RecordingPostWalkClient : RawCollectionNetworkClient {
         chunks: List<RawPlaintextChunk>,
         isCurrent: () -> Boolean,
     ): CancellableNetworkCall<RawCollectionReceipt> {
+        heldChunks = chunks.toList()
         sentWalkIds += localManifest.walkSessionId
         sentManifestWalkIds += JSONObject(String(backendManifest.jsonUtf8, Charsets.UTF_8)).getString("walk_id")
         sentConsentReceipts += consent.backendConsentReceiptSha256
