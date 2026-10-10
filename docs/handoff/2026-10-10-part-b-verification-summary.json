@@ -1,0 +1,1561 @@
+{
+  "project": "WalkMate",
+  "as_of": "2026-10-10",
+  "branch": "codex/walkmate-part-b-integration-20261006",
+  "purpose": "현재 작업 복구 지점과 팀 공유용 검증 요약. 전체 완료·출시 승인 자료가 아니다.",
+  "total": 188,
+  "counts": {
+    "device_partial": 104,
+    "code_or_host_only": 78,
+    "unreviewed": 6
+  },
+  "whole_items_closed": 0,
+  "evidence_scope": "원본 로그와 시험 계정은 로컬 work/에 보존하고 업로드하지 않았다. 이 파일은 기존 기록의 요약이며 원본 실행 로그 자체가 아니다. 합성 입력·부분 구성요소 통과를 실제 사람 인식률 또는 전체 보행 검증으로 확대하지 않는다.",
+  "change_groups": [
+    "가입 정책 사전 조회, 설치 삭제 증거 서명, 계정 삭제 후 신고·외부 사본 조회 및 잔여 자료 처리 보완",
+    "입력 장치 변경·마이크 차단·긴 녹음의 원인 안내와 명시 재시도, 종료 후 음성 임시 파일 정리, 후보 안내 중단 복구 보완",
+    "메인 권한 복구와 보행 재점검 제한 분리, 신고 영수증 거절·RAW 취소/정리 처리 보완",
+    "관리자 작업의 실행 실패·화면 세대 변경 처리, 시험 전부 건너뜀을 통과로 집계하지 않도록 보완"
+  ],
+  "latest_device_batch": {
+    "device": "Samsung SM-A716S / Android 13",
+    "passed_conditions": 8,
+    "scope": [
+      "서버 요청 중 메인·도움말 Activity 재생성 및 화면 꺼짐 4건: 요청 취소, 임시 파일 삭제, 늦은 응답 효과 차단, 명시 재녹음",
+      "서버 연결 단절 후 복원 2건: 실제 마이크·Whisper를 통한 도움말 열기 및 2번 설명",
+      "실제 연속 합성 입력 제한 2건: 20176ms/20206ms에서 중단, 부분 업로드 없이 원인 안내·수동 재시도"
+    ],
+    "not_verified": [
+      "보안 잠금 미설정으로 실제 잠금 2건 전제조건 불충족",
+      "사람 발화 정확도, 외부 모바일 데이터/Wi-Fi, 실제 ACTIVE 보행, 장시간 절전, 서버 연산 자체 취소"
+    ],
+    "retained_test_failure": "메인 도움말 첫 화면의 기대 문구를 잘못 지정한 시험 실패를 보존하고 시험 기대값 수정 후 재통과. 제품 변경 없음.",
+    "restoration": "인증된 장기 세션·HOME 유지, 보행 RECHECK_REQUIRED 유지, 음성 임시 파일 0개, USB 전달·호스트 음량 원복"
+  },
+  "pre_commit_checks": {
+    "android_selected_unit_tests": {
+      "app": 90,
+      "admin": 4,
+      "failures": 0,
+      "skipped": 0
+    },
+    "gateway_typecheck": "PASS",
+    "changed_report_summary_regression": "PASS",
+    "infra_full_run": "32개 시험 실행, 하위 조건 포함14개 실패 기록. 기존 Linux 고정 /usr/bin/chmod가 macOS에 없어 실행기 관련 조건 실패. 이전 HEAD에도 같은 경로 존재. 전체 통과 아님.",
+    "diff_check": "PASS",
+    "content_scan": "선별 소스146개에서 로컬 시험 비밀번호 값, 대표 키 형식, 개인 절대 경로, 임시 터널 주소 패턴 발견 없음. 완전한 비밀정보 부재 보증 아님."
+  },
+  "known_limits": [
+    "음성 결정은 서버 Whisper large-v3-turbo STT·현재 로컬 TTS 유지, hotword/initial_prompt 기본 비활성",
+    "장기 로그인 갱신·통신 단절 후 자동 복원 실패는 정상 재로그인 성공과 구분하며 미해결",
+    "도움말 일부 표현은 실제 마이크 전사 실패가 남고 신뢰도 기준을 낮춰 통과시키지 않음",
+    "관리자 등록 기기 키 부재, 실제 카메라·현장·운영 배포·추가 기기 조건은 별도 검증 필요",
+    "docs/handoff/2026-10-07-deferred-review.md의 정책6개는 후속 검토 대상. 당시 관측과 현재 설치 상태를 구분"
+  ],
+  "items": [
+    {
+      "id": "S01-1",
+      "title": "가입은 성공했는데 앱에서는 실패한 것으로 남을 수 있음",
+      "status": "device_partial",
+      "current_summary": "서버의 가입 결과 재조회는 기존에 있었고, 앱에 ‘가입 결과 미확인’ 저장·복구와 재로그인 경로를 보완했다.",
+      "remaining_condition": "키·요청 ID 복원은 별도 실기기 근거가 있다. 실제 SMTP 발송·응답 유실·가입 화면 복구는 메일 수신 가능한 전용 가입 계정과 서버 장애 주입이 추가로 필요하다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-3",
+      "title": "약관 버전 변경만으로 구버전 앱의 가입이 전부 막힐 수 있음",
+      "status": "device_partial",
+      "current_summary": "실기기 HTTP에서 약관 불일치·잘못된 정책 거절과 이전 선택 동의를 제거한 실제 전송 본문을 확인했다. Main 가입 화면·영속 재동의·운영 정책 종단은 남았다.",
+      "remaining_condition": "사용자가 보류한 6개 정책·배포 검토와 겹친다. 현행 동작을 검사하되 자동 복구·우회·동의 계약을 임의로 변경하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-5",
+      "title": "OTP 요청 ID의 복구가 프로세스 재시작까지 이어지는지는 불명확함",
+      "status": "device_partial",
+      "current_summary": "요청 ID가 안전하게 저장되기 전에 OTP를 보내거나 복구 ID를 먼저 지우던 순서를 수정했다.",
+      "remaining_condition": "키·요청 ID 복원은 별도 실기기 근거가 있다. 실제 SMTP 발송·응답 유실·가입 화면 복구는 메일 수신 가능한 전용 가입 계정과 서버 장애 주입이 추가로 필요하다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-7",
+      "title": "SMTP 처리와 앱의 응답 대기 시간이 맞지 않을 수 있음",
+      "status": "device_partial",
+      "current_summary": "앱·중계서버·메일 대기를 정렬했다. 실기기에서 일반12초/OTP75초 제한·13초 지연 수락·같은 요청 재시도와 오류 응답9종 거절을 확인했다. 실제 SMTP·Cloudflare·메일 도착 순서·화면 복구는 남았다.",
+      "remaining_condition": "키·요청 ID 복원은 별도 실기기 근거가 있다. 실제 SMTP 발송·응답 유실·가입 화면 복구는 메일 수신 가능한 전용 가입 계정과 서버 장애 주입이 추가로 필요하다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-8",
+      "title": "Android와 Gateway의 이메일 허용 규칙이 다름",
+      "status": "device_partial",
+      "current_summary": "이메일 국제화·숫자 도메인·잘못된 구분자 처리 규칙을 앱과 서버 사이에서 일치시켰다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-10",
+      "title": "계정 클라이언트 자체는 승인된 운영 서버에만 요청하도록 결속하지 않음",
+      "status": "code_or_host_only",
+      "current_summary": "release의 승인 서버 주소 차단은 기존 구현으로 확인했다. 현재 설치된 debug 앱에 같은 보호가 적용된다는 뜻은 아니다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-11",
+      "title": "scrypt 비용 설정이 현재 권고보다 낮음",
+      "status": "code_or_host_only",
+      "current_summary": "일반 사용자 계정의 해시 비용은 p=1이다. 관리자 p=5와 구분했으며 운영 부하 측정 전 임의로 올리지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-13",
+      "title": "비밀번호 정책이 길이와 NUL 문자 검사에 머물러 있음",
+      "status": "device_partial",
+      "current_summary": "실기기 HTTP에서 Unicode 비밀번호 원문 보존·길이/NUL 사전 차단을 확인했다. 실제 키보드·서버 암호 강도/해시/로그인은 별도다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-14",
+      "title": "OTP 관련 키 교체도 기존 계정 로그인 장애로 이어질 수 있음",
+      "status": "code_or_host_only",
+      "current_summary": "OTP 키 오류와 로그인 키 오류의 구분은 확인했다. 여러 키 버전의 공존·재암호화·실제 교체 기능은 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-16",
+      "title": "remember_me와 장기 자동 로그인이 같은 기능이 아님",
+      "status": "device_partial",
+      "current_summary": "충전 후 재연결에서 자동 인증 복원 실패를 다시 관측했다. 정상 재로그인은 성공했지만 자동 갱신/복원 해결로 처리하지 않는다.",
+      "remaining_condition": "사용자가 보류한 6개 정책·배포 검토와 겹친다. 현행 동작을 검사하되 자동 복구·우회·동의 계약을 임의로 변경하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-21",
+      "title": "갱신 응답 유실은 정상 사용자에게도 재로그인을 요구할 수 있음",
+      "status": "device_partial",
+      "current_summary": "장기 갱신 통신 예외 시 재로그인을 요구하는 흐름을 확인했고 실제 연결 단절/원복에서도 자동 복구 실패를 재현했다. 복구 정책은 보류 중이다.",
+      "remaining_condition": "사용자가 보류한 6개 정책·배포 검토와 겹친다. 현행 동작을 검사하되 자동 복구·우회·동의 계약을 임의로 변경하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-27",
+      "title": "장기 세션 기기 목록만으로는 사용자가 기기를 식별하기 어려움",
+      "status": "code_or_host_only",
+      "current_summary": "기기 목록·선택 해제 서버 API는 동작하지만 기기 이름·최근 사용 시각과 Android 접근성 목록 UI가 없다. Linux API 3개 통과, 정책/UI 및 실기기 2대 검증 잔여.",
+      "remaining_condition": "기기에서 한 번 실행하는 것으로 해결되지 않는 정책/수명주기/계약 또는 미구현 범위다. 기존 항목별 잔여 내용을 유지하며 제품 의도를 임의로 정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-29",
+      "title": "계정당 보행 세션 하나 제한은 다중 호스트 전체에서 보장되지 않음",
+      "status": "code_or_host_only",
+      "current_summary": "계정별 잠금은 단일 호스트에서 검사했다. 서로 다른 서버가 같은 계정에 동시에 보행권을 주는 문제는 보장하지 못한다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S01-30",
+      "title": "동기 파일 I/O와 전체 원장 잠금이 다른 요청까지 지연시킬 수 있음",
+      "status": "code_or_host_only",
+      "current_summary": "원장은 분할됐지만 동기 파일 저장이 이벤트 처리를 지연시키는 위험을 재현했다. 코드의 과장된 설명만 정정했고 구조 변경은 하지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-4",
+      "title": "기본 운영용 증거 검증기가 항상 실패함 — 조건부, 배포 전 확인",
+      "status": "code_or_host_only",
+      "current_summary": "실제 완료 경로에는 검증기가 연결돼 있다. 로컬 암호화 이력 복원의 신뢰 경계와 운영 release 검증은 남았고, 운영 주소 미설정으로 release 실행은 차단됐다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-8",
+      "title": "안전교육 청취 완료에는 오래된 콜백을 구분하는 토큰이 없음 — 조건부, 우선 수정",
+      "status": "device_partial",
+      "current_summary": "교육 완료를 실제 음성 완료와 연결하고 중단·늦은 응답을 구분했다. 모든 계정 전환 경합까지 검증한 것은 아니다.",
+      "remaining_condition": "필수 동의·교육의 실제 화면/음성·계정 전환을 검사했다. 잠금 해제 후 실제 계정의 교육 완료 및 HOME 진입을 관측했다. 모든 교육 전환 조합 및 사용자 청취·접근성 평가는 남아 있다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-9",
+      "title": "교육 상태 자체에 사용자 계정 식별 정보가 없음 — 조건부",
+      "status": "device_partial",
+      "current_summary": "교육 상태에 계정·세대 확인을 연결했다. 다른 계정으로 바뀌는 전체 화면·서버 조합 검증은 남았다.",
+      "remaining_condition": "필수 동의·교육의 실제 화면/음성·계정 전환을 검사했다. 잠금 해제 후 실제 계정의 교육 완료 및 HOME 진입을 관측했다. 모든 교육 전환 조합 및 사용자 청취·접근성 평가는 남아 있다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-11",
+      "title": "교육 완료 경로가 앱 자체 음성 재생 성공에 강하게 묶여 있음 — 조건부·접근성",
+      "status": "device_partial",
+      "current_summary": "사전 연습 음성 출력과 긴 설명 완료 문제를 수정했다. TTS가 불가능한 이용자의 대체 교육 완료 방식은 결정이 필요하다.",
+      "remaining_condition": "필수 동의·교육의 실제 화면/음성·계정 전환을 검사했다. 잠금 해제 후 실제 계정의 교육 완료 및 HOME 진입을 관측했다. 모든 교육 전환 조합 및 사용자 청취·접근성 평가는 남아 있다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-13",
+      "title": "연습 전달 완료를 실제 소리·진동 정상의 증거로 오해할 수 있음 — 검증 필요",
+      "status": "device_partial",
+      "current_summary": "TTS 완료와 진동 실행은 확인했다. 사용자가 실제로 듣고 느꼈다는 확인은 따로 필요하다.",
+      "remaining_condition": "필수 동의·교육의 실제 화면/음성·계정 전환을 검사했다. 잠금 해제 후 실제 계정의 교육 완료 및 HOME 진입을 관측했다. 모든 교육 전환 조합 및 사용자 청취·접근성 평가는 남아 있다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-16",
+      "title": "재개 승인에 최신 권한 관찰이 묶여 있지 않음 — 조건부",
+      "status": "code_or_host_only",
+      "current_summary": "최신 권한 확인 없이 재개 차단을 해제할 수 있던 미사용 공개 경로를 제거했다. 실제 보행 재개 직전 철회는 미검증이다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-17",
+      "title": "권한 Boolean만으로 거부 원인과 복구 방법을 결정하면 안 됨 — 연결 검증 필요",
+      "status": "device_partial",
+      "current_summary": "권한 복원 후 보행 재점검이 메인 음성·검색까지 막던 문제를 수정했다. 실제 설정 왕복·복원·녹음 재진입이 통과했다. 추가: 권한 4종의 실제 거절/설정 왕복/원복 8단계 통과; 내부 알림 권한명 노출 수정. 보행 재점검 차단 유지.",
+      "remaining_condition": "필수 동의·교육의 실제 화면/음성·계정 전환을 검사했다. 잠금 해제 후 실제 계정의 교육 완료 및 HOME 진입을 관측했다. 모든 교육 전환 조합 및 사용자 청취·접근성 평가는 남아 있다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-19",
+      "title": "화면을 벗어난 뒤 지원되는 기능의 범위를 명확히 해야 함 — 검증 필요",
+      "status": "device_partial",
+      "current_summary": "화면 이탈 시 일시정지·복귀 시 명시 재개 필요를 연습 음성에 반영했다. 준비 화면 이탈·복귀는 확인했고 ACTIVE 보행은 남았다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-20",
+      "title": "알림 권한 거부 시 음성 입력 중지 경로를 확인해야 함 — 검증 필요",
+      "status": "device_partial",
+      "current_summary": "실제 알림 권한 거부 신호를 확인했다. 알림을 초기 필수 권한으로 요구하는 정책과 채널별 차단·실제 보행 서비스 조합은 남았다. 추가: 실제 알림 거절 시 입력 없음·설정 왕복 자동 녹음 없음·원복 후 명시 녹음 통과. ACTIVE 서비스 철회 별도.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-21",
+      "title": "로그아웃·계정 변경 시 선택 동의값이 유지됨 — 정책 단독 확정, 앱 연결 점검 필요",
+      "status": "device_partial",
+      "current_summary": "계정 변경 시 이전 동의를 무효화하고 서버에서 재확인하도록 연결했다. 모든 수집·신고 경로의 계정 전환 조합은 남았다.",
+      "remaining_condition": "필수 동의·교육의 실제 화면/음성·계정 전환을 검사했다. 잠금 해제 후 실제 계정의 교육 완료 및 HOME 진입을 관측했다. 모든 교육 전환 조합 및 사용자 청취·접근성 평가는 남아 있다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-23",
+      "title": "서버 영수증의 선택값과 현재 유효 동의가 다를 수 있음 — 조건부, 우선 점검",
+      "status": "device_partial",
+      "current_summary": "철회 즉시 로컬 사용을 막고 서버 확인으로 이어지는 처리를 보완했다. 모든 오프라인 저장·재전송 조합 검증은 남았다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-27",
+      "title": "재동의 초기화가 미완료 철회 상태까지 제거함 — 조건부, 우선 점검",
+      "status": "device_partial",
+      "current_summary": "실기기 HTTP에서 로컬 철회를 유지하며 새 영수증으로 거절 재전송·응답 결속·충돌/취소 방어를 확인했다. 실제 Main 복구·저장/재시작·문서 버전 변경 종단은 남았다. 추가: 실제 암호화 저장/다른 PID의 철회 대기 및 CAS 후속 복원 4단계 통과. Main·실서버 재동의 종단 별도.",
+      "remaining_condition": "사용자가 보류한 6개 정책·배포 검토와 겹친다. 현행 동작을 검사하되 자동 복구·우회·동의 계약을 임의로 변경하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-28",
+      "title": "동의 확인 객체 자체에는 계정 식별 정보가 없음 — 조건부",
+      "status": "device_partial",
+      "current_summary": "현재 계정·로그인 세대가 다른 늦은 동의 응답을 차단하는 기존 구현을 행동 검사로 확인했다.",
+      "remaining_condition": "필수 동의·교육의 실제 화면/음성·계정 전환을 검사했다. 잠금 해제 후 실제 계정의 교육 완료 및 HOME 진입을 관측했다. 모든 교육 전환 조합 및 사용자 청취·접근성 평가는 남아 있다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-30",
+      "title": "동의 항목 이름과 설명이 실제 수집 범위를 오해하게 할 수 있음 — 문구상 개선 필요",
+      "status": "device_partial",
+      "current_summary": "동의 설명의 개발 용어를 쉬운 표현으로 바꿨다. 수집 범위와 동의 필드·문서 버전은 유지했다.",
+      "remaining_condition": "필수 동의·교육의 실제 화면/음성·계정 전환을 검사했다. 잠금 해제 후 실제 계정의 교육 완료 및 HOME 진입을 관측했다. 모든 교육 전환 조합 및 사용자 청취·접근성 평가는 남아 있다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-31",
+      "title": "기본 공식 사용환경 프로필이 null임 — 조건부, 배포 전 확인",
+      "status": "code_or_host_only",
+      "current_summary": "정식 환경 승인 프로필은 비어 있고 debug만 시험 후보를 쓴다. 현장 근거 없이 운영 승인으로 바꾸지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-32",
+      "title": "사용 제한 안내에 동의하면 일부 환경이 미확인이어도 시작 가능 — 확정된 설계 위험",
+      "status": "code_or_host_only",
+      "current_summary": "일부 주변 환경이 미확인인데도 전체 통과처럼 안내하던 문구를 수정했다. 시작·재개 음성에 조건부 상태를 알리며 허용 조건은 유지했다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-34",
+      "title": "한 번의 정상 평가가 반복 불안정 이력을 모두 초기화함 — 확정된 복구 특성, 개선 검토",
+      "status": "code_or_host_only",
+      "current_summary": "정상 관측 한 번으로 비종결 품질 저하 이력이 초기화되는 특성을 확인했다. 안정 복구 기준은 아직 결정하지 않았다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-35",
+      "title": "debug의 안내 시작 우회가 기본적으로 켜짐 — 확정, 우선 수정",
+      "status": "device_partial",
+      "current_summary": "실제 설치 앱의 런타임에서 안내 시작 우회 OFF·로그인 후 기기 점검 필수를 확인했다. 현재 debug 구성의 부분 근거이며 전체 빌드 조합은 아니다.",
+      "remaining_condition": "사용자가 보류한 6개 정책·배포 검토와 겹친다. 현행 동작을 검사하되 자동 복구·우회·동의 계약을 임의로 변경하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-36",
+      "title": "개발용 빠른 시작 비밀번호가 debug APK의 설정값으로 들어감 — 확정, 배포 관리 필요",
+      "status": "device_partial",
+      "current_summary": "실제 설치 앱에서 빠른 로그인 OFF·옛 이메일/비밀번호 설정 필드 부재를 확인했다. 전체 DEX 비밀 검색·과거 공유 APK·서명 release 검증은 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S02-38",
+      "title": "release의 소스 커밋·서버 주소 검증이 형식 검사에 머무름 — 조건부, 운영 개선",
+      "status": "code_or_host_only",
+      "current_summary": "release의 커밋·서버 주소 검사는 형식 검사다. 실제 소스·승인 서버·서명 APK를 연결하는 배포 근거는 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-2",
+      "title": "음성 중단·종료가 메인 스레드를 오래 막을 수 있음",
+      "status": "device_partial",
+      "current_summary": "실제 전역 마이크 차단은 감지했지만 설정 복구 안내가 빠져 수정했다. 수정본에서 수동 재녹음·자동 재시작 차단·실제 설정 UI 원복과 호스트7개 확인. 도움말 전사 실패는 별도 유지.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-8",
+      "title": "Foreground Service 시작 오류가 정상적인 기능 중단으로 처리되지 않음",
+      "status": "device_partial",
+      "current_summary": "서비스 시작 실패를 실제 앱에 전달했을 때 원인 표시와 자동 재시도 차단을 확인했다. Android 14/15의 실제 OS 거절은 아니다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-11",
+      "title": "비동기 명령이 끝나기 전에 호출어 대기로 돌아갈 수 있음",
+      "status": "device_partial",
+      "current_summary": "위치 대기·검색·경로 요청을 원래 음성 명령의 완료 판단에 연결했다. 준비·재점검 분기는 확인했고 실제 보행 중 경합은 남았다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-12",
+      "title": "전역 음성 상태 하나로 응답 완료를 추정함",
+      "status": "device_partial",
+      "current_summary": "명령 완료·중단을 실제 TTS 콜백으로 구분한다. 후보 음성 일부 재생 후 중단에 설정만 표시하던 UI를 다시 듣기로 수정하고 전체 재안내 후 입력을 검증했다. 사람 청취·전체 실패 조합은 남는다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-13",
+      "title": "취소 상태 전이가 있어도 “말하는 중 음성 취소”는 별개임",
+      "status": "device_partial",
+      "current_summary": "서버 처리 중 재생성·화면 꺼짐4건 통과·잠금2건 전제조건 미충족; 실제 보행/사람 청취 등 전체 항목 잔여는 유지.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-15",
+      "title": "호출어 직후 별도로 이어 말한 명령 앞부분이 잘릴 수 있음",
+      "status": "device_partial",
+      "current_summary": "호출 응답음 동안 입력을 억제하고 인식기를 초기화하는 구조는 유지된다. 이어 말한 앞부분이 얼마나 손실되는지는 실측이 필요하다. 추가: 실제 호출어 마이크 인계4회에서 새 녹음까지354/357ms, 연결 명령은3206/3254ms 관측. 호출어 결과는 합성 주입; 실제 PCM 손실량·사람 정확도 미검증.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-16",
+      "title": "자연스러운 호출 표현 일부를 인식하지 못함",
+      "status": "device_partial",
+      "current_summary": "실기기 합성 음성8개에서 기본 호출 수락·호격의 야/님 명령 분리·연결 발화 오인식을 관측했다. 별칭 정책이나 모델을 바꾸지 않았고 사람 발화/오호출률은 남았다.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-17",
+      "title": "문장 중간의 호출어도 명령 시작으로 취급함",
+      "status": "device_partial",
+      "current_summary": "일반 문장 중간의 호출어를 명령 시작으로 오인하지 않는 기존 추출 규칙을 확인했다. 실제 대화·TV 음성 오호출률은 미측정이다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-25",
+      "title": "Vosk 일회성 요청마다 모델을 다시 여는 비용이 발생함",
+      "status": "device_partial",
+      "current_summary": "실기기 모델 준비12회에서 매번2.18~2.36초가 들었다. 해제 후 네이티브 할당은 감소했지만 프로세스 메모리는 남았다. 캐시 변경 전 실제 호출 흐름과 장시간 측정이 필요하다.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-26",
+      "title": "오디오 캡처 스레드에서 음성 디코딩까지 동기 수행함",
+      "status": "device_partial",
+      "current_summary": "실제 모델의20ms입력 처리598회 중20회가20ms를 초과했고 최대876ms였다. 순간 지연은 관측했지만 실제 마이크 손실량은 아직 모른다.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-27",
+      "title": "마이크 사용권을 얻어도 실제 음성이 들어온다는 보장은 없음",
+      "status": "device_partial",
+      "current_summary": "실제 연속 입력20초 제한·메인/도움말 수동 재녹음 통과; 실제 보행/사람 청취 등 전체 항목 잔여는 유지.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-28",
+      "title": "이어폰·블루투스 연결 변화에 대한 입력 연속성 확인이 필요함",
+      "status": "device_partial",
+      "current_summary": "실제 유선 이어폰 연결·분리 양쪽에서 녹음 폐기·원인 안내·명시적 재시도 후 새 마이크 사용을 확인했다. 블루투스·발화 품질·보행 중 전환은 남아 있다.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-30",
+      "title": "알림의 “음성 입력 중지”가 앱의 사용자 의도 상태까지 반영되는지 확인해야 함",
+      "status": "device_partial",
+      "current_summary": "실제 알림 중지 버튼으로 마이크·파일·알림 정리를 확인했다. 시험용 보행 ID를 썼으므로 ACTIVE 보행 전체 검증은 아니다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S04-32",
+      "title": "실제 배포 환경에서 “왜 안 들렸는지” 구분하기 어려움",
+      "status": "device_partial",
+      "current_summary": "실제 서버 연결 복구 후 명령 처리2건 통과·제한/생명주기 추가 확인; 실제 보행/사람 청취 등 전체 항목 잔여는 유지.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S05-19",
+      "title": "후보 음성 문장의 길이와 구분 정보가 충분히 조절되지 않습니다 — 코드 확인·청취 검증 필요",
+      "status": "device_partial",
+      "current_summary": "후보를 3개씩 나누고 이름·주소·거리 및 상세 듣기를 구분한다. 실제 TTS 완료와 중단은 확인했고 청취 편의 평가는 남았다.",
+      "remaining_condition": "이전 기기 TTS 분할·완료·상세 읽기 근거는 유지한다. 주소 발음의 명료성·길이·청취 피로는 사람이 듣고 평가해야 하며 onDone만으로 완료 처리하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S05-22",
+      "title": "엔진과 명령의 영향도를 함께 고려하는 공통 정책이 필요합니다 — 설계 검토",
+      "status": "device_partial",
+      "current_summary": "실제 마이크6표현에서 도움말3개가 공백/구두점 차이를 넘어 전사 불일치. 취소2표현 정확 전사·일반 대화 명령 거절 확인. 인식 실패 미해결.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S05-26",
+      "title": "음성 출력 중에는 “중지” 명령도 이 컨트롤러로 받기 어렵습니다 — 구조 확인",
+      "status": "device_partial",
+      "current_summary": "출력 중 마이크 억제로 말로 하는 즉시 중지는 지원하지 않는다. 버튼 중단 경로가 있다는 것과 비주시 접근성은 별개다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S05-27",
+      "title": "명령 입력 시간이 고정 6초입니다 — 구조 확인·실기기 검증 필요",
+      "status": "device_partial",
+      "current_summary": "실제 연속 입력20초 제한·메인/도움말 수동 재녹음 통과; 실제 보행/사람 청취 등 전체 항목 잔여는 유지.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S05-28",
+      "title": "비동기 명령 완료를 실제 작업 결과가 아닌 출력 유무로 추정합니다 — 통합 검증 필요",
+      "status": "device_partial",
+      "current_summary": "명령 완료를 출력 유무로 추정하지 않고 실제 비동기 작업과 발화 완료에 연결했다. S04-11과 같은 수정 범위다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S05-29",
+      "title": "긴 안내가 30초를 넘으면 음성 세션 실패로 처리될 수 있습니다 — 구조 확인",
+      "status": "device_partial",
+      "current_summary": "실제 단일 발화 약 67초, 12구간 응답 약 101초가 조기 종료 없이 완료됐다. 사용자 청취·강제 엔진 고장은 별도다.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S05-30",
+      "title": "“보행 재개” 명령과 실제 청취 가능 상태가 충돌할 수 있습니다 — 통합 검증 필요",
+      "status": "code_or_host_only",
+      "current_summary": "일시정지에서는 버튼 음성으로 재개를 요청하고 재점검·확인을 거친다. 호출어만으로 재개하거나 실제 ACTIVE 전환을 검증한 것은 아니다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S05-33",
+      "title": "음성 명령과 화면 이동이 불필요하게 결합될 수 있습니다 — 정책 확인·통합 검증 필요",
+      "status": "device_partial",
+      "current_summary": "실제 서버 연결 복구 후 명령 처리2건 통과·제한/생명주기 추가 확인; 실제 보행/사람 청취 등 전체 항목 잔여는 유지.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S05-34",
+      "title": "신고 명령은 파싱 성공과 실제 제출 완료를 구분해야 합니다 — 실행부 검증 항목",
+      "status": "device_partial",
+      "current_summary": "직접 신고의 전송 시작·오류·접수 완료를 구분해 안내하도록 보완했다. 실제 현장 사진의 정상 제출 전체 과정은 남았다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S06-3",
+      "title": "‘현재 페이지’와 ‘실제로 음성 안내를 완료한 페이지’가 명확히 분리되어 있지 않습니다",
+      "status": "device_partial",
+      "current_summary": "실제 검색 후보 안내 뒤 음성 취소1/3 성공. 지원 명령의 낮은 신뢰도 거절 원인을 설명하도록 보완했고 기준0.55는 유지했다.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S06-15",
+      "title": "후보 ID가 이름·주소·분류·좌표 변경에 영향을 받습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "주소·분류 변경의 ID 안정성은 확인했다. 이름·좌표를 제외해도 출입구를 식별할 수 있는지는 공급자 근거가 필요하다.",
+      "remaining_condition": "기기에서 한 번 실행하는 것으로 해결되지 않는 정책/수명주기/계약 또는 미구현 범위다. 기존 항목별 잔여 내용을 유지하며 제품 의도를 임의로 정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S06-24",
+      "title": "‘가까운·근처’라는 검색 의도와 실제 검색어가 분리되지 않습니다.",
+      "status": "device_partial",
+      "current_summary": "실제 합성 스피커→마이크→Whisper 목적지 검색3/3 성공. 후보 후 음성 취소는1/3 성공·2개 실패. 사람 정확도·이동/경로 시작은 미검증.",
+      "remaining_condition": "서버 Whisper를 통한 실제 발화·동시 부하·쉼/긴 목적지·입출력 전환 시험이 필요하다. 이어폰/블루투스 항목은 해당 장치가 있어야 한다. 합성 WAV나 주입 콜백을 실사용 정확도로 판정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S06-26",
+      "title": "본번·부번을 하이픈이 아닌 공백으로 합칩니다.",
+      "status": "device_partial",
+      "current_summary": "주소 화면의 12-3은 유지하고 음성에는 ‘12의 3’으로 전달한다. 사용자 청취 명료성은 따로 확인해야 한다.",
+      "remaining_condition": "이전 기기 TTS 분할·완료·상세 읽기 근거는 유지한다. 주소 발음의 명료성·길이·청취 피로는 사람이 듣고 평가해야 하며 onDone만으로 완료 처리하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S06-37",
+      "title": "후보 3개의 이름·전체 주소·거리를 한 발화로 읽어 대화가 길어집니다.",
+      "status": "device_partial",
+      "current_summary": "페이지 소개→후보별 음성→선택 안내를 순서대로 완료시킨다. 상세 듣기는 선택과 분리했고 실패·교체 시 권한을 남기지 않는다.",
+      "remaining_condition": "이전 기기 TTS 분할·완료·상세 읽기 근거는 유지한다. 주소 발음의 명료성·길이·청취 피로는 사람이 듣고 평가해야 하며 onDone만으로 완료 처리하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-4",
+      "title": "영구적으로 실패하는 첫 신고가 뒤의 신고들을 막을 수 있음",
+      "status": "device_partial",
+      "current_summary": "영구 실패 신고의 보관함·상세 듣기·건별 삭제 확인을 추가했다. 서버 신고 삭제나 재전송 기능과는 다르다. 추가: 실제 격리 쓰기 실패 시 원본 보존·권한 복원 후 격리 재시도 통과. 저장소 구성요소 범위.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-8",
+      "title": "좌표 검사 결과가 없으면 \"pass\"로 기록 — 코드 확인",
+      "status": "code_or_host_only",
+      "current_summary": "좌표 근거가 없는데 pass로 남기던 부분을 실제 근거 판정과 연결했다. A가 제공하는 센서 근거와 현장 종단 대조는 필요하다.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-12",
+      "title": "탐지·깊이·JPEG가 동일 장면이라는 계약을 이 정책만으로 확인할 수 없음 — 연결 확인 필요",
+      "status": "code_or_host_only",
+      "current_summary": "탐지·거리·JPEG를 같은 프레임·시각·객체에 묶고 다른 장면이면 거절한다. 실제 카메라 지연·회전 검증은 남았다.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-13",
+      "title": "GPS가 요청 시점에는 신선해도 촬영 시점과 어긋날 수 있음 — 설계·연결 검증",
+      "status": "code_or_host_only",
+      "current_summary": "촬영 전 위치를 프레임에 묶어 쓰고 촬영 뒤 위치나 역전된 시각은 거절한다. 실제 이동 중 위치 오차 실측은 남았다.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-16",
+      "title": "직접 신고는 자동 신고의 안정성·0.70 기준을 적용받지 않음 — 의도된 정책의 품질 검증",
+      "status": "code_or_host_only",
+      "current_summary": "자동 신고와 직접 신고의 다른 조건은 유지했다. 직접 신고 사진의 흐림·가림·판독 품질 판단은 미구현이다.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-17",
+      "title": "후보 거절 사유가 대부분 null로 합쳐짐 — 코드 확인",
+      "status": "device_partial",
+      "current_summary": "직접 신고 거절 이유를 위치·촬영 시각·거리·기기 준비 등으로 나눠 음성으로 알리도록 수정했다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-18",
+      "title": "큐·직접 신고의 JPEG 검사 자체는 파일 앞뒤 표식 수준 — 코드 확인",
+      "status": "device_partial",
+      "current_summary": "JPEG 표식뿐 아니라 실제 Android 이미지 해독과 크기를 검사한다. 해독 성공이 손상 판독 가능을 뜻하지는 않는다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-20",
+      "title": "재시도 지연 함수에서 401·403·422를 같은 60초로 처리 — 연결 확인 필요",
+      "status": "device_partial",
+      "current_summary": "재시도·인증 오류 분리를 보완했다. 추가 실기기 검사로 잘못된 성공 영수증이 안내 없이 끝나는 문제를 찾아 기존 접수 확인 실패 결과로 연결했고, 원본 보존·조회 복구·추가POST 없음도 확인했다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-22",
+      "title": "multipart 전송에 스트리밍 모드 지정이 없음 — 코드 확인",
+      "status": "device_partial",
+      "current_summary": "기존 고정 길이 스트리밍을 실제 Android HTTP의 4MiB 합성 전송으로 확인했다. 최대 메모리 사용량은 아직 실측하지 않았다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-24",
+      "title": "시계 변경과 쿨다운·큐 만료 정책의 상호작용 — 코드 확인·설계 검증",
+      "status": "device_partial",
+      "current_summary": "시계가 뒤로 가면 큐가 숨고 앞으로 가면 재시도·만료가 앞당겨지는 문제를 주입 시계로 재현했다. 아직 수정하지 않았다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-25",
+      "title": "25m 쿨다운의 누락·중복 간 절충 — 설계 검증",
+      "status": "code_or_host_only",
+      "current_summary": "25m·10분 자동 신고 쿨다운의 경계는 검사했다. 가까운 다른 손상을 구별하는 현장 성능은 입증하지 못했다.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-28",
+      "title": "민감한 이미지 복사본의 메모리 수명 관리가 일관되지 않음 — 코드 확인",
+      "status": "device_partial",
+      "current_summary": "평문 사진·전송 자료의 소유권과 종료 시 버퍼 정리를 추가했다. 런타임 내부 복사본까지 완전 소거한다는 의미는 아니다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-29",
+      "title": "비활성 빌드에서 실패 신고가 저장된 것처럼 안내할 위험 — 연결 확인 필요",
+      "status": "device_partial",
+      "current_summary": "신고 큐가 꺼진 빌드에서 저장 성공으로 안내하지 않음을 확인했다. 현재 일반 앱의 실제 업로드 성공 근거는 아니다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-33",
+      "title": "다음 항목 하나를 찾기 위해 여러 신고 전체를 복호화 — 코드 확인",
+      "status": "device_partial",
+      "current_summary": "개수 조회·다음 신고 선택 시 사진 전체를 동시에 복호화하지 않도록 수정했다. 전체 파일 순회 자체와 최대 부하 측정은 남았다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-34",
+      "title": "해시·직렬화 단계에서 payload 전체 복사와 Base64 중첩 — 코드 확인",
+      "status": "device_partial",
+      "current_summary": "해시의 순차 계산은 기존에 있었고 Base64 입력 복사본·직렬화 실패 평문 정리를 보완했다. 저장 형식의 중첩 복사는 남아 있다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-38",
+      "title": "파일 잠금이 여러 전송자의 네트워크 중복까지 막지는 않음 — 연결 확인 필요",
+      "status": "device_partial",
+      "current_summary": "두 전송 담당자가 같은 신고를 동시에 POST할 수 있음을 합성 검사로 재현했다. 실제 Activity 중첩·서버 중복 저장은 미확인이다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-39",
+      "title": "30일 TTL이 정확한 30일 내 물리 삭제를 의미하지 않음 — 설계·운영 검증",
+      "status": "device_partial",
+      "current_summary": "실제 암호화 파일의 만료 정리·삭제 실패 후 재시도를 확인했다. 30일 실시간 경과·Doze·재부팅 보장은 아니다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-40",
+      "title": "일반 신고 이미지 한도와 개발 큐 payload 한도가 다름 — 의도된 제한의 UX 검증",
+      "status": "device_partial",
+      "current_summary": "사진과 메타데이터의 합산 한도를 확인 전에 검사하고 초과 시 재촬영을 안내한다. 용량 한도는 임의로 바꾸지 않았다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-42",
+      "title": "같은 동의 확인을 반복 적용해도 모든 진행 작업이 취소됨",
+      "status": "device_partial",
+      "current_summary": "같은 동의 재확인만으로 진행 전송이 취소되던 문제를 수정했다. 실기기 HTTP 대기 중 3회 재확인에도 POST 1회로 완료됐다.",
+      "remaining_condition": "실제 계정의 교육 완료와 HOME 진입이 확인돼 화면 검사를 진행한다. ACTIVE·PAUSED·SAFE_STOP 전체 조합에는 실제 보행 준비 조건이 필요하며 이를 강제로 통과시키지 않는다. 관련 통과 범위는 아래 근거와 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-43",
+      "title": "신고 사진의 해상도가 실제 손상 판독에 충분한지 검증해야 함",
+      "status": "code_or_host_only",
+      "current_summary": "긴 변 320px·JPEG 품질 80은 현행 규격이다. 실제 손상 판독에 충분한지 평가하지 않아 변경하지 않았다.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-44",
+      "title": "메타데이터 제거가 사람·차량 등 화면 속 정보까지 제거하는 것은 아님",
+      "status": "code_or_host_only",
+      "current_summary": "EXIF 등 부가정보 제거는 확인했다. 사진 속 얼굴·차량 번호의 모자이크나 화면 영역 최소화는 구현된 것으로 볼 수 없다.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S15-45",
+      "title": "문서와 테스트가 최신 계약을 충분히 대표하지 못하는 부분이 있음",
+      "status": "code_or_host_only",
+      "current_summary": "예전 철회 함수·저장 경로를 기대하던 일부 검사를 현행 동작에 맞췄다. 신고 문서 전체 정합까지 완료한 것은 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-2",
+      "title": "평균 시간만으로 순간적인 심한 지연을 찾기 어렵습니다.",
+      "status": "device_partial",
+      "current_summary": "실기기 암호화 저장 후에도 합성 통계의 평균320ms와 최대900ms가 구별됐다. 실제 추론 성능이나 합격 기준 측정은 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-3",
+      "title": "현재 통계로 인식 정확도를 평가할 수는 없습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "진단 통계로 mAP나 재현율을 계산할 수 없음을 명시했다. 정답 라벨이 있는 별도 평가 데이터가 필요하다.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-4",
+      "title": "두 processedFrameCount의 의미가 명확하게 고정돼 있지 않습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "두 프레임 수의 의미와 불일치 거절은 확인했다. 제출 수·깊이 사용 수를 별도로 세는 기능은 미구현이다.",
+      "remaining_condition": "기기에서 한 번 실행하는 것으로 해결되지 않는 정책/수명주기/계약 또는 미구현 범위다. 기존 항목별 잔여 내용을 유지하며 제품 의도를 임의로 정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-5",
+      "title": "시작·종료 시각이 같다고 같은 집계 스냅샷인 것은 아닙니다.",
+      "status": "device_partial",
+      "current_summary": "서로 다른 생산자의 집계 혼합을 거절하도록 수정했고 실기기 암호화 저장까지 확인했다. 실제 카메라 경쟁·부하 시험은 남았다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-7",
+      "title": "발열 상태가 단일 Boolean으로 축약됩니다.",
+      "status": "device_partial",
+      "current_summary": "미측정 발열을 정상으로 합치던 문제를 수정했고 실기기 암호화 왕복에서도 null 유지를 확인했다. 실제 열 부하는 미측정이다.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-13",
+      "title": "종료된 보행의 자료가 전송 대상으로 다시 선택되지 않을 수 있습니다.",
+      "status": "device_partial",
+      "current_summary": "종료한 보행 자료도 전경·Wi-Fi·충전·동의 조건에서 전송 대상으로 선택된다. 앱 종료 중 자동 전송은 구현되지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-15",
+      "title": "활성 포인터가 없는 손상 세그먼트는 만료 정리에서 누락될 수 있습니다.",
+      "status": "device_partial",
+      "current_summary": "실제 파일·키로 손상 자료 격리와 충돌 시 보존, 격리 포함 정리를 확인했다. 격리 사본의 자동 만료 정책은 남아 있다.",
+      "remaining_condition": "기기에서 한 번 실행하는 것으로 해결되지 않는 정책/수명주기/계약 또는 미구현 범위다. 기존 항목별 잔여 내용을 유지하며 제품 의도를 임의로 정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-16",
+      "title": "보관기한이 지났다고 즉시 삭제되는 것은 아닙니다.",
+      "status": "device_partial",
+      "current_summary": "실제 파일은 만료 시각이 지나도 정리 호출 전까지 남고 호출 뒤 삭제됨을 확인했다. 장기간 방치·OS 자동 실행은 미검증이다.",
+      "remaining_condition": "기기에서 한 번 실행하는 것으로 해결되지 않는 정책/수명주기/계약 또는 미구현 범위다. 기존 항목별 잔여 내용을 유지하며 제품 의도를 임의로 정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-18",
+      "title": "세그먼트 전체 개수·총량 제한이 저장소 자체에는 없고, 조회는 전체 manifest 순회입니다.",
+      "status": "device_partial",
+      "current_summary": "서버 거절 뒤 로컬 삭제 실패가 숨겨지던 문제를 실기기에서 재현해 오류로 반환하도록 수정했다. 실제 자동 정리·재시작 장애 복구는 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-19",
+      "title": "수집·저장 호출이 UI나 추론 스레드를 막을 수 있습니다.",
+      "status": "device_partial",
+      "current_summary": "실제 Main 수집 실행기에서8개 적체 제한·1000건 거절·메인 루프 응답·종료 정리를 확인했다. 실제 저장 지연·위험 음성 응답과 제어 작업 즉시 처리는 입증하지 않았다.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-21",
+      "title": "모든 업로드 실패가 선언된 결과형으로 정리되지는 않습니다.",
+      "status": "device_partial",
+      "current_summary": "실제 HTTP 오류→암호화 자료 보존·재시도 제한·평문 정리를 확인했다. 거절 자료 삭제 실패 누락도 수정했고 운영 전송 종단은 남았다.",
+      "remaining_condition": "기기에서 한 번 실행하는 것으로 해결되지 않는 정책/수명주기/계약 또는 미구현 범위다. 기존 항목별 잔여 내용을 유지하며 제품 의도를 임의로 정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-34",
+      "title": "릴리스의 Noop 팩토리만으로 모든 우회 경로까지 검증되지는 않습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "release에서 개발용 전송 구현·주소가 빠짐을 클래스·APK로 확인했다. 서명된 운영 앱의 실제 패킷 관측은 별도다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-36",
+      "title": "암호화 현장 로그를 회수해도 현재 호스트 요약 경로는 사용할 수 없습니다.",
+      "status": "device_partial",
+      "current_summary": "실기기 암호화 통계·철회 차단·프로세스 재시작 후 부분 통계 구분을 확인했다. 합성 측정이며 실제 통계 UI·현장 성능·공유·호스트 요약은 남았다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-39",
+      "title": "계정 삭제의 저장소 목록이 실제 산출물 전체를 포함하는지 확인해야 합니다.",
+      "status": "device_partial",
+      "current_summary": "삭제 대상 목록과 실패 판정을 보완하고 진단 로그가 늦게 다시 생성되는 경로를 차단했다. 전체 계정 삭제 종단은 남았다. 추가: RAW/신고 실제 쓰기·삭제 거절 시 실패와 차단 유지, 권한 원복 후 명시 재시도 통과. 실제 계정 삭제 아님.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-40",
+      "title": "삭제 저널의 재시작 안전성은 실제 중단 시험이 필요합니다.",
+      "status": "device_partial",
+      "current_summary": "실제 프로세스를 삭제 처리 7개 지점에서 끊고 복구를 확인했다. 합성 자료로 한 구성요소 검사이며 전체 서버·백업 삭제는 아니다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-41",
+      "title": "민감 설정 저장소가 차단돼도 getter는 기본값을 반환할 수 있습니다.",
+      "status": "device_partial",
+      "current_summary": "민감 저장소가 막히면 기본값·캐시 동의로 수집·신고를 계속하지 않도록 실제 사용 경계의 차단을 추가했다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-42",
+      "title": "민감 설정의 작은 변경도 전체 암호화 스냅샷·동기 저장 비용을 만들 수 있습니다.",
+      "status": "device_partial",
+      "current_summary": "동일 설정값을 반복 저장할 때 암호화·디스크 쓰기를 생략했다. 실제 호출 빈도·발열·전체 지연 측정은 남았다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-43",
+      "title": "향후 키 버전 변경 시 과거 키가 파기 목록에서 빠질 수 있습니다.",
+      "status": "device_partial",
+      "current_summary": "읽지 않는 과거 키도 삭제 목록에 남길 수 있게 보완했다. 현재 설치 키를 바꾸거나 실제 운영 키를 교체하지 않았다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-44",
+      "title": "KeyStore 오류를 안전하게 막는 것과 사용자가 복구할 수 있게 하는 것은 별개입니다.",
+      "status": "device_partial",
+      "current_summary": "실제 단말에서 세션/설치 키 유실·변조·서버 주소 불일치 차단과 프로세스 재시작 후 유지까지 확인했다. 사용자가 원인을 구분해 복구하는 화면은 부족하다.",
+      "remaining_condition": "기기에서 한 번 실행하는 것으로 해결되지 않는 정책/수명주기/계약 또는 미구현 범위다. 기존 항목별 잔여 내용을 유지하며 제품 의도를 임의로 정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-45",
+      "title": "AndroidKeyStore 사용만으로 특정 하드웨어 보호 수준을 확정할 수 없습니다.",
+      "status": "device_partial",
+      "current_summary": "시험 기기의 격리 키에서 TEE 보호 수준을 관측했다. 모든 앱 키·모든 기기·StrongBox 보장을 뜻하지 않는다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-46",
+      "title": "파일·키 삭제 완료 시점에 이전 작업이 완전히 종료됐는지도 확인해야 합니다.",
+      "status": "device_partial",
+      "current_summary": "실행 중 전송의 평문 정리가 끝나기 전에 삭제 완료로 보고하던 문제를 수정했다. 신고 전송 실측은 확인했고 모든 생산자는 남았다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-47",
+      "title": "백업 제외 규칙이 실제 기기 이전에서도 유지되는지 확인해야 합니다.",
+      "status": "code_or_host_only",
+      "current_summary": "현재 APK의 백업·기기 이전 제외 규칙을 확인했다. 제조사 이전 도구로 실제 이전한 검증은 없다.",
+      "remaining_condition": "제조사 기기 이전, 과거 설치 재접속, 잘못된 단말 시각의 삭제 증거는 독립 시험 계정/기기와 격리 조건이 필요하다. 현재 휴대전화의 시각·계정 자료를 임의로 변경하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-50",
+      "title": "개인정보 HMAC 키 변경은 식별·삭제 차단의 연속성과 연결됩니다.",
+      "status": "unreviewed",
+      "current_summary": "현재 코드 미대조. 이전 지적을 현행 결함으로 확정하지 않음.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-51",
+      "title": "과거의 모든 동기화 설치가 삭제 대상에 포함됩니다.",
+      "status": "device_partial",
+      "current_summary": "실기기 HTTP 조회에서 일부 기기 미확인을 전체 완료로 처리하지 않았고 잘못된8종 응답을 거절했다. 실제 설치 전수·재접속·삭제 화면 종단은 남았다.",
+      "remaining_condition": "제조사 기기 이전, 과거 설치 재접속, 잘못된 단말 시각의 삭제 증거는 독립 시험 계정/기기와 격리 조건이 필요하다. 현재 휴대전화의 시각·계정 자료를 임의로 변경하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-52",
+      "title": "단말 증거 해시가 일치하는 것과 실제 삭제가 입증되는 것은 다릅니다.",
+      "status": "device_partial",
+      "current_summary": "설치별 서명키 등록과 삭제 증거 서명을 연결했다. 기기 재시작·변조·키 유실은 확인했고 운영 서버 종단은 남았다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-53",
+      "title": "단말 시각이 잘못되면 이미 수행한 삭제의 증거가 거부될 수 있습니다.",
+      "status": "device_partial",
+      "current_summary": "실기기 HTTP422 거절 후 암호화 저장·새 프로세스 복원·동일 증거 재전송과 처리 차단 유지를 확인했다. 실제 단말 시각 변경과 운영 서버 판단은 미검증이다.",
+      "remaining_condition": "제조사 기기 이전, 과거 설치 재접속, 잘못된 단말 시각의 삭제 증거는 독립 시험 계정/기기와 격리 조건이 필요하다. 현재 휴대전화의 시각·계정 자료를 임의로 변경하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-55",
+      "title": "9개 항목 상태의 집계가 정확해도 실제 삭제 작업의 증거는 별도로 필요합니다.",
+      "status": "code_or_host_only",
+      "current_summary": "DB 목록 밖 잔여 파일도 삭제 완료를 막도록 저장 루트 근거와 재검색을 보완했다. 운영 저장소·백업 전체 삭제는 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-56",
+      "title": "업무 데이터 삭제와 삭제 증빙 보관은 구분해야 합니다.",
+      "status": "unreviewed",
+      "current_summary": "현재 코드 미대조. 이전 지적을 현행 결함으로 확정하지 않음.",
+      "remaining_condition": "기기에서 한 번 실행하는 것으로 해결되지 않는 정책/수명주기/계약 또는 미구현 범위다. 기존 항목별 잔여 내용을 유지하며 제품 의도를 임의로 정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-57",
+      "title": "백업 복원으로 삭제한 계정·자료가 부활할 가능성을 시험해야 합니다.",
+      "status": "code_or_host_only",
+      "current_summary": "별도 DB 복원 후 삭제 표시를 재적용하고 자료 재노출을 차단했다. 실제 복원 파일의 재삭제·재공개 승인까지 검증하지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-58",
+      "title": "학습 데이터·라벨·파생 모델의 처리 결과는 원본 삭제와 별개입니다.",
+      "status": "unreviewed",
+      "current_summary": "현재 코드 미대조. 이전 지적을 현행 결함으로 확정하지 않음.",
+      "remaining_condition": "기기에서 한 번 실행하는 것으로 해결되지 않는 정책/수명주기/계약 또는 미구현 범위다. 기존 항목별 잔여 내용을 유지하며 제품 의도를 임의로 정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-59",
+      "title": "외부 기관·관리자 내보내기·별도 진단 사본까지 지웠다는 보장은 내부 영수증만으로 끝나지 않습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "외부 사본 집계·삭제 순서와 DB 버전 준비 검사를 연결했다. 기관의 실제 삭제 확인·운영 마이그레이션은 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S1617-60",
+      "title": "클라이언트 구현과 실제 운영 수집 가능 상태가 다를 수 있습니다.",
+      "status": "device_partial",
+      "current_summary": "기기 내부 시험 서버의 수집 중단 응답 이후 추가 시도 차단·자료 보존을 확인했다. 운영 서버 수집 가능 상태와 실제 업로드 완료는 미검증이다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-5",
+      "title": "[검증 필요·P1] 미사용 challenge 8개 제한이 정상 요청까지 막을 수 있습니다",
+      "status": "code_or_host_only",
+      "current_summary": "로그인·복구와 인증된 작업의 인증 요청 한도 분리를 DB에서 확인했다. 프록시 뒤 여러 기기의 공유 한도 문제는 남는다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-7",
+      "title": "[개선·P2] 재인증은 작업을 묶지만, 작업 내용 전체를 묶지는 않습니다",
+      "status": "device_partial",
+      "current_summary": "관리자 6개 요청의 실제 내용까지 재인증에 결속했다. 실기기 HTTP는 확인했고 미지원 3개 경로·운영 MFA는 남았다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-9",
+      "title": "[확인·P2] 비밀번호 해시 비용이 현재 권고보다 낮습니다",
+      "status": "code_or_host_only",
+      "current_summary": "관리자 해시 비용은 이미 p=5였다. 일반 계정과 구분했으며 운영 동시 인증 부하는 미측정이다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-16",
+      "title": "[검증 필요·P1] 화면을 벗어난 뒤 도착한 인증 결과가 적용될 수 있습니다",
+      "status": "device_partial",
+      "current_summary": "기존 늦은 응답 차단 근거에 실제 화면 중지·재생성 입력 정리 근거를 추가했다. 현재 등록 기기 키 없음으로 인증 작업 추가검사는 막혀 있다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-18",
+      "title": "[검증 필요·P1] 로그아웃·종료 처리가 느린 작업 뒤에 대기할 수 있습니다",
+      "status": "device_partial",
+      "current_summary": "로그아웃이 서버 응답을 기다리며 로컬 세션을 남기던 결함을 수정했다. 지연 응답의 성공·실패 모두 로컬 정리가 먼저 수행됐다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-26",
+      "title": "[확인·P1] 복구수단 보관 확인은 실제 백업 검증이 아니라 사용자 진술입니다",
+      "status": "code_or_host_only",
+      "current_summary": "‘복구수단 보관 확인’은 사용자 진술이며 실제 백업 복원 검증이 아니라고 화면에 구분돼 있음을 확인했다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-28",
+      "title": "[개선·P2] ATTESTED를 장기적인 복구 가능성으로 해석하면 안 됩니다",
+      "status": "code_or_host_only",
+      "current_summary": "복구 시 보관 확인 해제는 존재한다. 백업 손상·관리자 변경 등 어떤 사건에 다시 확인할지는 정책이 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-30",
+      "title": "[확인·P1] 모든 관리자 단말을 잃으면 복구코드만으로 앱 복구를 시작할 수 없습니다",
+      "status": "code_or_host_only",
+      "current_summary": "새 미등록 기기로 복구를 시작할 수 없음을 DB에서 확인했다. 모든 기기를 잃었을 때 대체 등록·복구 훈련이 필요하다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-31",
+      "title": "[검증 필요·P1] 복구 시작은 기기키 소유 증명 전에 강한 부작용을 발생시킵니다",
+      "status": "code_or_host_only",
+      "current_summary": "복구 시작에 등록 여부는 검사하지만 개인키 소유 서명 검사가 없는 상태다. 시작용 서명과 앱·서버 연결 구현이 필요하다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-32",
+      "title": "[확인·P1] 복구 완료에 서버의 TOTP 비밀값 교체가 필요합니다",
+      "status": "code_or_host_only",
+      "current_summary": "복구 완료 전 서버 TOTP 교체 필요와 새 비밀번호 입력을 안내했다. 실제 운영자 교체·복구 훈련은 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-33",
+      "title": "[확인·P1] 서버 복제본의 TOTP 설정이 다르면 정상 세션도 사용할 수 없습니다",
+      "status": "code_or_host_only",
+      "current_summary": "TOTP 설정이 다른 서버 복제본은 준비·인증이 차단됨을 확인했다. 실제 배포·트래픽 제외·롤백은 미검증이다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-39",
+      "title": "[개선·P2] 기관 전달 상태 흐름이 기관별이 아니라 신고별입니다",
+      "status": "code_or_host_only",
+      "current_summary": "기관 불일치를 일반 충돌과 나눠 안내하고 확인된 기관 정보로 수동 재제출하게 했다. 여러 기관 전달 정책은 미확정이다.",
+      "remaining_condition": "기기에서 한 번 실행하는 것으로 해결되지 않는 정책/수명주기/계약 또는 미구현 범위다. 기존 항목별 잔여 내용을 유지하며 제품 의도를 임의로 정하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-44",
+      "title": "[확인·P1] release APK에서는 운영 기능을 사용할 수 없습니다",
+      "status": "code_or_host_only",
+      "current_summary": "관리자 release의 운영 화면은 잠겨 있다. 서명된 비디버그 내부 배포와 실제 운영 등록·회수 검증이 필요하다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-46",
+      "title": "[검증 필요·P1] Python 테스트만으로 운영 PostgreSQL 보안을 검증할 수 없습니다",
+      "status": "code_or_host_only",
+      "current_summary": "별도 PostgreSQL에서 관련 보안·API 검사를 했다. 운영 DB 권한·복구·배포 성공의 증거로 확대하지 않는다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-47",
+      "title": "[확인·P1] 코드 구현과 실제 배포·복구 성공의 증거가 분리되어 있습니다",
+      "status": "unreviewed",
+      "current_summary": "현재 코드 미대조. 이전 지적을 현행 결함으로 확정하지 않음.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S18-48",
+      "title": "[개선·P2] 4천 줄이 넘는 Activity가 보안 변경의 영향을 키웁니다",
+      "status": "device_partial",
+      "current_summary": "공통 실행기 연결은 유지된다. 추가 실행기 실기기3개는 등록 키 없음으로 실행 전 차단됐고, 독립적인 화면 중지·재생성 입력 정리2개만 통과했다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S19-1",
+      "title": "신규 이메일 계정의 “로그인 유지”가 장기 세션과 연결되지 않음",
+      "status": "device_partial",
+      "current_summary": "재연결 뒤 세션 부재·인증 실패를 보존했다. 정상 재로그인으로 장기 세션/HOME 복구 확인; 실패 원인 확정 및 자동 복구는 남음.",
+      "remaining_condition": "사용자가 보류한 6개 정책·배포 검토와 겹친다. 현행 동작을 검사하되 자동 복구·우회·동의 계약을 임의로 변경하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S19-6",
+      "title": "refresh 응답 유실 후 정상 재시도도 세션 폐기로 처리됨",
+      "status": "device_partial",
+      "current_summary": "갱신 결과 불명 시 이전 증거 재사용 대신 재로그인을 요구한다. 안전한 복구 계약 없이 단순 재시도를 허용하지 않았다.",
+      "remaining_condition": "사용자가 보류한 6개 정책·배포 검토와 겹친다. 현행 동작을 검사하되 자동 복구·우회·동의 계약을 임의로 변경하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S19-12",
+      "title": "운영 환경에서 Secure 쿠키가 항상 보장되지는 않음",
+      "status": "code_or_host_only",
+      "current_summary": "운영 모드에서 Secure 쿠키 강제는 기존에 있다. 실제 Cloudflare·운영 프록시 응답 확인은 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S19-44",
+      "title": "새 계정 삭제 요청에 최근 재인증을 요구하는 경계가 약함",
+      "status": "code_or_host_only",
+      "current_summary": "삭제 재인증이 필요한 상태를 복원하고 인증 없이 같은 삭제 요청을 반복하지 않게 수정했다. 일반 이메일 계정 재인증 화면은 미완료다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S19-49",
+      "title": "9MiB 업로드 제한은 9MiB 메모리 상한이 아니며, 동시 1건은 사용자 간 간섭을 만듦",
+      "status": "code_or_host_only",
+      "current_summary": "업로드 크기·전역 및 계정별 동시 제한을 확인했다. 실제 메모리 최고값과 운영 동시 처리량 측정 전 한도를 올리지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S19-60",
+      "title": "README의 일부 계약 설명이 현재 구현과 다름",
+      "status": "code_or_host_only",
+      "current_summary": "실제로 지원하는 개인정보 HEAD 요청을 명세에 추가하고 설명을 맞췄다. README 전체 정합 검토는 남았다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S20-1",
+      "title": "신고 저널 디렉터리 권한이 배포 환경의 저장 함수 정책과 충돌합니다",
+      "status": "code_or_host_only",
+      "current_summary": "시험 DB와 파일 저장 경로에서 관련 검사를 했다. 운영 서비스 계정·그룹 권한과 백업 복구 조합은 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S20-18",
+      "title": "HTTP worker 수를 늘리면 모델 프로세스와 GPU 사용량도 늘어날 수 있습니다",
+      "status": "code_or_host_only",
+      "current_summary": "서버 worker마다 추론 자원을 가질 수 있다. 합성 프로세스 검사는 통과했지만 실제 GPU의 다중 worker 부하는 미측정이다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S20-27",
+      "title": "출발·도착점의 100m 오차 허용이 보행 안내 계약과 맞는지 확인해야 합니다",
+      "status": "code_or_host_only",
+      "current_summary": "도착점 차이 안내는 구현돼 있다. 36·60·99m 출발점 차이는 서버가 허용하지만 앱은 방향을 억제한다. 경계 테스트만 추가했으며 시작점 접근 정책·현장 검증 잔여.",
+      "remaining_condition": "실제 같은 장면의 탐지/깊이/위치/사진, 손상 품질·보행 경로·발열 또는 정답 라벨이 필요한 범위다. 사용자가 주변/카메라 현장 검사를 보류한 상태이며 합성 근거로 대체 완료하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S20-45",
+      "title": "더 이상 요청하지 않는 사용자의 제한 이벤트 정리 여부가 불명확합니다",
+      "status": "code_or_host_only",
+      "current_summary": "만료 제한 기록을 정리하는 서비스·타이머는 기존에 있다. 실제 운영 실행·동시성·DB 증가 추세는 미확인이다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S20-48",
+      "title": "준비 상태 검사 시간 초과가 실제 검사 작업을 종료하지는 않습니다",
+      "status": "code_or_host_only",
+      "current_summary": "준비 검사 작업 재사용과 멈춤 구분은 확인했다. 막힌 시스템 I/O의 강제 종료·운영 자동 복구는 보장하지 않는다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S20-49",
+      "title": "한 기능의 외부 장애가 Backend 전체 비준비 상태로 이어집니다",
+      "status": "code_or_host_only",
+      "current_summary": "지도·탐지 중 하나가 지속 실패하면 전체 준비 실패로 처리하는 기존 정책을 유지하고 검사했다. 기능별 허용은 정책 변경이다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S20-50",
+      "title": "TMAP 준비 상태에 초기 트래픽과 readiness의 순환 의존이 생길 수 있습니다",
+      "status": "code_or_host_only",
+      "current_summary": "최근 TMAP 성공 기록이 없으면 준비 실패이고, 준비된 서버만 요청을 받는 배포에서는 순환 대기가 생길 수 있다. 배포 검토가 필요하다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S20-52",
+      "title": "정상적인 키 폐기 수명주기가 완료되지 않은 상태입니다",
+      "status": "unreviewed",
+      "current_summary": "현재 코드 미대조. 이전 지적을 현행 결함으로 확정하지 않음.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S20-54",
+      "title": "원본 열람 토큰 소비와 사용자의 실제 수신 완료는 다릅니다",
+      "status": "device_partial",
+      "current_summary": "관리자 원본 응답이 잘리거나 형식이 다르면 거절하고 새 권한으로 재시도한다. 실제 Android HTTP에서 확인했다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-1",
+      "title": "최신 커밋의 CI가 비밀정보 검사 단계에서 실패했다 — 확정, 최우선",
+      "status": "code_or_host_only",
+      "current_summary": "9월 16일 과거 CI는 Gitleaks 29→37건 및 해시 불일치로 실패했다. 현재 작업 브랜치 실행은 0건이다. 검출 내용 분류와 현행 전체 CI 실행이 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-2",
+      "title": "current의 브랜치 보호가 꺼져 있습니다.",
+      "status": "unreviewed",
+      "current_summary": "현재 코드 미대조. 이전 지적을 현행 결함으로 확정하지 않음.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-3",
+      "title": "여러 검사를 단일 acceptance job에서 순차 실행합니다.",
+      "status": "code_or_host_only",
+      "current_summary": "CI는 아직 단일 job의 순차 실행이다. 일부 연쇄 생략 방지는 있지만 독립 병렬 job 구조는 도입하지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-4",
+      "title": "일반 CI의 Android 보고서 업로드가 성공 시에만 실행됩니다.",
+      "status": "code_or_host_only",
+      "current_summary": "검사 보고서는 실패해도 업로드하도록 이미 설정돼 있다. 실제 원격 실패 실행에서 회수되는지는 확인하지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-5",
+      "title": "Python·Node 결과를 일관된 기계 판독 보고서로 모으는 구성이 부족합니다.",
+      "status": "code_or_host_only",
+      "current_summary": "모든 검사가 건너뛰었는데 성공으로 집계되던 문제를 SKIPPED로 구분하도록 수정했다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-6",
+      "title": "일부 준비·검사가 중복됩니다.",
+      "status": "code_or_host_only",
+      "current_summary": "중복 준비·검사 경로가 남아 있다. 서로 다른 환경·산출물 검증이 섞여 있어 단순 삭제하지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-7",
+      "title": "일반 품질 CI가 특정 과거 커밋과 관리 이력의 ancestry 확인에 강하게 결합돼 있습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "일반 CI가 과거 이력 확인과 같은 job에 묶여 있다. 제품 검사와 이력 검사를 분리하는 변경은 하지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-9",
+      "title": "기본 실기기 smoke가 현재 모델의 출력 모양과 충돌한다 — 확정, 최우선",
+      "status": "device_partial",
+      "current_summary": "현재 번들 모델 로드·출력 계약을 기기에서 확인했다. MobileSAM 별도 호환성 시험은 실제 보행 인식 성능 근거가 아니다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-10",
+      "title": "호스트 TFLite smoke도 모델 경로·클래스·출력이 모두 오래됐다 — 확정",
+      "status": "code_or_host_only",
+      "current_summary": "현재 모델의 768 입력·21클래스·출력 형태와 실제 호스트 추론을 확인했다. 예전 발표 규격과 구분해야 한다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-11",
+      "title": "기본 smoke의 unified 추론은 CPU Interpreter를 직접 생성합니다.",
+      "status": "device_partial",
+      "current_summary": "실제 기기 CPU와 GPU 경로를 각각 실행했다. 이 검사를 기본 CI에 포함하거나 모든 기종을 검증한 것은 아니다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-12",
+      "title": "legacy smoke는 설정을 복사해 legacy를 강제 선택합니다.",
+      "status": "device_partial",
+      "current_summary": "옛 모델 호환 시험과 주 모델 손상 시 대체 금지 시험을 구분했다. 기기에서 현행 실패 원인과 임의 legacy 대체 금지를 확인했다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-13",
+      "title": "정확도 시험의 합격 하한이 제품 안전성을 입증하기에는 낮습니다.",
+      "status": "device_partial",
+      "current_summary": "고정 20장 최소 회귀선은 통과했지만 사람 매칭은 1/63에 그쳤다. 실제 안전 성능이나 대표 mAP를 입증하지 못한다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-14",
+      "title": "이전 전처리와 새 전처리의 비교 결과를 계산하지만 차이를 assert하지 않습니다.",
+      "status": "device_partial",
+      "current_summary": "이전·현재 전처리 비교를 분리 실행해 CPU 감소 방지 검사를 확인했다. 현재 23/110, 이전 20/110 매칭이다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-15",
+      "title": "해당 정확도 시험은 정답과 매칭된 탐지 수를 보지만 추가 오탐을 합격 조건에서 제한하지 않습니다.",
+      "status": "device_partial",
+      "current_summary": "미매칭 예측 집계와 상대 정밀도 검사를 확인했다. 고정 사진의 모든 미매칭을 실제 오탐으로 단정하거나 절대 합격선으로 쓰지 않는다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-16",
+      "title": "정적 검사가 Kotlin 소스 문자열·정규식에 의존합니다.",
+      "status": "code_or_host_only",
+      "current_summary": "일부 오래된 소스 문자열 검사와 저장·복원 행동 검사를 보완했다. 저장소 전체의 정적 검사 의존은 남아 있다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-17",
+      "title": "APK 검사기의 artifact_sha256이 선택값입니다.",
+      "status": "code_or_host_only",
+      "current_summary": "모델 asset 중복 선언으로 필수 해시가 덮이던 문제를 수정했다. 미선언 옛 모델을 시험 자산으로 옮기고 APK를 확인했다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-18",
+      "title": "호스트 TFLite smoke가 선택 실행이고 일반 CI에서는 이미지 변수가 비어 있습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "호스트 추론은 현행 기본 실행 경로에 들어 있다. 로컬 추론 성공을 원격 Linux CI 성공으로 보지는 않는다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-19",
+      "title": "Android·Backend 임계값 차이는 기본적으로 경고입니다.",
+      "status": "code_or_host_only",
+      "current_summary": "앱·서버 임계값 차이는 정확한 값 목록으로 검사한다. 그 목록이 안전 승인 근거는 아니며 모델 담당 확인이 필요하다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-20",
+      "title": "verifyBundledVoskModelAssets라는 이름과 달리 실제 파일 해시를 계산하지 않습니다.",
+      "status": "device_partial",
+      "current_summary": "실제 설치 Vosk 모델 해시를 검사하고 격리 복사본의 변조·누락·링크3종 거절/정상 재설치를 확인했다. 인식률이나 현장 성능 근거는 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-22",
+      "title": "개발용 빠른 로그인 비밀번호가 debug BuildConfig에 들어갑니다.",
+      "status": "device_partial",
+      "current_summary": "실제 설치 앱의 빠른 로그인 OFF·옛 자격 필드 없음과 정상 로그인 화면 인증을 확인했다. 자동 세션 복원 실패는 따로 남기며 배포 전체 보증은 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-23",
+      "title": "사용자 앱의 일반 release 빌드 검사는 커밋 문자열의 형식만 검증합니다.",
+      "status": "code_or_host_only",
+      "current_summary": "release의 SHA 형식 검사는 실제 HEAD·미커밋 상태·APK 출처를 보장하지 않는다. 출처 결속 기능은 미도입이다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-24",
+      "title": "관리자 앱에는 사용자 앱과 같은 source commit 필드·검증이 없습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "관리자 앱도 커밋 형식·빌드 표시를 이미 가진다. 실제 서명·출처 검증까지 끝난 것은 아니다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-25",
+      "title": "일반 CI의 release 산출물은 unsigned APK이며 기본 시험 endpoint는 .invalid입니다.",
+      "status": "code_or_host_only",
+      "current_summary": "일반 CI의 unsigned·시험 서버 주소 APK는 운영 배포본이 아니다. 서명·승인 서버·배포 절차가 남아 있다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-26",
+      "title": "일반 신고 대기열 설정은 defaultConfig에 있어 release에도 상속됩니다.",
+      "status": "code_or_host_only",
+      "current_summary": "개발 큐 옵션을 켜서 요청해도 release에서 큐·주소·용량이 강제로 비활성화됨을 검사했다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-27",
+      "title": "개발용 큐·빠른 시작·관리자 운영 debug 같은 분기를 기본 빌드 하나로는 검증하지 못합니다.",
+      "status": "code_or_host_only",
+      "current_summary": "개발 옵션 ON/OFF와 release 금지 조합을 실제 빌드 설정으로 검사했다. 전체 원격 CI·실기기 조합 시험은 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-29",
+      "title": "레이어 runner는 testDebugUnitTest를 실행하지만 testReleaseUnitTest는 실행하지 않습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "관련 release 검사와 실기기 시험의 오래된 기대값을 보완했다. 최신 전체 프로젝트 검사 재실행을 의미하지 않는다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-30",
+      "title": "이미 작성된 중요한 실기기 시험이 기본 실기기 workflow 선택에서 제외됩니다.",
+      "status": "device_partial",
+      "current_summary": "기본 기기 workflow의 범위는 모델 검사 2개다. 추가 기기·성능 검사는 수동 실행했고 workflow 확대는 하지 않았다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-31",
+      "title": "실기기 workflow는 수동 실행입니다.",
+      "status": "code_or_host_only",
+      "current_summary": "실기기 workflow는 수동 실행이며 전체 앱 인수 시험이 아니다. 결과 형식 검사는 했지만 원격 실행은 하지 않았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-32",
+      "title": "실제 Activity 시험이 private 필드·메서드 이름에 강하게 의존합니다.",
+      "status": "code_or_host_only",
+      "current_summary": "일부 Activity 시험은 좁은 시험 진입점으로 바뀌었다. 다른 시험의 내부 필드 의존과 전체 음성 길안내 검증은 남았다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-33",
+      "title": "‘VoiceNavigation’이라는 시험 이름을 전체 음성 길안내 검증으로 해석하면 안 됩니다.",
+      "status": "device_partial",
+      "current_summary": "상태 연결 시험과 실제 검색·준비 시험을 구분했다. 실제 사람 발화부터 야외 경로 안내까지 한 번에 검증한 것은 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-34",
+      "title": "기본 2개 smoke로는 실행 중 권한 철회·센서 중단·앱 재개를 검증하지 못합니다.",
+      "status": "device_partial",
+      "current_summary": "권한·잠금·복귀 검사를 추가했고 마지막 권한 복원 정체도 수정했다. ACTIVE 보행 중 센서·권한 장애 조합은 남았다. 추가: 실제 미리보기 보호 화면의 취소/영역 이탈/두 손가락/HOME/키 누르기 중단 5종에서 새 3초 유지 필수 확인. ACTIVE/TalkBack 아님.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-35",
+      "title": "서버의 P-256 서명 시험은 실제 AndroidKeyStore 시험이 아닙니다.",
+      "status": "device_partial",
+      "current_summary": "실제 AndroidKeyStore 생성·서명·보호 수준 근거를 확보했다. 서버 서명 검사와 운영 키 관리를 따로 구분한다.",
+      "remaining_condition": "실제 Android 파일·키·HTTP·TTS·모델 중 해당 검사 범위의 근거를 연결한다. 주입 데이터·시험용 서버·고정 시각의 한계를 유지하며 체크리스트 전체 완료로 확대하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-37",
+      "title": "주요 계약 시험은 handleGatewayRequest()를 직접 호출하고 Backend 응답을 주입합니다.",
+      "status": "code_or_host_only",
+      "current_summary": "음성 릴레이 시험에 계정 유효성 경계를 반영했다. 모든 계약의 실제 네트워크·서버 종단 검증은 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-38",
+      "title": "시험 파일 패턴이 dist/test/*.test.js입니다.",
+      "status": "code_or_host_only",
+      "current_summary": "중첩된 Node 시험도 재귀적으로 실행·보고되는 기존 구현을 확인했다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-39",
+      "title": "기본 시험 명령에 개별 시험 timeout이 없습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "Node 시험 시간 제한과 실패 보고서 생성을 확인했다. 외부 I/O가 반드시 물리적으로 종료된다는 뜻은 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-41",
+      "title": "공통 시험 환경의 기본값은 보안 비활성·로컬 개발 허용입니다.",
+      "status": "code_or_host_only",
+      "current_summary": "격리 DB에서 다른 계정·다른 세대의 자료 접근 거절을 추가 검사했다. 실제 Gateway 서명부터 이어진 운영 종단은 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-42",
+      "title": "OpenAPI 현재성 검사는 이전 배포 클라이언트와의 호환성 검사가 아닙니다.",
+      "status": "code_or_host_only",
+      "current_summary": "오래된 응답 필드 기대값과 OpenAPI를 현재 코드에 맞췄다. 이전 배포 앱과의 호환성 검증은 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-45",
+      "title": "시험 환경의 DB 저장·전송 암호화 확인 플래그는 실제 운영 암호화를 입증하지 않습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "잘못된 DB TLS 설정을 거절하는 검사는 통과했다. 운영 디스크 암호화·실제 TLS 세션·KMS 근거는 별도다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-46",
+      "title": "TMAP의 모의 응답·readiness 시험 통과는 현재 외부 API 연결 성공이 아닙니다.",
+      "status": "device_partial",
+      "current_summary": "실제 서버 장소검색은 후속 기기 검사에서 확인했다. 실제 도보 경로·이동 중 재탐색·운영 외부망 전체는 미검증이다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-55",
+      "title": "활성 문서 검사 대상에서 apps/android/README.md가 빠져 있습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "Android README의 모델 설명이 활성 문서 검사에 포함됨을 확인했다. 역사 문서 전체의 사실성 보장은 아니다.",
+      "remaining_condition": "현행 코드/호스트 검사/산출물 검사 대상이다. 기존 근거를 보존하고 이번 관련 회귀 검사와의 범위를 구분한다. 기능 전체 종단 또는 현장 통과로 해석하지 않는다.",
+      "whole_item_closed": false
+    },
+    {
+      "id": "S21-57",
+      "title": "전체 runner의 개발 환경 요구가 무겁고 Linux에 강하게 묶여 있습니다.",
+      "status": "code_or_host_only",
+      "current_summary": "macOS 임시 경로로 인한 시험 실패를 실행 환경 지정으로 해결했다. Linux 잠금·전체 개발 환경 의존은 남았다.",
+      "remaining_condition": "휴대전화 연결만으로 완료할 수 없는 항목이다. 원문별 남은 운영 구성·서명 배포·부하·다중 호스트·키 교체·복구 또는 외부 API/CI 조건을 확인해야 한다. 로컬 모의/격리 검사와 운영 검증을 구분한다.",
+      "whole_item_closed": false
+    }
+  ]
+}
