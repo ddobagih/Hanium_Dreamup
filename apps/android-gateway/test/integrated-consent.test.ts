@@ -2396,3 +2396,31 @@ test("old-policy schema v4 GET requires reconsent and current PUT appends floor 
   assert.equal(updated.revision, 2);
   assert.equal(updated.policy_version, INTEGRATED_CONSENT_POLICY_VERSION);
 });
+
+test("installation key registration requires the same actor and installation control secret", async () => {
+  const installation = "installation_key_binding_test";
+  const saved = await save(installation, "installation_key_consent_request_01", 1, {
+    raw_source_collection: false, automatic_reporting: false, mobile_network_transfer: false, training_reuse: false
+  });
+  assert.equal(saved.status, 201);
+  let calls = 0;
+  const fetchImpl: GatewayFetch = async (url, init) => {
+    calls++;
+    assert.equal(String(url), "http://127.0.0.1:8000/privacy/installation-evidence-key");
+    assert.equal(new Headers(init?.headers).get(ACTOR_ID_HEADER), PRIMARY_ACTOR);
+    assert.equal(new Headers(init?.headers).get(ACCOUNT_GENERATION_HEADER), "1");
+    assert.ok(new Headers(init?.headers).get(ACTOR_ASSERTION_HEADER));
+    return new Response(null, {status: 204});
+  };
+  function request(cookie: string, secret: string, id = installation): Request {
+    return new Request("http://localhost/privacy/rights?control=installation-evidence-key", {
+      method: "PUT", headers: {cookie, "content-type": "application/json", [CONSENT_CONTROL_SECRET_HEADER]: secret},
+      body: JSON.stringify({installation_id: id, public_key: "a".repeat(122)})
+    });
+  }
+  assert.equal((await handleGatewayRequest(request(primaryCookie, CONTROL_SECRET), {fetchImpl})).status, 204);
+  assert.notEqual((await handleGatewayRequest(request(primaryCookie, "b".repeat(64)), {fetchImpl})).status, 204);
+  assert.notEqual((await handleGatewayRequest(request(secondaryCookie, CONTROL_SECRET), {fetchImpl})).status, 204);
+  assert.notEqual((await handleGatewayRequest(request(primaryCookie, CONTROL_SECRET, "unconfirmed_installation"), {fetchImpl})).status, 204);
+  assert.equal(calls, 1);
+});

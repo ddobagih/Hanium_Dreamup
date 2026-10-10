@@ -179,6 +179,8 @@ def test_s20_40_explicit_roles_preserve_field_and_public_boundaries() -> None:
         ("GET", "/navigation/destinations/search"),
         ("GET", "/navigation/destinations/search/health"),
         ("POST", "/navigation/walking"),
+        ("GET", "/account-signup-policy"),
+        ("POST", "/privacy/installation-evidence-key"),
         ("GET", "/privacy/consent-bootstrap"),
         ("POST", "/privacy/consent-events"),
         ("POST", "/privacy/account-deletions"),
@@ -754,6 +756,14 @@ def test_readiness_is_available_to_field_role_without_sensitive_details(
     secured_client: ASGITestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from backend.app.main import report_storage_monitor
+
+    # This access-control test does not run lifespan/storage monitoring. The route
+    # now reads the monitor snapshot, not the old synchronous filesystem helpers.
+    monkeypatch.setattr(report_storage_monitor, "checks", lambda: {
+        name: {"ready": True}
+        for name in ("upload_root", "report_image_encryption", "report_storage")
+    })
     monkeypatch.setattr("backend.app.api.health._database_readiness", lambda _url: {"ready": True})
     monkeypatch.setattr("backend.app.api.health._upload_readiness", lambda _path: {"ready": True})
     monkeypatch.setattr(
@@ -2002,6 +2012,7 @@ _S21_LITERAL_FIELD = frozenset({
     ("POST", "/detect"), ("POST", "/detect/v2"),
     ("GET", "/navigation/walking/health"), ("GET", "/navigation/destinations/search"),
     ("GET", "/navigation/destinations/search/health"), ("POST", "/navigation/walking"),
+    ("GET", "/account-signup-policy"), ("POST", "/privacy/installation-evidence-key"),
     ("GET", "/privacy/consent-bootstrap"), ("POST", "/privacy/consent-events"),
     ("POST", "/privacy/account-deletions"),
     ("GET", "/privacy/account-deletions/{request_id}/status"),

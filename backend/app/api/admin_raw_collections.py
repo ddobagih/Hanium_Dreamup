@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 from datetime import datetime
 from typing import Literal
 import uuid
@@ -86,7 +88,7 @@ def create_router() -> APIRouter:
         db: Session = Depends(get_db),
     ) -> AdminRawCollectionListV1:
         _identity(request, action=None)
-        statement = select(RawCollection).where(RawCollection.lifecycle_version == 2)
+        statement = select(RawCollection).where(account_subject_visible(RawCollection)).where(RawCollection.lifecycle_version == 2)
         if state == "QUARANTINED":
             statement = statement.where(RawCollection.state == "QUARANTINED")
         rows = db.scalars(

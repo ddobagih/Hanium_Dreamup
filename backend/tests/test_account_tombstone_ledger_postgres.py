@@ -148,6 +148,13 @@ def test_s1617_57_backup_restore_reapplies_signed_account_tombstones(
             _consent(SessionFactory, kept_actor)
             _consent(SessionFactory, later_actor)
 
+            from test_account_deletion_server_inventory_postgres import _seed_report
+            from backend.app.models import Report
+            from backend.app.services.privacy_visibility import account_subject_visible
+            from backend.app.services.admin_report_workflow import _locked_report, AdminReportWorkflowError
+            deleted_report, _ = _seed_report(SessionFactory, subject=privacy_subject_hmac(deleted_actor, 1, _KEY_A), upload_dir=tmp_path, suffix="restored_deleted")
+            kept_report, _ = _seed_report(SessionFactory, subject=privacy_subject_hmac(kept_actor, 1, _KEY_A), upload_dir=tmp_path, suffix="restored_kept")
+
             # "Backup" taken before the deletion (template copy of the store).
             engine.dispose()
             source_name = engine.url.database
@@ -220,10 +227,37 @@ def test_s1617_57_backup_restore_reapplies_signed_account_tombstones(
             assert "account_tombstone_reapply_confirmation_required" in capsys.readouterr().err
             assert reapply_cli.main(
                 ["apply", *files, "--confirm", "REAPPLY-RESTORED-ACCOUNT-TOMBSTONES"]
-            ) == 0
+            ) == 2
             applied = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
             assert (applied["missing"], applied["applied"]) == (1, True)
+            assert applied["requires_physical_redeletion"] is True
+            assert "consent_events" in applied["retained_data_categories"]
             assert restored_url not in capsys.readouterr().out
+
+            with Restored() as db:
+                # Workers can still find restored rows; product reads and mutation locks cannot.
+                assert db.get(Report, deleted_report) is not None
+                visible = set(db.scalars(select(Report.id).where(account_subject_visible(Report))).all())
+                assert deleted_report not in visible and kept_report in visible
+                from backend.app.api.reports import _filtered_reports_statement
+                from backend.app.services.report_summary_aggregation import build_report_summary_statement
+                from backend.app.services.admin_report_workflow import _report_history_snapshot
+                from backend.app.models import ReportReviewDecision
+                filtered = _filtered_reports_statement(status=None, class_name=None, source=None,
+                    demo_filter="all", model_key=None, trigger=None, auto_reported=None,
+                    performance_excluded=None, created_from=None, created_to=None,
+                    lat=None, lng=None, radius_m=None)
+                assert [report.id for report in db.scalars(filtered)] == [kept_report]
+                summary = db.execute(build_report_summary_statement(filtered,
+                    grid_size_degrees=0.1, top_limit=2)).mappings().one()
+                assert summary["total"] == 1
+                with pytest.raises(AdminReportWorkflowError) as history_hidden:
+                    _report_history_snapshot(db, report_id=deleted_report, history_model=ReportReviewDecision)
+                assert history_hidden.value.status_code == 404
+                with pytest.raises(AdminReportWorkflowError) as hidden:
+                    _locked_report(db, deleted_report)
+                assert hidden.value.status_code == 404
+            assert "reports" in applied["retained_data_categories"]
 
             # After reapply the old generation's report, RAW and consent writes fail.
             with pytest.raises(PrivacyLifecycleError) as report_blocked:
@@ -248,7 +282,7 @@ def test_s1617_57_backup_restore_reapplies_signed_account_tombstones(
             # Reapply is idempotent.
             assert reapply_cli.main(
                 ["apply", *files, "--confirm", "REAPPLY-RESTORED-ACCOUNT-TOMBSTONES"]
-            ) == 0
+            ) == 2
             again = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
             assert (again["missing"], again["present"]) == (0, 1)
 

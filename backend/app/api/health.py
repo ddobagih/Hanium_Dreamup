@@ -77,7 +77,7 @@ from backend.app.services.tmap_runtime import (
 )
 
 
-EXPECTED_ALEMBIC_HEAD = "202609300009"
+EXPECTED_ALEMBIC_HEAD = "202610070001"
 READINESS_LOCAL_CHECK_TIMEOUT_SECONDS = 5.0
 # S20-48: an in-flight probe older than this is reported as stuck. The worker
 # thread is not killed and no replacement thread is started; restart decisions

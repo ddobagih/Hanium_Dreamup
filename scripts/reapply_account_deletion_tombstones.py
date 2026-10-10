@@ -82,6 +82,8 @@ def _session(env_name: str):
 def _plan_summary(plan: ledger_service.AccountTombstoneReapplyPlan, *, applied: bool) -> dict:
     return {
         "applied": applied,
+        "requires_physical_redeletion": bool(plan.retained_data_categories),
+        "retained_data_categories": list(plan.retained_data_categories),
         "ledger_sha256": plan.ledger_sha256,
         "missing": len(plan.missing),
         "present": plan.present,
@@ -124,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
                 db, verified, confirmation=args.confirm
             )
         print(json.dumps(_plan_summary(plan, applied=True), sort_keys=True))
-        return 0
+        return 2 if plan.retained_data_categories else 0
     except ledger_service.AccountTombstoneLedgerError as exc:
         print(json.dumps({"error": exc.code}), file=sys.stderr)
         return 1

@@ -16,6 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 import pytest
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.exc import SQLAlchemyError
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -282,6 +283,36 @@ def _headers(
             )
         )
     return headers
+
+
+@pytest.fixture(autouse=True)
+def contract_account_authority(monkeypatch: pytest.MonkeyPatch) -> None:
+    # These are in-memory RAW transport contracts. Keep the real signature/replay checks,
+    # but explicitly supply the one legacy test account instead of contacting a database.
+    monkeypatch.setattr(
+        field_test_security,
+        "_actor_account_session_is_current",
+        lambda actor, generation, epoch: actor == ACTOR_ID and generation == 1 and epoch is None,
+    )
+
+
+@pytest.mark.parametrize("unavailable", [False, True], ids=["revoked", "store-unavailable"])
+def test_raw_contract_still_checks_account_authority_before_ingest_gate(monkeypatch, unavailable) -> None:
+    def authority(_actor, _generation, _epoch):
+        if unavailable:
+            raise SQLAlchemyError("synthetic account store failure")
+        return False
+
+    monkeypatch.setattr(field_test_security, "_actor_account_session_is_current", authority)
+    client = ASGITestClient(_app(enabled=False))
+    path = f"/raw-collections/{COLLECTION_ID}/manifest"
+    response = client.request(
+        "PUT", path, json=_manifest_payload(), headers=_headers(method="PUT", path=path),
+    )
+    assert response.status_code == (503 if unavailable else 401)
+    assert response.json()["detail"]["code"] == (
+        "account_authentication_unavailable" if unavailable else "account_authentication_stale"
+    )
 
 
 def _app(

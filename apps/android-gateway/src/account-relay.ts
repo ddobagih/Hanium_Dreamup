@@ -553,3 +553,30 @@ export async function authenticateBackendAccount(
     ? { value }
     : { error: accountError(502, "gateway_account_upstream_invalid") };
 }
+
+/** Public metadata only; service credentials and upstream extras never reach clients. */
+export async function relayAccountSignupPolicy(request: Request, fetchImpl?: GatewayFetch): Promise<Response> {
+  const headers = serviceHeaders();
+  if (headers instanceof Response) return headers;
+  const upstream = await fetchBackend(request, backendUrl("/account-signup-policy"),
+    { method: "GET", headers, cache: "no-store" }, 15_000, fetchImpl ?? globalThis.fetch);
+  const decoded = await boundedUpstreamJson(upstream);
+  if (decoded.timeout) return accountError(504, "gateway_upstream_response_timeout");
+  if (decoded.error) return accountError(502, "gateway_account_upstream_invalid");
+  if (upstream.status !== 200) return projectedError(upstream, decoded.value);
+  const value = objectPayload(decoded.value);
+  const docs = objectPayload(value?.documents);
+  if (!value || !exactKeys(value, ["schema_version", "documents"]) ||
+      value.schema_version !== "walksafe.account-signup-policy.v1" || !docs ||
+      !exactKeys(docs, SIGNUP_CONSENT_DOCUMENT_KEYS)) return accountError(502, "gateway_account_upstream_invalid");
+  for (const [index, key] of SIGNUP_CONSENT_DOCUMENT_KEYS.entries()) {
+    const doc = objectPayload(docs[key]);
+    if (!doc || !exactKeys(doc, ["version", "required", "equivalent_versions", "prior_versions"]) ||
+        !validBoundedVersion(doc.version) || doc.required !== (index < 3) ||
+        ![doc.equivalent_versions, doc.prior_versions].every(versions =>
+          Array.isArray(versions) && versions.every(validBoundedVersion))) {
+      return accountError(502, "gateway_account_upstream_invalid");
+    }
+  }
+  return Response.json(value, { headers: { "cache-control": "no-store" } });
+}

@@ -881,6 +881,29 @@
         "title": "AccountResponseV1",
         "type": "object"
       },
+      "AccountSignupPolicyV1": {
+        "additionalProperties": false,
+        "properties": {
+          "documents": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SignupPolicyDocumentV1"
+            },
+            "title": "Documents",
+            "type": "object"
+          },
+          "schema_version": {
+            "const": "walksafe.account-signup-policy.v1",
+            "default": "walksafe.account-signup-policy.v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "documents"
+        ],
+        "title": "AccountSignupPolicyV1",
+        "type": "object"
+      },
       "AdminAuditEventV1": {
         "additionalProperties": false,
         "properties": {
@@ -5113,6 +5136,31 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "InstallationEvidenceKeyV1": {
+        "additionalProperties": false,
+        "properties": {
+          "installation_id": {
+            "maxLength": 128,
+            "minLength": 8,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$",
+            "title": "Installation Id",
+            "type": "string"
+          },
+          "public_key": {
+            "maxLength": 122,
+            "minLength": 79,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Public Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "installation_id",
+          "public_key"
+        ],
+        "title": "InstallationEvidenceKeyV1",
+        "type": "object"
+      },
       "LoginRequest": {
         "additionalProperties": false,
         "properties": {
@@ -6986,6 +7034,20 @@
             "title": "Custody Reference",
             "type": "string"
           },
+          "expected_state_version": {
+            "anyOf": [
+              {
+                "maxLength": 19,
+                "minLength": 1,
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected State Version"
+          },
           "material_kind": {
             "enum": [
               "RECOVERY_CODE",
@@ -8800,6 +8862,7 @@
         "type": "object"
       },
       "ReportStatusUpdate": {
+        "additionalProperties": false,
         "properties": {
           "expected_updated_at": {
             "anyOf": [
@@ -9248,6 +9311,50 @@
         "title": "SignupDocumentVersionsV1",
         "type": "object"
       },
+      "SignupPolicyDocumentV1": {
+        "additionalProperties": false,
+        "properties": {
+          "equivalent_versions": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$",
+              "type": "string"
+            },
+            "title": "Equivalent Versions",
+            "type": "array"
+          },
+          "prior_versions": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$",
+              "type": "string"
+            },
+            "title": "Prior Versions",
+            "type": "array"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "required",
+          "equivalent_versions",
+          "prior_versions"
+        ],
+        "title": "SignupPolicyDocumentV1",
+        "type": "object"
+      },
       "StateResponse": {
         "additionalProperties": false,
         "properties": {
@@ -9647,6 +9754,8 @@
           "facility_type": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -9700,6 +9809,8 @@
           "turn_type": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -9904,6 +10015,8 @@
           "facility_type": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -9949,6 +10062,8 @@
           "turn_type": {
             "anyOf": [
               {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -10203,6 +10318,104 @@
           }
         ],
         "summary": "Create Email Otp Enrollment",
+        "tags": [
+          "accounts"
+        ],
+        "x-walksafe-actor-identity-required": false,
+        "x-walksafe-required-role": "field"
+      }
+    },
+    "/account-signup-policy": {
+      "get": {
+        "operationId": "signup_policy_account_signup_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountSignupPolicyV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountErrorResponseV1"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountErrorResponseV1"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountErrorResponseV1"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountErrorResponseV1"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountErrorResponseV1"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountErrorResponseV1"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountErrorResponseV1"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeFieldToken": []
+          }
+        ],
+        "summary": "Signup Policy",
         "tags": [
           "accounts"
         ],
@@ -10752,7 +10965,7 @@
             "schema": {
               "maxLength": 22,
               "minLength": 22,
-              "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
+              "pattern": "^[A-Za-z0-9_-]{22}$",
               "type": "string"
             }
           }
@@ -10917,7 +11130,7 @@
             "schema": {
               "maxLength": 22,
               "minLength": 22,
-              "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
+              "pattern": "^[A-Za-z0-9_-]{22}$",
               "type": "string"
             }
           }
@@ -11004,7 +11217,7 @@
             "schema": {
               "maxLength": 22,
               "minLength": 22,
-              "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
+              "pattern": "^[A-Za-z0-9_-]{22}$",
               "type": "string"
             }
           }
@@ -11484,7 +11697,7 @@
             "schema": {
               "maxLength": 22,
               "minLength": 22,
-              "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
+              "pattern": "^[A-Za-z0-9_-]{22}$",
               "type": "string"
             }
           }
@@ -11934,7 +12147,7 @@
             "schema": {
               "maxLength": 22,
               "minLength": 22,
-              "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
+              "pattern": "^[A-Za-z0-9_-]{22}$",
               "type": "string"
             }
           }
@@ -12155,7 +12368,7 @@
             "schema": {
               "maxLength": 22,
               "minLength": 22,
-              "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
+              "pattern": "^[A-Za-z0-9_-]{22}$",
               "type": "string"
             }
           }
@@ -12658,7 +12871,37 @@
     },
     "/admin/security/sessions": {
       "get": {
+        "description": "Page by session ID with the current session repeated on every page.\n\nSet paged=true for the first page, then pass the last non-current\nsession_id as after. A current-only page ends the traversal.",
         "operationId": "get_sessions_admin_security_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "paged",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Paged",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -12669,6 +12912,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -14394,6 +14647,140 @@
           }
         ],
         "summary": "Create Consent Event",
+        "tags": [
+          "privacy"
+        ],
+        "x-walksafe-actor-identity-required": true,
+        "x-walksafe-required-role": "field"
+      }
+    },
+    "/privacy/installation-evidence-key": {
+      "post": {
+        "operationId": "register_evidence_key_privacy_installation_evidence_key_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-walksafe-actor-id",
+            "required": true,
+            "schema": {
+              "title": "X-Walksafe-Actor-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-walksafe-account-generation",
+            "required": true,
+            "schema": {
+              "title": "X-Walksafe-Account-Generation",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallationEvidenceKeyV1"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponseV2"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponseV2"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponseV2"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponseV2"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponseV2"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponseV2"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponseV2"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyErrorResponseV2"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAccountGeneration": [],
+            "WalkSafeActorAssertion": [],
+            "WalkSafeActorId": [],
+            "WalkSafeFieldToken": []
+          }
+        ],
+        "summary": "Register Evidence Key",
         "tags": [
           "privacy"
         ],
@@ -16953,11 +17340,13 @@
             }
           },
           {
+            "description": "internal is an admin export; redacted=true only rounds coordinates and clears image paths. minimum is a minimized public export, not an anonymized export.",
             "in": "query",
             "name": "profile",
             "required": false,
             "schema": {
               "default": "internal",
+              "description": "internal is an admin export; redacted=true only rounds coordinates and clears image paths. minimum is a minimized public export, not an anonymized export.",
               "enum": [
                 "internal",
                 "minimum",
@@ -17054,7 +17443,7 @@
             "schema": {
               "maxLength": 22,
               "minLength": 22,
-              "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
+              "pattern": "^[A-Za-z0-9_-]{22}$",
               "type": "string"
             }
           }
@@ -18517,15 +18906,23 @@
             }
           },
           {
+            "description": "Defaults to 10 for full history, or 25 with position=last.",
             "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
-              "default": 10,
-              "maximum": 25,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 25,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to 10 for full history, or 25 with position=last.",
+              "title": "Limit"
             }
           },
           {
@@ -18545,6 +18942,22 @@
                 }
               ],
               "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "position",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Position"
             }
           }
         ],
@@ -18618,7 +19031,7 @@
             "schema": {
               "maxLength": 22,
               "minLength": 22,
-              "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
+              "pattern": "^[A-Za-z0-9_-]{22}$",
               "type": "string"
             }
           }
@@ -18702,7 +19115,7 @@
             "schema": {
               "maxLength": 22,
               "minLength": 22,
-              "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
+              "pattern": "^[A-Za-z0-9_-]{22}$",
               "type": "string"
             }
           }
@@ -18919,15 +19332,23 @@
             }
           },
           {
+            "description": "Defaults to 10 for full history, or 25 with position=last.",
             "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
-              "default": 10,
-              "maximum": 25,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 25,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Defaults to 10 for full history, or 25 with position=last.",
+              "title": "Limit"
             }
           },
           {
@@ -18947,6 +19368,22 @@
                 }
               ],
               "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "position",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Position"
             }
           }
         ],
@@ -19114,7 +19551,7 @@
             "schema": {
               "maxLength": 22,
               "minLength": 22,
-              "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
+              "pattern": "^[A-Za-z0-9_-]{22}$",
               "type": "string"
             }
           }

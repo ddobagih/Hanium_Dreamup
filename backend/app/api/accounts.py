@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.app.account_schemas import (
+    AccountSignupPolicyV1,
     AccountAuthenticateRequestV1,
     AccountAuthenticationResponseV1,
     AccountCreateRequestV1,
@@ -153,6 +154,25 @@ def create_router(
         else AccountEnrollmentRateLimiter(settings)
     )
     router = APIRouter(tags=["accounts"])
+
+    @router.get("/account-signup-policy", response_model=AccountSignupPolicyV1,
+                responses=_ERROR_RESPONSES)
+    def signup_policy(response: Response) -> AccountSignupPolicyV1:
+        from backend.app.services.signup_documents import (
+            SIGNUP_REQUIRED_DOCUMENT_KEYS, signup_document_keys_are_exact,
+            signup_equivalent_document_versions, signup_prior_document_versions,
+        )
+        versions = settings.account_signup_document_versions
+        if not signup_document_keys_are_exact(versions):
+            raise HTTPException(503, detail={"code": "account_enrollment_unavailable"},
+                                headers=_NO_STORE_HEADERS)
+        response.headers.update(_NO_STORE_HEADERS)
+        return AccountSignupPolicyV1(documents={
+            key: dict(version=version, required=key in SIGNUP_REQUIRED_DOCUMENT_KEYS,
+                      equivalent_versions=sorted(signup_equivalent_document_versions(settings).get(key, ())),
+                      prior_versions=sorted(signup_prior_document_versions(settings).get(key, ())))
+            for key, version in versions.items()
+        })
 
     @router.post(
         "/account-enrollments/email-otp",

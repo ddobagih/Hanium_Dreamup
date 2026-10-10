@@ -41,6 +41,7 @@ from backend.app.models import (  # noqa: E402
     RawCollectionObject,
     Report,
     ReportImageObject,
+    ReportDeletionTombstone,
     ReportInstitutionDeliveryEvent,
     SignupConsentReceipt,
     UserAccount,
@@ -67,7 +68,8 @@ from backend.app.services.raw_collection_storage import (  # noqa: E402
 )
 
 
-JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v4"
+JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v5"
+FROZEN_ENROLLMENT_JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v4"
 CREDENTIAL_JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v3"
 RAW_JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v2"
 LEGACY_JOURNAL_SCHEMA = "walksafe.account-deletion-worker-journal.v1"
@@ -107,10 +109,10 @@ _SERVER_INVENTORY_COUNT_KEYS = (
     "external_copy_count",
 )
 _CREDENTIAL_JOURNAL_SCHEMAS = frozenset(
-    {JOURNAL_SCHEMA, CREDENTIAL_JOURNAL_SCHEMA}
+    {JOURNAL_SCHEMA, FROZEN_ENROLLMENT_JOURNAL_SCHEMA, CREDENTIAL_JOURNAL_SCHEMA}
 )
 _RAW_INVENTORY_JOURNAL_SCHEMAS = frozenset(
-    {JOURNAL_SCHEMA, CREDENTIAL_JOURNAL_SCHEMA, RAW_JOURNAL_SCHEMA}
+    {JOURNAL_SCHEMA, FROZEN_ENROLLMENT_JOURNAL_SCHEMA, CREDENTIAL_JOURNAL_SCHEMA, RAW_JOURNAL_SCHEMA}
 )
 
 
@@ -932,6 +934,7 @@ def _read_journal(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema_version") not in {
         JOURNAL_SCHEMA,
+        FROZEN_ENROLLMENT_JOURNAL_SCHEMA,
         CREDENTIAL_JOURNAL_SCHEMA,
         RAW_JOURNAL_SCHEMA,
         LEGACY_JOURNAL_SCHEMA,
@@ -977,7 +980,7 @@ def _read_journal(path: Path) -> dict[str, object]:
             raise AccountDeletionWorkerError(
                 "worker credential journal inventory is invalid"
             )
-        if value["schema_version"] == JOURNAL_SCHEMA:
+        if value["schema_version"] in {JOURNAL_SCHEMA, FROZEN_ENROLLMENT_JOURNAL_SCHEMA}:
             # S1617-55/59: optional in v4 (absent = prepared before the
             # quarantine/copy inventory existed, legacy fixed basis).
             for count_key in _SERVER_INVENTORY_COUNT_KEYS:
@@ -1021,6 +1024,8 @@ def _read_journal(path: Path) -> dict[str, object]:
                 raise AccountDeletionWorkerError(
                     "worker credential journal inventory is invalid"
                 )
+    if value["schema_version"] == JOURNAL_SCHEMA:
+        _validate_storage_roots(value)
     return value
 
 
@@ -1443,7 +1448,16 @@ def _object_inventory(
     return reports, objects
 
 
-def _external_copy_count(db: Session, reports: list[Report]) -> int:
+def _prior_report_external_copy_count(db: Session, subject: str, generation: int) -> int:
+    return int(db.scalar(select(func.sum(ReportDeletionTombstone.external_copy_count)).where(
+        ReportDeletionTombstone.privacy_subject_hmac == subject,
+        ReportDeletionTombstone.account_generation == generation,
+    )) or 0)
+
+
+def _external_copy_count(
+    db: Session, reports: list[Report], *, subject: str, generation: int,
+) -> int:
     """S1617-59: delivered institution copies of the subject's reports.
 
     Every package (or unpackaged delivery event) counts as one external copy,
@@ -1451,14 +1465,17 @@ def _external_copy_count(db: Session, reports: list[Report]) -> int:
     deletes it, so ``server_copies`` stays open until that is confirmed.
     """
 
+    # Physical report deletion removes the report row but preserves its copy count.
+    # Count that evidence too, even when this account has no live reports left.
+    prior_copies = _prior_report_external_copy_count(db, subject, generation)
     report_ids = [report.id for report in reports]
     if not report_ids:
-        return 0
+        return prior_copies
     copy_key = func.coalesce(
         ReportInstitutionDeliveryEvent.package_id,
         ReportInstitutionDeliveryEvent.id,
     )
-    return int(
+    return prior_copies + int(
         db.scalar(
             select(func.count(func.distinct(copy_key))).where(
                 ReportInstitutionDeliveryEvent.report_id.in_(report_ids)
@@ -1947,7 +1964,7 @@ def _request_inventory_counts(
                 )
                 or 0
             )
-        if journal["schema_version"] == JOURNAL_SCHEMA:
+        if journal["schema_version"] in {JOURNAL_SCHEMA, FROZEN_ENROLLMENT_JOURNAL_SCHEMA}:
             enrollment_ids = _frozen_account_enrollment_ids(journal)
             if enrollment_ids:
                 account_enrollment_count = int(
@@ -2036,6 +2053,86 @@ def _manifest_server_inventory(journal: Mapping[str, object]) -> dict[str, str]:
     }
 
 
+def _capture_storage_root(path: Path, *, group_gid: int | None) -> dict[str, object]:
+    path = _upload_directory(path, expected_group_gid=group_gid)
+    if path.resolve(strict=True) != path:
+        raise AccountDeletionWorkerError("storage root must not traverse symlinks")
+    with _validated_directory_descriptor(
+        path, expected_mode=0o2750 if group_gid is not None else 0o700,
+        expected_gid=group_gid,
+    ) as descriptor:
+        metadata = os.fstat(descriptor)
+        return {"path": str(path), "device": metadata.st_dev, "inode": metadata.st_ino,
+                "group_gid": group_gid}
+
+
+def _validate_storage_roots(journal: Mapping[str, object]) -> dict[str, dict[str, object]]:
+    roots = journal.get("storage_roots")
+    if not isinstance(roots, dict) or set(roots) != {"uploads", "raw"}:
+        raise AccountDeletionWorkerError("worker storage root inventory is invalid")
+    for name, inventory_key in (("uploads", "objects"), ("raw", "raw_objects")):
+        root = roots[name]
+        if not isinstance(root, dict) or set(root) != {"path", "device", "inode", "group_gid"}:
+            raise AccountDeletionWorkerError("worker storage root binding is invalid")
+        path_text = root["path"]
+        if not isinstance(path_text, str) or not path_text or "\x00" in path_text:
+            raise AccountDeletionWorkerError("worker storage root path is invalid")
+        path = Path(path_text)
+        if not path.is_absolute() or str(path) != path_text or os.path.abspath(path) != path_text:
+            raise AccountDeletionWorkerError("worker storage root path is invalid")
+        if (type(root["device"]) is not int or root["device"] < 0
+                or type(root["inode"]) is not int or root["inode"] <= 0
+                or (root["group_gid"] is not None and
+                    (type(root["group_gid"]) is not int or root["group_gid"] <= 0))):
+            raise AccountDeletionWorkerError("worker storage root identity is invalid")
+        for item in journal.get(inventory_key, []):
+            if (not isinstance(item, dict) or not isinstance(item.get("source_path"), str)
+                    or Path(item["source_path"]).parent != path):
+                raise AccountDeletionWorkerError("worker storage root differs from object inventory")
+    if roots["uploads"]["path"] == roots["raw"]["path"]:
+        raise AccountDeletionWorkerError("worker storage roots must be distinct")
+    return roots
+
+
+def _scan_bound_storage_root(
+    binding: Mapping[str, object], identifiers: set[str], *, include_quarantines: bool,
+) -> list[str]:
+    path = Path(str(binding["path"]))
+    gid = binding["group_gid"]
+    mode = 0o2750 if gid is not None else 0o700
+    leftovers: list[str] = []
+    # Scan even without identifiers: missing/unreadable roots are not evidence of emptiness.
+    with _validated_directory_descriptor(path, expected_mode=mode, expected_gid=gid) as descriptor:
+        metadata = os.fstat(descriptor)
+        if (path.resolve(strict=True) != path or
+                (metadata.st_dev, metadata.st_ino) != (binding["device"], binding["inode"])):
+            raise AccountDeletionWorkerError("worker storage root identity changed")
+        names = os.listdir(descriptor)
+        leftovers.extend(str(path / name) for name in names
+                         if any(identifier in name for identifier in identifiers))
+        if include_quarantines:
+            for name in (RETENTION_QUARANTINE_DIRECTORY_NAME, REPORT_DELETION_QUARANTINE_DIRECTORY_NAME):
+                try:
+                    child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                                    dir_fd=descriptor)
+                except FileNotFoundError:
+                    continue
+                try:
+                    opened = os.fstat(child)
+                    anchored = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+                    child_names = os.listdir(child)
+                    if (_directory_binding(opened) != _directory_binding(anchored)
+                            or _directory_binding(opened) != _directory_binding(
+                                os.stat(name, dir_fd=descriptor, follow_symlinks=False))):
+                        raise AccountDeletionWorkerError("worker quarantine directory changed")
+                    leftovers.extend(str(path / name / entry) for entry in child_names
+                                     if any(identifier in entry for identifier in identifiers))
+                finally:
+                    os.close(child)
+        _assert_bound_directory(path, descriptor, expected_mode=mode, expected_gid=gid)
+    return leftovers
+
+
 def _leftover_server_objects(journal: Mapping[str, object]) -> list[str]:
     """S1617-55: re-scan storage roots for objects outside the journal.
 
@@ -2056,6 +2153,19 @@ def _leftover_server_objects(journal: Mapping[str, object]) -> list[str]:
         for item in journal.get("raw_collections", [])  # type: ignore[union-attr]
         if isinstance(item, dict) and "collection_id" in item
     }
+    if journal.get("schema_version") == JOURNAL_SCHEMA:
+        bindings = _validate_storage_roots(journal)
+        try:
+            return sorted(
+                _scan_bound_storage_root(bindings["uploads"], report_ids, include_quarantines=True)
+                + _scan_bound_storage_root(bindings["raw"], collection_ids, include_quarantines=False)
+            )
+        except OSError as exc:
+            raise AccountDeletionWorkerError("server storage cannot be re-scanned after commit") from exc
+    # Old records cannot establish where a manifest-only RAW collection was stored.
+    # Never invent that historical path from today's configuration or attest an empty scan.
+    if collection_ids and not journal.get("raw_objects"):
+        raise AccountDeletionWorkerError("legacy raw inventory lacks a verified storage root")
     roots: list[tuple[Path, set[str]]] = []
     upload_roots = {
         Path(str(item["source_path"])).parent
@@ -2181,6 +2291,14 @@ def _finish_committed_journal(
         counts = _request_inventory_counts(db, journal)
         if any(counts):
             raise AccountDeletionWorkerError("server object inventory is not empty after commit")
+        prior_copies = _prior_report_external_copy_count(
+            db, str(journal["privacy_subject_hmac"]), int(journal["account_generation"]),
+        )
+        _, recorded_copies = _server_inventory_counts(journal)
+        if prior_copies > (recorded_copies or 0):
+            # Old journals may have missed copies of already-deleted reports. Do not
+            # publish a completion claim or silently rewrite their committed inventory.
+            raise AccountDeletionWorkerError("prior report copy inventory is missing from journal")
         tombstone_count = db.scalar(
             select(func.count(AccountDeletionTombstone.tombstone_id)).where(
                 AccountDeletionTombstone.privacy_subject_hmac
@@ -2393,6 +2511,10 @@ def process_request(
             ) = _credential_inventory(db, request)
             journal = {
                 "schema_version": JOURNAL_SCHEMA,
+                "storage_roots": {
+                    "uploads": _capture_storage_root(upload_dir, group_gid=upload_group_gid),
+                    "raw": _capture_storage_root(raw_object_dir, group_gid=upload_group_gid),
+                },
                 "request_id": request.request_id,
                 "privacy_subject_hmac": request.privacy_subject_hmac,
                 "account_generation": request.account_generation,
@@ -2416,8 +2538,11 @@ def process_request(
                     1 for collection in raw_collections
                     if collection.state == "QUARANTINED"
                 ),
-                "external_copy_count": _external_copy_count(db, reports),
+                "external_copy_count": _external_copy_count(
+                    db, reports, subject=expected_subject, generation=expected_generation,
+                ),
             }
+            _validate_storage_roots(journal)
             _atomic_write(journal_path, journal)
             _move_to_quarantine(_journal_objects(journal))
             if fault is not None:
@@ -2428,7 +2553,9 @@ def process_request(
                 # acquired the row between preparation and DELETE is now
                 # visible; one arriving afterward must wait for the DELETE.
                 # Do not publish a journal whose copy count missed that fact.
-                if _external_copy_count(db, reports) != journal["external_copy_count"]:
+                if _external_copy_count(
+                    db, reports, subject=expected_subject, generation=expected_generation,
+                ) != journal["external_copy_count"]:
                     raise AccountDeletionWorkerError(
                         "external copy inventory changed during report deletion"
                     )

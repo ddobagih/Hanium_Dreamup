@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 import hashlib
 import uuid
 
@@ -415,7 +417,7 @@ def list_admin_reports(
             },
         ) from exc
 
-    statement = select(*admin_report_list_columns())
+    statement = select(*admin_report_list_columns()).where(account_subject_visible(Report))
     if filters.report_id is not None:
         statement = statement.where(Report.id == filters.report_id)
     if filters.status is not None:
@@ -564,7 +566,7 @@ def get_admin_report_detail(
 
     try:
         report_row = db.execute(
-            select(*admin_report_detail_columns()).where(Report.id == parsed_report_id)
+            select(*admin_report_detail_columns()).where(account_subject_visible(Report)).where(Report.id == parsed_report_id)
         ).one_or_none()
         if report_row is not None:
             report = coerce_admin_report_detail_row(report_row)

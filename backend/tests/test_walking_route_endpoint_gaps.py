@@ -88,6 +88,17 @@ def test_exact_endpoints_report_zero_gaps() -> None:
     assert (response.start_gap_m, response.end_gap_m) == (0, 0)
 
 
+@pytest.mark.parametrize("north_m", [36.0, 60.0, 99.0])
+def test_large_start_gap_is_reported_without_inventing_a_connector(north_m: float) -> None:
+    request = _request()
+    start = _shifted(ORIGIN, north_m)
+    end = _shifted(DESTINATION, 0.0)
+    response = _normalize_tmap_response(_payload(start, end), request)
+    assert response.start_gap_m == round(route_point_distance_m(request.origin, start))
+    assert response.polyline[0] == start
+    assert response.end_gap_m == 0
+
+
 @pytest.mark.parametrize("north_m", [-101.0, 101.0])
 def test_the_100_m_endpoint_bound_still_rejects(north_m: float) -> None:
     request = _request()

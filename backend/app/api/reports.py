@@ -7,6 +7,8 @@ operations only; this module does not submit reports to a public agency.
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 import csv
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
@@ -580,7 +582,7 @@ def _filtered_reports_statement(
     if has_radius_query and (lat is None or lng is None or radius_m is None):
         raise HTTPException(status_code=400, detail="lat, lng, and radius_m must be provided together")
 
-    statement = select(Report)
+    statement = select(Report).where(account_subject_visible(Report))
     if status is not None:
         statement = statement.where(Report.status == status)
     if class_name is not None:
@@ -1119,7 +1121,7 @@ def _report_transport_status_statement(
             Report.client_payload_bytes,
             Report.persistence_marker,
         )
-        .where(Report.id == report_id)
+        .where(Report.id == report_id, account_subject_visible(Report))
         .where(Report.privacy_subject_hmac == privacy_subject)
         .where(Report.account_generation == account_generation)
         .where(Report.client_payload_sha256.is_not(None))
@@ -1996,7 +1998,7 @@ def _idempotent_report_replay(
         {"lock_key": lock_key},
     )
     existing = db.scalar(
-        select(Report)
+        select(Report).where(account_subject_visible(Report))
         .where(Report.class_name == class_name)
         .where(Report.captured_at == captured_at)
         .where(Report.privacy_subject_hmac == privacy_subject)
@@ -2034,7 +2036,7 @@ def _report_transport_replay(
         text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
         {"lock_key": f"walksafe-report-transport-v1\n{contract.report_id}"},
     )
-    existing = db.get(Report, contract.report_id)
+    existing = db.scalar(select(Report).where(Report.id == contract.report_id, account_subject_visible(Report)))
     if existing is None:
         return None
     if (
@@ -3876,7 +3878,7 @@ def create_router(
             x_walksafe_read_purpose,
             required=settings.field_test_security_enabled,
         )
-        report = db.get(Report, report_id)
+        report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
         if report is None:
             raise HTTPException(status_code=404, detail="report not found")
         if settings.field_test_security_enabled:
@@ -3913,7 +3915,7 @@ def create_router(
                 "report.status.patch",
             )
             report = db.scalar(
-                select(Report)
+                select(Report).where(account_subject_visible(Report))
                 .where(Report.id == report_id)
                 .with_for_update()
             )

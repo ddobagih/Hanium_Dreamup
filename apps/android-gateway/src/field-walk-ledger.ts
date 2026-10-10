@@ -357,8 +357,10 @@ function ledgerPath(options: FieldWalkLedgerOptions): string {
  * S19-14: accounts are spread over a fixed set of shard files by a hash of the account id.
  * Each shard is a complete ledger (same schema, its own accounts and audit) with its own
  * kernel lock, so a heartbeat reads, validates, encrypts, and fsyncs only its shard, and
- * accounts in different shards never wait for each other. Fencing stays per account inside
- * the account's home shard. Shard 0 is the configured path itself, so a ledger written by an
+ * steady-state accounts in different shards do not contend on the same shard lock.
+ * Synchronous file work still blocks the process event loop; first-use migration also locks
+ * shard 0. This is lock isolation, not an independent request-latency guarantee.
+ * Fencing stays per account inside the account's home shard. Shard 0 is the configured path itself, so a ledger written by an
  * earlier single-file build is the legacy shard: an account found there but homed elsewhere
  * is moved once (home shard written first, then removed from shard 0) under both locks.
  */

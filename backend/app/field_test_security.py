@@ -216,6 +216,7 @@ _ADMIN_REPORT_MUTATION_BODY_ACTIONS = frozenset(
 ADMIN_REPORT_MUTATION_MAX_BODY_BYTES = 65_536
 ACCOUNT_GATEWAY_ROUTES = frozenset(
     {
+        ("GET", "/account-signup-policy"),
         ("POST", "/account-enrollments/email-otp"),
         ("POST", "/accounts"),
         ("POST", "/accounts/authenticate"),
@@ -265,9 +266,11 @@ FIELD_TEST_ROUTE_POLICIES = (
     ("POST", "/navigation/walking", FieldTestAccess.FIELD),
     ("GET", "/privacy/consent-bootstrap", FieldTestAccess.FIELD),
     ("POST", "/privacy/consent-events", FieldTestAccess.FIELD),
+    ("POST", "/privacy/installation-evidence-key", FieldTestAccess.FIELD),
     ("POST", "/privacy/account-deletions", FieldTestAccess.FIELD),
     ("GET", "/privacy/account-deletions/{request_id}/status", FieldTestAccess.FIELD),
     ("POST", "/privacy/account-deletions/{request_id}/device-evidence", FieldTestAccess.FIELD),
+    ("GET", "/account-signup-policy", FieldTestAccess.FIELD),
     ("POST", "/account-enrollments/email-otp", FieldTestAccess.FIELD),
     ("POST", "/accounts", FieldTestAccess.FIELD),
     ("POST", "/accounts/authenticate", FieldTestAccess.FIELD),
@@ -443,7 +446,7 @@ def _rate_limit_group(
     ):
         return "raw_collection"
     if (
-        (normalized_method == "POST" and policy_path == "/privacy/consent-events")
+        (normalized_method == "POST" and policy_path in {"/privacy/consent-events", "/privacy/installation-evidence-key"})
         or (normalized_method == "GET" and policy_path == "/privacy/consent-bootstrap")
     ):
         return "privacy"
@@ -516,7 +519,7 @@ def requires_account_generation(
     normalized_method = method.upper()
     return (
         (
-            (normalized_method == "POST" and policy_path == "/privacy/consent-events")
+            (normalized_method == "POST" and policy_path in {"/privacy/consent-events", "/privacy/installation-evidence-key"})
             or (
                 normalized_method == "GET"
                 and policy_path == "/privacy/consent-bootstrap"

@@ -1218,3 +1218,17 @@ test("fresh device verification is forwarded outside the canonical revision and 
   assert.equal(legacy.kind, "ok");
   if (legacy.kind === "ok") assert.deepEqual(legacy.status, canonical);
 });
+
+test("installation signature survives evidence parsing without changing the signed statement digest", () => {
+  const statement = {
+    schema_version: DEVICE_DELETION_EVIDENCE_SCHEMA_V2, request_id: REQUEST_ID,
+    tombstone_id: TOMBSTONE_ID, request_receipt_sha256: REQUEST_RECEIPT,
+    installation_id: "signed_installation_01", evidence_id: "signed_evidence_01",
+    client_revision: 1, expected_status_revision: 1, item: "device_untransmitted_data" as const,
+    result: "DELETED" as const, completed_at: "2026-08-09T00:10:00Z"
+  };
+  const signed = {...statement, evidence_sha256: deviceDeletionEvidenceSha256V2(statement), installation_signature: "a".repeat(96)};
+  assert.deepEqual(parseDeviceDeletionEvidenceV2(signed), signed);
+  assert.equal(parseDeviceDeletionEvidenceV2({...signed, installation_signature: "bad"}), null);
+  assert.equal(parseDeviceDeletionEvidenceV2({...signed, completed_at: "2026-08-09T00:11:00Z"}), null);
+});

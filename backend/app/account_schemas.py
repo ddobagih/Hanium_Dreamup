@@ -166,6 +166,18 @@ class SignupDocumentVersionsV1(_StrictModel):
     training_reuse: DocumentVersion
 
 
+class SignupPolicyDocumentV1(_StrictModel):
+    version: DocumentVersion
+    required: StrictBool
+    equivalent_versions: list[DocumentVersion]
+    prior_versions: list[DocumentVersion]
+
+
+class AccountSignupPolicyV1(_StrictModel):
+    schema_version: Literal["walksafe.account-signup-policy.v1"] = "walksafe.account-signup-policy.v1"
+    documents: dict[str, SignupPolicyDocumentV1]
+
+
 class SignupConsentSelectionsV1(_StrictModel):
     terms_of_service: StrictBool
     privacy_notice: StrictBool

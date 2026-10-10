@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 import base64
 import binascii
 from dataclasses import dataclass
@@ -290,7 +292,7 @@ def issue_report_original_access_grant(
         raise ValueError("report original access grant TTL is invalid")
     try:
         secured_dml = _secured_original_evidence_dml_required(db)
-        report_query = select(Report).where(Report.id == report_id)
+        report_query = select(Report).where(account_subject_visible(Report)).where(Report.id == report_id)
         if not secured_dml:
             report_query = report_query.with_for_update()
         report = db.execute(report_query).scalar_one_or_none()
@@ -917,7 +919,7 @@ def _access_report_original_secured(
         )
 
     try:
-        report = db.get(Report, report_id)
+        report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
         image_object = db.get(ReportImageObject, report_id)
     except SQLAlchemyError as exc:
         db.rollback()
@@ -1122,7 +1124,7 @@ def access_report_original(
             runtime_totp_secret=runtime_totp_secret,
             credential_issuer_key=credential_issuer_key,
         )
-    report = db.get(Report, report_id)
+    report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
     if report is None or report.image_path != f"/uploads/{filename}":
         _audit_then_raise(
             db,
@@ -1189,7 +1191,7 @@ def access_report_original(
     )
     try:
         locked_report = db.execute(
-            select(Report)
+            select(Report).where(account_subject_visible(Report))
             .where(Report.id == report_id)
             .with_for_update()
             .execution_options(populate_existing=True)

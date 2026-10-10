@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 from datetime import UTC, datetime
 from typing import Any, NoReturn
 import uuid
@@ -219,7 +221,7 @@ def _as_utc(value: datetime) -> datetime:
 def _locked_report(db: Session, report_id: uuid.UUID) -> Report:
     try:
         report = db.execute(
-            select(Report).where(Report.id == report_id).with_for_update()
+            select(Report).where(account_subject_visible(Report)).where(Report.id == report_id).with_for_update()
         ).scalar_one_or_none()
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
@@ -555,7 +557,7 @@ def append_report_review_decision(
 
     if existing is None and secured_dml:
         try:
-            report = db.get(Report, report_id)
+            report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
         except SQLAlchemyError as exc:
             _raise_database_unavailable(db, exc)
         if report is None:
@@ -917,7 +919,7 @@ def list_report_review_decisions(
     report_id: uuid.UUID,
 ) -> list[ReportReviewDecision]:
     try:
-        report = db.get(Report, report_id)
+        report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
     if report is None:
@@ -953,7 +955,7 @@ def get_report_review_decision(
     """
 
     try:
-        report = db.get(Report, report_id)
+        report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
     if report is None:
@@ -993,7 +995,7 @@ def _report_history_snapshot(
                 func.max(history_model.revision),
             )
             .outerjoin(history_model, history_model.report_id == Report.id)
-            .where(Report.id == report_id)
+            .where(Report.id == report_id, account_subject_visible(Report))
             .group_by(Report.id)
         ).one_or_none()
     except SQLAlchemyError as exc:
@@ -1233,7 +1235,7 @@ def append_report_institution_delivery_event(
         _raise_database_unavailable(db, exc)
     if secured_dml:
         try:
-            report = db.get(Report, report_id)
+            report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
         except SQLAlchemyError as exc:
             _raise_database_unavailable(db, exc)
         if report is None:
@@ -1884,7 +1886,7 @@ def list_report_institution_delivery_events(
     report_id: uuid.UUID,
 ) -> list[ReportInstitutionDeliveryEvent]:
     try:
-        report = db.get(Report, report_id)
+        report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
     if report is None:

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import base64
+import binascii
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
@@ -21,6 +23,7 @@ from backend.app.schemas import (
     AccountDeletionStatusV2,
     AccountDeletionStatusWithDeviceVerificationV2,
     DeviceDeletionEvidenceV2,
+    InstallationEvidenceKeyV1,
     PrivacyConsentBootstrapV1,
     PrivacyConsentEventV2,
     PrivacyEvidenceId,
@@ -34,6 +37,7 @@ from backend.app.services.privacy_lifecycle import (
     get_account_deletion_status,
     record_consent_event,
     record_device_deletion_evidence,
+    register_installation_evidence_key,
 )
 from backend.app.services.signup_documents import signup_equivalent_document_versions
 
@@ -128,6 +132,33 @@ def _raise_store_error(db: Session, exc: SQLAlchemyError) -> None:
 
 def create_router(settings: Settings) -> APIRouter:
     router = APIRouter(prefix="/privacy", tags=["privacy"])
+
+    @router.post("/installation-evidence-key", status_code=204, responses=_PRIVACY_ERROR_RESPONSES)
+    def register_evidence_key(
+        payload: InstallationEvidenceKeyV1,
+        x_walksafe_actor_id: str = Header(alias="x-walksafe-actor-id"),
+        x_walksafe_account_generation: str = Header(alias="x-walksafe-account-generation"),
+        db: Session = Depends(get_db),
+    ) -> Response:
+        generation = _generation(x_walksafe_account_generation)
+        if _ACTOR_ID.fullmatch(x_walksafe_actor_id) is None:
+            raise HTTPException(422, detail={"code": "privacy_consent_binding_invalid"}, headers=_NO_STORE_HEADERS)
+        try:
+            raw = base64.urlsafe_b64decode(payload.public_key + "=" * (-len(payload.public_key) % 4))
+            if base64.urlsafe_b64encode(raw).decode().rstrip("=") != payload.public_key:
+                raise ValueError("noncanonical key")
+            register_installation_evidence_key(
+                db, actor_id=x_walksafe_actor_id, account_generation=generation,
+                installation_id=payload.installation_id, public_key_der=raw,
+                secret=settings.privacy_hmac_secret, key_version=settings.privacy_hmac_key_version,
+            )
+        except (ValueError, binascii.Error):
+            raise HTTPException(422, detail={"code": "installation_evidence_key_invalid"}, headers=_NO_STORE_HEADERS) from None
+        except PrivacyLifecycleError as exc:
+            _raise_privacy_error(db, exc)
+        except SQLAlchemyError as exc:
+            _raise_store_error(db, exc)
+        return Response(status_code=204, headers=_NO_STORE_HEADERS)
 
     @router.get(
         "/consent-bootstrap",

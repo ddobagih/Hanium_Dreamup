@@ -32,6 +32,7 @@ import {
 import {
   authenticateBackendAccount,
   parsePasswordGrant,
+  relayAccountSignupPolicy,
   relayAccountCreation,
   relayAccountEnrollment
 } from "./account-relay.js";
@@ -3146,7 +3147,7 @@ async function dispatchGatewayRequest(
   const methods = matched.methods;
   if (!methods.includes(request.method)) return methodNotAllowed(methods);
   const accountRelayRoute = pathname === "/api/account-enrollments/email-otp" ||
-    pathname === "/api/accounts";
+    pathname === "/api/accounts" || pathname === "/api/account-signup-policy";
   const exactNoQueryRoute = accountRelayRoute ||
     pathname === "/api/speech/stt" || pathname === "/api/speech/tts";
   if (exactNoQueryRoute && matched.query === "none" && [...requestUrl.searchParams].length > 0) {
@@ -3170,7 +3171,10 @@ async function dispatchGatewayRequest(
   }
 
   let response: Response;
-  if (pathname === "/api/account-enrollments/email-otp") {
+  if (pathname === "/api/account-signup-policy") {
+    response = await relayAccountSignupPolicy(request, dependencies.fetchImpl);
+  }
+  else if (pathname === "/api/account-enrollments/email-otp") {
     response = matched.body === "json"
       ? await relayAccountEnrollment(request, dependencies.fetchImpl)
       : gatewayUnavailableResponse();

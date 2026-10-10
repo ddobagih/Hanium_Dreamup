@@ -320,6 +320,10 @@ class _HistorySession:
     def scalars(self, _statement: object) -> _HistoryRowsResult:
         return _HistoryRowsResult(self.rows)
 
+    def scalar(self, statement: object) -> object | None:
+        assert "account_deletion_tombstones" in str(statement)
+        return self.report
+
     def get(self, _model: type[object], _key: object) -> object | None:
         return self.report
 

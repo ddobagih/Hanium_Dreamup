@@ -2264,7 +2264,7 @@ def test_fresh_email_account_deletion_fences_auth_and_preserves_postcommit_reenr
         journal_path = next((journal_root / "journals").glob("*.json"))
         prepared_journal = json.loads(journal_path.read_text(encoding="utf-8"))
         assert prepared_journal["schema_version"] == (
-            "walksafe.account-deletion-worker-journal.v4"
+            "walksafe.account-deletion-worker-journal.v5"
         )
         assert prepared_journal["state"] == "PREPARED"
         assert prepared_journal["account_enrollment_count"] == 2

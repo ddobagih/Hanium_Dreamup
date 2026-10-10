@@ -265,6 +265,7 @@ export type DeviceDeletionEvidenceV2 = {
   result: DeviceDeletionEvidenceResultV2;
   completed_at: string;
   evidence_sha256: string;
+  installation_signature?: string;
 };
 
 type OutboxOperation = {
@@ -651,7 +652,8 @@ export function deviceDeletionEvidenceBodyV2(input: DeviceDeletionEvidenceV2): s
     item: "device_untransmitted_data",
     result: input.result,
     completed_at: input.completed_at,
-    evidence_sha256: input.evidence_sha256
+    evidence_sha256: input.evidence_sha256,
+    ...(input.installation_signature === undefined ? {} : { installation_signature: input.installation_signature })
   });
 }
 
@@ -664,8 +666,11 @@ export function parseDeviceDeletionEvidenceV2(
     !exactKeys(input, [
       "schema_version", "request_id", "tombstone_id", "request_receipt_sha256",
       "installation_id", "evidence_id", "client_revision", "expected_status_revision",
-      "item", "result", "completed_at", "evidence_sha256"
+      "item", "result", "completed_at", "evidence_sha256",
+      ...(input.installation_signature === undefined ? [] : ["installation_signature"])
     ]) ||
+    (input.installation_signature !== undefined && (typeof input.installation_signature !== "string" ||
+      !/^[A-Za-z0-9_-]{86,100}$/.test(input.installation_signature))) ||
     input.schema_version !== DEVICE_DELETION_EVIDENCE_SCHEMA_V2 ||
     typeof input.request_id !== "string" || !REQUEST_ID.test(input.request_id) ||
     typeof input.tombstone_id !== "string" || !OPAQUE_ID.test(input.tombstone_id) ||
@@ -691,7 +696,8 @@ export function parseDeviceDeletionEvidenceV2(
     item: "device_untransmitted_data",
     result: input.result as DeviceDeletionEvidenceResultV2,
     completed_at: input.completed_at,
-    evidence_sha256: input.evidence_sha256
+    evidence_sha256: input.evidence_sha256,
+    ...(input.installation_signature === undefined ? {} : { installation_signature: input.installation_signature })
   };
   const { evidence_sha256: _ignored, ...statement } = parsed;
   return equalHex(parsed.evidence_sha256, deviceDeletionEvidenceSha256V2(statement))

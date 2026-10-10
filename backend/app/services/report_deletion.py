@@ -466,6 +466,9 @@ def apply_report_deletion(
         deleted_at=deleted_at,
     )
     db.add(tombstone)
+    # The copy insert trigger reads this tombstone before accepting its evidence.
+    # These mappers have no ORM relationship to order their inserts automatically.
+    db.flush()
     for event in external_rows:
         db.add(
             ReportDeletionExternalCopyState(

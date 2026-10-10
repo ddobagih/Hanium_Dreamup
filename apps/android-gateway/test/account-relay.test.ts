@@ -2012,3 +2012,23 @@ test("S01-8 shared email vectors preserve canonical account identity", async () 
       password: "valid long passphrase", remember_me: false })?.email ?? null, canonical, input);
   }
 });
+
+test("signup policy is public no-store metadata and rejects malformed upstream documents", async () => {
+  const documents = Object.fromEntries(SIGNUP_CONSENT_DOCUMENT_KEYS.map((key, index) => [key,
+    {version: "v1", required: index < 3, equivalent_versions: [], prior_versions: []}]));
+  let calls = 0;
+  const fetchImpl: GatewayFetch = async (url, init) => {
+    calls++;
+    assert.equal(String(url), "http://127.0.0.1:8000/account-signup-policy");
+    assert.equal(init?.method, "GET");
+    return Response.json({schema_version: "walksafe.account-signup-policy.v1", documents});
+  };
+  const response = await handleGatewayRequest(new Request("http://localhost/api/account-signup-policy"), {fetchImpl});
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), {schema_version: "walksafe.account-signup-policy.v1", documents});
+  documents.terms_of_service!.required = false;
+  assert.equal((await handleGatewayRequest(new Request("http://localhost/api/account-signup-policy"), {fetchImpl})).status, 502);
+  assert.equal((await handleGatewayRequest(new Request("http://localhost/api/account-signup-policy?extra=1"), {fetchImpl})).status, 400);
+  assert.equal(calls, 2);
+});

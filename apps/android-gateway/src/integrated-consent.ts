@@ -1771,6 +1771,36 @@ export async function handleIntegratedConsentRequest(
   const url = new URL(request.url);
   const queryKeys = [...url.searchParams.keys()];
   try {
+    if (url.searchParams.get("control") === "installation-evidence-key") {
+      if (request.method !== "PUT" || queryKeys.length !== 1 || !backendContext) {
+        throw new IntegratedConsentRequestError(400, "installation_evidence_key_request_invalid", "Invalid registration request.");
+      }
+      const bounded = await readBoundedJsonBody(request, 1024);
+      if (bounded.error) return bounded.error;
+      const value = objectValue(bounded.value);
+      if (!value || !exactKeys(value, ["installation_id", "public_key"]) ||
+          typeof value.installation_id !== "string" || typeof value.public_key !== "string" ||
+          !/^[A-Za-z0-9_-]{79,122}$/.test(value.public_key)) {
+        throw new IntegratedConsentRequestError(400, "installation_evidence_key_request_invalid", "Invalid registration request.");
+      }
+      return await withInstallationLock(value.installation_id, async () => {
+        const current = currentConfirmation(value.installation_id as string,
+          request.headers.get(CONSENT_CONTROL_SECRET_HEADER)?.trim() ?? "", backendContext.fieldActorBindingId);
+        if (!current || backendContext.signal.aborted || backendContext.isCurrent?.() === false) {
+          throw new IntegratedConsentRequestError(409, "integrated_consent_reconsent_required", "Confirmed installation consent is required.");
+        }
+        const headers = proxyRequestHeaders(request,
+          { accept: "application/json", "content-type": "application/json" }, backendContext.accountGeneration);
+        if (!headers.get(ACTOR_ID_HEADER) || !headers.get(ACTOR_ASSERTION_HEADER)) {
+          throw new IntegratedConsentRequestError(503, "gateway_backend_assertion_unavailable", "Actor assertion is unavailable.");
+        }
+        const response = await fetchBackend(request, backendUrl("/privacy/installation-evidence-key"),
+          { method: "POST", headers, body: JSON.stringify(value), cache: "no-store", signal: backendContext.signal },
+          15_000, backendContext.fetchImpl ?? globalThis.fetch);
+        return response.status === 204 ? new Response(null, {status: 204, headers: {"cache-control": "no-store"}})
+          : toBackendResponse(response);
+      }, request.signal);
+    }
     if (request.method === "GET") {
       if (
         queryKeys.length !== 3 ||

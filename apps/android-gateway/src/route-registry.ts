@@ -29,6 +29,7 @@ const pathPattern = (source: string): RegExp => new RegExp(`^${source}$`);
 
 const routes: readonly RouteDefinition[] = [
   { template: "/api/account-enrollments/email-otp", path: "/api/account-enrollments/email-otp", methods: ["POST"], auth: "public", body: "json", query: "none", deadline: "ordinary", family: "static" },
+  { template: "/api/account-signup-policy", path: "/api/account-signup-policy", methods: ["GET"], auth: "public", body: "none", query: "none", deadline: "ordinary", family: "static" },
   { template: "/api/accounts", path: "/api/accounts", methods: ["POST"], auth: "public", body: "json", query: "none", deadline: "ordinary", family: "static" },
   { template: "/api/field-session", path: "/api/field-session", methods: ["GET", "POST", "DELETE"], auth: "session-lifecycle", body: "by-method", query: "session", deadline: "ordinary", family: "static" },
   { template: "/api/field-walk", path: "/api/field-walk", methods: ["GET", "POST"], auth: "field-device", body: "by-method", query: "none", deadline: "ordinary", family: "static" },
@@ -82,7 +83,7 @@ export function matchGatewayRoute(url: URL): GatewayRouteMatch | null {
       return { ...metadata, params: result, privacyVariant: "bootstrap", methods: ["GET"],
         auth: "field-session", body: "none", unsupportedMethod: "bootstrap-validation" };
     }
-    if (control === "integrated-consent") {
+    if (control === "integrated-consent" || control === "installation-evidence-key") {
       return { ...metadata, params: result, privacyVariant: "integrated", methods: ["GET", "PUT"],
         auth: "consent-bound", body: "by-method", unsupportedMethod: "integrated-handler" };
     }

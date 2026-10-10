@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import hashlib
@@ -151,7 +153,7 @@ def get_owned_report_content(
     )
     try:
         report = db.execute(
-            select(Report).where(
+            select(Report).where(account_subject_visible(Report)).where(
                 Report.id == report_id,
                 Report.privacy_subject_hmac == privacy_subject,
                 Report.account_generation == account_generation,
@@ -190,7 +192,7 @@ def apply_owned_report_correction(
     )
     try:
         report = db.execute(
-            select(Report)
+            select(Report).where(account_subject_visible(Report))
             .where(
                 Report.id == report_id,
                 Report.privacy_subject_hmac == privacy_subject,

@@ -342,12 +342,20 @@ def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
     }
     assert state_response["additionalProperties"] is False
     sessions_response = schema["components"]["schemas"]["SessionsResponse"]
-    assert set(sessions_response["required"]) == {"sessions", "devices"}
+    assert set(sessions_response["required"]) == {
+        "sessions", "devices", "device_total", "devices_complete",
+    }
+    assert sessions_response["properties"]["device_total"]["minimum"] == 1
+    assert sessions_response["properties"]["devices_complete"]["type"] == "boolean"
     assert sessions_response["additionalProperties"] is False
     assert sessions_response["properties"]["sessions"]["maxItems"] == 100
     assert sessions_response["properties"]["devices"]["maxItems"] == 100
     device_item = schema["components"]["schemas"]["DeviceItem"]
-    assert set(device_item["required"]) == {"device_id", "current"}
+    assert set(device_item["required"]) == {
+        "device_id", "current", "device_label", "last_seen_at", "key_version", "key_marker_prefix",
+    }
+    assert device_item["properties"]["key_version"]["minimum"] == 1
+    assert device_item["properties"]["key_marker_prefix"]["pattern"] == "^[0-9a-f]{8}$"
     assert device_item["additionalProperties"] is False
     recovery_complete_responses = schema["paths"][
         "/admin/security/recovery/complete"
