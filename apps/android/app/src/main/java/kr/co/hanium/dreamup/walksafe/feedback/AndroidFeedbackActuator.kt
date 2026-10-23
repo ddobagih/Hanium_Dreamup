@@ -413,6 +413,7 @@ class AndroidFeedbackActuator private constructor(
         onSpeechFailed: (() -> Unit)?,
         isStillValidAtStart: () -> Boolean,
         onSpeechCancelled: (() -> Unit)? = null,
+        distanceAfterWarning: (() -> ObstacleDistanceSpeech?)? = null,
     ): RiskFeedbackDispatchResult {
         val generation = outputGate.generation()
         val current = { outputGate.isCurrent(generation, action.validUntilMs, isStillValidAtStart) }
@@ -420,7 +421,26 @@ class AndroidFeedbackActuator private constructor(
         val speech = speak(
             message = action.message,
             priority = SpeechPriority.RISK,
-            onCompleted = onSpeechCompleted,
+            onCompleted = {
+                // Delivery accounting belongs to the warning, not to its optional distance.
+                onSpeechCompleted?.invoke()
+                if (outputGate.isCurrent(generation)) {
+                    val distance = distanceAfterWarning?.invoke()
+                    if (distance != null) speak(
+                        message = distance.message,
+                        priority = SpeechPriority.RISK,
+                        // Any new obstacle warning can interrupt this detail, including another STOP.
+                        riskRank = MessageLevel.AWARE.ordinal,
+                        deduplicate = false,
+                        advisoryStartDeadlineMs = distance.validUntilMs,
+                        advisoryStartValidator = {
+                            outputGate.isCurrent(generation, distance.validUntilMs, distance.isStillValidAtStart)
+                        },
+                        requiresExplicitTerminalCallback = true,
+                        protectsFromFollowingSpeech = false,
+                    )
+                }
+            },
             onFailed = onSpeechFailed,
             riskRank = action.level.ordinal,
             advisoryStartDeadlineMs = action.validUntilMs,
@@ -940,6 +960,7 @@ class AndroidFeedbackActuator private constructor(
         requiresExplicitTerminalCallback: Boolean = false,
         protectsFromFollowingSpeech: Boolean = requiresExplicitTerminalCallback,
         onCancelled: (() -> Unit)? = onFailed,
+        deduplicate: Boolean = true,
     ): NavigationSpeechDispatchResult {
         if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
         if (!speechAllowed()) return NavigationSpeechDispatchResult.UNAVAILABLE
@@ -966,6 +987,7 @@ class AndroidFeedbackActuator private constructor(
             requiresExplicitTerminalCallback,
             protectsFromFollowingSpeech,
             onCancelled,
+            deduplicate,
         )
     }
 
@@ -985,6 +1007,7 @@ class AndroidFeedbackActuator private constructor(
         requiresExplicitTerminalCallback: Boolean = false,
         protectsFromFollowingSpeech: Boolean = requiresExplicitTerminalCallback,
         onCancelled: (() -> Unit)? = onFailed,
+        deduplicate: Boolean = true,
     ): NavigationSpeechDispatchResult {
         if (!outputGate.isCurrent()) return NavigationSpeechDispatchResult.SUPPRESSED
         // A synchronous native stop callback must not reenter TTS speak before stop returns.
@@ -1028,7 +1051,7 @@ class AndroidFeedbackActuator private constructor(
             SpeechPriority.NAVIGATION -> NAV_DUP_WINDOW_MS
             SpeechPriority.ADVISORY -> 0L
         }
-        if (!isAdvisory && isDuplicateMessage(message, priority, messagePriorityMs)) {
+        if (deduplicate && !isAdvisory && isDuplicateMessage(message, priority, messagePriorityMs)) {
             return NavigationSpeechDispatchResult.SUPPRESSED
         }
         if (isAdvisory && synchronized(pendingUtterances) { pendingUtterances.isNotEmpty() }) {
@@ -1146,17 +1169,18 @@ class AndroidFeedbackActuator private constructor(
             if (utteranceId !in pendingUtterances) {
                 false
             } else {
-                if (isRisk) {
+                if (isRisk && deduplicate) {
                     lastRiskMessage = message
                     lastRiskMessageAtMs = nowMs
                 } else if (isInteraction) {
                     lastInteractionMessage = message
                     lastInteractionMessageAtMs = nowMs
-                } else if (!isAdvisory) {
+                } else if (!isAdvisory && deduplicate) {
                     lastNavMessage = message
                     lastNavMessageAtMs = nowMs
                 }
-                duplicateOwnerByPriority[utterancePrefix] = utteranceId
+                // Distance details must not replace the warning duplicate identity.
+                if (deduplicate) duplicateOwnerByPriority[utterancePrefix] = utteranceId
                 true
             }
         }

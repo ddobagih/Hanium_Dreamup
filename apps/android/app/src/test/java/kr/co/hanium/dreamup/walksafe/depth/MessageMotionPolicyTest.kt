@@ -9,120 +9,23 @@ import org.junit.Test
 
 class MessageMotionPolicyTest {
     @Test
-    fun omittedMotionEstimatePreservesRelativeApproachGuidance() {
-        val result = MetricDepthDecision(
-            className = "person",
-            source = DepthSource.ARCORE_RAW_DEPTH,
-            riskDistanceM = 2f,
-            trend = Trend.APPROACHING,
-            confidenceFinal = 0.65f,
-        )
-
-        val decision = evaluate(result)
-
-        assertEquals(MessageLevel.WARNING, decision.userFacing.messageLevel)
-        assertTrue(decision.userFacing.message!!.contains("거리가 줄어들고 있습니다"))
-        assertFalse(decision.userFacing.message!!.contains("다가오는"))
-        assertFalse(decision.userFacing.message!!.contains("정지해"))
-    }
-
-    @Test
-    fun lateralMovementNamesCameraSideWithoutClaimingObjectApproach() {
-        val sides = listOf(
-            ObjectMovementDirection.LEFT to "왼쪽",
-            ObjectMovementDirection.RIGHT to "오른쪽",
-        )
-        for ((direction, side) in sides) {
-            for (trend in listOf(Trend.STABLE, Trend.APPROACHING)) {
-                val decision = evaluate(obstacle(direction).copy(trend = trend))
-                val message = decision.userFacing.message!!
-
-                assertEquals(MessageLevel.WARNING, decision.userFacing.messageLevel)
-                assertEquals(MessagePurpose.OBSTACLE_WARNING, decision.purpose)
-                assertTrue(message, message.contains("카메라 기준 ${side}으로 이동하는 것으로 보입니다"))
-                assertFalse(message, message.contains("사용자 쪽으로 다가오는"))
-                assertFalse(message, message.contains("정지해 있는"))
-                assertFalse(message, message.contains(if (side == "왼쪽") "오른쪽" else "왼쪽"))
-                assertTrue(message, message.endsWith("멈출 준비를 하세요."))
+    fun motionAndScreenSideDoNotAddDescriptionsOrDelayTheStopAction() {
+        for (direction in ObjectMovementDirection.values()) {
+            for (side in CameraScreenLateralPosition.values()) {
+                for (trend in Trend.values()) {
+                    for (motion in ObjectMotion.values()) {
+                        val result = obstacle(direction).copy(
+                            cameraScreenLateralPosition = side, trend = trend, objectMotion = motion,
+                        )
+                        assertEquals("사람 주의. 멈출 준비를 하세요.", evaluate(result).userFacing.message)
+                        val stop = evaluate(result.copy(riskDistanceM = 1f)).userFacing
+                        assertEquals(MessageLevel.STOP, stop.messageLevel)
+                        assertEquals("멈추세요. 사람이 감지됐습니다. 주변을 확인하세요.", stop.message)
+                        assertNoSpokenDistanceOrStepCount(stop)
+                    }
+                }
             }
         }
-    }
-
-    @Test
-    fun objectApproachingUserUsesObjectMotionExplanation() {
-        val decision = evaluate(
-            obstacle(ObjectMovementDirection.TOWARD_USER).copy(
-                trend = Trend.APPROACHING,
-                objectMotion = ObjectMotion.OBJECT_APPROACHING,
-            ),
-        )
-
-        val message = decision.userFacing.message!!
-        assertTrue(message, message.contains("이 물체가 사용자 쪽으로 다가오는 것으로 보입니다"))
-        assertFalse(message, message.contains("현재 이 물체에 가까워지고"))
-        assertFalse(message, message.contains("정지해 있는"))
-    }
-
-    @Test
-    fun userApproachingStationaryObjectDoesNotAttributeMotionToObject() {
-        val decision = evaluate(
-            obstacle(ObjectMovementDirection.STATIONARY).copy(
-                trend = Trend.APPROACHING,
-                objectMotion = ObjectMotion.USER_APPROACHING_STATIONARY,
-            ),
-        )
-
-        val message = decision.userFacing.message!!
-        assertTrue(message, message.contains("정지해 있는 것으로 보이며"))
-        assertTrue(message, message.contains("현재 이 물체에 가까워지고 있습니다"))
-        assertFalse(message, message.contains("사용자 쪽으로 다가오는"))
-        assertFalse(message, message.contains("이동하는 것으로"))
-    }
-
-    @Test
-    fun relativeClosingSpeedWithoutObjectDirectionDoesNotClaimObjectApproach() {
-        val decision = evaluate(
-            obstacle().copy(
-                trend = Trend.APPROACHING,
-                motionEstimate = ObjectMotionEstimate(relativeClosingSpeedMps = 0.6f, confidence = 0.95f),
-            ),
-        )
-
-        val message = decision.userFacing.message!!
-        assertTrue(message, message.contains("거리가 줄어들고 있습니다"))
-        assertFalse(message, message.contains("다가오는"))
-        assertFalse(message, message.contains("정지해"))
-        assertFalse(message, message.contains("카메라 기준"))
-    }
-
-    @Test
-    fun recedingObjectUsesAwayPhraseWhileNearbyObstacleWarningRemains() {
-        val decision = evaluate(obstacle(ObjectMovementDirection.AWAY_FROM_USER).copy(trend = Trend.RECEDING))
-
-        assertEquals(MessageLevel.WARNING, decision.userFacing.messageLevel)
-        assertEquals(MessagePurpose.OBSTACLE_WARNING, decision.purpose)
-        assertTrue(decision.userFacing.message!!.contains("사용자에게서 멀어지는 방향으로 이동하는 것으로 보입니다"))
-        assertFalse(decision.userFacing.message!!.contains("다가오는"))
-        assertTrue(decision.userFacing.message!!.endsWith("멈출 준비를 하세요."))
-    }
-
-    @Test
-    fun supportedDirectionsUseExplicitClaimsWhileUnknownAndOtherKeepBaseline() {
-        val baseline = evaluate(obstacle()).userFacing
-        for (direction in listOf(
-            ObjectMovementDirection.UNKNOWN,
-            ObjectMovementDirection.OTHER,
-        )) {
-            assertEquals(direction.name, baseline, evaluate(obstacle(direction)).userFacing)
-        }
-        assertTrue(
-            evaluate(obstacle(ObjectMovementDirection.STATIONARY)).userFacing.message!!
-                .contains("정지해 있는 것으로 보입니다."),
-        )
-        assertTrue(
-            evaluate(obstacle(ObjectMovementDirection.TOWARD_USER)).userFacing.message!!
-                .contains("이 물체가 사용자 쪽으로 이동하는 것으로 보입니다."),
-        )
     }
 
     @Test
@@ -141,12 +44,12 @@ class MessageMotionPolicyTest {
                 if (expected == MessageLevel.NONE) {
                     assertNull(decision.userFacing.message)
                 } else {
-                    val action = if (expected == MessageLevel.STOP) {
-                        "멈추세요. 주변을 확인하세요."
+                    if (expected == MessageLevel.STOP) {
+                        assertTrue(decision.userFacing.message!!.startsWith("멈추세요. "))
+                        assertTrue(decision.userFacing.message!!.endsWith("주변을 확인하세요."))
                     } else {
-                        "멈출 준비를 하세요."
+                        assertEquals("사람 주의. 멈출 준비를 하세요.", decision.userFacing.message)
                     }
-                    assertTrue(decision.userFacing.message!!.endsWith(action))
                 }
             }
         }
@@ -246,7 +149,7 @@ class MessageMotionPolicyTest {
             assertEquals(source.name, MessageLevel.WARNING, admitted.userFacing.messageLevel)
             assertNoSpokenDistanceOrStepCount(weak.userFacing)
             assertNoSpokenDistanceOrStepCount(admitted.userFacing)
-            assertTrue(admitted.userFacing.message!!.contains("카메라 기준 왼쪽"))
+            assertEquals("사람 주의. 멈출 준비를 하세요.", admitted.userFacing.message)
             assertTrue(admitted.userFacing.message!!.endsWith("멈출 준비를 하세요."))
         }
     }
@@ -287,7 +190,7 @@ class MessageMotionPolicyTest {
         assertEquals(MessageLevel.CAUTION, atFloor.userFacing.messageLevel)
         assertEquals(MessagePurpose.APPROACH_CAUTION, atFloor.purpose)
         assertNull(atFloor.userFacing.stepsAhead)
-        assertTrue(atFloor.userFacing.message!!.contains("거리가 줄어드는 것 같습니다"))
+        assertEquals("사람과 가까워지는 것으로 보입니다. 속도를 늦추고 주변을 확인하세요.", atFloor.userFacing.message)
         assertFalse(atFloor.userFacing.message!!.contains("다가오는"))
         assertFalse(atFloor.userFacing.message!!.contains("멈추세요"))
         assertNoSpokenDistanceOrStepCount(atFloor.userFacing)
@@ -344,15 +247,15 @@ class MessageMotionPolicyTest {
             nowMs = 2_500L,
         )
 
-        assertTrue(first.userFacing.message!!.contains("왼쪽"))
+        assertEquals("사람 주의. 멈출 준비를 하세요.", first.userFacing.message)
         assertEquals(MessageLevel.WARNING, suppressed.userFacing.messageLevel)
         assertNull(suppressed.userFacing.message)
         assertTrue(suppressed.reason.startsWith("rate limited"))
-        assertTrue(allowed.userFacing.message!!.contains("오른쪽"))
+        assertEquals(first.userFacing.message, allowed.userFacing.message)
     }
 
     private fun assertNoSpokenDistanceOrStepCount(userFacing: UserFacingDepth) {
-        // Obstacle alerts retain action and measured motion; route distance guidance is separate.
+        // Obstacle alerts retain action without spoken distance, direction or movement descriptions.
         assertNull(userFacing.stepsAhead)
         userFacing.message?.let { message ->
             assertFalse(message, Regex("""\d+(?:\.\d+)?\s*(?:보|걸음|m|미터)""").containsMatchIn(message))

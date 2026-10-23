@@ -351,7 +351,7 @@ class UnknownObjectSpeechDeviceTest {
         ))
         assertEquals(MessageLevel.STOP, action.level)
         assertTrue(action.message.contains("물체"))
-        assertTrue(action.message.contains("사용자 쪽으로 다가오는"))
+        assertEquals("멈추세요. 물체가 감지됐습니다. 주변을 확인하세요.", action.message)
         return Fixture(
             batch,
             action.copy(validUntilMs = minOf(action.validUntilMs, batch.validUntilElapsedRealtimeMs)),

@@ -106,6 +106,30 @@ class FrozenImageToDepthTransformTest {
         }
     }
 
+    @Test
+    fun capturedInversePreservesCropRotationReflectionAndRejectsOutsideImage() {
+        val maps = listOf(
+            listOf(Point2(-.25f, 0f), Point2(1.25f, 0f), Point2(-.25f, 1f), Point2(1.25f, 1f)),
+            listOf(Point2(0f, 1.25f), Point2(0f, -.25f), Point2(1f, 1.25f), Point2(1f, -.25f)),
+            listOf(Point2(1.25f, 0f), Point2(-.25f, 0f), Point2(1.25f, 1f), Point2(-.25f, 1f)),
+        )
+        maps.forEach { corners ->
+            val t = requireNotNull(create(corners))
+            val mapper = kr.co.hanium.dreamup.walksafe.FrozenImageToTextureCoordinateMapper(123L, t,
+                kr.co.hanium.dreamup.walksafe.depth.ImageSize(40, 30))
+            for (point in listOf(Point2(.25f, .75f), Point2(.75f, .25f), Point2(.5f, .5f))) {
+                val depth = requireNotNull(t.map(point))
+                assertPoint(point.x, point.y, t.unmap(depth))
+                assertPoint(point.x, point.y, mapper.depthToImage(depth))
+            }
+            assertNull(t.unmap(Point2(Float.NaN, .5f)))
+            assertNull(t.unmap(Point2(1.1f, .5f)))
+        }
+        val cropped = requireNotNull(create(listOf(Point2(.25f, .25f), Point2(.75f, .25f),
+            Point2(.25f, .75f), Point2(.75f, .75f))))
+        assertNull(cropped.unmap(Point2(0f, .5f)))
+    }
+
     private val identityCorners = listOf(Point2(0f, 0f), Point2(1f, 0f), Point2(0f, 1f), Point2(1f, 1f))
 
     private fun create(corners: List<Point2>, center: Point2 = Point2(0.5f, 0.5f)) =

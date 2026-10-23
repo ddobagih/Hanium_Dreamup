@@ -181,7 +181,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
         val action = NonMetricObstacleAdvisoryAction(
             key = observation.key,
             direction = observation.direction,
-            message = buildMessage(observation.direction, observation.categoryLabelKo),
+            message = buildMessage(observation.categoryLabelKo),
             observedAtMs = nowMs,
             validUntilMs = nowMs + config.actionTtlMs,
         )
@@ -271,8 +271,8 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
         return if (union > 0f) intersection / union else 0f
     }
 
-    private fun buildMessage(direction: NonMetricObstacleDirection, categoryLabelKo: String): String =
-        "카메라 보조 경고. ${direction.labelKo}에 $categoryLabelKo 후보가 보입니다. " +
+    private fun buildMessage(categoryLabelKo: String): String =
+        "카메라 보조 안내입니다. ${ObstacleLabels.withAsParticle(categoryLabelKo)} 보이는 대상이 있습니다. " +
             "주변을 확인하세요."
 
     private companion object {

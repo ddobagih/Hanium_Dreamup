@@ -146,6 +146,21 @@ class FrozenImageToDepthTransform private constructor(
         return interpolate(imagePoint).takeIf { it.isNormalized() }
     }
 
+    /** Inverse of the validated capture affine transform, including rotated/cropped textures. */
+    fun unmap(depthPoint: Point2): Point2? {
+        if (!depthPoint.isNormalized()) return null
+        val hx = topRight.x.toDouble() - topLeft.x
+        val hy = topRight.y.toDouble() - topLeft.y
+        val vx = bottomLeft.x.toDouble() - topLeft.x
+        val vy = bottomLeft.y.toDouble() - topLeft.y
+        val determinant = hx * vy - hy * vx
+        if (!determinant.isFinite() || determinant == 0.0) return null
+        val x = depthPoint.x.toDouble() - topLeft.x
+        val y = depthPoint.y.toDouble() - topLeft.y
+        return Point2(((x * vy - y * vx) / determinant).toFloat(),
+            ((y * hx - x * hy) / determinant).toFloat()).takeIf { it.isNormalized() }
+    }
+
     private fun interpolate(imagePoint: Point2): Point2 {
         val top = lerp(topLeft, topRight, imagePoint.x)
         val bottom = lerp(bottomLeft, bottomRight, imagePoint.x)

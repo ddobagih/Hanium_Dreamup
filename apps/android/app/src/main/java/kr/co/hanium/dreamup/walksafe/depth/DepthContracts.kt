@@ -126,7 +126,11 @@ data class DepthStats(
      * that hold kept depth. A thin object is judged along its length only. Null = not judged.
      */
     val spatialCoverage: Float? = null,
+    /** Kept measured pixels only; additional speech geometry, never a replacement risk statistic. */
+    val surfaceSamples: List<DepthSurfaceSample> = emptyList(),
 )
+
+data class DepthSurfaceSample(val depthUv: Point2, val zM: Float, val confidence: Float?)
 
 /**
  * Per-reason counts of in-region depth candidates removed before statistics. A zero pixel is a
@@ -255,6 +259,8 @@ data class TrackedObjectDepth(
      * apart from [depthObservedAtMs]. Null when no metric source was used.
      */
     val depthReprojected: Boolean? = null,
+    /** Camera to nearest coherent observed surface, never Z, ground range or a prediction. */
+    val measuredSurfaceRangeM: Float? = null,
 ) {
     val uprightBottomContactNorm: Point2?
         get() = bottomContactNorm?.let { sensorPointToUpright(it, imageQuarterTurns) }

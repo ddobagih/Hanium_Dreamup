@@ -259,6 +259,8 @@ import kr.co.hanium.dreamup.walksafe.feedback.UtteranceCallbackRegistry
 import kr.co.hanium.dreamup.walksafe.feedback.CommandSpeechReadiness
 import kr.co.hanium.dreamup.walksafe.feedback.AndroidNonMetricObstacleAdvisoryPolicy
 import kr.co.hanium.dreamup.walksafe.feedback.ForegroundAacRecorder
+import kr.co.hanium.dreamup.walksafe.feedback.ObstacleDistanceSpeech
+import kr.co.hanium.dreamup.walksafe.feedback.distanceBriefingFor
 import kr.co.hanium.dreamup.walksafe.feedback.FeedbackAction
 import kr.co.hanium.dreamup.walksafe.feedback.NavigationSpeechDispatchResult
 import kr.co.hanium.dreamup.walksafe.feedback.NonMetricAdvisoryGate
@@ -35583,6 +35585,7 @@ generation != cameraFallbackGeneration
             activeFeedbackDeliveryKeys = dispatch.activeFeedbackDeliveryKeys,
             deviceGateAllowsAlerts = dispatch.deviceGateAllowsAlerts,
             observedAtMs = dispatch.policyEvaluatedAtMs,
+            distanceOutputsByDeliveryKey = dispatch.distanceOutputsByDeliveryKey,
         )
         val feedbackGeneration = feedbackLifecycleGeneration
         val activeRiskTrackIds = dispatch.activeRiskTrackIds
@@ -35697,6 +35700,17 @@ generation != cameraFallbackGeneration
                     }
                 },
                 onSpeechCancelled = cancelDelivery,
+                distanceAfterWarning = {
+                    val now = SystemClock.elapsedRealtime()
+                    val latest = latestFeedbackDeliveryState.distanceOutputsByDeliveryKey[action.deliveryKey]
+                    val text = if (completionCurrent()) latest?.distanceBriefingFor(action, now) else null
+                    text?.let {
+                        val refreshed = action.copy(validUntilMs = requireNotNull(latest?.sourceValidUntilElapsedRealtimeMs))
+                        ObstacleDistanceSpeech(it, refreshed.validUntilMs) {
+                            completionCurrent() && isFeedbackActionStillDeliverable(refreshed)
+                        }
+                    }
+                },
             )
             vibrationAccepted = dispatch.vibrationAccepted
             if (dispatch.speech != NavigationSpeechDispatchResult.ACCEPTED && !cancelled) {
@@ -47117,6 +47131,7 @@ generation != cameraFallbackGeneration
         val activeFeedbackDeliveryKeys: Set<String> = emptySet(),
         val deviceGateAllowsAlerts: Boolean = false,
         val observedAtMs: Long = 0L,
+        val distanceOutputsByDeliveryKey: Map<String, TrackedObjectDepth> = emptyMap(),
     )
 
     private data class PendingFeedbackTerminalResolution(
@@ -47170,7 +47185,8 @@ internal class FrozenImageToTextureCoordinateMapper(
         return transform.map(point)
     }
 
-    override fun depthToImage(point: Point2): Point2? = null
+    override fun depthToImage(point: Point2): Point2? =
+        if (frameId == transform.frameId && depthSize.width > 0 && depthSize.height > 0) transform.unmap(point) else null
 
     override fun imagePolygonToDepthPolygon(polygon: List<Point2>): List<Point2> {
         return polygon.map { point ->

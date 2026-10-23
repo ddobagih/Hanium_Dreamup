@@ -36,7 +36,7 @@ class UnknownObjectFeedbackPolicyTest {
         val batch = requireNotNull(admit(original))
         val admitted = batch.outputs.single()
         assertTrue(admitted.userFacing.message!!.contains("물체"))
-        assertTrue(admitted.userFacing.message!!.contains("물체가 사용자 쪽으로 다가오는"))
+        assertEquals("멈추세요. 물체가 감지됐습니다. 주변을 확인하세요.", admitted.userFacing.message)
         assertFalse(admitted.userFacing.message!!.contains("FastSAM"))
         assertFalse(admitted.userFacing.message!!.contains("unnamed"))
         assertEquals(original.frameId, admitted.frameId)
@@ -48,14 +48,14 @@ class UnknownObjectFeedbackPolicyTest {
     }
 
     @Test
-    fun userApproachToStationaryObjectIsDistinctAndNearUnknownMotionStillStops() {
+    fun stationaryAndUnknownMotionBothKeepStopFirstSpeech() {
         val stationary = output().copy(
             objectMotion = ObjectMotion.USER_APPROACHING_STATIONARY,
             motionEstimate = motion().copy(direction = ObjectMovementDirection.STATIONARY, objectSpeedMps = 0f),
         )
         val stationaryMessage = requireNotNull(admit(stationary)).outputs.single().userFacing
         assertEquals(MessageLevel.STOP, stationaryMessage.messageLevel)
-        assertTrue(stationaryMessage.message!!.contains("현재 이 물체에 가까워지고"))
+        assertEquals("멈추세요. 물체가 감지됐습니다. 주변을 확인하세요.", stationaryMessage.message)
         assertFalse(stationaryMessage.message!!.contains("다가오는"))
         val unknownMotion = output().copy(
             riskDistanceM = 1f,
@@ -98,7 +98,7 @@ class UnknownObjectFeedbackPolicyTest {
                 objectMotion = ObjectMotion.UNKNOWN,
                 motionEstimate = motion().copy(direction = direction),
             ))).outputs.single()
-            assertTrue(result.userFacing.message!!.contains("거리가 줄어들고"))
+            assertEquals("멈추세요. 물체가 감지됐습니다. 주변을 확인하세요.", result.userFacing.message)
             assertFalse(result.userFacing.message!!.contains("카메라 기준"))
             assertFalse(result.userFacing.message!!.contains("다가오는"))
         }

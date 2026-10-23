@@ -113,7 +113,7 @@ class AndroidFeedbackActuatorStaticTest {
         assertTrue(advisory.contains("onFailed = onFailed"))
         assertFalse(source.contains("fun vibrateAdvisory("))
         assertTrue(dispatch.contains("isAdvisory && synchronized(pendingUtterances) { pendingUtterances.isNotEmpty() }"))
-        assertTrue(dispatch.contains("if (!isAdvisory && isDuplicateMessage"))
+        assertTrue(dispatch.contains("if (deduplicate && !isAdvisory && isDuplicateMessage"))
         assertTrue(dispatch.contains("SpeechPriority.ADVISORY -> TextToSpeech.QUEUE_ADD"))
         assertTrue(dispatch.contains("ANNOUNCE_ADVISORY_PREFIX"))
         assertTrue(dispatch.contains("pendingIds.any { !it.startsWith(\"\$ANNOUNCE_ADVISORY_PREFIX-\") }"))
@@ -213,7 +213,9 @@ class AndroidFeedbackActuatorStaticTest {
         val dispatch = source.substringAfter("fun emit(\n")
             .substringBefore("fun vibrateRiskOnly(")
 
-        assertTrue(dispatch.contains("onCompleted = onSpeechCompleted"))
+        // Completion now wraps the callback to request a fresh distance afterwards.
+        assertTrue(dispatch.contains("onSpeechCompleted?.invoke()"))
+        assertTrue(dispatch.indexOf("onSpeechCompleted?.invoke()") < dispatch.indexOf("distanceAfterWarning?.invoke()"))
         assertTrue(dispatch.contains("onFailed = onSpeechFailed"))
         assertTrue(dispatch.contains("return RiskFeedbackDispatchResult(speech, vibrationAccepted)"))
     }

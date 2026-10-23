@@ -92,7 +92,7 @@ class UprightRiskGeometryTest {
                 objectMotion = kinematics.objectMotion, motionEstimate = kinematics.motionEstimate,
             ), 2_800L)
             assertEquals(MessageLevel.STOP, message.messageLevel)
-            assertTrue(message.message!!.contains("이 물체가 사용자 쪽으로 이동하는 것으로 보입니다"))
+            assertEquals("멈추세요. 사람이 감지됐습니다. 주변을 확인하세요.", message.message)
         }
     }
 

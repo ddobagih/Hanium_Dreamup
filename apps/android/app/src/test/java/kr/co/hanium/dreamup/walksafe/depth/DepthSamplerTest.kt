@@ -381,10 +381,11 @@ class DepthSamplerTest {
 
         assertEquals(MessageLevel.STOP, metric.messageLevel)
         assertNull(metric.stepsAhead)
-        assertTrue(metric.message!!.endsWith("멈추세요. 주변을 확인하세요."))
+        assertTrue(metric.message!!.startsWith("멈추세요. "))
+        assertTrue(metric.message!!.endsWith("주변을 확인하세요."))
         assertEquals(MessageLevel.CAUTION, pseudo.messageLevel)
         assertNull(pseudo.stepsAhead)
-        assertTrue(pseudo.message!!.contains("줄어드는 것"))
+        assertEquals("사람과 가까워지는 것으로 보입니다. 속도를 늦추고 주변을 확인하세요.", pseudo.message)
         for (message in listOf(metric.message!!, pseudo.message!!)) {
             assertFalse(message, Regex("""\d+(?:\.\d+)?\s*(?:보|걸음|m|미터)""").containsMatchIn(message))
         }

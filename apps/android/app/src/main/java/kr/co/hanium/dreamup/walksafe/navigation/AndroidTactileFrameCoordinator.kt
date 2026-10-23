@@ -21,6 +21,7 @@ internal data class TactileFrameFeedbackDispatch(
     val deviceGateAllowsAlerts: Boolean,
     val action: FeedbackAction?,
     val policyEvaluatedAtMs: Long,
+    val distanceOutputsByDeliveryKey: Map<String, TrackedObjectDepth> = emptyMap(),
 )
 
 internal fun interface TactileFrameFeedbackActuator {
@@ -227,6 +228,9 @@ internal class AndroidTactileFrameCoordinator(
                 deviceGateAllowsAlerts = deviceGateAllowsAlerts,
                 action = action,
                 policyEvaluatedAtMs = nowMs,
+                distanceOutputsByDeliveryKey = selected.filter { !it.feedback.stale }.associate {
+                    it.feedback.deliveryKey to it.output.copy(sourceValidUntilElapsedRealtimeMs = it.feedback.validUntilMs)
+                },
             )
         }
         (feedbackActuatorOverride ?: feedbackActuator).emit(dispatch)

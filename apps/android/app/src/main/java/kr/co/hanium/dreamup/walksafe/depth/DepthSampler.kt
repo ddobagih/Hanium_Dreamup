@@ -190,7 +190,8 @@ class DepthSampler {
                 .copy(rejectedSamples = rejected)
         }
 
-        return robustStats(samples, candidates.size, options, candidates).copy(rejectedSamples = rejected)
+        return robustStats(samples, candidates.size, options, candidates, depthImage.width, depthImage.height)
+            .copy(rejectedSamples = rejected)
     }
 
     private fun candidatePixels(width: Int, height: Int, polygonNorm: List<Point2>, maxSamples: Int): List<DepthCandidate> {
@@ -245,7 +246,7 @@ class DepthSampler {
     }
 
     private fun robustStats(samples: List<DepthSample>, totalSampleCount: Int, options: DepthSampleOptions,
-                            candidates: List<DepthCandidate> = emptyList()): DepthStats {
+                            candidates: List<DepthCandidate>, width: Int, height: Int): DepthStats {
         val sortedDepths = samples.map { it.depthM }.sorted()
         val med = percentile(sortedDepths, 0.5f) ?: return emptyStats(samples.size, totalSampleCount)
         val deviations = sortedDepths.map { abs(it - med) }.sorted()
@@ -292,6 +293,10 @@ class DepthSampler {
             confidenceMedian = confidenceMedian,
             outlierRatio = outlierRatio.coerceIn(0f, 1f),
             spatialCoverage = longAxisCoverage(candidates, kept),
+            surfaceSamples = kept.map { sample -> DepthSurfaceSample(
+                Point2((sample.candidate.x + .5f) / width, (sample.candidate.y + .5f) / height),
+                sample.depthM, sample.confidence,
+            ) },
         )
     }
 

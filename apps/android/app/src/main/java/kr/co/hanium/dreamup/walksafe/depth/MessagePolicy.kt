@@ -95,12 +95,12 @@ class MessagePolicy(
             CrosswalkReferencePolicy.isCrosswalkDetectorClass(result.className) -> crosswalkGuidanceMessage(result)
             WalkMateClassPolicy.isTrafficLightClass(result.className) -> none("traffic light color guidance deferred")
             isTactileClass(result.className) -> tactileMessage(result)
-            else -> metricOrPseudoObstacleMessage(result, nowMs)
+            else -> metricOrPseudoObstacleMessage(result)
         }
         return applyRateLimit(candidate, result, nowMs)
     }
 
-    private fun metricOrPseudoObstacleMessage(result: MetricDepthDecision, frameTimestampMs: Long): MessagePolicyDecision {
+    private fun metricOrPseudoObstacleMessage(result: MetricDepthDecision): MessagePolicyDecision {
         if (!hasReliableMetricDistance(result)) {
             activeObstacleLevelByKey.remove(stateKeyFor(result))
             return pseudoOrWeakMessage(result)
@@ -122,32 +122,14 @@ class MessagePolicy(
             )
         }
         val target = labelForClass(result.className)
-        val phrase = "${cameraScreenPositionPrefix(result.cameraScreenLateralPosition)}$target"
-        val currentMotion = result.motionEstimate.takeIf { it.isCurrentMeasuredMotion(frameTimestampMs) }
-        val motionPhrase = when {
-            result.trend == Trend.APPROACHING && result.objectMotion == ObjectMotion.USER_APPROACHING_STATIONARY &&
-                currentMotion?.direction == ObjectMovementDirection.STATIONARY ->
-                " 정지해 있는 것으로 보이며, 현재 이 물체에 가까워지고 있습니다."
-            result.trend == Trend.APPROACHING && result.objectMotion == ObjectMotion.OBJECT_APPROACHING &&
-                currentMotion?.direction == ObjectMovementDirection.TOWARD_USER &&
-                (currentMotion.relativeClosingSpeedMps ?: 0f) >= 0.25f ->
-                " 이 물체가 사용자 쪽으로 다가오는 것으로 보입니다."
-            currentMotion?.direction == ObjectMovementDirection.STATIONARY ->
-                " 정지해 있는 것으로 보입니다."
-            currentMotion?.direction == ObjectMovementDirection.TOWARD_USER ->
-                " 이 물체가 사용자 쪽으로 이동하는 것으로 보입니다."
-            currentMotion?.direction == ObjectMovementDirection.LEFT ->
-                " 이 물체가 카메라 기준 왼쪽으로 이동하는 것으로 보입니다."
-            currentMotion?.direction == ObjectMovementDirection.RIGHT ->
-                " 이 물체가 카메라 기준 오른쪽으로 이동하는 것으로 보입니다."
-            currentMotion?.direction == ObjectMovementDirection.AWAY_FROM_USER ->
-                " 이 물체가 사용자에게서 멀어지는 방향으로 이동하는 것으로 보입니다."
-            result.trend == Trend.APPROACHING -> " 거리가 줄어들고 있습니다."
-            else -> ""
+        // Speech is deliberately brief; measured motion still participates in risk assessment.
+        val message = if (level == MessageLevel.STOP) {
+            "멈추세요. ${ObstacleLabels.withSubjectParticle(target)} 감지됐습니다. 주변을 확인하세요."
+        } else {
+            "$target 주의. 멈출 준비를 하세요."
         }
-        val action = if (level == MessageLevel.STOP) "멈추세요. 주변을 확인하세요." else "멈출 준비를 하세요."
         return MessagePolicyDecision(
-            userFacing = UserFacingDepth(stepsAhead = null, messageLevel = level, message = "$phrase.$motionPhrase $action"),
+            userFacing = UserFacingDepth(stepsAhead = null, messageLevel = level, message = message),
             purpose = MessagePurpose.OBSTACLE_WARNING,
             reason = when {
                 level == MessageLevel.STOP -> "near metric obstacle"
@@ -195,7 +177,6 @@ class MessagePolicy(
 
     private fun pseudoOrWeakMessage(result: MetricDepthDecision): MessagePolicyDecision {
         val target = labelForClass(result.className)
-        val positionPrefix = cameraScreenPositionPrefix(result.cameraScreenLateralPosition)
         // Pseudo depth has no depth/sample score and cannot reach a metric confidence threshold.
         // Its positive score only proves that the estimator did not close the hard gate; the
         // estimator's stable visual-growth trend and the delivery gate provide the other checks.
@@ -207,7 +188,7 @@ class MessagePolicy(
                 userFacing = UserFacingDepth(
                     stepsAhead = null,
                     messageLevel = MessageLevel.CAUTION,
-                    message = "${positionPrefix}${target}와의 거리가 줄어드는 것 같습니다. 속도를 늦추고 주변을 확인하세요.",
+                    message = "${ObstacleLabels.withCompanionParticle(target)} 가까워지는 것으로 보입니다. 속도를 늦추고 주변을 확인하세요.",
                 ),
                 purpose = MessagePurpose.APPROACH_CAUTION,
                 reason = "pseudo-depth approaching",
@@ -218,7 +199,7 @@ class MessagePolicy(
                 userFacing = UserFacingDepth(
                     stepsAhead = null,
                     messageLevel = MessageLevel.CAUTION,
-                    message = "${positionPrefix}가까운 $target 가능성. 속도를 늦추고 주변을 확인하세요.",
+                    message = "가까이에 ${ObstacleLabels.withSubjectParticle(target)} 있을 수 있습니다. 속도를 늦추고 주변을 확인하세요.",
                 ),
                 purpose = MessagePurpose.APPROACH_CAUTION,
                 reason = "metric source confidence below warning threshold",
@@ -322,13 +303,6 @@ class MessagePolicy(
 
     private fun isTactileClass(className: String): Boolean {
         return WalkMateClassPolicy.isTactileClass(className) || isTactileBlockClass(className)
-    }
-
-    private fun cameraScreenPositionPrefix(position: CameraScreenLateralPosition): String = when (position) {
-        CameraScreenLateralPosition.LEFT -> "카메라 화면 왼쪽에 있는 "
-        CameraScreenLateralPosition.CENTER -> "카메라 화면 중앙에 있는 "
-        CameraScreenLateralPosition.RIGHT -> "카메라 화면 오른쪽에 있는 "
-        CameraScreenLateralPosition.UNKNOWN -> ""
     }
 
     private fun labelForClass(className: String): String = ObstacleLabels.labelFor(className)

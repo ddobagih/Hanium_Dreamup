@@ -1692,6 +1692,115 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
         assertEquals(1, runtime.engines.size)
     }
 
+    @Test
+    fun stopCompletesBeforeDistanceIsReadFromLatestEvidence() {
+        val (runtime, actuator) = readyActuator()
+        var currentDistance = "old 2.5"
+        var reads = 0
+        var completed = 0
+        val action = riskAction(runtime.now + 800, "멈추세요. 물체가 감지됐습니다.", MessageLevel.STOP)
+        actuator.emit(action, { completed++ }, {}, { true }, distanceAfterWarning = {
+            reads++
+            ObstacleDistanceSpeech(currentDistance, runtime.now + 800) { true }
+        })
+        val stop = runtime.spoken.single()
+        assertTrue(stop.message.startsWith("멈추세요."))
+        assertEquals(0, reads)
+        runtime.start(stop.id)
+        runtime.advanceBy(2_000)
+        currentDistance = "latest 1.2"
+        runtime.done(stop.id)
+        assertEquals(listOf(stop.message, "latest 1.2"), runtime.spoken.map { it.message })
+        assertEquals(1, completed)
+        assertEquals(1, reads)
+        val detail = runtime.spoken.last().id
+        runtime.start(detail)
+        runtime.done(detail)
+        assertEquals("Distance completion must not confirm the warning twice", 1, completed)
+    }
+
+    @Test
+    fun distanceDoesNotPreemptAnotherWarningAndANewStopCanInterruptIt() {
+        val (runtime, actuator) = readyActuator()
+        actuator.emit(riskAction(runtime.now + 800, "first stop", MessageLevel.STOP), {}, {}, { true },
+            distanceAfterWarning = { ObstacleDistanceSpeech("distance", runtime.now + 800) { true } })
+        val first = runtime.spoken.single().id
+        runtime.start(first)
+        runtime.done(first)
+        assertEquals("distance", runtime.spoken.last().message)
+        runtime.start(runtime.spoken.last().id)
+        assertEquals(NavigationSpeechDispatchResult.SUPPRESSED, actuator.speakInteraction("command", {}, {}))
+        assertEquals(NavigationSpeechDispatchResult.SUPPRESSED, actuator.speakNavigation("route", isStillValidAtStart = { true }))
+        actuator.emit(riskAction(runtime.now + 800, "second stop", MessageLevel.STOP), {}, {}, { true })
+        assertEquals("second stop", runtime.spoken.last().message)
+    }
+
+    @Test
+    fun expiredOrLostTargetDistanceCannotStartAfterWarning() {
+        for (expired in listOf(false, true)) {
+            val (runtime, actuator) = readyActuator()
+            actuator.emit(riskAction(runtime.now + 800), {}, {}, { true }, distanceAfterWarning = {
+                ObstacleDistanceSpeech("distance", if (expired) runtime.now - 1 else runtime.now + 800) { expired }
+            })
+            val id = runtime.spoken.single().id
+            runtime.start(id)
+            runtime.done(id)
+            assertEquals(1, runtime.spoken.size)
+        }
+    }
+
+    @Test
+    fun interruptedWarningNeverRequestsDistanceAndDelayedDistanceStartExpires() {
+        val (runtime, actuator) = readyActuator()
+        var reads = 0
+        actuator.emit(riskAction(runtime.now + 800), {}, {}, { true }, distanceAfterWarning = {
+            reads++
+            ObstacleDistanceSpeech("distance", runtime.now + 800) { true }
+        })
+        val warning = runtime.spoken.single().id
+        runtime.start(warning)
+        actuator.emit(riskAction(runtime.now + 800, "STOP", MessageLevel.STOP), {}, {}, { true })
+        runtime.done(warning)
+        assertEquals(0, reads)
+        val (late, other) = readyActuator()
+        other.emit(riskAction(late.now + 800), {}, {}, { true }, distanceAfterWarning = {
+            ObstacleDistanceSpeech("distance", late.now + 10) { true }
+        })
+        val first = late.spoken.single().id
+        late.start(first)
+        late.done(first)
+        val detail = late.spoken.last().id
+        late.advanceBy(11)
+        late.start(detail)
+        assertFalse(other.isAppSpeechActive())
+    }
+
+    @Test
+    fun distanceDoesNotEraseWarningDuplicateHistoryOrPreemptReentrantWarning() {
+        val (runtime, actuator) = readyActuator()
+        val action = riskAction(runtime.now + 800, "stop", MessageLevel.STOP)
+        actuator.emit(action, {}, {}, { true }, distanceAfterWarning = {
+            ObstacleDistanceSpeech("distance", runtime.now + 800) { true }
+        })
+        runtime.start(runtime.spoken.single().id)
+        runtime.done(runtime.spoken.single().id)
+        runtime.start(runtime.spoken.last().id)
+        runtime.done(runtime.spoken.last().id)
+        assertEquals(NavigationSpeechDispatchResult.SUPPRESSED, actuator.emit(action, {}, {}, { true }).speech)
+        assertEquals(2, runtime.spoken.size)
+
+        val (otherRuntime, other) = readyActuator()
+        other.emit(riskAction(otherRuntime.now + 800, "warning"), {
+            other.emit(riskAction(otherRuntime.now + 800, "new stop", MessageLevel.STOP), {}, {}, { true })
+        }, {}, { true }, distanceAfterWarning = {
+            ObstacleDistanceSpeech("old distance", otherRuntime.now + 800) { true }
+        })
+        val id = otherRuntime.spoken.single().id
+        otherRuntime.start(id)
+        otherRuntime.done(id)
+        assertEquals(listOf("warning", "new stop"), otherRuntime.spoken.map { it.message })
+    }
+
     private fun readyActuator(
         recoveryBudget: TtsEngineRecoveryBudget = TtsEngineRecoveryBudget(),
     ): Pair<FakeRuntime, AndroidFeedbackActuator> {
