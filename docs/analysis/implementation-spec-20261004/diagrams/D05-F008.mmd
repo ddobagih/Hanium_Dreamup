@@ -1,0 +1,13 @@
+flowchart TD
+  H["P-D05-008 · F-D05-008 적응형 추론 간격·재검출 힌트"]
+  H --> A{"idle 그리고 due"}
+  A -->|"아니오"| D["접수 없음 최신 frame 대기"]
+  A -->|"예"| T["generation ticket 1 개"]
+  T --> C{"complete ticket current"}
+  C -->|"이전 generation"| R["슬롯만 해제 학습없음"]
+  C -->|"현재"| E["EWMA thermal load 갱신"]
+  E --> B{"느려짐 또는 thermal"}
+  B -->|"예"| S["즉시 간격 증가"]
+  B -->|"아니오 4 healthy"| Q["최대 50ms 감소"]
+  S --> F["cooldown 후 최신 frame"]
+  Q --> F

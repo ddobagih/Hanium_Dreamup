@@ -306,3 +306,63 @@ def test_account_deletion_retries_normal_partial_inventory_without_touching_othe
         assert sum(row["storage_name"] is not None for row in manifest["raw_collections"]) == received_chunks
     finally:
         engine.dispose()
+
+
+def test_manifest_only_raw_leftover_blocks_completion_and_restart(tmp_path: Path) -> None:
+    engine, SessionFactory = helpers._session_factory()
+    suffix = uuid.uuid4().hex[:12]
+    actor_id = f"worker.emptyroot.{suffix}"
+    request_id = f"delete_emptyroot_{suffix}"
+    raw_root, upload_root = tmp_path / "raw", tmp_path / "uploads"
+    for directory in (raw_root, upload_root):
+        directory.mkdir(mode=0o700)
+    try:
+        collection_id, paths, _ = _stored_collection(
+            SessionFactory, raw_root, actor_id, received_chunks=0, commit_collection=False,
+        )
+        assert paths == []
+        helpers._accept(SessionFactory, actor_id=actor_id, request_id=request_id)
+        worker_root = tmp_path / "worker"
+        helpers.prepare_account_deletion_worker_roots(worker_root.resolve())
+        leftover = raw_root / f"{collection_id}.orphan"
+        unrelated = raw_root / "unrelated-account.orphan"
+        unrelated.write_bytes(b"other account synthetic data")
+
+        def fault(point: str) -> None:
+            if point == "before_object_removal":
+                leftover.write_bytes(b"synthetic leftover outside journal")
+
+        manifest_path = worker_root / "manifests" / f"{request_id}.json"
+        with helpers._worker_session_factory(engine, suffix) as WorkerSessionFactory:
+            with pytest.raises(AccountDeletionWorkerError, match="inventory is not empty after commit"):
+                helpers.process_account_deletion_request(
+                    WorkerSessionFactory, request_id=request_id,
+                    upload_dir=upload_root.resolve(), raw_object_dir=raw_root.resolve(),
+                    root=worker_root.resolve(), fault=fault,
+                )
+            assert not manifest_path.exists()
+            with SessionFactory() as db:
+                assert db.get(helpers.RawCollection, collection_id) is None
+                items = db.scalars(select(helpers.AccountDeletionItem).where(
+                    helpers.AccountDeletionItem.request_id == request_id,
+                    helpers.AccountDeletionItem.item_key.in_(
+                        ("server_originals", "report_records", "server_quarantine", "server_copies")
+                    ),
+                )).all()
+                assert len(items) == 4
+                assert all(item.state not in {"COMPLETED", "NOT_APPLICABLE"} for item in items)
+            journal_path = next((worker_root / "journals").glob("*.json"))
+            journal = json.loads(journal_path.read_text())
+            assert journal["schema_version"] == "walksafe.account-deletion-worker-journal.v5"
+            assert journal["raw_objects"] == []
+            assert journal["storage_roots"]["raw"]["inode"] == raw_root.stat().st_ino
+            with pytest.raises(AccountDeletionWorkerError, match="inventory is not empty after commit"):
+                helpers.reconcile_account_deletion_journal(WorkerSessionFactory, worker_root, journal_path)
+            assert not manifest_path.exists()
+            leftover.unlink()
+            helpers.reconcile_account_deletion_journal(WorkerSessionFactory, worker_root, journal_path)
+        assert manifest_path.is_file()
+        assert "storage_roots" not in json.loads(manifest_path.read_text())
+        assert unrelated.read_bytes() == b"other account synthetic data"
+    finally:
+        engine.dispose()

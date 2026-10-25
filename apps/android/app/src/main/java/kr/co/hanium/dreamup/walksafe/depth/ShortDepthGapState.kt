@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPoint
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -19,10 +20,11 @@ internal class ShortDepthGapState {
         val depthAtNs: Long,
         val source: DepthSource,
         val distanceM: Float,
-        val zDistanceM: Float,
+        val pointZDistanceM: Float?,
         val errorM: Float,
         val pose: CameraPoseEvidence?,
         val position: Vec3?,
+        val materialPoint: VisualMaterialPoint?,
         val motion: ObjectMotionEstimate,
         val geometry: ObjectGeometry,
     )
@@ -42,6 +44,7 @@ internal class ShortDepthGapState {
         pose: CameraPoseEvidence?,
         position: Vec3?,
         motion: ObjectMotionEstimate,
+        materialPoint: VisualMaterialPoint? = null,
     ) {
         if (!validContext(input)) {
             clear()
@@ -64,8 +67,8 @@ internal class ShortDepthGapState {
             else -> false
         }
         val z = stats.medianM
-        val observedAtMs = depthAt / 1_000_000L
-        if (!synchronized || input.timestampMs - observedAtMs !in 0L..50L || !confidence.isFinite() || confidence < 0.55f ||
+        val observedAtMs = input.depthObservationTime(source)?.frameTimestampMs ?: return
+        if (!synchronized || observedAtMs != input.timestampMs || !confidence.isFinite() || confidence < 0.55f ||
             distanceM == null || !distanceM.isFinite() || distanceM <= 0f ||
             z == null || !z.isFinite() || z <= 0f
         ) return
@@ -81,15 +84,24 @@ internal class ShortDepthGapState {
                 previous.geometry.imageQuarterTurns != input.geometry.imageQuarterTurns ||
                 abs(previous.distanceM - distanceM) > 1.2f ||
                 !continuousPose(previous.pose, pose, input.timestampMs - previous.capturedAtMs))) clear()
-        samples += Sample(observedAtMs, input.timestampMs, depthAt, source, distanceM, z,
+        // Only the point actually sampled in this depth capture may seed a spatial prediction.
+        val sampledPoint = materialPoint?.takeIf {
+            it == input.materialPoint && currentPointBelongsToGeometry(it, input) &&
+                pose != null && position != null && finite(position)
+        }
+        val pointZ = if (sampledPoint != null && pose != null && position != null) {
+            (position - pose.position()).dot(pose.forward()).takeIf { it.isFinite() && it > 0f }
+        } else null
+        samples += Sample(observedAtMs, input.timestampMs, depthAt, source, distanceM, pointZ,
             max(0.05f, stats.iqrM?.takeIf { it.isFinite() && it >= 0f } ?: 0.35f),
-            pose, position, motion.takeIf { motionHasAlignedClocks(input.track, it) } ?: ObjectMotionEstimate(), input.geometry)
+            pose, position.takeIf { pointZ != null }, sampledPoint.takeIf { pointZ != null },
+            motion.takeIf { motionHasAlignedClocks(input.track, it) } ?: ObjectMotionEstimate(), input.geometry)
         samples.removeAll { input.timestampMs - it.atMs > 4_000L }
         while (samples.size > 8) samples.removeAt(0)
     }
 
     fun gap(input: ObjectDepthInput): DepthGapDecision {
-        val latest = samples.lastOrNull() ?: return DepthGapDecision(DepthAvailability.UNAVAILABLE)
+        var latest = samples.lastOrNull() ?: return DepthGapDecision(DepthAvailability.UNAVAILABLE)
         val ageMs = input.timestampMs - latest.atMs
         val pose = input.motionContext.reliableCameraPoseEvidence()?.takeIf { validPose(it, input.timestampMs) }
         if (!validContext(input) || !input.track.stable || ageMs < 0L ||
@@ -98,6 +110,15 @@ internal class ShortDepthGapState {
         ) {
             clear()
             return DepthGapDecision(DepthAvailability.UNAVAILABLE)
+        }
+        if (latest.materialPoint != null && !ownsCurrentMaterialPoint(latest, input)) {
+            // Losing the measured point retires its spatial seed. Seeing its old ID again
+            // cannot restore velocity; keep the scalar samples and their original deadline.
+            for (index in samples.indices) {
+                samples[index] = samples[index].copy(position = null, materialPoint = null,
+                    pointZDistanceM = null, motion = ObjectMotionEstimate())
+            }
+            latest = samples.last()
         }
         val intervals = samples.zipWithNext().map { (a, b) -> b.atMs - a.atMs }.sorted()
         val cadenceMs = intervals.getOrNull(intervals.size / 2) ?: 100L
@@ -142,11 +163,12 @@ internal class ShortDepthGapState {
                 latest.motion.referenceId == latest.pose?.referenceId && it.norm() <= 8f
         }
         if (pose != null && latest.pose != null && latest.position != null && finite(latest.position) && velocity != null &&
-            abs(latest.distanceM - latest.zDistanceM) <= 0.25f
+            latest.pointZDistanceM != null && ownsCurrentMaterialPoint(latest, input) &&
+            abs(latest.distanceM - latest.pointZDistanceM) <= 0.25f
         ) {
             val position = latest.position + velocity * seconds
             val currentZ = (position - pose.position()).dot(pose.forward())
-            predicted = latest.distanceM + currentZ - latest.zDistanceM
+            predicted = latest.distanceM + currentZ - latest.pointZDistanceM
             predictedRange = (position - pose.position()).norm()
             velocityUncertainty = max(0.35f, slopeVariation)
         } else if (pose != null && latest.pose != null) {
@@ -193,13 +215,36 @@ internal class ShortDepthGapState {
         input.motionContext.trackingQuality >= 0.8f && input.motionContext.motionQuality >= 0.8f &&
         input.motionContext.freshnessQuality >= 0.7f && input.motionContext.shakeScore <= 0.2f
 
+    private fun ownsCurrentMaterialPoint(sample: Sample, input: ObjectDepthInput): Boolean {
+        val previous = sample.materialPoint ?: return false
+        val current = input.materialPoint ?: return false
+        return current.id === previous.id && currentPointBelongsToGeometry(current, input) &&
+            current.targetKey.epoch == previous.targetKey.epoch &&
+            current.targetKey.geometryVersion == previous.targetKey.geometryVersion &&
+            current.targetKey.cameraTimestampNs >= previous.targetKey.cameraTimestampNs &&
+            current.targetKey.capturedAtElapsedRealtimeMs >= previous.targetKey.capturedAtElapsedRealtimeMs
+    }
+
+    private fun currentPointBelongsToGeometry(point: VisualMaterialPoint, input: ObjectDepthInput): Boolean {
+        val key = point.targetKey
+        val position = point.imagePointNorm
+        val box = input.geometry.bboxNorm
+        return key.frameId == input.frameId && key.frameId / 1_000_000L == input.timestampMs &&
+            key.cameraTimestampNs > 0L && key.capturedAtElapsedRealtimeMs >= 0L &&
+            position.x.isFinite() && position.y.isFinite() && position.x >= 0f && position.x < 1f &&
+            position.y >= 0f && position.y < 1f &&
+            position.x in box.x..(box.x + box.width) && position.y in box.y..(box.y + box.height) &&
+            input.geometry.polygonNorm.size >= 3 && pointInPolygon(position, input.geometry.polygonNorm)
+    }
+
     private fun motionHasAlignedClocks(track: TrackState, motion: ObjectMotionEstimate): Boolean {
         val atMs = motion.observedAtMs ?: return false
         if (motion.elapsedMs <= 0L) return false
         // A newly aligned sample must not reuse a velocity fitted across earlier skewed samples.
         val fitted = track.denseMotionHistory().filter { it.timestampMs in (atMs - motion.elapsedMs)..atMs }
         return fitted.size >= 4 && fitted.all {
-            it.depthObservationTimestampNs?.div(1_000_000L) == it.timestampMs &&
+            it.depthObservationTimestampNs?.let { stamp -> stamp > 0L } == true &&
+                it.depthObservedAtFrameMs == it.timestampMs &&
                 it.cameraPoseEvidence?.timestampMs == it.timestampMs
         }
     }

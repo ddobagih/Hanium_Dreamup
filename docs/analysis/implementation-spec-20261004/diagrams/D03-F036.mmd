@@ -1,0 +1,19 @@
+flowchart TD
+ A["F-D03-036 fresh 위치 / P-D03-036"] --> G{"정상mode accepted match이며 jump와 gap hold가 없는가"}
+ G -->|"아니오"| X["도착 증거 축적 안 함"]
+ G -->|"예"| C{"raw accuracy 10m 이하이며 distance와 accuracy 합 12m 이하인가"}
+ C -->|"아니오"| R["연속 arrival 증거 초기화 / route 유지"]
+ C -->|"예"| D{"route remainder가 max 20m와 12m 더하기 accuracy 이하인가"}
+ D -->|"아니오"| R
+ D -->|"예"| O{"raw와 filtered 원시각이 모두 증가하고 gap 10초 이하인가"}
+ O -->|"동일 또는 역행"| X
+ O -->|"gap 초과"| B["첫 근접표본으로 다시 시작"]
+ O -->|"연속"| E["arrival 표본 추가 / 두 원시각 체류 중 작은값 계산"]
+ E --> T{"최소2표본과 3초 체류를 모두 만족하는가"}
+ T -->|"아니오"| W["다음 fresh 근접증거 대기"]
+ T -->|"예"| Q["ARRIVAL_CONFIRMATION / route 유지"]
+ Q --> U{"현재 token의 사용자 답인가"}
+ U -->|"도착 확인"| Y["route clear / arrived true / Main archive 종료"]
+ U -->|"도착 아니야"| N["route 유지 / 자동 재질문 disarm / F-D03-037"]
+ U -->|"stale 또는 만료"| X
+ B --> W

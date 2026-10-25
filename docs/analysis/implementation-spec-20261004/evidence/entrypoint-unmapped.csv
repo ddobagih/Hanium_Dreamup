@@ -1,0 +1,2 @@
+﻿path,line,kind,declaration,evidence,limit,mapping,range_feature_ids,same_file_feature_ids,read_domains,inventory_family_feature_ids,coverage_limit
+model/test_android_tflite_contract.py,101,CLI_MAIN,"if __name__ == ""__main__"":",DECLARED_ENTRY_CANDIDATE,선언 발견은 런타임 도달성 또는 실행 검증 아님,READ_FILE_INVENTORY_ONLY,,,D10,,선언 줄의 참조범위 포함 여부 검사. 같은 파일/범위 참조가 모든 동작 분기 상세 설명을 보장하지 않음.

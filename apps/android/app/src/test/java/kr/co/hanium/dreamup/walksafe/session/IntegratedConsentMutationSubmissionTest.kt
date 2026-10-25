@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.session
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -323,25 +324,33 @@ class IntegratedConsentMutationSubmissionTest {
             File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"),
             File("app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"),
         ).first { it.isFile }.readText()
-        val creation = source.substringAfter("private fun persistIntegratedConsentDraft(")
-            .substringBefore("private fun retryPendingIntegratedConsentMutation(")
-        val retry = source.substringAfter("private fun retryPendingIntegratedConsentMutation(")
-            .substringBefore("private fun startIntegratedConsentRequest(")
+        val creation = MainActivityRefactorSource.function(source, "private fun persistIntegratedConsentDraft(")
+        val retry = MainActivityRefactorSource.function(source, "private fun retryPendingIntegratedConsentMutation(")
+        assertTrue(creation.contains("integratedConsentSession.submitPendingMutation("))
+        assertTrue(retry.contains("integratedConsentSession.submitPendingMutation("))
         assertTrue(creation.indexOf("submitPendingMutation(") < creation.indexOf("sensitivePrefs.edit()"))
-        assertTrue(creation.indexOf("submitPendingMutation(") < creation.indexOf("integratedConsentClient.saveCall("))
-        assertTrue(retry.indexOf("submitPendingMutation(") < retry.indexOf("integratedConsentClient.saveCall("))
+        assertTrue(creation.indexOf("submitPendingMutation(") < creation.indexOf("remote.saveCall("))
+        assertTrue(retry.indexOf("submitPendingMutation(") < retry.indexOf("remote.saveCall("))
         assertFalse(creation.contains("restorePendingMutation("))
         assertFalse(retry.contains("restorePendingMutation("))
         assertTrue(creation.contains("withdrawalRecoverySelectionsOrNull()"))
-        assertTrue(source.contains("RejectedConsentCasJournalCodec.restoredPendingPreservesConfirmation("))
-        val pendingRestore = source.indexOf(
-            "val restoredPendingRaw = sensitivePrefs.getString(")
-        val markerRestore = source.indexOf(
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/consent/IntegratedConsentController.kt").readText()
+        val persistence = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/consent/IntegratedConsentPersistence.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(persistence, "restoredPendingPreservesConfirmation")
+            .contains("RejectedConsentCasJournalCodec.restoredPendingPreservesConfirmation("))
+        val assembly = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/privacy/PrivacyAuthorityComposition.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(source, "initializeIntegratedConsentPersistence")
+            .contains("privacyAuthority.initializeIntegratedConsentPersistence()"))
+        assertTrue(MainActivityRefactorSource.member(assembly, "initializeIntegratedConsentPersistence")
+            .contains("integratedConsentController.value.initializePersistence(IntegratedConsentPersistence("))
+        val restoredState = MainActivityRefactorSource.member(owner, "restoreConsentState")
+        val pendingRestore = restoredState.indexOf("val restoredPendingRaw = sensitivePrefs.getString(")
+        val markerRestore = restoredState.indexOf(
             "sensitivePrefs.getString(PREF_LOCAL_WITHDRAWAL_FAIL_CLOSED, null)\n            ?.let { raw ->")
         assertTrue(pendingRestore >= 0)
         assertTrue(markerRestore > pendingRestore)
-        val restore = source.substring(pendingRestore, markerRestore)
-        assertTrue(restore.contains("restoredPendingRaw?.let(::pendingIntegratedConsentMutationOrNull)"))
+        val restore = restoredState.substring(pendingRestore, markerRestore)
+        assertTrue(restore.contains("restoredPendingRaw?.let(persistence::pendingIntegratedConsentMutationOrNull)"))
         assertTrue(restore.contains("restoredPendingPreservesConfirmation("))
         assertTrue(restore.contains("restorePendingMutation(mutation, retry = true)"))
     }

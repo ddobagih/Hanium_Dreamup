@@ -1,0 +1,29 @@
+flowchart TD
+  IN["F-D14-007<br/>관리자 password·TOTP 로그인"]
+  G["적용 정책<br/>P-D14-001 / P-D14-003 / P-D14-004 / P-D14-005 / P-D14-006 / P-D14-008"]
+  IN --> G
+  N1["1. API no-store, enabled, Android header, LO<br/>GIN proof 검사"]
+  G --> N1
+  N2["2. 실패 횟수 제한 및 control/issuer 잠금"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. runtime factor 일치→admin/password→NORMAL→A<br/>CTIVE 기기 키→fresh TOTP 순서 검사"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 필요한 password rehash를 준비하고 같은 device의 기존 s<br/>ession 폐기"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 48 random bytes token의 SHA256만 저장, 기본 12시<br/>간 expires와 last_seen/step_up 시각 설정"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. SUCCESS 감사/attempt와 commit 후 access_token<br/>·security_state·current_session_id 반환"]
+  N5 -->|"계속 가능한 경우"| N6
+  B1["분기 결과<br/>401 admin_credentials_invalid"]
+  N3 -->|"잘못된 자격"| B1
+  B2["분기 결과<br/>409 admin_recovery_required"]
+  N3 -->|"복구 중/필요"| B2
+  B3["분기 결과<br/>403 admin_device_key_not_active"]
+  N3 -->|"기기 키 비활성"| B3
+  B4["분기 결과<br/>401 admin_totp_replayed"]
+  N3 -->|"TOTP 재사용"| B4
+  N6 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

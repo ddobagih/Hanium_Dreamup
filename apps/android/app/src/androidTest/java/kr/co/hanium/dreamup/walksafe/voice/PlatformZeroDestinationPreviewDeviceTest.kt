@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.voice
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
 import android.Manifest
 import android.app.Instrumentation
 import android.content.Intent
@@ -16,6 +18,8 @@ import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import kr.co.hanium.dreamup.walksafe.BuildConfig
 import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.feedback.AndroidFeedbackActuator
+import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState
 import kr.co.hanium.dreamup.walksafe.session.DeviceTestAccountUiLogin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,6 +42,16 @@ class PlatformZeroDestinationPreviewDeviceTest {
                 .getString("allowPlatformZeroDestinationPreviewTest").toBoolean(),
         )
         assertTrue("BLOCKED: DEBUG metadata events are required", BuildConfig.DEBUG)
+        val expectedCandidateName = InstrumentationRegistry.getArguments()
+            .getString("expectedPreviewCandidateName") ?: APPROVED_DESTINATION_NAME
+        require(expectedCandidateName == APPROVED_DESTINATION_NAME ||
+            expectedCandidateName == SYNTHETIC_DESTINATION_NAME) {
+            "Preview candidate name must be one of the two explicit test contracts"
+        }
+        if (expectedCandidateName == SYNTHETIC_DESTINATION_NAME) {
+            assertEquals("Synthetic preview candidates require the private account fixture profile",
+                "kr.co.hanium.dreamup.walksafe.accountrestartfixture", instrumentation.targetContext.packageName)
+        }
         val logReader = Executors.newSingleThreadExecutor()
         var openedActivity: MainActivity? = null
         try {
@@ -57,6 +71,7 @@ class PlatformZeroDestinationPreviewDeviceTest {
                 MainActivity::class.java.declaredMethods.single {
                     it.name == "showNativeUiPage" && it.parameterCount == 1
                 }.apply { isAccessible = true }.invoke(activity, voicePage)
+                val actuator = checkNotNull(mainField(activity, "feedbackActuator") as? AndroidFeedbackActuator)
                 Baseline(
                     searchGeneration = (mainField(activity, "destinationSearchGeneration") as Number).toLong(),
                     routeRequestGeneration = (mainField(activity, "routeRequestGeneration") as Number).toInt(),
@@ -64,9 +79,8 @@ class PlatformZeroDestinationPreviewDeviceTest {
                     pendingDestination = mainField(activity, "pendingUiDestination"),
                     routeActive = mainField(activity, "isRouteActive") as Boolean,
                     routeRequestInFlight = (mainField(activity, "routeRequestInFlight") as AtomicBoolean).get(),
-                    interactionAtMs = mainField(activity, "feedbackActuator")?.let {
-                        field(it, "lastInteractionMessageAtMs")
-                    },
+                    actuator = actuator,
+                    interactionAtMs = (field(actuator, "lastInteractionMessageAtMs") as Number).toLong(),
                 )
             }
             val candidateHandler = MainActivity::class.java.declaredMethods.single {
@@ -92,7 +106,7 @@ class PlatformZeroDestinationPreviewDeviceTest {
             val deadline = SystemClock.elapsedRealtime() + 60_000L
             var observed = PreviewObservation()
             while (SystemClock.elapsedRealtime() < deadline) {
-                observed = onMain(instrumentation) { observePreview(activity, before) }
+                observed = onMain(instrumentation) { observePreview(activity, before, expectedCandidateName) }
                 assertTrue("Preview must not select a destination or start a route", observed.routeUnchanged)
                 if (observed.ready) break
                 SystemClock.sleep(100L)
@@ -159,23 +173,24 @@ class PlatformZeroDestinationPreviewDeviceTest {
         assertTrue("BLOCKED: actual account/education/input/location readiness $observed", observed.ready)
     }
 
-    private fun observePreview(activity: MainActivity, before: Baseline): PreviewObservation {
+    private fun observePreview(
+        activity: MainActivity,
+        before: Baseline,
+        expectedCandidateName: String,
+    ): PreviewObservation {
         val results = mainField(activity, "destinationSearchResults") as List<*>
-        val voiceState = mainField(activity, "destinationSearchVoiceState")
-        val voiceQueryMatches = voiceState != null && field(voiceState, "query") == QUERY
-        val voiceResultsMatch = voiceState != null && field(voiceState, "results") == results
-        val prompt = if (voiceQueryMatches && voiceResultsMatch) {
-            voiceState!!.javaClass.methods.single {
-                it.name.substringBefore('$') == "voicePrompt" && it.parameterCount == 0
-            }.invoke(voiceState) as String
-        } else {
-            null
-        }
-        val actuator = mainField(activity, "feedbackActuator")
+        val voiceState = mainField(activity, "destinationSearchVoiceState") as? DestinationSearchVoiceState
+        val voiceQueryMatches = voiceState?.query == QUERY
+        val voiceResultsMatch = voiceState != null && voiceState.results == results
+        val prompt = if (voiceQueryMatches && voiceResultsMatch) voiceState!!.voicePrompt() else null
+        val promptParts = if (prompt != null) voiceState!!.voicePromptParts() else emptyList()
+        val actuator = mainField(activity, "feedbackActuator") as? AndroidFeedbackActuator
         // Prompt text remains in memory. Never pass it or the candidate objects to assertion output.
-        val feedbackAccepted = prompt != null && actuator != null &&
-            field(actuator, "lastInteractionMessage") == prompt &&
-            field(actuator, "lastInteractionMessageAtMs") != before.interactionAtMs
+        val lastNativePart = actuator?.let { field(it, "lastInteractionMessage") } as? String
+        val acceptedAtMs = actuator?.let { (field(it, "lastInteractionMessageAtMs") as Number).toLong() }
+        val feedbackAccepted = prompt != null && actuator === before.actuator &&
+            acceptedAtMs != null && acceptedAtMs > before.interactionAtMs &&
+            lastNativePart != null && lastNativePart in promptParts
         return PreviewObservation(
             newGeneration = (mainField(activity, "destinationSearchGeneration") as Number).toLong() >
                 before.searchGeneration,
@@ -185,7 +200,7 @@ class PlatformZeroDestinationPreviewDeviceTest {
             voiceQueryMatches = voiceQueryMatches,
             voiceResultsMatch = voiceResultsMatch,
             pendingVoiceQueryCleared = mainField(activity, "pendingVoiceDestinationQuery") == null,
-            approvedCandidatePresent = prompt?.contains(APPROVED_DESTINATION_NAME) == true,
+            approvedCandidatePresent = voiceState?.results?.any { it.name == expectedCandidateName } == true,
             feedbackAccepted = feedbackAccepted,
             routeUnchanged = routeUnchanged(activity, before),
         )
@@ -245,7 +260,7 @@ class PlatformZeroDestinationPreviewDeviceTest {
     }
 
     private fun mainField(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.get(activity)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.get(activity)
 
     private fun field(instance: Any, name: String): Any? =
         instance.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(instance)
@@ -275,7 +290,8 @@ class PlatformZeroDestinationPreviewDeviceTest {
         val pendingDestination: Any?,
         val routeActive: Boolean,
         val routeRequestInFlight: Boolean,
-        val interactionAtMs: Any?,
+        val actuator: AndroidFeedbackActuator,
+        val interactionAtMs: Long,
     )
 
     private data class Preconditions(
@@ -321,5 +337,6 @@ class PlatformZeroDestinationPreviewDeviceTest {
         const val QUERY = "금오공대"
         const val FINAL_PHRASE = "금오공대 목적지로 해줘"
         const val APPROVED_DESTINATION_NAME = "국립금오공과대학교"
+        const val SYNTHETIC_DESTINATION_NAME = "합성 금오공대 정문"
     }
 }

@@ -1,0 +1,10 @@
+flowchart TD
+  META["F-D16-001 · P-D16-001"]
+  META --> A
+  A["Launcher / Activity 생성"] --> B["FLAG_SECURE·UI 연결·coordinator 초기화"]
+  B --> C["onStart: observer 연결·현재 snapshot 표시"]
+  C --> D{"화면 lifecycle 이벤트"}
+  D -->|"onStop·구성변경"| E["observer만 분리·worker 유지"]
+  D -->|"실제 종료이며 구성변경 아님"| F["분석 취소 요청 F-D16-014"]
+  E -->|"onStart"| C
+  C --> G["busy·cancelling·입력·결과 상태로 버튼 허용"]

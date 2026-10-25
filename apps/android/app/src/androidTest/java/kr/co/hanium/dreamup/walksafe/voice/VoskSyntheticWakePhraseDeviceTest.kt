@@ -51,6 +51,7 @@ class VoskSyntheticWakePhraseDeviceTest {
         val files = Fixture.entries.associateWith { File(scratch, it.name.lowercase() + ".wav") }
         var speech: TextToSpeech? = null
         try {
+            val readinessDeadline = SystemClock.elapsedRealtime() + 20_000L
             val initialized = CountDownLatch(1)
             val initStatus = AtomicInteger(TextToSpeech.ERROR)
             val tts = onMain(instrumentation) {
@@ -60,23 +61,41 @@ class VoskSyntheticWakePhraseDeviceTest {
                 }
             }
             speech = tts
-            assertTrue("NOT_READY: TTS initialization timed out", initialized.await(20L, TimeUnit.SECONDS))
+            assertTrue(
+                "NOT_READY: TTS initialization timed out",
+                initialized.await(
+                    (readinessDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(0L),
+                    TimeUnit.MILLISECONDS,
+                ),
+            )
             assertEquals("NOT_READY: TTS initialization failed", TextToSpeech.SUCCESS, initStatus.get())
-            val voice = checkNotNull(onMain(instrumentation) {
-                tts.voices.orEmpty()
-                    .filter {
-                        it.locale.language == "ko" && !it.isNetworkConnectionRequired &&
-                            TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in it.features.orEmpty()
+            val voice = checkNotNull(run {
+                var candidate: android.speech.tts.Voice? = null
+                while (candidate == null && SystemClock.elapsedRealtime() < readinessDeadline) {
+                    candidate = onMain(instrumentation) {
+                        (listOfNotNull(tts.voice) + tts.voices.orEmpty())
+                            .filter(::isInstalledOfflineKoreanVoice)
+                            .distinctBy { it.name }
+                            .sortedBy { it.name }
+                            .firstOrNull()
                     }
-                    .sortedBy { it.name }
-                    .firstOrNull()
+                    if (SystemClock.elapsedRealtime() >= readinessDeadline) candidate = null
+                    if (candidate == null) {
+                        val remaining = readinessDeadline - SystemClock.elapsedRealtime()
+                        if (remaining > 0L) SystemClock.sleep(minOf(100L, remaining))
+                    }
+                }
+                candidate
             }) { "NOT_READY: no installed offline Korean TTS voice" }
             onMain(instrumentation) {
                 assertEquals("Offline voice selection failed", TextToSpeech.SUCCESS, tts.setVoice(voice))
                 assertEquals("Cannot set standard fixture rate", TextToSpeech.SUCCESS, tts.setSpeechRate(1f))
                 assertEquals("Cannot set standard fixture pitch", TextToSpeech.SUCCESS, tts.setPitch(1f))
                 val selected = checkNotNull(tts.voice) { "NOT_READY: selected TTS voice is absent" }
-                assertEquals("ko", selected.locale.language)
+                assertTrue(
+                    "Selected TTS voice must be installed, offline, and Korean: ${selected.locale}",
+                    isInstalledOfflineKoreanVoice(selected),
+                )
                 assertFalse("Network voice cannot synthesize this diagnostic", selected.isNetworkConnectionRequired)
             }
             val voiceId = voice.name.replace(Regex("[^A-Za-z0-9_.-]"), "_").take(96)
@@ -178,6 +197,8 @@ class VoskSyntheticWakePhraseDeviceTest {
             recognizer.setPartialWords(false)
             recognizer.setMaxAlternatives(0)
             recognizer.setEndpointerMode(Recognizer.EndpointerMode.SHORT)
+            // 실제 HOME listenUntilWake decoder와 같은 endpoint 지연(초)을 사용한다.
+            recognizer.setEndpointerDelays(5.0f, 0.35f, 5.0f)
             val deadline = SystemClock.elapsedRealtime() + 30_000L
             val frameSize = (wav.sampleRate / 50).coerceAtLeast(1)
             fun feed(samples: ShortArray) {

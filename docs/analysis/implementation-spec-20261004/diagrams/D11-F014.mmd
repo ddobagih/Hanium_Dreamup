@@ -1,0 +1,16 @@
+flowchart TD
+ A["F-D11-014 신고 retention"] --> P["P-D11-014 생성일 기준 fake/demo30일 및 active/resolved180일"]
+ P --> M{"apply 지정"}
+ M -->|"아니오"| V["후보와 digest 및 destructive_action=false 출력 후 종료"]
+ M -->|"예"| I["fixture와 미래 as-of 및 execute-delete 거부. batch1..5000 확인"]
+ I --> G["공용 lock과 최근26시간 백업 및 동일 backup restore receipt 검증"]
+ G --> R["이전 quarantine journal reconcile"]
+ R --> D["후보 재조회. 이미지 recovery copy와 journal 준비"]
+ D --> T{"DB transaction commit"}
+ T -->|"전 실패"| B["rollback과 원본 복구. 실패 manifest 보존"]
+ T -->|"성공"| F["postcommit 파일정리와 journal 재조정"]
+ F -->|"정리 실패"| X["DB 완료를 유지한 실패 manifest. 다음 reconcile 필요"]
+ F -->|"정리 성공"| Z["producer manifest 검증 뒤 wrapper no-replace 게시"]
+ G -->|"증거 불일치"| E["삭제 전 거부"]
+ I -->|"입력 위반"| E
+ Z -.-> C["wrapper signal은 child group에 전파. timeout+5초 뒤 KILL, pending audit 보존"]

@@ -38,30 +38,6 @@ type RefreshAdmissionLimits = {
 
 type Window = { startedAtEpochMs: number; count: number };
 
-let testLimits: RefreshAdmissionLimits | null = null;
-let inFlight = 0;
-const clientWindows = new Map<string, Window>();
-const familyFailureWindows = new Map<string, Window>();
-
-function limits(): RefreshAdmissionLimits {
-  return testLimits ?? {
-    perClientPerMinute: FIELD_SESSION_REFRESH_PER_CLIENT_PER_MINUTE,
-    failuresPerFamilyPerMinute: FIELD_SESSION_REFRESH_FAILURES_PER_FAMILY_PER_MINUTE,
-    maxConcurrent: FIELD_SESSION_REFRESH_MAX_CONCURRENT
-  };
-}
-
-/** Tests only: other limits, or null for the defaults; always clears the counters. */
-export function setFieldSessionRefreshAdmissionForTests(next: RefreshAdmissionLimits | null): void {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("refresh admission test limits are unavailable in production");
-  }
-  testLimits = next;
-  inFlight = 0;
-  clientWindows.clear();
-  familyFailureWindows.clear();
-}
-
 function current(windows: Map<string, Window>, key: string, now: number): Window {
   const existing = windows.get(key);
   if (existing && now - existing.startedAtEpochMs < WINDOW_MS && now >= existing.startedAtEpochMs) {
@@ -111,46 +87,87 @@ export type FieldSessionRefreshAdmission =
   | { admitted: false; response: Response }
   | { admitted: true; finish: (status: number) => void };
 
-/**
- * Admits one refresh. `clientIp` is the trusted client address: null when none is usable,
- * which outside production (no proxy) skips the per-client limit; in production the adapter
- * already refused such a request (S19-53), and one that gets here anyway (a direct
- * handleGatewayRequest caller) is counted in one fixed bucket. `actorId` and `familyId` are
- * the claimed (unverified) refresh family. The caller must call `finish` exactly once with
- * the response status.
- */
-export function admitFieldSessionRefresh(
-  clientIp: string | null,
-  actorId: string,
-  familyId: string,
-  nowEpochMs = Date.now()
-): FieldSessionRefreshAdmission {
-  const active = limits();
-  const familyKey = JSON.stringify([actorId, familyId]);
-  const familyWindow = current(familyFailureWindows, familyKey, nowEpochMs);
-  if (familyWindow.count >= active.failuresPerFamilyPerMinute) {
-    return { admitted: false, response: rateLimited(retryAfterSeconds(familyWindow, nowEpochMs)) };
+/** Owns one server's admission/cache lifetime; never constructed per request. */
+export function createRefreshAdmission(clock: () => number = () => Date.now()) {
+
+
+  let testLimits: RefreshAdmissionLimits | null = null;
+
+  let inFlight = 0;
+
+  const clientWindows = new Map<string, Window>();
+
+  const familyFailureWindows = new Map<string, Window>();
+
+
+  function limits(): RefreshAdmissionLimits {
+    return testLimits ?? {
+      perClientPerMinute: FIELD_SESSION_REFRESH_PER_CLIENT_PER_MINUTE,
+      failuresPerFamilyPerMinute: FIELD_SESSION_REFRESH_FAILURES_PER_FAMILY_PER_MINUTE,
+      maxConcurrent: FIELD_SESSION_REFRESH_MAX_CONCURRENT
+    };
   }
-  const clientKey = clientIp ?? (process.env.NODE_ENV === "production" ? UNBOUND_CLIENT_KEY : null);
-  if (clientKey !== null) {
-    const clientWindow = current(clientWindows, clientKey, nowEpochMs);
-    if (clientWindow.count >= active.perClientPerMinute) {
-      return { admitted: false, response: rateLimited(retryAfterSeconds(clientWindow, nowEpochMs)) };
+
+
+  /** Tests only: other limits, or null for the defaults; always clears the counters. */
+  function setFieldSessionRefreshAdmissionForTests(next: RefreshAdmissionLimits | null): void {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("refresh admission test limits are unavailable in production");
     }
-    clientWindow.count += 1;
+    testLimits = next;
+    inFlight = 0;
+    clientWindows.clear();
+    familyFailureWindows.clear();
   }
-  if (inFlight >= active.maxConcurrent) return { admitted: false, response: busy() };
-  inFlight += 1;
-  let finished = false;
-  return {
-    admitted: true,
-    finish: (status) => {
-      if (finished) return;
-      finished = true;
-      inFlight = Math.max(0, inFlight - 1);
-      if (COUNTED_REFUSAL_STATUSES.has(status)) {
-        current(familyFailureWindows, familyKey, Date.now()).count += 1;
+
+
+  /**
+   * Admits one refresh. `clientIp` is the trusted client address: null when none is usable,
+   * which outside production (no proxy) skips the per-client limit; in production the adapter
+   * already refused such a request (S19-53), and one that gets here anyway (a direct
+   * handleGatewayRequest caller) is counted in one fixed bucket. `actorId` and `familyId` are
+   * the claimed (unverified) refresh family. The caller must call `finish` exactly once with
+   * the response status.
+   */
+  function admitFieldSessionRefresh(
+    clientIp: string | null,
+    actorId: string,
+    familyId: string,
+    nowEpochMs = clock()
+  ): FieldSessionRefreshAdmission {
+    const active = limits();
+    const familyKey = JSON.stringify([actorId, familyId]);
+    const familyWindow = current(familyFailureWindows, familyKey, nowEpochMs);
+    if (familyWindow.count >= active.failuresPerFamilyPerMinute) {
+      return { admitted: false, response: rateLimited(retryAfterSeconds(familyWindow, nowEpochMs)) };
+    }
+    const clientKey = clientIp ?? (process.env.NODE_ENV === "production" ? UNBOUND_CLIENT_KEY : null);
+    if (clientKey !== null) {
+      const clientWindow = current(clientWindows, clientKey, nowEpochMs);
+      if (clientWindow.count >= active.perClientPerMinute) {
+        return { admitted: false, response: rateLimited(retryAfterSeconds(clientWindow, nowEpochMs)) };
       }
+      clientWindow.count += 1;
     }
-  };
+    if (inFlight >= active.maxConcurrent) return { admitted: false, response: busy() };
+    inFlight += 1;
+    let finished = false;
+    return {
+      admitted: true,
+      finish: (status) => {
+        if (finished) return;
+        finished = true;
+        inFlight = Math.max(0, inFlight - 1);
+        if (COUNTED_REFUSAL_STATUSES.has(status)) {
+          current(familyFailureWindows, familyKey, clock()).count += 1;
+        }
+      }
+    };
+  }
+  return { setFieldSessionRefreshAdmissionForTests, admitFieldSessionRefresh };
 }
+
+export type RefreshAdmissionController = ReturnType<typeof createRefreshAdmission>;
+export const defaultRefreshAdmission = createRefreshAdmission();
+export const setFieldSessionRefreshAdmissionForTests: RefreshAdmissionController["setFieldSessionRefreshAdmissionForTests"] = (...args) => defaultRefreshAdmission.setFieldSessionRefreshAdmissionForTests(...args);
+export const admitFieldSessionRefresh: RefreshAdmissionController["admitFieldSessionRefresh"] = (...args) => defaultRefreshAdmission.admitFieldSessionRefresh(...args);

@@ -1,5 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPoint
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
 import kr.co.hanium.dreamup.walksafe.navigation.UserMotionEstimate
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.HeadingObservation
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.WalkingSpeedObservation
@@ -41,13 +44,20 @@ class ObjectDepthRuntimePipelineTest {
         )
         listOf(255, 0).forEach { rawConfidence ->
             val pipeline = ObjectDepthRuntimePipeline()
+            val diagnosticTracker = ObjectTracker()
+            val diagnosticEstimator = ObjectDepthEstimator(tracker = diagnosticTracker)
+            val diagnosticOutputs = mutableListOf<TrackedObjectDepth>()
+            val pointId = VisualMaterialPointId()
+            val candidate = DetectionCandidate("person", .9f, RectNorm(.35f, .35f, .30f, .30f))
+            val mapper = LetterboxCoordinateMapper(ModelInputTransform(1_000, 1_000, 1_000, 1_000,
+                1f, 0f, 0f), ImageSize(40, 40))
             val outputs = (0..3).map { index ->
                 val atMs = 1_000L + index * 500L
                 val frameNs = atMs * 1_000_000L
                 val cameraNs = frameNs + 400_000L
                 val depthMm = 4_000 - index * 500
-                pipeline.processPrealignedForTest(
-                    snapshot = snapshot(depthMm, rawConfidence, depthMm).copy(
+                val target = VisualFrameKey(7L, frameNs, cameraNs, atMs + 50_000L, 3L)
+                val capturedSnapshot = snapshot(depthMm, rawConfidence, depthMm).copy(
                         frameTimestampNs = frameNs,
                         rawDepthTimestampNs = cameraNs,
                         rawConfidenceTimestampNs = cameraNs,
@@ -62,10 +72,24 @@ class ObjectDepthRuntimePipelineTest {
                                 1f, 0f, 0f, 0f, 1f, 0f,
                             ),
                         ),
-                    ),
-                    frameId = frameNs,
-                    timestampMs = atMs,
-                    detections = listOf(DetectionCandidate("person", 0.9f, RectNorm(0.35f, 0.35f, 0.30f, 0.30f))),
+                    )
+                if (rawConfidence == 0) {
+                    val geometry = MaskPolygonExtractor().extract(candidate)
+                    val track = diagnosticTracker.update(listOf(geometry), atMs).single()
+                    diagnosticOutputs += diagnosticEstimator.estimate(ObjectDepthInput(
+                        frameId = frameNs, timestampMs = atMs, geometry = geometry, track = track, mapper = mapper,
+                        fullDepth = capturedSnapshot.fullDepth, fullDepthTimestampNs = cameraNs,
+                        fullDepthMatchesCameraFrame = true, rawDepthMotionOnly = false,
+                        materialPoint = VisualMaterialPoint(pointId, target, Point2(.5f, .5f)),
+                        motionContext = MotionContext(cameraPoseEvidence = capturedSnapshot.cameraPoseEvidence),
+                    ))
+                }
+                pipeline.processTrackedObservation(
+                    snapshot = capturedSnapshot,
+                    observation = knownMaterialPointObservation(target, target, candidate, pointId),
+                    mapper = mapper,
+                    mapperFrameId = frameNs,
+                    nowElapsedRealtimeMs = target.capturedAtElapsedRealtimeMs,
                     motionContext = MotionContext(userMotion = userMotion),
                 ).single()
             }
@@ -78,8 +102,22 @@ class ObjectDepthRuntimePipelineTest {
             assertEquals(0f, result.motionEstimate.objectSpeedMps!!, 0.001f)
             assertEquals(1f, result.motionEstimate.relativeClosingSpeedMps!!, 0.001f)
             assertEquals(ObjectMotion.USER_APPROACHING_STATIONARY, result.objectMotion)
-            assertEquals(1f, result.approachSpeedMps!!, 0.001f)
-            assertEquals(2_500L, result.timeToCollisionMs)
+            if (rawConfidence > 0) {
+                assertEquals(1f, result.approachSpeedMps!!, 0.001f)
+                assertEquals(2_500L, result.timeToCollisionMs)
+            } else {
+                // Current-observation publication applies the existing Raw-only TTC budget,
+                // even when the diagnostic estimator permits measured Full point motion.
+                assertEquals(DepthSource.ARCORE_FULL_DEPTH, result.source)
+                assertNull(result.approachSpeedMps)
+                assertNull(result.timeToCollisionMs)
+                // Preserve the original Full diagnostic positive at the actual estimator boundary;
+                // the current publisher's Raw-only TTC gate is a separate consumer contract.
+                val diagnostic = diagnosticOutputs.last()
+                assertEquals(ObjectMotion.USER_APPROACHING_STATIONARY, diagnostic.objectMotion)
+                assertEquals(1f, diagnostic.approachSpeedMps!!, .001f)
+                assertEquals(2_500L, diagnostic.timeToCollisionMs)
+            }
         }
     }
 

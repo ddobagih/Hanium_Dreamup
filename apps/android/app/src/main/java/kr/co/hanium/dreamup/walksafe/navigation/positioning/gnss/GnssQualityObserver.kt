@@ -37,9 +37,19 @@ internal class GnssQualityObserver(
     private var measurementSubscription: GnssObservationSubscription? = null
     private var latestStatusSummary: GnssFrequencySummary? = null
     private var latestStatusAtNanos: Long? = null
-    private var latestRawSnapshot: GnssQualitySnapshot? = null
+    // Querying an expired (or older) quality snapshot must not change source admission order.
+    private var latestRawAtNanos: Long? = null
     private var lastStartResult: GnssQualityObserverStartResult? = null
     private val pendingCancellations = mutableListOf<GnssObservationSubscription>()
+
+    /**
+     * Cancellation handles whose cancel call did not complete. Read after stop/close to retain
+     * their retry owner; false on an active observer does not mean its subscriptions are closed.
+     * This query never retries cancellation or infers that native callbacks have physically ended.
+     */
+    @get:Synchronized
+    val cleanupPending: Boolean
+        get() = pendingCancellations.isNotEmpty()
 
     init {
         require(statusStaleAfterNanos > 0L)
@@ -104,7 +114,6 @@ internal class GnssQualityObserver(
     @Synchronized
     fun snapshot(elapsedRealtimeNanos: Long): GnssQualitySnapshot {
         val rawSnapshot = estimator.snapshot(elapsedRealtimeNanos)
-        latestRawSnapshot = rawSnapshot
         return mergeStatus(rawSnapshot, elapsedRealtimeNanos)
     }
 
@@ -154,6 +163,7 @@ internal class GnssQualityObserver(
     @Synchronized
     private fun handleStatus(callbackGeneration: Long, epoch: GnssSignalEpoch) {
         if (!isCurrent(callbackGeneration) || epoch.elapsedRealtimeNanos < 0L ||
+            epoch.receivedAtElapsedRealtimeNanos < epoch.elapsedRealtimeNanos ||
             latestStatusAtNanos?.let { epoch.elapsedRealtimeNanos <= it } == true
         ) return
         latestStatusSummary = summarizeGnssFrequencies(epoch.signals)
@@ -163,6 +173,7 @@ internal class GnssQualityObserver(
             epoch.signals,
             epoch.timeSource,
             epoch.timestampUncertaintyNanos,
+            epoch.receivedAtElapsedRealtimeNanos,
         )
         val rawSnapshot = estimator.snapshot(epoch.elapsedRealtimeNanos)
         onSnapshot(mergeStatus(rawSnapshot, epoch.elapsedRealtimeNanos))
@@ -171,15 +182,17 @@ internal class GnssQualityObserver(
     @Synchronized
     private fun handleMeasurements(callbackGeneration: Long, epoch: GnssSignalEpoch) {
         if (!isCurrent(callbackGeneration) || epoch.elapsedRealtimeNanos < 0L ||
-            latestRawSnapshot?.latestEpochAtNanos?.let { epoch.elapsedRealtimeNanos <= it } == true
+            epoch.receivedAtElapsedRealtimeNanos < epoch.elapsedRealtimeNanos ||
+            latestRawAtNanos?.let { epoch.elapsedRealtimeNanos <= it } == true
         ) return
         val rawSnapshot = estimator.addEpoch(
             epoch.elapsedRealtimeNanos,
             epoch.signals,
             epoch.timeSource,
             epoch.timestampUncertaintyNanos,
+            epoch.receivedAtElapsedRealtimeNanos,
         )
-        latestRawSnapshot = rawSnapshot
+        latestRawAtNanos = epoch.elapsedRealtimeNanos
         onSnapshot(mergeStatus(rawSnapshot, epoch.elapsedRealtimeNanos))
     }
 
@@ -190,10 +203,8 @@ internal class GnssQualityObserver(
         // S09-5: without a raw-measurement subscription the status C/N0 window is the only signal
         // quality evidence. With raw registered, status C/N0 is ignored (no double counting).
         val signalSnapshot = if (measurementSubscription == null && statusSubscription != null) {
-            statusCn0Estimator.snapshot(evaluatedAtNanos)
-                .takeIf { it.latestEpochAtNanos != null }
-                ?.copy(cn0FromSatelliteStatus = true)
-                ?: rawSnapshot
+            val statusSnapshot = statusCn0Estimator.snapshot(evaluatedAtNanos)
+            statusSnapshot.copy(cn0FromSatelliteStatus = statusSnapshot.latestEpochAtNanos != null)
         } else {
             rawSnapshot
         }
@@ -233,7 +244,7 @@ internal class GnssQualityObserver(
     private fun clearSessionState() {
         latestStatusSummary = null
         latestStatusAtNanos = null
-        latestRawSnapshot = null
+        latestRawAtNanos = null
         lastStartResult = null
         estimator.clear()
         statusCn0Estimator.clear()

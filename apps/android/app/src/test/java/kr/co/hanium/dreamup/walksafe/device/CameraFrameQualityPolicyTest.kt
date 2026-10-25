@@ -36,19 +36,27 @@ class CameraFrameQualityPolicyTest {
                 occludedFraction = PROFILE.maximumOccludedFraction + 0.01,
             ) to CameraFrameQualityReason.OCCLUSION_OUTSIDE_APPROVED_RANGE,
             observation().copy(
-                angularShakeDegreesPerSecond =
-                    PROFILE.maximumAngularShakeDegreesPerSecond + 0.01,
-            ) to CameraFrameQualityReason.SHAKE_OUTSIDE_APPROVED_RANGE,
-            observation().copy(
                 mountPitchDegrees = PROFILE.maximumMountPitchDegrees + 0.01,
-            ) to CameraFrameQualityReason.MOUNT_ANGLE_OUTSIDE_APPROVED_RANGE,
+            ) to CameraFrameQualityReason.MOUNT_ANGLE_NEAR_BOUNDARY,
         )
 
         adverse.forEach { (observation, expectedReason) ->
-            val assessment = assess(observation)
+            IGNORED_SHAKE_VALUES.forEach { shake ->
+                val assessment = assess(observation.copy(angularShakeDegreesPerSecond = shake))
 
-            assertEquals(EnvironmentEvidenceStatus.FAIL, assessment.status)
-            assertEquals(expectedReason, assessment.reason)
+                assertEquals(EnvironmentEvidenceStatus.FAIL, assessment.status)
+                assertEquals(expectedReason, assessment.reason)
+            }
+        }
+    }
+
+    @Test
+    fun missingInvalidOrHighShakeDoesNotAffectCameraQuality() {
+        IGNORED_SHAKE_VALUES.forEach { shake ->
+            val assessment = assess(observation().copy(angularShakeDegreesPerSecond = shake))
+
+            assertEquals("shake=$shake", EnvironmentEvidenceStatus.PASS, assessment.status)
+            assertEquals(CameraFrameQualityReason.PASSED, assessment.reason)
         }
     }
 
@@ -75,11 +83,11 @@ class CameraFrameQualityPolicyTest {
         val invalid = listOf(
             observation().copy(normalizedBrightness = Double.NaN),
             observation().copy(occludedFraction = Double.POSITIVE_INFINITY),
-            observation().copy(angularShakeDegreesPerSecond = Double.NEGATIVE_INFINITY),
+            observation().copy(normalizedBrightness = null),
+            observation().copy(mountPitchDegrees = null),
             observation().copy(mountPitchDegrees = Double.NaN),
             observation().copy(normalizedBrightness = -0.1),
             observation().copy(occludedFraction = 1.1),
-            observation().copy(angularShakeDegreesPerSecond = -0.1),
         )
 
         invalid.forEach {
@@ -128,6 +136,9 @@ class CameraFrameQualityPolicyTest {
         const val MAX_AGE_MS = 2_000L
         val EPOCH = WalkRuntimeEpoch("walk-1", 1L)
         val OTHER_EPOCH = WalkRuntimeEpoch("walk-2", 1L)
+        val IGNORED_SHAKE_VALUES = listOf(
+            null, Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, -0.1, 0.0, 1_000.0,
+        )
         val PROFILE = ApprovedCameraFrameQualityProfile(
             profileId = "camera-field-approved-r001",
             minimumNormalizedBrightness = 0.4,

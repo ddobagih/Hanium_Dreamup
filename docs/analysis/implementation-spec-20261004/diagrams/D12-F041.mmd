@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-041 화면 재생성·중단·로컬 상태·늦은 작업 정리"]
+  P["P-D12-041 비밀값 비보관과 완료 증거 보존"]
+  A --> P
+  M0["1. 회전 Bundle에는 조회 필터·선택 ID 및 확정 상태변경/사고 미확정 digest 등 허용 recovery 키만 복사한다."]
+  P --> M0
+  M1["2. onStop에서 자격증명·원본 bitmap·민감 입력을 지우고 controller generation을 무효화한다."]
+  M0 --> M1
+  M2["3. SAF 전환을 제외한 중단은 local security lock을 설정하고 패키지와 화면 결속을 정리한다."]
+  M1 --> M2
+  M3["4. 재생성 후 성공적으로 보안 초기화한 뒤 PendingRecoveryState를 복원·소비한다."]
+  M2 --> M3
+  M4["5. onDestroy는 작업 executor와 controller를 종료하고 늦은 UI callback이 현재 세대인지 확인한다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 민감정보 제거와 세대 무효화, 성공적 초기화 이후 한 번 recovery 복원."]
+  M0 -. "관련 조건 확인" .-> B0{"초기화 실패 뒤 재회전"}
+  B0 -->|"조건 해당"| R0["아직 소비하지 않은 recovery snapshot 유지"]
+  M1 -. "관련 조건 확인" .-> B1{"세션 ID/권한 결속 변경"}
+  B1 -->|"조건 해당"| R1["모든 세션 종속 목록·초안·이미지·패키지·이력 초기화"]
+  M2 -. "관련 조건 확인" .-> B2{"예전 callback"}
+  B2 -->|"조건 해당"| R2["isDestroyed/generation/session 검사로 UI 반영 차단"]
+  M3 -. "관련 조건 확인" .-> B3{"복구 저장 원문"}
+  B3 -->|"조건 해당"| R3["password/token/image/ZIP 저장 금지"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["복구 소비 전 초기화 실패는 동일 recovery 사본 유지; 네트워크 변경 자동 재전송 없음."]

@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D01-001 회원가입 동의 화면과 로그인 전환"]
+  G{"EMAIL_ACCOUNT_V4 계정 화면, 저장소·요청 상태에 따라 버튼 제한"}
+  I["필수 3개 및 선택 3개 CheckBox; 전부 false로 생성; 모두 동의는 여섯 항목 전체; 청취 버튼 별도"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 필수 미선택 안내; 저장/진행중 제한 시 버튼 동작 제한"]
+  G -->|"미충족"| X
+  N1["회원가입 버튼은 CONSENT 화면을 열고 필수 첫 항목에 focus를 둔다. 기존 OTP 단계면 DETAILS로 연다."]
+  I --> N1
+  N2["개별 문서 본문·청취 버튼·선택값을 연결한다. 청취 자체로 선택값을 바꾸지 않는다."]
+  N1 --> N2
+  N3["동의하고 계속은 requiredGranted를 검사한 뒤 DETAILS로 전환하고 email focus를 준다."]
+  N2 --> N3
+  N4["로그인으로 버튼은 signup toggle을 호출하여 가입 입력을 닫고 OTP retry policy를 취소한다."]
+  N3 --> N4
+  OK["DETAILS 진입 또는 로그인 화면 복귀"]
+  N4 --> OK
+  B0["누락 안내·해당 입력 확인; DETAILS 진입 불가"]
+  N3 -->|"필수 하나라도 false"| B0
+  B1["동의 상세보다 OTP·암호 재입력 화면 복원"]
+  N1 -->|"기존 ACCOUNT_CREATED"| B1
+  B2["화면 접힘 및 retry ID cancel; 원격 서버 전송 취소 보장 아님"]
+  N4 -->|"가입 닫기"| B2
+  R["중단·취소: 로그인으로 접기 가능; 이미 발급된 서버 OTP 철회 의미 아님 / Activity 전환의 요청 응답은 AccountRequestFence로 배제"]
+  V["복구·재시도: 저장 partial 선택이 있으면 체크값을 적용 / 사용자가 다시 펼칠 수 있음; 자동 가입 없음"]
+  Q["정책 P-D01-001 · P-D01-005"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

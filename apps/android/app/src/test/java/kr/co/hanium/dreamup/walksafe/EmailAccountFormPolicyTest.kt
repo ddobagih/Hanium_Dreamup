@@ -14,6 +14,14 @@ class EmailAccountFormPolicyTest {
     )
 
     @Test
+    fun compactBirthDateEnablesOtpWithoutBypassingDateOrConsentValidation() {
+        assertTrue(validForm(requiredConsents, dateOfBirth = "20020101").canRequestOtp)
+        assertTrue(validForm(requiredConsents, dateOfBirth = "2002-01-01").canRequestOtp)
+        assertFalse(validForm(requiredConsents, dateOfBirth = "20020230").canRequestOtp)
+        assertFalse(validForm(SignupConsentSelections(), dateOfBirth = "20020101").canRequestOtp)
+    }
+
+    @Test
     fun emptyFormCannotRunAnyAccountAction() {
         val validity = EmailAccountFormPolicy.evaluate(
             email = "",

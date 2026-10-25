@@ -22,6 +22,13 @@ class VoiceCommandPoliteFormRegressionTest {
         }
     }
 
+    @Test fun explicitlyOpeningHelpHasItsOwnActionAndKeepsOtherPoliteForms() {
+        for (phrase in listOf("도움말 열기", "도움말 열어줘", "도움말 열어주세요", "도움말 화면 열어줘", "도움말 화면 열어주세요")) {
+            assertEquals(AndroidVoiceCommand.OpenHelp,parseAndroidVoiceCommand(phrase))
+            assertEquals(AndroidVoiceAction.OpenHelp,selectAndroidVoiceAction(listOf(phrase),floatArrayOf(.9f)))
+        }
+    }
+
     // S05-10 (05.txt:128 "실제 신고 기능 범위를 정한 뒤 필요한 표현만"): the explicit damaged tactile paving report.
     @Test
     fun reportRequestsNamingTheReportedDamageFileTheReport() {
@@ -61,7 +68,7 @@ class VoiceCommandPoliteFormRegressionTest {
     fun negatedOrCombinedFormsStillDoNothing() {
         listOf(
             "설정 열어주지 마", "도움말 알려주지 마세요", "설정 화면 열어줘 그리고 편의점 찾아줘",
-            "설정 화면", "도움말 화면 열어줘",
+            "설정 화면", "도움말 화면", "도움말 화면 열지 마", "도움말 열어줘 그리고 편의점 찾아줘",
         ).forEach { phrase -> assertNull(phrase, parseAndroidVoiceCommand(phrase)) }
     }
 }

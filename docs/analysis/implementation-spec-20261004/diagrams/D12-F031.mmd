@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-031 사용자 정정·삭제 요청 상태·답변 처리"]
+  P["P-D12-031 삭제 완료와 일반 권리 요청 상태 변경 분리"]
+  A --> P
+  M0["1. RECEIVED에서 ACKNOWLEDGED, CORRECTION의 ACKNOWLEDGED에서 RESOLVED 또는 REJECTED만 허용한다."]
+  P --> M0
+  M1["2. DELETE의 ACKNOWLEDGED에서는 REJECTED만 UI 상태변경으로 허용한다."]
+  M0 --> M1
+  M2["3. 고위험 재인증 후 expected_status_version과 답변으로 PATCH /admin/report-requests/{id}/status를 수행한다."]
+  M1 --> M2
+  M3["4. PATCH 확인 후 상세를 GET하고 상태/version과 대조한다."]
+  M2 --> M3
+  M4["5. 상세 불일치·지연이면 갱신이 필요한 상태로 보이며 재시도는 GET만 수행한다."]
+  M3 --> M4
+  M4 --> N["정상 종료: PATCH 응답과 최신 상세 상태를 분리해 표시."]
+  M0 -. "관련 조건 확인" .-> B0{"DELETE→RESOLVED"}
+  B0 -->|"조건 해당"| R0["일반 상태 PATCH로 차단"]
+  M1 -. "관련 조건 확인" .-> B1{"409"}
+  B1 -->|"조건 해당"| R1["최신 상세를 조회하고 재검토"]
+  M2 -. "관련 조건 확인" .-> B2{"성공 응답 이후 GET 실패"}
+  B2 -->|"조건 해당"| R2["변경 성공과 상세 갱신 실패를 분리"]
+  M3 -. "관련 조건 확인" .-> B3{"응답 미확정"}
+  B3 -->|"조건 해당"| R3["자동 PATCH 재전송 없음"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["성공 후 상세 갱신 실패는 GET 재조회, 자동 PATCH 재요청 없음."]

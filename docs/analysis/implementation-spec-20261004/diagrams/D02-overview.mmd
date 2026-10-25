@@ -1,0 +1,28 @@
+flowchart TB
+ D01["D01 교육·동의·계정"] --> READY["F-D02-001 / 002 세션·준비 evidence"]
+ PERM["F003 권한 회복"] --> READY
+ CHECK["F004-009 startup·기기 검사·저장"] --> READY
+ ENV["F010-017 자원·환경·거치·Depth 지원과 실측 분리"] --> READY
+ D03["D03 음성 입력·wake phrase"] --> READY
+ READY --> ACTIVE["현재 epoch의 명시 확인 후 ACTIVE"]
+ ACTIVE --> SAFETY["F018 안전 latch와 실제 정리 완료"]
+ D04["D04 센서·GPS·IMU"] --> ENV
+ D05["D05 detector·RunningDetectorVerification"] --> FIXED["F019 fixed fixture selector ACTIVE"]
+ D05 -.-> LIVE["F020-022 live tuning 구현 UNCONNECTED"]
+ FIXED --> READY
+ D07["D07 metric·qualitative risk source"] --> PURPOSE["F036 목적별 DeviceGate"]
+ PURPOSE --> RISK["F023 위험 안정화·lease·queue"]
+ RISK --> OUT["F024-026 TTS·focus·진동·tone"]
+ NAV["경로 영역의 instruction·reference"] --> ACCESS["F027 경로 DONE·TalkBack dispatch 분리"]
+ NAV --> REF["F029-030 점형·횡단보도 receipt"]
+ ACCESS --> OUT
+ REF --> OUT
+ FALLBACK["F028 camera+IMU nonmetric 참고"] --> OUT
+ GATEWAY["D03/D08 gateway voice"] --> WAV["F035 임시 WAV player"]
+ OUT --> DIAG["F031 텍스트 없는 outcome 집계"]
+ DIAG --> STORE["F032 동의·actor·epoch 암호화 저장"]
+ PRIVACY["개인정보/field log 영역"] --> STORE
+ SAFETY --> CLEAN["F034 Activity·camera·native cleanup"]
+ CLEAN --> MARKER["F033 이전 보행 중단 안내만 저장"]
+ MARKER --> READY
+ ACCESS --> UI["F037 공통 조작크기·큰글자 배치·읽기 대상"]

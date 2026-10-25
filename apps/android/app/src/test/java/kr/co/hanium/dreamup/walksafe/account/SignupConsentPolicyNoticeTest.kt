@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.account
 
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
+
 import java.io.File
 import kr.co.hanium.dreamup.walksafe.network.GatewayAccountClient
 import kr.co.hanium.dreamup.walksafe.network.GatewayAccountHttpException
@@ -51,8 +53,7 @@ class SignupConsentPolicyNoticeTest {
         val source = File(
             "src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
         ).readText(Charsets.UTF_8)
-        val failure = source.substringAfter("private fun postAccountFailure(")
-            .substringBefore("private fun showAccountMessage(")
+        val failure = MainActivityRefactorSource.function(source, "private fun postAccountFailure(")
         val branch = failure.substringAfter("SignupConsentPolicyNotice.OUTDATED_CODE ->")
         assertTrue(failure.contains("SignupConsentPolicyNotice.OUTDATED_CODE ->"))
         assertTrue(branch.lineSequence().drop(1).first().trim().endsWith(

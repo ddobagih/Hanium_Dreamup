@@ -1,0 +1,17 @@
+stateDiagram-v2
+  state "S-D01-021-CLEAR" as Clear
+  state "S-D01-021-REQUEST_PENDING" as Request
+  state "S-D01-021-BLOCKED" as Block
+  state "S-D01-021-SETTINGS_PENDING" as Settings
+  state "S-D01-021-RECHECK_REQUIRED" as Recheck
+  state "S-D01-021-AWAITING_EXPLICIT_RESUME" as Await
+  [*] --> Clear
+  Clear --> Request: 현재 목적의 OS 권한 요청
+  Clear --> Block: 필수 권한 상실
+  Block --> Settings: 사용자 설정 열기
+  Settings --> Recheck: 설정 복귀 실제 grant 관측
+  Request --> Recheck: 결과 후 전체검사
+  Recheck --> Block: 필수 권한·readiness 미충족
+  Recheck --> Await: same actor·session·walk·request binding 통과
+  Await --> Recheck: binding 변화 또는 오래된 확인
+  Await --> Clear: fresh grants와 명시적 사용자 재개

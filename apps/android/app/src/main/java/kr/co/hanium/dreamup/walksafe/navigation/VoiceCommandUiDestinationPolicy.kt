@@ -3,6 +3,8 @@ enum class VoiceCommandUiDestination {
     VOICE_COMMAND,
     DESTINATION_SEARCH,
     SETTINGS,
+    HELP,
+    LOCAL_REPORTS,
     /**
      * S05-33: a read-only answer (repeat, help, next instruction) keeps the voice page the user is on;
      * the screen and TalkBack context do not change just because something was spoken again.
@@ -21,8 +23,14 @@ fun AndroidVoiceAction.uiDestination(): VoiceCommandUiDestination {
         AndroidVoiceAction.StartNavigation,
         -> VoiceCommandUiDestination.DESTINATION_SEARCH
         AndroidVoiceAction.OpenSettings -> VoiceCommandUiDestination.SETTINGS
+        AndroidVoiceAction.OpenHelp -> VoiceCommandUiDestination.HELP
+        AndroidVoiceAction.ListLocalQuarantinedReports -> VoiceCommandUiDestination.LOCAL_REPORTS
+        is AndroidVoiceAction.SelectLocalQuarantinedReport,
+        AndroidVoiceAction.ConfirmLocalQuarantinedReportDelete -> VoiceCommandUiDestination.CURRENT_VOICE_PAGE
+        is AndroidVoiceAction.SpeakDestinationCandidateDetail -> VoiceCommandUiDestination.CURRENT_VOICE_PAGE
         AndroidVoiceAction.RepeatDestinationCandidates,
         AndroidVoiceAction.SpeakCurrentGuidance,
+        AndroidVoiceAction.SpeakCurrentState,
         AndroidVoiceAction.SpeakVoiceHelp,
         AndroidVoiceAction.SpeakNextNavigationInstruction,
         // S05-12: closing the open dialog needs no other screen; the result is spoken.

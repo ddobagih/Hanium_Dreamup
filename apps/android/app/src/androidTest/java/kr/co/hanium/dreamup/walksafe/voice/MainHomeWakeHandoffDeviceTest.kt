@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.voice
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
 import android.Manifest
 import android.app.Instrumentation
 import android.content.Intent
@@ -10,6 +12,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.lang.reflect.Modifier
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -17,6 +20,8 @@ import java.util.concurrent.TimeoutException
 import kr.co.hanium.dreamup.walksafe.BuildConfig
 import kr.co.hanium.dreamup.walksafe.MainActivity
 import kr.co.hanium.dreamup.walksafe.session.DeviceTestAccountUiLogin
+import kr.co.hanium.dreamup.walksafe.voice.input.AndroidVoiceInputPlatform
+import kr.co.hanium.dreamup.walksafe.voice.input.WakeProbeEffect
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -65,9 +70,10 @@ assertTrue("A real HOME attempt is required: $it", it.homeRequests >= 1)
                 assertEquals("HOME", currentPage(activity))
                 assertTrue("HOME authorization changed", mainBoolean(activity, "homeVoiceCommandAvailable"))
                 assertFalse("One-shot cannot already own the microphone", mainField(activity, "voiceRecognitionActive") as Boolean)
-                val probe = checkNotNull(mainField(activity, "foregroundHomeWakeProbe")) {
+                val effect = checkNotNull(mainField(activity, "foregroundHomeWakeProbe")) {
                     "Actual HOME probe disappeared after ready"
                 }
+                val probe = actualHomeVoskProbe(effect)
                 val run = (probeField(probe, "activeRunId") as? Number)?.toLong()
                 assertTrue("Actual ready must assign a live Vosk run", run != null && run > 0L)
                 val listener = probeField(probe, "listener") as VoskStreamingListener
@@ -267,11 +273,23 @@ assertTrue("HOME re-entry needs a new actual ready: $returned", returned.homeRea
     private fun currentPage(activity: MainActivity): String =
         (mainField(activity, "nativeUiPage") as Enum<*>).name
 
-    private fun probeField(probe: Any, name: String): Any? =
+    private fun actualHomeVoskProbe(effect: Any): VoskWakePhraseProbe {
+        check(effect is WakeProbeEffect) { "Actual HOME owner must expose WakeProbeEffect" }
+        val expectedAdapter = AndroidVoiceInputPlatform::class.java.name + "\$createProbe\$1"
+        check(effect.javaClass.name == expectedAdapter) { "Unexpected HOME probe adapter" }
+        val captures = effect.javaClass.declaredFields.filter {
+            it.type == VoskWakePhraseProbe::class.java && !Modifier.isStatic(it.modifiers)
+        }
+        check(captures.size == 1) { "Expected exactly one actual Vosk probe capture" }
+        return checkNotNull(captures.single().apply { isAccessible = true }.get(effect))
+            as VoskWakePhraseProbe
+    }
+
+    private fun probeField(probe: VoskWakePhraseProbe, name: String): Any? =
         VoskWakePhraseProbe::class.java.getDeclaredField(name).apply { isAccessible = true }.get(probe)
 
     private fun mainField(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.get(activity)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.get(activity)
 
     private fun invokeNoArgs(activity: MainActivity, name: String): Any? =
         MainActivity::class.java.getDeclaredMethod(name).apply { isAccessible = true }.invoke(activity)

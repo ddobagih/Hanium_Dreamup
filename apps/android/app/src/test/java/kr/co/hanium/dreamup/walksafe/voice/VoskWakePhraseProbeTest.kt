@@ -127,6 +127,61 @@ class VoskWakePhraseProbeTest {
     }
 
     @Test
+    fun boundedWakePreparationRetainsTwentySecondDeadlineAndRejectsLateCallbacks() {
+        val harness = ProbeHarness(listenUntilWake = false, timeoutMs = 20_000L)
+        assertTrue(harness.probe.start())
+        harness.dispatcher.advanceBy(19_999L)
+        assertTrue(harness.results.isEmpty())
+        assertEquals(0, harness.stream.stopCount)
+        harness.dispatcher.advanceBy(1L)
+        harness.listener.onReady(211L)
+        harness.listener.onTranscript(211L, transcript("길라잡이", confidence = 0.99f))
+        harness.listener.onError(211L, VoskStreamingError.INFERENCE_FAILED)
+        harness.probe.cancel()
+        harness.probe.close()
+        harness.dispatcher.runPosted()
+
+        assertEquals(VoskWakePhraseProbeFailure.TIMEOUT, harness.results.single().failure)
+        assertEquals(VoskWakePhraseProbeAvailability.UNAVAILABLE, harness.results.single().availability)
+        assertEquals(0, harness.readyCallbacks)
+        assertEquals(1, harness.stream.stopCount)
+        assertEquals(1, harness.stream.closeCount)
+        assertTrue(harness.resourcesClosedAtResult.single())
+        assertFalse(harness.probe.start())
+    }
+
+    @Test
+    fun boundedReadyKeepsTwentySecondListeningDeadlineAndCannotAcceptALateWake() {
+        val harness = ProbeHarness(listenUntilWake = false, timeoutMs = 20_000L)
+        assertTrue(harness.probe.start())
+        harness.dispatcher.advanceBy(19_000L)
+        harness.listener.onReady(223L)
+        harness.dispatcher.runPosted()
+        assertEquals(1, harness.readyCallbacks)
+        assertTrue(harness.dispatcher.scheduledTasks.first().isCancelled)
+        assertEquals(1, harness.dispatcher.pendingTimeoutCount)
+        harness.dispatcher.advanceBy(19_999L)
+        assertTrue(harness.results.isEmpty())
+        assertEquals(0, harness.stream.stopCount)
+        harness.dispatcher.advanceBy(1L)
+        harness.listener.onReady(223L)
+        harness.listener.onTranscript(223L, transcript("길라잡이", confidence = 0.99f))
+        harness.listener.onError(223L, VoskStreamingError.INFERENCE_FAILED)
+        harness.probe.cancel()
+        harness.probe.close()
+        harness.dispatcher.runPosted()
+
+        assertEquals(VoskWakePhraseProbeFailure.TIMEOUT, harness.results.single().failure)
+        assertEquals(VoskWakePhraseProbeAvailability.UNAVAILABLE, harness.results.single().availability)
+        assertEquals(1, harness.readyCallbacks)
+        assertEquals(0, harness.dispatcher.pendingTimeoutCount)
+        assertEquals(1, harness.stream.stopCount)
+        assertEquals(1, harness.stream.closeCount)
+        assertTrue(harness.resourcesClosedAtResult.single())
+        assertFalse(harness.probe.start())
+    }
+
+    @Test
     fun streamErrorAfterReadyIsReportedOnceWithItsBoundedCategory() {
         val harness = ProbeHarness()
 
@@ -718,6 +773,7 @@ class VoskWakePhraseProbeTest {
     private class ProbeHarness(
         startFailure: RuntimeException? = null,
         listenUntilWake: Boolean = false,
+        timeoutMs: Long = 4_000L,
     ) {
         val dispatcher = FakeDispatcher()
         val stream = FakeStream(startFailure)
@@ -733,7 +789,7 @@ class VoskWakePhraseProbeTest {
         val probe = VoskWakePhraseProbe(
             streamFactory = factory,
             dispatcher = dispatcher,
-            timeoutMs = 4_000L,
+            timeoutMs = timeoutMs,
             onResult = { result ->
                 results += result
                 resultCallbacksWereOnMain += dispatcher.runningPostedTask

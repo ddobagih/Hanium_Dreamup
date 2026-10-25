@@ -133,10 +133,13 @@ fun selectedDestinationDistanceSentenceKo(
     ).joinToString(" ")
 }
 
-/** S06-30: the kind of a shown distance for the screen list and the confirmation; null when unknown. */
+/**
+ * S06-30: an optional distance annotation for the screen list and confirmation. The provider-radius
+ * annotation is omitted in the UI; voice distance disclaimers remain unchanged. Null when unknown.
+ */
 fun destinationDistanceKindKo(source: DestinationDistanceSource?): String? = when (source) {
     DestinationDistanceSource.STRAIGHT_LINE -> "직선 거리"
-    DestinationDistanceSource.TMAP_RADIUS -> "검색 위치 기준 반경, 도보 거리 아님"
+    DestinationDistanceSource.TMAP_RADIUS -> null
     null -> null
 }
 

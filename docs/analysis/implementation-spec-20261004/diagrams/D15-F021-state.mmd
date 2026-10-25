@@ -1,0 +1,17 @@
+stateDiagram-v2
+  state "S-D15-021-01 · RECEIVED" as RECEIVED
+  state "S-D15-021-02 · ACKNOWLEDGED" as ACK
+  state "S-D15-021-03 · RESOLVED" as RESOLVED
+  state "S-D15-021-04 · REJECTED" as REJECTED
+  [*] --> RECEIVED: 사용자 요청 생성
+  RECEIVED --> ACK: 관리자 expected_version 일치
+  ACK --> RESOLVED: CORRECTION 요청만 허용
+  ACK --> REJECTED: CORRECTION 또는 DELETE
+  RESOLVED --> [*]
+  REJECTED --> [*]
+  note right of ACK
+    P-D15-021
+    DELETE 완료는 status PATCH로 만들지 않음
+    물리삭제 F-D15-023 tombstone으로 확인
+    HTTP stepup 연결 한계 R-D15-006
+  end note

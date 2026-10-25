@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D08-019 명시 확인 보행 takeover"]
+  B["진입: POST /api/field-walk action=takeover"]
+  A --> B
+  P0["1. 현재 active walk/fence 가 사용자가 확인한 값인지 대조한다."]
+  B --> P0
+  P1["2. 새 lease·fence 를 발급한다."]
+  P0 --> P1
+  P2["3. 기존 보행을 TAKEN_OVER ended history 로 기록한다."]
+  P1 --> P2
+  P3["4. 새 active 와 takeover audit 를 저장한다."]
+  P2 --> P3
+  OK["정상: TAKEN_OVER 및 이전 holder 의 후속 CAS 거부"]
+  P3 --> OK
+  C0{"active 가 사라지거나 expected 값이 바뀜"}
+  X0["409; 자동 takeover 없음"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"confirmation 불일치"}
+  X1["명령 invalid"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"clock 불안정"}
+  X2["신규 활성화 금지"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-013, P-D08-014, P-D08-021"]
+  A -.-> POLICY

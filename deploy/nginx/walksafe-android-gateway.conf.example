@@ -53,6 +53,17 @@ server {
 
     location = /api/account-enrollments/email-otp {
         client_max_body_size 4k;
+        # OTP only: above the Gateway's 60 s whole-handler deadline.
+        proxy_read_timeout 65s;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/account-signup-policy {
+        if ($request_method != GET) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_read_timeout 40s;
         proxy_pass http://127.0.0.1:8081;
     }
 
@@ -63,6 +74,33 @@ server {
 
     location = /api/field-session {
         client_max_body_size 4k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/field-diagnostics/preference {
+        if ($request_method !~ ^(GET|POST|PUT)$) {
+            return 405;
+        }
+        client_max_body_size 256k;
+        proxy_read_timeout 40s;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/field-diagnostics/sessions/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/batches$" {
+        if ($request_method != POST) {
+            return 405;
+        }
+        client_max_body_size 256k;
+        proxy_read_timeout 40s;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location ~ "^/api/field-diagnostics/sessions/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" {
+        if ($request_method != GET) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_read_timeout 40s;
         proxy_pass http://127.0.0.1:8081;
     }
 

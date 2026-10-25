@@ -1,0 +1,15 @@
+flowchart TD
+  META["F-D16-016 · P-D16-016"]
+  META --> A
+  A["사용자 자료 삭제"] --> B{"busy/cancelling=false"}
+  B -->|"아니오"| X["삭제 거부"]
+  B -->|"예"| C["사본·키/alias·imports/work/key.part 삭제"]
+  C -->|"전체 성공"| D["입력·lastJson 초기화"]
+  C -->|"일부 실패"| E["실제 잔존 파일 기반 정합
+  manualBaseReady=false·결과 무효화"]
+  E -->|"사용자 재시도"| B
+  D --> F["외부 SAF 원본·내보낸JSON·공개station cache 보존"]
+  S["새 프로세스 initialize"] --> T["work/imports/key.part 고아 정리"]
+  T -->|"실패"| U["주의 안내·앱 전체 차단 아님"]
+  T -->|"성공"| V["입력/결과 복원 없음
+  정상 키·공개cache 유지"]

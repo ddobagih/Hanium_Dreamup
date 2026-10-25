@@ -1,0 +1,24 @@
+flowchart TD
+  title["F-D09-024 · 디버그 프레임 캡처 저장<br/>P-D09-024"]
+  N0["enabled와 metadata 검증"]
+  N1["공통 이미지 정제"]
+  N2["capture UUID 생성"]
+  N3["retention과 quota 검사"]
+  N4["이미지 저장 후 DB transaction"]
+  title --> N0
+  N0 --> N1
+  N1 --> N2
+  N2 --> N3
+  N3 --> N4
+  N4 --> OK["정상: 200 ok=true 및 capture_id"]
+  N0 -->|"metadata가 크거나 JSON/object/schema 부적합"| B0["413 또는 고정 422 코드; 거절값은 반사하지 않음"]
+  B0 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N0 -->|"enabled=false"| B1["404 android_debug_log_disabled"]
+  B1 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N1 -->|"이미지 형식·bytes·해상도 부적합"| B2["공통 upload 오류; 저장하지 않음"]
+  B2 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N3 -->|"quota 초과"| B3["507; 새 이미지 쓰기 전 거절"]
+  B3 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  title -.-> CANCEL["취소: 파일/DB worker가 종료될 때까지 소유권 유지"]
+  CANCEL --> CLEAN["정리: DB 실패 시 해당 이미지 제거; 중단 후 orphan은 다음 저장소 준비에서 정리"]
+  title -.-> RETRY["재시도: HTTP 실패의 서버 자동 재시도 없음"]

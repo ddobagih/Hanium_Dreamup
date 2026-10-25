@@ -623,7 +623,7 @@ def test_secured_auto_report_exact_retry_survives_capture_age_without_new_storag
         def now(cls, tz=None):
             return advanced_now.replace(tzinfo=None) if tz is None else advanced_now.astimezone(tz)
 
-    monkeypatch.setattr("backend.app.api.reports.datetime", AdvancedDatetime)
+    monkeypatch.setattr("backend.app.services.report_application.datetime", AdvancedDatetime)
     retry = submit(metadata)
     assert retry.status_code == 201, retry.text
     assert retry.json()["id"] == first.json()["id"]

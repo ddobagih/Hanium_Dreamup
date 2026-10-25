@@ -7,11 +7,11 @@ import org.junit.Test
 
 /** S06-6: keyboard search results -> 다시 듣기/더 듣기 -> current candidates are read, without a re-search. */
 class MainActivityShownResultsVoiceHandoffStaticTest {
-    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/DestinationVoiceDialogController.kt").readText()
     private fun block(start: String, end: String) = source.substringAfter(start).substringBefore(end)
 
-    private val repeat = block("private fun repeatVoiceDestinationCandidates() {", "private fun hearMoreVoiceDestinationCandidates() {")
-    private val hearMore = block("private fun hearMoreVoiceDestinationCandidates() {", "private fun cancelDestinationFromVoice() {")
+    private val repeat = block("fun repeatVoiceDestinationCandidates() {", "fun hearMoreVoiceDestinationCandidates() {")
+    private val hearMore = block("fun hearMoreVoiceDestinationCandidates() {", "fun cancelDestinationFromVoice() {")
     private val handoff = block(
         "private fun voiceStateForShownDestinationResultsOrNull(): DestinationSearchVoiceState? {",
         "private fun noVoiceDestinationCandidatesMessage(): String",
@@ -21,6 +21,8 @@ class MainActivityShownResultsVoiceHandoffStaticTest {
         assertTrue(repeat.contains("} ?: voiceStateForShownDestinationResultsOrNull()"))
         assertTrue(repeat.contains("speakHomeDestinationVoicePrompt(transition.state)"))
         assertFalse(repeat.contains("performDestinationSearch("))
+        assertFalse(repeat.contains("search().search("))
+        assertFalse(repeat.contains("search().requestLocation("))
     }
 
     @Test fun hearMoreWithoutADialogReadsTheFirstShownPage() {
@@ -28,18 +30,22 @@ class MainActivityShownResultsVoiceHandoffStaticTest {
         assertTrue(noDialog.contains("voiceStateForShownDestinationResultsOrNull()"))
         assertTrue(noDialog.contains("speakHomeDestinationVoicePrompt(shown)"))
         assertFalse(noDialog.contains("performDestinationSearch("))
+        assertFalse(noDialog.contains("search().search("))
+        assertFalse(noDialog.contains("search().requestLocation("))
     }
 
     @Test fun handoffUsesTheOneResultListAndNeverGrantsSelectionBeforeThePrompt() {
-        assertTrue(handoff.contains("destinationSearchInFlight || destinationSearchQuery.isBlank() || destinationSearchResults.isEmpty()"))
-        assertTrue(handoff.contains("val results = destinationSearchResults.toList()"))
-        assertTrue(handoff.contains("also { destinationSearchVoiceState = it }"))
+        assertTrue(handoff.contains("search().state.inFlight || search().state.query.isBlank() || search().state.results.isEmpty()"))
+        assertTrue(handoff.contains("val results = search().state.results.toList()"))
+        assertTrue(handoff.contains("also { search().showVoicePage(it) }"))
         // Selection authority still comes only from a completed page prompt.
         assertFalse(handoff.contains("completeVoicePrompt"))
         assertFalse(handoff.contains("performDestinationSearch("))
-        val prompt = block("private fun speakHomeDestinationVoicePrompt(", "private fun startVoiceDestinationSearch(")
+        assertFalse(handoff.contains("search().search("))
+        assertFalse(handoff.contains("search().requestLocation("))
+        val prompt = block("fun speakHomeDestinationVoicePrompt(", "fun startVoiceDestinationSearch(")
         assertTrue(prompt.contains("state.beginVoicePrompt()"))
         assertTrue(prompt.contains("state.completeVoicePrompt(attempt)"))
-        assertTrue(prompt.contains("destinationSearchVoiceState === state"))
+        assertTrue(prompt.contains("search().state.voicePage === state"))
     }
 }

@@ -170,6 +170,87 @@ class GnssQualityObserverTest {
         assertEquals(1, source.measurementCancelCount)
     }
 
+    @Test
+    fun cleanupQueryDoesNotCancelActiveSubscriptionsAndNormalCloseAcknowledgesBoth() {
+        val source = FakeGnssObservationSource()
+        val observer = GnssQualityObserver(source = source, onSnapshot = {})
+        observer.start()
+        assertFalse(observer.cleanupPending)
+        assertFalse(observer.cleanupPending)
+        assertEquals(0, source.statusCancelCount)
+        assertEquals(0, source.measurementCancelCount)
+        observer.close()
+        assertFalse(observer.cleanupPending)
+        observer.close()
+        assertFalse(observer.cleanupPending)
+        assertEquals(1, source.statusCancelCount)
+        assertEquals(1, source.measurementCancelCount)
+    }
+
+    @Test
+    fun failedStatusCancellationRemainsQueryableWithoutRetryAndOldCallbacksStayBlocked() {
+        val source = FakeGnssObservationSource()
+        source.statusCancelFailuresRemaining = 1
+        val snapshots = mutableListOf<GnssQualitySnapshot>()
+        val observer = GnssQualityObserver(source = source, onSnapshot = snapshots::add)
+        observer.start()
+        observer.close()
+        repeat(3) { assertTrue(observer.cleanupPending) }
+        assertEquals(1, source.statusCancelCount)
+        assertEquals(1, source.measurementCancelCount)
+        source.emitAllRetainedStatus(dualFrequencySignals(1L))
+        source.emitAllRetainedMeasurements(epoch(1L, 35.0))
+        assertTrue(snapshots.isEmpty())
+        assertTrue(observer.start().observerClosed)
+        assertTrue(observer.cleanupPending)
+        assertEquals(1, source.statusCancelCount)
+        assertEquals(1, source.statusSubscribeCount)
+        observer.close()
+        assertFalse(observer.cleanupPending)
+        assertEquals(2, source.statusCancelCount)
+        assertEquals(1, source.measurementCancelCount)
+    }
+
+    @Test
+    fun repeatedMeasurementCancellationFailureKeepsItsTargetUntilCloseAcknowledgement() {
+        val source = FakeGnssObservationSource()
+        source.measurementCancelFailuresRemaining = 2
+        val observer = GnssQualityObserver(source = source, onSnapshot = {})
+        observer.start()
+        observer.close()
+        assertTrue(observer.cleanupPending)
+        observer.close()
+        assertTrue(observer.cleanupPending)
+        assertEquals(1, source.statusCancelCount)
+        assertEquals(2, source.measurementCancelCount)
+        assertEquals(1, source.measurementSubscribeCount)
+        observer.close()
+        assertFalse(observer.cleanupPending)
+        assertEquals(3, source.measurementCancelCount)
+        observer.close()
+        assertEquals(3, source.measurementCancelCount)
+    }
+
+    @Test
+    fun pendingStopCleanupSurvivesTheFirstCloseAndLaterCloseRetriesTheSameHandle() {
+        val source = FakeGnssObservationSource()
+        source.statusCancelFailuresRemaining = 1
+        val observer = GnssQualityObserver(source = source, onSnapshot = {})
+        observer.start()
+        observer.stop()
+        assertTrue(observer.cleanupPending)
+        observer.close()
+        // The first close retires the open observer; only a subsequent close retries its pending handles.
+        assertTrue(observer.cleanupPending)
+        assertEquals(1, source.statusCancelCount)
+        assertTrue(observer.start().observerClosed)
+        assertEquals(1, source.statusSubscribeCount)
+        observer.close()
+        assertFalse(observer.cleanupPending)
+        assertEquals(2, source.statusCancelCount)
+        assertEquals(1, source.measurementCancelCount)
+    }
+
     private fun dualFrequencySignals(timestampNanos: Long) = GnssSignalEpoch(
         elapsedRealtimeNanos = timestampNanos,
         signals = listOf(
@@ -210,6 +291,7 @@ private class FakeGnssObservationSource(
     var measurementMode: RegistrationMode = RegistrationMode.SUCCESS,
 ) : GnssObservationSource {
     var statusCancelFailuresRemaining = 0
+    var measurementCancelFailuresRemaining = 0
     var statusSubscribeCount = 0
         private set
     var measurementSubscribeCount = 0
@@ -247,6 +329,10 @@ private class FakeGnssObservationSource(
         activeMeasurementListener = listener
         return GnssObservationSubscription {
             measurementCancelCount += 1
+            if (measurementCancelFailuresRemaining > 0) {
+                measurementCancelFailuresRemaining -= 1
+                throw IllegalStateException("temporary measurement unregister failure")
+            }
             if (activeMeasurementListener === listener) activeMeasurementListener = null
         }
     }

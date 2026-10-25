@@ -23,11 +23,11 @@ class RouteNavigatorManualNextGuidanceTest {
             }
             assertEquals(0, navigator.retryGuidance(now + 200, facing(now + 200))?.guideIndex ?: 0)
         }
-        assertTrue(navigator.currentInstruction(fix(30.0, 7_000))!!.contains("70m 앞, 오른쪽으로 꺾으세요."))
+        assertTrue(navigator.currentInstruction(fix(30.0, 7_000))!!.contains("70m 앞, 3시 방향으로 꺾으세요."))
 
         sample(navigator, 50.0, 12_000)
         assertEquals(0, navigator.currentGuidance(12_100, facing(12_100))?.guideIndex)
-        assertTrue(navigator.currentInstruction(fix(50.0, 12_000))!!.contains("50m 앞, 오른쪽으로 꺾으세요."))
+        assertTrue(navigator.currentInstruction(fix(50.0, 12_000))!!.contains("50m 앞, 3시 방향으로 꺾으세요."))
     }
 
     private fun navigator() = RouteNavigator().apply {

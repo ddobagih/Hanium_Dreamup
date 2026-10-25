@@ -8,7 +8,7 @@ import org.junit.Test
 /** S15-42: re-applying the exact current server confirmation must not cancel report work. */
 class MainActivityConsentRedeliveryStaticTest {
     private val source = ReportStaticSourceInspector.read(MAIN_ACTIVITY_PATH)
-    private val apply = ReportStaticSourceInspector.functionBlock(
+    private val apply = MainActivityRefactorSource.function(
         source,
         "private fun applyIntegratedConsentConfirmation",
     )
@@ -18,7 +18,7 @@ class MainActivityConsentRedeliveryStaticTest {
         assertTrue(apply.contains("integratedConsentSession.applyConfirmation(confirmation, authorityGuard)"))
         assertTrue(apply.contains("integratedConsentSession.applyExactPendingConfirmation(confirmation, authorityGuard)"))
         val guard = apply.substringAfter("val unchangedReportAuthority =")
-            .substringBefore("synchronized(reportUploadSafetyLock)")
+            .substringBefore("reports.applyConfirmationAuthority(")
         for (part in listOf(
             "!exactPending",
             "evaluation == IntegratedConsentApplyResult.DUPLICATE",
@@ -33,23 +33,27 @@ class MainActivityConsentRedeliveryStaticTest {
         val overwrite = apply.indexOf("integratedConsentConfirmedActorSha256 = expectedActorSha256")
         assertTrue(capture in 0 until overwrite)
 
-        val lockBlock = ReportStaticSourceInspector.blockAfter(apply, "synchronized(reportUploadSafetyLock)")
+        assertTrue(apply.contains("reports.applyConfirmationAuthority(unchangedReportAuthority, authorityGuard)"))
+        val effect = ReportStaticSourceInspector.functionBlock(
+            source, "override fun applyConfirmationAuthority",
+        )
+        val lockBlock = ReportStaticSourceInspector.blockAfter(effect, "synchronized(reportUploadSafetyLock)")
         val cancellation = ReportStaticSourceInspector.blockAfter(
             lockBlock,
-            "if (!unchangedReportAuthority || !reportPrivacyConsentSession.isGranted())",
+            "if (!unchanged || !reportConsent().isGranted())",
         )
         assertTrue(cancellation.contains("reportUploadSafetyGeneration += 1L"))
         assertTrue(cancellation.contains("automaticReportUploadSafetyGeneration += 1L"))
-        assertTrue(cancellation.contains("reportPrivacyConsentSession.cancelActiveCalls()"))
+        assertTrue(cancellation.contains("reportConsent().cancelActiveCalls()"))
         assertFalse(cancellation.contains("grantFromServerConfirmedIntegratedConsent"))
         assertTrue(
             lockBlock.substringAfter(cancellation)
-                .contains("reportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent(authorityGuard)"),
+                .contains("reportConsent().grantFromServerConfirmedIntegratedConsent(guard)"),
         )
         // No other unconditional report cancellation remains in this confirmation path.
         assertEquals(
             1,
-            Regex("reportPrivacyConsentSession\\.cancelActiveCalls\\(\\)").findAll(apply).count(),
+            Regex("reportConsent\\(\\)\\.cancelActiveCalls\\(\\)").findAll(effect).count(),
         )
     }
 

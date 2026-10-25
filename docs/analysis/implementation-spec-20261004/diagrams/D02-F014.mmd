@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D02-014 휴대폰 거치 확인과 runtime 교정 재시도"]
+  E["진입: 거치 방법 확인·자동 센서 점검·교정 재시도 / quality fault"]
+  G{"P-D02-014 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["시작/복구 불가"]
+  G -->|"같은 시각 또는 요청 이전 camera"| B0
+  B1["교정 성공 근거 불가"]
+  G -->|"fault 전에 찍은 PASS"| B1
+  B2["UNUSABLE; 새 walk 필요"]
+  G -->|"retry count＞=2"| B2
+  B3["사용 가능으로 승격하지 않음"]
+  G -->|"profile/epoch/측정 불명"| B3
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["명시 금지 거치면 센서 check 성공으로도 허용하지 않음"]
+    S1["automatic check는 방법을 추정하지 않고 요청 이후 새 camera PASS 요구"]
+    S2["legacy confirmation 경로는 허용 방법+fresh 확인+확인 이후 camera 요구"]
+    S3["ACTIVE fault 즉시 출력 제한, fault 이후와 새 correction 이후의 camera를 함께 요구"]
+    S4["retry 요청마다 bounded count; exhausted는 UNUSABLE latch"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: 해당 이벤트 처리를 마치고 현재 스냅샷/결과를 반환한다."]
+  X["취소·중단: 독립 취소 API가 없는 판단 함수는 호출자의 세대 무효화로 더 이상 결과를 사용하지 않는다. /<br/>foreground·epoch·owner 조건을 잃은 결과는 재사용하지 않는다."]
+  C["정리: 순수 정책은 소유하는 외부 리소스가 없다."]
+  R["재시도·복구: 사용자가 요청한 correction retry만 count; preflight는 runtime retry 상태와 분리. /<br/>새 교정 요청+그 이후 camera PASS; exhausted는 재개로 해제 불가."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

@@ -1,0 +1,28 @@
+flowchart TB
+  E["F-D15-043 · 복원 tombstone 재적용<br/>P-D15-043"]
+  E --> DRY{"dry_run인가"}
+  DRY -->|"예"| DRYRET["DRY_RUN 즉시 반환<br/>target adapter 호출 없음"]
+  DRY -->|"아니오"| ACTIONS{"삭제 actions가 있는가"}
+  ACTIONS -->|"아니오"| NOACT["NO_ACTION 즉시 반환"]
+  ACTIONS -->|"예"| CONFIRM{"정확 확인문자와 live source fence 충족"}
+  CONFIRM -->|"아니오"| BLOCK["BLOCKED 오류 반환"]
+  CONFIRM -->|"예"| LOOK["plan SHA256로 기존 receipt 조회"]
+  LOOK -->|"조회 실패"| BLOCK
+  LOOK --> EXIST{"기존 receipt가 있는가"}
+  EXIST -->|"예"| EXACT{"receipt가 exact plan과 일치·fence 유지"}
+  EXACT -->|"예"| REPLAY["REPLAYED 즉시 반환<br/>target.begin 하지 않음"]
+  EXACT -->|"아니오"| BLOCK
+  EXIST -->|"아니오"| BEGIN["target.begin·각 action 직전 fence 확인<br/>reapply 결과 DELETED 또는 ALREADY_ABSENT 요구"]
+  BEGIN -->|"precommit 실패"| ROLLBACK["target.rollback·오류 반환<br/>rollback 실패도 별도 blocker"]
+  BEGIN -->|"전체 action 성공"| COMMIT["exact receipt를 target.commit에 전달"]
+  COMMIT -->|"성공"| FENCE{"commit 후 source fence 유지"}
+  FENCE -->|"예"| APPLIED["APPLIED 반환<br/>publish는 별도 F-D15-045"]
+  FENCE -->|"아니오"| BLOCK
+  COMMIT -->|"semantic postcommit error"| SEMANTIC["오류 유지<br/>rollback 또는 replay 성공으로 덮지 않음"]
+  COMMIT -->|"기타 commit 응답 오류"| RECEIPT{"다시 읽은 receipt가 exact plan과 일치"}
+  RECEIPT -->|"예·fence 유지"| REPLAY
+  RECEIPT -->|"없음·불명확·조회불가"| AMB["commit 판정 오류·게시 차단<br/>상태에 따른 rollback 또는 reconciliation"]
+  NOTE["자동 재시도·취소 endpoint 없음<br/>CLI SIGINT/SIGTERM은 예외 처리 후 mutation_state를 보고<br/>호출자는 receipt와 target 상태를 기준으로 복구"]
+  E -.-> NOTE
+  SRC["근거 · report_restore_tombstones.py:2161 execute_report_restore_reapply"]
+  E -.-> SRC

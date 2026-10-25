@@ -33,6 +33,25 @@ final class AdminOkHttpTransport {
 
     private AdminOkHttpTransport() {}
 
+    static final class RequestOwner {
+        private final java.util.Set<Call> calls = new java.util.HashSet<>();
+        private boolean cancelled;
+        synchronized void register(Call call) throws IOException {
+            if (cancelled) throw new IOException("administrator client is closed");
+            calls.add(call);
+        }
+        synchronized void completed(Call call) { calls.remove(call); }
+        void cancelInFlight() {
+            java.util.List<Call> pending;
+            synchronized (this) {
+                // Controller close is terminal. A request racing registration cannot reopen it.
+                cancelled = true;
+                pending = new java.util.ArrayList<>(calls);
+            }
+            for (Call call : pending) call.cancel();
+        }
+    }
+
     static Result execute(
         String method,
         String url,
@@ -43,6 +62,20 @@ final class AdminOkHttpTransport {
         String noProgressMessage,
         String tooLargeMessage
     ) throws IOException {
+        return execute(new RequestOwner(), method, url, headers, body, maximumResponseBytes,
+            cancelledMessage, noProgressMessage, tooLargeMessage);
+    }
+
+    static Result execute(RequestOwner owner, String method, String url,
+        Map<String, String> headers, byte[] body, int maximumResponseBytes,
+        String cancelledMessage, String noProgressMessage, String tooLargeMessage) throws IOException {
+        return execute(owner, null, method, url, headers, body, maximumResponseBytes,
+            cancelledMessage, noProgressMessage, tooLargeMessage);
+    }
+
+    static Result execute(RequestOwner owner, AdminOperationsApi.SessionContext session,
+        String method, String url, Map<String, String> headers, byte[] body, int maximumResponseBytes,
+        String cancelledMessage, String noProgressMessage, String tooLargeMessage) throws IOException {
         if (Thread.currentThread().isInterrupted()) throw new IOException(cancelledMessage);
         Request.Builder request = new Request.Builder().url(url);
         headers.forEach(request::header);
@@ -51,60 +84,70 @@ final class AdminOkHttpTransport {
         CountDownLatch completed = new CountDownLatch(1);
         AtomicReference<Result> result = new AtomicReference<>();
         AtomicReference<Throwable> failure = new AtomicReference<>();
-        call.enqueue(new Callback() {
-            @Override
-            public void onFailure(Call ignored, IOException error) {
-                failure.set(error);
-                completed.countDown();
-            }
-
-            @Override
-            public void onResponse(Call ignored, okhttp3.Response response) {
-                try (response) {
-                    if (call.isCanceled()) throw new IOException(cancelledMessage);
-                    byte[] responseBytes = response.body() == null
-                        ? new byte[0]
-                        : readBounded(
-                            response.body().byteStream(),
-                            call,
-                            maximumResponseBytes,
-                            cancelledMessage,
-                            noProgressMessage,
-                            tooLargeMessage
-                        );
-                    Map<String, String> responseHeaders = new LinkedHashMap<>();
-                    response.headers().toMultimap().forEach((name, values) -> {
-                        if (name != null && values != null && values.size() == 1) {
-                            responseHeaders.put(name, values.get(0));
-                        }
-                    });
-                    result.set(new Result(response.code(), responseBytes, responseHeaders));
-                } catch (Throwable error) {
+        owner.register(call);
+        AdminRequestAdmission.Registration registration = null;
+        try {
+            Callback callback = new Callback() {
+                @Override
+                public void onFailure(Call ignored, IOException error) {
                     failure.set(error);
-                } finally {
                     completed.countDown();
                 }
-            }
-        });
-        try {
-            if (!completed.await(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+
+                @Override
+                public void onResponse(Call ignored, okhttp3.Response response) {
+                    try (response) {
+                        if (call.isCanceled()) throw new IOException(cancelledMessage);
+                        byte[] responseBytes = response.body() == null
+                            ? new byte[0]
+                            : readBounded(
+                                response.body().byteStream(),
+                                call,
+                                maximumResponseBytes,
+                                cancelledMessage,
+                                noProgressMessage,
+                                tooLargeMessage
+                            );
+                        Map<String, String> responseHeaders = new LinkedHashMap<>();
+                        response.headers().toMultimap().forEach((name, values) -> {
+                            if (name != null && values != null && values.size() == 1) {
+                                responseHeaders.put(name, values.get(0));
+                            }
+                        });
+                        result.set(new Result(response.code(), responseBytes, responseHeaders));
+                    } catch (Throwable error) {
+                        failure.set(error);
+                    } finally {
+                        completed.countDown();
+                    }
+                }
+            };
+            if (session == null) call.enqueue(callback);
+            else registration = session.dispatch(call::cancel, () -> call.enqueue(callback));
+            // Only admission/enqueue owns the lifecycle monitor; response waiting never does.
+            try {
+                if (!completed.await(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    call.cancel();
+                    throw new SocketTimeoutException("administrator API request timed out; server outcome unknown");
+                }
+            } catch (InterruptedException error) {
                 call.cancel();
-                throw new SocketTimeoutException("administrator API request timed out; server outcome unknown");
+                Thread.currentThread().interrupt();
+                throw new IOException(cancelledMessage, error);
             }
-        } catch (InterruptedException error) {
-            call.cancel();
-            Thread.currentThread().interrupt();
-            throw new IOException(cancelledMessage, error);
+            Throwable error = failure.get();
+            if (error instanceof IOException ioError) throw ioError;
+            if (error instanceof RuntimeException runtimeError) throw runtimeError;
+            if (error instanceof Error fatalError) throw fatalError;
+            Result completedResult = result.get();
+            if (completedResult == null) {
+                throw new IOException("administrator response did not complete");
+            }
+            return completedResult;
+        } finally {
+            if (registration != null) registration.close();
+            owner.completed(call);
         }
-        Throwable error = failure.get();
-        if (error instanceof IOException ioError) throw ioError;
-        if (error instanceof RuntimeException runtimeError) throw runtimeError;
-        if (error instanceof Error fatalError) throw fatalError;
-        Result completedResult = result.get();
-        if (completedResult == null) {
-            throw new IOException("administrator response did not complete");
-        }
-        return completedResult;
     }
 
     private static byte[] readBounded(

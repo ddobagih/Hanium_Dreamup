@@ -1,0 +1,32 @@
+sequenceDiagram
+  participant A as Android
+  participant G as Gateway HTTP
+  participant L as 삭제 ledger
+  participant W as Outbox worker
+  participant B as Backend 삭제 서비스
+  participant O as 운영자 CLI
+  A->>G: capability와신규삭제 request
+  G->>G: 최근 credential 인증 검증
+  G->>L: request fence outbox 원자 저장
+  G->>G: 이전 generation 작업 abort
+  G->>B: 전기기세션폐기후 서명 삭제 POST
+  alt 정상수락
+    B-->>G: tombstone receipt status
+    G->>L: ACK와상태저장
+    G-->>A: 202 또는 replay200
+  else 일시실패
+    G->>L: next attempt 저장
+    G-->>A: 503 Retry After
+    W->>L: 5초tick due조회
+    W->>B: request순서 유지 최대3개독립전달
+    B-->>W: 상태 또는오류
+    W->>L: ACK retry pause terminal
+  end
+  opt 계약 또는자격증명 pause
+    W->>L: paused와pause ID 저장
+    O->>L: 서비스중단 교정후 pause ID CAS resume
+  end
+  A->>G: 같은capability로status 또는device evidence
+  G->>B: 상태조회 또는revision결합증거
+  B-->>G: 검증할저장계층상태
+  G-->>A: 처리상태 물리삭제완료와구분

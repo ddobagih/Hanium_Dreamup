@@ -2,6 +2,32 @@
 
 from __future__ import annotations
 
+from backend.app.services.admin_operation_policy import (
+    _ADMIN_INCIDENT_DETAIL_PATH_PATTERN,
+    _ADMIN_INCIDENT_HISTORY_PATH_PATTERN,
+    _ADMIN_INCIDENT_LIST_PATH,
+    _ADMIN_INCIDENT_STATUS_PATH_PATTERN,
+    _ADMIN_RAW_COLLECTION_ACTION_PATH_PATTERN,
+    _ADMIN_RAW_COLLECTION_LIST_PATH,
+    _ADMIN_REPORT_ACTION_PATH_PATTERN,
+    _ADMIN_REPORT_DELETION_EXTERNAL_COPY_EVENT_PATH_PATTERN,
+    _ADMIN_REPORT_DELETION_EXTERNAL_COPY_LIST_PATH,
+    _ADMIN_REPORT_DETAIL_PATH_PATTERN,
+    _ADMIN_REPORT_LIST_PATH,
+    _ADMIN_REPORT_PACKAGE_PROOF_PATH_PATTERN,
+    _ADMIN_REPORT_REQUEST_DETAIL_PATH_PATTERN,
+    _ADMIN_REPORT_REQUEST_LIST_PATH,
+    _ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN,
+    _ADMIN_WRITE_WORKFLOW_PATH_PATTERN,
+    _CANONICAL_UUID_PATTERN,
+    _REPORT_DELIVERY_CORRECTION_PATH_PATTERN,
+    _REPORT_ORIGINAL_ACCESS_GRANT_PATH_PATTERN,
+    _REPORT_REVIEW_DECISION_LOOKUP_PATH_PATTERN,
+    _REPORT_WORKFLOW_HISTORY_PATH_PATTERN,
+    _REPORT_WORKFLOW_PATH_PATTERN,
+    is_admin_device_proof_workflow_request,
+)
+
 import base64
 import binascii
 from dataclasses import dataclass, field
@@ -95,68 +121,9 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _ADMIN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
 _DEVICE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 _READ_PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9_.:-]{2,63}$")
-_ADMIN_REPORT_LIST_PATH = "/admin/reports"
-_ADMIN_REPORT_DETAIL_PATH_PATTERN = re.compile(
-    r"^/admin/reports/[^/?#]{1,128}$"
-)
-_ADMIN_REPORT_ACTION_PATH_PATTERN = re.compile(
-    r"^/admin/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/"
-    r"(?:status|delivery-packages)$"
-)
-_ADMIN_REPORT_PACKAGE_PROOF_PATH_PATTERN = re.compile(
-    r"^/admin/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/delivery-packages/[1-9][0-9]*/proof$"
-)
-_ADMIN_REPORT_REQUEST_LIST_PATH = "/admin/report-requests"
-_ADMIN_REPORT_REQUEST_DETAIL_PATH_PATTERN = re.compile(
-    r"^/admin/report-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
-)
-_ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN = re.compile(
-    r"^/admin/report-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
-    r"[0-9a-fA-F]{12}/status$"
-)
-_ADMIN_REPORT_DELETION_EXTERNAL_COPY_LIST_PATH = (
-    "/admin/report-deletions/external-copies"
-)
-_ADMIN_REPORT_DELETION_EXTERNAL_COPY_EVENT_PATH_PATTERN = re.compile(
-    r"^/admin/report-deletions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
-    r"[0-9a-fA-F]{12}/external-copies/"
-    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/events$"
-)
-_ADMIN_INCIDENT_LIST_PATH = "/admin/incidents"
-_ADMIN_INCIDENT_DETAIL_PATH_PATTERN = re.compile(
-    r"^/admin/incidents/[^/?#]{1,128}$"
-)
-_ADMIN_INCIDENT_HISTORY_PATH_PATTERN = re.compile(
-    r"^/admin/incidents/[^/?#]+/history$"
-)
 _ADMIN_INCIDENT_CANONICAL_HISTORY_PATH_PATTERN = re.compile(
     r"^/admin/incidents/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
     r"[89ab][0-9a-f]{3}-[0-9a-f]{12}/history$"
-)
-_ADMIN_INCIDENT_STATUS_PATH_PATTERN = re.compile(
-    r"^/admin/incidents/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
-    r"[0-9a-fA-F]{12}/status$"
-)
-_ADMIN_RAW_COLLECTION_LIST_PATH = "/admin/raw-collections/quarantine"
-_ADMIN_RAW_COLLECTION_ACTION_PATH_PATTERN = re.compile(
-    r"^/admin/raw-collections/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
-    r"[0-9a-fA-F]{12}/(?:decisions|legal-holds)$"
-)
-_REPORT_WORKFLOW_PATH_PATTERN = re.compile(
-    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/"
-    r"(?:review-decisions|deliveries)$"
-)
-_REPORT_WORKFLOW_HISTORY_PATH_PATTERN = re.compile(
-    r"^/reports/[^/?#]+/(?:review-decisions|deliveries)/history$"
 )
 _REPORT_WORKFLOW_CANONICAL_HISTORY_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
@@ -164,30 +131,7 @@ _REPORT_WORKFLOW_CANONICAL_HISTORY_PATH_PATTERN = re.compile(
     r"(?:review-decisions|deliveries)/history$"
 )
 # S18-36: one earlier review attempt's outcome, looked up by its decision_id.
-_REPORT_REVIEW_DECISION_LOOKUP_PATH_PATTERN = re.compile(
-    r"^/reports/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
-    r"[89ab][0-9a-f]{3}-[0-9a-f]{12}/review-decisions/"
-    # S18-36-F1: same canonical v1-5 pattern as the route's decision_id parameter.
-    r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
-)
 # S18-40: POST-only correction of the latest effective delivery event.
-_REPORT_DELIVERY_CORRECTION_PATH_PATTERN = re.compile(
-    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/delivery-corrections$"
-)
-_REPORT_ORIGINAL_ACCESS_GRANT_PATH_PATTERN = re.compile(
-    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/original-access-grants$"
-)
-_ADMIN_WRITE_WORKFLOW_PATH_PATTERN = re.compile(
-    r"^(?:/admin/security/recovery-custody/attest|"
-    r"/admin/security/device-keys/rotation/confirm|"
-    r"/admin/security/devices/[A-Za-z0-9][A-Za-z0-9._:-]{7,127}/report-lost)$"
-)
-_CANONICAL_UUID_PATTERN = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
-    r"[0-9a-f]{4}-[0-9a-f]{12}$"
-)
 _BASE64URL_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 _UNRESERVED = frozenset(
     b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
@@ -471,64 +415,6 @@ def admin_device_key_marker(spki_der: bytes) -> str:
     return hashlib.sha256(spki_der).hexdigest()
 
 
-def is_admin_device_proof_workflow_request(method: str, path: str) -> bool:
-    if not isinstance(method, str) or not isinstance(path, str):
-        return False
-    normalized_method = method.upper()
-    if path == _ADMIN_REPORT_LIST_PATH:
-        return normalized_method == "GET"
-    if _ADMIN_REPORT_DETAIL_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "GET"
-    if _ADMIN_REPORT_ACTION_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method in {"PATCH", "POST"}
-    if _ADMIN_REPORT_PACKAGE_PROOF_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "GET"
-    if path == _ADMIN_REPORT_REQUEST_LIST_PATH:
-        return normalized_method == "GET"
-    if _ADMIN_REPORT_REQUEST_DETAIL_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "GET"
-    if _ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "PATCH"
-    if path == _ADMIN_REPORT_DELETION_EXTERNAL_COPY_LIST_PATH:
-        return normalized_method == "GET"
-    if (
-        _ADMIN_REPORT_DELETION_EXTERNAL_COPY_EVENT_PATH_PATTERN.fullmatch(path)
-        is not None
-    ):
-        return normalized_method == "POST"
-    if path == _ADMIN_INCIDENT_LIST_PATH:
-        return normalized_method == "GET"
-    if _ADMIN_INCIDENT_DETAIL_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "GET"
-    if _ADMIN_INCIDENT_HISTORY_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "GET"
-    if _ADMIN_INCIDENT_STATUS_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "PATCH"
-    if path == _ADMIN_RAW_COLLECTION_LIST_PATH:
-        return normalized_method == "GET"
-    if _ADMIN_RAW_COLLECTION_ACTION_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "POST"
-    if _REPORT_WORKFLOW_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method in {"GET", "POST"}
-    if _REPORT_WORKFLOW_HISTORY_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "GET"
-    if _REPORT_REVIEW_DECISION_LOOKUP_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "GET"
-    if _REPORT_ORIGINAL_ACCESS_GRANT_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "POST"
-    if _REPORT_DELIVERY_CORRECTION_PATH_PATTERN.fullmatch(path) is not None:
-        return normalized_method == "POST"
-    if (
-        normalized_method == "POST"
-        and path.startswith("/admin/security/sessions/")
-        and path.endswith("/revoke")
-    ):
-        operation = classify_admin_operation(normalized_method, path)
-        return operation is not None and operation.action == "session.revoke"
-    return (
-        normalized_method == "POST"
-        and _ADMIN_WRITE_WORKFLOW_PATH_PATTERN.fullmatch(path) is not None
-    )
 
 
 def validate_device_proof_challenge_binding(

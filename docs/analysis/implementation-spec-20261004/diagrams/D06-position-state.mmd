@@ -1,0 +1,24 @@
+stateDiagram-v2
+  state "F-D06-030 IDLE" as IDLE
+  state "ACTIVE lease" as ACTIVE
+  state "COMPLETED" as COMPLETED
+  state "INTERRUPTED" as INTERRUPTED
+  state "PURGE_PENDING" as PURGING
+  state "새 scope READY" as FRESH
+  [*] --> IDLE
+  IDLE --> ACTIVE: 명시고지·체크확인·scope/epoch
+  ACTIVE --> ACTIVE: 일치 lease·증가시간 append
+  ACTIVE --> COMPLETED: stop manifest 성공
+  ACTIVE --> INTERRUPTED: 프로세스재시작·시간역행·14일 만료
+  COMPLETED --> COMPLETED: 같은 scope·재인가·SAF export
+  COMPLETED --> PURGING: 계정전환 purge
+  ACTIVE --> PURGING: 계정전환 purge
+  INTERRUPTED --> PURGING: 전체 purge
+  PURGING --> PURGING: 삭제/새scope저장/marker해제 실패
+  PURGING --> FRESH: 세 단계 모두 성공
+  FRESH --> ACTIVE: 새로운 명시 시작
+  note right of INTERRUPTED
+    P-D06-028..032
+    자동 재개 전이 없음
+    COMPLETED만 export 가능
+  end note

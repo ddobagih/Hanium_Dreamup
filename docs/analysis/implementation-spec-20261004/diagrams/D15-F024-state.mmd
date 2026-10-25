@@ -1,0 +1,20 @@
+stateDiagram-v2
+  state "S-D15-024-01 · NOT_REQUESTED" as NONE
+  state "S-D15-024-02 · REQUEST_SENT" as SENT
+  state "S-D15-024-03 · REPLY_ACKNOWLEDGED" as ACK
+  state "S-D15-024-04 · REPLY_DELETION_CONFIRMED" as DELETED
+  state "S-D15-024-05 · REPLY_DECLINED" as DECLINED
+  [*] --> NONE: local 삭제의 외부사본 snapshot
+  NONE --> SENT: 삭제 요청 기록
+  SENT --> ACK: 접수 회신 기록
+  SENT --> DELETED: 삭제확인 회신 기록
+  SENT --> DECLINED: 거절 회신 기록
+  ACK --> DELETED: 삭제확인 회신 기록
+  ACK --> DECLINED: 거절 회신 기록
+  DECLINED --> SENT: 재요청 기록
+  DELETED --> [*]
+  note right of SENT
+    P-D15-024
+    revision CAS와 exact idempotency 검증
+    API 자체는 기관에 통신하거나 사본을 삭제하지 않음
+  end note

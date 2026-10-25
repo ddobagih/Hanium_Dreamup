@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.network
 
+import kr.co.hanium.dreamup.walksafe.startup.PrivacyStartupInspectionController
 import android.content.Context
 import android.content.Intent
 import android.graphics.Rect
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kr.co.hanium.dreamup.walksafe.BuildConfig
 import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
 import kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingSnapshot
 import org.json.JSONObject
 import org.json.JSONArray
@@ -31,7 +33,6 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -46,26 +47,39 @@ class BackendAccountSessionRestartDeviceTest {
     @Test(timeout = 75_000L)
     fun visiblePasswordLoginPersistsAndAutomaticallyRevalidatesAfterProcessDeath() {
         val arguments = InstrumentationRegistry.getArguments()
-        assumeTrue(arguments.getString("allowIsolatedBackendAccountE2E") == "true")
+        check(arguments.getString("allowIsolatedBackendAccountE2E") == "true") { "Explicit isolated account fixture opt-in required" }
         assertTrue("This probe never runs on a physical device",
             Build.HARDWARE.lowercase(Locale.ROOT) in setOf("ranchu", "goldfish") &&
                 (Build.FINGERPRINT.startsWith("generic") || Build.PRODUCT.lowercase(Locale.ROOT).contains("sdk")))
         assertTrue(BuildConfig.DEBUG)
         assertFalse("Quick start must not replace the actual login flow", BuildConfig.DEVELOPMENT_QUICK_START)
-        val phase = requireNotNull(arguments.getString("accountRestartPhase"))
-        require(phase in setOf("login", "offline", "restore"))
+        val requestedPhase = requireNotNull(arguments.getString("accountRestartPhase"))
+        val phase = when (requestedPhase) {
+            "write", "login" -> "login"
+            "read-offline", "offline" -> "offline"
+            "read", "restore" -> "restore"
+            else -> error("Account phase must be write/read-offline/read")
+        }
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
+        assertEquals("Main must never persist a test login into an existing user or journey package",
+            "kr.co.hanium.dreamup.walksafe.accountrestartfixture", context.packageName)
         val fixture = JSONObject(File(context.cacheDir, "walksafe-isolated-account-e2e.json").readText())
         val runId = fixture.getString("runId")
         require(runId.matches(Regex("[A-Za-z0-9_-]{1,40}")))
         require(fixture.getBoolean("isolatedTestOnly"))
-        require(fixture.getString("gatewayOrigin") == ORIGIN)
+        val origin = fixture.getString("gatewayOrigin")
+        val uri = java.net.URI(origin)
+        require(uri.scheme == "http" && uri.host == "127.0.0.1" && uri.port in 1024..65535 &&
+            uri.port !in setOf(8000, 8081, 9001) && uri.rawPath.orEmpty().isEmpty() &&
+            uri.rawUserInfo == null && uri.rawQuery == null && uri.rawFragment == null)
+        assertEquals("Root must build the fresh synthetic package for this exact temporary origin",
+            origin, BuildConfig.WALKSAFE_GATEWAY_ORIGIN)
         val expectedActor = fixture.getString("actorId")
         val email = fixture.getString("email")
         require(email.startsWith("codex-e2e-") && email.endsWith("@example.com"))
         val appPreferences = context.getSharedPreferences("walksafe", Context.MODE_PRIVATE)
-        assertEquals("Use the isolated port forward; never redirect a user installation", ORIGIN,
+        assertEquals("Use the isolated port forward; never redirect a user installation", origin,
             appPreferences.getString("gateway_origin", BuildConfig.WALKSAFE_GATEWAY_ORIGIN))
         val probe = context.getSharedPreferences(PROBE_PREFERENCES, Context.MODE_PRIVATE)
         if (phase == "login") {
@@ -77,7 +91,8 @@ class BackendAccountSessionRestartDeviceTest {
         }
         assertNull("The process must start without a published session",
             GatewaySessionProcessCoordinator.snapshot().session)
-        val previouslySaved = AndroidGatewaySessionStore(appPreferences).restoreBackendDevice(ORIGIN)
+        val previouslySaved = AndroidGatewaySessionStore(appPreferences).restoreBackendDevice(origin)
+        if (phase == "login") assertNull("Never replace a pre-existing saved account", previouslySaved)
         if (phase != "login") assertNotNull("The previous process must leave its actual saved account", previouslySaved)
         val observationOwner = Any()
         val observations = Collections.synchronizedList(mutableListOf<JSONObject>())
@@ -131,7 +146,7 @@ class BackendAccountSessionRestartDeviceTest {
                                 }
                         }
                 }
-                val retained = AndroidGatewaySessionStore(appPreferences).restoreBackendDevice(ORIGIN)
+                val retained = AndroidGatewaySessionStore(appPreferences).restoreBackendDevice(origin)
                 assertNotNull("Transient network loss must retain the actual encrypted account", retained)
                 assertEquals(previouslySaved?.session?.familyId, retained?.session?.familyId)
                 assertEquals(previouslySaved?.session?.deviceId, retained?.session?.deviceId)
@@ -165,7 +180,7 @@ class BackendAccountSessionRestartDeviceTest {
             val live = requireNotNull(GatewaySessionProcessCoordinator.snapshot().session)
             assertTrue(live.isBackendAccountDeviceBound)
             assertEquals(GatewaySessionVerificationState.VERIFIED, live.verificationState)
-            val saved = AndroidGatewaySessionStore(appPreferences).restoreBackendDevice(ORIGIN)
+            val saved = AndroidGatewaySessionStore(appPreferences).restoreBackendDevice(origin)
             assertNotNull("MainActivity must persist the actual server-issued session", saved)
             assertTrue(saved?.session?.actorId == expectedActor)
             assertEquals(GatewaySessionVerificationState.RESTORED_UNVERIFIED, saved?.session?.verificationState)
@@ -189,7 +204,7 @@ class BackendAccountSessionRestartDeviceTest {
                 .put("verification", state.session?.verificationState?.name ?: "absent")
                 .put("actorMatches", state.session?.actorId == expectedActor)
                 .put("operationInFlight", state.inFlightOperationId != null)
-                .put("savedAccountPresent", AndroidGatewaySessionStore(appPreferences).restoreBackendDevice(ORIGIN) != null)
+                .put("savedAccountPresent", AndroidGatewaySessionStore(appPreferences).restoreBackendDevice(origin) != null)
             activity?.let { main -> onMain {
                 diagnostic.put("loginFormVisible", loginEmail(main) != null)
                 for (field in listOf("backendDeviceRestorePending", "privacyStartupInspectionComplete",
@@ -214,12 +229,18 @@ class BackendAccountSessionRestartDeviceTest {
         }
 
     private fun firstRun(activity: MainActivity): FirstRunOnboardingSnapshot =
-        MainActivity::class.java.getDeclaredField("firstRunOnboardingSnapshot").apply {
+        MainActivityControllerTestFixture.field("firstRunOnboardingSnapshot").apply {
             isAccessible = true
         }.get(activity) as FirstRunOnboardingSnapshot
 
-    private fun booleanField(activity: MainActivity, name: String): Boolean =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.getBoolean(activity)
+    private fun booleanField(activity: MainActivity, name: String): Boolean {
+        if (name == "privacyStartupInspectionComplete" || name == "privacyStartupInspectionDestroyed") {
+            val owner = MainActivityControllerTestFixture.field("privacyStartupInspectionController")
+                .apply { isAccessible = true }.get(activity) as PrivacyStartupInspectionController
+            return if (name == "privacyStartupInspectionComplete") owner.isComplete else owner.isDestroyed
+        }
+        return MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.getBoolean(activity)
+    }
 
     private fun descendants(view: View): List<View> = buildList {
         add(view)
@@ -252,7 +273,6 @@ class BackendAccountSessionRestartDeviceTest {
     }
 
     private companion object {
-        const val ORIGIN = "http://127.0.0.1:8081"
         const val PROBE_PREFERENCES = "walksafe_isolated_backend_account_restart_probe"
     }
 }

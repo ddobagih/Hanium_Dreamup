@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D08-008 정적 field token 및 삭제복구 제한 세션"]
+  P0["1. 일반 password 와 분리된 token payload 를 검사한다."]
+  A --> P0
+  P1["2. 설정 actor/token timing-safe 검증 및 로그인 budgets 를 적용한다."]
+  P0 --> P1
+  P2["3. general과account_deletion_recovery 모두 actor generation을 활성화하고 삭제fence를 확인한다. 그 다음 일반device장기family 또는 scope서명단기cookie 발급으로 분기한다."]
+  P1 --> P2
+  P3["4. recovery purpose 는 account_deletion_recovery scope 서명 단기 쿠키만 발급한다."]
+  P2 --> P3
+  B0{"invalid token"}
+  R0["401 및 failure budget"]
+  A -. "해당 조건" .-> B0
+  B0 --> R0
+  B1{"recovery + device"}
+  R1["400"]
+  A -. "해당 조건" .-> B1
+  B1 --> R1
+  B2{"recovery 쿠키로 일반 API"}
+  R2["일반 API는403으로 제한하고 field-concealed 신고목록/상태 경로는404로 은닉한다."]
+  A -. "해당 조건" .-> B2
+  B2 --> R2
+  B3{"비운영 개발 bypass 명시 true"}
+  R3["개발 모드 예외; production 불가"]
+  A -. "해당 조건" .-> B3
+  B3 --> R3
+  END["v5 또는 legacy long family; recovery 는 제한 scope"]
+  P3 --> END
+  POLICY["P-D08-006, P-D08-007, P-D08-008, P-D08-009, P-D08-011"]
+  A -.-> POLICY

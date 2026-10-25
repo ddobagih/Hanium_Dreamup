@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from backend.app.services.admin_operation_policy import (
+    _DEVICE_PROOF_WORKFLOW_PATHS,
+    high_risk_device_proof_workflows,
+)
+
 from typing import Any
 
 from fastapi import FastAPI
@@ -31,125 +36,8 @@ _DEVICE_PROOF_PUBLIC_PURPOSES = {
     ("post", "/admin/security/sessions"): "LOGIN",
     ("post", "/admin/security/recovery/complete"): "RECOVERY_COMPLETE",
 }
-_DEVICE_PROOF_WORKFLOW_PATHS = {
-    "/admin/raw-collections/quarantine": {
-        "get": (None, "admin.raw_collection.list"),
-    },
-    "/admin/raw-collections/{collection_id}/decisions": {
-        "post": ("admin.raw_collection.purpose_decide", None),
-    },
-    "/admin/raw-collections/{collection_id}/legal-holds": {
-        "post": ("admin.raw_collection.legal_hold", None),
-    },
-    "/admin/reports": {
-        "get": (None, "admin.report.list"),
-    },
-    "/admin/reports/{report_id}": {
-        "get": (None, "admin.report.detail"),
-    },
-    "/admin/reports/audits": {
-        "get": (None, "admin.audit.list"),
-    },
-    "/admin/reports/{report_id}/status": {
-        "patch": ("admin.report.status.update", None),
-    },
-    "/admin/reports/{report_id}/delivery-packages": {
-        "post": ("admin.report.delivery_package.create", None),
-    },
-    "/admin/reports/{report_id}/delivery-packages/{package_revision}/proof": {
-        "get": (None, "admin.report.delivery_package.proof"),
-    },
-    "/admin/report-requests": {
-        "get": (None, "admin.report_request.list"),
-    },
-    "/admin/report-requests/{request_id}": {
-        "get": (None, "admin.report_request.detail"),
-    },
-    "/admin/report-requests/{request_id}/status": {
-        "patch": ("admin.report_request.status.update", None),
-    },
-    "/admin/report-deletions/external-copies": {
-        "get": (None, "admin.report_deletion.external_copy.list"),
-    },
-    "/admin/report-deletions/{request_id}/external-copies/{copy_id}/events": {
-        "post": ("report.external_copy_deletion.record", None),
-    },
-    "/admin/incidents": {
-        "get": (None, "admin.incident.list"),
-    },
-    "/admin/incidents/{incident_id}": {
-        "get": (None, "admin.incident.detail"),
-    },
-    "/admin/incidents/{incident_id}/history": {
-        "get": (None, "admin.incident.history"),
-    },
-    "/admin/incidents/{incident_id}/status": {
-        "patch": ("admin.incident.status.update", None),
-    },
-    "/admin/security/recovery-custody/attest": {
-        "post": ("recovery.custody.attest", None),
-    },
-    "/admin/security/devices/{device_id}/report-lost": {
-        "post": ("device.report_lost", None),
-    },
-    "/admin/security/device-keys/rotation/confirm": {
-        "post": ("device_key.rotation.confirm", None),
-    },
-    "/reports/{report_id}/review-decisions": {
-        "post": ("report.review.decide", None),
-        "get": (None, "report.review_decisions"),
-    },
-    "/reports/{report_id}/review-decisions/history": {
-        "get": (None, "report.review_decisions"),
-    },
-    "/reports/{report_id}/review-decisions/{decision_id}": {
-        "get": (None, "report.review_decisions"),
-    },
-    "/reports/{report_id}/original-access-grants": {
-        "post": ("report.original.grant", None),
-    },
-    "/reports/{report_id}/deliveries": {
-        "post": ("report.delivery.create", None),
-        "get": (None, "report.delivery_events"),
-    },
-    "/reports/{report_id}/deliveries/history": {
-        "get": (None, "report.delivery_events"),
-    },
-    "/reports/{report_id}/delivery-corrections": {
-        "post": ("report.delivery.correct", None),
-    },
-}
-_HIGH_RISK_DEVICE_PROOF_WORKFLOWS = {
-    (
-        "post",
-        "/admin/raw-collections/{collection_id}/decisions",
-    ): "admin.raw_collection.purpose_decide",
-    (
-        "post",
-        "/admin/raw-collections/{collection_id}/legal-holds",
-    ): "admin.raw_collection.legal_hold",
-    ("patch", "/admin/reports/{report_id}/status"): "admin.report.status.update",
-    (
-        "post",
-        "/admin/reports/{report_id}/delivery-packages",
-    ): "admin.report.delivery_package.create",
-    (
-        "patch",
-        "/admin/report-requests/{request_id}/status",
-    ): "admin.report_request.status.update",
-    (
-        "patch",
-        "/admin/incidents/{incident_id}/status",
-    ): "admin.incident.status.update",
-    (
-        "post",
-        "/reports/{report_id}/original-access-grants",
-    ): "report.original.grant",
-    (
-        "post",
-        "/reports/{report_id}/delivery-corrections",
-    ): "report.delivery.correct",
-}
+_HIGH_RISK_DEVICE_PROOF_WORKFLOWS = high_risk_device_proof_workflows()
+
 _ADMIN_RECONFIRMATION_PARAMETER = {
     "name": ADMIN_RECONFIRM_NONCE_HEADER_NAME,
     "in": "header",
@@ -162,10 +50,43 @@ _ADMIN_RECONFIRMATION_PARAMETER = {
         "type": "string",
         "minLength": 22,
         "maxLength": 22,
-        "pattern": "^[A-Za-z0-9_-]{22}$",
+        "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
     },
 }
 _SHA256_SCHEMA = {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+
+
+def _install_signup_policy_schema_invariants(components: dict[str, Any]) -> None:
+    schemas = components.setdefault("schemas", {})
+    policy = schemas.get("AccountSignupPolicyV1")
+    document = schemas.get("SignupPolicyDocumentV1")
+    if not isinstance(policy, dict) or not isinstance(document, dict):
+        return
+    from backend.app.services.signup_documents import (
+        SIGNUP_OPTIONAL_DOCUMENT_KEYS, SIGNUP_REQUIRED_DOCUMENT_KEYS,
+    )
+
+    keys = sorted(set(SIGNUP_REQUIRED_DOCUMENT_KEYS) | set(SIGNUP_OPTIONAL_DOCUMENT_KEYS))
+    policy["required"] = ["schema_version", "documents"]
+    policy["properties"]["documents"] = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": keys,
+        "properties": {
+            key: {
+                "allOf": [
+                    {"$ref": "#/components/schemas/SignupPolicyDocumentV1"},
+                    {"properties": {
+                        "required": {"const": key in SIGNUP_REQUIRED_DOCUMENT_KEYS},
+                        **({"prior_versions": {"maxItems": 0}} if key in SIGNUP_REQUIRED_DOCUMENT_KEYS else {}),
+                    }},
+                ],
+            }
+            for key in keys
+        },
+    }
+    for field in ("equivalent_versions", "prior_versions"):
+        document["properties"][field]["uniqueItems"] = True
 
 
 def _install_response_variant_components(components: dict[str, Any]) -> None:
@@ -545,6 +466,7 @@ def install_walksafe_openapi_contract(app: FastAPI, settings: Any) -> None:
         components["securitySchemes"] = security_schemes
         _install_response_variant_components(components)
         _install_privacy_schema_invariants(components)
+        _install_signup_policy_schema_invariants(components)
 
         admin_context_requirement = {
             "WalkSafeAdminAppKind": [],

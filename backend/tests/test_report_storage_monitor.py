@@ -245,7 +245,8 @@ def test_http_reads_memory_and_unconfigured_router_fails_closed(harness, monkeyp
     from fastapi import FastAPI
     from types import SimpleNamespace
     from asgi_client import ASGITestClient
-    from backend.app.api import health
+    from backend.app.services import health_readiness as health
+    from backend.app.api import health as health_router
 
     h = harness
     assert h.cycle()["ready"] is True
@@ -265,12 +266,12 @@ def test_http_reads_memory_and_unconfigured_router_fails_closed(harness, monkeyp
     monkeypatch.setattr(h.monitor, "_encryption_check", forbidden)
     monkeypatch.setattr(h.monitor, "_session", forbidden)
     app = FastAPI()
-    app.include_router(health.create_router(settings, lambda: None, object(), report_storage_monitor=h.monitor))
+    app.include_router(health_router.create_router(settings, lambda: None, object(), report_storage_monitor=h.monitor))
     for _ in range(3):
         response = ASGITestClient(app).get("/ready")
         assert response.status_code == 200, response.text
     unconfigured = FastAPI()
-    unconfigured.include_router(health.create_router(settings, lambda: None, object()))
+    unconfigured.include_router(health_router.create_router(settings, lambda: None, object()))
     response = ASGITestClient(unconfigured).get("/ready")
     assert response.status_code == 503
     assert response.json()["checks"]["report_storage"]["reason"] == "report_storage_not_checked"
@@ -332,14 +333,19 @@ def test_startup_seed_cannot_erase_write_failure_after_full_scan(harness):
 
 def test_monitor_shutdown_failure_still_closes_other_lifespan_resources(monkeypatch):
     from backend.app import main
+    owned_app = main.create_app(main.settings)
+    owner = owned_app.state.runtime
+    owner.initialize_resources()
+    monkeypatch.setattr(owner, "initialize_resources", lambda: None)
+    from backend.app import application_runtime as runtime_module
     events = []
     for name in ("validate_admin_credential_issuer_binding", "bind_privacy_hmac_key", "bind_account_crypto_keys", "reconcile_report_storage", "reconcile_raw_collection_storage", "start_detect_v2_health"):
-        monkeypatch.setattr(main, name, lambda *_args: None)
-    monkeypatch.setattr(main, "capacity_monitor", None)
-    monkeypatch.setattr(main, "inference_runner", None)
-    monkeypatch.setattr(main, "stop_detect_v2_health", lambda: events.append("detector-closed"))
-    monkeypatch.setattr(main.detect, "close_detection_preprocessing", lambda: events.append("preprocessing-closed"))
-    monkeypatch.setattr(main.report_storage_monitor, "stop", lambda: events.append("monitor-stopped"))
+        monkeypatch.setattr(runtime_module if name == "start_detect_v2_health" else owner, name, lambda *_args: None)
+    monkeypatch.setattr(owner, "capacity_monitor", None)
+    monkeypatch.setattr(owner, "inference_runner", None)
+    monkeypatch.setattr(runtime_module, "stop_detect_v2_health", lambda: events.append("detector-closed"))
+    monkeypatch.setattr(runtime_module.detect, "close_detection_preprocessing", lambda: events.append("preprocessing-closed"))
+    monkeypatch.setattr(owner.report_storage_monitor, "stop", lambda: events.append("monitor-stopped"))
 
     async def failed_monitor(stop):
         await stop.wait()
@@ -355,17 +361,18 @@ def test_monitor_shutdown_failure_still_closes_other_lifespan_resources(monkeypa
         async def aclose(self):
             events.append("tmap-closed")
 
-    monkeypatch.setattr(main.report_storage_monitor, "run", failed_monitor)
-    monkeypatch.setattr(main, "TmapRuntime", Runtime)
+    monkeypatch.setattr(owner.report_storage_monitor, "run", failed_monitor)
+    monkeypatch.setattr(runtime_module, "TmapRuntime", Runtime)
 
     async def exercise():
         with pytest.raises(RuntimeError, match="owned monitor shutdown failure"):
-            async with main.lifespan(main.app):
+            async with owner.lifespan(owned_app):
                 pass
 
     asyncio.run(exercise())
     assert events == ["monitor-stopped", "tmap-stopped", "tmap-closed", "detector-closed", "preprocessing-closed"]
-    assert main.app.state.tmap_runtime is None
+    assert owned_app.state.tmap_runtime is None
+
 
 
 @pytest.mark.parametrize("phase", ["metadata", "recheck", "namespace"])

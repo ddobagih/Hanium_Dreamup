@@ -1,0 +1,20 @@
+stateDiagram-v2
+  state "F-D06-004 대기 없음" as IDLE
+  state "동결 payload·안내 진행" as DISCLOSING
+  state "안내 완료·확인 가능" as ARMED
+  state "단회 소비·queue 저장" as CONSUMED
+  state "취소·만료·문맥 불일치" as CLEARED
+  [*] --> IDLE
+  IDLE --> DISCLOSING: 후보 gate 통과
+  DISCLOSING --> ARMED: VOICE TTS onCompleted·문맥 유효
+  DISCLOSING --> ARMED: ON_SCREEN 첫 OnDraw 뒤 posted delivered·문맥 유효
+  DISCLOSING --> CLEARED: 실패·취소·120초 초과
+  ARMED --> CONSUMED: 같은 문맥·30초 이내 확인
+  ARMED --> CLEARED: 취소·시간역행·30초 초과·문맥 변경
+  CONSUMED --> IDLE: 저장 결과 안내·원본 정리
+  CLEARED --> IDLE: frozen bytes zeroize
+  note right of ARMED
+    P-D06-004
+    actor·walk·recovery·consent receipt·session generation
+    경계와 같은 시간은 유효, 초과하면 만료
+  end note

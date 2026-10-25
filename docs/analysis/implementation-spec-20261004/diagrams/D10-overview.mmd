@@ -1,0 +1,20 @@
+flowchart LR
+ G["Gateway 내부 서비스 호출<br/>앱 실제 진입 연결은 D03 확인"] --> V["F-D10-001~003<br/>시작 · 인증 · admission"]
+ V --> S["F-D10-004~008<br/>STT · 음향 · intent"]
+ V --> T["F-D10-009~011<br/>TTS · 캐시 · 모델 hash"]
+ V --> H["F-D10-012~015<br/>health · ready · catalog · telemetry schema"]
+ P["F-D10-006 spawn pool<br/>deadline 및 cancel abort"] --> S
+ P --> T
+ O["운영자 CLI"] --> B["F-D10-022~027<br/>과거 source ETL · 검수 · subset"]
+ B -. "현재 hash 형식으로 직접 호환되지 않을 수 있음" .-> D["F-D10-019~020<br/>hash · 승인 gate · 학습"]
+ O --> D
+ O --> E["F-D10-021<br/>실패 후보 샘플"]
+ O --> R["F-D10-028~031<br/>registry · manifest 승격 · 격리"]
+ O --> L["F-D10-032~036<br/>Backend lifecycle CLI · retention"]
+ L --> DB["D13 Backend 승인·동의·삭제 서비스"]
+ DB --> D
+ O --> X["F-D10-037~039<br/>과거 exporter · train runners"]
+ X -. "tensor 계약 교차검토 필요" .-> A["D05 Android 21cls raw TFLite"]
+ R -. "13cls 기록 불일치" .-> A
+ M["F-D10-016~017<br/>서버 13cls CPU filter helper"] --> BE["Backend detect.v2"]
+ DOC["F-D10-040<br/>과거 후보·권리 요구 기록"] -. "실행 증거와 분리" .-> B

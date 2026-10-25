@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that a built APK contains only the configured model assets, unchanged."""
+"""Verify the exact model assets and hashes for a debug or release APK."""
 
 from __future__ import annotations
 
@@ -19,6 +19,14 @@ APK_CONFIG_ENTRY = "assets/model-config/two_model_runtime.json"
 DEFAULT_COMPANION_CONTRACTS = (
     ROOT / "apps/android/app/src/main/assets/model-config/fastsam_s_768_contract.json",
 )
+# Preserved comparison/rollback assets pinned by UnifiedTfliteAssetContractTest and
+# HeterogeneousModelCandidates. They are debug assets, never release runtime models.
+DEBUG_COMPARISON_MODELS = {
+    "assets/models/walksafe_unified_yolo26n_768_float32.tflite":
+        "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19",
+    "assets/models/walksafe_unified_yolo26n_768_float32_gpu_compatible.tflite":
+        "25ef119d4f07e1bffbd4ac6827fa46a44a0fa3deaaedfb0c867e7c655f813559",
+}
 FORBIDDEN_PAYLOAD = re.compile(
     r"(?:^|/)(?:\.env(?:\..*)?|secrets?|field_sessions?|logs?|tests?|fixtures?)(?:/|$)",
     re.IGNORECASE,
@@ -36,6 +44,9 @@ def configured_model_entries(config: dict[str, object]) -> dict[str, str | None]
     primary = config.get("primary_model")
     if not isinstance(primary, str) or primary not in models:
         raise ValueError("runtime config must name a declared primary_model")
+    fallback = config.get("fallback_model")
+    if fallback is not None and (not isinstance(fallback, str) or fallback not in models):
+        raise ValueError("runtime config fallback_model must be null or a declared model")
     expected: dict[str, str | None] = {}
     for model_key, raw_model in models.items():
         if not isinstance(raw_model, dict):
@@ -53,7 +64,10 @@ def configured_model_entries(config: dict[str, object]) -> dict[str, str | None]
             not isinstance(artifact_hash, str) or not re.fullmatch(r"[0-9a-f]{64}", artifact_hash)
         ):
             raise ValueError(f"invalid artifact SHA-256 for {model_key!r}")
-        expected[f"assets/{asset_path.as_posix()}"] = artifact_hash
+        entry = f"assets/{asset_path.as_posix()}"
+        if entry in expected:
+            raise ValueError(f"runtime model asset is declared twice: {asset!r}")
+        expected[entry] = artifact_hash
     return expected
 
 
@@ -83,14 +97,30 @@ def companion_model_entries(contract_paths: tuple[Path, ...]) -> tuple[dict[str,
 
 def verify_apk(
     apk_path: Path, config_path: Path, companion_contracts: tuple[Path, ...] = (),
+    *, profile: str = "release",
 ) -> tuple[int, int]:
+    if profile not in ("debug", "release"):
+        raise ValueError(f"unknown APK model asset profile: {profile!r}")
     config_bytes = config_path.read_bytes()
     config = json.loads(config_bytes.decode("utf-8"))
-    expected_models = configured_model_entries(config)
+    configured_models = configured_model_entries(config)
     companion_models, companion_contract_entries = companion_model_entries(tuple(companion_contracts))
-    overlap = sorted(set(expected_models) & set(companion_models))
+    overlap = sorted(set(configured_models) & set(companion_models))
     if overlap:
         raise ValueError(f"model asset is declared by more than one contract: {overlap}")
+    if profile == "release":
+        # Match FilterReleaseModelAssetsTask: only the primary and non-null fallback
+        # are loaded; inactive declarations remain validated above, but aren't packaged.
+        loaded_keys = [config["primary_model"]]
+        if config.get("fallback_model") is not None:
+            loaded_keys.append(config["fallback_model"])
+        loaded_entries = {f"assets/{config['models'][key]['asset']}" for key in loaded_keys}
+        expected_models = {name: digest for name, digest in configured_models.items() if name in loaded_entries}
+    else:
+        overlap = sorted((set(configured_models) | set(companion_models)) & set(DEBUG_COMPARISON_MODELS))
+        if overlap:
+            raise ValueError(f"debug comparison model is also declared by a runtime contract: {overlap}")
+        expected_models = {**configured_models, **DEBUG_COMPARISON_MODELS}
     expected_models = {**expected_models, **companion_models}
     with zipfile.ZipFile(apk_path) as archive:
         names = archive.namelist()
@@ -131,6 +161,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--apk", type=Path, default=DEFAULT_APK)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument(
+        "--profile", choices=("debug", "release"), default="debug",
+        help="debug requires pinned comparison assets; release permits only the loaded runtime bundle",
+    )
+    parser.add_argument(
         "--companion-contract", type=Path, action="append",
         help=f"model contract outside the runtime config; default: {DEFAULT_COMPANION_CONTRACTS[0].name}",
     )
@@ -141,11 +175,13 @@ def main() -> int:
     args = parse_args()
     companions = tuple(path.resolve() for path in (args.companion_contract or DEFAULT_COMPANION_CONTRACTS))
     try:
-        model_count, entry_count = verify_apk(args.apk.resolve(), args.config.resolve(), companions)
+        model_count, entry_count = verify_apk(
+            args.apk.resolve(), args.config.resolve(), companions, profile=args.profile,
+        )
     except (OSError, UnicodeError, json.JSONDecodeError, zipfile.BadZipFile, ValueError) as exc:
         print(f"Android APK model asset check FAIL: {exc}", file=sys.stderr)
         return 1
-    print(f"Android APK model asset check PASS: {model_count} models, {entry_count} APK entries")
+    print(f"Android APK model asset check PASS ({args.profile}): {model_count} models, {entry_count} APK entries")
     return 0
 
 

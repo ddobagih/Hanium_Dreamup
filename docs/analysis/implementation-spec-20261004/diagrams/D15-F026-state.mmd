@@ -1,0 +1,16 @@
+stateDiagram-v2
+  state "S-D15-026-01 · new" as NEW
+  state "S-D15-026-02 · reviewed" as REVIEWED
+  state "S-D15-026-03 · resolved" as RESOLVED
+  [*] --> NEW
+  NEW --> REVIEWED: expected_version 일치
+  NEW --> RESOLVED: expected_version·종결 사유
+  REVIEWED --> NEW: expected_version 일치
+  REVIEWED --> RESOLVED: expected_version·종결 사유
+  RESOLVED --> REVIEWED: expected_version 일치
+  note right of NEW
+    P-D15-026
+    동일상태·resolved에서 new 직접전이 금지
+    status_version CAS와 감사 commit
+    HTTP stepup 연결 한계 R-D15-006
+  end note

@@ -1,0 +1,25 @@
+flowchart TD
+  IN["F-D14-002<br/>기존 관리자에 issuer 키 결속"]
+  G["적용 정책<br/>P-D14-001 / P-D14-002"]
+  IN --> G
+  N1["1. 키 파일 권한 검사 후 migration_database_url로 DB 연<br/>결"]
+  G --> N1
+  N2["2. 현재 역할이 일반 runtime 멤버이면 결속 차단"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 보호 binding function이 capability 행을 잠그고 nu<br/>ll issuer digest에 최초 SHA256 기록"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 동일 digest이면 변경 없이 idempotent, 다른 digest이면<br/> 42501 거절"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. commit 후 BOUND 및 idempotent만 출력; finally <br/>db close와 engine dispose"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>ValueError"]
+  N1 -->|"PostgreSQL 아닌 DB"| B1
+  B2["분기 결과<br/>issuer 결속 금지"]
+  N2 -->|"runtime_member이고 superuser 아님"| B2
+  B3["분기 결과<br/>키 회전으로 처리하지 않고 거절"]
+  N4 -->|"이미 다른 키가 결속됨"| B3
+  N5 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. CLI db close/engine dispose. 비밀값 <br/>출력 없음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

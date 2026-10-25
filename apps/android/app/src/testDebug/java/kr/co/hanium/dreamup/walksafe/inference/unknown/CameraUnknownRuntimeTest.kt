@@ -115,6 +115,56 @@ class CameraUnknownRuntimeTest {
         assertEquals(1, f.services.size)
     }
 
+    @Test fun pauseAndReleaseClosesHealthyNativeOwnerWithoutWaitingForAnotherResume() = Fixture().use { f ->
+        val old = f.start()
+        val changes = f.changes
+        f.runtime.pauseAndRelease()
+        assertTrue(old.stats().stopping)
+        assertFalse(f.runtime.accepts(old.sessionEpoch))
+        old.releasedFuture().get(3, TimeUnit.SECONDS)
+        old.closeAsync().get(3, TimeUnit.SECONDS)
+        f.drain()
+        assertTrue(old.stats().nativeReleaseConfirmed)
+        assertEquals(0, f.nativeCount.get())
+        assertNull(f.runtime.service)
+        assertEquals(CameraUnknownRuntime.Status.IDLE, f.runtime.status)
+        assertEquals(changes, f.changes)
+    }
+
+    @Test fun resumeDuringPauseReleaseWaitsUntilTheOldNativeOwnerIsConfirmedClosed() = Fixture(blockClose = true).use { f ->
+        val old = f.start()
+        f.runtime.pauseAndRelease()
+        assertTrue(f.closeEntered.await(3, TimeUnit.SECONDS))
+        f.runtime.resume(); f.drain()
+        assertEquals(CameraUnknownRuntime.Status.WAITING_RELEASE, f.runtime.status)
+        assertSame(old, f.runtime.service)
+        assertEquals(1, f.services.size)
+        f.closeGate.countDown()
+        old.releasedFuture().get(3, TimeUnit.SECONDS)
+        old.closeAsync().get(3, TimeUnit.SECONDS)
+        f.drain()
+        val resumed = requireNotNull(f.runtime.service)
+        resumed.start().get(3, TimeUnit.SECONDS)
+        f.awaitStatus(CameraUnknownRuntime.Status.READY)
+        assertNotSame(old, resumed)
+        assertEquals(2, f.services.size)
+        assertEquals(1, f.maximumNative.get())
+        assertEquals(CameraUnknownRuntime.Status.READY, f.runtime.status)
+    }
+
+    @Test fun failedPauseReleaseCannotStartReplacementAfterResumeOrRetry() = Fixture(failClose = true).use { f ->
+        val old = f.start()
+        f.runtime.pauseAndRelease()
+        runCatching { old.releasedFuture().get(3, TimeUnit.SECONDS) }
+        runCatching { old.closeAsync().get(3, TimeUnit.SECONDS) }
+        f.drain()
+        assertEquals(CameraUnknownRuntime.Status.RELEASE_FAILED, f.runtime.status)
+        f.runtime.resume(); f.runtime.retry(); f.drain()
+        assertFalse(old.stats().nativeReleaseConfirmed)
+        assertSame(old, f.runtime.service)
+        assertEquals(1, f.services.size)
+    }
+
     @Test fun constructorFailureWaitsForExplicitRetryAndEpochsRemainUnique() {
         val epochs = mutableListOf<Long>()
         val runtime = CameraUnknownRuntime<Void>(create = { epoch ->
@@ -132,7 +182,37 @@ class CameraUnknownRuntimeTest {
         runtime.destroy()
     }
 
-    private class Fixture(val blockClose: Boolean = false, val failClose: Boolean = false) : AutoCloseable {
+    @Test fun loadingModelRejectsCaptureUntilNativePreparationCompletes() = Fixture(blockLoad = true).use { f ->
+        f.runtime.resume()
+        val service = requireNotNull(f.runtime.service)
+        assertTrue(f.loadEntered.await(3, TimeUnit.SECONDS))
+        assertEquals(CameraUnknownRuntime.Status.LOADING, f.runtime.status)
+        assertFalse(service.stats().stopping)
+        assertFalse(f.runtime.accepts(service.sessionEpoch))
+        f.loadGate.countDown()
+        service.start().get(3, TimeUnit.SECONDS)
+        f.awaitStatus(CameraUnknownRuntime.Status.READY)
+        assertTrue(f.runtime.accepts(service.sessionEpoch))
+        assertFalse(f.runtime.accepts(service.sessionEpoch + 1L))
+        f.runtime.pauseAndRelease()
+        assertFalse(f.runtime.accepts(service.sessionEpoch))
+    }
+
+    @Test fun repeatedLiveCompletionsDoNotRecreateTheModelOrRefreshUnchangedUi() = Fixture().use { f ->
+        val service = f.start()
+        f.awaitStatus(CameraUnknownRuntime.Status.READY)
+        val changes = f.changes
+        repeat(20) { f.runtime.resume() }
+        assertSame(service, f.runtime.service)
+        assertEquals(1, f.services.size)
+        assertEquals(changes, f.changes)
+        assertTrue(f.runtime.accepts(service.sessionEpoch))
+    }
+
+    private class Fixture(val blockClose: Boolean = false, val failClose: Boolean = false,
+        val blockLoad: Boolean = false) : AutoCloseable {
+        val loadGate = CountDownLatch(if (blockLoad) 1 else 0)
+        val loadEntered = CountDownLatch(1)
         val closeGate = CountDownLatch(if (blockClose) 1 else 0)
         val closeEntered = CountDownLatch(1)
         val error = CountDownLatch(1)
@@ -150,6 +230,17 @@ class CameraUnknownRuntimeTest {
         }
 
         fun drain() { while (true) (ui.poll() ?: return).invoke() }
+
+        fun awaitStatus(expected: CameraUnknownRuntime.Status) {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
+            while (runtime.status != expected) {
+                val remaining = deadline - System.nanoTime()
+                if (remaining <= 0L) break
+                (ui.poll(remaining, TimeUnit.NANOSECONDS) ?: break).invoke()
+            }
+            drain()
+            assertEquals(expected, runtime.status)
+        }
 
         fun fail(service: FastSamRuntimeService<Void>) {
             assertEquals(FastSamRuntimeService.Admission.ACCEPTED, submit(service))
@@ -171,6 +262,8 @@ class CameraUnknownRuntimeTest {
                 override fun onResult(value: FastSamResult<Void>) { result.countDown() }
                 override fun onError(value: Throwable) { runtime.failed(epoch); error.countDown() }
             }, {
+                loadEntered.countDown()
+                check(loadGate.await(3, TimeUnit.SECONDS))
                 val count = nativeCount.incrementAndGet()
                 maximumNative.accumulateAndGet(count, ::maxOf)
                 object : FastSamEngine {
@@ -195,6 +288,7 @@ class CameraUnknownRuntimeTest {
         }
 
         override fun close() {
+            loadGate.countDown()
             closeGate.countDown()
             runtime.destroy()
             services.forEach { runCatching { it.closeAsync().get(3, TimeUnit.SECONDS) } }

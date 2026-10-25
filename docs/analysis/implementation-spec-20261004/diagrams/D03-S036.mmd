@@ -1,0 +1,16 @@
+stateDiagram-v2
+  state "S-D03-036-01 진행" as active
+  state "S-D03-036-02 근접증거" as near
+  state "S-D03-036-03 도착질문" as question
+  state "S-D03-036-04 완료" as done
+  state "F-D03-037 자동질문 억제" as disarmed
+  [*] --> active
+  active --> near: accepted fresh fix inside raw arrival uncertainty
+  near --> question: at least 2 fixes and dwell 3s
+  near --> active: invalid or interrupted evidence
+  question --> done: exact token user confirms
+  question --> disarmed: user rejects
+  question --> active: fresh departure withdraws question
+  disarmed --> question: explicit request with fresh near evidence
+  disarmed --> active: 2 departure fixes rearm
+  done --> [*]

@@ -1,0 +1,218 @@
+{
+  "schema": "walksafe.guidance_stationary_full_journey.v2",
+  "policy_version": "20261010_user_approved_recheck_extension",
+  "scope": "READY_CONTROLLERS_SINGLE_NAVIGATION_COMPOSITION",
+  "sensor_inputs": "CONTROLLED_SDK_OBSERVATIONS_WITH_ORIGINAL_TIMESTAMPS",
+  "policy": {
+    "gps_period_ms": 3000,
+    "gps_periods": 6,
+    "gps_grace_ms": 18000,
+    "direction_grace_ms": 9000,
+    "camera_grace_ms": 4500,
+    "raw_location_ttl_ms": 10000,
+    "original_heading_start_lease_ms": 500,
+    "approved_gps_accuracy_m": 15
+  },
+  "stationary_inputs": {
+    "gps_cadence_ms": 900,
+    "heading_cadence_ms": 300,
+    "step_counter": "fresh same native raw total; actual normalized count remains zero",
+    "gps_jitter_m": [
+      [
+        -0.3,
+        0.4
+      ],
+      [
+        0.8,
+        -0.7
+      ],
+      [
+        -1,
+        0.3
+      ],
+      [
+        0.4,
+        1
+      ],
+      [
+        0,
+        -0.9
+      ]
+    ],
+    "gps_accuracy_m": [
+      3,
+      5,
+      8,
+      14.8
+    ],
+    "yaw_degrees": [
+      0,
+      0.5,
+      359.5,
+      0.25,
+      359.75
+    ],
+    "heading_error_degrees": [
+      3,
+      12,
+      5,
+      20,
+      8
+    ],
+    "boundary_pattern": [
+      0,
+      0,
+      1,
+      0,
+      1,
+      1
+    ]
+  },
+  "native_callbacks": {
+    "start_delay_ms": 80,
+    "done_delay_ms": 3000,
+    "old_callbacks_keep_original_listener": true,
+    "scheduled_timestamps_recorded": true
+  },
+  "limitations": [
+    "No physical field/acoustic or Android Handler evidence.",
+    "Camera inputs only exercise the real quality policy; ACTIVE mounting ownership and Depth/risk pipeline are not connected by this fixture.",
+    "Do not treat Camera metadata cases as Depth or physical mounting verification.",
+    "Historical v1 sensor JSON and results retain their original policy."
+  ],
+  "cases": [
+    {
+      "id": "fixed_gps_jitter_60s_pending_start",
+      "kind": "jitter",
+      "native_phase": "waiting",
+      "condition_ko": "60초 정지·GPS ±1m, 정확도3/5/8m, 첫 START 대기",
+      "expected_ko": "진척 누적/거짓 코너·도착/불필요한 STOP 없이 원 cue ACK",
+      "duration_ms": 60000
+    },
+    {
+      "id": "fixed_gps_jitter_60s_playing",
+      "kind": "jitter",
+      "native_phase": "playing",
+      "condition_ko": "같은 GPS jitter를 실제 native START 후 공급",
+      "expected_ko": "3초 문장이 재시작 없이 실제 DONE ACK",
+      "duration_ms": 60000
+    },
+    {
+      "id": "fixed_heading_uncertainty_60s_pending_start",
+      "kind": "heading",
+      "native_phase": "waiting",
+      "condition_ko": "북쪽 yaw ±0.5°, angular error3/12/5/20/8°, GPS고정",
+      "expected_ko": "같은 clock을 지지하는 actual measured precise/nominal cue를 완료",
+      "duration_ms": 60000
+    },
+    {
+      "id": "fixed_heading_uncertainty_60s_playing",
+      "kind": "heading",
+      "native_phase": "playing",
+      "condition_ko": "같은 불확실성 변동을 actual START 후 공급",
+      "expected_ko": "소프트 불확실성 변화로 문장 잘림/발화 소유권 반복 교체 없음",
+      "duration_ms": 60000
+    },
+    {
+      "id": "fixed_joint_uncertainty_60s",
+      "kind": "joint",
+      "native_phase": "playing",
+      "condition_ko": "GPS jitter와 같은 yaw uncertainty 동시60초",
+      "expected_ko": "작은 결합잡음으로 실제 진척·조향·제한 상태 채터링 없음",
+      "duration_ms": 60000
+    },
+    {
+      "id": "fixed_gps_15m_boundary_60s",
+      "kind": "gps_boundary",
+      "native_phase": "playing",
+      "condition_ko": "고정 좌표 GPSaccuracy14.8/15.2m 각300~900ms 왕복",
+      "expected_ko": "18초보다 짧은 품질 변동마다 기능 제한/복구·STOP를 반복하지 않음",
+      "duration_ms": 60000
+    },
+    {
+      "id": "fixed_heading_29_31_episode_60s",
+      "kind": "heading_boundary",
+      "native_phase": "playing",
+      "condition_ko": "고정yaw headingerror29/31° 각300~900ms 왕복",
+      "expected_ko": "9초 이내 실제같은 방향 근거 변동으로 제한·음성 채터링 없음",
+      "duration_ms": 60000
+    },
+    {
+      "id": "fixed_camera_optional_metadata_60s",
+      "kind": "camera_metadata",
+      "native_phase": "playing",
+      "condition_ko": "fresh RGB 정상, occlusion null/0, nearBlack null/.9, shake null/90",
+      "expected_ko": "실제 CameraFrameQualityPolicy의 optional diagnostic 값으로 정상 GPS 경로를 취소하지 않음",
+      "duration_ms": 60000
+    },
+    {
+      "id": "fixed_gps_loss_qualified_auto_recovery",
+      "kind": "gps_loss",
+      "native_phase": "playing",
+      "condition_ko": "same location의accuracy50m을18초+600ms 지속 후새accuracy3m",
+      "expected_ko": "first BAD/deadline 고정, 제한 후 같은 owner의 actual fresh cue 자동재개",
+      "duration_ms": 0
+    },
+    {
+      "id": "fixed_heading_loss_qualified_auto_recovery",
+      "kind": "heading_loss",
+      "native_phase": "playing",
+      "condition_ko": "heading unavailable을9초+600ms 지속 후새북쪽관측",
+      "expected_ko": "정밀 cue 제한, 기존episode 고정, 실제 새 heading으로 native automatic ACK",
+      "duration_ms": 0
+    },
+    {
+      "id": "fixed_dual_loss_gps_first_auto_recovery",
+      "kind": "dual_gps_first",
+      "native_phase": "playing",
+      "condition_ko": "GPS/heading BAD를18초+600ms 지속, GPS먼저 회복",
+      "expected_ko": "잔여방향fault 중 clock출력 불가, 둘다 qualified 후 같은 epoch 자동재개",
+      "duration_ms": 0
+    },
+    {
+      "id": "fixed_dual_loss_heading_first_auto_recovery",
+      "kind": "dual_heading_first",
+      "native_phase": "playing",
+      "condition_ko": "동일 dual BAD 후 heading먼저 회복",
+      "expected_ko": "잔여GPSfault 중 정밀경로 출력 불가, 둘다 qualified 후 자동재개",
+      "duration_ms": 0
+    },
+    {
+      "id": "genuine_reversal_stops_exact_old_cue",
+      "kind": "reversal",
+      "native_phase": "playing",
+      "condition_ko": "실제180°반전 새관측, 원playing cue의늦은DONE",
+      "expected_ko": "원cue즉시STOP, retired DONE은 Navigator ACK 소비불가, 새fresh 회복cue ACK",
+      "duration_ms": 0
+    },
+    {
+      "id": "genuine_corner_after_idle_confirmed_arrival_end",
+      "kind": "corner",
+      "native_phase": "playing",
+      "condition_ko": "10초 정지뒤 실제counter걸음+원L경로GPS→protected corner→도착",
+      "expected_ko": "원turn raw/filtered근거와 actual native ACK, 사용자도착확인 후 archive purge·voice END",
+      "duration_ms": 0
+    },
+    {
+      "id": "retired_epoch_rejects_late_native_callbacks",
+      "kind": "retired",
+      "native_phase": "playing",
+      "condition_ko": "사용자 voice END 뒤원native START/DONE/STOP callback",
+      "expected_ko": "ENDED/원저장scope 유지, 원cue/경로를 재활성화·ACK 소비하지 않음",
+      "duration_ms": 0
+    },
+    {
+      "id": "original_timestamps_not_refreshed_by_clock",
+      "kind": "silence",
+      "native_phase": "playing",
+      "condition_ko": "GPS/heading callback완전침묵25초, camera와동일counter만fresh",
+      "expected_ko": "원measurement시각 불변·정밀출력 제한, 새current raw근거후자동재개",
+      "duration_ms": 0
+    }
+  ],
+  "recovery_observation": {
+    "initial_fresh_input_window_ms": 6000,
+    "after_initial_window": "Consume the originally scheduled pending route DONE with fresh observations at intervals up to 300ms.",
+    "callback_deadlines": "Native requested/start/done/scheduled timestamps are recorded; no fast DONE or measurement restamping."
+  }
+}

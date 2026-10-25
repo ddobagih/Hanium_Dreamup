@@ -14,6 +14,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CameraTestFeedbackCoordinatorTest {
+    @Test fun originalProducerObservationAndSmallerAgeBudgetBoundTheCameraDelivery() {
+        val coordinator = coordinator()
+        val older = output().copy(sourceObservedAtElapsedRealtimeMs = NOW - 100L,
+            sourceMaxAgeMs = 600L, sourceValidUntilElapsedRealtimeMs = NOW + 700L)
+        assertTrue(coordinator.offer(sample(outputs = listOf(older))))
+        val delivery = requireNotNull(coordinator.next(NOW))
+
+        assertEquals(NOW + 500L, delivery.action.validUntilMs)
+        assertFalse(coordinator.isDeliverable(delivery, NOW + 501L))
+        assertNull(coordinator.next(NOW + 501L))
+    }
+
+    @Test fun currentCameraCaptureCannotRenewAnExpiredIndependentObservation() {
+        val coordinator = coordinator()
+        val expired = output("unknown-1").copy(sourceObservedAtElapsedRealtimeMs = NOW - 801L,
+            sourceMaxAgeMs = 800L, sourceValidUntilElapsedRealtimeMs = NOW + 800L)
+        assertTrue(coordinator.offer(sample(CameraTestFeedbackCoordinator.Source.UNKNOWN, listOf(expired))))
+
+        assertNull(coordinator.next(NOW))
+    }
+
+    @Test fun delayedCameraCompletionKeepsItsOriginalCaptureDeadline() {
+        val coordinator = coordinator()
+        assertTrue(coordinator.offer(sample(outputs = listOf(output())).copy(completedAtMs = NOW + 750L),
+            nowMs = NOW + 750L))
+        val delivery = requireNotNull(coordinator.next(NOW + 750L))
+
+        assertEquals(NOW + 800L, delivery.action.validUntilMs)
+        assertFalse(coordinator.isDeliverable(delivery, NOW + 801L))
+    }
+
     @Test fun clearingUnknownPreservesClaimedPrimaryAndRemovesUnknownQueue() {
         val coordinator = coordinator()
         coordinator.offer(sample(outputs = listOf(output())))

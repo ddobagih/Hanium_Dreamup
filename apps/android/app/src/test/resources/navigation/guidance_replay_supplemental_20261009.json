@@ -1,0 +1,6591 @@
+{
+  "schema": "walksafe.guidance_sensor_replay.v1",
+  "coordinate_frame": "SYNTHETIC_LOCAL_ENU_METERS",
+  "sensor_trace_kind": "GPS_AND_POST_ORIENTATION_HEADING",
+  "timeline_origin": "FIRST_ROUTE_SPEECH_REQUEST_AFTER_CONTROLLED_INTRO_DONE",
+  "policy": {
+    "gps_period_ms": 3000,
+    "gps_confirmations": 3,
+    "direction_observation_ms": 300,
+    "direction_grace_ms": 1500,
+    "direction_confirmations": 3,
+    "raw_location_ttl_ms": 10000
+  },
+  "coverage_scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+  "full_home_to_arrival": false,
+  "open_requirements": [
+    "These supplemental sensor cases bootstrap an admitted walk.",
+    "Readiness cases are a separate controlled production-controller phase.",
+    "Physical RAW sensors/acoustic/field behavior and complete Android HOME remain unverified."
+  ],
+  "cases": [
+    {
+      "id": "ext_gps_negative_retains_and_recovers",
+      "title_ko": "GPS 오류 종류 변경 중 최근 근거 유지·새 관측 회복",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "gps_transient_mixed",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": -1,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "gps",
+          "north_m": 1.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2100,
+          "type": "gps",
+          "north_m": 2.1,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1400,
+          "assert": "grace_active",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "grace_onset_fixed",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 2400,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 2700,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 3000,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_gps_missing_after_bad_retains_and_recovers",
+      "title_ko": "GPS 오류 종류 변경 중 최근 근거 유지·새 관측 회복",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "gps_transient_mixed",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 1.3,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false,
+          "accuracy_kind": "missing"
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "gps",
+          "north_m": 1.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2100,
+          "type": "gps",
+          "north_m": 2.1,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1400,
+          "assert": "grace_active",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "grace_onset_fixed",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 2400,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 2700,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 3000,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_gps_nan_after_bad_retains_and_recovers",
+      "title_ko": "GPS 오류 종류 변경 중 최근 근거 유지·새 관측 회복",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "gps_transient_mixed",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 1.3,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false,
+          "accuracy_kind": "nan"
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "gps",
+          "north_m": 1.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2100,
+          "type": "gps",
+          "north_m": 2.1,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1400,
+          "assert": "grace_active",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "grace_onset_fixed",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 2400,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 2700,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 3000,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_gps_recovers_before_deadline_9600",
+      "title_ko": "GPS 9초 유예 만료 직전 정상 복귀",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "gps_deadline",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 12000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3999,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6999,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 7000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 7200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 7500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 7800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9300,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 9600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9600,
+          "type": "gps",
+          "north_m": 1.1,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 9620,
+          "type": "gps",
+          "north_m": 1.2,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 9900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 10200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 9200,
+          "assert": "guidance_continues"
+        },
+        {
+          "at_ms": 9200,
+          "assert": "grace_onset_fixed",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 9630,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 10200,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 10300,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": "최초 BAD=1000ms, 고정 deadline=10000ms. 복구 표본을 deadline 이전에 제공한다. 초기 음성 DONE을 조작하지 않는다."
+    },
+    {
+      "id": "ext_gps_recovers_before_deadline_9800",
+      "title_ko": "GPS 9초 유예 만료 직전 정상 복귀",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "gps_deadline",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 12000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3999,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6999,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 7000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 7200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 7500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 7800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9300,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 9600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9800,
+          "type": "gps",
+          "north_m": 1.1,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 9820,
+          "type": "gps",
+          "north_m": 1.2,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 9900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 10200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 9200,
+          "assert": "guidance_continues"
+        },
+        {
+          "at_ms": 9200,
+          "assert": "grace_onset_fixed",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 9830,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 10200,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 10300,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": "최초 BAD=1000ms, 고정 deadline=10000ms. 복구 표본을 deadline 이전에 제공한다. 초기 음성 DONE을 조작하지 않는다."
+    },
+    {
+      "id": "ext_gps_recovers_before_deadline_9950",
+      "title_ko": "GPS 9초 유예 만료 직전 정상 복귀",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "gps_deadline",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 12000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3999,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6999,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 7000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 7200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 7500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 7800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9300,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 9600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9950,
+          "type": "gps",
+          "north_m": 1.1,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 9970,
+          "type": "gps",
+          "north_m": 1.2,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 10200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 9200,
+          "assert": "guidance_continues"
+        },
+        {
+          "at_ms": 9200,
+          "assert": "grace_onset_fixed",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 9980,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 10200,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 10300,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": "최초 BAD=1000ms, 고정 deadline=10000ms. 복구 표본을 deadline 이전에 제공한다. 초기 음성 DONE을 조작하지 않는다."
+    },
+    {
+      "id": "ext_gps_duplicate_burst_near_ttl",
+      "title_ko": "중복 GPS가 원 800ms 시각을 TTL 근처까지 갱신하지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "timestamp_integrity",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 500,
+          "mock": false
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 1100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 3100,
+          "mock": false
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 6100,
+          "mock": false
+        },
+        {
+          "at_ms": 7200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 7500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 7800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 8700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 9900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 9100,
+          "mock": false
+        },
+        {
+          "at_ms": 10200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 10300,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 9500,
+          "mock": false
+        },
+        {
+          "at_ms": 10500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 10800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1400,
+          "assert": "duplicate_not_renewed",
+          "measured_at_ms": 800
+        },
+        {
+          "at_ms": 4000,
+          "assert": "duplicate_not_renewed",
+          "measured_at_ms": 800
+        },
+        {
+          "at_ms": 7000,
+          "assert": "duplicate_not_renewed",
+          "measured_at_ms": 800
+        },
+        {
+          "at_ms": 10000,
+          "assert": "duplicate_not_renewed",
+          "measured_at_ms": 800
+        },
+        {
+          "at_ms": 10500,
+          "assert": "gps_not_future"
+        },
+        {
+          "at_ms": 11000,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": "수신시각을 현재 근거로 바꾸지 않는다. TTL 이후 raw가 폐기될 수 있어 동일 timestamp assert는 만료 전에만 적용한다."
+    },
+    {
+      "id": "ext_gps_older_cannot_replace_original",
+      "title_ko": "역순·미래 GPS가 진행 근거를 대체하지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "timestamp_integrity",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 400,
+          "east_m": 0,
+          "accuracy_m": 3,
+          "age_ms": 1100,
+          "mock": false
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1500,
+          "assert": "gps_not_future"
+        },
+        {
+          "at_ms": 1700,
+          "assert": "no_false_arrival"
+        },
+        {
+          "at_ms": 1500,
+          "assert": "duplicate_not_renewed",
+          "measured_at_ms": 800
+        },
+        {
+          "at_ms": 2600,
+          "assert": "route_done"
+        }
+      ],
+      "expectation_note_ko": "역순 입력은 이전 원 시각을 유지한다. 미래 입력은 hard rejection으로 raw를 폐기할 수 있으므로 이전 raw 강제 보존을 요구하지 않는다. 대신 미래 근거 미게시·허위 도착 방지·새 정상 스트림의 회복 및 실제 DONE을 검사한다. 최초 과도한 raw-retention 기대 RED는 보존한다."
+    },
+    {
+      "id": "ext_gps_future_cannot_replace_original",
+      "title_ko": "역순·미래 GPS가 진행 근거를 대체하지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "timestamp_integrity",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 400,
+          "east_m": 0,
+          "accuracy_m": 3,
+          "age_ms": -1,
+          "mock": false
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "gps",
+          "north_m": 3.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4900,
+          "type": "gps",
+          "north_m": 4.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 5100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5900,
+          "type": "gps",
+          "north_m": 5.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 6000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1500,
+          "assert": "gps_not_future"
+        },
+        {
+          "at_ms": 1700,
+          "assert": "no_false_arrival"
+        },
+        {
+          "at_ms": 6400,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 6400,
+          "assert": "route_done"
+        }
+      ],
+      "expectation_note_ko": "역순 입력은 이전 원 시각을 유지한다. 미래 입력은 hard rejection으로 raw를 폐기할 수 있으므로 이전 raw 강제 보존을 요구하지 않는다. 대신 미래 근거 미게시·허위 도착 방지·새 정상 스트림의 회복 및 실제 DONE을 검사한다. 최초 과도한 raw-retention 기대 RED는 보존한다."
+    },
+    {
+      "id": "ext_gps_future_large_cannot_replace_original",
+      "title_ko": "역순·미래 GPS가 진행 근거를 대체하지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "timestamp_integrity",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 400,
+          "east_m": 0,
+          "accuracy_m": 3,
+          "age_ms": -1000,
+          "mock": false
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "gps",
+          "north_m": 3.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4900,
+          "type": "gps",
+          "north_m": 4.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 5100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5900,
+          "type": "gps",
+          "north_m": 5.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 6000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1500,
+          "assert": "gps_not_future"
+        },
+        {
+          "at_ms": 1700,
+          "assert": "no_false_arrival"
+        },
+        {
+          "at_ms": 6400,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 6400,
+          "assert": "route_done"
+        }
+      ],
+      "expectation_note_ko": "역순 입력은 이전 원 시각을 유지한다. 미래 입력은 hard rejection으로 raw를 폐기할 수 있으므로 이전 raw 강제 보존을 요구하지 않는다. 대신 미래 근거 미게시·허위 도착 방지·새 정상 스트림의 회복 및 실제 DONE을 검사한다. 최초 과도한 raw-retention 기대 RED는 보존한다."
+    },
+    {
+      "id": "ext_direction_recovers_before_deadline_300",
+      "title_ko": "방향 유예의 서로 다른 시작 위상과 만료 직전 회복",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "direction_deadline",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 10000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 600,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 900,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 3900,
+          "type": "gps",
+          "north_m": 3.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4900,
+          "type": "gps",
+          "north_m": 4.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 5100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 400,
+          "assert": "grace_active",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 3300,
+          "assert": "grace_onset_fixed",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 4900,
+          "assert": "recovered",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 5400,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 5400,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": "최초 방향 BAD 뒤 4400ms에 새 정상 표본을 제공해 4500ms 유예를 유지한다. 반복 BAD가 onset을 연장하면 실패한다."
+    },
+    {
+      "id": "ext_direction_recovers_before_deadline_900",
+      "title_ko": "방향 유예의 서로 다른 시작 위상과 만료 직전 회복",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "direction_deadline",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 10000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 900,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 3900,
+          "type": "gps",
+          "north_m": 3.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4900,
+          "type": "gps",
+          "north_m": 4.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 5100,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 5300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5900,
+          "type": "gps",
+          "north_m": 5.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 6000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1000,
+          "assert": "grace_active",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 3900,
+          "assert": "grace_onset_fixed",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 5500,
+          "assert": "recovered",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 6000,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 6000,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": "최초 방향 BAD 뒤 4400ms에 새 정상 표본을 제공해 4500ms 유예를 유지한다. 반복 BAD가 onset을 연장하면 실패한다."
+    },
+    {
+      "id": "ext_direction_recovers_before_deadline_1250",
+      "title_ko": "방향 유예의 서로 다른 시작 위상과 만료 직전 회복",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "direction_deadline",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 10000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1250,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1550,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1850,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2150,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 2450,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 2750,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3050,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 3350,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 3650,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 3900,
+          "type": "gps",
+          "north_m": 3.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3950,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4250,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4550,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4850,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 4900,
+          "type": "gps",
+          "north_m": 4.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 5150,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 5450,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 5650,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 5900,
+          "type": "gps",
+          "north_m": 5.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 6000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 6300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1350,
+          "assert": "grace_active",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 4250,
+          "assert": "grace_onset_fixed",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 5850,
+          "assert": "recovered",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 6350,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 6350,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": "최초 방향 BAD 뒤 4400ms에 새 정상 표본을 제공해 4500ms 유예를 유지한다. 반복 BAD가 onset을 연장하면 실패한다."
+    },
+    {
+      "id": "ext_dual_recovery_gps_first",
+      "title_ko": "GPS·방향 문제의 회복 순서와 동일시각 이벤트 순서",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "mixed_recovery_order",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1300,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1800,
+          "type": "gps",
+          "north_m": 1.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2800,
+          "type": "gps",
+          "north_m": 2.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1500,
+          "assert": "guidance_continues"
+        },
+        {
+          "at_ms": 1500,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 3200,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 3500,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_dual_recovery_direction_first",
+      "title_ko": "GPS·방향 문제의 회복 순서와 동일시각 이벤트 순서",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "mixed_recovery_order",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1300,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "gps",
+          "north_m": 2.4,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2800,
+          "type": "gps",
+          "north_m": 2.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1500,
+          "assert": "guidance_continues"
+        },
+        {
+          "at_ms": 1500,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 3200,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 3500,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_dual_recovery_same_gps_first",
+      "title_ko": "GPS·방향 문제의 회복 순서와 동일시각 이벤트 순서",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "mixed_recovery_order",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1300,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1800,
+          "type": "gps",
+          "north_m": 1.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2800,
+          "type": "gps",
+          "north_m": 2.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1500,
+          "assert": "guidance_continues"
+        },
+        {
+          "at_ms": 1500,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 3200,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 3500,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_dual_recovery_same_direction_first",
+      "title_ko": "GPS·방향 문제의 회복 순서와 동일시각 이벤트 순서",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "mixed_recovery_order",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1300,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "gps",
+          "north_m": 1.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2800,
+          "type": "gps",
+          "north_m": 2.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1500,
+          "assert": "guidance_continues"
+        },
+        {
+          "at_ms": 1500,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 3200,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 3500,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_gps_bad_during_tts_pending",
+      "title_ko": "음성 START 대기/재생 중 GPS 순간 오류",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "tts_sensor_interaction",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 3000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 1.3,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1100,
+          "assert": "guidance_continues"
+        },
+        {
+          "at_ms": 1800,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 3200,
+          "assert": "route_done"
+        },
+        {
+          "at_ms": 3200,
+          "assert": "no_route_stop"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_gps_bad_during_tts_playing",
+      "title_ko": "음성 START 대기/재생 중 GPS 순간 오류",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "tts_sensor_interaction",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 3000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1300,
+          "type": "gps",
+          "north_m": 1.3,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1100,
+          "assert": "guidance_continues"
+        },
+        {
+          "at_ms": 1800,
+          "assert": "recovered",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 3200,
+          "assert": "route_done"
+        },
+        {
+          "at_ms": 3200,
+          "assert": "no_route_stop"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_direction_bad_during_delayed_tts_start",
+      "title_ko": "늦은 START와 방향 유예가 겹쳐도 적격 음성을 반복 중단하지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "tts_sensor_interaction",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 3000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 900,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "gps",
+          "north_m": 3.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4900,
+          "type": "gps",
+          "north_m": 4.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1000,
+          "assert": "grace_active",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 1000,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 2100,
+          "assert": "recovered",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 4500,
+          "assert": "route_done"
+        }
+      ],
+      "expectation_note_ko": "원 facing cue가 만료되어 실제 1200ms 교체 ROUTE 요청이 생긴다. 그 요청의 DONE=1200+3000=4200ms이므로 4500ms에 검사한다. 최초3200ms 기대 RED를 보존한다. native START 이후 완료를 추정하지 않고 실제 callback ACK를 요구한다."
+    },
+    {
+      "id": "ext_tts_error_late_callbacks_retry",
+      "title_ko": "종료된 음성의 늦은 START/DONE 이후 실제 자동 재시도",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "tts_terminal_callback",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 500,
+          "type": "tts",
+          "callback": "ERROR",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 800,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "gps",
+          "north_m": 3.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4900,
+          "type": "gps",
+          "north_m": 4.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 2800,
+          "assert": "output_retries"
+        },
+        {
+          "at_ms": 4900,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": "일반 ERROR/STOP 재시도와 오래된 완료를 구분한다. 새로운 적격 cue의 교체 요청을 같은 실패 cue backoff와 동일하게 금지하지 않는다."
+    },
+    {
+      "id": "ext_tts_stop_late_callbacks_retry",
+      "title_ko": "종료된 음성의 늦은 START/DONE 이후 실제 자동 재시도",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "tts_terminal_callback",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 500,
+          "type": "tts",
+          "callback": "STOP",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 800,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3900,
+          "type": "gps",
+          "north_m": 3.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 4200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 4900,
+          "type": "gps",
+          "north_m": 4.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 2800,
+          "assert": "output_retries"
+        },
+        {
+          "at_ms": 4900,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": "일반 ERROR/STOP 재시도와 오래된 완료를 구분한다. 새로운 적격 cue의 교체 요청을 같은 실패 cue backoff와 동일하게 금지하지 않는다."
+    },
+    {
+      "id": "ext_pending_tts_owner_foreground",
+      "title_ko": "START 대기 중 owner 교체와 늦은 음성·센서 입력",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "hard_owner_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 300,
+          "type": "owner",
+          "change": "foreground"
+        },
+        {
+          "at_ms": 700,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 500,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1200,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_pending_tts_owner_epoch",
+      "title_ko": "START 대기 중 owner 교체와 늦은 음성·센서 입력",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "hard_owner_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 300,
+          "type": "owner",
+          "change": "epoch"
+        },
+        {
+          "at_ms": 700,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 500,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1200,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_pending_tts_owner_session",
+      "title_ko": "START 대기 중 owner 교체와 늦은 음성·센서 입력",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "hard_owner_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 300,
+          "type": "owner",
+          "change": "session"
+        },
+        {
+          "at_ms": 700,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 500,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1200,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_pending_tts_owner_actor",
+      "title_ko": "START 대기 중 owner 교체와 늦은 음성·센서 입력",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "hard_owner_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 300,
+          "type": "owner",
+          "change": "actor"
+        },
+        {
+          "at_ms": 700,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 500,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1200,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_pending_tts_owner_location_generation",
+      "title_ko": "START 대기 중 owner 교체와 늦은 음성·센서 입력",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "hard_owner_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 300,
+          "type": "owner",
+          "change": "location_generation"
+        },
+        {
+          "at_ms": 700,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 500,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1200,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_pending_tts_owner_input_generation",
+      "title_ko": "START 대기 중 owner 교체와 늦은 음성·센서 입력",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "hard_owner_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 300,
+          "type": "owner",
+          "change": "input_generation"
+        },
+        {
+          "at_ms": 700,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 500,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1200,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_pending_tts_owner_route_reset",
+      "title_ko": "START 대기 중 owner 교체와 늦은 음성·센서 입력",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "hard_owner_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 300,
+          "type": "owner",
+          "change": "route_reset"
+        },
+        {
+          "at_ms": 700,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 500,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1200,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_permission_revoked_during_gps_grace",
+      "title_ko": "센서 유예 중 권한 취소는 이전 음성과 owner를 즉시 폐기",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "permission_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 400,
+          "type": "gps",
+          "north_m": 0.4,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 600,
+          "type": "permission",
+          "granted": false
+        },
+        {
+          "at_ms": 800,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 650,
+          "assert": "blocked_before_grace_end",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 1200,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1300,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_permission_revoked_during_direction_grace",
+      "title_ko": "센서 유예 중 권한 취소는 이전 음성과 owner를 즉시 폐기",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "permission_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 400,
+          "type": "heading_unavailable",
+          "reason": "REFERENCE_MISSING"
+        },
+        {
+          "at_ms": 600,
+          "type": "permission",
+          "granted": false
+        },
+        {
+          "at_ms": 800,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 650,
+          "assert": "blocked_before_grace_end",
+          "kind": "direction"
+        },
+        {
+          "at_ms": 1200,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1300,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_permission_return_does_not_reuse_retired_callback",
+      "title_ko": "권한 재허용 후에도 이전 수집·음성 콜백을 되살리지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "permission_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "permission",
+          "granted": false
+        },
+        {
+          "at_ms": 700,
+          "type": "permission",
+          "granted": true
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1.0,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 500,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1400,
+          "assert": "owner_retired"
+        },
+        {
+          "at_ms": 1600,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": "재허용 시 신규 binding은 별도 기능일 수 있다. 이 사례는 하네스가 보유한 폐기된 기존 binding만 재사용하지 않는지 확인한다."
+    },
+    {
+      "id": "ext_real_reversal_during_gps_grace_80",
+      "title_ko": "GPS 유예가 실제 180도 명령 반전의 무효화를 지연시키지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "hard_reversal_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 400,
+          "type": "gps",
+          "north_m": 0.4,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 180,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 800,
+          "assert": "blocked_before_grace_end",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 1500,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_real_reversal_during_gps_grace_1200",
+      "title_ko": "GPS 유예가 실제 180도 명령 반전의 무효화를 지연시키지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "hard_reversal_boundary",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 1200,
+        "tts_done_delay_ms": 5000,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 400,
+          "type": "gps",
+          "north_m": 0.4,
+          "east_m": 0,
+          "accuracy_m": 40,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 180,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "tts",
+          "callback": "START",
+          "utterance": "first_route"
+        },
+        {
+          "at_ms": 1000,
+          "type": "tts",
+          "callback": "DONE",
+          "utterance": "first_route"
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 800,
+          "assert": "blocked_before_grace_end",
+          "kind": "gps"
+        },
+        {
+          "at_ms": 1500,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_single_gps_jump_right",
+      "title_ko": "단발 GPS 점프가 합류·진척·도착을 확정하지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "spatial_outlier",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": 70,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1600,
+          "type": "gps",
+          "north_m": 1.6,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1200,
+          "assert": "no_false_arrival"
+        },
+        {
+          "at_ms": 1800,
+          "assert": "no_false_arrival"
+        },
+        {
+          "at_ms": 2600,
+          "assert": "route_done"
+        },
+        {
+          "at_ms": 2800,
+          "assert": "no_route_stop"
+        }
+      ],
+      "expectation_note_ko": "ADMITTED 직선 route에서의 단발 점프만 검증한다. 모호한 분기·재탐색·실제 회전 통과의 증거는 아니다."
+    },
+    {
+      "id": "ext_single_gps_jump_left",
+      "title_ko": "단발 GPS 점프가 합류·진척·도착을 확정하지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "spatial_outlier",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 1,
+          "east_m": -70,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1600,
+          "type": "gps",
+          "north_m": 1.6,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1200,
+          "assert": "no_false_arrival"
+        },
+        {
+          "at_ms": 1800,
+          "assert": "no_false_arrival"
+        },
+        {
+          "at_ms": 2600,
+          "assert": "route_done"
+        },
+        {
+          "at_ms": 2800,
+          "assert": "no_route_stop"
+        }
+      ],
+      "expectation_note_ko": "ADMITTED 직선 route에서의 단발 점프만 검증한다. 모호한 분기·재탐색·실제 회전 통과의 증거는 아니다."
+    },
+    {
+      "id": "ext_single_gps_jump_toward_endpoint",
+      "title_ko": "단발 GPS 점프가 합류·진척·도착을 확정하지 않음",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "spatial_outlier",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 900,
+          "type": "gps",
+          "north_m": 0.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1000,
+          "type": "gps",
+          "north_m": 500,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1600,
+          "type": "gps",
+          "north_m": 1.6,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1900,
+          "type": "gps",
+          "north_m": 1.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2900,
+          "type": "gps",
+          "north_m": 2.9,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 3300,
+          "type": "heading",
+          "degrees": 0,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1200,
+          "assert": "no_false_arrival"
+        },
+        {
+          "at_ms": 1800,
+          "assert": "no_false_arrival"
+        },
+        {
+          "at_ms": 2600,
+          "assert": "route_done"
+        },
+        {
+          "at_ms": 2800,
+          "assert": "no_route_stop"
+        }
+      ],
+      "expectation_note_ko": "ADMITTED 직선 route에서의 단발 점프만 검증한다. 모호한 분기·재탐색·실제 회전 통과의 증거는 아니다."
+    },
+    {
+      "id": "ext_irregular_cadence_sway_0",
+      "title_ko": "불규칙 수신 위상과 359/0도·작은 좌우 sway",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "cadence_and_sway",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 300,
+          "type": "heading",
+          "degrees": 353,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 600,
+          "type": "heading",
+          "degrees": 3,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 820,
+          "type": "gps",
+          "north_m": 0.82,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 900,
+          "type": "heading",
+          "degrees": 6,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1200,
+          "type": "heading",
+          "degrees": 356,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1500,
+          "type": "heading",
+          "degrees": 1,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1800,
+          "type": "heading",
+          "degrees": 359,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1950,
+          "type": "gps",
+          "north_m": 1.95,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2100,
+          "type": "heading",
+          "degrees": 353,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2400,
+          "type": "heading",
+          "degrees": 3,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2700,
+          "type": "heading",
+          "degrees": 6,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2800,
+          "type": "gps",
+          "north_m": 2.8,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3000,
+          "type": "heading",
+          "degrees": 356,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1800,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 3300,
+          "assert": "route_done"
+        },
+        {
+          "at_ms": 3300,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_irregular_cadence_sway_67",
+      "title_ko": "불규칙 수신 위상과 359/0도·작은 좌우 sway",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "cadence_and_sway",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 367,
+          "type": "heading",
+          "degrees": 353,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 667,
+          "type": "heading",
+          "degrees": 3,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 887,
+          "type": "gps",
+          "north_m": 0.887,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 967,
+          "type": "heading",
+          "degrees": 6,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1267,
+          "type": "heading",
+          "degrees": 356,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1567,
+          "type": "heading",
+          "degrees": 1,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1867,
+          "type": "heading",
+          "degrees": 359,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2017,
+          "type": "gps",
+          "north_m": 2.017,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2167,
+          "type": "heading",
+          "degrees": 353,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2467,
+          "type": "heading",
+          "degrees": 3,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2767,
+          "type": "heading",
+          "degrees": 6,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2867,
+          "type": "gps",
+          "north_m": 2.867,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3067,
+          "type": "heading",
+          "degrees": 356,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1800,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 3300,
+          "assert": "route_done"
+        },
+        {
+          "at_ms": 3300,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    },
+    {
+      "id": "ext_irregular_cadence_sway_149",
+      "title_ko": "불규칙 수신 위상과 359/0도·작은 좌우 sway",
+      "scope": "ADMITTED_WALK_HEADING_OBSERVATION",
+      "supplemental_family": "cadence_and_sway",
+      "initial": {
+        "gps_accuracy_m": 5,
+        "heading_deg": 0,
+        "heading_accuracy_deg": 3,
+        "tts_start_delay_ms": 80,
+        "tts_done_delay_ms": 2200,
+        "engine_ready_delay_ms": 0,
+        "intro_start_delay_ms": 60,
+        "intro_done_delay_ms": 200
+      },
+      "events": [
+        {
+          "at_ms": 449,
+          "type": "heading",
+          "degrees": 353,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 749,
+          "type": "heading",
+          "degrees": 3,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 969,
+          "type": "gps",
+          "north_m": 0.969,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 1049,
+          "type": "heading",
+          "degrees": 6,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1349,
+          "type": "heading",
+          "degrees": 356,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1649,
+          "type": "heading",
+          "degrees": 1,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 1949,
+          "type": "heading",
+          "degrees": 359,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2099,
+          "type": "gps",
+          "north_m": 2.099,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 2249,
+          "type": "heading",
+          "degrees": 353,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2549,
+          "type": "heading",
+          "degrees": 3,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2849,
+          "type": "heading",
+          "degrees": 6,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        },
+        {
+          "at_ms": 2949,
+          "type": "gps",
+          "north_m": 2.949,
+          "east_m": 0,
+          "accuracy_m": 5,
+          "age_ms": 100,
+          "mock": false
+        },
+        {
+          "at_ms": 3149,
+          "type": "heading",
+          "degrees": 356,
+          "accuracy_deg": 3,
+          "age_ms": 0
+        }
+      ],
+      "expectations": [
+        {
+          "at_ms": 1800,
+          "assert": "no_route_stop"
+        },
+        {
+          "at_ms": 3300,
+          "assert": "route_done"
+        },
+        {
+          "at_ms": 3300,
+          "assert": "no_false_arrival"
+        }
+      ],
+      "expectation_note_ko": ""
+    }
+  ]
+}

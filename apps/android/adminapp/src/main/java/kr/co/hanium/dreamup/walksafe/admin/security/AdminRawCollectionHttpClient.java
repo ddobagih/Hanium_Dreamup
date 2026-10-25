@@ -10,7 +10,6 @@ import java.security.GeneralSecurityException;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 
 /** Exact-contract client for metadata-only raw quarantine review. */
 public final class AdminRawCollectionHttpClient implements AdminRawCollectionRepository {
@@ -25,13 +24,13 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
     private static final int MAX_RESPONSE_BYTES = 128 * 1024;
     private static final byte[] EMPTY_BODY = new byte[0];
 
-    interface Clock {
+    interface Clock extends AdminProtectedRequestExecutor.Clock {
         long nowEpochMs();
 
         default long monotonicNanos() { return System.nanoTime(); }
     }
 
-    interface Transport {
+    interface Transport extends AdminProtectedRequestExecutor.Exchange<Response> {
         Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException;
 
@@ -72,11 +71,8 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
     }
 
     private final String origin;
-    private final String deviceKeyMarker;
-    private final int deviceKeyVersion;
-    private final AdminDeviceProof.Signer signer;
-    private final Clock clock;
     private final Transport transport;
+    private final AdminProtectedRequestExecutor<Response> protectedRequests;
 
     public AdminRawCollectionHttpClient(
         String configuredOrigin,
@@ -113,11 +109,47 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
             throw new IllegalArgumentException("raw collection client dependencies are invalid");
         }
         this.origin = approved;
-        this.deviceKeyMarker = deviceKeyMarker;
-        this.deviceKeyVersion = deviceKeyVersion;
-        this.signer = signer;
-        this.clock = clock;
         this.transport = transport;
+        this.protectedRequests = new AdminProtectedRequestExecutor<>(
+            this.origin, deviceKeyMarker, deviceKeyVersion, signer, clock, transport,
+            response -> {
+                requireStatus(response, 200);
+                return jsonBody(response);
+            },
+            AdminJava8Collections.map("Cache-Control", "no-store", "Pragma", "no-cache")
+        );
+    }
+
+    static byte[] purposeBody(AdminRawCollectionModels.PurposeDecisionRequest request) {
+        if (request == null) throw new IllegalArgumentException("decision request is required");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("scope", request.scope());
+        fields.put("decision", request.decision());
+        fields.put("expected_revision", request.expectedRevision());
+        fields.put("idempotency_key", request.idempotencyKey());
+        fields.put("reason", request.reason());
+        fields.put("training_consent_receipt_sha256", request.trainingConsentReceiptSha256());
+        fields.put("deidentification_receipt_sha256", request.deidentificationReceiptSha256());
+        fields.put("sanitized_manifest_sha256", request.sanitizedManifestSha256());
+        fields.put("target_dataset_id", request.targetDatasetId());
+        fields.put("exact_location_excluded", request.exactLocationExcluded());
+        fields.put("raw_audio_excluded", request.rawAudioExcluded());
+        fields.put("third_party_faces_excluded", request.thirdPartyFacesExcluded());
+        return AdminCanonicalEncoding.canonicalJsonBytes(fields);
+    }
+
+    static byte[] legalHoldBody(AdminRawCollectionModels.LegalHoldRequest request) {
+        if (request == null) throw new IllegalArgumentException("legal hold request is required");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("action", request.action());
+        fields.put("expected_revision", request.expectedRevision());
+        fields.put("idempotency_key", request.idempotencyKey());
+        fields.put("reason", request.reason());
+        fields.put("legal_basis", request.legalBasis());
+        fields.put("authority_reference", request.authorityReference());
+        fields.put("contact", request.contact());
+        fields.put("expires_at", request.expiresAt());
+        return AdminCanonicalEncoding.canonicalJsonBytes(fields);
     }
 
     @Override
@@ -152,21 +184,7 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
         String safeId = AdminRawCollectionModels.canonicalUuid(
             source.collectionId(), "collection_id"
         );
-        if (request == null) throw new IllegalArgumentException("decision request is required");
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("scope", request.scope());
-        fields.put("decision", request.decision());
-        fields.put("expected_revision", request.expectedRevision());
-        fields.put("idempotency_key", request.idempotencyKey());
-        fields.put("reason", request.reason());
-        fields.put("training_consent_receipt_sha256", request.trainingConsentReceiptSha256());
-        fields.put("deidentification_receipt_sha256", request.deidentificationReceiptSha256());
-        fields.put("sanitized_manifest_sha256", request.sanitizedManifestSha256());
-        fields.put("target_dataset_id", request.targetDatasetId());
-        fields.put("exact_location_excluded", request.exactLocationExcluded());
-        fields.put("raw_audio_excluded", request.rawAudioExcluded());
-        fields.put("third_party_faces_excluded", request.thirdPartyFacesExcluded());
-        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
+        byte[] body = purposeBody(request);
         Response response = executeProtected(
             boundSession,
             "POST",
@@ -194,17 +212,7 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
     ) throws IOException, GeneralSecurityException {
         AdminOperationsApi.SessionContext boundSession = requireSession(session);
         String safeId = AdminRawCollectionModels.canonicalUuid(collectionId, "collection_id");
-        if (request == null) throw new IllegalArgumentException("legal hold request is required");
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("action", request.action());
-        fields.put("expected_revision", request.expectedRevision());
-        fields.put("idempotency_key", request.idempotencyKey());
-        fields.put("reason", request.reason());
-        fields.put("legal_basis", request.legalBasis());
-        fields.put("authority_reference", request.authorityReference());
-        fields.put("contact", request.contact());
-        fields.put("expires_at", request.expiresAt());
-        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
+        byte[] body = legalHoldBody(request);
         Response response = executeProtected(
             boundSession,
             "POST",
@@ -233,47 +241,9 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
         byte[] body,
         Map<String, String> additionalHeaders
     ) throws IOException, GeneralSecurityException {
-        String correlationId = UUID.randomUUID().toString();
-        AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
-            action,
-            session.adminId(),
-            AdminCanonicalEncoding.sha256Hex(body),
-            correlationId,
-            session.deviceId(),
-            deviceKeyMarker,
-            deviceKeyVersion,
-            method,
-            path,
-            AdminDeviceProof.Purpose.ACTION,
-            AdminCanonicalEncoding.sha256Hex(canonicalQuery.getBytes(StandardCharsets.UTF_8)),
-            readPurpose,
-            session.sessionId()
-        );
-        Response challenge = transport.execute(
-            "POST",
-            origin + CHALLENGE_PATH,
-            jsonHeaders(protectedHeaders(session, correlationId, null)),
-            intent.challengeRequestBytes()
-        );
-        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
-        requireStatus(challenge, 200);
-        AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
-            jsonBody(challenge), intent, challengeTime.estimatedNowEpochMs(clock.monotonicNanos()), signer
-        );
-        Map<String, String> headers = new LinkedHashMap<>(
-            protectedHeaders(session, correlationId, readPurpose)
-        );
-        headers.putAll(proof.proofHeaders());
-        headers.putAll(additionalHeaders);
-        headers.put("Accept", "application/json");
-        if (body.length > 0) headers.put("Content-Type", "application/json; charset=utf-8");
-        String url = origin + path + (canonicalQuery.isEmpty() ? "" : "?" + canonicalQuery);
-        return transport.execute(
-            method,
-            url,
-            AdminJava8Collections.copyMap(headers),
-            body.length == 0 ? null : body
-        );
+        return protectedRequests.execute(session, method, path, canonicalQuery,
+            action, readPurpose, body.length == 0 ? null : body, additionalHeaders,
+            "application/json", null).response;
     }
 
     private static AdminOperationsApi.SessionContext requireSession(
@@ -298,31 +268,6 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
             throw new IOException("administrator device binding is unavailable");
         }
         return session;
-    }
-
-    private static Map<String, String> protectedHeaders(
-        AdminOperationsApi.SessionContext session,
-        String correlationId,
-        String readPurpose
-    ) {
-        Map<String, String> headers = new LinkedHashMap<>();
-        headers.put("Authorization", "Bearer " + session.accessToken());
-        headers.put("X-WalkSafe-App-Kind", AdminSecurityHttpClient.APP_KIND);
-        headers.put("X-WalkSafe-Role", AdminSecurityHttpClient.ROLE);
-        headers.put("X-WalkSafe-Audience", AdminSecurityHttpClient.AUDIENCE);
-        headers.put("X-WalkSafe-Device-Id", session.deviceId());
-        headers.put(CORRELATION_ID_HEADER, correlationId);
-        headers.put("Cache-Control", "no-store");
-        headers.put("Pragma", "no-cache");
-        if (readPurpose != null) headers.put(READ_PURPOSE_HEADER, readPurpose);
-        return AdminJava8Collections.copyMap(headers);
-    }
-
-    private static Map<String, String> jsonHeaders(Map<String, String> source) {
-        Map<String, String> headers = new LinkedHashMap<>(source);
-        headers.put("Accept", "application/json");
-        headers.put("Content-Type", "application/json; charset=utf-8");
-        return AdminJava8Collections.copyMap(headers);
     }
 
     private static Map<String, String> requireReconfirmation(Map<String, String> headers) {
@@ -415,7 +360,13 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException {
-            AdminHttpRequestDeadline.Owner owner = deadlines.open(url);
+            return execute(null, method, url, headers, body);
+        }
+
+        @Override
+        public Response execute(AdminOperationsApi.SessionContext session, String method, String url,
+            Map<String, String> headers, byte[] body) throws IOException {
+            AdminHttpRequestDeadline.Owner owner = deadlines.open(session, url);
             try {
                 HttpURLConnection connection = owner.connection();
                 connection.setUseCaches(false);

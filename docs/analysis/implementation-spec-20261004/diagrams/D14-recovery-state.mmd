@@ -1,0 +1,19 @@
+stateDiagram-v2
+  state "NORMAL + UNATTESTED" as N0
+  state "NORMAL + ATTESTED" as N1
+  state "RECOVERY_IN_PROGRESS + UNATTESTED" as R
+  state "RECOVERY_REQUIRED + UNATTESTED" as E
+  [*] --> N0: "F-D14-003 provision"
+  N0 --> N1: "F-D14-012 custody 확인"
+  N1 --> N1: "동일 reference replay 또는 정확 CAS 교체"
+  N0 --> R: "F-D14-021 복구 코드 시작과 전체 세션 폐기"
+  N1 --> R: "복구 시작과 custody 초기화"
+  R --> R: "F-D14-022 같은 code device 재개 - token 교체와 expiry 유지"
+  R --> E: "F-D14-024 만료 완료요청 - 더 새 활성 복구 없음"
+  R --> R: "오래된 만료요청 - 새 활성 복구 존재"
+  E --> R: "새 start 입력 검증 통과"
+  R --> N0: "F-D14-023 새 password TOTP 검증과 완료"
+  note right of R
+    "복구 취소 API 없음"
+    "기한 경과 자체의 백그라운드 전이 없음"
+  end note

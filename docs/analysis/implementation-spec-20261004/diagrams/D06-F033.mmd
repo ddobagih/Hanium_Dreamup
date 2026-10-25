@@ -1,0 +1,53 @@
+flowchart TD
+  T["F-D06-033 위치 평가 보존·삭제·계정전환 purge 복구"]
+  P["전제: DEBUG recorder. 일반 삭제는 scope binding 일치/비활성만. purge는<br/>marker 또는 preference fence 최소하나를 영속화해야 시작."]
+  T --> P
+  E1["E-D06-033-01 recorder 초기화→orphan ACTIVE interrupted→보존 정리"]
+  E1 --> T
+  E2["E-D06-033-02 delete 요청→같은 scope 비활성 session 확인→삭제"]
+  E2 --> T
+  E3["E-D06-033-03 계정변경 purge→durable fence→root 삭제→새scope 저장→fence<br/>해제"]
+  E3 --> T
+  E4["E-D06-033-04 앱 재시작 pending marker→purge 복구"]
+  E4 --> T
+  A1["1. constructor는 남은 ACTIVE manifest를 INTERRUPTED로 바꾸고 자동 재개하지<br/>않는다."]
+  P --> A1
+  A2["2. 비활성 age 이상 14일 자료를 지우고 count/bytes를 맞추기 위해 오래된 것부터 제거한다."]
+  A1 --> A2
+  A3["3. 계정전환은 storageBlocked=true 후 marker fsync 또는 purgePending<br/>commit을 보존한다."]
+  A2 --> A3
+  A4["4. purge 성공 후 lease/anchor/pending export를 비우고 export<br/>generation을 증가시킨다."]
+  A3 --> A4
+  A5["5. 새 scope와 purgePending=false를 commit하고 marker 삭제까지 성공해야 다시<br/>허용한다."]
+  A4 --> A5
+  N["정상 종료: purge+scope+marker 모두 성공한 뒤 unblock."]
+  A5 --> N
+  FX["결과: 정해진 noBackup 위치 기록 root 삭제, 계정 연계가 아닌 무작위 scope 교체. 기존 SAF<br/>export는 별도 사용자 파일이므로 이 purge가 일괄 삭제하지 않음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"fence 둘 다 저장실패"}
+    R1["계정전환 중단·기록 접근 차단"]
+    B1 -->|조건 성립| R1
+    B2{"purge 실패"}
+    R2["이전자료 남음 가능, blocked 유지"]
+    B2 -->|조건 성립| R2
+    B3{"새 scope 저장/marker 해제 실패"}
+    R3["blocked 유지, 다음 시작 때 복구"]
+    B3 -->|조건 성립| R3
+    B4{"다른 scope 또는 active 개별삭제"}
+    R4["거부"]
+    B4 -->|조건 성립| R4
+    B5{"손상 manifest"}
+    R5["전용 위치 trace artifact 제거"]
+    B5 -->|조건 성립| R5
+  end
+  POL["정책: P-D06-029, P-D06-032"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 오류 화면과 blocked 상태 유지."]
+    X2["시간: 비활성 age 이상 14일 보존삭제."]
+    X3["취소: purge 도중 임의 취소로 차단해제하지 않음."]
+    X4["중단: pending marker/prefs를 통해 재시작 복구."]
+    X5["복구: initialize에서 completePendingPositionFieldPurge."]
+    X6["정리: 메모리 lease/pending export/anchor 초기화, root만 제거."]
+  end

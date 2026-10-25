@@ -1,6 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
-import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.depth.DepthAgeBudget
 import kr.co.hanium.dreamup.walksafe.depth.DepthConfidenceBreakdown
 import kr.co.hanium.dreamup.walksafe.depth.DepthSource
 import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
@@ -285,7 +285,7 @@ class AndroidTactileCrossSourceFeedbackTest {
     private fun coordinator(policy: WalkSafeFeedbackPolicy) =
         AndroidTactileFrameCoordinator(AndroidTactileRouteGuidance(), policy, TactileFrameFeedbackActuator { })
 
-    private fun frame(outputs: List<TrackedObjectDepth>) = MainActivity.TactileSnapshotFrameResult(
+    private fun frame(outputs: List<TrackedObjectDepth>) = TactileSnapshotFrameResult(
         null, emptyList(), false,
         TactileRouteGuidanceResult(outputs, null, TactileRouteDecision(LocalRouteMode.TMAP, null, "test", null)),
     )
@@ -312,6 +312,10 @@ class AndroidTactileCrossSourceFeedbackTest {
             confidence = confidence(), userFacing = UserFacingDepth(null, level, "위험 $id"),
             trackAgeFrames = 20, trackStableMs = 1_900L,
             sourceValidUntilElapsedRealtimeMs = now + UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS,
+            // `now` is this synthetic output's original capture, independent of dispatch or lease overrides.
+            sourceObservedAtElapsedRealtimeMs = now,
+            sourceMaxAgeMs = if (id.startsWith("unknown")) UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS
+                else DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS,
         )
     }
 

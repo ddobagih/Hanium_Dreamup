@@ -1,0 +1,23 @@
+flowchart TD
+  ID["F-D04-035 · 야외 시험 완료기록 선택·파일 내보내기·취소 복원<br/>P-D04-035"]
+  A["완료 세션 선택과 export 버튼"]
+  C0{"완료 session·닫힌 Raw·export idle인가"}
+  R0["요청하지 않음"]
+  C1{"사용자가 picker RESULT_OK와 URI를 제공했는가"}
+  R1["취소; 로컬 완료본 유지"]
+  C2{"copy 또는 trace export가 성공하는가"}
+  R2["대상 delete 시도; 실패면 부분파일 안내"]
+  OK["저장완료와 URI 표시; 로컬 완료본 유지"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END

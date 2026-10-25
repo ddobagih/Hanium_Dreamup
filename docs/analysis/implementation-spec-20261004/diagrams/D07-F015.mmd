@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-015<br/>unknown actual mask별 Raw·Full depth 층 추정<br/>상태 ACTIVE"]
+    P0["actual foreground component와 inverse H grid sampling"]
+    A --> D
+    P1["Raw robust cluster와 coherent nearer layer 검사"]
+    P0 --> P1
+    P2["Raw를 가리지 않는 경우만 Full fallback"]
+    P1 --> P2
+    P3["KNOWN PARTIAL UNKNOWN과 actual support 반환"]
+    P2 --> P3
+    D{"P-D07-015<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["전체 mask 거리 UNKNOWN 또는 PARTIAL"]
+    D -->|"분리된 component 거리 불일치"| B0
+    B1["Full로 지워 전체 KNOWN 만들지 않음"]
+    D -->|"Raw nearer/conflicting 지원 존재"| B1
+    B2["거리 관측은 가능하나 새로운 sample/안정 count 아님"]
+    D -->|"반복 depth Image"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

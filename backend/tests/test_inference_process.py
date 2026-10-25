@@ -315,6 +315,11 @@ def test_inference_startup_deadline_must_cover_the_normal_execution_deadline(mon
 
 
 def test_application_lifespan_closes_the_inference_runner(monkeypatch) -> None:
+    owned_app = main_app.create_app(main_app.settings)
+    owner = owned_app.state.runtime
+    owner.initialize_resources()
+    monkeypatch.setattr(owner, "initialize_resources", lambda: None)
+    from backend.app import application_runtime as runtime_module
     class FakeRunner:
         closed = False
 
@@ -322,25 +327,26 @@ def test_application_lifespan_closes_the_inference_runner(monkeypatch) -> None:
             self.closed = True
 
     runner = FakeRunner()
-    monkeypatch.setattr(main_app, "inference_runner", runner)
+    monkeypatch.setattr(owner, "inference_runner", runner)
     monkeypatch.setattr(
-        main_app,
+        owner,
         "validate_admin_credential_issuer_binding",
         lambda: None,
     )
-    monkeypatch.setattr(main_app, "bind_privacy_hmac_key", lambda: None)
-    monkeypatch.setattr(main_app, "bind_account_crypto_keys", lambda: None)
-    monkeypatch.setattr(main_app, "reconcile_report_storage", lambda: None)
-    monkeypatch.setattr(main_app, "reconcile_raw_collection_storage", lambda: None)
-    monkeypatch.setattr(main_app, "capacity_monitor", None)
+    monkeypatch.setattr(owner, "bind_privacy_hmac_key", lambda: None)
+    monkeypatch.setattr(owner, "bind_account_crypto_keys", lambda: None)
+    monkeypatch.setattr(owner, "reconcile_report_storage", lambda: None)
+    monkeypatch.setattr(owner, "reconcile_raw_collection_storage", lambda: None)
+    monkeypatch.setattr(owner, "capacity_monitor", None)
 
     async def exercise_lifespan() -> None:
-        async with main_app.lifespan(main_app.app):
+        async with owner.lifespan(owned_app):
             assert runner.closed is False
 
     asyncio.run(exercise_lifespan())
 
     assert runner.closed is True
+
 
 
 # These records contain only test-owned local resources, not application data.

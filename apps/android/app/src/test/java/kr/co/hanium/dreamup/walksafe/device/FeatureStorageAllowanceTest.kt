@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.device
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -49,13 +50,21 @@ class FeatureStorageAllowanceTest {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/device/FeatureStorageAllowance.kt").readText()
         assertTrue(source.contains("manager.getAllocatableBytes(manager.getUuidForPath(directory))"))
         val main = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        assertTrue(main.contains("allocatableBytes = AndroidAllocatableBytes(applicationContext, applicationContext.filesDir),"))
+        assertTrue(main.contains("val reportFilesDirectory = applicationContext.filesDir.canonicalFile"))
+        assertTrue(main.contains("allocatableBytes = AndroidAllocatableBytes(applicationContext, reportFilesDirectory),"))
         assertTrue(main.contains("allocatableBytes = AndroidAllocatableBytes(applicationContext, noBackupRoot),"))
         // A held or failed RAW capture never drives the walk lifecycle.
-        val capture = main.substringAfter("rawCollectionRuntimeCoordinator.captureMetadataBatch(")
-            .substringBefore("private fun revalidateRawCollectionRuntime(")
+        val capture = MainActivityRefactorSource.function(main, "private fun recordRawCollectionDetectionMetadata(")
+        assertTrue(capture.contains("rawCollectionRuntimeCoordinator.captureMetadataBatch("))
+        val wiring = MainActivityRefactorSource.composition(main, "rawCollectionTransferController")
+        assertTrue(wiring.contains("RawCollectionTransferController("))
+        assertTrue(MainActivityRefactorSource.member(main, "onCreate")
+            .contains("initializeRawCollectionTransferController()"))
+        val initialization = MainActivityRefactorSource.member(main, "initializeRawCollectionTransferController")
+        assertTrue(initialization.contains("rawCollectionTransferController.initializeCoordinator(object : RawCollectionTransferController.Peer"))
+        assertTrue(initialization.contains("rawCollectionRuntimeCoordinator.captureMetadataBatch(context, detection, performance, observedAtElapsedRealtimeMs)"))
         assertFalse(capture.contains("transitionWalkSession("))
         assertFalse(capture.contains("SafetyStop"))
-        assertFalse(Regex("""val\s+\w+\s*=\s*rawCollectionRuntimeCoordinator\.captureMetadataBatch\(""").containsMatchIn(main))
+        assertFalse(Regex("""val\s+\w+\s*=\s*rawCollectionRuntimeCoordinator\.captureMetadataBatch\(""").containsMatchIn(capture))
     }
 }

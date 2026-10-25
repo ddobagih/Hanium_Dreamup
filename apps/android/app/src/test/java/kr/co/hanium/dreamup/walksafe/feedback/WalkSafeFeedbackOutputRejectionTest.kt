@@ -91,5 +91,7 @@ class WalkSafeFeedbackOutputRejectionTest {
         trackStableMs = 1_000L,
         stale = false,
         validUntilMs = 2_000L,
+        observedAtElapsedRealtimeMs = 1_000L,
+        observationMaxAgeMs = 800L,
     )
 }

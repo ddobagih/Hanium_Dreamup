@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -38,8 +39,9 @@ class DestinationSearchDisplayAddressTest {
 
     @Test fun screenListUsesTheSameAddressSelection() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val ui = source.substringAfter("private fun updateDestinationSearchUi()")
-            .substringBefore("private fun updateRouteButtonText()")
+        assertTrue(MainActivityRefactorSource.member(source, "updateDestinationSearchUi")
+            .contains("destinationSearchPresenter.renderSearch("))
+        val ui = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/DestinationSearchPresenter.kt").readText()
         assertTrue(ui.contains("result.displayAddressOrNull() ?: \"주소 없음\""))
         assertFalse(ui.contains("result.address ?: \"주소 없음\""))
     }

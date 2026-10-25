@@ -15,14 +15,14 @@ internal const val EMAIL_ENROLLMENT_SCHEMA =
 internal const val ACCOUNT_CREATE_SCHEMA = "walksafe.account-create.v1"
 internal const val SIGNUP_CONSENT_SCHEMA = "walksafe.signup-consent.v1"
 
-internal val SIGNUP_DOCUMENT_VERSIONS: Map<String, String> = linkedMapOf(
+internal val SIGNUP_DOCUMENT_VERSIONS: Map<String, String> = java.util.Collections.unmodifiableMap(linkedMapOf(
     "terms_of_service" to "walksafe.terms-of-service.v1",
     "privacy_notice" to "walksafe.privacy-notice.v1",
     "location_terms" to "walksafe.location-terms.v1",
     "raw_original" to "FP-013-RAW-1.2.0",
     "automatic_reporting" to "FP-013-AUTO-1.2.0",
     "training_reuse" to "FP-013-TRAINING-1.1.0",
-)
+))
 
 internal data class SignupConsentSelections(
     val termsOfService: Boolean = false,
@@ -150,15 +150,18 @@ internal sealed interface EmailEnrollmentRestoreResult {
     data object Blocked : EmailEnrollmentRestoreResult
 }
 
-internal class AndroidEmailEnrollmentStore(
-    preferences: SharedPreferences,
-    aead: LocalAead = AndroidKeyStoreAead(KEY_POLICY),
+internal class AndroidEmailEnrollmentStore private constructor(
+    private val sensitive: AndroidSensitivePreferenceStore,
 ) : kr.co.hanium.dreamup.walksafe.network.PendingEmailOtpRequestStore {
-    private val sensitive = AndroidSensitivePreferenceStore(
-        preferences = preferences,
-        spec = SPEC,
-        aead = aead,
-    )
+    constructor(
+        preferences: SharedPreferences,
+        aead: LocalAead = AndroidKeyStoreAead(KEY_POLICY),
+    ) : this(AndroidSensitivePreferenceStore(preferences = preferences, spec = SPEC, aead = aead))
+
+    internal constructor(
+        storage: kr.co.hanium.dreamup.walksafe.security.SensitivePreferenceStorage,
+        aead: LocalAead,
+    ) : this(AndroidSensitivePreferenceStore(storage = storage, spec = SPEC, aead = aead))
 
     fun save(partial: EmailEnrollmentPartial): Boolean =
         !sensitive.isBlocked() && sensitive.edit()
@@ -195,6 +198,22 @@ internal class AndroidEmailEnrollmentStore(
         return EmailEnrollmentRestoreResult.Restored(partial)
     }
 
+    // An owner-bound advisory only; it never supplies a receipt, actor, or onboarding grant.
+    fun hasUnconfirmedCreation(ownerBindingSha256: String): Boolean =
+        !sensitive.isBlocked() && OWNER_BINDING.matches(ownerBindingSha256) &&
+            sensitive.getString(CREATION_PENDING_KEY, null) == ownerBindingSha256
+
+    fun markCreationPending(ownerBindingSha256: String): Boolean =
+        OWNER_BINDING.matches(ownerBindingSha256) && !sensitive.isBlocked() && sensitive.edit()
+            .putString(CREATION_PENDING_KEY, ownerBindingSha256).commit()
+
+    fun clearUnconfirmedCreation(ownerBindingSha256: String): Boolean {
+        if (!OWNER_BINDING.matches(ownerBindingSha256) || sensitive.isBlocked()) return false
+        val pendingOwner = sensitive.getString(CREATION_PENDING_KEY, null) ?: return true
+        if (pendingOwner != ownerBindingSha256) return false
+        return sensitive.edit().remove(CREATION_PENDING_KEY).commit()
+    }
+
     fun clear(): Boolean =
         !sensitive.isBlocked() && sensitive.edit()
             .remove(PARTIAL_KEY)
@@ -206,9 +225,13 @@ internal class AndroidEmailEnrollmentStore(
     // S01-5: in-flight OTP send request (no OTP, password, email or birth date).
     override fun loadPendingOtpRequest():
         kr.co.hanium.dreamup.walksafe.network.PendingEmailOtpRequest? {
-        if (sensitive.isBlocked()) return null
+        check(!sensitive.isBlocked()) { "email OTP recovery storage is blocked" }
         val encoded = sensitive.getString(PENDING_OTP_REQUEST_KEY, null) ?: return null
         return kr.co.hanium.dreamup.walksafe.network.PendingEmailOtpRequestCodec.decode(encoded)
+            ?: run {
+                sensitive.failClosed()
+                error("invalid email OTP recovery record")
+            }
     }
 
     override fun savePendingOtpRequest(
@@ -227,6 +250,7 @@ internal class AndroidEmailEnrollmentStore(
         private const val PARTIAL_KEY = "email_enrollment_partial_v4"
         private const val LEGACY_PARTIAL_KEY = "email_enrollment_partial_v3"
         private const val PENDING_OTP_REQUEST_KEY = "email_otp_pending_request_v1"
+        private const val CREATION_PENDING_KEY = "account_creation_unconfirmed_v1"
         private val KEY_POLICY = AeadKeyPolicy(
             aliasPrefix = "walksafe.user.email_enrollment.aead.v",
             currentVersion = 1,
@@ -240,7 +264,7 @@ internal class AndroidEmailEnrollmentStore(
                 "kr.co.hanium.dreamup.walksafe|USER|email-enrollment|schema=4"
                     .toByteArray(Charsets.UTF_8),
             keyPolicy = KEY_POLICY,
-            exactKeys = setOf(PARTIAL_KEY, LEGACY_PARTIAL_KEY, PENDING_OTP_REQUEST_KEY),
+            exactKeys = setOf(PARTIAL_KEY, LEGACY_PARTIAL_KEY, PENDING_OTP_REQUEST_KEY, CREATION_PENDING_KEY),
         )
     }
 }

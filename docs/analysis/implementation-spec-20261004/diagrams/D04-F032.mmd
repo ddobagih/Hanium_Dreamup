@@ -1,0 +1,26 @@
+flowchart TD
+  ID["F-D04-032 · 야외 시험 기록 시작·센서 융합·로컬 보행 보정<br/>P-D04-032"]
+  A["preview에서 기록 시작"]
+  C0{"fresh fix·권한·동의·lease 없음인가"}
+  R0["시작 안 함"]
+  C1{"trace lease start가 성공했는가"}
+  R1["stop 및 저장 오류"]
+  C2{"Raw open/header flush·등록 성공과 current token인가"}
+  R2["stop 또는 stale completion 무시"]
+  OK["step reset 완료 후 ready → GNSS/step trace 및 로컬 calibration; matchedPosition 없음"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  STOP["stop → readiness 세대 증가; 늦은 준비완료 무효"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

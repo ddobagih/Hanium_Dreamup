@@ -23,7 +23,8 @@ class SpeechOutputDiagnosticsTest {
         f.runtime.fail(f.runtime.spoken.last().id, TextToSpeech.ERROR_SYNTHESIS)
 
         assertEquals(
-            listOf(SpeechOutputOutcome.STARTED, SpeechOutputOutcome.DONE, SpeechOutputOutcome.ENGINE_ERROR),
+            listOf(SpeechOutputOutcome.REQUESTED, SpeechOutputOutcome.STARTED, SpeechOutputOutcome.DONE,
+                SpeechOutputOutcome.REQUESTED, SpeechOutputOutcome.ENGINE_ERROR),
             f.events.map(SpeechOutputEvent::outcome),
         )
         assertTrue(f.events.all { it.kind == SpeechOutputKind.NAVIGATION })
@@ -41,7 +42,10 @@ class SpeechOutputDiagnosticsTest {
         f.runtime.grantFocus = false
         assertEquals(NavigationSpeechDispatchResult.UNAVAILABLE, f.actuator.speakNavigation("turn left"))
         assertEquals(
-            listOf(SpeechOutputEvent(SpeechOutputKind.NAVIGATION, SpeechOutputOutcome.FOCUS_DENIED, f.runtime.now)),
+            listOf(
+                SpeechOutputEvent(SpeechOutputKind.NAVIGATION, SpeechOutputOutcome.REQUESTED, f.runtime.now),
+                SpeechOutputEvent(SpeechOutputKind.NAVIGATION, SpeechOutputOutcome.FOCUS_DENIED, f.runtime.now),
+            ),
             f.events,
         )
     }
@@ -73,7 +77,7 @@ class SpeechOutputDiagnosticsTest {
         f.actuator.speakNavigation("turn right")
         assertTrue(f.actuator.cancelNavigationSpeech())
         assertEquals(
-            listOf(SpeechOutputOutcome.CANCELLED_STALE_NAVIGATION),
+            listOf(SpeechOutputOutcome.REQUESTED, SpeechOutputOutcome.CANCELLED_STALE_NAVIGATION),
             f.events.map(SpeechOutputEvent::outcome),
         )
     }
@@ -91,6 +95,7 @@ class SpeechOutputDiagnosticsTest {
     @Test
     fun diagnosticsAggregateCountsAndDrainPerWindow() {
         val diagnostics = SpeechOutputDiagnostics()
+        diagnostics.record(SpeechOutputEvent(SpeechOutputKind.RISK, SpeechOutputOutcome.REQUESTED, 5L))
         diagnostics.record(SpeechOutputEvent(SpeechOutputKind.RISK, SpeechOutputOutcome.FOCUS_DENIED, 10L))
         diagnostics.record(SpeechOutputEvent(SpeechOutputKind.RISK, SpeechOutputOutcome.FOCUS_DENIED, 20L))
         diagnostics.record(SpeechOutputEvent(SpeechOutputKind.NAVIGATION, SpeechOutputOutcome.ENGINE_ERROR, 30L, -3))
@@ -98,6 +103,7 @@ class SpeechOutputDiagnosticsTest {
             diagnostics.record(SpeechOutputEvent(SpeechOutputKind.OTHER, SpeechOutputOutcome.ENGINE_ERROR, 40L, 1_000 + code))
         }
         val snapshot = diagnostics.drain()
+        assertEquals(1, snapshot["risk.requested"])
         assertEquals(2, snapshot["risk.focus_denied"])
         assertEquals(1, snapshot["navigation.engine_error"])
         assertEquals(1, snapshot["error_code.-3"])

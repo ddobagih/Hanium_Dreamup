@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant Main as Main owner
+    participant V as D05 FastSAM LK worker
+    participant D as D07 unknown pipeline
+    participant T as D07 tactile coordinator
+    participant Q as D02 delivery
+    Main->>V: 원본 token RGB luma와 frozen capture
+    V-->>Main: 원본 mask 완료 callback
+    Main->>Main: context와 남은 원래 budget 검사
+    Main->>V: same capture actual material point consume
+    V-->>Main: mask index별 실제 point
+    Main->>D: F-D07-014 frozen token mask points
+    D->>D: actual mask depth와 clock age 재검사
+    D-->>Main: original lease unknown batch
+    Main->>T: 원본 tactile mask bundle upgrade
+    T->>T: P-D07-026 actual result ordering 및 one upgrade
+    alt current receipt와 원본 deadline 유효
+        T-->>Main: TMAP 관측과 참고 후보
+        Main->>Q: named unknown 원본 lease 후보 전달
+    else owner route epoch 만료
+        T-->>Main: 결과 폐기
+    end

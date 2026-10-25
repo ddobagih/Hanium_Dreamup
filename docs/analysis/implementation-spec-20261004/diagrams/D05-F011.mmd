@@ -1,0 +1,13 @@
+flowchart TD
+  H["P-D05-011 · F-D05-011 OpenCV 광류·실제 물질점·추적 소실 판정"]
+  H --> G["GFTT seed 최대 40"]
+  G --> K["LK forward 와 backward"]
+  K --> Q{"survivor FB photo residual support 통과"}
+  Q -->|"아니오"| L["LOST 재검출 힌트"]
+  Q -->|"예"| T["허용 transform 으로 geometry"]
+  T --> P{"독립 actual point quality0.65 와유일소유"}
+  P -->|"아니오"| N["box 만 point 폐기"]
+  P -->|"예"| A["물질점 identity 유지"]
+  A --> HN{"새 batch sameclass 유일 IoU0.65"}
+  HN -->|"아니오"| N
+  HN -->|"예"| R["실측 frame handoff"]

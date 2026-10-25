@@ -1,0 +1,12 @@
+stateDiagram-v2
+  state "F-D08-001 기동 전" as S0
+  state "F-D08-001 구성·lock·상태 검사" as S1
+  state "F-D08-001 서비스 및 worker 실행" as S2
+  state "F-D08-001 종료 대기" as S3
+  state "F-D08-001 종료" as S4
+  [*] --> S0
+  S0 --> S1: primary 기동
+  S1 --> S2: 모든 검사 성공
+  S1 --> S4: 검사 실패
+  S2 --> S3: SIGINT 또는 SIGTERM
+  S3 --> S4: close와 drain 완료 또는20초초과

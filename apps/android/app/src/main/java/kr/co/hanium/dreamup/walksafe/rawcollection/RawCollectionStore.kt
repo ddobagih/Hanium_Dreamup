@@ -657,9 +657,10 @@ internal class RawCollectionStore private constructor(
         val closed = storage.clearActiveCollectionId()
         val deleted = storage.deleteAllCollections()
         val keysDestroyed = aead.destroyKnownVersions()
-        val purgeVerified = fenced && closed && deleted && keysDestroyed &&
+        val emptyVerified = runCatching { storage.verifiedEmptyAfterAccountPurge() }.getOrDefault(false)
+        val purgeVerified = fenced && closed && deleted && keysDestroyed && emptyVerified &&
             storage.writeFenceAtomically(KEY_PURGE_VERIFIED_FENCE, KEY_PURGE_VERIFIED_VALUE)
-        return fenced && closed && deleted && keysDestroyed && purgeVerified
+        return fenced && closed && deleted && keysDestroyed && emptyVerified && purgeVerified
     }
 
     @Synchronized

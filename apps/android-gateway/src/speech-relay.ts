@@ -74,9 +74,6 @@ type VoiceFetchResult =
   | { response: Response; deadlineSignal: AbortSignal; error?: never }
   | { response?: never; deadlineSignal?: never; error: Response };
 
-const rateEvents = new Map<string, number[]>();
-const inFlight: Record<SpeechKind, number> = { stt: 0, tts: 0 };
-
 function responseError(status: number, code: string, retryAfter?: number): Response {
   const headers = new Headers({
     "cache-control": "no-store",
@@ -129,81 +126,6 @@ function speechLimit(kind: SpeechKind, suffix: string, fallback: number): number
     minimum!,
     maximum!
   );
-}
-
-function pruneRateEvents(nowMs: number, windowMs: number): void {
-  const cutoff = nowMs - windowMs;
-  for (const [key, events] of rateEvents) {
-    const retained = events.filter(eventAt => eventAt > cutoff && eventAt <= nowMs);
-    if (retained.length === 0) rateEvents.delete(key);
-    else rateEvents.set(key, retained);
-  }
-}
-
-function acquireSpeechAdmission(
-  request: Request,
-  kind: SpeechKind,
-  nowMs = Date.now()
-): SpeechAdmission {
-  const denied = authorizeProxyRequest(request);
-  if (denied) return { error: denied };
-  const actorId = gatewaySessionActor(request);
-  if (!actorId) return { error: gatewayUnauthorizedResponse() };
-  const clientIp = gatewayTrustedClientIp(request);
-  if (!clientIp) return { error: responseError(400, "speech_trusted_client_ip_required") };
-  if (!Number.isFinite(nowMs) || nowMs < 0) {
-    return { error: responseError(503, "speech_admission_unavailable", 1) };
-  }
-
-  const windowSeconds = boundedInteger(
-    "WALKSAFE_VOICE_RATE_WINDOW_SECONDS",
-    DEFAULT_RATE_WINDOW_SECONDS,
-    1,
-    3600
-  );
-  const windowMs = windowSeconds * 1000;
-  pruneRateEvents(nowMs, windowMs);
-  const defaults = kind === "stt"
-    ? { global: 120, actor: 12, ip: 30 }
-    : { global: 120, actor: 30, ip: 60 };
-  const limits: Array<[string, number]> = [
-    [`speech:${kind}:global`, speechLimit(kind, "GLOBAL_RATE_LIMIT", defaults.global)],
-    [`speech:${kind}:actor:${actorId}`, speechLimit(kind, "ACTOR_RATE_LIMIT", defaults.actor)],
-    [`speech:${kind}:ip:${clientIp}`, speechLimit(kind, "IP_RATE_LIMIT", defaults.ip)]
-  ];
-  for (const [key, limit] of limits) {
-    const events = rateEvents.get(key) ?? [];
-    if (events.length >= limit) {
-      const retryAfter = Math.ceil((events[0]! + windowMs - nowMs) / 1000);
-      return { error: responseError(429, "speech_rate_limited", retryAfter) };
-    }
-  }
-  const concurrency = speechLimit(kind, "MAX_CONCURRENCY", 1);
-  if (inFlight[kind] >= concurrency) {
-    return { error: responseError(503, "speech_capacity_busy", 1) };
-  }
-  for (const [key] of limits) {
-    const events = rateEvents.get(key) ?? [];
-    events.push(nowMs);
-    rateEvents.set(key, events);
-  }
-  inFlight[kind] += 1;
-  let released = false;
-  return {
-    actorId,
-    clientIp,
-    release: () => {
-      if (released) return;
-      released = true;
-      inFlight[kind] = Math.max(0, inFlight[kind] - 1);
-    }
-  };
-}
-
-export function resetSpeechAdmissionForTests(): void {
-  rateEvents.clear();
-  inFlight.stt = 0;
-  inFlight.tts = 0;
 }
 
 function configuredVoiceService(): VoiceServiceConfig | Response {
@@ -320,10 +242,23 @@ async function fetchVoice(
   const onAbort = () => rejectAbort(signal.reason);
   signal.addEventListener("abort", onAbort, { once: true });
   try {
+    signal.throwIfAborted();
+    const pending = fetchImpl(url, { ...init, cache: "no-store", redirect: "error", signal })
+      .then((response) => {
+        if (signal.aborted) {
+          cancelUpstream(response, "voice request was cancelled");
+          signal.throwIfAborted();
+        }
+        return response;
+      });
     const response = await Promise.race([
-      fetchImpl(url, { ...init, cache: "no-store", redirect: "error", signal }),
+      pending,
       aborted
     ]);
+    if (signal.aborted) {
+      cancelUpstream(response, "voice request was cancelled");
+      signal.throwIfAborted();
+    }
     return { response, deadlineSignal };
   } catch {
     if (request.signal.aborted) return { error: responseError(499, "gateway_client_closed") };
@@ -420,9 +355,10 @@ function ownedArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 export async function relaySpeechStt(
   request: Request,
   requestId: string,
-  fetchImpl: GatewayFetch = globalThis.fetch
+  fetchImpl: GatewayFetch = globalThis.fetch,
+  admissionController: SpeechAdmissionController = defaultSpeechAdmission
 ): Promise<Response> {
-  const admission = acquireSpeechAdmission(request, "stt");
+  const admission = admissionController.acquireSpeechAdmission(request, "stt");
   if (admission.error) return admission.error;
   try {
     const config = configuredVoiceService();
@@ -557,9 +493,10 @@ function wavDurationSeconds(bytes: Uint8Array): number | null {
 export async function relaySpeechTts(
   request: Request,
   correlationId: string,
-  fetchImpl: GatewayFetch = globalThis.fetch
+  fetchImpl: GatewayFetch = globalThis.fetch,
+  admissionController: SpeechAdmissionController = defaultSpeechAdmission
 ): Promise<Response> {
-  const admission = acquireSpeechAdmission(request, "tts");
+  const admission = admissionController.acquireSpeechAdmission(request, "tts");
   if (admission.error) return admission.error;
   try {
     const config = configuredVoiceService();
@@ -651,3 +588,95 @@ export async function relaySpeechTts(
     admission.release();
   }
 }
+
+/** Owns one server's admission/cache lifetime; never constructed per request. */
+export function createSpeechAdmission(clock: () => number = () => Date.now()) {
+
+
+  const rateEvents = new Map<string, number[]>();
+
+  const inFlight: Record<SpeechKind, number> = { stt: 0, tts: 0 };
+
+
+  function pruneRateEvents(nowMs: number, windowMs: number): void {
+    const cutoff = nowMs - windowMs;
+    for (const [key, events] of rateEvents) {
+      const retained = events.filter(eventAt => eventAt > cutoff && eventAt <= nowMs);
+      if (retained.length === 0) rateEvents.delete(key);
+      else rateEvents.set(key, retained);
+    }
+  }
+
+
+  function acquireSpeechAdmission(
+    request: Request,
+    kind: SpeechKind,
+    nowMs = clock()
+  ): SpeechAdmission {
+    const denied = authorizeProxyRequest(request);
+    if (denied) return { error: denied };
+    const actorId = gatewaySessionActor(request);
+    if (!actorId) return { error: gatewayUnauthorizedResponse() };
+    const clientIp = gatewayTrustedClientIp(request);
+    if (!clientIp) return { error: responseError(400, "speech_trusted_client_ip_required") };
+    if (!Number.isFinite(nowMs) || nowMs < 0) {
+      return { error: responseError(503, "speech_admission_unavailable", 1) };
+    }
+
+    const windowSeconds = boundedInteger(
+      "WALKSAFE_VOICE_RATE_WINDOW_SECONDS",
+      DEFAULT_RATE_WINDOW_SECONDS,
+      1,
+      3600
+    );
+    const windowMs = windowSeconds * 1000;
+    pruneRateEvents(nowMs, windowMs);
+    const defaults = kind === "stt"
+      ? { global: 120, actor: 12, ip: 30 }
+      : { global: 120, actor: 30, ip: 60 };
+    const limits: Array<[string, number]> = [
+      [`speech:${kind}:global`, speechLimit(kind, "GLOBAL_RATE_LIMIT", defaults.global)],
+      [`speech:${kind}:actor:${actorId}`, speechLimit(kind, "ACTOR_RATE_LIMIT", defaults.actor)],
+      [`speech:${kind}:ip:${clientIp}`, speechLimit(kind, "IP_RATE_LIMIT", defaults.ip)]
+    ];
+    for (const [key, limit] of limits) {
+      const events = rateEvents.get(key) ?? [];
+      if (events.length >= limit) {
+        const retryAfter = Math.ceil((events[0]! + windowMs - nowMs) / 1000);
+        return { error: responseError(429, "speech_rate_limited", retryAfter) };
+      }
+    }
+    const concurrency = speechLimit(kind, "MAX_CONCURRENCY", 1);
+    if (inFlight[kind] >= concurrency) {
+      return { error: responseError(503, "speech_capacity_busy", 1) };
+    }
+    for (const [key] of limits) {
+      const events = rateEvents.get(key) ?? [];
+      events.push(nowMs);
+      rateEvents.set(key, events);
+    }
+    inFlight[kind] += 1;
+    let released = false;
+    return {
+      actorId,
+      clientIp,
+      release: () => {
+        if (released) return;
+        released = true;
+        inFlight[kind] = Math.max(0, inFlight[kind] - 1);
+      }
+    };
+  }
+
+
+  function resetSpeechAdmissionForTests(): void {
+    rateEvents.clear();
+    inFlight.stt = 0;
+    inFlight.tts = 0;
+  }
+  return { resetSpeechAdmissionForTests, acquireSpeechAdmission };
+}
+
+export type SpeechAdmissionController = ReturnType<typeof createSpeechAdmission>;
+export const defaultSpeechAdmission = createSpeechAdmission();
+export const resetSpeechAdmissionForTests: SpeechAdmissionController["resetSpeechAdmissionForTests"] = (...args) => defaultSpeechAdmission.resetSpeechAdmissionForTests(...args);

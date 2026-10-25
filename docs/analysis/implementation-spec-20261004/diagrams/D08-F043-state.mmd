@@ -1,0 +1,18 @@
+stateDiagram-v2
+  state "F-D08-043 전달 기한 도래" as S0
+  state "F-D08-043 전달 중" as S1
+  state "F-D08-043 전달 확인" as S2
+  state "F-D08-043 재시도 시각 대기" as S3
+  state "F-D08-043 운영 교정 대기" as S4
+  state "F-D08-043 영구 충돌" as S5
+  state "F-D08-043 worker 종료" as S6
+  [*] --> S0
+  S0 --> S1: singleflight와slot확보
+  S1 --> S2: 유효2xx
+  S1 --> S3: 일시오류
+  S3 --> S0: persisted next_attempt도래
+  S1 --> S4: 계약 또는자격증명오류
+  S4 --> S0: 운영교정 및pauseID CAS resume
+  S1 --> S5: known409 또는unknown409 처리후누적attempts3이상
+  S0 --> S6: stop
+  S1 --> S6: abort후drain완료

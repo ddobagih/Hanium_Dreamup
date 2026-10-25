@@ -1,0 +1,25 @@
+flowchart TD
+ A["F-D10-004 STT 업로드"] --> B{"P-D10-005 MIME 및 파일 크기 유효"}
+ B -->|"아니오"| X["400 타입 또는413 크기 오류"]
+ B -->|"예"| C["1MiB chunk로 임시파일 작성"]
+ C --> D{"비어 있지 않고 누적 한도 이하"}
+ D -->|"아니오"| X
+ D -->|"예"| E["wave, soundfile, ffprobe5초 순서로 duration 검증"]
+ E -->|"invalid 또는 너무 김"| Y["400 invalid_audio 또는422 duration 초과"]
+ E -->|"유효"| G{"STT permit 기본2초 내 획득"}
+ G -->|"아니오"| Q["503 stt_busy"]
+ G -->|"예"| H["P-D10-006 worker 추론 기본30초 및 disconnect 감시"]
+ H -->|"결과"| I["finally 추론 permit 반환"]
+ H -->|"timeout/cancel/disconnect/runtime 예외"| IF["finally 추론 permit 반환 후 예외 재전파"]
+ IF --> TF["timeout504, disconnect499, runtime503. 취소는 전파"]
+ I --> J{"revision40hex 및 transcript500자 이하, 제어문자 없음"}
+ J -->|"아니오"| W["502 stt_result_invalid"]
+ J -->|"예"| K["F007 분류 및 F008 acoustic gate 후 JSON"]
+ X --> N["endpoint finally: UploadFile close 및 temp unlink 시도"]
+ Y --> N
+ Q --> N
+ TF --> N
+ W --> N
+ K --> N
+ N --> U["middleware finally: 획득했던 upload permit 반환"]
+ U --> O["종료. 자동 retry 없음"]

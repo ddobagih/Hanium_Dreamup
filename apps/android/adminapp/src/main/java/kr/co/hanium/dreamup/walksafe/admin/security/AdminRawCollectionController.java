@@ -68,6 +68,7 @@ public final class AdminRawCollectionController {
 
     private final Loader loader;
     private long generation;
+    private Request activeRequest;
     private boolean retryAvailable;
     private State state = empty(Phase.IDLE, null, null);
 
@@ -85,6 +86,8 @@ public final class AdminRawCollectionController {
     public synchronized Request beginLoad(char[] password, char[] totp) {
         try {
             Request request = new Request(++generation, password, totp);
+            if (activeRequest != null) activeRequest.clear();
+            activeRequest = request;
             retryAvailable = true;
             state = new State(
                 Phase.LOADING, state.items, state.selectedCollectionId, null
@@ -127,20 +130,37 @@ public final class AdminRawCollectionController {
         state = new State(state.phase, state.items, safeId, state.errorMessage);
     }
 
+    public boolean rejectSubmission(Request request) {
+        if (request == null) return false;
+        request.claim();
+        try { return fail(request); }
+        finally { clearRequest(request); }
+    }
+
+    private synchronized void clearRequest(Request request) {
+        request.clear();
+        if (activeRequest == request) activeRequest = null;
+    }
+
     public boolean execute(Request request) {
         if (request == null) throw new IllegalArgumentException("raw collection request is required");
         request.claim();
         try {
+            synchronized (this) {
+                if (request.generation != generation || activeRequest != request || state.phase != Phase.LOADING) return false;
+            }
             return apply(request, loader.load(request.password, request.totp));
         } catch (Exception error) {
             return fail(request);
         } finally {
-            request.clear();
+            clearRequest(request);
         }
     }
 
     public synchronized void requireRefresh(String message) {
         generation += 1;
+        if (activeRequest != null) activeRequest.clear();
+        activeRequest = null;
         retryAvailable = true;
         state = new State(
             Phase.ERROR,
@@ -154,6 +174,8 @@ public final class AdminRawCollectionController {
 
     public synchronized void invalidate() {
         generation += 1;
+        if (activeRequest != null) activeRequest.clear();
+        activeRequest = null;
         if (state.phase == Phase.LOADING) {
             retryAvailable = true;
             state = new State(
@@ -167,6 +189,8 @@ public final class AdminRawCollectionController {
 
     public synchronized void clearSessionState() {
         generation += 1;
+        if (activeRequest != null) activeRequest.clear();
+        activeRequest = null;
         retryAvailable = false;
         state = empty(Phase.IDLE, null, null);
     }

@@ -223,6 +223,8 @@ def environment() -> dict[str, str]:
     java_home = os.environ["JAVA_HOME"]
     return {
         "JAVA_HOME": java_home,
+        "ANDROID_HOME": os.environ["ANDROID_HOME"],
+        "ANDROID_SDK_ROOT": os.environ["ANDROID_SDK_ROOT"],
         "GRADLE_USER_HOME": os.environ.get(
             "GRADLE_USER_HOME", str(Path.home() / ".gradle")
         ),

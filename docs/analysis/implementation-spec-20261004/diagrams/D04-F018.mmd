@@ -1,0 +1,23 @@
+flowchart TD
+  ID["F-D04-018 · 위치 신뢰도 안내 중지·회복 상태와 알림 토큰<br/>P-D04-018"]
+  A["quality 관측 또는 최신성 평가"]
+  C0{"시간과 source 순서가 유효한가"}
+  R0["UNAVAILABLE·FAIL_CLOSED"]
+  C1{"LOW/UNAVAILABLE이 아닌가"}
+  R1["episode 생성 또는 escalation; 안내 pause"]
+  C2{"degraded episode가 없거나 informative HIGH 2개를 5초 내 확인했는가"}
+  R2["RECOVERY_PENDING"]
+  OK["pause 해제 및 RECOVERED 요청 → Main 출력 → token commit"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END

@@ -1,0 +1,13 @@
+flowchart TD
+  META["F-D16-004 · P-D16-004"]
+  META --> A
+  A["trace v2 반입"] --> B{"크기·schema·정확 key·synthetic=false"}
+  B -->|"아니오 / v1"| X["형식 오류·MISSING_ABSOLUTE_UTC 등 거부"]
+  B -->|"예"| C["seq 연속·receipt 단조증가·measurement 범위 검사"]
+  C --> D{"footer count/hash 일치·본문 계약 유효"}
+  D -->|"아니오"| X
+  D -->|"예"| E{"원래 UTC offset spread 100ms 이하"}
+  E -->|"아니오"| X
+  E -->|"예"| F["최대1ms 제한 정규화·UTC 위치 정렬"]
+  F --> G["monotonic-only는 평가 join 제외"]
+  G --> H["filtered 중앙값·없으면 raw 중앙값→TraceSession"]

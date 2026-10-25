@@ -1,0 +1,36 @@
+flowchart TB
+  E["F-D15-028 · 한 번만 허용되는 암호화 원본 열람<br/>GET /uploads/{filename}"]
+  P["P-D15-028 · 전제조건<br/>grant owner/session/device·expiry·content<br/>revision 일치, encrypted object 및 decryption<br/>key."]
+  E --> P
+  S1["1. 파일명/report path와 canonical token 검증"]
+  P --> S1
+  S2["2. secured prepare DB 함수 또는<br/>session/report/grant row lock으로 권한 재확인"]
+  S1 --> S2
+  S3["3. envelope size·hash·report AAD·header<br/>metadata·plaintext hash 검증 후 복호화"]
+  S2 --> S3
+  S4["4. 복호화 완료 시점 session/security<br/>state/expiry·grant expiry 재검사"]
+  S3 --> S4
+  S5["5. grant consume·ACCESS_GRANTED audit commit<br/>후 bytes 반환"]
+  S4 --> S5
+  OK["정상 결과<br/>grant consume·ACCESS_GRANTED audit commit 후<br/>bytes 반환"]
+  S5 --> OK
+  B1["조건 · 사용됨/만료/다른 identity<br/>결과 · 403"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · report/path 없음<br/>결과 · 404"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · encrypted metadata 없는 legacy original<br/>결과 · 410"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · blob 누락·hash/auth/key 실패<br/>결과 · 503 및 grant 소비 감사"]
+  S1 -. "해당 조건 발생" .-> B4
+  B5["조건 · 읽는 동안 session/TTL 만료<br/>결과 · 403; 복호화 bytes 보류"]
+  S1 -. "해당 조건 발생" .-> B5
+  B6["조건 · 감사 저장 실패<br/>결과 · 503; bytes 보류"]
+  S5 -. "해당 조건 발생" .-> B6
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>토큰 재사용403. grant metadata identity 불일치의 감사는 타<br/>grant 정보를 노출하지 않도록 최소화.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>실패/소비된 grant는 동일 token 재시도로 회복하지 않고 조건 확인 후 새<br/>grant 필요."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>파일 FD 정리·token 소비 상태와 감사 commit. legacy<br/>plaintext fallback 없음."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_original_access.py:1094<br/>access_report_original<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

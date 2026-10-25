@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D01-005 OTP 확인·계정 생성·생성 후 자동 로그인"]
+  G{"ACCOUNT_CREATED stage, current valid partial·owner·전경·네트워크·필수동의"}
+  I["handle43자,OTP6숫자,신규pw12..128,confirm,정확6문서version·selection; 응답 actor UUID/accountGeneration＞=1/receiptSHA"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 잘못된 OTP·약한/일반 암호·conflict·age 실패별 메시지"]
+  G -->|"미충족"| X
+  N1["create 직전 owner와 elapsed deadline을 다시 검사하고 필요한 입력을 검증한다."]
+  I --> N1
+  N2["현재 선택을 partial에 저장한 뒤 POST /api/accounts를 실행한다."]
+  N1 --> N2
+  N3["현재 요청만 201 strict schema 응답을 받아 account-created 상태를 반영하고 partial을 제거한다."]
+  N2 --> N3
+  N4["OTP와 확인 암호를 지우고 expectedCreatedActorId를 넣어 password login을 호출한다."]
+  N3 --> N4
+  OK["검증된 생성 응답 후 일치 actor 자동 로그인 경로"]
+  N4 --> OK
+  B0["partial 제거·새 epoch 초기가입으로"]
+  N1 -->|"partial 만료·owner 불일치"| B0
+  B1["앱 업데이트/새문서 안내; 임의 새 버전 동의 작성 안 함"]
+  N3 -->|"동의 outdated409"| B1
+  B2["계정 존재 가능성을 안내; 동일입력 재시도 또는 로그인"]
+  N3 -->|"네트워크 결과 불명"| B2
+  B3["계정 생성됨 안내·로그인 필요; 성공을 취소했다고 주장 안 함"]
+  N3 -->|"서버 성공 뒤 local clear 실패"| B3
+  R["중단·취소: 계정 token cancel/background 이후 늦은 성공은 UI 미적용 / AccountRequestFence가 중단 뒤 응답을 버림; 서버 효과는 남을 수 있음"]
+  V["복구·재시도: partial 없으면 신규OTP 또는 로그인 / 사용자 재시도 또는 기존계정 로그인 안내; 자동 반복 create 없음"]
+  Q["정책 P-D01-001 · P-D01-002 · P-D01-003 · P-D01-005 · P-D01-024"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

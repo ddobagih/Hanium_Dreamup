@@ -1,0 +1,18 @@
+flowchart TD
+  ID["F-D04-014 · GNSS 신호 위험·소실·이중주파수 진단<br/>P-D04-014"]
+  A["새 signal epoch"]
+  C0{"measurement 시각이 기존보다 증가하는가"}
+  R0["기존 snapshot"]
+  C1{"3epoch·4signal 및 최신 finite 신호가 충분한가"}
+  R1["UNKNOWN 또는 제한된 LOST_HOLDING"]
+  OK["위험 점수와 1..4 noise 산출; 주파수는 동일 위성 단위 별도 요약"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END

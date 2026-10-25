@@ -15,6 +15,51 @@ import org.junit.Test;
 
 public final class AdminSecurityControllerTest {
     @Test
+    public void reportRequestAndIncidentApproveTheExactTransportBodyBeforeDispatch() throws Exception {
+        FakeApi api = new FakeApi();
+        List<String> calls = new ArrayList<>();
+        AdminReportRepository reports = (AdminReportRepository) java.lang.reflect.Proxy.newProxyInstance(
+            getClass().getClassLoader(), new Class<?>[] {AdminReportRepository.class}, (proxy, method, args) -> {
+                byte[] expected;
+                if (method.getName().equals("updateStatus")) {
+                    expected = AdminReportHttpClient.statusBody((String) args[2], (Integer) args[3]);
+                } else if (method.getName().equals("updateRequestStatus")) {
+                    expected = AdminReportHttpClient.requestStatusBody((String) args[2], (String) args[3],
+                        (Integer) args[4], (String) args[5], (String) args[6]);
+                } else throw new AssertionError(method.getName());
+                assertEquals(AdminCanonicalEncoding.sha256Hex(expected), api.reconfirmationIntent);
+                calls.add(method.getName());
+                return null;
+            });
+        AdminIncidentRepository incidents = (AdminIncidentRepository) java.lang.reflect.Proxy.newProxyInstance(
+            getClass().getClassLoader(), new Class<?>[] {AdminIncidentRepository.class}, (proxy, method, args) -> {
+                assertEquals("updateStatus", method.getName());
+                assertEquals(AdminCanonicalEncoding.sha256Hex(AdminIncidentHttpClient.statusBody(
+                    (AdminIncidentModels.StatusRequest) args[2])), api.reconfirmationIntent);
+                calls.add("incident");
+                return null;
+            });
+        AdminSecurityController controller = new AdminSecurityController(api, null, reports, incidents);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+        String id = "11111111-1111-4111-8111-111111111111";
+        controller.updateAdminReportStatus(id, "reviewed", 1, PASSWORD.toCharArray(), "123456".toCharArray(), 10_000L, true);
+        controller.updateAdminReportRequestStatus(id, "CORRECTION", "ACKNOWLEDGED", 1,
+            "사용자 안내", "내부 메모", PASSWORD.toCharArray(), "123456".toCharArray(), 10_000L, true);
+        controller.updateAdminIncidentStatus(id, new AdminIncidentModels.StatusRequest(
+            "ACKNOWLEDGED", 1, "33333333-3333-4333-8333-333333333333",
+            "실제 장애를 확인했습니다.", "민감정보 없이 서비스 상태를 관찰했습니다.", "a".repeat(64)),
+            PASSWORD.toCharArray(), "123456".toCharArray(), 10_000L, true);
+        assertEquals(3, calls.size());
+        char[] password = PASSWORD.toCharArray();
+        char[] totp = "123456".toCharArray();
+        assertThrows(IllegalArgumentException.class, () -> controller.updateAdminReportStatus(
+            id, "invalid", 1, password, totp, 10_000L, true));
+        assertAllCleared(password);
+        assertAllCleared(totp);
+        assertEquals(3, api.reauthenticateCount);
+    }
+
+    @Test
     public void loginLoadsServerAuthorityAndBindsSnapshotToAuthenticatedAdministrator() throws Exception {
         FakeApi api = new FakeApi();
         AdminSecurityController controller = new AdminSecurityController(api);
@@ -887,6 +932,7 @@ public final class AdminSecurityControllerTest {
         assertEquals("admin.raw_collection.list", api.reconfirmationAction);
         assertEquals("GET", api.reconfirmationMethod);
         assertEquals("/admin/raw-collections/quarantine", api.reconfirmationPath);
+        assertEquals(AdminCanonicalEncoding.sha256Hex(new byte[0]), api.reconfirmationIntent);
         assertAllCleared(listPassword);
         assertAllCleared(listTotp);
         assertEquals(CURRENT_SESSION_ID, raw.session.sessionId());
@@ -907,6 +953,8 @@ public final class AdminSecurityControllerTest {
             api.reconfirmationPath
         );
         assertEquals(1, raw.decisionCalls);
+        assertEquals(AdminCanonicalEncoding.sha256Hex(AdminRawCollectionHttpClient.purposeBody(
+            AdminRawCollectionModelsTest.reportDecision())), api.reconfirmationIntent);
         assertEquals(1, raw.reconfirmationHeaders.size());
         assertEquals(
             api.reconfirmationNonce,
@@ -942,6 +990,8 @@ public final class AdminSecurityControllerTest {
         );
         assertEquals("admin.raw_collection.legal_hold", api.reconfirmationAction);
         assertEquals(1, raw.holdCalls);
+        assertEquals(AdminCanonicalEncoding.sha256Hex(AdminRawCollectionHttpClient.legalHoldBody(
+            AdminRawCollectionModelsTest.legalHold())), api.reconfirmationIntent);
         assertAllCleared(holdPassword);
         assertAllCleared(holdTotp);
     }
@@ -1057,6 +1107,15 @@ public final class AdminSecurityControllerTest {
     }
 
     private static final class FakeApi implements AdminSecurityApi {
+        String reconfirmationIntent;
+
+        @Override
+        public ReauthenticationResult reauthenticate(String accessToken, char[] password, char[] totpCode,
+            String action, String method, String path, String nonce, String intentSha256) throws IOException {
+            reconfirmationIntent = intentSha256;
+            return reauthenticate(accessToken, password, totpCode, action, method, path, nonce);
+        }
+
         boolean failState;
         boolean failRevoke;
         int revokeCalls;

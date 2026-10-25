@@ -1,0 +1,22 @@
+flowchart TD
+  A["F-D10-024 AIHub513 VL/VS zip 대응 읽기 전용 조사"]
+  N0["1. zip pair 존재/filename을 검사한다. zip central directory와 JSON member만 읽고 image bytes를 추출하지 않는다."]
+  A --> N0
+  N1["2. JSON/encoding/ZIP 오류는 count와 최대20 error sample에 기록하고 계속. filename/dimensions/tactile/defect/box validity로 수량 산출."]
+  N0 --> N1
+  N2["3. filename으로 이미지와 label/positive/negative set를 비교하여 missing/unmatched/duplicate를 집계."]
+  N1 --> N2
+  N3["4. stdout summary와 요청시 JSON summary를 쓰고0 종료; 입력/zip/value 실패2."]
+  N2 --> N3
+  B0{"누락 이미지 또는 parse error 발견"}
+  R0["summary에 기록하되 이 도구의 마지막 exit은0"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"json-summary 지정"}
+  R1["파일 쓰기가 있으므로 완전 무부작용 CLI는 아님"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-021"]
+  P -. "코드 분기 기준" .-> A

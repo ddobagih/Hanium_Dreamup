@@ -36,23 +36,37 @@ class MainActivityMotionConsumerExpiryStaticTest {
 
     @Test
     fun walkingCalibrationGatesMovingEvidenceOnSnapshotExpiryNotStateSince() {
-        val calibration = functionBlock("private fun attemptStepCalibration(")
-        val gate = calibration.substringAfter("val freshMovingEvidence =").substringBefore("val disposition")
+        val calibration = NavigationPolicySource.calibration(source)
+        val delegate = MainActivityRefactorSource.function(source, "internal fun observeWalkingCalibrationFix(")
+        assertTrue(delegate.contains("walkingCalibrationSession.observeFix(fix, userMotion, processingAtElapsedRealtimeMs, coordinator)"))
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/WalkingCalibrationSession.kt").readText()
+        val calibrationGate = MainActivityRefactorSource.member(owner, "observeFix")
+        val gate = calibrationGate.substringAfter("val freshMovingEvidence =").substringBefore("return coordinator.onFix(")
+        assertTrue(calibrationGate.contains("val freshMovingEvidence ="))
+        assertTrue(calibrationGate.contains("return coordinator.onFix("))
         assertFalse(gate.contains("latestPositionStationarySinceMs"))
         assertTrue(gate.contains("snapshot.userMotion") || calibration.contains("val userMotion = snapshot.userMotion"))
+        assertTrue(calibration.contains("userMotion = userMotion"))
         assertTrue(gate.contains("UserMovementState.MOVING"))
         assertTrue(gate.contains("evaluatedAtElapsedRealtimeMs"))
-        // GNSS-speed-only MOVING must not count as walking evidence.
+        assertTrue(gate.contains("processingAtElapsedRealtimeMs - userMotion.evaluatedAtElapsedRealtimeMs in 0L..2_000L"))
         assertTrue(gate.contains("stepObservedAtElapsedRealtimeMs != null"))
         assertFalse(gate.contains("stateSinceElapsedRealtimeMs"))
+        val callback = NavigationPolicySource.observation(source)
+        assertTrue(callback.contains("attemptStepCalibration(location, positioningSnapshot, receivedAtElapsedRealtimeMs)"))
     }
 
     @Test
     fun fieldCheckpointReevaluatesTheCurrentMotionBeforeUsingTheCachedState() {
         val checkpoint = functionBlock("private fun markPositionFieldCheckpoint(")
         val refresh = checkpoint.indexOf("applyUserMotionState(positioningCoordinator.currentUserMotion(nowMs))")
-        val use = checkpoint.indexOf("latestPositionStationaryState != PositionStationaryState.STATIONARY")
+        val use = checkpoint.indexOf("positionFieldController.markCheckpoint(")
         assertTrue(refresh >= 0 && use > refresh)
+        assertTrue(checkpoint.substring(use).contains("currentPositionFieldAuthority(), latestPositionStationaryState, latestPositionStationarySinceMs,"))
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/PositionFieldRecorderController.kt").readText()
+        val gate = MainActivityRefactorSource.member(owner, "markCheckpoint", 2)
+        assertTrue(gate.contains("stationaryState != PositionStationaryState.STATIONARY"))
+        assertTrue(MainActivityRefactorSource.property(source, "positionFieldController").contains("PositionFieldRecorderController("))
     }
 
     private fun functionBlock(marker: String): String {

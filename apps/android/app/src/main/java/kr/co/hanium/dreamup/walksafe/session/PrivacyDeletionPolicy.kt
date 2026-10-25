@@ -1335,8 +1335,18 @@ class AccountDeletionStateMachine {
                 )
         if (status.revision == journal.serverRevision) {
             if (statusMatchesJournal(status, journal)) {
-                if (deviceEvidenceAcknowledged != journal.deviceEvidenceAcknowledged) {
+                val proposedPhase = status.overallStatus.toPhase()
+                if (proposedPhase == AccountDeletionPhase.COMPLETED && !deviceEvidenceAcknowledged) {
+                    enterFailClosedLocked(ACCOUNT_DELETION_DEVICE_EVIDENCE_MISSING_REASON)
+                    return AccountDeletionApplyResult.IDENTITY_MISMATCH_FAIL_CLOSED
+                }
+                if (
+                    deviceEvidenceAcknowledged != journal.deviceEvidenceAcknowledged ||
+                    journal.phase != proposedPhase || journal.lastErrorCode != null
+                ) {
                     current = journal.copy(
+                        phase = preserveFailClosedPhaseLocked(journal, proposedPhase),
+                        lastErrorCode = null,
                         deviceEvidenceAcknowledged = deviceEvidenceAcknowledged,
                     )
                 }

@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.account
 
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
+
 import java.io.File
 import kr.co.hanium.dreamup.walksafe.network.GatewayAccountClient
 import kr.co.hanium.dreamup.walksafe.network.GatewayAccountHttpException
@@ -84,15 +86,13 @@ class EmailOtpTimingTest {
     fun mainActivityUsesTheElapsedDeadlineBeforeCreatingTheAccount() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt")
             .readText(Charsets.UTF_8)
-        val create = source.substringAfter("private fun createEmailAccount()")
-            .substringBefore("private fun loginEmailAccount(")
+        val create = MainActivityRefactorSource.function(source, "private fun createEmailAccount()")
         assertTrue(create.contains("!emailOtpPartialStillValid(partial, ownerBinding)"))
         assertFalse(create.contains("!partial.isValidAt(System.currentTimeMillis(), ownerBinding)"))
-        val helper = source.substringAfter("private fun emailOtpPartialStillValid(")
-            .substringBefore("\n    }\n")
-        assertTrue(helper.contains("SystemClock.elapsedRealtime()"))
-        val request = source.substringAfter("private fun requestEmailAccountOtp()")
-            .substringBefore("private fun createEmailAccount()")
+        val helper = MainActivityRefactorSource.function(source, "private fun emailOtpPartialStillValid(")
+        assertTrue(helper.contains("deadline.isOpenAt(elapsedRealtimeMs())"))
+        assertTrue(MainActivityRefactorSource.member(source, "createEmailAccountController").contains("elapsedRealtimeMs = SystemClock::elapsedRealtime"))
+        val request = MainActivityRefactorSource.function(source, "private fun requestEmailAccountOtp()")
         assertTrue(request.contains("emailOtpDeadline = kr.co.hanium.dreamup.walksafe.account.EmailOtpDeadline.received("))
     }
 

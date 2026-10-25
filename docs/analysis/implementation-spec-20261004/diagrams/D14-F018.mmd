@@ -1,0 +1,23 @@
+flowchart TD
+  IN["F-D14-018<br/>작업 경로·위험도 분류"]
+  G["적용 정책<br/>P-D14-008"]
+  IN --> G
+  N1["1. 정규 경로를 확인하고 명시된 method/path/UUID regex에만 <br/>action 반환"]
+  G --> N1
+  N2["2. HIGH와 STANDARD 작업을 등록표(P-D14-008)에 따라 분류"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 기기 proof workflow 별도 predicate로 GET read와<br/> write proof 필요 범위 확인"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 그 외 None/false 반환, middleware는 미등록 관리자 쓰기<br/>를 fail closed 처리(D09)"]
+  N3 -->|"계속 가능한 경우"| N4
+  B1["분기 결과<br/>해당 classifier match 없음"]
+  N1 -->|"알려진 경로지만 다른 method 또는 trailing slash"| B1
+  B2["분기 결과<br/>HIGH 분류지만 D14에 HTTP route가 없어 offline gate 사<br/>용"]
+  N2 -->|"release/privilege/data-delete virtual path"| B2
+  B3["분기 결과<br/>서로 별도 조건. HIGH가 항상 ACTION-proof workflow인 것은<br/> 아님"]
+  N3 -->|"위험도와 proof scope"| B3
+  N4 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

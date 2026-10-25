@@ -1,0 +1,21 @@
+flowchart TD
+ A["F-D10-008 IntentResult"] --> U{"unknown"}
+ U -- "예" --> S{"safe_noop 슬롯"}
+ S -- "예" --> R1["reprompt safe_noop"]
+ S -- "아니오" --> R2["reprompt unknown_intent"]
+ U -- "아니오" --> H{"P-D10-008 score 0.7 이상"}
+ H -- "아니오" --> R3["reprompt low_confidence"]
+ H -- "예" --> C{"P-D10-007 acoustic_allowed is False"}
+ C -- "예" --> R4["reprompt low_acoustic_confidence"]
+ C -- "아니오 또는 None" --> D{"set_destination 이며 destination 없음"}
+ D -- "예" --> R5["reprompt missing_destination"]
+ D -- "아니오" --> I{"select_candidate 이며 exact int 1 이상 아님"}
+ I -- "예" --> R6["reprompt missing_candidate_index"]
+ I -- "아니오" --> E["execute metadata · 실제 동작은 상위 실행부"]
+ R1 --> Z["응답 반환 · 자동 명령 실행 없음"]
+ R2 --> Z
+ R3 --> Z
+ R4 --> Z
+ R5 --> Z
+ R6 --> Z
+ E --> Z

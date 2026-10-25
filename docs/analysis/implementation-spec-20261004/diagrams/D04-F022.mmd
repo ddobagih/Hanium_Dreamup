@@ -1,0 +1,16 @@
+flowchart TD
+  ID["F-D04-022 · 개인 보행 프로필 저장·복원·이전 형식 이관<br/>P-D04-022"]
+  A["actor 프로필 load 또는 save"]
+  C0{"actor·암호화 store·profile schema가 유효한가"}
+  R0["NO_PROFILE / RESET_INVALID_RECORD / STORE_BLOCKED"]
+  OK["load: pending 최신값 우선; save: actor 고정 후 단일 IO queue·최신 대기값 합침"]
+  END["disk commit 결과 또는 false; reset barrier는 같은 queue"]
+  STOP["resetAllProfiles → destroyAndClear; barrier pending clear"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C0 -->|"예"| OK
+  OK --> END
+  R0 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

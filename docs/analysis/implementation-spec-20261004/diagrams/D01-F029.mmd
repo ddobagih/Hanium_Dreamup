@@ -1,0 +1,19 @@
+flowchart TD
+  A["F-D01-029 로컬 삭제 결과와 장치 증거"] --> G{"현재 accepted journal과 worker lease"}
+  G -->|"아님"| X["실행 거부 및 privacy fence 유지"]
+  G -->|"일치"| B["speech·route barrier와 report·raw·field·profile purge"]
+  B --> C{"모든 필수 purge 결과 true"}
+  C -->|"예"| D["result DELETED 증거 생성"]
+  C -->|"아니오"| E["result FAILED 증거 생성"]
+  D --> F["evidenceId·결과·시각·expectedStatusRevision·hash 결속"]
+  E --> F
+  F --> H["fallback EVIDENCE_PENDING과 journal durable 저장"]
+  H -->|"저장 실패 또는 stale"| X
+  H -->|"저장 성공 및 current"| I["POST device-evidence"]
+  I -->|"exact 서버 status와 ack"| J["증거 접수 반영"]
+  I -->|"실패 또는 결과 불명"| K["pending 유지·재시도/차단"]
+  J --> L{"9 inventory terminal과 완료 receipt 등 전체 조건"}
+  L -->|"미충족 또는 FAILED 미해결"| M["삭제 진행·실패 상태 유지"]
+  L -->|"충족"| N["terminal cleanup 및 F-D01-031 reset 검토"]
+  P["P-D01-021 증거와 실제 삭제 성공 분리"] -.-> L
+  Q["중단: worker generation 변경. durable intent 취소 아님"] -.-> H

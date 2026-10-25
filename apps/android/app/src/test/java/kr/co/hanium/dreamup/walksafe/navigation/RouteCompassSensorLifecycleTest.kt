@@ -56,20 +56,29 @@ class RouteCompassSensorLifecycleTest {
     }
 
     @Test
-    fun accuracyDropBlocksUntilRecoveryAndAFreshGoodEvent() {
+    fun accuracyDropKeepsIndependentFallbackButPrimaryRecoveryStillNeedsAFreshGoodEvent() {
         val state = RouteCompassSensorState()
         state.start(1, 0L, all)
         state.rv(1, 100L)
         state.fallbackInputs(1, 100L)
         state.onAccuracyChanged(1, RouteCompassStream.ROTATION_VECTOR, EarthOrientationAccuracy.LOW, 150L)
-        assertEquals(RouteCompassHeadingReason.QUALITY_LOW, state.evaluate(200L, reference).reason)
+        val firstFallback = requireNotNull(state.evaluate(200L, reference).observation)
+        assertEquals(RouteFacingSource.GRAVITY_MAGNETIC, firstFallback.source)
+        assertEquals(100L, firstFallback.observedAtElapsedRealtimeMs)
+        assertNull(firstFallback.headingAccuracyDegrees); assertNull(firstFallback.reportedHeadingAccuracyDegrees)
         // New events are still reported LOW until the accuracy callback recovers.
         state.rv(1, 250L)
         state.fallbackInputs(1, 250L)
-        assertEquals(RouteCompassHeadingReason.QUALITY_LOW, state.evaluate(260L, reference).reason)
+        val freshFallback = requireNotNull(state.evaluate(260L, reference).observation)
+        assertEquals(RouteFacingSource.GRAVITY_MAGNETIC, freshFallback.source)
+        assertEquals(250L, freshFallback.observedAtElapsedRealtimeMs)
+        assertNotNull(freshFallback.fallbackRecoveryEpisode)
         state.onAccuracyChanged(1, RouteCompassStream.ROTATION_VECTOR, EarthOrientationAccuracy.MEDIUM, 300L)
-        assertEquals("recovery status alone is not a fresh sample",
-            RouteCompassHeadingReason.QUALITY_LOW, state.evaluate(310L, reference).reason)
+        val callbackOnly = requireNotNull(state.evaluate(310L, reference).observation)
+        assertEquals("recovery status alone cannot restore the RV source",
+            RouteFacingSource.GRAVITY_MAGNETIC, callbackOnly.source)
+        assertEquals(250L, callbackOnly.observedAtElapsedRealtimeMs)
+        assertEquals(freshFallback.fallbackRecoveryEpisode, callbackOnly.fallbackRecoveryEpisode)
         state.rv(1, 320L)
         val recovered = state.evaluate(330L, reference)
         assertEquals(RouteCompassHeadingReason.VALID, recovered.reason)
@@ -145,6 +154,38 @@ class RouteCompassSensorLifecycleTest {
         assertEquals(RouteFacingDirection.UNKNOWN, RouteFacingGuidance.evaluate(3.6, observation, 520L).direction)
         assertEquals(RouteFacingDirection.FRONT,
             RouteFacingGuidance.evaluate(3.6, observation.copy(angularRateDegreesPerSecond = 0.0), 520L).direction)
+    }
+
+    @Test
+    fun rawRotationVectorSampleUsesTheProductConverterAndReachesGuidanceState() {
+        val state = RouteCompassSensorState()
+        state.start(1, 0L, all)
+        val rawAndroidValues = floatArrayOf(0.5f, -0.5f, -0.5f, 0.5f, 0.02f)
+        val converted = requireNotNull(RotationVectorMatrixConverter.fromSensorValues(rawAndroidValues))
+        assertEquals(converted, RotationVectorMatrixConverter.fromSensorValues(rawAndroidValues.copyOf(3)))
+
+        state.onSensorCallback(1, RouteCompassStream.ROTATION_VECTOR, 100_000_000L, 100_000_000L) { receivedAtMs ->
+            state.onRotationVector(
+                1, converted, Math.toDegrees(0.02).toFloat(), 100L,
+                EarthOrientationAccuracy.HIGH, receivedAtMs,
+            )
+        }
+
+        val result = state.evaluate(110L, reference)
+        assertEquals(RouteCompassHeadingReason.VALID, result.reason)
+        assertEquals(RouteFacingSource.ROTATION_VECTOR, result.observation?.source)
+        assertEquals(90.0, result.observation?.degreesTrueNorth!!, 0.1)
+    }
+
+    @Test
+    fun rotationVectorConverterMatchesAndroidFourValueMatrixAndRejectsMalformedInput() {
+        assertEquals(
+            RotationMatrix3(1f, 0f, 0f, 0f, -1f, 0f, 0f, 0f, -1f),
+            RotationVectorMatrixConverter.fromSensorValues(floatArrayOf(1f, 0f, 0f, 0f)),
+        )
+        assertNull(RotationVectorMatrixConverter.fromSensorValues(floatArrayOf(0f, 0f)))
+        assertNull(RotationVectorMatrixConverter.fromSensorValues(floatArrayOf(Float.NaN, 0f, 0f)))
+        assertNull(RotationVectorMatrixConverter.fromSensorValues(floatArrayOf(0f, 0f, 0f, Float.NaN)))
     }
 
     @Test

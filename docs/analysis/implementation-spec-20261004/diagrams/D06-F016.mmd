@@ -1,0 +1,41 @@
+flowchart TD
+  T["F-D06-016 계정삭제 fallback marker 내구 보존과 단계별 복구 연결"]
+  P["전제: 정확 requestId+actorHash; accountDeletionNetworkEntryAllowed<br/>journal. 다른 identity·corrupt·unavailable는 덮어쓰기 금지."]
+  T --> P
+  E1["E-D06-016-01 계정삭제 prepare/update→AEAD marker durable write"]
+  E1 --> T
+  E2["E-D06-016-02 앱 재시작→marker read→phase별 부모 계정삭제 동작 dispatch"]
+  E2 --> T
+  E3["E-D06-016-03 terminal receipt→정확 identity clear→key-reset 복구"]
+  E3 --> T
+  A1["1. create/update는 같은<br/>identity/secret/origin/install/clientRevision 및 허용 단조 전이를<br/>검사한다."]
+  P --> A1
+  A2["2. PREPARED에서 recovery actor를 hash 검증 후 1회 결속 가능; ACCEPTED 이후<br/>제거하고 재결속 불가."]
+  A1 --> A2
+  A3["3. temp file sync·atomic move/replace·directory sync 후 exact<br/>durability를 확인한다."]
+  A2 --> A3
+  A4["4. dispatch는 prepare replay, accepted local purge,<br/>local-purged missing evidence 거절, pending evidence 전송, ack<br/>status, terminal cleanup으로 분기한다."]
+  A3 --> A4
+  N["정상 종료: 정확 단계 저장/dispatch."]
+  A4 --> N
+  FX["결과: 비밀값이 있는 marker는 AEAD 저장; toString secret redacted. 실제 계정삭제<br/>UI/API/서버 결과는 D01/D13 경계."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"identity conflict"}
+    R1["부모 rejectIdentityConflict callback"]
+    B1 -->|조건 성립| R1
+    B2{"corrupt/symlink/hardlink/불확실 저장"}
+    R2["기존 evidence 보존, fail closed"]
+    B2 -->|조건 성립| R2
+    B3{"EVIDENCE_PENDING CAS revision 상승"}
+    R3["같은 삭제 결과·완료시간을 보존하는 evidence rebase 허용"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-015"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: false/Corrupt/Unavailable 반환."]
+    X2["시간: process/file lock 공유2000ms."]
+    X3["복구: key-reset pending을 먼저 reconcile."]
+    X4["정리: terminal exact identity만 clear."]
+  end

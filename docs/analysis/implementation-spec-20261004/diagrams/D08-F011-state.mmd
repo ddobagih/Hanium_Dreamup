@@ -1,0 +1,20 @@
+stateDiagram-v2
+ state "F-D08-011 제출된 proof" as PROOF
+ state "Backend current 확인" as BACKEND
+ state "잠금 안 proof 재검증" as LOCKED
+ state "새 rotation" as ROTATED
+ state "계정 세션 전체 폐기" as REVOKED
+ state "해당 family 폐기와401" as FAMILY_REVOKED
+ state "기존 상태 유지와 거부" as DENIED
+ state "결과 불명" as UNKNOWN
+ [*] --> PROOF
+ PROOF --> BACKEND: Backend family의current proof
+ PROOF --> LOCKED: 확인된consumed proof 또는legacy family
+ PROOF --> DENIED: invalid proof
+ BACKEND --> LOCKED: current 또는denied 결과
+ BACKEND --> DENIED: unavailable
+ LOCKED --> REVOKED: active family의확인된소비 token
+ LOCKED --> FAMILY_REVOKED: Backend denied 또는idle absolute 만료 또는rotation cap
+ LOCKED --> ROTATED: current proof와모든binding TTL 조건통과
+ LOCKED --> DENIED: 이미폐기 또는invalid stale
+ LOCKED --> UNKNOWN: commit후오류

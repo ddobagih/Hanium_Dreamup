@@ -9,6 +9,50 @@ import org.junit.Test;
 
 public final class AdminHighRiskActionGateTest {
     @Test
+    public void bindingFreezesOperationValuesEvenWhenTheCallerMutatesItsOperation() {
+        var frozen = AdminHighRiskActionGate.bindBody(
+            AdminHighRiskActionGate.reportStatus("11111111-1111-4111-8111-111111111111"),
+            AdminReportHttpClient.statusBody("reviewed", 1));
+        String[] values = {frozen.reauthenticationAction(), frozen.method(), frozen.path(), frozen.intentSha256()};
+        AdminHighRiskActionGate.Operation mutable = new AdminHighRiskActionGate.Operation() {
+            public String reauthenticationAction() { return values[0]; }
+            public String method() { return values[1]; }
+            public String path() { return values[2]; }
+            public String intentSha256() { return values[3]; }
+        };
+        var binding = new AdminHighRiskActionGate.Binding(mutable, "AAECAwQFBgcICQoLDA0ODw", 20_000L);
+        values[2] = "/admin/reports/22222222-2222-4222-8222-222222222222/status";
+        values[3] = null;
+        assertTrue(AdminHighRiskActionGate.evaluate(frozen, AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED, binding, 10_000L, true).isAllowed());
+        assertFalse(AdminHighRiskActionGate.evaluate(mutable, AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED, binding, 10_000L, true).isAllowed());
+    }
+
+    @Test
+    public void changedOrMissingBodyCannotReuseTheSameActionApproval() {
+        var base = AdminHighRiskActionGate.reportStatus("11111111-1111-4111-8111-111111111111");
+        byte[] body = AdminReportHttpClient.statusBody("reviewed", 1);
+        var approved = AdminHighRiskActionGate.bindBody(base, body);
+        var binding = new AdminHighRiskActionGate.Binding(approved, "AAECAwQFBgcICQoLDA0ODw", 20_000L);
+        body[0] = 0; // Mutating a caller buffer cannot change the approved digest.
+        for (var candidate : new AdminHighRiskActionGate.Operation[] {
+            base,
+            AdminHighRiskActionGate.bindBody(base, AdminReportHttpClient.statusBody("resolved", 1)),
+            AdminHighRiskActionGate.bindBody(base, AdminReportHttpClient.statusBody("reviewed", 2))
+        }) {
+            var result = AdminHighRiskActionGate.evaluate(candidate, AdminSecurityState.NORMAL,
+                AdminRecoveryCustodyState.ATTESTED, binding, 10_000L, true);
+            assertFalse(result.isAllowed());
+            assertEquals("reconfirmation_binding_mismatch", result.reason());
+        }
+        assertTrue(AdminHighRiskActionGate.evaluate(
+            AdminHighRiskActionGate.bindBody(base, AdminReportHttpClient.statusBody("reviewed", 1)),
+            AdminSecurityState.NORMAL, AdminRecoveryCustodyState.ATTESTED,
+            binding, 10_000L, true).isAllowed());
+    }
+
+    @Test
     public void actionCatalogIsExactlyTheThreeCanonicalTriples() {
         String[][] expected = {
             {"RELEASE_APPROVAL", "release.approval", "POST", "/admin/operations/release-approvals"},

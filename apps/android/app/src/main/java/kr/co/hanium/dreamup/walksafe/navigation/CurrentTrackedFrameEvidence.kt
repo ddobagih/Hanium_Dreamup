@@ -1,22 +1,23 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
-import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionFrameEvidence
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionSnapshot
 import kr.co.hanium.dreamup.walksafe.depth.CurrentTrackedFrameObservation
 import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingResult
 
 /** Current visual/depth evidence with a separate, unchanged detector source. Contains no report image. */
 internal class CurrentTrackedFrameEvidence private constructor(
     val observation: CurrentTrackedFrameObservation,
-    val currentEvidence: MainActivity.DetectionFrameEvidence,
+    val currentEvidence: DetectionFrameEvidence,
 ) {
     fun sourceAgeMs(nowElapsedRealtimeMs: Long): Long =
         nowElapsedRealtimeMs - observation.sourceKey.capturedAtElapsedRealtimeMs
 
     companion object {
         fun fromTrackingResult(
-            sourceSnapshot: MainActivity.DetectionSnapshot,
+            sourceSnapshot: DetectionSnapshot,
             trackingResult: VisualTrackingResult,
-            currentEvidence: MainActivity.DetectionFrameEvidence,
+            currentEvidence: DetectionFrameEvidence,
             nowElapsedRealtimeMs: Long,
         ): CurrentTrackedFrameEvidence? {
             val source = trackingResult.detectorSourceKey

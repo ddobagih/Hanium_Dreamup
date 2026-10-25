@@ -1,0 +1,45 @@
+flowchart TD
+  T["F-D06-026 현장 telemetry·카메라 비측정 샘플·이벤트 allowlist"]
+  P["전제: 활성 현장 로그, privacy/crypto fence 없음, 세션32MiB 미도달."]
+  T --> P
+  E1["E-D06-026-01 새 telemetry→1000ms 제한→runtime와 depth_debug 저장"]
+  E1 --> T
+  E2["E-D06-026-02 camera fallback sample→monotonic 간격 확인→metric<br/>false 기록"]
+  E2 --> T
+  E3["E-D06-026-03 허용 event→이름/field allowlist 검사→암호화 append"]
+  E3 --> T
+  A1["1. telemetry는 벽시각 기준 최소1000ms 간격으로 rate limit한다."]
+  P --> A1
+  A2["2. 카메라 대체 샘플은 단조시각 최소1000ms 간격,<br/>metric=false/reports_allowed=false로 저장한다."]
+  A1 --> A2
+  A3["3. event 이름과 허용된 key만 보존하며 문자열은 제한된 token 문자·길이로 필터한다."]
+  A2 --> A3
+  A4["4. 각 레코드는 ordinal·segment AAD로 봉인한다. 기존 bytes와 예상이 다르면 chain을<br/>복원·검증한다."]
+  A3 --> A4
+  A5["5. segment rotate, append fsync 후 tail hash/ordinal manifest를<br/>갱신한다."]
+  A4 --> A5
+  N["정상 종료: 하나의 암호화 레코드 및 manifest 기록."]
+  A5 --> N
+  FX["결과: 암호화 records-NNNN.jsonl·manifest; 표준 event는 정확한 좌표/발화 텍스트<br/>비수집."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"레이트 제한/허용되지 않은 field"}
+    R1["해당 샘플 또는 field 생략"]
+    B1 -->|조건 성립| R1
+    B2{"session bytes 상한 초과"}
+    R2["storageLimitReached=true, 이후 신규 record 차단"]
+    B2 -->|조건 성립| R2
+    B3{"append/manifest 실패"}
+    R3["cryptoBlocked"]
+    B3 -->|조건 성립| R3
+    B4{"한 segment4MiB 도달 예상"}
+    R4["비어있지 않으면 다음 segment로 회전"]
+    B4 -->|조건 성립| R4
+  end
+  POL["정책: P-D06-024, P-D06-025"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: crypto failure 차단; 부분 실패를 정상 기록으로 표시하지 않음."]
+    X2["재시도: 별도 자동 재전송 없음."]
+    X3["정리: 단기 plaintext byte 배열 사용 후 지움."]
+  end

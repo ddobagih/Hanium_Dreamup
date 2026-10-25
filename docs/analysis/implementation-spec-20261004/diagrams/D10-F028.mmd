@@ -1,0 +1,28 @@
+flowchart TD
+  A["F-D10-028 로컬 model registry 전체·runtime 참조 검증"]
+  N0["1. registry/deployment schema와 model 목록 고유성을 검사한다."]
+  A --> N0
+  N1["2. verify는 모든 model의 PT·exports·dataset manifest·training results 파일 hash 검사. Android export metadata 입력[1,768,768,3],출력[1,300,6]을 요구."]
+  N0 --> N1
+  N2["3. deployment_eligible=true이면 per-image/label hash policy 및 F-D10-019 content 검사, blockers 없음 요구. active/previous 참조 model ID 존재 확인."]
+  N1 --> N2
+  N3["4. verify-runtime은 active 및 previous에 참조된 모델의 artifact/exports만 검사하고 dataset/training 입력은 요구하지 않는다."]
+  N2 --> N3
+  N4["5. issues 배열과 ok를 출력. 문제없음0, 검증이슈1, 읽기/파싱 예외2."]
+  N3 --> N4
+  B0{"verify-runtime 성공"}
+  R0["실제 Android config와 class/hash 대조는 이 함수가 하지 않음; process serving 증거도 아님"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"배포대상 refs 없음"}
+  R1["runtime 검증 이슈"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"등록된21cls raw export"}
+  R2["고정 [1,300,6] metadata 정책과 충돌 가능"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N4 --> Z
+  P["적용 정책 · P-D10-023"]
+  P -. "코드 분기 기준" .-> A

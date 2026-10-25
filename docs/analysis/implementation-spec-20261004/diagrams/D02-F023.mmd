@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D02-023 위험 음성 후보 안정화·공정 큐·원본 lease"]
+  E["진입: current risk observations / claim/start/done/reject"]
+  G{"P-D02-023 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["일반 stability보다 빠른 STOP 허용"]
+  G -->|"emergency RAW STOP conf＞=.90·2frame·100ms·TTC＜=300·dist＜=.9·남은<br/>lease＞400"| B0
+  B1["newer source+later deadline 및 TTC band+절반 또는 distance band+margin<br/>조건; global700ms는 유지"]
+  G -->|"same severity worsen"| B1
+  B2["distance band가 margin 이상 변하지 않으면 반복 억제"]
+  G -->|"same continuous CAUTION"| B2
+  B3["진행 발화를 임의 무효화하지 않고 terminal owner 보존"]
+  G -->|"claimed/started 후 startTTL 만료"| B3
+  B4["미시작 candidate 취소; 이미 시작 terminal receipt 별도"]
+  G -->|"scene/source owner 사라짐"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["신뢰 source·distance/TTC/confidence·원본 만료를 검사"]
+    S1["track별 안정화 후 severity·approach·distance·FIFO 공정순위로 후보 예약"]
+    S2["global/track/navigation cooldown과 동일 CAUTION 억제를 적용"]
+    S3["높은 severity는 기존 위험을 preempt; 같은 rank 악화는 policy replacement token으로만<br/>교체"]
+    S4["actuator가 새 owner를 실제 수락한 뒤 이전 예약을 revoke"]
+    S5["실제 DONE으로 cooldown 확정, 거절/실패는 예약 회계 rollback"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+  E -.-> S0
+  N["정상 종료: actual DONE이 confirmed cooldown/FIFO 상태 반영."]
+  X["취소·중단: pending cancellation은 exact receipt/owner에만 적용. / 늦은 이전 소유자의<br/>callback은 현 상태를 바꾸지 않는다."]
+  C["정리: 새 walk reset은 track/history/pending 전체; owner-specific reset은 해당<br/>source만."]
+  R["재시도·복구: 자동 재시도 없음; 새 적법한 요청이 필요하다. / 현재 조건과 소유권을 다시 검사한다."]
+  S5 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

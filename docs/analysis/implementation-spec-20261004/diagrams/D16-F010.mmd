@@ -1,0 +1,18 @@
+flowchart TD
+  META["F-D16-010 · P-D16-010"]
+  META --> A
+  A["PPK 요청"] --> A2["base O·합친 navigation 그룹 내부 canonical 중복 병합"]
+  A2 --> B{"exact native version·입력 수/읽기·출력충돌 유효"}
+  B -->|"아니오"| X["ENGINE_NOT_AVAILABLE 또는 입력 오류"]
+  B -->|"예"| C["generation token·Java processLock·C mutex"]
+  C --> D{"실제 rover 관측 기간 0..48시간"}
+  D -->|"아니오"| F["native 실패·잘못된 출력 삭제"]
+  D -->|"예"| E["KINEMATIC COMBINED·nf3·postpos"]
+  E -->|"showmsg token 취소 / result4"| K["출력 폐기·AnalysisCancelledException"]
+  E -->|"native 오류"| F
+  E -->|"성공"| G["UTC LLH output 계약 검증"]
+  G -->|"유효"| H["Q1 0개도 반환·평가기에서 충분성 판단"]
+  G -->|"무효"| F
+  F --> J["event출력·token·C메모리·symlink·lock 정리"]
+  K --> J
+  

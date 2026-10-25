@@ -44,7 +44,8 @@ class RouteNavigatorOrderedAlignmentTest {
             facingObservation = facing(90.0))
         assertClock(12, update)
         assertEquals(0, update.routeAlignmentDiagnostic?.segmentIndex)
-        assertTrue(update.instruction?.contains("20m 앞, 오른쪽으로 꺾으세요") == true)
+        assertTrue(update.instruction?.contains("다음 안내 지점까지 경로를 따라 약 20미터") == true)
+        assertTrue(update.instruction?.contains("다음 안내 지점에서 경로 기준으로 3시 방향으로 꺾으세요") == true)
     }
 
     @Test fun targetStopsAtTheCornerUntilTheCurrentProjectionReachesItsVertex() {
@@ -102,10 +103,13 @@ class RouteNavigatorOrderedAlignmentTest {
 
     @Test fun staleCompassStillSuppressesClockEvenWhenTheOrderedRouteTargetIsKnown() {
         val navigator = navigator(route(point(0.0), point(90.0)), fix(0.0))
-        val update = navigator.update(fix(0.0), 1_000, false, facingObservation = facing(90.0, 499))
+        val waiting = navigator.update(fix(0.0), 1_000, false, facingObservation = facing(90.0, 499))
+        assertEquals("guidance_facing_recheck_wait", waiting.reason)
+        assertNull(waiting.instruction)
+        val update = requireNotNull(navigator.retryGuidance(2_500L, facing(90.0, 499)))
         assertNoClock(update)
         assertNotNull(update.routeAlignmentDiagnostic?.bearingDegreesTrueNorth)
-        assertTrue(update.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
+        assertTrue(update.instruction?.contains("사용자 방향을 확인할 수 없어 다음 방향 안내를 보류합니다") == true)
     }
 
     @Test fun replacementAndInterruptionDoNotReviveThePreviousDepartureAnchor() {
@@ -159,7 +163,7 @@ class RouteNavigatorOrderedAlignmentTest {
         val connector = navigator(route, offset).update(offset, 1_000, false, facingObservation = facing(180.0))
         assertClock(12, connector)
         assertEquals(RouteAlignmentReason.DEPARTURE_CONNECTOR, connector.routeAlignmentDiagnostic?.reason)
-        assertTrue(connector.instruction?.contains("경로 시작점은") == true)
+        assertTrue(connector.instruction?.contains("가장 가까운 경로 지점은") == true)
         val uncertain = offset.copy(accuracyM = 20f)
         val departure = navigator(route, uncertain).update(uncertain, 1_000, false, facingObservation = facing(90.0))
         assertClock(12, departure)
@@ -169,10 +173,30 @@ class RouteNavigatorOrderedAlignmentTest {
     @Test fun lateralStartOffsetStillUsesTheConnectorWhenProjectionIsInsideTheFirstSegment() {
         val route = route(point(0.0), point(100.0))
         val offset = fix(5.0, 15.0)
-        val update = navigator(route, offset).update(offset, 1_000, false, facingObservation = facing(180.0))
-        // The unchanged angular-error envelope crosses a clock bin edge: only coarse FRONT is supported.
-        assertNoClock(update)
-        assertTrue(update.instruction?.contains("휴대전화 후면 카메라 기준 앞쪽") == true)
+        val connector = navigator(route, offset)
+        val waiting = connector.update(offset, 1_000, false, facingObservation = facing(180.0))
+        assertEquals("route_guidance", waiting.reason)
+        assertEquals(RouteFacingExpression.CLOCK, waiting.facingDiagnostic?.expression)
+        val projectedFacing = RouteFacingGuidance.evaluate(
+            requireNotNull(waiting.routeAlignmentDiagnostic?.bearingDegreesTrueNorth), facing(180.0), 1_000L)
+        assertEquals(12, projectedFacing.clockHour)
+        assertNull(projectedFacing.clockRange)
+        assertTrue(projectedFacing.clockPrecisionAvailable)
+        assertClock(12, waiting)
+        assertTrue(waiting.instruction?.contains("가장 가까운 경로 지점은") == true)
+        assertTrue(waiting.instruction?.contains("걸어갈 수 있는 통로는 확인되지 않았습니다") == true)
+        assertNull(connector.currentAcceptedRouteMatchFor(1_000L))
+        assertTrue(connector.isInstructionCurrent(waiting, 1_000, facing(180.0)))
+        assertFalse(connector.isInstructionCurrent(waiting, 1_501, facing(180.0)))
+        val update = requireNotNull(connector.retryGuidance(2_500L, facing(180.0, 2_500L)))
+        // The closest projection is directly south of the unchanged fix: heading 180 is 12 o'clock.
+        assertClock(12, update)
+        assertEquals(RouteFacingExpression.CLOCK, update.facingDiagnostic?.expression)
+        assertTrue(update.instruction?.contains("가장 가까운 경로 지점은") == true)
+        assertTrue(update.instruction?.contains("걸어갈 수 있는 통로는 확인되지 않았습니다") == true)
+        assertTrue(connector.isInstructionCurrent(update, 2_500, facing(180.0, 2_500)))
+        assertFalse(update.instruction?.contains("기준 앞쪽") == true)
+        assertFalse(update.instruction?.contains("몸을 돌려주세요") == true)
         assertEquals(RouteAlignmentReason.DEPARTURE_CONNECTOR, update.routeAlignmentDiagnostic?.reason)
         assertFalse(update.instruction?.contains("왼쪽으로") == true)
         val uncertain = offset.copy(accuracyM = 20f)
@@ -231,7 +255,7 @@ class RouteNavigatorOrderedAlignmentTest {
         assertTrue("$update", update.instruction?.contains("약 ${hour}시 방향") == true)
     }
     private fun assertNoClock(update: RouteNavigatorUpdate) {
-        assertFalse("$update", update.instruction?.contains("시 방향") == true)
+        assertFalse("$update", update.instruction?.let { Regex("""약 (?:1[0-2]|[1-9])시(?: 방향|에서 (?:1[0-2]|[1-9])시 사이 방향)""").containsMatchIn(it) } == true)
     }
 
     // Captured public Seoul City Hall -> Cheonggye Plaza response, 2026-09-15; no user location.

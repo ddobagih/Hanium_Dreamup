@@ -10,28 +10,36 @@ class MainActivityPositioningWiringStaticTest {
 
     @Test
     fun actorChangeStartsFromANewCoordinatorBeforeRestoringThatActorsProfile() {
-        val profile = functionBlock("private fun ensurePositioningProfileForCurrentActor(")
-        val replaced = profile.indexOf("positioningCoordinator = PositioningCoordinator()")
+        val profile = MainActivityRefactorSource.function(source, "private fun ensurePositioningProfileForCurrentActor(")
+        val replaced = profile.indexOf("positioningCoordinator = defaultPositioningCoordinator()")
         val actorBound = profile.indexOf("positioningProfileActorId = actorId")
         val restored = profile.indexOf("restored?.let(positioningCoordinator::restoreProfile)")
         assertTrue(replaced >= 0 && actorBound > replaced && restored > actorBound)
-        // S09-56 (09.txt:154): the load status is kept so default step length and storage failure differ.
         assertTrue(profile.contains("pedestrianProfileStore?.loadResult(id)"))
-
-        val persist = functionBlock("private fun persistPositioningProfileForCurrentActor(")
+        val persist = MainActivityRefactorSource.function(source, "private fun persistPositioningProfileForCurrentActor(")
         assertTrue(persist.contains("if (actorId != positioningProfileActorId) return"))
     }
 
     @Test
     fun zuptKeepsSensorMeasurementTimeAndCallbackReceiptTimeSeparate() {
-        val sources = functionBlock("private fun startPositioningObservationSources(")
+        val sources = MainActivityRefactorSource.function(source, "private fun startPositioningObservationSources(")
         assertTrue(sources.contains("ZuptObservation(decision.sample?.elapsedRealtimeMs ?: nowMs)"))
         assertTrue(sources.contains("receivedAtElapsedRealtimeMs = nowMs"))
+        val androidSources = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/AndroidNavigationSources.kt").readText()
+        val tracker = MainActivityRefactorSource.member(androidSources, "pedestrianTracker")
+        assertTrue(tracker.contains("AndroidPedestrianMotionTracker(context, onDecision = onMotion)"))
+        val sourcesFactory = MainActivityRefactorSource.factory(source, "createNavigationAndroidSources")
+        assertTrue(sourcesFactory.contains("AndroidNavigationSources("))
+        assertTrue(sourcesFactory.contains("context = this,"))
+        assertTrue(MainActivityRefactorSource.factory(source, "createNavigationSessions").contains("sources = { createNavigationAndroidSources() }"))
+        val positioning = MainActivityRefactorSource.composition(source, "positioningSessionController")
+        assertTrue(positioning.contains("val sources = positions.sources()"))
+        assertTrue(positioning.contains("PositioningSessionController(run, scope, sources, mounting,"))
     }
 
     @Test
     fun zuptIsRateLimitedAndRequiresPhysicalStationaryEvidence() {
-        val sources = functionBlock("private fun startPositioningObservationSources(")
+        val sources = MainActivityRefactorSource.function(source, "private fun startPositioningObservationSources(")
         assertTrue(sources.contains("nowMs - it >= 1_000L"))
         assertTrue(sources.contains("decision.shouldApplyZeroVelocityUpdate && userMotion.zeroVelocityUpdateAllowed && zuptDue"))
     }
@@ -46,11 +54,20 @@ class MainActivityPositioningWiringStaticTest {
 
     @Test
     fun routeGuidanceRequiresThePositionConfidenceGateIndependentlyOfTheCorridorMatch() {
-        val handler = functionBlock("private fun handleLocationUpdate(")
-        val gate = handler.indexOf("val matchedEvidenceCurrent = !positionGuidancePaused &&")
-        val guidance = handler.indexOf("updateRouteGuidance(filteredTrusted, rawRouteLocation)")
-        assertTrue(gate >= 0 && guidance > gate)
-        assertTrue(handler.substring(gate, guidance).contains("if (matchedEvidenceCurrent) {"))
+        val handler = NavigationPolicySource.observation(source)
+        val dispatch = handler.indexOf("val matchedEvidenceCurrent = guidance().dispatchAcceptedRouteFix(")
+        assertTrue(handler.indexOf("val positionGuidancePaused = guidance().applyPositionConfidenceDecision(") in 0 until dispatch)
+        assertTrue(handler.substring(dispatch).contains("filteredTrusted, rawRouteLocation, positionGuidancePaused,"))
+        assertTrue(handler.indexOf("appendGnssTrace(positioningSnapshot, matchedEvidenceCurrent)") > dispatch)
+        val accepted = MainActivityRefactorSource.function(source, "internal fun dispatchAcceptedRouteFix(")
+        assertTrue(accepted.contains("val matchedEvidenceCurrent = !positionPaused && directionGuidancePauseReason != \"tmap_unavailable\""))
+        assertTrue(accepted.contains("dispatchGuidance: (TrustedLocation, TrustedLocation) -> Unit = ::updateRouteGuidance"))
+        assertTrue(accepted.contains("if (matchedEvidenceCurrent) dispatchGuidance(location, rawLocation)"))
+        assertTrue(accepted.contains("return matchedEvidenceCurrent"))
+        assertTrue(accepted.contains("publishDecision(decision.copy(reason = \"tmap_unavailable\"))"))
+        assertTrue(MainActivityRefactorSource.composition(source, "positioningSessionController").contains("{ guidance.value }"))
+        assertTrue(MainActivityRefactorSource.composition(source, "routeGuidanceController").contains("RouteGuidanceController(run,"))
+        assertTrue(MainActivityRefactorSource.property(source, "routeGuidanceController").contains("by navigationSessions.guidance"))
     }
 
     private fun functionBlock(marker: String): String {

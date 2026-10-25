@@ -3,6 +3,10 @@ package kr.co.hanium.dreamup.walksafe
 import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import org.junit.Assert.*
 import org.junit.Test
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.random.Random
 
 class CameraObjectPresentationTest {
     private val source = CameraObjectPresentation.Capture(1, 1_000_000_000L, 1_000L, "sensor-portrait")
@@ -203,5 +207,177 @@ class CameraObjectPresentationTest {
         val displayed = unknown.filterIndexed { index, _ -> index !in merged }.take(6)
         assertEquals(unrelated, displayed)
         assertEquals("other-5", displayed.last().trackId)
+    }
+
+    @Test fun repeatedFreshQueriesReuseTheMergeWithoutRepeatingAnyOverlapWork() {
+        val regions = (0 until 16).map { index ->
+            region("track-$index", RectNorm(.05f + index % 4 * .22f, .05f + index / 4 * .22f, .1f, .1f))
+        }
+        val presentation = presentation(regions)
+        repeat(30) { index -> presentation.recordPrimary(capture(1_010L + index * 10L), regions) }
+        val expected = regions.indices.associateWith { it }
+        assertEquals(expected, presentation.mergedUnknownIndices(source, regions, 1_400L))
+        val first = presentation.computationStats
+        assertEquals(31L, first.geometricPasses)
+        assertEquals(31L * 16L * 16L, first.overlapComparisons)
+        repeat(30) { index ->
+            assertEquals(expected, presentation.mergedUnknownIndices(source, regions, 1_400L + index))
+        }
+        assertEquals(first, presentation.computationStats)
+        assertTrue(presentation.mergedUnknownIndices(source, regions, 1_801L).isEmpty())
+        assertTrue(presentation.mergedUnknownIndices(source, regions, 1_299L).isEmpty())
+        assertEquals(first, presentation.computationStats)
+        assertEquals(expected, presentation.mergedUnknownIndices(source, regions, 1_800L))
+    }
+
+    @Test fun everyNewPrimaryComputesOnlyItsNewEdgeAndCannotSkipAMetricContinuityFailure() {
+        val unknown = listOf(region("mask"))
+        val presentation = presentation()
+        assertEquals(mapOf(0 to 0), presentation.mergedUnknownIndices(source, unknown, 1_010L))
+        assertEquals(1L, presentation.computationStats.overlapComparisons)
+        presentation.recordPrimary(capture(1_100L), listOf(region(depth = 2.2)))
+        assertEquals(mapOf(0 to 0), presentation.mergedUnknownIndices(source, unknown, 1_110L))
+        assertEquals(2L, presentation.computationStats.overlapComparisons)
+        presentation.recordPrimary(capture(1_200L), listOf(region(depth = 2.4)))
+        assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_210L).isEmpty())
+        assertEquals(3L, presentation.computationStats.overlapComparisons)
+        presentation.recordPrimary(capture(1_300L), listOf(region()))
+        assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_310L).isEmpty())
+        assertEquals(4L, presentation.computationStats.overlapComparisons)
+    }
+
+    @Test fun changedUnknownRegionsInvalidateReuseEvenWhenTheCallerMutatesItsOriginalList() {
+        val unknown = mutableListOf(region("mask"))
+        val presentation = presentation()
+        assertEquals(mapOf(0 to 0), presentation.mergedUnknownIndices(source, unknown, 1_010L))
+        unknown.add(region("second-mask"))
+        assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_020L).isEmpty())
+        unknown.removeAt(1)
+        unknown[0] = region("mask", depth = 5.0)
+        assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_030L).isEmpty())
+        unknown[0] = region("mask")
+        assertEquals(mapOf(0 to 0), presentation.mergedUnknownIndices(source, unknown, 1_040L))
+        assertEquals(4L, presentation.computationStats.mergePasses)
+    }
+
+    @Test fun aNewUnknownCaptureWithEqualRegionValuesUsesItsOwnExactAnchor() {
+        val unknown = listOf(region("mask"))
+        val presentation = presentation()
+        assertEquals(mapOf(0 to 0), presentation.mergedUnknownIndices(source, unknown, 1_010L))
+        val replacement = capture(1_100L)
+        presentation.recordPrimary(replacement, listOf(region("replacement")))
+        assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_110L).isEmpty())
+        assertEquals(mapOf(0 to 0), presentation.mergedUnknownIndices(replacement, unknown, 1_110L))
+        assertTrue(presentation.mergedUnknownIndices(replacement.copy(capturedAtMs = 1_099L), unknown, 1_110L).isEmpty())
+    }
+
+    @Test fun clearAndGeometryOrEpochReplacementCannotReuseAnOldExactCaptureResult() {
+        val unknown = listOf(region("mask"))
+        val presentation = presentation()
+        assertEquals(mapOf(0 to 0), presentation.mergedUnknownIndices(source, unknown, 1_010L))
+        presentation.clear()
+        assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_010L).isEmpty())
+        presentation.recordPrimary(source, listOf(region(depth = 5.0)))
+        assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_010L).isEmpty())
+        val rotated = capture(1_100L).copy(geometryId = "sensor-landscape")
+        presentation.recordPrimary(rotated, listOf(region()))
+        assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_110L).isEmpty())
+        assertEquals(mapOf(0 to 0), presentation.mergedUnknownIndices(rotated, unknown, 1_110L))
+        val nextEpoch = rotated.copy(epoch = 2, frameId = 1L)
+        presentation.recordPrimary(nextEpoch, listOf(region(depth = 5.0)))
+        assertTrue(presentation.mergedUnknownIndices(rotated, unknown, 1_110L).isEmpty())
+        assertTrue(presentation.mergedUnknownIndices(nextEpoch, unknown, 1_110L).isEmpty())
+    }
+
+    @Test fun aCachedSourceEvictedByTheFrameBoundCannotContinueMerging() {
+        val unknown = listOf(region("mask"))
+        val presentation = presentation()
+        assertEquals(mapOf(0 to 0), presentation.mergedUnknownIndices(source, unknown, 1_010L))
+        repeat(64) { offset ->
+            presentation.recordPrimary(source.copy(frameId = source.frameId + offset + 1), listOf(region()))
+        }
+        assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_010L).isEmpty())
+    }
+
+    @Test fun ambiguousReverseMatchesAreCountedOnceAndStillPreserveEveryUnknownRegion() {
+        val unknown = List(80) { region("mask-$it") }
+        val presentation = presentation(List(40) { region("track-$it") })
+        assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_010L).isEmpty())
+        assertEquals(3_200L, presentation.computationStats.overlapComparisons)
+        repeat(10) { assertTrue(presentation.mergedUnknownIndices(source, unknown, 1_020L).isEmpty()) }
+        assertEquals(3_200L, presentation.computationStats.overlapComparisons)
+    }
+
+    @Test fun optimizedOutputMatchesTheUncachedBaselineAcrossDelayedAndAmbiguousScenes() {
+        val random = Random(6_102_026)
+        repeat(80) { scene ->
+            val frames = mutableListOf<Pair<CameraObjectPresentation.Capture, List<CameraObjectPresentation.Region>>>()
+            val unknown = (0 until 6).map { index ->
+                region("mask-$index", gridBox(index), 2.0 + index * .5)
+            }
+            val presentation = CameraObjectPresentation()
+            repeat(12) { step ->
+                val current = capture(1_000L + step * 40L)
+                val regions = unknown.mapIndexedNotNull { index, item ->
+                    if (step > 0 && random.nextInt(10) == 0) null else item.copy(
+                        trackId = if (step > 0 && random.nextInt(12) == 0) "replacement-$step-$index" else "track-$index",
+                        bboxNorm = item.bboxNorm.copy(x = item.bboxNorm.x + random.nextInt(4) * .005f),
+                        metricDistanceM = if (random.nextInt(9) == 0) null else item.metricDistanceM?.plus(random.nextInt(3) * .1),
+                    )
+                }.let { rows -> if (random.nextInt(8) == 0 && rows.isNotEmpty()) rows + rows.first() else rows }
+                frames.add(current to regions)
+                assertTrue(presentation.recordPrimary(current, regions))
+                val now = current.capturedAtMs + 1L
+                val expected = baselineMerge(frames, unknown)
+                assertEquals("scene=$scene step=$step", expected, presentation.mergedUnknownIndices(source, unknown, now))
+                assertEquals("cached scene=$scene step=$step", expected, presentation.mergedUnknownIndices(source, unknown.toList(), now + 1L))
+            }
+        }
+    }
+
+    private fun gridBox(index: Int) = RectNorm(.05f + index % 3 * .3f, .05f + index / 3 * .3f, .12f, .16f)
+
+    /** Kept as the previous uncached algorithm to compare behavior, not a mirror of cache mechanics. */
+    private fun baselineMerge(
+        frames: List<Pair<CameraObjectPresentation.Capture, List<CameraObjectPresentation.Region>>>,
+        unknown: List<CameraObjectPresentation.Region>,
+    ): Map<Int, Int> {
+        fun overlaps(left: RectNorm, right: RectNorm): Boolean {
+            val width = max(0f, min(left.x + left.width, right.x + right.width) - max(left.x, right.x))
+            val height = max(0f, min(left.y + left.height, right.y + right.height) - max(left.y, right.y))
+            val intersection = width * height
+            return intersection / (left.area + right.area - intersection) >= .70f
+        }
+        fun matches(left: List<CameraObjectPresentation.Region>, right: List<CameraObjectPresentation.Region>): Map<Int, Int> {
+            val candidates = left.map { row -> right.indices.filter { overlaps(row.bboxNorm, right[it].bboxNorm) } }
+            return candidates.mapIndexedNotNull { index, rows ->
+                rows.singleOrNull()?.takeIf { other -> candidates.count { other in it } == 1 }?.let { index to it }
+            }.toMap()
+        }
+        fun sameMetric(left: CameraObjectPresentation.Region, right: CameraObjectPresentation.Region): Boolean {
+            val a = left.metricDistanceM ?: return false
+            val b = right.metricDistanceM ?: return false
+            return abs(a - b) <= .30
+        }
+        val sourceRows = frames.first().second
+        val following = frames.drop(1)
+        val edges = frames.zipWithNext { previous, next -> matches(previous.second, next.second) }
+        return matches(unknown, sourceRows).mapNotNull { (unknownIndex, primaryIndex) ->
+            val mask = unknown[unknownIndex]
+            if (!sameMetric(mask, sourceRows[primaryIndex])) return@mapNotNull null
+            var index = primaryIndex
+            var previous = sourceRows
+            for ((step, frame) in following.withIndex()) {
+                val rows = frame.second
+                val id = previous[index].trackId?.takeIf { it.isNotBlank() }
+                val nextIndex = id?.let { track -> rows.indices.singleOrNull { rows[it].trackId == track } }
+                if (id == null || nextIndex == null || previous.count { it.trackId == id } != 1 ||
+                    edges[step][index] != nextIndex || !sameMetric(previous[index], rows[nextIndex]) ||
+                    !sameMetric(mask, rows[nextIndex])) return@mapNotNull null
+                index = nextIndex
+                previous = rows
+            }
+            unknownIndex to index
+        }.toMap()
     }
 }

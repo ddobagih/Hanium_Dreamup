@@ -1,0 +1,42 @@
+flowchart TD
+  T["F-D06-017 raw 탐지·성능·움직임 30초 집계 창"]
+  P["전제: ACTIVE current walk epoch; raw 동의는 최종 coordinator gate에서<br/>재검사; 정확 detector loaded generation/hash token."]
+  T --> P
+  E1["E-D06-017-01 완료 추론 callback→raw executor→window counters"]
+  E1 --> T
+  E2["E-D06-017-02 30초 창 도달→동일시각 DETECTION/PERFORMANCE pair"]
+  E2 --> T
+  E3["E-D06-017-03 detector identity 변경→이전 짧은 창 폐기/분리 count"]
+  E3 --> T
+  A1["1. MainActivity가 완료 추론 시각과 drop 수를 캡처해 single raw executor로<br/>넘긴다."]
+  P --> A1
+  A2["2. walk/epoch stale이면 창 전체를 reset한다."]
+  A1 --> A2
+  A3["3. identity가 창 도중 바뀌면 짧은 이전 창을 저장하지 않고 split count를 올린다."]
+  A2 --> A3
+  A4["4. 동의가 있을 때 motion read-only peek로 상태 집계만 더한다."]
+  A3 --> A4
+  A5["5. 30초 후 pair 생성·창 reset을 하되 같은 보행의 마지막 completion timestamp는<br/>보존하여 경계 stall을 측정한다."]
+  A4 --> A5
+  N["정상 종료: captureMetadataBatch에 pair 전달."]
+  A5 --> N
+  FX["결과: 메모리 집계. 영상/사진/오디오/정확 좌표/route geometry·bbox 없음. bucket은 성능<br/>합격기준이 아님."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"runtime identity 없음/검증 세대 불일치"}
+    R1["최종 INVALID_WINDOW"]
+    B1 -->|조건 성립| R1
+    B2{"서로 다른 walk"}
+    R2["전체 reset, 과거 interval 안 섞음"]
+    B2 -->|조건 성립| R2
+    B3{"raw 동의 없음"}
+    R3["motion aggregate 보존하지 않음"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-016"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 누락 identity/시간 불일치 저장 차단."]
+    X2["중단: pause/end/동의 변경에서 reset."]
+    X3["정리: 메모리 counters reset."]
+  end

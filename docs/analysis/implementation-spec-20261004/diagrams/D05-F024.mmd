@@ -1,0 +1,14 @@
+flowchart TD
+  H["P-D05-024 · F-D05-024 진단 FastSAM 재시작·unknown 소유범위·중복 표시 결합"]
+  H --> L["primary 준비 뒤 unknown load"]
+  L -->|"성공"| R["READY serviceepoch"]
+  L -->|"실패"| F["FAILED 사용자 retry"]
+  F --> W["WAITING_RELEASE"]
+  W --> Q{"native release 확인"}
+  Q -->|"아니오"| X["RELEASE_FAILED"]
+  Q -->|"예"| L
+  R --> C["원 camera service geometry scope"]
+  C --> T["mask 와 materialpoint callback"]
+  T --> G{"scope current age800"}
+  G -->|"아니오"| D["overlay 폐기 leaseclose"]
+  G -->|"예"| U["유일 known 매칭만시각 merge 최대 6"]

@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D11-022 visualTest 별도 workspace 생성·지원 overlay"]
+  B["P-D11-022 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. 인자 수와 절대경로 및 destination 부재를 검사한다"]
+  B --> T0
+  T1["2. git archive HEAD를 새 디렉터리에 추출한다"]
+  T0 --> T1
+  T2["3. 동일 export의 tools/visual-test/overlay를 위에 복사한다"]
+  T1 --> T2
+  T3["4. 로컬 SDK·Vosk·비밀 설정을 별도 준비하고 assembleVisualTest를 사용하도록 안내한다"]
+  T2 --> T3
+  Z["검사 또는 처리 결과를 반환하고 해당 호출 종료"]
+  T3 --> Z
+  C0{"대상 경로 존재 또는 symlink"}
+  R0["exit2; 기존 작업 유지"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"미커밋 WIP"}
+  R1["archive에 포함하지 않음"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"visualTest build"}
+  R2["별도 .visualtest package/debug signing; 출시 APK 아님"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

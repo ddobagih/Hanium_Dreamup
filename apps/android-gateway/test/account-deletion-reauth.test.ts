@@ -309,3 +309,39 @@ test("GWBE-10 a failed auth-time read is not recent: new request 401, capability
     }
   }
 });
+
+test("backend password recovery scope can accept deletion and retain capability status", async () => {
+  const actorId = "018f2b63-8fb8-4cc2-98a1-4a4fd27c3099";
+  const requestId = "password_recovery_delete_request_01";
+  const login = await handleGatewayRequest(new Request("http://127.0.0.1:8081/api/field-session", {
+    method: "POST",
+    headers: { "content-type": "application/json", "cf-connecting-ip": "198.51.100.199" },
+    body: JSON.stringify({
+      grant_type: "password", email: "recovery@example.org",
+      password: "deletion-recovery-password-1234", remember_me: false,
+      purpose: "account_deletion_recovery"
+    })
+  }), { fetchImpl: async () => Response.json({
+    schema_version: "walksafe.account-authentication.v1",
+    actor_id: actorId, account_generation: 1, auth_epoch: 1
+  }) });
+  assert.equal(login.status, 200);
+  assert.deepEqual(await login.json(), { session_scope: "account_deletion_recovery" });
+  const cookie = (login.headers.get("set-cookie") ?? "").split(";", 1)[0]!;
+  assert.match(cookie, /^walksafe_field_session=v6\./);
+  const calls: string[] = [];
+  const accepted = await handleGatewayRequest(deletionRequest(requestId, CAPABILITY, cookie),
+    { fetchImpl: backendFor(requestId, calls) });
+  assert.equal(accepted.status, 202);
+  assert.equal((await accepted.json() as AccountDeletionStatusV2).overall_status, "PARTIAL");
+  const described = await handleGatewayRequest(
+    new Request("http://127.0.0.1:8081/privacy/account-deletions/" + requestId + "/status", {
+      headers: { [DELETION_ACCESS_SECRET_HEADER]: CAPABILITY }
+    }), { fetchImpl: backendFor(requestId, calls) });
+  assert.equal(described.status, 200);
+  assert.equal((await described.json() as AccountDeletionStatusV2).overall_status, "PARTIAL");
+  assert.deepEqual(calls, [
+    "POST /privacy/account-deletions",
+    "GET /privacy/account-deletions/" + requestId + "/status"
+  ]);
+});

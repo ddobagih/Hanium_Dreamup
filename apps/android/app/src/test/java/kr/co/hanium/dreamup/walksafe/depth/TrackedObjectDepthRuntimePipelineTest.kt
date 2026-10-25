@@ -6,6 +6,7 @@ import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingMetrics
 import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingObservation
 import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingResult
 import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingStatus
+import kr.co.hanium.dreamup.walksafe.feedback.toFeedbackCandidate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -17,6 +18,51 @@ class TrackedObjectDepthRuntimePipelineTest {
     private val mapper = LetterboxCoordinateMapper(
         ModelInputTransform(100, 100, 100, 100, 1f, 0f, 0f), ImageSize(100, 100),
     )
+
+    @Test
+    fun feedbackProvenanceKeepsTheOriginalCaptureClockThroughCurrentVisualFrames() {
+        val pipeline = ObjectDepthRuntimePipeline()
+        val source = key(1_000L)
+        val initial = process(pipeline, observation(source, key(1_040L))).single()
+        val later = process(pipeline, observation(source, key(1_140L))).single()
+
+        listOf(initial, later).forEach { output ->
+            assertEquals(source.capturedAtElapsedRealtimeMs, output.sourceObservedAtElapsedRealtimeMs)
+            assertEquals(800L, output.sourceMaxAgeMs)
+            assertEquals(source.capturedAtElapsedRealtimeMs + 800L, output.sourceValidUntilElapsedRealtimeMs)
+            val feedback = requireNotNull(output.copy(userFacing = UserFacingDepth(null, MessageLevel.STOP, "stop")).toFeedbackCandidate())
+            assertEquals(output.timestampMs, feedback.timestampMs)
+            assertEquals(source.capturedAtElapsedRealtimeMs, feedback.observedAtElapsedRealtimeMs)
+            assertEquals(800L, feedback.observationMaxAgeMs)
+        }
+        assertTrue(later.timestampMs != requireNotNull(later.sourceObservedAtElapsedRealtimeMs))
+    }
+
+    @Test
+    fun depthOlderThanDetectorSourceKeepsItsEarlierNormalizedObservation() {
+        val pipeline = ObjectDepthRuntimePipeline()
+        // First establish independently captured Raw evidence and detector stability. A first
+        // reprojected image alone cannot establish the metric source under test.
+        (0..11).forEach { index ->
+            val current = key(1_040L + index * 100L)
+            process(pipeline, observation(key(1_000L + (index / 5) * 500L), current))
+        }
+        val target = key(2_240L)
+        val source = key(2_000L)
+        // This Raw ID was independently observed at 1940 in the actual sequence above.
+        val depthTimestamp = key(1_940L).cameraTimestampNs
+        val snapshot = depth(target).copy(
+            rawDepthTimestampNs = depthTimestamp, rawConfidenceTimestampNs = depthTimestamp,
+            cameraPoseEvidence = CameraPoseEvidence(7L, 2_240L, 0f, 0f, 0f, 0f, 0f, -1f,
+                CameraImageProjection(100, 100, 70f, 70f, 50f, 50f, 1f, 0f, 0f, 0f, 1f, 0f)),
+        )
+        val output = process(pipeline, observation(source, target), snapshot).single()
+
+        assertEquals(1_940L, output.depthObservedAtMs)
+        assertEquals(51_940L, output.sourceObservedAtElapsedRealtimeMs)
+        assertEquals(800L, output.sourceMaxAgeMs)
+        assertEquals(52_740L, output.sourceValidUntilElapsedRealtimeMs)
+    }
 
     @Test
     fun currentImageGeometrySamplesItsOwnDepthWithoutManufacturingDetectorConfirmations() {
@@ -137,14 +183,15 @@ class TrackedObjectDepthRuntimePipelineTest {
     }
 
     @Test
-    fun bboxOnlyImageTrackingCanDistinguishStationaryAndApproachingObjectsWithMetricPoseEvidence() {
+    fun actualPointImageTrackingCanDistinguishStationaryAndApproachingObjectsWithMetricPoseEvidence() {
         fun sequence(cameraSpeedMps: Float, reprojectLastDepth: Boolean = false): TrackedObjectDepth {
             val pipeline = ObjectDepthRuntimePipeline()
             val centered = detection.copy(bboxNorm = RectNorm(0.35f, 0.35f, 0.30f, 0.30f))
+            val pointId = kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId()
             return (0..12).map { index ->
                 val target = key(1_040L + index * 100L)
                 val source = key(1_000L + (index / 5) * 500L)
-                val observation = observation(source, target, centered, sourceDetection = centered, quality = 0.70f)
+                val observation = knownMaterialPointObservation(source, target, centered, pointId, quality = .70f)
                 val zMm = 4_000 - index * 100
                 val depthTimestampNs = if (reprojectLastDepth && index == 12) key(2_140L).cameraTimestampNs else target.cameraTimestampNs
                 val snapshot = depth(target).copy(

@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-026<br/>tactile 프레임 합성·결과 순서·mask upgrade·feedback 전달<br/>상태 ACTIVE"]
+    P0["capture 및 현재 navigation route identity 합성"]
+    A --> D
+    P1["depth 관측 또는 원본 mask upgrade 계산"]
+    P0 --> P1
+    P2["실제 결과 소비와 one upgrade receipt 발급"]
+    P1 --> P2
+    P3["current receipt로 선택 후 lock 밖 D02 emit"]
+    P2 --> P3
+    D{"P-D07-026<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["원본 bounded mask 결과 소비 가능"]
+    D -->|"camera만 더 최신으로 도착했지만 원본 결과 아직 current"| B0
+    B1["receipt/source 거절"]
+    D -->|"더 새 결과 소비 뒤 old callback"| B1
+    B2["거절; depth 재처리 없음"]
+    D -->|"같은 frame 두번째 mask upgrade"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

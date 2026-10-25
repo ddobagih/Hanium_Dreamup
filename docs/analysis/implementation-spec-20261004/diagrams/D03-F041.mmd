@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D03-041 생산 profile 이 비어 있는 이전 wake eligibility gate"]
+  P["정책 P-D03-041"]
+  A --> P
+  N0["1. 기존 default-off gate 를 현재 Vosk hands-free 구현과 구분한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. 기본 null profile 에서는 startIfEligible 이 false 를반환한다."]
+  N0 --> N1
+  N2["3. 주입된 profile 이있어도 ACTIVE/mic/on-deviceavailability 가모두 필요하며 started 중복 callback 을억제한다."]
+  N1 --> N2
+  N3["4. stopCallback 실패 시 started 를 true 로남겨중지성공을거짓표시하지않는다."]
+  N2 --> N3
+  Z["정상: 허용여부 boolean."]
+  N3 --> Z
+  B0{"profile null"}
+  R0["false"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"eligibility 상실"}
+  R1["stop 후 false"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"callback 성공"}
+  R2["started=true"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: startcallback 예외 false;stop 실패 started 유지."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xcancel["취소: stopcallback 성공 시에만 started=false."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xretry["재시도: caller 재시도가능,자동 timer 없음."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry

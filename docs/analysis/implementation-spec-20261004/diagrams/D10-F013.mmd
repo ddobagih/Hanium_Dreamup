@@ -1,0 +1,20 @@
+flowchart TD
+  A["F-D10-013 Voice readiness 순차 warmup·live worker probe"]
+  N0["1. STT pool ready action을 await하고 성공시 ready=true,evidence=live_worker_probe,model 저장."]
+  A --> N0
+  N1["2. 이어서 TTS pool ready action을 수행한다. 동시 로딩의 GPU 메모리 spike를 피하도록 순차 처리."]
+  N0 --> N1
+  N2["3. 두 check가 모두 ready=True이면 200/status ready. 어느 하나 실패하면 reason=model_warmup_failed,error_type 및 503/not_ready."]
+  N1 --> N2
+  B0{"이전 ready 성공 후 이번 worker failure"}
+  R0["이번 결과 false로 보고; 이전 ready flag 재사용 안 함"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"모델별 probe timeout"}
+  R1["그 pool abort 후 false; 다음 모델 probe는 계속"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  Z["종료 · 자동 재시도 없음"]
+  N2 --> Z
+  P["적용 정책 · P-D10-006 · P-D10-009"]
+  P -. "코드 분기 기준" .-> A

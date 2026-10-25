@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D02-028 camera+IMU 비거리 장애물 참고 안내"]
+  E["진입: 현재 detector boxes"]
+  G{"P-D02-028 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["TMAP_ONLY; local advisory 없음"]
+  G -->|"fresh camera/IMU 부족"| B0
+  B1["참고 후보 제외"]
+  G -->|"불안정/작은 box/위쪽 box"| B1
+  B2["DONE cooldown 소비 안 함"]
+  G -->|"TTS suppressed/failed"| B2
+  B3["camera+IMU 조건이면 local qualitative 안내 가능"]
+  G -->|"route inactive"| B3
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["local tactile tier에서 ARCORE_METRIC 또는<br/>CAMERA_IMU_NON_METRIC/TMAP_ONLY 선택"]
+    S1["nonmetric일 때 class/box/near-field proxy로 후보 추림"]
+    S2["동일 class+direction+IoU를 안정화"]
+    S3["queue 최대3, center 우선 뒤 confidence+area·FIFO"]
+    S4["1500ms action lease로 advisory 발급; DONE 후 global/perkey cooldown"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: 현재 owner에 결과 전달."]
+  X["취소·중단: 소유권을 폐기하면 늦은 결과가 새 요청을 변경하지 못한다. / foreground/actor/epoch 변경 시 현재<br/>요청을 폐기한다."]
+  C["정리: 새 source/epoch reset은 pending·history 제거; 오래된 receipt가 새 owner의<br/>cooldown을 소비하지 않음."]
+  R["재시도·복구: 자동 재시도 없음; 새 적법한 이벤트 필요. / 현재 owner와 조건을 다시 확보해야 한다."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

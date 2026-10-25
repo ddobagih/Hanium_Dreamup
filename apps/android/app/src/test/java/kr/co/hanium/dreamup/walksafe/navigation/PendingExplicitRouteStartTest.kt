@@ -76,6 +76,36 @@ class PendingExplicitRouteStartTest {
         assertNull(pending.currentOrNull())
     }
 
+    @Test
+    fun foregroundInitialConnectionIntentCanOutliveTheOldFifteenSecondDeadline() {
+        val pending = PendingExplicitRouteStart<String>()
+        val request = pending.replace(CONTEXT, 1_000L, keepUntilCancelled = true)
+        assertFalse(pending.expireIfCurrent(request, CONTEXT, 60_000L))
+        assertEquals(CONTEXT, pending.consumeIfCurrent(request, CONTEXT, 60_001L))
+        assertNull(pending.consumeIfCurrent(CONTEXT, 60_002L))
+    }
+
+    @Test
+    fun indefiniteIntentStillCannotSurviveRecoveryGenerationOrDestinationChanges() {
+        data class Context(val walkId: String, val recovery: Long, val destination: String)
+        val pending = PendingExplicitRouteStart<Context>()
+        val original = Context("same-walk", 0L, "destination-A")
+        val request = pending.replace(original, 1_000L, keepUntilCancelled = true)
+        assertNull(pending.consumeIfCurrent(request, original.copy(recovery = 1L), 60_000L))
+        assertNull(pending.currentOrNull())
+        pending.replace(original, 60_000L, keepUntilCancelled = true)
+        assertNull(pending.consumeIfCurrent(original.copy(destination = "destination-B"), 61_000L))
+    }
+
+    @Test
+    fun indefiniteIntentStillRejectsTimeReversalAndExplicitCancellation() {
+        val pending = PendingExplicitRouteStart<String>()
+        pending.replace(CONTEXT, 2_000L, keepUntilCancelled = true)
+        assertNull(pending.consumeIfCurrent(CONTEXT, 1_999L))
+        pending.cancel()
+        assertNull(pending.currentOrNull())
+    }
+
     private companion object {
         const val CONTEXT = "actor|walk-epoch|gateway-generation|destination"
     }

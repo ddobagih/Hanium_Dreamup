@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.network
 
 import android.content.SharedPreferences
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import java.io.File
 import java.net.SocketTimeoutException
 import java.util.Base64
@@ -249,19 +250,16 @@ class GatewayRefreshBusyRetryRegressionTest {
 
     @Test fun mainHandlesDurableRollbackBeforeSchedulingAndBeforeGenericAbandon() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val renewal = source.substringAfter("private fun renewRestoredGatewaySession(")
-            .substringBefore("private fun claimGateway")
-        val rollback = renewal.indexOf("gatewaySessionStore.rollbackRenewalForRetry(")
+        val renewal = MainActivityRefactorSource.function(source, "fun renewRestoredGatewaySession(")
+        val rollback = renewal.indexOf("store.rollbackRenewalForRetry(")
         assertTrue(rollback >= 0)
         assertTrue(renewal.indexOf("GatewaySessionProcessCoordinator.deferRenewalAfterRollback(") > rollback)
-        assertTrue(renewal.indexOf("gatewaySessionStore.abandonRenewal(") > rollback)
-        val retry = source.substringAfter("private fun retryPendingGatewayRenewal()")
-            .substringBefore("private fun retryPendingBackendDeviceRestore()")
+        assertTrue(renewal.indexOf("store.abandonRenewal(") > rollback)
+        val retry = MainActivityRefactorSource.function(source, "fun retryPendingGatewayRenewal(")
         assertTrue(retry.contains("GatewaySessionProcessCoordinator.snapshot().renewalRetryAtElapsedMs"))
-        assertTrue(retry.contains("retryAt - SystemClock.elapsedRealtime()"))
-        val dispatch = source.substringAfter("private fun dispatchGatewayProcessSessionChanged(")
-            .substringBefore("private fun registerGatewayCapacityNetworkObserver()")
-        val latestSnapshot = dispatch.indexOf("val latest = GatewaySessionProcessCoordinator.snapshot()")
+        assertTrue(retry.contains("retryAt - elapsedRealtimeMs()"))
+        val dispatch = MainActivityRefactorSource.function(source, "fun dispatchGatewayProcessSessionChanged(")
+        val latestSnapshot = dispatch.indexOf("val latest = gateway.snapshot()")
         val applySnapshot = dispatch.indexOf("onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)")
         assertTrue(latestSnapshot >= 0)
         assertTrue(applySnapshot > latestSnapshot)
@@ -270,9 +268,9 @@ class GatewayRefreshBusyRetryRegressionTest {
         assertTrue(dispatch.substring(latestSnapshot, applySnapshot)
             .contains("snapshot.session !== latest.session"))
         assertTrue(dispatch.substringBefore("val deliver = Runnable {")
-            .contains("integratedConsentSession.invalidateBackendAuthority()"))
+            .contains("consent.fenceAuthorityChanged(snapshot)"))
         assertTrue(dispatch.contains(
-            "onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)\n            retryPendingGatewayRenewal()",
+            "onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)\n            gateway.retryPendingRenewal()",
         ))
         assertTrue(retry.contains("restoreGatewaySessionFromPrefs()"))
     }

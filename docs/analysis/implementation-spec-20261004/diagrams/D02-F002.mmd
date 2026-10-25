@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D02-002 행동별 준비 증거 집계"]
+  E["진입: START/RESUME/검색/경로/제보 요청"]
+  G{"P-D02-002 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["READY로 판정하지 않음"]
+  G -->|"필수 evidence 버전/age 불일치"| B0
+  B1["metric requirement만 선택 제외"]
+  G -->|"거리 제한 모드"| B1
+  B2["first run·route service·gateway 필요"]
+  G -->|"검색"| B2
+  B3["first run·location·voice output·route·gateway·resource 필요"]
+  G -->|"경로 요청"| B3
+  B4["first run·location·gateway·resource 필요"]
+  G -->|"제보 전송"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["plan이 기능별 필수 requirement 집합을 선택"]
+    S1["start/resume는 교육·환경·거치·카메라·위치·모델·gateway·자원·음성 출력을 요구; LIMITED는<br/>metric 제외"]
+    S2["필수 관찰 누락은 오류, 비필수는 NOT_REQUIRED로 채움"]
+    S3["UNAVAILABLE 우선, 그 다음 PENDING, 전부 충족하면 READY"]
+    S4["시작 직전과 runtime 변경에서 같은 원본 evidence를 다시 평가"]
+    S5["WalkSessionFeatureReadiness는 disabled camera/location/model을<br/>UNAVAILABLE로 남긴다. disabled를 NOT_REQUIRED로 바꾸는 권한은 없고 plan만 required<br/>집합을 정한다."]
+    S6["RunningDetectorReadiness는 VERIFIED만 기기 검사 READY, NONE/PENDING은<br/>PENDING, FAILED 또는 sample_inference_unverified로 분리된 detector는 walk<br/>entry 차단이다. load 성공만으로 READY 아님."]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 --> S6
+  end
+  E -.-> S0
+  N["정상 종료: 해당 이벤트 처리를 마치고 현재 스냅샷/결과를 반환한다."]
+  X["취소·중단: 독립 취소 API가 없는 판단 함수는 호출자의 세대 무효화로 더 이상 결과를 사용하지 않는다. /<br/>foreground·epoch·owner 조건을 잃은 결과는 재사용하지 않는다."]
+  C["정리: 순수 정책은 소유하는 외부 리소스가 없다."]
+  R["재시도·복구: 자동 재시도 없음. 호출자가 명시된 새 이벤트를 전달해야 한다. / 현재 증거와 소유권을 다시 확보해야 한다. 이전 성공을<br/>소급 복원하지 않는다."]
+  S6 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

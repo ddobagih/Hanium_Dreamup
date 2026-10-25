@@ -8,6 +8,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RouteNavigatorCappedProgressRegressionTest {
+    // This fixture observes capped route progress and guide order, independently of heading recheck delay.
+    // Production 1.5-second delay and immediate safety actions are covered by RouteDirectionRecheckGraceTest.
+
     @Test
     fun acceptedMatchBeyondAdvanceCapUpdatesDistanceAndDoesNotRepeatPassedTurn() {
         val navigator = navigator()
@@ -49,7 +52,7 @@ class RouteNavigatorCappedProgressRegressionTest {
     }
 
     private fun navigator() = RouteNavigator(
-        RouteNavigatorConfig(maximumProgressAdvanceM = 40.0, guidanceIntervalMs = 0L),
+        RouteNavigatorConfig(directionRecheckGraceMs = 0L, maximumProgressAdvanceM = 40.0, guidanceIntervalMs = 0L),
     ).apply {
         setRoute(WalkingRoute(
             priority = "TEST",

@@ -1,0 +1,20 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-019-UNCONNECTED" as UNCONNECTED
+  state "S-D05-019-PREPARING" as PREPARING
+  state "S-D05-019-COMPARING" as COMPARING
+  state "S-D05-019-OFFERED" as OFFERED
+  state "S-D05-019-ADOPTED" as ADOPTED
+  state "S-D05-019-DRAINING" as DRAINING
+  state "S-D05-019-RELEASE_FAILED" as RELEASE_FAILED
+  [*] --> UNCONNECTED
+  UNCONNECTED --> PREPARING: "callerwouldstart"
+  PREPARING --> COMPARING: "references and warmup ready"
+  COMPARING --> OFFERED: "proposal"
+  OFFERED --> ADOPTED: "current healthy swap"
+  OFFERED --> DRAINING: "reject cancel"
+  COMPARING --> DRAINING: "deadline cancel failure"
+  DRAINING --> RELEASE_FAILED: "native release failed"
+  note right of UNCONNECTED
+    F-D05-019 P-D05-019
+  end note

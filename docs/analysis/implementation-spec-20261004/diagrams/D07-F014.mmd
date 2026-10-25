@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-014<br/>unknown 원본 캡처 동결과 비동기 join<br/>상태 ACTIVE"]
+    P0["원본 token depth pose H를 복사 동결"]
+    A --> D
+    P1["epoch geometry clock age 검사"]
+    P0 --> P1
+    P2["원래 callback budget에서 actual point 소비"]
+    P1 --> P2
+    P3["처리 후 context와 source age 재검사"]
+    P2 --> P3
+    D{"P-D07-014<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["출력 없음"]
+    D -->|"foreign token/frame/CPU/mapper/pose 또는 stale"| B0
+    B1["trackerGeneration 증가·상태 reset"]
+    D -->|"새 epoch 또는 geometry/dimensions 교체"| B1
+    B2["계산 결과 폐기"]
+    D -->|"callback 동안 context/age 만료"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

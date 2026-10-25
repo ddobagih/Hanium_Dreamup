@@ -92,6 +92,12 @@ def secured_client(monkeypatch: pytest.MonkeyPatch) -> ASGITestClient:
 
 
 def test_route_access_matrix_separates_field_and_admin_operations() -> None:
+    assert required_field_test_access("/account-signup-policy", "GET") is FieldTestAccess.FIELD
+    assert not requires_actor_identity("/account-signup-policy", "GET")
+    assert not requires_account_generation("/account-signup-policy", "GET")
+    assert required_field_test_access("/privacy/installation-evidence-key", "POST") is FieldTestAccess.FIELD
+    assert requires_actor_identity("/privacy/installation-evidence-key", "POST")
+    assert requires_account_generation("/privacy/installation-evidence-key", "POST")
     assert required_field_test_access("/detect/v2", "POST") is FieldTestAccess.FIELD
     assert required_field_test_access("/ready", "GET") is FieldTestAccess.FIELD
     assert required_field_test_access("/detect/v2/health", "GET") is FieldTestAccess.ADMIN
@@ -180,11 +186,13 @@ def test_s20_40_explicit_roles_preserve_field_and_public_boundaries() -> None:
         ("GET", "/navigation/destinations/search/health"),
         ("POST", "/navigation/walking"),
         ("GET", "/privacy/consent-bootstrap"),
+        ("POST", "/privacy/installation-evidence-key"),
         ("POST", "/privacy/consent-events"),
         ("POST", "/privacy/account-deletions"),
         ("GET", "/privacy/account-deletions/{request_id}/status"),
         ("POST", "/privacy/account-deletions/{request_id}/device-evidence"),
         ("POST", "/account-enrollments/email-otp"),
+        ("GET", "/account-signup-policy"),
         ("POST", "/accounts"),
         ("POST", "/accounts/authenticate"),
         ("POST", "/accounts/session-current"),
@@ -207,6 +215,11 @@ def test_s20_40_explicit_roles_preserve_field_and_public_boundaries() -> None:
         ("POST", "/reports/v2"),
         ("GET", "/reports/v2/{report_id}/status"),
         ("GET", "/internal/capacity"),
+        ("GET", "/field-diagnostics/preference"),
+        ("POST", "/field-diagnostics/preference"),
+        ("PUT", "/field-diagnostics/preference"),
+        ("POST", "/field-diagnostics/sessions/{session_id}/batches"),
+        ("GET", "/field-diagnostics/sessions/{session_id}"),
     }
     expected_public = {
         ("POST", "/admin/security/device-proof/challenges"),
@@ -754,26 +767,31 @@ def test_readiness_is_available_to_field_role_without_sensitive_details(
     secured_client: ASGITestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("backend.app.api.health._database_readiness", lambda _url: {"ready": True})
-    monkeypatch.setattr("backend.app.api.health._upload_readiness", lambda _path: {"ready": True})
+    monkeypatch.setattr("backend.app.services.health_readiness._database_readiness", lambda _url: {"ready": True})
+    # Lifespan now owns storage initialization; this transport test supplies
+    # the already-verified monitor result without starting storage or workers.
     monkeypatch.setattr(
-        "backend.app.api.health._report_storage_inventory_readiness",
-        lambda _settings, _manager: {"ready": True},
+        app.state.runtime,
+        "report_storage_monitor",
+        SimpleNamespace(checks=lambda: {
+            name: {"ready": True}
+            for name in ("upload_root", "report_image_encryption", "report_storage")
+        }),
     )
     monkeypatch.setattr(
-        "backend.app.api.health._privacy_hmac_binding_readiness",
+        "backend.app.services.health_readiness._privacy_hmac_binding_readiness",
         lambda _settings: {"ready": True, "binding": "matched"},
     )
     monkeypatch.setattr(
-        "backend.app.api.health._account_crypto_binding_readiness",
+        "backend.app.services.health_readiness._account_crypto_binding_readiness",
         lambda _settings: {"ready": True, "binding": "matched"},
     )
     async def navigation_ready(_settings, *, runtime_provider=None):
         return {"ready": True, "provider": "tmap_pedestrian", "evidence": "recent_success"}
 
-    monkeypatch.setattr("backend.app.api.health._navigation_readiness", navigation_ready)
+    monkeypatch.setattr("backend.app.services.health_readiness._navigation_readiness", navigation_ready)
     monkeypatch.setattr(
-        "backend.app.api.health.detect_v2_health",
+        "backend.app.services.health_readiness.detect_v2_health",
         lambda _settings: {"status": "ready", "mode": "fake", "reason": None, "configured_runtime": None},
     )
 
@@ -1435,10 +1453,12 @@ def test_slow_shared_rate_limit_store_does_not_block_liveness(
             release.set()
             return await limited_task, health, health_elapsed
 
+    app.state.runtime.actor_rate_limits.start()
     try:
         limited, health, health_elapsed = asyncio.run(exercise())
     finally:
         release.set()
+        app.state.runtime.actor_rate_limits.close()
 
     assert limited.status_code == 422
     assert health.status_code == 200
@@ -1998,6 +2018,8 @@ _S21_LITERAL_PUBLIC = frozenset({
     ("POST", "/admin/security/recovery/complete"),
 })
 _S21_LITERAL_FIELD = frozenset({
+    ("GET", "/account-signup-policy"),
+    ("POST", "/privacy/installation-evidence-key"),
     ("GET", "/health"), ("GET", "/ready"), ("GET", "/detect/health"),
     ("POST", "/detect"), ("POST", "/detect/v2"),
     ("GET", "/navigation/walking/health"), ("GET", "/navigation/destinations/search"),
@@ -2023,6 +2045,11 @@ _S21_LITERAL_FIELD = frozenset({
     ("POST", "/reports/mine/{report_id}/corrections"),
     ("POST", "/reports"), ("POST", "/reports/v2"),
     ("GET", "/reports/v2/{report_id}/status"), ("GET", "/internal/capacity"),
+    ("GET", "/field-diagnostics/preference"),
+    ("POST", "/field-diagnostics/preference"),
+    ("PUT", "/field-diagnostics/preference"),
+    ("POST", "/field-diagnostics/sessions/{session_id}/batches"),
+    ("GET", "/field-diagnostics/sessions/{session_id}"),
 })
 
 
@@ -2253,6 +2280,10 @@ def test_s21_41_every_field_actor_route_rejects_missing_and_revoked_sessions(
 # resource is concealed, or be one of the recorded gaps below. A new resource
 # route therefore fails until someone makes that decision explicitly.
 _S21_OWNER_SCOPED_ROUTE_TESTS = {
+    ("GET", "/field-diagnostics/sessions/{session_id}"):
+        ("test_guidance_diagnostics", "test_other_actor_generation_cannot_read_or_write_existing_session"),
+    ("POST", "/field-diagnostics/sessions/{session_id}/batches"):
+        ("test_guidance_diagnostics", "test_other_actor_generation_cannot_read_or_write_existing_session"),
     ("GET", "/reports/mine/{report_id}"):
         ("test_report_user_requests", "test_foreign_generation_and_tombstone_are_concealed_as_not_found"),
     ("GET", "/reports/mine/{report_id}/requests/{request_id}"):
@@ -2262,20 +2293,31 @@ _S21_OWNER_SCOPED_ROUTE_TESTS = {
     ("GET", "/reports/mine/deletions/{request_id}"):
         ("test_report_physical_deletion", "test_user_deletion_status_route_is_no_store_and_owner_bound"),
 }
-_S21_OWNER_SCOPED_ROUTE_GAPS = frozenset({
-    ("POST", "/reports/mine/{report_id}/requests"),
-    ("POST", "/reports/mine/{report_id}/corrections"),
-    ("GET", "/reports/v2/{report_id}/status"),
-    ("GET", "/privacy/account-deletions/{request_id}/status"),
-    ("POST", "/privacy/account-deletions/{request_id}/device-evidence"),
-    ("HEAD", "/raw-collections/{collection_id}/manifest"),
-    ("HEAD", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
-    ("HEAD", "/raw-collections/{collection_id}/commit"),
-    ("PUT", "/raw-collections/{collection_id}/manifest"),
-    ("PUT", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
-    ("GET", "/raw-collections/{collection_id}"),
-    ("POST", "/raw-collections/{collection_id}/commit"),
+_S21_OWNER_SCOPED_ROUTE_TESTS.update({
+    route: ("test_owner_routes_postgres", test)
+    for test, routes in (
+        ("test_foreign_report_routes_conceal_and_do_not_mutate", (
+            ("POST", "/reports/mine/{report_id}/requests"),
+            ("POST", "/reports/mine/{report_id}/corrections"),
+            ("GET", "/reports/v2/{report_id}/status"),
+        )),
+        ("test_foreign_deletion_routes_conceal_even_with_the_owners_capability", (
+            ("GET", "/privacy/account-deletions/{request_id}/status"),
+            ("POST", "/privacy/account-deletions/{request_id}/device-evidence"),
+        )),
+        ("test_foreign_raw_routes_hide_resources_and_preflight_has_no_existence_oracle", (
+            ("HEAD", "/raw-collections/{collection_id}/manifest"),
+            ("HEAD", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
+            ("HEAD", "/raw-collections/{collection_id}/commit"),
+            ("PUT", "/raw-collections/{collection_id}/manifest"),
+            ("PUT", "/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}"),
+            ("GET", "/raw-collections/{collection_id}"),
+            ("POST", "/raw-collections/{collection_id}/commit"),
+        )),
+    )
+    for route in routes
 })
+_S21_OWNER_SCOPED_ROUTE_GAPS = frozenset()
 
 
 def test_s21_41_owner_scoped_field_routes_have_other_user_decisions() -> None:

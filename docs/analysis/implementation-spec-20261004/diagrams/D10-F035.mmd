@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D10-035 학습 artifact retention 후보 조회·중단 복구"]
+  N0["1. main은 PREVIEW/APPLY 모두에서 reconcile을 먼저 호출한다."]
+  A --> N0
+  N1["2. recovery entry regular/non-symlink 및 UUID+base64 storage name 검사. DB deletion receipt 있으면 recovery file unlink; 없으면 원위치가 비어있을 때 restore. ambiguous면 중단."]
+  N0 --> N1
+  N2["3. 제거 사유 우선순위: ACCOUNT_DELETED 다음 CONSENT_WITHDRAWN 다음 DATASET_EXPIRED"]
+  N1 --> N2
+  N3["4. 후보 envelope 실제 size/hash를 immutable metadata와 대조. preview는 ID/reason만 출력하고 DB rollback."]
+  N2 --> N3
+  B0{"관련 dataset revision이 하나도 없음"}
+  R0["all expired 사유 적용 안 함"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"유효 dataset 하나 이상"}
+  R1["expiry 사유로 삭제하지 않음"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"recovery original와 staged 둘 다 존재"}
+  R2["ambiguous 실패"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  B3{"PREVIEW 호출"}
+  R3["새 후보 삭제는 안 하지만 이전 recovery 파일 삭제/복원은 가능"]
+  A -. "관련 분기" .-> B3
+  B3 --> R3
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-027 · P-D10-028"]
+  P -. "코드 분기 기준" .-> A

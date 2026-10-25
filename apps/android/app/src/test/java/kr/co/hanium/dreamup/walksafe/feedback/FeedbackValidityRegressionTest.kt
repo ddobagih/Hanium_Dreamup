@@ -6,6 +6,31 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FeedbackValidityRegressionTest {
+    @Test fun missingObservationLeaseCannotBeRenewedByFalseStaleFlag() {
+        val unleased = FeedbackCandidate("risk", "stop", MessageLevel.STOP,
+            DepthSource.ARCORE_RAW_DEPTH, .8f, 1L, 3, 700L, false)
+
+        assertNull(WalkSafeFeedbackPolicy().evaluate(unleased, true, 10_000L))
+    }
+
+    @Test fun unboundedObservationLeaseCannotAuthorizeRiskOrInformation() {
+        listOf(MessageLevel.CAUTION, MessageLevel.WARNING, MessageLevel.STOP, MessageLevel.INFO).forEach { level ->
+            val unbounded = candidate(deadline = Long.MAX_VALUE).copy(level = level, message = level.name)
+            val policy = WalkSafeFeedbackPolicy()
+
+            assertNull("Unbounded $level candidate cannot reserve output", policy.evaluate(unbounded, true, 10_000L))
+            assertTrue(policy.activeRiskTrackIds(listOf(unbounded), true, 10_000L).isEmpty())
+            assertTrue(policy.activeFeedbackDeliveryKeys(listOf(unbounded), true, 10_000L).isEmpty())
+        }
+    }
+
+    @Test fun omittedActionLeaseCannotDefaultToUnlimitedRiskOutput() {
+        val action = FeedbackAction("risk", "stop", MessageLevel.STOP,
+            VibrationPatterns.forLevel(MessageLevel.STOP), "test")
+
+        assertEquals(Long.MIN_VALUE, action.validUntilMs)
+    }
+
     @Test fun expiredCandidateCannotBeRenewedByFalseStaleFlag() {
         assertNull(WalkSafeFeedbackPolicy().evaluate(candidate(deadline = 1_100L), true, 1_101L))
     }
@@ -205,5 +230,5 @@ class FeedbackValidityRegressionTest {
 
     private fun candidate(deadline: Long = 2_000L) = FeedbackCandidate("risk", "stop",
         MessageLevel.STOP, DepthSource.ARCORE_RAW_DEPTH, .8f, 1_000L, 3, 700L, false,
-        validUntilMs = deadline)
+        validUntilMs = deadline, observedAtElapsedRealtimeMs = 1_000L, observationMaxAgeMs = 800L)
 }

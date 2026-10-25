@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D08-005 이메일 OTP 발급 중계"]
+  B["진입: POST /api/account-enrollments/email-otp"]
+  A --> B
+  P0["1. 정확 4 개 key 와 email·date·request_id 를 검사한다."]
+  B --> P0
+  P1["2. 신뢰 IP 가 없으면 중계 전에 400 을 반환한다."]
+  P0 --> P1
+  P2["3. 서비스 token 과 새 x-walksafe-client-ip 만 Backend /account-enrollments/email-otp 로 보낸다."]
+  P1 --> P2
+  P3["4. Backend 202 body 를 16 KiB/5 초 제한 아래 검증·투영한다."]
+  P2 --> P3
+  OK["정상: 유효 202 가입 handle/유효기간 계약 반환"]
+  P3 --> OK
+  C0{"입력 부적합"}
+  X0["422 account_enrollment_request_invalid"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"Backend 202 아닌 응답"}
+  X1["허용 status/code 만 투영; 나머지 502"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"응답 읽기 지연·형식 이상"}
+  X2["504 또는 502"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-003, P-D08-004, P-D08-005"]
+  A -.-> POLICY

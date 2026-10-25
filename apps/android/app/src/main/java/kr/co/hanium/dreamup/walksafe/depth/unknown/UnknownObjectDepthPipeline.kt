@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.depth.unknown
 
 import kr.co.hanium.dreamup.walksafe.depth.*
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPoint
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamFrameToken
 import kr.co.hanium.dreamup.walksafe.inference.unknown.segmentation.InstanceMask
 
@@ -77,6 +78,7 @@ class UnknownObjectDepthPipeline(
     private val extentByTrack = mutableMapOf<String, ExtentHistory>()
     private val proximityRegions = UnknownProximityRegions()
     private val travelDirection = UnknownTravelDirection()
+    private var depthCaptureClock = DepthCaptureClock()
     private val unavailableMapper = LetterboxCoordinateMapper(
         ModelInputTransform(1, 1, 1, 1, 1f, 0f, 0f), ImageSize(1, 1))
 
@@ -96,6 +98,7 @@ class UnknownObjectDepthPipeline(
         extentByTrack.clear()
         proximityRegions.reset()
         travelDirection.reset()
+        depthCaptureClock = DepthCaptureClock()
     }
 
     @Synchronized
@@ -115,7 +118,11 @@ class UnknownObjectDepthPipeline(
         masks: List<InstanceMask>,
         nowElapsedRealtimeMs: Long,
         namedEvidence: List<NamedMaskDepthEvidence> = emptyList(),
+        materialPointsByMaskIndex: Map<Int, UnknownMaterialPointObservation> = emptyMap(),
     ): UnknownDepthFrameResult {
+        val materialPoints = materialPointsByMaskIndex.toMap()
+        val duplicatePointIds = materialPoints.values.groupingBy { it.point.id }.eachCount()
+            .filterValues { it > 1 }.keys
         fun reject(reason: String) = UnknownDepthFrameResult(token, emptyList(), emptyList(), reason)
         if (!sameCapture(capture.token, token)) return reject("capture_token_mismatch")
         val capturedMs = token.capturedElapsedNs / 1_000_000L
@@ -141,6 +148,8 @@ class UnknownObjectDepthPipeline(
         }
         if (masks.any { it.imageWidth() != token.width || it.imageHeight() != token.height }) return reject("mask_image_dimensions_mismatch")
         lastToken = token
+        // An admitted capture can establish depth time even when it has no object mask yet.
+        depthCaptureClock.observe(capture.snapshot, capture.frameTimestampMs, capturedMs)
         val capturedMapper = capture.calibration?.let { CapturedDepthMapper(it) }
         val prepared = masks.mapIndexed { index, mask -> prepare(index, mask, capturedMapper, capture.imageQuarterTurns) }
         val detections = prepared.map {
@@ -187,6 +196,8 @@ class UnknownObjectDepthPipeline(
             val result = results[i]
             val assignment = assignments[mask.index]
             val track = assignment?.track
+            val materialPoint = materialPointFor(capture, mask, prepared,
+                materialPoints[mask.index]?.takeIf { it.point.id !in duplicatePointIds })
             if (track != null && assignment.status != MaskAssociationStatus.AMBIGUOUS) {
                 val supportedWholeMask = mask.fullyCovered && result.status == MaskDepthEstimator.Status.KNOWN && result.axialDepthM != null
                 if (supportedWholeMask) {
@@ -204,7 +215,9 @@ class UnknownObjectDepthPipeline(
                         track.resetMetricAndSpatialHistoryPreservingTrackId(capture.frameTimestampMs)
                         extentByTrack.remove(track.trackId)
                     }
-                    objects += supported(capture, mask.geometry, track, result, nowElapsedRealtimeMs)
+                    objects += supported(capture, mask.geometry, track, result, nowElapsedRealtimeMs,
+                        materialPoint.takeIf { result.components.size == 1 && !result.componentDepthConflict &&
+                            result.nearerLayers.isEmpty() && result.source == "ARCORE_RAW_DEPTH" })
                 } else {
                     // A missing measurement is not automatically a new surface. Preserve the
                     // bounded prediction seed only while the actual mask identity remains unique.
@@ -216,7 +229,7 @@ class UnknownObjectDepthPipeline(
                         scopeByTrack.remove(track.trackId)
                         supportByTrack.remove(track.trackId)
                     }
-                    objects += unsupported(capture, mask.geometry, track)
+                    objects += unsupported(capture, mask.geometry, track, materialPoint)
                 }
             }
             UnknownDepthObservation(mask.index, mask.binary, result, track?.trackId, assignment?.status,
@@ -470,6 +483,8 @@ class UnknownObjectDepthPipeline(
             rawDepth = capture.snapshot.rawDepth, rawConfidence = capture.snapshot.rawConfidence,
             fullDepth = capture.snapshot.fullDepth, rawDepthFreshnessQuality = capture.snapshot.rawDepthFreshnessQuality,
             rayDistanceM = sample.rayDistanceM, requireIndependentDepthObservation = true,
+            depthCaptureTimes = depthCaptureClock.observe(capture.snapshot, capture.frameTimestampMs,
+                capture.token.capturedElapsedNs / 1_000_000L),
             motionContext = capture.motionContext.copy(freshnessQuality = minOf(capture.motionContext.freshnessQuality, freshness),
                 cameraPoseEvidence = null),
         ), sample.stats, source = sample.source)
@@ -502,8 +517,28 @@ class UnknownObjectDepthPipeline(
             else extent.copy(canRejectSmall = false, reason = "extent_temporal_support_pending")
     }
 
+    private fun materialPointFor(capture: FrozenUnknownDepthCapture, mask: Prepared, masks: List<Prepared>,
+                                 evidence: UnknownMaterialPointObservation?): VisualMaterialPoint? {
+        evidence ?: return null
+        if (!sameCapture(capture.token, evidence.token) || evidence.imageQuarterTurns != capture.imageQuarterTurns) return null
+        val point = evidence.point
+        val key = point.targetKey
+        val token = capture.token
+        if (key.epoch != token.sessionEpoch || key.frameId != token.frameId ||
+            key.cameraTimestampNs != token.cpuImageTimestampNs ||
+            key.capturedAtElapsedRealtimeMs != token.capturedElapsedNs / 1_000_000L) return null
+        val norm = point.imagePointNorm
+        if (!norm.x.isFinite() || !norm.y.isFinite() || norm.x < 0f || norm.x >= 1f || norm.y < 0f || norm.y >= 1f) return null
+        val x = (norm.x * token.width).toInt()
+        val y = (norm.y * token.height).toInt()
+        if (!mask.fullyCovered || !mask.binary.contains(x, y) ||
+            masks.any { it.index != mask.index && it.binary.contains(x, y) }) return null
+        return point
+    }
+
     private fun supported(capture: FrozenUnknownDepthCapture, geometry: ObjectGeometry, track: TrackState,
-                          result: MaskDepthEstimator.Result, nowElapsedRealtimeMs: Long): TrackedObjectDepth {
+                          result: MaskDepthEstimator.Result, nowElapsedRealtimeMs: Long,
+                          materialPoint: VisualMaterialPoint?): TrackedObjectDepth {
         val snapshot = capture.snapshot
         val spatial = spatialEvidence(capture, result)
         val hasIndependentSpatialSupport = spatial != null
@@ -521,6 +556,9 @@ class UnknownObjectDepthPipeline(
             rawDepthTimestampNs = snapshot.rawDepthTimestampNs.takeIf { hasIndependentSpatialSupport },
             rayDistanceM = result.euclideanRangeM?.toFloat(), requireIndependentDepthObservation = true,
             rawDepthMotionOnly = true,
+            materialPoint = materialPoint,
+            depthCaptureTimes = depthCaptureClock.observe(snapshot, capture.frameTimestampMs,
+                capture.token.capturedElapsedNs / 1_000_000L),
             motionContext = capture.motionContext.copy(freshnessQuality = minOf(capture.motionContext.freshnessQuality, freshness),
                 cameraPoseEvidence = snapshot.cameraPoseEvidence.takeIf { hasIndependentSpatialSupport || result.source == "ARCORE_FULL_DEPTH" }),
         ), stats, spatial?.pointInAnchor, if (result.source == "ARCORE_FULL_DEPTH")
@@ -582,10 +620,12 @@ class UnknownObjectDepthPipeline(
             bounds[0], bounds[1], width, height, packed), calibration.imageToDepthUv())
     }
 
-    private fun unsupported(capture: FrozenUnknownDepthCapture, geometry: ObjectGeometry, track: TrackState): TrackedObjectDepth =
+    private fun unsupported(capture: FrozenUnknownDepthCapture, geometry: ObjectGeometry, track: TrackState,
+                            materialPoint: VisualMaterialPoint?): TrackedObjectDepth =
         estimator.estimateUnavailable(ObjectDepthInput(capture.token.frameId, capture.frameTimestampMs,
             geometry, track, unavailableMapper, motionContext = capture.motionContext,
-            requireIndependentDepthObservation = true, rawDepthMotionOnly = true)).copy(
+            requireIndependentDepthObservation = true, rawDepthMotionOnly = true,
+            materialPoint = materialPoint)).copy(
             source = DepthSource.UNKNOWN, trend = Trend.UNKNOWN, approachScore = 0f,
             approachSpeedMps = null, timeToCollisionMs = null, objectMotion = ObjectMotion.UNKNOWN,
             motionEstimate = ObjectMotionEstimate(), userFacing = UserFacingDepth(null, MessageLevel.NONE, null))

@@ -1,0 +1,23 @@
+flowchart TD
+  IN["F-D14-033 오프라인 release privilege 삭제 gate"] --> ACT{"지원 action과 enabled 검사"}
+  ACT -->|"지원하지 않음 또는 배포 disabled"| INPUTERR["자체 RuntimeError<br/>try 이전이며 frozen 변환 없음"]
+  ACT -->|"개발 test와 explicit insecure opt-in 및 disabled"| BYPASS["identity None으로 caller 진입"]
+  ACT -->|"보호 enabled"| REQUIRED{"DB token device nonce TOTP 입력 존재"}
+  REQUIRED -->|"누락"| INPUTERR
+  REQUIRED -->|"존재"| TRY["try 진입<br/>context 생성과 TTL 검사"]
+  TRY --> AUTH["P-D14-014 P-D14-022<br/>custody NORMAL bearer와 일회 nonce 검증"]
+  AUTH --> COMMIT["nonce 소비 commit"]
+  COMMIT --> FENCE["recovery fence와 protected-work 재검증"]
+  TRY -->|"scope 진입 전 예외"| FROZEN["RuntimeError frozen<br/>원 예외 문맥 숨김"]
+  AUTH -->|"실패"| FROZEN
+  COMMIT -->|"실패"| FROZEN
+  FENCE -->|"실패"| FROZEN
+  FENCE --> WORK["mutation_scope_entered=true<br/>fence를 유지하며 caller에 yield"]
+  WORK -->|"caller 성공"| FINAL["business commit"]
+  WORK -->|"caller 예외"| ROLLBACK["rollback 시도 후 원 예외 전파"]
+  FINAL -->|"commit 예외"| ORIGINAL["원 예외 전파"]
+  FINAL --> END["정상 종료"]
+  BYPASS --> END
+  CLEAN["session와 engine 종료<br/>caller 보존 삭제 계약은 D11<br/>실패해도 소비된 nonce 재사용 불가"] -.-> END
+  CLEAN -.-> ROLLBACK
+  CLEAN -.-> ORIGINAL

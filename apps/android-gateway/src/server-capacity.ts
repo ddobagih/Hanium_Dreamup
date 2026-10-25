@@ -51,8 +51,6 @@ const CAPACITY_KEYS = [
   "level",
   "reason"
 ] as const;
-let capacityFetchInFlight: Promise<ServerCapacitySnapshot | null> | null = null;
-let telemetryCapacitySnapshot: ServerCapacitySnapshot | null = null;
 
 export type ServerCapacityLevel = typeof SERVER_CAPACITY_LEVELS[number];
 export type ServerCapacityTelemetryLevel = ServerCapacityLevel | "UNKNOWN";
@@ -141,18 +139,6 @@ function freshSnapshot(
   return expiresAt !== null && expiresAt > BigInt(nowEpochMs) * 1_000n
     ? snapshot
     : null;
-}
-
-export function currentServerCapacityLevelForTelemetry(
-  nowEpochMs = Date.now()
-): ServerCapacityTelemetryLevel {
-  if (!Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0) return "UNKNOWN";
-  return freshSnapshot(telemetryCapacitySnapshot, nowEpochMs)?.level ?? "UNKNOWN";
-}
-
-export function resetServerCapacityForTests(): void {
-  telemetryCapacitySnapshot = null;
-  capacityFetchInFlight = null;
 }
 
 function sameSnapshot(
@@ -371,27 +357,6 @@ async function fetchCapacitySnapshot(
   }
 }
 
-function fetchCapacitySnapshotSingleFlight(
-  request: Request,
-  fieldToken: string,
-  fetchImpl: GatewayFetch,
-  timeoutMs: number
-): Promise<ServerCapacitySnapshot | null> {
-  if (request.signal.aborted) return Promise.reject(request.signal.reason);
-  if (!capacityFetchInFlight) {
-    const pending = fetchCapacitySnapshot(
-      new Request(request.url),
-      fieldToken,
-      fetchImpl,
-      timeoutMs
-    ).finally(() => {
-      if (capacityFetchInFlight === pending) capacityFetchInFlight = null;
-    });
-    capacityFetchInFlight = pending;
-  }
-  return waitForSignal(capacityFetchInFlight, request.signal);
-}
-
 function cachedCapacity(nowEpochMs: number): ServerCapacitySnapshot | null {
   try {
     const target = resolveServerCapacityStatePath();
@@ -431,72 +396,126 @@ function acceptCapacitySnapshot(
   });
 }
 
-export async function serverCapacityForFieldSession(
-  request: Request,
-  fetchImpl: GatewayFetch = globalThis.fetch,
-  nowEpochMs?: number,
-  timeoutMs = SERVER_CAPACITY_FETCH_TIMEOUT_MS
-): Promise<ServerCapacitySnapshot | null> {
-  const fieldToken = gatewayTokenForBackend();
-  let candidate: ServerCapacitySnapshot | null = null;
-  if (fieldToken.length >= MIN_FIELD_TOKEN_LENGTH) {
-    try {
-      candidate = await fetchCapacitySnapshotSingleFlight(
-        request,
+/** Owns one server's admission/cache lifetime; never constructed per request. */
+export function createServerCapacityRuntime(clock: () => number = () => Date.now()) {
+
+  let capacityFetchInFlight: Promise<ServerCapacitySnapshot | null> | null = null;
+
+  let telemetryCapacitySnapshot: ServerCapacitySnapshot | null = null;
+
+
+  function currentServerCapacityLevelForTelemetry(
+    nowEpochMs = clock()
+  ): ServerCapacityTelemetryLevel {
+    if (!Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0) return "UNKNOWN";
+    return freshSnapshot(telemetryCapacitySnapshot, nowEpochMs)?.level ?? "UNKNOWN";
+  }
+
+
+  function resetServerCapacityForTests(): void {
+    telemetryCapacitySnapshot = null;
+    capacityFetchInFlight = null;
+  }
+
+
+  function fetchCapacitySnapshotSingleFlight(
+    request: Request,
+    fieldToken: string,
+    fetchImpl: GatewayFetch,
+    timeoutMs: number
+  ): Promise<ServerCapacitySnapshot | null> {
+    if (request.signal.aborted) return Promise.reject(request.signal.reason);
+    if (!capacityFetchInFlight) {
+      const pending = fetchCapacitySnapshot(
+        new Request(request.url),
         fieldToken,
         fetchImpl,
         timeoutMs
+      ).finally(() => {
+        if (capacityFetchInFlight === pending) capacityFetchInFlight = null;
+      });
+      capacityFetchInFlight = pending;
+    }
+    return waitForSignal(capacityFetchInFlight, request.signal);
+  }
+
+
+  async function serverCapacityForFieldSession(
+    request: Request,
+    fetchImpl: GatewayFetch = globalThis.fetch,
+    nowEpochMs?: number,
+    timeoutMs = SERVER_CAPACITY_FETCH_TIMEOUT_MS
+  ): Promise<ServerCapacitySnapshot | null> {
+    const fieldToken = gatewayTokenForBackend();
+    let candidate: ServerCapacitySnapshot | null = null;
+    if (fieldToken.length >= MIN_FIELD_TOKEN_LENGTH) {
+      try {
+        candidate = await fetchCapacitySnapshotSingleFlight(
+          request,
+          fieldToken,
+          fetchImpl,
+          timeoutMs
+        );
+      } catch {
+        candidate = null;
+      }
+    }
+    const now = nowEpochMs ?? clock();
+    if (candidate) {
+      try {
+        const accepted = acceptCapacitySnapshot(candidate, now);
+        telemetryCapacitySnapshot = accepted;
+        return accepted;
+      } catch {
+        // Storage, encryption, replay, and lock failures never fail the session route.
+      }
+    }
+    const cached = cachedCapacity(now);
+    telemetryCapacitySnapshot = cached;
+    return cached;
+  }
+
+
+  async function mergeServerCapacityIntoFieldSessionResponse(
+    request: Request,
+    response: Response,
+    fetchImpl?: GatewayFetch
+  ): Promise<Response> {
+    if (response.status !== 200) return response;
+    let body: Record<string, unknown> | null = null;
+    try {
+      body = objectValue(await response.clone().json());
+    } catch {
+      return response;
+    }
+    if (!body) return response;
+    if (body.authenticated !== true) return response;
+    try {
+      const capacity = await serverCapacityForFieldSession(
+        request,
+        fetchImpl ?? globalThis.fetch
+      );
+      if (!capacity) return response;
+      const headers = new Headers(response.headers);
+      headers.delete("content-length");
+      return Response.json(
+        { ...body, capacity },
+        {
+          status: response.status,
+          statusText: response.statusText,
+          headers
+        }
       );
     } catch {
-      candidate = null;
+      return response;
     }
   }
-  const now = nowEpochMs ?? Date.now();
-  if (candidate) {
-    try {
-      const accepted = acceptCapacitySnapshot(candidate, now);
-      telemetryCapacitySnapshot = accepted;
-      return accepted;
-    } catch {
-      // Storage, encryption, replay, and lock failures never fail the session route.
-    }
-  }
-  const cached = cachedCapacity(now);
-  telemetryCapacitySnapshot = cached;
-  return cached;
+  return { currentServerCapacityLevelForTelemetry, resetServerCapacityForTests, serverCapacityForFieldSession, mergeServerCapacityIntoFieldSessionResponse };
 }
 
-export async function mergeServerCapacityIntoFieldSessionResponse(
-  request: Request,
-  response: Response,
-  fetchImpl?: GatewayFetch
-): Promise<Response> {
-  if (response.status !== 200) return response;
-  let body: Record<string, unknown> | null = null;
-  try {
-    body = objectValue(await response.clone().json());
-  } catch {
-    return response;
-  }
-  if (!body) return response;
-  if (body.authenticated !== true) return response;
-  try {
-    const capacity = await serverCapacityForFieldSession(
-      request,
-      fetchImpl ?? globalThis.fetch
-    );
-    if (!capacity) return response;
-    const headers = new Headers(response.headers);
-    headers.delete("content-length");
-    return Response.json(
-      { ...body, capacity },
-      {
-        status: response.status,
-        statusText: response.statusText,
-        headers
-      }
-    );
-  } catch {
-    return response;
-  }
-}
+export type ServerCapacityRuntime = ReturnType<typeof createServerCapacityRuntime>;
+export const defaultServerCapacityRuntime = createServerCapacityRuntime();
+export const currentServerCapacityLevelForTelemetry: ServerCapacityRuntime["currentServerCapacityLevelForTelemetry"] = (...args) => defaultServerCapacityRuntime.currentServerCapacityLevelForTelemetry(...args);
+export const resetServerCapacityForTests: ServerCapacityRuntime["resetServerCapacityForTests"] = (...args) => defaultServerCapacityRuntime.resetServerCapacityForTests(...args);
+export const serverCapacityForFieldSession: ServerCapacityRuntime["serverCapacityForFieldSession"] = (...args) => defaultServerCapacityRuntime.serverCapacityForFieldSession(...args);
+export const mergeServerCapacityIntoFieldSessionResponse: ServerCapacityRuntime["mergeServerCapacityIntoFieldSessionResponse"] = (...args) => defaultServerCapacityRuntime.mergeServerCapacityIntoFieldSessionResponse(...args);

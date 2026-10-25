@@ -1,0 +1,21 @@
+flowchart TD
+  A["F-D04-034 · P-D04-034<br/>종료·onPause·권한/동의철회·저장실패"] --> G{"stopping인가"}
+  G -->|예| I["재진입 반환"]
+  G -->|아니오| R["readiness retire · lease detach · generation 증가<br/>collecting false · heartbeat/센서/화면 flag 정리<br/>FLP remove best effort"]
+  R --> H{"active lease와 Raw recorder가 모두 있는가"}
+  H -->|예| C["Raw.stop 비동기 close 완료 대기"]
+  H -->|아니오| T
+  C --> T{"active trace lease가 있는가"}
+  T -->|아니오| END["stopping false · 상태표시<br/>onResume 자동 재시작 없음"]
+  T -->|예| S["Raw 성공 여부와 별개로 recorder.stop 시도"]
+  S --> Q{"trace stop 성공"}
+  Q -->|예| OK["completedSessionId 갱신 · 완료목록 조회"]
+  Q -->|아니오| P["pendingFinalization 보존<br/>새 preview 차단"]
+  OK --> RAW{"Raw stop 성공인가"}
+  P --> RAW
+  RAW -->|아니오| RF["completedRawFile null<br/>불완전 .part 보존 안내"]
+  RAW -->|예| END
+  RF --> END
+  P -. 명시 종료저장 재시도 .-> RETRY{"같은 lease recorder.stop 성공"}
+  RETRY -->|아니오| P
+  RETRY -->|예| DONE["pending 해제 · completed 갱신<br/>Raw 완전성은 별도"]

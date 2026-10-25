@@ -1,0 +1,26 @@
+flowchart TD
+    A["F-D07-029<br/>tracked·tactile depth와 측정 신체 helper 연결 wrapper<br/>상태 UNCONNECTED"]
+    P0["원본 capture와 measured binding freeze"]
+    A --> D
+    P1["기존 pipeline 또는 projector를 한 번 호출"]
+    P0 --> P1
+    P2["sample cell과 body floor cell 일치 검사"]
+    P1 --> P2
+    P3["원본 output과 optional clearance를 함께 반환"]
+    P2 --> P3
+    D{"P-D07-029<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["clearance null; 원본출력 변조 없음"]
+    D -->|"cell/owner/mapper/capture mismatch"| B0
+    B1["optional point evidence 반환"]
+    D -->|"모든 own-cell 관계 동일"| B1
+    B2["wrapper 경로 없음"]
+    D -->|"현재 Main 호출"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    N["Main 실행 연결 없음<br/>직접 API와 시험 기대만"]
+    A -.-> N
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

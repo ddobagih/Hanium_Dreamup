@@ -1,0 +1,17 @@
+flowchart TD
+ A["F-D10-006 격리 worker run"] --> B["P-D10-006 lock 아래 spawn executor 필요시 생성"]
+ B --> C["submit 후 wait_for로 결과와 hard deadline 대기"]
+ C --> D{"결과 종류"}
+ D -->|"성공"| E["ready=True로 설정하고 결과 반환. pool 유지"]
+ D -->|"기타 worker 예외"| X["예외 전파. 이 분기에서 abort 호출 없음"]
+ D -->|"TimeoutError, CancelledError, BrokenProcessPool"| F["abort: executor 참조 None 및 ready=False"]
+ F --> G["shutdown wait=False 및 pending cancel"]
+ G --> H["살아 있는 process terminate, join 1초, 남으면 kill 및 join 1초"]
+ H --> I["timeout은 VoiceInferenceTimeout, cancel/broken은 원래 예외 전파"]
+ H -.-> N["마지막 생존 재검사 없음. 강제 종료 완료 보장 아님"]
+ I -.-> J["다음 새 호출은 새 pool 생성. 자동 retry 없음"]
+ W["HTTP disconnect 감시"] --> V{"infer도 동시에 완료했는가"}
+ V -->|"예"| E2["완료한 infer 결과 또는 예외 우선"]
+ V -->|"아니오"| C2["infer task 취소 후 pool abort 경로. HTTP499"]
+ C2 -.-> F
+ R["ready 조회"] --> R2["flag, executor, worker 존재와 모든 process alive를 함께 확인"]

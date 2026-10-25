@@ -9,6 +9,7 @@ data class ApprovedCameraFrameQualityProfile(
     val profileId: String,
     val minimumNormalizedBrightness: Double,
     val maximumOccludedFraction: Double,
+    /** Retained for profile compatibility; angular shake is not a camera-quality condition. */
     val maximumAngularShakeDegreesPerSecond: Double,
     val minimumMountPitchDegrees: Double,
     val maximumMountPitchDegrees: Double,
@@ -52,9 +53,13 @@ data class CameraFrameQualityObservation(
     val observedAtElapsedRealtimeMs: Long,
     val frameAvailable: Boolean?,
     val normalizedBrightness: Double?,
+    /** Physical coverage evidence when available; a scene's dark pixels do not establish it. */
     val occludedFraction: Double?,
+    /** Optional diagnostic value, deliberately ignored by the quality assessment. */
     val angularShakeDegreesPerSecond: Double?,
     val mountPitchDegrees: Double?,
+    /** Luma-only diagnostic; presence, absence, or value does not determine camera quality. */
+    val nearBlackFraction: Double? = null,
 )
 
 enum class CameraFrameQualityReason {
@@ -70,6 +75,10 @@ enum class CameraFrameQualityReason {
     OCCLUSION_OUTSIDE_APPROVED_RANGE,
     SHAKE_OUTSIDE_APPROVED_RANGE,
     MOUNT_ANGLE_OUTSIDE_APPROVED_RANGE,
+    /** Raw FAIL close to the approved angle; only the runtime gate may qualify a recheck. */
+    MOUNT_ANGLE_NEAR_BOUNDARY,
+    /** Still FAIL: same-source passing history qualifies a bounded, automatically recoverable recheck. */
+    MOUNT_ANGLE_RECHECK_PENDING,
 }
 
 data class CameraFrameQualityAssessment(
@@ -153,18 +162,12 @@ object CameraFrameQualityPolicy {
 
         val brightness = measured.normalizedBrightness
         val occlusion = measured.occludedFraction
-        val shake = measured.angularShakeDegreesPerSecond
         val mountPitch = measured.mountPitchDegrees
         if (
             brightness == null ||
             !brightness.isFinite() ||
             brightness !in 0.0..1.0 ||
-            occlusion == null ||
-            !occlusion.isFinite() ||
-            occlusion !in 0.0..1.0 ||
-            shake == null ||
-            !shake.isFinite() ||
-            shake < 0.0 ||
+            (occlusion != null && (!occlusion.isFinite() || occlusion !in 0.0..1.0)) ||
             mountPitch == null ||
             !mountPitch.isFinite()
         ) {
@@ -179,22 +182,18 @@ object CameraFrameQualityPolicy {
                 CameraFrameQualityReason.BRIGHTNESS_OUTSIDE_APPROVED_RANGE,
             )
         }
-        if (occlusion > profile.maximumOccludedFraction) {
+        if (occlusion != null && occlusion > profile.maximumOccludedFraction) {
             return result(
                 EnvironmentEvidenceStatus.FAIL,
                 CameraFrameQualityReason.OCCLUSION_OUTSIDE_APPROVED_RANGE,
             )
         }
-        if (shake > profile.maximumAngularShakeDegreesPerSecond) {
-            return result(
-                EnvironmentEvidenceStatus.FAIL,
-                CameraFrameQualityReason.SHAKE_OUTSIDE_APPROVED_RANGE,
-            )
-        }
         if (mountPitch !in profile.minimumMountPitchDegrees..profile.maximumMountPitchDegrees) {
             return result(
                 EnvironmentEvidenceStatus.FAIL,
-                CameraFrameQualityReason.MOUNT_ANGLE_OUTSIDE_APPROVED_RANGE,
+                if (mountPitch in (profile.minimumMountPitchDegrees - 5.0)..(profile.maximumMountPitchDegrees + 5.0))
+                    CameraFrameQualityReason.MOUNT_ANGLE_NEAR_BOUNDARY
+                else CameraFrameQualityReason.MOUNT_ANGLE_OUTSIDE_APPROVED_RANGE,
             )
         }
         return result(

@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import backend.app.api.health as health_api
+import backend.app.services.health_readiness as health_api
 from backend.app.services.tmap_pedestrian import (
     _record_tmap_success,
     reset_tmap_success_cache,

@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
 import java.io.Closeable
+import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessStatus
 
 enum class WalkSessionResourceQuery {
@@ -93,6 +94,106 @@ internal class WalkSessionResourceMonitoringTracker(
     }
 }
 
+enum class WalkSessionBatteryObservationSource {
+    UNKNOWN,
+    ANDROID_SYSTEM,
+}
+
+enum class WalkSessionBatteryChargeStatus {
+    UNKNOWN,
+    CHARGING,
+    DISCHARGING,
+    NOT_CHARGING,
+    FULL,
+}
+
+enum class WalkSessionBatteryUnknownReason {
+    NO_OBSERVATION,
+    LEVEL_UNAVAILABLE,
+    CURRENT_NOW_UNAVAILABLE,
+    CURRENT_AVERAGE_UNAVAILABLE,
+    CHARGE_STATUS_UNAVAILABLE,
+    POWER_CONNECTION_UNAVAILABLE,
+    RECEIPT_TIME_UNAVAILABLE,
+    QUERY_FAILED,
+}
+
+/**
+ * Independent sticky extras and current-property reads, without a common physical sample time.
+ * Raw facts only; these do not set readiness, a drain rate, or a remaining runtime.
+ */
+data class WalkSessionBatteryObservation(
+    /** ACTION_BATTERY_CHANGED level/scale, kept together only when 0 <= level <= scale > 0. */
+    val level: Int? = null,
+    val scale: Int? = null,
+    /** CURRENT_NOW/AVERAGE in microamperes: positive charging, negative discharging. */
+    val currentNowMicroamps: Int? = null,
+    /** The average period belongs to the device fuel gauge, not an application window. */
+    val currentAverageMicroamps: Int? = null,
+    val chargeStatus: WalkSessionBatteryChargeStatus = WalkSessionBatteryChargeStatus.UNKNOWN,
+    val pluggedIn: Boolean? = null,
+    val source: WalkSessionBatteryObservationSource = WalkSessionBatteryObservationSource.UNKNOWN,
+    /** Receipt of this completed query, including a repeated sticky read; never measurement time. */
+    val queryReceivedAtElapsedRealtimeMs: Long? = null,
+    val unknownReasons: Set<WalkSessionBatteryUnknownReason> = setOf(WalkSessionBatteryUnknownReason.NO_OBSERVATION),
+) {
+    /** Neither the sticky extras nor the integer current properties provide a sample timestamp. */
+    val measuredAtElapsedRealtimeMs: Long? get() = null
+}
+
+internal fun readWalkSessionBatteryObservation(
+    level: Int?,
+    scale: Int?,
+    status: Int?,
+    plugged: Int?,
+    currentNowMicroamps: () -> Int?,
+    currentAverageMicroamps: () -> Int?,
+    targetSdkVersion: Int,
+    elapsedRealtimeMs: () -> Long,
+): WalkSessionBatteryObservation {
+    val reasons = linkedSetOf<WalkSessionBatteryUnknownReason>()
+    fun current(read: () -> Int?, unavailable: WalkSessionBatteryUnknownReason): Int? {
+        val result = runCatching(read)
+        if (result.isFailure) reasons.add(WalkSessionBatteryUnknownReason.QUERY_FAILED)
+        // getIntProperty reports errors as zero only for legacy targets; current target 36 uses MIN.
+        // A valid zero at target >= P remains a raw value and is never inferred to mean no drain.
+        return result.getOrNull()?.takeUnless {
+            it == Int.MIN_VALUE || (targetSdkVersion < Build.VERSION_CODES.P && it == 0)
+        }.also { if (it == null) reasons.add(unavailable) }
+    }
+    val currentNow = current(currentNowMicroamps, WalkSessionBatteryUnknownReason.CURRENT_NOW_UNAVAILABLE)
+    val currentAverage = current(currentAverageMicroamps, WalkSessionBatteryUnknownReason.CURRENT_AVERAGE_UNAVAILABLE)
+    val receipt = runCatching(elapsedRealtimeMs).getOrNull()?.takeIf { it >= 0L }
+    if (receipt == null) reasons.add(WalkSessionBatteryUnknownReason.RECEIPT_TIME_UNAVAILABLE)
+    val validLevel = level != null && scale != null && scale > 0 && level in 0..scale
+    if (!validLevel) reasons.add(WalkSessionBatteryUnknownReason.LEVEL_UNAVAILABLE)
+    val chargeStatus = when (status) {
+        BatteryManager.BATTERY_STATUS_CHARGING -> WalkSessionBatteryChargeStatus.CHARGING
+        BatteryManager.BATTERY_STATUS_DISCHARGING -> WalkSessionBatteryChargeStatus.DISCHARGING
+        BatteryManager.BATTERY_STATUS_NOT_CHARGING -> WalkSessionBatteryChargeStatus.NOT_CHARGING
+        BatteryManager.BATTERY_STATUS_FULL -> WalkSessionBatteryChargeStatus.FULL
+        else -> WalkSessionBatteryChargeStatus.UNKNOWN
+    }
+    if (chargeStatus == WalkSessionBatteryChargeStatus.UNKNOWN) {
+        reasons.add(WalkSessionBatteryUnknownReason.CHARGE_STATUS_UNAVAILABLE)
+    }
+    val pluggedIn = plugged?.takeIf { it >= 0 }?.let { it != 0 }
+    if (pluggedIn == null) reasons.add(WalkSessionBatteryUnknownReason.POWER_CONNECTION_UNAVAILABLE)
+    val hasFact = validLevel || currentNow != null || currentAverage != null ||
+        chargeStatus != WalkSessionBatteryChargeStatus.UNKNOWN || pluggedIn != null
+    return WalkSessionBatteryObservation(
+        level = level.takeIf { validLevel },
+        scale = scale.takeIf { validLevel },
+        currentNowMicroamps = currentNow,
+        currentAverageMicroamps = currentAverage,
+        chargeStatus = chargeStatus,
+        pluggedIn = pluggedIn,
+        source = if (hasFact) WalkSessionBatteryObservationSource.ANDROID_SYSTEM else WalkSessionBatteryObservationSource.UNKNOWN,
+        queryReceivedAtElapsedRealtimeMs = receipt,
+        unknownReasons = reasons.toSet(),
+    )
+}
+
 data class WalkSessionDeviceResourceSnapshot(
     val batteryNotLow: Boolean?,
     val privateStorageAboveSystemLow: Boolean?,
@@ -104,7 +205,22 @@ data class WalkSessionDeviceResourceSnapshot(
     val checkedAtElapsedRealtimeMs: Map<WalkSessionResourceQuery, Long> = emptyMap(),
     /** Exception type per failed query; the message is never kept. */
     val queryFailureReasons: Map<WalkSessionResourceQuery, String> = emptyMap(),
+    val batteryObservation: WalkSessionBatteryObservation = WalkSessionBatteryObservation(),
 ) {
+    /** Resource evidence only; the caller supplies the epoch and monotonic source/receipt times. */
+    fun toRuntimeSafetyObservation(
+        epoch: WalkRuntimeEpoch,
+        observedAtElapsedRealtimeMs: Long,
+        receivedAtElapsedRealtimeMs: Long,
+    ): WalkRuntimeSafetyObservation = WalkRuntimeSafetyObservation(
+        epoch = epoch,
+        observedAtElapsedRealtimeMs = observedAtElapsedRealtimeMs,
+        receivedAtElapsedRealtimeMs = receivedAtElapsedRealtimeMs,
+        batteryCritical = batteryNotLow?.not(),
+        storageCritical = privateStorageAboveSystemLow?.not(),
+        thermalCritical = thermalBelowCritical?.not(),
+    )
+
     val readinessStatus: WalkSessionReadinessStatus
         get() = when {
             batteryNotLow == false ||
@@ -144,6 +260,10 @@ data class WalkSessionDeviceResourceSnapshot(
                 },
             )
             if (monitoring.reason.isNotEmpty()) add(monitoring.reason)
+            if (readinessStatus == WalkSessionReadinessStatus.READY) {
+                if (thermalThrottled == true) add("thermal_throttled")
+                if (thermalThrottled == null) add("thermal_throttle_state_pending")
+            }
         }.joinToString(",")
 
     /** Stable measurement conditions for device checks, separate from runtime resource safety. */
@@ -159,7 +279,7 @@ data class WalkSessionDeviceResourceSnapshot(
             if (reason.isNotEmpty()) add(reason)
             if (thermalThrottled == true) add("thermal_throttled")
             if (thermalThrottled == null) add("thermal_throttle_state_pending")
-        }.joinToString(",")
+        }.distinct().joinToString(",")
 }
 
 internal fun readWalkSessionDeviceResourceSnapshot(
@@ -168,6 +288,7 @@ internal fun readWalkSessionDeviceResourceSnapshot(
     thermalStatus: () -> Int?,
     monitoring: WalkSessionResourceMonitoringHealth = WalkSessionResourceMonitoringHealth(),
     elapsedRealtimeMs: (() -> Long)? = null,
+    batteryObservation: (() -> WalkSessionBatteryObservation)? = null,
 ): WalkSessionDeviceResourceSnapshot {
     val checkedAt = linkedMapOf<WalkSessionResourceQuery, Long>()
     fun <T> query(kind: WalkSessionResourceQuery, read: () -> T): Result<T> {
@@ -204,12 +325,18 @@ internal fun readWalkSessionDeviceResourceSnapshot(
             failure(WalkSessionResourceQuery.PRIVATE_STORAGE, storage)
             failure(WalkSessionResourceQuery.THERMAL, thermal)
         },
+        // Quantitative failure cannot discard an independently confirmed low-battery signal.
+        batteryObservation = batteryObservation?.let { read ->
+            runCatching(read).getOrElse {
+                WalkSessionBatteryObservation(unknownReasons = setOf(WalkSessionBatteryUnknownReason.QUERY_FAILED))
+            }
+        } ?: WalkSessionBatteryObservation(),
     )
 }
 
 /**
- * Reads only Android-defined low-battery and thermal severity signals. Device-specific numeric
- * thresholds remain unset until the designated-device measurement work approves them.
+ * Reads Android-defined resource signals and raw battery facts. Device-specific numeric thresholds
+ * remain unset until the designated-device measurement work approves them.
  */
 class AndroidWalkSessionResourceProbe(
     context: Context,
@@ -275,6 +402,7 @@ class AndroidWalkSessionResourceProbe(
     @Suppress("DEPRECATION")
     fun snapshot(): WalkSessionDeviceResourceSnapshot {
         // Every call re-queries the system; a resume recheck therefore never reuses an old value.
+        var batteryObservation = WalkSessionBatteryObservation()
         return readWalkSessionDeviceResourceSnapshot(
             monitoring = monitoring.health,
             elapsedRealtimeMs = SystemClock::elapsedRealtime,
@@ -283,7 +411,7 @@ class AndroidWalkSessionResourceProbe(
                     null,
                     IntentFilter(Intent.ACTION_BATTERY_CHANGED),
                 )
-                if (
+                val notLow = if (
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
                     battery?.hasExtra(BatteryManager.EXTRA_BATTERY_LOW) == true
                 ) {
@@ -291,7 +419,32 @@ class AndroidWalkSessionResourceProbe(
                 } else {
                     null
                 }
+                batteryObservation = runCatching {
+                    fun extra(name: String): Int? = if (battery?.hasExtra(name) == true) {
+                        battery.getIntExtra(name, Int.MIN_VALUE)
+                    } else null
+                    readWalkSessionBatteryObservation(
+                        level = extra(BatteryManager.EXTRA_LEVEL),
+                        scale = extra(BatteryManager.EXTRA_SCALE),
+                        status = extra(BatteryManager.EXTRA_STATUS),
+                        plugged = extra(BatteryManager.EXTRA_PLUGGED),
+                        currentNowMicroamps = {
+                            appContext.getSystemService(BatteryManager::class.java)
+                                ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+                        },
+                        currentAverageMicroamps = {
+                            appContext.getSystemService(BatteryManager::class.java)
+                                ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE)
+                        },
+                        targetSdkVersion = appContext.applicationInfo.targetSdkVersion,
+                        elapsedRealtimeMs = SystemClock::elapsedRealtime,
+                    )
+                }.getOrElse {
+                    WalkSessionBatteryObservation(unknownReasons = setOf(WalkSessionBatteryUnknownReason.QUERY_FAILED))
+                }
+                notLow
             },
+            batteryObservation = { batteryObservation },
             privateStorageAboveSystemLow = {
                 val files = appContext.filesDir
                 val systemLowStorage = appContext.registerReceiver(

@@ -24,6 +24,44 @@ import org.junit.Test
 
 class AndroidUserReportClientNetworkTest {
     @Test
+    fun successfulResponseRequiresJsonWhileHttpFailureKeepsItsStatusTaxonomy() {
+        for (status in listOf(200, 503)) {
+            LocalHttpTestServer { _, socket ->
+                val body = LIST_RESPONSE.toByteArray(Charsets.UTF_8)
+                socket.getOutputStream().apply {
+                    write(("HTTP/1.1 $status Test\r\nContent-Type: text/plain\r\n" +
+                        "Content-Length: ${body.size}\r\nConnection: close\r\n\r\n").toByteArray(Charsets.US_ASCII))
+                    write(body)
+                    flush()
+                }
+            }.use { server ->
+                val call = AndroidUserReportClient().listReportsCall(session(server.baseUrl), 25, null, null)
+                if (status == 200) assertThrows(UserReportProtocolException::class.java) { call.execute() }
+                else assertEquals(status, assertThrows(UserReportHttpException::class.java) { call.execute() }.statusCode)
+            }
+        }
+    }
+
+    @Test
+    fun redirectResponseNeverFollowsLocationWithTheAuthenticatedRequest() {
+        val redirects = java.util.concurrent.atomic.AtomicInteger()
+        LocalHttpTestServer { _, socket ->
+            redirects.incrementAndGet()
+            socket.writeFixedResponse(200, LIST_RESPONSE.toByteArray(Charsets.UTF_8))
+        }.use { target ->
+            LocalHttpTestServer { _, socket ->
+                socket.writeFixedResponse(302, ByteArray(0), headers = mapOf("Location" to target.baseUrl + "/moved"))
+            }.use { source ->
+                val error = assertThrows(UserReportHttpException::class.java) {
+                    AndroidUserReportClient().listReportsCall(session(source.baseUrl), 25, null, null).execute()
+                }
+                assertEquals(302, error.statusCode)
+                assertEquals(0, redirects.get())
+            }
+        }
+    }
+
+    @Test
     fun listAndCreateUseOnlyExactGatewayApiPathsCookieNoStoreAndExactBody() {
         CapturingServer(
             responses = listOf(

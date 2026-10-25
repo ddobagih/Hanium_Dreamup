@@ -143,10 +143,16 @@ internal class CameraTestFeedbackCoordinator {
         // Sample admission above proves the capture clock and frame ownership. Bind that
         // lease before selection/evaluation, never after an action has already been reserved.
         val accepted = sample.copy(outputs = sample.outputs.map { output ->
-            output.copy(sourceValidUntilElapsedRealtimeMs = minOf(
-                output.sourceValidUntilElapsedRealtimeMs ?: sample.validUntilMs,
-                sample.validUntilMs,
-            ))
+            output.copy(
+                sourceValidUntilElapsedRealtimeMs = minOf(
+                    output.sourceValidUntilElapsedRealtimeMs ?: sample.validUntilMs,
+                    sample.validUntilMs,
+                ),
+                sourceObservedAtElapsedRealtimeMs = minOf(output.sourceObservedAtElapsedRealtimeMs ?: sample.capturedAtMs,
+                    sample.capturedAtMs),
+                sourceMaxAgeMs = minOf(output.sourceMaxAgeMs ?: UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS,
+                    UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS),
+            )
         })
         samples[sample.source] = accepted
         if (sample.source == Source.PRIMARY) {

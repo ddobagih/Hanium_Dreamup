@@ -9,24 +9,21 @@ import org.junit.Test
 /** S06-10/S06-11: voice, screen and failure recovery share one provider-based "more" rule. */
 class MainActivityDestinationSearchPagingStaticTest {
     private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-    private val search = source.substringAfter("private fun performDestinationSearch(reset: Boolean)")
-        .substringBefore("private fun isDestinationSearchLeaseCurrent(")
+    private val search = MainActivityRefactorSource.function(source, "private fun performDestinationSearch(reset: Boolean)")
 
     @Test fun theOldUniqueCountGuessIsGoneFromEveryCaller() {
-        assertFalse(source.contains("destinationSearchResults.size >= destinationSearchPage * DESTINATION_SEARCH_PAGE_SIZE"))
-        assertFalse(source.contains("retainedCandidates.size >= destinationSearchPage * DESTINATION_SEARCH_PAGE_SIZE"))
-        assertFalse(Regex("destinationSearchResults.size >=\\s+destinationSearchPage").containsMatchIn(source))
+        assertFalse(MainActivityRefactorSource.destination.contains("destinationSearchResults.size >= destinationSearchPage * DESTINATION_SEARCH_PAGE_SIZE"))
+        assertFalse(MainActivityRefactorSource.destination.contains("retainedCandidates.size >= destinationSearchPage * DESTINATION_SEARCH_PAGE_SIZE"))
+        assertFalse(Regex("destinationSearchResults.size >=\\s+destinationSearchPage").containsMatchIn(MainActivityRefactorSource.destination))
         // hearMore, screen "more" button, retained-candidate recovery and the success page.
-        val hearMore = source.substringAfter("private fun hearMoreVoiceDestinationCandidates() {")
-            .substringBefore("private fun cancelDestinationFromVoice() {")
+        val hearMore = MainActivityRefactorSource.function(source, "fun hearMoreVoiceDestinationCandidates()")
         // S06-9: hearMore no longer asks for a larger page; after the local pages it reads the provider answer.
-        assertFalse(hearMore.contains("destinationSearchCanLoadMore()"))
-        assertTrue(hearMore.contains("destinationSearchProviderHasMore == true"))
-        val ui = source.substringAfter("private fun updateDestinationSearchUi()")
-            .substringBefore("private fun updateRouteButtonText()")
-        assertTrue(ui.contains("val canLoadMore = destinationSearchCanLoadMore()"))
-        assertTrue(search.contains("moreResultsAvailable = destinationSearchCanLoadMore(retainedCandidates.size),"))
-        assertEquals(1, Regex("moreResultsAvailable = destinationSearchCanLoadMore\\(\\),").findAll(search).count())
+        assertFalse(hearMore.contains("search().canLoadMore("))
+        assertTrue(hearMore.contains("search().state.providerHasMore == true"))
+        val ui = MainActivityRefactorSource.member(source, "updateDestinationSearchUi")
+        assertTrue(ui.contains("canLoadMore = { destinationSearchController.canLoadMore() }"))
+        assertTrue(search.contains("moreResultsAvailable = canLoadMore(retainedCandidates.size),"))
+        assertEquals(1, Regex("moreResultsAvailable = canLoadMore\\(\\),").findAll(search).count())
     }
 
     @Test fun providerAnswerIsStoredPerListAndResetForANewQuery() {
@@ -35,8 +32,7 @@ class MainActivityDestinationSearchPagingStaticTest {
         val success = search.substringAfter("destinationSearchPage = requestedPage")
             .substringBefore("val merged")
         assertTrue(success.contains("destinationSearchProviderHasMore = result.moreResultsAvailable"))
-        val rule = source.substringAfter("private fun destinationSearchCanLoadMore(")
-            .substringBefore("private fun isDestinationSearchLeaseCurrent(")
+        val rule = MainActivityRefactorSource.function(source, "private fun destinationSearchCanLoadMore(")
         assertTrue(rule.contains("destinationSearchCanRequestMore("))
         assertTrue(rule.contains("providerMoreAvailable = destinationSearchProviderHasMore"))
         assertTrue(rule.contains("maxResults = DESTINATION_SEARCH_MAX_RESULTS"))
@@ -49,10 +45,11 @@ class MainActivityDestinationSearchEmptyMergeStaticTest {
 
     @Test
     fun emptyMoreMergeUsesTheProviderAnswerInsteadOfEndingTheVoiceDialog() {
-        val branch = source.substringAfter("if (requestedPageIndex <= lastPageIndex) {")
-            .substringBefore("speakHomeDestinationVoicePrompt(state, lead + state.voicePrompt())")
+        val branch = MainActivityRefactorSource.function(source, "private fun performDestinationSearch(reset: Boolean)")
+            .substringAfter("if (requestedPageIndex <= lastPageIndex) {")
+            .substringBefore("actions.offerCandidates(state, lead + state.voicePrompt())")
         val fallback = branch.substringAfter("} else {")
-        assertTrue(fallback.contains("val providerHasMore = destinationSearchCanLoadMore()"))
+        assertTrue(fallback.contains("val providerHasMore = canLoadMore()"))
         assertTrue(fallback.contains("moreResultsAvailable = providerHasMore,"))
         assertFalse(fallback.contains("moreResultsAvailable = false"))
         assertTrue(fallback.contains("\"더 안내할 목적지 후보가 없습니다. \""))

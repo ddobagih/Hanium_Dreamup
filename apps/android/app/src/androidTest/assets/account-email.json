@@ -1,0 +1,217 @@
+{
+  "schema": "walkmate.account-email-test-vectors.v1",
+  "vectors": [
+    {
+      "input": "person@example.com",
+      "canonical": "person@example.com"
+    },
+    {
+      "input": "Person@EXAMPLE.COM",
+      "canonical": "Person@example.com"
+    },
+    {
+      "input": "person@bücher.example",
+      "canonical": "person@xn--bcher-kva.example"
+    },
+    {
+      "input": "a@faß.de",
+      "canonical": "a@xn--fa-hia.de"
+    },
+    {
+      "input": "a@ς.gr",
+      "canonical": "a@xn--3xa.gr"
+    },
+    {
+      "input": "a@☕.example",
+      "canonical": "a@xn--53h.example"
+    },
+    {
+      "input": "a@a‍b.com",
+      "canonical": null
+    },
+    {
+      "input": "a@xn--ab-m1t.com",
+      "canonical": null
+    },
+    {
+      "input": "a@ab--cd.example",
+      "canonical": null
+    },
+    {
+      "input": "a@xn--fa-hia.de",
+      "canonical": "a@xn--fa-hia.de"
+    },
+    {
+      "input": "a@한국.kr",
+      "canonical": "a@xn--3e0b707e.kr"
+    },
+    {
+      "input": "a@ｅｘａｍｐｌｅ.com",
+      "canonical": "a@example.com"
+    },
+    {
+      "input": "a@example。com",
+      "canonical": "a@example.com"
+    },
+    {
+      "input": "a@EXAMPLE.COM.",
+      "canonical": null
+    },
+    {
+      "input": "a@x..com",
+      "canonical": null
+    },
+    {
+      "input": "a@-x.com",
+      "canonical": null
+    },
+    {
+      "input": "a@x-.com",
+      "canonical": null
+    },
+    {
+      "input": "a@x_y.com",
+      "canonical": null
+    },
+    {
+      "input": "a@example%2ecom",
+      "canonical": null
+    },
+    {
+      "input": " a@example.com",
+      "canonical": null
+    },
+    {
+      "input": "a@example.com ",
+      "canonical": null
+    },
+    {
+      "input": "a@@example.com",
+      "canonical": null
+    },
+    {
+      "input": "한글@example.com",
+      "canonical": null
+    },
+    {
+      "input": "A+b@example.com",
+      "canonical": "A+b@example.com"
+    },
+    {
+      "input": "a..b@example.com",
+      "canonical": null
+    },
+    {
+      "input": "a@xn--.com",
+      "canonical": null
+    },
+    {
+      "input": "a@example​.com",
+      "canonical": "a@example.com"
+    },
+    {
+      "input": "a@a‌b.com",
+      "canonical": null
+    },
+    {
+      "input": "a@123.1",
+      "canonical": "a@123.0.0.1"
+    },
+    {
+      "input": "a@127.0.0.1",
+      "canonical": "a@127.0.0.1"
+    },
+    {
+      "input": "a@0x7f.1",
+      "canonical": "a@127.0.0.1"
+    },
+    {
+      "input": "a@010.1",
+      "canonical": "a@8.0.0.1"
+    },
+    {
+      "input": "a@foo.1",
+      "canonical": null
+    },
+    {
+      "input": "a@foo.09",
+      "canonical": null
+    },
+    {
+      "input": "a@foo.0x",
+      "canonical": null
+    },
+    {
+      "input": "a@1.2.3.256",
+      "canonical": null
+    },
+    {
+      "input": "a@1.2.3.4.5",
+      "canonical": null
+    },
+    {
+      "input": "a@999999999999999999.1",
+      "canonical": null
+    },
+    {
+      "input": "a@שלום.example",
+      "canonical": "a@xn--9dbne9b.example"
+    },
+    {
+      "input": "a@اa.example",
+      "canonical": null
+    },
+    {
+      "input": "a@127",
+      "canonical": "a@0.0.0.127"
+    },
+    {
+      "input": "a@0x7f000001",
+      "canonical": "a@127.0.0.1"
+    },
+    {
+      "input": "a@0177.1",
+      "canonical": "a@127.0.0.1"
+    },
+    {
+      "input": "a@example.com/a",
+      "canonical": null
+    },
+    {
+      "input": "a@example.com?a",
+      "canonical": null
+    },
+    {
+      "input": "a@example.com#a",
+      "canonical": null
+    },
+    {
+      "input": "a@example.com:443",
+      "canonical": null
+    },
+    {
+      "input": "a@example.com\\a",
+      "canonical": null
+    },
+    {
+      "input": "a@exam\nple.com",
+      "canonical": null
+    },
+    {
+      "input": "a@exam\tple.com",
+      "canonical": null
+    },
+    {
+      "input": "a@exam\rple.com",
+      "canonical": null
+    },
+    {
+      "input": "a@exam ple.com",
+      "canonical": null
+    },
+    {
+      "input": "a@example.com",
+      "canonical": null
+    }
+  ]
+}

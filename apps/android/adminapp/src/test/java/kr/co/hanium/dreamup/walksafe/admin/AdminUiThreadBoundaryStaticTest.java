@@ -94,15 +94,28 @@ public final class AdminUiThreadBoundaryStaticTest {
             "private void scheduleOriginalEvidenceExpiry(");
         assertFalse(apply.contains("BitmapFactory"));
         assertFalse(apply.contains("copyImageBytes"));
-        assertTrue(apply.contains("!activityStarted"));
-        assertTrue(apply.contains("controller.isLocallyLocked()"));
-        assertTrue(apply.contains("sessionGeneration != operationsSessionGeneration"));
-        assertTrue(apply.contains("!sessionId.equals(boundOperationsSessionId)"));
-        assertTrue(apply.contains("contentRevision != connectedOperationsContentRevision"));
-        assertTrue(apply.contains("!loaded.matches("));
-        assertTrue(apply.indexOf("destroyBitmap(decoded)") < apply.indexOf("originalEvidence = loaded"));
-        assertTrue(apply.indexOf("!loaded.matches(") < apply.indexOf("originalEvidence = loaded"));
-        assertTrue(activity.contains("awaitingSafResult || awaitingSafReconnectResult || awaitingLocalUnlock"));
+        assertTrue(apply.contains("activityStarted && controller != null"));
+        assertTrue(apply.contains("!controller.isLocallyLocked()"));
+        assertTrue(apply.contains("evidenceWorkflow.adopt(request,"));
+        assertTrue(apply.contains("historyState.connectedOperationsContentRevision(), historyState.boundOperationsSessionId(), deviceId,"));
+        assertTrue(apply.contains("historyState.operationsSessionGeneration())"));
+        String owner = read("src/main/java/kr/co/hanium/dreamup/walksafe/admin/OriginalEvidenceCoordinator.java");
+        assertTrue(owner.contains("!expected.binding.matches(current)"));
+        assertTrue(owner.contains("!loaded.matches(current.reportId, current.contentRevision,"));
+        assertTrue(owner.indexOf("imageDisposer.destroy(decoded)") < owner.indexOf("evidence = loaded"));
+        assertTrue(owner.indexOf("!loaded.matches(") < owner.indexOf("evidence = loaded"));
+        assertTrue(activity.contains("packageWorkflow.awaitingSave() || packageWorkflow.awaitingReconnect() || awaitingLocalUnlock"));
+    }
+
+    @Test
+    public void elapsedExpiryUsesOwnerCallbackAndDetachesBeforeDisposal() {
+        String expiry = section("private void scheduleOriginalEvidenceExpiry(", "private void clearOriginalEvidence(");
+        assertTrue(expiry.contains("evidenceWorkflow.scheduleExpiry(evidence, System.currentTimeMillis()"));
+        assertTrue(expiry.contains("originalEvidenceExpiryHandler.postDelayed(expiry, delay)"));
+        assertTrue(expiry.contains("originalEvidenceExpiryHandler.removeCallbacks(expiry)"));
+        assertTrue(expiry.contains("clearOriginalEvidence("));
+        String clear = section("private void clearOriginalEvidence(", "private void renderOriginalEvidenceConfirmationState()");
+        assertTrue(clear.indexOf("setImageDrawable(null)") < clear.indexOf("evidenceWorkflow.clear()"));
     }
 
     @Test

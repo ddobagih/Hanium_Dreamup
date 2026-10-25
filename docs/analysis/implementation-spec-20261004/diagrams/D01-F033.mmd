@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D01-033 세션 저장 CAS·TTL·키 reset·지원되는 구버전 이관"]
+  G{"AndroidGatewaySessionStore process lock; installID·키정상; allowlisted scope"}
+  I["Active/Renewing/PendingRevocation,operationId16..128,current version(origin/actor/device/family/rotation); encrypted limit plaintext20480B/cipher24576B/envelope32768chars"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 손상·CAS불일치·keyfailure는 저장권위 제한"]
+  G -->|"미충족"| X
+  N1["저장 로드는 reset marker를 먼저 reconcile하고 failClosed·V1/V2 잔재·V4/V3/backendDevice 동시존재를 차단한다."]
+  I --> N1
+  N2["backendDevice 복원은 now＜expires·origin/install을 확인하고 actor-bound EMAIL receipt prefix1..5로 unverified session을 만든다."]
+  N1 --> N2
+  N3["장기 active 복원은 actor/device/origin과 first-run 완결이력 검사 후 now＞=idle 또는 absolute면 pendingrevocation으로 옮긴다."]
+  N2 --> N3
+  N4["reserveRenewal/commit/rollback/abandon/complete는 pure CAS result가 COMMITTED일 때만 encrypted durable 저장한다. refreshed bundle은 epoch/flow/evidence 동일,rotation+1,absolute 동일,access·refresh 모두 변경을 요구한다."]
+  N3 --> N4
+  N5["완료된 authenticated V3만 exactlegacy로 V4에 이관하고 old key를 제거한다. session purge는 installID 보존, 확인된 계정삭제 reset은 installation scope까지 제거한다."]
+  N4 --> N5
+  OK["정확 저장상태 복원/commit 또는 검증된reset"]
+  N5 --> OK
+  B0["failClosed marker"]
+  N1 -->|"지원안되는legacy·동시형식"| B0
+  B1["currentversion 제거·복원없음"]
+  N2 -->|"backend expires 경계 도달"| B1
+  B2["PendingRevocation; ACTIVE 복원없음"]
+  N3 -->|"장기 idle/absolute 경계도달"| B2
+  B3["ALREADY_COMMITTED; 중복저장 필요없음"]
+  N4 -->|"same exactcommit"| B3
+  B4["STALE/BLOCKED로 current상태 그대로"]
+  N4 -->|"wrongversion/op 또는 renewing충돌"| B4
+  B5["store blocked"]
+  N5 -->|"write·keydestroy 실패"| B5
+  R["중단·취소: disk mutation 중 사용자취소 API 없음; 상위 operation으로 논리취소 / crash Renewing은 PendingRevocation으로만 복구; oldrefresh 재전송없음"]
+  V["복구·재시도: current key readable자료 rewrap; V3 completedlegacy만 migration / confirmed-unapplied reservation을 durable rollback후release한때만 refresh재시도"]
+  Q["정책 P-D01-006 · P-D01-007 · P-D01-018 · P-D01-019"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

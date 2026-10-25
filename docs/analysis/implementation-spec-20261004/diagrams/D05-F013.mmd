@@ -1,0 +1,38 @@
+flowchart TD
+  H["P-D05-013 · F-D05-013 FastSAM 실행서비스·GPU 생성·최신 1 프레임 배압"]
+  H --> L{"시작 기한과 asset SHA 유효"}
+  L -->|"아니오"| X["실패 또는 close로 STOPPING<br/>CPU fallback 없음"]
+  L -->|"예"| B{"요청 backend"}
+  B -->|"CPU"| C["CPU native 생성 1 회"]
+  B -->|"GPU · 기한 내"| G["GPU native 생성<br/>가용 serialization cache 적용"]
+  G -->|"성공"| V{"후속 deadline 및 tensor 계약 유효<br/>1 input · 2 output · FP32 shape와 bytes"}
+  G -->|"RuntimeException 또는 LinkageError"| RG{"실패 GPU native 정상 해제 확인"}
+  G -->|"그 밖의 실패"| X
+  RG -->|"실패"| X
+  RG -->|"성공"| K{"실패한 GPU 시도에 cache 사용"}
+  K -->|"예"| DL{"uncached GPU 재시도 전 기한 유효"}
+  DL -->|"아니오"| X
+  DL -->|"예"| UG["uncached GPU native 생성 1 회"]
+  UG -->|"성공 · GPU 유지"| V
+  UG -->|"RuntimeException 또는 LinkageError"| RU{"실패 GPU native 정상 해제 확인"}
+  UG -->|"그 밖의 실패"| X
+  RU -->|"실패"| X
+  RU -->|"성공"| F{"explicit allowCpuFallback 및 기한 유효"}
+  K -->|"아니오"| F
+  F -->|"아니오"| X
+  F -->|"예"| C
+  C -->|"실패"| X
+  C -->|"성공"| V
+  V -->|"아니오 · tensor 실패도 fallback 없음"| X
+  V -->|"예"| R["READY"]
+  R --> A{"token epoch timestamp TTL 유효"}
+  A -->|"아니오"| D["Admission 거부"]
+  A -->|"예"| P["ownedARGB latest pending1"]
+  P --> I["modelowner invoke"]
+  I -->|"오류 · CPU 재실행 없음"| X
+  I -->|"성공"| O["owned tensors postdecode consumer"]
+  O -->|"실패"| X
+  O -->|"끝 · 다음 pending 처리"| P
+  R -->|"close"| X
+  X --> Q["copy invoke consumer drain<br/>native owner에서 정리"]
+  Q --> Z["releasedFuture와 실제 release 확인 결과<br/>해제 실패를 새 owner 허가로 취급하지 않음"]

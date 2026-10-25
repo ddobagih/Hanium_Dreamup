@@ -85,8 +85,8 @@ internal class GpuSerializationCache private constructor(
             }
         }
 
-        fun privateDirectory(codeCacheDir: File): File {
-            val directory = File(codeCacheDir, "walksafe-gpu-v1")
+        fun privateDirectory(nativeCacheRoot: File): File {
+            val directory = File(nativeCacheRoot, "walksafe-gpu-v1")
             check((directory.isDirectory || directory.mkdirs()) && directory.isDirectory && directory.canWrite()) {
                 "GPU serialization directory is unavailable"
             }

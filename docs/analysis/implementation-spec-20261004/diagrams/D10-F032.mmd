@@ -1,0 +1,20 @@
+flowchart TD
+  A["F-D10-032 비식별 학습 artifact 등록 CLI"]
+  N0["1. args 파싱·DB URL 요구. training-root strict resolve 및 nonce bytes.fromhex."]
+  A --> N0
+  N1["2. Backend register_sanitized_artifact에 심사 decision·source object·암호화 metadata를 넘긴다."]
+  N0 --> N1
+  N2["3. artifact_id,source_collection_id,storage_name JSON 출력; finally engine dispose."]
+  N1 --> N2
+  B0{"DB URL 없음/invalid nonce/경로오류/service lifecycle error"}
+  R0["exit1"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"등록 성공 JSON"}
+  R1["비식별화 이미지가 실제 육안 안전한지 이 CLI가 판정한 것은 아님"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  Z["종료 · 자동 재시도 없음"]
+  N2 --> Z
+  P["적용 정책 · P-D10-026"]
+  P -. "코드 분기 기준" .-> A

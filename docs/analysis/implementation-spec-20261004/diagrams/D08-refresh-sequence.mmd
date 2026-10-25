@@ -1,0 +1,40 @@
+sequenceDiagram
+ participant A as Android
+ participant G as Gateway
+ participant Q as Actor queue와filelock
+ participant B as Backend
+ participant L as Long family ledger
+ participant S as Short session ledger
+ A->>G: refresh proof
+ G->>G: refresh family 본검사전 admission과family proof 예비검사
+ alt Backend family의current proof
+ G->>B: 서명된 session current
+ B-->>G: current denied unavailable
+ else 확인된consumed proof 또는legacy family
+ G->>G: Backend current 조회 생략
+ end
+ alt Backend unavailable 또는invalid proof
+ G-->>A: 503 또는401 기존상태유지
+ else 잠금 경로 진입가능
+ G->>Q: actor 직렬화
+ Q->>L: family proof binding 재읽기
+ alt current proof와모든조건통과
+ Q->>L: privacy commit guard 아래rotation 저장
+ Q-->>G: 새bundle 결과
+ else 확인된소비 token과활성family
+ Q->>L: long전체폐기와reuse watermark 같은write에저장
+ Q-->>G: reuse 결과와전량폐기 flag
+ else Backend denied 또는idle absolute 만료 또는rotation cap
+ Q->>L: 해당family만 폐기하고저장
+ Q-->>G: 해당family폐기 결과
+ else 이미폐기 또는stale
+ Q-->>G: 거부와기존상태유지
+ end
+ Q->>Q: actor lock 반납
+ opt 재사용 전량폐기 flag와commit확인 또는outcome unknown
+ G->>S: short 정리 callback 시도
+ Note over G,S: callback 실패가능 · short 발급시각과long watermark검사로도무효화
+ end
+ G-->>A: 새cookie와refresh 또는401 등 결과
+ end
+ G->>G: admission release

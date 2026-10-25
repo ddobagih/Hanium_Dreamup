@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D11-020 암호화 현장 로그 회수·미인증 receipt"]
+  B["P-D11-020 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. 기기 identity를 읽고32byte nonce를 만든다"]
+  B --> T0
+  T1["2. bounded adb command로 tar bytes를 회수한다"]
+  T0 --> T1
+  T2["3. 기기 identity가 변하지 않았는지 비교한다"]
+  T1 --> T2
+  T3["4. 허용 tar 구조를 검사해 암호화 원본 bytes를 그대로 저장한다"]
+  T2 --> T3
+  T4["5. UNATTESTED_NOT_ELIGIBLE receipt를 기록한다"]
+  T3 --> T4
+  T5["6. 항상 exit1로 종료해 physical/device NOT_RUN 상태를 유지한다"]
+  T4 --> T5
+  Z["암호문 보존 완료여도 정책상 return1"]
+  T5 --> Z
+  C0{"전후 device/transport identity 차이"}
+  R0["RuntimeError"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"tar 경로/중복/금지 member"}
+  R1["거부"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"archive 보존 성공"}
+  R2["출시/현장 인정 없음; exit1"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

@@ -1,0 +1,21 @@
+flowchart TD
+  A["F-D11-025 모델 준비와 export 및 smoke 지원"] --> P["P-D11-025 독립 CLI별 입력 검증"]
+  P --> C{"호출한 CLI 계열"}
+  C -->|"Vosk"| V{"verify-only"}
+  V -->|"예"| V0["기존 hash와 license 및 파일 검증"]
+  V -->|"아니오"| V1["고정 archive 검증 후 asset 준비"]
+  C -->|"direct Android export"| E["nms=True float TFLite 변환과 asset명 복사"]
+  E --> EN["runtime config와 hash 자동 갱신 없음"]
+  C -->|"unified export"| U["지정 모델 변환과 sidecar metadata 기록"]
+  C -->|"Android smoke"| S["현행 primary config와 hash 및 raw tensor 확인 후 invoke"]
+  C -->|"Backend smoke"| B["별도13class epoch270 지정 경로 load 및 invoke"]
+  C -->|"학습 또는 resume 후처리"| T["해당 날짜형 실험 CLI만 실행. 상세 D10 모델영역 연결"]
+  V0 --> Z["선택한 CLI 결과 반환 후 종료. 다른 계열 자동 연속 실행 아님"]
+  V1 --> Z
+  EN --> Z
+  U --> Z
+  S --> Z
+  B --> Z
+  T --> Z
+  P -->|"입력 또는 환경 불충족"| X["해당 도구 오류 종료. 실제 기기나 정확도 검증으로 승격하지 않음"]
+  Z -.-> R["자동 재시도 없음. 중단 복구는 각 독립 도구와 산출물에 한정"]

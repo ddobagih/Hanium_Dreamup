@@ -1,0 +1,42 @@
+flowchart TD
+  T["F-D06-018 raw 세그먼트 개시·집계 교체·경계 봉인"]
+  P["전제: GENERAL backend actor/device/account generation,<br/>deviceCheck PASS와 동일 session/attempt generation, current RAW<br/>consent, ACTIVE에서 usable 동일 Gateway walk lease."]
+  T --> P
+  E1["E-D06-018-01 유효 집계 pair→active segment 생성 또는 merge"]
+  E1 --> T
+  E2["E-D06-018-02 모델·detector·시계 경계→seal 후 새 segment"]
+  E2 --> T
+  E3["E-D06-018-03 ENDED/SAFE_STOP/재시작 잔여→완전 pair seal 또는 incomplete<br/>discard"]
+  E3 --> T
+  A1["1. owner/session/consent/walk lease gate를 먼저 검사한다."]
+  P --> A1
+  A2["2. continuation receipt면 기존 pair를 원래 receipt로 seal; 미승인 이전<br/>receipt partial은 버린다."]
+  A1 --> A2
+  A3["3. merge 가능한 창은 새 collection ID에 완전 replacement를 쓰고 active<br/>pointer 게시 뒤 이전 사본을 삭제한다."]
+  A2 --> A3
+  A4["4. 경계에서 seal하되 no-profile 마지막 slot을 쓰는 경우 opening identity를<br/>유지하며 boundary_window_count에 다른 실행 창을 집계한다."]
+  A3 --> A4
+  A5["5. 완전 DETECTION/PERFORMANCE pair와 저장 hash를 확인해야 COMPLETE로<br/>seal한다."]
+  A4 --> A5
+  N["정상 종료: CAPTURED 또는 SEALED."]
+  A5 --> N
+  FX["결과: 원래 walkId/receipt/model opening identity를 유지한 암호 세그먼트; 경계<br/>병합 count."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"replacement 저장 실패/ENOSPC/시계 역행"}
+    R1["기존 PARTIAL과 집계 보존, 새 창만 유실"]
+    B1 -->|조건 성립| R1
+    B2{"incomplete/손상 pair"}
+    R2["seal 불가; 종료/다음 admission에서 discard"]
+    B2 -->|조건 성립| R2
+    B3{"SAFE_STOP"}
+    R3["봉인은 허용; 업로드는 사용자의 종료/새 보행 준비까지 보류"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-016, P-D06-017"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: STORAGE_FAILURE/INVALID_WINDOW/GATE_BLOCKED."]
+    X2["복구: 이전 process partial 완전 pair는 다음 admission에 seal 가능."]
+    X3["정리: 새 replacement 실패 시 이전 사본 보존."]
+  end

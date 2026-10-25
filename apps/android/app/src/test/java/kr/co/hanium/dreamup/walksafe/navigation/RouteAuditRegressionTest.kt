@@ -105,7 +105,8 @@ class RouteAuditRegressionTest {
             facingObservation = facing(0.0, 3_500))
         assertNotNull(navigator.currentAcceptedRouteMatchFor(3_500))
         assertFalse(ready.directionOnly)
-        assertTrue(ready.instruction?.contains("전체 경로는") == true)
+        assertFalse(ready.instruction?.contains("전체 경로는") == true)
+        assertTrue(ready.infoUtterance?.message?.contains("전체 경로는") == true)
         assertTrue(navigator.reserveInstruction(ready))
     }
 
@@ -116,16 +117,22 @@ class RouteAuditRegressionTest {
         assertTrue(navigator.reserveInstruction(reference))
         val recovered = navigator.update(fix(0.0, at = 2_000), 2_000, false,
             facingObservation = facing(0.0, 2_000))
-        assertEquals("guidance_in_flight", recovered.reason)
-        assertFalse(recovered.cancelStaleNavigationSpeech)
+        assertEquals("guidance_facing_recheck_wait", recovered.reason)
+        assertNull(recovered.instruction)
+        assertTrue(recovered.cancelStaleNavigationSpeech)
+        assertFalse(navigator.isInstructionCurrent(reference, 2_000L, facing(0.0, 2_000)))
         val stable = navigator.update(fix(0.0, at = 2_050), 2_050, false,
             facingObservation = facing(0.0, 2_050))
         assertNotNull(navigator.currentAcceptedRouteMatchFor(2_050))
-        assertEquals("guidance_in_flight", stable.reason)
+        assertEquals("route_guidance", stable.reason)
+        assertFalse(stable.directionOnly)
+        // The old reference phase ended. Its late DONE cannot consume the new full-guidance cue.
         navigator.acknowledgeInstruction(reference, 2_100)
+        assertFalse(navigator.isInstructionCompletionCurrent(reference, 2_100L))
         val full = requireNotNull(navigator.retryGuidance(2_101, facing(0.0, 2_101)))
         assertFalse(full.directionOnly)
-        assertTrue(full.instruction?.contains("전체 경로는") == true)
+        assertFalse(full.instruction?.contains("전체 경로는") == true)
+        assertTrue(full.infoUtterance?.message?.contains("전체 경로는") == true)
         assertTrue(navigator.reserveInstruction(full))
     }
 
@@ -134,9 +141,14 @@ class RouteAuditRegressionTest {
         val navigator = navigator(straightWithGuide(), raw)
         val old = navigator.update(raw, 1_000, false, facingObservation = facing(0.0))
         val staleCompass = requireNotNull(navigator.retryGuidance(1_600, facing(0.0)))
-        assertFalse(staleCompass.instruction?.contains("6시") == true)
+        assertTrue(staleCompass.instruction?.contains("6시") == true)
+        assertEquals(1_000L, staleCompass.speechCueToken?.facingObservedAtElapsedRealtimeMs)
+        assertEquals(1_500L, staleCompass.speechCueToken?.facingValidUntilElapsedRealtimeMs)
+        assertEquals(3_001L, staleCompass.speechCueToken?.directionGraceDeadlineElapsedRealtimeMs)
         assertFalse(navigator.reserveInstruction(old))
+        assertTrue(navigator.reserveInstruction(staleCompass))
         navigator.onPositioningEvidenceInterrupted()
+        assertFalse(navigator.isInstructionCompletionCurrent(staleCompass, 1_700L))
         assertFalse(navigator.reserveInstruction(staleCompass))
         assertNull(navigator.retryGuidance(1_700, facing(0.0, 1_700)))
         navigator.setRoute(straightWithGuide())

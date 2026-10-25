@@ -1,0 +1,19 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+E0000 00:00:1790825469.261844 1745466 cuda_dnn.cc:8579] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+E0000 00:00:1790825469.263757 1745466 cuda_blas.cc:1407] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+W0000 00:00:1790825469.269635 1745466 computation_placer.cc:177] computation placer already registered. Please check linkage and avoid linking the same target more than once.
+W0000 00:00:1790825469.269647 1745466 computation_placer.cc:177] computation placer already registered. Please check linkage and avoid linking the same target more than once.
+W0000 00:00:1790825469.269648 1745466 computation_placer.cc:177] computation placer already registered. Please check linkage and avoid linking the same target more than once.
+W0000 00:00:1790825469.269649 1745466 computation_placer.cc:177] computation placer already registered. Please check linkage and avoid linking the same target more than once.
+/home/ddobagi/.local/share/hanium-dreamup/venv-tflite-py312/lib/python3.12/site-packages/tensorflow/lite/python/interpreter.py:457: UserWarning:     Warning: tf.lite.Interpreter is deprecated and is scheduled for deletion in
+    TF 2.20. Please use the LiteRT interpreter from the ai_edge_litert package.
+    See the [migration guide](https://ai.google.dev/edge/litert/migration)
+    for details.
+    
+  warnings.warn(_INTERPRETER_DELETION_WARNING)
+INFO: Created TensorFlow Lite XNNPACK delegate for CPU.
+{"phase": "START", "images": 149, "selection": "every source photo with >=20 annotated boxes; source maximum34", "selection_sha256": "66e8ff93271c4cd410f1e1ee3e170eff0066d1f27875f9beadd83c01529e544c", "tensorflow": "2.19.1", "opencv": "4.13.0"}
+{"phase": "PROGRESS", "done": 100, "total": 149, "elapsed_s": 3.9, "ambiguous_photos": 0, "ambiguous_anchors": 0}
+{"phase": "PROGRESS", "done": 149, "total": 149, "elapsed_s": 6.0, "ambiguous_photos": 0, "ambiguous_anchors": 0}
+{"scope": "All 149 source photos with at least 20 annotated boxes (maximum34 of full27021). Current actual model pre-NMS accepted-anchor upper bound for the existing300 cap; not field performance, risk-object loss, annotation completeness, mAP, Android YUV/delegate equivalence or artificial300-object stress.", "selection_rule": "all full_all27021 source photos with >=20 nonempty YOLO label rows, absolute path order", "source_list": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/full_all.txt", "source_list_sha256": "f76fe1cd238760de74f1101bee1766b0ca9bfdd26bfce4f9b1a4015067c4d7e6", "source_images": 27021, "model": "/home/ddobagi/Hanium_Dreamup/apps/android/app/src/main/assets/models/walkmate_yolo11n_21cls_768_float32.tflite", "model_sha256": "d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57", "config_sha256": "2d75fe233d7a321347575673172495635045dcad88b54f3c3f6e2d6ce166489e", "selection_sha256": "66e8ff93271c4cd410f1e1ee3e170eff0066d1f27875f9beadd83c01529e544c", "runtime": {"tensorflow": "2.19.1", "opencv": "4.13.0", "numpy": "2.1.3", "delegate": "host CPU XNNPACK", "threads": 2}, "images": 149, "images_with_discarded_alternative": 0, "raw_anchors": 1802304, "visible_valid_anchors": 1116541, "top1_pass_anchors": 19616, "discarded_top1_with_other_pass_anchors": 0, "pairs": [], "elapsed_s": 6.010246013989672, "maximum_pre_nms_accepted_anchors": 218, "images_with_accepted_anchors_at_least_300": 0, "images_with_accepted_anchors_above_300": 0}
+Actual current-model crowded subset measurement. Output: /tmp/walksafe-s10-18-crowded-evaluation-53xjc0be

@@ -1,0 +1,22 @@
+stateDiagram-v2
+ state "F-D02-032 UNPUBLISHED" as N
+ state "PUBLISHED exact binding" as P
+ state "INVALIDATED" as I
+ state "PURGING" as G
+ state "PURGE_RESULT true/false" as R
+ state "CLOSED" as C
+ state "DRAINED quiescence" as D
+ [*] --> N
+ N --> P: "consent·actor·epoch·source current 및 admission token 동일"
+ P --> P: "event enqueue64 이하; worker에서 privacy 이중 검사"
+ P --> I: "withdrawal·actor/lifecycle 교체"
+ I --> G: "대기 event 제거 후 in-flight 뒤 serial purge"
+ G --> R: "실제 삭제 결과 future"
+ P --> C: "close는 대기 event 폐기·새 입장 차단"
+ G --> C: "close 중에도 앞선 purge drain 기다림"
+ C --> D: "worker quiescence와 shutdown 확인"
+ R --> N: "상위 verified reset과 새 lifetime만 가능"
+ note right of D
+  drain ACK는 purge 성공이 아님
+  실패한 기존 binding은 다시 살아나지 않음
+ end note

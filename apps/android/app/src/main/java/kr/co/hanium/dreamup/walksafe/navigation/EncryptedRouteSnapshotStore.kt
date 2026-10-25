@@ -31,6 +31,7 @@ internal data class StoredRouteSnapshot(
     val route: WalkingRoute,
     val savedAtElapsedRealtimeMs: Long = 0L,
     val savedBootCount: Int = UNKNOWN_BOOT_COUNT,
+    val destinationCoordinateEvidence: DestinationCoordinateEvidence? = null,
 ) {
     val walkSessionId: String get() = scope.walkSessionId
 }
@@ -126,8 +127,15 @@ internal class EncryptedRouteSnapshotStore private constructor(
         route: WalkingRoute,
         destination: RoutePoint,
         nowEpochMs: Long = System.currentTimeMillis(),
+        destinationCoordinateEvidence: DestinationCoordinateEvidence? = null,
     ): Boolean = synchronized(process.lock) {
         if (!ownsWalk(scope) || nowEpochMs < 0L) return@synchronized false
+        // Reject an unreadable new archive before touching a previously saved route.
+        val ownedCoordinateEvidence = runCatching {
+            destinationCoordinateEvidence?.let {
+                parseDestinationCoordinateEvidence(it.copy(candidates = it.candidates.toList()).toJson(), destination)
+            }
+        }.getOrElse { return@synchronized false }
         val existing = readSnapshot(nowEpochMs)
         if (existing != null && existing.scope == scope) return@synchronized true
         if (existing != null) {
@@ -139,7 +147,8 @@ internal class EncryptedRouteSnapshotStore private constructor(
         if (expiresAtEpochMs < nowEpochMs) return@synchronized false
         val savedElapsed = elapsedRealtimeMs().takeIf { it >= 0L } ?: return@synchronized false
         saveReplacement(StoredRouteSnapshot(scope, nowEpochMs, expiresAtEpochMs, destination, route,
-            savedElapsed, currentBootCountOrUnknown()))
+            savedElapsed, currentBootCountOrUnknown(),
+            ownedCoordinateEvidence))
     }
 
     /** Returning the archive requires the expected account generation and the current walk lease. */
@@ -240,11 +249,17 @@ internal class EncryptedRouteSnapshotStore private constructor(
         .put("saved_boot_count", snapshot.savedBootCount)
         .put("destination", snapshot.destination.toJson())
         .put("route", snapshot.route.toJson())
+        .also { json ->
+            snapshot.destinationCoordinateEvidence?.let {
+                json.put(DESTINATION_COORDINATE_EVIDENCE_FIELD, it.toJson())
+            }
+        }
         .toString()
 
     private fun decodeSnapshot(payload: ByteArray): StoredRouteSnapshot? = runCatching {
         val root = JSONObject(String(payload, Charsets.UTF_8))
-        require(root.keysAsSet() == SNAPSHOT_FIELDS)
+        // The additive provenance field is optional in existing owner-bound v4 archives.
+        require(root.keysAsSet() - DESTINATION_COORDINATE_EVIDENCE_FIELD == SNAPSHOT_FIELDS)
         require(root.getString("schema_version") == ROUTE_SNAPSHOT_SCHEMA)
         val scope = RouteSnapshotScope(RouteSnapshotOwner(root.getString("owner_actor_id"),
             root.getString("owner_account_generation")), root.getString("walk_session_id"))
@@ -257,16 +272,22 @@ internal class EncryptedRouteSnapshotStore private constructor(
         val savedBootCount = root.getInt("saved_boot_count")
         require(savedBootCount >= UNKNOWN_BOOT_COUNT)
         val destination = root.getJSONObject("destination").toRoutePoint()
+        val destinationCoordinateEvidence = if (!root.has(DESTINATION_COORDINATE_EVIDENCE_FIELD) ||
+            root.isNull(DESTINATION_COORDINATE_EVIDENCE_FIELD)
+        ) null else {
+            parseDestinationCoordinateEvidence(root.getJSONObject(DESTINATION_COORDINATE_EVIDENCE_FIELD), destination)
+        }
         val routeJson = root.getJSONObject("route")
         val route = parseWalkingRoute(routeJson, WalkingRouteRequest(
             origin = routeJson.getJSONArray("polyline").getJSONObject(0).toRoutePoint(), destination = destination))
         StoredRouteSnapshot(scope, savedAtEpochMs, expiresAtEpochMs, destination, route,
-            savedAtElapsedRealtimeMs, savedBootCount)
+            savedAtElapsedRealtimeMs, savedBootCount, destinationCoordinateEvidence)
     }.getOrNull()
 
     private companion object {
         // v4 requires an account owner/generation; ownerless v1-v3 archives are deleted.
         const val ROUTE_SNAPSHOT_SCHEMA = "walksafe.encrypted-route-snapshot.v4"
+        const val DESTINATION_COORDINATE_EVIDENCE_FIELD = "destination_coordinate_evidence"
         const val BOOT_REFERENCE_TOLERANCE_MS = 5L * 60L * 1_000L
         val SNAPSHOT_FIELDS = setOf("schema_version", "owner_actor_id", "owner_account_generation",
             "walk_session_id", "saved_at_epoch_ms", "expires_at_epoch_ms", "saved_at_elapsed_realtime_ms",
@@ -304,6 +325,14 @@ private fun RoutePoint.toJson(): JSONObject = JSONObject()
     .put("latitude", latitude)
     .put("longitude", longitude)
     .also { if (!name.isNullOrBlank()) it.put("name", name) }
+
+private fun DestinationCoordinateEvidence.toJson(): JSONObject = JSONObject()
+    .also { json -> selectedKind?.let { json.put("coordinate_kind", it.wireName) } }
+    .put("coordinate_candidates", JSONArray().also { array ->
+        candidates.forEach { candidate ->
+            array.put(JSONObject().put("kind", candidate.kind.wireName).put("point", candidate.point.toJson()))
+        }
+    })
 
 private fun JSONObject.toRoutePoint(): RoutePoint = RoutePoint(
     latitude = getDouble("latitude"),
@@ -347,6 +376,7 @@ private fun WalkingRouteStep.toJson(): JSONObject = JSONObject()
         roadName?.let { json.put("road_name", it) }
         turnType?.let { json.put("turn_type", it) }
         facilityType?.let { json.put("facility_type", it) }
+        roadType?.let { json.put("road_type", it) }
     }
 
 private fun JSONObject.keysAsSet(): Set<String> = buildSet { keys().forEach(::add) }

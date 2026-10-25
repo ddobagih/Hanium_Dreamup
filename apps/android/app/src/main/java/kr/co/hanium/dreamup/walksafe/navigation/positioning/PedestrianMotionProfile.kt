@@ -8,6 +8,9 @@ data class WalkingCalibrationSample(
     val stepCount: Int,
     val durationMs: Long,
     val trustedPositionSegment: Boolean,
+    /** Null on legacy/direct samples whose original endpoint inputs are unknown. */
+    val startEndpointEvidence: WalkingCalibrationEndpointEvidence? = null,
+    val endEndpointEvidence: WalkingCalibrationEndpointEvidence? = null,
 )
 
 enum class MotionCalibrationStatus {

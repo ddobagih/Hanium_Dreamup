@@ -14,6 +14,21 @@ object GatewayEndpointPolicy {
         return normalizeOrNull(raw, allowDebugLoopbackHttp = true)
     }
 
+    /** A field APK replaces an old temporary tunnel without rewriting a user's fixed server. */
+    fun configuredDebugOriginOrNull(configured: String?, buildOrigin: String): String? {
+        val saved = debugOriginOrNull(configured) ?: return null
+        val compiled = debugOriginOrNull(buildOrigin) ?: return saved
+        return if (isQuickTunnelOrigin(saved) && isQuickTunnelOrigin(compiled)) compiled else saved
+    }
+
+    private fun isQuickTunnelOrigin(origin: String): Boolean {
+        val uri = URI(origin)
+        return uri.scheme == "https" && uri.port in setOf(-1, 443) &&
+            QUICK_TUNNEL_HOST.matches(uri.host)
+    }
+
+    private val QUICK_TUNNEL_HOST = Regex("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.trycloudflare\\.com")
+
     fun approvedDebugOriginOrNull(raw: String?, approvedOrigin: String): String? {
         val approved = normalizeOrNull(approvedOrigin, allowDebugLoopbackHttp = true) ?: return null
         val requested = normalizeOrNull(raw, allowDebugLoopbackHttp = true) ?: return null

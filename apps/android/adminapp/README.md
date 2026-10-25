@@ -127,3 +127,63 @@ debug API origin 기본값은 `http://127.0.0.1:8000`이다. 다른 내부 주�
 - 로컬 잠금은 서버 로그아웃이나 키의 사용자 인증 요구 설정을 대신하지 않는다. SAF 복귀 예외, 확정된 전달/상태 변경의 조회 복구, 즉시 로컬 차단과 비차단 snapshot을 유지한다.
 - AndroidKeyStore 실기기 지연, 큰 이미지 디코딩 중 홈/회전/만료, 기기 인증 취소·복귀, SAF 제공자별 취소·반환 및 실제 폰 데이터 보존 시험은 미수행이다. 기존 폰 DB에 접근하거나 수정하지 않았다.
 - S18-1~48의 개별 상태와 잔여 조치는 `/home/ddobagi/Hanium_chat_review_2026-09-17/progress-slices/S18.jsonl`에 기록한다. 미해결 서버 계약·키 정책·외부 custody·기관 접수·PostgreSQL·배포 검증을 로컬 잠금 수정으로 완료 처리하지 않는다.
+
+## 상태와 실행 책임
+
+관리자 앱은 사용자 앱의 인증 모듈과 합치지 않는다. `AdminSecurityController`가
+access/recovery token, `workLock`, lifecycle generation, 재인증·재확인 nonce의 유일한
+authority이다. 신고·신청·감사는 `AdminReportOperations`, 사건은
+`AdminIncidentOperations`, 원시수집은 `AdminRawCollectionOperations`, 검토·수동 전달은
+`AdminReviewDeliveryOperations`가 맡는다. 각 capability는 작업마다 제한된
+`AdminOperationAuthority.Lease`를 빌려 현재 세션·운영 enable·custody를 다시 확인한다.
+Activity는 이 capability를 직접 호출하며 기존 Controller 업무 진입점은 호환 위임만 한다.
+업무 객체는 token을 필드에 복제하지 않는다.
+
+Activity의 비동기 자원은 다음 소유자로 나뉜다.
+
+- `OriginalEvidenceCoordinator`: 일회 인증정보, 요청 세대·신고/콘텐츠/세션 결속,
+  Future 취소, 원본/표시 이미지 소유권과 만료 정리. 디코딩·Handler·ImageView는 Android
+  adapter에 남으며 승인 감사 응답을 실제 표시 완료로 취급하지 않는다.
+- `DeliveryPackageCoordinator`: SAF 요청 코드와 세대, 제출본 소유권, 세션·신고 증명과
+  파일 재읽기를 통한 전체 검증. 선택 취소·늦은 결과는 현재 결속에 반영하지 않는다.
+  Activity의 ContentResolver adapter는 새로 만든 문서의 실패 정리를 수행한다. 기존
+  제출본 재연결은 읽기만 수행하며 기관 전송을 자동 실행하지 않는다.
+- `AdminKeyWorkflowCoordinator`: 기기 인증 요청/단일 재시도, 교체 로그인 선택과 pending
+  descriptor·회전 표시 상태. 일회 비밀번호·TOTP를 쓴 요청은 자동 재전송하지 않는다.
+  영속 키 준비·서버 확인 뒤 승격 순서는 기존 `AdminDeviceKeyRotation`과
+  `AdminDeviceKeyStore`에 남는다.
+
+`AdminProtectedRequestExecutor`는 challenge 수신 시각을 먼저 기록하고 검증·서명·최종
+전송을 한 번 수행한다. ACTION 요청의 exact method/path/query/body/session/device/key
+결속과 최종 요청 전용 재확인 헤더를 공통 처리한다. 로그인·복구는 기존 별도 identity
+결속을 유지하고 challenge 서명 단계만 같은 구현을 사용한다. 각 HTTP adapter의 응답
+크기 제한, 파서, 에러 해석, PATCH·redirect·retry 정책은 각 adapter에 유지한다.
+
+passive Panel, typed DTO, strict parser, 원본 grant와 제출본 값 객체, 업무별 복구 attempt,
+단일 보안 authority는 각각 이미 독립적인 계약을 갖기 때문에 공통 기반 클래스나 전역
+repository로 합치지 않는다. Report/Incident 전송은 기존 bounded timeout과 generation
+fence에 의존하며 이 구조 변경이 서버 mutation 취소 보장을 추가하지 않는다.
+
+검증 대상은 기존 관리자 단위·HTTP·lifecycle·보안 경계 테스트와 새
+`OriginalEvidenceCoordinatorTest`, `DeliveryPackageCoordinatorTest`,
+`AdminKeyWorkflowCoordinatorTest`, `AdminProtectedRequestExecutorTest`,
+`AdminAuthorizedOperationsTest`다. JVM 검증은 KeyStore/Keyguard 인증, SAF provider,
+bitmap/UI 표시와 실제 기기 lifecycle 검증을 대신하지 않는다.
+
+
+## 검토·전달 이력과 요청 종료 책임
+
+- `AdminReviewDeliveryState`가 신고·관리자 세션 바인딩, 이력 snapshot/cursor/revision, 부분 페이지 적용, 최근 이력 미리보기, 유효한 전달 상태 전이와 정정 대상을 함께 관리한다. `AdminBoundaryActivity`는 이 상태의 변경 결과로 폼·화면을 갱신하며, SAF·원본 증거·기기키 작업의 기존 담당 객체를 사용한다.
+- `AdminSecurityController`가 발급한 작업 lease의 세션은 challenge 전, challenge 응답 뒤, 최종 전송 전에 현재 작업인지 확인한다. 신고와 중대사고 클라이언트도 close 취소 대상이며, 각 클라이언트의 OkHttp 요청 소유자는 진행 중 호출 취소와 종료 뒤 호출 등록 거부를 담당한다. 승인 소비·서명 내용·자동 재전송 금지 정책은 그대로 유지한다.
+- 모든 실제 HTTP 요청은 `AdminRequestAdmission`으로 현재 로컬 작업에 결속된다. 신고·중대사고의 OkHttp는 세대 검사·취소 등록·비동기 enqueue를 같은 경계에서 처리하고, 검토·전달·원시 수집·원본 이미지·보안 클라이언트의 URLConnection은 첫 네트워크 I/O 전에 세대 검사와 요청별 취소 등록을 마친다. 네트워크 대기와 취소 콜백은 로컬 잠금 밖에서 실행한다. 백그라운드 전환 전에 허가받지 못한 요청은 전송하지 않고, 이미 허가한 요청은 취소한다. 사용자 확인으로 복귀한 새 작업은 계속 사용할 수 있으며 서버에서 이미 처리한 변경을 되돌린다고 보장하지 않는다.
+- 직접 행동시험은 `AdminProtectedOperationCloseTest`, `AdminBackgroundDispatchRaceTest`, `AdminUrlConnectionAdmissionTest`, `AdminReviewDeliveryStateTest`, `AdminAuthorizedOperationsTest`, `AdminPatchOkHttpTransportTest`에서 확인한다. JVM에서 확인한 전송 차단·상태 규칙은 실제 기기 화면·통신·기관 전달 검증을 대신하지 않는다.
+
+
+## 2026-10-11 관리자 후보 이식
+
+- 신고 상태·신고 요청 상태·중대 사고 상태·RAW 검역 목록·RAW 목적 결정·RAW 법적 보존은 같은 canonical serializer의 본문 SHA-256을 재인증에 결속한다. 승인에는 action/method/path/digest 값의 불변 사본을 보관한다. 원본 열람 권한·제출본 생성·전달 정정은 기존 nonce 계약을 유지한다.
+- 현재 세션 로그아웃은 UI에서 로컬 세대와 공개 세션을 먼저 폐기하고 기존 admission을 취소한다. 서버 폐기는 캡처한 token/session/device와 전용 admission으로 한 번만 시도한다. 화면 종료·새 로그인·capability 종료 뒤에는 이전 요청을 새 권한으로 사용할 수 없다. 서버 폐기 불명과 이 기기의 로그아웃은 별도로 안내한다.
+- 전달 정정 비밀번호·TOTP는 화면 중지·재생성 때 비우며, 업무 자격증명 버퍼는 lease 생성·검증·전송 실패에도 finally에서 덮는다. 화면과 세션이 바뀐 실행 대기 작업은 실행하지 않고, 선택된 고위험 작업의 제출 거부는 자격증명과 진행 상태를 정리한다.
+- 기관 불일치 409는 일반 충돌과 구분한다. 기관 입력 보조는 현재 상세 및 끝까지 검증한 이력의 최신 유효 기록만 사용하며 기존 입력을 덮지 않는다. 자동 재전송은 하지 않는다. 복구 완료 안내에는 신뢰할 수 있는 로컬 운영자의 서버 TOTP 비밀키 교체 선행 조건을 명시한다.
+- `src/androidTest`의 화면 수명주기·취소·실제 Android HTTP·보안 경합·키 저장소 시험은 합성 자격증명과 모의 서버를 사용한다. 기기 잠금 또는 최근 인증 전제가 없으면 해당 키 시험은 건너뛰며 시험이 기기 설정을 바꾸지 않는다. 계측 소스 컴파일과 JVM 회귀는 실제 AVD/기기 실행·운영 MFA의 근거를 대신하지 않는다.
+- `AdminBuildVariantIsolationTest`는 실제 생성된 BuildConfig의 debug 운영 옵션 ON/OFF와 release 운영 기능 잠금을 확인한다. 각 변형 Gradle 실행과 계측 결과는 통합 담당의 이번 실행 근거로 판정한다.

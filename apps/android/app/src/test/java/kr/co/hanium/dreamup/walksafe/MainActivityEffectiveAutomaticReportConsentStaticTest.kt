@@ -16,7 +16,7 @@ class MainActivityEffectiveAutomaticReportConsentStaticTest {
 
     @Test
     fun automaticCandidateCreationRechecksEffectiveConsentBeforeEnqueue() {
-        val process = ReportStaticSourceInspector.functionBlock(
+        val process = MainActivityRefactorSource.function(
             source,
             "private fun processReportCandidate",
         )
@@ -27,14 +27,14 @@ class MainActivityEffectiveAutomaticReportConsentStaticTest {
                 "!explicitRequest &&",
                 effective,
                 "reportCandidate=blocked:automatic_report_consent_required",
-                "reportQueueStore.enqueue(",
+                "queue.enqueue(",
             ),
         )
     }
 
     @Test
     fun automaticQueueDrainUsesEffectiveConsent() {
-        val context = ReportStaticSourceInspector.functionBlock(
+        val context = MainActivityRefactorSource.function(
             source,
             "private fun reportQueueDrainContext",
         )

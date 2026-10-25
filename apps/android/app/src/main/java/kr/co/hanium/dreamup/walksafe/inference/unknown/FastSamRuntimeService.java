@@ -90,6 +90,11 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
         }
     }
 
+    /** Capture can skip tracking/copying during cold preparation without starting native work. */
+    public boolean isReady() {
+        synchronized(lock){return !stopping && ready.isDone() && !ready.isCompletedExceptionally();}
+    }
+
     /** Synchronous, stride-aware copy while the caller still owns an open Image. */
     public Admission submit(Image image,FastSamFrameToken token,T frozenAttachment) {
         Objects.requireNonNull(image,"image");Objects.requireNonNull(token,"token");
@@ -214,6 +219,13 @@ public final class FastSamRuntimeService<T> implements AutoCloseable {
                     job=pendingPost;pendingPost=null;
                 }
                 try {
+                    boolean retired;
+                    synchronized(lock){retired=stopping;if(retired)discardedAtClose++;}
+                    if(retired) {
+                        // Native invoke already drained; do not scan/reconstruct masks for a closed owner.
+                        listener.onDiscard(job.input.token,"closed_before_decode");
+                        continue;
+                    }
                     long postStarted=clock.getAsLong();
                     DecodeResult decoded=decoder.decode(job.output.ownedTensors[0],job.output.ownedTensors[1],
                         job.input.token.width,job.input.token.height);

@@ -1,5 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPoint
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -51,12 +54,16 @@ class DepthEstimatorTest {
         val tracker = ObjectTracker()
         val estimator = ObjectDepthEstimator(tracker = tracker)
         val geometry = MaskPolygonExtractor().extract(DetectionCandidate("car", 0.9f, RectNorm(0f, 0f, 1f, 1f)))
+        // This uniform-depth synthetic scene declares one known physical point, not a box-derived motion proof.
+        val pointId = VisualMaterialPointId()
         return distancesMm.mapIndexed { index, millimeters ->
             val at = index * 500L
+            val key = VisualFrameKey(1L, at * 1_000_000L + 1L, at * 1_000_000L + 1L, at, 1L)
             val track = tracker.update(listOf(geometry), at).single()
             estimator.estimate(
                 ObjectDepthInput(
-                    frameId = index.toLong(), timestampMs = at, geometry = geometry, track = track, mapper = mapper,
+                    frameId = key.frameId, timestampMs = at, geometry = geometry, track = track, mapper = mapper,
+                    materialPoint = VisualMaterialPoint(pointId, key, Point2(.5f, .5f)),
                     rawDepth = DepthImage16(10, 10, IntArray(100) { millimeters }),
                     rawConfidence = ConfidenceImage8(10, 10, ByteArray(100) { 255.toByte() }),
                     rawDepthMatchesCameraFrame = true,
@@ -86,13 +93,16 @@ class DepthEstimatorTest {
             val geometry = MaskPolygonExtractor().extract(
                 DetectionCandidate("car", 0.9f, RectNorm(0f, 0f, 1f, 1f)),
             )
+            val pointId = VisualMaterialPointId()
             var latest: TrackedObjectDepth? = null
             listOf(4_000, 3_500, 3_000, 2_500).forEachIndexed { index, millimeters ->
                 val at = index * 500L
+                val key = VisualFrameKey(1L, at * 1_000_000L + 1L, at * 1_000_000L + 1L, at, 1L)
                 val track = tracker.update(listOf(geometry), at).single()
                 latest = estimator.estimate(
                     ObjectDepthInput(
-                        frameId = index.toLong(), timestampMs = at, geometry = geometry,
+                        frameId = key.frameId, timestampMs = at, geometry = geometry,
+                        materialPoint = VisualMaterialPoint(pointId, key, Point2(.5f, .5f)),
                         track = track, mapper = mapper,
                         rawDepth = DepthImage16(10, 10, IntArray(100) { millimeters }),
                         rawConfidence = ConfidenceImage8(10, 10, ByteArray(100) { 255.toByte() }),

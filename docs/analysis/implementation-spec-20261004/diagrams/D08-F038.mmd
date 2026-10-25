@@ -1,0 +1,28 @@
+flowchart TD
+  A["F-D08-038 개인정보 권리 안내·퇴역 v1 경계"]
+  B["진입: GET HEAD /privacy/rights; control=account-deletion"]
+  A --> B
+  P0["1. 설정 URL 을 검증·escape 하여 안내 HTML 구성"]
+  B --> P0
+  P1["2. HEAD 는 body 없이 같은 계약"]
+  P0 --> P1
+  P2["3. retired v1 control 은 410"]
+  P1 --> P2
+  P3["4. recovery scope 로 일반권리경로 사용을 제한"]
+  P2 --> P3
+  OK["정상: HTML 안내 또는 퇴역 응답"]
+  P3 --> OK
+  C0{"설정 invalid"}
+  X0["startup 또는 handler 구성오류"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"구형삭제 control"}
+  X1["410 Gone; v2 path 사용"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-001, P-D08-002, P-D08-019"]
+  A -.-> POLICY

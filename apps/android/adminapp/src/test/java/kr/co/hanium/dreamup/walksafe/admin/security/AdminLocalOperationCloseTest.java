@@ -122,8 +122,20 @@ public final class AdminLocalOperationCloseTest {
                 throw new UnsupportedOperationException(method.getName());
             }
         );
+        AdminReportRepository reports = (AdminReportRepository) Proxy.newProxyInstance(
+            AdminReportRepository.class.getClassLoader(), new Class<?>[] {AdminReportRepository.class},
+            (proxy, method, args) -> {
+                if (method.getName().equals("cancelInFlightRequests")) { calls.add("reports"); return null; }
+                throw new UnsupportedOperationException(method.getName());
+            });
+        AdminIncidentRepository incidents = (AdminIncidentRepository) Proxy.newProxyInstance(
+            AdminIncidentRepository.class.getClassLoader(), new Class<?>[] {AdminIncidentRepository.class},
+            (proxy, method, args) -> {
+                if (method.getName().equals("cancelInFlightRequests")) { calls.add("incidents"); return null; }
+                throw new UnsupportedOperationException(method.getName());
+            });
         AdminSecurityController controller = new AdminSecurityController(
-            api, operations, null, null, raw, event -> {});
+            api, operations, reports, incidents, raw, event -> {});
         holder[0] = controller;
         AdminLocalOperationCloseRaceProbe.login(controller);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -136,7 +148,7 @@ public final class AdminLocalOperationCloseTest {
             executor.submit(controller::close).get(500, TimeUnit.MILLISECONDS);
             assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 500);
 
-            assertEquals(java.util.Arrays.asList("security", "operations", "raw"), calls);
+            assertEquals(java.util.Arrays.asList("security", "operations", "raw", "reports", "incidents"), calls);
             assertTrue("local lock and secret release must precede cancellation", lockedBeforeCancel[0]);
             ExecutionException failure = assertThrows(ExecutionException.class,
                 () -> refresh.get(1, TimeUnit.SECONDS));

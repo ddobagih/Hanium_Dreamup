@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D02-008 기기 검사 카메라 샘플과 실제 detector 실행"]
+  E["진입: 검사 프레임 완료"]
+  G{"P-D02-008 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["성공 sample: 정확도 pass는 아님"]
+  G -->|"빈 detections이나 완전한 실행"| B0
+  B1["실패 sample"]
+  G -->|"noop/partial/시간 누락/failed"| B1
+  B2["decode 대신 허용된 fused 계약으로 판단"]
+  G -->|"fused 전략 known model timing 대응"| B2
+  B3["detector 호출 제한"]
+  G -->|"preflight 품질 PASS 아님"| B3
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["frame quality admission이 허용된 프레임만 detector에 전달"]
+    S1["실제 final inference 결과인지 검사"]
+    S2["성공/실패 sample count 누적"]
+    S3["8 success 또는 3 failure로 조기 종료; 최대10 sample에서 판단"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+  end
+  E -.-> S0
+  N["정상 종료: 해당 이벤트 처리를 마치고 현재 스냅샷/결과를 반환한다."]
+  X["취소·중단: 독립 취소 API가 없는 판단 함수는 호출자의 세대 무효화로 더 이상 결과를 사용하지 않는다. /<br/>foreground·epoch·owner 조건을 잃은 결과는 재사용하지 않는다."]
+  C["정리: Main analyzer/image owner가 ImageProxy 또는 Image를 닫음; 정책은 이미지 소유하지 않음."]
+  R["재시도·복구: 자동 재시도 없음. 호출자가 명시된 새 이벤트를 전달해야 한다. / 현재 증거와 소유권을 다시 확보해야 한다. 이전 성공을<br/>소급 복원하지 않는다."]
+  S3 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

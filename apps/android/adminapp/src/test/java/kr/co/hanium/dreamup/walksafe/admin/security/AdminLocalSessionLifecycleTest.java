@@ -297,7 +297,7 @@ public final class AdminLocalSessionLifecycleTest {
             java.nio.charset.StandardCharsets.UTF_8);
         String stop = activity.substring(activity.indexOf("protected void onStop()"),
             activity.indexOf("protected void onDestroy()"));
-        assertTrue(stop.contains("awaitingSafResult || awaitingSafReconnectResult || awaitingLocalUnlock"));
+        assertTrue(stop.contains("packageWorkflow.awaitingSave() || packageWorkflow.awaitingReconnect() || awaitingLocalUnlock"));
         assertTrue(stop.contains("reportWorkflowController.suspendForLifecycle()"));
         assertFalse(stop.contains("revokeSession("));
         assertFalse(stop.contains("resetSessionBoundReportState("));

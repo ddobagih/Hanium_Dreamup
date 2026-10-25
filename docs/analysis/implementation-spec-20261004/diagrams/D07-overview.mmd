@@ -1,0 +1,26 @@
+flowchart LR
+    V["D05 원본 camera YOLO LK FastSAM<br/>frame source token actual mask point"]
+    A["F-D07-001~003<br/>ARCore receipt depth clocks mapper"]
+    N["F-D07-004~012<br/>named ROI track motion risk"]
+    U["F-D07-014~019 및 032<br/>unknown mask depth region spatial"]
+    M["D04 위치 heading motion<br/>capture freshness"]
+    T["F-D07-020~027<br/>tactile 관측과 참고 알림"]
+    G["F-D07-013<br/>runtime metric session gate"]
+    Q["D02 최종 queue delivery<br/>lease cooldown 취소 음성 진동"]
+    X["F-D07-028~031<br/>미연결 measured body semantic helper"]
+    V --> A
+    V --> N
+    V --> U
+    A --> N
+    A --> U
+    M --> N
+    M --> U
+    M --> T
+    N --> T
+    G --> N
+    G --> U
+    N --> Q
+    U --> Q
+    T --> Q
+    T --> R["D03 TMAP 유지<br/>local steering 없음"]
+    A -. "직접 helper만" .-> X

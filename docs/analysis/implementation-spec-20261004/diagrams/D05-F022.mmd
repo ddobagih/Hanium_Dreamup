@@ -1,0 +1,12 @@
+flowchart TD
+  H["P-D05-022 · F-D05-022 두 tensor slot 의 전처리·추론 겹침 실험"]
+  H --> U["internal benchmark 전용"]
+  U --> P{"준비 가능한 slot"}
+  P -->|"없음"| B["BUSY"]
+  P -->|"있음"| W["ownedtensor 작성"]
+  W --> V{"lease size timestamp age800 유효"}
+  V -->|"아니오"| X["publish 거부"]
+  V -->|"예"| R["latest READY 이전 ready 교체"]
+  R --> I["read-only INFLIGHT 다른 slot 보호"]
+  I --> D["완료 release"]
+  U -->|"close"| C["접수닫고 active drain"]

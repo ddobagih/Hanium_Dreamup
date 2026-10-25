@@ -6,9 +6,12 @@ from email import policy
 from email.parser import BytesParser
 from email.utils import parsedate_to_datetime
 from ipaddress import ip_address
+import socket
 import socketserver
 import ssl
-from threading import Thread
+from threading import Event, Thread, enumerate as live_threads
+from concurrent.futures import ThreadPoolExecutor
+from time import monotonic, sleep
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -55,7 +58,7 @@ def smtp_tls_context(tmp_path, monkeypatch):
 
 
 @contextmanager
-def _smtp_server(context, security, *, reject_message):
+def _smtp_server(context, security, *, reject_message=False, command_delay=0, slow_greeting=False, handshake_delay=0):
     received = {}
 
     class Handler(socketserver.BaseRequestHandler):
@@ -64,12 +67,30 @@ def _smtp_server(context, security, *, reject_message):
             connection.settimeout(3)
             encrypted = security == "implicit_tls"
             if encrypted:
-                connection = context.wrap_socket(connection, server_side=True)
+                if handshake_delay:
+                    sleep(handshake_delay)
+                try:
+                    connection = context.wrap_socket(connection, server_side=True)
+                except (OSError, ssl.SSLError):
+                    return
             stream = connection.makefile("rwb", buffering=0)
-            stream.write(b"220 localhost SMTP test\r\n")
+            try:
+                if slow_greeting:
+                    for chunk in (b"220", b" localhost", b" SMTP", b" test\r\n"):
+                        sleep(0.1)
+                        stream.write(chunk)
+                else:
+                    stream.write(b"220 localhost SMTP test\r\n")
+            except (OSError, ssl.SSLError):
+                stream.close()
+                connection.close()
+                return
             try:
                 while command := stream.readline():
                     verb = command.split(b" ", 1)[0].strip().upper()
+                    received.setdefault("commands", []).append(verb)
+                    if command_delay:
+                        sleep(command_delay)
                     if verb == b"EHLO":
                         stream.write(
                             b"250-localhost\r\n250 AUTH PLAIN\r\n"
@@ -79,6 +100,8 @@ def _smtp_server(context, security, *, reject_message):
                     elif verb == b"STARTTLS":
                         stream.write(b"220 Ready for TLS\r\n")
                         stream.close()
+                        if handshake_delay:
+                            sleep(handshake_delay)
                         connection = context.wrap_socket(connection, server_side=True)
                         stream = connection.makefile("rwb", buffering=0)
                         encrypted = True
@@ -109,6 +132,8 @@ def _smtp_server(context, security, *, reject_message):
                         stream.write(b"250 Reset\r\n")
                     else:
                         stream.write(b"500 Unknown command\r\n")
+            except (OSError, ssl.SSLError):
+                pass  # A deadline intentionally disconnects before the reply.
             finally:
                 stream.close()
                 connection.close()
@@ -158,3 +183,138 @@ def test_otp_delivery_over_authenticated_tls_smtp(
     assert "012345" in message.get_content()
     assert "10 minutes" in message.get_content()
     assert not message.defects
+
+
+@pytest.mark.parametrize("security", ["implicit_tls", "starttls"])
+@pytest.mark.parametrize("phase", ["steps", "slow_greeting", "tls"])
+def test_smtp_real_tls_deadline_bounds_stalled_and_slow_streams(smtp_tls_context, security, phase):
+    options = {"command_delay": 0.12} if phase == "steps" else (
+        {"slow_greeting": True} if phase == "slow_greeting" else {"handshake_delay": 0.5}
+    )
+    budget = 0.3
+    with _smtp_server(smtp_tls_context, security, **options) as (port, received):
+        sender = SmtpOtpSender(
+            host="127.0.0.1", port=port, security=security,
+            username="test", password="test", from_address="no-reply@example.com",
+            timeout_seconds=budget,
+        )
+        started = monotonic()
+        with pytest.raises(OtpDeliveryError):
+            sender.send(email="recipient@example.com", code="012345", expires_in_seconds=600)
+        elapsed = monotonic() - started
+        print(f"SMTP_BOUNDARY security={security} phase={phase} budget={budget} elapsed={elapsed:.3f}")
+        assert elapsed < 0.6
+        assert "message" not in received
+
+
+@pytest.mark.parametrize("security", ["implicit_tls", "starttls"])
+def test_data_accepted_closes_without_waiting_for_quit(smtp_tls_context, security):
+    with _smtp_server(smtp_tls_context, security) as (port, received):
+        sender = SmtpOtpSender(
+            host="127.0.0.1", port=port, security=security,
+            username="test", password="test", from_address="no-reply@example.com",
+            timeout_seconds=1,
+        )
+        sender.send(email="recipient@example.com", code="012345", expires_in_seconds=600)
+    assert b"QUIT" not in received["commands"]
+    assert received["message"]
+
+
+def test_delayed_dns_does_not_outlive_the_delivery_deadline(smtp_tls_context, monkeypatch):
+    original = socket.getaddrinfo
+    def slow_dns(*args, **kwargs):
+        sleep(0.5)
+        return original(*args, **kwargs)
+    with _smtp_server(smtp_tls_context, "implicit_tls") as (port, received):
+        monkeypatch.setattr(socket, "getaddrinfo", slow_dns)
+        sender = SmtpOtpSender(
+            host="127.0.0.1", port=port, security="implicit_tls",
+            username="test", password="test", from_address="no-reply@example.com",
+            timeout_seconds=0.2,
+        )
+        started = monotonic()
+        with pytest.raises(OtpDeliveryError):
+            sender.send(email="recipient@example.com", code="012345", expires_in_seconds=600)
+        elapsed = monotonic() - started
+        print(f"SMTP_BOUNDARY phase=dns budget=0.2 elapsed={elapsed:.3f}")
+        assert elapsed < 0.4
+        sleep(0.6)  # Late resolver completion must not open a connection or deliver mail.
+        assert not received
+
+
+
+def test_blocked_resolvers_are_bounded_and_late_completion_cannot_send(smtp_tls_context, monkeypatch):
+    original = socket.getaddrinfo
+    release = Event()
+    started = []
+    def blocked_dns(*args, **kwargs):
+        started.append(True)
+        release.wait(timeout=3)
+        return original(*args, **kwargs)
+    with _smtp_server(smtp_tls_context, "implicit_tls") as (port, received):
+        monkeypatch.setattr(socket, "getaddrinfo", blocked_dns)
+        sender = SmtpOtpSender(
+            host="127.0.0.1", port=port, security="implicit_tls", username="", password="",
+            from_address="no-reply@example.com", timeout_seconds=0.15,
+        )
+        def send():
+            with pytest.raises(OtpDeliveryError):
+                sender.send(email="recipient@example.com", code="012345", expires_in_seconds=600)
+        try:
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                attempts = [pool.submit(send) for _ in range(4)]
+                for attempt in attempts:
+                    attempt.result(timeout=2)
+            assert len(started) == 4
+            assert len([thread for thread in live_threads() if thread.name == "walksafe-smtp-resolver"]) == 4
+            for _ in range(6):
+                send()
+            assert len(started) == 4  # Capacity exhaustion cannot spawn more OS resolvers.
+        finally:
+            release.set()
+        until = monotonic() + 1
+        while any(thread.name == "walksafe-smtp-resolver" for thread in live_threads()) and monotonic() < until:
+            sleep(0.01)
+        assert not any(thread.name == "walksafe-smtp-resolver" for thread in live_threads())
+        assert not received  # Late DNS answers have no network side effects.
+        print("SMTP_BOUNDARY phase=resolver_capacity workers_max=4 late_connect=0 late_send=0 released_workers=0")
+
+
+@pytest.mark.parametrize("security", ["implicit_tls", "starttls"])
+def test_dns_and_tls_use_the_same_original_deadline(smtp_tls_context, monkeypatch, security):
+    original = socket.getaddrinfo
+    def delayed_dns(*args, **kwargs):
+        sleep(0.15)
+        return original(*args, **kwargs)
+    with _smtp_server(smtp_tls_context, security, handshake_delay=0.3) as (port, received):
+        monkeypatch.setattr(socket, "getaddrinfo", delayed_dns)
+        sender = SmtpOtpSender(
+            host="127.0.0.1", port=port, security=security, username="", password="",
+            from_address="no-reply@example.com", timeout_seconds=0.3,
+        )
+        started = monotonic()
+        with pytest.raises(OtpDeliveryError):
+            sender.send(email="recipient@example.com", code="012345", expires_in_seconds=600)
+        elapsed = monotonic() - started
+        assert elapsed < 0.4
+        assert "message" not in received
+        print(f"SMTP_BOUNDARY security={security} phase=dns_plus_tls budget=0.3 elapsed={elapsed:.3f}")
+
+
+
+@pytest.mark.parametrize("security", ["implicit_tls", "starttls"])
+def test_real_tls_hostname_mismatch_never_authenticates_or_sends(smtp_tls_context, monkeypatch, security):
+    original = socket.getaddrinfo
+    def local_address(host, port, *args):
+        assert host == "mismatched-smtp.invalid"
+        return original("127.0.0.1", port, *args)
+    with _smtp_server(smtp_tls_context, security) as (port, received):
+        monkeypatch.setattr(socket, "getaddrinfo", local_address)
+        sender = SmtpOtpSender(
+            host="mismatched-smtp.invalid", port=port, security=security,
+            username="test", password="test", from_address="no-reply@example.com", timeout_seconds=1,
+        )
+        with pytest.raises(OtpDeliveryError):
+            sender.send(email="recipient@example.com", code="012345", expires_in_seconds=600)
+    assert "authenticated_over_tls" not in received
+    assert "message" not in received

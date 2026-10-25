@@ -19,26 +19,26 @@ class MainActivityPostWalkRetryStaticTest {
 
     @Test
     fun capabilityCallbacksRestartTransfersOnlyWhenTheNetworkTransportOrValidationChanged() {
-        val callback = source.substringAfter("override fun onCapabilitiesChanged(")
-            .substringBefore("private var currentDestination")
-        val filter = callback.indexOf("postWalkNetworkChangeFilter.changed(")
-        assertTrue(filter >= 0)
-        assertTrue(callback.contains("NetworkCapabilities.NET_CAPABILITY_VALIDATED"))
-        assertTrue(callback.indexOf("onReportQueueDrainNetworkChanged()") > filter)
-        val lost = source.substringAfter("override fun onLost(network: Network) {")
-            .substringBefore("override fun onCapabilitiesChanged(")
-        assertTrue(lost.contains("postWalkNetworkChangeFilter.reset()"))
-        assertTrue(lost.contains("onReportQueueDrainNetworkChanged()"))
+        val adapter = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/AndroidGatewayCapacityObserver.kt").readText()
+        assertTrue(adapter.contains("NetworkCapabilities.NET_CAPABILITY_VALIDATED"))
+        assertTrue(adapter.contains("events.capabilitiesChanged(network, transport,"))
+        val network = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/GatewaySessionController.kt").readText()
+        assertTrue(network.contains("if (networkEffects.networkCapabilitiesChanged(network, transport, validated)) networkEffects.reportDrainNetworkChanged()"))
+        val lost = network.substringAfter("override fun lost() {").substringBefore("override fun capabilitiesChanged")
+        assertTrue(lost.contains("networkEffects.resetNetworkChangeFilter()"))
+        assertTrue(lost.contains("networkEffects.reportDrainNetworkChanged()"))
+        val wiring = MainActivityRefactorSource.factory(source, "createGatewaySessionController")
+        assertTrue(wiring.contains("postWalkNetworkChangeFilter.changed(network, transport, validated)"))
+        assertTrue(wiring.contains("override fun reportDrainNetworkChanged() = onReportQueueDrainNetworkChanged()"))
     }
 
     @Test
     fun aChargerPluggedInWhileInTheForegroundRetriesThePostWalkTransfer() {
-        val receiver = source.substringAfter("private val postWalkPowerConnectedReceiver")
-            .substringBefore("private var postWalkPowerConnectedReceiverRegistered")
+        val receiver = MainActivityRefactorSource.property(source, "postWalkPowerConnectedReceiver")
         assertTrue(receiver.contains("Intent.ACTION_POWER_CONNECTED"))
         assertTrue(receiver.contains("onPostWalkChargingMaybeChanged()"))
         val register = functionBlock("private fun registerPostWalkPowerConnectedReceiver()")
-        assertTrue(register.contains("IntentFilter(Intent.ACTION_POWER_CONNECTED)"))
+        assertTrue(MainActivityRefactorSource.factory(source, "createPostWalkTransferController").contains("IntentFilter(Intent.ACTION_POWER_CONNECTED)"))
         assertTrue(register.contains("onPostWalkChargingMaybeChanged()"))
         val resume = source.indexOf("registerPostWalkPowerConnectedReceiver()\n        schedulePostWalkTransfers()")
         assertTrue(resume >= 0)
@@ -52,30 +52,15 @@ class MainActivityPostWalkRetryStaticTest {
         assertTrue(retry.contains("if (postWalkWalkInProgressRetryWalkId == walkId) return@runOnUiThread"))
         assertTrue(retry.contains("POST_WALK_WALK_IN_PROGRESS_RETRY_DELAY_MS"))
         val delay = Regex("""const val POST_WALK_WALK_IN_PROGRESS_RETRY_DELAY_MS = 90_000L \+ (\d+)_000L""")
-            .find(source)?.groupValues?.get(1)?.toInt()
+            .find(File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/PostWalkTransferController.kt").readText())?.groupValues?.get(1)?.toInt()
         assertTrue(delay != null && delay in 5..30)
         val upload = functionBlock("private fun scheduleRawCollectionPostWalkUpload()")
         assertTrue(upload.contains("completed == RawCollectionUploadOutcome.WALK_IN_PROGRESS"))
-        assertTrue(upload.contains("schedulePostWalkRetryAfterWalkInProgress()"))
+        assertTrue(upload.contains("postWalk.scheduleWalkInProgressRetry()"))
         val drain = functionBlock("private fun drainInitialExactReportQueue(")
-        assertTrue(drain.contains("if (result.walkInProgress) schedulePostWalkRetryAfterWalkInProgress()"))
+        assertTrue(drain.contains("if (result.walkInProgress) effects.schedulePostWalkRetryAfterWalkInProgress()"))
         assertFalse(retry.contains("speakInteraction("))
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing $signature" }
-        val open = source.indexOf('{', source.indexOf(')', start))
-        var depth = 0
-        for (index in open until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        error("unterminated $signature")
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
 }

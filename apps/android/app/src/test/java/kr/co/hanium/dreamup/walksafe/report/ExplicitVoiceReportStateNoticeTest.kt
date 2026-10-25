@@ -1,5 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.report
 
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
+import kr.co.hanium.dreamup.walksafe.ReportStaticSourceInspector
+
 import java.nio.file.Files
 import java.nio.file.Paths
 import org.junit.Assert.assertEquals
@@ -18,8 +21,11 @@ class ExplicitVoiceReportStateNoticeTest {
         Charsets.UTF_8,
     )
 
-    private fun block(start: String, end: String): String =
-        source.substringAfter(start).substringBefore(end)
+    private fun block(start: String, end: String): String = MainActivityRefactorSource.function(source, start)
+    private val candidateSource = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/ReportCandidateController.kt").readText()
+    private val presentationSource = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/AndroidExplicitReportPresentation.kt").readText()
+    private val drainSource = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/ReportQueueDrainController.kt").readText()
+
 
     @Test
     fun savedNoticeSaysNotYetAcceptedAndSentAfterTheWalk() {
@@ -51,8 +57,10 @@ class ExplicitVoiceReportStateNoticeTest {
             "private fun renderExplicitReportConfirmationDisclosure(",
             "private fun renderExplicitReportConfirmationIdle(",
         )
-        assertTrue(render.contains("val disclosure = \"\$REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO \$action\""))
-        assertTrue(render.contains("explicitReportConfirmationText.contentDescription = disclosure"))
+        assertTrue(render.contains("disclosure = \"\$disclosureText \$action\""))
+        assertTrue(presentationSource.contains("text.text = presentation.disclosure"))
+        assertTrue(presentationSource.contains("text.contentDescription = presentation.disclosure"))
+        assertTrue(MainActivityRefactorSource.composition(source, "explicitReportPresentation").contains("disclosureText = REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO"))
     }
     @Test
     fun confirmationSaveUsesOneSentenceForSpeechScreenAndTalkBack() {
@@ -61,7 +69,7 @@ class ExplicitVoiceReportStateNoticeTest {
             "private fun prepareExplicitReportCandidateIfCurrent(",
         )
         assertTrue(submit.contains("ExplicitReportSubmissionNotice.SAVED_NOT_SUBMITTED_KO"))
-        assertTrue(submit.contains("renderExplicitReportConfirmationIdle(savedNotice)"))
+        assertTrue(submit.contains("ui.renderIdle(savedNotice)"))
         assertTrue(submit.contains("speakInteraction(savedNotice)"))
         assertTrue(
             "the save notice is decided only from a queued status",
@@ -72,7 +80,7 @@ class ExplicitVoiceReportStateNoticeTest {
 
     @Test
     fun acceptanceIsAnnouncedOnlyFromTheServerCreatedResult() {
-        assertEquals(1, source.split("\"신고가 접수되었습니다.\"").size - 1)
+        assertEquals(1, drainSource.split("\"신고가 접수되었습니다.\"").size - 1)
         val drain = block(
             "private fun reportQueueDrainResultMessage(",
             "private fun postReportQueueDrainNotice(",
@@ -87,29 +95,57 @@ class ExplicitVoiceReportStateNoticeTest {
             assertFalse(beforeServer.contains("접수했습니다"))
         }
         // Parse success only records a status token; it announces nothing by itself.
-        val action = block("AndroidVoiceAction.CreateReport -> {", "is AndroidVoiceAction.SearchDestination ->")
-        assertTrue(action.contains("updateNavigationStatus(\"voice=report_command_recognized\")"))
-        assertTrue(action.contains("requestExplicitReport(ExplicitReportRequestSource.VOICE)"))
+        val commandSource = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/VoiceCommandInteractionController.kt").readText()
+        val action = commandSource.substringAfter("AndroidVoiceAction.CreateReport -> {").substringBefore("is AndroidVoiceAction.SearchDestination ->")
+        assertTrue(action.contains("ui.navigationStatus(\"voice=report_command_recognized\")"))
+        assertTrue(action.contains("walk.requestExplicitVoiceReport()"))
+        assertTrue(source.contains("override fun requestExplicitVoiceReport() = requestExplicitReport(ExplicitReportRequestSource.VOICE)"))
         assertFalse(action.contains("speak"))
+
     }
 
     @Test
     fun oneVoiceTaskDeliversOneFinalAndOneStagedReportIsConsumedOnce() {
         // One-shot recognizer: a second onResults of the same lease fails the generation check.
-        val oneShot = block("override fun onResults(results: Bundle?) {", "private fun isVoiceRecognitionLeaseCurrent(")
-        val lease = oneShot.indexOf("isVoiceRecognitionLeaseCurrent(")
+        val voice = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/VoiceInputSessionController.kt").readText()
+        val listener = MainActivityRefactorSource.member(voice, "buildVoiceCommandRecognitionListener")
+        val oneShot = ReportStaticSourceInspector.functionBlock(listener, "override fun onResults")
+        assertEquals(
+            "val source = recognitionSource?.takeIf { it.generation == generation } " +
+                "?: RecognitionSource(generation, environment.identity(), environment.feedbackLifetimeGeneration())",
+            listener.substringAfter("): RecognitionListener {").substringBefore("fun currentLease():")
+                .trim().replace(Regex("\\s+"), " "),
+        )
+        assertEquals(
+            "recognitionSourceIsCurrent(source) && isVoiceRecognitionLeaseCurrent(generation, purpose, " +
+                "expectedWalkEpoch, expectedResumeToken, expectedGatewayWalkOperationId)",
+            listener.substringAfter("fun currentLease(): Boolean =").substringBefore("return object : RecognitionListener")
+                .trim().replace(Regex("\\s+"), " "),
+        )
+        val sourceCurrent = MainActivityRefactorSource.member(voice, "recognitionSourceIsCurrent")
+        assertEquals(
+            "voiceRecognitionGeneration == source.generation && environment.identity() == source.identity && " +
+                "environment.feedbackLifetimeGeneration() == source.lifecycleGeneration && " +
+                "environment.foreground() && environment.microphoneGranted()",
+            sourceCurrent.substringAfter("): Boolean =").trim().replace(Regex("\\s+"), " "),
+        )
+        assertEquals("if ( !currentLease() ) return",
+            oneShot.substringAfter("{").substringBefore("voiceRecognitionGeneration += 1")
+                .trim().replace(Regex("\\s+"), " "))
+        val lease = oneShot.indexOf("!currentLease()")
         val bump = oneShot.indexOf("voiceRecognitionGeneration += 1")
         assertTrue(lease in 0 until bump)
+        assertTrue(bump < oneShot.indexOf("commands.recognized("))
+        val currentLease = MainActivityRefactorSource.member(voice, "isVoiceRecognitionLeaseCurrent")
+        assertTrue(currentLease.contains("expectedGeneration != voiceRecognitionGeneration"))
         // Hands-free: each listening capture is consumed by its first command.
-        assertTrue(
-            source.contains(
-                "val capture = handsFreeNavigationDecisionCapture ?: return@command\n" +
-                    "                handsFreeNavigationDecisionCapture = null",
-            ),
-        )
+        val handsFree = MainActivityRefactorSource.member(voice, "handleHandsFreeCommand")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(handsFree, "val capture = handsFreeNavigationDecisionCapture ?: return", "handsFreeNavigationDecisionCapture = null", "commands.recognized("))
+        MainActivityRefactorSource.composition(source, "voiceInputController")
         // Gateway STT: the interaction is finished before its command runs.
         val gateway = block("private fun handleGatewaySpeechTranscript(", "private fun speakGatewayInteractionOrLocalFallback(")
-        assertTrue(gateway.indexOf("finishGatewaySpeechInteraction(active)") < gateway.indexOf("handleVoiceCommandPhrases("))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(gateway,
+            "finishGatewaySpeechInteraction(active)", "inputSession.recognized("))
         // A repeated request while the disclosure plays is absorbed; only an armed payload is
         // consumed (once) by the second action, before any new capture is prepared.
         val request = block("private fun requestExplicitReport(", "private fun ensureExplicitReportAuthorityPreconditions(")

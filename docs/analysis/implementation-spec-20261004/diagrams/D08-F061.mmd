@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D08-061 통합 동의 감사 archive·단조 철회 여유·재시작 복구"]
+  B["진입: readState / recordConsent → archiveConsentHistory"]
+  A --> B
+  P0["1. eventhash·연속 revision·previousaudit·actor 별 clientrevision 을검증한다."]
+  B --> P0
+  P1["2. Backendauthoritativeevent 뒤 legacy receipt event 재등장을거부한다."]
+  P0 --> P1
+  P2["3. normal 한계접근시 tail 앞부분을별도 AADrecordID 의암호화 segment 로 seal 한다."]
+  P1 --> P2
+  P3["4. 기존 orphansegment 면 current retainedprefix 와 canonical 동일성검사후 fsync 를다시완료한다."]
+  P2 --> P3
+  P4["5. archive 가 durable 한후 schema7 pointer 와짧은 tail 을저장한다."]
+  P3 --> P4
+  P5["6. 읽기는 segment 하나씩전체 chain 을검사하고 queryrequest 와 actorrevisionfloor 만유지하여무제한 event 배열을만들지않는다."]
+  P4 --> P5
+  OK["정상: 검증 가능한 연속 감사체인과 current consent tail"]
+  P5 --> OK
+  C0{"archive seal 실패"}
+  X0["새 grant 보류;단조철회/allfalse 만 reserve 내허용"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"main 파일없는데 audit 존재"}
+  X1["빈동의로초기화하지않고실패"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"orphan 내용이 retainedprefix 와다름"}
+  X2["덮어쓰지않고실패"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"tail/current hash 또는 revision 불일치"}
+  X3["integrity 실패"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 동기 ledger 검사·파일 처리 자체에 독립 timeout 은 없다. 호출 HTTP/maintenance lock 의 기한과 실행 맥락을 따른다."]
+  B -. "중단 조건" .-> T
+  R["재시도: archive-only crash 의 orphan 은같은 prefix 인지검증·fsync 한뒤 pointer 를완성한다. 임의 orphan 교체는없다."]
+  T -.-> R
+  POLICY["정책: P-D08-017, P-D08-021, P-D08-023, P-D08-024, P-D08-032"]
+  A -.-> POLICY

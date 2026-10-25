@@ -7,6 +7,11 @@ from collections import deque
 import hashlib
 from io import BytesIO
 import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import textwrap
 import threading
 import wave
 import time
@@ -28,6 +33,61 @@ CLEAR_ACOUSTIC_EVIDENCE = STTAcousticEvidence(
     execution_allowed=True,
 )
 MODEL_REVISION = "a" * 40
+
+
+@pytest.mark.parametrize("configured", [False, True])
+def test_stt_factory_preserves_environment_and_one_lazy_cached_engine(monkeypatch, configured) -> None:
+    from voice import engine_factory
+
+    expected = {
+        "model_size": "medium",
+        "model_revision": None,
+        "model_manifest_path": None,
+        "model_manifest_sha256": None,
+        "device": None,
+        "compute_type": None,
+        "language": "ko",
+    }
+    overrides = {
+        "VOICE_STT_MODEL": ("model_size", "fixture/stt"),
+        "VOICE_STT_MODEL_REVISION": ("model_revision", MODEL_REVISION),
+        "VOICE_STT_MODEL_MANIFEST_PATH": ("model_manifest_path", "/fixture/stt.json"),
+        "VOICE_STT_MODEL_MANIFEST_SHA256": ("model_manifest_sha256", "b" * 64),
+        "VOICE_STT_DEVICE": ("device", "cpu"),
+        "VOICE_STT_COMPUTE_TYPE": ("compute_type", "float32"),
+        "VOICE_STT_LANGUAGE": ("language", "en"),
+    }
+    for name, (argument, value) in overrides.items():
+        monkeypatch.delenv(name, raising=False)
+        if configured:
+            monkeypatch.setenv(name, value)
+            expected[argument] = value
+
+    created = []
+
+    class Engine:
+        def __init__(self, **arguments):
+            self.arguments = arguments
+            created.append(self)
+
+        def load(self):
+            raise AssertionError("factory construction must not load a model")
+
+    monkeypatch.setattr(engine_factory, "LocalSTTEngine", Engine)
+    factory = engine_factory.get_stt_engine
+    factory.cache_clear()
+    try:
+        assert voice_server.get_stt_engine is factory
+        engine = voice_server.get_stt_engine()
+        assert engine.arguments == expected
+        monkeypatch.setenv("VOICE_STT_MODEL", "changed-after-construction")
+        assert factory() is engine
+        assert len(created) == 1
+        voice_server.get_stt_engine.cache_clear()
+        assert factory() is not engine
+        assert created[-1].arguments["model_size"] == "changed-after-construction"
+    finally:
+        factory.cache_clear()
 
 
 class _DirectSTTPool:
@@ -804,3 +864,209 @@ def test_asgi_disconnect_cancels_inference_and_removes_request_temp_file(monkeyp
     assert pool.path is not None
     assert not voice_server.Path(pool.path).exists()
     assert any(message.get("status") == 499 for message in sent if message["type"] == "http.response.start")
+
+
+def test_real_spawn_workers_use_factories_without_http_and_recover_after_abort(tmp_path) -> None:
+    # A script is re-imported by spawn, so constructor fakes are installed in
+    # each real worker without replacing the pool, dispatcher, or factories.
+    script = tmp_path / "spawn_voice_factories.py"
+    script.write_text(textwrap.dedent('''
+        import asyncio
+        import importlib.abc
+        import json
+        import os
+        from pathlib import Path
+        import sys
+        import time
+
+        sys.path.insert(0, sys.argv[1])
+
+        class RejectHttpImport(importlib.abc.MetaPathFinder):
+            def find_spec(self, fullname, path=None, target=None):
+                if fullname == "voice.server":
+                    raise AssertionError("inference workers must not import the HTTP server")
+
+        sys.meta_path.insert(0, RejectHttpImport())
+
+        from voice import engine_factory
+        from voice.inference_process import IsolatedInferencePool, VoiceInferenceTimeout
+
+        class STTEngine:
+            constructions = 0
+
+            def __init__(self, **arguments):
+                type(self).constructions += 1
+                self.arguments = arguments
+                self.model_size = arguments["model_size"]
+                self.loads = 0
+
+            def load(self):
+                if self.model_size == "fail-load":
+                    raise RuntimeError("fixture model load failed")
+                self.loads += 1
+
+            def transcribe_file(self, path):
+                assert isinstance(path, Path)
+                assert "voice.server" not in sys.modules
+                if path.suffix == ".hang":
+                    path.with_suffix(".started").write_text("started")
+                    time.sleep(60)
+                    path.with_suffix(".late").write_text("must not complete")
+                return {
+                    "pid": os.getpid(), "loads": self.loads,
+                    "constructions": self.constructions,
+                    "revision": self.arguments["model_revision"], "path": str(path),
+                }
+
+        class TTSEngine:
+            constructions = 0
+
+            def __init__(self, **arguments):
+                type(self).constructions += 1
+                self.arguments = arguments
+                self.model_id = arguments["model_id"]
+                self.loads = 0
+
+            def load(self):
+                self.loads += 1
+
+            def synthesize(self, text, *, use_cache):
+                assert "voice.server" not in sys.modules
+                return {
+                    "pid": os.getpid(), "loads": self.loads,
+                    "constructions": self.constructions, "text": text,
+                    "cache": use_cache, "speaker": self.arguments["speaker"],
+                    "revision": self.arguments["model_revision"],
+                }
+
+        engine_factory.LocalSTTEngine = STTEngine
+        engine_factory.LocalTTSEngine = TTSEngine
+
+        def processes(pool):
+            return list(pool._executor._processes.values())
+
+        def assert_aborted(pool, old_processes, pending):
+            assert pool._executor is None
+            assert pool.ready is False
+            assert old_processes and all(not process.is_alive() for process in old_processes)
+            assert pending.with_suffix(".started").exists()
+            assert not pending.with_suffix(".late").exists()
+
+        async def wait_until_started(path):
+            async with asyncio.timeout(10):
+                while not path.with_suffix(".started").exists():
+                    await asyncio.sleep(0.01)
+
+        async def run():
+            stt = IsolatedInferencePool("stt", 1)
+            tts = IsolatedInferencePool("tts", 1)
+            failing = IsolatedInferencePool("stt", 1)
+            try:
+                assert engine_factory.get_stt_engine.cache_info().currsize == 0
+                assert engine_factory.get_tts_engine.cache_info().currsize == 0
+                assert await stt.run("ready", timeout=20) == {"ready": True, "model": "fixture/stt"}
+                first = await stt.run("infer", "sample.wav", timeout=10)
+                assert first == {
+                    "pid": first["pid"], "loads": 1, "constructions": 1,
+                    "revision": "a" * 40, "path": "sample.wav",
+                }
+                assert first["pid"] != os.getpid() and stt.ready
+                await stt.run("ready", timeout=10)
+                repeated = await stt.run("infer", "second.wav", timeout=10)
+                assert repeated["pid"] == first["pid"]
+                assert repeated["loads"] == 2 and repeated["constructions"] == 1
+
+                assert await tts.run("ready", timeout=20) == {"ready": True, "model": "fixture/tts"}
+                for use_cache in (False, True):
+                    speech = await tts.run("infer", "fixture speech", use_cache, timeout=10)
+                    assert speech == {
+                        "pid": speech["pid"], "loads": 1, "constructions": 1,
+                        "text": "fixture speech", "cache": use_cache,
+                        "speaker": "Sohee", "revision": "b" * 40,
+                    }
+                    assert speech["pid"] not in (os.getpid(), first["pid"]) and tts.ready
+
+                try:
+                    await stt.run("unknown-action", timeout=10)
+                except ValueError as error:
+                    assert str(error) == "unsupported voice inference action"
+                else:
+                    raise AssertionError("unknown inference action accepted")
+
+                pending = Path(sys.argv[2]) / "timeout.hang"
+                old_processes = processes(stt)
+                try:
+                    await stt.run("infer", str(pending), timeout=0.5)
+                except VoiceInferenceTimeout:
+                    pass
+                else:
+                    raise AssertionError("hung inference did not time out")
+                assert_aborted(stt, old_processes, pending)
+                await stt.run("ready", timeout=20)
+                restarted = await stt.run("infer", "restarted.wav", timeout=10)
+                assert restarted["pid"] != first["pid"]
+                assert restarted["loads"] == 1 and restarted["constructions"] == 1
+
+                pending = Path(sys.argv[2]) / "cancel.hang"
+                old_processes = processes(stt)
+                task = asyncio.create_task(stt.run("infer", str(pending), timeout=20))
+                await wait_until_started(pending)
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                else:
+                    raise AssertionError("cancelled inference returned a late result")
+                assert_aborted(stt, old_processes, pending)
+                await stt.run("ready", timeout=20)
+                recovered = await stt.run("infer", "recovered.wav", timeout=10)
+                assert recovered["pid"] != restarted["pid"] and stt.ready
+                assert recovered["loads"] == 1 and recovered["constructions"] == 1
+
+                os.environ["VOICE_STT_MODEL"] = "fail-load"
+                try:
+                    await failing.run("ready", timeout=20)
+                except RuntimeError as error:
+                    assert str(error) == "fixture model load failed"
+                else:
+                    raise AssertionError("worker model load error was swallowed")
+                assert failing.ready is False
+                assert "voice.server" not in sys.modules
+                assert engine_factory.get_stt_engine.cache_info().currsize == 0
+                assert engine_factory.get_tts_engine.cache_info().currsize == 0
+                print(json.dumps({"spawn_factories": True, "abort_recovery": True, "load_error": True}))
+            finally:
+                stt.close()
+                tts.close()
+                failing.close()
+
+        if __name__ == "__main__":
+            asyncio.run(run())
+    '''), encoding="utf-8")
+    environment = {
+        key: value for key, value in os.environ.items()
+        if not key.startswith("VOICE_")
+    }
+    environment.update({
+        "VOICE_STT_MODEL": "fixture/stt",
+        "VOICE_STT_MODEL_REVISION": "a" * 40,
+        "VOICE_TTS_MODEL": "fixture/tts",
+        "VOICE_TTS_MODEL_REVISION": "b" * 40,
+        "CUDA_VISIBLE_DEVICES": "",
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    })
+    completed = subprocess.run(
+        [sys.executable, "-B", str(script), str(Path(__file__).resolve().parents[1]), str(tmp_path)],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert json.loads(completed.stdout.strip()) == {
+        "spawn_factories": True, "abort_recovery": True, "load_error": True,
+    }

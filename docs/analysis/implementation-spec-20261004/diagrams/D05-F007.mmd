@@ -1,0 +1,17 @@
+flowchart TD
+  H["P-D05-007 · F-D05-007 Main 카메라 프레임 접수·검출 publication"]
+  H --> C{"current epoch geometry camera quality"}
+  C -->|"아니오"| X["Image close 출력 없음"]
+  C -->|"예"| P{"due 그리고 native idle"}
+  P -->|"아니오"| X
+  P -->|"예"| O["owned YUV 와 source lease"]
+  O --> W["worker native watchdog start"]
+  W --> R{"SUCCESS 결과와 current owner"}
+  R -->|"아니오"| F["실패감독 또는 stale 폐기"]
+  R -->|"partial"| S["원 capture partial 게시"]
+  R -->|"final"| L{"원 source lease publish"}
+  L -->|"실패"| F
+  L -->|"성공"| B["snapshot 와 named capture 기록"]
+  S --> Q["finally lease ticket 해제"]
+  B --> Q
+  F --> Q

@@ -1,0 +1,20 @@
+flowchart TB
+  USER["사용자 Android 앱<br/>D01 계정·동의 / D02 세션·출력<br/>D03 음성·경로 / D04 위치·방향<br/>D05 영상 / D06 신고·수집 / D07 깊이·위험"]
+  GW["D08 Android Gateway<br/>사용자 세션·서명 요청·중계"]
+  ADMIN["D12 관리자 Android<br/>보안 기능 / 조건부 운영 기능"]
+  BE["Backend<br/>D09 실행 경계·추론·경로<br/>D13 계정·개인정보·raw<br/>D14 관리자 보안 / D15 신고·저장"]
+  VOICE["D10 Voice 서비스<br/>STT·TTS·worker"]
+  EXT["외부 경로 서비스·DB·암호화 파일<br/>이번 실환경 실행 미검증"]
+  USER -->|"계정·검색·경로·신고·수집 요청"| GW
+  GW -->|"허용 경로·세션·actor 증명 통과"| BE
+  GW -->|"음성 API·voice 활성화·설정/인증 통과 P-D08-025"| VOICE
+  ADMIN -->|"Backend 직접 호출·관리자 증명"| BE
+  BE -->|"서비스별 검증·보존·전송 정책"| EXT
+  subgraph SUPPORT["별도 실행과 지원 범위"]
+    EV["D16 위치 평가 앱<br/>trace·GNSS·RINEX 반입과 분석"]
+    DATA["D10 모델·데이터 CLI<br/>학습·검증·변환"]
+    OPS["D11 운영·개발·검증<br/>CI·서비스·timer·시험 도구"]
+    WEB["D11 Web 보존 코드<br/>전체 요청 410"]
+  end
+  OPS -. "설치·명시 실행 조건" .-> BE
+  DATA -. "모델 자산·계약" .-> USER

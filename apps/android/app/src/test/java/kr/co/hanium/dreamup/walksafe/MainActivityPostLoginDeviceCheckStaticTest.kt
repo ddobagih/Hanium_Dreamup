@@ -15,107 +15,116 @@ class MainActivityPostLoginDeviceCheckStaticTest {
         "src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
     ).readText()
 
+    private val device = MainActivityRefactorSource.device
+    private val probes = MainActivityRefactorSource.deviceProbes
+    private val presenter = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/DeviceCheckPresenter.kt").readText()
+    private val panel = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/OnboardingReadinessPanel.kt").readText()
+    private val factory = MainActivityRefactorSource.member(source, "createPostLoginDeviceCheckController")
+    private val probeComposition = source.substringAfter("private val postLoginDeviceProbesHolder:")
+        .substringBefore("private val postLoginDeviceProbes:")
+
+    private fun main(name: String) = MainActivityRefactorSource.member(source, name)
+    private fun owned(name: String) = MainActivityRefactorSource.function(source, "private fun $name(")
+    private fun core(name: String) = MainActivityRefactorSource.member(device, name)
+    private fun probe(name: String) = MainActivityRefactorSource.member(probes, name)
+    private fun callback(name: String) = ReportStaticSourceInspector.functionBlock(probeComposition, "override fun $name")
+    private fun effect(name: String) = ReportStaticSourceInspector.functionBlock(factory, "override fun $name")
+    private fun native(className: String, name: String): String {
+        check(probes.contains("private class $className("))
+        return MainActivityRefactorSource.member(probes.substringAfter("private class $className("), name)
+    }
+    private fun ordered(text: String, vararg tokens: String) =
+        assertTrue(tokens.joinToString(" -> "), ReportStaticSourceInspector.appearsInOrder(text, *tokens))
+
+    private fun startupPresentationWire(): String {
+        assertTrue(owned("refreshStartupCapabilityUi").contains("ui.render(decision, confirmed, priorityUserDecision, officialEnvironmentReady, phoneMountingReady)"))
+        assertTrue(MainActivityRefactorSource.composition(source, "startupCapabilityCoordinator")
+            .contains("startupCapabilityFactsRenderer.renderStartupCapabilityFacts(decision, confirmed, priority, officialReady, mountingReady)"))
+        val render = File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/presentation/StartupCapabilityFactsRenderer.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(render, "renderStartupCapabilityFacts").contains("effects.render(startupUiFacts)"))
+        return MainActivityRefactorSource.composition(source, "startupCapabilityFactsRenderer")
+    }
+
     @Test
     fun jitTransitionCreatesTheFreshRuntimeProbeBeforePublishingTheStageChange() {
-        val completion = source.substringAfter(
-            "private fun completePostLoginDeviceCheckPermissionObservation(",
-        ).substringBefore("private fun requiredPostLoginDeviceCheckPermissions()")
-        val freshProbe = completion.indexOf("startPostLoginDeviceCheckRuntime(binding)")
-        val stageChange = completion.indexOf("onFirstRunOnboardingStateChanged(")
-        val branchReturn = completion.indexOf("return", stageChange)
-        val nonJitStart = completion.indexOf(
-            "startPostLoginDeviceCheckRuntime(binding)",
-            freshProbe + 1,
-        )
-
-        assertTrue(freshProbe >= 0)
-        assertTrue(stageChange > freshProbe)
-        assertTrue(branchReturn > stageChange)
-        assertTrue(nonJitStart > branchReturn)
+        val completion = owned("completePostLoginDeviceCheckPermissionObservation")
+        ordered(completion, "effects.recordPermissionObservation(binding)", "startRuntime(binding)", "effects.afterPermissionObservation(binding)")
+        assertTrue(completion.contains("cancel(\"jit_transition_rejected\")"))
+        val record = effect("recordPermissionObservation")
+        val after = effect("afterPermissionObservation")
+        assertTrue(record.contains("FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION"))
+        assertTrue(record.contains("jitPermissionObservationBinding = binding"))
+        ordered(after, "if (jitPermissionObservationBinding == binding)", "onFirstRunOnboardingStateChanged(")
+        assertEquals(1, Regex("startRuntime\\(binding\\)").findAll(completion).count())
+        assertTrue(completion.indexOf("startRuntime(binding)") > completion.indexOf("return"))
     }
 
     @Test
     fun loginDoesNotAutomaticallyStartAndOneTapBeginsTheDeviceCheck() {
-        val login = source.substringAfter("private fun loginEmailAccount(")
-            .substringBefore("private fun postAccountFailure(")
-        val start = source.substringAfter(
-            "private fun startPostLoginDeviceCheckFromPrimaryAction()",
-        ).substringBefore("private fun handlePostLoginDeviceCheckPrimaryAction()")
-        val primaryAction = source.substringAfter(
-            "private fun handlePostLoginDeviceCheckPrimaryAction()",
-        ).substringBefore("private fun beginPostLoginDeviceCheckFromUserAction(")
-        val begin = source.substringAfter("private fun beginPostLoginDeviceCheckFromUserAction(")
-            .substringBefore("private fun handlePostLoginDeviceCheckPermissionResult(")
-
+        val login = MainActivityRefactorSource.function(source, "private fun loginEmailAccount(")
         assertFalse(login.contains("beginPostLoginDeviceCheckFromUserAction("))
-        assertTrue(source.contains("setOnClickListener { handlePostLoginDeviceCheckPrimaryAction() }"))
-        assertTrue(primaryAction.contains("startPostLoginDeviceCheckFromPrimaryAction()"))
-        assertTrue(start.contains("acknowledgeHandsFreeVoiceDisclosure()"))
-        assertTrue(start.contains("beginPostLoginDeviceCheckFromUserAction(sessionBinding)"))
-        assertFalse(primaryAction.contains("showPostLoginDeviceCheckExplanation()"))
-        assertFalse(start.contains("AlertDialog"))
-        assertFalse(begin.contains("AlertDialog"))
-        assertTrue(begin.contains("requestPermissionsWithLease("))
-        assertTrue(source.contains("PostLoginDeviceCheckPolicy.beginFromUserAction("))
+        assertFalse(MainActivityRefactorSource.member(source, "createEmailAccountController").contains("beginPostLoginDeviceCheckFromUserAction("))
+        assertTrue(panel.contains("setOnClickListener { actions.readiness.onDeviceCheck() }"))
+        assertTrue(source.contains("onDeviceCheck = { handlePostLoginDeviceCheckPrimaryAction() }"))
+        val primary = owned("handlePostLoginDeviceCheckPrimaryAction")
+        val start = owned("startPostLoginDeviceCheckFromPrimaryAction")
+        val begin = owned("beginPostLoginDeviceCheckFromUserAction")
+        assertTrue(primary.contains("beginFromPrimaryAction()"))
+        ordered(start, "permissions.acknowledgeVoiceDisclosure()", "beginFromUserAction(binding)")
+        assertTrue(effect("recordPermissionObservation").contains("firstRunOnboardingController.recordEmailPermissionObservation()"))
+        assertTrue(factory.contains("requestPermissionsWithLease(permissions.toTypedArray(), PermissionRequestPurpose.POST_LOGIN_DEVICE_CHECK)"))
+        assertTrue(begin.contains("permissions.request(binding, missing)"))
+        assertTrue(begin.contains("PostLoginDeviceCheckPolicy.beginFromUserAction("))
+        for (entry in listOf(primary, start, begin)) {
+            assertFalse(entry.contains("AlertDialog"))
+            assertFalse(entry.contains("showPostLoginDeviceCheckExplanation()"))
+        }
     }
 
     @Test
     fun permissionAndDeviceStagesUseLocalTransitionsAndRespectLimitedFeatures() {
-        val firstRunGate = source.substringAfter("private fun firstRunOnboardingComplete()")
-            .substringBefore("private fun postLoginDeviceCheckPassesFeatureGate()")
-        val deviceGate = source.substringAfter("private fun postLoginDeviceCheckPassesFeatureGate()")
-            .substringBefore("private fun revalidateCompletedPostLoginDeviceCheckPrerequisites()")
-        val featureGate = source.substringAfter(
-            "private fun postLoginDeviceFeatureEnabled(feature: PostLoginDeviceCheckFeature)",
-        ).substringBefore("private fun postLoginDeviceCheckItemsMessage()")
-
+        val firstRunGate = main("firstRunOnboardingComplete")
+        val deviceGate = owned("postLoginDeviceCheckPassesFeatureGate")
+        val featureGate = owned("postLoginDeviceFeatureEnabled")
         assertTrue(source.contains("PermissionRequestPurpose.POST_LOGIN_DEVICE_CHECK"))
-        assertTrue(source.contains("recordEmailJitPermissionObservation("))
-        assertTrue(source.contains("recordEmailDeviceCheckPassed("))
-        assertTrue(source.contains("postLoginDeviceCheckPassesFeatureGate()"))
+        assertTrue(effect("recordPermissionObservation").contains("firstRunOnboardingController.recordEmailPermissionObservation()"))
+        assertTrue(owned("completePostLoginDeviceCheckPassEffects").contains("firstRun.completeEmailDeviceCheck("))
+        assertTrue(onboardingOwner("completeEmailDeviceCheck").contains("FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(before, before.epoch, before.revision)"))
+        assertTrue(onboardingOwner("recordEmailPermissionObservation").contains("FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(snapshot, snapshot.epoch, snapshot.revision)"))
         assertTrue(firstRunGate.contains("firstRunOnboardingSnapshot.mayEnterWalk"))
         assertTrue(firstRunGate.contains("GatewaySessionProcessCoordinator.snapshot()"))
-        assertTrue(deviceGate.contains("postLoginDeviceCheckSnapshot.passesFeatureGate"))
+        assertTrue(deviceGate.contains("current.passesFeatureGate"))
         assertFalse(deviceGate.contains("WalkSafeStartupCapabilityTier.FULL"))
-        assertTrue(featureGate.contains("postLoginDeviceCheckSnapshot.passesFeatureGate"))
+        assertTrue(featureGate.contains("facts.passesFeatureGate()"))
+        assertTrue(MainActivityRefactorSource.factory(source, "createPostLoginDeviceInteraction")
+            .contains("override fun passesFeatureGate() = postLoginDeviceCheckPassesFeatureGate()"))
         assertTrue(featureGate.contains("feature !in currentPostLoginDisabledFeatures()"))
     }
 
     @Test
     fun passedDeviceCheckCannotBeReexposedAsANoOpCompletionButton() {
-        val button = source.substringAfter("startupMetricPreflightButton = Button(this).apply")
-            .substringBefore("postLoginDeviceCheckSettingsButton = Button(this).apply")
-        val firstRunUi = source.substringAfter("private fun updateFirstRunOnboardingUi()")
-            .substringBefore("private fun linkPriorityUserAccessibilityTraversal()")
-        val capabilityUi = source.substringAfter("private fun refreshStartupCapabilityUi()")
-            .substringBefore("private fun applyRuntimeReadinessIfActive(")
-        val primaryAction = source.substringAfter(
-            "private fun handlePostLoginDeviceCheckPrimaryAction()",
-        ).substringBefore("private fun beginPostLoginDeviceCheckFromUserAction(")
-
+        val button = panel.substringAfter("startupMetricPreflightButton = Button(context).apply")
+            .substringBefore("postLoginDeviceCheckSettingsButton = Button(context).apply")
         assertTrue(button.contains("visibility = View.GONE"))
-        assertFalse(firstRunUi.contains("startupMetricPreflightButton.visibility"))
-        assertTrue(capabilityUi.contains("val deviceCheckStage"))
-        assertTrue(capabilityUi.contains("val showDeviceCheckAction"))
-        assertTrue(capabilityUi.contains("!postLoginDeviceCheckSnapshot.passesFeatureGate"))
-        assertTrue(capabilityUi.contains("isEnabled = showDeviceCheckAction &&"))
-        assertTrue(primaryAction.contains("postLoginDeviceCheckSnapshot.passesFeatureGate"))
-        assertTrue(
-            primaryAction.indexOf("postLoginDeviceCheckSnapshot.passesFeatureGate") <
-                primaryAction.indexOf("startPostLoginDeviceCheckFromPrimaryAction()"),
-        )
+        assertFalse(main("updateFirstRunOnboardingUi").contains("startupMetricPreflightButton.visibility"))
+        val primary = owned("handlePostLoginDeviceCheckPrimaryAction")
+        ordered(primary, "if (current.passesFeatureGate)", "if (!deferredChecksCanBeRetried) return", "beginFromPrimaryAction()")
+        assertTrue(presenter.contains("val deviceCheckStage"))
+        assertTrue(presenter.contains("val showDeviceCheckAction"))
+        assertTrue(presenter.contains("!check.passesFeatureGate || check.deferredChecksRetriable"))
+        assertTrue(presenter.contains("enabled = showDeviceCheckAction &&"))
+        assertTrue(startupPresentationWire().contains("deviceCheckPresenter.renderStartupCapability(facts)"))
     }
 
     @Test
     fun cameraPipelineUsesBoundedDetectorAttemptsWithoutWalkOutputs() {
-        val preflight = source.substringAfter(
-            "private fun startPostLoginCameraPipelinePreflight(",
-        ).substringBefore("private fun isPostLoginCameraPipelinePreflightCurrent(")
-        assertTrue(preflight.contains("ProcessCameraProvider.getInstance(this)"))
+        val preflight = owned("startPostLoginCameraPipelinePreflight")
+        assertTrue(native("AndroidPostLoginCameraSource", "requestBind").contains("ProcessCameraProvider.getInstance(context)"))
+        assertTrue(preflight.contains("camera.requestBind("))
         assertTrue(preflight.contains("frameClaimed.compareAndSet(false, true)"))
         assertTrue(preflight.contains("attemptedFrames.incrementAndGet()"))
         assertTrue(preflight.contains("DeviceCheckCameraSamplingPolicy.evaluate(attempts, passes)"))
-        assertTrue(preflight.contains("verdict != DeviceCheckCameraSampleVerdict.CONTINUE"))
+        assertTrue(preflight.contains("verdict == DeviceCheckCameraSampleVerdict.CONTINUE"))
         assertTrue(preflight.contains("terminalClaim.compareAndSet(false, true)"))
         assertEquals(10, DeviceCheckCameraSamplingPolicy.REQUIRED_FRAMES)
         assertEquals(80, DeviceCheckCameraSamplingPolicy.MINIMUM_PASSING_PERCENT)
@@ -133,10 +142,10 @@ class MainActivityPostLoginDeviceCheckStaticTest {
             )
         }
         assertTrue(preflight.contains("frameClaimed.set(false)"))
-        assertTrue(preflight.contains("POST_LOGIN_CAMERA_PIPELINE_TIMEOUT_MS"))
-        assertTrue(preflight.contains("frameDetector.detect("))
+        assertTrue(preflight.contains("CAMERA_TIMEOUT_MS"))
+        assertTrue(preflight.contains("detector().detect("))
         assertTrue(preflight.contains("DeviceCheckDetectorExecutionPolicy.passes(result)"))
-        assertTrue(preflight.contains("finishPostLoginCameraPipelinePreflight("))
+        assertTrue(preflight.contains("finishCamera("))
         assertFalse(preflight.contains("phoneMountingSensorProbe"))
         assertFalse(preflight.contains("CameraLumaMeasurementPolicy"))
         assertFalse(preflight.contains("cameraFrameQualityObservation"))
@@ -149,196 +158,176 @@ class MainActivityPostLoginDeviceCheckStaticTest {
 
     @Test
     fun functionalLocationProbeWaitsForAPassingSampleAndCleansUpItsCallback() {
-        val start = source.substringAfter("private fun startPostLoginLocationFixProbe(")
-            .substringBefore("private fun isPostLoginDeviceCheckBindingCurrent(")
-        val finish = source.substringAfter("private fun finishPostLoginLocationFixProbe(")
-            .substringBefore("private fun cancelPostLoginLocationFixProbe(")
-        val cancel = source.substringAfter("private fun cancelPostLoginLocationFixProbe(")
-            .substringBefore("private fun requestPostLoginDeviceCheckHaptic(")
-
-        assertTrue(start.contains("object : LocationCallback()"))
-        assertTrue(start.contains("val decisions = result.locations.map(::evaluatePostLoginLocationFix)"))
-        assertTrue(start.contains("decisions.forEach(::recordPostLoginLocationFixDiagnostic)"))
+        val start = owned("startPostLoginLocationFixProbe")
+        val finish = probe("finishLocation")
+        val cancel = owned("cancelPostLoginLocationFixProbe")
+        val sdk = native("AndroidPostLoginLocationSource", "request")
+        assertTrue(sdk.contains("object : LocationCallback()"))
+        assertTrue(start.contains("val decisions = samples.map"))
+        assertTrue(start.contains("DeviceCheckLocationFixPolicy.evaluate("))
+        assertTrue(start.contains("observer.locationDiagnostic(it)"))
         assertTrue(start.contains("DeviceCheckLocationFixPolicy.selectBatch(decisions)"))
         assertTrue(start.contains("DeviceCheckLocationFixReason.MOCK_LOCATION"))
-        assertTrue(start.contains("fusedLocationClient.requestLocationUpdates("))
-        assertTrue(start.contains("callback,"))
-        assertTrue(start.contains("Looper.getMainLooper()"))
-        assertTrue(start.contains("setWaitForAccurateLocation(false)"))
-        assertTrue(
-            start.contains(
-                "setMaxUpdateAgeMillis(DeviceCheckLocationFixPolicy.MAX_AGE_MS)",
-            ),
-        )
-        assertTrue(source.contains("POST_LOGIN_LOCATION_FIX_TIMEOUT_MS = 30_000L"))
-        assertFalse(start.contains("getCurrentLocation("))
-        assertTrue(finish.contains("cancelPostLoginLocationFixProbe()"))
-        assertTrue(cancel.contains("removeLocationUpdates"))
+        assertTrue(sdk.contains("fused.requestLocationUpdates(request, callback, Looper.getMainLooper())"))
+        assertTrue(sdk.contains("setWaitForAccurateLocation(false)"))
+        assertTrue(sdk.contains("setMaxUpdateAgeMillis(DeviceCheckLocationFixPolicy.MAX_AGE_MS)"))
+        assertTrue(probes.contains("LOCATION_TIMEOUT_MS = 30_000L"))
+        assertFalse(sdk.contains("getCurrentLocation("))
+        assertTrue(finish.contains("cancelLocation()"))
+        assertTrue(cancel.contains("retired?.registration?.cancel()"))
+        assertTrue(sdk.contains("fused.removeLocationUpdates(callback)"))
     }
 
     @Test
     fun cameraChecksOwnTheirUseCasesAndWaitForAnalyzerCleanupBeforeRetry() {
-        val start = source.substringAfter("private fun startPostLoginCameraPipelinePreflight(")
-            .substringBefore("private fun isPostLoginCameraPipelinePreflightCurrent(")
-        val stop = source.substringAfter("private fun stopPostLoginCameraPipelinePreflight()")
-            .substringBefore("private fun currentFirstRunAsyncLease()")
-
-        assertTrue(start.contains("officialEnvironmentCameraCleanupPending"))
-        assertTrue(start.contains("postLoginCameraPipelineProvider = provider"))
-        assertTrue(start.contains("postLoginCameraPipelineAnalysis = analysis"))
-        assertFalse(start.contains("cameraFallbackProvider = provider"))
+        val start = owned("startPostLoginCameraPipelinePreflight")
+        val stop = owned("stopPostLoginCameraPipelinePreflight")
+        val sdk = native("AndroidPostLoginCameraSource", "requestBind")
+        val resources = probes.substringAfter("private class AndroidPostLoginCameraResources(").substringBefore("private class AndroidPostLoginCameraSource(")
+        assertTrue(probeComposition.contains("officialEnvironmentCameraCleanupPending"))
+        assertTrue(start.contains("env.otherCameraOwnerBusy"))
+        assertTrue(sdk.contains("resources.provider = provider"))
+        assertTrue(sdk.contains("resources.analysis = analysis"))
+        assertFalse(sdk.contains("cameraFallbackProvider = provider"))
         assertTrue(start.contains("terminalClaim.compareAndSet(false, true)"))
-        assertTrue(stop.contains("ownedAnalysis?.clearAnalyzer()"))
-        assertTrue(stop.contains("postLoginCameraPipelineCleanupPending ="))
+        assertTrue(stop.contains("resources?.clearAnalyzer()"))
+        assertTrue(stop.contains("cameraCleanupPending ="))
         assertTrue(stop.contains("detectorExecutor.execute"))
-        assertTrue(stop.contains("ownedProvider?.unbind(ownedAnalysis)"))
-        assertTrue(stop.contains("CAMERA_ANALYZER_RELEASE_BARRIER_TIMEOUT_MS"))
-        assertTrue(stop.contains("awaitCameraXClosed(ownedCamera)"))
-        assertTrue(stop.contains("cameraXReleaseBlocked = true"))
+        assertTrue(resources.contains("provider?.unbind(ownedAnalysis)"))
+        assertTrue(stop.contains("CAMERA_BARRIER_TIMEOUT_MS"))
+        assertTrue(stop.contains("resources.awaitClosed(complete)"))
+        assertTrue(stop.contains("markSharedReleaseBlocked()"))
+        assertTrue(probeComposition.contains("markSharedReleaseBlocked = { cameraFallbackController.markReleaseBlocked() }"))
         assertTrue(stop.contains("PostLoginCameraPipelineFailure.RELEASE_TIMED_OUT"))
-        assertTrue(
-            stop.indexOf("maybeContinuePostLoginDeviceCheck(currentBinding)") <
-                stop.indexOf("refreshStartupCapabilityUi()"),
-        )
+        ordered(stop, "observer.continueCheck(binding)", "observer.changed()")
+        assertTrue(callback("continueCheck").contains("maybeContinuePostLoginDeviceCheck(binding)"))
+        assertTrue(callback("changed").contains("refreshStartupCapabilityUi()"))
     }
 
     @Test
     fun locationFailureIsDiagnosableWithoutLoggingCoordinates() {
-        val diagnostic = source.substringAfter("private fun recordPostLoginLocationFixDiagnostic(")
-            .substringBefore("private fun finishPostLoginLocationFixProbe(")
-        val terminalDiagnostic = source.substringAfter(
-            "private fun recordPostLoginLocationTerminalDiagnostic(",
-        ).substringBefore("private fun cancelPostLoginLocationFixProbe()")
-        val failure = source.substringAfter("private fun postLoginLocationFixFailureMessage()")
-            .substringBefore("Proves the camera and production detector path")
-
+        val diagnostic = callback("locationDiagnostic")
+        val terminal = callback("locationTerminal")
+        val failure = ReportStaticSourceInspector.functionBlock(presenter, "fun postLoginLocationFixFailureMessage")
         assertTrue(diagnostic.contains("GPS_PREFLIGHT_LOG_TAG"))
-        assertTrue(diagnostic.contains("decision.reason"))
-        assertTrue(diagnostic.contains("decision.accuracyMeters"))
-        assertTrue(diagnostic.contains("decision.ageMs"))
-        assertFalse(diagnostic.contains("latitude"))
-        assertFalse(diagnostic.contains("longitude"))
-        assertTrue(terminalDiagnostic.contains("PREF_DEVICE_CHECK_LOCATION_RESULT"))
-        assertTrue(terminalDiagnostic.contains("PREF_DEVICE_CHECK_LOCATION_REASON"))
-        assertTrue(terminalDiagnostic.contains("PREF_DEVICE_CHECK_LOCATION_ACCURACY_BUCKET"))
-        assertTrue(terminalDiagnostic.contains("PREF_DEVICE_CHECK_LOCATION_AGE_BUCKET"))
-        assertTrue(terminalDiagnostic.contains("post_login_location_check_terminal"))
-        assertFalse(terminalDiagnostic.contains("latitude"))
-        assertFalse(terminalDiagnostic.contains("longitude"))
-        assertTrue(fieldLogSource.contains("\"accuracy_bucket\""))
-        assertTrue(fieldLogSource.contains("\"age_bucket\""))
-        assertTrue(fieldLogSource.contains("\"result\""))
+        for (token in listOf("decision.reason", "decision.accuracyMeters", "decision.ageMs")) assertTrue(diagnostic.contains(token))
+        for (token in listOf("PREF_DEVICE_CHECK_LOCATION_RESULT", "PREF_DEVICE_CHECK_LOCATION_REASON",
+            "PREF_DEVICE_CHECK_LOCATION_ACCURACY_BUCKET", "PREF_DEVICE_CHECK_LOCATION_AGE_BUCKET", "post_login_location_check_terminal")) assertTrue(terminal.contains(token))
+        for (text in listOf(diagnostic, terminal)) { assertFalse(text.contains("latitude")); assertFalse(text.contains("longitude")) }
+        for (token in listOf("\"accuracy_bucket\"", "\"age_bucket\"", "\"result\"")) assertTrue(fieldLogSource.contains(token))
         assertTrue(failure.contains("ACCURACY_OUTSIDE_FUNCTIONAL_RANGE"))
         assertTrue(failure.contains("MOCK_LOCATION"))
-        assertTrue(failure.contains("PostLoginLocationFixTerminalFailure.REQUEST_FAILED"))
+        assertTrue(main("captureDeviceCheckLocationFailureFacts").contains("PostLoginLocationFixTerminalFailure.REQUEST_FAILED"))
+        assertTrue(failure.contains("facts.requestFailed"))
     }
 
     @Test
     fun statusIsAccessibleAndFailureOffersSettingsRecovery() {
-        val evaluate = source.substringAfter("private fun evaluatePostLoginDeviceCheck(")
-            .substringBefore("private fun currentPostLoginDeviceCheckObservation()")
-        val progress = source.substringAfter(
-            "private fun announcePostLoginDeviceCheckProgress(message: String)",
-        ).substringBefore("private fun announcePostLoginDeviceCheckTerminal(message: String)")
-        val terminal = source.substringAfter(
-            "private fun announcePostLoginDeviceCheckTerminal(message: String)",
-        ).substringBefore("private fun clearPostLoginDeviceCheckOverallTimeout()")
-        val timeout = source.substringAfter("private fun startPostLoginDeviceCheckRuntime(")
-            .substringBefore("private fun maybeContinuePostLoginDeviceCheck(")
-        val sessionFailure = source.substringAfter(
-            "private fun failPostLoginDeviceCheckForSessionChange()",
-        ).substringBefore("private fun cancelPostLoginDeviceCheckRuntime(")
-        val revalidate = source.substringAfter(
-            "private fun revalidateCompletedPostLoginDeviceCheckPrerequisites()",
-        ).substringBefore("private fun bindPostLoginDeviceCheckSession(")
-        assertTrue(source.contains("View.ACCESSIBILITY_LIVE_REGION_POLITE"))
-        assertTrue(
-            source.contains(
-                "필수 기능 중 일부를 사용할 수 없습니다. 위의 사용할 수 없는 기능 목록을 확인하세요.",
-            ),
-        )
-        assertFalse(source.contains("필수 카메라·GPS·마이크·진동·음성 기능을 사용할 수 없습니다."))
-        assertTrue(source.contains("postLoginDeviceCheckSettingsButton"))
-        assertTrue(source.contains("Settings.ACTION_LOCATION_SOURCE_SETTINGS"))
-        assertTrue(source.contains("Settings.ACTION_APPLICATION_DETAILS_SETTINGS"))
-        assertTrue(evaluate.contains("val detail = postLoginDeviceCheckFailureMessage(next.failure)"))
+        val evaluate = owned("evaluatePostLoginDeviceCheck")
+        val progress = owned("announcePostLoginDeviceCheckProgress")
+        val terminal = owned("announcePostLoginDeviceCheckTerminal")
+        val timeout = core("armOverallTimeout")
+        val sessionFailure = owned("failPostLoginDeviceCheckForSessionChange")
+        val revalidate = owned("revalidateCompletedPostLoginDeviceCheckPrerequisites")
+        assertTrue(panel.contains("View.ACCESSIBILITY_LIVE_REGION_POLITE"))
+        assertTrue(presenter.contains("필수 기능 중 일부를 사용할 수 없습니다. 위의 사용할 수 없는 기능 목록을 확인하세요."))
+        assertFalse(presenter.contains("필수 카메라·GPS·마이크·진동·음성 기능을 사용할 수 없습니다."))
+        assertTrue(panel.contains("postLoginDeviceCheckSettingsButton = Button(context).apply"))
+        assertTrue(panel.contains("setOnClickListener { actions.readiness.onDeviceSettings() }"))
+        assertTrue(source.contains("onDeviceSettings = { openPostLoginDeviceCheckSettings() }"))
+        val settings = owned("openPostLoginDeviceCheckSettings")
+        assertTrue(settings.contains("settings.openWithApplicationFallback(target)"))
+        assertTrue(MainActivityRefactorSource.factory(source, "createVoiceDataSettingsRecovery")
+            .contains("settings = StartupSettingsNavigation(AndroidStartupSettingsNative(this))"))
+        val nativeSettings = File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/interaction/AndroidStartupSettingsNative.kt").readText()
+        assertTrue(nativeSettings.contains("Settings.ACTION_LOCATION_SOURCE_SETTINGS"))
+        assertTrue(nativeSettings.contains("Settings.ACTION_APPLICATION_DETAILS_SETTINGS"))
+        assertTrue(evaluate.contains("val detail = effects.failureMessage(next.failure)"))
         assertTrue(evaluate.contains("기기 점검에 실패했습니다. \$detail"))
-        assertTrue(evaluate.contains("announcePostLoginDeviceCheckTerminal("))
+        assertTrue(evaluate.contains("effects.announceTerminal("))
+        assertTrue(factory.contains("override fun announceTerminal(message: String) = this@MainActivity.postLoginDeviceInteraction.announcePostLoginDeviceCheckTerminal(message)"))
         assertFalse(evaluate.contains("화면의 실패 항목을 확인하세요"))
-        assertTrue(progress.contains("View.ACCESSIBILITY_LIVE_REGION_POLITE"))
-        assertTrue(terminal.contains("View.ACCESSIBILITY_LIVE_REGION_NONE"))
-        assertFalse(terminal.contains("View.ACCESSIBILITY_LIVE_REGION_POLITE"))
-        assertTrue(terminal.contains("isScreenReaderActive()"))
-        assertTrue(terminal.contains("PostLoginDeviceCheckState.FAIL"))
-        assertTrue(terminal.contains("postLoginDeviceCheckLiveStatusText.isShown"))
-        assertTrue(terminal.contains("ACTION_ACCESSIBILITY_FOCUS"))
-        assertEquals(1, "ACTION_ACCESSIBILITY_FOCUS".toRegex().findAll(terminal).count())
-        assertTrue(timeout.contains("announcePostLoginDeviceCheckTerminal("))
-        assertTrue(sessionFailure.contains("announcePostLoginDeviceCheckTerminal("))
+        assertTrue(progress.contains("view.liveRegionPolite()"))
+        assertTrue(terminal.contains("view.liveRegionNone()"))
+        assertFalse(terminal.contains("view.liveRegionPolite()"))
+        for (token in listOf("facts.screenReaderActive()", "PostLoginDeviceCheckState.FAIL", "view.shown()", "view.requestAccessibilityFocus()")) assertTrue(terminal.contains(token))
+        val interaction = MainActivityRefactorSource.factory(source, "createPostLoginDeviceInteraction")
+        assertTrue(interaction.contains("override fun screenReaderActive() = isScreenReaderActive()"))
+        assertTrue(interaction.contains("postLoginDeviceCheckLiveStatusText.isShown"))
+        assertTrue(ReportStaticSourceInspector.functionBlock(interaction, "override fun liveRegionPolite").contains("View.ACCESSIBILITY_LIVE_REGION_POLITE"))
+        assertTrue(ReportStaticSourceInspector.functionBlock(interaction, "override fun liveRegionNone").contains("View.ACCESSIBILITY_LIVE_REGION_NONE"))
+        assertEquals(1, "ACTION_ACCESSIBILITY_FOCUS".toRegex().findAll(interaction).count())
+        assertTrue(timeout.contains("effects.announceTerminal("))
+        assertTrue(sessionFailure.contains("effects.announceTerminal("))
         assertFalse(revalidate.contains("PostLoginDeviceCheckPolicy.invalidatePassedGate("))
-        assertFalse(revalidate.contains("announcePostLoginDeviceCheckTerminal("))
+        assertFalse(revalidate.contains("effects.announceTerminal("))
     }
 
     @Test
     fun everyAsyncMutationAndResourceStartRequiresTheLiveGatewayBinding() {
-        val start = source.substringAfter("private fun startPostLoginDeviceCheckRuntime(")
-            .substringBefore("private fun maybeContinuePostLoginDeviceCheck(")
-        val orchestration = source.substringAfter("private fun maybeContinuePostLoginDeviceCheck(")
-            .substringBefore("private fun evaluatePostLoginDeviceCheck(")
-        val evaluate = source.substringAfter("private fun evaluatePostLoginDeviceCheck(")
-            .substringBefore("private fun currentPostLoginDeviceCheckObservation()")
-        val camera = source.substringAfter("private fun startPostLoginCameraPipelinePreflight(")
-            .substringBefore("private fun isPostLoginCameraPipelinePreflightCurrent(")
-        val permissionCurrent = source.substringAfter("private fun isPermissionRequestLeaseCurrent(")
-            .substringBefore("private fun handleMetricPreflightCameraPermissionResult()")
-        val metricCurrent = source.substringAfter(
-            "private fun isRuntimeMetricPreflightAttemptCurrent(",
-        ).substringBefore("private fun finishRuntimeMetricPreflight(")
-
-        assertTrue(start.contains("isPostLoginDeviceCheckBindingCurrent(binding)"))
-        assertTrue(start.contains("!isPostLoginDeviceCheckBindingCurrent(binding)"))
-        assertTrue(orchestration.contains("isPostLoginDeviceCheckBindingCurrent(binding)"))
-        assertTrue(evaluate.contains("isPostLoginDeviceCheckSnapshotBindingLive(binding)"))
-        assertTrue(camera.contains("isPostLoginDeviceCheckBindingCurrent(binding)"))
-        assertTrue(permissionCurrent.contains("lease.postLoginBinding"))
-        assertTrue(permissionCurrent.contains("isPostLoginDeviceCheckSnapshotBindingLive"))
-        assertTrue(metricCurrent.contains("isPostLoginDeviceCheckSnapshotBindingLive(binding)"))
-        assertTrue(source.contains("val postLoginBinding: PostLoginDeviceCheckBinding?"))
+        val start = owned("startPostLoginDeviceCheckRuntime")
+        val orchestration = owned("maybeContinuePostLoginDeviceCheck")
+        val evaluate = owned("evaluatePostLoginDeviceCheck")
+        val camera = owned("startPostLoginCameraPipelinePreflight")
+        assertTrue(start.contains("!isRunningBindingCurrent(binding)"))
+        assertTrue(orchestration.contains("!isRunningBindingCurrent(binding)"))
+        assertTrue(evaluate.contains("!isSnapshotBindingLive(binding)"))
+        assertTrue(camera.contains("!isCurrent(binding)"))
+        assertTrue(probeComposition.contains("isCurrent = ::isPostLoginDeviceCheckBindingCurrent"))
+        assertTrue(owned("isPermissionRequestLeaseCurrent").contains("lease.postLoginBinding"))
+        assertTrue(owned("isPermissionRequestLeaseCurrent").contains("authority::postLoginBindingLive"))
+        assertTrue(owned("isRuntimeMetricPreflightAttemptCurrent").contains("device.bindingLive(binding)"))
+        assertTrue(factory.contains("actorSource = ::capturePostLoginDeviceCheckActorFacts"))
+        assertTrue(core("isSnapshotBindingLive").contains("PostLoginDeviceCheckPolicy.isCurrent(current, binding) && isSessionBindingLive(binding)"))
+        assertTrue(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/PermissionFlowContracts.kt").readText().contains("val postLoginBinding: PostLoginDeviceCheckBinding?"))
+        assertTrue(MainActivityRefactorSource.composition(source, "permissionFlowController")
+            .contains("override fun postLoginBindingLive(binding: PostLoginDeviceCheckBinding) = postLoginDeviceCheckController.isSnapshotBindingLive(binding)"))
+        assertTrue(MainActivityRefactorSource.composition(source, "runtimeMetricSession")
+            .contains("override fun bindingLive(binding: PostLoginDeviceCheckBinding) = isPostLoginDeviceCheckSnapshotBindingLive(binding)"))
         assertFalse(source.contains("postLoginAttemptGeneration"))
     }
 
     @Test
     fun deviceCheckRequiresObservedWakePhraseAndExcludesHapticMeasurement() {
-        val orchestration = source.substringAfter("private fun maybeContinuePostLoginDeviceCheck(")
-            .substringBefore("private fun evaluatePostLoginDeviceCheck(")
-        val observation = source.substringAfter("private fun currentPostLoginDeviceCheckObservation()")
-            .substringBefore("private fun completePostLoginDeviceCheckPass(")
-        val evaluation = source.substringAfter("private fun evaluatePostLoginDeviceCheck(")
-            .substringBefore("private fun currentPostLoginDeviceCheckObservation()")
-        val completion = source.substringAfter("private fun completePostLoginDeviceCheckPass(")
-            .substringBefore("private fun failPostLoginDeviceCheckForSessionChange()")
-
-        assertFalse(orchestration.contains("maybeStartPostLoginWakePhraseProbe(binding)"))
-        assertFalse(orchestration.contains("beginPostLoginWakePhraseProbeFromUserAction()"))
-        assertFalse(orchestration.contains("confirmPostLoginDeviceCheckHaptic("))
-        assertTrue(observation.contains("wakePhraseRecognition = when"))
-        assertTrue(observation.contains("!hasRecordAudioPermission()"))
-        assertTrue(observation.contains("handsFreeVoiceModelPreparationFailed"))
-        assertTrue(observation.contains("else -> postLoginWakePhraseSignal"))
+        val orchestration = owned("maybeContinuePostLoginDeviceCheck")
+        val observation = owned("currentPostLoginDeviceCheckObservation")
+        val evaluation = owned("evaluatePostLoginDeviceCheck")
+        for (forbidden in listOf("maybeStartWake(binding)", "beginWakeFromUserAction()", "confirmHaptic(")) assertFalse(orchestration.contains(forbidden))
+        assertTrue(observation.contains("wakePhraseRecognition = if"))
+        assertTrue(observation.contains("!hardware.microphonePermission"))
+        assertTrue(observation.contains("hardware.voiceModelPreparationFailed"))
+        assertTrue(observation.contains("else probeSignals.wakePhrase"))
         assertFalse(observation.contains("hapticFeedback ="))
         assertFalse(observation.contains("startup.vibrationAvailable"))
         assertTrue(evaluation.contains("PostLoginDeviceCheckState.FULL"))
         assertTrue(evaluation.contains("PostLoginDeviceCheckState.LIMITED"))
-        assertTrue(evaluation.contains("completePostLoginDeviceCheckPass(next.state)"))
-        assertTrue(completion.contains("recordEmailDeviceCheckPassed("))
-        assertFalse(completion.contains("startupCapabilityConfirmButton"))
+        assertTrue(evaluation.contains("completePass()"))
+        assertTrue(core("completePass").contains("effects.afterPassed(current)"))
+        val pass = ReportStaticSourceInspector.maskNonCode(effect("afterPassed"))
+        ordered(pass,
+            "val lifecycleGeneration = feedbackLifecycleGeneration",
+            "val isCurrent = {",
+            "isFeedbackLifecycleCurrent(lifecycleGeneration) &&",
+            "postLoginDeviceCheckController.isPassedSnapshotCurrent(snapshot)",
+            "if (!isCurrent()) return PostLoginDeviceCheckPassContinuation.TRANSITION_REJECTED",
+            "speechOutputController.restartFailedActuatorAfterDeviceCheck(isCurrent)",
+            "if (!isCurrent()) return PostLoginDeviceCheckPassContinuation.TRANSITION_REJECTED",
+            "return this@MainActivity.actorSessionLifecycleCoordinator.completePostLoginDeviceCheckPassEffects(snapshot)",
+        )
+        assertEquals(2, Regex(Regex.escape("if (!isCurrent()) return PostLoginDeviceCheckPassContinuation.TRANSITION_REJECTED")).findAll(pass).count())
+        assertEquals(1, Regex("completePostLoginDeviceCheckPassEffects").findAll(pass).count())
+        ordered(core("completePass"), "savedResults.save(current", "effects.afterPassed(current)",
+            "PostLoginDeviceCheckPassContinuation.TRANSITION_REJECTED -> return")
+        assertFalse(effect("afterRestoredResult").contains("restartFailedActuatorAfterDeviceCheck"))
+        assertTrue(owned("completePostLoginDeviceCheckPassEffects").contains("firstRun.completeEmailDeviceCheck("))
+        assertTrue(onboardingOwner("completeEmailDeviceCheck").contains("FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(before, before.epoch, before.revision)"))
+        assertTrue(onboardingOwner("recordEmailPermissionObservation").contains("FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(snapshot, snapshot.epoch, snapshot.revision)"))
+        assertFalse(owned("completePostLoginDeviceCheckPassEffects").contains("startupCapabilityConfirmButton"))
     }
 
     @Test
     fun inconclusiveFeatureMeasurementsBecomeLimitsInsteadOfBlockingTheApp() {
-        val observation = source.substringAfter(
-            "private fun currentPostLoginDeviceCheckObservation()",
-        ).substringBefore("private fun completePostLoginDeviceCheckPass(")
+        val observation = owned("currentPostLoginDeviceCheckObservation")
         val blocking = observation.substringAfter("blockingFailure = when {")
 
         assertFalse(blocking.contains("!hasCameraPermission()"))
@@ -355,7 +344,7 @@ class MainActivityPostLoginDeviceCheckStaticTest {
         assertFalse(blocking.contains("PostLoginCameraPipelineFailure.TIMED_OUT"))
         assertFalse(blocking.contains("PostLoginDeviceCheckFailure.CAMERA_PIPELINE_UNAVAILABLE"))
 
-        val unsupported = observation.substringAfter("val unsupportedFeatures = buildSet {")
+        val unsupported = observation.substringAfter("val unsupported = buildSet {")
             .substringBefore("return PostLoginDeviceCheckObservation(")
         assertFalse(unsupported.contains("cameraPermissionGranted &&"))
         assertFalse(unsupported.contains("cameraPipeline == PostLoginDeviceCheckSignal.UNAVAILABLE"))
@@ -368,75 +357,68 @@ class MainActivityPostLoginDeviceCheckStaticTest {
 
     @Test
     fun terminalCancellationOwnsTimeoutTtsCameraAndMetricPreflightCleanup() {
-        val start = source.substringAfter("private fun startPostLoginDeviceCheckRuntime(")
-            .substringBefore("private fun maybeContinuePostLoginDeviceCheck(")
-        val cancel = source.substringAfter("private fun cancelPostLoginDeviceCheckRuntime(")
-            .substringBefore("private fun isLocationServiceEnabledForDeviceCheck()")
-        val metricCurrent = source.substringAfter(
-            "private fun isRuntimeMetricPreflightAttemptCurrent(",
-        ).substringBefore("private fun finishRuntimeMetricPreflight(")
-
-        assertTrue(
-            start.indexOf("postLoginDeviceCheckOverallTimeout = timeout") <
-                start.indexOf("loadDetectorForPostLoginDeviceCheck()"),
-        )
-        assertTrue(start.contains("cancelPostLoginDeviceCheckRuntime(\"check_timeout\")"))
-        assertTrue(cancel.contains("invalidateRuntimeMetricEvidence("))
-        assertTrue(cancel.contains("startupCapabilityProbe.close()"))
-        assertTrue(cancel.contains("stopPostLoginCameraPipelinePreflight()"))
-        assertTrue(metricCurrent.contains("metricPreflightPostLoginBinding"))
-        assertTrue(metricCurrent.contains("isPostLoginDeviceCheckSnapshotBindingLive"))
+        val start = owned("startPostLoginDeviceCheckRuntime")
+        val timeout = core("armOverallTimeout")
+        val cancel = owned("cancelPostLoginDeviceCheckRuntime")
+        ordered(start, "armOverallTimeout(binding)", "probes.prepareVoiceModelAndDetector()")
+        assertTrue(timeout.contains("overallTimeout = scheduler.schedule("))
+        assertTrue(timeout.contains("cancel(\"check_timeout\")"))
+        assertTrue(cancel.contains("clearOverallTimeout()"))
+        assertTrue(cancel.contains("probes.cancelFunctionalProbes()"))
+        assertTrue(cancel.contains("probes.cancelMetricPreflight("))
+        assertTrue(cancel.contains("probes.closeCapabilityAndResetResources()"))
+        assertTrue(cancel.contains("probes.stopCamera()"))
+        assertTrue(callback("cancelMetricPreflight").contains("this@MainActivity.runtimeMetricInvalidation.invalidate(reason)"))
+        assertTrue(callback("closeCapabilityAndResetResources").contains("privacyStartupResources.releaseOnUiThread(startupCapabilityProbe)"))
+        MainActivityRefactorSource.composition(source, "runtimeMetricInvalidation")
+        assertTrue(MainActivityRefactorSource.composition(source, "runtimeMetricSession")
+            .contains("override fun bindingLive(binding: PostLoginDeviceCheckBinding) = isPostLoginDeviceCheckSnapshotBindingLive(binding)"))
+        assertTrue(owned("isRuntimeMetricPreflightAttemptCurrent").contains("val binding = attempt.binding ?: return false"))
+        assertTrue(owned("isRuntimeMetricPreflightAttemptCurrent").contains("device.bindingLive(binding)"))
     }
 
     @Test
     fun backgroundFailureRemainsAccessibleDuringTheAutomaticCheck() {
-        val resume = source.substringAfter(
-            "private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()",
-        ).substringBefore("override fun onBackPressed()")
-        val pause = source.substringAfter("override fun onPause()")
-            .substringBefore("override fun onDestroy()")
-
-        assertTrue(resume.contains("postLoginDeviceCheckBackgroundFailurePending"))
-        assertTrue(resume.contains("announcePostLoginDeviceCheckTerminal("))
-        assertTrue(resume.contains("PostLoginDeviceCheckFailure.BACKGROUNDED"))
-        assertTrue(pause.contains("PostLoginDeviceCheckPolicy.onBackground("))
-        assertTrue(pause.contains("postLoginDeviceCheckBackgroundFailurePending ="))
-        assertTrue(pause.contains("PostLoginDeviceCheckFailure.BACKGROUNDED"))
+        assertTrue(main("resumeWalkSafeRuntimeAfterPrivacyStartupInspection").contains("postLoginDeviceCheckController.announceDeferredBackgroundFailure()"))
+        assertTrue(main("onPause").contains("postLoginDeviceCheckController.enteredBackground()"))
+        val resumed = core("announceDeferredBackgroundFailure")
+        val paused = core("enteredBackground")
+        assertTrue(resumed.contains("backgroundFailurePending"))
+        assertTrue(resumed.contains("effects.announceTerminal("))
+        assertTrue(resumed.contains("PostLoginDeviceCheckFailure.BACKGROUNDED"))
+        assertTrue(paused.contains("PostLoginDeviceCheckPolicy.onBackground("))
+        assertTrue(paused.contains("backgroundFailurePending ="))
+        assertTrue(paused.contains("PostLoginDeviceCheckFailure.BACKGROUNDED"))
     }
 
     @Test
     fun itemListIsNotLiveAndOnlyTheMeasuredWakePhrasePromptIsInteractive() {
-        val capabilityText = source.substringAfter("startupCapabilityText = TextView(this).apply")
-            .substringBefore("postLoginDeviceCheckLiveStatusText = TextView(this).apply")
-        val liveStatus = source.substringAfter(
-            "postLoginDeviceCheckLiveStatusText = TextView(this).apply",
-        ).substringBefore("startupMetricPreflightButton = Button(this).apply")
-        val items = source.substringAfter("private fun postLoginDeviceCheckItemsMessage()")
-            .substringBefore("private fun postLoginDeviceCheckPermissionLabel(")
-        val refresh = source.substringAfter("private fun refreshStartupCapabilityUi()")
-            .substringBefore("private fun refreshOfficialEnvironmentUi(")
-
+        val capabilityText = panel.substringAfter("startupCapabilityText = TextView(context).apply")
+            .substringBefore("postLoginDeviceCheckLiveStatusText = TextView(context).apply")
+        val liveStatus = panel.substringAfter("postLoginDeviceCheckLiveStatusText = TextView(context).apply")
+            .substringBefore("startupMetricPreflightButton = Button(context).apply")
         assertFalse(capabilityText.contains("contentDescription"))
         assertFalse(capabilityText.contains("accessibilityLiveRegion"))
         assertTrue(liveStatus.contains("View.ACCESSIBILITY_LIVE_REGION_POLITE"))
-        listOf(
-            "postLoginDeviceCheckHapticQuestionText",
-            "postLoginDeviceCheckHapticConfirmButton",
-            "postLoginDeviceCheckHapticRejectButton",
-        ).forEach { control ->
-            assertTrue(refresh.contains("$control.visibility = View.GONE"))
-        }
-        assertTrue(refresh.contains("val interactiveCheckRunning ="))
-        assertTrue(refresh.contains("postLoginDeviceCheckSnapshot.state == PostLoginDeviceCheckState.RUNNING"))
-        assertTrue(refresh.contains("postLoginWakePhraseSignal == PostLoginDeviceCheckSignal.PENDING"))
-        assertTrue(refresh.contains("if (interactiveCheckRunning) View.VISIBLE else View.GONE"))
-        assertTrue(refresh.contains("if (needsWakePhrase) View.VISIBLE else View.GONE"))
-        assertTrue(refresh.contains("postLoginDeviceCheckWakePhraseStartButton.isEnabled = needsWakePhrase &&"))
-        assertTrue(refresh.contains("handsFreeVoiceModelDirectory != null && postLoginWakePhraseProbe == null"))
-        assertTrue(items.contains("startup.microphoneAvailable.toDeviceCheckSignal()"))
-        assertTrue(items.contains("startup.gpsAvailable.toDeviceCheckSignal()"))
-        assertFalse(items.contains("startup.vibrationAvailable"))
-        assertFalse(items.contains("진동"))
-        assertTrue(items.contains("startup.cameraAvailable.toDeviceCheckSignal()"))
+        for (control in listOf("postLoginDeviceCheckHapticQuestionText", "postLoginDeviceCheckHapticConfirmButton", "postLoginDeviceCheckHapticRejectButton")) assertTrue(presenter.contains("$control.visibility = View.GONE"))
+        assertTrue(presenter.contains("val interactiveCheckRunning = check.state == PostLoginDeviceCheckState.RUNNING"))
+        assertTrue(presenter.contains("facts.wake.signal == PostLoginDeviceCheckSignal.PENDING"))
+        assertTrue(presenter.contains("wakeInstructionVisible = interactiveCheckRunning"))
+        assertTrue(presenter.contains("visible = needsWakePhrase"))
+        assertTrue(presenter.contains("enabled = needsWakePhrase && facts.wake.modelReady && !facts.wake.probeActive"))
+        assertTrue(startupPresentationWire().contains("deviceCheckPresenter.renderStartupCapability(facts)"))
+        assertTrue(presenter.contains("facts.microphoneAvailable.toDeviceCheckSignal()"))
+        assertTrue(presenter.contains("facts.gpsAvailable.toDeviceCheckSignal()"))
+        assertFalse(main("postLoginDeviceCheckItemsMessage").contains("startup.vibrationAvailable"))
+        assertFalse(main("postLoginDeviceCheckItemsMessage").contains("진동"))
+        assertTrue(presenter.contains("facts.cameraAvailable.toDeviceCheckSignal()"))
     }
+
+    private fun onboardingOwner(name: String): String {
+        MainActivityRefactorSource.composition(source, "firstRunOnboardingController")
+        return MainActivityRefactorSource.member(java.io.File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/session/onboarding/FirstRunOnboardingController.kt",
+        ).readText(), name)
+    }
+
 }

@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D01-002 이메일·생년월일·비밀번호 입력 검증"]
+  G{"계정 화면에서 OTP 요청·계정 만들기·로그인 클릭"}
+  I["email exact text(no whitespace), DOB YYYYMMDD 또는 YYYY-MM-DD, pw codepoints, confirm exact equality, OTP 숫자6자리"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 입력 오류 UI 및 음성/접근성 메시지"]
+  G -->|"미충족"| X
+  N1["이메일 local·IDN domain 길이·구문을 검증한다."]
+  I --> N1
+  N2["생년월일을 서울 기준 엄격 날짜로 parse하여 YYYY-MM-DD로 정규화한다."]
+  N1 --> N2
+  N3["가입은 신규 암호12..128 및 확인 일치, 로그인은10..128; NUL 거부한다."]
+  N2 --> N3
+  N4["Main은 필드 오류·status 및 접근성 안내를 표시하고 유효 입력만 다음 요청으로 넘긴다."]
+  N3 --> N4
+  OK["정규화된 입력을 요청 client에 전달"]
+  N4 --> OK
+  B0["email 오류 focus; 전송 없음"]
+  N1 -->|"이메일 오류"| B0
+  B1["DOB 오류; 8자리 자동 보정 없음"]
+  N2 -->|"잘못된 달력 날짜·연도0·미래"| B1
+  B2["관련 입력 오류; 전송 없음"]
+  N3 -->|"암호 불일치 또는 OTP 형식 오류"| B2
+  R["중단·취소: 화면 닫기 가능; 비밀번호 재설정 API는 이 기능 아님 / 전경 요청 token이 입력/상태 변경을 감시"]
+  V["복구·재시도: OTP partial 복원은 email/DOB/password를 복원하지 않음 / 정정 후 명시적 다시 클릭"]
+  Q["정책 P-D01-002"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

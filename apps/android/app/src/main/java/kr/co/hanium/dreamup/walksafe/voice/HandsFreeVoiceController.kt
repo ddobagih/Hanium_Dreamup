@@ -24,6 +24,7 @@ internal sealed interface HandsFreeVoiceTerminalFailure {
             VoskStreamingError.AUDIO_START_FAILED -> "audio_start_failed"
             VoskStreamingError.AUDIO_READ_FAILED -> "audio_read_failed"
             VoskStreamingError.AUDIO_SILENCED -> "audio_input_silenced"
+            VoskStreamingError.AUDIO_ROUTE_CHANGED -> "audio_input_route_changed"
             VoskStreamingError.INFERENCE_FAILED -> "inference_failed"
         }
     }
@@ -106,6 +107,8 @@ internal class HandsFreeVoiceController internal constructor(
      * "No speech right now" is not "command finished": wake listening waits until this turns false.
      */
     private val isCommandWorkPending: (commandId: Long) -> Boolean = { false },
+    private val commandSpeechProgress: (Long) -> CommandSpeechProgress = { CommandSpeechProgress.NOT_TRACKED },
+    private val commandSpeechRevision: (Long) -> Long = { 0L },
 ) : WalkVoiceSessionController, Closeable {
     constructor(
         context: Context,
@@ -125,6 +128,8 @@ internal class HandsFreeVoiceController internal constructor(
         ),
         isSpeechRecognitionBlocked: () -> Boolean = isAppSpeechActive,
         isCommandWorkPending: (commandId: Long) -> Boolean = { false },
+        commandSpeechProgress: (Long) -> CommandSpeechProgress = { CommandSpeechProgress.NOT_TRACKED },
+        commandSpeechRevision: (Long) -> Long = { 0L },
         speakLowConfidenceReprompt: ((onFinished: (WakeAcknowledgementResult) -> Unit) -> Unit)? = null,
     ) : this(
         dependencies = HandsFreeVoiceDependencies(
@@ -168,6 +173,8 @@ internal class HandsFreeVoiceController internal constructor(
         onSessionEnded = onSessionEnded,
         isSpeechRecognitionBlocked = isSpeechRecognitionBlocked,
         isCommandWorkPending = isCommandWorkPending,
+        commandSpeechProgress = commandSpeechProgress,
+        commandSpeechRevision = commandSpeechRevision,
     )
 
     private val stateMachine = HandsFreeVoiceStateMachine()
@@ -611,6 +618,12 @@ internal class HandsFreeVoiceController internal constructor(
         waitForOutputToSettle(speaking.state.generation, commandId = processing.generation)
     }
 
+    /** Routine guidance waits until the wake acknowledgement and the user's command have ended. */
+    internal fun isCommandInputActive(): Boolean = when (stateMachine.snapshot()) {
+        is HandsFreeVoiceState.AcknowledgingWake, is HandsFreeVoiceState.WaitingForCommand -> true
+        else -> false
+    }
+
     /** S04-11: id of the command whose [onCommand] call is running now; null outside that call. */
     internal fun dispatchingCommandId(): Long? =
         (stateMachine.snapshot() as? HandsFreeVoiceState.ProcessingCommand)?.generation
@@ -670,6 +683,8 @@ internal class HandsFreeVoiceController internal constructor(
         outputActiveAtLastPoll = false
         outputProgressAtMs = dispatchedAtMs
         var commandWorkWasPending = false
+        var lastSpeechRevision = Long.MIN_VALUE
+        var commandSpeechProgressAtMs = dispatchedAtMs
         var workQuietSinceMs: Long? = null
         // S04-11: the wait moves between Speaking (output on, input suppressed) and
         // WaitingForCommandResult (silent, wake phrase accepted); each move is a new generation.
@@ -740,6 +755,28 @@ internal class HandsFreeVoiceController internal constructor(
                 outputObserved = false
                 outputQuietSinceMs = null
                 outputWaitStartedAtMs = nowMs
+            }
+            val revision = runCatching { commandSpeechRevision(commandId) }.getOrDefault(lastSpeechRevision)
+            if (revision != lastSpeechRevision) { lastSpeechRevision = revision; commandSpeechProgressAtMs = nowMs }
+            when (runCatching { commandSpeechProgress(commandId) }.getOrDefault(CommandSpeechProgress.PENDING)) {
+                CommandSpeechProgress.COMPLETED, CommandSpeechProgress.FAILED, CommandSpeechProgress.RETIRED -> {
+                    finishOutput(pollGeneration)
+                    return@Runnable
+                }
+                CommandSpeechProgress.PENDING -> {
+                    if (nowMs - commandSpeechProgressAtMs >= OUTPUT_STALL_TIMEOUT_MS) {
+                        failClosed(pollGeneration, HandsFreeVoiceTerminalFailure.OutputTimeout)
+                        return@Runnable
+                    }
+                    dependencies.runtime.postDelayed(poll, OUTPUT_POLL_MS)
+                    return@Runnable
+                }
+                CommandSpeechProgress.NO_OUTPUT -> {
+                    if (nowMs - outputWaitStartedAtMs >= NO_OUTPUT_SETTLE_MS) { finishOutput(pollGeneration); return@Runnable }
+                    dependencies.runtime.postDelayed(poll, OUTPUT_POLL_MS)
+                    return@Runnable
+                }
+                CommandSpeechProgress.NOT_TRACKED -> Unit
             }
             if (outputActive) {
                 outputObserved = true

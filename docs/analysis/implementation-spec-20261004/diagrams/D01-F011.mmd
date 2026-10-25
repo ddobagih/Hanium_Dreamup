@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D01-011 이메일 첫 실행 단계·증거 접수·과거 영수증 복원"]
+  G{"EMAIL_ACCOUNT_V4·현재 epoch/revision; 로그인 actor 검증; D02 current device check"}
+  I["stage token,requestId req_64hex,attempt att_64hex,receiptSHA,actor; email policy FP-010-EMAIL-2.0.0"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 증거 불일치 시 현재 단계 유지/명시 rejection"]
+  G -->|"미충족"| X
+  N1["신규 흐름은 EMAIL_OTP_ENROLLMENT→ACCOUNT_CREATED→VERIFIED_LOGIN→PURPOSE_AND_SAFETY→JIT_PERMISSION_OBSERVATION→DEVICE_CHECK→FP004_TRAINING→COMPLETE이다."]
+  I --> N1
+  N2["기존 계정 password login은 OTP/계정생성 증거를 꾸미지 않고 VERIFIED_LOGIN부터 진행한다."]
+  N1 --> N2
+  N3["단계별 요청 token을 기록하고 정확한 token·증거 verifier 결과만 해당 단계에 반영한다."]
+  N2 --> N3
+  N4["restoreVerifiedEmailReceiptPrefix는 과거 login/safety/training 증거를 검증해 보존하지만 JIT에서 새 권한·기기 검사를 요구한다."]
+  N3 --> N4
+  N5["Main의 native-complete profile 복원은 actor/install/origin/policy/probe binding을 별도 검증하며 보행 현재 readiness는 D02와 연결한다."]
+  N4 --> N5
+  OK["완료 또는 다음 검사 단계"]
+  N5 --> OK
+  B0["전이 거부; 상태보존"]
+  N3 -->|"stage·epoch·revision mismatch"| B0
+  B1["검증은 하지만 현재 검사 대체 안 함"]
+  N4 -->|"과거 device/JIT receipt 존재"| B1
+  B2["FP004 재수행 없이 COMPLETE 가능"]
+  N4 -->|"보존된 training 후 fresh device 통과"| B2
+  R["중단·취소: cancel은 epoch/revision을 바꾸어 pending 토큰 폐기 / 세대가 바뀌면 과거 callback 수락하지 않음"]
+  V["복구·재시도: fresh JIT/device 경계와 actor-bound native복원을 구분 / 현재 단계에서 새 요청 token으로 재시도"]
+  Q["정책 P-D01-008 · P-D01-010 · P-D01-011"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

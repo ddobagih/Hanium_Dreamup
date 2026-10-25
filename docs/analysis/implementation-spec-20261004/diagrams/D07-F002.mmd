@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-002<br/>Raw·Full Depth 획득과 실패 진단<br/>상태 ACTIVE"]
+    P0["Raw와 confidence 동일 timestamp 및 shape 검사"]
+    A --> D
+    P1["Raw 복사와 close 후 Full fallback 또는 supplement"]
+    P0 --> P1
+    P2["Full acquire convert close 시간 관측"]
+    P1 --> P2
+    P3["frame local 실패창과 bounded counter 갱신"]
+    P2 --> P3
+    D{"P-D07-002<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["쌍을 해제하고 Raw 사용 불가"]
+    D -->|"Raw timestamp/shape 불일치"| B0
+    B1["획득 소유권·기존 예외를 변경하지 않음"]
+    D -->|"Full timing clock/observer 실패"| B1
+    B2["counter만 증가; 다음 depth 프레임 fatal 아님"]
+    D -->|"camera 단계 RESOURCE_EXHAUSTED"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

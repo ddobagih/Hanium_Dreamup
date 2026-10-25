@@ -16,20 +16,20 @@ class MainActivityResumeAdmissionSymmetryStaticTest {
     ).first { it.isFile }.readText()
 
     private val leaseGuard =
-        "if(gatewayWalkAuthorityController.activeLeaseOrNull(snapshot.epoch)==null){"
+        "if(environment.activeLeaseOrNull(snapshot.epoch)==null){"
 
     @Test
     fun startPathChecksRuntimeGatesBeforeStartRequested() {
         val activation = compact(method("completeGatewayWalkActivation"))
         listOf(
-            "permissionRecoveryGate.blocksAutomaticResourceStart&&!developmentGuidanceStartBypassEnabled",
-            "gatewayWalkAuthorityController.activeLeaseOrNull(snapshot.epoch)==null",
-            "currentGatewayWalkStartReadinessOrNull(token)",
+            "runtime.blocksAutomaticStart()",
+            "authority.activeLeaseOrNull(snapshot.epoch)==null",
+            "runtime.currentStartReadinessOrNull(token)",
         ).forEach { gate ->
             assertBefore(
                 activation,
                 gate,
-                "WalkSessionEvent.StartRequested(token)",
+                "runtime.startRequested(token,currentReadiness)",
                 "start reference gate must precede StartRequested: $gate",
             )
         }
@@ -37,7 +37,7 @@ class MainActivityResumeAdmissionSymmetryStaticTest {
 
     @Test
     fun resumeRecheckRejectsMissingWalkAuthorityBeforeFreshReadiness() {
-        val gate = compact(method("recheckWalkSessionResumeBeforeConfirmation"))
+        val gate = code(method("recheckWalkSessionResumeBeforeConfirmation"))
         assertTrue("S03-1: resume must check the server walk lease", gate.contains(leaseGuard))
         assertBefore(
             gate,
@@ -48,31 +48,33 @@ class MainActivityResumeAdmissionSymmetryStaticTest {
         assertBefore(
             gate,
             leaseGuard,
-            "captureWalkSessionReadiness(",
+            "readiness.capture(",
             "S03-1: a missing lease must reject before readiness is collected",
         )
         val lost = blockAt(gate, leaseGuard)
         assertTrue(
             "S03-1: a missing lease must use the existing authority-lost safety stop",
-            lost.contains("handleGatewayWalkAuthorityLost(\"walk_lease_missing_on_resume_confirmation\")"),
+            lost.contains("effects.authorityLost()") &&
+                blockAt(compact(method("recheckWalkSessionResumeBeforeConfirmation")), leaseGuard)
+                    .contains("effects.authorityLost(\"walk_lease_missing_on_resume_confirmation\")"),
         )
-        assertTrue("S03-1: a missing lease must reject the resume", lost.endsWith("returnfalse}"))
+        assertTrue("S03-1: a missing lease must reject the resume", lost.endsWith("returnnull}"))
     }
 
     @Test
     fun resumeRecheckRequiresOpenPermissionAndRevalidationGates() {
-        val gate = compact(method("recheckWalkSessionResumeBeforeConfirmation"))
+        val gate = code(method("recheckWalkSessionResumeBeforeConfirmation"))
         val gatesOpen =
             "valruntimeGatesOpen=" +
-                "(!permissionRecoveryGate.blocksAutomaticResourceStart||developmentGuidanceStartBypassEnabled)&&" +
-                "!gatewayWalkResumeRevalidationPending"
+                "environment.permissionAllowsAutomaticStart()&&" +
+                "!environment.gatewayRevalidationPending()&&readiness.isConfirmed()"
         assertTrue(
             "S03-1: resume must consult the permission recovery gate and pending lease revalidation",
             gate.contains(gatesOpen),
         )
         val guardedCapture =
-            "if(runtimeGatesOpen&&decision!=null&&walkSessionReadinessBlockReason(decision)==null)" +
-                "{captureWalkSessionReadiness(decision,WalkSessionAction.RESUME_WALK)}elsenull"
+            "if(runtimeGatesOpen&&decision!=null&&readiness.blockReason(decision)==null)" +
+                "{readiness.capture(decision,WalkSessionAction.RESUME_WALK,recordResourceDiagnostics=true)}elsenull"
         assertTrue(
             "S03-1: fresh readiness may only be collected while the runtime gates are open",
             gate.contains(guardedCapture),
@@ -86,10 +88,13 @@ class MainActivityResumeAdmissionSymmetryStaticTest {
         assertBefore(
             gate,
             guardedCapture,
-            "enterWalkSessionForegroundRecheckAndCancelOutputs(\"resume_readiness_changed\")",
+            "effects.foregroundRecheck()",
             "S03-1: closed gates fall through to the existing recheck rejection",
         )
-        assertTrue("S03-1: closed gates must reject", gate.endsWith("returnfalse}"))
+        assertTrue(method("recheckWalkSessionResumeBeforeConfirmation").contains(
+            "effects.foregroundRecheck(\"resume_readiness_changed\")",
+        ))
+        assertTrue("S03-1: closed gates must reject", blockAt(gate, "privatefunrecheckWalkSessionResumeBeforeConfirmation").endsWith("returnnull}"))
     }
 
     @Test
@@ -100,10 +105,10 @@ class MainActivityResumeAdmissionSymmetryStaticTest {
             "confirmWalkSessionResumeFromButton" to
                 "recheckWalkSessionResumeBeforeConfirmation(token)",
         ).forEach { (name, call) ->
-            val body = compact(method(name))
+            val body = code(method(name))
             assertBefore(
                 body,
-                call,
+                "$call?:return",
                 "WalkSessionEvent.ResumeConfirmationReceived(",
                 "S03-1: $name must run the guarded recheck before the resume transition",
             )
@@ -116,9 +121,11 @@ class MainActivityResumeAdmissionSymmetryStaticTest {
         assertTrue(message, firstIndex >= 0 && secondIndex >= 0 && firstIndex < secondIndex)
     }
 
+    private fun code(text: String): String = ReportStaticSourceInspector.maskNonCode(text).filterNot(Char::isWhitespace)
+
     private fun compact(text: String): String = text.replace(Regex("\\s+"), "")
 
-    private fun method(name: String): String = blockAt(source, "private fun $name(")
+    private fun method(name: String): String = MainActivityRefactorSource.function(source, "private fun $name(")
 
     private fun blockAt(text: String, marker: String): String {
         val markerIndex = text.indexOf(marker)

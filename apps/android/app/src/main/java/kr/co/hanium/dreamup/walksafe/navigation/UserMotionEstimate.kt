@@ -8,8 +8,13 @@ data class UserMotionLocationEvidence(
     val observedAtElapsedRealtimeMs: Long,
     val horizontalAccuracyM: Double?,
     val isMock: Boolean,
-    /** Stable, monotonic identity of the original fix, preserved when it is repackaged. */
-    val observationId: Long = observedAtElapsedRealtimeMs,
+    /** Supplied monotonic identity of the original fix; null when the producer provides none. */
+    val observationId: Long? = null,
+    /** Original location coordinates, not a filtered or route-matched position. */
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    /** Original boot-relative measurement clock; never an identity or a fabricated receipt. */
+    val measurementElapsedRealtimeNanos: Long? = null,
 )
 
 /**
@@ -50,7 +55,8 @@ object UserMotionEstimateFactory {
         val location = locationEvidence?.takeIf {
             !it.isMock &&
                 validAge(nowElapsedRealtimeMs, it.observedAtElapsedRealtimeMs, MAX_LOCATION_AGE_MS) &&
-                validAccuracy(it.horizontalAccuracyM, MAX_HORIZONTAL_ACCURACY_M)
+                validAccuracy(it.horizontalAccuracyM, MAX_HORIZONTAL_ACCURACY_M) &&
+                validOriginalLocationMetadata(it)
         }
         val acceptedSpeed = speed?.takeIf {
             location != null &&
@@ -73,6 +79,15 @@ object UserMotionEstimateFactory {
 
         return UserMotionEstimate(acceptedSpeed, acceptedCourse, acceptedPhoneHeading)
     }
+
+    // Missing legacy facts stay optional; supplied original facts must agree with this fix.
+    private fun validOriginalLocationMetadata(location: UserMotionLocationEvidence): Boolean =
+        location.observationId?.let { it >= 0L } != false &&
+            location.latitude?.let { it.isFinite() && it in -90.0..90.0 } != false &&
+            location.longitude?.let { it.isFinite() && it in -180.0..180.0 } != false &&
+            location.measurementElapsedRealtimeNanos?.let {
+                it >= 0L && it / 1_000_000L == location.observedAtElapsedRealtimeMs
+            } != false
 
     private fun validHeading(
         observation: HeadingObservation,

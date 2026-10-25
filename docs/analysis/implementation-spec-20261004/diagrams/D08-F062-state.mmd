@@ -1,0 +1,11 @@
+stateDiagram-v2
+  state "F-D08-062 공개 v1 경로 퇴역" as RETIRED
+  state "F-D08-062 410 Gone" as GONE
+  state "F-D08-062 테스트 등 직접 호출" as DIRECT
+  state "F-D08-062 EXTERNAL_PENDING" as PENDING
+  state "F-D08-062 항목 상태 전이" as ITEM
+  [*] --> RETIRED
+  RETIRED --> GONE: HTTPcontrolaccountdeletion
+  DIRECT --> PENDING: 직접helperaccept와tombstone
+  PENDING --> ITEM: operationid와revisionCAS
+  ITEM --> ITEM: 유효metadata로다음직접전이

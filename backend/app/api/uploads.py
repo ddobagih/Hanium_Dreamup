@@ -19,7 +19,7 @@ from backend.app.services.report_original_access import (
 ORIGINAL_ACCESS_GRANT_HEADER_NAME = "X-WalkSafe-Original-Access-Grant"
 
 
-def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> APIRouter:
+def create_router(settings: Settings, key_manager: ReportImageKeyManager | None = None, *, key_manager_provider=None) -> APIRouter:
     router = APIRouter()
 
     @router.get(
@@ -70,7 +70,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                     filename=filename,
                     raw_access_token=x_walksafe_original_access_grant,
                     identity=identity,
-                    key_manager=key_manager,
+                    key_manager=key_manager_provider() if key_manager_provider else key_manager,
                     runtime_totp_secret=settings.admin_totp_secret,
                 )
             )

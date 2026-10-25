@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe
 
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionFrameEvidence
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionSnapshot
 import java.io.File
 import kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot
 import kr.co.hanium.dreamup.walksafe.depth.MotionContext
@@ -49,21 +51,20 @@ class MainActivityDetectionPublishGuardTest {
 
     @Test
     fun theArCoreRequestRecordsItsGeometryUnderTheFrameLock() {
-        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val schedule = source.substringAfter("private fun scheduleDetectionIfDue(")
-            .substringBefore("private fun encodeDebugFrameJpeg(")
-        val capture = schedule.substringAfter("val requestGeometryVersion = synchronized(frameStateLock) {")
-            .substringBefore("val generation = frameGeneration")
-        assertTrue(capture.contains("lastDetectionCaptureFrameId = frame.timestamp"))
-        assertTrue(capture.trimEnd().removeSuffix("}").trimEnd().endsWith("visualGeometryVersion"))
-        assertTrue(schedule.contains("geometryVersion = requestGeometryVersion,"))
-        val guard = source.substringAfter("internal fun publishDetectionSnapshot(")
-            .substringBefore("val snapshot = DetectionSnapshot.published(")
-        assertTrue(
-            guard.contains(
-                "(frameEvidence.geometryVersion != null && frameEvidence.geometryVersion != visualGeometryVersion)",
-            ),
-        )
+        fun source(path: String) = File("src/main/java/kr/co/hanium/dreamup/walksafe/$path.kt").readText()
+        val main = source("MainActivity")
+        assertTrue(main.contains("primaryArSubmissionBridge.schedule("))
+        assertTrue(main.contains("primaryDetectionPublisher.publish(PrimarySnapshotPublication("))
+        val bridge = source("runtime/vision/primary/AndroidPrimaryArSubmissionBridge")
+        val scheduling = MainActivityRefactorSource.member(source("runtime/vision/primary/PrimaryDetectorInvocationWorker"), "commitGeometryIfCurrent")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(scheduling, "synchronized(stateLock)",
+            "if (!currentFrame())", "lastCaptureFrameId = frameId()", "currentGeometry()"))
+        assertTrue(bridge.contains("expectedGeometry = input.geometryVersion"))
+        assertTrue(bridge.contains("currentGeometry = { synthesis().geometryVersion }"))
+        assertTrue(bridge.contains("geometryVersion = requestGeometryVersion"))
+        val publisher = source("runtime/vision/primary/PrimaryDetectionPublisher")
+        val guard = publisher.substringBefore("val snapshot = DetectionSnapshot.published(")
+        assertTrue(guard.contains("event.frameEvidence.geometryVersion != null && event.frameEvidence.geometryVersion != frameOwner.geometryVersion"))
     }
 
     private fun publish(
@@ -71,7 +72,7 @@ class MainActivityDetectionPublishGuardTest {
         frameId: Long,
         geometryVersion: Long?,
         expectedWalkEpoch: WalkRuntimeEpoch? = null,
-    ): MainActivity.DetectionSnapshot? = activity.publishDetectionSnapshot(
+    ): DetectionSnapshot? = activity.publishDetectionSnapshot(
         result = AndroidDetectionResult.empty(),
         generation = 0,
         detectionIdentity = AndroidDetectionSnapshotFrameIdentity(captureFrameId = frameId, frameTimestampMs = 1_000L),
@@ -85,7 +86,7 @@ class MainActivityDetectionPublishGuardTest {
         expectedWalkEpoch = expectedWalkEpoch,
     )
 
-    private fun evidence(frameId: Long, geometryVersion: Long?) = MainActivity.DetectionFrameEvidence(
+    private fun evidence(frameId: Long, geometryVersion: Long?) = DetectionFrameEvidence(
         frameId = frameId,
         frameTimestampMs = 1_000L,
         depthSnapshot = DepthFrameSnapshot(frameTimestampNs = frameId, rawDepth = null, rawConfidence = null, fullDepth = null),
@@ -108,10 +109,10 @@ class MainActivityDetectionPublishGuardTest {
     )
 
     private fun setField(activity: MainActivity, name: String, value: Any) =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.set(activity, value)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.set(activity, value)
 
-    private fun geometryField() = MainActivity::class.java.getDeclaredField("visualGeometryVersion").apply { isAccessible = true }
+    private fun geometryField() = MainActivityControllerTestFixture.field("visualGeometryVersion").apply { isAccessible = true }
 
-    private fun latest(activity: MainActivity) = MainActivity::class.java.getDeclaredField("latestDetectionSnapshot")
+    private fun latest(activity: MainActivity) = MainActivityControllerTestFixture.field("latestDetectionSnapshot")
         .apply { isAccessible = true }.get(activity)
 }

@@ -1,0 +1,44 @@
+sequenceDiagram
+  participant U as 사용자·보행종료
+  participant M as MainActivity
+  participant Q as 암호화 ReportQueueStore
+  participant D as DrainCoordinator
+  participant P as Privacy permit
+  participant G as D08 Gateway
+  participant B as D15 Backend
+  U->>M: F-D06-004 건별 동결자료 확인
+  M->>Q: F-D06-006 exact payload enqueue
+  Q-->>M: 내구 저장 성공
+  M-->>U: 휴대전화 저장·서버 미접수
+  U->>M: READY 또는 ENDED trigger
+  M->>D: F-D06-007 단일 lease와 현재 authority
+  D->>Q: explicit 우선 다음 항목
+  D->>P: live purpose permit
+  D->>G: GET status - 1회
+  G->>B: exact receipt 조회
+  B-->>G: receipt 또는 미접수
+  G-->>D: bounded status
+  alt status 정확 receipt
+    D->>D: POST 생략
+  else 미접수이며 현재 목적 허용
+    D->>P: 현재 permit 재확인
+    D->>G: exact multipart POST - 최대1회
+    G->>B: reportID·payload/hash
+    B-->>G: exact transport receipt
+    G-->>D: bounded receipt
+  else auth·walk·network 변경
+    M->>D: generation 변경·cancel
+    D->>G: owned call 취소
+    D-->>Q: 원본 유지
+  end
+  opt 현재 lease 및 exact receipt 성공
+    D->>M: automatic이면 cooldown 내구 commit
+    M-->>D: commit 결과
+    D->>Q: deleteAfterReceipt
+    alt delete 성공
+      M-->>U: 서버 접수 확인
+    else delete 실패
+      D-->>Q: 원본 보존
+      Note over Q,D: 다음 trigger에서 status로 복구<br/>기관 전달 완료를 뜻하지 않음
+    end
+  end

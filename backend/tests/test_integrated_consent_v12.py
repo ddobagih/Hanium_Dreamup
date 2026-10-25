@@ -440,7 +440,7 @@ def test_v12_migration_round_trip_on_postgres(monkeypatch: pytest.MonkeyPatch) -
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM public.alembic_version")
-            ).scalar_one() == "202609300009"
+            ).scalar_one() == "202610110001"
             assert _ingest_hash(connection) == NEW_INGEST_HASH
             assert integrity.admin_report_integrity_boundary_state(connection) is True
             # The latest consent is 1.1.0: reports wait for the 1.2.0 reconsent.
@@ -498,7 +498,7 @@ def test_v12_migration_round_trip_on_postgres(monkeypatch: pytest.MonkeyPatch) -
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM public.alembic_version")
-            ).scalar_one() == "202609300009"
+            ).scalar_one() == "202610110001"
             assert _ingest_hash(connection) == NEW_INGEST_HASH
             assert integrity.admin_report_integrity_boundary_state(connection) is True
             assert _runtime_report_insert(connection, login_role) is None

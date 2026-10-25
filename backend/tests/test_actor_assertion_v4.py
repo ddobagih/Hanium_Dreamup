@@ -257,16 +257,48 @@ def _send(app, authority, method: str, target: str, assertion: str, body: bytes 
     return asyncio.run(exercise())
 
 
-def test_middleware_accepts_v4_and_replays_the_exact_body(authority):
+@pytest.mark.parametrize("target", ["/navigation/walking", "/reports/v2"])
+def test_middleware_accepts_v4_and_replays_the_exact_body(authority, target):
     app = _app(authority, _settings())
     body = b'{"origin":{"lat":37.5,"lng":127.0}}'
-    response = _send(app, authority, "POST", "/navigation/walking", _v4(authority, "POST", "/navigation/walking", body), body)
+    response = _send(app, authority, "POST", target, _v4(authority, "POST", target, body), body)
     assert response.status_code == 200, response.text
     assert response.json() == {"epoch": 4, "sha": hashlib.sha256(body).hexdigest()}
     assert authority.bodies == [body]
     target = "/reports/mine?limit=10&cursor=a%2Fb"
     response = _send(app, authority, "GET", target, _v4(authority, "GET", target))
     assert response.status_code == 200, response.text
+
+
+def test_signed_destination_search_keeps_provider_alive_after_body_replay(authority, monkeypatch):
+    from backend.app.api import navigation
+    from backend.app.schemas import DestinationSearchResponse, DestinationSearchResult, RoutePoint
+
+    provider_calls = []
+    response_body = DestinationSearchResponse(
+        schema_version="walksafe.destination_search.v1", provider="tmap_poi", query="서울역",
+        results=[DestinationSearchResult(
+            id="test-poi", name="서울역", point=RoutePoint(latitude=37.55, longitude=126.97),
+        )],
+    )
+
+    async def provider(query, _settings, **kwargs):
+        provider_calls.append(query)
+        # Keep work pending while the route's disconnect watcher drains replay.
+        await asyncio.sleep(0.02)
+        return response_body
+
+    monkeypatch.setattr(navigation, "fetch_tmap_poi_search", provider)
+    settings = _settings()
+    app = FastAPI()
+    app.include_router(navigation.create_router(settings))
+    app.add_middleware(security.FieldTestSecurityMiddleware, settings=settings)
+    target = "/navigation/destinations/search?query=%EC%84%9C%EC%9A%B8%EC%97%AD"
+    response = _send(app, authority, "GET", target, _v4(authority, "GET", target))
+    assert response.status_code == 200, response.text
+    assert response.json() == response_body.model_dump(mode="json")
+    assert provider_calls == ["서울역"]
+    assert authority.queries == 1
 
 
 def test_middleware_rejects_v4_reused_for_another_request(authority):

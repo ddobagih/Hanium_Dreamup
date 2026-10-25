@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
 import android.app.Instrumentation
 import android.os.Bundle
 import android.os.SystemClock
@@ -42,7 +44,7 @@ class NavigationStartContinuityDeviceTest {
             onMain {
                 assertTrue("Real account onboarding must be complete", call(activity, "firstRunOnboardingComplete") as Boolean)
                 assertFalse("Test must start without an active route", field(activity, "isRouteActive") as Boolean)
-                val pageType = Class.forName("${MainActivity::class.java.name}\$NativeUiPage")
+                val pageType = Class.forName("kr.co.hanium.dreamup.walksafe.ui.workflow.NativeWorkflowController\$NativeUiPage")
                 val page = pageType.enumConstants.single { it.toString() == "DESTINATION_SEARCH" }
                 MainActivity::class.java.getDeclaredMethod("showNativeUiPage", pageType).apply {
                     isAccessible = true
@@ -282,7 +284,7 @@ class NavigationStartContinuityDeviceTest {
         } else own
     }
 
-    private fun field(target: Any, name: String): Any? = target.javaClass.getDeclaredField(name).run {
+    private fun field(target: Any, name: String): Any? = MainActivityControllerTestFixture.field(name).run {
         isAccessible = true
         get(target)
     }

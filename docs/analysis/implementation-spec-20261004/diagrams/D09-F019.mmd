@@ -1,0 +1,10 @@
+flowchart TD
+  A["F-D09-019 · 보행 경로 의존성 상태 조회<br/>P-D09-019"] --> B["GET /navigation/walking/health · field 인가"]
+  B --> C{"provider=tmap_pedestrian"}
+  C -->|"아니오"| E["503 walking_route_provider_invalid"]
+  C -->|"예"| D{"app key 존재와 route_recent"}
+  D -->|"모두 참"| R["HTTP200 status ready"]
+  D -->|"하나라도 거짓"| U["HTTP200 status unavailable와 고정 reason"]
+  R --> X["마지막 dependency_state 별도 표시 · 새 probe 없음"]
+  U --> X
+  X --> END["종료 · 별도 취소와 자동 재시도 없음"]

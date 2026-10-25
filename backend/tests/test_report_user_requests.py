@@ -170,7 +170,10 @@ class _OwnedRequestSession:
             }.issubset(values):
                 return _Result(SimpleNamespace(id=self.report_id))
             return _Result(None)
-        if "JOIN reports" not in sql and "FROM report_user_requests" in sql:
+        if "FROM report_user_requests" in sql and (
+            "JOIN reports" not in sql
+            or statement.column_descriptions[0]["name"] == "ReportUserRequest"
+        ):
             item = next(
                 (
                     item
@@ -930,9 +933,7 @@ def test_admin_authentication_errors_are_no_store() -> None:
 
 
 def test_user_routes_are_registered_before_dynamic_report_detail() -> None:
-    source = Path("backend/app/main.py").read_text(encoding="utf-8")
-    assert source.index(
-        "app.include_router(report_user_requests.create_router(settings))"
-    ) < source.index(
-        "app.include_router(reports.create_router(settings, report_image_key_manager))"
-    )
+    from backend.app.main import app
+    paths = [route.path for route in app.routes]
+    assert paths.index("/reports/mine") < paths.index("/reports/{report_id}")
+    assert paths.index("/reports/mine/{report_id}") < paths.index("/reports/{report_id}")

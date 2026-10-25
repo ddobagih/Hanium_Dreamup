@@ -198,6 +198,7 @@ def test_backend_only_epoch_update_blocks_existing_gateway_cookie_over_http(epoc
             created_at=now, updated_at=now,
         ))
 
+    walking_fixture = json.loads((ROOT / "contracts/fixtures/walking-route-v1.json").read_text())
     business_calls: list[str] = []
     auth_http: list[tuple[str, int]] = []
     app = FastAPI()
@@ -207,9 +208,9 @@ def test_backend_only_epoch_update_blocks_existing_gateway_cookie_over_http(epoc
 
     @app.post("/navigation/walking")
     async def controlled_walking(request: Request):
-        await request.body()
+        assert await request.json() == walking_fixture["request"]
         business_calls.append("/navigation/walking")
-        return JSONResponse({"ok": True})
+        return JSONResponse(walking_fixture["response"])
 
     @app.post("/reports/v2")
     async def controlled_report(request: Request):
@@ -278,6 +279,7 @@ def test_backend_only_epoch_update_blocks_existing_gateway_cookie_over_http(epoc
             "WALKSAFE_FIELD_WALK_LEDGER_PATH": str(state / "walk.json"),
             "EPOCH_TEST_BACKEND_ORIGIN": f"http://127.0.0.1:{port}",
             "EPOCH_TEST_COOKIE_VERSION": version, "EPOCH_TEST_EMAIL": email,
+            "EPOCH_TEST_WALKING_REQUEST": json.dumps(walking_fixture["request"]),
             "EPOCH_TEST_PASSWORD": PASSWORD,
         }
         with stderr_path.open("w") as stderr:

@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D11-034 Legacy Web 신고·관리자 검수·offline queue 정책 모듈"]
+  B["P-D11-034 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. report hook은 같은 분석 snapshot과 저장 동의 및 요청 cancellation을 결속한다"]
+  B --> T0
+  T1["2. 성공/실패·cooldown을 UI와 session storage에 표시한다"]
+  T0 --> T1
+  T2["3. 관리자 UI는 목록/상세/heatmap·new/reviewed/resolved 상태와 검수 메모를 제공한다"]
+  T1 --> T2
+  T3["4. 상태변경에 updated_at을 보내 충돌 감지를 요청하고 resolved→new 버튼을 막는다"]
+  T2 --> T3
+  T4["5. offline helper는 opt-in·size·TTL·수량 기준을 적용한 배열만 반환한다"]
+  T3 --> T4
+  Z["검사 또는 처리 결과를 반환하고 해당 호출 종료"]
+  T4 --> Z
+  C0{"voice snapshot3000ms 초과"}
+  R0["해당 snapshot 신고 거부"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"offline optIn=false 또는 payload상한 초과"}
+  R1["throw Error"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"expires_at_ms＜=now"}
+  R2["expired로 분리"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  C3{"offline helper 존재"}
+  R3["실제 persistence/replay 구현을 의미하지 않음"]
+  B -. "관련 조건 분기" .-> C3
+  C3 -->|"해당"| R3
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

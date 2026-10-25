@@ -1,0 +1,44 @@
+flowchart TD
+  A["F-D08-049 서버 STT 중계"]
+  B["진입: POST /api/speech/stt"]
+  A --> B
+  P0["1. 일반 session·Backend current·speech admission 을 검사하고 Backend 계정의 삭제 fence 를 relay 전에 확인한다."]
+  B --> P0
+  P1["2. Voiceenabled/contenttype 확인후 body10 초내읽기"]
+  P0 --> P1
+  P2["3. 새 multipartaudio 와신뢰 actor/IP/correlationheaders 만전달"]
+  P1 --> P2
+  P3["4. 35 초기본 deadline 으로 Voice STT 응답수신"]
+  P2 --> P3
+  P4["5. 64KiB 허용 schema·transcript/acousticevidence 검증후 projection"]
+  P3 --> P4
+  P5["6. finally 에서 speech slot 을 해제한다. dispatcher 는 relay 후 삭제 fence 를 다시 확인하고 바뀌면 응답 body 를 취소하여 inactive 응답으로 대체한다."]
+  P4 --> P5
+  OK["STT transcript·음향증거 응답"]
+  P5 --> OK
+  C0{"Voice 기능 disabled"}
+  X0["503;upstreamfetch 없음"]
+  B -. "해당 단계에서 검사" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"empty/oversize/type"}
+  X1["400/413/415"]
+  B -. "해당 단계에서 검사" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"rate/concurrency"}
+  X2["429/503"]
+  B -. "해당 단계에서 검사" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"Voiceunknownfields/invalidresponse"}
+  X3["502"]
+  B -. "해당 단계에서 검사" .-> C3
+  C3 -->|"조건 충족"| X3
+  C4{"삭제 fence 가응답중변경"}
+  X4["body 취소/inactive 로대체"]
+  B -. "해당 단계에서 검사" .-> C4
+  C4 -->|"조건 충족"| X4
+  T["클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["P-D08-004, P-D08-011, P-D08-025"]
+  A -.-> POLICY

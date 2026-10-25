@@ -43,7 +43,8 @@ class MessageMotionPolicyTest {
                 assertFalse(message, message.contains("사용자 쪽으로 다가오는"))
                 assertFalse(message, message.contains("정지해 있는"))
                 assertFalse(message, message.contains(if (side == "왼쪽") "오른쪽" else "왼쪽"))
-                assertTrue(message, message.endsWith("멈출 준비를 하세요."))
+                assertTrue(message, message.indexOf("멈출 준비를 하세요.") >= 0 &&
+                    message.indexOf("멈출 준비를 하세요.") < message.indexOf("이 물체가"))
             }
         }
     }
@@ -59,7 +60,7 @@ class MessageMotionPolicyTest {
 
         val message = decision.userFacing.message!!
         assertTrue(message, message.contains("이 물체가 사용자 쪽으로 다가오는 것으로 보입니다"))
-        assertFalse(message, message.contains("현재 이 물체에 가까워지고"))
+        assertFalse(message, message.contains("사용자가 다가갑니다"))
         assertFalse(message, message.contains("정지해 있는"))
     }
 
@@ -74,7 +75,7 @@ class MessageMotionPolicyTest {
 
         val message = decision.userFacing.message!!
         assertTrue(message, message.contains("정지해 있는 것으로 보이며"))
-        assertTrue(message, message.contains("현재 이 물체에 가까워지고 있습니다"))
+        assertTrue(message, message.contains("정지해 있는 것으로 보이며, 사용자가 다가갑니다."))
         assertFalse(message, message.contains("사용자 쪽으로 다가오는"))
         assertFalse(message, message.contains("이동하는 것으로"))
     }
@@ -103,7 +104,9 @@ class MessageMotionPolicyTest {
         assertEquals(MessagePurpose.OBSTACLE_WARNING, decision.purpose)
         assertTrue(decision.userFacing.message!!.contains("사용자에게서 멀어지는 방향으로 이동하는 것으로 보입니다"))
         assertFalse(decision.userFacing.message!!.contains("다가오는"))
-        assertTrue(decision.userFacing.message!!.endsWith("멈출 준비를 하세요."))
+        val message = requireNotNull(decision.userFacing.message)
+        assertTrue(message, message.indexOf("멈출 준비를 하세요.") >= 0 &&
+            message.indexOf("멈출 준비를 하세요.") < message.indexOf("이 물체가"))
     }
 
     @Test
@@ -146,7 +149,11 @@ class MessageMotionPolicyTest {
                     } else {
                         "멈출 준비를 하세요."
                     }
-                    assertTrue(decision.userFacing.message!!.endsWith(action))
+                    val message = requireNotNull(decision.userFacing.message)
+                    assertTrue(message, message.contains(action))
+                    val commentaryAt = listOf(" 정지해", " 이 물체가", " 거리가")
+                        .map { message.indexOf(it) }.filter { it >= 0 }.minOrNull()
+                    if (commentaryAt != null) assertTrue(message, message.indexOf(action) < commentaryAt)
                 }
             }
         }
@@ -247,7 +254,9 @@ class MessageMotionPolicyTest {
             assertNoSpokenDistanceOrStepCount(weak.userFacing)
             assertNoSpokenDistanceOrStepCount(admitted.userFacing)
             assertTrue(admitted.userFacing.message!!.contains("카메라 기준 왼쪽"))
-            assertTrue(admitted.userFacing.message!!.endsWith("멈출 준비를 하세요."))
+            val message = requireNotNull(admitted.userFacing.message)
+            assertTrue(message, message.indexOf("멈출 준비를 하세요.") >= 0 &&
+                message.indexOf("멈출 준비를 하세요.") < message.indexOf("이 물체가"))
         }
     }
 

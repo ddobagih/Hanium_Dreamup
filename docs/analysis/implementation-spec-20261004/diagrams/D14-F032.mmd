@@ -1,0 +1,35 @@
+flowchart TD
+  IN["F-D14-032<br/>사고 상태 관측의 CAS·일회 의도 기록"]
+  G["적용 정책<br/>P-D14-019 / P-D14-021"]
+  IN --> G
+  N1["1. middleware가 nonce와 proof를 소비한 뒤 route 검사;<br/> step_up_verified_at None이면403(R-D14-008), 이<br/>후 단계 미진입"]
+  G --> N1
+  N2["2. incident 행 FOR UPDATE 및 정규 intent digest <br/>계산"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 같은 incident+idempotency key 기존 event가 있으면<br/> payload 전체 일치 우선 검사"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 기존 동일 의도면 그 event snapshot 반환 및 새 성공 audi<br/>t만 추가"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 신규이면 expected version=current 및 허용 transi<br/>tion/버전&lt;256 검사"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. changed_at&lt;=현재 updated이면1microsecond 증가하여<br/> 시간 전진"]
+  N5 -->|"계속 가능한 경우"| N6
+  N7["7. projection 상태/version 및 append event+oper<br/>ation audit 같은 commit"]
+  N6 -->|"계속 가능한 경우"| N7
+  N8["8. integrity race는 기존 event 재조회로 exact retry<br/> 복원, 아니면 latest 포함409"]
+  N7 -->|"계속 가능한 경우"| N8
+  B1["분기 결과<br/>OPEN→ACKNOWLEDGED→RESOLVED→REOPENED→ACKNOWLE<br/>DGED"]
+  N5 -->|"허용 상태"| B1
+  B2["분기 결과<br/>409 latest(status/version/allowed) 반환"]
+  N5 -->|"expected mismatch/idempotency key 다른 의도/vers<br/>ion256"| B2
+  B3["분기 결과<br/>422"]
+  N5 -->|"허용되지 않는 transition"| B3
+  B4["분기 결과<br/>기존 event 당시 snapshot 반환; state를 되돌리지 않음"]
+  N3 -->|"정확 재시도지만 현재 상태는 더 뒤에 있음"| B4
+  B5["분기 결과<br/>route403 admin_step_up_required; 서비스 CAS 호출 <br/>전에 종료"]
+  N1 -->|"정상 재확인 발급 후 identity.step_up_verified_at=Non<br/>e 유지"| B5
+  N8 --> END["정상 종료<br/>아래 서비스 성공 결과는 route의 모든 문맥 검사를 통과하는 경우에 한한다.<br/> 현재 재확인→route timestamp 연결 불일치는 R-D14-008 참조<br/>."]
+  RET["재시도와 복구 계약<br/>자동 재시도 없음. 새 proof·재확인과 기존 idempotency key/의<br/>도로 outcome 조회 효과 가능. 실패 원인을 해소한 새 요청 또는 명시된 <br/>복구 기능 사용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. event append-only, 최대256에서 새 상태 관<br/>측 차단."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

@@ -24,7 +24,7 @@ from backend.app.account_schemas import (
     AccountCreateRequestV1,
     EmailOtpEnrollmentRequestV1,
 )
-from backend.app.api import health as health_api
+from backend.app.services import health_readiness
 from backend.app.models import AccountCryptoKeyBinding
 from backend.app.services.accounts import AccountService, AccountServiceError, utc_now
 from test_accounts import _settings
@@ -114,7 +114,7 @@ def test_s01_14_each_key_changed_alone_while_the_old_instance_keeps_serving(
     now = utc_now()
     step = timedelta(seconds=old_settings.account_otp_resend_cooldown_seconds + 1)
     with _disposable_database(monkeypatch) as (_engine, SessionFactory):
-        monkeypatch.setattr(health_api, "SessionLocal", SessionFactory)
+        monkeypatch.setattr(health_readiness, "SessionLocal", SessionFactory)
         first_email = "coexist-first@example.com"
         created = _create(
             old, SessionFactory, old_settings,
@@ -144,8 +144,8 @@ def test_s01_14_each_key_changed_alone_while_the_old_instance_keeps_serving(
         second = _create(old, SessionFactory, old_settings, issued_by_old, now + step)
         assert _login(new_otp, SessionFactory, second_email).actor_id == second.actor_id
 
-        assert health_api._account_crypto_binding_readiness(old_settings)["ready"] is True
-        new_otp_ready = health_api._account_crypto_binding_readiness(new_otp_settings)
+        assert health_readiness._account_crypto_binding_readiness(old_settings)["ready"] is True
+        new_otp_ready = health_readiness._account_crypto_binding_readiness(new_otp_settings)
         assert new_otp_ready["ready"] is True
         assert new_otp_ready.get("otp_hmac_binding") == "mismatch"
 
@@ -155,7 +155,7 @@ def test_s01_14_each_key_changed_alone_while_the_old_instance_keeps_serving(
             assert _mismatch(lambda: _login(service, SessionFactory, first_email)) == (
                 "account_crypto_key_mismatch", 503,
             ), name
-            assert health_api._account_crypto_binding_readiness(settings) == {
+            assert health_readiness._account_crypto_binding_readiness(settings) == {
                 "ready": False,
                 "reason": "account_crypto_binding_mismatch",
             }, name

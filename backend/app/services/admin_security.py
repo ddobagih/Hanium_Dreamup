@@ -7,6 +7,32 @@ details are restricted to non-secret operational metadata.
 
 from __future__ import annotations
 
+from backend.app.services.admin_operation_policy import (
+    ADMIN_DEVICE_KEY_ROTATION_CONFIRM_PATH,
+    ADMIN_DEVICE_PROOF_CHALLENGE_PATH,
+    ADMIN_DEVICE_REPORT_LOST_PATH_PATTERN,
+    ADMIN_INCIDENT_STATUS_PATH_PATTERN,
+    ADMIN_RAW_COLLECTION_DECISION_PATH_PATTERN,
+    ADMIN_RAW_COLLECTION_HOLD_PATH_PATTERN,
+    ADMIN_RECOVERY_CUSTODY_ATTEST_PATH,
+    ADMIN_REPORT_DELETION_EXTERNAL_COPY_EVENT_PATH_PATTERN,
+    ADMIN_REPORT_DELIVERY_PACKAGE_PATH_PATTERN,
+    ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN,
+    ADMIN_REPORT_STATUS_PATH_PATTERN,
+    ADMIN_SESSION_REVOKE_PATH_PATTERN,
+    AdminOperation,
+    DATA_DELETE_PATH,
+    PRIVILEGE_CHANGE_PATH,
+    RELEASE_APPROVAL_PATH,
+    REPORT_DELIVERY_CORRECTION_PATH_PATTERN,
+    REPORT_DELIVERY_PATH_PATTERN,
+    REPORT_ORIGINAL_GRANT_PATH_PATTERN,
+    REPORT_REVIEW_DECISION_PATH_PATTERN,
+    REPORT_STATUS_PATH_PATTERN,
+    classify_admin_operation,
+    normalize_admin_operation_path,
+)
+
 import base64
 import binascii
 from dataclasses import dataclass
@@ -59,76 +85,7 @@ RECONFIRMATION_NONCE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{22}$")
 RECOVERY_CUSTODY_REFERENCE_PATTERN = re.compile(
     r"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
 )
-REPORT_STATUS_PATH_PATTERN = re.compile(
-    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/status$"
-)
-ADMIN_REPORT_STATUS_PATH_PATTERN = re.compile(
-    r"^/admin/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/status$"
-)
-ADMIN_REPORT_DELIVERY_PACKAGE_PATH_PATTERN = re.compile(
-    r"^/admin/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/delivery-packages$"
-)
-ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN = re.compile(
-    r"^/admin/report-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
-    r"[0-9a-fA-F]{12}/status$"
-)
-ADMIN_REPORT_DELETION_EXTERNAL_COPY_EVENT_PATH_PATTERN = re.compile(
-    r"^/admin/report-deletions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
-    r"[0-9a-fA-F]{12}/external-copies/"
-    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/events$"
-)
-ADMIN_INCIDENT_STATUS_PATH_PATTERN = re.compile(
-    r"^/admin/incidents/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
-    r"[0-9a-fA-F]{12}/status$"
-)
-ADMIN_RAW_COLLECTION_DECISION_PATH_PATTERN = re.compile(
-    r"^/admin/raw-collections/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
-    r"[0-9a-fA-F]{12}/decisions$"
-)
-ADMIN_RAW_COLLECTION_HOLD_PATH_PATTERN = re.compile(
-    r"^/admin/raw-collections/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
-    r"[0-9a-fA-F]{12}/legal-holds$"
-)
-REPORT_ORIGINAL_GRANT_PATH_PATTERN = re.compile(
-    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/original-access-grants$"
-)
-ADMIN_SESSION_REVOKE_PATH_PATTERN = re.compile(
-    r"^/admin/security/sessions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-    r"[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-"
-    r"[0-9a-fA-F]{12}/revoke$"
-)
-ADMIN_DEVICE_REPORT_LOST_PATH_PATTERN = re.compile(
-    r"^/admin/security/devices/[A-Za-z0-9][A-Za-z0-9._:-]{7,127}/report-lost$"
-)
-REPORT_REVIEW_DECISION_PATH_PATTERN = re.compile(
-    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/review-decisions$"
-)
-REPORT_DELIVERY_PATH_PATTERN = re.compile(
-    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/deliveries$"
-)
 # S18-40: HIGH-risk append-only correction of the latest effective delivery event.
-REPORT_DELIVERY_CORRECTION_PATH_PATTERN = re.compile(
-    r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
-    r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/delivery-corrections$"
-)
-ADMIN_DEVICE_PROOF_CHALLENGE_PATH = "/admin/security/device-proof/challenges"
-ADMIN_RECOVERY_CUSTODY_ATTEST_PATH = "/admin/security/recovery-custody/attest"
-ADMIN_DEVICE_KEY_ROTATION_CONFIRM_PATH = "/admin/security/device-keys/rotation/confirm"
-RELEASE_APPROVAL_PATH = "/admin/operations/release-approvals"
-PRIVILEGE_CHANGE_PATH = "/admin/operations/privilege-changes"
-DATA_DELETE_PATH = "/admin/operations/data-deletions"
 ADMIN_UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _SCRYPT_N = 1 << 14
 _SCRYPT_R = 8
@@ -213,12 +170,6 @@ class RecoveryGrant:
     security_state: str
 
 
-@dataclass(frozen=True)
-class AdminOperation:
-    action: str
-    method: str
-    path: str
-    risk: str
 
 
 @dataclass(frozen=True)
@@ -229,227 +180,8 @@ class ReconfirmationGrant:
     path: str
 
 
-def normalize_admin_operation_path(path: str) -> str | None:
-    if (
-        not isinstance(path, str)
-        or not path.startswith("/")
-        or len(path) > 512
-        or "//" in path
-        or "?" in path
-        or "#" in path
-        or "%" in path
-        or any(ord(character) < 0x20 or ord(character) == 0x7F for character in path)
-    ):
-        return None
-    return path
 
 
-def classify_admin_operation(method: str, path: str) -> AdminOperation | None:
-    normalized_method = method.upper()
-    normalized_path = normalize_admin_operation_path(path)
-    if normalized_path is None:
-        return None
-    if (
-        normalized_method == "GET"
-        and normalized_path == "/admin/raw-collections/quarantine"
-    ):
-        return AdminOperation(
-            "admin.raw_collection.list", normalized_method, normalized_path, "HIGH"
-        )
-    if (
-        normalized_method == "POST"
-        and ADMIN_RAW_COLLECTION_DECISION_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "admin.raw_collection.purpose_decide",
-            normalized_method,
-            normalized_path,
-            "HIGH",
-        )
-    if (
-        normalized_method == "POST"
-        and ADMIN_RAW_COLLECTION_HOLD_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "admin.raw_collection.legal_hold",
-            normalized_method,
-            normalized_path,
-            "HIGH",
-        )
-    if normalized_method == "GET" and normalized_path == "/reports/export":
-        return AdminOperation("report.export", normalized_method, normalized_path, "HIGH")
-    for operation_path, action in (
-        (RELEASE_APPROVAL_PATH, "release.approval"),
-        (PRIVILEGE_CHANGE_PATH, "privilege.change"),
-        (DATA_DELETE_PATH, "data.delete"),
-    ):
-        if normalized_method == "POST" and normalized_path == operation_path:
-            return AdminOperation(action, normalized_method, normalized_path, "HIGH")
-    if normalized_method == "PATCH" and REPORT_STATUS_PATH_PATTERN.fullmatch(normalized_path):
-        return AdminOperation(
-            "report.status.patch",
-            normalized_method,
-            normalized_path,
-            "HIGH",
-        )
-    if (
-        normalized_method == "PATCH"
-        and ADMIN_REPORT_STATUS_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "admin.report.status.update",
-            normalized_method,
-            normalized_path,
-            "HIGH",
-        )
-    if (
-        normalized_method == "POST"
-        and ADMIN_REPORT_DELIVERY_PACKAGE_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "admin.report.delivery_package.create",
-            normalized_method,
-            normalized_path,
-            "HIGH",
-        )
-    if (
-        normalized_method == "PATCH"
-        and ADMIN_REPORT_REQUEST_STATUS_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "admin.report_request.status.update",
-            normalized_method,
-            normalized_path,
-            "HIGH",
-        )
-    if (
-        normalized_method == "PATCH"
-        and ADMIN_INCIDENT_STATUS_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "admin.incident.status.update",
-            normalized_method,
-            normalized_path,
-            "HIGH",
-        )
-    if (
-        normalized_method == "POST"
-        and REPORT_DELIVERY_CORRECTION_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "report.delivery.correct",
-            normalized_method,
-            normalized_path,
-            "HIGH",
-        )
-    if (
-        normalized_method == "POST"
-        and REPORT_ORIGINAL_GRANT_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "report.original.grant",
-            normalized_method,
-            normalized_path,
-            "HIGH",
-        )
-    if (
-        normalized_method == "POST"
-        and normalized_path == "/admin/security/reauthenticate"
-    ):
-        return AdminOperation(
-            "session.reauthenticate",
-            normalized_method,
-            normalized_path,
-            "STANDARD",
-        )
-    if (
-        normalized_method == "POST"
-        and ADMIN_SESSION_REVOKE_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "session.revoke",
-            normalized_method,
-            normalized_path,
-            "STANDARD",
-        )
-    if (
-        normalized_method == "POST"
-        and REPORT_REVIEW_DECISION_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "report.review.decide",
-            normalized_method,
-            normalized_path,
-            "STANDARD",
-        )
-    if (
-        normalized_method == "POST"
-        and REPORT_DELIVERY_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        return AdminOperation(
-            "report.delivery.create",
-            normalized_method,
-            normalized_path,
-            "STANDARD",
-        )
-    if (
-        normalized_method == "POST"
-        and ADMIN_REPORT_DELETION_EXTERNAL_COPY_EVENT_PATH_PATTERN.fullmatch(
-            normalized_path
-        )
-    ):
-        return AdminOperation(
-            "report.external_copy_deletion.record",
-            normalized_method,
-            normalized_path,
-            "STANDARD",
-        )
-    if (
-        normalized_method == "POST"
-        and normalized_path == ADMIN_DEVICE_PROOF_CHALLENGE_PATH
-    ):
-        return AdminOperation(
-            "device_proof.challenge",
-            normalized_method,
-            normalized_path,
-            "STANDARD",
-        )
-    if (
-        normalized_method == "POST"
-        and normalized_path == ADMIN_RECOVERY_CUSTODY_ATTEST_PATH
-    ):
-        return AdminOperation(
-            "recovery.custody.attest",
-            normalized_method,
-            normalized_path,
-            "STANDARD",
-        )
-    if (
-        normalized_method == "POST"
-        and normalized_path == ADMIN_DEVICE_KEY_ROTATION_CONFIRM_PATH
-    ):
-        # S18-3: signed by the ACTIVE key (device proof) and by the PENDING key
-        # (rotation signature); it only replaces this device's own key.
-        return AdminOperation(
-            "device_key.rotation.confirm",
-            normalized_method,
-            normalized_path,
-            "STANDARD",
-        )
-    if (
-        normalized_method == "POST"
-        and ADMIN_DEVICE_REPORT_LOST_PATH_PATTERN.fullmatch(normalized_path)
-    ):
-        # Revoking another device's keys and sessions is sensitive work: it
-        # needs an exact-path reconfirmation. The emergency path when that is
-        # impossible is recovery-code recovery (NPC-SINGLE-ADMIN-RECOVERY).
-        return AdminOperation(
-            "device.report_lost",
-            normalized_method,
-            normalized_path,
-            "HIGH",
-        )
-    return None
 
 
 # S18-7: a reconfirmation may be bound to the exact request body it approves.

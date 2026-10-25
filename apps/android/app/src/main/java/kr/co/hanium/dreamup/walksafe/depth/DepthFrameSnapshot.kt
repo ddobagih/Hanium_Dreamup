@@ -12,6 +12,8 @@ data class DepthFrameSnapshot(
     val cameraImageTimestampNs: Long? = null,
     // Actual confidence Image clock; null preserves legacy callers without claiming a verified pair.
     val rawConfidenceTimestampNs: Long? = null,
+    // Optional same-Frame semantic observation; it supplies no metric/alignment qualification.
+    val semanticFrame: SemanticFrameSnapshot? = null,
 ) {
     /** Metric Raw Depth requires a same-observation depth/confidence pair. */
     val hasMetricRawDepth: Boolean get() = rawConfidenceMatchesRawDepth
@@ -79,7 +81,7 @@ fun ArCoreDepthBundle.toSnapshotAndClose(): DepthFrameSnapshot {
             frameTimestampNs = bundle.frameTimestampNs,
             rawDepth = bundle.rawDepth?.takeIf { matchingRawPair }?.toDepthImage16Snapshot(),
             rawConfidence = bundle.rawConfidence?.takeIf { matchingRawPair }?.toConfidenceImage8Snapshot(),
-            fullDepth = bundle.fullDepth?.toDepthImage16Snapshot(),
+            fullDepth = bundle.copyFullDepthSnapshot(),
             rawDepthTimestampNs = bundle.rawDepthTimestampNs,
             fullDepthTimestampNs = bundle.fullDepthTimestampNs,
             cameraImageTimestampNs = bundle.cameraImageTimestampNs,

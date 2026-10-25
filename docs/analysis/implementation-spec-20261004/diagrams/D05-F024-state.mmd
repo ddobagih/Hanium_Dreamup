@@ -1,0 +1,19 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-024-IDLE" as IDLE
+  state "S-D05-024-LOADING" as LOADING
+  state "S-D05-024-READY" as READY
+  state "S-D05-024-FAILED" as FAILED
+  state "S-D05-024-WAITING_RELEASE" as WAITING_RELEASE
+  state "S-D05-024-RELEASE_FAILED" as RELEASE_FAILED
+  [*] --> IDLE
+  IDLE --> LOADING: "active primary ready"
+  LOADING --> READY: "service ready currentepoch"
+  LOADING --> FAILED: "load error"
+  READY --> FAILED: "service error"
+  FAILED --> WAITING_RELEASE: "explicit retry"
+  WAITING_RELEASE --> LOADING: "released and unique newepoch"
+  WAITING_RELEASE --> RELEASE_FAILED: "native release unconfirmed"
+  note right of IDLE
+    F-D05-024 P-D05-024
+  end note

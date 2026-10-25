@@ -1,0 +1,23 @@
+stateDiagram-v2
+  state "S-D15-011-01 · start" as START
+  state "S-D15-011-02 · rows" as ROWS
+  state "S-D15-011-03 · namespace" as NAMESPACE
+  state "S-D15-011-04 · finish" as FINISH
+  state "S-D15-011-05 · stopped" as STOP
+  [*] --> START
+  START --> ROWS: journal recovery·key와 root 검사
+  ROWS --> ROWS: page16개·lock 밖 hash 후 결과 재검사
+  ROWS --> NAMESPACE: 마지막 page
+  NAMESPACE --> NAMESPACE: bounded directory entry 확인
+  NAMESPACE --> FINISH: namespace 완료
+  FINISH --> START: revision·최종집합 검증 결과 게시 후 다음 cycle
+  ROWS --> STOP: stop flag 후 worker 종료 대기
+  NAMESPACE --> STOP: stop flag 후 worker 종료 대기
+  START --> STOP: 소유 lifespan 종료
+  STOP --> [*]: iterator와 pinned descriptor 닫기
+  note right of FINISH
+    P-D15-011
+    readiness cache age30초 미만만 사용
+    HTTP 경로는 cache만 읽음
+    batch1초는 entry 사이 협조 경계
+  end note

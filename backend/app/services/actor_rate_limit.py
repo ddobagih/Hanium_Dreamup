@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar, copy_context
+import atexit
+
 import asyncio
 from collections import deque
-from concurrent.futures import CancelledError as FutureCancelledError, ThreadPoolExecutor
+from concurrent.futures import CancelledError as FutureCancelledError, ThreadPoolExecutor, wait
 import hashlib
 import math
-from threading import BoundedSemaphore, Event, Lock
+from threading import BoundedSemaphore, Event, Lock, RLock
 from time import monotonic
 from typing import Any, Callable
 
@@ -123,6 +127,23 @@ class ActorRateLimitExecution:
     def _submit(
         self, action: Callable[[_DecisionBudget], Any], *, started_at: float | None = None,
     ) -> tuple[Any, _DecisionBudget]:
+        owner = _CURRENT_EXECUTION_OWNER.get()
+        if owner is None:
+            return self._submit_work(action, started_at=started_at)
+        with owner._lock:
+            if owner._execution is not self:
+                # Explicitly injected executions retain their own ownership.
+                return self._submit_work(action, started_at=started_at)
+            if not owner._accepting:
+                raise ActorRateLimitStoreUnavailable
+            future, budget = self._submit_work(action, started_at=started_at)
+            owner._pending.add(future)
+            future.add_done_callback(owner._completed)
+            return future, budget
+
+    def _submit_work(
+        self, action: Callable[[_DecisionBudget], Any], *, started_at: float | None = None,
+    ) -> tuple[Any, _DecisionBudget]:
         budget = _DecisionBudget(
             self._budget_ms, self._statement_timeout_ms, self._clock, started_at=started_at,
         )
@@ -146,7 +167,7 @@ class ActorRateLimitExecution:
                     release()
 
             try:
-                future = self._executor.submit(work)
+                future = self._executor.submit(copy_context().run, work)
             except Exception as exc:
                 budget.cancel()
                 # submit() can fail after enqueueing work. Do not reuse uncertain
@@ -214,10 +235,106 @@ class ActorRateLimitExecution:
 
 _DEFAULT_EXECUTION: ActorRateLimitExecution | None = None
 _DEFAULT_EXECUTION_LOCK = Lock()
+_DEFAULT_EXECUTION_CONFIG: tuple[int, int, int] | None = None
+_DEFAULT_EXECUTION_OWNERS: set[ActorRateLimitRuntime] = set()
+_CURRENT_EXECUTION_OWNER: ContextVar[ActorRateLimitRuntime | None] = ContextVar(
+    "actor_rate_limit_runtime", default=None,
+)
+
+
+def _execution_config(settings: Any) -> tuple[int, int, int]:
+    return (
+        settings.actor_rate_limit_max_in_flight,
+        settings.actor_rate_limit_budget_ms,
+        settings.database_statement_timeout_ms,
+    )
+
+
+class ActorRateLimitRuntime:
+    """One app's lease on the process budget, including its unfinished DB work."""
+
+    def __init__(self, settings: Any) -> None:
+        self._settings = settings
+        self._execution: ActorRateLimitExecution | None = None
+        self._accepting = False
+        self._pending: set[Any] = set()
+        self._lock = RLock()
+
+    @contextmanager
+    def context(self):
+        token = _CURRENT_EXECUTION_OWNER.set(self)
+        try:
+            yield
+        finally:
+            _CURRENT_EXECUTION_OWNER.reset(token)
+
+    def start(self) -> None:
+        global _DEFAULT_EXECUTION, _DEFAULT_EXECUTION_CONFIG
+        if self._settings.actor_rate_limit_store != "postgresql":
+            return
+        config = _execution_config(self._settings)
+        with self._lock, _DEFAULT_EXECUTION_LOCK:
+            if _DEFAULT_EXECUTION is None:
+                _DEFAULT_EXECUTION = ActorRateLimitExecution(*config)
+                _DEFAULT_EXECUTION_CONFIG = config
+            elif _DEFAULT_EXECUTION_CONFIG != config:
+                raise ValueError("apps sharing the actor rate-limit budget must use matching execution settings")
+            _DEFAULT_EXECUTION_OWNERS.add(self)
+            self._execution = _DEFAULT_EXECUTION
+            self._accepting = True
+
+    def execution(self) -> ActorRateLimitExecution:
+        with self._lock:
+            if not self._accepting or self._execution is None:
+                raise ActorRateLimitStoreUnavailable
+            return self._execution
+
+    def _completed(self, future: Any) -> None:
+        with self._lock:
+            self._pending.discard(future)
+
+    def close(self) -> None:
+        global _DEFAULT_EXECUTION, _DEFAULT_EXECUTION_CONFIG
+        with self._lock:
+            self._accepting = False
+            pending = tuple(self._pending)
+        # Timed-out callers may still own live sessions. Drain those before
+        # this app disposes its database, without closing another app's pool.
+        wait(pending)
+        if self._execution is not None and self._execution._quarantined:
+            # submit() can fail after queueing untracked work. A quarantined
+            # shared pool already rejects every owner; drain it before DB close.
+            self._execution.shutdown()
+        with _DEFAULT_EXECUTION_LOCK:
+            if self not in _DEFAULT_EXECUTION_OWNERS:
+                return
+            _DEFAULT_EXECUTION_OWNERS.remove(self)
+            if not _DEFAULT_EXECUTION_OWNERS:
+                try:
+                    _DEFAULT_EXECUTION.shutdown()
+                finally:
+                    _DEFAULT_EXECUTION = None
+                    _DEFAULT_EXECUTION_CONFIG = None
+        # Keep the closed execution reference until start() so any late copied
+        # context rejects admission instead of becoming an unowned caller.
+
+
+def _close_standalone_execution() -> None:
+    # Direct service callers outside an application retain a process-owned
+    # fallback. Application requests must acquire their lifespan lease first.
+    with _DEFAULT_EXECUTION_LOCK:
+        if _DEFAULT_EXECUTION is not None:
+            _DEFAULT_EXECUTION.shutdown()
+
+
+atexit.register(_close_standalone_execution)
 
 
 def _default_execution() -> ActorRateLimitExecution:
-    global _DEFAULT_EXECUTION
+    global _DEFAULT_EXECUTION, _DEFAULT_EXECUTION_CONFIG
+    owner = _CURRENT_EXECUTION_OWNER.get()
+    if owner is not None:
+        return owner.execution()
     if not _DEFAULT_EXECUTION_LOCK.acquire(blocking=False):
         raise ActorRateLimitStoreUnavailable
     try:
@@ -225,11 +342,8 @@ def _default_execution() -> ActorRateLimitExecution:
             from backend.app.config import get_settings
 
             settings = get_settings()
-            _DEFAULT_EXECUTION = ActorRateLimitExecution(
-                settings.actor_rate_limit_max_in_flight,
-                settings.actor_rate_limit_budget_ms,
-                settings.database_statement_timeout_ms,
-            )
+            _DEFAULT_EXECUTION_CONFIG = _execution_config(settings)
+            _DEFAULT_EXECUTION = ActorRateLimitExecution(*_DEFAULT_EXECUTION_CONFIG)
         return _DEFAULT_EXECUTION
     finally:
         _DEFAULT_EXECUTION_LOCK.release()

@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-005 서버 보안 상태·세션·활성 기기 목록 갱신"]
+  P["P-D12-005 현재 session/device와 일관된 서버 projection만 사용"]
+  A --> P
+  M0["1. access token으로 서버 security state를 읽어 NORMAL 또는 RECOVERY_REQUIRED만 받는다."]
+  P --> M0
+  M1["2. 전체 session 페이지를 순서대로 읽고 각 페이지 전후 local generation을 확인한다."]
+  M0 --> M1
+  M2["3. 현재 session ID 불변, 다른 session 중복 없음, current nonrevoked session 정확히 하나를 확인한다."]
+  M1 --> M2
+  M3["4. device ID 중복을 거부하고 현재 device가 로그인 device ID와 일치하는지 확인한다."]
+  M2 --> M3
+  M4["5. state_version·timezone 포함 observed_at·custody 상태와 시간을 검증해 공개하고 부분 기기 목록이면 별도 안내한다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 일관된 state/session/device snapshot을 표시."]
+  M0 -. "관련 조건 확인" .-> B0{"다른 session이 99개보다 적음"}
+  B0 -->|"조건 해당"| R0["페이지 수집 종료"]
+  M1 -. "관련 조건 확인" .-> B1{"1000페이지 한도 초과 또는 중복 session"}
+  B1 -->|"조건 해당"| R1["오류 및 FAIL_CLOSED"]
+  M2 -. "관련 조건 확인" .-> B2{"deviceTotal=-1 및 incomplete"}
+  B2 -->|"조건 해당"| R2["전체 개수 확인 불가 안내"]
+  M3 -. "관련 조건 확인" .-> B3{"NORMAL 아님 또는 custody ATTESTED 아님"}
+  B3 -->|"조건 해당"| R3["재인증 허가 제거"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["명시적 새로고침. 다른 세션은 99건 페이지가 가득 찬 경우에만 다음 페이지."]

@@ -9,7 +9,7 @@ import org.junit.Test
  * miss, while "내 위치 확인해줘" (re-measure) is the RecheckLocation command handled by the route flow.
  */
 class MainActivityVoiceLocationDescriptionStaticTest {
-    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/VoiceCommandInteractionController.kt").readText()
 
     @Test
     fun aLocationDescriptionRequestIsNamedAsNotOfferedWithTheStateHint() {
@@ -17,10 +17,10 @@ class MainActivityVoiceLocationDescriptionStaticTest {
             .substringBefore("\n\n")
         assertTrue(helper.contains("navigation.isLocationDescriptionRequest(recognized)"))
         assertTrue(helper.contains("navigation.LOCATION_DESCRIPTION_UNSUPPORTED_KO} \${unrecognizedCommandHintKo()}"))
-        val scoredMiss = source.substringAfter("private fun handleVoiceCommandPhrases(")
+        val scoredMiss = source.substringAfter("fun handleVoiceCommandPhrases(")
             .substringBefore("executeVoiceAction(action, expectedNavigationDecisionToken)")
             .substringAfter("if (action == null) {")
-        val retry = scoredMiss.substringAfter("val retryMessage =").substringBefore("if (!retryHomeDestinationVoiceDialog(retryMessage))")
+        val retry = scoredMiss.substringAfter("val retryMessage =").substringBefore("if (!dialog().retryHomeDestinationVoiceDialog(retryMessage))")
         assertTrue(retry.contains("navigation.isLocationDescriptionRequest(recognized)"))
         assertTrue(retry.contains("kr.co.hanium.dreamup.walksafe.navigation.LOCATION_DESCRIPTION_UNSUPPORTED_KO"))
     }
@@ -32,7 +32,7 @@ class MainActivityVoiceLocationDescriptionStaticTest {
         val helper = source.substringAfter("private fun unrecognizedCommandMessageKo(recognized: String): String =")
             .substringBefore("\n\n")
         assertTrue(helper.contains("navigation.LOCATION_DESCRIPTION_UNSUPPORTED_KO} \${unrecognizedCommandHintKo()}\" +\n                locationRecheckOfferKo()"))
-        val offer = source.substringAfter("private fun locationRecheckOfferKo(): String = when (routeNavigator.pendingUserDecision()) {")
+        val offer = source.substringAfter("private fun locationRecheckOfferKo(): String = when (routeRun().navigator.pendingUserDecision()) {")
             .substringBefore("\n    }\n")
         assertTrue(offer.contains("RouteNavigatorUserDecision.LOCATION_RECHECK, RouteNavigatorUserDecision.REROUTE ->"))
         assertTrue(offer.contains("\" 위치 다시 확인이라고 하면 현재 위치를 다시 잽니다.\""))
@@ -42,14 +42,14 @@ class MainActivityVoiceLocationDescriptionStaticTest {
                 kr.co.hanium.dreamup.walksafe.navigation.AndroidVoiceCommand.RecheckLocation,
         )
         // The same two decisions are the ones recheckLocationFromVoice accepts.
-        val recheck = source.substringAfter("private fun recheckLocationFromVoice(expectedToken: RouteNavigatorDecisionToken?) {")
-            .substringBefore("\n    }\n")
+        val main = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        val recheck = NavigationPolicySource.locationRecheck(main)
         assertTrue(recheck.contains("RouteNavigatorUserDecision.LOCATION_RECHECK,\n                RouteNavigatorUserDecision.REROUTE,"))
     }
 
     @Test
     fun reMeasuringStaysTheRouteDecisionCommand() {
-        val execute = source.substringAfter("private fun executeVoiceAction(")
+        val execute = source.substringAfter("fun executeVoiceAction(")
             .substringBefore("private fun unrecognizedCommandHintKo()")
         assertTrue(execute.contains("AndroidVoiceAction.RecheckLocation -> recheckLocationFromVoice(expectedNavigationDecisionToken)"))
     }

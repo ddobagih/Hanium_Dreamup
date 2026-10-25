@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-030 · 검토 결정 이력·응답 유실 조회<br/>GET review-decisions; GET<br/>review-decisions/history; GET<br/>review-decisions/{decision_id}"]
+  P["P-D15-030 · 전제조건<br/>report.review_decisions read-bound admin<br/>proof. decision ID lookup는 해당 관리자가 남긴 결정만."]
+  E --> P
+  S1["1. legacy list는 기존 unpaged shape 유지"]
+  P --> S1
+  S2["2. history 최초 snapshot revision 고정 후 revision<br/>증가순 page 구성"]
+  S1 --> S2
+  S3["3. position=last는 최신 tail을 증가순 반환; cursor 동시<br/>사용 불가"]
+  S2 --> S3
+  S4["4. 48KiB 응답 budget에 맞게 item 수 축소"]
+  S3 --> S4
+  S5["5. read audit commit 후 반환; decision lookup로<br/>lost response 확인"]
+  S4 --> S5
+  OK["정상 결과<br/>read audit commit 후 반환; decision lookup로 lost<br/>response 확인"]
+  S5 --> OK
+  B1["조건 · cursor 다른 stream/report/snapshot gap<br/>결과 · 422 또는 무결성 오류"]
+  S2 -. "해당 조건 발생" .-> B1
+  B2["조건 · last + cursor 또는 unknown/duplicate query<br/>결과 · 422"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · decision 다른 admin/신고 또는 없음<br/>결과 · 404"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · 신규 append<br/>결과 · 기존 history snapshot에 끼우지 않음"]
+  S1 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/admin_report_workflow.py:1018<br/>list_report_review_decision_history_page<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

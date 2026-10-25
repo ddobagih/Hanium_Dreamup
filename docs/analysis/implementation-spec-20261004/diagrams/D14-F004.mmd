@@ -1,0 +1,25 @@
+flowchart TD
+  IN["F-D14-004<br/>비밀번호 검증·성공 로그인 재해시"]
+  G["적용 정책<br/>P-D14-003"]
+  IN --> G
+  N1["1. 검증 encodings의 prefix·숫자 canonical 표기·발급된 <br/>cost tuple·salt/derived canonical 길이 검사"]
+  G --> N1
+  N2["2. memory 계산 128*r*(N+p+2)+1MiB가 256MiB 이하인 <br/>경우만 scrypt 실행"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. constant-time compare로 검증"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. login의 password와 fresh TOTP 성공 후 비현행 hash<br/>면 새 random salt로 hash 생성"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. PostgreSQL wrapper로 session 발급과 expected <br/>hash CAS를 같은 transaction에 적용"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>False 반환, 재해시 없음"]
+  N3 -->|"알 수 없는 cost·비canonical encoding·잘못된 password"| B1
+  B2["분기 결과<br/>password_rehash 만들지 않음"]
+  N4 -->|"TOTP 또는 기타 로그인 검사 실패"| B2
+  B3["분기 결과<br/>session과 rehash 전체 rollback"]
+  N5 -->|"기존 hash CAS 변경 또는 issuance SQL 실패"| B3
+  N5 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

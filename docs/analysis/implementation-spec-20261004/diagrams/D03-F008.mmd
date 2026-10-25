@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D03-008 호출 응답음과 HOME 명령 입력 인계"]
+  P["정책 P-D03-007, P-D03-008"]
+  A --> P
+  N0["1. HOME 호출 후 새 mic 인식 또는 동일문장 명령에 한 번 인계한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. handoff flag 를 화면 렌더 전에 설정하여 refresh 가 passive wake 를 다시 열지 못하게 한다."]
+  N0 --> N1
+  N2["3. 응답음 COMPLETED 면 캡처된 command 를 local parser 로 보내거나 시작 prompt 를 생략한 one-shot 을 연다."]
+  N1 --> N2
+  N3["4. 응답음 FAILED 는 일반 입력 prompt 로 전환; CANCELLED/출력 겹침 또는 owner stale 은 실행하지 않고 현재 context 에서 대기를 재평가한다."]
+  N2 --> N3
+  Z["정상: 응답음 자원 해제 뒤 terminal callback."]
+  N3 --> Z
+  B0{"동일문장 command 검증됨"}
+  R0["재녹음 없이 command parser 호출"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"음성 출력·tone 중복·focus 거부"}
+  R1["FAILED"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"owner 달라짐"}
+  R2["새 화면에 late command 실행 안 함"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: FAILED 도 현재 context 이면 일반 prompt 로 회복."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xcancel["취소: cancel 은 generation 증가 및 CANCELLED."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: focus 손실/다른 speech 시작은 FAILED."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xcleanup["정리: tone stop/release 와 focus abandon 뒤 callback."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

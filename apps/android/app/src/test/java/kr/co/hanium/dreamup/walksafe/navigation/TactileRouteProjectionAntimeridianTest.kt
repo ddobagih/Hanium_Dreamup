@@ -9,6 +9,7 @@ import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.depth.Trend
 import kr.co.hanium.dreamup.walksafe.depth.UserFacingDepth
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.LocalGeodesy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -36,6 +37,42 @@ class TactileRouteProjectionAntimeridianTest {
         // A segment really far away is still outside the corridor.
         val far = supplier.evaluateObservation(output(), context(walkerLongitude = 179.999999, segmentLongitude = -179.99))
         assertEquals(TactileObservationRejection.OUTSIDE_TMAP_CORRIDOR, far.rejection)
+    }
+
+    @Test
+    fun corridorBoundaryUsesTheSameMeterScaleAtOrdinaryAndWrappedLongitudes() {
+        // This fixture has 6.4937 m combined projection error, leaving about 8.5063 m
+        // inside the 15 m corridor. The former 111320 scale incorrectly rejects 8.50 m.
+        for (walkerLongitude in listOf(127.0, 179.99999)) {
+            for ((offsetMeters, accepted) in listOf(8.50 to true, 8.51 to false)) {
+                val segmentLongitude = LocalGeodesy.Frame(37.0, walkerLongitude)
+                    .toCoordinate(offsetMeters, 0.0).longitude
+                val result = supplier.evaluateObservation(output(), context(walkerLongitude, segmentLongitude))
+                if (accepted) {
+                    assertNotNull("longitude=$walkerLongitude, offset=$offsetMeters", result.observation)
+                    assertNull(result.rejection)
+                } else {
+                    assertEquals(TactileObservationRejection.OUTSIDE_TMAP_CORRIDOR, result.rejection)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun aShortAntimeridianSegmentDoesNotSpanTheOppositeSideOfTheWorld() {
+        for ((startLongitude, endLongitude) in listOf(179.99995 to -179.99995, -179.99995 to 179.99995)) {
+            val route = ActiveRouteProjection("active", 0,
+                RoutePoint(37.0, startLongitude), RoutePoint(37.0, endLongitude), 0.0, 90f)
+            val nearby = supplier.evaluateObservation(output(),
+                context(179.999999, startLongitude).copy(routeProjection = route))
+            assertNotNull(nearby.observation)
+            assertNull(nearby.rejection)
+
+            val opposite = supplier.evaluateObservation(output(),
+                context(0.0, startLongitude).copy(routeProjection = route))
+            assertNull("An approximately 9 m segment cannot include longitude 0", opposite.observation)
+            assertEquals(TactileObservationRejection.OUTSIDE_TMAP_CORRIDOR, opposite.rejection)
+        }
     }
 
     private fun context(walkerLongitude: Double, segmentLongitude: Double) = TactileProjectionContext(

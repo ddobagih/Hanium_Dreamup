@@ -1,0 +1,18 @@
+stateDiagram-v2
+  state "S-D03-029-01 없음" as empty
+  state "S-D03-029-02 소유보행" as leased
+  state "S-D03-029-03 보관" as saved
+  state "S-D03-029-04 종료" as ended
+  state "S-D03-029-05 만료" as expired
+  state "S-D03-029-06 삭제실패" as blocked
+  [*] --> empty
+  empty --> leased: bind account and begin walk
+  leased --> saved: first validated route sealed and read back
+  saved --> saved: reroute does not replace first archive
+  saved --> ended: end walk or account boundary
+  saved --> expired: 24h or reboot or invalid clock relation
+  ended --> empty: verified clear
+  expired --> empty: verified clear
+  ended --> blocked: purge failed
+  expired --> blocked: purge failed
+  blocked --> empty: scope bound purge succeeds

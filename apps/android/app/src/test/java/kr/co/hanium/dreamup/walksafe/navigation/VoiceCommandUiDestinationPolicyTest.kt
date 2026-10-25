@@ -74,6 +74,11 @@ class VoiceCommandUiDestinationPolicyTest {
     fun everyActionHasOneExplicitDestination() {
         val expected = mapOf(
             AndroidVoiceAction.CreateReport to VoiceCommandUiDestination.VOICE_COMMAND,
+            AndroidVoiceAction.OpenHelp to VoiceCommandUiDestination.HELP,
+            AndroidVoiceAction.SpeakDestinationCandidateDetail(1) to VoiceCommandUiDestination.CURRENT_VOICE_PAGE,
+            AndroidVoiceAction.ListLocalQuarantinedReports to VoiceCommandUiDestination.LOCAL_REPORTS,
+            AndroidVoiceAction.SelectLocalQuarantinedReport(1) to VoiceCommandUiDestination.CURRENT_VOICE_PAGE,
+            AndroidVoiceAction.ConfirmLocalQuarantinedReportDelete to VoiceCommandUiDestination.CURRENT_VOICE_PAGE,
             AndroidVoiceAction.OpenSettings to VoiceCommandUiDestination.SETTINGS,
             AndroidVoiceAction.SearchDestination("서울역") to VoiceCommandUiDestination.DESTINATION_SEARCH,
             AndroidVoiceAction.SelectDestinationCandidate(1) to VoiceCommandUiDestination.DESTINATION_SEARCH,
@@ -84,6 +89,7 @@ class VoiceCommandUiDestinationPolicyTest {
             AndroidVoiceAction.CancelDialog to VoiceCommandUiDestination.CURRENT_VOICE_PAGE,
             AndroidVoiceAction.StartNavigation to VoiceCommandUiDestination.DESTINATION_SEARCH,
             AndroidVoiceAction.SpeakCurrentGuidance to VoiceCommandUiDestination.CURRENT_VOICE_PAGE,
+            AndroidVoiceAction.SpeakCurrentState to VoiceCommandUiDestination.CURRENT_VOICE_PAGE,
             AndroidVoiceAction.SpeakVoiceHelp to VoiceCommandUiDestination.CURRENT_VOICE_PAGE,
             AndroidVoiceAction.SpeakNextNavigationInstruction to VoiceCommandUiDestination.CURRENT_VOICE_PAGE,
             AndroidVoiceAction.RequestReroute to VoiceCommandUiDestination.CURRENT_VOICE_PAGE,
@@ -94,7 +100,7 @@ class VoiceCommandUiDestinationPolicyTest {
         )
         // One entry per AndroidVoiceAction subtype (w25: PreviousDestinationCandidates and CancelDialog
         // added); uiDestination()'s exhaustive when covers new ones.
-        assertEquals(18, expected.keys.map { it::class.java }.toSet().size)
+        assertEquals(24, expected.keys.map { it::class.java }.toSet().size)
         expected.forEach { (action, destination) -> assertEquals(action.toString(), destination, action.uiDestination()) }
     }
 }

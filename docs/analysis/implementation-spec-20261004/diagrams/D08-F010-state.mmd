@@ -1,0 +1,9 @@
+stateDiagram-v2
+  state "F-D08-010 family 없음" as S0
+  state "F-D08-010 활성 family" as S1
+  state "F-D08-010 폐기" as S2
+  state "F-D08-010 commit 결과 불명" as S3
+  [*] --> S0
+  S0 --> S1: 인증과 내구 발급
+  S1 --> S2: logout 교체 만료 보안폐기
+  S1 --> S3: rename 뒤 fsync 실패

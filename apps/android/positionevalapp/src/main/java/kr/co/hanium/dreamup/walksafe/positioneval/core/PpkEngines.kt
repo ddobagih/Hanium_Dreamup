@@ -13,7 +13,11 @@ data class ConversionOutput(
 
 interface GnssLoggerRinexConverter {
     val status: ComponentStatus
-    fun convert(rawGnssLogger: File, outputDirectory: File): ConversionOutput
+    fun convert(
+        rawGnssLogger: File,
+        outputDirectory: File,
+        cancellation: AnalysisCancellation = AnalysisCancellation(),
+    ): ConversionOutput
 }
 
 class PinnedAndroidRinexConverter : GnssLoggerRinexConverter {
@@ -28,11 +32,12 @@ class PinnedAndroidRinexConverter : GnssLoggerRinexConverter {
         "RINEX 반송파 위상·LLI·행 단위 제외를 적용하고 RTKLIB readrnxt() round-trip을 검증했습니다.",
     )
 
-    override fun convert(rawGnssLogger: File, outputDirectory: File): ConversionOutput {
+    override fun convert(rawGnssLogger: File, outputDirectory: File, cancellation: AnalysisCancellation): ConversionOutput {
+        cancellation.throwIfCancelled()
         check(status.available) { status.code }
-        GnssLoggerValidator.validate(rawGnssLogger)
+        GnssLoggerValidator.validate(rawGnssLogger, cancellation)
         val observationFile = File(outputDirectory, "rover.obs")
-        GnssLoggerRinex3Converter.convert(rawGnssLogger, observationFile)
+        GnssLoggerRinex3Converter.convert(rawGnssLogger, observationFile, cancellation = cancellation)
         return ConversionOutput(
             observationFile = observationFile,
             navigationFile = null,
@@ -66,11 +71,20 @@ data class PpkRequest(
 
 class PpkEngineException(val reasonCode: String, message: String) : IllegalStateException(message)
 
+data class PpkRunContext(
+    val generation: Long = AnalysisRunGeneration.next(),
+    val cancellation: AnalysisCancellation = AnalysisCancellation(),
+) {
+    init { require(generation > 0L) }
+}
+
 interface PpkEngine {
     val status: ComponentStatus
     val name: String
     val sourceCommit: String
-    fun run(request: PpkRequest)
+    fun run(request: PpkRequest, context: PpkRunContext)
+
+    fun run(request: PpkRequest) = run(request, PpkRunContext())
 }
 
 data class NativeRinexObservationSummary(
@@ -112,14 +126,12 @@ class Demo5JniPpkEngine : PpkEngine {
             }
         }
 
-    override fun run(request: PpkRequest) = run(
-        request,
-        AnalysisRunGeneration.next(),
-        AnalysisCancellation(),
-    )
+    fun run(request: PpkRequest, generation: Long, cancellation: AnalysisCancellation) =
+        run(request, PpkRunContext(generation, cancellation))
 
-    fun run(request: PpkRequest, generation: Long, cancellation: AnalysisCancellation) {
-        require(generation > 0L)
+    override fun run(request: PpkRequest, context: PpkRunContext) {
+        val generation = context.generation
+        val cancellation = context.cancellation
         val nativeToken = Demo5NativeBridge.createRunToken(generation)
         val cancellationRegistration = cancellation.register(nativeToken::cancel)
         try {

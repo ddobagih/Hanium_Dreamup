@@ -1,0 +1,21 @@
+flowchart TD
+  A["F-D12-013 기기키 소실·영구 무효화 뒤 교체 키 로그인"]
+  P["P-D12-013 교체 로그인에서 다른 키로 자동 fallback 금지"]
+  A --> P
+  M0["1. 로그인 전 교체용 다음 버전 키를 준비하고 공개 descriptor를 보여준다."]
+  P --> M0
+  M1["2. 선택한 pending version+marker만 signPinned로 사용하는 보안 클라이언트로 재구성한다."]
+  M0 --> M1
+  M2["3. 서버가 그 키의 LOGIN 또는 RECOVERY_COMPLETE proof를 승인한 뒤 서버 현재 기기 view를 대조한다."]
+  M1 --> M2
+  M3["4. version/marker 일치일 때만 local active로 승격하고 기존 alias 삭제를 시도한다."]
+  M2 --> M3
+  M3 --> N["정상 종료: 서버가 pinned 교체키 proof를 받아들인 로그인 후 pending 승격."]
+  M0 -. "관련 조건 확인" .-> B0{"서버 key version 또는 prefix 불일치"}
+  B0 -->|"조건 해당"| R0["승격 거부"]
+  M1 -. "관련 조건 확인" .-> B1{"서버 current key metadata가 보고되지 않은 0/null"}
+  B1 -->|"조건 해당"| R1["서버가 받아들인 pinned proof를 근거로 pending 승격 가능"]
+  M2 -. "관련 조건 확인" .-> B2{"로그인 실패"}
+  B2 -->|"조건 해당"| R2["기존 metadata 유지·자동 초기화 없음"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["같은 교체키로 새 credentials 로그인; 임의 다른 alias fallback 금지."]

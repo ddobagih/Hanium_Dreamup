@@ -31,26 +31,43 @@ class CameraDetectorAdmissionPolicyTest {
                 occludedFraction = PROFILE.maximumOccludedFraction + 0.01,
             ),
             observation().copy(
-                angularShakeDegreesPerSecond =
-                    PROFILE.maximumAngularShakeDegreesPerSecond + 0.01,
-            ),
-            observation().copy(
                 mountPitchDegrees = PROFILE.maximumMountPitchDegrees + 0.01,
             ),
             observation().copy(
                 observedAtElapsedRealtimeMs = NOW_MS - MAX_AGE_MS - 1L,
             ),
+            observation().copy(frameAvailable = false),
+            observation().copy(frameAvailable = null),
+            observation().copy(mountPitchDegrees = null),
+            observation().copy(epoch = WalkRuntimeEpoch("other-walk", 1L)),
         )
         var detectorInvocations = 0
 
         adverseObservations.forEach { adverse ->
-            val admission = admit(adverse) {
+            val admission = admit(adverse.copy(angularShakeDegreesPerSecond = null)) {
                 detectorInvocations += 1
             }
 
             assertFalse(admission.detectorInvocationAllowed)
         }
         assertEquals(0, detectorInvocations)
+    }
+
+    @Test
+    fun detectorRunsWithMissingInvalidOrHighShakeWhenOtherMeasurementsPass() {
+        val shakeValues = listOf(
+            null, Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, -0.1, 0.0, 1_000.0,
+        )
+        var detectorInvocations = 0
+        shakeValues.forEach { shake ->
+            val admission = admit(observation().copy(angularShakeDegreesPerSecond = shake)) {
+                detectorInvocations += 1
+            }
+
+            assertTrue("shake=$shake", admission.detectorInvocationAllowed)
+            assertEquals(CameraFrameQualityReason.PASSED, admission.frameQuality.reason)
+        }
+        assertEquals(shakeValues.size, detectorInvocations)
     }
 
     @Test

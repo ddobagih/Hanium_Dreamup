@@ -1,0 +1,46 @@
+flowchart LR
+  OWNER["D04 F001<br/>제품 MainActivity 위치 owner·권한·전경"]
+  FLP["F002·F015<br/>FLP GNSS fix와 quality filtering"]
+  GNSS["F013·F014<br/>status/raw CN0 risk"]
+  STEPS["F003·F004<br/>hardware step·LOW accel 대체"]
+  IMU["F005·F006<br/>IMU 창과 phone stillness"]
+  USER["F007<br/>지면 이동·보행·회전·mount 통합"]
+  ORIENT["F008부터 F012<br/>route compass / strict chest / heading 선택"]
+  PDR["F015부터 F018<br/>GNSS·PDR·ZUPT·confidence"]
+  CAL["F019부터 F022<br/>raw 직선 보정·profile·actor 저장"]
+  ROUTE["F023부터 F025<br/>corridor·alignment·상대방향"]
+  DEPTH["F026<br/>독립 typed motion → depth 소비자"]
+  RAW["F027<br/>RAW motion aggregate"]
+  UNLINKED["F028 UNCONNECTED<br/>TransferStationaryEvidencePolicy"]
+  TRACE["F029 CONDITIONAL<br/>DEBUG field trace v2"]
+  TYPES["F030<br/>ENU·uncertainty·rotation 계약"]
+  D03["D03 경로·재탐색·회전 안내"]
+  D07["D07 tactile / AR orientation 소비"]
+  D16["D16 positionevalapp<br/>별도 manifest·runtime"]
+  OWNER --> FLP
+  OWNER --> GNSS
+  OWNER --> STEPS
+  OWNER --> IMU
+  OWNER --> ORIENT
+  GNSS -->|"원 관측시각 risk"| FLP
+  FLP --> USER
+  STEPS --> USER
+  IMU --> USER
+  ORIENT -->|"step 이전 heading"| PDR
+  STEPS --> PDR
+  USER -->|"독립 정지 ZUPT gate"| PDR
+  FLP --> PDR
+  FLP -->|"raw accepted endpoint"| CAL
+  STEPS --> CAL
+  CAL -->|"보폭·noise"| PDR
+  CAL --> DEPTH
+  PDR --> ROUTE
+  ROUTE --> D03
+  ORIENT --> D07
+  USER --> RAW
+  USER --> DEPTH
+  USER -.->|"helper 선언만; 제품 호출 부재"| UNLINKED
+  PDR --> TRACE
+  TRACE -->|"export 계약; storage는 fieldlog"| D16
+  TYPES --> PDR
+  TYPES --> ROUTE

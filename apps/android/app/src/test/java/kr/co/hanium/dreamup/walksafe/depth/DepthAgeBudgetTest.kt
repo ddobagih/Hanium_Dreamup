@@ -51,11 +51,12 @@ class DepthAgeBudgetTest {
         assertEquals(key(2_240L).capturedAtElapsedRealtimeMs - 300L + DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS,
             past.sourceValidUntilElapsedRealtimeMs)
         assertTrue(requireNotNull(past.sourceValidUntilElapsedRealtimeMs) < requireNotNull(fresh.sourceValidUntilElapsedRealtimeMs))
-        // Future-stamped Raw is reprojected too: shown and used for guidance, never a TTC.
+        // An unseen future Image ID has no original Frame attribution, so cannot guide.
         val future = visualSequence { key(it.frameId / 1_000_000L + 100L).cameraTimestampNs }
         assertEquals(true, future.depthReprojected)
         assertNull(future.timeToCollisionMs)
-        assertTrue(DepthAgeBudget.admits(DepthUse.RISK_GUIDANCE, future, future.timestampMs))
+        assertNull(future.depthObservedAtMs)
+        assertFalse(DepthAgeBudget.admits(DepthUse.RISK_GUIDANCE, future, future.timestampMs))
         // Repeated Raw: the previous frame's depth again.
         val repeated = visualSequence { key(it.frameId / 1_000_000L - 100L).cameraTimestampNs }
         assertEquals(true, repeated.depthReprojected)

@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D03-017 대화 취소·목적지 취소·길안내 종료의 구분"]
+  P["정책 P-D03-017"]
+  A --> P
+  N0["1. 취소 대상이 다른 세 기능을 명시적으로 분리한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. 일반 취소는 search/location acquisition/candidate/walking selection 과 미저장 신고 확인만 닫고 설치 route 를 유지한다."]
+  N0 --> N1
+  N2["3. 목적지 취소는 설치 route 가 있으면 user_destination 교체요청만 취소하고 off_route 요청은 유지; 첫 route 전이면 전체 목적지를 reset 한다."]
+  N1 --> N2
+  N3["4. 길안내 진행과 후보 dialog 가 함께 열려 있을 때 길 없는 안내 취소는 종료인지 후보닫기인지 한 번 묻는다."]
+  N2 --> N3
+  N4["5. 길안내 종료/취소 또는 질문 내 재발화는 종료; pending 결정은 stale token 과 충돌 차단을 먼저 적용한다."]
+  N3 --> N4
+  Z["정상: 지정 scope 만 종료."]
+  N4 --> Z
+  B0{"명시 길안내 종료 또는 dialog 없음"}
+  R0["즉시 stop"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"모호 안내 취소+설치 route+dialog"}
+  R1["한 번 확인"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"질문 window 초과/clock regression"}
+  R2["기존 확인 권한 없음"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: 저장 purge 실패는 별도 fence/안내."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xtimeout["만료: stop 확인≤30s; 후보창과 경계가 다름."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xtimeout
+  Xcancel["취소: 취소 자체가 기능; 기존 route 보존 범위 명시."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: route/epoch 변경 질문 무효."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xretry["재시도: 재질문 또는 명시적 길안내 종료로 진행."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry
+  Xcleanup["정리: pending selection/lease/location request clear; route reset 시 transport/output/archive 정리."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

@@ -1,0 +1,30 @@
+flowchart TB
+  E["F-D15-010 · 중단된 신고 쓰기 journal 복구<br/>startup 및 monitor cycle의 pending journal 회복"]
+  P["P-D15-010 · 전제조건<br/>maintenance lock 다음 exclusive storage<br/>transaction lock; upload root 권한·inode/ACL<br/>검사."]
+  E --> P
+  S1["1. journal 목록·형식·파일 binding 검사"]
+  P --> S1
+  S2["2. Report와 image metadata 동시 부재면 암호화 고아·중간파일<br/>제거"]
+  S1 --> S2
+  S3["3. Report가 있으면 image metadata·envelope<br/>hash/header가 journal과 정확히 같아야 보존"]
+  S2 --> S3
+  S4["4. 검증 완료 journal 제거; 남은 directory는 안전하게 비었을 때<br/>제거"]
+  S3 --> S4
+  OK["정상 결과<br/>검증 완료 journal 제거; 남은 directory는 안전하게 비었을 때 제거"]
+  S4 --> OK
+  B1["조건 · v1 plaintext journal<br/>결과 · offline migration 필요, 자동복구 거절"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · Report 없음·image metadata 있음<br/>결과 · unresolved"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · Report 있음·blob/metadata 불일치<br/>결과 · unresolved; 자동 삭제 안 함"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · max_items/deadline 도달<br/>결과 · RecoveryDeferred; 다음 bounded pass"]
+  S1 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>DB 상태가 명확해진 뒤 재실행; legacy/malformed/불일치는 별도<br/>수동 조정."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_storage.py:475<br/>reconcile_pending_report_writes<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

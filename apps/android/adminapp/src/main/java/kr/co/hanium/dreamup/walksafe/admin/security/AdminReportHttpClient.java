@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.Set;
 
 /** Device-proof protected client for strict, minimum administrator report reads. */
@@ -35,13 +34,14 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     private static final int MAX_PACKAGE_RESPONSE_BYTES = 8 * 1024 * 1024;
     private static final byte[] EMPTY_BODY = new byte[0];
 
-    interface Clock {
+    interface Clock extends AdminProtectedRequestExecutor.Clock {
         long nowEpochMs();
 
         default long monotonicNanos() { return System.nanoTime(); }
     }
 
-    interface Transport {
+    interface Transport extends AdminProtectedRequestExecutor.Exchange<Response> {
+        default void cancelInFlight() {}
         Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException;
     }
@@ -71,11 +71,8 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     }
 
     private final String origin;
-    private final String deviceKeyMarker;
-    private final int deviceKeyVersion;
-    private final AdminDeviceProof.Signer signer;
-    private final Clock clock;
     private final Transport transport;
+    private final AdminProtectedRequestExecutor<Response> protectedRequests;
 
     public AdminReportHttpClient(
         String configuredOrigin,
@@ -113,11 +110,48 @@ public final class AdminReportHttpClient implements AdminReportRepository {
             throw new IllegalArgumentException("device signer, clock, and transport are required");
         }
         this.origin = approved;
-        this.deviceKeyMarker = deviceKeyMarker;
-        this.deviceKeyVersion = deviceKeyVersion;
-        this.signer = signer;
-        this.clock = clock;
         this.transport = transport;
+        this.protectedRequests = new AdminProtectedRequestExecutor<>(
+            this.origin, deviceKeyMarker, deviceKeyVersion, signer, clock, transport,
+            response -> {
+                requireStatus(response, 200);
+                return jsonBody(response);
+            }
+        );
+    }
+
+    static byte[] statusBody(String nextStatus, int expectedVersion) {
+        if (!AdminJava8Collections.set("new", "reviewed", "resolved").contains(nextStatus)) {
+            throw new IllegalArgumentException("next status is invalid");
+        }
+        if (expectedVersion < 1) throw new IllegalArgumentException("expected_version must be positive");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("expected_version", expectedVersion);
+        fields.put("status", nextStatus);
+        return AdminCanonicalEncoding.canonicalJsonBytes(fields);
+    }
+
+    static byte[] requestStatusBody(String requestType, String nextStatus, int expectedVersion, String publicResponse, String internalNote) {
+        String safeType = AdminReportRequestModels.requestType(requestType);
+        if (!AdminJava8Collections.set("ACKNOWLEDGED", "RESOLVED", "REJECTED").contains(nextStatus)) {
+            throw new IllegalArgumentException("next report request status is invalid");
+        }
+        if ("DELETE".equals(safeType) && "RESOLVED".equals(nextStatus)) {
+            throw new IllegalArgumentException("DELETE report requests cannot be resolved");
+        }
+        if (expectedVersion < 1) throw new IllegalArgumentException("expected_version must be positive");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("status", nextStatus);
+        fields.put("expected_version", expectedVersion);
+        fields.put(
+            "public_response",
+            AdminReportRequestModels.optionalResponse(publicResponse, "public_response")
+        );
+        fields.put(
+            "internal_note",
+            AdminReportRequestModels.optionalResponse(internalNote, "internal_note")
+        );
+        return AdminCanonicalEncoding.canonicalJsonBytes(fields);
     }
 
     @Override
@@ -195,14 +229,7 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     ) throws IOException, GeneralSecurityException {
         if (dispatch == null) throw new IllegalArgumentException("status dispatch is required");
         String safeId = AdminReportModels.canonicalUuid(reportId, "report_id");
-        if (!AdminJava8Collections.set("new", "reviewed", "resolved").contains(nextStatus)) {
-            throw new IllegalArgumentException("next status is invalid");
-        }
-        if (expectedVersion < 1) throw new IllegalArgumentException("expected_version must be positive");
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("expected_version", expectedVersion);
-        fields.put("status", nextStatus);
-        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
+        byte[] body = statusBody(nextStatus, expectedVersion);
         Response response = executeProtected(
             requireSession(session),
             "PATCH",
@@ -379,25 +406,7 @@ public final class AdminReportHttpClient implements AdminReportRepository {
     ) throws IOException, GeneralSecurityException {
         String safeId = AdminReportRequestModels.canonicalUuid(requestId, "request_id");
         String safeType = AdminReportRequestModels.requestType(requestType);
-        if (!AdminJava8Collections.set("ACKNOWLEDGED", "RESOLVED", "REJECTED").contains(nextStatus)) {
-            throw new IllegalArgumentException("next report request status is invalid");
-        }
-        if ("DELETE".equals(safeType) && "RESOLVED".equals(nextStatus)) {
-            throw new IllegalArgumentException("DELETE report requests cannot be resolved");
-        }
-        if (expectedVersion < 1) throw new IllegalArgumentException("expected_version must be positive");
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("status", nextStatus);
-        fields.put("expected_version", expectedVersion);
-        fields.put(
-            "public_response",
-            AdminReportRequestModels.optionalResponse(publicResponse, "public_response")
-        );
-        fields.put(
-            "internal_note",
-            AdminReportRequestModels.optionalResponse(internalNote, "internal_note")
-        );
-        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
+        byte[] body = requestStatusBody(requestType, nextStatus, expectedVersion, publicResponse, internalNote);
         Response response = executeProtected(
             requireSession(session),
             "PATCH",
@@ -540,49 +549,13 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         String accept,
         AdminReportWorkflowController.StatusDispatch dispatch
     ) throws IOException, GeneralSecurityException {
-        String correlationId = UUID.randomUUID().toString();
-        AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
-            action,
-            session.adminId(),
-            AdminCanonicalEncoding.sha256Hex(body),
-            correlationId,
-            session.deviceId(),
-            deviceKeyMarker,
-            deviceKeyVersion,
-            method,
-            path,
-            AdminDeviceProof.Purpose.ACTION,
-            AdminCanonicalEncoding.sha256Hex(canonicalQuery.getBytes(StandardCharsets.UTF_8)),
-            readPurpose,
-            session.sessionId()
-        );
-        Map<String, String> challengeHeaders = jsonHeaders(protectedHeaders(session, correlationId, null));
-        Response challenge = transport.execute(
-            "POST",
-            origin + CHALLENGE_PATH,
-            challengeHeaders,
-            intent.challengeRequestBytes()
-        );
-        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
-        requireStatus(challenge, 200);
-        AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
-            jsonBody(challenge),
-            intent,
-            challengeTime.estimatedNowEpochMs(clock.monotonicNanos()),
-            signer
-        );
-        Map<String, String> headers = new LinkedHashMap<>(
-            protectedHeaders(session, correlationId, readPurpose)
-        );
-        headers.putAll(proof.proofHeaders());
-        headers.putAll(additionalHeaders);
-        headers.put("Accept", accept);
-        if (body.length > 0) headers.put("Content-Type", "application/json; charset=utf-8");
-        String url = origin + path + (canonicalQuery.isEmpty() ? "" : "?" + canonicalQuery);
-        if (dispatch != null && !dispatch.markDispatched()) {
-            throw new AdminReportWorkflowController.StatusDispatchCancelledException();
-        }
-        return transport.execute(method, url, AdminJava8Collections.copyMap(headers), body.length == 0 ? null : body);
+        return protectedRequests.execute(session, method, path, canonicalQuery,
+            action, readPurpose, body.length == 0 ? null : body, additionalHeaders,
+            accept, () -> {
+                if (dispatch != null && !dispatch.markDispatched()) {
+                    throw new AdminReportWorkflowController.StatusDispatchCancelledException();
+                }
+            }).response;
     }
 
     private static AdminOperationsApi.SessionContext requireSession(
@@ -608,29 +581,6 @@ public final class AdminReportHttpClient implements AdminReportRepository {
             throw new IOException("administrator device binding is unavailable");
         }
         return session;
-    }
-
-    private static Map<String, String> protectedHeaders(
-        AdminOperationsApi.SessionContext session,
-        String correlationId,
-        String readPurpose
-    ) {
-        Map<String, String> headers = new LinkedHashMap<>();
-        headers.put("Authorization", "Bearer " + session.accessToken());
-        headers.put("X-WalkSafe-App-Kind", AdminSecurityHttpClient.APP_KIND);
-        headers.put("X-WalkSafe-Role", AdminSecurityHttpClient.ROLE);
-        headers.put("X-WalkSafe-Audience", AdminSecurityHttpClient.AUDIENCE);
-        headers.put("X-WalkSafe-Device-Id", session.deviceId());
-        headers.put(CORRELATION_ID_HEADER, correlationId);
-        if (readPurpose != null) headers.put(READ_PURPOSE_HEADER, readPurpose);
-        return AdminJava8Collections.copyMap(headers);
-    }
-
-    private static Map<String, String> jsonHeaders(Map<String, String> source) {
-        Map<String, String> headers = new LinkedHashMap<>(source);
-        headers.put("Accept", "application/json");
-        headers.put("Content-Type", "application/json; charset=utf-8");
-        return AdminJava8Collections.copyMap(headers);
     }
 
     private static void add(
@@ -702,11 +652,21 @@ public final class AdminReportHttpClient implements AdminReportRepository {
         }
     }
 
+    @Override public void cancelInFlightRequests() { transport.cancelInFlight(); }
+
     private static final class OkHttpTransport implements Transport {
+        private final AdminOkHttpTransport.RequestOwner requests = new AdminOkHttpTransport.RequestOwner();
+        @Override public void cancelInFlight() { requests.cancelInFlight(); }
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException {
+            return execute(null, method, url, headers, body);
+        }
+        @Override
+        public Response execute(AdminOperationsApi.SessionContext session, String method, String url,
+            Map<String, String> headers, byte[] body) throws IOException {
             AdminOkHttpTransport.Result response = AdminOkHttpTransport.execute(
+                requests, session,
                 method,
                 url,
                 headers,

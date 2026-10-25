@@ -217,6 +217,131 @@ class RuntimeLoadMonitorTest {
         assertEquals(1L, monitor.snapshot().completedWindows)
     }
 
+    @Test
+    fun maximumIsUnknownUntilWindowClosesAndRawZeroRemainsAnObservation() {
+        val monitor = RuntimeLoadMonitor()
+        assertNull(monitor.snapshot().lastCompletedWindowMaxEndToEndMs)
+        addSamples(monitor, 0L, 0L)
+        assertNull(monitor.snapshot().lastCompletedWindowMaxEndToEndMs)
+
+        val closed = monitor.observe(20_000L, KEY, true, inputObserved = true)
+
+        assertEquals(0L, closed.lastCompletedWindowMaxEndToEndMs)
+        assertEquals(RuntimeLoadWindowStatus.BASELINE_LEARNED, closed.lastWindowStatus)
+        assertEquals(0.0, checkNotNull(closed.baseline).medianEndToEndMs, 0.0)
+        monitor.observe(20_001L, KEY, true, true, RuntimeLoadCompletion(700L))
+        assertEquals(0L, monitor.snapshot().lastCompletedWindowMaxEndToEndMs)
+    }
+
+    @Test
+    fun completionAtWindowBoundaryBelongsToTheNextWindowMaximum() {
+        val monitor = RuntimeLoadMonitor()
+        addSamples(monitor, 0L, 100L)
+
+        val first = monitor.observe(20_000L, KEY, true, true, RuntimeLoadCompletion(999L))
+
+        assertEquals(100L, first.lastCompletedWindowMaxEndToEndMs)
+        assertEquals(1L, first.completedWindows)
+        val second = monitor.observe(40_000L, KEY, true, inputObserved = true)
+        assertEquals(999L, second.lastCompletedWindowMaxEndToEndMs)
+        assertEquals(2L, second.completedWindows)
+        assertEquals(RuntimeLoadWindowStatus.INSUFFICIENT_SAMPLES, second.lastWindowStatus)
+        assertNull(second.pendingReason)
+    }
+
+    @Test
+    fun maximumPreservesRawLongBeyondTheMedianSampleCap() {
+        val monitor = RuntimeLoadMonitor()
+        repeat(1_024) { index ->
+            monitor.observe(index.toLong(), KEY, true, true, RuntimeLoadCompletion(100L))
+        }
+        val tailMs = 9_007_199_254_740_993L
+        monitor.observe(1_024L, KEY, true, true, RuntimeLoadCompletion(tailMs))
+
+        val closed = monitor.observe(20_000L, KEY, true, inputObserved = true)
+
+        assertEquals(tailMs, closed.lastCompletedWindowMaxEndToEndMs)
+        assertEquals(RuntimeLoadBaseline(100.0, 0.0, 0.0, 1_024), closed.baseline)
+        assertEquals(RuntimeLoadWindowStatus.BASELINE_LEARNED, closed.lastWindowStatus)
+        assertNull(closed.pendingReason)
+    }
+
+    @Test
+    fun observedMaximumDoesNotTurnInsufficientOrInterruptedWindowsIntoHealthyEvidence() {
+        val insufficient = RuntimeLoadMonitor()
+        addWindow(insufficient, 0L, 900L, count = 1)
+        assertEquals(900L, insufficient.snapshot().lastCompletedWindowMaxEndToEndMs)
+        assertEquals(RuntimeLoadWindowStatus.INSUFFICIENT_SAMPLES, insufficient.snapshot().lastWindowStatus)
+        assertNull(insufficient.snapshot().baseline)
+        assertNull(insufficient.snapshot().pendingReason)
+
+        val stale = RuntimeLoadMonitor()
+        addWindow(stale, 0L, 900L, count = 1, staleCount = 1)
+        assertEquals(900L, stale.snapshot().lastCompletedWindowMaxEndToEndMs)
+        assertEquals(RuntimeLoadWindowStatus.RESULT_INTERRUPTION, stale.snapshot().lastWindowStatus)
+        assertEquals(RuntimeLoadPendingReason.NO_FRESH_RESULTS_WITH_INPUT, stale.snapshot().pendingReason)
+        assertNull(stale.snapshot().baseline)
+
+        val missing = RuntimeLoadMonitor()
+        missing.observe(0L, KEY, true, inputObserved = true)
+        missing.observe(20_000L, KEY, true, inputObserved = true)
+        assertNull(missing.snapshot().lastCompletedWindowMaxEndToEndMs)
+        assertEquals(RuntimeLoadPendingReason.NO_COMPLETIONS_WITH_INPUT, missing.snapshot().pendingReason)
+    }
+
+    @Test
+    fun continuityBreakAndNewScopeClearThePreviousWindowMaximum() {
+        val interruptions: List<Pair<RuntimeLoadWindowStatus, (RuntimeLoadMonitor) -> Unit>> = listOf(
+            RuntimeLoadWindowStatus.INACTIVE_ENVIRONMENT to { it.observe(20_001L, KEY, false) },
+            RuntimeLoadWindowStatus.INACTIVE_ENVIRONMENT to { it.observe(20_001L, "", true) },
+            RuntimeLoadWindowStatus.COLLECTING to { it.observe(20_001L, "CPU:2:tracking-depth", true) },
+            RuntimeLoadWindowStatus.INVALID_TIMING to { it.observe(19_999L, KEY, true) },
+            RuntimeLoadWindowStatus.INVALID_TIMING to { it.observe(-1L, KEY, true) },
+            RuntimeLoadWindowStatus.INVALID_TIMING to {
+                it.observe(20_001L, KEY, true, true, RuntimeLoadCompletion(-1L))
+            },
+            RuntimeLoadWindowStatus.SOURCE_TIMING_MISMATCH to {
+                it.observe(20_001L, KEY, true, true, RuntimeLoadCompletion(900L, sourceTimestampMatches = false))
+            },
+            RuntimeLoadWindowStatus.INACTIVE_ENVIRONMENT to {
+                it.observe(20_001L, KEY, true, true, RuntimeLoadCompletion(900L, liveCameraInput = false))
+            },
+            RuntimeLoadWindowStatus.OBSERVATION_GAP to { it.observe(40_001L, KEY, true, inputObserved = true) },
+            RuntimeLoadWindowStatus.INACTIVE_ENVIRONMENT to { it.pause() },
+        )
+        interruptions.forEach { (expectedStatus, interrupt) ->
+            val monitor = RuntimeLoadMonitor()
+            addWindow(monitor, 0L, 100L)
+            assertEquals(100L, monitor.snapshot().lastCompletedWindowMaxEndToEndMs)
+
+            interrupt(monitor)
+
+            assertNull("Previous scope must not supply the maximum after $expectedStatus",
+                monitor.snapshot().lastCompletedWindowMaxEndToEndMs)
+            assertEquals(expectedStatus, monitor.snapshot().lastWindowStatus)
+            assertEquals(1L, monitor.snapshot().completedWindows)
+            assertEquals(0, monitor.snapshot().consecutiveDegradedWindows)
+        }
+    }
+
+    @Test
+    fun resetClearsMaximumAlongsideStickyPendingAndBaseline() {
+        val monitor = RuntimeLoadMonitor()
+        addWindow(monitor, 0L, 100L)
+        repeat(3) { addWindow(monitor, (it + 1) * 20_000L, 200L) }
+        assertEquals(200L, monitor.snapshot().lastCompletedWindowMaxEndToEndMs)
+        assertNotNull(monitor.snapshot().pendingReason)
+
+        monitor.reset()
+
+        assertNull(monitor.snapshot().lastCompletedWindowMaxEndToEndMs)
+        assertNull(monitor.snapshot().pendingReason)
+        assertNull(monitor.snapshot().baseline)
+        assertNull(monitor.snapshot().environmentKey)
+        assertEquals(0L, monitor.snapshot().completedWindows)
+        assertEquals(RuntimeLoadWindowStatus.COLLECTING, monitor.snapshot().lastWindowStatus)
+    }
+
     private fun addWindow(
         monitor: RuntimeLoadMonitor,
         startMs: Long,

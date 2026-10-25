@@ -39,6 +39,8 @@ class DestinationSearchLocationController(
     private val nowElapsedRealtimeMs: () -> Long,
 ) {
     private var generation = 0L
+    var consumerGeneration = 0L
+        private set
     private var lease: DestinationSearchLocationLease? = null
     private var fix: DestinationSearchLocationFix? = null
     private var cancelRequest: (() -> Unit)? = null
@@ -73,7 +75,9 @@ class DestinationSearchLocationController(
             cancel()
             return false
         }
-        originOrNull(expectedLease)?.let {
+        val cached = originOrNull(expectedLease)
+        consumerGeneration += 1L
+        cached?.let {
             onResult(it)
             return true
         }
@@ -111,6 +115,7 @@ class DestinationSearchLocationController(
 
     fun cancel() {
         generation += 1L
+        consumerGeneration += 1L
         isAcquiring = false
         fix = null
         lease = null

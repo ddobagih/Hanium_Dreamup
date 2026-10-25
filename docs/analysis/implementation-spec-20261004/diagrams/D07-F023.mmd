@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-023<br/>점자블록 후보 선택과 TMAP 유지 정책<br/>상태 ACTIVE"]
+    P0["현재 route와 traversable 후보 blocker 비교"]
+    A --> D
+    P1["confidence 안정 age heading corridor 검사"]
+    P0 --> P1
+    P2["거절사유 또는 motion evidence unavailable 결정"]
+    P1 --> P2
+    P3["항상 TMAP 유지 steering instruction null"]
+    P2 --> P3
+    D{"P-D07-023<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["TMAP와 해당 거절사유"]
+    D -->|"candidate 없음·route mismatch·blocker"| B0
+    B1["TMAP tactile_motion_evidence_unavailable"]
+    D -->|"모든 현재 조건 충족"| B1
+    B2["현재 evaluate 생성 경로 없음"]
+    D -->|"TACTILE_LOCAL 요청 가정"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

@@ -74,7 +74,12 @@ class TactileRouteProgressPolicyTest {
         val coordinator = source("navigation/AndroidTactileFrameCoordinator.kt")
         assertEquals(3, Regex("activeRouteProgress = (input\\.)?activeRouteProgress").findAll(coordinator).count())
         val activity = source("MainActivity.kt")
-        assertEquals(2, Regex("activeRouteProgress = routeNavigator\\.currentTactileRouteProgress\\(\\)").findAll(activity).count())
+        val capture = source("navigation/capture/TactileFrameCaptureController.kt")
+        assertTrue(activity.contains("tactileCapture.processTactileSnapshotFrame("))
+        assertTrue(capture.contains("activeRouteProgress = navigator().currentTactileRouteProgress()"))
+        assertTrue(activity.contains("routeNavigator.currentRouteId(), routeNavigator.currentTactileRouteProgress()"))
+        val pipeline = source("runtime/vision/frame/FramePipelineController.kt")
+        assertTrue(pipeline.contains("activeRouteProgress = sourceLease.routeProgress"))
     }
 
     @Test

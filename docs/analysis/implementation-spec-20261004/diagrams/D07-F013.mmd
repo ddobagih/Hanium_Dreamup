@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-013<br/>Main 실시간 depth 허용·손실·공백 처리<br/>상태 ACTIVE"]
+    P0["metric session generation과 current purpose 검사"]
+    A --> D
+    P1["새 frame 반복 frame 역행 구분"]
+    P0 --> P1
+    P2["sample failure와 2000ms stale 평가"]
+    P1 --> P2
+    P3["새 유효 frame만 last valid 갱신"]
+    P2 --> P3
+    D{"P-D07-013<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["출력 허용, lastValid 갱신 없음"]
+    D -->|"같은 frame이고 previousFresh·samplesValid"| B0
+    B1["즉시 loss 처리"]
+    D -->|"fatal 또는 timestamp 역행"| B1
+    B2["제한된 gap prediction 경로만"]
+    D -->|"samples 불가지만 lastValid age≤600"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

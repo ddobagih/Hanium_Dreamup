@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-011 · 신고 저장소 inventory monitor·stale 결과<br/>차단<br/>lifespan background run, readiness checks"]
+  P["P-D15-011 · 전제조건<br/>startup seed는 lock 하 전체 검증 성공 결과만; 런타임 task는<br/>lifespan 소유(D09)."]
+  E --> P
+  S1["1. start에서 bounded journal 복구 및 upload/key<br/>readiness snapshot"]
+  P --> S1
+  S2["2. 16개/1초 cooperative budget으로 DB row 조회 후 DB<br/>lock 밖에서 ciphertext hash 검사"]
+  S1 --> S2
+  S3["3. 다시 lock을 얻어 metadata·fingerprint 일치 재확인"]
+  S2 --> S3
+  S4["4. namespace 검사 후 missing/extra 정확 집합 비교,<br/>concurrent 신규 행 보완"]
+  S3 --> S4
+  S5["5. 같은 coverage revision만 성공 publish; checks는<br/>snapshot만 반환"]
+  S4 --> S5
+  OK["정상 결과<br/>같은 coverage revision만 성공 publish; checks는<br/>snapshot만 반환"]
+  S5 --> OK
+  B1["조건 · DB/file 집합 불일치<br/>결과 · incident 기록, readiness false"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · coverage 변경/stop<br/>결과 · 늦은 성공 publish 금지; cycle restart/종료"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · snapshot age≥max age<br/>결과 · monitor unavailable"]
+  S2 -. "해당 조건 발생" .-> B3
+  B4["조건 · blocking I/O<br/>결과 · 1초 budget이 강제 I/O timeout은 아님"]
+  S1 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>task cancel→stop publication→shield worker 종료<br/>대기.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>worker가 FD를 쓰는 동안 닫지 않고 owner가 종료 후<br/>iterator/descriptor 정리."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_storage_monitor.py:52<br/>ReportStorageMonitor<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

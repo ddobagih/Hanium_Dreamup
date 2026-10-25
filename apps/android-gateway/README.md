@@ -21,9 +21,13 @@ Android가 사용하는 가입·세션·현장·음성 API와 앱 밖 개인정�
 
 | 경로 | 메서드 | 요청 제한 | 게이트웨이 제한 |
 | --- | --- | ---: | ---: |
-| `/api/account-enrollments/email-otp` | POST | JSON 4 KiB | 본문 10초, upstream 15초, 응답 16 KiB/5초 |
+| `/api/account-enrollments/email-otp` | POST | JSON 4 KiB | 본문 10초, OTP upstream 40초, 응답 16 KiB/5초, 전체 60초 |
+| `/api/account-signup-policy` | GET | 본문·query 없음 | upstream 15초, 응답 16 KiB/5초, no-store |
 | `/api/accounts` | POST | JSON 16 KiB | 본문 10초, upstream 15초, 응답 16 KiB/5초 |
 | `/api/field-session` | GET, POST, DELETE | POST JSON 4 KiB | 본문 읽기 10초, refresh는 상태 읽기 전 IP 60회/분·(actor, family) 거절 30회/분·동시 16건(S19-10) |
+| `/api/field-diagnostics/preference` | GET, POST, PUT | JSON 256 KiB, query 없음 | 현재 general 계정의 진단 opt-in 조회·최초 동의·revision CAS 변경 |
+| `/api/field-diagnostics/sessions/{session_id}/batches` | POST | JSON 256 KiB, canonical lowercase UUID | 독립 진단 동의 revision·같은 session/build의 1~100 event, Backend schema 검사 |
+| `/api/field-diagnostics/sessions/{session_id}` | GET | canonical lowercase UUID, query 없음 | 현재 계정의 보존 진단 조회, 응답 최대 256 KiB |
 | `/api/field-walk` | GET, POST | POST JSON 4 KiB | 장기·v7 기기 세션, 계정당 활성 보행 1개·90초 lease, 명령 v2(v1은 기본 409) |
 | `/api/speech/stt` | POST | raw audio 기본 10 MiB | 로그인, actor/IP/global rate, 동시 1건, upstream 35초, 응답 64 KiB |
 | `/api/speech/tts` | POST | exact JSON 2 KiB | 로그인, actor/IP/global rate, 동시 1건, upstream 65초, WAV 4 MiB·30초 |
@@ -43,7 +47,7 @@ Android가 사용하는 가입·세션·현장·음성 API와 앱 밖 개인정�
 | `/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}` | PUT | exact raw bytes 8 MiB | Content-Length·raw SHA-256 필수, bounded read/hash, write 동시 1건 |
 | `/api/raw-collections/{collection_id}` | GET | body/query 없음 | current v7·account/privacy generation만 요구하는 복구 조회 |
 | `/api/raw-collections/{collection_id}/commit` | POST | canonical JSON 16 KiB | domain-separated commit digest, HEAD preflight, 14일 검역 receipt v2 strict projection |
-| `/privacy/rights` | GET, HEAD(HTML), PUT(통합 동의) | `control` query·JSON 4 KiB(HTML 안내는 query 없는 GET/HEAD) | 통합 동의 제어면·bootstrap(아래 절) |
+| `/privacy/rights` | GET, HEAD, PUT | `control` query·JSON 4 KiB(HTML 안내는 query 없는 GET/HEAD) | 통합 동의·bootstrap·설치 삭제 증거 키 등록, HTML HEAD 지원(아래 절) |
 | `/privacy/account-deletions` | POST | exact JSON 4 KiB | 세대 fence를 durable 기록한 뒤 v2 요청 전달(아래 절) |
 | `/privacy/account-deletions/{request_id}/status` | GET | body/query 없음 | 요청에 결속된 capability만 사용 |
 | `/privacy/account-deletions/{request_id}/device-evidence` | POST | exact JSON 16 KiB | capability·status revision CAS, 증거 원장 durable 기록 |
@@ -51,6 +55,10 @@ Android가 사용하는 가입·세션·현장·음성 API와 앱 밖 개인정�
 모든 응답에는 `Cache-Control: no-store`를 설정합니다. 가입 relay는 exact JSON key와 성공 응답 schema를 검사하고, Backend 오류에서는 허용된 status와 code만 재구성합니다. 새 계정 비밀번호(`AccountCreateRequest.password`)는 NUL 없는 12~128 code point여야 하며 그 밖의 길이는 Backend 호출 전 422 `account_create_request_invalid`로 거부합니다. 흔하거나 추측하기 쉬운 비밀번호는 Backend가 400 `account_password_too_common`으로 거부하고 Gateway는 비밀번호를 반사하지 않고 그 code만 전달합니다. 로그인(`AccountPasswordSessionLogin`)은 기존 계정 호환을 위해 10~128 code point를 계속 허용합니다. 계정 이메일 local part는 ASCII만 허용합니다. domain은 `domainToASCII()`로 IDNA ASCII(`xn--` punycode 포함) 소문자 형식으로 변환한 값만 Backend로 전달하며, Backend는 이 Gateway 변환 결과를 전제로 합니다. 변환할 수 없거나 형식이 잘못된 이메일은 원문을 반사하지 않는 422로 거부합니다. Backend 인증의 429/503과 안전한 `Retry-After`는 같은 no-store status로 투영합니다. 이메일 OTP relay는 `WALKSAFE_GATEWAY_TRUSTED_IP_HEADER`에서 읽은 단일 IP를 canonical 형식으로 검증한 뒤 Gateway가 `x-walksafe-client-ip`를 새로 설정하며, 클라이언트가 보낸 동명 헤더는 전달하지 않습니다. 이메일·생년월일·IP·OTP·비밀번호·enrollment handle·동의 선택은 telemetry나 로그에 넣지 않습니다. 요청 telemetry(`walksafe.gateway-telemetry.v3`)는 Response 객체가 준비된 시점의 `walksafe.gateway.request.prepared`와 body 전달이 끝난 시점의 `walksafe.gateway.request.finished`(`outcome`: `completed`=body 전체를 전송 계층에 넘김, `aborted`=클라이언트 연결 종료 등으로 취소, `stream_error`=헤더 뒤 body 실패, `first_byte_ms` 포함)를 따로 기록하며 지연 시간은 180초까지 잘리지 않습니다. 그 밖의 보호 API에서 백엔드의 401/403은 내부 서비스 자격 증명 실패이므로 Android 사용자 세션 오류로 노출하지 않고 502 `gateway_upstream_auth_failed`로 변환합니다.
 
 음성 경로는 기본 비활성이며 로그인된 general session에서만 열립니다. STT는 허용 audio content type만 받아 내부 multipart로 다시 만들고, Voice의 intent/action/slots/segments/timestamps를 폐기한 뒤 transcript와 네 acoustic 근거 및 고정 model revision만 반환합니다. TTS는 exact `{schema_version,text,request_id}`를 내부 `{text,use_cache:false,allow_fallback:false}`로 바꾸고 WAV type·byte·duration을 재검증합니다. inbound Authorization/cookie/actor/assertion/voice-token은 Voice로 전달하지 않으며 APK나 공개 예제에 내부 token을 넣지 않습니다. 서버 장애는 안전 안내 성공으로 처리하지 않고 Android 내장 TTS·진동 fallback이 담당합니다.
+
+STT·TTS는 요청 본문 읽기부터 클라이언트 응답 본문 전달 완료·취소까지 기존 개인정보 작업 lease를 유지합니다. 계정 삭제가 접수되면 업로드 읽기와 Voice 요청·응답 읽기를 취소하고, 반환 직전 세대·삭제 상태를 다시 확인해 결과를 차단합니다. 헤더 반환 뒤 삭제되더라도 아직 전달하지 않은 transcript·WAV 본문은 차단합니다. 취소를 무시한 transport가 뒤늦게 돌려준 응답 본문도 해제합니다. Backend 세션 확인은 상태 코드만 사용하므로 오류·취소 후 도착한 응답을 포함해 확보한 본문을 읽지 않고 취소합니다.
+
+보행 경로·현장 진단도 요청 본문 대기를 같은 lease 취소에 연결합니다. 현장 진단은 Backend 응답 변환 완료 뒤 세대를 다시 확인하고, 응답 본문 전달이 끝나거나 취소될 때 lease를 해제합니다.
 
 신고 multipart는 `metadata` 문자열 1개(최대 64 KiB)와 `image` JPEG 1개(1 byte~8 MiB)만 허용합니다. 중복 part, 추가 필드, 다른 이미지 형식은 Backend로 전달하지 않습니다.
 
@@ -188,3 +196,17 @@ S07-30: 내비게이션은 v7 계정 세션 확인·요청 본문 읽기·Backen
 - report 요청에는 installation, consent control secret, policy, revision, receipt, current network transport, report purpose header가 모두 필요하다. transport/동의 precondition 누락은 428이며 선택 거부, stale receipt·generation, metadata 불일치는 각각 명시적 오류로 거부한다.
 - 삭제 요청 replay는 암호화된 actor recovery envelope로 field 세션 폐기를 재시도한다. tombstone은 폐기 작업 성공 여부와 무관하게 기존 access·refresh를 즉시 거부한다.
 - 로그인 없는 account-deletion POST에서 알 수 없는 request ID와 기존 request의 틀린 secret은 동일한 404/no-store 응답을 사용한다.
+
+## 내부 책임 경계
+
+`routes.ts`는 공개 요청 façade, 경로 선택, deadline과 응답 telemetry를 소유합니다. 세션·보행·내비게이션·신고·삭제·진단의 실제 handler는 각각 `*-routes.ts`로 연결되며 신고 DTO 검증은 `report-contract.ts`에 있습니다. `request-scope.ts`는 개인정보 generation lease와 stream 종료·취소 시 해제를 유지합니다. 기능 handler에는 해당 기능의 fetch/admission만 전달합니다.
+
+`backend.ts`의 기존 export는 유지합니다. 실제 구현은 `backend-request-signing.ts`(v4 및 RAW/삭제 증명), `backend-transport.ts`(abort/deadline/제한된 응답), `backend-response.ts`, `report-multipart.ts`, `image-upload-admission.ts`로 구분됩니다. 요청 본문은 기존과 같이 한 번 직렬화한 bytes로 서명하고 전송합니다.
+
+상태는 저장소별 `*-codec.ts`와 `*-store.ts`로 나눕니다. 보행 clock은 `field-walk-clock.ts`, 삭제 전송·재시도는 `privacy-deletion-outbox.ts`가 담당합니다. 기존 façade와 maintenance validator export, 암호화 포맷, archive·clock·idempotency, 잠금과 fsync/rename 순서는 유지합니다. 삭제 actor fence와 outbox 기록은 동일 durable mutation 안에 남습니다.
+
+`server.ts`는 `createGatewayRuntime()`을 한 번 생성해 업로드·refresh·음성·RAW admission 및 capacity single-flight/cache 수명을 소유합니다. 직접 호출 호환용 기본 runtime은 기존 테스트 hook과 같은 인스턴스를 씁니다. keyring·required-state marker·durable 저장소는 단일 상태 root의 소유권을 유지하며 runtime마다 복제하지 않습니다. `npm test`는 `dist`를 재생성하므로 실행 중인 서비스가 해당 출력을 사용하는 환경에서는 테스트 출력 경로를 분리해야 합니다.
+
+가입 정책은 `/api/account-signup-policy`에서 필수 여부와 현재·동등·이전 문서 버전을 제공한다. 설치 키는 확인된 설치 동의의 제어 비밀값으로 `PUT /privacy/rights?control=installation-evidence-key`에 `{installation_id, public_key}`를 보내 등록한다. 현재 계정 세대와 P-256 SPKI 키만 허용하며 성공은 204다. Backend 계정의 장기 세션 로그인·갱신·상태 응답은 저장된 인증 결속의 `account_generation`을 제공한다. 삭제 evidence의 `installation_signature`는 원문 statement SHA에 포함하지 않고 outbox 전송 본문에 보존한다. 삭제 상태 GET의 `x-walksafe-deletion-status-view: device-verification.v1`은 응답에 기기 검증 정보를 붙이며 정본 revision·원장에 저장하지 않는다.
+
+OTP는 SMTP 전체 30초·DB 작업 여유를 반영해 upstream 40초, Node 전체 요청 60초로 한정한다. 본문 10초·응답 5초·여유 5초를 합산하며 일반 경로의 예산은 유지한다. Android OTP 전용 요청은 70초 예산으로 맞춘다.

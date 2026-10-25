@@ -1,0 +1,16 @@
+stateDiagram-v2
+  state "F-D04-006 UNKNOWN" as Unknown
+  state "MOVING" as Moving
+  state "STATIONARY_CANDIDATE" as Candidate
+  state "STATIONARY" as Stationary
+  [*] --> Unknown
+  Unknown --> Moving: 유효 걸음 또는 moving threshold
+  Unknown --> Candidate: 충분한 독립 quiet 창
+  Moving --> Candidate: 충분한 quiet 창
+  Candidate --> Stationary: gyro 있음 1.5초 / 없음 3초
+  Candidate --> Moving: 걸음 또는 움직임
+  Stationary --> Moving: 걸음 또는 움직임
+  Candidate --> Unknown: partial·stale·invalid
+  Stationary --> Unknown: partial·stale·invalid
+  Moving --> Unknown: stale·invalid
+  Candidate --> Candidate: 같은 창 반복 / dwell 증가 없음

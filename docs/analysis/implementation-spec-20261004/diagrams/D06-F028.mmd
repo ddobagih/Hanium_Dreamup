@@ -1,0 +1,39 @@
+flowchart TD
+  T["F-D06-028 현장 세션 통계 요약과 archive 구분"]
+  P["전제: 세션 summary는 현장 로그 start/stop과 연계. raw 동의 철회시 이전 summary<br/>삭제."]
+  T --> P
+  E1["E-D06-028-01 현장 샘플/heartbeat→메모리 accumulator 갱신"]
+  E1 --> T
+  E2["E-D06-028-02 stop→summary 암호화 및 메모리 보존→버튼/결과 UI"]
+  E2 --> T
+  E3["E-D06-028-03 재시작 archive 존재→ARCHIVE_ONLY 표시"]
+  E3 --> T
+  A1["1. 세션 동안 숫자 통계를 누적하고 중지시 encrypted summary record에 넣는다."]
+  P --> A1
+  A2["2. 앱 메모리에 분석 가능한 종료 summary가 있으면 ANALYZABLE을 반환한다."]
+  A1 --> A2
+  A3["3. 파일 archive만 있으면 ARCHIVE_ONLY, 아무것도 없으면 NONE이다."]
+  A2 --> A3
+  A4["4. 재시작 후 이어쓰기는 coversWholeSession=false로 부분 통계임을 명시한다."]
+  A3 --> A4
+  N["정상 종료: UI용 snapshot 반환."]
+  A4 --> N
+  FX["결과: 앱내 숫자 통계. latency 분위수는 측정치 전체 정렬값이나 합격 판정 기준이 아님."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"과거 archive만 존재"}
+    R1["현재 화면이 전체 archive를 복호화·재분석하지 않음"]
+    B1 -->|조건 성립| R1
+    B2{"복원 세션 일부 accumulator"}
+    R2["전체 세션 통계처럼 표시하지 않음"]
+    B2 -->|조건 성립| R2
+    B3{"원본 동의 철회"}
+    R3["summary도 버림"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-025"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["복구: archive 존재와 앱내 summary 가용성을 별개로 취급."]
+    X2["정리: purge와 raw withdrawal이 메모리 summary를 제거."]
+  end

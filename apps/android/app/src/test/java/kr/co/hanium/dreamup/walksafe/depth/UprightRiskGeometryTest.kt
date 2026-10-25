@@ -1,6 +1,9 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
 import kr.co.hanium.dreamup.walksafe.UprightCameraImage
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPoint
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -114,7 +117,9 @@ class UprightRiskGeometryTest {
                     y >= geometry.bboxNorm.y && y <= geometry.bboxNorm.y + geometry.bboxNorm.height) 1_600 else 0
             }
             val result = ObjectDepthEstimator(tracker = tracker).estimate(ObjectDepthInput(
-                frameId = 1L, timestampMs = 1_000L, geometry = geometry, track = track,
+                frameId = 1_000_000_000L, timestampMs = 1_000L, geometry = geometry, track = track,
+                materialPoint = VisualMaterialPoint(VisualMaterialPointId(),
+                    VisualFrameKey(1L, 1_000_000_000L, 1_000_000_000L, 1_000L, 1L), geometry.centerNorm),
                 mapper = recordingMapper, rawDepth = DepthImage16(SIZE, SIZE, pixels),
                 rawConfidence = ConfidenceImage8(SIZE, SIZE, ByteArray(SIZE * SIZE) { 255.toByte() }),
                 rawDepthMatchesCameraFrame = true, rawDepthTimestampNs = 1_000_000_000L,
@@ -166,6 +171,8 @@ class UprightRiskGeometryTest {
 
     private fun movingTrack(geometry: ObjectGeometry, stationary: Boolean = false): Pair<TrackState, ObjectTracker> {
         val tracker = ObjectTracker()
+        // One known physical point is observed across this synthetic trajectory.
+        val pointId = VisualMaterialPointId()
         var latest: TrackState? = null
         for (at in 1_000L..2_800L step 300L) {
             val track = tracker.update(listOf(geometry), at).single { it.missedFrames == 0 }
@@ -178,7 +185,7 @@ class UprightRiskGeometryTest {
             ) else basePose
             assertTrue(tracker.recordDistance(track, depth, DepthSource.ARCORE_RAW_DEPTH, .95f, at,
                 pose, pose.objectCenterInAnchor(geometry.centerNorm, depth),
-                9_000_000_000L + at * 1_000_000L, true))
+                9_000_000_000L + at * 1_000_000L, true, materialPointId = pointId))
             latest = track
         }
         return requireNotNull(latest) to tracker

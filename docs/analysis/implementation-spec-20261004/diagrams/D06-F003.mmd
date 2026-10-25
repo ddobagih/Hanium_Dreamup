@@ -1,0 +1,37 @@
+flowchart TD
+  T["F-D06-003 손상 점자블록 신고 후보 승인과 거절 이유"]
+  P["전제: 보행 runtime active, 카메라/정확한 위치 권한, 로그인 actor, 현재 서버 동의 확인,<br/>device resource READY, metric output 허용."]
+  T --> P
+  E1["E-D06-003-01 자동 탐지 또는 명시 신고 요청→evaluate→Ready 또는 최초 Rejected<br/>이유"]
+  E1 --> T
+  A1["1. 좌표·깊이·수치·bbox 증거를 먼저 검사한다."]
+  P --> A1
+  A2["2. device gate, damage class, trigger allowlist, 자동 안정성/신뢰도<br/>조건을 검사한다."]
+  A1 --> A2
+  A3["3. custom_tactile class1/unified_walksafe class8/walkmate 손상<br/>선형1·점형3을 공통 damaged_tactile_block으로 변환한다."]
+  A2 --> A3
+  A4["4. fresh GPS·threshold·source model·source commit 40hex 또는<br/>unverified를 검사한다."]
+  A3 --> A4
+  A5["5. detect.v2 allowlist metadata에 provenance와 CAPTURE_DEVICE를<br/>기록하고 다음 저장 단계로 전달한다."]
+  A4 --> A5
+  N["정상 종료: Ready 후보."]
+  A5 --> N
+  FX["결과: 수치·좌표·이미지를 로그 이유에 넣지 않는 고정 diagnostic token. 시설 좌표 추정 또는<br/>기관 제출 없음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"auto opt-in 미허용 또는 Gateway capacity가 자동 후보 차단"}
+    R1["고정 blocked 코드로 종료"]
+    B1 -->|조건 성립| R1
+    B2{"직접 voice/on_screen"}
+    R2["3회·700ms·0.70 자동 기준만 면제; metric/GPS 근거는 계속 필요"]
+    B2 -->|조건 성립| R2
+    B3{"손상은 보이나 metric 없음"}
+    R3["화면·음성·TalkBack에 거리 확인 불가 및 재시도 행동 안내"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-002, P-D06-003"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 각 실패 이유의 Rejected; 후보 생성/전송 없음."]
+    X2["재시도: 다음 유효 프레임 또는 사용자 재요청에서 새 판정."]
+  end

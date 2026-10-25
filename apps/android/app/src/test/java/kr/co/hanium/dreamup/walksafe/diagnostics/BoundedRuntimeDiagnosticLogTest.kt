@@ -153,6 +153,52 @@ class BoundedRuntimeDiagnosticLogTest {
         assertTrue(start >= 0 && start < initialize.indexOf("writer = created"))
     }
 
+    @Test fun purgeDropsQueuedRecordsAndLateAppendCannotRecreateDirectory() {
+        val directory = temporary.newFolder("purge-queued")
+        WriterHarness(directory).use { writer ->
+            writer.enqueue("event=BEFORE_PURGE"); writer.awaitIdle()
+            val entered = CountDownLatch(1); val release = CountDownLatch(1)
+            writer.executor.execute { entered.countDown(); release.await(3L, TimeUnit.SECONDS) }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            repeat(10) { writer.enqueue("event=QUEUED") }
+            try {
+                assertTrue(writer.purge())
+                assertFalse(directory.exists())
+                writer.enqueue("event=LATE")
+            } finally { release.countDown() }
+            assertTrue(writer.executor.awaitTermination(2L, TimeUnit.SECONDS))
+            assertFalse(directory.exists())
+        }
+    }
+
+    @Test fun purgeSerializesWithTheRunningWriteLockAndRejectsRemainingCopies() {
+        val directory = temporary.newFolder("purge-running")
+        WriterHarness(directory).use { writer ->
+            writer.enqueue("event=FIRST"); writer.awaitIdle()
+            val entered = CountDownLatch(1); val release = CountDownLatch(1)
+            val running = Thread { synchronized(writer.writeLock) {
+                entered.countDown(); release.await(3L, TimeUnit.SECONDS)
+                writer.current.appendText("event=IN_FLIGHT\n")
+            } }
+            running.start(); assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            val completed = CountDownLatch(1)
+            var purged = false
+            val cleanup = Thread { purged = writer.purge(); completed.countDown() }
+            cleanup.start()
+            assertFalse(completed.await(50L, TimeUnit.MILLISECONDS))
+            release.countDown(); running.join(2_000L); cleanup.join(2_000L)
+            assertTrue(purged); assertFalse(directory.exists())
+        }
+        val copies = temporary.newFolder("purge-copy")
+        File(copies, "unexpected-copy").writeText("controlled fixture")
+        WriterHarness(copies).use { writer ->
+            assertFalse(writer.purge())
+            writer.enqueue("event=LATE_FAILED_PURGE")
+            assertTrue(File(copies, "unexpected-copy").exists())
+            assertFalse(writer.current.exists())
+        }
+    }
+
     private class WriterHarness(directory: File) : Closeable {
         private val type = Class.forName(
             "kr.co.hanium.dreamup.walksafe.diagnostics.RuntimeDiagnosticFileWriter",
@@ -172,6 +218,9 @@ class BoundedRuntimeDiagnosticLogTest {
         ).apply { isAccessible = true }
         val runId: String = type.getDeclaredField("runId").apply { isAccessible = true }
             .get(instance) as String
+        val writeLock = type.getDeclaredField("writeLock").apply { isAccessible = true }.get(instance)!!
+        private val purgeMethod = type.getDeclaredMethod("blockAndPurge").apply { isAccessible = true }
+        fun purge(): Boolean = purgeMethod.invoke(instance) as Boolean
         val current = File(directory, "events.log")
         val dropped: Long get() = droppedCounter.get()
 

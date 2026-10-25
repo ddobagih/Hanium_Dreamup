@@ -1,0 +1,17 @@
+flowchart TD
+  IN["F-D14-026 보안 감사 hash chain 기록"] --> KIND{"호출 경로"}
+  KIND -->|"일반 감사 또는 denial"| GIVEN["호출자가 제공한 details"]
+  KIND -->|"record_admin_security_failure"| ALERT["저장 전에 alert metadata 구성<br/>admin_alert_required=true<br/>ADMIN_API_RESPONSE와 correlation 및 reason"]
+  GIVEN --> VALID["P-D14-017 JSON 타입과 중첩 key 검사"]
+  ALERT --> VALID
+  VALID -->|"민감 key 또는 지원하지 않는 타입"| DENY["거절"]
+  VALID -->|"유효한 metadata"| LOCK["PG audit-chain advisory lock"]
+  LOCK --> HASH["최신 sequence와 previous digest<br/>details 포함 canonical JSON SHA256"]
+  HASH --> FLUSH["행 생성 및 flush"]
+  FLUSH --> TX{"호출자의 transaction"}
+  TX -->|"일반"| COMMIT["사업 transaction과 함께 commit"]
+  TX -->|"denial 또는 failure helper"| OWN["독립 SessionLocal.begin commit"]
+  FLUSH -->|"SQL 오류"| STORE["store unavailable 오류 및 rollback"]
+  APPEND["기존 감사 UPDATE DELETE TRUNCATE 금지"] -.-> HASH
+  CLEAN["취소 API와 자동 재시도 없음<br/>DB 보존 행의 자동 TTL purge는 확인되지 않음"] -.-> COMMIT
+  CLEAN -.-> OWN

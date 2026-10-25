@@ -1,0 +1,14 @@
+flowchart TD
+  H["P-D05-025 · F-D05-025 진단 화면의 주·보조 경고 조정·음성완료 처리"]
+  H --> S{"source current 증가 frame metric 유효"}
+  S -->|"아니오"| X["sample 거부"]
+  S -->|"예"| M["유일 crosssource 중복조정"]
+  M --> E{"track3 stable700 score0.55 위험 level"}
+  E -->|"아니오"| W["대기"]
+  E -->|"예"| R["reserve 원 TTL 보존"]
+  R --> C{"claim 직전 current 와 deadline"}
+  C -->|"아니오"| D["cancel"]
+  C -->|"예"| A["actuator emit"]
+  A --> T{"TTS DONE 또는 accepted 진동 timer"}
+  T -->|"성공"| F["complete history cooldown"]
+  T -->|"실패 취소"| D

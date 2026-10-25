@@ -1,0 +1,27 @@
+flowchart TD
+  T["F-D09-004 원시 수집·계정 삭제 전용 요청 증명 / P-D09-004"]
+  N0["service token과 actor 확인"]
+  T --> N0
+  N1["operation과 purpose hash 조합검증"]
+  N0 --> N1
+  N2["필요한 원문 body hash"]
+  N1 --> N2
+  N3["전용 HMAC와 시각 검증"]
+  N2 --> N3
+  N4["검증 capability 전달"]
+  N3 --> N4
+  Z["정상: 검증된 요청 범위 capability를 D13 endpoint로 전달"]
+  N4 --> Z
+  B0["503 raw_ingest_disabled"]
+  N1 -->|"raw write/preflight이며 raw_ingest_enabled=false"| B0
+  B1["401 raw_request_proof_required/invalid"]
+  N2 -->|"raw 증명 없음/변경/잘못된 hash조합"| B1
+  B2["422 account_deletion_binding_invalid"]
+  N1 -->|"삭제 헤더 바인딩 불완전"| B2
+  R["종료와 복구: 서버 자동 재시도 없음 / 원인 해소 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  C["취소와 정리: 전용 취소 API 없음 / 요청 지역 상태 반환; 공유 자원은 소유자의 lifecycle에서 정리"]
+  N4 -.-> C

@@ -10,26 +10,23 @@ class MainActivityPermissionSafetyStopStaticTest {
 
     @Test
     fun activeOrPausedWalkSafetyStopsOnObservedLossOfBothCoreGuidancePermissions() {
-        val observation = source
-            .substringAfter("private fun applyObservedPermissionStateChange(reason: String) {")
-            .substringBefore("private fun isRouteLocationPermissionReady()")
+        val observation = MainActivityRefactorSource.function(source, "fun applyObservedPermissionStateChange(")
 
         assertTrue(observation.contains("PermissionDependencyPolicy.evaluate("))
         assertTrue(observation.contains("currentObservedPermissionSnapshot()"))
         assertTrue(observation.contains("sessionSnapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)"))
         assertTrue(observation.contains(").requiresWholeWalkSafetyStop"))
-        assertTrue(observation.contains("enterWalkSessionSafetyStopAndCancelOutputs(\"core_guidance_permissions_unavailable\")"))
+        assertTrue(observation.contains("runtime.safetyStop(\"core_guidance_permissions_unavailable\")"))
         assertTrue(observation.contains("enterPermissionRecoveryBarrier("))
     }
 
     @Test
     fun freshWalkReadinessBlocksWhenBothCoreGuidancePermissionsAreMissing() {
-        val readiness = source
-            .substringAfter("private fun walkSessionReadinessBlockReason(")
-            .substringBefore("private fun missingRequiredWalkSessionPermissions(")
+        val readiness = MainActivityRefactorSource.function(source, "fun walkSessionReadinessBlockReason(")
 
         assertTrue(readiness.contains("PermissionDependencyPolicy.evaluate("))
-        assertTrue(readiness.contains("currentObservedPermissionSnapshot()"))
+        assertTrue(readiness.contains("sources.observedPermissions()"))
+        assertTrue(MainActivityRefactorSource.composition(source, "walkReadinessBlockController").contains("override fun observedPermissions() = currentObservedPermissionSnapshot()"))
         assertTrue(readiness.contains(").requiresWholeWalkSafetyStop"))
     }
 }

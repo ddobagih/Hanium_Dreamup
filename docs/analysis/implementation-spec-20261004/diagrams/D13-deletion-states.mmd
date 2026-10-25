@@ -1,0 +1,29 @@
+stateDiagram-v2
+    state "F-D13-012 삭제 수락 전" as Before
+    state "PARTIAL" as Partial
+    state "PROCESSING" as Processing
+    state "RETRY_WAIT" as Retry
+    state "RESTRICTED" as Restricted
+    state "FAILED" as Failed
+    state "COMPLETED" as Completed
+    [*] --> Before
+    Before --> Partial: tombstone와9항목 저장 및 credential DISABLED
+    Partial --> Restricted: 하나라도 LEGAL_HOLD
+    Processing --> Restricted: 하나라도 LEGAL_HOLD
+    Partial --> Failed: hold 없이 FAILED 있음
+    Partial --> Retry: hold와failure 없이 RETRY_WAIT
+    Retry --> Partial: 운영 상태 전이 또는 후속 증거
+    Failed --> Partial: 실패한 기기의 새 증거 또는 운영 전이
+    Restricted --> Partial: 운영상 hold 해제 후 재집계
+    Partial --> Completed: 9항목 모두 COMPLETED 또는 NOT_APPLICABLE
+    Processing --> Completed: 9항목 모두 terminal
+    note right of Completed
+      P-D13-016
+      3년 완료 영수증 생성
+      새 상태 변경 금지
+    end note
+    note right of Partial
+      기기 24시간 미접속은
+      상태를 완료로 바꾸지 않음
+      기관 사본도 EXTERNAL_PENDING 유지
+    end note

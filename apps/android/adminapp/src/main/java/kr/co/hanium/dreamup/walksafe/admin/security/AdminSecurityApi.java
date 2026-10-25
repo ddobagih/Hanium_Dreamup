@@ -5,6 +5,9 @@ import java.util.Base64;
 import java.util.List;
 
 public interface AdminSecurityApi {
+    /** Production transports bind requests to the controller's current local operation. */
+    default void bindRequestAdmission(AdminRequestAdmission admission) {}
+
     enum RecoveryMaterialKind {
         RECOVERY_CODE,
         SECURITY_KEY
@@ -358,6 +361,13 @@ public interface AdminSecurityApi {
     }
 
     StateSnapshot revokeSession(String accessToken, String sessionId) throws IOException;
+
+    /** A captured current-session revoke has no authority for any other request. */
+    default StateSnapshot revokeSession(String accessToken, String sessionId, String deviceId,
+        AdminRequestAdmission admission) throws IOException {
+        return revokeSession(accessToken, sessionId);
+    }
+
 
     StateSnapshot attestRecoveryCustody(
         String accessToken,

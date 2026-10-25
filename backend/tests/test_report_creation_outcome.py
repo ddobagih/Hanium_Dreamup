@@ -7,7 +7,7 @@ import uuid
 from fastapi import HTTPException
 import pytest
 
-from backend.app.api import reports
+from backend.app.services import report_application as reports
 from backend.app.schemas import ReportMetadata
 from backend.tests.test_report_transport_contract import _metadata
 

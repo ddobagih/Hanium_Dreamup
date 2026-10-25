@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -104,12 +103,12 @@ class CommandTtsFeedbackDeviceTest {
             )
             // Read only: do not replace the engine, listener or terminal callbacks.
             val engine = onMain(deadlineMs) {
-                val field = AndroidFeedbackActuator::class.java.getDeclaredField("textToSpeech")
+                val field = AndroidFeedbackActuator::class.java.getDeclaredField("speechRuntime")
                 field.isAccessible = true
-                field.get(actuator) as TextToSpeech
+                field.get(actuator) as AndroidFeedbackSpeechRuntime
             }
             waitUntil(deadlineMs, 5_000L, "Cancellation requires the real engine to report speaking") {
-                onMain(deadlineMs) { engine.isSpeaking }
+                onMain(deadlineMs) { engine.isSpeaking() }
             }
             assertEquals("Long response unexpectedly completed before cancellation", 0, cancelled.completed.get())
             onMain(deadlineMs) { actuator.cancelCommandInteraction() }
@@ -117,7 +116,7 @@ class CommandTtsFeedbackDeviceTest {
             assertEquals("Cancellation must fail exactly once", 1, cancelled.failed.get())
             assertEquals("Cancellation must never count as onDone", 0, cancelled.completed.get())
             waitUntil(deadlineMs, 3_000L, "Cancellation did not stop the actual Android TTS engine") {
-                onMain(deadlineMs) { !engine.isSpeaking && !actuator.isAppSpeechActive() }
+                onMain(deadlineMs) { !engine.isSpeaking() && !actuator.isAppSpeechActive() }
             }
 
             val observationEndMs = SystemClock.elapsedRealtime() + 3_000L
@@ -125,7 +124,7 @@ class CommandTtsFeedbackDeviceTest {
                 remainingMs(deadlineMs)
                 assertEquals("Late onDone escaped cancellation", 0, cancelled.completed.get())
                 assertEquals("Cancellation delivered duplicate failure", 1, cancelled.failed.get())
-                assertFalse("Cancelled audio resumed", onMain(deadlineMs) { engine.isSpeaking })
+                assertFalse("Cancelled audio resumed", onMain(deadlineMs) { engine.isSpeaking() })
                 Thread.sleep(100L)
             }
             Log.i(TAG, "command_cancel_actual_engine_stopped=true late_done_observation_ms=3000")

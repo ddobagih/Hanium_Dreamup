@@ -1,0 +1,26 @@
+flowchart TD
+  A["F-D10-034 현재 승인 dataset의 짧은 HMAC gate 발급"]
+  N0["1. manifest hash 계산 후 require_current_dataset_revision으로 현재 승인 확인."]
+  A --> N0
+  N1["2. state APPROVED, withdrawn_at null, manifest/member set hashes,revision/UUID,expiry를 body 구성."]
+  N0 --> N1
+  N2["3. gate_expires_at=min(dataset_expires_at,now+10분). canonical ASCII JSON+domain prefix에 HMAC-SHA256 receipt 생성."]
+  N1 --> N2
+  N3["4. output parent0700 생성, O_EXCL file0600 쓰기·fsync. 기존 파일이면 오류로 덮어쓰지 않는다."]
+  N2 --> N3
+  B0{"만료/철회 등 Backend current gate 실패"}
+  R0["파일 생성 안 함"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"출력 파일 존재"}
+  R1["O_EXCL 오류 exit1"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"HMAC key 없음/짧음"}
+  R2["DB 실행 전 exit1"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-017 · P-D10-026"]
+  P -. "코드 분기 기준" .-> A

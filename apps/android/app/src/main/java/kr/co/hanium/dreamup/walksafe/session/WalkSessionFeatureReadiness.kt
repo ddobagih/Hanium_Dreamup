@@ -53,10 +53,13 @@ object WalkSessionFeatureReadiness {
         cameraGuidanceEnabled: Boolean,
         detectorAvailable: Boolean,
         detectorLoadReason: String?,
+        preparing: Boolean = false,
     ): Pair<WalkSessionReadinessStatus, String> = when {
         !cameraGuidanceEnabled ->
             WalkSessionReadinessStatus.UNAVAILABLE to "model_unavailable:camera_guidance_disabled"
         detectorAvailable -> READY
+        preparing && detectorLoadReason == null ->
+            WalkSessionReadinessStatus.PENDING to "model_preparing"
         else ->
             WalkSessionReadinessStatus.UNAVAILABLE to
                 "model_unavailable:${detectorLoadReason ?: "not_loaded"}"

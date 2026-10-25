@@ -1,0 +1,30 @@
+stateDiagram-v2
+ state "F-D02-021/022 UNCONNECTED 준비" as Prep
+ state "고정 correctness·screening" as Fixed
+ state "AB/BA·confirmation" as Compare
+ state "LIVE_BASELINE" as A
+ state "LIVE_CANDIDATE" as B
+ state "SELECTING" as Select
+ state "DRAINING" as Drain
+ state "실제 camera close 대기" as Camera
+ state "DRAINED" as Done
+ state "CLOSE_FAILED lease 보유" as Failed
+ [*] --> Prep
+ Prep --> Fixed: "유효한 외부 caller가 시작했을 때의 구현 계약"
+ Fixed --> Compare: "출력 검증과 예산 확보"
+ Compare --> A: "후보 유효"
+ A --> B: "10초 및10완료·fresh evidence"
+ B --> Select: "scope quality 통과"
+ Select --> Drain: "CONFIRMED save·tryAdopt 또는 reject"
+ Fixed --> Drain: "cancel/failure/deadline"
+ Compare --> Drain: "cancel/failure/deadline"
+ A --> Drain: "cancel/failure/deadline"
+ B --> Drain: "cancel/failure/deadline"
+ Drain --> Camera: "native/image 실제 해제 완료"
+ Camera --> Done: "AR close 또는 CameraX CLOSED 확인"
+ Camera --> Failed: "close 예외/불확실"
+ Failed --> Failed: "소유 lease 보존; 자동 재사용 없음"
+ note right of Prep
+  Main schedule은 fixed selector 또는 detector load만 호출
+  live runner/session 기본 UI entry는 현재 미연결
+ end note

@@ -1,0 +1,14 @@
+stateDiagram-v2
+  state "F-D04-011 방위 없음" as None
+  state "VALID" as Valid
+  state "FIELD_ANOMALY latch" as Anomaly
+  state "FIELD_RECOVERING" as Recovering
+  [*] --> None
+  None --> Valid: 전체 gate 정상 / latch 없음
+  Valid --> Anomaly: strength·inclination·east residual 이상
+  Anomaly --> Recovering: 전체 gate 통과한 새 magnetic sample
+  Recovering --> Recovering: 증가 sample 및 gap 500ms 이하
+  Recovering --> Valid: 정상 5개 이상과 1초 이상 모두 충족
+  Recovering --> Anomaly: 자기 이상 또는 다른 gate 실패
+  Recovering --> Recovering: gap 500ms 초과 / 누적 새로 시작
+  Valid --> None: age·quality·posture gate 실패

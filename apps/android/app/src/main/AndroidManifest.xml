@@ -49,6 +49,11 @@
             android:foregroundServiceType="microphone" />
 
         <service
+            android:name=".voice.VoskDecoderService"
+            android:exported="false"
+            android:process=":vosk_decoder" />
+
+        <service
             android:name=".report.ReportQueueCleanupJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />

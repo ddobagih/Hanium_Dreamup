@@ -85,6 +85,8 @@ def test_only_known_predecessors_may_use_legacy_compatibility(
         "202609300007",
         "202609300008",
         "202609300009",
+        "202610080001",
+        "202610110001",
     }
 
 
@@ -181,6 +183,16 @@ def test_only_known_predecessors_may_use_legacy_compatibility(
             "2b68a3968fa183f5c2682246c8048c9220ffa802ca55b97f782905bc08d26249",
             "c2fb02f571021324c9ced411354abca78ea8a25b01590c3b68c27ffc51e6cb37",
         ),
+        (
+            "202610080001",
+            "2b68a3968fa183f5c2682246c8048c9220ffa802ca55b97f782905bc08d26249",
+            "c2fb02f571021324c9ced411354abca78ea8a25b01590c3b68c27ffc51e6cb37",
+        ),
+        (
+            "202610110001",
+            "2b68a3968fa183f5c2682246c8048c9220ffa802ca55b97f782905bc08d26249",
+            "c2fb02f571021324c9ced411354abca78ea8a25b01590c3b68c27ffc51e6cb37",
+        ),
     ],
 )
 @pytest.mark.parametrize("boundary_ready", [True, False])
@@ -207,7 +219,7 @@ def test_known_successor_queries_its_exact_integrity_boundary(
                 other_hash not in str(statement)
                 for other_hash in review_hashes - {expected_review_sha256}
             )
-            if revision == "202609300009":
+            if revision in {"202609300009", "202610080001", "202610110001"}:
                 assert "report_review_duplicate_representative" in str(statement)
                 assert "dab50537fbfc918e37ab8f6e693b1ea9868d421dc6c75c92131ebd1d331a43b3" in str(statement)
 

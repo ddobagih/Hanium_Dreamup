@@ -1,0 +1,22 @@
+flowchart TB
+  E["F-D15-017 · 사용자 권리요청<br/>P-D15-017"]
+  OWNER{"active subject·세대의 소유 신고가 있는가"}
+  E --> OWNER
+  OWNER -->|"아니오"| NF["404 반환"]
+  OWNER -->|"예"| HASH["report·client_request_id·CORRECTION 또는 DELETE·text intent hash"]
+  HASH --> EXIST{"같은 client_request_id가 있는가"}
+  EXIST -->|"예"| EQ{"intent hash가 같은가"}
+  EQ -->|"예"| REPLAY["기존 request 상태 반환 · HTTP200<br/>신규 행 생성 없음"]
+  EQ -->|"아니오"| CONFLICT["409 intent conflict 반환"]
+  EXIST -->|"아니오"| WRITE["RECEIVED/version1·FIELD event 저장"]
+  WRITE --> COMMIT{"commit 결과"}
+  COMMIT -->|"성공"| CREATED["새 request · HTTP201 반환"]
+  COMMIT -->|"유일키 경합"| RETRYLOOK["rollback 후 동일 client UUID 재조회"]
+  RETRYLOOK --> FOUNDAGAIN{"경합 후 기존 request를 읽었는가"}
+  FOUNDAGAIN -->|"예"| EQ
+  FOUNDAGAIN -->|"없음 또는 조회 오류"| UNAVAILABLE
+  COMMIT -->|"DB 오류"| UNAVAILABLE["503 반환"]
+  NOTE["CORRECTION 접수는 내용 수정이 아니며 DELETE 접수는 물리삭제가 아님<br/>별도 취소·서버 자동 재시도 없음<br/>응답 유실은 동일 key 재전송 또는 GET 단건으로 조정"]
+  E -.-> NOTE
+  SRC["근거 · report_user_requests.py:535 create_report_user_request"]
+  E -.-> SRC

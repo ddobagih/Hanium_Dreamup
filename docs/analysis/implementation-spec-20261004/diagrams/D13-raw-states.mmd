@@ -1,0 +1,23 @@
+stateDiagram-v2
+    state "F-D13-025 manifest 전" as Before
+    state "MANIFEST_ACCEPTED" as Manifest
+    state "READY_TO_COMMIT" as Ready
+    state "QUARANTINED v2" as Quarantine
+    state "COMMITTED legacy v1" as Legacy
+    state "digest_rejected marker" as Rejected
+    state "보존 삭제 DB row 제거" as Deleted
+    [*] --> Before
+    Before --> Manifest: P-D13-025 capacity와 admission 통과
+    Manifest --> Manifest: 일부 chunk 수신 응답은 RECEIVING
+    Manifest --> Ready: 모든 chunk persisted
+    Manifest --> Rejected: 완성 object digest 불일치
+    Ready --> Rejected: commit digest 불일치
+    Ready --> Quarantine: F-D13-028 v2 receipt 및14일
+    Ready --> Legacy: F-D13-028 v1 receipt 및180일
+    Quarantine --> Quarantine: REPORT 또는 TRAINING 결정은 별도 event
+    Quarantine --> Deleted: 만료와 active hold 없음 또는 계정 삭제
+    Legacy --> Deleted: 만료와 active hold 없음 또는 계정 삭제
+    note right of Rejected
+      같은 collection 쓰기 차단
+      terminal expiry 후보에는 없음
+    end note

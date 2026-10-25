@@ -1,0 +1,27 @@
+flowchart TD
+  IN["F-D14-015<br/>두 키 소유 증명을 통한 기기 키 교체 확정"]
+  G["적용 정책<br/>P-D14-011"]
+  IN --> G
+  N1["1. proof previous version/marker 정확 일치 및 새 v<br/>ersion&gt;이전/version marker 다름 검사"]
+  G --> N1
+  N2["2. control NORMAL 및 caller 유효성 재검사"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 같은 device의 이전/새 version row 조회, ACTIVE+PE<br/>NDING 조합 요구"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 새 key marker를 DER로 재계산하고 canonical rotati<br/>on v1 payload 구성"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. PENDING 공개키로 SHA256 ECDSA 검증"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. 한 transaction에서 이전 REVOKED→새 ACTIVE→state<br/>_version+1→감사→commit"]
+  N5 -->|"계속 가능한 경우"| N6
+  B1["분기 결과<br/>409 admin_device_key_rotation_not_pending"]
+  N3 -->|"key 조합 없음/상태 부적합"| B1
+  B2["분기 결과<br/>403 rotation_signature_invalid 및 DENIED 감사"]
+  N5 -->|"새 키 서명 불일치"| B2
+  B3["분기 결과<br/>서명은 여전히 검사하며 idempotent=true; HTTP 재진입은 구키 p<br/>roof 거절로 불가"]
+  N3 -->|"direct service call에서 old REVOKED/new ACTIVE"| B3
+  N6 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 응답 유실 시 관리자 앱의 sessions.device<br/>s key version/marker 조회 조정(D12)."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

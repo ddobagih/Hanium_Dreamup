@@ -1,0 +1,30 @@
+stateDiagram-v2
+  state "확인 전" as Idle
+  state "CONFIRM_REQUIRED" as Confirm
+  state "durable confirmed PREPARED" as Prepared
+  state "accepted inventory" as Accepted
+  state "local purge 및 evidence pending" as Evidence
+  state "EVIDENCE_ACKED" as Ack
+  state "RETRY_WAIT 또는 RESTRICTED" as Retry
+  state "terminal receipt 및 cleanup" as Terminal
+  state "RESET_PENDING" as Reset
+  state "REENROLLMENT_REQUIRED" as New
+  state "FAIL_CLOSED" as Blocked
+  [*] --> Idle
+  Idle --> Confirm: 삭제 주버튼
+  Confirm --> Idle: durable 준비 전 취소
+  Confirm --> Prepared: 명시 확인·이중 authority 저장
+  Prepared --> Accepted: 일치하는 서버 접수
+  Accepted --> Evidence: local purge 결과 DELETED 또는 FAILED 저장
+  Evidence --> Ack: exact device evidence acknowledgement
+  Accepted --> Retry: 서버 retry·legal hold·실패 상태
+  Retry --> Accepted: same request 새 status
+  Ack --> Terminal: 9 inventory terminal과 receipt
+  Terminal --> Reset: terminalCleanupComplete 및 reset reservation
+  Reset --> New: 모든 reset 단계 및 fence clear
+  Prepared --> Blocked: identity·storage authority 충돌
+  Evidence --> Blocked: 필수 증거 누락·불일치
+  note right of Prepared
+    재시작은 marker 단계로 replay·purge·증거·status·cleanup 선택
+    durable 확인 이후 취소 전이 없음
+  end note

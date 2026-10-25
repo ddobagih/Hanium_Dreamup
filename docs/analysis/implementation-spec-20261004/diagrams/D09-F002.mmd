@@ -1,0 +1,30 @@
+flowchart TD
+  T["F-D09-002 등록된 HTTP route의 field·admin 분리 인가 / P-D09-002"]
+  N0["실제 route template resolve"]
+  T --> N0
+  N1["등록된 method와 접근표 대조"]
+  N0 --> N1
+  N2["field token 또는 admin session 검증"]
+  N1 --> N2
+  N3["actor와 추가 proof 및 rate 검사"]
+  N2 --> N3
+  N4["router handler 호출"]
+  N3 --> N4
+  Z["정상: 허용된 동일 역할의 route handler만 호출"]
+  N4 --> Z
+  B0["403 route_policy_not_registered; admin 권한 fallback 없음"]
+  N1 -->|"미등록 route/method"| B0
+  B1["403 field_test_forbidden"]
+  N2 -->|"다른 역할의 올바른 토큰"| B1
+  B2["401 field_test_auth_required"]
+  N2 -->|"토큰 없거나 불일치"| B2
+  B3["handler 호출 없이405와 Allow"]
+  N1 -->|"허용 route에 일반 OPTIONS만 partial match"| B3
+  R["종료와 복구: 서버 자동 재시도 없음 / 원인 해소 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  C["취소와 정리: 전용 취소 API 없음 / 요청 지역 상태 반환; 공유 자원은 소유자의 lifecycle에서 정리"]
+  N4 -.-> C

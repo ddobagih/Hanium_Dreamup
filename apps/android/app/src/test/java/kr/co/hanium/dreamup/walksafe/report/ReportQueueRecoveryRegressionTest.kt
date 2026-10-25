@@ -151,12 +151,14 @@ class ReportQueueRecoveryRegressionTest {
 
     @Test
     fun authenticationFailureNeverQuarantinesPayload() {
-        val f = fixture()
-        f.enqueue()
-        assertEquals(ReportQueueDrainOutcome.AUTHORITY_BLOCKED,
-            requireNotNull(f.coordinator.startNext({ context() }, failingTransport(403))).execute())
-        assertFalse(f.store.queuedReports().single().quarantined)
-        assertNotNull(f.store.nextForRecoveryDrain(ACTOR))
+        listOf(401 to ReportQueueDrainOutcome.AUTHENTICATION_REQUIRED,
+            403 to ReportQueueDrainOutcome.PERMISSION_BLOCKED).forEach { (status, expected) ->
+            val f = fixture()
+            f.enqueue()
+            assertEquals(expected, requireNotNull(f.coordinator.startNext({ context() }, failingTransport(status))).execute())
+            f.store.queuedReports().single().use { assertFalse(it.quarantined) }
+            assertNotNull(f.store.nextForRecoveryDrain(ACTOR))
+        }
     }
 
     @Test
@@ -199,10 +201,15 @@ class ReportQueueRecoveryRegressionTest {
                 CancellableNetworkCall.blocking<ReportQueueReceipt?> { receipt(other) }
             override fun uploadCall(report: QueuedReport) = error("no post")
         }
-        assertEquals(ReportQueueDrainOutcome.RECEIPT_REJECTED,
+        assertEquals(ReportQueueDrainOutcome.RECEIPT_UNCONFIRMED,
             requireNotNull(f.coordinator.startNext({ context() }, transport) { commits++; true }).execute())
         assertEquals(0, commits)
-        assertEquals(first.payload.reportId, f.store.nextForDrain()?.payload?.reportId)
+        f.store.queuedReports().single { it.payload.reportId == first.payload.reportId }.use { retained ->
+            assertEquals(first.payload.payloadSha256, retained.payload.payloadSha256)
+            assertTrue(retained.retryNotBeforeEpochMs > f.now)
+            f.now = retained.retryNotBeforeEpochMs
+        }
+        f.store.nextForDrain()?.use { assertEquals(first.payload.reportId, it.payload.reportId) }
     }
 
     @Test

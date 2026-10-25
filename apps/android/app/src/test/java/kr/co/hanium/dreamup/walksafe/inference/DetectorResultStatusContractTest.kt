@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.inference
 
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
 import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import org.junit.Assert.assertEquals
@@ -66,20 +67,44 @@ class DetectorResultStatusContractTest {
     }
 
     @Test fun walkTimeCameraPathsUseOrientedDetectionAndTheUnrotatedCallStaysInThePreflight() {
-        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val fallback = source.substringAfter("private fun analyzeCameraFallbackFrame(")
-            .substringBefore("private fun recordCameraFallbackFrameAnalyzedOnce(")
-        val arcore = source.substringAfter("private fun scheduleDetectionIfDue(")
-            .substringBefore("private fun encodeDebugFrameJpeg(")
-        assertTrue(fallback.contains("frameDetector.detectOriented("))
-        assertTrue(arcore.contains("frameDetector.detectOriented("))
-        assertFalse(fallback.contains("frameDetector.detect("))
-        assertFalse(arcore.contains("frameDetector.detect("))
-        // The only unrotated call is the post-login execution check, whose boxes are not guidance.
-        assertEquals(1, Regex("frameDetector\\.detect\\(").findAll(source).count())
-        val preflight = source.substringAfter("val detectorSucceeded = try {")
-            .substringBefore("// Count successful camera/model invocations")
-        assertTrue(preflight.contains("frameDetector.detect("))
+        fun source(path: String) = File("src/main/java/kr/co/hanium/dreamup/walksafe/$path.kt").readText()
+        val main = source("MainActivity")
+        val fallback = source("runtime/vision/primary/PrimaryCameraFallbackDetectorWorker")
+        val arcore = source("runtime/vision/primary/PrimaryArDetectorWorker")
+        val bridge = source("runtime/vision/primary/AndroidPrimaryArSubmissionBridge")
+        val invocation = source("runtime/vision/primary/PrimaryDetectorInvocationWorker")
+        val execution = source("runtime/vision/primary/PrimaryDetectorExecutionOwner")
+        val composition = source("runtime/vision/composition/VisionPrimaryComposition")
+        assertTrue(MainActivityRefactorSource.member(main, "analyzeCameraFallbackFrame")
+            .contains("primaryCameraFallbackDetectorWorker.analyze("))
+        assertTrue(MainActivityRefactorSource.member(main, "scheduleDetectionIfDue")
+            .contains("primaryArSubmissionBridge.schedule("))
+        assertTrue(main.contains("frameRouteEvidence, { primaryArDetectorWorker }, object : PrimaryArSubmissionAuthority"))
+        assertTrue(bridge.contains("val targetWorker = worker()"))
+        assertTrue(bridge.contains("targetWorker.submit(queuedWork)"))
+        for (factory in listOf("createPrimaryCameraFallbackDetectorWorker", "createPrimaryArDetectorWorker")) {
+            assertTrue(MainActivityRefactorSource.member(main, factory)
+                .contains("primaryDetectorOwner, primaryDetectorInvocationWorker"))
+        }
+        assertTrue(main.contains("private val primaryDetectorInvocationWorker by visionPrimaryComposition.invocation"))
+        assertTrue(composition.contains("PrimaryDetectorInvocationWorker(detector.value, elapsedRealtimeMs, wallTimeMs)"))
+        assertTrue(fallback.contains("val quarterTurns = frameCapture.imageQuarterTurns"))
+        assertTrue(fallback.contains("timestampNs / NANOS_PER_MILLISECOND, quarterTurns, quality"))
+        assertTrue(arcore.contains("work.timestampMs, work.imageQuarterTurns, work.input.qualityObservation"))
+        for (worker in listOf(fallback, arcore)) assertTrue(worker.contains("invocationWorker.invoke(prepared,"))
+        assertEquals(2, Regex("detectorOwner\\.detectOriented\\(").findAll(invocation).count())
+        assertTrue(invocation.contains("detectorOwner.detectOriented(ownedFrame, request.timestampMs, request.quarterTurns)"))
+        assertTrue(MainActivityRefactorSource.member(execution, "detectOriented")
+            .contains("detector.detectOriented(cameraFrame, timestampMs, quarterTurns, partial)"))
+        for (runtime in listOf(main, bridge, fallback, arcore, invocation, execution)) {
+            assertFalse("Walking paths must not call the unrotated detector API",
+                Regex("\\.detect\\(").containsMatchIn(runtime))
+        }
+        // The unrotated post-login execution check does not publish boxes into walking guidance.
+        val probes = source("device/postlogin/AndroidPostLoginDeviceProbes")
+        assertEquals(1, Regex("detector\\(\\)\\.detect\\(").findAll(probes).count())
+        val preflight = MainActivityRefactorSource.member(probes, "startCamera")
+        assertTrue(preflight.contains("detector().detect(frame, timestampNs / NANOS_PER_MILLISECOND)"))
         assertTrue(preflight.contains("DeviceCheckDetectorExecutionPolicy.passes(result)"))
     }
 }

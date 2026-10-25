@@ -15,18 +15,18 @@ class RouteLongGapRealignmentRegressionTest {
     @Test
     fun theFirstSampleAfterALongGapRealignsAndTheNextPassesOneGuideAtATime() {
         val navigator = walkedTo50m()
-        val realigned = navigator.update(fix(130.0, 56_000L), 56_000L, false)
+        val realigned = navigator.update(fix(130.0, 56_000L), 56_000L, false, facingObservation = RouteFacingObservation(90.0, 3.0, 56_000L))
         assertAccepted(navigator)
         assertEquals("30 s gap: the jump past two guides only realigns", 0, realigned.guideIndex)
-        assertEquals(1, navigator.update(fix(131.0, 57_000L), 57_000L, false).guideIndex)
-        assertEquals(2, navigator.update(fix(132.0, 58_000L), 58_000L, false).guideIndex)
+        assertEquals(1, navigator.update(fix(131.0, 57_000L), 57_000L, false, facingObservation = RouteFacingObservation(90.0, 3.0, 57_000L)).guideIndex)
+        assertEquals(2, navigator.update(fix(132.0, 58_000L), 58_000L, false, facingObservation = RouteFacingObservation(90.0, 3.0, 58_000L)).guideIndex)
     }
 
     @Test
     fun aGapWhosePriorStaysWithinTheFloorKeepsTheOrdinaryCatchUp() {
         val navigator = walkedTo50m()
         // 20 s: 3 x 20 + 2 x 5 = 70 m <= 80 m, so this is not a realignment gap.
-        val caughtUp = navigator.update(fix(110.0, 46_000L), 46_000L, false)
+        val caughtUp = navigator.update(fix(110.0, 46_000L), 46_000L, false, facingObservation = RouteFacingObservation(90.0, 3.0, 46_000L))
         assertAccepted(navigator)
         assertEquals(1, caughtUp.guideIndex)
     }
@@ -34,10 +34,10 @@ class RouteLongGapRealignmentRegressionTest {
     @Test
     fun anUnreachableNextSampleKeepsRealigning() {
         val navigator = walkedTo50m()
-        assertEquals(0, navigator.update(fix(130.0, 56_000L), 56_000L, false).guideIndex)
+        assertEquals(0, navigator.update(fix(130.0, 56_000L), 56_000L, false, facingObservation = RouteFacingObservation(90.0, 3.0, 56_000L)).guideIndex)
         // 100 m in 1 s is not reachable from the realigned sample: still no passage.
-        assertEquals(0, navigator.update(fix(230.0, 57_000L), 57_000L, false).guideIndex)
-        assertEquals(1, navigator.update(fix(231.0, 58_000L), 58_000L, false).guideIndex)
+        assertEquals(0, navigator.update(fix(230.0, 57_000L), 57_000L, false, facingObservation = RouteFacingObservation(90.0, 3.0, 57_000L)).guideIndex)
+        assertEquals(1, navigator.update(fix(231.0, 58_000L), 58_000L, false, facingObservation = RouteFacingObservation(90.0, 3.0, 58_000L)).guideIndex)
     }
 
     @Test
@@ -61,7 +61,8 @@ class RouteLongGapRealignmentRegressionTest {
         )))
         // 1 Hz walk from 0 to 50 m, last sample at 26 s.
         for ((index, eastM) in (0..50 step 2).withIndex()) {
-            assertEquals(0, update(fix(eastM.toDouble(), 1_000L + index * 1_000L), 1_000L + index * 1_000L, false).guideIndex)
+            assertEquals(0, update(fix(eastM.toDouble(), 1_000L + index * 1_000L), 1_000L + index * 1_000L, false,
+                facingObservation = RouteFacingObservation(90.0, 3.0, 1_000L + index * 1_000L)).guideIndex)
         }
         assertAccepted(this)
     }

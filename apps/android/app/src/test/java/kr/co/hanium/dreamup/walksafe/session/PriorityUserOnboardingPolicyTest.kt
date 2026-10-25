@@ -470,8 +470,24 @@ class PriorityUserOnboardingPolicyTest {
         )
         assertEquals(null, restoration.rejection)
         assertEquals(5, restoration.restoredEvidenceCount)
-        val completed = restoration.snapshot
+        // Historical permission/device receipts cannot substitute for this login's local checks.
+        val restored = restoration.snapshot
+        assertEquals(FirstRunOnboardingStage.JIT_PERMISSION_OBSERVATION, restored.stage)
+        assertFalse(restored.mayEnterWalk)
+        assertFalse(FirstRunOnboardingPolicy.restartFp004Training(restored).accepted)
+        val permission = FirstRunOnboardingPolicy.recordEmailJitPermissionObservation(
+            restored, restored.epoch, restored.revision,
+        )
+        assertTrue(permission.accepted)
+        assertEquals(FirstRunOnboardingStage.DEVICE_CHECK, permission.current.stage)
+        assertFalse(permission.current.mayEnterWalk)
+        val device = FirstRunOnboardingPolicy.recordEmailDeviceCheckPassed(
+            permission.current, permission.current.epoch, permission.current.revision,
+        )
+        assertTrue(device.accepted)
+        val completed = device.current
         assertTrue(completed.isComplete)
+        assertEquals(restored.completedReceiptHashes, completed.completedReceiptHashes)
         val migrated = FirstRunOnboardingPolicy.restartFp004Training(completed)
         assertTrue(migrated.accepted)
         assertEquals(FirstRunOnboardingStage.FP004_TRAINING, migrated.current.stage)

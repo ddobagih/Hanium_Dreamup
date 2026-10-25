@@ -1,0 +1,12 @@
+flowchart TD
+ A["F-D11-005 도구체인과 package 검사"] --> P["P-D11-005 선택된 검사 계약"]
+ P --> C{"명시적으로 호출된 검사"}
+ C -->|"Node attestation"| N["잠긴 Node root와 distribution bytes 확인"]
+ C -->|"Node test runner"| T["시험 목록 수집과 양의 timeout 검증 후 시험과 보고서"]
+ C -->|"APK checker"| K["APK runtime config와 configured 및 companion 모델 hash와 금지 payload 확인"]
+ N --> Z["그 검사 결과 반환. 다른 검사 자동 연속 실행 아님"]
+ T --> Z
+ K --> Z
+ P -->|"입력 또는 bytes 불일치"| X["비정상 종료. 실제 기기 invoke는 별도"]
+ T -->|"기본60000ms testcase 한계"| X
+ Z -.-> R["자동 재시도 없음. 보고서별 결과 해석"]

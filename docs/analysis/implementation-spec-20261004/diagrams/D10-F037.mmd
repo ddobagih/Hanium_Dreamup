@@ -1,0 +1,26 @@
+flowchart TD
+  A["F-D10-037 Android 직접 TFLite asset exporter"]
+  N0["1. 현재 Android config를 읽고 custom/coco export spec을 먼저 추출한다. unified만 요청해도 이 두 spec을 요구한다."]
+  A --> N0
+  N1["2. 현재 interpreter→repo .venv 순으로 ultralytics import 가능 Python 선택. 실export는 tensorflow import 확인."]
+  N0 --> N1
+  N2["3. YOLO(model).export(format=tflite,imgsz=config.input_size,nms=True,int8=False) subprocess 실행."]
+  N1 --> N2
+  N3["4. 근처 saved_model/*.tflite 및 *.tflite 중 output name float32/16 suffix 우선, 최신 mtime 파일을 output asset명으로 copy2."]
+  N2 --> N3
+  B0{"--dry-run"}
+  R0["추론/export 안 하지만 interpreter import probe와 output-dir mkdir는 수행"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"현재21cls raw config target"}
+  R1["nms=True export로 현재 raw [1,25,12096] 계약과 불일치 가능"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"config/file/dependency 없음"}
+  R2["예외로 종료"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-029"]
+  P -. "코드 분기 기준" .-> A

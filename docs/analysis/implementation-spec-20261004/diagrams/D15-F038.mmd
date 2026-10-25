@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-038 · 신고 보존기간 후보 미리보기<br/>운영 CLI dry-run, JSON 입력 또는 DB preview"]
+  P["P-D15-038 · 전제조건<br/>dry-run은 삭제하지 않음. DB preview 접속 권한 필요."]
+  E --> P
+  S1["1.<br/>source/fake_source/data_origin/review_flags/source_model로<br/>demo 판정"]
+  P --> S1
+  S2["2. demo30일, active/resolved180일의 created_at<br/>기준 age 계산"]
+  S1 --> S2
+  S3["3. 만료 경계에 도달한 행을 후보로 projection"]
+  S2 --> S3
+  S4["4. DB preview는 만료 created_at/id 순서와 batch+1로<br/>남은 후보 여부 확인"]
+  S3 --> S4
+  S5["5. 보고서/JSON에 would_delete=false로 기록"]
+  S4 --> S5
+  OK["정상 결과<br/>보고서/JSON에 would_delete=false로 기록"]
+  S5 --> OK
+  B1["조건 · performance_excluded만 true<br/>결과 · demo30일로 단축하지 않음"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · age&lt;retention<br/>결과 · 제외"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · 경계 age=retention<br/>결과 · 후보"]
+  S2 -. "해당 조건 발생" .-> B3
+  B4["조건 · missing date<br/>결과 · 파일입력 helper는 후보 제외"]
+  S1 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · scripts/check_report_retention_dry_run.py:958<br/>candidate_for_row<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D02-006 기기 검사 결과 정규 저장과 복원"]
+  E["진입: terminal 검사 저장·앱 재진입 복원"]
+  G{"P-D02-006 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["완료 교육 gate를 열지 않고 같은 프로세스 memory restore도 차단"]
+  G -->|"commit false"| B0
+  B1["복원 거절"]
+  G -->|"wrong actor/install/app/OS/profile"| B1
+  B2["측정 결과 자체 보존; 별도 runtime permission gate가 현재 사용 제한"]
+  G -->|"mutable 권한 변경"| B2
+  B3["모순 레코드 거절"]
+  G -->|"camera deferred + obstacle disabled"| B3
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["FULL은 disabled empty, LIMITED는 nonempty인지 검사"]
+    S1["disabled features를 unique sorted canonical CSV로 직렬화"]
+    S2["전체 레코드를 synchronous commit; 실패한 binding은 메모리 fence에 등록"]
+    S3["restore는 정책·binding·tier·canonical CSV·deferred camera 일관성 검사"]
+    S4["legacy depth 결과는 selective refresh 요청; 현재 지원 정책 결과만 최신으로 취급"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: 해당 이벤트 처리를 마치고 현재 스냅샷/결과를 반환한다."]
+  X["취소·중단: 독립 취소 API가 없는 판단 함수는 호출자의 세대 무효화로 더 이상 결과를 사용하지 않는다. /<br/>foreground·epoch·owner 조건을 잃은 결과는 재사용하지 않는다."]
+  C["정리: 순수 prefs record 관리; 실제 센서/권한 복원하지 않음."]
+  R["재시도·복구: 실패 뒤 명시 재검사/저장 성공은 failed commit fence 해제. / 현재 증거와 소유권을 다시 확보해야 한다.<br/>이전 성공을 소급 복원하지 않는다."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

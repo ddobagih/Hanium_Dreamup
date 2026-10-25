@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-025<br/>현재 횡단보도 시각 관측과 경로 참고 알림<br/>상태 ACTIVE"]
+    P0["현재 visual source와 navigation route 검사"]
+    A --> D
+    P1["exact source index와 crosswalk label 안정도 검사"]
+    P0 --> P1
+    P2["detector 400ms와 location 2000ms lease 중 min"]
+    P1 --> P2
+    P3["건널지 판단하지 않는 참고 notice 반환"]
+    P2 --> P3
+    D{"P-D07-025<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["depthless reference 가능"]
+    D -->|"depth sample 없음·시각/경로 자격 있음"| B0
+    B1["notice 무효"]
+    D -->|"다음segment 또는 route version 변경"| B1
+    B2["bbox equality로 복원하지 않고 거절"]
+    D -->|"현재 source index 연결 또는tracking 품질 없음"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

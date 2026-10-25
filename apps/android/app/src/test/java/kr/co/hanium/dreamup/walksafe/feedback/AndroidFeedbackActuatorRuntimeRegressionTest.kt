@@ -5,6 +5,7 @@ import android.speech.tts.TextToSpeech
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kr.co.hanium.dreamup.walksafe.depth.DepthSource
 import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
 import kr.co.hanium.dreamup.walksafe.navigation.RouteFacingObservation
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigator
@@ -22,6 +23,58 @@ import org.junit.Test
 
 /** Runs the actual actuator with deterministic platform effects, not a second speech policy. */
 class AndroidFeedbackActuatorRuntimeRegressionTest {
+    @Test
+    fun terminalRuntimeCallbacksReleaseOnlyTheirRegistrationOnce() {
+        for (terminal in listOf("done", "error", "legacy_error", "stop", "interrupted")) {
+            val (runtime, actuator) = readyActuator()
+            val events = Events()
+            acceptNavigation(actuator, "terminal $terminal", events)
+            val oldId = runtime.spoken.single().id
+            val oldListener = checkNotNull(runtime.engines.single().listener)
+            val oldFocus = runtime.focusRegistrations.single().listener
+            runtime.start(oldId)
+            assertEquals(0, events.completed + events.failed + events.cancelled)
+            assertTrue(runtime.grantedFocusListeners.contains(oldFocus))
+
+            when (terminal) {
+                "done" -> oldListener.onDone(oldId)
+                "error" -> oldListener.onError(oldId, TextToSpeech.ERROR_SYNTHESIS)
+                "legacy_error" -> oldListener.onError(oldId)
+                "stop" -> oldListener.onStop(oldId, false)
+                "interrupted" -> oldListener.onStop(oldId, true)
+            }
+            runtime.runCurrent()
+            assertEquals(if (terminal == "done") 1 else 0, events.completed)
+            assertEquals(if (terminal.endsWith("error")) 1 else 0, events.failed)
+            assertEquals(if (terminal == "stop" || terminal == "interrupted") 1 else 0, events.cancelled)
+            assertEquals(listOf(oldFocus), runtime.releasedFocusListeners)
+            assertTrue(runtime.grantedFocusListeners.isEmpty())
+
+            val next = Events()
+            acceptNavigation(actuator, "replacement after $terminal", next)
+            val replacementId = runtime.spoken.last().id
+            val replacementFocus = runtime.focusRegistrations.last().listener
+            oldListener.onDone(oldId)
+            oldListener.onError(oldId, TextToSpeech.ERROR_SERVICE)
+            oldListener.onStop(oldId, true)
+            oldFocus.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
+            runtime.runCurrent()
+            assertEquals(listOf(oldFocus), runtime.releasedFocusListeners)
+            assertTrue(runtime.grantedFocusListeners.contains(replacementFocus))
+            assertEquals(0, next.completed + next.failed + next.cancelled)
+            assertEquals("tts=ready", actuator.statusText())
+
+            runtime.start(replacementId)
+            runtime.done(replacementId)
+            assertEquals(1, next.completed)
+            assertEquals(listOf(oldFocus, replacementFocus), runtime.releasedFocusListeners)
+            actuator.close()
+            actuator.close()
+            assertEquals(1, runtime.shutdowns)
+            assertEquals(2, runtime.focusReleases)
+        }
+    }
+
     @Test
     fun initializingFalseNeverReplaysAnUnownedInteraction() {
         val runtime = FakeRuntime()
@@ -47,6 +100,204 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
         assertEquals("tts=closed", actuator.statusText())
         assertEquals(0, ready)
         assertTrue(runtime.spoken.isEmpty())
+    }
+
+    @Test
+    fun validMissingStartRevokesReadinessBeforeFailureObserverCanReplaceOwner() {
+        checkFailureObserverCannotReplaceTimedOutOwner(started = false)
+    }
+
+    @Test
+    fun validMissingDoneRevokesReadinessBeforeFailureObserverCanReplaceOwner() {
+        checkFailureObserverCannotReplaceTimedOutOwner(started = true)
+    }
+
+    private fun checkFailureObserverCannotReplaceTimedOutOwner(started: Boolean) {
+        val runtime = FakeRuntime()
+        var unavailable = 0
+        val actuator = AndroidFeedbackActuator(
+            runtime = runtime,
+            onOfflineKoreanSpeechUnavailable = { unavailable += 1 },
+        )
+        runtime.ready()
+        val original = Events()
+        val message = "timeout owner"
+        acceptNavigation(actuator, message, original)
+        val originalId = runtime.spoken.single().id
+        if (started) runtime.start(originalId)
+
+        var timeoutEvents = 0
+        var statusAtFailure: String? = null
+        var readyGenerationAtFailure: Long? = -1L
+        var replacementAccepted: Boolean? = null
+        actuator.speechOutputListener = { event ->
+            if (event.outcome == SpeechOutputOutcome.TERMINAL_TIMEOUT) {
+                timeoutEvents += 1
+                statusAtFailure = actuator.statusText()
+                readyGenerationAtFailure = actuator.readySpeechEngineGenerationOrNull()
+                replacementAccepted = actuator.speakInteraction("observer replacement")
+            }
+        }
+        runtime.advanceBy(if (started) {
+            utteranceTerminalTimeoutMs(message.length, SpeechMessageFamily.NAVIGATION)
+        } else 8_000L)
+
+        println("timeout started=$started observerStatus=$statusAtFailure " +
+            "observerReadyGeneration=$readyGenerationAtFailure replacementAccepted=$replacementAccepted " +
+            "finalStatus=${actuator.statusText()} finalReadyGeneration=${actuator.readySpeechEngineGenerationOrNull()} " +
+            "failed=${original.failed} completed=${original.completed} cancelled=${original.cancelled} " +
+            "unavailable=$unavailable spoken=${runtime.spoken.size}")
+        // Assertions stay outside the observer: its exception isolation must not hide a failure.
+        assertEquals(1, timeoutEvents)
+        assertEquals("tts=init_failed", statusAtFailure)
+        assertEquals(null, readyGenerationAtFailure)
+        assertEquals(false, replacementAccepted)
+        assertEquals(1, original.failed)
+        assertEquals(0, original.completed)
+        assertEquals(0, original.cancelled)
+        assertEquals(1, unavailable)
+        assertEquals(listOf(message), runtime.spoken.map { it.message })
+        assertFalse(actuator.isAppSpeechActive())
+        runtime.advanceBy(30_000L)
+        assertEquals(1, runtime.engines.size)
+        assertEquals(1, timeoutEvents)
+        assertEquals(1, unavailable)
+    }
+
+    @Test
+    fun serviceAndMissingDataErrorsRetireReadinessBeforeObserverReentry() {
+        for ((code, expectedStatus) in listOf(
+            TextToSpeech.ERROR_SERVICE to "tts=init_failed",
+            TextToSpeech.ERROR_NOT_INSTALLED_YET to "tts=korean_unsupported",
+        )) {
+            val runtime = FakeRuntime()
+            var unavailable = 0
+            val actuator = AndroidFeedbackActuator(
+                runtime = runtime, onOfflineKoreanSpeechUnavailable = { unavailable += 1 },
+            )
+            runtime.ready()
+            val original = Events()
+            acceptNavigation(actuator, "failed engine owner", original)
+            var statusAtFailure: String? = null
+            var generationAtFailure: Long? = -1L
+            var replacementAccepted: Boolean? = null
+            var errors = 0
+            actuator.speechOutputListener = { event ->
+                if (event.outcome == SpeechOutputOutcome.ENGINE_ERROR) {
+                    errors += 1
+                    statusAtFailure = actuator.statusText()
+                    generationAtFailure = actuator.readySpeechEngineGenerationOrNull()
+                    replacementAccepted = actuator.speakInteraction("error observer replacement")
+                }
+            }
+            runtime.error(runtime.spoken.single().id, code)
+            assertEquals(expectedStatus, statusAtFailure)
+            assertEquals(expectedStatus, actuator.statusText())
+            assertEquals(null, generationAtFailure)
+            assertEquals(false, replacementAccepted)
+            assertEquals(1, errors)
+            assertEquals(1, original.failed)
+            assertEquals(0, original.cancelled)
+            assertEquals(1, unavailable)
+            assertEquals(1, runtime.spoken.size)
+            assertFalse(actuator.isAppSpeechActive())
+        }
+    }
+
+    @Test
+    fun failureObserverCloseRetiresOwnerOnceAndPreventsRecoveryTail() {
+        val runtime = FakeRuntime()
+        var unavailable = 0
+        val actuator = AndroidFeedbackActuator(
+            runtime = runtime,
+            onOfflineKoreanSpeechUnavailable = { unavailable += 1 },
+            recoveryBudget = TtsEngineRecoveryBudget(automaticRetries = 1),
+        )
+        runtime.ready()
+        val original = Events()
+        acceptNavigation(actuator, "observer closes failed owner", original)
+        var timeouts = 0
+        actuator.speechOutputListener = { event ->
+            if (event.outcome == SpeechOutputOutcome.TERMINAL_TIMEOUT) {
+                timeouts += 1
+                actuator.close()
+            }
+        }
+        runtime.advanceBy(8_000L)
+        assertEquals("tts=closed", actuator.statusText())
+        assertEquals(1, timeouts)
+        assertEquals(1, original.cancelled)
+        assertEquals(0, original.failed)
+        assertEquals(0, original.completed)
+        assertEquals(0, unavailable)
+        assertEquals(1, runtime.stops)
+        assertEquals(1, runtime.shutdowns)
+        runtime.advanceBy(30_000L)
+        assertEquals(1, runtime.engines.size)
+        assertEquals(1, original.cancelled)
+        assertEquals(1, runtime.stops)
+        assertEquals(0, unavailable)
+    }
+
+    @Test
+    fun throwingFailureObserverAndSynchronousStopCallbacksCannotPoisonRecovery() {
+        val (runtime, actuator) = readyActuator(TtsEngineRecoveryBudget(automaticRetries = 1))
+        val original = Events()
+        acceptNavigation(actuator, "missing callback owner", original)
+        val originalId = runtime.spoken.single().id
+        val previousListener = checkNotNull(runtime.engines.single().listener)
+        val staleWatchdog = runtime.scheduledTasksSnapshot().single().runnable
+        val engineLock = AndroidFeedbackActuator::class.java.getDeclaredField("speechEngineOperationLock")
+            .apply { isAccessible = true }.get(actuator)
+        val pendingLock = AndroidFeedbackActuator::class.java.getDeclaredField("pendingUtterances")
+            .apply { isAccessible = true }.get(actuator)
+        var timeouts = 0
+        var observerHeldOwnershipLock = false
+        var statusAtFailure: String? = null
+        actuator.speechOutputListener = { event ->
+            if (event.outcome == SpeechOutputOutcome.TERMINAL_TIMEOUT) {
+                timeouts += 1
+                statusAtFailure = actuator.statusText()
+                observerHeldOwnershipLock = Thread.holdsLock(engineLock) || Thread.holdsLock(pendingLock)
+                error("failure observer")
+            }
+        }
+        runtime.onStop = {
+            previousListener.onStart(originalId)
+            previousListener.onDone(originalId)
+            previousListener.onError(originalId, TextToSpeech.ERROR_SERVICE)
+        }
+        runtime.advanceBy(8_000L)
+        assertEquals("tts=initializing", statusAtFailure)
+        assertFalse(observerHeldOwnershipLock)
+        assertEquals(1, timeouts)
+        assertEquals(1, original.failed)
+        assertEquals(0, original.completed)
+        assertEquals(0, original.cancelled)
+        assertFalse(actuator.isAppSpeechActive())
+        runtime.onStop = null
+        runtime.advanceBy(250L)
+        runtime.ready()
+        val current = Events()
+        acceptNavigation(actuator, "replacement engine owner", current)
+        val currentId = runtime.spoken.last().id
+        val stopsBeforeStaleTimer = runtime.stops
+        staleWatchdog.run()
+        previousListener.onError(currentId, TextToSpeech.ERROR_SERVICE)
+        previousListener.onDone(currentId)
+        runtime.runCurrent()
+        assertEquals("tts=ready", actuator.statusText())
+        assertTrue(actuator.isAppSpeechActive())
+        assertEquals(stopsBeforeStaleTimer, runtime.stops)
+        assertEquals(0, current.failed)
+        assertEquals(0, current.completed)
+        assertEquals(1, timeouts)
+        runtime.start(currentId)
+        runtime.done(currentId)
+        assertEquals(1, current.completed)
+        assertEquals(0, current.failed)
+        assertEquals(0, current.cancelled)
+        assertEquals(2, runtime.engines.size)
     }
 
     @Test
@@ -293,12 +544,10 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
         val stopsBefore = runtime.stops
         val stopEntered = CountDownLatch(1)
         val releaseStop = CountDownLatch(1)
-        val dangerFocusRequested = CountDownLatch(1)
         runtime.onStop = {
             stopEntered.countDown()
             releaseStop.await(10, TimeUnit.SECONDS)
         }
-        runtime.onFocusRequest = { dangerFocusRequested.countDown() }
         var cancellationResult: Boolean? = null
         var dangerDispatch: NavigationSpeechDispatchResult? = null
         val cancellationThread = Thread { cancellationResult = actuator.cancelNavigationSpeech() }
@@ -316,7 +565,7 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
         try {
             assertTrue(stopEntered.await(5, TimeUnit.SECONDS))
             dangerThread.start()
-            assertTrue(dangerFocusRequested.await(5, TimeUnit.SECONDS))
+            // Admission now waits for the same native-operation lock before acquiring focus.
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
             while (dangerThread.isAlive && dangerThread.state != Thread.State.BLOCKED &&
                 System.nanoTime() < deadline
@@ -620,6 +869,8 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
         runtime.stopThrows = true
         runtime.shutdownThrows = true
         actuator.close()
+        runtime.runCurrent()
+        assertEquals(1, events.cancelled)
         val failuresAtClose = events.failed
         val cancellationsAtClose = events.cancelled
         assertEquals(1, runtime.focusReleases)
@@ -634,6 +885,234 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
         assertEquals(failuresAtClose, events.failed)
         assertEquals(cancellationsAtClose, events.cancelled)
         assertEquals(1, runtime.engines.size)
+    }
+
+    @Test
+    fun closeDeliversExplicitNavigationAndPolicyRiskCancellationBeforeAndAfterStart() {
+        for (risk in listOf(false, true)) for (started in listOf(false, true)) {
+            val (runtime, actuator) = readyActuator()
+            val events = Events()
+            val policy = WalkSafeFeedbackPolicy()
+            val action = if (risk) claimPolicyRisk(runtime, policy, "explicit close risk") else null
+            if (action != null) {
+                assertEquals(NavigationSpeechDispatchResult.ACCEPTED, actuator.emit(
+                    action = action,
+                    isStillValidAtStart = { policy.hasClaimedFeedbackDelivery(action) },
+                    onSpeechCompleted = { events.completed += 1 },
+                    onSpeechFailed = { events.failed += 1 },
+                    onSpeechCancelled = {
+                        events.cancelled += 1
+                        policy.rejectUndeliveredFeedback(action, 1_000L)
+                    },
+                ).speech)
+            } else {
+                acceptNavigation(actuator, "explicit close navigation", events)
+            }
+            val id = runtime.spoken.single().id
+            if (started) runtime.start(id)
+            actuator.close()
+            runtime.runCurrent()
+            assertEquals("risk=$risk started=$started", 1, events.cancelled)
+            assertEquals(0, events.completed + events.failed)
+            assertFalse(actuator.isAppSpeechActive())
+            if (action != null) assertFalse(policy.hasClaimedFeedbackDelivery(action))
+            runtime.start(id)
+            runtime.done(id)
+            runtime.error(id, TextToSpeech.ERROR_SERVICE)
+            runtime.advanceBy(20_500L)
+            assertEquals(1, events.cancelled)
+            assertEquals(0, events.completed + events.failed)
+            assertEquals(1, runtime.engines.size)
+        }
+    }
+
+    @Test(timeout = 10_000L)
+    fun closeReenteredFromNativeSpeakDefersExplicitRiskCancellationUntilAfterEngineLock() {
+        val (runtime, actuator) = readyActuator()
+        val policy = WalkSafeFeedbackPolicy()
+        val action = claimPolicyRisk(runtime, policy, "close inside native speak")
+        val events = Events()
+        var insideNativeSpeak = false
+        var cancellationInsideNativeSpeak = false
+        var cancellationAtClose = -1
+        var anotherCloseJoined = false
+        runtime.onSpeak = {
+            insideNativeSpeak = true
+            actuator.close()
+            cancellationAtClose = events.cancelled
+            insideNativeSpeak = false
+        }
+        assertEquals(NavigationSpeechDispatchResult.SUPPRESSED, actuator.emit(
+            action = action,
+            isStillValidAtStart = { policy.hasClaimedFeedbackDelivery(action) },
+            onSpeechCompleted = { events.completed += 1 },
+            onSpeechFailed = { events.failed += 1 },
+            onSpeechCancelled = {
+                events.cancelled += 1
+                cancellationInsideNativeSpeak = insideNativeSpeak
+                policy.rejectUndeliveredFeedback(action, 1_000L)
+                val finished = CountDownLatch(1)
+                val closer = Thread {
+                    try {
+                        actuator.close()
+                    } finally {
+                        finished.countDown()
+                    }
+                }
+                closer.start()
+                anotherCloseJoined = finished.await(5L, TimeUnit.SECONDS)
+                closer.join(50L)
+            },
+        ).speech)
+        assertEquals(0, cancellationAtClose)
+        assertEquals(0, events.cancelled)
+        runtime.runCurrent()
+        assertEquals(1, events.cancelled)
+        assertFalse(cancellationInsideNativeSpeak)
+        assertTrue("cancellation must not hold the engine lock", anotherCloseJoined)
+        assertFalse(policy.hasClaimedFeedbackDelivery(action))
+        assertEquals(0, events.completed + events.failed)
+        assertEquals(1, runtime.stops)
+        assertEquals(1, runtime.shutdowns)
+        assertFalse(actuator.isAppSpeechActive())
+    }
+
+    @Test
+    fun throwingOldCancellationAfterReentrantCloseCannotDropNewRiskCloseCancellation() {
+        val (runtime, actuator) = readyActuator()
+        val old = Events()
+        assertEquals(NavigationSpeechDispatchResult.ACCEPTED, actuator.speakNavigation(
+            message = "old navigation closes replacement",
+            onCompleted = { old.completed += 1 },
+            onFailed = { old.failed += 1 },
+            onCancelled = {
+                old.cancelled += 1
+                actuator.close()
+                throw IllegalStateException("old cancellation consumer")
+            },
+            requiresExplicitTerminalCallback = true,
+        ))
+        val oldId = runtime.spoken.single().id
+        val next = Events()
+        assertEquals(NavigationSpeechDispatchResult.UNAVAILABLE, actuator.emit(
+            action = riskAction(runtime.now + 20_000L, "replacement closed by old owner", MessageLevel.STOP),
+            isStillValidAtStart = { true },
+            onSpeechCompleted = { next.completed += 1 },
+            onSpeechFailed = { next.failed += 1 },
+            onSpeechCancelled = { next.cancelled += 1 },
+        ).speech)
+        runtime.runCurrent()
+        assertEquals(1, old.cancelled)
+        assertEquals(1, next.cancelled)
+        assertEquals(0, old.completed + old.failed + next.completed + next.failed)
+        assertEquals(1, runtime.spoken.size)
+        assertEquals(1, runtime.stops)
+        assertEquals(1, runtime.shutdowns)
+        runtime.done(oldId)
+        runtime.error(oldId, TextToSpeech.ERROR_SERVICE)
+        runtime.advanceBy(20_500L)
+        assertEquals(1, old.cancelled)
+        assertEquals(1, next.cancelled)
+        assertEquals(0, old.completed + old.failed + next.completed + next.failed)
+    }
+
+    @Test
+    fun closeDoesNotTurnLegacyFailureConsumersIntoCancellationConsumers() {
+        for (interaction in listOf(false, true)) {
+            val (runtime, actuator) = readyActuator()
+            val events = Events()
+            val result = if (interaction) actuator.speakInteraction(
+                message = "legacy interaction failure only",
+                onCompleted = { events.completed += 1 },
+                onFailed = { events.failed += 1 },
+            ) else actuator.speakNavigation(
+                message = "legacy navigation failure only",
+                onCompleted = { events.completed += 1 },
+                onFailed = { events.failed += 1 },
+            )
+            assertEquals(NavigationSpeechDispatchResult.ACCEPTED, result)
+            val id = runtime.spoken.single().id
+            runtime.start(id)
+            actuator.close()
+            runtime.runCurrent()
+            runtime.done(id)
+            runtime.error(id, TextToSpeech.ERROR_SERVICE)
+            runtime.advanceBy(20_500L)
+            assertEquals(0, events.completed + events.failed + events.cancelled)
+        }
+    }
+
+    @Test
+    fun explicitCommandCloseCancellationSurvivesRepeatedCloseForEveryCommandApi() {
+        for (api in listOf("home", "interaction", "confirmation", "consent", "training")) {
+            val (runtime, actuator) = readyActuator()
+            val events = Events()
+            val completed = { events.completed += 1 }
+            val failed = { events.failed += 1 }
+            val cancelled = { events.cancelled += 1 }
+            val result = when (api) {
+                "home" -> actuator.speakHomeCommandInteraction("explicit home close", failed, completed, cancelled)
+                "interaction" -> actuator.speakInteraction("explicit interaction close", completed, failed, cancelled)
+                "confirmation" -> actuator.speakExplicitConfirmation("explicit confirmation close", completed, failed, cancelled)
+                "consent" -> actuator.speakConsentClause("explicit consent close", completed, failed, cancelled)
+                else -> actuator.speakPriorityUserTraining("explicit training close", completed, failed, cancelled)
+            }
+            assertEquals(api, NavigationSpeechDispatchResult.ACCEPTED, result)
+            val id = runtime.spoken.single().id
+            runtime.start(id)
+            actuator.close()
+            actuator.close()
+            assertEquals(api, 0, events.cancelled)
+            runtime.runCurrent()
+            assertEquals(api, 1, events.cancelled)
+            assertEquals(0, events.completed + events.failed)
+            runtime.done(id)
+            runtime.error(id, TextToSpeech.ERROR_SERVICE)
+            runtime.advanceBy(20_500L)
+            assertEquals(1, events.cancelled)
+            assertEquals(0, events.completed + events.failed)
+            assertEquals(1, runtime.stops)
+            assertEquals(1, runtime.shutdowns)
+        }
+    }
+
+    @Test
+    fun repeatedCloseAndLateCallbacksCannotReopenOutputOrRepeatNativeTeardown() {
+        val (runtime, actuator) = readyActuator()
+        val events = Events()
+        acceptNavigation(actuator, "repeat close owner", events)
+        val id = runtime.spoken.single().id
+        runtime.start(id)
+        actuator.close()
+        runtime.runCurrent()
+        val cancellationsAtClose = events.cancelled
+        actuator.close()
+        runtime.start(id)
+        runtime.done(id)
+        runtime.error(id, TextToSpeech.ERROR_SERVICE)
+        val rejected = Events()
+        assertEquals(NavigationSpeechDispatchResult.UNAVAILABLE, actuator.speakNavigation(
+            "after close navigation",
+            onCompleted = { rejected.completed += 1 },
+            onFailed = { rejected.failed += 1 },
+            onCancelled = { rejected.cancelled += 1 },
+        ))
+        assertEquals(NavigationSpeechDispatchResult.SUPPRESSED, actuator.emit(
+            action = riskAction(runtime.now + 20_000L, "after close risk", MessageLevel.STOP),
+            isStillValidAtStart = { true },
+            onSpeechCompleted = { rejected.completed += 1 },
+            onSpeechFailed = { rejected.failed += 1 },
+            onSpeechCancelled = { rejected.cancelled += 1 },
+        ).speech)
+        runtime.advanceBy(20_500L)
+        assertEquals(cancellationsAtClose, events.cancelled)
+        assertEquals(0, events.completed + events.failed + rejected.completed + rejected.failed + rejected.cancelled)
+        assertEquals(1, runtime.spoken.size)
+        assertEquals(1, runtime.stops)
+        assertEquals(1, runtime.shutdowns)
+        assertEquals(1, runtime.engines.size)
+        assertEquals("tts=closed", actuator.statusText())
+        assertFalse(actuator.isAppSpeechActive())
     }
 
     @Test
@@ -1384,7 +1863,8 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
         actuator.playProgressBeep(50)
         runtime.onFocusRelease = { actuator.close() }
 
-        val dispatch = dispatchToneReplacement(runtime, actuator, true, Events())
+        val events = Events()
+        val dispatch = dispatchToneReplacement(runtime, actuator, true, events)
 
         assertEquals(NavigationSpeechDispatchResult.UNAVAILABLE, dispatch)
         assertEquals("tts=closed", actuator.statusText())
@@ -1393,6 +1873,10 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
         assertTrue(runtime.grantedFocusListeners.isEmpty())
         assertFalse(actuator.isAppSpeechActive())
         assertTrue(runtime.spoken.isEmpty())
+        assertEquals(0, events.cancelled)
+        runtime.runCurrent()
+        assertEquals(1, events.cancelled)
+        assertEquals(0, events.completed + events.failed)
         assertTrue(runtime.scheduledTasksSnapshot().isEmpty())
         assertEquals(1, runtime.tones.single().releases)
     }
@@ -1657,6 +2141,27 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
         validUntilMs = deadline,
     )
 
+    private fun claimPolicyRisk(runtime: FakeRuntime, policy: WalkSafeFeedbackPolicy, message: String): FeedbackAction {
+        val action = requireNotNull(policy.evaluate(FeedbackCandidate(
+            trackId = "close-policy-risk",
+            message = message,
+            level = MessageLevel.STOP,
+            source = DepthSource.ARCORE_RAW_DEPTH,
+            confidence = .9f,
+            timestampMs = runtime.now + 50_000L,
+            trackAgeFrames = 20,
+            trackStableMs = 4_000L,
+            stale = false,
+            validUntilMs = runtime.now + 800L,
+            timeToCollisionMs = 1_000L,
+            riskDistanceM = 1.0f,
+            observedAtElapsedRealtimeMs = runtime.now,
+            observationMaxAgeMs = 800L,
+        ), true, runtime.now))
+        assertTrue(policy.claimFeedbackDelivery(action, runtime.now, runtime.now))
+        return action
+    }
+
     private class Events {
         var completed = 0
         var failed = 0
@@ -1717,6 +2222,7 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
         var listenerThrows = false
         var speakThrows = false
         var speakResult = TextToSpeech.SUCCESS
+        var onSpeak: (() -> Unit)? = null
         var focusRequestThrows = false
         var focusRequestResult = true
         var onFocusRequest: (() -> Unit)? = null
@@ -1761,6 +2267,9 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
                 if (queueMode == TextToSpeech.QUEUE_FLUSH || activeSpeechId == null) {
                     activeSpeechId = utteranceId
                 }
+                val callback = onSpeak
+                onSpeak = null
+                callback?.invoke()
             }
             return speakResult
         }

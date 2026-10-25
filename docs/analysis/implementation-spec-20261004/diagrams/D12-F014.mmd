@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-014 요청별 기기 proof·정규 인코딩·시간 결속"]
+  P["P-D12-014 기기 proof는 정확한 단일 요청에 결속"]
+  A --> P
+  M0["1. 허용된 purpose/method/read-purpose/action 형태만 Intent로 만든다."]
+  P --> M0
+  M1["2. 본문 실제 UTF-8 bytes 및 정렬된 percent-encoded query의 SHA-256을 challenge에 결속한다."]
+  M0 --> M1
+  M2["3. POST /admin/security/device-proof/challenges 응답의 모든 필드·물리적 null·정규 UUID/hash/nonce/schema를 정확히 검증한다."]
+  M1 --> M2
+  M3["4. expires=issued+120000ms, 미래 issued skew 최대 5000ms, now＜expires를 검사한다."]
+  M2 --> M3
+  M4["5. canonical payload를 P-256 SHA256withECDSA로 서명하여 canonical DER 8~72바이트를 무패딩 Base64url로 보낸다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 실제 요청에 결속된 canonical device proof 반환."]
+  M0 -. "관련 조건 확인" .-> B0{"unknown/missing 필드 또는 intent 불일치"}
+  B0 -->|"조건 해당"| R0["후속 보호 요청 전 실패"]
+  M1 -. "관련 조건 확인" .-> B1{"now＞=expires 또는 미래 skew 초과"}
+  B1 -->|"조건 해당"| R1["새 challenge와 자동 시간 설정 안내"]
+  M2 -. "관련 조건 확인" .-> B2{"기기 서명 실패"}
+  B2 -->|"조건 해당"| R2["보호 요청 미전송"]
+  M3 -. "관련 조건 확인" .-> B3{"challenge 발급 이후 wall clock 이동"}
+  B3 -->|"조건 해당"| R3["수신시각+monotonic 경과로 추정 시각 계산"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["실패하면 보호 요청 전송 없음; 새로운 호출에서 새 challenge. 기존 proof의 자동 재사용 없음."]

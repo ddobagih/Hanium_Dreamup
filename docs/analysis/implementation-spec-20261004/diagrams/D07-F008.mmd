@@ -1,0 +1,21 @@
+flowchart TD
+    A["F-D07-008 · P-D07-008<br/>독립 depth scalar 접근과 실제 point 3D 자격"]
+    W["history 최대256개 4000ms<br/>200ms 이상 표본 간격<br/>4개 및1500ms는 탐색 종료 목표"]
+    A --> W
+    W --> S{"scalar 자격<br/>4개 이상 span600..4000ms<br/>gap100..1500ms 및 stable·source·통계 gate"}
+    S -->|실패| N["scalar speed·접근시간 미확인"]
+    S -->|성공| R["거리 회귀와 trend<br/>speed≥0.25 및≥2stderr이면 접근시간 후보"]
+    W -.-> P{"별도 spatial 자격<br/>동일 actual point·pose·독립 capture<br/>4점 span600..4000ms"}
+    P -->|실패| U["3D velocity·CPA 미확인<br/>scalar 후보 자체는 차단하지 않음"]
+    P -->|성공| V["same point 3D motion과 signed CPA"]
+    R --> G{"현재 동시 3D confidence≥0.55<br/>유한 relativeClosing≤0 증거가 있는가"}
+    V -.-> G
+    U -.-> G
+    G -->|있음| X["접근시간만 null<br/>trend와 near warning 유지"]
+    G -->|없음| T["qualified scalar 접근시간 유지"]
+    N --> L["원본 publication lease 확인<br/>collision UNKNOWN"]
+    X --> L
+    T --> L
+    V --> L
+    L --> Z["현재 lease가 허용하는 결과 반환<br/>CPA는 통행 안전 판단 아님"]
+    NOTE["점선은 자격의 논리적 의존 관계<br/>별도 병렬 실행을 뜻하지 않음"]

@@ -1,8 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.network
 
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.CancellationException
+import java.util.concurrent.atomic.AtomicReference
 import kr.co.hanium.dreamup.walksafe.session.INTEGRATED_CONSENT_CONFIRMATION_SCHEMA_VERSION
 import kr.co.hanium.dreamup.walksafe.session.INTEGRATED_CONSENT_AUTOMATIC_ITEM_VERSION
 import kr.co.hanium.dreamup.walksafe.session.INTEGRATED_CONSENT_MOBILE_ITEM_VERSION
@@ -90,7 +90,10 @@ data class IntegratedConsentBootstrap(
     }
 }
 
-class AndroidIntegratedConsentClient {
+class AndroidIntegratedConsentClient(
+    private val installationPublicKey: ((String, String, String, Long) -> String)? = null,
+    private val markInstallationKeyRegistered: ((String, String, String, Long) -> Unit)? = null,
+) {
     fun fetchBootstrapCall(
         gatewayBaseUrl: String,
         session: GatewayFieldSession,
@@ -105,12 +108,12 @@ class AndroidIntegratedConsentClient {
                 "&installation_id=${encoded(installationId)}" +
                 "&policy_version=${encoded(INTEGRATED_CONSENT_POLICY_VERSION)}"
         return cancellableHttpCall { cancellation ->
-            val connection = URL(
-                gatewayBaseUrl.trimEnd('/') + "/privacy/rights" + query,
-            ).openConnection() as HttpURLConnection
-            cancellation.attach(connection)
-            try {
-                connection.apply {
+            withJsonHttpExchange(
+                cancellation = cancellation,
+                endpoint = gatewayBaseUrl.trimEnd('/') + "/privacy/rights" + query,
+                requestBody = null,
+                maximumResponseBytes = INTEGRATED_CONSENT_MAX_RESPONSE_BYTES,
+                configure = {
                     requestMethod = "GET"
                     connectTimeout = 8_000
                     readTimeout = 12_000
@@ -119,11 +122,8 @@ class AndroidIntegratedConsentClient {
                     setRequestProperty("Accept", "application/json")
                     setRequestProperty("Connection", "close")
                     session.requestHeaders().forEach(::setRequestProperty)
-                }
-                val response = connection.readBoundedResponse(
-                    INTEGRATED_CONSENT_MAX_RESPONSE_BYTES,
-                    cancellation,
-                )
+                },
+            ) { response ->
                 if (response.statusCode !in 200..299) {
                     cancellation.throwIfCancelled()
                     consumeGatewayAuthenticationStaleResponse(authenticationRequest, session, response)
@@ -133,9 +133,6 @@ class AndroidIntegratedConsentClient {
                     body = response.body,
                     expectedInstallationId = installationId,
                 ) ?: throw IntegratedConsentProtocolException()
-            } finally {
-                cancellation.detach(connection)
-                connection.disconnect()
             }
         }
     }
@@ -153,14 +150,14 @@ class AndroidIntegratedConsentClient {
             "?control=integrated-consent" +
                 "&installation_id=${encoded(installationId)}" +
                 "&policy_version=${encoded(INTEGRATED_CONSENT_POLICY_VERSION)}"
-        return requestCall(
+        return afterConfirmedConsent(session, requestCall(
             endpoint = gatewayBaseUrl.trimEnd('/') + "/privacy/rights" + query,
             method = "GET",
             installationId = installationId,
             controlSecret = controlSecret,
             session = session,
             requestBody = null,
-        )
+        ))
     }
 
     fun saveCall(
@@ -216,7 +213,7 @@ class AndroidIntegratedConsentClient {
                     .put("training_reuse", selections.trainingReuse),
             )
             .toString()
-        return requestCall(
+        return afterConfirmedConsent(session, requestCall(
             endpoint = gatewayBaseUrl.trimEnd('/') +
                 "/privacy/rights?control=integrated-consent",
             method = "PUT",
@@ -225,7 +222,87 @@ class AndroidIntegratedConsentClient {
             session = session,
             requestBody = requestBody,
             authenticationRequest = authenticationRequest,
+        ))
+    }
+
+    /** Registration is installation authority metadata, never a replacement for consent. */
+    fun registerInstallationEvidenceKeyCall(
+        session: GatewayFieldSession,
+        confirmation: IntegratedConsentConfirmation,
+        isCurrent: () -> Boolean,
+    ): CancellableNetworkCall<Unit> {
+        require(session.sessionScope == GatewaySessionScope.GENERAL)
+        val generation = session.accountGenerationOrNull
+            ?: throw IllegalStateException("Installation evidence account generation is unknown")
+        require(generation > 0L && session.isUsableFor(session.actorId))
+        require(!session.isBackendAccountDeviceBound || session.deviceId == confirmation.installationId)
+        require(confirmation.schemaVersion == INTEGRATED_CONSENT_CONFIRMATION_SCHEMA_VERSION &&
+            confirmation.policyVersion == INTEGRATED_CONSENT_POLICY_VERSION &&
+            confirmation.itemVersions == IntegratedConsentItemVersions())
+        val provider = installationPublicKey ?: error("Installation evidence key provider is unavailable")
+        return cancellableHttpCall(deadlineMs = 20_000L) { cancellation ->
+            fun ensureCurrent() {
+                cancellation.throwIfCancelled()
+                if (!isCurrent() || !session.isUsableFor(session.actorId)) throw CancellationException("Installation evidence owner changed")
+            }
+            ensureCurrent()
+            val key = provider(confirmation.installationId, session.gatewayBaseUrl, session.actorId, generation)
+            require(validInstallationEvidencePublicKey(key))
+            ensureCurrent()
+            val body = JSONObject().put("installation_id", confirmation.installationId).put("public_key", key).toString()
+            withJsonHttpExchange(
+                cancellation = cancellation,
+                endpoint = session.gatewayBaseUrl.trimEnd('/') + "/privacy/rights?control=installation-evidence-key",
+                requestBody = body,
+                maximumResponseBytes = 4_096,
+                configure = {
+                    requestMethod = "PUT"; connectTimeout = 8_000; readTimeout = 12_000
+                    doInput = true; instanceFollowRedirects = false
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty(CONSENT_CONTROL_SECRET_HEADER, confirmation.controlSecret)
+                    session.requestHeaders().forEach(::setRequestProperty)
+                },
+            ) { response ->
+                ensureCurrent()
+                if (response.statusCode != 204 || response.body.isNotEmpty()) {
+                    throw IntegratedConsentHttpException(response.statusCode, response.body)
+                }
+                markInstallationKeyRegistered?.invoke(confirmation.installationId, session.gatewayBaseUrl, session.actorId, generation)
+                Unit
+            }
+        }
+    }
+
+    private fun afterConfirmedConsent(
+        session: GatewayFieldSession,
+        consentCall: CancellableNetworkCall<IntegratedConsentConfirmation?>,
+    ): CancellableNetworkCall<IntegratedConsentConfirmation?> {
+        if (installationPublicKey == null) return consentCall
+        val request = captureGatewayAuthenticationRequest(session)
+        val registration = AtomicReference<CancellableNetworkCall<Unit>?>()
+        lateinit var outer: CancellableNetworkCall<IntegratedConsentConfirmation?>
+        outer = CancellableNetworkCall(
+            executeBlock = {
+                val confirmation = consentCall.execute()
+                if (confirmation != null && !outer.isCancelled()) {
+                    // A server-accepted consent remains accepted if the optional key registration fails.
+                    try {
+                        val call = registerInstallationEvidenceKeyCall(session, confirmation) {
+                            !outer.isCancelled() && request != null &&
+                                GatewaySessionProcessCoordinator.isCurrentGeneralSession(request.generation, session)
+                        }
+                        registration.set(call)
+                        if (outer.isCancelled()) call.cancel()
+                        call.execute()
+                    } catch (_: Exception) {
+                        // Registration acknowledgement is held separately by the durable key provider.
+                    } finally { registration.set(null) }
+                }
+                confirmation
+            },
+            cancelBlock = { consentCall.cancel(); registration.getAndSet(null)?.cancel() },
         )
+        return outer
     }
 
     private fun requestCall(
@@ -238,10 +315,12 @@ class AndroidIntegratedConsentClient {
         authenticationRequest: GatewaySessionProcessSnapshot? = null,
     ): CancellableNetworkCall<IntegratedConsentConfirmation?> =
         cancellableHttpCall { cancellation ->
-            val connection = URL(endpoint).openConnection() as HttpURLConnection
-            cancellation.attach(connection)
-            try {
-                connection.apply {
+            withJsonHttpExchange(
+                cancellation = cancellation,
+                endpoint = endpoint,
+                requestBody = requestBody,
+                maximumResponseBytes = INTEGRATED_CONSENT_MAX_RESPONSE_BYTES,
+                configure = {
                     requestMethod = method
                     connectTimeout = 8_000
                     readTimeout = 12_000
@@ -254,27 +333,9 @@ class AndroidIntegratedConsentClient {
                         controlSecret,
                     )
                     session?.requestHeaders()?.forEach(::setRequestProperty)
-                    if (requestBody != null) {
-                        doOutput = true
-                        setRequestProperty("Content-Type", "application/json")
-                    }
-                }
-                if (requestBody != null) {
-                    connection.outputStream.use { output ->
-                        cancellation.attach(output)
-                        try {
-                            output.write(requestBody.toByteArray(Charsets.UTF_8))
-                            output.flush()
-                        } finally {
-                            cancellation.detach(output)
-                        }
-                    }
-                }
-                val response = connection.readBoundedResponse(
-                    INTEGRATED_CONSENT_MAX_RESPONSE_BYTES,
-                    cancellation,
-                )
-                if (method == "GET" && response.statusCode == 404) return@cancellableHttpCall null
+                },
+            ) { response ->
+                if (method == "GET" && response.statusCode == 404) return@withJsonHttpExchange null
                 if (response.statusCode !in 200..299) {
                     cancellation.throwIfCancelled()
                     consumeGatewayAuthenticationStaleResponse(authenticationRequest, session, response)
@@ -285,9 +346,6 @@ class AndroidIntegratedConsentClient {
                     expectedInstallationId = installationId,
                     expectedControlSecret = controlSecret,
                 ) ?: throw IntegratedConsentProtocolException()
-            } finally {
-                cancellation.detach(connection)
-                connection.disconnect()
             }
         }
 }

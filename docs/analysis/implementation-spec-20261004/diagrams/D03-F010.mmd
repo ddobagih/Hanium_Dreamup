@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D03-010 hands-free 명령 창과 낮은 신뢰도 재질문"]
+  P["정책 P-D03-006, P-D03-010"]
+  A --> P
+  N0["1. 잘못 들은 명령을 실행하지 않고 동일 phase 에서 한 번만 다시 묻는다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. wake 는 신뢰하되 같은 문장 command 불신뢰이면 command window 만 연다."]
+  N0 --> N1
+  N2["3. 재질문 completion 과 현재 phase/run 이 같아야 새 창을 연다."]
+  N1 --> N2
+  N3["4. 두 번째 불신뢰 입력 또는 명령창 timeout 은 조용히 wake 로 복귀한다."]
+  N2 --> N3
+  Z["정상: 신뢰 final 은 command dispatch."]
+  N3 --> Z
+  B0{"첫 confidence 실패"}
+  R0["재질문 callback"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"재질문 취소"}
+  R1["wake 복귀"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"재질문 출력 종료 안 됨 4s"}
+  R2["fail/복귀 처리"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: 재질문 실패/eligibility 상실은 실행 없이 종료."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xtimeout["만료: 6s/20s/1.2s 서로 다른 deadline."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xtimeout
+  Xcancel["취소: state generation invalidate."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: 출력 개입이면 현재 창 중단."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xretry["재시도: confidence 재질문은 한 번; 새 wake 는 새 cycle."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry
+  Xcleanup["정리: phase 별 Runnable 제거."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

@@ -20,6 +20,16 @@ internal class WalkSafeApplication : Application(), WalkVoiceSessionControllerPr
 
     override fun onCreate() {
         super.onCreate()
+        // The decoder shares this UID/cache but must not clean the microphone owner's audio.
+        val processName = if (android.os.Build.VERSION.SDK_INT >= 28) {
+            Application.getProcessName()
+        } else {
+            getSystemService(android.app.ActivityManager::class.java).runningAppProcesses
+                ?.firstOrNull { it.pid == android.os.Process.myPid() }?.processName
+        }
+        if (processName != applicationInfo.processName) return
+        val cleanup = TemporaryVoiceAudio.cleanupAtProcessStart(cacheDir)
+        if (cleanup.failures > 0) android.util.Log.w("WalkSafeVoice", "temporary_audio_cleanup_incomplete count=${cleanup.failures}")
         ReportQueueCleanupJobService.schedule(this)
     }
 

@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D02-022 실시간 보정 camera lease·UI deadline·실제 drain"]
+  E["진입: start·cancel·whenDrained / dialog cancel/back·frame·camera closed"]
+  G{"P-D02-022 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["cancel intent; 곧바로 camera free로 표시하지 않음"]
+  G -->|"deadline/back/window cancel"| B0
+  B1["current generation 검사 뒤 close/discard"]
+  G -->|"late provider/frame"| B1
+  B2["camera lease 유지·앱 재시작 필요 표시"]
+  G -->|"close 실패"| B2
+  B3["drain 완료 근거 아님"]
+  G -->|"runner만 종료/UI만 dismiss"| B3
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["전용 dialog와 camera/GL owner 준비; 권한을 새로 요청하지 않음"]
+    S1["frame을 current runner에 전달하고 거절 frame 즉시 close"]
+    S2["cancel intent는 UI와 frame publication을 막고 runner drain 대기"]
+    S3["AR은 image/native drain→GL pause/provider pause→worker Session.close"]
+    S4["CameraX는 analyzer serial barrier→unbind→실제 CameraState.CLOSED를 100ms<br/>간격 관찰"]
+    S5["모든 실제 owner 해제가 확인된 뒤 drained callback"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+  E -.-> S0
+  N["정상 종료: 유효한 결과를 현재 호출자에게 반환한다."]
+  X["취소·중단: button/back/window lifecycle에서 같은 cancellation owner 사용. / 늦은 이전<br/>소유자의 callback은 현 상태를 바꾸지 않는다."]
+  C["정리: AR 실제 close 또는 CameraX CLOSED 확인, failed close는 lease를 붙들고 새 owner<br/>차단."]
+  R["재시도·복구: close 실패 뒤 자동 camera 재사용 없음. / 현재 조건과 소유권을 다시 검사한다."]
+  S5 --> N
+  E -.-> X
+  X --> C
+  C -.-> R
+  TEST["debug non-exported TestHost: explicit opt-in instrumentation만 실행"]
+  TEST --> HOST["onCreate label, detector install·borrow·expected identity replace"]
+  HOST --> PAUSE["onPause/onDestroy: fixture callback이 attempt.cancel 요청"]
+  PAUSE --> C

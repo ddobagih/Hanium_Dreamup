@@ -204,13 +204,14 @@ def create_router(
     settings: Settings,
     *,
     inference_runner: InferenceProcessRunner | None = None,
+    inference_runner_provider=None,
 ) -> APIRouter:
     router = APIRouter()
     # Ultralytics inference is synchronous and model objects are not guaranteed
     # to be thread-safe. Keep it off the event loop and serialize access to the
     # process-local model cache.
     inference_limiter = CapacityLimiter(1)
-    if inference_runner is None:
+    if inference_runner is None and inference_runner_provider is None:
         inference_runner = create_inference_runner(settings)
 
     @router.get("/detect/health", response_model=DetectHealthResponse)
@@ -235,9 +236,10 @@ def create_router(
         image_bytes, content_type = await _read_detection_image_upload(image, settings)
 
         try:
-            if inference_runner is not None:
+            current_runner = inference_runner_provider() if inference_runner_provider else inference_runner
+            if current_runner is not None:
                 return await _await_isolated_inference(
-                    inference_runner,
+                    current_runner,
                     "legacy",
                     image_bytes=image_bytes,
                     content_type=content_type,
@@ -313,9 +315,10 @@ def create_router(
 
         image_bytes, content_type = await _read_detection_image_upload(image, settings)
         try:
-            if inference_runner is not None:
+            current_runner = inference_runner_provider() if inference_runner_provider else inference_runner
+            if current_runner is not None:
                 return await _await_isolated_inference(
-                    inference_runner,
+                    current_runner,
                     "v2",
                     image_bytes=image_bytes,
                     content_type=content_type,

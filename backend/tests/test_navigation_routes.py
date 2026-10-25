@@ -56,6 +56,9 @@ from backend.app.services.tmap_pedestrian import (  # noqa: E402
 )
 from backend.app.services import tmap_pedestrian as tmap_service  # noqa: E402
 from backend.app.services import tmap_runtime as runtime_module  # noqa: E402
+from backend.app.services import tmap_response_normalization as response_normalization  # noqa: E402
+from backend.app.services import tmap_walking_normalization as walking_normalization  # noqa: E402
+from backend.app.services import tmap_poi_normalization as poi_normalization  # noqa: E402
 from backend.app.services.tmap_runtime import (  # noqa: E402
     TmapRuntime, TmapRuntimeError, TmapWorkerTestHooks,
 )
@@ -2207,7 +2210,7 @@ def test_tmap_bearing_consensus_and_default_keep_short_polyline_unknown(point_co
 @pytest.mark.parametrize(("latitude", "expected_checks"), [(0.0, 2), (-0.0001, 3)])
 def test_tmap_bearing_consensus_keeps_deadline_checkpoints(monkeypatch, latitude, expected_checks):
     checkpoints = []
-    monkeypatch.setattr("backend.app.services.tmap_pedestrian._ensure_tmap_deadline", checkpoints.append)
+    monkeypatch.setattr("backend.app.services.tmap_walking_normalization._ensure_tmap_deadline", checkpoints.append)
     point = RoutePoint(latitude=latitude, longitude=0.0)
     polyline = [RoutePoint(latitude=index * 0.000000001, longitude=0.0) for index in range(258)]
 
@@ -3194,7 +3197,8 @@ def test_tmap_response_job_walks_strings_once_and_direct_normalizer_still_checks
         walked.append(payload)
         return original_walk(payload, deadline_at=deadline_at)
 
-    monkeypatch.setattr(tmap_service, "_json_has_oversized_string", observed_walk)
+    for owner in (tmap_service, walking_normalization, poi_normalization):
+        monkeypatch.setattr(owner, "_json_has_oversized_string", observed_walk)
     if mode == "route":
         payload = _runtime_route_payload()
         arguments = {"request": _runtime_request().model_dump(mode="json")}
@@ -3232,8 +3236,8 @@ def test_tmap_bound_guides_compute_each_proven_outgoing_edge_once(monkeypatch):
     def unexpected_global_scan(*args, **kwargs):
         pytest.fail("A proven bound outgoing edge must not rescan/slice the polyline")
 
-    monkeypatch.setattr(tmap_service, "_bearing_deg", observed_bearing)
-    monkeypatch.setattr(tmap_service, "_route_bearing_for_point", unexpected_global_scan)
+    monkeypatch.setattr(walking_normalization, "_bearing_deg", observed_bearing)
+    monkeypatch.setattr(walking_normalization, "_route_bearing_for_point", unexpected_global_scan)
     result = _normalize_tmap_feature_fixture(features, origin, destination)
     assert len(edges) == 3  # north U-turn is now a required guided edge
     original_guides = _loop_original_guides(result)
@@ -3266,8 +3270,8 @@ def test_tmap_visit_bearing_memo_is_per_edge_and_per_response(monkeypatch, direc
     def unexpected_global_scan(*args, **kwargs):
         pytest.fail("Normalized guide bearings must use resolved visits, not a coordinate-wide scan")
 
-    monkeypatch.setattr(tmap_service, "_bearing_deg", observed_bearing)
-    monkeypatch.setattr(tmap_service, "_route_bearing_for_point", unexpected_global_scan)
+    monkeypatch.setattr(walking_normalization, "_bearing_deg", observed_bearing)
+    monkeypatch.setattr(walking_normalization, "_route_bearing_for_point", unexpected_global_scan)
     for repeat in (1, 2):
         result = _normalize_tmap_feature_fixture(features, origin, destination)
         expected_later = 0.0 if directions_agree else pytest.approx(90.0, abs=0.001)
@@ -3846,7 +3850,7 @@ def test_tmap_waypoint_deadline_is_checked_during_preparation_and_matching(monke
         clock_reads.append(None)
         return 10.0 if len(clock_reads) >= expire_on else 9.0
 
-    monkeypatch.setattr(tmap_service, "monotonic", clock)
+    monkeypatch.setattr(response_normalization, "monotonic", clock)
     with pytest.raises(TimeoutError, match="TMAP request exceeded its wall-clock deadline"):
         tmap_service._validate_route_waypoint_order(points, [waypoint], deadline_at=10.0)
     assert len(clock_reads) == expire_on

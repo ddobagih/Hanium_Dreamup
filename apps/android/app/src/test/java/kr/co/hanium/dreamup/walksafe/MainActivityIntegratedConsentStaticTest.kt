@@ -9,69 +9,99 @@ class MainActivityIntegratedConsentStaticTest {
     private val source =
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
 
+    private val consentSource = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/consent/IntegratedConsentController.kt").readText()
+    private val authorityComposition = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/privacy/PrivacyAuthorityComposition.kt").readText()
+
+    private val accountPresenterSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/AccountAccessPresenter.kt",
+    ).readText()
+
+    private val accountPanelSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/AccountAccessPanel.kt",
+    ).readText()
+
+    private val settingsPresenterSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/SettingsPrivacyPresenter.kt",
+    ).readText()
+
+    private val firstRunPresenterSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/FirstRunOnboardingPresenter.kt",
+    ).readText()
+
     @Test
     fun cachedConsentIsHeldUntilFreshBackendAuthorityAndLateSessionResultsAreFenced() {
-        val restore = ReportStaticSourceInspector.functionBlock(
+        val restore = MainActivityRefactorSource.function(
             source, "private fun restorePrivacyControlStateFromPrefs",
         )
-        val refresh = ReportStaticSourceInspector.functionBlock(
+        val refresh = MainActivityRefactorSource.function(
             source, "private fun refreshIntegratedConsentFromServer",
         )
-        val hold = ReportStaticSourceInspector.functionBlock(
+        val hold = MainActivityRefactorSource.function(
             source, "private fun holdIntegratedConsentAuthorityForRefresh",
         )
-        val request = ReportStaticSourceInspector.functionBlock(
+        val request = MainActivityRefactorSource.function(
             source, "private fun startIntegratedConsentRequest",
         )
-        val bootstrap = ReportStaticSourceInspector.functionBlock(
+        val bootstrap = MainActivityRefactorSource.function(
             source, "private fun startIntegratedConsentBootstrap",
         )
-        assertTrue(restore.contains("reportPrivacyConsentSession.withdraw()"))
-        assertTrue(restore.contains("integratedConsentBootstrapReady = false"))
+        assertTrue(restore.contains("effects.withdrawReportPrivacy()"))
+        assertTrue(restore.contains("consent.restoreConsentState()"))
+        assertTrue(authorityComposition.contains("override fun restoreConsentState() { integratedConsentController.value.restoreConsentState() }"))
+        assertTrue(authorityComposition.contains("override fun withdrawReportPrivacy() { reportPrivacyConsentSession.withdraw() }"))
+        assertTrue(MainActivityRefactorSource.member(consentSource, "restoreConsentState").contains("integratedConsentBootstrapReady = false"))
         assertFalse(restore.contains("reportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent()"))
         assertTrue(refresh.contains("holdIntegratedConsentAuthorityForRefresh()"))
         assertTrue(hold.contains("integratedConsentSession.invalidateBackendAuthority()"))
-        assertTrue(hold.contains("reportPrivacyConsentSession.withdraw()"))
+        assertTrue(hold.contains("reports.withdrawAuthority()"))
         assertTrue(request.contains("isCurrentIntegratedConsentSession(expectedSession, processGeneration)"))
         assertTrue(request.contains("GatewaySessionProcessCoordinator.withCurrentGeneralSession("))
         assertTrue(request.contains("synchronized(integratedConsentLock)"))
         assertTrue(bootstrap.contains("isCurrentIntegratedConsentSession(gatewaySession, processGeneration)"))
-        val dispatch = ReportStaticSourceInspector.functionBlock(
+        val dispatch = MainActivityRefactorSource.function(
             source, "private fun dispatchGatewayProcessSessionChanged",
         )
         assertTrue(ReportStaticSourceInspector.appearsInOrder(
             dispatch,
-            "integratedConsentSession.invalidateBackendAuthority()",
-            "reportPrivacyConsentSession.withdraw()",
+            "consent.fenceAuthorityChanged(snapshot)",
+            "reports.withdrawPrivacy()",
             "val deliver = Runnable",
         ))
-        assertTrue(dispatch.contains("previous.generation != snapshot.generation"))
-        assertTrue(dispatch.contains("previous.session !== snapshot.session"))
+        val fence = MainActivityRefactorSource.member(consentSource, "fenceGatewayAuthorityChange")
+        assertTrue(fence.contains("previous.generation != snapshot.generation"))
+        assertTrue(fence.contains("previous.session !== snapshot.session"))
+        assertTrue(fence.contains("integratedConsentSession.invalidateBackendAuthority()"))
+        val composition = MainActivityRefactorSource.composition(source, "actorSessionLifecycleCoordinator")
+        assertTrue(composition.contains("override fun fenceAuthorityChanged(snapshot: GatewaySessionProcessSnapshot) = integratedConsentController.fenceGatewayAuthorityChange(snapshot)"))
+        assertTrue(composition.contains("override fun withdrawPrivacy() { reportPrivacyConsentSession.withdraw() }"))
         assertTrue(dispatch.contains("if (consentAuthorityChanged)"))
     }
 
     @Test
     fun v11BootstrapAndCasAreBoundAcrossInitialSaveAndExactRetry() {
-        val refresh = ReportStaticSourceInspector.functionBlock(
+        val refresh = MainActivityRefactorSource.function(
             source,
             "private fun refreshIntegratedConsentFromServer",
         )
-        val bootstrap = ReportStaticSourceInspector.functionBlock(
+        val bootstrap = MainActivityRefactorSource.function(
             source,
             "private fun startIntegratedConsentBootstrap",
         )
-        val persist = source.substringAfter(
-            "private fun persistIntegratedConsentDraft(announce: Boolean)",
-        ).substringBefore("private fun retryPendingIntegratedConsentMutation")
-        val retry = source.substringAfter(
-            "private fun retryPendingIntegratedConsentMutation",
-        ).substringBefore("private fun startIntegratedConsentRequest")
+        val persist = MainActivityRefactorSource.function(source, "fun persistIntegratedConsentDraft(")
+        val retry = MainActivityRefactorSource.function(source, "fun retryPendingIntegratedConsentMutation(")
 
         assertTrue(refresh.contains("bootstrapOnMissing = true"))
         assertTrue(refresh.contains("session = gatewaySession"))
-        assertTrue(refresh.contains("integratedConsentRefreshSessionOrNull()"))
+        assertTrue(refresh.contains("gateway.refreshSessionOrNull()"))
         assertFalse(refresh.contains("gatewaySessionOrNull("))
-        val refreshSession = ReportStaticSourceInspector.functionBlock(
+        assertFalse(refresh.contains("gateway.sessionOrNull("))
+        val assembly = MainActivityRefactorSource.composition(source, "integratedConsentController")
+        assertTrue(assembly.contains("gateway = ports.gateway"))
+        val participants = MainActivityRefactorSource.factory(source, "createPrivacyConsent")
+        assertTrue(participants.contains("privacyAuthority.createIntegratedConsentController"))
+        assertTrue(participants.contains("gateway = object : IntegratedConsentController.Gateway"))
+        assertTrue(participants.contains("override fun refreshSessionOrNull() = integratedConsentRefreshSessionOrNull()"))
+        val refreshSession = MainActivityRefactorSource.function(
             source,
             "private fun integratedConsentRefreshSessionOrNull",
         )
@@ -88,46 +118,42 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(refreshSession.contains("session.gatewayBaseUrl == configuredGatewayOriginOrNull()"))
         assertTrue(refreshSession.contains("clearExpiredGatewaySessionIfCurrent(session)"))
         assertFalse(refreshSession.contains("clearGatewaySession("))
-        assertTrue(bootstrap.contains("isCurrentGatewaySession(gatewaySession)"))
+        assertTrue(bootstrap.contains("gateway.isCurrentSession(gatewaySession)"))
         assertTrue(bootstrap.contains("bootstrap.clientRevisionFloor"))
         assertTrue(bootstrap.contains("bootstrap.expectedPreviousBackendReceiptSha256"))
         assertTrue(bootstrap.contains("IntegratedConsentBootstrapStatus.READY"))
         assertTrue(persist.contains("integratedConsentBootstrapReady"))
         assertTrue(persist.contains("expectedPreviousBackendReceiptSha256 ="))
         assertTrue(retry.contains("mutation.expectedPreviousBackendReceiptSha256"))
-        val request = ReportStaticSourceInspector.functionBlock(
+        val request = MainActivityRefactorSource.function(
             source,
             "private fun startIntegratedConsentRequest",
         )
         assertTrue(request.contains("integrated_consent_actor_reconsent_required"))
         assertTrue(request.contains("privacy_consent_previous_receipt_conflict"))
-        val sessionChange = ReportStaticSourceInspector.functionBlock(
-            source,
-            "private fun onGatewayProcessSessionChanged",
-        )
-        assertTrue(sessionChange.contains("integratedConsentConfirmedActorSha256"))
-        assertTrue(sessionChange.contains("integratedConsentActorSha256(currentSession)"))
-        assertTrue(source.contains("session.lease.backendAccountGeneration"))
+        val sessionChange = actorSessionChange(source)
+        assertTrue(sessionChange.contains("consent.onActorBindingChanged(snapshot.session)"))
+        val actorChange = MainActivityRefactorSource.member(consentSource, "onActorBindingChanged")
+        assertTrue(actorChange.contains("integratedConsentConfirmedActorSha256"))
+        assertTrue(actorChange.contains("integratedConsentActorSha256(currentSession)"))
+        assertTrue(consentSource.contains("session.lease.backendAccountGeneration"))
         assertTrue(retry.contains("mutation.actorSha256"))
     }
 
     @Test
     fun knownV1PolicyMigratesToDeniedReconsentWithoutDroppingStableSecrets() {
-        val migration = ReportStaticSourceInspector.functionBlock(
+        val migration = MainActivityRefactorSource.function(
             source,
             "private fun migrateKnownIntegratedConsentPolicyAtStartup",
         )
 
-        assertTrue(migration.contains("PREVIOUS_INTEGRATED_CONSENT_POLICY_VERSION"))
+        assertTrue(migration.contains("KNOWN_PREVIOUS_INTEGRATED_CONSENT_POLICY_VERSIONS"))
         assertTrue(migration.contains("PREF_RAW_SOURCE_FIELD_LOG_BLOCKED"))
-        val reset = ReportStaticSourceInspector.functionBlock(
+        val reset = MainActivityRefactorSource.function(
             source,
             "private fun resetIntegratedConsentForReconsent",
         )
-        val unsettledMarker = "private fun hasUnsettledIntegratedConsentControl(): Boolean ="
-        assertTrue(source.contains(unsettledMarker))
-        val unsettled = source.substringAfter(unsettledMarker)
-            .substringBefore("private fun resetIntegratedConsentForReconsent")
+        val unsettled = MainActivityRefactorSource.member(consentSource, "hasUnsettledIntegratedConsentControl")
         assertTrue(ReportStaticSourceInspector.appearsInOrder(
             migration,
             "if (hasUnsettledIntegratedConsentControl())",
@@ -176,8 +202,8 @@ class MainActivityIntegratedConsentStaticTest {
 
     @Test
     fun signupShowsAccessibleDetailedConsentNoticeAtReadableSize() {
-        val controls = source.substringAfter("val accountConsentDisclosure =")
-            .substringBefore("accountConsentChecks.clear()")
+        val controls = accountPanelSource.substringAfter("val accountConsentDisclosure =")
+            .substringBefore("val consentClauseStops")
 
         assertTrue(controls.contains("14일"))
         assertTrue(controls.contains("30일"))
@@ -195,13 +221,33 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(controls.contains("contentDescription = accountConsentDisclosure"))
         assertTrue(controls.contains("textSize = 18f"))
         assertTrue(controls.contains("View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
-        assertTrue(source.contains("[선택] 원본·진단수집 raw v2 자료 처리 동의"))
+        assertTrue(accountPanelSource.contains("[선택] 원본·진단수집 raw v2 자료 처리 동의"))
         assertTrue(controls.contains("직접 신고에는 영향이 없습니다"))
+        val composition = MainActivityRefactorSource.function(source, "private fun buildContentView")
+        assertTrue(composition.contains("val accountPanel = AccountAccessPanel("))
+        assertTrue(composition.contains("nativeRegistrationComposition.bindAccountInputs(accountPanel)"))
+        val registration = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRegistrationScreenComposition.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(registration, "bindAccountInputs").contains("accountSource().bindPanel(panel)"))
+        assertTrue(accountPresenterSource.contains("private val accountConsentDisclosureText: TextView get() = requireNotNull(panel).accountConsentDisclosureText"))
+        assertTrue(accountPresenterSource.contains("private val accountConsentChecks get() = panel?.accountConsentChecks ?: emptyMap()"))
+        assertTrue(composition.contains("onConsentChanged = {"))
+        assertTrue(composition.contains("refreshAccountConsentSummary()"))
+        assertTrue(composition.contains("refreshAccountActionAvailability()"))
+        assertTrue(accountPanelSource.contains("setOnCheckedChangeListener { button, _ ->"))
+        assertTrue(accountPanelSource.contains("if (key in unavailableOptionalDocuments && button.isChecked)"))
+        assertTrue(accountPanelSource.contains("button.isChecked = false"))
+        assertTrue(accountPanelSource.contains("actions.onConsentChanged()"))
+        val summary = ReportStaticSourceInspector.functionBlock(accountPresenterSource, "fun refreshAccountConsentSummary")
+        assertTrue(summary.contains("currentAccountConsentSelections()"))
+        assertTrue(summary.contains("selections.requiredGranted"))
+        assertTrue(summary.contains("accountConsentAllCheck.isChecked = allGranted"))
+        assertTrue(MainActivityRefactorSource.function(source, "private fun refreshAccountConsentSummary").contains("accountAccessPresenter.refreshAccountConsentSummary(nativeUiPublication.isPublished(NativeUiPublication.Target.ACCOUNT_CONSENT_ALL_CHECK))"))
+        assertTrue(MainActivityRefactorSource.function(source, "private fun refreshAccountActionAvailability").contains("accountAccessPresenter.refreshAccountActionAvailability("))
     }
 
     @Test
     fun consentAndNetworkGatesPrecedeDrainAndEveryAcquiredLeaseIsReleased() {
-        val process = ReportStaticSourceInspector.functionBlock(
+        val process = MainActivityRefactorSource.function(
             source,
             "private fun processReportCandidate",
         )
@@ -210,12 +256,12 @@ class MainActivityIntegratedConsentStaticTest {
                 process,
                 "integratedConsentSession.currentConfirmationOrNull()",
                 "!explicitRequest && !consentConfirmation.selections.automaticReporting",
-                "reportQueueStore.enqueue(",
+                "queue.enqueue(",
             ),
         )
         assertFalse(process.contains("rawSourceCollection"))
 
-        val capture = ReportStaticSourceInspector.functionBlock(
+        val capture = MainActivityRefactorSource.function(
             source,
             "private fun buildReportQueueDrainTrigger",
         )
@@ -223,9 +269,9 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(capture.contains("integratedConsentSession.currentConfirmationOrNull("))
         assertFalse(capture.contains("IntegratedConsentItem.RAW_SOURCE_COLLECTION"))
         assertTrue(capture.contains("AndroidNetworkTransferPolicy.isAllowed("))
-        assertTrue(capture.contains("currentIntegratedConsentBinding() ?: return null"))
+        assertTrue(capture.contains("network.currentBinding() ?: return null"))
 
-        val context = ReportStaticSourceInspector.functionBlock(
+        val context = MainActivityRefactorSource.function(
             source,
             "private fun reportQueueDrainContext",
         )
@@ -238,7 +284,9 @@ class MainActivityIntegratedConsentStaticTest {
             "src/main/java/kr/co/hanium/dreamup/walksafe/report/" +
                 "ReportQueueDrainCoordinator.kt",
         ).readText()
-        val startNext = ReportStaticSourceInspector.functionBlock(coordinator, "fun startNext")
+        val legacyEntry = MainActivityRefactorSource.member(coordinator, "startNext")
+        assertTrue(legacyEntry.contains("startNextWithResult(contextProvider, transport, beforeDeleteAfterReceipt)"))
+        val startNext = MainActivityRefactorSource.member(coordinator, "startNextWithResult")
         assertTrue(startNext.contains("finally"))
         assertTrue(startNext.contains("policy.release(lease)"))
         assertTrue(
@@ -249,15 +297,11 @@ class MainActivityIntegratedConsentStaticTest {
 
     @Test
     fun consentMutationRequiresAndForwardsTheCurrentGatewaySession() {
-        val persist = source.substringAfter(
-            "private fun persistIntegratedConsentDraft(announce: Boolean)",
-        ).substringBefore("private fun retryPendingIntegratedConsentMutation")
-        val retry = source.substringAfter(
-            "private fun retryPendingIntegratedConsentMutation",
-        ).substringBefore("private fun startIntegratedConsentRequest")
+        val persist = MainActivityRefactorSource.function(source, "fun persistIntegratedConsentDraft(")
+        val retry = MainActivityRefactorSource.function(source, "fun retryPendingIntegratedConsentMutation(")
         for (function in listOf(persist, retry)) {
-            val session = function.indexOf("gatewaySessionOrNull(")
-            val save = function.indexOf("integratedConsentClient.saveCall(")
+            val session = function.indexOf("gateway.sessionOrNull(")
+            val save = function.indexOf("remote.saveCall(")
             assertTrue(session >= 0)
             assertTrue(save > session)
             assertTrue(
@@ -279,39 +323,71 @@ class MainActivityIntegratedConsentStaticTest {
 
     @Test
     fun pendingDraftNeverDisplaysAsBackendConfirmedConsent() {
+        val buttonPresentation = ReportStaticSourceInspector.functionBlock(
+            settingsPresenterSource, "fun consentButtonPresentation",
+        )
+        val buttonRenderer = ReportStaticSourceInspector.functionBlock(
+            settingsPresenterSource, "fun renderConsentButton",
+        )
         listOf(
-            "updateReportPrivacyConsentUi",
-            "updateAutomaticReportConsentUi",
-            "updateMobileNetworkPreferenceUi",
-            "updateTrainingReuseConsentUi",
-        ).forEach { name ->
-            val function = ReportStaticSourceInspector.functionBlock(
+            "updateReportPrivacyConsentUi" to "RAW_SOURCE_COLLECTION",
+            "updateAutomaticReportConsentUi" to "AUTOMATIC_REPORTING",
+            "updateMobileNetworkPreferenceUi" to "MOBILE_NETWORK_TRANSFER",
+            "updateTrainingReuseConsentUi" to "TRAINING_REUSE",
+        ).forEach { (name, item) ->
+            val function = MainActivityRefactorSource.function(
                 source,
                 "private fun $name",
             )
             assertTrue(function.contains("integratedConsentSession.status("))
-            assertTrue(function.contains("PurposeConsentSyncState.CONFIRMED_GRANTED"))
-            assertTrue(function.contains("PurposeConsentSyncState.GRANT_PENDING"))
-            assertTrue(function.contains("아직 활성 아님"))
+            assertTrue(function.contains("integratedConsentSession.status(IntegratedConsentItem.$item)"))
+            assertTrue(function.contains("settingsPrivacyPresenter.renderConsentButton("))
+            assertTrue(function.contains("SettingsPrivacyPresenter.ConsentFacts("))
+            assertTrue(function.contains("integratedConsentController.screenState().requestInFlight"))
+            val itemPresentation = buttonPresentation.substringAfter("IntegratedConsentItem.$item -> when (state) {")
+                .substringBefore("\n                IntegratedConsentItem.")
+            assertTrue(itemPresentation.contains("PurposeConsentSyncState.CONFIRMED_GRANTED"))
+            assertTrue(itemPresentation.contains("PurposeConsentSyncState.GRANT_PENDING"))
+            assertTrue(itemPresentation.contains("아직 활성 아님"))
+            assertTrue(buttonRenderer.contains("IntegratedConsentItem.$item ->"))
             assertTrue(!function.contains("integratedConsentDraft."))
         }
 
-        val integrated = ReportStaticSourceInspector.functionBlock(
+        val integrated = MainActivityRefactorSource.function(
             source,
             "private fun updateIntegratedConsentUi",
         )
-        assertTrue(integrated.contains("허용(서버 확인)"))
-        assertTrue(integrated.contains("허용 선택 저장 중(아직 활성 아님)"))
-        assertTrue(integrated.contains("button.text = \"\$label: \$syncState\""))
+        assertTrue(integrated.contains("settingsPrivacyPresenter.renderConsentItems(SettingsPrivacyPresenter.IntegratedConsentFacts("))
+        assertTrue(integrated.contains("states = IntegratedConsentItem.entries.associateWith(integratedConsentSession::status)"))
+        val itemPresentation = ReportStaticSourceInspector.functionBlock(
+            settingsPresenterSource, "fun consentItemPresentation",
+        )
+        val itemRenderer = ReportStaticSourceInspector.functionBlock(
+            settingsPresenterSource, "fun renderConsentItems",
+        )
+        assertTrue(itemPresentation.contains("허용(서버 확인)"))
+        assertTrue(itemPresentation.contains("허용 선택 저장 중(아직 활성 아님)"))
+        assertTrue(itemPresentation.contains("val text = \"\${itemLabel(item)}: \$syncState\""))
+        assertTrue(itemRenderer.contains("consentItemPresentation(item, facts)"))
+        assertTrue(itemRenderer.contains("button.text = presentation.text"))
     }
 
     @Test
     fun draftSummaryDoesNotMasqueradeAsServerConfirmation() {
-        val summary = ReportStaticSourceInspector.functionBlock(
+        val summary = MainActivityRefactorSource.function(
             source,
             "private fun updateFirstRunConsentSummaryUi",
         )
-        assertTrue(summary.contains("선택 초안:"))
+        assertTrue(summary.contains("firstRunOnboardingPresenter.updateFirstRunConsentSummaryUi("))
+        assertTrue(summary.contains("FirstRunOnboardingPresenter.ConsentSummaryFacts(items.size, draftGranted, serverSummary)"))
+        val rendered = ReportStaticSourceInspector.functionBlock(
+            firstRunPresenterSource, "fun updateFirstRunConsentSummaryUi",
+        )
+        assertTrue(rendered.contains("선택 초안:"))
+        assertTrue(rendered.contains("\${facts.itemCount}개"))
+        assertTrue(rendered.contains("\${facts.draftGranted}개 허용"))
+        assertTrue(rendered.contains("\${facts.serverSummary}"))
+        assertTrue(rendered.contains("firstRunConsentCountText.contentDescription = firstRunConsentCountText.text"))
         assertTrue(summary.contains("서버 미확인"))
         assertTrue(summary.contains("서버 확인 중"))
         assertTrue(summary.contains("서버 확인 완료:"))
@@ -319,17 +395,17 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(summary.contains("서버 처리 잠김"))
         assertTrue(
             summary.indexOf("PurposeConsentSyncState.FAIL_CLOSED in states") <
-                summary.indexOf("integratedConsentRequestInFlight"),
+                summary.indexOf("integratedConsentController.screenState().requestInFlight"),
         )
         assertTrue(
-            summary.indexOf("integratedConsentRequestInFlight") <
+            summary.indexOf("integratedConsentController.screenState().requestInFlight") <
                 summary.indexOf("PurposeConsentSyncState.WITHDRAWAL_RETRY in states"),
         )
     }
 
     @Test
     fun draftSummaryRefreshesOnEveryConsentUiRefresh() {
-        val update = ReportStaticSourceInspector.functionBlock(
+        val update = MainActivityRefactorSource.function(
             source,
             "private fun updateIntegratedConsentUi",
         )
@@ -338,7 +414,7 @@ class MainActivityIntegratedConsentStaticTest {
 
     @Test
     fun gatewayConnectionFailureIsHandledInsteadOfKillingTheProcess() {
-        val request = ReportStaticSourceInspector.functionBlock(
+        val request = MainActivityRefactorSource.function(
             source,
             "private fun startIntegratedConsentRequest",
         )
@@ -349,4 +425,56 @@ class MainActivityIntegratedConsentStaticTest {
         assertTrue(request.contains("catch (error: Exception)"))
         assertTrue(request.contains("integratedConsent=blocked:server_confirmation_failed"))
     }
+
+    private fun actorSessionChange(mainSource: String): String {
+        MainActivityRefactorSource.composition(mainSource, "actorSessionLifecycleCoordinator")
+        val main = MainActivityRefactorSource.factory(mainSource, "onGatewayProcessSessionChanged")
+        // Whole declaration comparison preserves guards, argument forwarding and effect order.
+        val expectedMain = """
+private fun onGatewayProcessSessionChanged(
+        snapshot: GatewaySessionProcessSnapshot,
+        consentAuthorityChanged: Boolean,
+    ) {
+        actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)
+        refreshGuidanceDiagnosticAuthority()
+    }
+        """.trimIndent()
+        org.junit.Assert.assertEquals("Main gateway callback must invoke the owner before diagnostic refresh", expectedMain.filterNot(Char::isWhitespace),
+            main.filterNot(Char::isWhitespace))
+        val call = main.indexOf("actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)")
+        org.junit.Assert.assertTrue(call >= 0)
+        org.junit.Assert.assertTrue(main.indexOf("refreshGuidanceDiagnosticAuthority()") > call)
+        return MainActivityRefactorSource.member(java.io.File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/ActorSessionLifecycleCoordinator.kt",
+        ).readText(), "onGatewayProcessSessionChanged")
+    }
+
+
+    @Test
+    fun actorSessionChangeRejectsNonExecutingOrReorderedCallers() {
+        val mainSource = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        actorSessionChange(mainSource)
+        val caller = MainActivityRefactorSource.factory(mainSource, "onGatewayProcessSessionChanged")
+        val call = "actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)"
+        org.junit.Assert.assertTrue(caller.contains(call))
+        val variants = linkedMapOf(
+            "conditional" to caller.replace(call, "if (false) { $call }"),
+            "uninvoked lambda" to caller.replace(call, "{ $call }"),
+            "comment" to caller.replace(call, "/* $call */"),
+            "additional effect" to caller.replace(call, "$call\nunexpectedEffect()"),
+            "omitted" to caller.replace(call, ""),
+            "early return" to caller.replace(call, "return\n$call"),
+        )
+
+        variants["reordered effects"] = caller.replace(call, "").replace(
+            "refreshGuidanceDiagnosticAuthority()", "refreshGuidanceDiagnosticAuthority()\n" + call,
+        )
+
+        val accepted = variants.filter { (_, changed) ->
+            val mainSource = mainSource.replace(caller, changed)
+            runCatching { actorSessionChange(mainSource) }.isSuccess
+        }.keys
+        org.junit.Assert.assertTrue("Non-equivalent Main callers accepted: $accepted", accepted.isEmpty())
+    }
+
 }

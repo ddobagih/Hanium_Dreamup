@@ -12,17 +12,36 @@ class HandsFreeVoiceIntegrationStaticTest {
         "src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
     ).readText()
 
+    private val input = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/VoiceInputSessionController.kt").readText()
+    private val runtime = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/HandsFreeRuntimeSession.kt").readText()
+    private fun runtimeMember(name: String) = MainActivityRefactorSource.member(runtime, name)
+
     @Test
     fun modelPreparationStartsAfterPrivacyReadyAndExplicitRequestsCanRetry() {
-        val privacyReady = functionBlock("private fun completePrivacyStartupReadyIfForeground")
-        val preparation = functionBlock("private fun prepareHandsFreeVoiceModel")
-        val buttonRecognition = functionBlock("private fun startVoiceCommandRecognition")
+        val startupController = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/startup/PrivacyStartupInspectionController.kt",
+        ).readText()
+        val privacyReady = ReportStaticSourceInspector.functionBlock(startupController, "fun completeReadyIfForeground")
+        val inspection = MainActivityRefactorSource.member(startupController, "startInspection")
+        assertTrue(inspection.contains("pendingPrivacyStartupReadyAction = PendingReady(generation, onReady)"))
+        assertTrue(mainActivity.contains("privacyStartupInspectionController.completeReadyIfForeground()"))
+        assertTrue(mainActivity.contains("override fun prepareHandsFreeVoiceModel() { this@MainActivity.prepareHandsFreeVoiceModel() }"))
+        assertTrue(privacyReady.contains("privacyStartupInspectionDestroyed || privacyStartupInspectionComplete || !isForeground()"))
+        assertTrue(privacyReady.contains("val pending = pendingPrivacyStartupReadyAction ?: return"))
+        val readyGuard = privacyReady.substringAfter("pending.action()").substringBefore("actions.prepareHandsFreeVoiceModel()")
+        assertTrue(readyGuard.contains("if (!isCurrent(pending.generation))"))
+        assertTrue(readyGuard.contains("privacyStartupInspectionComplete = false"))
+        assertTrue(readyGuard.contains("actions.closeReadyResourcesOnUiThread()"))
+        assertTrue(readyGuard.contains("scheduleResourcesClose()"))
+        assertTrue(readyGuard.contains("return"))
+        val preparation = runtimeMember("prepareHandsFreeVoiceModel")
+        val buttonRecognition = MainActivityRefactorSource.function(mainActivity, "private fun startVoiceCommandRecognition")
 
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 privacyReady,
                 "privacyStartupInspectionComplete = true",
-                "onReady()",
+                "pending.action()",
                 "prepareHandsFreeVoiceModel()",
             ),
         )
@@ -31,27 +50,31 @@ class HandsFreeVoiceIntegrationStaticTest {
                 "handsFreeVoiceDestroyed || handsFreeVoiceModelDirectory != null || handsFreeVoiceModelPreparing",
             ),
         )
-        assertTrue(preparation.contains("BundledVoskModelInstaller.installedModelOrNull(this)"))
+        val sdk = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/AndroidVoiceInputPlatform.kt").readText()
+        assertTrue(preparation.contains("platform.prepareInstalledModel()"))
+        assertTrue(MainActivityRefactorSource.member(sdk, "prepareInstalledModel").contains("BundledVoskModelInstaller.installedModelOrNull(context)"))
+        assertTrue(MainActivityRefactorSource.function(mainActivity, "private fun createVoiceInputController(").contains("val platform = AndroidVoiceInputPlatform(this)"))
         assertTrue(preparation.contains("generation != handsFreeVoiceModelGeneration"))
-        assertTrue(preparation.contains("oneShotSpeechRecognitionLimited = false"))
+        assertTrue(preparation.contains("input.modelPrepared()"))
+        assertTrue(MainActivityRefactorSource.member(input.replace("\n            override fun ", "\n    override fun "), "modelPrepared").contains("oneShotSpeechRecognitionLimited = false"))
         assertTrue(
             buttonRecognition.contains(
                 "val preferPlatform = purpose == VoiceRecognitionPurpose.COMMAND &&",
             ),
         )
-        assertTrue(buttonRecognition.contains("nativeHomeFeatureContextAvailable()"))
+        assertTrue(buttonRecognition.contains("environment.homeFeatureContextAvailable()"))
         assertTrue(
             buttonRecognition.contains(
-                "if (handsFreeVoiceModelDirectory == null && !preferPlatform)",
+                "if (handsFreeRuntime.modelDirectory == null && !preferPlatform)",
             ),
         )
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 buttonRecognition,
-                "if (handsFreeVoiceModelDirectory == null) prepareHandsFreeVoiceModel()",
-                "if (handsFreeVoiceModelDirectory == null && !preferPlatform)",
+                "if (handsFreeRuntime.modelDirectory == null) prepareHandsFreeVoiceModel()",
+                "if (handsFreeRuntime.modelDirectory == null && !preferPlatform)",
                 "stopHandsFreeVoiceService()",
-                "PreferredOfflineSpeechRecognizer(this) { handsFreeVoiceModelDirectory }",
+                "platform.createRecognizer { handsFreeRuntime.modelDirectory }",
                 "preferPlatform = preferPlatform",
                 "isRequestCurrent = {",
             ),
@@ -60,38 +83,38 @@ class HandsFreeVoiceIntegrationStaticTest {
 
     @Test
     fun foregroundServiceFollowsTheActiveWalkLifecycle() {
-        val runtimeEligibility = functionBlock("private fun isWalkSessionRuntimeActive")
-        val activate = functionBlock("private fun activateWalkSessionRuntime")
+        val runtimeEligibility = MainActivityRefactorSource.function(mainActivity, "private fun isWalkSessionRuntimeActive")
+        val activate = MainActivityRefactorSource.function(mainActivity, "private fun activateWalkSessionRuntime")
         val startAfterCameraRelease =
-            functionBlock("private fun startWalkSessionRuntimeAfterCameraRelease")
-        val start = functionBlock("private fun maybeStartHandsFreeVoiceService")
+            MainActivityRefactorSource.function(mainActivity, "private fun startWalkSessionRuntimeAfterCameraRelease")
+        val start = runtimeMember("maybeStartHandsFreeVoiceService")
         val service = File(
             "src/main/java/kr/co/hanium/dreamup/walksafe/voice/WalkVoiceForegroundService.kt",
         ).readText()
         val serviceStart = functionBlockFrom(service, "private fun startVoiceSession")
-        val transition = functionBlock("private fun transitionWalkSession")
-        val pause = functionBlock("override fun onPause")
-        val destroy = functionBlock("override fun onDestroy")
-        val close = functionBlock("private fun closeHandsFreeVoice")
+        val transition = MainActivityRefactorSource.function(mainActivity, "private fun transitionWalkSession")
+        val pause = MainActivityRefactorSource.function(mainActivity, "override fun onPause")
+        val destroy = MainActivityRefactorSource.function(mainActivity, "override fun onDestroy")
+        val close = runtimeMember("closeHandsFreeVoice")
 
         assertTrue(runtimeEligibility.contains("snapshot.state == WalkSessionState.ACTIVE"))
-        assertTrue(activate.contains("startWalkSessionRuntimeAfterCameraRelease(runtimeEpoch)"))
-        assertTrue(startAfterCameraRelease.contains("maybeStartHandsFreeVoiceService()"))
-        assertTrue(start.contains("if (!isActivityForeground ||"))
-        assertTrue(start.contains("isHandsFreeVoiceDisclosureAccepted()"))
-        assertTrue(start.contains("hasHandsFreeNotificationPermission()"))
+        assertTrue(activate.contains("camera.startRuntimeAfterRelease(runtimeEpoch)"))
+        assertTrue(startAfterCameraRelease.contains("effects.startHandsFreeVoice()"))
+        assertTrue(start.contains("if (!environment.foreground() ||"))
+        assertTrue(start.contains("environment.disclosureAccepted()"))
+        assertTrue(start.contains("environment.notificationGranted()"))
         assertTrue(start.contains("handsFreeVoiceController == null"))
         assertTrue(start.contains("handsFreeVoiceModelDirectory?.isDirectory != true"))
-        assertTrue(start.contains("!hasRecordAudioPermission()"))
+        assertTrue(start.contains("!environment.microphoneGranted()"))
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 start,
-                "!isActivityForeground",
+                "!environment.foreground()",
                 "handsFreeVoiceController == null",
                 "handsFreeVoiceModelDirectory?.isDirectory != true",
-                "!isWalkSessionRuntimeActive()",
-                "!hasRecordAudioPermission()",
-                "startService(startIntent)",
+                "!environment.runtimeActive()",
+                "!environment.microphoneGranted()",
+                "platform.startService(requestId)",
                 "handsFreeVoiceServiceRequested = true",
             ),
         )
@@ -108,7 +131,7 @@ class HandsFreeVoiceIntegrationStaticTest {
                 ReportStaticSourceInspector.appearsInOrder(
                     start.substringAfter(handler),
                     "handsFreeVoiceServiceRequested = false",
-                    "app.reportWalkVoiceStartFailure(",
+                    "platform.reportStartFailure(",
                     failure,
                 ),
             )
@@ -137,7 +160,7 @@ class HandsFreeVoiceIntegrationStaticTest {
         ))
         assertFalse(failedStart.contains("throw "))
         assertTrue(transition.contains("transition.current.state != WalkSessionState.ACTIVE"))
-        assertTrue(transition.contains("stopHandsFreeVoiceService()"))
+        assertTrue(transition.contains("effects.stopHandsFreeVoiceService()"))
         assertTrue(pause.contains("stopHandsFreeVoiceService()"))
         assertTrue(destroy.contains("closeHandsFreeVoice()"))
         assertTrue(close.contains("stopHandsFreeVoiceService()"))
@@ -146,17 +169,17 @@ class HandsFreeVoiceIntegrationStaticTest {
     @Test
     fun deviceCheckRecordsDisclosureAndActualVoiceProbeResults() {
         val deviceCheckStart =
-            functionBlock("private fun startPostLoginDeviceCheckFromPrimaryAction")
-        val orchestration = functionBlock("private fun maybeContinuePostLoginDeviceCheck")
-        val observation = functionBlock("private fun currentPostLoginDeviceCheckObservation")
+            MainActivityRefactorSource.function(mainActivity, "private fun startPostLoginDeviceCheckFromPrimaryAction")
+        val orchestration = MainActivityRefactorSource.function(mainActivity, "private fun maybeContinuePostLoginDeviceCheck")
+        val observation = MainActivityRefactorSource.function(mainActivity, "private fun currentPostLoginDeviceCheckObservation")
         val requiredPermissions =
-            functionBlock("private fun requiredPostLoginDeviceCheckPermissions")
+            MainActivityRefactorSource.function(mainActivity, "private fun requiredPostLoginDeviceCheckPermissions")
 
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 deviceCheckStart,
-                "acknowledgeHandsFreeVoiceDisclosure()",
-                "beginPostLoginDeviceCheckFromUserAction(sessionBinding)",
+                "permissions.acknowledgeVoiceDisclosure()",
+                "beginFromUserAction(binding)",
             ),
         )
         assertFalse(deviceCheckStart.contains("AlertDialog"))
@@ -167,64 +190,71 @@ class HandsFreeVoiceIntegrationStaticTest {
                 "wakePhraseRecognition = speechRecognitionAvailable.toDeviceCheckSignal()",
             ),
         )
-        val wakeObservation = observation.substringAfter("wakePhraseRecognition = when {")
+        val wakeObservation = observation.substringAfter("wakePhraseRecognition = if (")
             .substringBefore("metricDepth = metricDepth")
-        assertTrue(wakeObservation.contains("!hasRecordAudioPermission()"))
+        assertTrue(wakeObservation.contains("!hardware.microphonePermission"))
         assertTrue(wakeObservation.contains("startup.microphoneAvailable == false"))
-        assertTrue(wakeObservation.contains("handsFreeVoiceModelPreparationFailed"))
+        assertTrue(wakeObservation.contains("hardware.voiceModelPreparationFailed"))
         assertTrue(wakeObservation.contains("PostLoginDeviceCheckSignal.UNAVAILABLE"))
-        assertTrue(wakeObservation.contains("else -> postLoginWakePhraseSignal"))
+        assertTrue(wakeObservation.contains("else probeSignals.wakePhrase"))
         assertTrue(requiredPermissions.contains("Manifest.permission.RECORD_AUDIO"))
         assertTrue(requiredPermissions.contains("Manifest.permission.POST_NOTIFICATIONS"))
-        val start = functionBlock("private fun maybeStartHandsFreeVoiceService")
-        assertTrue(start.contains("isHandsFreeVoiceDisclosureAccepted()"))
+        val start = runtimeMember("maybeStartHandsFreeVoiceService")
+        assertTrue(start.contains("environment.disclosureAccepted()"))
         assertTrue(start.contains("voice_hands_free=disclosure_required"))
-        assertTrue(start.contains("hasHandsFreeNotificationPermission()"))
+        assertTrue(start.contains("environment.notificationGranted()"))
         assertTrue(start.contains("voice_hands_free=notification_permission_required"))
-        val observedPermissions = functionBlock("private fun applyObservedPermissionStateChange")
+        val observedPermissions = MainActivityRefactorSource.function(mainActivity, "private fun applyObservedPermissionStateChange")
         val notificationBranch = observedPermissions
-            .substringAfter("if (!hasHandsFreeNotificationPermission()) {")
-            .substringBefore("if (!hasRecordAudioPermission()) {")
+            .substringAfter("if (!platform.notificationGranted()) {")
+            .substringBefore("if (!platform.microphoneGranted()) {")
         val microphoneBranch = observedPermissions
-            .substringAfter("if (!hasRecordAudioPermission()) {")
-            .substringBefore("if (!hasActivityRecognitionPermission()) {")
-        assertTrue(notificationBranch.contains("stopHandsFreeVoiceService()"))
-        assertFalse(notificationBranch.contains("cancelVoiceCommandRecognition()"))
-        assertTrue(microphoneBranch.contains("stopHandsFreeVoiceService()"))
-        assertTrue(microphoneBranch.contains("cancelVoiceCommandRecognition()"))
+            .substringAfter("if (!platform.microphoneGranted()) {")
+            .substringBefore("if (!platform.activityRecognitionGranted()) {")
+        assertTrue(notificationBranch.contains("runtime.stopHandsFree()"))
+        assertFalse(notificationBranch.contains("runtime.cancelVoiceRecognition()"))
+        assertTrue(microphoneBranch.contains("runtime.stopHandsFree()"))
+        assertTrue(microphoneBranch.contains("runtime.cancelVoiceRecognition()"))
     }
 
     @Test
     fun handsFreeTranscriptReusesTheExistingHandlerWithoutDisplayingRawText() {
-        val attach = functionBlock("private fun attachHandsFreeVoiceController")
-        val commandCallback = ReportStaticSourceInspector.blockAfter(
-            attach,
-            "onCommand = command@",
-        )
+        val attach = runtimeMember("attachHandsFreeVoiceController")
+        assertTrue(attach.contains("command = input::recognizedCommand"))
+        assertTrue(MainActivityRefactorSource.member(input.replace("\n            override fun ", "\n    override fun "), "recognizedCommand").contains("handleHandsFreeCommand(text, confidence)"))
+        val commandCallback = MainActivityRefactorSource.member(input, "handleHandsFreeCommand")
 
-        assertTrue(commandCallback.contains("handleVoiceCommandPhrases("))
-        assertTrue(commandCallback.contains("floatArrayOf(confidence ?: Float.NaN)"))
-        assertTrue(commandCallback.contains("includeRecognizedTextInStatus = false"))
-        assertTrue(commandCallback.contains("redactedRecognitionSource = \"on_device_hands_free\""))
+        assertTrue(commandCallback.contains("commands.recognized(RecognizedVoiceInput("))
+        assertTrue(commandCallback.contains("listOf(confidence ?: Float.NaN)"))
+        assertTrue(commandCallback.contains("capture.decisionToken, false,"))
+        assertTrue(commandCallback.contains("\"on_device_hands_free\""))
         assertFalse(commandCallback.contains("updateNavigationStatus("))
         assertFalse(commandCallback.contains("toStatusToken("))
+        val peers = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/composition/VoiceControllerPeerAdapters.kt").readText()
+        assertTrue(MainActivityRefactorSource.function(mainActivity, "private fun createVoiceInputController(").contains("commands = VoiceInputCommandPeerAdapter({ voiceInteractionControllers }"))
+        assertTrue(MainActivityRefactorSource.member(peers, "recognized").contains("interaction().commands.handleRecognized(result)"))
+        val commands = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/VoiceCommandInteractionController.kt").readText()
+        val handoff = MainActivityRefactorSource.member(commands, "handleRecognized")
+        assertTrue(handoff.contains("handleVoiceCommandPhrases(result.phrases,"))
+        assertTrue(handoff.contains("result.confidenceScores?.toFloatArray(), result.expectedNavigationDecisionToken"))
+        assertTrue(handoff.contains("result.includeRecognizedTextInStatus, result.source, result.backend, result.hasAdditionalAlternatives"))
     }
 
     @Test
     fun homeWakeCommandUsesTheSameHandlerWithoutStartingASecondRecording() {
-        val home = functionBlock("private fun refreshForegroundHomeWakeListening")
+        val home = MainActivityRefactorSource.function(mainActivity, "private fun refreshForegroundHomeWakeListening")
         val available = home.substringAfter("result.availability == VoskWakePhraseProbeAvailability.AVAILABLE")
             .substringBefore("// A passive render")
-        val acknowledgement = functionBlock("private fun acknowledgeForegroundHomeWake")
+        val acknowledgement = MainActivityRefactorSource.function(mainActivity, "private fun acknowledgeForegroundHomeWake")
         val command = acknowledgement.substringAfter("} else {")
         assertTrue(acknowledgement.contains("if (command == null)"))
-        assertTrue(acknowledgement.contains("startVoiceCommandRecognition()"))
-        assertTrue(command.contains("handleVoiceCommandPhrases("))
-        assertTrue(command.contains("phrases = listOf(command.text)"))
-        assertTrue(command.contains("confidenceScores = floatArrayOf(command.confidence ?: Float.NaN)"))
-        assertTrue(command.contains("includeRecognizedTextInStatus = false"))
-        assertTrue(command.contains("resultBackend = OfflineSpeechEngine.VOSK"))
-        assertFalse(command.contains("startVoiceCommandRecognition()"))
+        assertTrue(acknowledgement.contains("session.startCommandRecognition()"))
+        assertTrue(command.contains("session.recognized(RecognizedVoiceInput("))
+        assertTrue(command.contains("listOf(command.text)"))
+        assertTrue(command.contains("listOf(command.confidence ?: Float.NaN)"))
+        assertTrue(command.contains("expectedNavigationDecisionToken, false,"))
+        assertTrue(command.contains("OfflineSpeechEngine.VOSK"))
+        assertFalse(command.contains("session.startCommandRecognition()"))
         assertTrue(ReportStaticSourceInspector.appearsInOrder(
             available,
             "cancelForegroundHomeWakeListening()",
@@ -232,8 +262,8 @@ class HandsFreeVoiceIntegrationStaticTest {
         ))
         assertTrue(ReportStaticSourceInspector.appearsInOrder(
             home,
-            "val expectedNavigationDecisionToken = routeNavigator.pendingDecisionToken()",
-            "probe = VoskWakePhraseProbe(",
+            "val expectedNavigationDecisionToken = environment.pendingNavigationDecisionToken()",
+            "probe = platform.createProbe(ForegroundWakeCallbacks(",
         ))
         assertTrue(
             Regex(
@@ -241,15 +271,16 @@ class HandsFreeVoiceIntegrationStaticTest {
                     """expectedNavigationDecisionToken,?\s*\)""",
             ).containsMatchIn(available),
         )
-        assertTrue(command.contains("expectedNavigationDecisionToken = expectedNavigationDecisionToken"))
+        assertTrue(command.contains("expectedNavigationDecisionToken, false," ))
         assertFalse(available.contains("pendingDecisionToken()"))
         assertFalse(acknowledgement.contains("pendingDecisionToken()"))
         assertTrue(ReportStaticSourceInspector.appearsInOrder(
             acknowledgement,
-            "showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)",
+            "presentation.showCommandPage()",
             "val isCurrent =",
             "player.play",
-            "if (!isCurrent()) return@play",
+            "if (!isCurrent()) {",
+            "return@play",
             "if (command == null)",
         ))
     }
@@ -283,7 +314,7 @@ class HandsFreeVoiceIntegrationStaticTest {
         val transcript = functionBlockFrom(controller, "private fun handleTranscript")
         val handleError = functionBlockFrom(controller, "private fun handleError")
         val failClosed = functionBlockFrom(controller, "private fun failClosed")
-        val ended = functionBlock("private fun handleHandsFreeVoiceSessionEnded")
+        val ended = runtimeMember("handleHandsFreeVoiceSessionEnded")
         val serviceStart = functionBlockFrom(service, "private fun startVoiceSession")
         val relayStart = functionBlockFrom(application, "fun startController")
 
@@ -292,15 +323,15 @@ class HandsFreeVoiceIntegrationStaticTest {
         assertTrue(controller.contains("HandsFreeVoiceTerminalFailure.CommandDispatchFailed"))
         assertTrue(controller.contains("HandsFreeVoiceTerminalFailure.OutputTimeout"))
         assertFalse(controller.contains("HandsFreeVoiceInternalFailure"))
-        assertTrue(mainActivity.contains("onTerminalFailure = ::handleHandsFreeVoiceTerminalFailure"))
-        val terminalHandler = functionBlock("private fun handleHandsFreeVoiceTerminalFailure")
-        assertTrue(mainActivity.contains("failure: HandsFreeVoiceTerminalFailure,"))
+        assertTrue(runtimeMember("attachHandsFreeVoiceController").contains("terminalFailure = ::handleHandsFreeVoiceTerminalFailure"))
+        val terminalHandler = runtimeMember("handleHandsFreeVoiceTerminalFailure")
+        assertTrue(terminalHandler.contains("failure: HandsFreeVoiceTerminalFailure,"))
         assertTrue(terminalHandler.contains("handsFreeVoiceServiceRequested = false"))
         assertTrue(terminalHandler.contains("stopService("))
         assertTrue(terminalHandler.contains("is HandsFreeVoiceTerminalFailure.Transcriber ->"))
         assertTrue(terminalHandler.contains("HandsFreeVoiceTerminalFailure.CommandDispatchFailed,"))
         assertTrue(terminalHandler.contains("HandsFreeVoiceTerminalFailure.OutputTimeout,"))
-        assertTrue(terminalHandler.contains("onDeviceSpeechRecognitionCapabilityOverride = false"))
+        assertTrue(terminalHandler.contains("applicationEffects.limitPersistentHandsFreeRecognition()"))
         assertTrue(terminalHandler.contains("scheduleHandsFreeVoiceRestart()"))
         assertTrue(
             terminalHandler.contains("transcriber_limited_\${failure.statusToken}"),
@@ -348,7 +379,7 @@ class HandsFreeVoiceIntegrationStaticTest {
         assertTrue(serviceStart.contains("stopVoiceSession(stopController = false)"))
         assertTrue(serviceStart.contains("stopSelf()"))
 
-        assertTrue(mainActivity.contains("onSessionEnded = ::handleHandsFreeVoiceSessionEnded"))
+        assertTrue(runtimeMember("attachHandsFreeVoiceController").contains("sessionEnded = ::handleHandsFreeVoiceSessionEnded"))
         assertTrue(ready.contains("HandsFreeVoiceRunCallbackFence.acceptsReady"))
         assertTrue(ready.contains("endSessionWithoutRestart("))
         assertTrue(transcript.contains("endSessionWithoutRestart("))
@@ -393,29 +424,35 @@ class HandsFreeVoiceIntegrationStaticTest {
 
     @Test
     fun automaticVoicePageCanRecoverWithoutTakingOverAnExplicitButtonCapture() {
-        val start = functionBlock("private fun maybeStartHandsFreeVoiceService")
-        val automaticPage = functionBlock("private fun handleHandsFreeVoiceCommandListeningStarted")
-        val manualPage = functionBlock("private fun showNativeUiPage")
-        val capture = functionBlock("private fun startVoiceCommandRecognition")
-        val stop = functionBlock("private fun stopHandsFreeVoiceService")
-        val close = functionBlock("private fun closeHandsFreeVoice")
+        val start = runtimeMember("maybeStartHandsFreeVoiceService")
+        val automaticPage = MainActivityRefactorSource.function(mainActivity, "private fun handleHandsFreeVoiceCommandListeningStarted")
+        val manualPage = MainActivityRefactorSource.function(mainActivity, "private fun showNativeUiPage")
+        val capture = MainActivityRefactorSource.function(mainActivity, "private fun startVoiceCommandRecognition")
+        val stop = runtimeMember("stopHandsFreeVoiceService")
+        val close = runtimeMember("closeHandsFreeVoice")
 
-        assertTrue(start.replace(Regex("\\s+"), "").contains(
+        assertFalse(start.replace(Regex("\\s+"), "").contains(
             "(nativeUiPage==NativeUiPage.VOICE_COMMAND&&!handsFreeVoiceOwnsCommandPage)",
         ))
-        assertTrue(start.contains("voiceCommandPromptPending"))
+        assertTrue(start.contains("input.otherInputBusy()"))
+        val inputBusy = MainActivityRefactorSource.member(input.replace("\n            override fun ", "\n    override fun "), "otherInputBusy")
+        assertTrue(inputBusy.contains("voiceRecognitionActive || voiceCommandPromptPending ||"))
+        assertTrue(inputBusy.contains("deferredVoiceRecognitionStart != null"))
+        assertTrue(inputBusy.contains("gateway.isRecording()"))
+        assertTrue(inputBusy.contains("gateway.hasInteraction()"))
         assertTrue(ReportStaticSourceInspector.appearsInOrder(
             automaticPage,
             "handsFreeVoiceOwnsCommandPage = true",
-            "showNativeUiPage(NativeUiPage.VOICE_COMMAND, preserveVoiceInteraction = true)",
+            "presentation.showCommandPage()",
         ))
-        assertTrue(manualPage.contains("handsFreeVoiceOwnsCommandPage = false"))
+        assertTrue(manualPage.contains("pages.releaseCommandPageOwnership()"))
         assertTrue(capture.contains("handsFreeVoiceOwnsCommandPage = false"))
-        assertTrue(close.contains("handsFreeVoiceOwnsCommandPage = false"))
+        assertTrue(close.contains("input.runtimeRetired()"))
+        assertTrue(MainActivityRefactorSource.member(input.replace("\n            override fun ", "\n    override fun "), "runtimeRetired").contains("handsFreeVoiceOwnsCommandPage = false"))
         assertFalse(stop.contains("handsFreeVoiceOwnsCommandPage = false"))
-        assertTrue(start.contains("!isWalkSessionRuntimeActive()"))
-        assertTrue(start.contains("isHandsFreeVoiceDisclosureAccepted()"))
-        assertTrue(start.contains("!hasRecordAudioPermission()"))
+        assertTrue(start.contains("!environment.runtimeActive()"))
+        assertTrue(start.contains("environment.disclosureAccepted()"))
+        assertTrue(start.contains("!environment.microphoneGranted()"))
     }
 
     @Test
@@ -425,7 +462,7 @@ class HandsFreeVoiceIntegrationStaticTest {
         ).readText()
         val openWindow = functionBlockFrom(controller, "private fun openCommandWindow")
         val acknowledgeWake = functionBlockFrom(controller, "private fun acknowledgeWake")
-        val callback = functionBlock("private fun handleHandsFreeVoiceCommandListeningStarted")
+        val callback = MainActivityRefactorSource.function(mainActivity, "private fun handleHandsFreeVoiceCommandListeningStarted")
 
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
@@ -445,8 +482,12 @@ class HandsFreeVoiceIntegrationStaticTest {
                 "openCommandWindow(acknowledging.generation, runId, command, confidence)",
             ),
         )
-        assertTrue(callback.contains("playVoiceListeningStartVibration()"))
-        assertTrue(callback.contains("updateGatewayVoiceStatus("))
+        val peers = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/composition/VoiceControllerPeerAdapters.kt").readText()
+        assertTrue(callback.contains("output.playListeningStarted()"))
+        assertTrue(MainActivityRefactorSource.member(peers, "playListeningStarted").contains("speech().ensureFeedbackActuator().playVoiceListeningStartVibration()"))
+        assertTrue(callback.contains("presentation.voiceStatus("))
+        assertTrue(MainActivityRefactorSource.property(mainActivity, "voiceInputPresentation").contains("VoiceInputPresentationAdapter(voiceUiEffects"))
+        assertTrue(MainActivityRefactorSource.property(mainActivity, "voiceUiEffects").contains("updateGatewayVoiceStatus(message)"))
         assertTrue(mainActivity.contains("ACCESSIBILITY_LIVE_REGION_POLITE"))
     }
 
@@ -521,7 +562,7 @@ class HandsFreeVoiceIntegrationStaticTest {
     fun onlyAPersistentTranscriberFailureDisablesOnDeviceSpeechRecognition() {
         // S14-16-a / FP-025 "계속 실패": a single transient transcriber error restarts listening; only
         // MODEL_UNAVAILABLE or two consecutive failures disable on-device STT (which blocks walks).
-        val terminalHandler = functionBlock("private fun handleHandsFreeVoiceTerminalFailure")
+        val terminalHandler = runtimeMember("handleHandsFreeVoiceTerminalFailure")
         val transcriberBranch = terminalHandler
             .substringAfter("is HandsFreeVoiceTerminalFailure.Transcriber ->")
             .substringBefore("HandsFreeVoiceTerminalFailure.CommandDispatchFailed,")
@@ -532,45 +573,60 @@ class HandsFreeVoiceIntegrationStaticTest {
                 "failure.error == VoskStreamingError.MODEL_UNAVAILABLE ||",
                 "handsFreeTranscriberFailureCount >= HANDS_FREE_TRANSCRIBER_PERSISTENT_FAILURES",
                 "if (!persistentTranscriberFailure) {",
-                "updateNavigationStatus(\"voice_hands_free=internal_restart_\${failure.statusToken}\")",
+                "presentation.navigationStatus(\"voice_hands_free=internal_restart_\${failure.statusToken}\")",
                 "scheduleHandsFreeVoiceRestart()",
                 "return",
-                "onDeviceSpeechRecognitionCapabilityOverride = false",
-                "refreshStartupCapabilityUi()",
+                "applicationEffects.limitPersistentHandsFreeRecognition()",
+                "presentation.navigationStatus(",
             ),
         )
-        assertTrue(mainActivity.contains("const val HANDS_FREE_TRANSCRIBER_PERSISTENT_FAILURES = 2"))
-        assertTrue(mainActivity.contains("private var handsFreeTranscriberFailureCount = 0"))
+        assertTrue(runtime.contains("const val HANDS_FREE_TRANSCRIBER_PERSISTENT_FAILURES = 2"))
+        assertTrue(runtime.contains("private var handsFreeTranscriberFailureCount = 0"))
 
         // The streak restarts whenever command listening starts again.
-        val listeningStarted = functionBlock("private fun handleHandsFreeVoiceCommandListeningStarted")
-        assertTrue(listeningStarted.contains("handsFreeTranscriberFailureCount = 0"))
+        val listeningStarted = MainActivityRefactorSource.function(mainActivity, "private fun handleHandsFreeVoiceCommandListeningStarted")
+        assertTrue(listeningStarted.contains("handsFreeRuntime.clearTranscriberFailureHistory()"))
         // Every place that clears the device-check STT override also clears the streak.
-        val clearedOverrides = Regex("onDeviceSpeechRecognitionCapabilityOverride = null").findAll(mainActivity).count()
-        val clearedWithStreak = Regex(
-            "onDeviceSpeechRecognitionCapabilityOverride = null\\s+handsFreeTranscriberFailureCount = 0",
-        ).findAll(mainActivity).count()
+        val device = File("src/main/java/kr/co/hanium/dreamup/walksafe/device/PostLoginDeviceCheckController.kt").readText()
+        val clearedOverrides = Regex("effects\\.applyCapabilityOverrides\\(").findAll(device).count()
         assertTrue("override clears=$clearedOverrides", clearedOverrides >= 4)
-        assertEquals(clearedOverrides, clearedWithStreak)
+        val reset = functionBlockFrom(mainActivity, "override fun applyCapabilityOverrides")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(reset,
+            "onDeviceSpeechRecognitionCapabilityOverride = null", "voiceInputController.clearTranscriberFailureHistory()"))
+        val persistentEffect = functionBlockFrom(mainActivity, "override fun limitPersistentHandsFreeRecognition")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(persistentEffect,
+            "val wasConfirmed = isStartupCapabilityConfirmed()",
+            "onDeviceSpeechRecognitionCapabilityOverride = false",
+            "refreshStartupCapabilityUi()",
+            "if (wasConfirmed) {",
+            "confirmedStartupCapabilityDecision = startupCapabilityDecision?.takeIf {",
+            "it.mayConfirmAndStart",
+            "refreshStartupCapabilityUi()",
+            "val walkStartStillAllowed = startupCapabilityDecision?.mayConfirmAndStart == true"))
+        val confirmedRecheck = ReportStaticSourceInspector.blockAfter(persistentEffect, "if (wasConfirmed)")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(confirmedRecheck,
+            "confirmedStartupCapabilityDecision = startupCapabilityDecision?.takeIf {",
+            "it.mayConfirmAndStart",
+            "refreshStartupCapabilityUi()"))
+        val clearHistory = runtimeMember("clearTranscriberFailureHistory")
+        assertTrue(clearHistory.contains("handsFreeTranscriberFailureCount = 0"))
     }
 
     @Test
     fun restoredWakePhraseTestMissStaysAHandsFreeFeatureRestriction() {
         // S14-16-b: a stored HANDS_FREE_VOICE restriction (wake-word test miss) is not evidence that
         // the on-device STT engine is unavailable, so a restart does not turn it into a walk block.
-        val bind = functionBlock("private fun bindPostLoginDeviceCheckSession")
+        val bind = MainActivityRefactorSource.function(mainActivity, "private fun bindPostLoginDeviceCheckSession")
         assertTrue(bind.contains("if (restored != null) {"))
-        val restoredOverrides = bind
-            .substringAfter("runtimeObstacleDetectionCapabilityOverride = if (")
-            .substringBefore("offlineKoreanTextToSpeechCapabilityOverride = if (")
+        val restoredOverrides = functionBlockFrom(mainActivity, "override fun applyCapabilityOverrides")
         assertTrue(restoredOverrides.contains("onDeviceSpeechRecognitionCapabilityOverride = null"))
         assertFalse(restoredOverrides.contains("HANDS_FREE_VOICE"))
-        assertFalse(bind.contains("onDeviceSpeechRecognitionCapabilityOverride = if ("))
+        assertFalse(bind.contains("speechRecognition ="))
         assertFalse(
             Regex("HANDS_FREE_VOICE in restored\\.disabledFeatures\\s*\\)\\s*\\{\\s*false").containsMatchIn(bind),
         )
         // In-session the same restriction is a feature restriction only, never an STT override.
-        val restrictions = functionBlock("private fun applyPostLoginDeviceFeatureRestrictions")
+        val restrictions = MainActivityRefactorSource.function(mainActivity, "private fun applyPostLoginDeviceFeatureRestrictions")
         assertTrue(restrictions.contains("PostLoginDeviceCheckFeature.HANDS_FREE_VOICE"))
         assertFalse(restrictions.contains("onDeviceSpeechRecognitionCapabilityOverride = false"))
     }

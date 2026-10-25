@@ -7,56 +7,44 @@ import org.junit.Test
 
 class MainActivityGatewaySpeechHapticStaticTest {
     private val source =
-        File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/GatewayVoiceCaptureController.kt").readText()
 
     @Test
     fun successfulServerRecordingStartSignalsListeningOnce() {
-        val start = section(
-            "private fun startGatewayVoiceCapture()",
-            "private fun stopGatewayVoiceCapture(",
-        )
+        val start = MainActivityRefactorSource.member(source, "startGatewayVoiceCapture")
 
         assertInOrder(
             start,
-            "if (!recorder.start())",
+            "val started = recorder.start()",
+            "if (activeGatewaySpeechInteraction !== active) return false",
+            "if (!started)",
             "return false",
-            "playVoiceListeningStartVibration()",
+            "if (activeGatewaySpeechInteraction !== active || !recorder.isRecording) return false",
+            "output.playListeningStarted()",
             "return true",
         )
-        assertTrue(occurrences(start, "playVoiceListeningStartVibration()") == 1)
+        assertTrue(occurrences(start, "output.playListeningStarted()") == 1)
     }
 
     @Test
     fun normalServerRecordingStopClaimsRecorderBeforeEndSignal() {
-        val stop = section(
-            "private fun stopGatewayVoiceCapture(",
-            "private fun submitGatewayVoiceRecording(",
-        )
+        val stop = MainActivityRefactorSource.member(source, "stopGatewayVoiceCapture")
 
         assertInOrder(
             stop,
             "val recorder = gatewayVoiceRecorder ?: return",
             "gatewayVoiceRecorder = null",
             "recorder.stop()",
-            "playVoiceListeningEndVibration()",
+            "output.playListeningEnded()",
         )
-        assertTrue(occurrences(stop, "playVoiceListeningEndVibration()") == 1)
+        assertTrue(occurrences(stop, "output.playListeningEnded()") == 1)
     }
 
     @Test
     fun cancellationSignalsOnlyAnActiveRecordingAndProcessingDoesNotDuplicateIt() {
-        val cancel = section(
-            "private fun cancelGatewaySpeechInteraction(",
-            "private fun updateGatewayVoiceStatus(",
-        )
-        val finish = section(
-            "private fun finishGatewaySpeechInteraction(",
-            "private fun cancelGatewaySpeechInteraction(",
-        )
-        val upload = section(
-            "private fun submitGatewayVoiceRecording(",
-            "private fun handleGatewaySpeechTranscript(",
-        )
+        val cancel = MainActivityRefactorSource.member(source, "cancelGatewaySpeechInteraction")
+        val finish = MainActivityRefactorSource.member(source, "finishGatewaySpeechInteraction")
+        val upload = MainActivityRefactorSource.member(source, "submitGatewayVoiceRecording")
 
         assertInOrder(
             cancel,
@@ -65,12 +53,12 @@ class MainActivityGatewaySpeechHapticStaticTest {
             "gatewayVoiceRecorder = null",
             "recorder?.cancel()",
             "if (wasRecording)",
-            "playVoiceListeningEndVibration()",
+            "output.playListeningEnded()",
         )
-        assertTrue(occurrences(cancel, "playVoiceListeningEndVibration()") == 1)
+        assertTrue(occurrences(cancel, "output.playListeningEnded()") == 1)
         listOf(finish, upload).forEach { processing ->
-            assertFalse(processing.contains("playVoiceListeningStartVibration()"))
-            assertFalse(processing.contains("playVoiceListeningEndVibration()"))
+            assertFalse(processing.contains("output.playListeningStarted()"))
+            assertFalse(processing.contains("output.playListeningEnded()"))
         }
     }
 

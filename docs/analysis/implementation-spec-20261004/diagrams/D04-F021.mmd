@@ -1,0 +1,18 @@
+flowchart TD
+  ID["F-D04-021 · 개인 보폭·속도·분산 프로필<br/>P-D04-021"]
+  A["보정 SAMPLE_READY"]
+  C0{"distance·steps·duration·trusted·stride·speed가 유효한가"}
+  R0["REJECTED counter만 증가"]
+  C1{"최근 유효 학습 sample이 3개 이상인가"}
+  R1["ACCEPTED_WARMUP 및 기본값"]
+  OK["median·MAD → bounded EWMA → process dynamics 및 3개 보폭 consumer 갱신 → 저장 요청"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END

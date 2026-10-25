@@ -1,0 +1,23 @@
+flowchart TD
+  A["F-D12-010 새 인증수단으로 관리자 복구 완료"]
+  P["P-D12-010 복구 완료 응답과 현재 서버 session을 재검증"]
+  A --> P
+  M0["1. 기기키 preflight 후 POST /admin/security/recovery/complete를 호출한다."]
+  P --> M0
+  M1["2. 응답은 NORMAL 상태·유효 access token·canonical session ID인지 검사한다."]
+  M0 --> M1
+  M2["3. recovery token을 제거하고 새 admin/device/session access binding을 만든다."]
+  M1 --> M2
+  M3["4. 서버 security state 및 session inventory를 재확인한 뒤 정상 snapshot을 공개한다."]
+  M2 --> M3
+  M3 --> N["정상 종료: 새 access session을 검증하고 복구 token을 제거."]
+  M0 -. "관련 조건 확인" .-> B0{"TOTP 비밀키가 별도 관리 경로에서 미교체"}
+  B0 -->|"조건 해당"| R0["별도 경로에서 교체 후 새 코드 안내"]
+  M1 -. "관련 조건 확인" .-> B1{"RECOVERY_EXPIRED 또는 INVALID 등 restart 요구"}
+  B1 -->|"조건 해당"| R1["recovery token 제거 및 시작부터 안내"]
+  M2 -. "관련 조건 확인" .-> B2{"기기키 미활성"}
+  B2 -->|"조건 해당"| R2["trusted local 등록 안내"]
+  M3 -. "관련 조건 확인" .-> B3{"오류"}
+  B3 -->|"조건 해당"| R3["FAIL_CLOSED; 자동 재시도 없음"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["사용자 명시 동작으로 다시 시도한다. 비밀번호/TOTP를 자동 재전송하지 않는다. 상세 분기는 해당 입력·분기와 F-D12-003을 따른다."]

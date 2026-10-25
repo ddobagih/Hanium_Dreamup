@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D08-036 통합 동의 기록·철회·멱등 replay"]
+  B["진입: PUT /privacy/rights?control=integrated-consent"]
+  A --> B
+  P0["1. installation queue32/1 초·파일 lock 획득"]
+  B --> P0
+  P1["2. actor 전체 revision floor 와 기존 request exact replay 를 확인"]
+  P0 --> P1
+  P2["3. 필요 시 audit archive seal 과 main capacity 를 확인"]
+  P1 --> P2
+  P3["4. Backend /privacy/consent-events 에 동일 request/time/내용을 보내 권위 receipt 수신"]
+  P2 --> P3
+  P4["5. hash-chain event append 와 encrypted durable write"]
+  P3 --> P4
+  P5["6. 200/201 receipt 반환"]
+  P4 --> P5
+  OK["정상: 새 동의 receipt 또는 철회 기록"]
+  P5 --> OK
+  C0{"같은 request 같은내용 최신 event"}
+  X0["Backend 동일 id 로 replay"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"같은 id 다른내용/옛 event replay/낮은 revision"}
+  X1["409"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"main4MiB 또는 4096events 임계"}
+  X2["archive 가 실패해도 같은 actor 의 단조 부분 철회 또는 모든 false 철회는 16 KiB·4 event reserve 내 허용한다."]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"Backend 수락후 local failure"}
+  X3["outcome_unknown; 동일키로 조정"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-011, P-D08-017, P-D08-021, P-D08-024, P-D08-029, P-D08-032"]
+  A -.-> POLICY

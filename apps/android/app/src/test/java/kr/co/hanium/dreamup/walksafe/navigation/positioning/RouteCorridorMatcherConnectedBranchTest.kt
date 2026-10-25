@@ -128,7 +128,7 @@ class RouteCorridorMatcherConnectedBranchTest {
             var time = 1_000L
             var east = 60.0
             repeat(22) {
-                val result = matcher.match("u", uTurnAcrossCrossing(), position(east, accuracy = 10.0, time = time), accepted)
+                val result = matcher.match("u", uTurnAcrossCrossing(), position(east, accuracy = 5.0, time = time), accepted)
                 if (result.quality == RouteMatchQuality.HIGH || result.quality == RouteMatchQuality.MEDIUM) {
                     accepted = result.geometricProgressM
                 }
@@ -149,6 +149,15 @@ class RouteCorridorMatcherConnectedBranchTest {
             )
             assertNotEquals("errorNorth=$errorNorth", RouteMatchQuality.HIGH, jumped.quality)
         }
+    }
+
+    @Test
+    fun initialParallelReturnLegAtTwoSigmaRemainsAmbiguous() {
+        val result = navigatorMatcher().match(
+            "u", uTurnAcrossCrossing(), position(60.0, accuracy = 10.0, time = 1_000L),
+        )
+
+        assertEquals(RouteMatchQuality.LOW, result.quality)
     }
 
     @Test

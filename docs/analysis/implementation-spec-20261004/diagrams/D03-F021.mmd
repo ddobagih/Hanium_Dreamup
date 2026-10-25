@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D03-021 후보 page 전체 낭독과 선택 권한 lease"]
+  P["정책 P-D03-021"]
+  A --> P
+  N0["1. 현재 페이지를 끝까지 들은 후 해당 번호만 선택할 수 있게 한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. beginVoicePrompt 가 이전 선택권한을 폐기하며 DONE callback 만 current attempt 를 complete 한다."]
+  N0 --> N1
+  N2["3. 긴 낭독시간은 30s 답변창에 포함하지 않는다; 완료/실패 terminal 이후 한 번 열고 연장하지 않는다."]
+  N1 --> N2
+  N3["4. 실패는 후보 context 를 남겨 재질문할 수 있으나 complete=false 이므로 번호 실행을 허용하지 않는다."]
+  N2 --> N3
+  N4["5. owner/query/page change, timeout, cancel 은 lease 와 prompt selection 권한을 함께 폐기한다."]
+  N3 --> N4
+  Z["정상: 완료된 현재 page 에 한정한 선택권한."]
+  N4 --> Z
+  B0{"번호가 현재 3 개 밖"}
+  R0["허용 전역번호를 다시 안내"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"현재 번호지만 prompt 미완료"}
+  R1["끝까지 들은 뒤 선택 요청"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"old TTS DONE"}
+  R2["새 page 선택권한 부여 안 함"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: 낭독실패는 권한 미부여, retry context 가능."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xtimeout["만료: HOME terminal 이후 30s 미만; 역행 clock invalid."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xtimeout
+  Xcancel["취소: lease.close→state.invalidateVoicePrompt."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: 화면/actor/session/query 변동 무효."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xretry["재시도: 전체 같은 page 재낭독."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry
+  Xcleanup["정리: 기존 lease·follow-up context·prompt attempt 제거."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

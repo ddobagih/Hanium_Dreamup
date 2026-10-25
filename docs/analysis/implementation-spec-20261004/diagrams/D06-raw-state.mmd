@@ -1,0 +1,28 @@
+stateDiagram-v2
+  state "수집 대기" as IDLE
+  state "F-D06-018 PARTIAL" as PARTIAL
+  state "SEALED" as SEALED
+  state "UPLOADING" as UPLOADING
+  state "ACK 보존" as ACK
+  state "DELETED_AFTER_EXACT_RECEIPT" as DELETED
+  state "격리·보류" as HELD
+  state "계정·동의 차단" as BLOCKED
+  [*] --> IDLE
+  IDLE --> PARTIAL: profile·동의·capacity·metadata pair
+  PARTIAL --> PARTIAL: atomic aggregate replace
+  PARTIAL --> SEALED: 유효 pair 경계·종료·SAFE_STOP
+  SEALED --> UPLOADING: READY 또는 ENDED·충전·Wi-Fi
+  UPLOADING --> ACK: v2 exact receipt
+  ACK --> DELETED: local delete 성공
+  ACK --> ACK: delete 실패·다음 cleanup
+  UPLOADING --> SEALED: 일시실패·취소
+  SEALED --> HELD: policy continuity 미결정
+  UPLOADING --> HELD: 거절·격리
+  PARTIAL --> BLOCKED: 동의철회·계정삭제
+  SEALED --> BLOCKED: 동의철회·계정삭제
+  BLOCKED --> IDLE: 검증된 purge·허용된 fresh key
+  note right of HELD
+    P-D06-016..022
+    sealed와 physical delete는 서로 다른 사실
+    server-disabled는 process upload fence
+  end note

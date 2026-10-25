@@ -3,11 +3,15 @@ package kr.co.hanium.dreamup.walksafe.navigation
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteMatchReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RouteNavigatorProtectedGuideProgressRegressionTest {
+    // These fixtures observe guide passage from position evidence, independently of heading recheck delay.
+    // Production 1.5-second delay and immediate safety actions are covered by RouteDirectionRecheckGraceTest.
+
     @Test
     fun turnThenCrosswalkNeedsFreshObservationsAfterOvershoot() {
         assertSeparatedGuides(
@@ -71,10 +75,28 @@ class RouteNavigatorProtectedGuideProgressRegressionTest {
             assertGuideIndex(navigator, 0.0, 1_000L, 0)
             assertGuideIndex(navigator, 40.0, 11_000L, 1)
             navigator.update(rejectedFix, nowMs = 11_001L, requestInFlight = false)
-            assertGuideIndex(navigator, 42.0, 12_000L, 1)
+            val recovering = navigator.update(location(42.0, 12_000L), 12_000L, false)
+            if (rejectedFix == location(40.0, 11_000L)) {
+                // An exact duplicate does not break the existing owned position authority.
+                assertEquals("route_guidance", recovering.reason)
+                assertEquals(1, recovering.guideIndex)
+                assertNotNull(navigator.currentAcceptedRouteMatchFor(12_000L))
+            } else {
+                // Conflicting equal-time/regressed inputs interrupt it; one fresh sample is insufficient.
+                assertEquals("route_geometry_recheck_wait", recovering.reason)
+                assertNull(navigator.currentAcceptedRouteMatchFor(12_000L))
+                assertNull(recovering.speechCueToken)
+            }
             assertGuideIndex(navigator, 45.0, 13_000L, 1)
             assertGuideIndex(navigator, 50.0, 14_000L, 1)
-            assertGuideIndex(navigator, 60.0, 16_000L, null)
+            if (rejectedFix == location(40.0, 11_000L)) {
+                assertGuideIndex(navigator, 60.0, 16_000L, null)
+            } else {
+                // Reacquisition restarts consecutive passage evidence; the crossing is still held at 16 s.
+                assertGuideIndex(navigator, 60.0, 16_000L, 1)
+                // 70 ± 3 m clears the preceding 60 ± 3 m interval; 65 ± 3 m still overlaps it.
+                assertGuideIndex(navigator, 70.0, 17_000L, null)
+            }
         }
     }
 
@@ -227,7 +249,7 @@ class RouteNavigatorProtectedGuideProgressRegressionTest {
         summaryDistanceM: Int = 200,
         secondGuideEastM: Double = 190.0,
     ): RouteNavigator = RouteNavigator(
-        RouteNavigatorConfig(maximumProgressAdvanceM = 40.0, guidanceIntervalMs = 0L),
+        RouteNavigatorConfig(directionRecheckGraceMs = 0L, maximumProgressAdvanceM = 40.0, guidanceIntervalMs = 0L),
     ).apply {
         val scale = summaryDistanceM / 200
         setRoute(
@@ -283,7 +305,7 @@ class RouteNavigatorProtectedGuideProgressRegressionTest {
 
     private fun navigator(vararg guides: WalkingRouteGuidePoint): RouteNavigator =
         RouteNavigator(
-            RouteNavigatorConfig(maximumProgressAdvanceM = 40.0, guidanceIntervalMs = 0L),
+            RouteNavigatorConfig(directionRecheckGraceMs = 0L, maximumProgressAdvanceM = 40.0, guidanceIntervalMs = 0L),
         ).apply {
             setRoute(
                 WalkingRoute(

@@ -30,24 +30,9 @@ class MainActivityRawCollectionPostWalkUploadBudgetStaticTest {
                 .contains("scheduleRawCollectionPostWalkUpload()"),
         )
         val budget = Regex("""const val RAW_COLLECTION_POST_WALK_UPLOADS_PER_TASK = (\d+)""")
-            .find(source)?.groupValues?.get(1)?.toInt()
+            .find(File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/RawCollectionTransferController.kt").readText())?.groupValues?.get(1)?.toInt()
         assertTrue(budget != null && budget in 1..8)
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing $signature" }
-        val open = source.indexOf('{', source.indexOf(')', start))
-        var depth = 0
-        for (index in open until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        error("unterminated $signature")
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
 }

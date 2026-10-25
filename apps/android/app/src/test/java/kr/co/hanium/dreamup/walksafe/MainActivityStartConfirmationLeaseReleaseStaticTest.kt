@@ -13,19 +13,19 @@ class MainActivityStartConfirmationLeaseReleaseStaticTest {
     private val source = sequenceOf(
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"),
         File("app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"),
-    ).first { it.isFile }.readText().replace(Regex("\\s+"), "")
+    ).first { it.isFile }.readText()
 
     @Test
     fun rejectedStartConfirmationReleasesTheAcquiredLease() {
-        val activation = source.substringAfter("privatefuncompleteGatewayWalkActivation(")
-            .substringBefore("privatefuncurrentGatewayWalkStartReadinessOrNull(")
-        val start = activation.indexOf("transitionWalkSession(WalkSessionEvent.StartRequested(token))")
+        val activation = MainActivityRefactorSource.function(source, "private fun completeGatewayWalkActivation(")
+            .replace(Regex("\\s+"), "")
+        val start = activation.indexOf("runtime.startRequested(token,currentReadiness)")
         val rejected = activation.indexOf(
-            "if(walkSessionLifecycle.snapshot().state!=WalkSessionState.ACTIVE){",
+            "if(runtime.snapshot().state!=WalkSessionState.ACTIVE){",
             start,
         )
-        val release = activation.indexOf("gatewayWalkAuthorityController.beginEnd(token.epoch)", rejected)
-        val runtime = activation.indexOf("if(isWalkSessionRuntimeActive()){", rejected)
+        val release = activation.indexOf("authority.beginEnd(token.epoch)", rejected)
+        val runtime = activation.indexOf("if(runtime.isActive()){", rejected)
         assertTrue(start >= 0 && rejected > start && release > rejected && runtime > release)
     }
 }

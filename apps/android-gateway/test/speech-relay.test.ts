@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { after, before, beforeEach, test } from "node:test";
+import { after, afterEach, before, beforeEach, test } from "node:test";
 
 import { establishBackendGatewaySession } from "../src/auth.js";
-import { handleGatewayRequest } from "../src/routes.js";
+import { activePrivacyOperationCountForTests, bindBackendActorGeneration } from "../src/privacy-rights.js";
+import { handleGatewayRequest as dispatchGatewayRequest, type GatewayDependencies } from "../src/routes.js";
+import { assertBackendActorAssertionV4 } from "./actor-assertion-v4-fixture.js";
 import {
   resetSpeechAdmissionForTests,
   SPEECH_STT_RESPONSE_SCHEMA,
@@ -21,6 +23,26 @@ const REQUEST_ID = "018f2b63-8fb8-7cc2-98a1-4a4fd27c3001";
 const MODEL_REVISION = "a".repeat(40);
 const ACTOR_ID = "account-user-voice";
 const CLIENT_IP = "198.51.100.77";
+
+// Authenticated speech requests pass the Backend session-current gate before Voice.
+// Keep that real boundary in the fixture; each test's fetch stub models only Voice.
+function handleGatewayRequest(request: Request, dependencies: GatewayDependencies = {}) {
+  const voiceFetch = dependencies.fetchImpl;
+  return dispatchGatewayRequest(request, {
+    ...dependencies,
+    fetchImpl: async (url, init) => {
+      if (new URL(String(url)).pathname === "/accounts/session-current") {
+        assert.ok(init);
+        assertBackendActorAssertionV4(String(url), init, {
+          actorId: ACTOR_ID, accountGeneration: 3, authEpoch: 2
+        });
+        return new Response(null, { status: 204 });
+      }
+      assert.ok(voiceFetch, "Voice calls must use this test's local fake provider");
+      return voiceFetch(url, init);
+    }
+  });
+}
 
 let stateDirectory = "";
 
@@ -45,6 +67,8 @@ after(async () => {
   await rm(stateDirectory, { recursive: true, force: true });
 });
 
+afterEach(() => { assert.equal(activePrivacyOperationCountForTests(), 0); });
+
 beforeEach(() => {
   resetSpeechAdmissionForTests();
   for (const name of [
@@ -59,6 +83,8 @@ beforeEach(() => {
 });
 
 function backendSessionCookie(): string {
+  // Production password login binds privacy authority before issuing this cookie.
+  bindBackendActorGeneration(ACTOR_ID, 3);
   const response = establishBackendGatewaySession(
     new Request("https://walksafe.example/api/field-session"),
     { actorId: ACTOR_ID, accountGeneration: 3, authEpoch: 2 },
@@ -229,7 +255,10 @@ test("STT replaces spoofable headers and projects only transcript and acoustic e
     },
     model_revision: MODEL_REVISION
   });
-  assert.equal(telemetry.length, 1);
+  assert.deepEqual(telemetry.map(event => [event.event_name, event.outcome]), [
+    ["walksafe.gateway.request.prepared", "prepared"],
+    ["walksafe.gateway.request.finished", "completed"]
+  ]);
   const serialized = JSON.stringify(telemetry);
   for (const sensitive of ["주변을 설명해줘", VOICE_TOKEN, CLIENT_IP, "execute", "segments"]) {
     assert.equal(serialized.includes(sensitive), false);
@@ -248,6 +277,7 @@ test("STT rejects unknown upstream fields and cumulative oversized request bodie
     { fetchImpl: async () => jsonVoiceStt({ unexpected: "not exposed" }) }
   );
   assert.equal(malformed.status, 502);
+  await malformed.body?.cancel();
 
   resetSpeechAdmissionForTests();
   process.env.WALKSAFE_VOICE_STT_MAX_BODY_BYTES = "1024";
@@ -260,6 +290,7 @@ test("STT rejects unknown upstream fields and cumulative oversized request bodie
     { fetchImpl: async () => { fetches += 1; return jsonVoiceStt(); } }
   );
   assert.equal(oversized.status, 413);
+  await oversized.body?.cancel();
   assert.equal(fetches, 0);
 });
 
@@ -308,6 +339,8 @@ test("STT enforces actor rate and in-flight capacity before another body is read
   );
   assert.equal(first.status, 200);
   assert.equal(second.status, 429);
+  await first.body?.cancel();
+  await second.body?.cancel();
   assert.equal(fetches, 1);
 
   delete process.env.WALKSAFE_VOICE_STT_ACTOR_RATE_LIMIT;
@@ -334,8 +367,11 @@ test("STT enforces actor rate and in-flight capacity before another body is read
     { fetchImpl: async () => { throw new Error("capacity must reject before fetch"); } }
   );
   assert.equal(busy.status, 503);
+  await busy.body?.cancel();
   releaseFetch(jsonVoiceStt());
-  assert.equal((await pending).status, 200);
+  const completed = await pending;
+  assert.equal(completed.status, 200);
+  await completed.body?.cancel();
 });
 
 test("TTS forwards exact non-caching request and returns only validated bounded WAV", async () => {
@@ -399,6 +435,7 @@ test("TTS rejects controls, wrong upstream types, and declared oversize without 
     { fetchImpl: async () => { fetches += 1; throw new Error("not reached"); } }
   );
   assert.equal(invalidText.status, 422);
+  await invalidText.body?.cancel();
   assert.equal(fetches, 0);
 
   resetSpeechAdmissionForTests();
@@ -415,6 +452,7 @@ test("TTS rejects controls, wrong upstream types, and declared oversize without 
     { fetchImpl: async () => new Response("not audio", { headers: { "content-type": "text/plain" } }) }
   );
   assert.equal(wrongType.status, 502);
+  await wrongType.body?.cancel();
 
   resetSpeechAdmissionForTests();
   const missingRevision = await handleGatewayRequest(
@@ -434,6 +472,7 @@ test("TTS rejects controls, wrong upstream types, and declared oversize without 
     }
   );
   assert.equal(missingRevision.status, 502);
+  await missingRevision.body?.cancel();
 
   resetSpeechAdmissionForTests();
   process.env.WALKSAFE_VOICE_TTS_RESPONSE_MAX_BYTES = "1024";
@@ -454,4 +493,5 @@ test("TTS rejects controls, wrong upstream types, and declared oversize without 
     }
   );
   assert.equal(oversized.status, 502);
+  await oversized.body?.cancel();
 });

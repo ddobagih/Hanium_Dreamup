@@ -1,4 +1,5 @@
 import cluster from "node:cluster";
+import { createGatewayRuntime } from "./src/gateway-runtime.js";
 import { writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -93,6 +94,7 @@ try {
     accountDeletionOutboxHasPausedOperations
   );
   server = createGatewayServer({
+    runtime: createGatewayRuntime(),
     readinessProbe: createGatewayReadinessProbe(
       () => probeGatewayManagedStorageReady(ledgerPath),
       () => deletionWorker.isReady()

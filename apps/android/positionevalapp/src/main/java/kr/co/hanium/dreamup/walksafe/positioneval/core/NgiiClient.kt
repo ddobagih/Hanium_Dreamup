@@ -211,6 +211,7 @@ open class StrictHttpsTransport(
     private val connectionFactory: (URL) -> HttpsURLConnection = { url ->
         url.openConnection() as HttpsURLConnection
     },
+    private val openOutput: (File) -> FileOutputStream = ::FileOutputStream,
 ) {
     companion object {
         const val JSON_LIMIT_BYTES = 4L * 1024L * 1024L
@@ -305,9 +306,9 @@ open class StrictHttpsTransport(
                 val digest = MessageDigest.getInstance("SHA-256")
                 var count = 0L
                 val memory = if (sink == null) java.io.ByteArrayOutputStream() else null
-                val output = if (sink != null) FileOutputStream(sink) else memory!!
-                connection.inputStream.use { input ->
-                    output.use { target ->
+                val output = if (sink != null) openOutput(sink) else memory!!
+                output.use { target ->
+                    connection.inputStream.use { input ->
                         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                         while (true) {
                             cancellation?.throwIfCancelled()

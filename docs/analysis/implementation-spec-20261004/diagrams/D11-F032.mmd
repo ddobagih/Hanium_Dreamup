@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D11-032 Legacy Web 카메라·탐지·보행 세션·위험 UI"]
+  B["P-D11-032 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. Home은 camera·GPS·navigation·voice·report hook을 조합한다"]
+  B --> T0
+  T1["2. 처리동의와 저장동의는 초기 false이며 저장 허용은 처리동의를 요구한다"]
+  T0 --> T1
+  T2["3. 카메라 generation을 결속해 fresh frame을 포착하고 stale callback을 거부한다"]
+  T1 --> T2
+  T3["4. 활성 detector mode만 결과를 게시한다"]
+  T2 --> T3
+  T4["5. background는 active→paused, foreground만으로는 재개하지 않는다"]
+  T3 --> T4
+  T5["6. user_resume은active, user_stop은stopped로 전이한다"]
+  T4 --> T5
+  Z["검사 또는 처리 결과를 반환하고 해당 호출 종료"]
+  T5 --> Z
+  C0{"처리동의 철회"}
+  R0["processing/storage 둘 다 false"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"카메라 재시작 전 generation의 frame"}
+  R1["유효 결과로 사용하지 않음"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"현재 HTTP 실행"}
+  R2["F-D11-031의410 때문에 내부 hook 시작 불가"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

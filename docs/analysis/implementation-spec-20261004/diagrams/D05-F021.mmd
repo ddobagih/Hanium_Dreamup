@@ -1,0 +1,12 @@
+flowchart TD
+  H["P-D05-021 · F-D05-021 모델 bundle 활성화·rollback 순수 계약"]
+  H --> P{"approval profile 존재"}
+  P -->|"현재 null"| N["NOT_CONFIGURED"]
+  P -->|"예"| W{"activewalk 아님"}
+  W -->|"아니오"| X["전환거부"]
+  W -->|"예"| A["exactapproval validation 검사"]
+  A -->|"실패"| X
+  A -->|"activation"| C["current previous 교체"]
+  A -->|"rollback"| R{"previous target DB data no-loss audit"}
+  R -->|"모두통과"| C
+  R -->|"실패"| X

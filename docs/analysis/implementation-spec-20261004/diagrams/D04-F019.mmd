@@ -1,0 +1,20 @@
+flowchart TD
+  A["F-D04-019 · P-D04-019<br/>HIGH 단일 hardware step 또는 raw fix"]
+  V{"scope·원시각·receipt·input 품질이 유효한가"}
+  BAD["REJECTED 진단 또는 관련 history reset"]
+  STORE["bounded steps와 pending fix에 저장"]
+  WATER{"newestStep가 fix 시각보다 큰가"}
+  WAIT["WAITING_FOR_STEP_WATERMARK<br/>fix를 pending에 유지; 아직 reject하지 않음"]
+  POP["fix dequeue; before와 after 검색"]
+  BR{"before≤fix<after가 있고 gap≤2초·confirm wait≤2초인가"}
+  NO["MISSING_STEP_BRACKET / STEP_BRACKET_GAP / FIX_CONFIRMATION_EXPIRED<br/>segment reset과 REJECTED; 다음 pending fix 처리"]
+  OK["ALIGNED_FIX → raw straight segment policy"]
+  A --> V
+  V -->|"아니오"| BAD
+  V -->|"예"| STORE
+  STORE --> WATER
+  WATER -->|"아니오"| WAIT
+  WATER -->|"예"| POP
+  POP --> BR
+  BR -->|"아니오"| NO
+  BR -->|"예"| OK

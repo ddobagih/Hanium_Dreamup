@@ -51,11 +51,11 @@ class RouteAlignmentTurnPassagePhaseTest {
                 val label = "degraded=$degraded facing=$facingAtVertex ${vertex.instruction}"
                 println("S08-18-F1 $label")
                 assertEquals(label, RouteAlignmentReason.TURN_PASSAGE_PENDING, vertex.routeAlignmentDiagnostic?.reason)
-                assertEquals(label, "안내 지점 부근입니다. 경로 기준으로 오른쪽으로 꺾으세요.", vertex.instruction)
+                assertEquals(label, "안내 지점 부근입니다. 경로 기준으로 3시 방향으로 꺾으세요.", vertex.instruction)
                 val text = vertex.instruction.orEmpty()
                 assertFalse(label, text.contains("다시 안내를 요청"))
-                assertFalse(label, text.contains("시 방향"))
-                assertFalse(label, text.contains("앞쪽이 경로 진행 방향"))
+                assertFalse(label, Regex("""약 (?:1[0-2]|[1-9])시(?: 방향|에서 (?:1[0-2]|[1-9])시 사이 방향)""").containsMatchIn(text))
+                assertFalse(label, text.contains("휴대전화 후면 카메라 기준"))
                 // A manual request while the hold only waits for passage repeats the same turn.
                 vertex.instruction?.let { navigator.reserveInstruction(vertex); navigator.acknowledgeInstruction(vertex, 2_000) }
                 val repeated = navigator.currentGuidance(2_100, RouteFacingObservation(facingAtVertex, 5.0, 2_100))
@@ -142,15 +142,15 @@ class RouteAlignmentTurnPassagePhaseTest {
                     assertNotEquals(label, 180, update.routeAlignmentDiagnostic?.bearingDegreesTrueNorth?.roundToInt())
                 }
                 if (east >= 20.0) {
-                    assertFalse(label, text.contains("앞쪽이 경로 진행 방향") && text.contains("꺾으세요"))
-                    assertFalse(label, text.contains("시 방향") && text.contains("꺾으세요"))
+                    assertFalse(label, text.contains("휴대전화 후면 카메라 기준") && text.contains("꺾으세요"))
+                    assertFalse(label, Regex("""약 (?:1[0-2]|[1-9])시(?: 방향|에서 (?:1[0-2]|[1-9])시 사이 방향)""").containsMatchIn(text) && text.contains("꺾으세요"))
                 }
                 assertFalse(label, text.contains("다시 안내를 요청"))
             }
             val vertex = updates[2]
             assertEquals(RouteAlignmentReason.TURN_PASSAGE_PENDING, vertex.routeAlignmentDiagnostic?.reason)
             assertTrue("${vertex.instruction}", vertex.instruction.orEmpty().startsWith("안내 지점 부근입니다. 경로 기준으로 "))
-            assertTrue("${vertex.instruction}", vertex.instruction.orEmpty().contains("오른쪽으로 꺾으세요"))
+            assertTrue("${vertex.instruction}", vertex.instruction.orEmpty().contains("3시 방향으로 꺾으세요"))
             // The walk ends past the guide and its margin: passage is confirmed and the next leg guides.
             assertEquals(RouteAlignmentReason.CURRENT_SEGMENT, updates.last().routeAlignmentDiagnostic?.reason)
             assertEquals(180, updates.last().routeAlignmentDiagnostic?.bearingDegreesTrueNorth?.roundToInt())
@@ -181,9 +181,9 @@ class RouteAlignmentTurnPassagePhaseTest {
         assertTrue("$before", before?.instruction?.contains("약 12시 방향") == true)
         assertEquals(0, before?.routeAlignmentDiagnostic?.segmentIndex)
         val vertex = step(20.0, 0.0, 2_000, 180.0)
-        assertFalse("$vertex", vertex.instruction?.contains("시 방향") == true)
+        assertFalse("$vertex", vertex.instruction?.let { Regex("""약 (?:1[0-2]|[1-9])시(?: 방향|에서 (?:1[0-2]|[1-9])시 사이 방향)""").containsMatchIn(it) } == true)
         assertEquals(RouteAlignmentReason.TURN_PASSAGE_PENDING, vertex.routeAlignmentDiagnostic?.reason)
-        assertEquals("안내 지점 부근입니다. 경로 기준으로 오른쪽으로 꺾으세요.", vertex.instruction)
+        assertEquals("안내 지점 부근입니다. 경로 기준으로 3시 방향으로 꺾으세요.", vertex.instruction)
         val passed = step(20.0, -6.0, 3_000, 180.0)
         assertEquals(RouteAlignmentReason.CURRENT_SEGMENT, passed.routeAlignmentDiagnostic?.reason)
         assertEquals(1, passed.routeAlignmentDiagnostic?.segmentIndex)
@@ -215,7 +215,7 @@ class RouteAlignmentTurnPassagePhaseTest {
                 update.routeAlignmentDiagnostic?.bearingDegreesTrueNorth?.roundToInt())
             // From the vertex on, the user facing the outgoing leg must not hear "ahead ... turn right".
             val text = update.instruction.orEmpty()
-            if (index >= 1) assertFalse("fix $index: '$text'", text.contains("앞쪽이 경로 진행 방향") && text.contains("꺾으세요"))
+            if (index >= 1) assertFalse("fix $index: '$text'", text.contains("휴대전화 후면 카메라 기준") && text.contains("꺾으세요"))
         }
         assertEquals(RouteAlignmentReason.TURN_PASSAGE_PENDING, updates[1].routeAlignmentDiagnostic?.reason)
         // After passage the outgoing leg is used.

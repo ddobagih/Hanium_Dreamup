@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D11-001 현행 계층별 테스트 선택·격리·결과 집계"]
+  B["P-D11-001 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. ambient pytest 설정과 plugin 자동 로딩을 차단한다"]
+  B --> T0
+  T1["2. 모든 backend/tests·tests·model test_*.py가 정확히 한 계층에 포함되는지 검사한다"]
+  T0 --> T1
+  T2["3. 선택된 계층을 순서대로 실행하며 첫 비정상 종료에서 멈춘다"]
+  T1 --> T2
+  T3["4. scope.tsv·started·exit·JUnit 결과를 기록한다"]
+  T2 --> T3
+  T4["5. EXIT trap으로 summary.json과 summary.md를 만들고 임시 Node HOME을 정리한다"]
+  T3 --> T4
+  Z["검사 또는 처리 결과를 반환하고 해당 호출 종료"]
+  T4 --> Z
+  C0{"중복·누락·존재하지 않는 시험 파일"}
+  R0["exit 2; 계층 실행 차단"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"all 선택"}
+  R1["model-audit·active-session-control·historical-control은 EXCLUDED"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"선택됐으나 앞 단계 실패로 시작하지 못함"}
+  R2["NOT_RUN; PASS 아님"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

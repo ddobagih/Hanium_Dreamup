@@ -64,21 +64,53 @@ internal class FrozenReportPayload private constructor(
     metadataUtf8: ByteArray,
     imageJpeg: ByteArray,
     val payloadSha256: String,
-) {
+) : java.io.Closeable {
+    private val ownerLock = Any()
+    private var closed = false
     private val frozenMetadata = metadataUtf8.copyOf()
     private val frozenImage = imageJpeg.copyOf()
 
     val payloadBytes: Long = frozenMetadata.size.toLong() + frozenImage.size.toLong()
 
-    fun metadataUtf8(): ByteArray = frozenMetadata.copyOf()
+    fun metadataUtf8(): ByteArray = synchronized(ownerLock) {
+        check(!closed) { "report payload is closed" }
+        frozenMetadata.copyOf()
+    }
 
-    fun imageJpeg(): ByteArray = frozenImage.copyOf()
+    fun imageJpeg(): ByteArray = synchronized(ownerLock) {
+        check(!closed) { "report payload is closed" }
+        frozenImage.copyOf()
+    }
 
-    internal fun contentEquals(other: FrozenReportPayload): Boolean =
-        reportId == other.reportId &&
-            payloadSha256 == other.payloadSha256 &&
-            frozenMetadata.contentEquals(other.frozenMetadata) &&
-            frozenImage.contentEquals(other.frozenImage)
+    /** Copies returned by this scope are zeroed even when parsing/transport fails. */
+    fun <T> useExactBytes(action: (ByteArray, ByteArray) -> T): T {
+        val bytes = synchronized(ownerLock) {
+            check(!closed) { "report payload is closed" }
+            frozenMetadata.copyOf() to frozenImage.copyOf()
+        }
+        return try { action(bytes.first, bytes.second) }
+        finally { bytes.first.fill(0); bytes.second.fill(0) }
+    }
+
+    override fun close() = synchronized(ownerLock) {
+        if (!closed) {
+            frozenMetadata.fill(0)
+            frozenImage.fill(0)
+            closed = true
+        }
+    }
+
+    internal fun contentEquals(other: FrozenReportPayload): Boolean {
+        if (reportId != other.reportId || payloadSha256 != other.payloadSha256) return false
+        // Never acquire two owner locks together (opposite comparisons may run concurrently).
+        return runCatching {
+            useExactBytes { metadata, image ->
+                other.useExactBytes { otherMetadata, otherImage ->
+                    metadata.contentEquals(otherMetadata) && image.contentEquals(otherImage)
+                }
+            }
+        }.getOrDefault(false)
+    }
 
     companion object {
         fun freeze(
@@ -86,16 +118,12 @@ internal class FrozenReportPayload private constructor(
             metadataUtf8: ByteArray,
             imageJpeg: ByteArray,
         ): FrozenReportPayload? {
-            if (
-                !isCanonicalReportUuid(reportId) ||
-                metadataUtf8.isEmpty() ||
-                !isStrictUtf8(metadataUtf8) ||
-                !isJpeg(imageJpeg)
-            ) {
-                return null
-            }
-            val digest = reportPayloadSha256(reportId, metadataUtf8, imageJpeg)
-            return FrozenReportPayload(reportId, metadataUtf8, imageJpeg, digest)
+            val metadata = metadataUtf8.copyOf()
+            val image = imageJpeg.copyOf()
+            return try {
+                if (!isCanonicalReportUuid(reportId) || metadata.isEmpty() || !isStrictUtf8(metadata) || !isJpeg(image)) null
+                else FrozenReportPayload(reportId, metadata, image, reportPayloadSha256(reportId, metadata, image))
+            } finally { metadata.fill(0); image.fill(0) }
         }
     }
 }
@@ -111,7 +139,11 @@ internal data class QueuedReport(
     val accountGeneration: Long? = null,
     val quarantined: Boolean = false,
     val retryNotBeforeEpochMs: Long = 0L,
-)
+    val retryAttempts: Int = 0,
+) : java.io.Closeable {
+    // data-class copy shares this owner; it does not acquire an independent plaintext copy.
+    override fun close() = payload.close()
+}
 
 internal fun reportActorIdFromMetadataOrNull(metadataUtf8: ByteArray): String? = runCatching {
     val root = JSONObject(String(metadataUtf8, Charsets.UTF_8))

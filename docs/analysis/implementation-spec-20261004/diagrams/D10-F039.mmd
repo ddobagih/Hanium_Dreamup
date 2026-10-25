@@ -1,0 +1,26 @@
+flowchart TD
+  A["F-D10-039 과거 학습 shell runner·resume·2단계 fine-tune"]
+  N0["1. 20260627 runner는 yolo detect train 직접 구성: cacheFalse,ampTrue,cos_lrTrue,close_mosaic10,patience30,save_period-1,plotsTrue,exist_okFalse. --print-only 전에 TMPDIR mk"]
+  A --> N0
+  N1["2. 20260601 runner는 model/train_yolo.py wrapper를 사용하고 추가 CLI 인자를 전달하므로 현재 manifest/gate 인자를 별도 제공해야 실제 진행."]
+  N0 --> N1
+  N2["3. tactile3 runner는 base960/epochs200/MuSGD→test val→base best로1280/epochs80/no mosaic fine-tune→test val 순차 수행."]
+  N1 --> N2
+  N3["4. reviewed runner는 data/PT 존재와 run dir 미존재 검사; resume runner는 last.pt 존재 확인 후 resume=True/workers4로 시작하고 동일후속평가/finetune 수행. set -euo pipefail로 실패시 중단."]
+  N2 --> N3
+  B0{"20260627·3cls 직접 yolo runner"}
+  R0["F-D10-019 승인 gate wrapper를 호출하지 않음"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"--print-only (20260627)"}
+  R1["학습은 안 하지만 TMPDIR 생성 가능"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"resume"}
+  R2["checkpoint 기반 재개이며 모든 runner에 공통 자동 retry가 있는 것은 아님"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-018 · P-D10-030"]
+  P -. "코드 분기 기준" .-> A

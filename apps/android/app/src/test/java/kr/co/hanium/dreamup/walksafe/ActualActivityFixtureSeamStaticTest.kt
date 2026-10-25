@@ -24,7 +24,15 @@ class ActualActivityFixtureSeamStaticTest {
         assertTrue(fixture.contains("activity.navigationFixtureObservation()"))
         assertTrue("start is pressed through the visible button", fixture.contains("clickVisibleButton(activity, START_GUIDANCE_LABEL)"))
         assertTrue(fixture.contains("const val START_GUIDANCE_LABEL = \"안내 시작\""))
-        assertTrue(activity.contains("label = \"안내 시작\",\n            emphasis = true,\n            onClick = ::startNativeDestinationGuidance,"))
+        val composition = MainActivityRefactorSource.member(activity, "buildContentView")
+        assertTrue(composition.contains("val destinationPanel = DestinationGuidancePanel("))
+        assertTrue(composition.contains("onStart = ::startNativeDestinationGuidance,"))
+        assertTrue(composition.contains("destinationSearchPresenter.bindPanel(destinationPanel)"))
+        val panel = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/DestinationGuidancePanel.kt").readText()
+        val button = MainActivityRefactorSource.property(panel, "nativeDestinationStartButton")
+        assertTrue(button.contains("label = \"안내 시작\""))
+        assertTrue(button.contains("emphasis = true"))
+        assertTrue(button.contains("onClick = actions.onStart"))
     }
 
     @Test

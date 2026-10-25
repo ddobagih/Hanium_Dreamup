@@ -1,0 +1,13 @@
+flowchart TD
+ A["F-D08-009 로그인 예산 P-D08-006"] --> B["신뢰 IP 및 secure directory 확인, 만료 로그 정리"]
+ B --> C{"신규 IP file capacity 256에 도달"}
+ C -->|"예"| X["503 capacity Retry After60"]
+ C -->|"아니오"| D["IP와 global 실패 blockedUntil 읽기"]
+ D --> E{"max blockedUntil 이 현재보다 큼"}
+ E -->|"예"| F["429 더 늦은 시각 적용, 동률 global code"]
+ E -->|"아니오"| G{"total240 per5min 소진"}
+ G -->|"예"| H["429 total request limited"]
+ G -->|"아니오"| I["전체 attempt 기록 후 인증"]
+ I --> J{"확인된 invalid credentials"}
+ J -->|"예"| K["IP와 global failure 기록"]
+ J -->|"아니오"| L["실패예산 변경 없음, 성공도 기존실패 초기화 안 함"]

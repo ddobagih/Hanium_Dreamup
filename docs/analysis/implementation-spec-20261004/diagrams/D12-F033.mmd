@@ -1,0 +1,27 @@
+flowchart TD
+  A["F-D12-033 외부 사본 삭제 요청·기관 회신 사실 기록"]
+  P["P-D12-033 외부 회신 사실과 멱등 재시도"]
+  A --> P
+  M0["1. 선택 사본의 상태/revision과 입력 명령을 결속한다."]
+  P --> M0
+  M1["2. NOT_REQUESTED→REQUEST_SENT→REPLY_ACKNOWLEDGED/REPLY_DELETION_CONFIRMED/REPLY_DECLINED를 허용한다."]
+  M0 --> M1
+  M2["3. ACKNOWLEDGED→DELETION_CONFIRMED/DECLINED 및 DECLINED→REQUEST_SENT를 허용한다."]
+  M1 --> M2
+  M3["4. device proof로 POST /admin/report-deletions/{request}/external-copies/{copy}/events에 사실을 추가한다."]
+  M2 --> M3
+  M4["5. 결과 미확정이면 동일 명령과 event ID만 명시적으로 재시도한다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 외부 기관 회신 사실 한 건 추가 및 최신 사본 표시."]
+  M0 -. "관련 조건 확인" .-> B0{"회신인데 참조와 digest 둘 다 없음"}
+  B0 -->|"조건 해당"| R0["전송 차단"]
+  M1 -. "관련 조건 확인" .-> B1{"삭제확인인데 digest 없음"}
+  B1 -->|"조건 해당"| R1["전송 차단"]
+  M2 -. "관련 조건 확인" .-> B2{"REPLY_DELETION_CONFIRMED 이후"}
+  B2 -->|"조건 해당"| R2["추가 전이 없음"]
+  M3 -. "관련 조건 확인" .-> B3{"409 또는 최신 revision 변화"}
+  B3 -->|"조건 해당"| R3["현재 상태 재조회 후 새 판단"]
+  M4 -. "관련 조건 확인" .-> B4{"세션/generation 변경"}
+  B4 -->|"조건 해당"| R4["미확정 재시도 명령 폐기"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["RECORD_RETRY에 한해 동일 명령 재전송; conflict는 최신 상태 조회."]

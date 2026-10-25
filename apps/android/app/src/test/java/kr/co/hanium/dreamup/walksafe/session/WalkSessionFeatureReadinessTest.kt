@@ -78,6 +78,19 @@ class WalkSessionFeatureReadinessTest {
     }
 
     @Test
+    fun actualInitialModelPreparationIsPendingButFailureAndDisabledCameraRemainUnavailable() {
+        assertEquals(WalkSessionReadinessStatus.PENDING to "model_preparing",
+            WalkSessionFeatureReadiness.model(true, false, null, preparing = true))
+        assertEquals(WalkSessionReadinessStatus.UNAVAILABLE to "model_unavailable:verification_failed",
+            WalkSessionFeatureReadiness.model(true, false, "verification_failed", preparing = true))
+        assertEquals(WalkSessionReadinessStatus.UNAVAILABLE to "model_unavailable:camera_guidance_disabled",
+            WalkSessionFeatureReadiness.model(false, false, null, preparing = true))
+        assertEquals(WalkSessionReadinessStatus.UNAVAILABLE to "model_unavailable:not_loaded",
+            WalkSessionFeatureReadiness.model(true, false, null))
+        assertEquals(ready, WalkSessionFeatureReadiness.model(true, true, null, preparing = true))
+    }
+
+    @Test
     fun disabledCameraBlocksBothApprovedModesWhileDistanceAloneOnlyLimits() {
         val epoch = WalkRuntimeEpoch("walk-1", 0)
         listOf(WalkSessionMode.FULL, WalkSessionMode.DISTANCE_LIMITED).forEach { mode ->

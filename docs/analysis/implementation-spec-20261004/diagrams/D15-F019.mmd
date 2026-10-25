@@ -1,0 +1,24 @@
+flowchart TB
+  E["F-D15-019 · 사용자 내용 정정<br/>P-D15-019"]
+  E --> LOCK["active owner 확인·Report FOR UPDATE<br/>user_description 또는 category_hint patch intent 계산"]
+  LOCK --> EXIST{"같은 idempotency_key revision이 있는가"}
+  EXIST -->|"예"| EQ{"intent가 정확히 같은가"}
+  EQ -->|"예"| REPLAY["기존 content state 즉시 반환<br/>CAS·append 수행하지 않음"]
+  EQ -->|"아니오"| IC["409 idempotency conflict 반환"]
+  EXIST -->|"아니오"| CUR["current content 읽기<br/>revision0 기본값 또는 정확 revision 행"]
+  CUR --> FOUND{"현재 revision evidence가 유효한가"}
+  FOUND -->|"아니오"| MISSING["503 content evidence 오류 반환"]
+  FOUND -->|"예"| CAS{"expected_revision 일치"}
+  CAS -->|"아니오"| RC["409 revision conflict 반환"]
+  CAS -->|"예"| PATCH["누락 필드는 유지·null은 삭제"]
+  PATCH --> CHANGE{"내용이 실제로 바뀌는가"}
+  CHANGE -->|"아니오"| NOCHANGE["422 no_change 반환"]
+  CHANGE -->|"예"| SAVE["ReportContentRevision append<br/>Report.content_revision 증가·commit"]
+  SAVE -->|"성공"| OK["새 content state 반환"]
+  SAVE -->|"IntegrityError"| RC
+  SAVE -->|"기타 DB 오류"| ERR["rollback·503 반환"]
+  LOCK -->|"소유 신고 없음"| NF["404 반환"]
+  NOTE["사진·GPS·detection 원본 변경 없음<br/>자동 재시도·취소 endpoint 없음<br/>응답 유실은 같은 key의 정확 intent로 조회·재전송"]
+  E -.-> NOTE
+  SRC["근거 · report_content_corrections.py:176 apply_owned_report_correction"]
+  E -.-> SRC

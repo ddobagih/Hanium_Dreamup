@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-018<br/>unknown 지원 근접 region의 중복·시간 연속성<br/>상태 ACTIVE"]
+    P0["actual inlier cell을 원본 foreground region으로 복원"]
+    A --> D
+    P1["동일 capture 중복을 all pair로 제거"]
+    P0 --> P1
+    P2["독립 depth와 reused depth를 다르게 추적"]
+    P1 --> P2
+    P3["3회 700ms 이후 warning 또는 retained lease 반환"]
+    P2 --> P3
+    D{"P-D07-018<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["하나의 region/count/candidate"]
+    D -->|"겹친 decoded mask가 같은 depth support"| B0
+    B1["원본 lease/count 유지; 새 output 발급 안함"]
+    D -->|"같은 depth Image 재사용"| B1
+    B2["새 region 안정화 시작"]
+    D -->|"region gap/IoU/depth 불연속"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

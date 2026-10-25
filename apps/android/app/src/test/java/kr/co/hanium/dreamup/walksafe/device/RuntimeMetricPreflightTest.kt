@@ -389,7 +389,8 @@ class RuntimeMetricPreflightTest {
         generation = generation,
         startedAtElapsedRealtimeMs = START_MS,
         depthSupport = RuntimeMetricDepthSupport.SUPPORTED,
-        profile = RuntimeMetricPreflightPolicy.testCandidateProfile,
+        // Keep the historical window algorithm covered independently of the active candidate.
+        profile = historicalWindowProfile,
     )
 
     private fun frame(
@@ -408,5 +409,15 @@ class RuntimeMetricPreflightTest {
     private companion object {
         const val START_MS = 5_000L
         const val FIRST_FRAME_NS = 1_000_000_000L
+        val historicalWindowProfile = RuntimeMetricPreflightProfile(
+            profileId = "runtime-metric-historical-window-test",
+            maximumDurationMs = 10_000L,
+            minimumDistinctFrames = 10,
+            minimumObservationSpanMs = 1_000L,
+            minimumValidSamplesPerPassingFrame = 30,
+            minimumPassingPercent = 80,
+            minimumValidDistanceMeters = 0.2,
+            maximumValidDistanceMeters = 8.0,
+        )
     }
 }

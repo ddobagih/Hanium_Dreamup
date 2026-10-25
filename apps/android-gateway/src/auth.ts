@@ -1,76 +1,84 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, createHash, createHmac, randomBytes } from "node:crypto";
 import {
-  chmodSync,
-  closeSync,
-  constants as fsConstants,
-  fstatSync,
-  fsyncSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  realpathSync,
-  renameSync,
-  rmSync,
-  unlinkSync,
-  writeFileSync
-} from "node:fs";
-import { lstat, mkdir, open, readdir, realpath, rename, rm } from "node:fs/promises";
-import { isIP } from "node:net";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
-import {
-  FieldLongSessionStorageUnavailableError,
-  backendFieldLongSessionAuthenticatedAtEpochMs,
-  fieldLongSessionStorageOutcomeUnknownResponse,
+  fieldSessionReuseRevokedAtEpochMs,
+  fieldLongSessionIdentity,
   backendFieldLongSessionIdentity,
   fieldLongSessionAuthenticatedAtEpochMs,
-  fieldLongSessionIdentity,
-  fieldSessionReuseRevokedAtEpochMs,
+  backendFieldLongSessionAuthenticatedAtEpochMs,
+  fieldLongSessionStorageOutcomeUnknownResponse,
   revokeAllFieldLongSessions
 } from "./field-long-session.js";
+import { isIP } from "node:net";
 import {
+  withExclusiveFileLockAsync,
   ExclusiveFileLockBusyError,
-  withExclusiveFileLock,
-  withExclusiveFileLockAsync
+  withExclusiveFileLock
 } from "./exclusive-file-lock.js";
+import path from "node:path";
+import { mkdir, lstat, realpath, readdir, rm, open, rename } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { GatewayStorageOutcomeUnknownError } from "./encrypted-json-store.js";
 import {
-  decryptGatewayStateJson,
-  encryptGatewayStateJson,
-  GatewayStorageOutcomeUnknownError,
-  maxGatewayStateEnvelopeBytes
-} from "./encrypted-json-store.js";
+  ACTOR_ID,
+  type GatewaySessionScope,
+  type BackendAccountSessionBinding,
+  type LegacyGatewaySessionIdentity,
+  validGatewaySessionScope,
+  SESSION_MAX_AGE_SECONDS,
+  type BackendGatewaySessionIdentity,
+  type BackendDeviceGatewaySessionIdentity,
+  DEVICE_ID,
+  type GatewaySessionIdentity,
+  GatewaySessionRollbackError,
+  GatewaySessionDeviceCapacityError
+} from "./short-session-codec.js";
+import {
+  readActiveSession,
+  isBackendDeviceSessionLedger,
+  isBackendSessionWatermark,
+  isBackendSessionIdentity,
+  loginAttemptDirectory,
+  ownedByCurrentProcess,
+  writeActiveSession,
+  sessionStatePath,
+  writeSessionState,
+  backendSessionStateWithSlots,
+  backendSessionWatermarkState,
+  clearActiveSession,
+  durableUnlinkSync
+} from "./short-session-store.js";
 
 const FIELD_COOKIE = "walksafe_field_session";
-const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60;
+
 const MIN_TOKEN_LENGTH = 24;
+
 const LOGIN_ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
+
 const LOGIN_BLOCK_MS = 15 * 60 * 1000;
+
 const LOGIN_CLIENT_ATTEMPT_LIMIT = 5;
+
 const LOGIN_GLOBAL_ATTEMPT_LIMIT = 120;
+
 const LOGIN_TOTAL_ATTEMPT_LIMIT = 240;
+
 const LOGIN_CLIENT_FILE_LIMIT = 256;
+
 const LOGIN_LOCK_WAIT_MS = 1000;
+
 const LOGIN_ATTEMPT_RETENTION_MS = LOGIN_ATTEMPT_WINDOW_MS + LOGIN_BLOCK_MS;
+
 const LOGIN_CLIENT_ATTEMPT_FILE = /^field-[0-9a-f]{64}\.log$/;
+
 const LOGIN_GLOBAL_ATTEMPT_FILE = "global-attempts.log";
+
 const LOGIN_GLOBAL_FAILURE_FILE = "global-failures.log";
-const ACTOR_ID = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$/;
-const DEVICE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
 const RESERVED_ACTOR_IDS = new Set(["unknown", "system", "anonymous"]);
+
 const gatewayLoginLocks = new Map<string, Promise<void>>();
-export const SHORT_SESSION_MAX_PLAINTEXT_BYTES = 16 * 1024;
-export const SHORT_DEVICE_SESSION_LIMIT = 32;
 
 type GatewayAccount = { actorId: string; token: string };
-
-export type BackendAccountSessionBinding = Readonly<{
-  actorId: string;
-  accountGeneration: number;
-  authEpoch: number;
-  deviceId?: string | null;
-}>;
 
 function configuredToken(): string {
   return process.env.WALKSAFE_FIELD_TEST_TOKEN?.trim() ?? "";
@@ -146,71 +154,6 @@ function dedicatedSessionSecret(): string | null {
   return secret.length >= 32 && secret !== serviceToken ? secret : null;
 }
 
-export type GatewaySessionScope = "general" | "account_deletion_recovery";
-
-type LegacyGatewaySessionIdentity = {
-  actorId: string;
-  sessionId: string;
-  expiresAtSeconds: number;
-  sessionScope: GatewaySessionScope;
-};
-
-type BackendGatewaySessionIdentity = LegacyGatewaySessionIdentity & {
-  sessionKind: "backend_account";
-  accountGeneration: number;
-  authEpoch: number;
-};
-
-type BackendDeviceGatewaySessionIdentity = LegacyGatewaySessionIdentity & {
-  sessionKind: "backend_account_device";
-  accountGeneration: number;
-  authEpoch: number;
-  deviceId: string;
-};
-
-type GatewaySessionIdentity =
-  | LegacyGatewaySessionIdentity
-  | BackendGatewaySessionIdentity
-  | BackendDeviceGatewaySessionIdentity;
-
-// The exact three-key shape adds one v6 slot without a second file or lock.
-// Existing singleton, device-ledger and watermark shapes remain readable.
-// Older readers reject the combined shape; mixed-version writers and rollback
-// deployment are not supported by this internal format extension.
-// The existing device cap counts v7 entries; the v6 slot remains singular.
-type BackendDeviceGatewaySessionLedger = {
-  actorId: string;
-  sessions: BackendDeviceGatewaySessionIdentity[];
-  compatibilitySession?: BackendGatewaySessionIdentity;
-};
-
-type BackendGatewaySessionWatermark = {
-  actorId: string;
-  accountGeneration: number;
-  authEpoch: number;
-};
-
-type GatewaySessionState =
-  | GatewaySessionIdentity
-  | BackendDeviceGatewaySessionLedger
-  | BackendGatewaySessionWatermark;
-
-class GatewaySessionDeviceCapacityError extends Error {
-  constructor() {
-    super("gateway short-session device capacity is unavailable");
-  }
-}
-
-class GatewaySessionRollbackError extends Error {
-  constructor() {
-    super("gateway account session generation or authentication epoch would roll back");
-  }
-}
-
-function validGatewaySessionScope(value: unknown): value is GatewaySessionScope {
-  return value === "general" || value === "account_deletion_recovery";
-}
-
 function sessionValue(
   account: GatewayAccount,
   expiresAtSeconds: number,
@@ -268,479 +211,6 @@ function backendAccountSessionValue(
     .update(`walksafe-backend-account-session-v1:${unsigned}`)
     .digest("base64url");
   return `${unsigned}.${signature}`;
-}
-
-function secureDirectorySync(directory: string, context: string): string {
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const metadata = lstatSync(directory);
-  const resolved = realpathSync(directory);
-  if (!metadata.isDirectory() || metadata.isSymbolicLink() || resolved !== directory) {
-    throw new Error(`${context} must be a real directory without symlinks`);
-  }
-  if (!ownedByCurrentProcess(metadata.uid) || (metadata.mode & 0o077) !== 0) {
-    throw new Error(`${context} must be owned by this process and mode 0700`);
-  }
-  return directory;
-}
-
-function sessionStateDirectory(): string {
-  const parent = secureDirectorySync(loginAttemptDirectory(), "gateway state directory");
-  return secureDirectorySync(path.join(parent, "sessions"), "gateway session directory");
-}
-
-function sessionStatePath(actorId: string): string {
-  const digest = createHash("sha256").update(`field\0${actorId}`).digest("hex");
-  return path.join(sessionStateDirectory(), `field-${digest}.json`);
-}
-
-function durableUnlinkSync(target: string): void {
-  try {
-    unlinkSync(target);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-    throw error;
-  }
-  let directoryDescriptor: number | null = null;
-  try {
-    directoryDescriptor = openSync(
-      path.dirname(target),
-      fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
-    );
-    fsyncSync(directoryDescriptor);
-  } finally {
-    if (directoryDescriptor !== null) closeSync(directoryDescriptor);
-  }
-}
-
-function isBackendDeviceSessionLedger(
-  state: GatewaySessionState
-): state is BackendDeviceGatewaySessionLedger {
-  return "sessions" in state;
-}
-
-function isBackendSessionWatermark(
-  state: GatewaySessionState
-): state is BackendGatewaySessionWatermark {
-  return "accountGeneration" in state && !("sessionKind" in state);
-}
-
-function isBackendSessionIdentity(
-  state: GatewaySessionState
-): state is BackendGatewaySessionIdentity | BackendDeviceGatewaySessionIdentity {
-  return "sessionKind" in state && (
-    state.sessionKind === "backend_account" ||
-    state.sessionKind === "backend_account_device"
-  );
-}
-
-function readActiveSession(actorId: string): GatewaySessionState | null {
-  let descriptor: number | null = null;
-  try {
-    const filePath = sessionStatePath(actorId);
-    descriptor = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
-    const metadata = fstatSync(descriptor);
-    if (
-      !metadata.isFile() ||
-      metadata.nlink !== 1 ||
-      !ownedByCurrentProcess(metadata.uid) ||
-      (metadata.mode & 0o777) !== 0o600 ||
-      metadata.size > maxGatewayStateEnvelopeBytes(SHORT_SESSION_MAX_PLAINTEXT_BYTES)
-    ) {
-      throw new Error("gateway session state must be an owned regular file with mode 0600");
-    }
-    const recordId = path.basename(filePath);
-    const decoded = decryptGatewayStateJson(
-      { kind: "short-session", recordId },
-      readFileSync(descriptor, "utf8"),
-      SHORT_SESSION_MAX_PLAINTEXT_BYTES
-    ).value;
-    if (!validShortSessionStateForMaintenance(decoded, recordId)) return null;
-    // Known v3 records may survive a rollout so startup can proceed, but they
-    // remain deliberately unauthenticated until a new scope-bound login replaces them.
-    const state = decoded as GatewaySessionState;
-    if (isBackendDeviceSessionLedger(state) || isBackendSessionWatermark(state)) {
-      return state;
-    }
-    if (!validGatewaySessionScope(state.sessionScope)) return null;
-    return state;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    // Unreadable, undecryptable, or insecure state is a storage fault, not an
-    // invalid credential; callers map this to the retryable 503 response.
-    throw new FieldLongSessionStorageUnavailableError();
-  } finally {
-    if (descriptor !== null) closeSync(descriptor);
-  }
-}
-
-export function validShortSessionStateForMaintenance(
-  value: unknown,
-  recordId: string
-): boolean {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const state = value as Record<string, unknown>;
-  const keys = Object.keys(value).sort().join("\0");
-  const legacyKeys = ["actorId", "expiresAtSeconds", "sessionId"].sort().join("\0");
-  const scopedKeys = ["actorId", "expiresAtSeconds", "sessionId", "sessionScope"]
-    .sort()
-    .join("\0");
-  const backendKeys = [
-    "accountGeneration",
-    "actorId",
-    "authEpoch",
-    "expiresAtSeconds",
-    "sessionId",
-    "sessionKind",
-    "sessionScope"
-  ].sort().join("\0");
-  const backendDeviceKeys = [...backendKeys.split("\0"), "deviceId"]
-    .sort().join("\0");
-  const watermarkKeys = ["actorId", "accountGeneration", "authEpoch"]
-    .sort().join("\0");
-  if (keys === watermarkKeys) {
-    if (
-      typeof state.actorId !== "string" ||
-      !ACTOR_ID.test(state.actorId) ||
-      !Number.isSafeInteger(state.accountGeneration) ||
-      Number(state.accountGeneration) < 1 ||
-      !Number.isSafeInteger(state.authEpoch) ||
-      Number(state.authEpoch) < 1
-    ) return false;
-    const digest = createHash("sha256")
-      .update(`field\0${state.actorId}`)
-      .digest("hex");
-    return recordId === `field-${digest}.json`;
-  }
-  const ledgerKeys = ["actorId", "sessions"].sort().join("\0");
-  const coexistenceKeys = ["actorId", "sessions", "compatibilitySession"]
-    .sort().join("\0");
-  if (keys === ledgerKeys || keys === coexistenceKeys) {
-    if (
-      typeof state.actorId !== "string" ||
-      !ACTOR_ID.test(state.actorId) ||
-      !Array.isArray(state.sessions) ||
-      state.sessions.length === 0 ||
-      state.sessions.length > SHORT_DEVICE_SESSION_LIMIT
-    ) return false;
-    const devices = new Set<string>();
-    const sessionIds = new Set<string>();
-    let accountGeneration: number | null = null;
-    let authEpoch: number | null = null;
-    for (const session of state.sessions) {
-      if (
-        typeof session !== "object" ||
-        session === null ||
-        Array.isArray(session)
-      ) return false;
-      const entry = session as Record<string, unknown>;
-      if (
-        Object.keys(entry).sort().join("\0") !== backendDeviceKeys ||
-        entry.actorId !== state.actorId ||
-        entry.sessionKind !== "backend_account_device" ||
-        !Number.isSafeInteger(entry.accountGeneration) ||
-        Number(entry.accountGeneration) < 1 ||
-        !Number.isSafeInteger(entry.authEpoch) ||
-        Number(entry.authEpoch) < 1 ||
-        typeof entry.deviceId !== "string" ||
-        !DEVICE_ID.test(entry.deviceId) ||
-        typeof entry.sessionId !== "string" ||
-        !/^[A-Za-z0-9_-]{32,128}$/.test(entry.sessionId) ||
-        entry.sessionScope !== "general" ||
-        !Number.isSafeInteger(entry.expiresAtSeconds) ||
-        Number(entry.expiresAtSeconds) <= 0 ||
-        devices.has(entry.deviceId) ||
-        sessionIds.has(entry.sessionId)
-      ) return false;
-      accountGeneration ??= Number(entry.accountGeneration);
-      authEpoch ??= Number(entry.authEpoch);
-      if (
-        entry.accountGeneration !== accountGeneration ||
-        entry.authEpoch !== authEpoch
-      ) return false;
-      devices.add(entry.deviceId);
-      sessionIds.add(entry.sessionId);
-    }
-    if (keys === coexistenceKeys) {
-      const compatibility = state.compatibilitySession;
-      if (
-        typeof compatibility !== "object" ||
-        compatibility === null ||
-        Array.isArray(compatibility)
-      ) return false;
-      const entry = compatibility as Record<string, unknown>;
-      if (
-        Object.keys(entry).sort().join("\0") !== backendKeys ||
-        entry.sessionKind !== "backend_account" ||
-        entry.actorId !== state.actorId ||
-        entry.accountGeneration !== accountGeneration ||
-        entry.authEpoch !== authEpoch ||
-        typeof entry.sessionId !== "string" ||
-        sessionIds.has(entry.sessionId) ||
-        !validShortSessionStateForMaintenance(entry, recordId)
-      ) return false;
-    }
-    const digest = createHash("sha256")
-      .update(`field\0${state.actorId}`)
-      .digest("hex");
-    return recordId === `field-${digest}.json`;
-  }
-  const legacyV3State = keys === legacyKeys;
-  const backendAccountState = keys === backendKeys;
-  const backendDeviceState = keys === backendDeviceKeys;
-  if (
-    (!legacyV3State && keys !== scopedKeys && !backendAccountState && !backendDeviceState) ||
-    typeof state.actorId !== "string" ||
-    !ACTOR_ID.test(state.actorId) ||
-    typeof state.sessionId !== "string" ||
-    !/^[A-Za-z0-9_-]{32,128}$/.test(state.sessionId) ||
-    (!legacyV3State && !validGatewaySessionScope(state.sessionScope)) ||
-    !Number.isSafeInteger(state.expiresAtSeconds) ||
-    Number(state.expiresAtSeconds) <= 0
-  ) {
-    return false;
-  }
-  if ((backendAccountState || backendDeviceState) && (
-    state.sessionKind !== (backendDeviceState
-      ? "backend_account_device"
-      : "backend_account") ||
-    !Number.isSafeInteger(state.accountGeneration) ||
-    Number(state.accountGeneration) < 1 ||
-    !Number.isSafeInteger(state.authEpoch) ||
-    Number(state.authEpoch) < 1
-  )) return false;
-  if (backendDeviceState && (
-    typeof state.deviceId !== "string" ||
-    !DEVICE_ID.test(state.deviceId) ||
-    state.sessionScope !== "general"
-  )) return false;
-  const digest = createHash("sha256")
-    .update(`field\0${state.actorId}`)
-    .digest("hex");
-  return recordId === `field-${digest}.json`;
-}
-
-function writeSessionState(target: string, state: GatewaySessionState): void {
-  const temporary = `${target}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
-  let descriptor: number | null = null;
-  let directoryDescriptor: number | null = null;
-  try {
-    const encoded = encryptGatewayStateJson(
-      { kind: "short-session", recordId: path.basename(target) },
-      state,
-      SHORT_SESSION_MAX_PLAINTEXT_BYTES
-    );
-    descriptor = openSync(
-      temporary,
-      fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW,
-      0o600
-    );
-    writeFileSync(descriptor, encoded, "utf8");
-    fsyncSync(descriptor);
-    closeSync(descriptor);
-    descriptor = null;
-    chmodSync(temporary, 0o600);
-    renameSync(temporary, target);
-    // S19-27: after the rename the new session state may be durable; a later failure is
-    // reported as outcome unknown, never as the not-committed storage error.
-    try {
-      injectShortSessionStorageFault("directory_fsync");
-      directoryDescriptor = openSync(
-        path.dirname(target),
-        fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
-      );
-      fsyncSync(directoryDescriptor);
-    } catch (error) {
-      throw new GatewayStorageOutcomeUnknownError("short-session", { cause: error });
-    }
-  } finally {
-    if (descriptor !== null) closeSync(descriptor);
-    if (directoryDescriptor !== null) closeSync(directoryDescriptor);
-    rmSync(temporary, { force: true });
-  }
-}
-
-let shortSessionStorageFaultForTests: "directory_fsync" | null = null;
-
-/** Tests only (S19-27): injects a failure right after the short-session rename. */
-export function setShortSessionStorageFaultForTests(stage: "directory_fsync" | null): void {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("short-session storage faults are unavailable in production");
-  }
-  shortSessionStorageFaultForTests = stage;
-}
-
-function injectShortSessionStorageFault(stage: "directory_fsync"): void {
-  if (shortSessionStorageFaultForTests === stage) {
-    throw new Error(`injected short-session ${stage} failure`);
-  }
-}
-
-function currentBackendDeviceSessions(
-  state: GatewaySessionState | null,
-  identity: BackendAccountSessionBinding,
-  nowSeconds: number
-): BackendDeviceGatewaySessionIdentity[] {
-  const sessions = state && isBackendDeviceSessionLedger(state)
-    ? state.sessions
-    : state && isBackendSessionIdentity(state) &&
-      state.sessionKind === "backend_account_device"
-      ? [state]
-      : [];
-  return sessions.filter((session) =>
-    session.actorId === identity.actorId &&
-    session.accountGeneration === identity.accountGeneration &&
-    session.authEpoch === identity.authEpoch &&
-    session.expiresAtSeconds > nowSeconds &&
-    session.expiresAtSeconds <= nowSeconds + SESSION_MAX_AGE_SECONDS
-  );
-}
-
-function backendSessionWatermark(
-  state: GatewaySessionState | null
-): { accountGeneration: number; authEpoch: number } | null {
-  if (state && isBackendSessionWatermark(state)) {
-    return {
-      accountGeneration: state.accountGeneration,
-      authEpoch: state.authEpoch
-    };
-  }
-  const session = state && isBackendDeviceSessionLedger(state)
-    ? state.sessions[0] ?? null
-    : state && isBackendSessionIdentity(state)
-      ? state
-      : null;
-  return session
-    ? {
-        accountGeneration: session.accountGeneration,
-        authEpoch: session.authEpoch
-      }
-    : null;
-}
-
-function backendSessionWatermarkState(
-  state: BackendAccountSessionBinding
-): BackendGatewaySessionWatermark {
-  return {
-    actorId: state.actorId,
-    accountGeneration: state.accountGeneration,
-    authEpoch: state.authEpoch
-  };
-}
-
-function currentBackendCompatibilitySession(
-  state: GatewaySessionState | null,
-  identity: BackendAccountSessionBinding,
-  nowSeconds: number
-): BackendGatewaySessionIdentity | undefined {
-  const session = state && isBackendDeviceSessionLedger(state)
-    ? state.compatibilitySession
-    : state && isBackendSessionIdentity(state) &&
-      state.sessionKind === "backend_account"
-      ? state
-      : undefined;
-  return session &&
-    session.actorId === identity.actorId &&
-    session.accountGeneration === identity.accountGeneration &&
-    session.authEpoch === identity.authEpoch &&
-    session.expiresAtSeconds > nowSeconds &&
-    session.expiresAtSeconds <= nowSeconds + SESSION_MAX_AGE_SECONDS
-    ? session
-    : undefined;
-}
-
-function backendSessionStateWithSlots(
-  binding: BackendAccountSessionBinding,
-  sessions: BackendDeviceGatewaySessionIdentity[],
-  compatibilitySession?: BackendGatewaySessionIdentity
-): GatewaySessionState {
-  if (sessions.length > 0) {
-    return compatibilitySession
-      ? { actorId: binding.actorId, sessions, compatibilitySession }
-      : { actorId: binding.actorId, sessions };
-  }
-  return compatibilitySession ?? backendSessionWatermarkState(binding);
-}
-
-function writeActiveSession(identity: GatewaySessionIdentity): void {
-  const target = sessionStatePath(identity.actorId);
-  withExclusiveFileLock(`${target}.lock`, () => {
-    const active = "sessionKind" in identity
-      ? readActiveSession(identity.actorId)
-      : null;
-    if ("sessionKind" in identity) {
-      const watermark = backendSessionWatermark(active);
-      if (watermark && (
-        identity.accountGeneration < watermark.accountGeneration ||
-        (identity.accountGeneration === watermark.accountGeneration &&
-          identity.authEpoch < watermark.authEpoch)
-      )) {
-        throw new GatewaySessionRollbackError();
-      }
-      const nowSeconds = Math.floor(Date.now() / 1000);
-      let sessions = currentBackendDeviceSessions(active, identity, nowSeconds);
-      let compatibilitySession = currentBackendCompatibilitySession(
-        active,
-        identity,
-        nowSeconds
-      );
-      if (identity.sessionKind === "backend_account_device") {
-        sessions = sessions.filter((session) => session.deviceId !== identity.deviceId);
-        if (sessions.length >= SHORT_DEVICE_SESSION_LIMIT) {
-          throw new GatewaySessionDeviceCapacityError();
-        }
-        sessions = [...sessions, identity];
-      } else {
-        compatibilitySession = identity;
-      }
-      writeSessionState(
-        target,
-        backendSessionStateWithSlots(identity, sessions, compatibilitySession)
-      );
-      return;
-    }
-    writeSessionState(target, identity);
-  });
-}
-
-function clearActiveSession(identity: GatewaySessionIdentity): void {
-  const target = sessionStatePath(identity.actorId);
-  withExclusiveFileLock(`${target}.lock`, () => {
-    const active = readActiveSession(identity.actorId);
-    if (active && isBackendDeviceSessionLedger(active)) {
-      if ("sessionKind" in identity && identity.sessionKind === "backend_account") {
-        if (active.compatibilitySession?.sessionId !== identity.sessionId) return;
-        writeSessionState(
-          target,
-          backendSessionStateWithSlots(active.sessions[0]!, active.sessions)
-        );
-        return;
-      }
-      if (!("sessionKind" in identity) ||
-        identity.sessionKind !== "backend_account_device"
-      ) return;
-      const sessions = active.sessions.filter(
-        (session) => session.sessionId !== identity.sessionId
-      );
-      if (sessions.length === active.sessions.length) return;
-      writeSessionState(
-        target,
-        backendSessionStateWithSlots(
-          active.sessions[0]!,
-          sessions,
-          active.compatibilitySession
-        )
-      );
-      return;
-    }
-    if (active && isBackendSessionWatermark(active)) return;
-    if (active?.sessionId === identity.sessionId) {
-      if (isBackendSessionIdentity(active)) {
-        writeSessionState(target, backendSessionWatermarkState(active));
-      } else {
-        durableUnlinkSync(target);
-      }
-    }
-  });
 }
 
 function validLegacySessionIdentity(candidate: string): LegacyGatewaySessionIdentity | null {
@@ -1085,16 +555,6 @@ export async function withGatewayLoginLock<T>(
   }
 }
 
-function loginAttemptDirectory(): string {
-  const configured = process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR?.trim() ?? "";
-  if (process.env.NODE_ENV === "production" && !configured) {
-    throw new Error("WALKSAFE_GATEWAY_RATE_LIMIT_DIR is required in production");
-  }
-  const directory = configured || path.join(tmpdir(), "walksafe-gateway-rate-limit-v1");
-  if (!path.isAbsolute(directory)) throw new Error("gateway rate-limit directory must be absolute");
-  return path.resolve(directory);
-}
-
 function loginAttemptPath(directory: string, request: Request): string {
   const clientKey = loginClientKey(request);
   if (!clientKey) throw new Error("trusted gateway client IP is required");
@@ -1108,10 +568,6 @@ function globalLoginAttemptPath(directory: string): string {
 
 function globalLoginFailurePath(directory: string): string {
   return path.join(directory, LOGIN_GLOBAL_FAILURE_FILE);
-}
-
-function ownedByCurrentProcess(uid: number): boolean {
-  return typeof process.getuid !== "function" || uid === process.getuid();
 }
 
 async function secureLoginAttemptDirectory(): Promise<string> {
@@ -1639,9 +1095,13 @@ export function establishGatewaySession(
 export function establishBackendGatewaySession(
   request: Request,
   binding: BackendAccountSessionBinding,
-  rememberMe: boolean
+  rememberMe: boolean,
+  sessionScope: GatewaySessionScope = "general"
 ): Response {
   if (
+    !validGatewaySessionScope(sessionScope) ||
+    (sessionScope === "account_deletion_recovery" &&
+      (rememberMe !== false || binding.deviceId != null)) ||
     !ACTOR_ID.test(binding.actorId) ||
     !Number.isSafeInteger(binding.accountGeneration) ||
     binding.accountGeneration < 1 ||
@@ -1653,7 +1113,6 @@ export function establishBackendGatewaySession(
   ) return gatewayUnavailableResponse();
   const expiresAtSeconds = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS;
   const sessionId = randomBytes(32).toString("base64url");
-  const sessionScope: GatewaySessionScope = "general";
   const value = backendAccountSessionValue(
     binding,
     expiresAtSeconds,
@@ -1963,3 +1422,14 @@ export function gatewayUnavailableResponse(): Response {
     { status: 503, headers: { "cache-control": "no-store" } }
   );
 }
+
+export {
+  SHORT_SESSION_MAX_PLAINTEXT_BYTES,
+  setShortSessionStorageFaultForTests
+} from "./short-session-store.js";
+export {
+  SHORT_DEVICE_SESSION_LIMIT,
+  type BackendAccountSessionBinding,
+  type GatewaySessionScope,
+  validShortSessionStateForMaintenance
+} from "./short-session-codec.js";

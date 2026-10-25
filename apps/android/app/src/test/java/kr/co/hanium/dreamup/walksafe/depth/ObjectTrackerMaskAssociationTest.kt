@@ -1,11 +1,13 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.Random
 
 /** Analytic synthetic evidence only; these tests do not measure ARCore or real-video accuracy. */
 class ObjectTrackerMaskAssociationTest {
+    private val knownPoints = mutableMapOf<TrackState, VisualMaterialPointId>()
     private fun mask(x0:Int=10,x1:Int=50,y0:Int=20,y1:Int=70,w:Int=100,h:Int=100):BinaryImageMask {
         val bytes=ByteArray((w*h+7)/8)
         for(y in y0 until y1)for(x in x0 until x1) {
@@ -27,7 +29,8 @@ class ObjectTrackerMaskAssociationTest {
     private fun pose(at:Long,cameraZ:Float=0f)=CameraPoseEvidence(42L,at,0f,0f,cameraZ,0f,0f,-1f,
         CameraImageProjection(100,100,60f,60f,50f,50f,1f,0f,0f,0f,1f,0f))
     private fun record(t:ObjectTracker,s:TrackState,at:Long,z:Float,worldZ:Float=-z,cameraZ:Float=0f,raw:Long=9_000_000_000L+at*1_000_000L)=
-        t.recordDistance(s,z,DepthSource.ARCORE_RAW_DEPTH,.9f,at,pose(at,cameraZ),Vec3(0f,0f,worldZ),raw,true)
+        t.recordDistance(s,z,DepthSource.ARCORE_RAW_DEPTH,.9f,at,pose(at,cameraZ),Vec3(0f,0f,worldZ),raw,true,
+            materialPointId = knownPoints.getOrPut(s) { VisualMaterialPointId() })
 
     @Test fun packedRoiIoUAgreesWithIndependentPixelTruthAcrossWordBoundaries() {
         val random=Random(6712)

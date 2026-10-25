@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D03-033 행동 뒤 선택적 경로 정보의 한 번 전달"]
+  P["정책 P-D03-033"]
+  A --> P
+  N0["1. 행동문과 덜 중요한 설명을 분리해 긴 정보가 이동지시를 지연하지 않게 한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. matching ACTION ack 에서만 informationAfterCompletion 을 제공한다."]
+  N0 --> N1
+  N2["3. reserveInformation 은 같은 정보 한 번만 시도하며 완료뿐 아니라 취소/억제도 소비한다."]
+  N1 --> N2
+  N3["4. 새 행동이나 판단 변화가 오면 optional 정보를 교체/취소할 수 있고 실패자동재시도는 없다."]
+  N2 --> N3
+  Z["정상: 한 번 reserve 하여 출력."]
+  N3 --> Z
+  B0{"action 완료 아님"}
+  R0["정보 cue 없음"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"새 행동 우선"}
+  R1["optional info 억제"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"상대방향정보 아님"}
+  R2["오래된 facing 만으로 독립정보까지 차단하지 않음"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: 소비한정보 자동 retry 없음."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xcancel["취소: 취소도 소비."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: 새 action/route/context invalid 시억제."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xretry["재시도: 자동재시도 없음."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry
+  Xcleanup["정리: action/route 변경에 old info 제거."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

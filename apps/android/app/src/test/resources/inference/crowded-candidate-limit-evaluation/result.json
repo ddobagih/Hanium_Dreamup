@@ -1,0 +1,2833 @@
+{
+  "scope": "All 149 source photos with at least 20 annotated boxes (maximum34 of full27021). Current actual model pre-NMS accepted-anchor upper bound for the existing300 cap; not field performance, risk-object loss, annotation completeness, mAP, Android YUV/delegate equivalence or artificial300-object stress.",
+  "selection_rule": "all full_all27021 source photos with >=20 nonempty YOLO label rows, absolute path order",
+  "source_list": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/full_all.txt",
+  "source_list_sha256": "f76fe1cd238760de74f1101bee1766b0ca9bfdd26bfce4f9b1a4015067c4d7e6",
+  "source_images": 27021,
+  "available_per_class": {
+    "0": 766,
+    "1": 2104,
+    "2": 1018,
+    "3": 662,
+    "4": 6777,
+    "5": 2384,
+    "6": 3375,
+    "7": 2427,
+    "8": 2296,
+    "9": 1510,
+    "10": 2099,
+    "11": 3239,
+    "12": 1081,
+    "13": 2107,
+    "14": 1971,
+    "15": 1550,
+    "16": 2361,
+    "17": 4659,
+    "18": 1678,
+    "19": 2731,
+    "20": 2255
+  },
+  "classes": [
+    "linear_tactile_paving",
+    "damaged_linear_tactile_paving",
+    "dot_tactile_paving",
+    "damaged_dot_tactile_paving",
+    "passenger_car",
+    "bus",
+    "truck",
+    "motorcycle",
+    "bicycle",
+    "abandoned_e_scooter",
+    "moving_e_scooter",
+    "traffic_light",
+    "crosswalk",
+    "construction_fence",
+    "barricade",
+    "traffic_cone",
+    "bollard",
+    "utility_or_streetlight_pole",
+    "trash_bin",
+    "portable_sign",
+    "person"
+  ],
+  "thresholds": {
+    "default": 0.15,
+    "linear_tactile_paving": 0.25,
+    "damaged_linear_tactile_paving": 0.3,
+    "dot_tactile_paving": 0.25,
+    "damaged_dot_tactile_paving": 0.3,
+    "passenger_car": 0.15,
+    "bus": 0.15,
+    "truck": 0.15,
+    "motorcycle": 0.15,
+    "bicycle": 0.15,
+    "abandoned_e_scooter": 0.25,
+    "moving_e_scooter": 0.15,
+    "traffic_light": 0.3,
+    "crosswalk": 0.25,
+    "construction_fence": 0.15,
+    "barricade": 0.15,
+    "traffic_cone": 0.15,
+    "bollard": 0.15,
+    "utility_or_streetlight_pole": 0.15,
+    "trash_bin": 0.15,
+    "portable_sign": 0.15,
+    "person": 0.15
+  },
+  "model": "/home/ddobagi/Hanium_Dreamup/apps/android/app/src/main/assets/models/walkmate_yolo11n_21cls_768_float32.tflite",
+  "model_sha256": "d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57",
+  "config_sha256": "2d75fe233d7a321347575673172495635045dcad88b54f3c3f6e2d6ce166489e",
+  "selection_sha256": "66e8ff93271c4cd410f1e1ee3e170eff0066d1f27875f9beadd83c01529e544c",
+  "runtime": {
+    "tensorflow": "2.19.1",
+    "opencv": "4.13.0",
+    "numpy": "2.1.3",
+    "delegate": "host CPU XNNPACK",
+    "threads": 2
+  },
+  "images": 149,
+  "images_with_discarded_alternative": 0,
+  "raw_anchors": 1802304,
+  "visible_valid_anchors": 1116541,
+  "top1_pass_anchors": 19616,
+  "discarded_top1_with_other_pass_anchors": 0,
+  "pairs": [],
+  "examples": [],
+  "rows": [
+    {
+      "index": 0,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253620_493499076309a072.jpg",
+      "image_sha256": "b148d332522ed677a041f44a929133697df73cbddb381513bcb071963717f9a5",
+      "selected_for_classes": [
+        4,
+        6,
+        14,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7454,
+      "top1_pass_anchors": 196,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "91b5af30932950074bc10f520edae8f1588b0cbf91f3123b4aa4f78670012f65",
+      "input_sha256": "c50c6664e2f1b9fda34ba4eb1c1b984ea23b5990b05a3e0ed51905c828ca9ee3",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 1,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253703_df85c8d797502383.jpg",
+      "image_sha256": "80717f0596e42a546bf2cedad0b84090ba9a254d8861574d413233f420717213",
+      "selected_for_classes": [
+        4,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7313,
+      "top1_pass_anchors": 149,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "b31dd936165fbd3b32d31dadb6308af90332e556f160ebcce97da1c2961fc1f1",
+      "input_sha256": "387836edf80ec9a28fac515bac1cb5a40fe486faaead8604d91e948b09840700",
+      "annotated_box_count": 26
+    },
+    {
+      "index": 2,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253723_65e31d01ca375adc.jpg",
+      "image_sha256": "6a447fa4ee58b599ef502c2002ff3f9f4e9c497331b47ff81f9389c1bc5c4b98",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7387,
+      "top1_pass_anchors": 210,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "9a9e5059876797bf554dab6863fe48dd6403f3cc4bea88f0d75bb402801b3f44",
+      "input_sha256": "dfbcde9db7d4d83137c452f3d63d76c5c233e925e604adb81d198c9abc88bb5f",
+      "annotated_box_count": 25
+    },
+    {
+      "index": 3,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253724_aac1eca376b2bc1d.jpg",
+      "image_sha256": "5c85018f71cd50f563260b9314d775e4248579a38d65045470170a7e8893f1cd",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7329,
+      "top1_pass_anchors": 189,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "8bbaaec3b8452bb0279999cc6b05fd83127e6dde30b5514c5b73cbafd595182d",
+      "input_sha256": "5c6f3b1a43083490a4e26169615f588d9fa8482fcf3e4b573cb048825dc073b1",
+      "annotated_box_count": 32
+    },
+    {
+      "index": 4,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253742_f49c3cf11b863cc9.jpg",
+      "image_sha256": "9fe40c52ebb3772adacc81e8fdf7fbe4fb83d8f063759fa3b624d8249808aef8",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        7,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7321,
+      "top1_pass_anchors": 166,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "456c3f04dee38665837447f46fe97af315f0e376ef6a4e400e9f35b555182d42",
+      "input_sha256": "e13968fb402f58f2e71838e9d261116d2fe305db653b25b2f484b472a82ba821",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 5,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253774_0cd0bc539aab8ce5.jpg",
+      "image_sha256": "a47be43d7a38fe32c17e43ffcb2796670f8aedcd0d2df7cd2f5fe3b99b75c45b",
+      "selected_for_classes": [
+        4,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7215,
+      "top1_pass_anchors": 91,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "cbb54e776b03a0174f6f7456714cbb9b58e36f07571af765dc0fdf774f899dd9",
+      "input_sha256": "2c51e35f7a237aa7fdb1cadf75945f67ee401e51d29ab50abfb5c98d76c726b7",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 6,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253791_0f9c8f6f2b2793cc.jpg",
+      "image_sha256": "99f4a4d527aaebca417c8f731d6aef2f3048d48f402c6bc08af75edface6969f",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        8,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7341,
+      "top1_pass_anchors": 170,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "f2d3ba9371ddefbfbd76f88579da5d746a92d5c14ba6ba0958bed7dcffc29f2a",
+      "input_sha256": "2c729f02f5f50d085ad83d312fc62e517fce2567912092471df791a95cddaf5f",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 7,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253824_5b84356c83dba9d2.jpg",
+      "image_sha256": "e64b1d1f0a073e5d82b4d04d5e457f437c79f209e401c758635b077e34461053",
+      "selected_for_classes": [
+        6,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7296,
+      "top1_pass_anchors": 165,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "db699ab82d3475fda4d67a773d9f04435b5172938b90608af25db1393b270d80",
+      "input_sha256": "ab58d5baed8941639eabede0f1827106417d4a6aa613f9efcef0730764305eb1",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 8,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253846_e66cd0ba59856e8f.jpg",
+      "image_sha256": "3e94920f0272b42cb114de9a8b5f207699734f7a6aa49518efeef69c4fa3a965",
+      "selected_for_classes": [
+        4,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7280,
+      "top1_pass_anchors": 125,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "919cae390089d858541f3519742f4cdc79d976373e87db1377b32d4919351cab",
+      "input_sha256": "87a62a0f7c50a5ea5bf5a325d07f061bb4b9dd382a683830cce9b11da72cba4f",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 9,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253911_2ed1faadf0cdfe39.jpg",
+      "image_sha256": "9045d90390974b7e223307b0eaa1963810744148074c3dea52bb0f298560b6a1",
+      "selected_for_classes": [
+        4,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7447,
+      "top1_pass_anchors": 126,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "ef0cb60d08dde52504892a670edbf053ceab3358fa17f3900c6a53614c42e834",
+      "input_sha256": "eaee33b98c6d4e7b0161f06be9adb907f3548d093c79870ab2b004fc322ffbe4",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 10,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254477_fb601cfccacfa528.jpg",
+      "image_sha256": "5814210904a6b47b235695f83825826cceffebcd2735649fe2a2c5dcfe2ff25b",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7345,
+      "top1_pass_anchors": 112,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "25c693c0cab417d5726f95d0e1ec6a59f8af6654b51ee73dd6b78f4e3e539143",
+      "input_sha256": "5c3585bdac004961e9c139df4232f2d966150112c27bf636f123dabf95b5ab6e",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 11,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254522_23a5449ee41d6eec.jpg",
+      "image_sha256": "f0a1a0af54a87e1388e14f073be730f813c7fb7f931163bc7d6a7568498338af",
+      "selected_for_classes": [
+        4,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7290,
+      "top1_pass_anchors": 128,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "5c590015215c2135745ceb9946e7a3554526ae46ae85ed9805f93ac9f2d98844",
+      "input_sha256": "308ff1e2312cced699f7ff0b30d5b3acd39bc8d27472cd810eb97ee5a4a3d617",
+      "annotated_box_count": 23
+    },
+    {
+      "index": 12,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254564_65a8b3bde44f7775.jpg",
+      "image_sha256": "cf19f3c261cf9658bdfc92d2ed8a82824f08daeadbc0be202c53de2ed6c035d9",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7356,
+      "top1_pass_anchors": 175,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "b9cbb03edae45963f9448b1affb495ad63c0e5be59787f545861ef9c90c8fcb7",
+      "input_sha256": "a4e309417e04761219905ca455754c0febc2a9d4370d8e092acf1834386c4f69",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 13,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254598_4c4fe06785813238.jpg",
+      "image_sha256": "4bfe17daddd2589ef925f567722704ad1556008c41751ae7c0e527c4c6604c5b",
+      "selected_for_classes": [
+        4,
+        5,
+        7,
+        8,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7316,
+      "top1_pass_anchors": 125,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "be3e0a9529e7c22ad4b3ed7df2d812f4ec4938630a63388fdcb26b37987cbb54",
+      "input_sha256": "06bf962e5a4f7160b7a16ad2159ed869091e93ba59b1b075a1cc2fade49f7e07",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 14,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254727_45600a975a817787.jpg",
+      "image_sha256": "c67f491174602fdea7d7e72c9aab8cf98b27a3847b76ac6bbdf4781e9f11224d",
+      "selected_for_classes": [
+        4,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7390,
+      "top1_pass_anchors": 155,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "71c9dee2502a0ea6b68ff6c6a42716ed578d04a25e03f956cbe8ed1d8fd035fc",
+      "input_sha256": "3dd33a3ccee469e0baa2d8a775314e6bef347009728c8f743fca96f50b76945f",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 15,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254900_a351f427c49def6d.jpg",
+      "image_sha256": "41268f5676991f84c3c3d70c74713f8715404c5fc7737f6e613eb43ad7ff077c",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7372,
+      "top1_pass_anchors": 152,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "54774a015938bfdf72153af4741d8a793f840457610d10421ebb2f4d2a720357",
+      "input_sha256": "58d0e9948737dfde5aa292cf35589428548f520bd484a99c6b5b9443ddd31109",
+      "annotated_box_count": 23
+    },
+    {
+      "index": 16,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254904_59edf0997801aa27.jpg",
+      "image_sha256": "96f6f8703bf4b679114446224a1993a3c252c2b21d191add6a018e4ee18156ad",
+      "selected_for_classes": [
+        4,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7427,
+      "top1_pass_anchors": 147,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "b2c26a8e3e7b184b48c08ab16b6e86d2ebab76d6f0e8b3df25687348264a1a9c",
+      "input_sha256": "9d91e32262cfcfb370f4bd49bea2cbf14b4425dffda4c81bb810503d7d165a18",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 17,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254981_69d36e0ad89036fa.jpg",
+      "image_sha256": "8c22637646c2568556a6a18e7388ea1d2eca5049c380a2789a22dd2f8cabcf76",
+      "selected_for_classes": [
+        4,
+        14,
+        16
+      ],
+      "visible_valid_anchors": 7491,
+      "top1_pass_anchors": 154,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "4ff1f214509dd4e05c18fe40d921245308e6329582c25612de5dd28890e966de",
+      "input_sha256": "b0cced3e6add666d7b9aef96241e07c69b1aa7fcca6a699df63dd70e1abbdf11",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 18,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255029_e6451a65af3cef2f.jpg",
+      "image_sha256": "5b2b4e627a92f00f02855ab99f8fdaa0c59516bf7a39e86406b11abc8dd2cc8e",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7330,
+      "top1_pass_anchors": 139,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "36ff56cd7b0b1d71a02f36797e943e706e48b5dd1eadaee85e4bbb5cd76bbd98",
+      "input_sha256": "d3a451b36d7b5eb99d494918cdfb9f1d66c5122c517bd9b240130c03f0bd9c92",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 19,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255246_925258911179d06d.jpg",
+      "image_sha256": "b0a397da8b7ef3937f32db96def56b572762943892066e2946d6a7ec4a4132e5",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7352,
+      "top1_pass_anchors": 171,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "9affa6883e1735d8f4632a2fb8203bce01c28c16f034f2a7f889e3d5bffa030d",
+      "input_sha256": "cf8b6fbb5bd261752194d85b53ebdfeee359cc27e012161e0165ad0aea61837d",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 20,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255363_5dd7da4dd0cd4850.jpg",
+      "image_sha256": "50043e65a5dc7f206576065ba22d72e76dcf7c5b23da24f0361d22d026a14fe2",
+      "selected_for_classes": [
+        4,
+        8,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7357,
+      "top1_pass_anchors": 124,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "e84c2922f82816842f37d07f42ecf992e27d64aa0795a05a8140e0b9759104a2",
+      "input_sha256": "d69accfe81e7dc655d325c73689f30e392e06975e1af69d2a7e407d2a9fb29aa",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 21,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255450_167dcdaa44a1903b.jpg",
+      "image_sha256": "538c3875ab91a89361da1fcc416ac878cc8be03995e060c963d5a11e9ddd6ba7",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        16
+      ],
+      "visible_valid_anchors": 7333,
+      "top1_pass_anchors": 50,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "f48531acf40fb93a87ed8ed859484872694519aa06a30956d47f7f4b8c4bc01d",
+      "input_sha256": "8f3727348caa35117e8d3dc19d01a3083f4b7ed4f661b9e1603d506c9ea0ccad",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 22,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255496_a0c4dd24ff27d043.jpg",
+      "image_sha256": "bfa77a3b377d263c90193919cf656309a5d2ef61b406f112dfdf39bb01355b6a",
+      "selected_for_classes": [
+        4,
+        5,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7366,
+      "top1_pass_anchors": 141,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "c63cd7f0adae865eb15b96bee15b1ebeab3f821dafb0c4948063ae3d92bae16c",
+      "input_sha256": "6ac2a52f551362f92d901b48b9c121fd1f2073fd861480b7947aea1e49d52a78",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 23,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255732_b66bd8ac89f80153.jpg",
+      "image_sha256": "4913c55b87d38047eb40acfe9674d6c6a298884af2785f4eea358e3a127cf9b0",
+      "selected_for_classes": [
+        4,
+        8,
+        10,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7308,
+      "top1_pass_anchors": 153,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "2a02153b02427c9232ab6e3e0a1780ab9f326fa67c3939537444e13892903c6a",
+      "input_sha256": "12446af7d0587c046bef1aee7f84eafbbf556b57546d3a3a2d6686b6004d8383",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 24,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255736_025d902063e4f78f.jpg",
+      "image_sha256": "36871b94378957855c471ae35dd7f0d6b0028bcc6525943157806c8d95f6832a",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        10,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7319,
+      "top1_pass_anchors": 166,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "c03b40078ee7b8ee4c4f5fe4a4df4bd80daa0aec7d113d0bf6417817070a50a3",
+      "input_sha256": "f87f04f52c7b2b97d0c49a4e0a4439ae5d34d3fe96cf5ce5b9416490004d5f3e",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 25,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256006_7cd76073c4dad334.jpg",
+      "image_sha256": "567ebc73b3083cd6227eccbbc644660ffc099f95a553637cab3fecb9869894b2",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        8,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7333,
+      "top1_pass_anchors": 118,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "b283986f92c3c2c6fd98474f7b447aea35fdbc4d586a9752d328e00eb0f63a0a",
+      "input_sha256": "9bc90b3a58266f31d3403af110686536666c9b1d37960f36781a182a723fa70d",
+      "annotated_box_count": 27
+    },
+    {
+      "index": 26,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256007_94f7136bdea4f579.jpg",
+      "image_sha256": "741dacc4bed115a469ec2ae8ee1c04c8ddce3de454f2269851a6ff1bf8fefc96",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7316,
+      "top1_pass_anchors": 96,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "0fb4d92a68397b8d3cd22866aea55524cd7661cedb8ac13a9cc0ca6f8cb584d2",
+      "input_sha256": "1d0497a00b7be8f50161db8db1e664e689e51039a979943c5b3bb7d1e96a33b4",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 27,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256042_cb5bada9f2e0f767.jpg",
+      "image_sha256": "41099348d1143b04c8fe2c262242abbcca80c2f0babb00c0d34c47130d3b5698",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7363,
+      "top1_pass_anchors": 97,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "4790f08a7a40e200b925f6ce4eeceb79f0ac477fb62a05d1dff48d4367a1e3de",
+      "input_sha256": "21104b6530735e01c533c15185a88051902504718186f07b9b7cc2f9212a5304",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 28,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256064_0da64ed559808cae.jpg",
+      "image_sha256": "dda2c699a5ea13cc9d0e4e71ac54c13158d9b331633fbc375d63f613d5ca60f3",
+      "selected_for_classes": [
+        5,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7315,
+      "top1_pass_anchors": 124,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "62963f785ecbd22ab47838ac41289928088dd72a1b9f48e575969132f384d868",
+      "input_sha256": "37a171538aef7a077f3a4d357253d23048707c997835e7d3b94ab137a8485695",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 29,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256111_76e0cbcfa8138826.jpg",
+      "image_sha256": "116c5791691f7885a47dc663751a7da429a8e968e68e5a9a0aef97bf561fe0dd",
+      "selected_for_classes": [
+        4,
+        6,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7289,
+      "top1_pass_anchors": 145,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "c90518136883366ccafdc1778f9664867943d46b902a8a54a4410c32125e1af9",
+      "input_sha256": "8c8cff32ea7e465f4f0792157b6ac5d6ec86aec228b592a74bd5424c273afcb5",
+      "annotated_box_count": 28
+    },
+    {
+      "index": 30,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256868_4a9fbbaf9a96fff0.jpg",
+      "image_sha256": "29cda36144a8a0ecbe05ad871527351c8f2bfe9747a773b13437c4dcf6681d5a",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7355,
+      "top1_pass_anchors": 79,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "af8461c62e1724972fd24f12f9e3bb6fb966b17ec27d2d4934842b01b8c737e7",
+      "input_sha256": "9ee5b02076bc478576db3caa54065d57e272d84b01f113bceecbc37cf398cea3",
+      "annotated_box_count": 27
+    },
+    {
+      "index": 31,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256869_1b4a0b0347a1040b.jpg",
+      "image_sha256": "202af00617340c14fe5ad699914a05b7207596b9a9dc4f0b2887dd409d3aa5da",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16
+      ],
+      "visible_valid_anchors": 7314,
+      "top1_pass_anchors": 162,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "ae6e4ddaba202f70ccb025cfcc5fcb06f6038c4f9b3d6caf588823c3488fb449",
+      "input_sha256": "bc61a314b673f66a88fe4d90452d25533c31e684c295072f71e857a870b11168",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 32,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256871_1151b82ac4b21b48.jpg",
+      "image_sha256": "591ca9989317979bd5a8bfc54a13d5a3d826ca3d061f4bd731b180febda5a62d",
+      "selected_for_classes": [
+        4,
+        7,
+        10,
+        11,
+        17
+      ],
+      "visible_valid_anchors": 7296,
+      "top1_pass_anchors": 153,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "5724320c0f5eff57223b852aa4bb1181d05e3d0a460edfeef9dbe487a9d5c6b2",
+      "input_sha256": "ecf27044c35413acb93a7fa4e6f5e8e99e3e3d07d57651ea5677e203b3f748d6",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 33,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256953_1dc5e8b10eeb0cae.jpg",
+      "image_sha256": "64d648f5f423b62477654c885172095a8cc3c3a793c3aa476e8da118ac98d5d0",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        8,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7228,
+      "top1_pass_anchors": 76,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "1504212d5b111b3e98de4a94644ae178ad63b415fdba9980a9a87fb0c415f3bc",
+      "input_sha256": "c861a36f7415e704ed49cf68f226d3089902dc4d30064c30fbe871fcafe77cb5",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 34,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256955_0f2698c9c8e43b63.jpg",
+      "image_sha256": "46ed91363ef0d43e7305c5e885c20eafd289915655d5ace9006fd997a8896b69",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        17
+      ],
+      "visible_valid_anchors": 7301,
+      "top1_pass_anchors": 119,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "c57546aa77cc4c710a025bf54892bd03bea398621db94d5e317a977bcc771834",
+      "input_sha256": "f422613d367a433cac3f08475adebd6e16dbcad8867396d3964e312a2b413cd7",
+      "annotated_box_count": 25
+    },
+    {
+      "index": 35,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257005_4faa1c970bd03c63.jpg",
+      "image_sha256": "540c3c5e868082686049ed392feaba511953620297585cb0104b2397a8609bcb",
+      "selected_for_classes": [
+        4,
+        8,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7278,
+      "top1_pass_anchors": 41,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "c0a59bfc3bc98d96103bbd88cf7835db7be74aeaebb2715747ba131250ec24a6",
+      "input_sha256": "6c658b7b28305397f0576e352c054184ced030884a18e95d32e200c39e1b187a",
+      "annotated_box_count": 23
+    },
+    {
+      "index": 36,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257047_215f1708abfc22bc.jpg",
+      "image_sha256": "2bd401d49fa3bcbeb8cc7834a0ed2d88b1e3092d57f0c3d6c35dd6ef7011d47f",
+      "selected_for_classes": [
+        4,
+        7,
+        8,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7361,
+      "top1_pass_anchors": 163,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "32e64c878f42eabcee09135017086e7c6d9f49357409114fca4d3209727fc554",
+      "input_sha256": "bdcdfa9d8015558a645613cd221964358898b7f01a901466595633557766c90e",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 37,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257055_8e7637aeaf1895e1.jpg",
+      "image_sha256": "638dace19649340a8e6e44cd016f7869af2b3480334f677daa0e35ada7a48907",
+      "selected_for_classes": [
+        4,
+        7,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7367,
+      "top1_pass_anchors": 102,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "9928e4344f436815b32de7871d7872969812c81b4433f628b5a7b612beefa43a",
+      "input_sha256": "9ff48d7fad867189db3a9fabf3f9808cce09590b0464f22c54f868b9a57ef9c3",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 38,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257057_fc5ff349e58dcab0.jpg",
+      "image_sha256": "bf70950a6777f60ff06d588424148d2095ab0d0ec12c60559f0519781b4a2623",
+      "selected_for_classes": [
+        4,
+        7,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7353,
+      "top1_pass_anchors": 124,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "21c5c1fc07372e2bfa2a562c46214e922f0f52a70e49283d41da3837d0d8cdd6",
+      "input_sha256": "522307cc6721c74f8052add19ca58d2f404b0703b82ed3dd3f1741a970be2c9c",
+      "annotated_box_count": 26
+    },
+    {
+      "index": 39,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257080_185c19a4ea5edc79.jpg",
+      "image_sha256": "7d815c1ab7f79750b1102b6aab9ca98587a0a7a3602e598987b7d321a680f238",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        10,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7335,
+      "top1_pass_anchors": 163,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "afde58ed0f0df8a796adf0ee13fe6692ba4e87c8af226dd7ca785fca2d84ceaa",
+      "input_sha256": "78b85d051cfa38cef5887e64acfcad91d6360a4ff919bfb69ea76150ece083b6",
+      "annotated_box_count": 26
+    },
+    {
+      "index": 40,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257179_4ad54609d384adee.jpg",
+      "image_sha256": "ff38abf8bba0016c89c299f0431e87ed260547d95a2fd2bc996d03a8aaca090b",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7345,
+      "top1_pass_anchors": 207,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "61fd9ed9602d2b6161e3b899d1dbfeef2c8dee693379cd13ffab988a23ad3be1",
+      "input_sha256": "c00b32c8b805b5745f8219a99508db16f764a362f0dcc64b1f43368847b7dbbc",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 41,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257227_d02350b734f899c2.jpg",
+      "image_sha256": "cee0e54578772c77cc64bfe398b264fcdf202a30c2cc21029f8ae9bbd6b0ed43",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        8,
+        11,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7281,
+      "top1_pass_anchors": 169,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "2f9e071e530ac50835dc0b2f0ded86364126c494712de2b6aaed681ab4348529",
+      "input_sha256": "9c816d20535339dacc20e47ef4c7834502439e15a13c3b837627616c4009cb04",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 42,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257230_60cf372d1aab3608.jpg",
+      "image_sha256": "006b0fe89a72f539819d82ff962a3c9d310166c82cfd943cb0e30c00c9769bcc",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        11,
+        17
+      ],
+      "visible_valid_anchors": 7449,
+      "top1_pass_anchors": 100,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "89dfd4fe4f14d9a64d6b6f2ad4ca9558e61e2841a4c81fbb831c653ecefd8ef8",
+      "input_sha256": "fbef283579ab9eedc687bdafc28056ecfa0ad5f0f09736437857d95bdc56d8cb",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 43,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257236_873a69ec6404cd04.jpg",
+      "image_sha256": "a2358fd50f8e015726dfe56b90317d025a939f11792e82de6f3715f86c70fa5d",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        17
+      ],
+      "visible_valid_anchors": 7280,
+      "top1_pass_anchors": 133,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "de4b8e1239f180199822c32563a322f70c1adfce8d0ef4a6635fb725c067f379",
+      "input_sha256": "78521e13642ec5bfa5ea0ff83295e34130ddc033837adfd94003d135070b30f4",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 44,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257309_d60c3fd42420dc12.jpg",
+      "image_sha256": "3c88aa1c75243cc4588a22c9fdf22907b8c3b024854a1d9de042cc38b6789a41",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        8,
+        11,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7327,
+      "top1_pass_anchors": 147,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "d340e59e2604f98c5c8545deb54660189c764ffd292080c7d7c46acbbee84e3a",
+      "input_sha256": "395670ac37a2b9fce5ec42aa591a35d34a89722665d7f66f7dae83b68a373a54",
+      "annotated_box_count": 23
+    },
+    {
+      "index": 45,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257439_65cea941290b014c.jpg",
+      "image_sha256": "862e137423d5a1d9bfd7379289875318b143fa2f7ca26c0c21086209a728142b",
+      "selected_for_classes": [
+        4,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7294,
+      "top1_pass_anchors": 105,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "25520e4d6f8e89985fbb0d786db37f2e01242bc9e4f1ce0aa5038b69f3e5d2f3",
+      "input_sha256": "e3c0ee0c55cd49f8f45f8f0c268f47c181b0a083976f8b4b3d1a354b2955ab2d",
+      "annotated_box_count": 23
+    },
+    {
+      "index": 46,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257441_96023158c613b766.jpg",
+      "image_sha256": "a54d2c807f50dcc6726b9a1551f1c9240de131cda7bc3c7d85021665fd6062e0",
+      "selected_for_classes": [
+        4,
+        5,
+        8,
+        11,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7305,
+      "top1_pass_anchors": 67,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "69ba2db82559f40bd7f4a250e9e1c783f3428a0e5974d1dcab84c38a31704c2c",
+      "input_sha256": "1a8cf70a03a09168515354873baa2551c37a73dca1bf02fcde6111b33ab4d68a",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 47,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257462_50867825127b29d3.jpg",
+      "image_sha256": "3f9c8432911e4f6be157114e78cbc3ff6b2880722ce1cf715537a94eb1a2e9fd",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7356,
+      "top1_pass_anchors": 77,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "a9174118b3f7820663c530f7f99c8808d54d480fdc5081a1879d6083118cc443",
+      "input_sha256": "3b3d712c6b270b8369686522a88658dd28a9030aa7575855eb0950fc0828912d",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 48,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257463_a69b672d8c0e7221.jpg",
+      "image_sha256": "9fd2e637209d950ed10bab7d0d5946d6859a80f61ede9f163895c38d638e32e8",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7233,
+      "top1_pass_anchors": 141,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "7e768f46cab6f4ad0c7c33fed352988889cf61aa2e3859c39633929e0da2bece",
+      "input_sha256": "277fa299b2fac78461252b78f08132d83f8a1469041b6fa6067ecacc3e77afe9",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 49,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257529_f3b2068550da3e21.jpg",
+      "image_sha256": "c32ed41b074a28a5774582cd9e6b2573e8c343e21238f10f39026507d48d272e",
+      "selected_for_classes": [
+        4,
+        8,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7366,
+      "top1_pass_anchors": 121,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "7dfc2af955b6a0ee88d46ebb7d2044f3d0a14da0a6269f46a4558747062603bc",
+      "input_sha256": "b0026d7db1b71d42323cafc78c6a926c147f4532ac6e127a9fd6336d8306ac94",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 50,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257530_78afc13923d3cabd.jpg",
+      "image_sha256": "b317415b9340f782989af41dd9c9c759ad0e236c3cc97898c0bbd4dc8821dd61",
+      "selected_for_classes": [
+        4,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7387,
+      "top1_pass_anchors": 176,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "c3cfe285898813dd1e44184fe7d79a917619c62f13a7b22bd51b56881a7ea658",
+      "input_sha256": "5bee059a090ed9558347afa1f7dbdaf129f5ed9cad1b5520dff7891d4b7a68b9",
+      "annotated_box_count": 27
+    },
+    {
+      "index": 51,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257589_7292a08d30985c75.jpg",
+      "image_sha256": "7ed0144cfd04b998af765c9f58f95299b017ed9930bad1fd5f81963a54266813",
+      "selected_for_classes": [
+        4,
+        7,
+        11,
+        17
+      ],
+      "visible_valid_anchors": 7322,
+      "top1_pass_anchors": 103,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "4a02e5b045ea5f08c3a46e2ad66be17afaaffaecb5396c933cc72a5110203f64",
+      "input_sha256": "cd0314aafc3c6efdac80ca90257f6244466736fe6b33929e3fbd3a822534b52b",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 52,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257609_ea82a3bc3d58bc79.jpg",
+      "image_sha256": "e5a6fd8a4a8c47014f96b4fecdf8ce4cfd8bf64a3d88a39803fe08f345a7704d",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7342,
+      "top1_pass_anchors": 130,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "51a610ea6cbc0d4c897cf75154416d8a8dfa13d3931f60c5474e2a441c21dfe5",
+      "input_sha256": "5d35a109b5c7345846bb69123e6adcd4ed50e88612e4838ba6832ea5f69471c4",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 53,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257664_b98599d3316dc7e3.jpg",
+      "image_sha256": "04d2afe9f79a611053cfb85bb3a5a1e0153242c80a944706cdd3484590eb02db",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        7,
+        11,
+        16,
+        19
+      ],
+      "visible_valid_anchors": 7243,
+      "top1_pass_anchors": 79,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "aebcca04b3bcf433dd14eff69c37222a73f1c65b0f101b5f8cbeb13666365252",
+      "input_sha256": "152da2022c03133f0df6afcd07cd925243f171883c3dce4c434a0256193b5cd1",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 54,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257670_b9c2df09f7741fa8.jpg",
+      "image_sha256": "491b173c5af1c83ba4b92744912b9c55780f700ab90942cbfd91d394e132c747",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7386,
+      "top1_pass_anchors": 168,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "b5b8602da7f8193ba37276fe60eec7c71d2eccce2365f88b32f740d1215cd242",
+      "input_sha256": "ede560171af95f9ab3303dc924023881856d6a845cce600376d0b9466f8d80e2",
+      "annotated_box_count": 29
+    },
+    {
+      "index": 55,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257680_7af30343809ecbe8.jpg",
+      "image_sha256": "ba67d634ae9bb0a5c402a6d861e4b7e429045638925e6a1ec6fc00c1f0e7379c",
+      "selected_for_classes": [
+        4,
+        7,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7283,
+      "top1_pass_anchors": 125,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "e38a0a3d006633d5e2d830b1ff721eca5625eed1fe1f9a0455dadcfc428c8722",
+      "input_sha256": "06a38e6f24b39ba8c073fe018dbb0314267ee3101d33e29f973af295c0bc22d1",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 56,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257690_5f580c76cfe74da2.jpg",
+      "image_sha256": "b05af35944f25f8d8e00841eab468cca9927e8417b7077bf001f7fecbf14653b",
+      "selected_for_classes": [
+        4,
+        6,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7417,
+      "top1_pass_anchors": 82,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "5be750985e9bf67106179c7655ed9ad4c76b598db7dcab9911d75f40ba099bcf",
+      "input_sha256": "7ec095900df799c2969dd7ef9935c1a974cd065ee5a60bd6136112cd6e482a36",
+      "annotated_box_count": 23
+    },
+    {
+      "index": 57,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257763_24bbb4e3c5ec4325.jpg",
+      "image_sha256": "8b21abbcc93ec2f120d508a5046fdeab832fbb5b51f8b65a0e92a0ca5e8c03c4",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7264,
+      "top1_pass_anchors": 100,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "6dacd8346de483edf30d1c3fa53a742e19b3a2ea1a99ce678b19174161d11701",
+      "input_sha256": "5030beb3fa715db391c7c10b6e8a6c8d0e026e7caa9b1fbcf006925ab0f65e39",
+      "annotated_box_count": 25
+    },
+    {
+      "index": 58,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257768_7a8477e8f1450d36.jpg",
+      "image_sha256": "363e0a29fcc65401c951e1070eba80962bc8d6c38f8adc6fee93b8b3f0ddd84b",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7198,
+      "top1_pass_anchors": 51,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "7145817bc2527d077075666d0c0e28fdd9f3425aeea285a88078d4eef1a40b44",
+      "input_sha256": "64165c8482e35e632c798c574abd7e9291d2184de3ee2ae835f7d81e034d36bb",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 59,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257776_986e30b0421fa300.jpg",
+      "image_sha256": "afadcb299463f2266495c644c1d53d5c2726f8e0e7c06e745ab3bbfa7026c721",
+      "selected_for_classes": [
+        4,
+        7,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7309,
+      "top1_pass_anchors": 113,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "c07b5bff7f777e5c237ea1b14373249248bc9d023a992dddee08c25e4aa3ac5e",
+      "input_sha256": "9f7b5f8dc6ba83969d2f5f557f593e3fa921413276a14e126f83516c9358cead",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 60,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257875_5c11e653d306b3e1.jpg",
+      "image_sha256": "2ddc282c3ee8bbdf38b998ac02dc99153b668bffbc5804fed7c7c5cd612ab50b",
+      "selected_for_classes": [
+        7,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7239,
+      "top1_pass_anchors": 25,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "5d79007f236a64bfd2f423c8aced38ea7086fb395a6992d9a3cad8914c930b1d",
+      "input_sha256": "45d47f93b0b241afba5032f87d4fcb68a83752629e9c33b421ce9b6f47b24739",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 61,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257980_45418ba9630c3aa0.jpg",
+      "image_sha256": "89696639145fb4a25a6ff907fbf02cdc87a108c40fe3c29fc2fbddb0f7f15fb6",
+      "selected_for_classes": [
+        4,
+        8,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7421,
+      "top1_pass_anchors": 102,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "db0845731e8549854c626dbd72870b94b3f59b7f8481ff45b1c01b4041deb579",
+      "input_sha256": "6de3641dbaf64f12222f35092f170515679436556cfe72b8391a1b1a61e57889",
+      "annotated_box_count": 25
+    },
+    {
+      "index": 62,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257996_5ea067a1c0ad6fb1.jpg",
+      "image_sha256": "0a379ae7b23173b96a47964030c1d0e142720256f9bbae1de5c43b3b628a24fd",
+      "selected_for_classes": [
+        4,
+        5,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7276,
+      "top1_pass_anchors": 105,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "dc28e27186645923cb9af9f29493e4b95f16d7b803903cbf23c768e4eb6b6e7d",
+      "input_sha256": "233b1b49bb018f4792deb28c3de89f61f1a965ac2bec8c28dfe31d4c8f77521f",
+      "annotated_box_count": 25
+    },
+    {
+      "index": 63,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258001_a7beacf271e78331.jpg",
+      "image_sha256": "84b46bc08a03710cda0ceab9049aa1eadaecd81da5961f074851d2e5d9a78a85",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7279,
+      "top1_pass_anchors": 101,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "85aeeffe698acc3c7db842ec2e1b439e545799b1da57c04cdd97d084f52158f0",
+      "input_sha256": "4ef69b11f245e8b05279d577ed2684989149a54e4029409122f4befeeac606f2",
+      "annotated_box_count": 29
+    },
+    {
+      "index": 64,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258007_9226b4f17fe3543e.jpg",
+      "image_sha256": "8a4319218f4cc5f10b394f222a5fb06a55873962ddee26eb5bcc8c69f6e8cece",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7275,
+      "top1_pass_anchors": 63,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "7e470166467e8e32eab3834116a136658b7e1ffca563952e8d1092313482d96d",
+      "input_sha256": "9268d50e6bfaa1ab18425b8d4eca7b05784915e3c695eabc1a548701ecb074ae",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 65,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258012_16978378e7cee0af.jpg",
+      "image_sha256": "576da34f68999989fc62633807d4f22ef6485db014300e8c1e2e47ec604e175f",
+      "selected_for_classes": [
+        4,
+        7,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7341,
+      "top1_pass_anchors": 113,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "5f151ff5d3db722e57ce276d5e84e856f28ed3f4f348c7201ba55a2d619ec611",
+      "input_sha256": "28e6e732879bca19fd6a30c4d916a3218c0b465cf8caa3fe358e44a68c5040c5",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 66,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258128_012bac9ac507ede8.jpg",
+      "image_sha256": "81aea461c8caf5b1160e7159ba4e4840ddf92d85ecc65209b81980f4f7cce383",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7392,
+      "top1_pass_anchors": 167,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "d62a99e18535862a918655946bf984ea1d40f20211cba59ef49e8524fc2ec0a8",
+      "input_sha256": "ea6fcc0ea4577ccec9321fda92febf2650c25dd9ea6ebf44419b49d8d436a6ec",
+      "annotated_box_count": 29
+    },
+    {
+      "index": 67,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258130_611310d6d9916b79.jpg",
+      "image_sha256": "648d852fe2c16137b2b056bfcce7ad446bfc0dc22c89afb50439762d60cdfcf9",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        7,
+        11,
+        17
+      ],
+      "visible_valid_anchors": 7352,
+      "top1_pass_anchors": 135,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "23fcd15d71fc470961996af551b8725b5201f882f8d2b56b8fef40994b80b271",
+      "input_sha256": "9b5103bf36dbc2a95c0161a51a7e0833b7e68207fe58bc9bae7afe7247a0da29",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 68,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258145_e66f52292ecc8f2e.jpg",
+      "image_sha256": "3ce230e293484578fe3791396197649344dcd501f3e0e4b563ba05b861d63f51",
+      "selected_for_classes": [
+        4,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7398,
+      "top1_pass_anchors": 129,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "bb9294db1c462a9395567f3a3d1fe7ff528485d4784378f8a461aa654593cbcf",
+      "input_sha256": "20cda78929b8bdd37da25bbb4808d46648567cf20c393cd12d19cd5df2f252e9",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 69,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258154_b81cf797cc5283f5.jpg",
+      "image_sha256": "d88d6e0802c5e4ef14e00fe81764ebf12085d5cece47429010544606f5d18b0b",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7327,
+      "top1_pass_anchors": 135,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "18c4fdfde19cceccc975ffb2fe38b3570aa1dd0507029d33225da701dc978005",
+      "input_sha256": "03a22adf749f014a85352fa739546f15ba70499707a3c786dc589e8e707b2327",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 70,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258160_4777ceb114ebe201.jpg",
+      "image_sha256": "dea8bee49df48015ffce5d4a9b71010c077b12fdd4f9597bcd0dc0aba0dcca5d",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        8,
+        11,
+        17
+      ],
+      "visible_valid_anchors": 7200,
+      "top1_pass_anchors": 109,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "2b00f30fdf54c86c8d5bed8ae6c502663e45edc23bf21d64fde4f07060758954",
+      "input_sha256": "2291855a611c6d43a8679fbd4e8448b900b329e60f49f6d85862a50846f4ed30",
+      "annotated_box_count": 23
+    },
+    {
+      "index": 71,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258228_166fdbf91cf4d135.jpg",
+      "image_sha256": "e2fa7060472de54834fe922a83b728d3a7e0727d0988f9f4362280c683131aec",
+      "selected_for_classes": [
+        4,
+        5,
+        7,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7364,
+      "top1_pass_anchors": 74,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "feb23809a9c184e3184e1e5651fb785b66da4e590628f45a5a028cf1584e52f9",
+      "input_sha256": "2db90f512f66a963f89de37ead27e53c7a796db427fed212feed57ff7f54f8b5",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 72,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258280_507182776cb94cf0.jpg",
+      "image_sha256": "4f777a9f2e0061b17d9ed2ba6d4dea891e681a0b5483b1238916b903b333e515",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        17
+      ],
+      "visible_valid_anchors": 7308,
+      "top1_pass_anchors": 131,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "0d631dc16892bbb51dc4be7ea30183a978b24df6942b931ff9a5dbbdd690c074",
+      "input_sha256": "916fc9292b9efc9018883fa6309c4d504f68d522f4617a17fc0171dcea09126f",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 73,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258401_58cd55fb04524fde.jpg",
+      "image_sha256": "15fe37d6b8862b1c1cad67db2445edaaba6293b85d77203724abc2a5d2859f84",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        14,
+        17
+      ],
+      "visible_valid_anchors": 7209,
+      "top1_pass_anchors": 123,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "317db163676736be22c0b85cefd0e87a2d66f3e37dac5d56d881c7929ccad2bf",
+      "input_sha256": "a07cbcf269ba14932502e8b6b934f073171b290b64b319d675e020769b34fcf7",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 74,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258404_c4217c077fd8190e.jpg",
+      "image_sha256": "8f0eced6aab73f2271dcd85715daa18e12c603e9b703eb92ef1144674d07a284",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        16
+      ],
+      "visible_valid_anchors": 7310,
+      "top1_pass_anchors": 182,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "235fd7877f08265ff1401bc07e201978450d8852c3dba35c9d6bab984dc6ca78",
+      "input_sha256": "bd3fbd036e53088bda3b73c9fda1419036f02629f56ff7868e11f82e78a134b4",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 75,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258406_56bc7f2c655c32d8.jpg",
+      "image_sha256": "f22cc9a693f9b3aadc45a8d3918b0246bf3fd275c7b1190309393f3231b24701",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        7,
+        11,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7207,
+      "top1_pass_anchors": 121,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "8dc2a25895c900d5b77b6e910744b6e440e6b3d9e0118d4f529fc7c3cdcf8eb8",
+      "input_sha256": "3dc073559e3fd9114837942f68b2140fc5b924e8a0e46da57770440e632f5be3",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 76,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258525_93cfb127b1b22ba5.jpg",
+      "image_sha256": "3d19c6ee0a7f4ac4ee8a4be32fbc7e6ccb5c406968d46f5511e7baf2f66b8dbc",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7288,
+      "top1_pass_anchors": 107,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "a9b2984b637ca41e79c2f32e8ec41c76a4e1e873e5122d76d05a03aa8ddd7b60",
+      "input_sha256": "de2dbf00f9194c775eb3931a87d8e521848be120e4340f3ca36fe50b1ded8768",
+      "annotated_box_count": 23
+    },
+    {
+      "index": 77,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258580_fec8aa8003ad74f5.jpg",
+      "image_sha256": "f472eed767092c1d041aee9d76e090e409363965916f742ccee479a0bc08ebd7",
+      "selected_for_classes": [
+        4,
+        8,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7247,
+      "top1_pass_anchors": 102,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "5f4d9617670c1c97e2e3c36dc570afa8e758137af9956ce06f14a4cc6d2c6c80",
+      "input_sha256": "afc1506c112ae2f59f09cc40d51d26a78c380fb889ae4620ae0992d7c233e2ce",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 78,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258604_096e7849d2123d67.jpg",
+      "image_sha256": "3b2e1d31acf575b24dae969210b7b38c46977e40bbe81b410a3ecfbdcf2d2ee9",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7262,
+      "top1_pass_anchors": 133,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "ce88f642ad1671375f188194d66c3dca092af0031823148c9598103feae5212a",
+      "input_sha256": "51cdfa3b75edbe9b49dcf21e4c41d7256dd202b2ecdb5b2dcfe45a3771e6015d",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 79,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258879_a434ae2ba8bb7065.jpg",
+      "image_sha256": "4bfddfa2e07b86e3413a43c1999577f3511184c78fb448ac974b92a7e1d75674",
+      "selected_for_classes": [
+        4,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7366,
+      "top1_pass_anchors": 78,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "a9e7a01bfefed93f8d0c89d2b1c8065fbb83c130e877e2977e43a45a9cd18719",
+      "input_sha256": "c814c2654c2449499f6f1cb69eefd120a53d0785ac73bbf60c17a031095808e4",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 80,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258889_ee237693f8d49055.jpg",
+      "image_sha256": "896a0a1b05d9659f36a47642580be7e34e83c548fc5d225bc4d996de1d801681",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7333,
+      "top1_pass_anchors": 125,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "a4ac4fce8763ed1c00c66de90dc92278dfbf61f976b9021ddd627e5de1793132",
+      "input_sha256": "858550571e35faed4488c93fdf6b87cf20d358a7ed67df39845449aa80cfacd7",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 81,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258963_98acb80e27fafecf.jpg",
+      "image_sha256": "6bd5c7442572dbdd0321a424b966e1fbd85dc9e9213cd1af26815768a05ddfc2",
+      "selected_for_classes": [
+        6,
+        11,
+        16
+      ],
+      "visible_valid_anchors": 7210,
+      "top1_pass_anchors": 86,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "c98fb05f3e372101bff3d4d6dbc9fa99c51f76eac2bd0b38e05ba485f1c2ca8c",
+      "input_sha256": "1e36f10e49781ae4d0ad4b81661c326e08ff3087ea05ad807670eb45baadef44",
+      "annotated_box_count": 26
+    },
+    {
+      "index": 82,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259201_a03c33418a36c57a.jpg",
+      "image_sha256": "c1c4fb79c6aaa9624bf07f6a192b57474f9d8bfee6827b9b9dd4740ba847efad",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7306,
+      "top1_pass_anchors": 134,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "55e18eb036dc20259e03e1e1948b38cd6a9875ec5ff66695ecf7cc262befb12f",
+      "input_sha256": "ad48aceeb7190e99c88b70cf3a1aefce4617428486f715e08b9c058bc91f981e",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 83,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259204_19856c5bde1706dd.jpg",
+      "image_sha256": "264889e3644d042d286fa3e3ea574e9f4f23f2888c602208399d2710ff590b84",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7377,
+      "top1_pass_anchors": 142,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "eb1a84c81f3a478d6e493ad61b144dccea452a2b1f89633aa7356d6199ac45ff",
+      "input_sha256": "31c380fe06c17dfe6d1933acd6df8d2b1a215b35052e164de132f236287fd3f5",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 84,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259222_735ef71e60948712.jpg",
+      "image_sha256": "ecabf792301013a145c6369910ea07929d38fb25f35d8adb393cea281c9ac44c",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        7,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7305,
+      "top1_pass_anchors": 218,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "33017ee51f79e926a621a00e0185159a9fc7d9a4131eae41abe0de0dee04ad56",
+      "input_sha256": "dc04912d6364a8f5e74035b74cbebbecc0585b0a64374fad9edc968b0a73dc5f",
+      "annotated_box_count": 33
+    },
+    {
+      "index": 85,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259238_c4bbe4ca1c27dc16.jpg",
+      "image_sha256": "a0b6ae4fc0500c27c9a84f91ca3ba8bec7d7990cb9e9791f09a5a0b8eee27fb6",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7280,
+      "top1_pass_anchors": 134,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "bd4c82f05542e365e907fced74455d6a3ca6a293f8ddd706cdb20d9f12a0f734",
+      "input_sha256": "c2962834426433faa162f17d84da692a15d31112e24c483de1ffbccb2c45dde3",
+      "annotated_box_count": 25
+    },
+    {
+      "index": 86,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259239_873fee4920a38d30.jpg",
+      "image_sha256": "efa8b07fde38091da67c7ace1e7022ecf4f15e3947d6493042cf83d44b1e7b4a",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7196,
+      "top1_pass_anchors": 138,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "445cd53aaa4126136bcdde1b3f0381f6c9670ae81ba5ecffdfb34e0665764532",
+      "input_sha256": "0a057e4e962da87d6470bf57c5b127340afa05f60d52baed4e2efb673131584a",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 87,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259241_414a291a4d468965.jpg",
+      "image_sha256": "27edd95e8d7b9e718ba7352d7d79b2457e2196e554e9222818e0dfc4e1b09254",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7239,
+      "top1_pass_anchors": 174,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "cc856de24ac98599f96ac2d26838127cde09d9c865497598b8dfef6b32c768c7",
+      "input_sha256": "0b5f41d6a6c66174d00eec4d28a626c87cac4faa921182abd64a90b0f3f64b41",
+      "annotated_box_count": 34
+    },
+    {
+      "index": 88,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259244_6de836fdd5100eea.jpg",
+      "image_sha256": "129fedbcf1c2c4ad4b9367a7295c09e662e5afa198d436960a4f2fe6701ac31f",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7178,
+      "top1_pass_anchors": 120,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "7e29f6c454df259a4cfcde262b464f72e0c8d9a5eff4f94aa05db24d63a833a3",
+      "input_sha256": "36fb543b2f491e77102999931f260e699b48725834b65c007e94a3374b25e280",
+      "annotated_box_count": 30
+    },
+    {
+      "index": 89,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259245_d7b3d57b6cd90acd.jpg",
+      "image_sha256": "fed770cc54db288f4495978f5b9ccd28b496fdebafdd9483f5339cc3d6f2d7ff",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7306,
+      "top1_pass_anchors": 100,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "1373168f1b1d9bba18f9cb6a5be285a6ce00f5f4ac8545ad7a135c739b9a74d1",
+      "input_sha256": "d2a1ec7690dab075b7fa665ebdb61e481a7dd3e388be8c528a32bc07e16f6a2b",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 90,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259247_c62b3a59fef3972f.jpg",
+      "image_sha256": "5256a34bb11451baae6572f7e9b15c584e1ad0549e14930c3c0396dc04e412c2",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7280,
+      "top1_pass_anchors": 141,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "68a8894dc49530028b0060a523dd9ae6da7975817f0ee9f7dfb7fae400d7617b",
+      "input_sha256": "8e8c826a12c7c6bb59ba437cb996f3288f4a99ebcc05ace6d4735cf52dbabdf7",
+      "annotated_box_count": 34
+    },
+    {
+      "index": 91,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259373_c1c318aa40df44af.jpg",
+      "image_sha256": "ca8c64ef70ba024e2fdfe751d92f8ce7b2fbdc8cab55fc252187eb162dd7a4e0",
+      "selected_for_classes": [
+        4,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7337,
+      "top1_pass_anchors": 123,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "95e861198f1cf31adb842db7993bd918f0d9e42673c40ccd8f4e4e4c4821cf2c",
+      "input_sha256": "3ba5720cb5b7d7d68065ff7b58aa5645b7398402b5e8bbe64026a89fc5cedb5d",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 92,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259438_6483ba74638ec982.jpg",
+      "image_sha256": "07c07f268be9c0b6cd6da6d1ceea5ca7eb604a0433a590f899b25ebfdab5c076",
+      "selected_for_classes": [
+        4,
+        6,
+        14,
+        16,
+        19
+      ],
+      "visible_valid_anchors": 7442,
+      "top1_pass_anchors": 113,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "4ca9a715c45477198bba1e93e356a9706379a4573e3b4ae5a9ea0a501603f24b",
+      "input_sha256": "3bdec105e2cd02172a52cf5b69fdc7e11f1f911efe5023316aac20b5f5a141f4",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 93,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259558_4c7192cc7b6f7256.jpg",
+      "image_sha256": "4bcf9faeba1af4be7852d46f1a6cf91d41964c7a03453d47571578e0c1324cee",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7285,
+      "top1_pass_anchors": 154,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "236e59b04896e97ab911375695dcec010aff6828bbaf220b40afa355cf9df390",
+      "input_sha256": "c44ff093bb2047b6acca6d9cf20c482c10e4717265cbedb3d450a69b4fbd59ce",
+      "annotated_box_count": 29
+    },
+    {
+      "index": 94,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259563_5d325745bd90d643.jpg",
+      "image_sha256": "10245b86e567870ea673dfd05f44b6e22721e248740639883bfc0a66ea3ab282",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7291,
+      "top1_pass_anchors": 158,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "fbe6aab25368e32aec6f7609046b029c66051e60fb282a84d14826a2428b8557",
+      "input_sha256": "e66487f90e1a482bfb1df613eed1b84796844ef765679c6c3639d9737564452c",
+      "annotated_box_count": 33
+    },
+    {
+      "index": 95,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259564_cb64c9946e55715c.jpg",
+      "image_sha256": "60c0abf97bb3eb8c9f965c72c5c2a3caaa0a65fe8888700da1a2054dfdff6924",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7300,
+      "top1_pass_anchors": 160,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "559f7f0cef2a620a7dedc3551b1e8f4ae445425b238bc07b211702dd6756f49d",
+      "input_sha256": "a2ceb18d42c9658a904a34dbabbb0eb41b2cd0816d1a95f47a85736eec2601a0",
+      "annotated_box_count": 32
+    },
+    {
+      "index": 96,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259587_12faba71c77ab988.jpg",
+      "image_sha256": "bf50b58eaea63480377fd05553ebf73653c3511b11b6d59273661aeabb95a81b",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7241,
+      "top1_pass_anchors": 132,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "e1af2df1b10a1f9b63bb5c28415dc1c3daf1c2429fe5276588908b43684217e8",
+      "input_sha256": "6678297f6b259d36e71bcce011e796170efdfae98a67d3327debe77fc5cb8977",
+      "annotated_box_count": 28
+    },
+    {
+      "index": 97,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259588_0daef2817f8beb80.jpg",
+      "image_sha256": "580f7ede42dffb035c59a3ff4ed7cfc3ecb9a53c218a4d7a4724fd772f51d000",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7366,
+      "top1_pass_anchors": 125,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "9b97ccec5b53b65b57e18f99c9bf5c62a81ec0aa4e66fbd7710e35cd8a02f402",
+      "input_sha256": "c88b6cf34a909b44af5112982a33cc2c56feecaee303ceeb3c23c7cf4d278c30",
+      "annotated_box_count": 26
+    },
+    {
+      "index": 98,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259598_0ad681afb40ad9e2.jpg",
+      "image_sha256": "2a8b19c127bb8790250ffb2bc311a10906173c970e9e20beeaf353a5c6e3f355",
+      "selected_for_classes": [
+        7,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7354,
+      "top1_pass_anchors": 125,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "83a067c27bd70da01e1a6df8520f59473e45568516e607514834bb1f4766e4f7",
+      "input_sha256": "246c6028d59f614fa581e264d0dc4f6e6c11034d6d4d9f80f7c5da4340358809",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 99,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259632_7c4604218b32b5b4.jpg",
+      "image_sha256": "c7a95edd59a92bd94326b00aa5cce356b528e2cd44b3891f5c28dab788fb84be",
+      "selected_for_classes": [
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7225,
+      "top1_pass_anchors": 138,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "7c1c873fb9d4fc251f464a5503b6c3b4f76f53aec97963feccdf05e5acd62723",
+      "input_sha256": "139159ef13947a39850743f3e31b798037b263379715bed93969cff2420a0580",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 100,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259708_dcc8d3409bc0a90b.jpg",
+      "image_sha256": "239c27ee8cb68ff91f21ae46fd093f6d20052df04f3145540c5a5b8e00cbf749",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7362,
+      "top1_pass_anchors": 165,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "3434cb35068a1d15f4065e974603d99ca3e3ba1231539f0fbdc701f9d07aa75f",
+      "input_sha256": "39b306e5b411d43c714643eed8ae1fe9f8ffb6606fb2afeffd6698c8d6501867",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 101,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259723_81fd04233a3c3de4.jpg",
+      "image_sha256": "1ec2192737ba28fb2f72438b276b8fb21bd61092d611f480ecab43756a0cdf1c",
+      "selected_for_classes": [
+        4,
+        11,
+        16,
+        19
+      ],
+      "visible_valid_anchors": 7289,
+      "top1_pass_anchors": 66,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "85d96377eee9a22ee37a4ebbcbd0cf7a521c085040ecd5b0c16bd3a25f65609a",
+      "input_sha256": "21f8eb3f0cfd60bcf86d0deb20a758e81c8981546f94d777a9d0b5672653ac7c",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 102,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259870_aa49ea6bcc3341c4.jpg",
+      "image_sha256": "a94bf8af0a35482935b4a00eb36433fae09bbfd305cf5bb3d07ee53c31703808",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7384,
+      "top1_pass_anchors": 90,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "3489abf068cb4b5d409ce9d969a4f85bf2ee4ef9de6895c434730558a4286df9",
+      "input_sha256": "182301db6bca335e136c076f5d6bfb20e11cfecf0b82ef833a7be7f2dd06b834",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 103,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259871_d3e536000a34dfc0.jpg",
+      "image_sha256": "c2bc3e9745160d3745ea0064ab781879c00530af859b8c5ff04cfec0499be383",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7401,
+      "top1_pass_anchors": 104,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "419c948942d3c644dfac34cd46d405fc5f5e37f2937919d11459e2528a81a0d2",
+      "input_sha256": "aa35edad6078cf454664bc8a4c92d914b8616467cd5f3c2efdb4dc2d55af3079",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 104,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259876_e595921d077ff94a.jpg",
+      "image_sha256": "83fcc6d24805c67fe3f5551e970f6130c592c3a5d99bb0db4a7c88cc03c816ed",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7376,
+      "top1_pass_anchors": 148,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "2202e5e1ab321e8f5a23271f65477610d67e95d6979eae207654546ce59f50f3",
+      "input_sha256": "f27e92728cfdb79b991d98767de62ab23744432be3fec8ca81b73e45e3d7ca4e",
+      "annotated_box_count": 23
+    },
+    {
+      "index": 105,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259884_d5df466bd75fcb83.jpg",
+      "image_sha256": "8253759d54127f060ec3dd1554332c4218e8aeb8dbfbc5176f7529217997bf76",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7344,
+      "top1_pass_anchors": 113,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "3624538297d0850bdde648a5fc3a55d6f345b63db2d78ec1aa0aa4cada7e262a",
+      "input_sha256": "d6517779424d3b5611af977550a00dc4ddcbf97d62bd1613d61308010429389e",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 106,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260245_c76d9820b549e3b0.jpg",
+      "image_sha256": "3be5f9273283e1a4498ef3d9e7315496bb58af0b04efca4fcabc673ef467bc63",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        14,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7343,
+      "top1_pass_anchors": 120,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "42b29cbac0adc5e2e094471dd31d572145839c7268b499b4d9775f9d7953c7d3",
+      "input_sha256": "e56c8a3eea70221c2b50517a7dd24b0aeb78739da3a8fe1c15f7f919c7281820",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 107,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260252_952cd57e486ab9d9.jpg",
+      "image_sha256": "73130afc5d36362ea932d55b357a2c00fa90bf5fbdf3d2666873314eb5bc9074",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7367,
+      "top1_pass_anchors": 155,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "ed26a64d892749363b30a4b8cccdae4d2a49c0f57a2eb1c478a33bbec52ccc66",
+      "input_sha256": "eaa0b8c87588cd62d126f1bf0f401d7becee75ac3217e3292c1cd2827a4d8677",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 108,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260257_72cdf776bc5a4e99.jpg",
+      "image_sha256": "3476166f8ba0dbb1267ed4744e7e93863f1b2db4c5000d631a673028aba2ee04",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        17
+      ],
+      "visible_valid_anchors": 7226,
+      "top1_pass_anchors": 134,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "603c5b1d783b3c4fa72d6adabbc9b1af4849ec066247c5a6a5166f146ec2f4e7",
+      "input_sha256": "2515037d19e416e0ba2bcbc72c24c30594fb510428b03d81564fe0d0a1f577e4",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 109,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260258_ee3cc99336a44f6a.jpg",
+      "image_sha256": "62e22744e25d6a0b4a41d42b593cfb039d3a4df0b883213bfb0ce50342d72756",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        17
+      ],
+      "visible_valid_anchors": 7363,
+      "top1_pass_anchors": 182,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "3eee9b3a119e0f484c32d2da6eb6ec5849f85a798624f93767798c97af312095",
+      "input_sha256": "ccd9f7ccc4bd97cbcc7f34d3c60be97746718ec82592c04704aa8d9a3e53de12",
+      "annotated_box_count": 23
+    },
+    {
+      "index": 110,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260393_7f361b687ed0115a.jpg",
+      "image_sha256": "615d8ad325a8fff9d19fa9d02e740a4aa19e68782ddf41253d9b1260532a679f",
+      "selected_for_classes": [
+        5,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7392,
+      "top1_pass_anchors": 141,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "95d77780cc4b3c501b408edf4ddc1d0efa91e4be8edf9831be872f774accf6b8",
+      "input_sha256": "3e591db81a4e5c935f661b21ca2e83385fc28d99c5a49aeb01504001f14e6f41",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 111,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260400_528daaf5b207db95.jpg",
+      "image_sha256": "3577c19da9d7469b98a8ed96b0d1eb147da7028c8091373da8c151a445d396db",
+      "selected_for_classes": [
+        4,
+        5,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7386,
+      "top1_pass_anchors": 79,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "b18ee8d76dde42ee850086c5c89a967335f75cceefda6c21eb5bcb917af85972",
+      "input_sha256": "28513d31da605cc7d958e988091df6512f2d759351debd28a0e67f7d0a09c92c",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 112,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260428_9bc62f934cf35769.jpg",
+      "image_sha256": "f174804d869963ec0f4a18e3651fb4cadc0dbdb15ea6561c59b9a1605832fe25",
+      "selected_for_classes": [
+        4,
+        6,
+        7,
+        8,
+        11,
+        14,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7369,
+      "top1_pass_anchors": 125,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "f97c84e2e4d395e9f688902be4d76c48dc916c3714dbddcc0ce967179a1cb087",
+      "input_sha256": "798ae9f8cf1926ca9f5a5c0e44e90a884df885fc6e09a45ac7e72a98975d5aa5",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 113,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260474_e9c07e9e7743a5bb.jpg",
+      "image_sha256": "4ab50a5bd2cb38eed5243fc351fa2004ec77530039416926c09f1491823dca54",
+      "selected_for_classes": [
+        4,
+        7,
+        14,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7333,
+      "top1_pass_anchors": 153,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "400b6da7fb5c75e872ff9c20c96b4f2fe02e885830e3e0c3152d83c9a3ac6849",
+      "input_sha256": "e94397ad40036ef956560e5d664f3b6ff035f2842f856c47b917b0d2ef612acb",
+      "annotated_box_count": 31
+    },
+    {
+      "index": 114,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260486_29cbf52307a99344.jpg",
+      "image_sha256": "15bae29107e1a9a5ae304fdfb53d1e2acd95b121f8bc064bdd6dfbd16dd8ad07",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7348,
+      "top1_pass_anchors": 107,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "ac92c3c0b3e1c41f2f746ee61b02daf635b0793f8fb1b37101d92e8f73e37572",
+      "input_sha256": "2605daf47e30f323969c8c793077049712e6b13cbafbd5d0b7a50a11dc0e315f",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 115,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260602_1c6d51f2ec91d69f.jpg",
+      "image_sha256": "b320c015e8b9f740e477a7f23d7b4bf0b0c3241a606492b00f843bb07672f85a",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        14,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7429,
+      "top1_pass_anchors": 150,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "785e61897977cbae540d356d63b00e9ac40454184d444417cf461327acda4b26",
+      "input_sha256": "059f39ce71e5b83ede36554f189488b354af5d4a564b29456777a7162d4552d7",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 116,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260651_a7aa3fe6bb26e8da.jpg",
+      "image_sha256": "709e31c0819de6f520a2dedf9e822a1ec2f872554f341fe080b3ba497a8e901c",
+      "selected_for_classes": [
+        4,
+        5,
+        7,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7304,
+      "top1_pass_anchors": 80,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "26e53d28486fb1044c24815b3c9d5599259218d05caeffcef4753e0a8d217d72",
+      "input_sha256": "47ff493a52a4d1795e56a237208fd50872615487910342d74dd9e21029ba90d5",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 117,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260795_c03a7c6a94e814f7.jpg",
+      "image_sha256": "b613dbd2452115ff50cb104cb827b3ed937905a98c13df3a7ad9aadc17e814d7",
+      "selected_for_classes": [
+        4,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7269,
+      "top1_pass_anchors": 124,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "e86639d6bae7dfeed62176ca31c0a71f6ae7fa22d00e485b4e628640204c550e",
+      "input_sha256": "945d9d45f216cb9a495bc8943ced2db0eef87783f1393157aad5b0d13c4c1dc5",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 118,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260801_ea7020288b9d09a5.jpg",
+      "image_sha256": "d90a415a9769c4ada3b6dbf471fc3d096eeb5b1c6e18c363dcf30dc653f3701f",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7354,
+      "top1_pass_anchors": 191,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "ba5e42d6074526bb8be66567815074785585b6c65bfd269ed7b61e2adddf690f",
+      "input_sha256": "0720183a4ed00eae3d144faf439da3f1b65c3810426a2e49c8532c9012c7541d",
+      "annotated_box_count": 26
+    },
+    {
+      "index": 119,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260815_3c0451d22b706756.jpg",
+      "image_sha256": "ed1a0fd1bd032d41d620cde7f48c749fc189c6a1eb0d03ce0823855e9e1e7371",
+      "selected_for_classes": [
+        6,
+        8,
+        11,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7242,
+      "top1_pass_anchors": 130,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "fd3e99cc8a2572e639d1c48af5c2a42224aaa3b302d0969d414fdcb956c32f38",
+      "input_sha256": "4f35095abc864466111e972db6aff4f0f7b441c6eac022b2cbc97a43ece1b33f",
+      "annotated_box_count": 22
+    },
+    {
+      "index": 120,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261010_fd4bce2a235650d9.jpg",
+      "image_sha256": "602f346dba5d391ee0711049e7bb212c42b0a5633add497b8e3ebe8ea5732d61",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8394,
+      "top1_pass_anchors": 170,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "adba716520cd6e0909ba413269465b520d8c88f57bdf5c2d3b91630991e1f07f",
+      "input_sha256": "46980bb5ecdbc9f43c6176eccd6b9d337f71b69f0f55ea92023b04392189d8fd",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 121,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261011_7688fa02ac25a587.jpg",
+      "image_sha256": "2fdd9cbede9dc8b886449e7670016b97e187937bf9a48c37ad44e4043372d34d",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8394,
+      "top1_pass_anchors": 173,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "8fdc2932930c60eaea06d8370a2d92bf3653c194b7f2363a6220928353ce956e",
+      "input_sha256": "9cb8a17a22838f3f01025a1b28ac9a61cfde2a60c1b85074f6b5d513a4da64ec",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 122,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261012_8a262d5d24657845.jpg",
+      "image_sha256": "2267a1810fbdfbb5fa88de8593c85a03f954519ce5616231afa7c551bccefc58",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8398,
+      "top1_pass_anchors": 175,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "b6941a308722c871789dccfb3b38e5b425a57be8992844dc242481e3bc5297cf",
+      "input_sha256": "c54f8bf7583e35eeb4b0395db0a28ecaff4001af3b75ff91bda6ed662c93b825",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 123,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261013_5eb2e4d6591696d8.jpg",
+      "image_sha256": "cdec25b018c9c3c8c784d63a343a9d5cb5d5b4db9ea16819dd6290dfbac684c4",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8398,
+      "top1_pass_anchors": 173,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "721abf7f7adf1c474830e7b89bdd81f94eed29a09a267610bc344bf965a6877e",
+      "input_sha256": "42dc688f2d8c8e6f7c7e0a26aef9a19bd71cf6069e00ef04c2145322dadd9577",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 124,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261014_91eb768ddf2b6213.jpg",
+      "image_sha256": "10b003d797b55009021cd1a3e9233bb0ce8dd3f35a197c50f650916dc41ebab4",
+      "selected_for_classes": [
+        4,
+        6,
+        8,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8400,
+      "top1_pass_anchors": 159,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "5f2469928eb2d63f018676651b772bdab06539072958ab506a59366ef382a067",
+      "input_sha256": "07a8424116d7f18660cca56de1e62c74ba1dc3e2ca37697ff561301f503b5514",
+      "annotated_box_count": 21
+    },
+    {
+      "index": 125,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261040_ee440b0937d7a5a4.jpg",
+      "image_sha256": "b0d1ef3f428eeaf7dd7f7ef2bdb363021dcf9659cab670f8f70c2ce127fb35a9",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8378,
+      "top1_pass_anchors": 147,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "2205a8e2cdb22828e7dd91c16a18f7f3622d66aa9d0f2bf6e4bbd77f86131ade",
+      "input_sha256": "1d247694667c1ec55026ffce39895f1b75031f3f53f34ef3377d43f96eec11fe",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 126,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261041_5066cc994a67308d.jpg",
+      "image_sha256": "3db49eea07e4b0e6dcaff0e5fd0f4f357d69e69496e17dbff79572aa2c10ecc4",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8392,
+      "top1_pass_anchors": 147,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "ddf1712b491b7b5af13b0c137452adc14e5acd96c44c1a12e85de36d73c04c4b",
+      "input_sha256": "46c50ce21a3f07f27b8d07edd8e25a2a3ed085a7f432faadd966bd327646cba8",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 127,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261042_5ea61f1d60455fc1.jpg",
+      "image_sha256": "22d9d55ba617ac2d2114b990089e28af00c7edabe78c56f650957ce4df356487",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8384,
+      "top1_pass_anchors": 147,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "74fe4d6e12938d2199debfd5a57ab0265fc6828187226549305094b8783a4f87",
+      "input_sha256": "cc285a433cb11ad2ab20b3c202de81554e7836be6e939c1785ebae17e93bcf36",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 128,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261043_890dd9d8d3141d90.jpg",
+      "image_sha256": "0b8cd96f7bc8679644f0035b3d3ec42e644dd2df55685da729382e806265de25",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8381,
+      "top1_pass_anchors": 152,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "f0e04c9c7acc6725f05749234fa2b1358263f379e968b03251f3e61dc928c2ea",
+      "input_sha256": "7a7cf595481b5bb5d5744a890e4bb6b3f82b3b8dd5b55685c9b5e51e46cb9876",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 129,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261051_45d0514021b48e12.jpg",
+      "image_sha256": "f3e2796995950194bd8c65a66dc4b1e7a51a26dc93fea302ef8fb2a574a9d31a",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8388,
+      "top1_pass_anchors": 148,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "3a1685fa60ddee1508a5e9dfe5bde2fdadcf153bdbf87435d23f37159a0bc367",
+      "input_sha256": "9c7e2cdc9054eceae6af416c3b36984f5eea986572f8dcfbb0f225ce3da92727",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 130,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261052_99f07a90105d36a1.jpg",
+      "image_sha256": "38f8250f6137e69d0b5e375fe5c1740e036018fbe053c95f354af162046c5074",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8388,
+      "top1_pass_anchors": 155,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "1181af6a00b32cdfb53c374d3a6dd6a0be461d282928fc2aa70035fd81910fc3",
+      "input_sha256": "518baecf61e6dc40702e933c14b4334cf918df5159f019933a87d1639a827efd",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 131,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261053_deca730cb6742a6d.jpg",
+      "image_sha256": "e9a15dfc0508b4d415742f3effedb22342b628d7accd01ce6861d14f77246756",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8392,
+      "top1_pass_anchors": 158,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "a53bf5f33453dadb373316cec877521fa4f11bcf1ad430d375e178bad83fd0db",
+      "input_sha256": "37d8ffb56c9312e2fdbf545c6fe58703fbc40621e5ccc1676747f765b426c685",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 132,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261054_676080256b0ad0c7.jpg",
+      "image_sha256": "e17891325133f865c83683726f139b74ea62709b4ef8ef56d7eddeaf28e8a63d",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8394,
+      "top1_pass_anchors": 152,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "6f213376539dcd51a9af5f01382a1ac502f9c960d714fe56b005fe21e1e45713",
+      "input_sha256": "5cb048f4e1388e946ef3804a61bf086593173323e43c7d2969e64f52cbcfb7de",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 133,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261055_b10b7ace397da27a.jpg",
+      "image_sha256": "ae9a91b7194c0c975326c02b2475cd0513046bdec8d7a45a74a972b7a176620e",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8392,
+      "top1_pass_anchors": 155,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "e6c228d17af22f0ad8f1c0d88fac8c3dfb99dd14407a708f1079e7c297d86af6",
+      "input_sha256": "bf0646a1ea08a764f84c08f55eee92f9f69d17d318fe5b88af18f3c4931d871b",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 134,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261056_64ae16c77e4ab1af.jpg",
+      "image_sha256": "30cfaa12e9c464e343508807181db442208f3f61e0f3624fd171dc049add3059",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8400,
+      "top1_pass_anchors": 149,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "4559e12be3f5ad5f728b1660f1954b491f7cc8875a368794d35c47fcf80c2d94",
+      "input_sha256": "26b98efb2fb773ed463edb70a15246101edf9e4cb7025aa61fd2ac79e2026038",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 135,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261057_0b31b8fceacdbb83.jpg",
+      "image_sha256": "84f883301ec5d7eb777a3a84c9071802915e99f180c67f1659f46818a4897c0c",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8397,
+      "top1_pass_anchors": 147,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "d796e18f3a3a2dcaae767ee8014ae4f57819d71c86518174647fb342a1a5d55f",
+      "input_sha256": "48a7a71fe95c6ce3e6a3c63eaf455ee5eefda2d8cc46327ea3ccd7e8fec84588",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 136,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261058_0e4f2e786e65b4ac.jpg",
+      "image_sha256": "85b354eb37106df9176d0b16cbf87c24eeaef6401dec9d8a979f8d248fb6f77f",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8391,
+      "top1_pass_anchors": 147,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "20ead718345ae93dcbea16d25b297240b9d78c6fcfc178b909a6c86b327e995f",
+      "input_sha256": "cf7de779994d3b3dc5c537754f0b8f735fff218fcc57635358a6e0803ff3f6c7",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 137,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261059_83432021bf5ebb85.jpg",
+      "image_sha256": "8a2b5e78d831a32a97735538e07bb29d3ad10700e484d5c93082afe9689b0b1e",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8403,
+      "top1_pass_anchors": 150,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "186c55955144645dbd08c9d1f35ab21ae3c633dbdd1c94767ba1e4ea26946c47",
+      "input_sha256": "f54376f76117a1c71cbb45cc5605f38c325e9a8c2eeae89e421e454441712fb6",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 138,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261060_7e3587891dcf93dc.jpg",
+      "image_sha256": "301325d9a932291a872664fb1ccfebeceb4951b6b8d8e3efa047e1a85e48dbd0",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8400,
+      "top1_pass_anchors": 148,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "ca79b3c1abf4cef35a3f70c41e035844ecc5fbc7d33f423b465ce966fe9c3d43",
+      "input_sha256": "335ea5083459eb508e21f0227d1407a2f2bf1b1ea17297398be117697397d448",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 139,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261061_e979ab69eba21396.jpg",
+      "image_sha256": "1e763d3b6702ad562e1e5f2b7c5d3cffa85f9078a82f4c82bcde50b1e0259efd",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8381,
+      "top1_pass_anchors": 147,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "117571704b7a7954d2ae8063b5deaa6d08b15167ee067b3e157b8a635d271ded",
+      "input_sha256": "c6844ee5daf74181a052a78d71f9558b4d8de2d29aaa6d35b41c5ba939933500",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 140,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261062_9cc3325fc1bba79d.jpg",
+      "image_sha256": "3762542655924c9c59b0720e3295cda3de48a3f005c883b9e85f4f56ce23ecae",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8378,
+      "top1_pass_anchors": 147,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "ffb5fb4456f0f94d2466a334b94e67faebca8c8ca5d888356acc1337883e63fe",
+      "input_sha256": "849ca709e149b61a93329498287c74683a6a87819e623e9af0092b37fe86dc52",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 141,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261063_fddb0101b7137a7c.jpg",
+      "image_sha256": "1a15a5ec981cfc0b3b50a3e001896509c5fd8dffc686999ac6c6f49ee5f76455",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8384,
+      "top1_pass_anchors": 147,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "44a691259d277567ab508b85caf9691047521f62422896fbeb9bd05807b8b313",
+      "input_sha256": "560b97bb46821663d98ad67f601940f42154ce3697c921272c085a778519e9d3",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 142,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261064_117f57d93151727b.jpg",
+      "image_sha256": "175e643c07f3e8970e735c115363e99d5288b444ca957e49bbae720598a92381",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8383,
+      "top1_pass_anchors": 144,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "2590664e64f339d009035f4a52f7ecc8c34b9bf6e4ea897bb372011a9d51977e",
+      "input_sha256": "d5e462a1599c86100d4c90adb513b4ade35ff4d307ba3736deb352bf17178b5f",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 143,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261095_04aefccc385c1e58.jpg",
+      "image_sha256": "ced6554b6bbee35dbe9f3bee6fe968e5c083d218f7fbc80d009fd3d9667c567c",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        15
+      ],
+      "visible_valid_anchors": 8427,
+      "top1_pass_anchors": 135,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "7bafbd5ae159378c9d7277e30198be0f4fb45f6cd58970d3a6dbe76a3fe11bfe",
+      "input_sha256": "154eb7fd2ff63e2228c0f3ef19b7ce4962b53344d6e146159984ed2cb65652a0",
+      "annotated_box_count": 20
+    },
+    {
+      "index": 144,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_264255_0cf18bddcf8dcd8e.png",
+      "image_sha256": "abe3ba11756c6676a917dd0bf31ffaaf927c2f9252fc1995f773f204deadb2f7",
+      "selected_for_classes": [
+        13
+      ],
+      "visible_valid_anchors": 7253,
+      "top1_pass_anchors": 113,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "1679dd3524842da225ec678ef5f1c83a14f250390f933946816f246989366597",
+      "input_sha256": "b67bc81ed7acc714aa476ff1e59f3e7e2b15f7dcf60885e838cb789a1a69209a",
+      "annotated_box_count": 27
+    },
+    {
+      "index": 145,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_264380_48ac17f581f6db85.png",
+      "image_sha256": "78ea1ad0ecdf1fb4b655952747f7f90935bff5c3766830e223630dab98ce05dc",
+      "selected_for_classes": [
+        13
+      ],
+      "visible_valid_anchors": 7311,
+      "top1_pass_anchors": 80,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "1f0654095cbc8da9726b17a79d9855ade58bdbf5343ec1da005f4e5b524137df",
+      "input_sha256": "3de26732735fe849a11ad2cfaf04717ce8f979fcd2b244de29a9485ef3f3868b",
+      "annotated_box_count": 24
+    },
+    {
+      "index": 146,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_270679_9ed23428dd98d469.png",
+      "image_sha256": "6fd8be52c3eedb8b783def8a34e5122555dd5cb0691e50f7fc54f32e9b700664",
+      "selected_for_classes": [
+        4,
+        5,
+        11,
+        14,
+        16,
+        17
+      ],
+      "visible_valid_anchors": 7185,
+      "top1_pass_anchors": 134,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "8b7b7719f725110cbe9d899e0c6533a8fd32692c5785af718a1b700e6caee95b",
+      "input_sha256": "185769a3b5ad16caa3a980c6cd5558e209e3f12acc92095e02a91c6ebaffb1e9",
+      "annotated_box_count": 25
+    },
+    {
+      "index": 147,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_271234_09833f73514e22b2.jpg",
+      "image_sha256": "002073834655a3785d7d947f3d802fa2778dd3b7a6b89bc8a4bc82b7a1104552",
+      "selected_for_classes": [
+        4,
+        6,
+        11,
+        14,
+        17
+      ],
+      "visible_valid_anchors": 7391,
+      "top1_pass_anchors": 113,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "14c61f1d232d4a82cd1ec6268019a7e9d365cffd9f1295b63e69edc7542148df",
+      "input_sha256": "29d55ca0a80da7b75eaa7043c5ed5d67be2a222da909861f9b61d4fb93570631",
+      "annotated_box_count": 31
+    },
+    {
+      "index": 148,
+      "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_271238_dd5ec310af0600e3.jpg",
+      "image_sha256": "e0f48cc582895e46e057aa0a4f60b9d3cfe105e1567eeeb959db407c02d34a2f",
+      "selected_for_classes": [
+        6,
+        7,
+        14,
+        16,
+        17,
+        19
+      ],
+      "visible_valid_anchors": 7265,
+      "top1_pass_anchors": 137,
+      "discarded_top1_with_other_pass_anchors": 0,
+      "raw_sha256": "60dd524b33cf0dec28d495221a4ce7323af29b94a269e9d59fef02205d8a415c",
+      "input_sha256": "9ebcf62b23a8a31b782b6de350b2b3fcdcf648b1c262bba6cf6ef905418bc9a4",
+      "annotated_box_count": 25
+    }
+  ],
+  "elapsed_s": 6.010246013989672,
+  "maximum_pre_nms_accepted_anchors": 218,
+  "images_with_accepted_anchors_at_least_300": 0,
+  "images_with_accepted_anchors_above_300": 0
+}

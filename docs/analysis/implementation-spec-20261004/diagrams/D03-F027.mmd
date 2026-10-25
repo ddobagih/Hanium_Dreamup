@@ -1,0 +1,19 @@
+flowchart TD
+ A["F-D03-027 명시 시작 / 교체 / 승인 재탐색<br/>P-D03-025 P-D03-026 P-D03-027"] --> G{"runtime session network storage 결정 gate 통과인가"}
+ G -->|"아니오"| X["요청하지 않음 / 상태별 복구 안내"]
+ G -->|"예"| L{"fresh 요청 원점이 있는가"}
+ L -->|"아니오"| P["허용된 첫 명시 시작만 F-D03-024 15초 위치대기"]
+ L -->|"예"| I{"CAS 단일 inFlight 획득인가"}
+ I -->|"아니오"| X
+ I -->|"예"| N["기존 설치 route 유지 / generation 예약 / executor 전송"]
+ N --> H{"HTTP와 route 검증 성공인가"}
+ H -->|"아니오"| F["typed failure / 기존 route 유지<br/>countable 연속2회는 safety stop"]
+ H -->|"예"| C{"현재 request lease와 최신 위치 연결성 통과인가"}
+ C -->|"아니오"| D["late 또는 분리된 응답 설치 거부"]
+ C -->|"예"| S["직렬 IO에 첫 archive save와 load 확인 제출"]
+ S --> V{"archive 성공이며 UI복귀시 lease와 최신 연결성도 유효한가"}
+ V -->|"아니오"| E["설치 거부 / 저장실패는 정상모드 safety stop"]
+ V -->|"예"| R["이번 response route 설치 / destination provenance 갱신"]
+ R --> A0["새 목적지일 때만 계단회피 범위 고지"]
+ N -->|"취소 계정 epoch 변경"| Z["generation 폐기 / call cancel / stale callback 무시"]
+ S -->|"owner 변경"| Z

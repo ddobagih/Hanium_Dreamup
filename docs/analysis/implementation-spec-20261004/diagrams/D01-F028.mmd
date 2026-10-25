@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D01-028 계정 삭제 요청·status 갱신·9개 inventory·완료 증거"]
+  G{"durableconfirmed intent 및 request journal; current deletion worker lease; 적절한 session/controlsecret"}
+  I["request/install/clientrev/accountgeneration/tombstone/receipt; statusrev,acceptedAt,itemstates; exact9 inventory"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: HTTP/parsing/storage 실패는 retry/restricted/failclosed 상태 유지"]
+  G -->|"미충족"| X
+  N1["initial POST /privacy/account-deletions는 GENERAL session과 삭제secret로202를 기대한다. 접수 후 GET request/status는 secret로 조회한다."]
+  I --> N1
+  N2["상태응답은 identity와 accepted binding·revision·9항목과 상태별 evidence를 검증한다."]
+  N1 --> N2
+  N3["worker lease/generation이 current일 때 stateMachine.apply를 호출하고 durable journal 저장 뒤 UI progress를 갱신한다."]
+  N2 --> N3
+  N4["PENDING/IN_PROGRESS/EXTERNAL_PENDING/RETRY_WAIT/LEGAL_HOLD/FAILED/COMPLETED/NOT_APPLICABLE를 inventory별로 유지하고 전체phase를 유도한다."]
+  N3 --> N4
+  N5["전체terminal receipt와 deviceEvidenceAcknowledged까지 만족해야 COMPLETED; terminalCleanupComplete는 별도 reset 선행조건이다."]
+  N4 --> N5
+  OK["정확한 서버COMPLETED+증거ack 후 완료표시/정리 경로"]
+  N5 --> OK
+  B0["stale 무시"]
+  N2 -->|"lowerrevision"| B0
+  B1["duplicate 허용"]
+  N2 -->|"same revision 동일"| B1
+  B2["failClosed"]
+  N2 -->|"same revision 다름·다른identity·항목누락"| B2
+  B3["다음재시도시각 또는 보류사유·재검토·문의/부분실패 유지"]
+  N4 -->|"retry/legalhold/failed"| B3
+  B4["서버 항목이 끝났어도 앱 전체완료 불허"]
+  N5 -->|"device 증거 미ack"| B4
+  R["중단·취소: durable 삭제 요청 취소 API 없음; network call cancel은 절차취소 아님 / worker ownership 및 Activity lease로 late UI/update 배제"]
+  V["복구·재시도: journal과 authority 복원으로 같은request 이어감 / secret replay POST/status GET 경로; 일정/실행worker 상세 일부 미정독"]
+  Q["정책 P-D01-021 · P-D01-022 · P-D01-024"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

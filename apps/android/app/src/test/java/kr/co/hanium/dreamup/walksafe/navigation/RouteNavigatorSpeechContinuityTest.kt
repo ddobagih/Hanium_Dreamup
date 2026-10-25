@@ -13,6 +13,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RouteNavigatorSpeechContinuityTest {
+    // These fixtures isolate position provenance and in-flight speech lease continuity.
+    // Production 1.5-second delay and immediate safety actions are covered by RouteDirectionRecheckGraceTest.
+
     @Test
     fun distanceBandChangesWaitForSentenceCompletionAndOfferOnlyLatestStage() {
         // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
@@ -33,7 +36,7 @@ class RouteNavigatorSpeechContinuityTest {
             val nextStage = requireNotNull(navigator.retryGuidance(3_002, facingObservation = RouteFacingObservation(90.0, 5.0, 3_002)))
             assertEquals(first.guideIndex, nextStage.guideIndex)
             assertEquals(0, nextStage.speechCueToken?.distanceBand)
-            assertTrue(nextStage.instruction?.contains("6m 앞") == true)
+            assertTrue(nextStage.instruction?.contains("다음 안내 지점까지 경로를 따라 약 6미터") == true)
             assertFalse(nextStage.instruction?.contains("길안내를 시작합니다") == true)
             assertFalse(nextStage.cancelStaleNavigationSpeech)
             assertTrue(navigator.reserveInstruction(nextStage))
@@ -78,7 +81,7 @@ class RouteNavigatorSpeechContinuityTest {
         assertEquals("guidance_retry_wait", navigator.retryGuidance(2_003, facingObservation = RouteFacingObservation(90.0, 5.0, 2_003))?.reason)
         assertEquals("guidance_retry_wait", navigator.retryGuidance(4_000, facingObservation = RouteFacingObservation(90.0, 5.0, 4_000))?.reason)
         val latest = requireNotNull(navigator.retryGuidance(4_001, facingObservation = RouteFacingObservation(90.0, 5.0, 4_001)))
-        assertTrue(latest.instruction?.contains("20m 앞") == true)
+        assertTrue(latest.instruction?.contains("다음 안내 지점까지 경로를 따라 약 20미터") == true)
         assertTrue(latest.instruction?.contains("길안내를 시작합니다") == true)
         assertNotEquals(first.speechCueToken, latest.speechCueToken)
         assertTrue(navigator.reserveInstruction(latest))
@@ -187,7 +190,7 @@ class RouteNavigatorSpeechContinuityTest {
         val next = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 4_000), 4_000, false, facingObservation = RouteFacingObservation(0.0, 5.0, 4_000))
         assertTrue(next.cancelStaleNavigationSpeech)
         assertNotEquals(first.guideIndex, next.guideIndex)
-        assertTrue(next.instruction?.contains("오른쪽으로 꺾으세요") == true)
+        assertTrue(next.instruction?.contains("3시 방향으로 꺾으세요") == true)
         assertTrue(navigator.reserveInstruction(next))
         navigator.acknowledgeInstruction(first, 4_001)
         assertEquals("guidance_in_flight", navigator.retryGuidance(4_002, facingObservation = RouteFacingObservation(0.0, 5.0, 4_002))?.reason)
@@ -205,7 +208,12 @@ class RouteNavigatorSpeechContinuityTest {
             assertNull(old.instruction)
             assertNull(navigator.currentAcceptedRouteMatchFor(1_000))
             navigator.acknowledgeInstruction(first, 2_001)
-            val fresh = navigator.update(raw.copy(elapsedRealtimeMs = 3_000), 3_000, false)
+            val recovering = navigator.update(raw.copy(elapsedRealtimeMs = 3_000), 3_000, false)
+            val fresh = if (testMode) recovering else {
+                assertNull(recovering.instruction)
+                assertNull(recovering.speechCueToken)
+                navigator.update(raw.copy(elapsedRealtimeMs = 3_100), 3_100, false)
+            }
             assertNotNull(fresh.instruction)
             assertTrue(navigator.reserveInstruction(fresh))
         }
@@ -228,7 +236,7 @@ class RouteNavigatorSpeechContinuityTest {
     }
 
     private fun navigator(testMode: Boolean = false) =
-        RouteNavigator(allowDegradedRouteGuidance = testMode).apply { setRoute(route()) }
+        RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L), allowDegradedRouteGuidance = testMode).apply { setRoute(route()) }
 
     // Synthetic fixtures validate cue continuity and do not represent recorded walking accuracy.
     private fun fix(longitude: Double, atMs: Long) = TrustedLocation(0.0, longitude, 2f, atMs)

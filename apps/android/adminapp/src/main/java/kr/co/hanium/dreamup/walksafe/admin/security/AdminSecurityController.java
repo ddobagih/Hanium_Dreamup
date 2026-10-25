@@ -78,6 +78,8 @@ public final class AdminSecurityController implements AutoCloseable {
     // Network work remains serialized, but never owns the UI/lifecycle monitor.
     private final ReentrantLock workLock = new ReentrantLock();
     private final Object lifecycleLock = new Object();
+    // Guarded by lifecycleLock; callbacks run only after dropping that monitor.
+    private final Set<Runnable> admittedRequestCancellations = new HashSet<>();
     private final ThreadLocal<LocalOperation> currentOperation = new ThreadLocal<>();
     private Snapshot publishedSnapshot;
     private long localGeneration;
@@ -87,10 +89,10 @@ public final class AdminSecurityController implements AutoCloseable {
     private final AdminRecoveryCustodyAttempt custodyAttempt;
 
     private final AdminSecurityApi api;
-    private final AdminOperationsApi operationsApi;
-    private final AdminReportRepository reportRepository;
-    private final AdminIncidentRepository incidentRepository;
-    private final AdminRawCollectionRepository rawCollectionRepository;
+    private final AdminReviewDeliveryOperations deliveries;
+    private final AdminReportOperations reports;
+    private final AdminIncidentOperations incidents;
+    private final AdminRawCollectionOperations rawCollections;
     private final AdminSecurityTelemetry.Recorder telemetry;
     private AdminSecurityState securityState = AdminSecurityState.SIGNED_OUT;
     private String accessToken;
@@ -243,14 +245,51 @@ public final class AdminSecurityController implements AutoCloseable {
         if (api == null) throw new IllegalArgumentException("api is required");
         if (telemetry == null) throw new IllegalArgumentException("telemetry is required");
         this.api = api;
-        this.operationsApi = operationsApi;
-        this.reportRepository = reportRepository;
-        this.incidentRepository = incidentRepository;
-        this.rawCollectionRepository = rawCollectionRepository;
+        this.deliveries = new AdminReviewDeliveryOperations(this::openOperationalLease, operationsApi);
+        this.reports = new AdminReportOperations(this::openOperationalLease, reportRepository);
+        this.incidents = new AdminIncidentOperations(this::openOperationalLease, incidentRepository);
+        this.rawCollections = new AdminRawCollectionOperations(this::openOperationalLease, rawCollectionRepository);
         this.telemetry = telemetry;
         this.custodyAttempt = new AdminRecoveryCustodyAttempt(custodyAttemptStore);
         publishedSnapshot = currentSnapshot();
+        api.bindRequestAdmission((cancel, start) ->
+            admitRequest(this::requireCurrentOperation, cancel, start));
     }
+
+    private AdminOperationAuthority.Lease openOperationalLease() {
+        LocalOperation operation = beginOperation(false);
+        return new AdminOperationAuthority.Lease() {
+            private boolean released;
+            private void requireLease() {
+                if (released) throw new IllegalStateException("administrator operation lease is closed");
+                requireCurrentOperation();
+            }
+            @Override public AdminOperationsApi.SessionContext session(boolean enabled) {
+                requireLease();
+                return requireOperationalSession(enabled, this::requireLease);
+            }
+            @Override public void reauthenticate(char[] password, char[] totp,
+                AdminHighRiskActionGate.Operation action, long now) throws IOException {
+                requireLease();
+                AdminSecurityController.this.reauthenticate(password, totp, action, now);
+            }
+            @Override public AdminHighRiskActionGate.Decision consume(
+                AdminHighRiskActionGate.Operation action, long now, boolean enabled) {
+                requireLease();
+                return consumeHighRiskAuthorization(action, now, enabled);
+            }
+            @Override public void close() {
+                if (released) return;
+                released = true;
+                operation.close();
+            }
+        };
+    }
+
+    public AdminReviewDeliveryOperations deliveries() { return deliveries; }
+    public AdminReportOperations reports() { return reports; }
+    public AdminIncidentOperations incidents() { return incidents; }
+    public AdminRawCollectionOperations rawCollections() { return rawCollections; }
 
     public Snapshot snapshot() {
         synchronized (lifecycleLock) {
@@ -288,10 +327,39 @@ public final class AdminSecurityController implements AutoCloseable {
     /** SAF is already bound to a session/report and revalidated before reading or writing. */
     public void suspendForBackground(boolean intentionalExternalActivity) {
         if (intentionalExternalActivity) return;
+        List<Runnable> pending;
         synchronized (lifecycleLock) {
             localGeneration += 1L;
             locallyLocked = true;
+            pending = drainAdmittedRequests();
         }
+        pending.forEach(AdminSecurityController::bestEffortCancel);
+    }
+
+    // Caller owns lifecycleLock. Generation invalidation and draining are one transition.
+    private List<Runnable> drainAdmittedRequests() {
+        List<Runnable> pending = new ArrayList<>(admittedRequestCancellations);
+        admittedRequestCancellations.clear();
+        return pending;
+    }
+
+    private AdminRequestAdmission.Registration admitRequest(
+        Runnable currentLeaseCheck, Runnable cancel, Runnable enqueue
+    ) {
+        synchronized (lifecycleLock) {
+            currentLeaseCheck.run();
+            admittedRequestCancellations.add(cancel);
+            try {
+                // Only registration/nonblocking enqueue belongs here; network I/O stays outside.
+                enqueue.run();
+            } catch (RuntimeException | Error error) {
+                admittedRequestCancellations.remove(cancel);
+                throw error;
+            }
+        }
+        return () -> {
+            synchronized (lifecycleLock) { admittedRequestCancellations.remove(cancel); }
+        };
     }
 
     /** Reopens only the signed-out form, never an existing administrator session. */
@@ -378,6 +446,7 @@ public final class AdminSecurityController implements AutoCloseable {
     }
 
     private void discardLocalSession(boolean permanent) {
+        List<Runnable> pending;
         synchronized (lifecycleLock) {
             localGeneration += 1L;
             locallyLocked = false;
@@ -387,7 +456,9 @@ public final class AdminSecurityController implements AutoCloseable {
             recoveryToken = null;
             recoveryAdminId = null;
             publishedSnapshot = emptySnapshot(AdminSecurityState.SIGNED_OUT);
+            pending = drainAdmittedRequests();
         }
+        pending.forEach(AdminSecurityController::bestEffortCancel);
         // An active worker drains this on exit. Otherwise cleanup may be slow,
         // so never run it on the caller that just revoked local access.
         if (!workLock.isLocked()) {
@@ -740,19 +811,125 @@ public final class AdminSecurityController implements AutoCloseable {
         }
     }
 
+    /** Revoke local authority without waiting for workLock or any HTTP/client monitor. */
+    public CurrentSessionRevocation beginCurrentSessionRevocation(String sessionId) throws IOException {
+        requireCanonicalSessionId(sessionId, "invalid_session_id");
+        List<Runnable> pending;
+        CurrentSessionRevocation revocation;
+        synchronized (lifecycleLock) {
+            if (closed || locallyLocked || accessToken == null || !sessionId.equals(currentSessionId)) {
+                throw new IllegalStateException("current administrator session is unavailable");
+            }
+            String token = accessToken;
+            String device = authenticatedDeviceId;
+            localGeneration += 1L;
+            localClearPending = true;
+            clearControllerSessionState();
+            recoveryToken = null;
+            recoveryAdminId = null;
+            publishedSnapshot = emptySnapshot(AdminSecurityState.SIGNED_OUT);
+            pending = drainAdmittedRequests();
+            revocation = new CurrentSessionRevocation(token, sessionId, device, localGeneration);
+        }
+        pending.forEach(AdminSecurityController::bestEffortCancel);
+        return revocation;
+    }
+
+    /** One captured server revoke; this capability cannot reopen local administrator access. */
+    public final class CurrentSessionRevocation implements AutoCloseable {
+        private String token;
+        private final String sessionId;
+        private final String deviceId;
+        private final long generation;
+        private boolean used;
+        private volatile boolean cancelled;
+        private Runnable requestCancellation; // guarded by lifecycleLock
+
+        private CurrentSessionRevocation(String token, String sessionId, String deviceId, long generation) {
+            this.token = token;
+            this.sessionId = sessionId;
+            this.deviceId = deviceId;
+            this.generation = generation;
+        }
+
+        private void requireCurrent() {
+            synchronized (lifecycleLock) {
+                if (cancelled || closed || locallyLocked || generation != localGeneration
+                    || accessToken != null || recoveryToken != null) {
+                    throw new IllegalStateException("current session revocation is no longer admitted");
+                }
+            }
+        }
+
+        public void revoke() throws IOException {
+            String captured;
+            synchronized (this) {
+                if (used || cancelled) throw new IllegalStateException("current session revocation was already consumed");
+                used = true;
+                captured = token;
+            }
+            try {
+                requireCurrent();
+                AdminSecurityApi.StateSnapshot state = api.revokeSession(captured, sessionId, deviceId,
+                    this::admitRevocationRequest);
+                requireCurrent();
+                requireAuthenticatedState(state.securityState(), "invalid_revoke_state");
+            } finally {
+                close();
+                // Never wait for an older worker; it drains localClearPending on exit.
+                if (workLock.tryLock()) {
+                    try { clearPendingLocalSessionIfNeeded(); }
+                    finally { workLock.unlock(); }
+                }
+            }
+        }
+
+        private AdminRequestAdmission.Registration admitRevocationRequest(Runnable cancel, Runnable start) {
+            AdminRequestAdmission.Registration registration;
+            synchronized (lifecycleLock) {
+                requireCurrent();
+                requestCancellation = cancel;
+                try { registration = admitRequest(this::requireCurrent, cancel, start); }
+                catch (RuntimeException | Error error) { requestCancellation = null; throw error; }
+            }
+            return () -> {
+                registration.close();
+                synchronized (lifecycleLock) {
+                    if (requestCancellation == cancel) requestCancellation = null;
+                }
+            };
+        }
+
+        @Override public void close() {
+            synchronized (this) {
+                cancelled = true;
+                token = null;
+            }
+            Runnable cancel;
+            synchronized (lifecycleLock) {
+                cancel = requestCancellation;
+                requestCancellation = null;
+            }
+            if (cancel != null) bestEffortCancel(cancel);
+        }
+    }
+
     public void revokeSession(String sessionId) throws IOException {
+        boolean current;
+        synchronized (lifecycleLock) { current = sessionId != null && sessionId.equals(currentSessionId); }
+        if (current) {
+            try (CurrentSessionRevocation revocation = beginCurrentSessionRevocation(sessionId)) {
+                revocation.revoke();
+            }
+            return;
+        }
         try (LocalOperation ignored = beginOperation(false)) {
             String token = requireAccessToken();
             requireCanonicalSessionId(sessionId, "invalid_session_id");
-            boolean revokingCurrent = sessionId.equals(currentSessionId);
             try {
                 AdminSecurityApi.StateSnapshot state = api.revokeSession(token, sessionId);
                 AdminSecurityState next = state.securityState();
                 requireAuthenticatedState(next, "invalid_revoke_state");
-                if (revokingCurrent) {
-                    clearLocalSession();
-                    return;
-                }
                 applyRemoteState(state, null);
                 List<AdminSecurityApi.SessionInfo> remaining = new ArrayList<>();
                 for (AdminSecurityApi.SessionInfo item : sessions) {
@@ -760,12 +937,9 @@ public final class AdminSecurityController implements AutoCloseable {
                 }
                 sessions = AdminJava8Collections.copyList(remaining);
                 if (next != AdminSecurityState.NORMAL
-                    || recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) {
-                    clearReconfirmation();
-                }
+                    || recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) clearReconfirmation();
             } catch (IOException | RuntimeException error) {
-                if (revokingCurrent) clearLocalSession();
-                else failClosed();
+                failClosed();
                 throw error;
             }
         }
@@ -1092,13 +1266,7 @@ public final class AdminSecurityController implements AutoCloseable {
         AdminReportDecision decision,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireOperationsApi().recordReviewDecision(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                reportId,
-                decision
-            );
-        }
+        return deliveries.recordReviewDecision(reportId, decision, operationalWorkflowsEnabled);
     }
 
     public AdminOriginalEvidence loadAdminOriginalEvidence(
@@ -1110,29 +1278,7 @@ public final class AdminSecurityController implements AutoCloseable {
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            AdminHighRiskActionGate.Operation operation =
-                AdminHighRiskActionGate.originalEvidence(reportId);
-            try {
-                reauthenticate(password, totpCode, operation, nowEpochMs);
-                AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
-                    operation,
-                    nowEpochMs,
-                    operationalWorkflowsEnabled
-                );
-                if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
-                return requireOperationsApi().loadOriginalEvidence(
-                    requireOperationalSession(operationalWorkflowsEnabled),
-                    reportId,
-                    expectedContentRevision,
-                    reason,
-                    decision.requestHeaders()
-                );
-            } finally {
-                if (password != null) Arrays.fill(password, '\0');
-                if (totpCode != null) Arrays.fill(totpCode, '\0');
-            }
-        }
+        return deliveries.loadAdminOriginalEvidence(reportId, expectedContentRevision, reason, password, totpCode, nowEpochMs, operationalWorkflowsEnabled);
     }
 
     /**
@@ -1145,13 +1291,7 @@ public final class AdminSecurityController implements AutoCloseable {
         String decisionId,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireOperationsApi().lookupReviewDecision(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                reportId,
-                decisionId
-            );
-        }
+        return deliveries.lookupReviewDecision(reportId, decisionId, operationalWorkflowsEnabled);
     }
 
     /** S18-3: confirms this device's PENDING key in the current (ACTIVE key) session. */
@@ -1171,33 +1311,21 @@ public final class AdminSecurityController implements AutoCloseable {
         String cursor,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireOperationsApi().readReviewDecisions(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                reportId,
-                cursor
-            );
-        }
+        return deliveries.readReviewDecisions(reportId, cursor, operationalWorkflowsEnabled);
     }
 
     public AdminOperationsApi.Result readReviewDecisions(
         String reportId,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return readReviewDecisions(reportId, null, operationalWorkflowsEnabled);
-        }
+        return deliveries.readReviewDecisions(reportId, operationalWorkflowsEnabled);
     }
 
     public AdminOperationsApi.Result readRecentReviewDecisions(
         String reportId,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireOperationsApi().readRecentReviewDecisions(
-                requireOperationalSession(operationalWorkflowsEnabled), reportId
-            );
-        }
+        return deliveries.readRecentReviewDecisions(reportId, operationalWorkflowsEnabled);
     }
 
     public AdminOperationsApi.Result recordDelivery(
@@ -1205,13 +1333,7 @@ public final class AdminSecurityController implements AutoCloseable {
         AdminInstitutionDelivery delivery,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireOperationsApi().recordDelivery(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                reportId,
-                delivery
-            );
-        }
+        return deliveries.recordDelivery(reportId, delivery, operationalWorkflowsEnabled);
     }
 
     /**
@@ -1228,32 +1350,7 @@ public final class AdminSecurityController implements AutoCloseable {
         boolean resendOfUncertainAttempt,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            try {
-                if (correction == null) {
-                    throw new IllegalArgumentException("delivery correction is required");
-                }
-                AdminHighRiskActionGate.Operation operation =
-                    AdminHighRiskActionGate.deliveryCorrection(reportId);
-                reauthenticate(password, totpCode, operation, nowEpochMs);
-                AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
-                    operation,
-                    nowEpochMs,
-                    operationalWorkflowsEnabled
-                );
-                if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
-                return requireOperationsApi().recordDeliveryCorrection(
-                    requireOperationalSession(operationalWorkflowsEnabled),
-                    reportId,
-                    correction,
-                    decision.requestHeaders(),
-                    resendOfUncertainAttempt
-                );
-            } finally {
-                if (password != null) Arrays.fill(password, '\0');
-                if (totpCode != null) Arrays.fill(totpCode, '\0');
-            }
-        }
+        return deliveries.correctDelivery(reportId, correction, password, totpCode, nowEpochMs, resendOfUncertainAttempt, operationalWorkflowsEnabled);
     }
 
     public AdminOperationsApi.Result readDeliveries(
@@ -1261,33 +1358,21 @@ public final class AdminSecurityController implements AutoCloseable {
         String cursor,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireOperationsApi().readDeliveries(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                reportId,
-                cursor
-            );
-        }
+        return deliveries.readDeliveries(reportId, cursor, operationalWorkflowsEnabled);
     }
 
     public AdminOperationsApi.Result readDeliveries(
         String reportId,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return readDeliveries(reportId, null, operationalWorkflowsEnabled);
-        }
+        return deliveries.readDeliveries(reportId, operationalWorkflowsEnabled);
     }
 
     public AdminOperationsApi.Result readRecentDeliveries(
         String reportId,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireOperationsApi().readRecentDeliveries(
-                requireOperationalSession(operationalWorkflowsEnabled), reportId
-            );
-        }
+        return deliveries.readRecentDeliveries(reportId, operationalWorkflowsEnabled);
     }
 
     public AdminReportModels.Page listAdminReports(
@@ -1295,25 +1380,14 @@ public final class AdminSecurityController implements AutoCloseable {
         String cursor,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireReportRepository().list(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                filters,
-                cursor
-            );
-        }
+        return reports.listAdminReports(filters, cursor, operationalWorkflowsEnabled);
     }
 
     public AdminReportModels.Detail getAdminReportDetail(
         String reportId,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireReportRepository().detail(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                reportId
-            );
-        }
+        return reports.getAdminReportDetail(reportId, operationalWorkflowsEnabled);
     }
 
     public AdminReportModels.StatusSnapshot updateAdminReportStatus(
@@ -1325,22 +1399,7 @@ public final class AdminSecurityController implements AutoCloseable {
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            try {
-                return updateAdminReportStatus(
-                    reportId,
-                    nextStatus,
-                    expectedVersion,
-                    password,
-                    totpCode,
-                    nowEpochMs,
-                    operationalWorkflowsEnabled,
-                    () -> true
-                );
-            } catch (AdminReportWorkflowController.StatusDispatchCancelledException impossible) {
-                throw new IllegalStateException("unconditional report status dispatch was cancelled", impossible);
-            }
-        }
+        return reports.updateAdminReportStatus(reportId, nextStatus, expectedVersion, password, totpCode, nowEpochMs, operationalWorkflowsEnabled);
     }
 
     public AdminReportModels.StatusSnapshot updateAdminReportStatus(
@@ -1354,25 +1413,7 @@ public final class AdminSecurityController implements AutoCloseable {
         AdminReportWorkflowController.StatusDispatch dispatch
     ) throws IOException, GeneralSecurityException,
         AdminReportWorkflowController.StatusDispatchCancelledException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            if (dispatch == null) throw new IllegalArgumentException("status dispatch is required");
-            AdminHighRiskActionGate.Operation operation = AdminHighRiskActionGate.reportStatus(reportId);
-            reauthenticate(password, totpCode, operation, nowEpochMs);
-            AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
-                operation,
-                nowEpochMs,
-                operationalWorkflowsEnabled
-            );
-            if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
-            return requireReportRepository().updateStatus(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                reportId,
-                nextStatus,
-                expectedVersion,
-                decision.requestHeaders(),
-                dispatch
-            );
-        }
+        return reports.updateAdminReportStatus(reportId, nextStatus, expectedVersion, password, totpCode, nowEpochMs, operationalWorkflowsEnabled, dispatch);
     }
 
     public AdminDeliveryPackage createAdminDeliveryPackage(
@@ -1382,31 +1423,7 @@ public final class AdminSecurityController implements AutoCloseable {
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            try {
-                if (eligibility == null) {
-                    throw new IllegalArgumentException("package eligibility is required");
-                }
-                String reportId = eligibility.reportId();
-                AdminHighRiskActionGate.Operation operation =
-                    AdminHighRiskActionGate.deliveryPackage(reportId);
-                reauthenticate(password, totpCode, operation, nowEpochMs);
-                AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
-                    operation,
-                    nowEpochMs,
-                    operationalWorkflowsEnabled
-                );
-                if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
-                return requireReportRepository().createDeliveryPackage(
-                    requireOperationalSession(operationalWorkflowsEnabled),
-                    eligibility,
-                    decision.requestHeaders()
-                );
-            } finally {
-                if (password != null) Arrays.fill(password, '\0');
-                if (totpCode != null) Arrays.fill(totpCode, '\0');
-            }
-        }
+        return reports.createAdminDeliveryPackage(eligibility, password, totpCode, nowEpochMs, operationalWorkflowsEnabled);
     }
 
     public AdminDeliveryPackage.Proof getAdminDeliveryPackageProof(
@@ -1414,13 +1431,7 @@ public final class AdminSecurityController implements AutoCloseable {
         int packageRevision,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireReportRepository().deliveryPackageProof(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                reportId,
-                packageRevision
-            );
-        }
+        return reports.getAdminDeliveryPackageProof(reportId, packageRevision, operationalWorkflowsEnabled);
     }
 
     public AdminAuditModels.Page listAdminAudits(
@@ -1428,13 +1439,7 @@ public final class AdminSecurityController implements AutoCloseable {
         String cursor,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireReportRepository().audits(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                filters,
-                cursor
-            );
-        }
+        return reports.listAdminAudits(filters, cursor, operationalWorkflowsEnabled);
     }
 
     public AdminIncidentModels.Page listAdminIncidents(
@@ -1442,25 +1447,14 @@ public final class AdminSecurityController implements AutoCloseable {
         String cursor,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireIncidentRepository().list(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                filters,
-                cursor
-            );
-        }
+        return incidents.listAdminIncidents(filters, cursor, operationalWorkflowsEnabled);
     }
 
     public AdminIncidentModels.Detail getAdminIncidentDetail(
         String incidentId,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireIncidentRepository().detail(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                incidentId
-            );
-        }
+        return incidents.getAdminIncidentDetail(incidentId, operationalWorkflowsEnabled);
     }
 
     public AdminIncidentModels.HistoryPage getAdminIncidentHistory(
@@ -1468,13 +1462,7 @@ public final class AdminSecurityController implements AutoCloseable {
         String cursor,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireIncidentRepository().history(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                incidentId,
-                cursor
-            );
-        }
+        return incidents.getAdminIncidentHistory(incidentId, cursor, operationalWorkflowsEnabled);
     }
 
     public AdminIncidentModels.StatusSnapshot updateAdminIncidentStatus(
@@ -1485,28 +1473,7 @@ public final class AdminSecurityController implements AutoCloseable {
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            AdminHighRiskActionGate.Operation operation =
-                AdminHighRiskActionGate.incidentStatus(incidentId);
-            try {
-                reauthenticate(password, totpCode, operation, nowEpochMs);
-                AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
-                    operation,
-                    nowEpochMs,
-                    operationalWorkflowsEnabled
-                );
-                if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
-                return requireIncidentRepository().updateStatus(
-                    requireOperationalSession(operationalWorkflowsEnabled),
-                    incidentId,
-                    request,
-                    decision.requestHeaders()
-                );
-            } finally {
-                if (password != null) Arrays.fill(password, '\0');
-                if (totpCode != null) Arrays.fill(totpCode, '\0');
-            }
-        }
+        return incidents.updateAdminIncidentStatus(incidentId, request, password, totpCode, nowEpochMs, operationalWorkflowsEnabled);
     }
 
     public AdminRawCollectionModels.Page listAdminRawQuarantine(
@@ -1515,25 +1482,7 @@ public final class AdminSecurityController implements AutoCloseable {
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            AdminHighRiskActionGate.Operation operation = AdminHighRiskActionGate.rawCollectionList();
-            try {
-                reauthenticate(password, totpCode, operation, nowEpochMs);
-                AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
-                    operation,
-                    nowEpochMs,
-                    operationalWorkflowsEnabled
-                );
-                if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
-                return requireRawCollectionRepository().listQuarantine(
-                    requireOperationalSession(operationalWorkflowsEnabled),
-                    decision.requestHeaders()
-                );
-            } finally {
-                if (password != null) Arrays.fill(password, '\0');
-                if (totpCode != null) Arrays.fill(totpCode, '\0');
-            }
-        }
+        return rawCollections.listAdminRawQuarantine(password, totpCode, nowEpochMs, operationalWorkflowsEnabled);
     }
 
     public AdminRawCollectionModels.PurposeDecisionReceipt
@@ -1545,29 +1494,7 @@ public final class AdminSecurityController implements AutoCloseable {
             long nowEpochMs,
             boolean operationalWorkflowsEnabled
         ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            try {
-                if (source == null) throw new IllegalArgumentException("decision source is required");
-                AdminHighRiskActionGate.Operation operation =
-                    AdminHighRiskActionGate.rawCollectionPurposeDecision(source.collectionId());
-                reauthenticate(password, totpCode, operation, nowEpochMs);
-                AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
-                    operation,
-                    nowEpochMs,
-                    operationalWorkflowsEnabled
-                );
-                if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
-                return requireRawCollectionRepository().decidePurpose(
-                    requireOperationalSession(operationalWorkflowsEnabled),
-                    source,
-                    request,
-                    decision.requestHeaders()
-                );
-            } finally {
-                if (password != null) Arrays.fill(password, '\0');
-                if (totpCode != null) Arrays.fill(totpCode, '\0');
-            }
-        }
+        return rawCollections.decideAdminRawCollectionPurpose(source, request, password, totpCode, nowEpochMs, operationalWorkflowsEnabled);
     }
 
     public AdminRawCollectionModels.LegalHoldReceipt
@@ -1579,28 +1506,7 @@ public final class AdminSecurityController implements AutoCloseable {
             long nowEpochMs,
             boolean operationalWorkflowsEnabled
         ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            try {
-                AdminHighRiskActionGate.Operation operation =
-                    AdminHighRiskActionGate.rawCollectionLegalHold(collectionId);
-                reauthenticate(password, totpCode, operation, nowEpochMs);
-                AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
-                    operation,
-                    nowEpochMs,
-                    operationalWorkflowsEnabled
-                );
-                if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
-                return requireRawCollectionRepository().recordLegalHold(
-                    requireOperationalSession(operationalWorkflowsEnabled),
-                    collectionId,
-                    request,
-                    decision.requestHeaders()
-                );
-            } finally {
-                if (password != null) Arrays.fill(password, '\0');
-                if (totpCode != null) Arrays.fill(totpCode, '\0');
-            }
-        }
+        return rawCollections.recordAdminRawCollectionLegalHold(collectionId, request, password, totpCode, nowEpochMs, operationalWorkflowsEnabled);
     }
 
     public AdminReportRequestModels.Page listAdminReportRequests(
@@ -1608,25 +1514,14 @@ public final class AdminSecurityController implements AutoCloseable {
         String cursor,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireReportRepository().listRequests(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                filters,
-                cursor
-            );
-        }
+        return reports.listAdminReportRequests(filters, cursor, operationalWorkflowsEnabled);
     }
 
     public AdminReportRequestModels.Detail getAdminReportRequestDetail(
         String requestId,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireReportRepository().requestDetail(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                requestId
-            );
-        }
+        return reports.getAdminReportRequestDetail(requestId, operationalWorkflowsEnabled);
     }
 
     public AdminReportRequestModels.StatusSnapshot updateAdminReportRequestStatus(
@@ -1641,27 +1536,7 @@ public final class AdminSecurityController implements AutoCloseable {
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            AdminHighRiskActionGate.Operation operation =
-                AdminHighRiskActionGate.reportRequestStatus(requestId);
-            reauthenticate(password, totpCode, operation, nowEpochMs);
-            AdminHighRiskActionGate.Decision decision = consumeHighRiskAuthorization(
-                operation,
-                nowEpochMs,
-                operationalWorkflowsEnabled
-            );
-            if (!decision.isAllowed()) throw new IllegalStateException(decision.reason());
-            return requireReportRepository().updateRequestStatus(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                requestId,
-                requestType,
-                nextStatus,
-                expectedVersion,
-                publicResponse,
-                internalNote,
-                decision.requestHeaders()
-            );
-        }
+        return reports.updateAdminReportRequestStatus(requestId, requestType, nextStatus, expectedVersion, publicResponse, internalNote, password, totpCode, nowEpochMs, operationalWorkflowsEnabled);
     }
 
     public AdminExternalCopyDeletionModels.Page listAdminExternalCopyDeletions(
@@ -1669,25 +1544,14 @@ public final class AdminSecurityController implements AutoCloseable {
         String cursor,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireReportRepository().listExternalCopyDeletions(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                filter,
-                cursor
-            );
-        }
+        return reports.listAdminExternalCopyDeletions(filter, cursor, operationalWorkflowsEnabled);
     }
 
     public AdminExternalCopyDeletionModels.Item recordAdminExternalCopyDeletion(
         AdminExternalCopyDeletionModels.EventCommand command,
         boolean operationalWorkflowsEnabled
     ) throws IOException, GeneralSecurityException {
-        try (LocalOperation ignored = beginOperation(false)) {
-            return requireReportRepository().recordExternalCopyDeletion(
-                requireOperationalSession(operationalWorkflowsEnabled),
-                command
-            );
-        }
+        return reports.recordAdminExternalCopyDeletion(command, operationalWorkflowsEnabled);
     }
 
     public AdminHighRiskActionGate.Decision consumeHighRiskAuthorization(
@@ -1724,10 +1588,10 @@ public final class AdminSecurityController implements AutoCloseable {
     public void close() {
         discardLocalSession(true);
         bestEffortCancel(api::cancelInFlightRequests);
-        if (operationsApi != null) bestEffortCancel(operationsApi::cancelInFlightRequests);
-        if (rawCollectionRepository != null) {
-            bestEffortCancel(rawCollectionRepository::cancelInFlightRequests);
-        }
+        bestEffortCancel(deliveries::cancelInFlightRequests);
+        bestEffortCancel(rawCollections::cancelInFlightRequests);
+        bestEffortCancel(reports::cancelInFlightRequests);
+        bestEffortCancel(incidents::cancelInFlightRequests);
     }
 
     private static void bestEffortCancel(Runnable cancellation) {
@@ -1746,33 +1610,9 @@ public final class AdminSecurityController implements AutoCloseable {
         }
     }
 
-    private AdminOperationsApi requireOperationsApi() {
-        if (operationsApi == null) throw new IllegalStateException("administrator operations are unavailable");
-        return operationsApi;
-    }
-
-    private AdminReportRepository requireReportRepository() {
-        if (reportRepository == null) {
-            throw new IllegalStateException("administrator report reads are unavailable");
-        }
-        return reportRepository;
-    }
-
-    private AdminIncidentRepository requireIncidentRepository() {
-        if (incidentRepository == null) {
-            throw new IllegalStateException("administrator incident operations are unavailable");
-        }
-        return incidentRepository;
-    }
-
-    private AdminRawCollectionRepository requireRawCollectionRepository() {
-        if (rawCollectionRepository == null) {
-            throw new IllegalStateException("administrator raw collection review is unavailable");
-        }
-        return rawCollectionRepository;
-    }
-
-    private AdminOperationsApi.SessionContext requireOperationalSession(boolean operationalWorkflowsEnabled) {
+    private AdminOperationsApi.SessionContext requireOperationalSession(
+        boolean operationalWorkflowsEnabled, Runnable currentLeaseCheck
+    ) {
         synchronized (lifecycleLock) {
             requireCurrentOperation();
             if (!operationalWorkflowsEnabled) throw new IllegalStateException("operational workflows are locked");
@@ -1790,7 +1630,9 @@ public final class AdminSecurityController implements AutoCloseable {
                 accessToken,
                 authenticatedAdminId,
                 currentSessionId,
-                authenticatedDeviceId
+                authenticatedDeviceId,
+                currentLeaseCheck,
+                (cancel, enqueue) -> admitRequest(currentLeaseCheck, cancel, enqueue)
             );
         }
     }

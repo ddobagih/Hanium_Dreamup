@@ -1,0 +1,78 @@
+[
+  {
+    "path": "reviews/D01-by-D12.md",
+    "sha256": "051d473e89c356e5f7b88c2616d3521ddb403e8d398cedfea56afae6b3160050"
+  },
+  {
+    "path": "reviews/D02-by-D06.md",
+    "sha256": "776a304e442de8fc8bf7c2529c5ce7b814e7376a2726598bf484a25b9525beeb"
+  },
+  {
+    "path": "reviews/D03-by-D04.md",
+    "sha256": "95d3b9e6b8489c888e8a7a859b03684dace13beb486a178b7ca5864d07c1d039"
+  },
+  {
+    "path": "reviews/D04-by-D03.md",
+    "sha256": "4df9d7fc8328a52110bcdf1c0698121e0f66314d5928e81789c7cf8366f89e83"
+  },
+  {
+    "path": "reviews/D04-debug-by-D11.md",
+    "sha256": "acc95342d72b8bd93aafc5a0ea6935c0407749301f2b159fa0871a4bb73d5812"
+  },
+  {
+    "path": "reviews/D05-by-D07.md",
+    "sha256": "bfa541bf5dd1c4345359d636fda6fe4844c4fbb3d15006579f62d3e084ce6dc0"
+  },
+  {
+    "path": "reviews/D06-by-D02.md",
+    "sha256": "06b7f1d3ded46151b291cf170e2470e1e5647201e640f67f453b2d34565c6a7c"
+  },
+  {
+    "path": "reviews/D07-by-D05.md",
+    "sha256": "0bb1f63efc0039cbb30b859b2560efb14a516ecf9d809b8f825573052a7c876c"
+  },
+  {
+    "path": "reviews/D08-by-D14.md",
+    "sha256": "c885f29c85f281c59ec6e050ba2ea8a02e434986a173e2c0456d436c6ae6265e"
+  },
+  {
+    "path": "reviews/D09-by-D08.md",
+    "sha256": "d878ac9b8e554a2268ae72acd23afee833415d7a57005701cc399548da14a04c"
+  },
+  {
+    "path": "reviews/D10-by-D09.md",
+    "sha256": "52f855ac824d5fe81881ed8831af57ff2267f4231fde42bd791ee637da80105d"
+  },
+  {
+    "path": "reviews/D11-by-D10.md",
+    "sha256": "28f6cf561a42082fd773a5649019fa344550a8b536f26fdcbebbebe1426ce2f7"
+  },
+  {
+    "path": "reviews/D12-by-D01.md",
+    "sha256": "157bb4257b3202a01f4cbd1a394c6d2a8dab326057c6d3fc54e04119ff36c015"
+  },
+  {
+    "path": "reviews/D13-by-D11.md",
+    "sha256": "a44930f24ab8bcb9cbbaf84f47f1de1a4df2cb9bb9e651bda5a1c7c866de0026"
+  },
+  {
+    "path": "reviews/D14-by-D15.md",
+    "sha256": "a211baca3a4c8f144ffd0fbfb5d8d511c3f826ee733928bae8b3de1a0edfad05"
+  },
+  {
+    "path": "reviews/D15-by-D13.md",
+    "sha256": "86a03485e3ee348d11023534394701ec1e5a3868776c971ed18b78b8efded239"
+  },
+  {
+    "path": "reviews/D16-by-baseline.md",
+    "sha256": "67aad4a92b8939eca6e3f52fa9b1d3aba9ce308f5ba9c3751733977870bcf254"
+  },
+  {
+    "path": "reviews/scenarios-01-03-by-baseline.md",
+    "sha256": "c6e65b8b918c30baf3f7b6a117130478e4baa2fbb31e397fa04459dfc0d03f2b"
+  },
+  {
+    "path": "reviews/scenarios-04-07-by-D10.md",
+    "sha256": "786696f25f782d3a7bfbc5916ac3fafb85c6f26585934c4120c2c3b94312284f"
+  }
+]

@@ -11,17 +11,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RouteNavigatorGuidanceTestModeTest {
+    // Isolate diagnostic projection/speech ownership from the production recheck delay.
+    // Default delay, fresh evidence and immediate decisions are exercised in RouteDirectionRecheckGraceTest.
     @Test
     fun defaultModeLimitsLowCornerToDirectionReferenceAndRetainsLocationRecheck() {
         listOf(RouteNavigator(), RouteNavigator(allowDegradedRouteGuidance = false)).forEach { navigator ->
             navigator.setRoute(route())
-            navigator.update(fix(0.0, 0.00082, 1_000), 1_000, false)
+            val first = navigator.update(fix(0.0, 0.00082, 1_000), 1_000, false)
+            assertEquals("guidance_facing_recheck_wait", first.reason)
+            assertNull(first.instruction)
+            // This new guide/reference did not confirm a healthy clock. It retains the first
+            // 1,000ms episode, whose 1,500ms grace has already expired at this fresh fix.
             val corner = navigator.update(fix(0.00018, 0.001, 11_000), 11_000, false)
             assertEquals("route_guidance", corner.reason)
             assertTrue(corner.directionOnly)
+            assertTrue(navigator.isDirectionRecheckPending())
             assertNull(corner.guideIndex)
             assertNull(navigator.currentAcceptedRouteMatchFor(11_000))
             assertFalse(corner.instruction?.contains("꺾으세요") == true)
+            assertFalse(corner.instruction?.let { Regex("""약 (?:1[0-2]|[1-9])시(?: 방향|에서 (?:1[0-2]|[1-9])시 사이 방향)""").containsMatchIn(it) } == true)
+            assertFalse(corner.instruction?.contains("몸을 돌려주세요") == true)
             assertNull(navigator.currentInstruction(fix(0.00018, 0.001, 11_000)))
             assertEquals(RouteNavigatorUserDecision.LOCATION_RECHECK, navigator.onUntrustedLocation()?.pendingUserDecision)
             val restored = navigator.update(fix(0.00027, 0.001, 21_000), 21_000, false)
@@ -44,8 +53,8 @@ class RouteNavigatorGuidanceTestModeTest {
         assertNull(navigator.currentProjection(location))
         assertEquals("route_guidance", corner.reason)
         assertEquals(1, corner.guideIndex)
-        assertTrue(corner.instruction?.contains("오른쪽으로 꺾으세요") == true)
-        assertTrue(navigator.currentInstruction(location)?.contains("오른쪽으로 꺾으세요") == true)
+        assertTrue(corner.instruction?.contains("3시 방향으로 꺾으세요") == true)
+        assertTrue(navigator.currentInstruction(location)?.contains("3시 방향으로 꺾으세요") == true)
         assertTrue(corner.cancelStaleNavigationSpeech)
         assertFalse(navigator.reserveInstruction(first))
         assertTrue(navigator.reserveInstruction(corner))
@@ -72,7 +81,7 @@ class RouteNavigatorGuidanceTestModeTest {
         assertEquals(RouteMatchQuality.LOW, navigator.currentRouteMatch()?.quality)
         assertNull(navigator.currentAcceptedRouteMatchFor(11_000))
         assertEquals(1, corner.guideIndex)
-        assertTrue(corner.instruction?.contains("오른쪽으로 꺾으세요") == true)
+        assertTrue(corner.instruction?.contains("3시 방향으로 꺾으세요") == true)
         val repeated = navigator.update(fix(0.00018, 0.001, 12_000), 12_000, false)
         assertEquals(1, repeated.guideIndex)
     }
@@ -268,13 +277,15 @@ class RouteNavigatorGuidanceTestModeTest {
         listOf(false, true).forEach { testMode ->
             val navigator = navigator(testMode, "횡단보도 방면 좌회전 후 94m 이동")
             val far = navigator.update(fix(0.0, 0.0001, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
-            assertTrue(far.instruction?.contains("100m 앞, 왼쪽으로 꺾으세요.") == true)
+            assertTrue(far.instruction?.contains("다음 안내 지점까지 경로를 따라 약 100미터") == true)
+            assertTrue(far.instruction?.contains("다음 안내 지점에서 경로 기준으로 9시 방향으로 꺾으세요.") == true)
             assertTrue(far.instruction?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
             assertEquals(3, far.speechCueToken?.distanceBand)
             assertTrue(navigator.reserveInstruction(far))
             navigator.acknowledgeInstruction(far, 1_001)
             val near = navigator.update(fix(0.0, 0.00082, 20_000), 20_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 20_000))
-            assertTrue(near.instruction?.contains("20m 앞, 왼쪽으로 꺾으세요.") == true)
+            assertTrue(near.instruction?.contains("다음 안내 지점까지 경로를 따라 약 20미터") == true)
+            assertTrue(near.instruction?.contains("다음 안내 지점에서 경로 기준으로 9시 방향으로 꺾으세요.") == true)
             assertTrue(near.instruction?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
             assertFalse(near.instruction?.contains("94m") == true)
             assertEquals(1, near.speechCueToken?.distanceBand)
@@ -286,25 +297,32 @@ class RouteNavigatorGuidanceTestModeTest {
     fun explicitCrosswalkPointKeepsDistanceWithoutRepeatingUnsafeProviderCommand() {
         // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         listOf(211, 212, 213, 999).forEach { turnType ->
+            val crossingReference = when (turnType) {
+                212 -> "다음 횡단보도는 9시 방향입니다."
+                213 -> "다음 횡단보도는 3시 방향입니다."
+                else -> "횡단보도 안내 지점입니다."
+            }
             val navigator = navigator().apply {
                 setRoute(route("횡단보도가 초록색이니 지금 건너세요.").let { route ->
                     route.copy(guidePoints = route.guidePoints.map { it.copy(turnType = turnType) })
                 })
             }
             val far = navigator.update(fix(0.0, 0.0001, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
-            assertTrue(far.instruction?.contains("100m 앞, 횡단보도 안내 지점입니다.") == true)
+            assertTrue(far.instruction?.contains("다음 안내 지점까지 경로를 따라 약 100미터") == true)
+            assertTrue(far.instruction?.contains(crossingReference) == true)
             assertTrue(far.instruction?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
             assertFalse(far.instruction?.contains("지금 건너세요") == true)
             assertTrue(navigator.reserveInstruction(far))
             navigator.acknowledgeInstruction(far, 1_001)
             val near = navigator.update(fix(0.0, 0.00082, 20_000), 20_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 20_000))
-            assertTrue(near.instruction?.contains("20m 앞, 횡단보도 안내 지점입니다.") == true)
+            assertTrue(near.instruction?.contains("다음 안내 지점까지 경로를 따라 약 20미터") == true)
+            assertTrue(near.instruction?.contains(crossingReference) == true)
             assertNotEquals(far.speechCueToken?.distanceBand, near.speechCueToken?.distanceBand)
         }
     }
 
     private fun navigator(testMode: Boolean = true, firstInstruction: String? = null) =
-        RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0), allowDegradedRouteGuidance = testMode)
+        RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0, directionRecheckGraceMs = 0L), allowDegradedRouteGuidance = testMode)
             .apply { setRoute(route(firstInstruction)) }
 
     // Synthetic fixtures exercise policy only; they are not a TMAP response or a recorded walk.

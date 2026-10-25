@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D01-021 권한 철회 종속 기능 중단과 명시적 보행 재개"]
+  G{"관측된 OS grant 변경 또는 설정복귀; 기존 walk/session binding"}
+  I["camera,precise,mic,activity 및 위치서비스; actorSHA/sessionGeneration/walkEpoch/recheckId"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 부족권한/상태mismatch이면 block 유지"]
+  G -->|"미충족"| X
+  N1["camera 철회는 depth/camera handoff를, precise 또는 위치서비스 상실은 목적지·현재위치·활성경로를 취소한다."]
+  I --> N1
+  N2["notification/mic 철회는 handsfree·음성,activity 철회는 steps·관련 report drain을 취소한다."]
+  N1 --> N2
+  N3["활성/paused에서 camera+precise 동시누락이면 즉시 safetyStop; 그 외도 current startup capability를 먼저 재평가한다."]
+  N2 --> N3
+  N4["부분 제한 안내는 실제 아직 active인 경우에만 내고 허용 서비스만 재시작한다."]
+  N3 --> N4
+  N5["full recheck가 same binding으로 통과하면 AWAITING_EXPLICIT_RESUME; 최신 grants와 readiness를 다시 검사한 명시 버튼으로만 clear하고 start 경로에 들어간다."]
+  N4 --> N5
+  OK["fresh readiness+사용자 명시적 재개"]
+  N5 --> OK
+  B0["나머지안내 계속된다는 문구 출력 안 함"]
+  N3 -->|"startup 재평가가 safety stop"| B0
+  B1["RECHECK_REQUIRED"]
+  N5 -->|"recheck binding stale"| B1
+  B2["BLOCKED"]
+  N5 -->|"한 필수권한이라도 없음"| B2
+  B3["재개 허용하지 않고 재검사 요구"]
+  N5 -->|"binding된 gate에 no-arg ack"| B3
+  R["중단·취소: 사용자가 재개하지 않으면 대기 유지 / session/actor/walk 변경시 이전 recheck 효력 상실"]
+  V["복구·재시도: onResume 실제 OS 관측; 저장 grants는 권위 아님 / 권한 허용 뒤 새 전체검사와 명시 재개"]
+  Q["정책 P-D01-013"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

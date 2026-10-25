@@ -1,0 +1,9 @@
+flowchart TD
+  A["F-D04-033 · P-D04-033<br/>기준점 표시 호출"] --> R{"recordingReady이며 lease가 있는가"}
+  R -->|아니오| I["문구 변경 없이 반환"]
+  R -->|예| Q{"device STATIONARY<br/>receipt age 0..1500ms<br/>stationarySince 지속 1500ms 이상"}
+  Q -->|아니오| W["3초 기다림 안내<br/>ordinal 유지"]
+  Q -->|예| C["다음 CP ordinal과 관측 시각 구성"]
+  C --> S{"recorder.markCheckpoint 성공"}
+  S -->|예| O["ordinal 증가와 저장 표시<br/>참좌표 생성 아님"]
+  S -->|아니오| F["F034 stopEverything"]

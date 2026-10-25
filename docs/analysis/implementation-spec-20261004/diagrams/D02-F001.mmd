@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D02-001 명시 시작·일시중지·재개 확인과 모드 보존"]
+  E["진입: 시작·재개 확인·종료 / foreground/background·프로세스 재시작"]
+  G{"P-D02-001 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["확인 토큰 생성; 아직 ACTIVE 아님"]
+  G -->|"검사 READY"| B0
+  B1["RECHECK_REQUIRED 유지/재검사"]
+  G -->|"PENDING 또는 오래된 확인"| B1
+  B2["SAFE_STOP; silent FULL→LIMITED 전환 없음"]
+  G -->|"UNAVAILABLE 또는 ACTIVE 모드 변경"| B2
+  B3["PAUSED 유지, 토큰 폐기·generation 증가"]
+  G -->|"재개 CANCEL"| B3
+  B4["확인 대기 유지"]
+  G -->|"NO_RESPONSE·UNRECOGNIZED"| B4
+  B5["거절; 새 보행 필요"]
+  G -->|"SAFE_STOP에서 재개 요구"| B5
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["handle은 동기화하여 이전 상태와 이벤트로 다음 스냅샷 계산"]
+    S1["InitialCheckCompleted는 READY/START_WALK, RecoveryRecheckCompleted는<br/>PAUSED/RECHECK_REQUIRED/RESUME_WALK 및 exact epoch를 요구"]
+    S2["START는 exact token과 fresh readiness를 재검사하고 ACTIVE로 전이"]
+    S3["background는 ACTIVE/PAUSED를 PAUSED·RECHECK_REQUIRED로 바꾸고<br/>recoveryGeneration 증가·readiness 폐기"]
+    S4["runtime readiness는 ACTIVE에서 동일 모드의 READY만 허용하고 나머지는 SAFE_STOP"]
+    S5["beforePublish 경계 작업이 성공한 뒤 스냅샷 공개 및 전이 진단"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+  E -.-> S0
+  N["정상 종료: 현재 epoch의 명시 확인 뒤 ACTIVE; EndRequested 뒤 ENDED."]
+  X["취소·중단: 재개 취소는 PAUSED이며 이전 token으로 재개 불가. / foreground·epoch·owner 조건을 잃은<br/>결과는 재사용하지 않는다."]
+  C["정리: 전이 callback이 Main의 센서·위치·음성·네트워크 정리를 수행; 상태 클래스는 리소스를 소유하지 않음."]
+  R["재시도·복구: foreground 복귀 자체는 재개하지 않으며 full recheck 후 새 명시 확인. /<br/>ProcessRestarted/NewWalkRequested는 새 UUID로 READY 생성."]
+  S5 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

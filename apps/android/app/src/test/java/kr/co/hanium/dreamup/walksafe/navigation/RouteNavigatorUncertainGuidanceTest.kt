@@ -15,11 +15,13 @@ class RouteNavigatorUncertainGuidanceTest {
         assertEquals(RouteMatchQuality.LOW, navigator.currentRouteMatch()?.quality)
         assertEquals(confident.guideIndex, uncertain.guideIndex)
         assertEquals(confident.speechCueToken?.distanceBand, uncertain.speechCueToken?.distanceBand)
-        assertTrue(confident.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
+        assertTrue(confident.instruction?.contains("사용자 방향을 확인할 수 없어 다음 방향 안내를 보류합니다") == true)
         assertNotNull(uncertain.routeAlignmentDiagnostic?.bearingDegreesTrueNorth)
-        assertTrue(uncertain.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
+        assertTrue(uncertain.instruction?.contains("사용자 방향을 확인할 수 없어 다음 방향 안내를 보류합니다") == true)
         assertFalse(confident.instruction?.contains("추정") == true)
-        assertTrue(uncertain.instruction?.contains("추정") == true)
+        assertFalse(confident.infoUtterance?.message?.contains("추정") == true)
+        assertFalse(uncertain.instruction?.contains("추정") == true)
+        assertNull(uncertain.infoUtterance)
         assertNotEquals(confident.speechCueToken, uncertain.speechCueToken)
         assertFalse(navigator.reserveInstruction(confident))
         assertTrue(navigator.reserveInstruction(uncertain))
@@ -36,7 +38,8 @@ class RouteNavigatorUncertainGuidanceTest {
         assertFalse(duringSpeech.cancelStaleNavigationSpeech)
         navigator.acknowledgeInstruction(confident, 2_001)
         val next = requireNotNull(navigator.currentGuidance(2_002))
-        assertTrue(next.instruction?.contains("추정") == true)
+        assertFalse(next.instruction?.contains("추정") == true)
+        assertNull(next.infoUtterance)
         assertNotEquals(confident.speechCueToken, next.speechCueToken)
         assertTrue(navigator.reserveInstruction(next))
     }
@@ -44,7 +47,9 @@ class RouteNavigatorUncertainGuidanceTest {
     @Test
     fun ambiguityKeepsDebugSpeechAsAnEstimateWithoutPromotingLocationOrFacingEvidence() {
         listOf(false, true).forEach { degraded ->
-            val navigator = RouteNavigator(allowDegradedRouteGuidance = degraded)
+            // Inspect the emitted uncertainty claim, not its 1.5-second announcement delay.
+            val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = if (degraded) 0L else 1_500L),
+                allowDegradedRouteGuidance = degraded)
             navigator.setRoute(WalkingRoute("TEST", WalkingRouteSummary(400, 400),
                 listOf(point(0.0), point(200.0), point(0.0, 4.0)), emptyList()))
             val raw = location(0.0, 4.0, 1_000)
@@ -54,16 +59,23 @@ class RouteNavigatorUncertainGuidanceTest {
             assertNull(navigator.currentBearingDeg())
             assertFalse(update.arrivalCandidate)
             if (degraded) {
-                assertTrue(update.instruction?.contains("추정") == true)
+                assertFalse(update.instruction?.contains("추정") == true)
+                assertNull(update.infoUtterance)
                 assertTrue(update.instruction?.contains("현재 위치에서 경로의 진행 방향을 정확히 구분하기 어렵습니다") == true)
-                assertFalse(update.instruction?.contains("몸을 돌리세요") == true)
+                assertFalse(update.instruction?.contains("몸을 돌려주세요") == true)
                 assertTrue(navigator.reserveInstruction(update))
                 navigator.acknowledgeInstruction(update, 1_001)
                 val manual = requireNotNull(navigator.currentGuidance(1_002, RouteFacingObservation(90.0, 5.0, 1_002)))
-                assertTrue(manual.instruction?.contains("추정") == true)
+                assertFalse(manual.instruction?.contains("추정") == true)
+                assertNull(manual.infoUtterance)
             } else {
+                assertNull(update.pendingUserDecision)
+                assertEquals("route_geometry_recheck_wait", update.reason)
                 assertNull(update.instruction)
-                assertTrue(update.cancelStaleNavigationSpeech)
+                assertFalse(update.instruction.orEmpty().contains("몸을 돌려주세요"))
+                assertFalse(Regex("[0-9]+시 방향").containsMatchIn(update.instruction.orEmpty()))
+                assertNull(update.speechCueToken)
+                assertFalse(update.cancelStaleNavigationSpeech)
             }
         }
     }
@@ -118,7 +130,8 @@ class RouteNavigatorUncertainGuidanceTest {
         for (at in 1_000L..3_000L step 1_000L) assertFalse(update(location(100.0, -198.0, at), at, false).arrivalCandidate)
         assertTrue(update(location(100.0, -198.0, 4_000), 4_000, false).arrivalCandidate)
     }
-    private fun nearbyBranches() = RouteNavigator(allowDegradedRouteGuidance = true).apply {
+    // Isolate uncertainty provenance and lease changes; default timer safety is tested separately.
+    private fun nearbyBranches() = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L), allowDegradedRouteGuidance = true).apply {
         setRoute(WalkingRoute("TEST", WalkingRouteSummary(125, 300),
             listOf(point(0.0), point(30.0), point(30.0, 20.0), point(0.0, 20.0), point(0.0, 5.0), point(30.0, 5.0)),
             emptyList()))

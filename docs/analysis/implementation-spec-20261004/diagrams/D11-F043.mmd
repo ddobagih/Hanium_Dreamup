@@ -1,0 +1,13 @@
+flowchart TD
+ A["F-D11-043 계정 tombstone 원장 이관"] --> P["P-D11-043 명시 subcommand와 source 또는 target"]
+ P --> C{"subcommand"}
+ C -->|"export"| E["source DB에서 원장 생성과 private key 서명"]
+ E --> EW["ledger와signature create-only 저장 후 종료"]
+ C -->|"plan 또는 apply"| V["최대64MiB 파일과 trusted key 서명 검증"]
+ V --> M{"apply 명령"}
+ M -->|"아니오"| PL["target 변경계획 요약 후 종료"]
+ M -->|"예"| AP["확인문구와 검증 원장을 Backend reapply 서비스에 전달"]
+ AP --> Z["적용요약 후 종료. engine dispose"]
+ V -->|"서명 또는 입력 오류"| X["target 변경 전 거부"]
+ EW -->|"기존 파일이면"| X
+ Z -.-> R["자동 재시도 없음. 계정 worker 실행과 별개"]

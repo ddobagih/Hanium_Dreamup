@@ -18,6 +18,16 @@ import org.junit.Test
 class AndroidReportCandidatePolicyTest {
     private val policy = AndroidReportCandidatePolicy()
 
+    @Test fun captureRejectsFutureGpsNegativeClockAndRequestRegression() {
+        val current = input()
+        assertNotNull(policy.prepare(current))
+        assertNull(policy.prepare(current.copy(location = current.location!!.copy(elapsedRealtimeMs = 1_901L))))
+        assertNull(policy.prepare(current.copy(capturedAtElapsedRealtimeMs = -1L)))
+        assertNull(policy.prepare(current.copy(location = current.location!!.copy(elapsedRealtimeMs = -1L))))
+        assertNull(policy.prepare(current.copy(requestElapsedRealtimeMs = 1_899L)))
+        assertNull(policy.prepare(current.copy(capturedAtElapsedRealtimeMs = null)))
+    }
+
     @Test
     fun preparesOnlyAndroidDamageCandidateWithGpsAndAllowedModel() {
         val candidate = policy.prepare(input())
@@ -336,6 +346,7 @@ class AndroidReportCandidatePolicyTest {
             threshold = 0.35f,
             capturedAtMs = 1_782_907_200_000L,
             requestElapsedRealtimeMs = requestElapsedRealtimeMs,
+            capturedAtElapsedRealtimeMs = 1_900L,
             trigger = trigger,
             reporterUserId = "user-123",
             traceId = "trace-1",

@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.device
 
 import android.os.PowerManager
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -153,20 +154,24 @@ class WalkSessionResourceMonitoringHealthTest {
         assertTrue(probe.substringAfter("override fun close()").contains("monitoring.closed()"))
 
         val activity = source("MainActivity.kt")
-        val activate = activity.substringAfter("private fun activateWalkSessionRuntime(): Boolean")
-            .substringBefore("scheduleGatewayWalkRenewal()")
-        val ensure = activate.indexOf("ensureWalkSessionResourceMonitoring()")
-        val observe = activate.indexOf("observeWalkRuntimeResourceSafety(runtimeEpoch)")
+        val activate = MainActivityRefactorSource.function(activity, "private fun activateWalkSessionRuntime(")
+        val binding = MainActivityRefactorSource.composition(activity, "walkRuntimeActivationController")
+        assertTrue(binding.contains("override fun ensureResourceMonitoring() = ensureWalkSessionResourceMonitoring()"))
+        assertTrue(binding.contains("override fun resourceMonitoringBlocksReadiness() = walkSessionResourceProbe.monitoringHealth.blocksReadiness"))
+        assertTrue(binding.contains("override fun observeResourceSafety(epoch: WalkRuntimeEpoch) = observeWalkRuntimeResourceSafety(epoch)"))
+        val ensure = activate.indexOf("services.ensureResourceMonitoring()")
+        val observe = activate.indexOf("services.observeResourceSafety(runtimeEpoch)")
         assertTrue(ensure >= 0 && observe > ensure)
-        val guard = activate.indexOf("walkSessionResourceProbe.monitoringHealth.blocksReadiness")
+        val guard = activate.indexOf("services.resourceMonitoringBlocksReadiness()")
         assertTrue(guard in (ensure + 1) until observe)
         val guardBlock = activate.substring(guard, observe)
-        assertTrue(guardBlock.contains("enterWalkSessionForegroundRecheckAndCancelOutputs(\"resource_monitoring_unavailable\")"))
-        assertTrue(guardBlock.contains("walkSessionResumeRetryRequiresUserAction = true"))
+        assertTrue(guardBlock.contains("effects.foregroundRecheck(\"resource_monitoring_unavailable\")"))
+        assertTrue(guardBlock.contains("resume.requireUserRetry()"))
         assertTrue(guardBlock.contains("return false"))
-        val observeBody = activity.substringAfter("private fun observeWalkRuntimeResourceSafety(")
-            .substringBefore("private fun firstRunPermissionRequestAllowed(")
-        assertTrue(observeBody.contains("walkSessionResourceProbe.snapshot()"))
+        val observeBody = MainActivityRefactorSource.function(activity, "private fun observeWalkRuntimeResourceSafety(")
+        assertTrue(observeBody.contains("resources ?: facts.resourceSnapshot()"))
+        val resourceWire = MainActivityRefactorSource.composition(activity, "startupResourceSafetyAdmission")
+        assertTrue(resourceWire.contains("override fun resourceSnapshot() = walkSessionResourceProbe.snapshot()"))
     }
 
     private fun source(relative: String): String = sequenceOf(

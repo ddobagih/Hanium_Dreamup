@@ -1,0 +1,17 @@
+stateDiagram-v2
+  state "S-D12-041-CREATING" as C
+  state "S-D12-041-VISIBLE" as V
+  state "S-D12-041-BACKGROUND_LOCKED" as L
+  state "S-D12-041-RESTORING" as R
+  state "S-D12-041-DESTROYED" as D
+  [*] --> C
+  C --> V: key 준비와 보안 초기화 성공
+  C --> R: 보관된 비밀값 없는 recovery snapshot
+  R --> V: 복구 적용 성공 뒤 사본 소비
+  R --> R: 초기화 실패 / 사본 유지
+  V --> L: 일반 onStop / 입력 및 원본 정리
+  L --> V: 현재 generation에서 기기확인 및 서버재검증
+  V --> D: onDestroy / executor와 controller close
+  L --> D: onDestroy
+  D --> C: 새 Activity / 보관된 최소 상태만 전달
+  note right of D: 서버에 이미 보낸 변경의 rollback 아님

@@ -82,6 +82,7 @@ internal class PatchMotionEstimator(private val maxFeatures: Int) : VisualMotion
         features: List<VisualMotionFeature>,
         originalFeatureCount: Int,
         budget: TrackingWorkBudget,
+        materialPoint: VisualMotionPoint?,
     ): VisualMotionEstimate {
         val matches = mutableListOf<Match>()
         var lastFailure = VisualTrackingFailure.TOO_FEW_FEATURES

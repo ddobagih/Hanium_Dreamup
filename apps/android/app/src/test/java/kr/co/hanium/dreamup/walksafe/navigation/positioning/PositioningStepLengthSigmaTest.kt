@@ -18,7 +18,10 @@ class PositioningStepLengthSigmaTest {
 
     @Test
     fun calibratedProfileKeepsTheFormerSigma() {
-        fun calibrated() = PositioningCoordinator().also { assertTrue(it.restoreProfile(knownProfile())) }
+        fun calibrated() = PositioningCoordinator().also {
+            assertTrue(it.restoreProfile(knownProfile()))
+            it.setCurrentCalibrationCondition(knownCondition())
+        }
 
         val derived = stepUncertainty(calibrated(), sigma = null)
         val narrow = stepUncertainty(calibrated(), sigma = 0.08)
@@ -37,6 +40,7 @@ class PositioningStepLengthSigmaTest {
         assertEquals(wide, derived, 1e-12)
 
         fun recalibrated() = unknown().also { coordinator ->
+            coordinator.setCurrentCalibrationCondition(knownCondition())
             repeat(3) {
                 coordinator.calibrateProfile(WalkingCalibrationSample(6.5, 10, 5_417L, trustedPositionSegment = true))
             }
@@ -82,11 +86,14 @@ class PositioningStepLengthSigmaTest {
         return requireNotNull(snapshot.filtered).horizontalUncertaintyM
     }
 
+    private fun knownCondition() = PedestrianCalibrationCondition("STEP_DETECTOR", "CHEST_FORWARD")
+
     // Same values as the uncalibrated defaults so only the sigma differs between states.
     private fun knownProfile() = PersistedPedestrianMotionProfile(
         stepLengthM = 0.65,
         meanWalkingSpeedMps = 1.20,
         speedVarianceMps2 = 0.16,
         acceptedSampleCount = 12L,
+        calibrationCondition = knownCondition(),
     )
 }

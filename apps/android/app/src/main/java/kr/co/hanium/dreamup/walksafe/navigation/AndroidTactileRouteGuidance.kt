@@ -1,12 +1,14 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
 import kr.co.hanium.dreamup.walksafe.depth.DepthSource
+import kr.co.hanium.dreamup.walksafe.depth.CurrentTrackedFrameObservation
 import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
 import kr.co.hanium.dreamup.walksafe.depth.Point2
 import kr.co.hanium.dreamup.walksafe.depth.RectNorm
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
 import kr.co.hanium.dreamup.walksafe.depth.UserFacingDepth
 import kr.co.hanium.dreamup.walksafe.depth.Vec3
+import kr.co.hanium.dreamup.walksafe.depth.TactileMaskSurfaceResult
 import kr.co.hanium.dreamup.walksafe.inference.WalkMateClassPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.LocalGeodesy
 import kotlin.math.abs
@@ -114,7 +116,10 @@ data class TactileProjectionContext(
     val magneticDeclinationDeg: Float?,
     val cameraFrame: TactileCameraFrame?,
     val detectionAgeMs: Long?,
+    /** Frozen capture receipt; it never becomes a later processing or playback timestamp. */
     val nowElapsedRealtimeMs: Long,
+    /** A later evaluation must supply its own elapsed clock without changing capture geometry. */
+    val decisionElapsedRealtimeMs: Long? = nowElapsedRealtimeMs,
 )
 
 /** Immutable CPU-image to depth-texture mapping captured while its ARCore Frame is current. */
@@ -202,7 +207,10 @@ enum class TactileObservationRejection {
     ORIENTATION_UNTRUSTED,
     DECLINATION_UNAVAILABLE,
     CAMERA_FRAME_UNTRUSTED,
+    DECISION_TIME_UNAVAILABLE,
     DETECTION_STALE,
+    DETECTION_INCOMPLETE,
+    VISUAL_TRACKING_UNAVAILABLE,
     DEPTH_INSUFFICIENT,
     CONTACT_UNAVAILABLE,
     POSE_UNSUPPORTED,
@@ -210,6 +218,9 @@ enum class TactileObservationRejection {
     OUTSIDE_TMAP_CORRIDOR,
     DAMAGE_AREA_OVERLAP,
     BLOCKER_UNPROJECTABLE,
+    SURFACE_UNAVAILABLE,
+    SURFACE_TOPOLOGY_UNRESOLVED,
+    SURFACE_NO_MULTIPOINT_ROUTE_OVERLAP,
     UNSPECIFIED,
 }
 
@@ -252,6 +263,10 @@ class AndroidTactileRouteObservationSupplier : TactileRouteObservationSupplier {
         if (!output.isTactileRouteClass()) return reject(TactileObservationRejection.NOT_TACTILE_ROUTE_CLASS)
         val captureFrameId = context.captureFrameId ?: return reject(TactileObservationRejection.FRAME_MISMATCH)
         if (output.frameId != captureFrameId) return reject(TactileObservationRejection.FRAME_MISMATCH)
+        val decisionMs = context.decisionElapsedRealtimeMs
+        if (context.nowElapsedRealtimeMs < 0L || decisionMs == null || decisionMs < context.nowElapsedRealtimeMs) {
+            return reject(TactileObservationRejection.DECISION_TIME_UNAVAILABLE)
+        }
         val routeId = context.expectedRouteId?.takeIf(String::isNotBlank)
             ?: return reject(TactileObservationRejection.ROUTE_MISMATCH)
         val route = context.routeProjection?.takeIf { it.routeId == routeId }
@@ -272,21 +287,13 @@ class AndroidTactileRouteObservationSupplier : TactileRouteObservationSupplier {
         }
 
         val location = context.trustedLocation ?: return reject(TactileObservationRejection.LOCATION_UNTRUSTED)
-        val locationAgeMs = context.nowElapsedRealtimeMs - location.elapsedRealtimeMs
-        if (
-            locationAgeMs !in 0L..MAX_LOCATION_AGE_MS ||
-            !location.latitude.isFinite() || location.latitude !in -90.0..90.0 ||
-            !location.longitude.isFinite() || location.longitude !in -180.0..180.0 ||
-            !location.accuracyM.isFinite() ||
-            location.accuracyM !in 0f..MAX_GPS_ACCURACY_M
-        ) {
+        if (!TactileObservationEvidence.hasFreshLocation(context)) {
             return reject(TactileObservationRejection.LOCATION_UNTRUSTED)
         }
 
         val orientation = context.orientation ?: return reject(TactileObservationRejection.ORIENTATION_UNTRUSTED)
-        val orientationAgeMs = context.nowElapsedRealtimeMs - orientation.observedAtElapsedRealtimeMs
         if (
-            orientationAgeMs !in 0L..MAX_ORIENTATION_AGE_MS ||
+            !TactileObservationEvidence.freshAtCaptureAndDecision(orientation.observedAtElapsedRealtimeMs, context.nowElapsedRealtimeMs, decisionMs, MAX_ORIENTATION_AGE_MS) ||
             orientation.accuracy < EarthOrientationAccuracy.MEDIUM ||
             !orientation.headingErrorDeg.isFinite() ||
             orientation.headingErrorDeg !in 0f..MAX_HEADING_ERROR_DEG ||
@@ -300,14 +307,13 @@ class AndroidTactileRouteObservationSupplier : TactileRouteObservationSupplier {
 
         val frame = context.cameraFrame ?: return reject(TactileObservationRejection.CAMERA_FRAME_UNTRUSTED)
         if (frame.frameId != captureFrameId) return reject(TactileObservationRejection.FRAME_MISMATCH)
-        val frameAgeMs = context.nowElapsedRealtimeMs - frame.observedAtElapsedRealtimeMs
-        if (!frame.tracking || frameAgeMs !in 0L..MAX_CAMERA_FRAME_AGE_MS || !frame.cameraToAndroidSensor.isOrthonormal()) {
+        if (!TactileObservationEvidence.hasFreshCameraFrame(context)) {
             return reject(TactileObservationRejection.CAMERA_FRAME_UNTRUSTED)
         }
         val intrinsics = frame.intrinsics.takeIf { it.isUsable() }
             ?: return reject(TactileObservationRejection.CAMERA_FRAME_UNTRUSTED)
         val detectionAgeMs = context.detectionAgeMs ?: return reject(TactileObservationRejection.DETECTION_STALE)
-        if (detectionAgeMs !in 0L..MAX_DETECTION_AGE_MS) return reject(TactileObservationRejection.DETECTION_STALE)
+        if (detectionAgeMs !in 0L..TactileObservationEvidence.MAX_DETECTION_AGE_MS) return reject(TactileObservationRejection.DETECTION_STALE)
 
         val contactDepth = output.contactDepth ?: return reject(TactileObservationRejection.DEPTH_INSUFFICIENT)
         val depthM = contactDepth.distanceM.takeIf { it.isFinite() && it in MIN_DEPTH_M..MAX_DEPTH_M }
@@ -317,7 +323,7 @@ class AndroidTactileRouteObservationSupplier : TactileRouteObservationSupplier {
         ) return reject(TactileObservationRejection.DEPTH_INSUFFICIENT)
         val depthIqrM = output.depthIqrM?.takeIf { it.isFinite() && it in 0f..MAX_DEPTH_IQR_M }
             ?: return reject(TactileObservationRejection.DEPTH_INSUFFICIENT)
-        if (!output.hasTrustedMetricDepth()) return reject(TactileObservationRejection.DEPTH_INSUFFICIENT)
+        if (!TactileObservationEvidence.hasTrustedMetricDepth(output)) return reject(TactileObservationRejection.DEPTH_INSUFFICIENT)
         val contact = output.bottomContactNorm ?: return reject(TactileObservationRejection.CONTACT_UNAVAILABLE)
         val uprightContact = output.uprightBottomContactNorm
             ?: return reject(TactileObservationRejection.CONTACT_UNAVAILABLE)
@@ -403,19 +409,6 @@ class AndroidTactileRouteObservationSupplier : TactileRouteObservationSupplier {
         )
     }
 
-    private fun TrackedObjectDepth.hasTrustedMetricDepth(): Boolean {
-        val minimumSamples = when (source) {
-            DepthSource.ARCORE_RAW_DEPTH -> MIN_RAW_DEPTH_SAMPLES
-            DepthSource.ARCORE_FULL_DEPTH -> MIN_FULL_DEPTH_SAMPLES
-            else -> return false
-        }
-        return validSampleCount >= minimumSamples &&
-            validSampleRatio.isFinite() &&
-            validSampleRatio in MIN_VALID_SAMPLE_RATIO..1f &&
-            confidence.hardGate > 0f &&
-            confidence.finalScore >= MIN_DEPTH_CONFIDENCE
-    }
-
     private fun TrackedObjectDepth.minimumDepthErrorM(): Float = when (source) {
         DepthSource.ARCORE_RAW_DEPTH -> MIN_RAW_DEPTH_ERROR_M
         DepthSource.ARCORE_FULL_DEPTH -> MIN_FULL_DEPTH_ERROR_M
@@ -435,12 +428,8 @@ class AndroidTactileRouteObservationSupplier : TactileRouteObservationSupplier {
             WalkMateClassPolicy.isTactileRouteBlockingClass(className)
     }
 
-    private companion object {
-        const val MAX_LOCATION_AGE_MS = 2_000L
+    internal companion object {
         const val MAX_ORIENTATION_AGE_MS = 150L
-        const val MAX_CAMERA_FRAME_AGE_MS = 100L
-        const val MAX_DETECTION_AGE_MS = 400L
-        const val MAX_GPS_ACCURACY_M = 5f
         const val MAX_HEADING_ERROR_DEG = 15f
         const val MAX_DECLINATION_DEG = 90f
         const val DECLINATION_MODEL_ERROR_DEG = 2f
@@ -455,10 +444,6 @@ class AndroidTactileRouteObservationSupplier : TactileRouteObservationSupplier {
         const val MAX_VERTICAL_DROP_M = 2.5f
         const val MIN_CONTACT_Y_NORMALIZED = 0.35f
         const val MIN_MASK_AREA_NORMALIZED = 0.003f
-        const val MIN_RAW_DEPTH_SAMPLES = 30
-        const val MIN_FULL_DEPTH_SAMPLES = 50
-        const val MIN_VALID_SAMPLE_RATIO = 0.25f
-        const val MIN_DEPTH_CONFIDENCE = 0.55f
         const val MIN_RAW_DEPTH_ERROR_M = 0.25f
         const val MIN_FULL_DEPTH_ERROR_M = 0.50f
         const val GPS_ERROR_MULTIPLIER = 2f
@@ -475,13 +460,29 @@ data class TactileRouteGuidanceResult(
     val decision: TactileRouteDecision,
     /** Per tactile track, why it supplied no selectable observation. Diagnostics only. */
     val observationRejections: Map<String, TactileObservationRejection> = emptyMap(),
+    /** A supplier prerequisite can fail before depth outputs have track IDs. */
+    val observationFrameRejection: TactileObservationRejection? = null,
+    val observationStatistics: TactileObservationFrameStatisticsSnapshot? = null,
+    val observationFrameIdentified: Boolean? = null,
+    /** Separate, distance-free dot observation; callers deliver it only through advisory speech. */
+    val dotReferenceNotice: TactileDotReferenceNotice? = null,
+    /** A current RGB reference with its own eligibility; no metric or movement authority. */
+    val crosswalkReferenceNotice: CrosswalkReferenceNotice? = null,
+    /** Original named detection index to actual surface observations, including rejected joins. */
+    val surfaceEvaluations: Map<Int, TactileSurfaceRouteEvaluation> = emptyMap(),
 ) {
     /** Compact developer tally, e.g. `obs=depth_insufficient:2,pose_unsupported:1`. */
     fun observationDiagnosticsText(): String {
-        if (observationRejections.isEmpty()) return "obs=-"
-        return observationRejections.values.groupingBy { it }.eachCount().entries
-            .sortedBy { it.key.ordinal }
-            .joinToString(separator = ",", prefix = "obs=") { "${it.key.name.lowercase()}:${it.value}" }
+        val tracks = if (observationRejections.isEmpty()) "obs=-" else
+            observationRejections.values.groupingBy { it }.eachCount().entries
+                .sortedBy { it.key.ordinal }
+                .joinToString(separator = ",", prefix = "obs=") { "${it.key.name.lowercase()}:${it.value}" }
+        return buildString {
+            append(tracks)
+            observationFrameRejection?.let { append(" obsFrame=${it.name.lowercase(java.util.Locale.ROOT)}") }
+            observationStatistics?.let { append(" ${it.diagnosticsText()}") }
+            if (observationFrameIdentified == false) append(" obsFrameId=unavailable")
+        }
     }
 }
 
@@ -532,6 +533,9 @@ internal data class AndroidTactileFrameInput(
     val tmapOnRouteNow: Boolean,
     val activeRouteId: String?,
     val activeRouteProgress: TactileActiveRouteProgress? = null,
+    val decisionElapsedRealtimeMs: Long? = null,
+    val tactileSurfaces: List<TactileMaskSurfaceResult> = emptyList(),
+    val decisionElapsedRealtimeNs: Long? = null,
 )
 
 /** Compiled boundary that keeps snapshot identity independent from capture evidence identity. */
@@ -560,6 +564,9 @@ internal object AndroidTactileFrameComposition {
         tmapOnRouteNow: Boolean,
         activeRouteId: String?,
         activeRouteProgress: TactileActiveRouteProgress? = null,
+        decisionElapsedRealtimeMs: Long? = null,
+        tactileSurfaces: List<TactileMaskSurfaceResult> = emptyList(),
+        decisionElapsedRealtimeNs: Long? = null,
     ): AndroidTactileFrameInput = AndroidTactileFrameInput(
         outputs = outputs,
         identity = identity(detectionIdentity, evidenceIdentity),
@@ -571,6 +578,9 @@ internal object AndroidTactileFrameComposition {
         tmapOnRouteNow = tmapOnRouteNow,
         activeRouteId = activeRouteId,
         activeRouteProgress = activeRouteProgress,
+        decisionElapsedRealtimeMs = decisionElapsedRealtimeMs,
+        tactileSurfaces = tactileSurfaces.toList(),
+        decisionElapsedRealtimeNs = decisionElapsedRealtimeNs,
     )
 }
 
@@ -579,6 +589,9 @@ class AndroidTactileRouteGuidance(
     private val observationSupplier: TactileRouteObservationSupplier? = AndroidTactileRouteObservationSupplier(),
     private val policy: TactileRoutePolicy = TactileRoutePolicy(),
 ) {
+    private val dotReferencePolicy = TactileDotReferenceNoticePolicy()
+    private val crosswalkReferencePolicy = CrosswalkObservationReferencePolicy()
+
     fun apply(
         outputs: List<TrackedObjectDepth>,
         context: TactileProjectionContext?,
@@ -586,9 +599,25 @@ class AndroidTactileRouteGuidance(
         tmapOnRoute: Boolean,
         activeRouteId: String? = context?.expectedRouteId,
         activeRouteProgress: TactileActiveRouteProgress? = null,
+        currentVisualObservation: CurrentTrackedFrameObservation? = null,
+        tactileSurfaces: List<TactileMaskSurfaceResult> = emptyList(),
+        decisionElapsedRealtimeNs: Long? = null,
     ): TactileRouteGuidanceResult {
         val tactileOutputs = outputs.filter { it.isTactileClass() }
         val rejections = linkedMapOf<String, TactileObservationRejection>()
+        val surfaceEvaluations = linkedMapOf<Int, TactileSurfaceRouteEvaluation>()
+        if (context != null) tactileSurfaces.groupBy { it.candidate.namedDetectionIndex }.forEach { (index, matches) ->
+            val joined = matches.singleOrNull()
+            val surface = joined?.surface
+            val output = tactileOutputs.singleOrNull { it.sourceDetectionIndex == index }
+            val candidate = joined?.candidate
+            surfaceEvaluations[index] = if (surface == null || candidate == null || output == null ||
+                output.frameId != candidate.capture.token.frameId ||
+                output.imageQuarterTurns != candidate.capture.imageQuarterTurns ||
+                !output.className.equals(candidate.semantic.className, ignoreCase = true) || decisionElapsedRealtimeNs == null) {
+                TactileSurfaceRouteEvaluation(null, TactileSurfaceRouteRejection.CAPTURE_MISMATCH)
+            } else TactileSurfaceRouteProjector().project(surface, context, decisionElapsedRealtimeNs)
+        }
         val evaluated = when {
             context == null -> {
                 tactileOutputs.forEach { rejections[it.trackId] = TactileObservationRejection.CAPTURE_CONTEXT_UNAVAILABLE }
@@ -598,13 +627,53 @@ class AndroidTactileRouteGuidance(
                 tactileOutputs.forEach { rejections[it.trackId] = TactileObservationRejection.SUPPLIER_UNAVAILABLE }
                 emptyList()
             }
-            else -> tactileOutputs.map { output -> output to observationSupplier.evaluateObservation(output, context) }
+            else -> tactileOutputs.map { output ->
+                val typed = output.sourceDetectionIndex?.let { surfaceEvaluations[it] }
+                val evaluation = if (WalkMateClassPolicy.isTraversableTactileClass(output.className) && typed != null) {
+                    val surface = typed.evidence?.surface
+                    val contact = typed.evidence?.selectedContact
+                    val token = surface?.candidate?.capture?.token
+                    val originalElapsedMs = token?.capturedElapsedNs?.div(1_000_000L)
+                    val lease = output.sourceValidUntilElapsedRealtimeMs
+                    // The factory cell must belong to this exact source observation. The output
+                    // clock is AR Frame time; the surface Image stamp remains the distinct CPU time.
+                    if (surface == null || contact == null || token == null || originalElapsedMs == null ||
+                        output.bboxNorm != surface.candidate.detection.bboxNorm ||
+                        output.source != surface.source || !surface.depthMatchesCameraImage ||
+                        surface.depthTimestampNs != token.cpuImageTimestampNs ||
+                        output.timestampMs != surface.frameTimestampMs ||
+                        output.depthObservedAtMs != surface.frameTimestampMs ||
+                        output.depthReprojected != false ||
+                        output.sourceObservedAtElapsedRealtimeMs != originalElapsedMs ||
+                        lease == null || context.decisionElapsedRealtimeMs?.let { it in originalElapsedMs..lease } != true) {
+                        TactileObservationEvaluation(null, TactileObservationRejection.SURFACE_UNAVAILABLE)
+                    } else {
+                        // A temporary Supplier view only: source/clock/ledger and returned outputs
+                        // keep the original producer values. Typed failure never retries legacy.
+                        observationSupplier.evaluateObservation(output.copy(bottomContactNorm = contact.sensorPointNorm,
+                            contactDepth = contact.depth), context)
+                    }
+                } else observationSupplier.evaluateObservation(output, context)
+                output to evaluation
+            }
         }
         // S12-16: a legacy tactile_damage_area is not itself a route class, but a normal block whose
         // image box touches it is not selectable. This removes only that candidate, never every block.
         val damageAreas = outputs.filter { it.className.equals(TACTILE_DAMAGE_AREA_CLASS, ignoreCase = true) }
         val observations = evaluated.mapNotNull { (output, evaluation) ->
             val observation = evaluation.observation
+            // Negative-only identity: the source extractor/estimator preserves this exact bbox.
+            // It never restores a positive source index, epoch, or opaque acquisition receipt.
+            val typedForCandidate = tactileSurfaces.filter {
+                val candidate = it.candidate; val token = candidate.capture.token
+                token.frameId == output.frameId && output.imageQuarterTurns == candidate.capture.imageQuarterTurns &&
+                    output.timestampMs == token.cameraTimestampNs / 1_000_000L &&
+                    output.className == candidate.semantic.className && output.bboxNorm == candidate.detection.bboxNorm
+            }
+            val explicitJoinFailed = typedForCandidate.isNotEmpty() &&
+                typedForCandidate.none { it.candidate.namedDetectionIndex == output.sourceDetectionIndex }
+            val surfaceEvaluation = output.sourceDetectionIndex?.let { surfaceEvaluations[it] }
+            val surfaceHeadingDelta = surfaceEvaluation?.evidence?.uniqueRouteTangentAngleOrNull()
             when {
                 observation == null -> {
                     rejections[output.trackId] = evaluation.rejection ?: TactileObservationRejection.UNSPECIFIED
@@ -615,7 +684,28 @@ class AndroidTactileRouteGuidance(
                     rejections[output.trackId] = TactileObservationRejection.DAMAGE_AREA_OVERLAP
                     null
                 }
-                else -> observation
+                WalkMateClassPolicy.isTraversableTactileClass(output.className) && explicitJoinFailed -> {
+                    rejections[output.trackId] = TactileObservationRejection.SURFACE_UNAVAILABLE
+                    null
+                }
+                WalkMateClassPolicy.isTraversableTactileClass(output.className) && surfaceEvaluation != null &&
+                    (surfaceEvaluation.evidence?.observedRouteSupport != TactileObservedRouteSupport.AXIS_AND_MULTIPOINT_OVERLAP ||
+                        surfaceHeadingDelta == null) -> {
+                    rejections[output.trackId] = when (surfaceEvaluation.evidence?.observedRouteSupport) {
+                        TactileObservedRouteSupport.TOPOLOGY_UNRESOLVED -> TactileObservationRejection.SURFACE_TOPOLOGY_UNRESOLVED
+                        TactileObservedRouteSupport.NO_MULTIPOINT_OVERLAP -> TactileObservationRejection.SURFACE_NO_MULTIPOINT_ROUTE_OVERLAP
+                        TactileObservedRouteSupport.AXIS_AND_MULTIPOINT_OVERLAP -> TactileObservationRejection.SURFACE_TOPOLOGY_UNRESOLVED
+                        else -> TactileObservationRejection.SURFACE_UNAVAILABLE
+                    }
+                    null
+                }
+                else -> observation.copy(
+                    surfaceEvidence = surfaceEvaluation?.evidence,
+                    // Reuse the existing eligibility input/35-degree limit. A typed block supplies
+                    // its measured overlapping tangent (0 and 180 equivalent), not the camera's bearing.
+                    routeHeadingDeltaDeg = if (WalkMateClassPolicy.isTraversableTactileClass(output.className))
+                        surfaceHeadingDelta ?: observation.routeHeadingDeltaDeg else observation.routeHeadingDeltaDeg,
+                )
             }
         }
         val hasUnprojectedBlocker = tactileOutputs.any { output ->
@@ -641,6 +731,10 @@ class AndroidTactileRouteGuidance(
             ),
         )
         val guidedOutputs = outputs.map { output ->
+            // Crosswalk observations have one advisory owner; metric INFO must not also enter RISK.
+            if (CrosswalkReferencePolicy.isCrosswalkDetectorClass(output.className) &&
+                output.userFacing.messageLevel == MessageLevel.INFO
+            ) return@map output.copy(userFacing = UserFacingDepth(null, MessageLevel.NONE, null))
             if (!WalkMateClassPolicy.isTactileClass(output.className)) return@map output
             val useAsLocalPath = WalkMateClassPolicy.isTraversableTactileClass(output.className) &&
                 decision.mode == LocalRouteMode.TACTILE_LOCAL && output.trackId == selected?.candidateId
@@ -656,7 +750,46 @@ class AndroidTactileRouteGuidance(
                 },
             )
         }
-        return TactileRouteGuidanceResult(guidedOutputs, selected, decision, rejections.toMap())
+        return TactileRouteGuidanceResult(
+            guidedOutputs, selected, decision, rejections.toMap(),
+            dotReferenceNotice = dotReferencePolicy.noticeFor(outputs, context),
+            crosswalkReferenceNotice = crosswalkReferencePolicy.noticeFor(outputs, context, currentVisualObservation,
+                navigationActive, tmapOnRoute, activeRouteId, activeRouteProgress),
+            surfaceEvaluations = surfaceEvaluations.toMap(),
+        )
+    }
+
+    private fun TactileSurfaceRouteEvidence.uniqueRouteTangentAngleOrNull(): Float? {
+        if (observedRouteSupport != TactileObservedRouteSupport.AXIS_AND_MULTIPOINT_OVERLAP ||
+            originalMaskComponentCount != 1 || originalMaskHoleCount != 0 || originalMaskBranching) return null
+        val component = components.singleOrNull()?.takeIf { !it.branching } ?: return null
+        val axis = component.axis ?: return null
+        if (!axis.routeAngleDeg.isFinite() || axis.routeAngleDeg !in 0.0..90.0 || component.tangents.isEmpty()) return null
+        val nodes = component.centerlineDepthCells.toSet()
+        val adjacency = nodes.associateWith { mutableSetOf<Int>() }
+        for (edge in component.tangents) {
+            if (edge.fromDepthCell !in nodes || edge.toDepthCell !in nodes ||
+                !edge.routeAngleDeg.isFinite() || edge.routeAngleDeg !in 0.0..90.0) return null
+            adjacency.getValue(edge.fromDepthCell).add(edge.toDepthCell)
+            adjacency.getValue(edge.toDepthCell).add(edge.fromDepthCell)
+        }
+        // An observed simple centerline has two ends and one connected component. A fork, loop,
+        // or fragmented support cannot invent a single progress axis; these are topology facts.
+        if (adjacency.values.count { it.size == 1 } != 2 || adjacency.values.any { it.size !in 1..2 }) return null
+        val reached = mutableSetOf<Int>(); val queue = ArrayDeque<Int>()
+        queue.add(nodes.first())
+        while (queue.isNotEmpty()) {
+            val cell = queue.removeFirst()
+            if (reached.add(cell)) adjacency.getValue(cell).forEach(queue::add)
+        }
+        if (reached.size != nodes.size) return null
+        // Only the measured edges supported by actual route-intersection patches describe the
+        // current overlap. A distant bend cannot stand in for its local direction.
+        val localTangents = component.tangents.filter { edge ->
+            overlaps.any { patch -> edge.fromDepthCell in patch.depthCells && edge.toDepthCell in patch.depthCells } }
+        // Do not average distinct directions into a false route alignment. The existing policy
+        // applies its unchanged heading limit to the greatest observed local deviation.
+        return localTangents.maxOfOrNull { it.routeAngleDeg }?.toFloat()
     }
 
     private fun TrackedObjectDepth.isTactileClass(): Boolean {
@@ -703,7 +836,7 @@ private fun normalizeBearing(value: Float): Float = ((value % 360f) + 360f) % 36
 
 private fun projectGeodesic(origin: TrustedLocation, bearingDeg: Float, distanceM: Float): RoutePoint? {
     if (!bearingDeg.isFinite() || !distanceM.isFinite() || distanceM < 0f) return null
-    val angularDistance = distanceM.toDouble() / EARTH_RADIUS_M
+    val angularDistance = distanceM.toDouble() / LocalGeodesy.EARTH_RADIUS_M
     val bearingRad = Math.toRadians(bearingDeg.toDouble())
     val latitudeRad = Math.toRadians(origin.latitude)
     val longitudeRad = Math.toRadians(origin.longitude)
@@ -716,7 +849,7 @@ private fun projectGeodesic(origin: TrustedLocation, bearingDeg: Float, distance
         cos(angularDistance) - sin(latitudeRad) * sin(projectedLatitude),
     )
     val latitude = Math.toDegrees(projectedLatitude)
-    val longitude = ((Math.toDegrees(projectedLongitude) + 540.0) % 360.0) - 180.0
+    val longitude = LocalGeodesy.wrapLongitudeDegrees(Math.toDegrees(projectedLongitude))
     return RoutePoint(latitude, longitude).takeIf {
         it.latitude.isFinite() && it.latitude in -90.0..90.0 &&
             it.longitude.isFinite() && it.longitude in -180.0..180.0
@@ -725,21 +858,17 @@ private fun projectGeodesic(origin: TrustedLocation, bearingDeg: Float, distance
 
 /**
  * S09-52 (w25 review pos-F11): longitude differences use the shared [LocalGeodesy] wrap, so a segment across
- * ±180° is measured by its short way round. The 111 320 m/degree scale is still the route-projection scale
- * (the shared radius is S09-52 remaining work).
+ * ±180° is measured by its short way round, using the same sphere radius and local scale as positioning.
  */
 private fun distancePointToSegmentMeters(point: RoutePoint, start: RoutePoint, end: RoutePoint): Float {
-    val latScale = 111_320.0
-    val lonScale = 111_320.0 * cos(Math.toRadians(point.latitude))
-    val ax = LocalGeodesy.wrapLongitudeDegrees(start.longitude - point.longitude) * lonScale
-    val ay = (start.latitude - point.latitude) * latScale
-    val bx = LocalGeodesy.wrapLongitudeDegrees(end.longitude - point.longitude) * lonScale
-    val by = (end.latitude - point.latitude) * latScale
-    val abx = bx - ax
-    val aby = by - ay
+    val latScale = LocalGeodesy.METERS_PER_DEGREE
+    val lonScale = LocalGeodesy.metersPerLongitudeDegree(start.latitude)
+    // Keep the short segment in one frame even when the query is on the other side of ±180°.
+    val px = LocalGeodesy.wrapLongitudeDegrees(point.longitude - start.longitude) * lonScale
+    val py = (point.latitude - start.latitude) * latScale
+    val abx = LocalGeodesy.wrapLongitudeDegrees(end.longitude - start.longitude) * lonScale
+    val aby = (end.latitude - start.latitude) * latScale
     val denominator = abx * abx + aby * aby
-    val fraction = if (denominator <= 1e-6) 0.0 else (-(ax * abx + ay * aby) / denominator).coerceIn(0.0, 1.0)
-    return kotlin.math.hypot(ax + abx * fraction, ay + aby * fraction).toFloat()
+    val fraction = if (denominator <= 1e-6) 0.0 else ((px * abx + py * aby) / denominator).coerceIn(0.0, 1.0)
+    return kotlin.math.hypot(px - abx * fraction, py - aby * fraction).toFloat()
 }
-
-private const val EARTH_RADIUS_M = 6_371_000.0

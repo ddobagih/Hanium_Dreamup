@@ -138,7 +138,8 @@ internal fun classifyVoiceRequestOutcome(
     streamingError == VoskStreamingError.MODEL_UNAVAILABLE ||
         streamingError == VoskStreamingError.MODEL_LOAD_FAILED -> VoiceRequestOutcome.MODEL_LOAD_FAILED
     streamingError == VoskStreamingError.INFERENCE_FAILED -> VoiceRequestOutcome.DECODER_FAILED
-    streamingError == VoskStreamingError.AUDIO_START_FAILED ||
+    streamingError == VoskStreamingError.AUDIO_ROUTE_CHANGED ||
+        streamingError == VoskStreamingError.AUDIO_START_FAILED ||
         streamingError == VoskStreamingError.AUDIO_READ_FAILED -> VoiceRequestOutcome.AUDIO_FAILED
     errorCode == SpeechRecognizer.ERROR_CLIENT && !ready -> VoiceRequestOutcome.MODEL_LOAD_TIMEOUT
     errorCode == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->

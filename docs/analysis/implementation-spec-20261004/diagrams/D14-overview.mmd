@@ -1,0 +1,18 @@
+flowchart LR
+  OPS["F-D14-001..003<br/>issuer 파일과 단일관리자 설정"] --> AUTH["F-D14-004..008<br/>password TOTP 제한 로그인 bearer"]
+  AUTH --> VIEW["F-D14-009..012<br/>상태 세션 기기 custody"]
+  KEY["F-D14-014..015<br/>공개키 provision과 교체"] --> PROOF["F-D14-016..017<br/>120초 challenge와 요청 서명"]
+  AUTH --> PROOF
+  VIEW --> HIGH["F-D14-018..020<br/>작업 분류와 일회 재확인"]
+  PROOF --> HIGH
+  HIGH --> LOST["F-D14-013<br/>다른 기기 분실 폐기"]
+  HIGH --> BIZ["D13 D15<br/>관리자 데이터 작업"]
+  HIGH --> INCIDENT["F-D14-028..032<br/>사고 기록 조회와 상태 관측"]
+  REC["F-D14-021..025<br/>복구 시작 재개 새인자 완료 만료"] -->|"NORMAL 복귀와 custody 재확인 필요"| VIEW
+  REC -->|"모든 세션 폐기"| AUTH
+  REC -->|"다른 ACTIVE와 모든 PENDING 폐기"| KEY
+  AUTH --> AUDIT["F-D14-026..027<br/>연결 감사 기록과 최소 목록"]
+  INCIDENT --> AUDIT
+  OFF["F-D14-033<br/>오프라인 작업 보호"] --> HIGH
+  MID["D09 middleware<br/>요청 포착과 proof 소비"] --> PROOF
+  AND["D12 관리자 Android<br/>UI와 KeyStore"] --> AUTH

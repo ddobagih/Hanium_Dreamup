@@ -1,0 +1,31 @@
+sequenceDiagram
+  participant C as 신고 클라이언트
+  participant API as v2 API
+  participant WORK as 동기 저장 worker
+  participant DB as PostgreSQL
+  participant FS as 암호화 저장소
+  participant MON as storage monitor
+  C->>API: metadata·원본 이미지·전송 ID
+  API->>API: bytes 계약·schema·이미지 검증
+  API->>WORK: anyio to_thread 저장 작업
+  WORK->>DB: privacy shared lock·전송 ID advisory lock
+  alt exact 전송 ID replay
+    DB-->>WORK: 기존 receipt 결속 확인
+    WORK-->>API: REPLAYED
+  else 신규 신고
+    WORK->>DB: 자동 gate·내용 멱등·공간 쿨다운 lock
+    WORK->>FS: 공유 maintenance lock·key·journal·암호화 object stage
+    WORK->>DB: precommit 동의·image metadata 검증 후 commit
+    DB-->>WORK: commit 결과
+    WORK->>FS: journal 완료 정리
+    WORK-->>API: CREATED 또는 commit 후503
+  end
+  API-->>C: receipt 또는 오류
+  opt 응답 유실
+    C->>API: 같은 전송 ID 재시도 또는 status 조회
+    API-->>C: actor와 generation에 결속된 상태
+  end
+  MON->>DB: 다음 cycle inventory page
+  MON->>FS: lock 밖 hash·namespace 검증
+  MON->>DB: revision·최종 집합 재검사
+  Note over API,MON: F-D15-002·004·008·010·011 / P-D15-008<br/>늦은 완료와 commit 후 오류는 삭제됐다는 뜻이 아님

@@ -538,12 +538,50 @@ class InfraTests(unittest.TestCase):
         (self.root / "missing.xml").write_text('<testsuite><testcase name="stale"/></testsuite>')
         self.assertEqual([row["status"] for row in summarize(self.root)], ["PASS", "FAIL", "NOT_RUN", "EXCLUDED"])
 
+    def test_report_all_skipped_is_not_pass_and_failures_keep_precedence(self):
+        (self.root / "scope.tsv").write_text("group\tselected\tcase.py\n")
+        (self.root / "group.started").touch()
+        cases = [
+            ('<testcase><skipped/></testcase>', 0, "SKIPPED"),
+            ('<testcase><skipped/></testcase><testcase/>', 0, "PASS"),
+            ('<testcase><skipped/></testcase><testcase><failure/></testcase>', 0, "FAIL"),
+            ('<testcase><skipped/><error/></testcase>', 0, "FAIL"),
+            ('<testcase><skipped/></testcase>', 1, "FAIL"),
+            ('', 0, "FAIL"),
+        ]
+        for body, exit_code, expected in cases:
+            with self.subTest(body=body, exit_code=exit_code):
+                (self.root / "group.exit").write_text(str(exit_code))
+                (self.root / "group.xml").write_text(f"<testsuite>{body}</testsuite>")
+                row = summarize(self.root)[0]
+                self.assertEqual(row["status"], expected)
+                self.assertEqual(row["skipped"], body.count("<skipped/>"))
+
+    def test_skipped_report_without_exit_stays_incomplete(self):
+        (self.root / "scope.tsv").write_text("group\tselected\tcase.py\n")
+        (self.root / "group.started").touch()
+        (self.root / "group.xml").write_text('<testsuite><testcase><skipped/></testcase></testsuite>')
+        self.assertEqual("INCOMPLETE", summarize(self.root)[0]["status"])
+
     def test_node_recursive_discovery_and_junit(self):
         self.run_node_fixture("import {test} from 'node:test'; test('nested test', () => {});", expected=0)
         inventory = json.loads((self.root / "reports/node-gateway-inventory.json").read_text())
         self.assertEqual(len(inventory["files"]), 1)
         self.assertIn("deep", inventory["files"][0])
         self.assertTrue(list(ET.parse(self.root / "reports/node-gateway.xml").iter("testcase")))
+
+    def test_node_all_skipped_keeps_json_and_markdown_status(self):
+        self.run_node_fixture("import {test} from 'node:test'; test('unavailable', {skip: true}, () => {});", expected=0)
+        reports = self.root / "reports"
+        (reports / "scope.tsv").write_text("node-gateway\tselected\tnested.test.js\n")
+        result = subprocess.run([sys.executable, "-B", str(ROOT / "scripts/summarize_walksafe_test_reports.py"),
+                                 "--report-dir", str(reports), "--exit-code", "0"],
+                                capture_output=True, text=True, timeout=5)
+        self.assertEqual(0, result.returncode, result.stderr)
+        row = json.loads((reports / "summary.json").read_text())["groups"][0]
+        self.assertEqual("SKIPPED", row["status"])
+        self.assertEqual(row["tests"], row["skipped"])
+        self.assertIn("| node-gateway | SKIPPED |", (reports / "summary.md").read_text())
 
     def test_node_timeout_is_failure_with_report(self):
         self.run_node_fixture("import {test} from 'node:test'; test('never ends', async () => { await new Promise(() => { setInterval(() => {}, 1000); }); });", expected=1)
@@ -583,6 +621,38 @@ class InfraTests(unittest.TestCase):
         # An unknown selector in a selector table is still a contract error.
         errors, _ = docs._runner_contract(ROOT, set(result.runner_selectors) | {"bogus"})
         self.assertIn("bogus: documented selector is missing from runner case", errors)
+
+    def test_android_debug_matrix_executes_both_expected_flag_combinations(self):
+        source = (ROOT / "scripts/run_walksafe_test_layers_current.sh").read_text()
+        matrix = source.split("  # Generated BuildConfig combinations:", 1)[1]
+        matrix = matrix[matrix.index("  local enabled"):matrix.index('  (cd "${REPO_ROOT}/apps/android" && ./gradlew')]
+        android = self.root / "apps/android"
+        android.mkdir(parents=True)
+        log = self.root / "gradle-calls.jsonl"
+        stub = android / "gradlew"
+        stub.write_text(f'#!{sys.executable}\nimport json, sys\nwith open({str(log)!r}, "a") as output:\n output.write(json.dumps(sys.argv[1:]) + "\\n")\n')
+        stub.chmod(0o755)
+        result = subprocess.run(["/bin/bash", "--noprofile", "--norc", "-c",
+            'set -euo pipefail\nREPO_ROOT="$1"\nrun_matrix() {\n' + matrix + '\n}\nrun_matrix\n',
+            "matrix-fixture", str(self.root)], capture_output=True, text=True, timeout=5)
+        self.assertEqual(0, result.returncode, result.stderr)
+        calls = [json.loads(line) for line in log.read_text().splitlines()]
+        self.assertEqual(2, len(calls))
+        for enabled, call in zip(("false", "true"), calls):
+            self.assertIn(":app:testDebugUnitTest", call)
+            self.assertIn(":adminapp:testDebugUnitTest", call)
+            self.assertIn("*BuildVariantIsolationTest", call)
+            self.assertIn("*AdminBuildVariantIsolationTest", call)
+            for flag in ("developmentReportQueue", "developmentQuickStart", "walksafe.guidanceStartBypass",
+                         "WALKSAFE_ADMIN_OPERATIONAL_DEBUG", "walksafe.expectedDevelopmentQuickStart",
+                         "walksafe.expectedReportQueue", "walksafe.expectedGuidanceStartBypass"):
+                self.assertIn(f"-P{flag}={enabled}", call)
+            self.assertIn("-PWALKSAFE_REPORT_QUEUE_ENABLED=false", call)
+            self.assertFalse(any("positioneval" in option for option in call))
+        for module in ("app", "adminapp"):
+            self.assertIn(f":{module}:verifyReleaseBuildConfigIsolation :{module}:lintRelease :{module}:assembleRelease", source)
+        self.assertIn("-PWALKSAFE_ADMIN_OPERATIONAL_DEBUG=true", source)
+        self.assertIn("-Pwalksafe.expectedDevelopmentQuickStart=false -Pwalksafe.expectedReportQueue=false", source)
 
     def test_runner_cwd_and_failure_reporting_with_command_stubs(self):
         self.check_runner_report_directory(relative=False)
@@ -638,7 +708,9 @@ class InfraTests(unittest.TestCase):
         groups = {row["group"]: row for row in report["groups"]}
         self.assertEqual(groups["python-unit"]["status"], "FAIL")
         self.assertEqual(groups["node-gateway"]["status"], "NOT_RUN")
-        self.assertIn("testReleaseUnitTest lintRelease assembleRelease", source)
+        for module in ("app", "adminapp"):
+            self.assertIn(f":{module}:verifyReleaseBuildConfigIsolation :{module}:lintRelease :{module}:assembleRelease", source)
+        self.assertIn(":app:testDebugSdkAdapterUnitTest --no-daemon --rerun-tasks", source)
 
 
 if __name__ == "__main__":

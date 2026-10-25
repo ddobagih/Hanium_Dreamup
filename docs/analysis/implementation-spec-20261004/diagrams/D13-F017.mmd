@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D13-017<br/>서버 계정 삭제 worker 와 저널 복구"]
+  P["P-D13-017<br/>파일과 DB 는 journal 을 사이에 두고 복구한다. DBcommit 전 복구와 commit 후 파일<br/>제거를 구분한다."]
+  A --> P
+  N0["1. run_once 는 maintenance 배타락 아래 기존 journal 을 먼저 reconcile<br/>하고 pending 요청을 선택한다."]
+  P --> N0
+  N1["2. request identity 재조회, subject deletion fence,<br/>report/raw storage reconcile lock, RAW capacity lock 을<br/>잡는다. RAW write journal 이 있으면 중단한다."]
+  N0 --> N1
+  N2["3. 신고파일·RAW·credential·enrollment UUID·가입 영수증<br/>잔존수·격리수·외부기관전달수를 PREPARED journal 로 fsync 한다."]
+  N1 --> N2
+  N3["4. 검증한 파일을 같은 filesystem 의 private quarantine 으로<br/>no-replace rename 한다."]
+  N2 --> N3
+  N4["5. Report/RawCollection/AccountEnrollment/UserAccount 를<br/>삭제하고 외부 사본수 재조회 및 관련 DB inventory0 을 확인한 뒤 commit 한다."]
+  N3 --> N4
+  N5["6. DATABASE_COMMITTED journal 을 기록한 뒤 파일을 unlink 하고 DB<br/>inventory0, tombstone1, item9,가입 영수증·동의원장을 재검증한다."]
+  N4 --> N5
+  N6["7. create-only server manifest SHA256 으로 서버항목을 확정하고<br/>journal/quarantine 을 정리한다."]
+  N5 --> N6
+  Z["내부 삭제 manifest 를 남기며 기기·학습물·backup·기관사본 완료까지 자동 주장하지 않음."]
+  N6 --> Z
+  B0{"commit 시도 전 실패"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["DBrollback 와 quarantine 원본 복구"]
+  B1{"commit acknowledgement 모호/프로세스 중단"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["저널 보존; 다음 reconcile 에서 DB rows 전체존재면 RESTORED, 전체 0 이면 후처리"]
+  B2{"일부 row 만 삭제되었거나 metadata/파일 identity 불일치"}
+  P -. "예외 조건 검사" .-> B2
+  B2 -- "조건 성립" --> X2["복구 추측 금지; 오류로 중단"]
+  B3{"외부기관전달수 삭제경쟁 중 변경"}
+  P -. "예외 조건 검사" .-> B3
+  B3 -- "조건 성립" --> X3["commit 전 오류; 잘못된 external inventory 로 manifest 생성 금지"]
+  R["재시도: 재실행 시 저널부터 복구. 신규요청 재시도와 기존저널 복구를 섞지 않음.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 별도 취소 진입점 없음."]
+  A -. "취소 API 여부" .-> C

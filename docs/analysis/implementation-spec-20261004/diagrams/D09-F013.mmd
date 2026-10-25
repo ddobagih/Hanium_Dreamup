@@ -1,0 +1,24 @@
+flowchart TD
+  T["F-D09-013 legacy 탐지 health / P-D09-013"]
+  N0["field 인가"]
+  T --> N0
+  N1["model path와 cache identity"]
+  N0 --> N1
+  N2["필요 시 파일해시와 YOLO load"]
+  N1 --> N2
+  N3["task 및 class mapping"]
+  N2 --> N3
+  N4["health DTO 반환"]
+  N3 --> N4
+  Z["정상: v1 adapter 가용성 DTO 반환"]
+  N4 --> Z
+  B0["HTTP200 DTO model_status=unavailable + 공개reason"]
+  N1 -->|"artifact 없음/불일치/dependency/load/task 실패"| B0
+  B1["재로드 없이 cached adapter result"]
+  N1 -->|"cache stat/order 동일"| B1
+  R["복구: 서버 자동 재시도 없음 / 조건 복구 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  C["취소와 정리: 전용 취소 API 없음 / 요청 지역 메모리 반환; 공유 자원은 runtime 소유자가 정리"]
+  N4 -.-> C

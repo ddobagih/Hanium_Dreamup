@@ -38,6 +38,8 @@ class ObjectDepthValidatedPairPipelineTest {
         listOf(
             snapshot(),
             snapshot().copy(
+                // Without a fresh Full competitor, the verified reprojected Raw pair remains usable.
+                fullDepth = null, fullDepthTimestampNs = null,
                 rawDepthTimestampNs = targetKey.cameraTimestampNs - 1L,
                 rawConfidenceTimestampNs = targetKey.cameraTimestampNs - 1L,
             ),
@@ -46,6 +48,18 @@ class ObjectDepthValidatedPairPipelineTest {
                 assertEquals(DepthSource.ARCORE_RAW_DEPTH, output.source)
                 assertEquals(1.2f, output.depthMedianM!!, 0.01f)
             }
+        }
+    }
+
+    @Test
+    fun verifiedButOldRawDoesNotHideFreshFullObservation() {
+        val oldRaw = snapshot().copy(
+            rawDepthTimestampNs = targetKey.cameraTimestampNs - 1L,
+            rawConfidenceTimestampNs = targetKey.cameraTimestampNs - 1L,
+        )
+        outputs(oldRaw).forEach { output ->
+            assertEquals(DepthSource.ARCORE_FULL_DEPTH, output.source)
+            assertEquals(2.0f, output.depthMedianM!!, 0.01f)
         }
     }
 

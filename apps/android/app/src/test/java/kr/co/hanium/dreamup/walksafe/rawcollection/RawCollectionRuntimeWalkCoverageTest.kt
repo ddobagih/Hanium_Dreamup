@@ -689,6 +689,7 @@ class RawCollectionRuntimeWalkCoverageTest {
             identity: RawDetectorRuntimeIdentity? = RUNTIME_IDENTITY,
         ) =
             RawDetectionMetadataSample(
+        windowIdentity = RAW_TEST_WINDOW_IDENTITY,
                 windowStartedAtEpochMs = start,
                 capturedAtEpochMs = end,
                 processedFrameCount = 30,
@@ -706,6 +707,7 @@ class RawCollectionRuntimeWalkCoverageTest {
             )
 
         fun performance(start: Long, end: Long, thermal: Boolean? = false) = RawPerformanceMetadataSample(
+        windowIdentity = RAW_TEST_WINDOW_IDENTITY,
             windowStartedAtEpochMs = start,
             capturedAtEpochMs = end,
             processedFrameCount = 30,
@@ -978,3 +980,5 @@ private fun coverageActiveWalk(epoch: WalkRuntimeEpoch): WalkSessionSnapshot {
         readiness = WalkSessionReadinessSnapshot(epoch, plan, 1L, observations),
     )
 }
+
+private val RAW_TEST_WINDOW_IDENTITY = RawRuntimeWindowIdentity()

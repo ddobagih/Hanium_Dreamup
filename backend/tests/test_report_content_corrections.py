@@ -315,6 +315,12 @@ def test_package_v2_binds_content_and_supersedes_without_changing_v1_bytes() -> 
 
 
 class _AdminSession(_Session):
+    def scalar(self, statement: object) -> object | None:
+        # This fixture has the active report represented by its first row.
+        if statement.column_descriptions[0]["name"] == "id":
+            return self.results[0].id
+        return super().scalar(statement)
+
     def flush(self) -> None:
         return None
 

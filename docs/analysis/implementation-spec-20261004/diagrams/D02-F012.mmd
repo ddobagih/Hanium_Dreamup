@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D02-012 공식 사용 환경과 런타임 품질 저하 제한"]
+  E["진입: GPS/camera·환경 사용자 확인 / 현재 assessment"]
+  G{"P-D02-012 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["초기/runtime gate fail closed"]
+  G -->|"production profile 없음"| B0
+  B1["사용한계 동의로 우회 불가"]
+  G -->|"명시 환경 FAIL"| B1
+  B2["가능 feature 출력만 continue"]
+  G -->|"한 측정 가능·다른 측정 불가"| B2
+  B3["SUPPRESS_OUTPUTS_AND_RETRY"]
+  G -->|"저하 count＜=2"| B3
+  B4["terminal SAFE_STOP"]
+  G -->|"count＞2"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["각 측정의 epoch/profile/원본 age를 정규화"]
+    S1["적용 요소 중 FAIL이면 unsupported; 전부 PASS면 supported; 그 밖은 limited"]
+    S2["시작은 profile 있고 enabled measured nonempty, 전부 supported 또는 사용한계 동의+측정<br/>PASS+명시 FAIL 없음"]
+    S3["runtime은 공통조건 허용 및 enabled 측정 하나 이상 유효하면 CONTINUE; 불가한 측정의 출력만 제한"]
+    S4["모두 불가/공통 실패는 즉시 전체 출력 억제하고 실제 시간 간격으로 retry count 소비"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: 해당 이벤트 처리를 마치고 현재 스냅샷/결과를 반환한다."]
+  X["취소·중단: 독립 취소 API가 없는 판단 함수는 호출자의 세대 무효화로 더 이상 결과를 사용하지 않는다. /<br/>foreground·epoch·owner 조건을 잃은 결과는 재사용하지 않는다."]
+  C["정리: 순수 정책은 소유하는 외부 리소스가 없다."]
+  R["재시도·복구: candidate는 첫 저하 count1, 3000ms 이상 후 count2, 다음 count3에서 stop; 센서<br/>callback 빈도로 retry 소진하지 않음. / 한 가지 측정이라도 실제 허용되면 count reset;<br/>terminal guard는 새 epoch 필요."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

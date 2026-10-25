@@ -49,6 +49,58 @@ class AndroidSensitivePreferenceStoreTest {
     }
 
     @Test
+    fun identicalTypedEditDoesNotEncryptOrWriteButExplicitClearStillDoes() {
+        val storage = FakeStorage()
+        val keys = FakeKeyProvider()
+        val store = newStore(storage, keys)
+        assertTrue(store.edit().putString("control_secret", "same-value").putLong("revision", 9L)
+            .putBoolean("consent", true).commit())
+        val envelope = storage.strings.getValue(spec.storageKey)
+        val writes = storage.commitCalls
+        val keyCalls = keys.createCalls
+        assertTrue(store.edit().putString("control_secret", "same-value").putLong("revision", 9L)
+            .putBoolean("consent", true).remove("profile_absent").commit())
+        assertEquals(envelope, storage.strings.getValue(spec.storageKey))
+        assertEquals(writes, storage.commitCalls)
+        assertEquals(keyCalls, keys.createCalls)
+        assertTrue(store.edit().clear().putString("control_secret", "same-value").putLong("revision", 9L)
+            .putBoolean("consent", true).commit())
+        assertTrue(storage.commitCalls > writes)
+        assertTrue(keys.createCalls > keyCalls)
+    }
+
+    @Test
+    fun explicitPersistedCommitRequiresFreshStorageAcknowledgementForIdenticalValues() {
+        val storage = FakeStorage()
+        val store = newStore(storage, FakeKeyProvider())
+        assertTrue(store.edit().putString("control_secret", "same-value").commit())
+        val envelope = storage.strings.getValue(spec.storageKey)
+        val calls = storage.commitCalls
+        storage.commitsSucceed = false
+        assertTrue(store.edit().putString("control_secret", "same-value").commit())
+        assertEquals(calls, storage.commitCalls)
+        assertFalse(store.edit().putString("control_secret", "same-value").commitPersisted())
+        assertTrue(storage.commitCalls > calls)
+        assertTrue(store.isBlocked())
+        assertEquals(envelope, storage.strings.getValue(spec.storageKey))
+        assertFalse(store.edit().putString("control_secret", "same-value").commitPersisted())
+    }
+
+    @Test
+    fun identicalEditCannotBypassStaleOwnerBlockedStateOrPendingReset() {
+        val storage = FakeStorage()
+        val keys = FakeKeyProvider()
+        val stale = newStore(storage, keys)
+        assertTrue(stale.edit().putString("control_secret", "same-value").commit())
+        val current = newStore(storage, keys)
+        assertFalse(stale.edit().putString("control_secret", "same-value").commit())
+        storage.strings[spec.resetPendingKey] = "RESET_PENDING_V1"
+        assertFalse(current.edit().putString("control_secret", "same-value").commit())
+        val blockedStorage = FakeStorage().apply { booleans[spec.blockedKey] = true }
+        assertFalse(newStore(blockedStorage, FakeKeyProvider()).edit().commit())
+    }
+
+    @Test
     fun plaintextLegacyValueIsRemovedAndBlocksTheDomain() {
         val storage = FakeStorage().apply {
             strings["control_secret"] = "legacy-plaintext"
@@ -366,6 +418,7 @@ class AndroidSensitivePreferenceStoreTest {
         val strings = mutableMapOf<String, String>()
         val booleans = mutableMapOf<String, Boolean>()
         var commitsSucceed = true
+        var commitCalls = 0
         var keyEnumerationSucceeds = true
         var failResetMarkerClearOnce = false
         var failResetMarkerStageOnce = false
@@ -384,6 +437,7 @@ class AndroidSensitivePreferenceStoreTest {
             booleans: Map<String, Boolean>,
             removals: Set<String>,
         ): Boolean {
+            commitCalls += 1
             if (!commitsSucceed) return false
             if (
                 failResetMarkerStageOnce &&

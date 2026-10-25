@@ -46,6 +46,8 @@ data class RuntimeLoadSnapshot(
     val pendingReason: RuntimeLoadPendingReason?,
     val lastWindowStatus: RuntimeLoadWindowStatus,
     val sourceTimingMismatchSamples: Long,
+    /** Maximum admitted caller-defined latency in the last closed window; null means unobserved. */
+    val lastCompletedWindowMaxEndToEndMs: Long? = null,
 )
 
 /**
@@ -85,6 +87,7 @@ class RuntimeLoadMonitor(
     private var lastWindowStatus = RuntimeLoadWindowStatus.COLLECTING
     private var sourceTimingMismatchSamples = 0L
     private var noFreshResultSinceMs: Long? = null
+    private var lastCompletedWindowMaxEndToEndMs: Long? = null
 
     /**
      * Each completion is submitted exactly once after the owner's ticket/generation check. Supply
@@ -147,6 +150,9 @@ class RuntimeLoadMonitor(
                 }
                 else -> {
                     currentWindow.completedSamples += 1L
+                    val previousMaxMs = currentWindow.maxEndToEndMs
+                    currentWindow.maxEndToEndMs = if (previousMaxMs == null) completion.endToEndMs
+                    else max(previousMaxMs, completion.endToEndMs)
                     if (completion.staleOrDropped) currentWindow.staleOrDropped += 1L
                     else noFreshResultSinceMs = null
                     if (currentWindow.timings.size < MAXIMUM_TIMING_SAMPLES) {
@@ -175,16 +181,18 @@ class RuntimeLoadMonitor(
         lastWindowStatus = RuntimeLoadWindowStatus.COLLECTING
         sourceTimingMismatchSamples = 0L
         noFreshResultSinceMs = null
+        lastCompletedWindowMaxEndToEndMs = null
     }
 
     @Synchronized
     fun snapshot(): RuntimeLoadSnapshot = RuntimeLoadSnapshot(
         environmentKey, baseline, consecutiveDegradedWindows, completedWindows, pendingReason,
-        lastWindowStatus, sourceTimingMismatchSamples,
+        lastWindowStatus, sourceTimingMismatchSamples, lastCompletedWindowMaxEndToEndMs,
     )
 
     private fun finishWindow(finished: Window) {
         completedWindows += 1L
+        lastCompletedWindowMaxEndToEndMs = finished.maxEndToEndMs
         val noFreshSinceMs = noFreshResultSinceMs
         val wholeWindowWithoutFreshResult = noFreshSinceMs != null &&
             finished.startedAtMs + windowDurationMs - noFreshSinceMs >= windowDurationMs
@@ -239,6 +247,7 @@ class RuntimeLoadMonitor(
 
     private fun breakContinuity(status: RuntimeLoadWindowStatus) {
         window = null
+        lastCompletedWindowMaxEndToEndMs = null
         noFreshResultSinceMs = null
         consecutiveDegradedWindows = 0
         lastWindowStatus = status
@@ -254,6 +263,7 @@ class RuntimeLoadMonitor(
         var inputObserved = false
         var completedSamples = 0L
         var staleOrDropped = 0L
+        var maxEndToEndMs: Long? = null
         val timings = ArrayList<Double>()
     }
 

@@ -1,0 +1,28 @@
+flowchart TD
+  A["F-D10-011 Voice 모델 revision·manifest·캐시 파일 무결성"]
+  N0["1. manifest를 O_NOFOLLOW로 열어 regular file·크기·전체 raw bytes digest 확인. UTF8 JSON duplicate key를 거부한다."]
+  A --> N0
+  N1["2. schema/kind/model_id/revision 일치와 normalized POSIX relative file names, 각 64hex digest를 확인한다."]
+  N0 --> N1
+  N2["3. STT는 config.json/model.bin/tokenizer.json 및 vocabulary.*가 필요; TTS는 config.json과 bin/safetensors weight 필요."]
+  N1 --> N2
+  N3["4. HF cache precedence에 따라 model cache/snapshots/revision을 선택. root snapshot symlink·symlink dir·특수파일·추가/누락 파일 집합 거부."]
+  N2 --> N3
+  N4["5. 각 logical file을 resolve하여 model cache root 안 regular file인지 검사하고 1MiB chunk SHA256를 재계산 후 경로 반환."]
+  N3 --> N4
+  B0{"manifest 또는 모델 file hash 불일치"}
+  R0["fail closed RuntimeError"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"모델 파일 symlink가 model cache 내부 blob으로 resolve"}
+  R1["허용; directory symlink는 거부"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"원격 model이 없거나 로컬 snapshot 없음"}
+  R2["다운로드 대신 실패"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N4 --> Z
+  P["적용 정책 · P-D10-009"]
+  P -. "코드 분기 기준" .-> A

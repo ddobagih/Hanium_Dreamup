@@ -1,6 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.inference
 
 import android.graphics.Rect
+import android.hardware.DataSpace
+import android.os.Build
 import android.media.Image
 import kr.co.hanium.dreamup.walksafe.UprightCameraImage
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
@@ -10,6 +12,54 @@ import java.nio.ByteOrder
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+
+/** Declared matrix/range only; unknown declarations retain the existing full adjusted BT.601. */
+internal enum class YuvColorConversion(
+    private val yOffset: Int,
+    private val yScale: Float,
+    private val redV: Float,
+    private val greenU: Float,
+    private val greenV: Float,
+    private val blueU: Float,
+) {
+    BT601_FULL(0, 1f, 1.402f, .344136f, .714136f, 1.772f),
+    BT601_LIMITED(16, 255f / 219f, 1.402f * 255f / 224f,
+        .344136f * 255f / 224f, .714136f * 255f / 224f, 1.772f * 255f / 224f),
+    BT709_FULL(0, 1f, 1.5748f, .187324f, .468124f, 1.8556f),
+    BT709_LIMITED(16, 255f / 219f, 1.5748f * 255f / 224f,
+        .187324f * 255f / 224f, .468124f * 255f / 224f, 1.8556f * 255f / 224f);
+
+    fun toArgb(y: Int, u: Int, v: Int): Int {
+        val luma = (y - yOffset) * yScale
+        val red = (luma + redV * v).roundToInt().coerceIn(0, 255)
+        val green = (luma - greenU * u - greenV * v).roundToInt().coerceIn(0, 255)
+        val blue = (luma + blueU * u).roundToInt().coerceIn(0, 255)
+        return (0xff shl 24) or (red shl 16) or (green shl 8) or blue
+    }
+
+    companion object {
+        fun fromImage(image: Image): YuvColorConversion {
+            if (Build.VERSION.SDK_INT < 33) return BT601_FULL
+            val dataSpace = try {
+                image.dataSpace
+            } catch (_: RuntimeException) {
+                // Optional metadata must not discard otherwise readable YUV planes.
+                return BT601_FULL
+            }
+            // These packed field masks match android.hardware.DataSpace.getStandard/getRange.
+            val standard = dataSpace and (63 shl 16)
+            val range = dataSpace and (7 shl 27)
+            if (range != DataSpace.RANGE_FULL && range != DataSpace.RANGE_LIMITED) return BT601_FULL
+            val limited = range == DataSpace.RANGE_LIMITED
+            return when (standard) {
+                DataSpace.STANDARD_BT601_525, DataSpace.STANDARD_BT601_625 ->
+                    if (limited) BT601_LIMITED else BT601_FULL
+                DataSpace.STANDARD_BT709 -> if (limited) BT709_LIMITED else BT709_FULL
+                else -> BT601_FULL
+            }
+        }
+    }
+}
 
 data class PreprocessedImage(
     val inputBuffer: ByteBuffer,
@@ -204,10 +254,14 @@ class YuvImagePreprocessor {
             uvPixelStride = uPlane.pixelStride,
             modelSize = modelSize,
             cropRect = YuvCropRect.fromImage(image),
+            colorConversion = YuvColorConversion.fromImage(image),
         )
     }
 
-    fun decode(image: Image): ArgbImage {
+    fun decode(image: Image): ArgbImage = decodeInto(image, IntArray(image.width * image.height))
+
+    /** Destination belongs to the serial caller; the ordinary decode API still returns owned pixels. */
+    internal fun decodeInto(image: Image, destination: IntArray): ArgbImage {
         val width = image.width
         val height = image.height
         val planes = image.planes
@@ -228,6 +282,8 @@ class YuvImagePreprocessor {
                 uvRowStride = uPlane.rowStride,
                 uvPixelStride = uPlane.pixelStride,
                 cropRect = YuvCropRect.fromImage(image),
+                destination = destination,
+                colorConversion = YuvColorConversion.fromImage(image),
             ),
         )
     }
@@ -290,6 +346,23 @@ class YuvImagePreprocessor {
         uvPixelStride: Int,
         modelSize: Int,
         cropRect: YuvCropRect = YuvCropRect.full(width, height),
+    ): PreprocessedImage = preprocessYuv420(width, height, yBuffer, uBuffer, vBuffer,
+        yRowStride, yPixelStride, uvRowStride, uvPixelStride, modelSize, cropRect,
+        YuvColorConversion.BT601_FULL)
+
+    internal fun preprocessYuv420(
+        width: Int,
+        height: Int,
+        yBuffer: ByteBuffer,
+        uBuffer: ByteBuffer,
+        vBuffer: ByteBuffer,
+        yRowStride: Int,
+        yPixelStride: Int,
+        uvRowStride: Int,
+        uvPixelStride: Int,
+        modelSize: Int,
+        cropRect: YuvCropRect,
+        colorConversion: YuvColorConversion,
     ): PreprocessedImage {
         require(modelSize > 0) { "modelSize must be positive" }
         cropRect.requireWithin(width, height)
@@ -341,10 +414,10 @@ class YuvImagePreprocessor {
                             val uvOffset = uvRow + (sourceX / 2) * uvPixelStride
                             val uValue = (uBuffer.get(uvOffset).toInt() and 0xff) - 128
                             val vValue = (vBuffer.get(uvOffset).toInt() and 0xff) - 128
-                            red = (yValue + 1.402f * vValue).roundToInt().coerceIn(0, 255) / 255f
-                            green = (yValue - 0.344136f * uValue - 0.714136f * vValue)
-                                .roundToInt().coerceIn(0, 255) / 255f
-                            blue = (yValue + 1.772f * uValue).roundToInt().coerceIn(0, 255) / 255f
+                            val pixel = colorConversion.toArgb(yValue, uValue, vValue)
+                            red = ((pixel ushr 16) and 0xff) / 255f
+                            green = ((pixel ushr 8) and 0xff) / 255f
+                            blue = (pixel and 0xff) / 255f
                             previousSourceX = sourceX
                         }
                         row[rowOffset++] = red
@@ -401,14 +474,36 @@ internal fun yuv420ToArgbPixels(
     uvRowStride: Int,
     uvPixelStride: Int,
     cropRect: YuvCropRect = YuvCropRect.full(width, height),
+    destination: IntArray = IntArray(width * height),
+): IntArray = yuv420ToArgbPixels(width, height, yBuffer, uBuffer, vBuffer,
+    yRowStride, yPixelStride, uvRowStride, uvPixelStride, cropRect, destination,
+    YuvColorConversion.BT601_FULL)
+
+internal fun yuv420ToArgbPixels(
+    width: Int,
+    height: Int,
+    yBuffer: ByteBuffer,
+    uBuffer: ByteBuffer,
+    vBuffer: ByteBuffer,
+    yRowStride: Int,
+    yPixelStride: Int,
+    uvRowStride: Int,
+    uvPixelStride: Int,
+    cropRect: YuvCropRect,
+    destination: IntArray = IntArray(width * height),
+    colorConversion: YuvColorConversion,
 ): IntArray {
     cropRect.requireWithin(width, height)
-    val pixels = IntArray(width * height)
+    require(destination.size.toLong() == width.toLong() * height) { "ARGB destination shape mismatch" }
+    val pixels = destination
     val isCropped = !cropRect.isFull(width, height)
     for (y in 0 until height) {
         val yRow = y * yRowStride
         val uvRow = (y / 2) * uvRowStride
         val pixelRow = y * width
+        var previousUvOffset = -1
+        var uValue = 0
+        var vValue = 0
         for (x in 0 until width) {
             if (isCropped && !cropRect.contains(x, y)) {
                 pixels[pixelRow + x] = YUV_CROP_PAD_ARGB
@@ -416,12 +511,12 @@ internal fun yuv420ToArgbPixels(
             }
             val yValue = yBuffer.get(yRow + x * yPixelStride).toInt() and 0xff
             val uvOffset = uvRow + (x / 2) * uvPixelStride
-            val uValue = (uBuffer.get(uvOffset).toInt() and 0xff) - 128
-            val vValue = (vBuffer.get(uvOffset).toInt() and 0xff) - 128
-            val r = (yValue + 1.402f * vValue).roundToInt().coerceIn(0, 255)
-            val g = (yValue - 0.344136f * uValue - 0.714136f * vValue).roundToInt().coerceIn(0, 255)
-            val b = (yValue + 1.772f * uValue).roundToInt().coerceIn(0, 255)
-            pixels[pixelRow + x] = (0xff shl 24) or (r shl 16) or (g shl 8) or b
+            if (uvOffset != previousUvOffset || previousUvOffset < 0) {
+                uValue = (uBuffer.get(uvOffset).toInt() and 0xff) - 128
+                vValue = (vBuffer.get(uvOffset).toInt() and 0xff) - 128
+                previousUvOffset = uvOffset
+            }
+            pixels[pixelRow + x] = colorConversion.toArgb(yValue, uValue, vValue)
         }
     }
     return pixels

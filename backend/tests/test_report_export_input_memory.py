@@ -45,7 +45,8 @@ config.get_settings = lambda: SimpleNamespace(
     database_connect_timeout_seconds=1,
     database_statement_timeout_ms=1000,
 )
-from backend.app.api import reports
+from backend.app.api import reports as reports_api
+from backend.app.services import report_export as reports
 from fastapi import HTTPException
 from fastapi.params import Param
 
@@ -109,7 +110,7 @@ db = Database(records)
 audits = []
 reports._reauthorize_admin_high_risk_in_transaction = lambda *args: None
 reports._persist_export_audit = lambda *args, **kwargs: audits.append(kwargs)
-router = reports.create_router(SimpleNamespace(admin_security_enabled=False, field_test_security_enabled=False), object())
+router = reports_api.create_router(SimpleNamespace(admin_security_enabled=False, field_test_security_enabled=False), object())
 endpoint = next(route.endpoint for route in router.routes if route.path == "/reports/export")
 arguments = {
     name: parameter.default.default if isinstance(parameter.default, Param) else parameter.default

@@ -1,0 +1,31 @@
+flowchart TD
+  IN["F-D14-021<br/>복구 코드로 긴급 복구 시작"]
+  G["적용 정책<br/>P-D14-005 / P-D14-007 / P-D14-011 / P-D14-015"]
+  IN --> G
+  N1["1. 실패 제한과 admin recovery advisory fence/cont<br/>rol lock"]
+  G --> N1
+  N2["2. 설정 admin와 미사용 recovery code digest 및 활성 t<br/>ransaction 조회"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 기존 같은 code/device transaction이면 F-D14-022<br/> resume로 연결; 다른 활성 transaction이면409"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 기기 proof 활성 시 recovery device에 정확히 1 ACTI<br/>VE key 요구"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 모든 session 폐기, 복구 device ACTIVE 하나만 보존, 다<br/>른 ACTIVE와 모든 PENDING key 폐기"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. 48바이트 random token의 digest/이전 TOTP finger<br/>print/device/기본15분 expiry transaction 저장"]
+  N5 -->|"계속 가능한 경우"| N6
+  N7["7. custody UNATTESTED로 초기화, security_state R<br/>ECOVERY_IN_PROGRESS 및 state_version 증가"]
+  N6 -->|"계속 가능한 경우"| N7
+  N8["8. 행 변경·attributable source digest/device_la<br/>bel 포함 성공 감사 commit 후 recovery_token 반환"]
+  N7 -->|"계속 가능한 경우"| N8
+  B1["분기 결과<br/>401 recovery_credentials_invalid"]
+  N2 -->|"잘못된 admin/code"| B1
+  B2["분기 결과<br/>403 recovery_device_key_required"]
+  N4 -->|"복구 device active key 수가1이 아님"| B2
+  B3["분기 결과<br/>409 recovery_in_progress"]
+  N3 -->|"다른 code/device 활성 복구 존재"| B3
+  N8 --> END["정상 종료<br/>복구 코드는 시작 때 소비하지 않고 성공 완료 때 used_at 설정."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 새 TOTP 배포 후 F-D14-023 완료; 만료는 <br/>F-D14-024."]
+  CAN["취소와 정리 계약<br/>복구 취소 HTTP API 없음. 키·세션 삭제 대신 revoke, custod<br/>y 해시·메타데이터 초기화."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

@@ -1,0 +1,13 @@
+flowchart TD
+  META["F-D16-002 · P-D16-002"]
+  META --> A
+  A["키 저장 버튼·CharArray 입력"] --> B["입력창 지움"]
+  B --> C{"1..512자이며 busy/cancelling 아님"}
+  C -->|"아니오"| X["입력 안내 또는 요청 거부"]
+  C -->|"예"| D["AES-256-GCM·고정 AAD·envelope v1"]
+  D --> E["part fsync→atomic replace"]
+  E -->|"성공"| F["keyStored=true·평문 배열 지움"]
+  E -->|"실패"| G["실패 안내·임시파일 정리"]
+  F --> H{"사용 시 복호화·길이·trailing bytes 검사"}
+  H -->|"유효"| I["허용 NGII 경로의 헤더로 사용"]
+  H -->|"실패"| J["envelope·alias 삭제·재입력"]

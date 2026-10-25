@@ -363,11 +363,13 @@ def test_android_cas_recovery_against_real_backend_and_gateway(tmp_path):
         write_private_json(ready_path, {"fixture_path": str(fixture_path), "done_path": str(done_path)})
         ready_mtime_ns = ready_path.stat().st_mtime_ns
         print(f"s19-31 fixture_ready={ready_path}", flush=True)
-        deadline = time.monotonic() + 300
+        handoff_wait_seconds = int(os.environ.get("WALKSAFE_S19_31_ANDROID_HANDOFF_TIMEOUT_SECONDS", "300"))
+        assert 1 <= handoff_wait_seconds <= 600
+        deadline = time.monotonic() + handoff_wait_seconds
         while not done_path.exists() and process.poll() is None and time.monotonic() < deadline:
             time.sleep(0.2)
         assert process.poll() is None, "isolated Gateway exited during Android JVM test"
-        assert done_path.is_file(), "Android JVM test did not deliver a done marker within 300 seconds"
+        assert done_path.is_file(), f"Android JVM test did not deliver a done marker within {handoff_wait_seconds} seconds"
         done = json.loads(done_path.read_text(encoding="utf-8"))
         assert done.get("gradle_exit_code") == 0
         xml_path = Path(done["junit_xml"]).resolve()

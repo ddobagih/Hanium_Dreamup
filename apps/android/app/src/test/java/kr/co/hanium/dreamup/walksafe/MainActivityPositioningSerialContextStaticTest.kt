@@ -21,22 +21,29 @@ class MainActivityPositioningSerialContextStaticTest {
     @Test
     fun everyInputFeedIsDeliveredOnTheMainLooper() {
         // Location fixes: the fused provider calls back on the main looper.
-        assertTrue(main.contains("fusedLocationClient.requestLocationUpdates(request, callback, Looper.getMainLooper())"))
+        val sources = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/AndroidNavigationSources.kt").readText()
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/PositioningSessionController.kt").readText()
+        MainActivityRefactorSource.composition(main, "positioningSessionController")
+        assertTrue(MainActivityRefactorSource.factory(main, "createNavigationSessions").contains("sources = { createNavigationAndroidSources() }"))
+        assertTrue(sources.contains("source.requestUpdates(request, Looper.getMainLooper(), Executor { runOnUiThread(it) })"))
         // Step events from the sensor callback are posted to the UI thread before touching the coordinator.
         val stepFeed = main.substringAfter("onStepEvent = { event ->").substringBefore("earthOrientationTracker = ")
-        assertTrue(stepFeed.contains("runOnUiThread {\n                                handlePositioningStepEvent(event, binding, receivedAtMs)"))
+        assertTrue(stepFeed.contains("runOnUiThread {\n                                handlePositioningStepEvent(event, binding, receivedAtMs, motionOwner)"))
         // Motion and step sensors are registered without a Handler: SensorManager delivers on the main looper.
-        assertEquals(2, Regex("""sensorManager\.registerListener\(listener, it, SensorManager\.SENSOR_DELAY_GAME\)""").findAll(motionTracker).count())
+        assertEquals(1, Regex("""sensorManager\.registerListener\(listener, it, SensorManager\.SENSOR_DELAY_GAME\)""").findAll(motionTracker).count())
+        assertTrue(motionTracker.contains("registration.register(listener, Sensor.TYPE_ACCELEROMETER)"))
+        assertTrue(motionTracker.contains("registration.register(listener, Sensor.TYPE_GYROSCOPE)"))
         assertTrue(stepTracker.contains("sensorManager.registerListener(listener, it, delay)"))
         assertFalse(motionTracker.contains("Handler("))
         assertFalse(stepTracker.contains("Handler("))
         // GNSS signal status is delivered on the main executor.
-        assertTrue(main.contains("executor = ContextCompat.getMainExecutor(this),"))
+        assertTrue(sources.contains("AndroidGnssObservationSource(manager, ContextCompat.getMainExecutor(context))"))
         // The motion callback is the only place that feeds user motion and ZUPT.
-        assertEquals(1, Regex("""binding\.coordinator\.observeUserMotion\(""").findAll(main).count())
-        assertEquals(1, Regex("""binding\.coordinator\.observeZupt\(""").findAll(main).count())
-        val motionCallback = main.substringAfter("AndroidPedestrianMotionTracker(this) motion@{ decision ->")
-            .substringBefore("runCatching { pedestrianMotionTracker?.start() }")
+        assertEquals(1, Regex("""binding\.coordinator\.observeUserMotion\(""").findAll(owner).count())
+        assertEquals(1, Regex("""binding\.coordinator\.observeZupt\(""").findAll(owner).count())
+        val motionCallback = MainActivityRefactorSource.member(owner, "startPositioningObservationSources")
+        assertTrue(motionCallback.contains("sources.pedestrianTracker motion@{ decision ->"))
+        assertTrue(sources.contains("AndroidPedestrianMotionTracker(context, onDecision = onMotion)"))
         assertTrue(motionCallback.contains("binding.coordinator.observeUserMotion("))
         assertTrue(motionCallback.contains("binding.coordinator.observeZupt("))
     }
@@ -48,7 +55,11 @@ class MainActivityPositioningSerialContextStaticTest {
         assertTrue(publicMethods.size >= 15)
         publicMethods.forEach { assertTrue("unsynchronized ${it.groupValues[2]}", it.groupValues[1].isNotEmpty()) }
         // The RAW metadata path (camera/detector thread) reads the motion state without publishing.
-        assertTrue(main.contains("runCatching { positioningCoordinator.peekUserMotion(SystemClock.elapsedRealtime()) }"))
+        val capture = MainActivityRefactorSource.factory(main, "createRawCollectionTransferController")
+        assertTrue(capture.contains("runCatching { positioningCoordinator.peekUserMotion(nowElapsedRealtimeMs) }"))
+        val record = MainActivityRefactorSource.function(main, "private fun recordRawCollectionDetectionMetadata(")
+        assertTrue(record.contains("capture.peekMotion(elapsedRealtimeMs())"))
+        assertFalse(record.contains(".currentUserMotion("))
         assertTrue(coordinator.contains("S09-58"))
     }
 }

@@ -22,14 +22,15 @@ class MainActivityRawCollectionRetentionStaticTest {
 
     @Test
     fun productionCoordinatorUsesTheLeaseDeadlineClock() {
-        assertTrue(
-            main.contains(
-                "RawCollectionRuntimeCoordinator(File(noBackupRoot,\"raw_collections\")," +
-                    "elapsedRealtimeMs=SystemClock::elapsedRealtime," +
-                    // S14-39: the OS allocatable bytes of the same volume gate new RAW writes.
-                    "allocatableBytes=AndroidAllocatableBytes(applicationContext,noBackupRoot),)",
-            ),
-        )
+        val creation = main.substringAfter("rawCollectionRuntimeCoordinator=privacyStartupResources.acquireOnWorker(create={RawCollectionRuntimeCoordinator(")
+            .substringBefore("initializeRawCollectionTransferController()")
+        val directory = creation.indexOf("File(noBackupRoot.canonicalFile,\"raw_collections\")")
+        val clock = creation.indexOf("elapsedRealtimeMs=SystemClock::elapsedRealtime,")
+        // S14-39: the OS allocatable bytes of the same volume gate new RAW writes.
+        val allocatable = creation.indexOf("allocatableBytes=AndroidAllocatableBytes(applicationContext,noBackupRoot)")
+        assertTrue(directory >= 0)
+        assertTrue(clock > directory)
+        assertTrue(allocatable > clock)
         assertFalse(
             "the public constructor must not default to an uptime clock",
             coordinator.contains("elapsedRealtimeMs={System.nanoTime()/1_000_000L}"),
@@ -38,7 +39,7 @@ class MainActivityRawCollectionRetentionStaticTest {
 
     @Test
     fun expiredRawDataIsPrunedOncePerProcessStart() {
-        val creation = main.indexOf("rawCollectionRuntimeCoordinator=RawCollectionRuntimeCoordinator(")
+        val creation = main.indexOf("rawCollectionRuntimeCoordinator=privacyStartupResources.acquireOnWorker(create={RawCollectionRuntimeCoordinator(")
         val prune = main.indexOf("executeRawCollectionTask{rawCollectionRuntimeCoordinator.pruneExpired()}")
         assertTrue(creation >= 0 && prune > creation)
         assertTrue(coordinator.contains("funpruneExpired():Int=try{store.pruneExpired()}"))

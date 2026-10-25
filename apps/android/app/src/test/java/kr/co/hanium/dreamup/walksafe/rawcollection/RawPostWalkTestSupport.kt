@@ -105,6 +105,7 @@ internal class PostWalkRawRig {
         return coordinator.captureMetadataBatch(
             active(walkId),
             RawDetectionMetadataSample(
+        windowIdentity = RAW_TEST_WINDOW_IDENTITY,
                 windowStartedAtEpochMs = start, capturedAtEpochMs = end, processedFrameCount = 30,
                 detectionCount = 3, averageInferenceMs = 30L, detectorAvailable = true,
                 modelRevision = "model-v1", maxInferenceMs = 50L,
@@ -115,6 +116,7 @@ internal class PostWalkRawRig {
                 runtimeIdentity = NP_IDENTITY,
             ),
             RawPerformanceMetadataSample(
+        windowIdentity = RAW_TEST_WINDOW_IDENTITY,
                 windowStartedAtEpochMs = start, capturedAtEpochMs = end, processedFrameCount = 30,
                 droppedFrameCount = 1, averageFrameDurationMs = 100L, thermalThrottled = false,
                 maxFrameDurationMs = 150L, frameDurationMsHistogram = listOf(0, 0, 10, 19, 0, 0, 0),
@@ -168,3 +170,5 @@ internal class RecordingPostWalkClient : RawCollectionNetworkClient {
         }
     }
 }
+
+private val RAW_TEST_WINDOW_IDENTITY = RawRuntimeWindowIdentity()

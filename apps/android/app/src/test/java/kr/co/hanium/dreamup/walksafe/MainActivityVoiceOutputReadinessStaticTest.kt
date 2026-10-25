@@ -26,7 +26,7 @@ class MainActivityVoiceOutputReadinessStaticTest {
         assertTrue(
             "S03-5: VOICE_OUTPUT must report the OFFLINE_KOREAN_TTS capability status",
             compactBranch.contains(
-                "startupRequirementCheck(effectiveDecision,setOf(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS),)",
+                "startupRequirementCheck(decision,setOf(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS))",
             ),
         )
         assertFalse(
@@ -68,7 +68,7 @@ class MainActivityVoiceOutputReadinessStaticTest {
         // Mixed with feature-limiting items (e.g. METRIC_DISTANCE) the gap still applies;
         // only an unsupported Android version keeps the fail-closed transition.
         val gap = "valinstallableGapBeforeWalk=session.state==WalkSessionState.READY&&" +
-            "decision.unavailableRequirements.any(USER_INSTALLABLE_REQUIREMENTS::contains)&&" +
+            "decision.unavailableRequirements.any(userInstallableRequirements::contains)&&" +
             "WalkSafeStartupRequirement.ANDROID_VERSION!indecision.unavailableRequirements"
         assertTrue("installable gap before a walk must be recognised", advance.contains(gap))
         assertBefore(
@@ -80,11 +80,14 @@ class MainActivityVoiceOutputReadinessStaticTest {
         assertBefore(
             advance,
             "!installableGapBeforeWalk",
-            "persistWalkSessionInterruptionMarker()",
+            "effects.persistInterruptionMarker()",
             "no interruption marker is written for a walk that never started",
         )
         // A paused walk that loses speech output still fails closed.
         assertFalse(advance.contains("session.state==WalkSessionState.PAUSED&&decision.unavailableRequirements.all("))
+        val factory = compact(MainActivityRefactorSource.factory(source, "createWalkSessionAdmissionController"))
+        assertTrue(factory.contains("userInstallableRequirements=USER_INSTALLABLE_REQUIREMENTS"))
+        assertTrue(factory.contains("overridefunpersistInterruptionMarker()=persistWalkSessionInterruptionMarker()"))
     }
 
     @Test
@@ -92,11 +95,40 @@ class MainActivityVoiceOutputReadinessStaticTest {
         val block = compact(method("walkSessionReadinessBlockReason"))
         assertTrue(
             block.contains(
-                "!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)||" +
-                    "!decision.allowsRequirement(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS)",
+                "!sources.voiceFeatureEnabled()||" + "!sources.offlineTtsAllowed(decision)",
             ),
         )
-        assertTrue(block.contains("returnKOREAN_TTS_WALK_BLOCK_DETAIL"))
+        assertTrue(block.contains("returnkoreanTtsBlockDetail"))
+        val factory = compact(MainActivityRefactorSource.factory(source, "createWalkReadinessBlockController"))
+        assertTrue(factory.contains("koreanTtsBlockDetail=KOREAN_TTS_WALK_BLOCK_DETAIL"))
+        assertTrue(factory.contains("overridefunvoiceFeatureEnabled()=postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)"))
+        assertTrue(factory.contains("overridefunofflineTtsAllowed(decision:WalkSafeStartupCapabilityDecision)=decision.allowsRequirement(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS)"))
+    }
+
+    @Test
+    fun voiceDataRecheckRevokesTheEarlierOverrideBeforeStartingEitherProbePath() {
+        val recheck = compact(method("recheckVoiceDataAfterSettingsIfNeeded"))
+        assertBefore(
+            recheck,
+            "effects.offlineTtsOverride=null",
+            "probe.recheck()",
+            "the earlier success must not override a pending voice-data recheck",
+        )
+        assertBefore(
+            recheck,
+            "effects.offlineTtsOverride=null",
+            "startReplacedProbe()",
+            "a replacement probe must also begin without the earlier override",
+        )
+        val replacement = compact(MainActivityRefactorSource.member(File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/startup/interaction/VoiceDataSettingsRecoveryController.kt").readText(), "startReplacedProbe"))
+        assertBefore(replacement, "probe.replace", "probe.start()", "the replacement starts only after replacing the old probe")
+        val factory = compact(MainActivityRefactorSource.factory(source, "createVoiceDataSettingsRecovery"))
+        assertTrue(factory.contains("overridevarofflineTtsOverride:Boolean?"))
+        assertTrue(factory.contains("get()=offlineKoreanTextToSpeechCapabilityOverride"))
+        assertTrue(factory.contains("set(value){offlineKoreanTextToSpeechCapabilityOverride=value}"))
+        assertTrue(factory.contains("overridefunrecheck()=startupCapabilityProbe.recheckOfflineKoreanTextToSpeech()"))
+        assertTrue(factory.contains("overridefunstart()=startupCapabilityProbe.start()"))
     }
 
     private fun assertBefore(text: String, first: String, second: String, message: String) {
@@ -107,7 +139,29 @@ class MainActivityVoiceOutputReadinessStaticTest {
 
     private fun compact(text: String): String = text.replace(Regex("\\s+"), "")
 
-    private fun method(name: String): String = blockAt(source, "private fun $name(")
+    private fun method(name: String): String = when (name) {
+        "captureWalkSessionReadiness" -> {
+            val wrapper = MainActivityRefactorSource.member(source, name)
+            assertTrue(wrapper.contains("walkReadinessCoordinator.capture(decision, action, recordResourceDiagnostics, checkEntryPermissions)"))
+            val binding = MainActivityRefactorSource.property(source, "walkReadinessCoordinator")
+            assertTrue(binding.contains("val producers = WalkReadinessProducers("))
+            assertTrue(binding.contains("WalkReadinessCoordinator({ walkSessionLifecycle }, startupReadinessEvidence,"))
+            assertTrue(binding.contains("official, mounting, producers,"))
+            val coordinator = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/readiness/WalkReadinessCoordinator.kt").readText()
+            assertTrue(MainActivityRefactorSource.member(coordinator, "capture")
+                .contains("producers.evaluate(requirement, effectiveDecision, epoch, officialAssessment, mountingAssessment, deviceResources)"))
+            MainActivityRefactorSource.member(
+                File("src/main/java/kr/co/hanium/dreamup/walksafe/session/readiness/WalkReadinessProducers.kt").readText()
+                    .substringAfter("internal class WalkReadinessProducers("), "evaluate")
+        }
+        "startupRequirementCheck" -> {
+            assertTrue(MainActivityRefactorSource.member(source, name)
+                .contains("return kr.co.hanium.dreamup.walksafe.session.readiness.startupRequirementCheck(decision, requirements)"))
+            MainActivityRefactorSource.member(
+                File("src/main/java/kr/co/hanium/dreamup/walksafe/session/readiness/WalkReadinessProducers.kt").readText(), name)
+        }
+        else -> MainActivityRefactorSource.function(source, "private fun $name(")
+    }
 
     private fun blockAt(text: String, marker: String): String {
         val markerIndex = text.indexOf(marker)

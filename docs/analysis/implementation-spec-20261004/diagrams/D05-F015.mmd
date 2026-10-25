@@ -1,0 +1,10 @@
+flowchart TD
+  H["P-D05-015 · F-D05-015 동일 capture 의 점자 의미·FastSAM mask 유일 결합"]
+  H --> E{"named 완료 sameopaque receipt token deadline"}
+  E -->|"아니오"| U["UNAVAILABLE 원 상태보존"]
+  E -->|"예"| C["4class config threshold 검사"]
+  C --> P["actual true pixelcell 전체포함"]
+  P --> Q{"유일 mask 이며 semantic 경쟁없음"}
+  Q -->|"여러개"| A["AMBIGUOUS"]
+  Q -->|"없음"| U
+  Q -->|"예"| R["ASSOCIATE_CANDIDATE 실제 bits 보존"]

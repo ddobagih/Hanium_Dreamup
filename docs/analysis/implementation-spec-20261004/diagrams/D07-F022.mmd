@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-022<br/>점자 표면의 실제 경로 교차·axis·topology 관측<br/>상태 ACTIVE"]
+    P0["원본 context route version와 sensor freshness 검사"]
+    A --> D
+    P1["same capture의 유일한 수평 plane 지원 선택"]
+    P0 --> P1
+    P2["actual topology axis tangent와 4cell patch 계산"]
+    P1 --> P2
+    P3["다점 route overlap 관측만 반환"]
+    P2 --> P3
+    D{"P-D07-022<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["PLANE_UNAVAILABLE 또는 PLANE_AMBIGUOUS"]
+    D -->|"plane 없음 또는 서로 다른 여러 plane"| B0
+    B1["topology unresolved; hull/평균축으로 이동지시 생성 없음"]
+    D -->|"mask 구멍/단절/branch"| B1
+    B2["AXIS_AND_MULTIPOINT_OVERLAP 관측"]
+    D -->|"유효 axis와 multipoint overlap"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

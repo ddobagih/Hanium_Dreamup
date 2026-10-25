@@ -1,0 +1,44 @@
+flowchart TD
+  A["F-D08-046 오프라인 상태 inspect·평문 이관·key rotate·secret retire 점검"]
+  B["진입: state-encryption-maintenance CLI"]
+  A --> B
+  P0["1. paths 와 consent lock residue 검증"]
+  B --> P0
+  P1["2. lock 하에서 managedstates 재열거"]
+  P0 --> P1
+  P2["3. 모든 state 를 prepare 한후 write 시작하여사전검증실패시어느것도수정하지않음"]
+  P1 --> P2
+  P3["4. migrate 는 validplaintext 만 activeencrypt; rotate 는 decrypt-only 만 active 로 rewrite"]
+  P2 --> P3
+  P4["5. 파일별 atomicreplace 후재읽기검증"]
+  P3 --> P4
+  P5["6. inspect 는 integrity-failed 까지파일별보고; legacycapability 수를집계"]
+  P4 --> P5
+  OK["정상: 상태별 report·명시 암호화 이관/키교체"]
+  P5 --> OK
+  C0{"plaintext rotate"}
+  X0["거부; 먼저명시 migrate"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"unknown/compromised"}
+  X1["검사가능하나복호화/rotate 불가"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"legacy capability total＞0"}
+  X2["sessionsecret retirement blocked exit3"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"inspect 미처리불량"}
+  X3["exit2"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  C4{"쓰기중후속파일실패"}
+  X4["이미쓴앞파일롤백보장없음"]
+  B -. "해당 단계 분기" .-> C4
+  C4 -->|"조건 충족"| X4
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-021, P-D08-022, P-D08-023, P-D08-024"]
+  A -.-> POLICY

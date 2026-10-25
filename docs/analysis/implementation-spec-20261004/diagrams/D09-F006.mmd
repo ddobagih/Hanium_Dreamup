@@ -1,0 +1,29 @@
+flowchart TD
+  T["F-D09-006 전역 rate-event 보존 미리보기와 단일 배치 삭제 / P-D09-006"]
+  N0["인자와 PostgreSQL 정책 검증"]
+  T --> N0
+  N1["DB clock와 그룹 retention"]
+  N0 --> N1
+  N2["preview read-only 집계 또는 apply 후보"]
+  N1 --> N2
+  N3["그룹 cutoff 재검증 delete 한 번"]
+  N2 --> N3
+  N4["transaction commit"]
+  N3 --> N4
+  N5["최소 JSON 출력"]
+  N4 --> N5
+  Z["정상: preview 또는 한 배치 삭제 count 반환"]
+  N5 --> Z
+  B0["DB 열기 전 실패"]
+  N0 -->|"batch<1 또는 >1000 또는 PostgreSQL 아님"| B0
+  B1["preview로 알리고 apply 후보에는 포함 안 함"]
+  N2 -->|"unknown rate group"| B1
+  B2["failed/deletion_outcome unknown; 성공 count 만들지 않음"]
+  N3 -->|"commit 결과 불확실"| B2
+  R["종료와 복구: 한 실행 안 자동 재시도 없음; scheduler 여부 D12 / 원인 해소 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  C["취소와 정리: 전용 취소 API 없음 / transaction context 종료; 상세 actor data를 출력하지 않음"]
+  N5 -.-> C

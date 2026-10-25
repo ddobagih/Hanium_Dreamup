@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-015 · 호환 상태 변경·기관 검토 flag<br/>PATCH /reports/{report_id}/status"]
+  P["P-D15-015 · 전제조건<br/>보안 high-risk report.status.patch; maintenance<br/>shared lock와 Report row FOR UPDATE."]
+  E --> P
+  S1["1. expected_updated_at을 제공하면 현재 ISO<br/>timestamp와 비교"]
+  P --> S1
+  S2["2. 동일 상태와 금지 전이 거절"]
+  S1 --> S2
+  S3["3. 상태 version+1, payload status_history 최대20개<br/>기록"]
+  S2 --> S3
+  S4["4. reviewed이면서 named human·파손점자블록·high 위치·not<br/>fake이면 agency_review_verified 부여"]
+  S3 --> S4
+  S5["5. reviewed에서 벗어나면 agency flag 제거; status<br/>audit와 같이 commit"]
+  S4 --> S5
+  OK["정상 결과<br/>reviewed에서 벗어나면 agency flag 제거; status audit와<br/>같이 commit"]
+  S5 --> OK
+  B1["조건 · 동일 status<br/>결과 · 409 report_status_unchanged"]
+  S3 -. "해당 조건 발생" .-> B1
+  B2["조건 · timestamp 충돌<br/>결과 · 409"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · resolved→new<br/>결과 · 422"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · new→reviewed/resolved; reviewed→new/resolved;<br/>resolved→reviewed<br/>결과 · 전이 허용"]
+  S1 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>동일 status 재전송은 멱등 성공이 아니라409.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/api/reports.py:3897<br/>update_report_status<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

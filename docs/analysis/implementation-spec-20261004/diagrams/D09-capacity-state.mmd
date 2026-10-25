@@ -1,0 +1,30 @@
+stateDiagram-v2
+  state "S-D09-027-UNAVAILABLE · 미측정 또는 만료" as Unavailable
+  state "S-D09-027-NORMAL · 70 미만" as Normal
+  state "S-D09-027-WARNING · 70 이상 85 미만" as Warning
+  state "S-D09-027-PAUSE_PARTICIPANTS · 85 이상 95 미만" as Pause
+  state "S-D09-027-HOLD_RAW · 95 이상 100 미만" as Raw
+  state "S-D09-027-HOLD_CANDIDATES · 100 이상" as Candidates
+  state "새 snapshot의 level 계산" as Publish <<choice>>
+  [*] --> Unavailable
+  Unavailable --> Publish: 유효한 새 측정
+  Normal --> Publish: 증가 version의 새 측정
+  Warning --> Publish: 증가 version의 새 측정
+  Pause --> Publish: 증가 version의 새 측정
+  Raw --> Publish: 증가 version의 새 측정
+  Candidates --> Publish: 증가 version의 새 측정
+  Publish --> Normal: used percent 70 미만
+  Publish --> Warning: used percent 70 이상 85 미만
+  Publish --> Pause: used percent 85 이상 95 미만
+  Publish --> Raw: used percent 95 이상 100 미만
+  Publish --> Candidates: used percent 100 이상
+  Normal --> Unavailable: now가 expires_at 이상
+  Warning --> Unavailable: now가 expires_at 이상
+  Pause --> Unavailable: now가 expires_at 이상
+  Raw --> Unavailable: now가 expires_at 이상
+  Candidates --> Unavailable: now가 expires_at 이상
+  note right of Publish
+    F-D09-027..028 / P-D09-027..028
+    낮은 level 회복도 새 version 필요
+    측정 실패와 조회는 기존 expiry 연장 불가
+  end note

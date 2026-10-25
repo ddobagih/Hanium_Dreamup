@@ -1,0 +1,17 @@
+flowchart TD
+ A["F-D03-035 이탈 증거 / P-D03-034 P-D03-035"] --> C{"uncertainty 제외 cross track 35m 초과인가"}
+ C -->|"아니오이며 latch 없음"| N["의심 증거 초기화 / 일반 update"]
+ C -->|"예"| T{"raw와 filtered 모두 증가하며 gap 10초 이내 2표본인가"}
+ T -->|"아니오"| S["의심 및 위치재확인 / 자동 재탐색 없음"]
+ T -->|"예"| L["confirmed latch / 이동안내 중단 / REROUTE token"]
+ L --> Q{"현재 token으로 선택했는가"}
+ Q -->|"stale 또는 30초 만료"| H["선택 실행 안 함 / latch 유지"]
+ Q -->|"RECHECK"| K["새 decision revision / latch 유지 / 센서 재확인"]
+ Q -->|"END"| E["route clear / archive purge"]
+ Q -->|"NEW_ROUTE"| R["승인 한 번 소비 / 같은 목적지 off_route 요청"]
+ R --> V{"현재 응답 검증과 설치 성공인가"}
+ V -->|"예"| Y["새 route revision / 새 경로 안내"]
+ V -->|"아니오"| F["old route와 suspension 유지 / REROUTE 다시 열기"]
+ F --> L
+ K --> L
+ L -->|"나중에 in-route fix 도착"| H

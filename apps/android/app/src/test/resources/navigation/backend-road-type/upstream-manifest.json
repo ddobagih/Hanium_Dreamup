@@ -1,0 +1,141 @@
+{
+  "started_at": "2026-10-02T05:31:14.930842+09:00",
+  "finished_at": "2026-10-02T05:31:14.932854+09:00",
+  "source_sha256": {
+    "backend/app/schemas.py": "6d15eb2dbd82612c9d0c7efea2b6a9de99fba362dc1f03624ae75e1c12a4b6a2",
+    "backend/app/services/tmap_pedestrian.py": "2092780b74c5698a5b90f297b26764c03e9cc274a59a9a9efd1737c45f3dd6dc",
+    "backend/tests/test_navigation_road_type_preservation.py": "65f520959c5889ec1e0d6bcebb8e302f54f76e084bf5f17fafa5a174e195da24"
+  },
+  "request": {
+    "path": "captured-responses/request.json",
+    "sha256": "1d36ebf556e3d349ef84ab57dc95816b5eae33c24fc9a86a00916cdd690b2fb9",
+    "bytes": 199
+  },
+  "responses": [
+    {
+      "case": "road-16",
+      "source_path": "provider fixture -> _normalize_tmap_response -> WalkingRouteResponse.model_dump_json",
+      "input": {
+        "path": "captured-responses/road-16.provider-input.json",
+        "sha256": "f5c1165dfa0bbe665167a23400e2136b12b3e8c19afe9d5e7c70f9c3d710f07a",
+        "bytes": 429
+      },
+      "output": {
+        "path": "captured-responses/road-16.response.json",
+        "sha256": "e0b07faaec44414de8dc13ff6011f3218e90b961926f205a888a1825229ffc54",
+        "bytes": 940
+      },
+      "step_index": 0,
+      "expected_road_type": 16,
+      "actual_road_type": 16,
+      "provider_roadType_present": true
+    },
+    {
+      "case": "road-999",
+      "source_path": "provider fixture -> _normalize_tmap_response -> WalkingRouteResponse.model_dump_json",
+      "input": {
+        "path": "captured-responses/road-999.provider-input.json",
+        "sha256": "2bb546a47349af14a5348f819edb1216d6eba5a6be75b47b0b227840ebda1776",
+        "bytes": 430
+      },
+      "output": {
+        "path": "captured-responses/road-999.response.json",
+        "sha256": "0dc1e143b616330e5708b666797b6d76bd411563b53453452e67011a658d33ce",
+        "bytes": 941
+      },
+      "step_index": 0,
+      "expected_road_type": 999,
+      "actual_road_type": 999,
+      "provider_roadType_present": true
+    },
+    {
+      "case": "road-0",
+      "source_path": "provider fixture -> _normalize_tmap_response -> WalkingRouteResponse.model_dump_json",
+      "input": {
+        "path": "captured-responses/road-0.provider-input.json",
+        "sha256": "f34b2b4bdb01c3539317b0eb579ca217eefa2cca8a1c20dc56e10bc25e30c625",
+        "bytes": 428
+      },
+      "output": {
+        "path": "captured-responses/road-0.response.json",
+        "sha256": "65c44b85b4d1efcd022554ae51a30da09233f75b630eaff1b87147f51126f7b9",
+        "bytes": 939
+      },
+      "step_index": 0,
+      "expected_road_type": 0,
+      "actual_road_type": 0,
+      "provider_roadType_present": true
+    },
+    {
+      "case": "road-int-max",
+      "source_path": "provider fixture -> _normalize_tmap_response -> WalkingRouteResponse.model_dump_json",
+      "input": {
+        "path": "captured-responses/road-int-max.provider-input.json",
+        "sha256": "1448a0388e65576ec262a47ae7da5b7260fb7574c85dbfcc5472d330fa3b13af",
+        "bytes": 437
+      },
+      "output": {
+        "path": "captured-responses/road-int-max.response.json",
+        "sha256": "756b234d691d24ff6871f8885cb260883419c0212e34b01e50285fdbc0292c55",
+        "bytes": 948
+      },
+      "step_index": 0,
+      "expected_road_type": 2147483647,
+      "actual_road_type": 2147483647,
+      "provider_roadType_present": true
+    },
+    {
+      "case": "provider-absent",
+      "source_path": "provider fixture -> _normalize_tmap_response -> WalkingRouteResponse.model_dump_json",
+      "input": {
+        "path": "captured-responses/provider-absent.provider-input.json",
+        "sha256": "a63c03a36ede360db69b45607e04cdcd1f20772fd2d47b29830b94614f2329b3",
+        "bytes": 415
+      },
+      "output": {
+        "path": "captured-responses/provider-absent.response.json",
+        "sha256": "69c9fa17d57c14119373c46a5f892942dbc25f73eb81138462d8dd5811de061c",
+        "bytes": 942
+      },
+      "step_index": 0,
+      "expected_road_type": null,
+      "actual_road_type": null,
+      "provider_roadType_present": false
+    },
+    {
+      "case": "explicit-dto-null",
+      "source_path": "provider absent -> production normalizer -> explicit nullable DTO input -> WalkingRouteResponse.model_validate/model_dump_json",
+      "input": {
+        "path": "captured-responses/explicit-dto-null.dto-input.json",
+        "sha256": "69c9fa17d57c14119373c46a5f892942dbc25f73eb81138462d8dd5811de061c",
+        "bytes": 942
+      },
+      "output": {
+        "path": "captured-responses/explicit-dto-null.response.json",
+        "sha256": "69c9fa17d57c14119373c46a5f892942dbc25f73eb81138462d8dd5811de061c",
+        "bytes": 942
+      },
+      "step_index": 0,
+      "expected_road_type": null,
+      "actual_road_type": null,
+      "provider_raw_null_normalized": false
+    }
+  ],
+  "raw_provider_null": {
+    "successful_response": false,
+    "input": {
+      "path": "captured-responses/raw-provider-null.provider-input.json",
+      "sha256": "2908e74b63a57630d7026ddffc5e76a4f877fe2675f7c857c75a77fb8c4b7c91",
+      "bytes": 431
+    },
+    "actual_domain_error": {
+      "path": "captured-responses/raw-provider-null.domain-error.json",
+      "sha256": "e2238ce4c9d6c83d703fd516a3620c60f5055a73b345eff0f673ff40524081fd",
+      "bytes": 156
+    },
+    "source_path": "provider raw null -> _normalize_tmap_response -> existing _tmap_code_field domain error"
+  },
+  "network_called": false,
+  "http_endpoint_called": false,
+  "android_consumer_executed": false
+}

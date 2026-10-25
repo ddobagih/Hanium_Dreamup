@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import fs from "node:fs";
 import { link, lstat, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { request as httpRequest, type ClientRequest } from "node:http";
@@ -2395,4 +2395,91 @@ test("old-policy schema v4 GET requires reconsent and current PUT appends floor 
   assert.equal(updated.client_revision, 2);
   assert.equal(updated.revision, 2);
   assert.equal(updated.policy_version, INTEGRATED_CONSENT_POLICY_VERSION);
+});
+
+
+test("installation evidence key registration binds consent, current actor and signed upstream body over Node HTTP", async () => {
+  const installationId = "installation_key_http_fixture_0001";
+  const selections = { raw_source_collection: true, automatic_reporting: false,
+    mobile_network_transfer: false, training_reuse: false };
+  assert.equal((await save(installationId, "installation_key_consent_0001", 1, selections)).status, 201);
+  const key = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).publicKey
+    .export({ format: "der", type: "spki" }).toString("base64url");
+  const secondKey = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).publicKey
+    .export({ format: "der", type: "spki" }).toString("base64url");
+  let calls = 0;
+  let registered: string | undefined;
+  const server = createGatewayServer({ fetchImpl: async (input, init) => {
+    calls += 1;
+    assert.equal(new URL(String(input)).pathname, "/privacy/installation-evidence-key");
+    assert.equal(init?.method, "POST");
+    assertBackendActorAssertionV4(input, init, { actorId: PRIMARY_ACTOR, accountGeneration: 1, authEpoch: null });
+    const body = JSON.parse(String(init?.body));
+    assert.deepEqual(Object.keys(body).sort(), ["installation_id", "public_key"]);
+    assert.equal(body.installation_id, installationId);
+    if (registered && registered !== body.public_key) {
+      return Response.json({ detail: { code: "installation_evidence_key_conflict", message: "secret-details" }, secret: "never-expose" }, { status: 409 });
+    }
+    registered = body.public_key;
+    return new Response(null, { status: 204 });
+  } });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const send = (body: unknown, cookie = primaryCookie, secret = CONTROL_SECRET, suffix = "") => fetch(
+    `${base}/privacy/rights?control=installation-evidence-key${suffix}`, {
+      method: "PUT", headers: { cookie, "content-type": "application/json", [CONSENT_CONTROL_SECRET_HEADER]: secret },
+      body: JSON.stringify(body)
+    });
+  try {
+    for (let index = 0; index < 2; index += 1) {
+      const accepted = await send({ installation_id: installationId, public_key: key });
+      assert.equal(accepted.status, 204); assert.equal(accepted.headers.get("cache-control"), "no-store");
+    }
+    const conflict = await send({ installation_id: installationId, public_key: secondKey });
+    assert.equal(conflict.status, 409);
+    assert.deepEqual(await conflict.json(), { detail: { code: "installation_evidence_key_conflict" } });
+    const beforeInvalid = calls;
+    const wrongOwner = await send({ installation_id: installationId, public_key: key }, secondaryCookie);
+    assert.equal(wrongOwner.status, 409); await wrongOwner.arrayBuffer();
+    const wrongSecret = await send({ installation_id: installationId, public_key: key }, primaryCookie, "b".repeat(64));
+    assert.equal(wrongSecret.status, 403); await wrongSecret.arrayBuffer();
+    for (const body of [
+      { installation_id: installationId, public_key: key, account_generation: 1 },
+      { installation_id: installationId, public_key: "A".repeat(122) },
+      { installation_id: installationId, public_key: key + "=" },
+      { installation_id: "invalid", public_key: key }
+    ]) {
+      const rejected = await send(body); assert.equal(rejected.status, 400); await rejected.arrayBuffer();
+    }
+    const query = await send({ installation_id: installationId, public_key: key }, primaryCookie, CONTROL_SECRET, "&extra=1");
+    assert.equal(query.status, 400); await query.arrayBuffer();
+    const method = await fetch(`${base}/privacy/rights?control=installation-evidence-key`, { headers: { cookie: primaryCookie } });
+    assert.equal(method.status, 405); assert.equal(method.headers.get("allow"), "PUT"); await method.arrayBuffer();
+    assert.equal(calls, beforeInvalid);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test("installation key registration rejects a late success after its current session is revoked", async () => {
+  const installationId = "installation_key_late_fixture_0001";
+  const selections = { raw_source_collection: true, automatic_reporting: false,
+    mobile_network_transfer: false, training_reuse: false };
+  const actorCookie = await login(PRIMARY_ACTOR, PRIMARY_TOKEN, "198.51.100.214");
+  assert.equal((await save(installationId, "installation_key_late_consent_0001", 1, selections, actorCookie)).status, 201);
+  const key = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).publicKey
+    .export({ format: "der", type: "spki" }).toString("base64url");
+  let entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  let finish!: (response: Response) => void;
+  const held = new Promise<Response>(resolve => { finish = resolve; });
+  const pending = handleGatewayRequest(new Request("https://gateway.invalid/privacy/rights?control=installation-evidence-key", {
+    method: "PUT", headers: { cookie: actorCookie, "content-type": "application/json", [CONSENT_CONTROL_SECRET_HEADER]: CONTROL_SECRET },
+    body: JSON.stringify({ installation_id: installationId, public_key: key })
+  }), { fetchImpl: async () => { entered(); return held; } });
+  await started;
+  assert.equal((await clearGatewaySession(new Request("https://gateway.invalid/api/field-session", { headers: { cookie: actorCookie } }))).status, 204);
+  finish(new Response(null, { status: 204 }));
+  const response = await pending;
+  assert.equal(response.status, 401);
 });

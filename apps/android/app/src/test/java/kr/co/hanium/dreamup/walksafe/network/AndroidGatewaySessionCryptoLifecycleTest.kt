@@ -2,6 +2,9 @@ package kr.co.hanium.dreamup.walksafe.network
 
 import android.content.SharedPreferences
 import java.util.Base64
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Proxy
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
@@ -150,12 +153,48 @@ class AndroidGatewaySessionCryptoLifecycleTest {
         val fixture = Fixture("password-binding")
         val store = fixture.store()
         val deviceId = requireNotNull(store.getOrCreateInstallDeviceId())
+        val installEnvelope = fixture.preferences.getString(INSTALL_ID_PREF_KEY, null)
+        assertTrue(fixture.preferences.edit().putString("origin_recovery_progress", "kept").commit())
+        val oldSession = backendSession(deviceId)
         assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
-            backendSession(deviceId), backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS,
+            oldSession, backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS,
         ))
-        assertNull(store.restoreBackendDevice("https://other.example.test", NOW_EPOCH_MS))
-        assertTrue(store.isStorageBlocked())
+        val oldRestored = requireNotNull(store.restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        val otherOrigin = "https://other.example.test"
+        assertNull(store.restoreBackendDevice(otherOrigin, NOW_EPOCH_MS))
+        assertFalse(store.isStorageBlocked())
+        assertFalse(fixture.store().isStorageBlocked())
+        assertFalse(fixture.preferences.getBoolean(FAIL_CLOSED_PREF_KEY, false))
         assertFalse(fixture.preferences.contains(BACKEND_DEVICE_PREF_KEY))
+        assertNull(fixture.store().restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        assertEquals(deviceId, store.getOrCreateInstallDeviceId())
+        assertEquals(installEnvelope, fixture.preferences.getString(INSTALL_ID_PREF_KEY, null))
+        assertEquals("kept", fixture.preferences.getString("origin_recovery_progress", null))
+        assertEquals(GatewaySessionStoreResult.BLOCKED, store.saveBackendDeviceIfAbsent(
+            oldRestored.session, backendFirstRun(), otherOrigin, NOW_EPOCH_MS,
+        ))
+        assertFalse(fixture.preferences.contains(BACKEND_DEVICE_PREF_KEY))
+        val freshSeed = requireNotNull(backendSession(deviceId, "j".repeat(43))
+            .backendDevicePersistenceSnapshotOrNull(NOW_EPOCH_MS))
+        val fresh = GatewayFieldSession.backendAccountDeviceSession(
+            otherOrigin,
+            BackendAccountDeviceCookieBinding(freshSeed.actorId, freshSeed.accountGeneration,
+                freshSeed.authEpoch, freshSeed.deviceId, freshSeed.sessionId, freshSeed.expiresAtEpochMs),
+            freshSeed.accessCookiePair, freshSeed.expiresAtEpochMs,
+        )
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
+            fresh, backendFirstRun(), otherOrigin, NOW_EPOCH_MS,
+        ))
+        val freshEnvelope = fixture.preferences.getString(BACKEND_DEVICE_PREF_KEY, null)
+        assertEquals(GatewaySessionStoreResult.STALE, store.removeBackendDeviceIfCurrent(oldRestored.version))
+        assertEquals(freshEnvelope, fixture.preferences.getString(BACKEND_DEVICE_PREF_KEY, null))
+        val newRestored = requireNotNull(fixture.store().restoreBackendDevice(otherOrigin, NOW_EPOCH_MS))
+        assertEquals(fresh.versionOrNull, newRestored.version)
+        assertEquals(otherOrigin, newRestored.session.gatewayBaseUrl)
+        assertEquals(GatewaySessionVerificationState.RESTORED_UNVERIFIED, newRestored.session.verificationState)
+        assertFalse(newRestored.session.isUsableFor(BACKEND_ACTOR_ID, NOW_EPOCH_MS))
+        assertEquals(deviceId, store.getOrCreateInstallDeviceId())
+        assertEquals("kept", fixture.preferences.getString("origin_recovery_progress", null))
         assertTrue(store.resetInstallationAfterConfirmedAccountDeletion())
         val newDeviceId = requireNotNull(store.getOrCreateInstallDeviceId())
         assertNotEquals(deviceId, newDeviceId)
@@ -165,6 +204,61 @@ class AndroidGatewaySessionCryptoLifecycleTest {
         assertTrue(store.resetInstallationAfterConfirmedAccountDeletion())
         assertFalse(fixture.preferences.contains(BACKEND_DEVICE_PREF_KEY))
         assertNull(fixture.store().restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+
+        for (mode in listOf("wrong_actor", "corrupt", "missing_install", "commit_false", "commit_throws")) {
+            val rejected = Fixture("origin-$mode")
+            val original = rejected.store()
+            val installation = requireNotNull(original.getOrCreateInstallDeviceId())
+            assertEquals(GatewaySessionStoreResult.COMMITTED, original.saveBackendDeviceIfAbsent(
+                backendSession(installation), backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS,
+            ))
+            when (mode) {
+                "wrong_actor" -> rejected.rewriteBackendPayload {
+                    it.getJSONArray("ordered_evidence").getJSONObject(0)
+                        .put("actor_binding", "123e4567-e89b-42d3-a456-426614174001")
+                }
+                "corrupt" -> assertTrue(rejected.preferences.edit()
+                    .putString(BACKEND_DEVICE_PREF_KEY, "tampered-envelope").commit())
+                "missing_install" -> assertTrue(rejected.preferences.edit().remove(INSTALL_ID_PREF_KEY).commit())
+            }
+            val target = if (mode.startsWith("commit_")) AndroidGatewaySessionStore(
+                preferences = failOneBackendRemovalCommit(rejected.preferences, mode == "commit_throws"),
+                sessionAead = rejected.sessionAead, installIdAead = rejected.installAead,
+                v3SessionAead = rejected.v3SessionAead, legacySessionAead = rejected.legacyAead,
+            ) else original
+            assertNull("$mode must reject even during origin recovery", target.restoreBackendDevice(otherOrigin, NOW_EPOCH_MS))
+            assertTrue("$mode must remain fail closed", target.isStorageBlocked())
+            assertTrue(rejected.preferences.getBoolean(FAIL_CLOSED_PREF_KEY, false))
+            assertTrue(rejected.store().isStorageBlocked())
+            assertFalse(rejected.preferences.contains(BACKEND_DEVICE_PREF_KEY))
+            assertTrue(original.resetInstallationAfterConfirmedAccountDeletion())
+        }
+    }
+
+    private fun failOneBackendRemovalCommit(base: SharedPreferences, throwing: Boolean): SharedPreferences {
+        var failed = false
+        return Proxy.newProxyInstance(javaClass.classLoader, arrayOf(SharedPreferences::class.java)) { _, method, args ->
+            val result = try { method.invoke(base, *(args ?: emptyArray())) }
+                catch (failure: InvocationTargetException) { throw failure.cause!! }
+            if (method.name != "edit") result else {
+                val editor = result as SharedPreferences.Editor
+                var removingBackend = false
+                lateinit var wrapped: SharedPreferences.Editor
+                wrapped = Proxy.newProxyInstance(javaClass.classLoader, arrayOf(SharedPreferences.Editor::class.java)) { _, call, values ->
+                    if (call.name == "remove" && values?.get(0) == BACKEND_DEVICE_PREF_KEY) removingBackend = true
+                    if (call.name == "commit" && removingBackend && !failed) {
+                        failed = true
+                        if (throwing) throw IllegalStateException("fixture backend removal commit failure")
+                        false
+                    } else {
+                        val value = try { call.invoke(editor, *(values ?: emptyArray())) }
+                            catch (failure: InvocationTargetException) { throw failure.cause!! }
+                        if (value is SharedPreferences.Editor) wrapped else value
+                    }
+                } as SharedPreferences.Editor
+                wrapped
+            }
+        } as SharedPreferences
     }
 
     private fun backendFirstRun(epoch: Long = 12L): FirstRunOnboardingSnapshot =
@@ -468,17 +562,16 @@ class AndroidGatewaySessionCryptoLifecycleTest {
     @Test
     fun mainRestoresAuthenticationBindingWhileWalkGateStillRequiresFreshChecks() {
         val source = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val restore = source.substringAfter("private fun restoreGatewaySessionFromPrefs()")
-            .substringBefore("private fun retryPendingGatewayRenewal()")
+        val restore = MainActivityRefactorSource.function(source, "private fun restoreGatewaySessionFromPrefs()")
         assertTrue(restore.contains("restored.firstRunSnapshot.verifiedActorBinding?.value"))
-        val walkGate = source.substringAfter("private fun firstRunOnboardingComplete(): Boolean")
-            .substringBefore("private fun firstRunWaitingTextOrNull")
+        val walkGate = MainActivityRefactorSource.function(source, "private fun firstRunOnboardingComplete(): Boolean")
         assertTrue(walkGate.contains("!firstRunOnboardingSnapshot.mayEnterWalk"))
         assertTrue(walkGate.contains("!postLoginDeviceCheckPassesFeatureGate()"))
-        val publish = source.substringAfter("private fun onGatewayProcessSessionChanged(")
-            .substringBefore("private fun dispatchGatewayProcessSessionChanged(")
+        val publish = actorSessionChange(source)
         assertTrue(publish.contains("appliedFirstRun.isComplete &&"))
-        assertTrue(publish.contains("permissionSessionPolicy.authenticationExpired()"))
+        assertTrue(publish.contains("permissions.expireAuthentication()"))
+        val actorPorts = MainActivityRefactorSource.composition(source, "actorSessionLifecycleCoordinator")
+        assertTrue(actorPorts.contains("override fun expireAuthentication() { permissionSessionPolicy.authenticationExpired() }"))
     }
 
     private fun assertFreshChecksPending(snapshot: FirstRunOnboardingSnapshot) {
@@ -561,6 +654,26 @@ class AndroidGatewaySessionCryptoLifecycleTest {
             } finally {
                 plaintext.fill(0)
             }
+        }
+
+        fun rewriteBackendPayload(mutate: (JSONObject) -> Unit) {
+            val envelope = requireNotNull(preferences.getString(BACKEND_DEVICE_PREF_KEY, null))
+            val aad = AndroidGatewaySessionStore::class.java.getDeclaredField("BACKEND_DEVICE_AAD").run {
+                isAccessible = true
+                get(null) as ByteArray
+            }
+            val limits = AndroidGatewaySessionStore::class.java.getDeclaredField("STATE_LIMITS").run {
+                isAccessible = true
+                get(null) as AeadLimits
+            }
+            val opened = sessionAead.open(envelope, aad, limits) as AeadOpenResult.Opened
+            val payload = try { JSONObject(String(opened.plaintext, Charsets.UTF_8)) }
+                finally { opened.plaintext.fill(0) }
+            mutate(payload)
+            val plaintext = payload.toString().toByteArray(Charsets.UTF_8)
+            val sealed = try { sessionAead.seal(plaintext, aad, limits) as AeadSealResult.Sealed }
+                finally { plaintext.fill(0) }
+            assertTrue(preferences.edit().putString(BACKEND_DEVICE_PREF_KEY, sealed.envelope).commit())
         }
 
         fun rewriteLongPayload(mutate: (JSONObject) -> Unit) {
@@ -806,4 +919,56 @@ class AndroidGatewaySessionCryptoLifecycleTest {
             maxEnvelopeChars = 32_768,
         )
     }
+
+    private fun actorSessionChange(mainSource: String): String {
+        MainActivityRefactorSource.composition(mainSource, "actorSessionLifecycleCoordinator")
+        val main = MainActivityRefactorSource.factory(mainSource, "onGatewayProcessSessionChanged")
+        // Whole declaration comparison preserves guards, argument forwarding and effect order.
+        val expectedMain = """
+private fun onGatewayProcessSessionChanged(
+        snapshot: GatewaySessionProcessSnapshot,
+        consentAuthorityChanged: Boolean,
+    ) {
+        actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)
+        refreshGuidanceDiagnosticAuthority()
+    }
+        """.trimIndent()
+        org.junit.Assert.assertEquals("Main gateway callback must invoke the owner before diagnostic refresh", expectedMain.filterNot(Char::isWhitespace),
+            main.filterNot(Char::isWhitespace))
+        val call = main.indexOf("actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)")
+        org.junit.Assert.assertTrue(call >= 0)
+        org.junit.Assert.assertTrue(main.indexOf("refreshGuidanceDiagnosticAuthority()") > call)
+        return MainActivityRefactorSource.member(java.io.File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/ActorSessionLifecycleCoordinator.kt",
+        ).readText(), "onGatewayProcessSessionChanged")
+    }
+
+
+    @Test
+    fun actorSessionChangeRejectsNonExecutingOrReorderedCallers() {
+        val mainSource = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        actorSessionChange(mainSource)
+        val caller = MainActivityRefactorSource.factory(mainSource, "onGatewayProcessSessionChanged")
+        val call = "actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)"
+        org.junit.Assert.assertTrue(caller.contains(call))
+        val variants = linkedMapOf(
+            "conditional" to caller.replace(call, "if (false) { $call }"),
+            "uninvoked lambda" to caller.replace(call, "{ $call }"),
+            "comment" to caller.replace(call, "/* $call */"),
+            "additional effect" to caller.replace(call, "$call\nunexpectedEffect()"),
+            "omitted" to caller.replace(call, ""),
+            "early return" to caller.replace(call, "return\n$call"),
+        )
+
+        variants["reordered effects"] = caller.replace(call, "").replace(
+            "refreshGuidanceDiagnosticAuthority()", "refreshGuidanceDiagnosticAuthority()\n" + call,
+        )
+
+        val accepted = variants.filter { (_, changed) ->
+            val mainSource = mainSource.replace(caller, changed)
+            runCatching { actorSessionChange(mainSource) }.isSuccess
+        }.keys
+        org.junit.Assert.assertTrue("Non-equivalent Main callers accepted: $accepted", accepted.isEmpty())
+    }
+
 }

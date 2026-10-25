@@ -1,0 +1,18 @@
+flowchart TD
+  ID["F-D04-025 · 경로 상대방향과 시계방향 표현 허용<br/>P-D04-025"]
+  A["route bearing + 현재 facing"]
+  C0{"fresh 500ms·source quality·숫자 계약이 유효한가"}
+  R0["UNKNOWN"]
+  C1{"오차 포함 범위가 한 방향을 지지하는가"}
+  R1["UNKNOWN"]
+  OK["FRONT/BEHIND/RIGHT/LEFT → 별도 15도 시계 정밀도 gate → 결과"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END

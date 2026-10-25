@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D01-008 로그아웃·인증 만료와 계정 입력 초기화"]
+  G{"사용자 session 버튼; durable 계정삭제 확인이 없어야 일반 logout 가능"}
+  I["current actor/session/generation 및 저장 version; logout action은 사용자 이벤트"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 저장소 blocked면 일반 동작 차단 및 안내"]
+  G -->|"미충족"| X
+  N1["삭제 recovery-only·storageBlocked·durable deletion confirmation 경계를 먼저 검사한다."]
+  I --> N1
+  N2["debug 위치 저장 범위를 purge/rotate하고 training·환경·장착 증거 및 출력 저장 binding을 무효화한다."]
+  N1 --> N2
+  N3["clearGatewaySession으로 session revoke를 시작하고 permissionSessionPolicy.explicitLogout 및 계정 UI/firstRun epoch를 초기화한다."]
+  N2 --> N3
+  N4["활성 보행은 safety stop; credential 입력을 지우고 로그아웃 안내를 표시한다."]
+  N3 --> N4
+  OK["SIGNED_OUT, 새 가입/로그인 진입"]
+  N4 --> OK
+  B0["일반 logout 거부; 삭제 복구 유지"]
+  N1 -->|"삭제 durable confirmation 존재"| B0
+  B1["durable pending revocation 경로가 있으면 다음 복구에서 drain; 세션은 로컬 비활성"]
+  N3 -->|"원격 revoke 실패"| B1
+  B2["재인증 안내 경로는 동일계정 교육진행 보존 가능"]
+  N1 -->|"stale/expired advanced session"| B2
+  R["중단·취소: logout 시작 이후 로컬 세션 재활성 취소 없음 / process revocation은 Activity 분리 후에도 executor 소유"]
+  V["복구·재시도: 장기 token은 durable PendingRevocation drain. backendDevice 원격 DELETE 실패는 durable retry journal 없음. 재로그인은 actor profile 검증 후 재사용"]
+  Q["정책 P-D01-006 · P-D01-011 · P-D01-020"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G
+  BD["backendDevice: current local bundle 제거 후 원격 DELETE 시도. 실패 재시도 journal 없음"]
+  LL["장기 token: durable PendingRevocation 후 DELETE. 성공 시 저장 정리"]
+  N3 -->|"backendDevice"| BD
+  N3 -->|"long-lived token"| LL

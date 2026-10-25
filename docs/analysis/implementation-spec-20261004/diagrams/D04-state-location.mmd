@@ -1,0 +1,14 @@
+stateDiagram-v2
+  state "F-D04-001 IDLE" as Idle
+  state "BOUND: 현재 owner와 generation" as Bound
+  state "CANCELLING: callback 먼저 retire" as Cancelling
+  state "CLEANUP_PENDING: handle 보존" as Pending
+  [*] --> Idle
+  Idle --> Bound: owner·권한·전경 유효 및 pending 없음
+  Bound --> Bound: 동일 owner 시작 / 중복 등록 없음
+  Bound --> Cancelling: stop 또는 owner 변경
+  Cancelling --> Idle: remove Task 성공 ack
+  Cancelling --> Pending: 예외·미완료
+  Pending --> Idle: 명시 재시도 또는 완료 관측 성공
+  Pending --> Pending: start 요청 / 신규 binding 차단
+  Bound --> Bound: 늦은 다른 generation callback 무시

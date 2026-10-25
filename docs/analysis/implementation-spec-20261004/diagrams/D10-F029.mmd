@@ -1,0 +1,26 @@
+flowchart TD
+  A["F-D10-029 모델 deployment manifest 승격"]
+  N0["1. approve exact-match 확인 후 .local-model-state.lock flock을 잡고 최신 JSON을 다시 읽는다."]
+  A --> N0
+  N1["2. model 존재, deployment_eligible=True, blockers 없음과 verify_state 전체 통과를 요구."]
+  N0 --> N1
+  N2["3. 같은 active이면 'already active'로0. 아니면 previous←active,active←새model,runtime_state=manifest_promoted_runtime_not_changed."]
+  N1 --> N2
+  N3["4. generation+1,updated_at/history 추가. timestamp backup→동일 dir temp JSON fsync→os.replace."]
+  N2 --> N3
+  B0{"candidate 또는 blockers 존재"}
+  R0["ValueError/exit2"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"target 없음"}
+  R1["ValueError/exit2"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"write 실패"}
+  R2["tmp 삭제; 기존 backup 보존"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-023 · P-D10-024"]
+  P -. "코드 분기 기준" .-> A

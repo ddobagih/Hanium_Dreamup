@@ -42,7 +42,9 @@ object ObjectMotionPolicy {
                     it.objectPositionInAnchor?.isFinite() != true
             }
         ) return unknown
-        if (history.map { it.source }.distinct().size != 1) return unknown
+        val materialPointId = history.first().materialPointId ?: return unknown
+        if (history.any { it.materialPointId !== materialPointId } ||
+            history.map { it.source }.distinct().size != 1) return unknown
         val elapsedMs = history.last().timestampMs - history.first().timestampMs
         if (elapsedMs !in 600L..4_000L || history.zipWithNext().any { (a, b) ->
                 b.timestampMs - a.timestampMs !in 100L..1_500L
@@ -105,6 +107,33 @@ object ObjectMotionPolicy {
         val upSpeed = objectVelocity.dot(Vec3(projection.upX, projection.upY, projection.upZ))
         val forwardSpeed = objectVelocity.dot(Vec3(latestPose.forwardX, latestPose.forwardY, latestPose.forwardZ))
         if (listOf(speed, relativeClosingSpeed, rightSpeed, upSpeed, forwardSpeed).any { !it.isFinite() }) return unknown
+        // The same qualified latest point/pose and fitted relative velocity support point CPA.
+        // Double arithmetic avoids Float square overflow/underflow; there is no new speed epsilon.
+        val relativePosition = requireNotNull(latest.objectPositionInAnchor) - latestPose.position()
+        val vx = relativeVelocity.x.toDouble()
+        val vy = relativeVelocity.y.toDouble()
+        val vz = relativeVelocity.z.toDouble()
+        val rx = relativePosition.x.toDouble()
+        val ry = relativePosition.y.toDouble()
+        val rz = relativePosition.z.toDouble()
+        val denominator = vx * vx + vy * vy + vz * vz
+        val depthAt = latest.depthObservationTimestampNs?.takeIf { it > 0L }
+        val motionConfidence = history.minOf { it.confidence }
+        val pointCpa = if (relativePosition.isFinite() && relativeVelocity.isFinite() &&
+            denominator.isFinite() && denominator >= 0.0 && depthAt != null &&
+            // These are original Frame-clock values supplied by DepthCaptureTimes, not Image ns / 1e6.
+            history.all { it.depthObservedAtFrameMs == it.timestampMs }
+        ) {
+            val time = if (denominator == 0.0) null else -(rx * vx + ry * vy + rz * vz) / denominator
+            val px = rx + vx * (time ?: 0.0)
+            val py = ry + vy * (time ?: 0.0)
+            val pz = rz + vz * (time ?: 0.0)
+            val distance = sqrt(px * px + py * py + pz * pz)
+            if ((time == null || time.isFinite()) && distance.isFinite()) PointClosestApproach(
+                reference.referenceId, latestAtMs, latest.source, depthAt, materialPointId,
+                elapsedMs, motionConfidence, relativePosition, relativeVelocity, time, distance,
+            ) else null
+        } else null
         val direction = when {
             speed <= 0.20f -> ObjectMovementDirection.STATIONARY
             objectClosingSpeed >= 0.45f -> ObjectMovementDirection.TOWARD_USER
@@ -125,7 +154,8 @@ object ObjectMotionPolicy {
             objectSpeedMps = speed,
             relativeClosingSpeedMps = relativeClosingSpeed,
             direction = direction,
-            confidence = history.minOf { it.confidence },
+            confidence = motionConfidence,
+            capturedPointClosestApproach = pointCpa,
         )
     }
 

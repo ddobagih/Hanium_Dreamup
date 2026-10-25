@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -8,14 +9,46 @@ import org.junit.Test
 
 /** S08-34: the route sentence carries its relative angle and expression level into the diagnostic chain. */
 class RouteGuidanceDiagnosticsTest {
+    // This fixture isolates diagnostics captured when a sentence is actually offered.
+    // Production 1.5-second delay and immediate safety actions are covered by RouteDirectionRecheckGraceTest.
+
+    @Test
+    fun generatedCueRetainsItsRejectedCompassChecksWithoutReplacingTheRouteReason() {
+        val compass = RouteCompassHeading.evaluate(
+            DeviceEarthOrientation(RotationMatrix3(1f, 0f, 0f, 0f, 0f, -1f, 0f, 1f, 0f),
+                1_000L, 30.01f, EarthOrientationAccuracy.HIGH), 0.0, 1_000L,
+        )
+        assertNull(compass.observation)
+        val update = navigator().update(fix(), 1_000L, false, facingObservation = compass.observation)
+        val fields = RouteGuidanceDiagnostics.guidanceGenerated(update, 1_010L, compass)
+        assertEquals("CURRENT_SEGMENT", fields["reason"])
+        assertEquals("HEADING_ACCURACY", fields["compass_reason"])
+        assertEquals("REPORTED_HEADING_ERROR", fields["compass_rejected_check"])
+        assertEquals("ROTATION_VECTOR", fields["compass_source"])
+        assertEquals(10L, fields["compass_input_age_ms"])
+        assertEquals(30, fields["reported_heading_accuracy_deg"])
+        assertEquals("UNKNOWN", fields["expression_level"])
+        assertNull(fields["relative_angle_deg"])
+        assertOnlyEnumsNumbersAndIds(fields)
+    }
+
     @Test
     fun eachSentenceRecordsTheRelativeAngleAndHowTheFacingWasExpressed() {
         fun diagnostic(observation: RouteFacingObservation?) =
             requireNotNull(navigator().update(fix(), 1_000, false, facingObservation = observation).facingDiagnostic)
-        assertEquals(RouteFacingSpeechDiagnostic(0, RouteFacingExpression.CLOCK), diagnostic(facing(90.0)))
-        assertEquals(RouteFacingSpeechDiagnostic(90, RouteFacingExpression.CLOCK), diagnostic(facing(0.0)))
-        assertEquals(RouteFacingSpeechDiagnostic(0, RouteFacingExpression.COARSE),
-            diagnostic(facing(90.0).copy(headingAccuracyDegrees = 20.0)))
+        assertEquals(RouteFacingSpeechDiagnostic(0, RouteFacingExpression.CLOCK, RouteClockReferenceKind.REPORTED_ERROR), diagnostic(facing(90.0)))
+        assertEquals(RouteFacingSpeechDiagnostic(90, RouteFacingExpression.CLOCK, RouteClockReferenceKind.REPORTED_ERROR), diagnostic(facing(0.0)))
+        val nominal = facing(90.0).copy(headingAccuracyDegrees = 20.0)
+        val nav = navigator()
+        val first = nav.update(fix(), 1_000L, false, facingObservation = nominal)
+        assertEquals(RouteFacingExpression.UNKNOWN, first.facingDiagnostic?.expression)
+        val confirmed = requireNotNull(nav.currentGuidance(1_001L,
+            RouteFacingObservation(90.0, 20.0, 1_001L)))
+        assertEquals(RouteFacingSpeechDiagnostic(0, RouteFacingExpression.CLOCK,
+            RouteClockReferenceKind.NOMINAL_TREND_CLOCK), confirmed.facingDiagnostic)
+        assertFalse(confirmed.instruction.orEmpty().contains("사이 방향"))
+        assertNotNull(nav.currentAcceptedRouteMatchFor(1_000L))
+        assertNull(nav.currentAcceptedRouteMatchFor(1_001L))
         assertEquals(RouteFacingSpeechDiagnostic(null, RouteFacingExpression.UNKNOWN), diagnostic(null))
     }
 
@@ -66,7 +99,7 @@ class RouteGuidanceDiagnosticsTest {
         }
     }
 
-    private fun navigator() = RouteNavigator().apply {
+    private fun navigator() = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L)).apply {
         setRoute(WalkingRoute("TEST", WalkingRouteSummary(400, 400),
             listOf(point(0.0), point(400.0)),
             listOf(WalkingRouteGuidePoint(0, point(200.0), "안내", 200, 200, turnType = 13))))

@@ -15,8 +15,9 @@ public final class AdminDeliveryCorrectionW23StaticTest {
     private static final String ACTIVITY = read(
         "src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java"
     );
+    private static final String HISTORY = read("src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminReviewDeliveryState.java");
     private static final String CONTROLLER = read(
-        "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java"
+        "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminReviewDeliveryOperations.java"
     );
 
     @Test
@@ -26,13 +27,13 @@ public final class AdminDeliveryCorrectionW23StaticTest {
         assertTrue(flow.contains("latestEffectiveDeliveryForCorrection()"));
         assertTrue(flow.contains("takeMutableInput(deliveryCorrectionPasswordInput)"));
         assertTrue(flow.contains("takeMutableInput(deliveryCorrectionTotpInput)"));
-        assertTrue(flow.contains("controller.correctDelivery("));
+        assertTrue(flow.contains("controller.deliveries().correctDelivery("));
         assertTrue(flow.contains("BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED"));
         assertTrue(flow.contains("connectedOperationsLatestDeliveryRevision"));
         assertTrue(flow.contains("Arrays.fill(requestPassword, '\\0')"));
         assertTrue(flow.contains("Arrays.fill(requestTotp, '\\0')"));
         assertTrue(flow.contains("refreshConnectedReportDetail()"));
-        assertEquals(1, occurrences(flow, "controller.correctDelivery("));
+        assertEquals(1, occurrences(flow, "controller.deliveries().correctDelivery("));
         assertEquals(1, occurrences(flow, "setInteractiveEnabled(contentRoot, true)"));
         // No automatic replay of a credential-bearing request (S18-1-F2).
         assertFalse(flow.contains("handleDeviceKeyUseFailure("));
@@ -56,8 +57,8 @@ public final class AdminDeliveryCorrectionW23StaticTest {
         assertTrue(flow.contains("deliveryCorrectionAttempt.renewAfterIdConflict()"));
         assertTrue(flow.indexOf("catch (AdminOperationsApi.CorrectionIdConflictException")
             < flow.indexOf("catch (AdminOperationsApi.MutationConflictException"));
-        String history = between(ACTIVITY, "private void runReportHistoryOperation(", "private void applyReportHistoryPage(");
-        assertTrue(history.contains("deliveryCorrectionAttempt.confirmedBy(deliveryHistoryItems)"));
+        String history = between(ACTIVITY, "private void runReportHistoryOperation(", "private void runRecentHistoryOperation(");
+        assertTrue(history.contains("deliveryCorrectionAttempt.confirmedBy(historyState.deliveryHistoryItems())"));
         String method = between(
             CONTROLLER,
             "public AdminOperationsApi.Result correctDelivery(",
@@ -69,19 +70,19 @@ public final class AdminDeliveryCorrectionW23StaticTest {
     public void s18_40_f6_successAlwaysInvalidatesTheLoadedDeliveryHistory() {
         String flow = between(ACTIVITY, "private void correctLatestDelivery()", "private void runReportHistoryOperation(");
         String success = flow.substring(flow.indexOf("if (succeeded)"));
-        assertTrue(success.contains("deliveryHistoryNeedsFirstPage = true;"));
-        assertTrue(success.indexOf("deliveryHistoryNeedsFirstPage = true;")
+        assertTrue(success.contains("historyState.requireFirstPage(false);"));
+        assertTrue(success.indexOf("historyState.requireFirstPage(false);")
             < success.indexOf("refreshConnectedReportDetail()"));
     }
     @Test
     public void s18_40_f8_historyReadsTheKoreanReasonAndTheScreenWarnsAboutReopening() {
-        String text = between(ACTIVITY, "private String deliveryHistoryText()", "private static boolean validDeliveryHistoryTransition(");
+        String text = between(ACTIVITY, "private String deliveryHistoryText()", "private void runOperationalOperation(");
         assertTrue(text.contains("deliveryCorrectionReasonLabel(item.correction().reason())"));
         assertFalse(text.contains(".append(item.correction().reason())"));
         String label = between(
             ACTIVITY,
             "private static String deliveryCorrectionReasonLabel(",
-            "private static boolean validDeliveryHistoryTransition("
+            "private void runOperationalOperation("
         );
         assertTrue(label.contains("DELIVERY_CORRECTION_REASON_LABELS[index]"));
         // w24 S18-40 / owner decision 6: no REOPEN event; a later new damage is a new report.
@@ -93,9 +94,9 @@ public final class AdminDeliveryCorrectionW23StaticTest {
     @Test
     public void s18_40_onlyTheLatestEffectiveEventOfAFullyLoadedCurrentHistoryIsCorrectable() {
         String target = between(
-            ACTIVITY,
-            "private AdminOperationsApi.DeliveryHistoryItem latestEffectiveDeliveryForCorrection()",
-            "private void correctLatestDelivery()"
+            HISTORY,
+            "AdminOperationsApi.DeliveryHistoryItem latestEffectiveDeliveryForCorrection()",
+            "static boolean operationalConflictSnapshotsMatch("
         );
         assertTrue(target.contains("deliveryHistoryNeedsFirstPage"));
         assertTrue(target.contains("deliveryHistoryNextCursor != null"));
@@ -106,11 +107,11 @@ public final class AdminDeliveryCorrectionW23StaticTest {
 
     @Test
     public void s18_40_historyMergeUsesTheEffectiveChainAndShowsCorrections() {
-        String merge = between(ACTIVITY, "private void applyReportHistoryPage(", "private static void requireLoadedCount(");
+        String merge = between(HISTORY, "void applyReportHistoryPage(", "private static void requireLoadedCount(");
         assertTrue(merge.contains("(!item.corrected() && !validDeliveryHistoryTransition(previous, item))"));
         assertTrue(merge.contains("if (!item.corrected()) previous = item;"));
         assertTrue(merge.contains("AdminOperationsHttpClient.requireCorrectionsStepBack(combined)"));
-        String text = between(ACTIVITY, "private String deliveryHistoryText()", "private static boolean validDeliveryHistoryTransition(");
+        String text = between(ACTIVITY, "private String deliveryHistoryText()", "private void runOperationalOperation(");
         assertTrue(text.contains("정정됨, 현재 상태에서 제외"));
         assertTrue(text.contains("item.correction().memo()"));
         assertTrue(ACTIVITY.contains("잘못 기록한 전달 상태 정정"));
@@ -144,7 +145,7 @@ public final class AdminDeliveryCorrectionW23StaticTest {
         );
         assertTrue(method.contains("AdminHighRiskActionGate.deliveryCorrection(reportId)"));
         assertTrue(method.contains("reauthenticate(password, totpCode, operation, nowEpochMs)"));
-        assertTrue(method.contains("consumeHighRiskAuthorization("));
+        assertTrue(method.contains("lease.consume("));
         assertTrue(method.contains("recordDeliveryCorrection("));
         assertTrue(method.contains("decision.requestHeaders()"));
         assertTrue(method.contains("finally"));

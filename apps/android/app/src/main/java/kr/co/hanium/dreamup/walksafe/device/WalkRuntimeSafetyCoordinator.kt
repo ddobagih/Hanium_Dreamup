@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.device
 
+import java.util.Collections
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionSnapshot
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionState
@@ -77,6 +78,14 @@ data class WalkRuntimeSafetyStop(
     val causes: Set<WalkRuntimeSafetyStopCause>,
 )
 
+/** One read of the owned stop's original causes, current causes, and actual cleanup result. */
+data class WalkRuntimeSafetyStopStatus(
+    val stop: WalkRuntimeSafetyStop,
+    val initialCauses: Set<WalkRuntimeSafetyStopCause>,
+    val cleanupComplete: Boolean,
+    val cleanupExhausted: Boolean,
+)
+
 data class WalkRuntimeSafetyDecision(
     val disposition: WalkRuntimeSafetyDisposition,
     val epoch: WalkRuntimeEpoch?,
@@ -100,6 +109,7 @@ class WalkRuntimeSafetyCoordinator(
     private var activeEpoch: WalkRuntimeEpoch? = null
     private var latchedEpoch: WalkRuntimeEpoch? = null
     private var latchedCauses: Set<WalkRuntimeSafetyStopCause> = emptySet()
+    private var initialLatchedCauses: Set<WalkRuntimeSafetyStopCause> = emptySet()
     private var lastObservedAtElapsedRealtimeMs: Long? = null
     private val trustEvidence = mutableMapOf<TrustSource, TimedTrust>()
     private var timingEvidence: WalkRuntimeSafetyObservation? = null
@@ -147,11 +157,34 @@ class WalkRuntimeSafetyCoordinator(
         latchedEpoch?.let { WalkRuntimeSafetyStop(it, latchedCauses) }
     }
 
+    /** Reading this immutable snapshot never refreshes evidence or acknowledges cleanup. */
+    fun latchedStopStatus(): WalkRuntimeSafetyStopStatus? = synchronized(lock) {
+        if (closed) return@synchronized null
+        latchedEpoch?.let { epoch ->
+            WalkRuntimeSafetyStopStatus(
+                stop = WalkRuntimeSafetyStop(epoch, Collections.unmodifiableSet(latchedCauses.toSet())),
+                initialCauses = Collections.unmodifiableSet(initialLatchedCauses.toSet()),
+                cleanupComplete = stopDelivered,
+                cleanupExhausted = stopDeliveryExhausted,
+            )
+        }
+    }
+
     fun close() = synchronized(lock) {
         closed = true
+        initialLatchedCauses = emptySet()
         stopDeliveryGeneration += 1L
         stopDeliveryInProgress = false
         stopRetryScheduled = false
+    }
+
+    /** Retire only the exact, unlatched runtime; an existing stop must finish its own cleanup. */
+    fun retireEpoch(expectedEpoch: WalkRuntimeEpoch): Boolean = synchronized(lock) {
+        if (closed || activeEpoch != expectedEpoch || latchedEpoch != null) {
+            return@synchronized false
+        }
+        activeEpoch = null
+        true
     }
 
     fun beginEpoch(epoch: WalkRuntimeEpoch): WalkRuntimeSafetyDecision {
@@ -168,6 +201,7 @@ class WalkRuntimeSafetyCoordinator(
                 if (latchedEpoch != epoch) {
                     latchedEpoch = null
                     latchedCauses = emptySet()
+                    initialLatchedCauses = emptySet()
                 }
                 lastObservedAtElapsedRealtimeMs = null
                 trustEvidence.clear()
@@ -194,6 +228,7 @@ class WalkRuntimeSafetyCoordinator(
 
     fun observe(observation: WalkRuntimeSafetyObservation): WalkRuntimeSafetyDecision {
         val evaluation = synchronized(lock) {
+            if (closed) return@synchronized Evaluation(closedDecision())
             val profile = thresholdProfile
             val epochForStop = activeEpoch
             if (epochForStop == null || epochForStop != observation.epoch) {
@@ -241,6 +276,7 @@ class WalkRuntimeSafetyCoordinator(
             } else {
                 latchedEpoch = epochForStop
                 latchedCauses = newCauses.toSet()
+                initialLatchedCauses = newCauses.toSet()
                 val stop = WalkRuntimeSafetyStop(epochForStop, latchedCauses)
                 Evaluation(
                     decision = WalkRuntimeSafetyDecision(
@@ -267,6 +303,7 @@ class WalkRuntimeSafetyCoordinator(
     /** A read does not refresh any observation or acknowledge a safe-stop side effect. */
     fun evaluate(nowElapsedRealtimeMs: Long): WalkRuntimeSafetyDecision {
         val decision = synchronized(lock) {
+            if (closed) return@synchronized closedDecision()
             val epoch = activeEpoch ?: return@synchronized WalkRuntimeSafetyDecision(
                 disposition = WalkRuntimeSafetyDisposition.NOT_CONFIGURED,
                 epoch = null,
@@ -329,7 +366,7 @@ class WalkRuntimeSafetyCoordinator(
             } else if (completionCallback != null) {
                 if (stopDeliveryAttempts >= MAX_STOP_DELIVERY_ATTEMPTS) {
                     stopDeliveryExhausted = true
-                    exhausted = delivery.stop
+                    exhausted = WalkRuntimeSafetyStop(delivery.stop.epoch, latchedCauses.toSet())
                 } else {
                     stopRetryScheduled = true
                     retry = Runnable {
@@ -359,7 +396,7 @@ class WalkRuntimeSafetyCoordinator(
                     ) null else {
                         stopRetryScheduled = false
                         stopDeliveryExhausted = true
-                        delivery.stop
+                        WalkRuntimeSafetyStop(delivery.stop.epoch, latchedCauses.toSet())
                     }
                 }
             }
@@ -444,6 +481,13 @@ class WalkRuntimeSafetyCoordinator(
         disposition = WalkRuntimeSafetyDisposition.AWAITING_EVIDENCE,
         epoch = epoch,
         deferredFailures = deferredFailures,
+    )
+
+    /** Closing retires this owner permanently; queued reads cannot reuse its last permission. */
+    private fun closedDecision() = WalkRuntimeSafetyDecision(
+        disposition = WalkRuntimeSafetyDisposition.SAFE_STOP_LATCHED,
+        epoch = activeEpoch,
+        causes = latchedCauses,
     )
 
     private enum class TrustSource { CAMERA, DEPTH, GPS, RISK, TTS, BATTERY, STORAGE, THERMAL }
@@ -590,4 +634,8 @@ class WalkRuntimeStopCleanupCheckpoints {
     fun isComplete(key: String): Boolean = stages[key] == StageState.COMPLETE
 
     fun isUncertain(key: String): Boolean = stages[key] == StageState.UNCERTAIN
+
+    fun allStagesComplete(): Boolean = stages.isNotEmpty() && stages.values.all { it == StageState.COMPLETE }
+
+    fun hasUncertainStages(): Boolean = stages.values.any { it == StageState.UNCERTAIN }
 }

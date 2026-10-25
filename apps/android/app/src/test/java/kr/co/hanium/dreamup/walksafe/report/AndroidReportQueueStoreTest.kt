@@ -29,6 +29,57 @@ class AndroidReportQueueStoreTest {
     @get:Rule
     val temporaryFolder = TemporaryFolder()
 
+    @Test fun quarantineMetadataAndDeletionRequireExactActorGenerationAndPayload() {
+        val aead = FakeQueueAead()
+        val store = AndroidReportQueueStore(temporaryFolder.newFolder("exact-quarantine"), PROFILE, aead,
+            idFactory = { UUID.fromString(REPORT_1) }, nowMillis = { 1_000L })
+        val metadata = JSONObject(String(automaticMetadata(priority = ReportQueuePriority.EXPLICIT)))
+            .put("confidence", .91).put("captured_at", "2026-10-11T00:00:00Z").toString().toByteArray()
+        val report = requireNotNull(store.enqueue(ACTOR_ID, metadata, jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT, 4L))
+        assertTrue(store.recordUploadFailure(report, true))
+        report.close()
+        assertTrue(store.quarantinedSummaries("other-actor", 4L).isEmpty())
+        assertTrue(store.quarantinedSummaries(ACTOR_ID, 5L).isEmpty())
+        val expected = store.quarantinedSummaries(ACTOR_ID, 4L).single()
+        assertFalse(store.deleteQuarantinedExact(expected, ACTOR_ID, 5L))
+        assertFalse(store.deleteQuarantinedExact(expected.copy(payloadSha256 = "f".repeat(64)), ACTOR_ID, 4L))
+        assertFalse(store.deleteQuarantinedExact(expected.copy(confidence = .92), ACTOR_ID, 4L))
+        assertEquals(1, store.quarantinedSummaries(ACTOR_ID, 4L).size)
+        assertTrue(store.deleteQuarantinedExact(expected, ACTOR_ID, 4L))
+        assertTrue(store.quarantinedSummaries(ACTOR_ID, 4L).isEmpty())
+    }
+
+    @Test fun ambiguousOrInvalidConfidenceNeverProducesADeleteableQuarantineSummary() {
+        for (confidence in listOf<Any>(org.json.JSONObject.NULL, 1.01, "0.9")) {
+            val store = AndroidReportQueueStore(temporaryFolder.newFolder(), PROFILE, FakeQueueAead(),
+                idFactory = { UUID.fromString(REPORT_1) }, nowMillis = { 1_000L })
+            val metadata = JSONObject(String(automaticMetadata(priority = ReportQueuePriority.EXPLICIT)))
+                .put("confidence", confidence).put("captured_at", "2026-10-11T00:00:00Z").toString().toByteArray()
+            val report = requireNotNull(store.enqueue(ACTOR_ID, metadata, jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT, 4L))
+            assertTrue(store.recordUploadFailure(report, true)); report.close()
+            assertTrue(store.quarantinedSummaries(ACTOR_ID, 4L).isEmpty())
+            assertEquals(1, store.queuedReports().size)
+        }
+    }
+
+    @Test fun failedPhysicalExpiryDeleteRemainsPendingMaintenance() {
+        var now = 1_000L
+        val base = FakeReportQueueStorage()
+        val failing = object : ReportQueueStorage by base {
+            override fun <T> withLockedAccess(action: (LockedReportQueueStorage) -> T): T? =
+                base.withLockedAccess { access -> action(object : LockedReportQueueStorage by access {
+                    override fun delete(reportId: String): Boolean = false
+                }) }
+        }
+        val store = AndroidReportQueueStore(PROFILE, { failing }, FakeQueueAead(),
+            { UUID.fromString(REPORT_1) }, { now }, testOnly = Unit)
+        requireNotNull(store.enqueue(ACTOR_ID, metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT)).close()
+        now += REPORT_QUEUE_TTL_MS
+        assertEquals(0, store.pruneExpired())
+        assertFalse(store.maintenanceSucceeded())
+        assertEquals(1, base.values.size)
+    }
+
     @Test
     fun productionNullProfileBlocksAdmissionAndReadWithoutTouchingStorage() {
         var storageCalls = 0

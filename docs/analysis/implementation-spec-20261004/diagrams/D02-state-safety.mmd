@@ -1,0 +1,24 @@
+stateDiagram-v2
+ state "F-D02-018 증거 대기/출력 억제" as Await
+ state "ALLOW" as Allow
+ state "SAFE_STOP latch" as Latch
+ state "정리 callback 진행" as Deliver
+ state "retry 대기" as Retry
+ state "정리 완료 ACK" as Done
+ state "EXHAUSTED 새 활성화 차단" as Block
+ state "CLOSED" as Closed
+ [*] --> Await
+ Await --> Allow: "설정 profile와 모든 fresh trust/timing 충족"
+ Allow --> Await: "evaluate에서 증거 만료; 별도 새 cause latch 아님"
+ Await --> Latch: "명시 distrust/critical/invalid observation"
+ Allow --> Latch: "명시 unsafe observation"
+ Latch --> Deliver: "state 먼저 latch 후 lock 밖 cleanup callback"
+ Deliver --> Done: "실제 cleanup completion true"
+ Deliver --> Retry: "failure·남은 시도·scheduler 있음"
+ Retry --> Deliver: "Main 250ms 뒤, current epoch"
+ Deliver --> Block: "총3회 소진 또는 scheduler 없음"
+ Latch --> Latch: "추가 cause 합집합; 정리 무조건 반복하지 않음"
+ Block --> Block: "새 epoch/reset 거절"
+ Done --> Await: "새 epoch 요청; stopped walk 자동 재개 아님"
+ Await --> Closed: "close"
+ Deliver --> Closed: "close는 generation/retry fence"

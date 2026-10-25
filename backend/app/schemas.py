@@ -403,6 +403,7 @@ class WalkingRouteStep(BaseModel):
     road_name: Optional[str] = None
     turn_type: Optional[int] = Field(default=None, ge=0, le=2_147_483_647, strict=True)
     facility_type: Optional[int] = Field(default=None, ge=0, le=2_147_483_647, strict=True)
+    road_type: Optional[int] = Field(default=None, ge=0, le=2_147_483_647, strict=True)
 
 
 class WalkingRouteGuidePoint(BaseModel):
@@ -426,11 +427,13 @@ _TURN_MIN_ANGLE_DEG = 60.0
 _TURN_STRAIGHT_RUN_MAX_BEND_DEG = 60.0
 ROUTE_TURN_GUIDE_PROGRESS_TOLERANCE_M = 5.0
 ROUTE_TURN_GUIDE_CORNER_TOLERANCE_M = 5.0
-_SPOKEN_TURN_TYPES = frozenset({12, 13, 14, 16, 17, 18, 19})
+_SPOKEN_TURN_TYPES = frozenset({12, 13, 14, 16, 17, 18, 19, 212, 213, 214, 215, 216, 217})
 
 
 def route_turn_guide_speaks(guide: WalkingRouteGuidePoint) -> bool:
     # Only an Android-mapped directional code proves a spoken corner cue.
+    # TMAP 212..217 retain their crossing identity and speak direction-only
+    # references, never permission to cross. Plain 211 has no direction.
     # Provider prose cannot authorize movement for absent/unmapped codes.
     return guide.turn_type in _SPOKEN_TURN_TYPES
 
@@ -2039,6 +2042,13 @@ PRIVACY_CONSENT_ITEM_VERSIONS = {
     "mobile_network_transfer": "FP-013-MOBILE-1.0.0",
     "training_reuse": "FP-013-TRAINING-1.1.0",
 }
+
+
+class InstallationEvidenceKeyV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    installation_id: PrivacyEvidenceId
+    public_key: str = Field(min_length=79, max_length=122, pattern=r"^[A-Za-z0-9_-]+$")
 
 
 class PrivacyConsentItemVersionsV2(BaseModel):

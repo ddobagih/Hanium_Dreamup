@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D08-044 삭제 outbox 운영자 list·교정 후 resume"]
+  B["진입: privacy-deletion-outbox-operator CLI"]
+  A --> B
+  P0["1. service 동시실행을 runtime lock 으로차단"]
+  B --> P0
+  P1["2. 키초기화및목록을 hashreference 로출력"]
+  P0 --> P1
+  P2["3. resume 은식별자형식과 pause_id CAS 를대조"]
+  P1 --> P2
+  P3["4. 일치시 paused 제거 attempts0 next_attempt=now 내구저장"]
+  P2 --> P3
+  OK["정상: 운영자 수동 재개 또는 stale/not_found"]
+  P3 --> OK
+  C0{"pause_id 달라짐"}
+  X0["stale;변경없음"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"대상없음"}
+  X1["not_found"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"--corrected 없음/lockbusy"}
+  X2["실행거부"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["종료·기한: 별도 취소 API 없음. 프로세스 중단 시 이미 내구 저장된 resume 은 유지된다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-020, P-D08-021, P-D08-023, P-D08-024"]
+  A -.-> POLICY

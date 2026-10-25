@@ -38,6 +38,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -74,23 +75,54 @@ class AndroidReportPostcommitRecoveryTest {
                 assertEquals(ReportQueueDrainOutcome.RETRY_DEFERRED, first.outcome)
                 assertNull(first.creationOutcome)
                 assertFalse(first.walkInProgress)
+                assertEquals(ReportQueuePriority.AUTOMATIC, first.reportPriority)
                 assertEquals(2, opened.get())
-                assertEquals(originalDiskBytes, diskBytes(fixture.root))
+                // The payload stays frozen; UNKNOWN persists retry state in a newly sealed envelope.
+                val postUnknownDiskBytes = diskBytes(fixture.root)
+                assertEquals(originalDiskBytes.keys, postUnknownDiskBytes.keys)
+                assertNotEquals(originalDiskBytes, postUnknownDiskBytes)
                 val reopened = fixture.reopen()
-                assertTrue(original.contentEquals(reopened.queuedReports().single().payload))
-                assertEquals(original.reportId, reopened.queuedReports().single().payload.reportId)
+                val retryAt = reopened.queuedReports().single().use { stored ->
+                    assertFrozenRecoveryIdentity(fixture.report, stored)
+                    assertEquals(1, stored.retryAttempts)
+                    assertEquals(3_000L, stored.retryNotBeforeEpochMs)
+                    assertFalse(stored.quarantined)
+                    stored.retryNotBeforeEpochMs
+                }
+                assertEquals(retryAt, reopened.nextRecoveryRetryEpochMs(ACTOR, ACCOUNT_GENERATION))
                 assertMultipartIsFrozen(server.requests[1], original)
 
-                // Missing current consent/authority or another account generation opens no socket.
                 val blocked = ReportQueueDrainCoordinator(reopened)
+                assertNull(blocked.startNextWithResult({ current }, transport(binding, confirmation(automatic = true))))
+                assertEquals(2, opened.get())
+                assertEquals(postUnknownDiskBytes, diskBytes(fixture.root))
+
+                // Reauthorization keeps automatic OFF and does not bypass the persisted deadline.
+                assertTrue(ReportPrivacyConsentSession.withdraw())
+                assertTrue(ReportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent())
+                val fresh = confirmation(automatic = false, revision = 2L, receipt = FRESH_RECEIPT)
+                assertFalse(fresh.selections.automaticReporting)
+                current = current.copy(automaticReportingAllowed = false, consentReceiptSha256 = FRESH_RECEIPT)
+                fixture.nowMillis = retryAt - 1L
+                assertNull(blocked.startNextWithResult({ current }, transport(binding, fresh)))
+                assertEquals(2, opened.get())
+                assertEquals(postUnknownDiskBytes, diskBytes(fixture.root))
+                fixture.reopen().queuedReports().single().use { stored ->
+                    assertFrozenRecoveryIdentity(fixture.report, stored)
+                    assertEquals(1, stored.retryAttempts)
+                    assertEquals(retryAt, stored.retryNotBeforeEpochMs)
+                }
+                fixture.nowMillis = retryAt
+
+                // Missing current consent/authority or another account generation opens no socket.
                 listOf(
                     current.copy(consentAllowed = false, automaticReportingAllowed = false),
                     current.copy(authorityAllowed = false, automaticReportingAllowed = false),
                     current.copy(accountGeneration = ACCOUNT_GENERATION + 1, automaticReportingAllowed = false),
                 ).forEach { denied ->
-                    assertNull(blocked.startNext({ denied }, transport(binding, confirmation(automatic = false))))
+                    assertNull(blocked.startNext({ denied }, transport(binding, fresh)))
                     assertEquals(2, opened.get())
-                    assertEquals(originalDiskBytes, diskBytes(fixture.root))
+                    assertEquals(postUnknownDiskBytes, diskBytes(fixture.root))
                 }
                 val cellularAllowed = AndroidNetworkTransferPolicy.isAllowed(
                     MobileNetworkPreference.WIFI_ONLY, ActiveNetworkTransport.CELLULAR,
@@ -99,22 +131,19 @@ class AndroidReportPostcommitRecoveryTest {
                 assertNull(blocked.startNext(
                     { current.copy(networkAllowed = cellularAllowed, automaticReportingAllowed = false) },
                     transport(binding(server, opened, IntegratedConsentNetworkTransport.CELLULAR),
-                        confirmation(automatic = false)),
+                        fresh),
                 ))
                 assertEquals(2, opened.get())
-                assertEquals(originalDiskBytes, diskBytes(fixture.root))
+                assertEquals(postUnknownDiskBytes, diskBytes(fixture.root))
 
                 // A fresh server confirmation may keep automatic OFF. GET must not turn it back on.
-                assertTrue(ReportPrivacyConsentSession.withdraw())
-                assertTrue(ReportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent())
-                val fresh = confirmation(automatic = false, revision = 2L, receipt = FRESH_RECEIPT)
-                assertFalse(fresh.selections.automaticReporting)
-                current = current.copy(automaticReportingAllowed = false, consentReceiptSha256 = FRESH_RECEIPT)
                 var localReceiptCommits = 0
                 val recovered = requireNotNull(blocked.startNextWithResult(
                     { current }, transport(binding, fresh),
                     beforeDeleteAfterReceipt = { stored ->
-                        assertTrue(original.contentEquals(stored.payload))
+                        assertFrozenRecoveryIdentity(fixture.report, stored)
+                        assertEquals(1, stored.retryAttempts)
+                        assertEquals(retryAt, stored.retryNotBeforeEpochMs)
                         localReceiptCommits++
                         true
                     },
@@ -126,6 +155,8 @@ class AndroidReportPostcommitRecoveryTest {
                 assertEquals(listOf("GET", "POST", "GET"), server.requests.map { it.method })
                 assertEquals(1, server.requests.count { it.method == "POST" })
                 assertEquals(FRESH_RECEIPT, server.requests.last().headers[CONSENT_RECEIPT_HEADER])
+                assertFalse(current.automaticReportingAllowed)
+                assertEquals(ACCOUNT_GENERATION, current.accountGeneration)
                 assertTransportIdentity(server.requests, original)
                 server.assertHealthy()
             } finally { ReportPrivacyConsentSession.resetForNewEnrollment() }
@@ -166,6 +197,7 @@ class AndroidReportPostcommitRecoveryTest {
     }
 
     private class Fixture(val root: File) {
+        var nowMillis = 1_000L
         private val aead = VersionedLocalAead(AeadKeyPolicy("test.report.postcommit.aead.v", 1, setOf(1)),
             PostcommitKeys())
         fun reopen() = AndroidReportQueueStore(
@@ -173,7 +205,7 @@ class AndroidReportPostcommitRecoveryTest {
             capacityProfile = ApprovedReportQueueCapacityProfile(8, 1_024, 4_096L, 32_768L, 6, 24_576L),
             aead = aead,
             idFactory = { UUID.fromString(REPORT_ID) },
-            nowMillis = { 1_000L },
+            nowMillis = { nowMillis },
         )
         val store = reopen()
         val report = requireNotNull(store.enqueue(
@@ -244,6 +276,20 @@ class AndroidReportPostcommitRecoveryTest {
             .substringBefore("\r\n--$boundary").toByteArray(Charsets.ISO_8859_1)
         assertArrayEquals(payload.metadataUtf8(), part("application/json"))
         assertArrayEquals(payload.imageJpeg(), part("image/jpeg"))
+    }
+
+    private fun assertFrozenRecoveryIdentity(original: QueuedReport, stored: QueuedReport) {
+        assertEquals(original.payload.reportId, stored.payload.reportId)
+        assertEquals(original.payload.payloadSha256, stored.payload.payloadSha256)
+        assertEquals(original.payload.payloadBytes, stored.payload.payloadBytes)
+        original.payload.useExactBytes { metadata, image ->
+            stored.payload.useExactBytes { recoveredMetadata, recoveredImage ->
+                assertArrayEquals(metadata, recoveredMetadata)
+                assertArrayEquals(image, recoveredImage)
+            }
+        }
+        assertEquals(original.copy(payload = stored.payload,
+            retryAttempts = stored.retryAttempts, retryNotBeforeEpochMs = stored.retryNotBeforeEpochMs), stored)
     }
 
     private fun diskBytes(root: File) = root.walkTopDown().filter { it.isFile }.associate {

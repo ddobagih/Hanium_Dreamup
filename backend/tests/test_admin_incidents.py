@@ -1457,7 +1457,13 @@ def test_migration_015_is_append_only_event_bound_and_least_privilege(
     assert consent_v12_successor.down_revision == delivery_correction_successor.revision
     assert copy_inventory_successor.down_revision == consent_v12_successor.revision
     assert head.down_revision == copy_inventory_successor.revision
-    assert health_api.EXPECTED_ALEMBIC_HEAD == head.revision
+    duplicate_guard = importlib.import_module("backend.alembic.versions.202609300009_admin_duplicate_representative")
+    diagnostics = importlib.import_module("backend.alembic.versions.202610080001_guidance_test_diagnostics")
+    prior_copies = importlib.import_module("backend.alembic.versions.202610110001_account_deletion_prior_report_copies")
+    assert duplicate_guard.down_revision == head.revision
+    assert diagnostics.down_revision == duplicate_guard.revision
+    assert prior_copies.down_revision == diagnostics.revision
+    assert health_api.EXPECTED_ALEMBIC_HEAD == prior_copies.revision
     alembic_config = Config(
         str(Path(__file__).resolve().parents[1] / "alembic.ini")
     )
@@ -1466,7 +1472,7 @@ def test_migration_015_is_append_only_event_bound_and_least_privilege(
         str(Path(__file__).resolve().parents[1] / "alembic"),
     )
     assert ScriptDirectory.from_config(alembic_config).get_heads() == [
-        head.revision
+        prior_copies.revision
     ]
 
     created_tables: list[str] = []

@@ -1,0 +1,17 @@
+flowchart TD
+ A["F-D02-037 공통 native 접근성 적용"] --> D["현재 density·fontScale·화면폭 조회"]
+ D --> G{"P-D02-037 화면폭 600dp 미만 또는 fontScale 1.3 이상"}
+ G -->|"예"| V["전체폭 세로 배치"]
+ G -->|"아니오"| H["균등2열 및 간격 분배"]
+ D --> R["view tree 재귀 순회"]
+ R --> C{"Button EditText CheckBox"}
+ C -->|"예"| M["기존값과64dp 중 큰 minimum; 글자 최소18sp"]
+ M --> Y["조작 view 읽기 대상 YES"]
+ C -->|"장식 container 또는 preview"| N["읽기 대상 NO"]
+ R --> S["기존0 margin만12dp 보정; 큰 기존값 축소 안 함"]
+ V --> E["화면 생성 완료"]
+ H --> E
+ Y --> E
+ N --> E
+ E --> F["home card 단일 설명에 잠김 이유; 확인 버튼 focus"]
+ F --> T["실제 잘림·초점·TalkBack 동작은 이번 미검증"]

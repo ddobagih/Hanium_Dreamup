@@ -1,0 +1,19 @@
+stateDiagram-v2
+  state "S-D15-044-01 · NOT_STARTED" as NOT_STARTED
+  state "S-D15-044-02 · IN_PROGRESS" as IN_PROGRESS
+  state "S-D15-044-03 · DB_COMMITTED_RECONCILIATION_REQUIRED" as RECONCILE
+  state "S-D15-044-04 · DB_COMMITTED_POSTCHECK_REQUIRED" as POSTCHECK
+  state "S-D15-044-05 · DB_COMMITTED_POSTCHECK_FAILED" as POSTFAIL
+  state "S-D15-044-06 · COMPLETE" as COMPLETE
+  [*] --> NOT_STARTED
+  NOT_STARTED --> IN_PROGRESS: target isolation·계획 검증 후 begin
+  IN_PROGRESS --> RECONCILE: receipt DB commit
+  RECONCILE --> POSTCHECK: artifact finalize 완료
+  POSTCHECK --> POSTFAIL: semantic guard 실패
+  POSTCHECK --> COMPLETE: postcheck 성공
+  note right of RECONCILE
+    P-D15-044
+    commit된 receipt면 finalize를 이어감
+    receipt가 없으면 restore 보상 여부를 판정
+    commit 후 오류는 삭제효과 취소 선언이 아님
+  end note

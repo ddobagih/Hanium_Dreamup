@@ -1,0 +1,26 @@
+flowchart TD
+ A["F-D10-009 TTSRequest"] --> B["P-D10-010 phrase 우선 및 text cache 거부"]
+ B --> C{"TTS permit 기본2초 내 획득"}
+ C -->|"아니오"| E1["503 tts_busy. fallback 없음"]
+ C -->|"예"| D["worker 합성 기본60초 및 disconnect 감시"]
+ D -->|"disconnect/caller cancel"| E2["499 또는 cancel 전파 준비"]
+ D -->|"runtime/value/timeout"| F{"allow_fallback 및 fallback 파일"}
+ F -->|"없음"| E3["503 또는504 예외 준비"]
+ F -->|"있음"| G["P-D10-011 fallback WAV size/duration 검증"]
+ G -->|"실패"| E4["502/503/499 검증 예외 준비. fallback 파일 보존"]
+ G -->|"성공"| FH["fallback FileResponse 준비"]
+ E2 --> RF["finally 추론 permit 반환"]
+ E3 --> RF
+ E4 --> RF
+ FH --> RF
+ RF --> FE["준비한 fallback 응답 반환 또는 예외 전파. 종료"]
+ D -->|"결과"| RS["finally 추론 permit 반환"]
+ RS --> J{"worker revision40hex"}
+ J -->|"아니오"| E5["transient이면 unlink 후503"]
+ J -->|"예"| K["WAV size/duration 검증"]
+ K -->|"Exception"| E6["transient이면 unlink 후 예외 재전파"]
+ K -->|"유효"| L{"transient"}
+ L -->|"예"| M["bytes 읽기. finally output unlink"]
+ M -->|"성공"| O["bytes Response, no-store/nosniff. 종료"]
+ M -->|"읽기 실패"| EX["예외 전파. 종료"]
+ L -->|"아니오"| N["cache FileResponse, no-store/nosniff. 종료"]

@@ -1,0 +1,22 @@
+flowchart TD
+  title["F-D09-022 · 깊이 디버그 로그 배치 수집<br/>P-D09-022"]
+  N0["수신 body 크기 검사"]
+  N1["schema 및 enabled 검사"]
+  N2["서버 수신 시각 결합"]
+  N3["잠금과 retention 및 quota"]
+  N4["transaction에 배치 저장"]
+  title --> N0
+  N0 --> N1
+  N1 --> N2
+  N2 --> N3
+  N3 --> N4
+  N4 --> OK["정상: 200 ok=true 및 stored 개수"]
+  N0 -->|"수신 또는 직렬화 bytes가 설정 상한 초과"| B0["413 android_debug_log_too_large"]
+  B0 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N1 -->|"기능 플래그 false"| B1["404 android_debug_log_disabled"]
+  B1 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N3 -->|"일별 또는 전체 저장 quota 초과"| B2["507 android_debug_storage_quota_exceeded"]
+  B2 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  title -.-> CANCEL["취소: worker에 전달한 저장 작업 종료까지 기다림"]
+  CANCEL --> CLEAN["정리: transaction 종료와 SQLite/파일 lock 반환"]
+  title -.-> RETRY["재시도: HTTP 실패의 서버 자동 재시도 없음"]

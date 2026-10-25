@@ -8,8 +8,7 @@ import org.junit.Test
 /** Wiring guards; async behavior is also exercised by the source-extracted private Main harness. */
 class MainActivityDestinationSearchRecoveryStaticTest {
     private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-    private val search = source.substringAfter("private fun performDestinationSearch(reset: Boolean)")
-        .substringBefore("private fun isDestinationSearchLeaseCurrent(")
+    private val search = MainActivityRefactorSource.function(source, "private fun performDestinationSearch(reset: Boolean)")
 
     @Test fun requestedPageIsCommittedOnlyAfterTheCurrentSuccessfulResponse() {
         assertTrue(search.contains("val requestedPage = if (resetSearch) 1 else destinationSearchPage + 1"))
@@ -31,12 +30,12 @@ class MainActivityDestinationSearchRecoveryStaticTest {
         assertTrue(recovery.contains("results = retainedCandidates"))
         assertTrue(recovery.contains("pageIndex = retainedVoicePageIndex"))
         assertTrue(recovery.contains("destinationSearchVoiceState = state"))
-        assertTrue(recovery.contains("speakHomeDestinationVoicePrompt(state"))
+        assertTrue(recovery.contains("actions.offerCandidates(state"))
         val owner = search.substringAfter("fun isCurrentSearchRequest(): Boolean")
             .substringBefore("fun recoverRetainedCandidates(")
-        assertTrue(owner.contains("isDestinationSearchLeaseCurrent(expectedWalkEpoch, requestId)"))
+        assertTrue(owner.contains("isLeaseCurrent(expectedWalkEpoch, requestId)"))
         assertTrue(owner.contains("generation == expectedGatewaySessionGeneration"))
-        assertTrue(owner.contains("isCurrentGatewaySession(gatewaySession)"))
+        assertTrue(owner.contains("facts.isSessionCurrent(gatewaySession)"))
         assertFalse(recovery.contains("destinationSearchGeneration ="))
     }
 

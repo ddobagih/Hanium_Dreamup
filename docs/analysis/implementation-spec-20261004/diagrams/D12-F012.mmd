@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-012 등록된 기기키의 정상 회전·미확정 결과 조정"]
+  P["P-D12-012 서버 확인 후 키 승격과 이전 키 폐기"]
+  A --> P
+  M0["1. max(activeVersion,highestVersion)+1 새 키를 만들고 PENDING metadata를 commit한다. 기존 pending이 있으면 동일 descriptor를 반환한다."]
+  P --> M0
+  M1["2. 운영자가 공개 descriptor를 서버에 PENDING 등록한 뒤 앱에서 확인한다."]
+  M0 --> M1
+  M2["3. 현재 ACTIVE 키의 ACTION proof와 PENDING 키의 canonical rotation payload 서명을 같은 correlation ID에 결속한다."]
+  M1 --> M2
+  M3["4. 서버 확인 후에만 pending을 local active로 commit하고 이전 alias 삭제를 시도한다."]
+  M2 --> M3
+  M4["5. 응답 분실은 서버 current-device key_version과 8자리 marker prefix로 reconcile한다. 포기 시 local pending만 지운다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 서버 current-device가 pending을 승인했을 때 local active commit 후 구 alias 정리."]
+  M0 -. "관련 조건 확인" .-> B0{"서버 확인 전 실패"}
+  B0 -->|"조건 해당"| R0["ACTIVE 유지"]
+  M1 -. "관련 조건 확인" .-> B1{"서버가 pending version과 marker prefix를 가리킴"}
+  B1 -->|"조건 해당"| R1["PROMOTED"]
+  M2 -. "관련 조건 확인" .-> B2{"서버가 기존 active를 가리킴"}
+  B2 -->|"조건 해당"| R2["UNCHANGED"]
+  M3 -. "관련 조건 확인" .-> B3{"어느 키와도 일치 안 됨"}
+  B3 -->|"조건 해당"| R3["UNKNOWN; 임의 승격 금지"]
+  A -. "중단 경계" .-> C["포기는 로컬 pending만 제거; 서버 pending 자동 삭제는 없다."]
+  A -. "복구 경계" .-> Q["같은 pending descriptor 재사용; 응답 미확정은 server version/marker reconcile."]

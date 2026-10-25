@@ -1,0 +1,14 @@
+flowchart TD
+  A["F-D10-012 Voice health 설정·장치 정보 조회"]
+  N0["1. torch.cuda.is_available 및 가능하면 GPU name을 확인한다."]
+  A --> N0
+  N1["2. model/revision 설정값, STT/TTS concurrency, request/duration 제한, process_isolation true와 process_local/1worker/1replica를 반환한다."]
+  N0 --> N1
+  B0{"status=ok"}
+  R0["함수 실행 성공이라는 의미; 모델이 실제 로드됨을 뜻하지 않음"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  Z["종료 · 자동 재시도 없음"]
+  N1 --> Z
+  P["적용 정책 · P-D10-001"]
+  P -. "코드 분기 기준" .-> A

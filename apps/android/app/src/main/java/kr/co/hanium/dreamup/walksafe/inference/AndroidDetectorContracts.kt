@@ -5,6 +5,7 @@ import android.graphics.Rect
 import android.media.Image
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicLong
 
 /** Plane bytes are private copies, so native inference never borrows a CameraX or ARCore image. */
 class OwnedYuvFrame private constructor(
@@ -18,6 +19,7 @@ class OwnedYuvFrame private constructor(
     private val uvRowStride: Int,
     private val uvPixelStride: Int,
     internal val cropRect: YuvCropRect,
+    private val colorConversion: YuvColorConversion,
 ) {
     internal fun toArgb(): ArgbImage = ArgbImage(
         width,
@@ -25,13 +27,19 @@ class OwnedYuvFrame private constructor(
         yuv420ToArgbPixels(
             width, height, yBuffer(), uBuffer(), vBuffer(),
             yRowStride, yPixelStride, uvRowStride, uvPixelStride, cropRect,
+            colorConversion = colorConversion,
         ),
     )
+
+    /** Writes only into an explicitly supplied owner scratch; [toArgb] remains an owned copy. */
+    internal fun toArgbInto(destination: IntArray): ArgbImage = ArgbImage(width, height,
+        yuv420ToArgbPixels(width, height, yBuffer(), uBuffer(), vBuffer(),
+            yRowStride, yPixelStride, uvRowStride, uvPixelStride, cropRect, destination, colorConversion))
 
     internal fun preprocessFused(preprocessor: YuvImagePreprocessor, modelSize: Int): PreprocessedImage =
         preprocessor.preprocessYuv420(
             width, height, yBuffer(), uBuffer(), vBuffer(),
-            yRowStride, yPixelStride, uvRowStride, uvPixelStride, modelSize, cropRect,
+            yRowStride, yPixelStride, uvRowStride, uvPixelStride, modelSize, cropRect, colorConversion,
         )
 
     private fun yBuffer(): ByteBuffer = ByteBuffer.wrap(y).asReadOnlyBuffer()
@@ -52,6 +60,7 @@ class OwnedYuvFrame private constructor(
                 planes[0].rowStride, planes[0].pixelStride,
                 planes[1].rowStride, planes[1].pixelStride,
                 YuvCropRect.fromRect(cropRect),
+                YuvColorConversion.fromImage(image),
             )
         }
 
@@ -66,13 +75,29 @@ class OwnedYuvFrame private constructor(
             uvRowStride: Int,
             uvPixelStride: Int,
             cropRect: YuvCropRect = YuvCropRect.full(width, height),
+        ): OwnedYuvFrame = copyOf(width, height, yBuffer, uBuffer, vBuffer,
+            yRowStride, yPixelStride, uvRowStride, uvPixelStride, cropRect,
+            YuvColorConversion.BT601_FULL)
+
+        private fun copyOf(
+            width: Int,
+            height: Int,
+            yBuffer: ByteBuffer,
+            uBuffer: ByteBuffer,
+            vBuffer: ByteBuffer,
+            yRowStride: Int,
+            yPixelStride: Int,
+            uvRowStride: Int,
+            uvPixelStride: Int,
+            cropRect: YuvCropRect,
+            colorConversion: YuvColorConversion,
         ): OwnedYuvFrame {
             require(width > 0 && height > 0 && width.toLong() * height <= Int.MAX_VALUE)
             cropRect.requireWithin(width, height)
             return OwnedYuvFrame(
                 width, height,
                 copyPlane(yBuffer), copyPlane(uBuffer), copyPlane(vBuffer),
-                yRowStride, yPixelStride, uvRowStride, uvPixelStride, cropRect,
+                yRowStride, yPixelStride, uvRowStride, uvPixelStride, cropRect, colorConversion,
             )
         }
 
@@ -210,6 +235,10 @@ data class AndroidDetectorTiming(
     val customRuntime: AndroidDetectorRuntime? = null,
     val preprocessingStrategy: String? = null,
     val ownedTensorCopyMs: Long? = null,
+    /** Separate provenance/cost: supplementary people must not be reported as primary inference work. */
+    val personSupplementInferenceMs: Long? = null,
+    val personSupplementParseMs: Long? = null,
+    val personSupplementRuntime: AndroidDetectorRuntime? = null,
 )
 
 data class AndroidDetectorRuntime(
@@ -225,6 +254,95 @@ data class AndroidDetectorRuntime(
     val gpuSerializationCacheToken: String? = null,
     val gpuSerializationCacheFailureReason: String? = null,
 )
+
+/** Only executed phases are present. A missing phase is not a successful zero-duration phase. */
+enum class AndroidDetectorLoadPhase {
+    CONFIG_LOAD, OWNER_QUEUE, ASSET_INTEGRITY, ASSET_MAP, GPU_CACHE_PREPARE,
+    GPU_COMPATIBILITY, DELEGATE_INIT, INTERPRETER_INIT, TENSOR_CHECK,
+    FIRST_INFERENCE, CLOSE_QUEUE, NATIVE_CLOSE,
+}
+
+enum class AndroidDetectorPhaseOutcome { SUCCEEDED, FAILED }
+
+data class AndroidDetectorPhaseTiming(
+    val phase: AndroidDetectorLoadPhase,
+    val startedNs: Long,
+    val finishedNs: Long,
+    val threadId: Long,
+    val threadName: String,
+    val outcome: AndroidDetectorPhaseOutcome,
+    val modelKey: String? = null,
+    val delegate: String? = null,
+    val failureType: String? = null,
+) {
+    val elapsedNs: Long get() = finishedNs - startedNs
+    val elapsedMs: Double get() = elapsedNs / 1_000_000.0
+}
+
+/** Monotonic process-local times. Phase intervals can overlap during an inference fallback. */
+data class AndroidDetectorLoadTiming(
+    val loadGeneration: Long,
+    val requestedNs: Long,
+    val requestThreadId: Long,
+    val requestThreadName: String,
+    val loadFinishedNs: Long?,
+    val detectorAvailable: Boolean?,
+    val phases: List<AndroidDetectorPhaseTiming>,
+) {
+    val loadElapsedMs: Double? get() = loadFinishedNs?.let { (it - requestedNs) / 1_000_000.0 }
+}
+
+/** Small per-load record; snapshots are copied only when a caller requests diagnostics. */
+internal class DetectorLoadTimingRecorder(private val nowNs: () -> Long = System::nanoTime) {
+    private val generation = nextGeneration.incrementAndGet()
+    private val requestedNs = nowNs()
+    private val requestThreadId = Thread.currentThread().id
+    private val requestThreadName = Thread.currentThread().name
+    private val phases = mutableListOf<AndroidDetectorPhaseTiming>()
+    private var loadFinishedNs: Long? = null
+    private var available: Boolean? = null
+
+    fun now(): Long = nowNs()
+
+    fun <T> measure(phase: AndroidDetectorLoadPhase, modelKey: String? = null,
+        delegate: String? = null, block: () -> T): T {
+        val startedNs = nowNs()
+        var failure: Throwable? = null
+        try {
+            return block()
+        } catch (error: Throwable) {
+            failure = error
+            throw error
+        } finally {
+            record(phase, startedNs, modelKey, delegate, failure)
+        }
+    }
+
+    /** Ends a queue interval when its accepted task starts, or when admission fails. */
+    fun record(phase: AndroidDetectorLoadPhase, startedNs: Long, modelKey: String? = null,
+        delegate: String? = null, failure: Throwable? = null) {
+        val finishedNs = nowNs()
+        val thread = Thread.currentThread()
+        val timing = AndroidDetectorPhaseTiming(phase, startedNs, finishedNs, thread.id, thread.name,
+            if (failure == null) AndroidDetectorPhaseOutcome.SUCCEEDED else AndroidDetectorPhaseOutcome.FAILED,
+            modelKey, delegate, failure?.javaClass?.simpleName)
+        synchronized(this) { phases.add(timing) }
+    }
+
+    @Synchronized fun finishLoad(detectorAvailable: Boolean): AndroidDetectorLoadTiming {
+        if (loadFinishedNs == null) {
+            loadFinishedNs = nowNs()
+            available = detectorAvailable
+        }
+        return snapshot()
+    }
+
+    @Synchronized fun snapshot(): AndroidDetectorLoadTiming = AndroidDetectorLoadTiming(
+        generation, requestedNs, requestThreadId, requestThreadName, loadFinishedNs, available, phases.toList(),
+    )
+
+    private companion object { val nextGeneration = AtomicLong() }
+}
 
 fun AndroidDetectorTiming.totalModelMs(): Long? {
     val genericValues = listOfNotNull(

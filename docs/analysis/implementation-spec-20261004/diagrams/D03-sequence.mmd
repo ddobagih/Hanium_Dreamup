@@ -1,0 +1,33 @@
+sequenceDiagram
+  participant U as 사용자
+  participant M as MainActivity
+  participant V as 음성 owner
+  participant N as Route executor
+  participant I as Snapshot IO lane
+  participant R as RouteNavigator
+  participant T as D02 TTS
+  U->>V: F-D03-023 별도 길안내 시작
+  V->>M: final and captured actor epoch decision token
+  M->>M: P-D03-027 gates and request generation
+  M->>N: immutable request and cancellable call
+  M-->>V: F-D03-011 commandId bound to request generation
+  N->>N: session recheck and HTTP parse P-D03-026
+  N-->>M: validated route response
+  M->>M: current lease and connected latest fix
+  alt current and connected
+    M->>I: F-D03-028 response token save first route then load check
+    I->>I: process owner lock and first archive policy
+    I-->>M: archive result
+    M->>M: same response token and latest connected fix again
+    alt still current
+      M->>R: setRoute actual response
+      M->>T: initial scope disclosure and current ACTION cue
+      T-->>M: actual DONE
+      M->>R: F-D03-032 acknowledge matching reserved cue
+      M-->>V: work ended and output settling
+    else context changed during IO
+      M->>M: discard stale result
+    end
+  else stale disconnected or cancelled
+    M->>M: reject install and preserve old route when applicable
+  end

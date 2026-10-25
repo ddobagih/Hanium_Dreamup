@@ -1,0 +1,27 @@
+flowchart TD
+  A["F-D13-035<br/>원시 보존 만료 후보 미리보기"]
+  P["P-D13-035<br/>승인됐어도원본 격리 expiry 후삭제후보이며승인데이터셋보존과분리한다."]
+  A --> P
+  N0["1. v1COMMITTED/RAW_ORIGINAL_180D 와 retentionexpiry<=asof<br/>또는 v2QUARANTINED/RAW_QUARANTINE_14D 와<br/>quarantineexpiry<=asof 를선택한다."]
+  P --> N0
+  N1["2. 최신 hold 가 APPLY 이며 expiry>asof 이면제외한다."]
+  N0 --> N1
+  N2["3. v2 는승격 artifact 존재/승인판단존재/모두 REJECTED/기타순으로<br/>PROMOTED_SOURCE_EXPIRED,PROMOTION_INCOMPLETE_EXPIRED,REJECTED,UNAPPROVED_EXPIRED<br/>사유를붙인다."]
+  N1 --> N2
+  N3["4. chunkstorage name/size/hash 를확인하고 candidate+chunk 집합을<br/>domainhash 하여 preview 를반환한다."]
+  N2 --> N3
+  Z["readonlypreview 로 apply 할후보 digest·목록제공. 파일삭제없음."]
+  N3 --> Z
+  B0{"unfinishedMANIFEST_ACCEPTED/READY_TO_COMMIT 또는<br/>digestrejected 비 terminal"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["이후보 query 에들지않음"]
+  B1{"activelegalhold"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["삭제후보에서제외"]
+  B2{"committedchunkmetadata 미완성"}
+  P -. "예외 조건 검사" .-> B2
+  B2 -- "조건 성립" --> X2["RawRetentionError"]
+  R["재시도: 자동 반복 루프 없음. 호출자가 오류와 현재 상태를 확인 후 재호출.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 별도 취소 진입점 없음."]
+  A -. "취소 API 여부" .-> C

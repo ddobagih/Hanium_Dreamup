@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D01-025 민감 preference의 암호화 map·소유권·저장 장애 차단"]
+  G{"AndroidSensitivePreferenceStore 초기화 및 허용된 key/prefix 요청"}
+  I["타입있는 map 최대256 entries,평문64KiB,envelope96KiB; storage identity+key+owner epoch"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: blocked; caller가 false/default를 허용으로 취급하지 않도록 상위 gate"]
+  G -->|"미충족"| X
+  N1["초기화는 reset marker·blocked marker·plaintext artifact를 검사하고 encrypted envelope만 decode한다."]
+  I --> N1
+  N2["모든 key/type/size를 검증하고 old readable version이면 필요한 rewrap 경로를 사용한다."]
+  N1 --> N2
+  N3["editor는 소유자 epoch를 확인하고 새 map을 암호화·durable commit한 뒤 메모리값을 publish한다."]
+  N2 --> N3
+  N4["복호·파싱·scope·저장 실패면 identity-free blocked marker를 남기고 getter는 기본값을 반환한다."]
+  N3 --> N4
+  N5["destroyAndClear는 reset pending을 먼저 저장하고 payload부재 확인→known key 폐기→새키생성→marker해제 readback을 수행한다."]
+  N4 --> N5
+  OK["검증값 읽기/성공commit 또는 durable reset"]
+  N5 --> OK
+  B0["자동이관 없이 제거·차단"]
+  N1 -->|"plaintext 민감 artifact 발견"| B0
+  B1["복원 차단"]
+  N2 -->|"bad type/key/size/decrypt"| B1
+  B2["old instance commit 실패; 새상태 덮기 없음"]
+  N3 -->|"새 store instance가 owner를 교체"| B2
+  B3["marker남고 차단; 새 정상상태로 오인 안 함"]
+  N5 -->|"중간 reset 실패"| B3
+  R["중단·취소: 저장 mutation의 중간 취소 API 없음 / crash의 reset marker가 다음 초기화를 차단"]
+  V["복구·재시도: same identity encrypted store 복원, keymissing이면 blocked / caller 재시도·명시reset; 복호 실패를 새키생성으로 덮지 않음"]
+  Q["정책 P-D01-018 · P-D01-019"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

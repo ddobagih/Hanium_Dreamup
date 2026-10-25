@@ -1,0 +1,35 @@
+flowchart TD
+  T["F-D09-003 요청 결속 actor assertion v4와 현재 계정 세대 확인 / P-D09-003"]
+  N0["token 구조와 시간 precheck"]
+  T --> N0
+  N1["bounded body hash와 replay"]
+  N0 --> N1
+  N2["exact HMAC 검증"]
+  N1 --> N2
+  N3["jti 단일사용 claim"]
+  N2 --> N3
+  N4["현재 account 세대와 epoch 검사"]
+  N3 --> N4
+  N5["검증 identity 전달"]
+  N4 --> N5
+  Z["정상: 현재 계정 권한과 정확한 요청에 결속된 identity 전달"]
+  N5 --> Z
+  B0["assertion invalid401; 내신고/transport는404 은폐"]
+  N0 -->|"current > exp 또는 iat > current+5 또는 exp > iat+30"| B0
+  B1["401 actor_assertion_replayed 또는 은폐404"]
+  N3 -->|"이미 claim된 jti"| B1
+  B2["503 account_authentication_unavailable 및 Retry-After1"]
+  N3 -->|"replay cache 100000개 포화"| B2
+  B3["401 account_authentication_stale 또는 은폐404"]
+  N4 -->|"계정 inactive/세대·epoch 불일치"| B3
+  B4["503 account_authentication_unavailable"]
+  N4 -->|"현재 계정 DB 조회 실패"| B4
+  R["종료와 복구: 재시도는 Gateway의 새 jti 서명 필요; 업무 멱등은 별도 endpoint 계약 / 원인 해소 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  B4 -.-> R
+  C["취소와 정리: 전용 취소 API 없음 / jti는 exp+5보다 현재시각이 커질 때 heap에서 제거"]
+  N5 -.-> C

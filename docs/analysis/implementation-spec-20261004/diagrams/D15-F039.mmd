@@ -1,0 +1,38 @@
+flowchart TB
+  E["F-D15-039 · 기간 만료 신고 삭제·복구 저널·예약 진입점<br/>CLI --apply 및<br/>walksafe-report-retention.service/timer"]
+  P["P-D15-039 · 전제조건<br/>DATA_DELETE high-risk 운영 인증; exclusive<br/>maintenance lock, signed backup≤26시간·대상<br/>identity 및 content consistency, 같은 backup의<br/>restore receipt 필요."]
+  E --> P
+  S1["1. DB URL/TLS·timeout·권한·upload inode/ACL·서명<br/>검증"]
+  P --> S1
+  S2["2. 이전 quarantine run을 먼저 DB 상태와 조정"]
+  S1 --> S2
+  S3["3. 동일 storage lock에서 만료 Report 행 lock 및<br/>encrypted metadata·blob 검증"]
+  S2 --> S3
+  S4["4. PREPARING→PRECOMMIT_READY recovery copy와<br/>manifest를 durable 기록"]
+  S3 --> S4
+  S5["5. DATABASE_COMMITTING→Report 삭제 commit"]
+  S4 --> S5
+  S6["6. postcommit reconcile로 원본/복구파일 cleanup 후<br/>completed audit manifest; 실패는 commit 여부별 상태<br/>보존"]
+  S5 --> S6
+  OK["정상 결과<br/>postcommit reconcile로 원본/복구파일 cleanup 후<br/>completed audit manifest; 실패는 commit 여부별 상태<br/>보존"]
+  S6 --> OK
+  B1["조건 · backup&gt;26h/다른 DB-upload-lock<br/>identity/restore receipt 불일치<br/>결과 · apply 차단"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · precommit 실패<br/>결과 · 원상복구·failed_before_commit"]
+  S6 -. "해당 조건 발생" .-> B2
+  B3["조건 · commit 뒤 cleanup 실패<br/>결과 · failed_after_database_commit/증거 보존"]
+  S6 -. "해당 조건 발생" .-> B3
+  B4["조건 · signal<br/>결과 · 신호를 제어 구간에서 유예하고 recovery evidence 정리·보존"]
+  S1 -. "해당 조건 발생" .-> B4
+  B5["조건 · scheduler<br/>결과 · 03:30 일일,random≤30분; 설치/활성 여부는 미확인"]
+  S1 -. "해당 조건 발생" .-> B5
+  B6["조건 · active legal hold가 있는 Report를 DELETE<br/>결과 · 설치된 reports_deletion_effect_guard가 DB에서 거절;<br/>service 후보 선별과 별도"]
+  S3 -. "해당 조건 발생" .-> B6
+  LIFE["중단·취소<br/>CLI signal을 받아 제어 구간에서 처리; HTTP 취소 API 없음.<br/>DB commit 전후를 나눠 recovery manifest를 남기고 후속<br/>reconcile 대상으로 보존."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>이전 run recovery manifest를 먼저 reconcile; DB<br/>상태가 확정되지 않으면 후속 삭제를 진행하지 않음."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>postcommit reconcile에서 암호화 원본·복구 copy를 정리하고<br/>감사 manifest 유지. 실패 시 무조건 삭제하지 않음."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · scripts/check_report_retention_dry_run.py:3509<br/>apply_database_retention<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

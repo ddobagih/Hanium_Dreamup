@@ -1,7 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
-import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.navigation.TactileSnapshotFrameResult
 import kr.co.hanium.dreamup.walksafe.feedback.WalkSafeFeedbackPolicy
+import kr.co.hanium.dreamup.walksafe.feedback.toFeedbackCandidate
 import kr.co.hanium.dreamup.walksafe.navigation.AndroidTactileFrameCoordinator
 import kr.co.hanium.dreamup.walksafe.navigation.AndroidTactileRouteGuidance
 import kr.co.hanium.dreamup.walksafe.navigation.LocalRouteMode
@@ -17,6 +18,42 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UnknownObjectFeedbackPolicyTest {
+    @Test fun admittedFeedbackUsesTheFrozenElapsedCaptureRatherThanTheRawCameraClock() {
+        val admitted = requireNotNull(admit(output())).outputs.single()
+        val candidate = requireNotNull(admitted.toFeedbackCandidate())
+
+        assertEquals(FRAME_MS, candidate.timestampMs)
+        assertEquals(CAPTURED_MS, admitted.sourceObservedAtElapsedRealtimeMs)
+        assertEquals(800L, admitted.sourceMaxAgeMs)
+        assertEquals(CAPTURED_MS, candidate.observedAtElapsedRealtimeMs)
+        assertEquals(800L, candidate.observationMaxAgeMs)
+        val action = requireNotNull(WalkSafeFeedbackPolicy().evaluate(candidate, true, CAPTURED_MS + 500L))
+        assertEquals(CAPTURED_MS + 800L, action.validUntilMs)
+        assertNull(WalkSafeFeedbackPolicy().evaluate(candidate.copy(validUntilMs = CAPTURED_MS + 5_000L),
+            true, CAPTURED_MS + 801L))
+    }
+
+    @Test fun anExistingEarlierObservationAndSmallerAgeBudgetCannotBeRenewedByAdmission() {
+        val original = output().copy(sourceObservedAtElapsedRealtimeMs = CAPTURED_MS - 100L,
+            sourceMaxAgeMs = 700L, sourceValidUntilElapsedRealtimeMs = CAPTURED_MS + 700L)
+        val admitted = requireNotNull(admit(original)).outputs.single()
+        val candidate = requireNotNull(admitted.toFeedbackCandidate())
+
+        assertEquals(CAPTURED_MS - 100L, admitted.sourceObservedAtElapsedRealtimeMs)
+        assertEquals(700L, admitted.sourceMaxAgeMs)
+        val action = requireNotNull(WalkSafeFeedbackPolicy().evaluate(candidate, true, CAPTURED_MS + 500L))
+        assertEquals(CAPTURED_MS + 600L, action.validUntilMs)
+        assertNull(WalkSafeFeedbackPolicy().evaluate(candidate, true, CAPTURED_MS + 601L))
+    }
+
+    @Test fun aDeadlineOnlyOutputCannotSynthesizeAnObservationAtConversion() {
+        val candidate = requireNotNull(output().toFeedbackCandidate())
+
+        assertNull(candidate.observedAtElapsedRealtimeMs)
+        assertNull(candidate.observationMaxAgeMs)
+        assertNull(WalkSafeFeedbackPolicy().evaluate(candidate, true, CAPTURED_MS + 500L))
+    }
+
     @Test fun forwardObstacleSelectionIsRequiredEvenWithMeasuredNearDepth() {
         assertNull(admit(output().copy(walkingObstacleCandidate = false)))
     }
@@ -55,7 +92,7 @@ class UnknownObjectFeedbackPolicyTest {
         )
         val stationaryMessage = requireNotNull(admit(stationary)).outputs.single().userFacing
         assertEquals(MessageLevel.STOP, stationaryMessage.messageLevel)
-        assertTrue(stationaryMessage.message!!.contains("현재 이 물체에 가까워지고"))
+        assertTrue(stationaryMessage.message!!.contains("정지해 있는 것으로 보이며, 사용자가 다가갑니다."))
         assertFalse(stationaryMessage.message!!.contains("다가오는"))
         val unknownMotion = output().copy(
             riskDistanceM = 1f,
@@ -164,6 +201,8 @@ class UnknownObjectFeedbackPolicyTest {
         val known = output().copy(
             className = "person", trackId = "known-stop",
             userFacing = UserFacingDepth(1, MessageLevel.STOP, "전방 사람. 멈추세요."),
+            sourceObservedAtElapsedRealtimeMs = CAPTURED_MS,
+            sourceMaxAgeMs = 800L,
         )
         val dispatch = coordinator().dispatchFeedback(
             frame = frame(listOf(known)), stale = false, deviceGateAllowsAlerts = true,
@@ -258,7 +297,7 @@ class UnknownObjectFeedbackPolicyTest {
         AndroidTactileRouteGuidance(), WalkSafeFeedbackPolicy(), TactileFrameFeedbackActuator { },
     )
 
-    private fun frame(outputs: List<TrackedObjectDepth>) = MainActivity.TactileSnapshotFrameResult(
+    private fun frame(outputs: List<TrackedObjectDepth>) = TactileSnapshotFrameResult(
         null, emptyList(), false,
         TactileRouteGuidanceResult(outputs, null, TactileRouteDecision(LocalRouteMode.TMAP, null, "test", null)),
     )

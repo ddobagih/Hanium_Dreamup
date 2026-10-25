@@ -1,0 +1,11 @@
+flowchart TD
+  H["P-D05-017 · F-D05-017 고정 fixture 무결성·raw/parsed 출력 동등성"]
+  H --> M{"manifest 와 image hash dim roles 유효"}
+  M -->|"아니오"| X["fixture 미완료"]
+  M -->|"예"| R["같은 ARGB baseline candidate 실행"]
+  R --> Q{"rawshape finite class threshold 동등"}
+  Q -->|"아니오"| F["OUTPUT_MISMATCH"]
+  Q -->|"예"| P["parsed perfectmatching"]
+  P --> G{"GT matched 집합과 positive empty 유지"}
+  G -->|"아니오"| F
+  G -->|"예"| E["F-D05-018 fixture evidence"]

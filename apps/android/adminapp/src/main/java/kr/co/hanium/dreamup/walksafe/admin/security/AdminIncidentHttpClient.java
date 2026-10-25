@@ -24,13 +24,14 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
     private static final int MAX_HISTORY_RESPONSE_BYTES = 96 * 1024;
     private static final byte[] EMPTY_BODY = new byte[0];
 
-    interface Clock {
+    interface Clock extends AdminProtectedRequestExecutor.Clock {
         long nowEpochMs();
 
         default long monotonicNanos() { return System.nanoTime(); }
     }
 
-    interface Transport {
+    interface Transport extends AdminProtectedRequestExecutor.Exchange<Response> {
+        default void cancelInFlight() {}
         Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException;
     }
@@ -52,11 +53,8 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
     }
 
     private final String origin;
-    private final String deviceKeyMarker;
-    private final int deviceKeyVersion;
-    private final AdminDeviceProof.Signer signer;
-    private final Clock clock;
     private final Transport transport;
+    private final AdminProtectedRequestExecutor<Response> protectedRequests;
 
     public AdminIncidentHttpClient(
         String configuredOrigin,
@@ -93,11 +91,26 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
             throw new IllegalArgumentException("incident client dependencies are invalid");
         }
         this.origin = approved;
-        this.deviceKeyMarker = deviceKeyMarker;
-        this.deviceKeyVersion = deviceKeyVersion;
-        this.signer = signer;
-        this.clock = clock;
         this.transport = transport;
+        this.protectedRequests = new AdminProtectedRequestExecutor<>(
+            this.origin, deviceKeyMarker, deviceKeyVersion, signer, clock, transport,
+            response -> {
+                requireStatus(response, 200);
+                return jsonBody(response);
+            }
+        );
+    }
+
+    static byte[] statusBody(AdminIncidentModels.StatusRequest request) {
+        if (request == null) throw new IllegalArgumentException("incident status request is required");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("expected_version", request.expectedVersion());
+        fields.put("idempotency_key", request.idempotencyKey());
+        fields.put("reason", request.reason());
+        fields.put("observation", request.observation());
+        fields.put("evidence_sha256", request.evidenceSha256());
+        fields.put("next_state", request.nextState());
+        return AdminCanonicalEncoding.canonicalJsonBytes(fields);
     }
 
     @Override
@@ -190,15 +203,7 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException {
         String safeId = AdminIncidentModels.canonicalUuid(incidentId, "incident_id");
-        if (request == null) throw new IllegalArgumentException("incident status request is required");
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("expected_version", request.expectedVersion());
-        fields.put("idempotency_key", request.idempotencyKey());
-        fields.put("reason", request.reason());
-        fields.put("observation", request.observation());
-        fields.put("evidence_sha256", request.evidenceSha256());
-        fields.put("next_state", request.nextState());
-        byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(fields);
+        byte[] body = statusBody(request);
         Response response = executeProtected(
             requireSession(session), "PATCH", LIST_PATH + "/" + safeId + "/status", "",
             STATUS_ACTION, null, body, requireReconfirmation(reconfirmationHeaders)
@@ -220,47 +225,9 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
         byte[] body,
         Map<String, String> additionalHeaders
     ) throws IOException, GeneralSecurityException {
-        String correlationId = UUID.randomUUID().toString();
-        AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
-            action,
-            session.adminId(),
-            AdminCanonicalEncoding.sha256Hex(body),
-            correlationId,
-            session.deviceId(),
-            deviceKeyMarker,
-            deviceKeyVersion,
-            method,
-            path,
-            AdminDeviceProof.Purpose.ACTION,
-            AdminCanonicalEncoding.sha256Hex(canonicalQuery.getBytes(StandardCharsets.UTF_8)),
-            readPurpose,
-            session.sessionId()
-        );
-        Response challenge = transport.execute(
-            "POST",
-            origin + CHALLENGE_PATH,
-            jsonHeaders(protectedHeaders(session, correlationId, null)),
-            intent.challengeRequestBytes()
-        );
-        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
-        requireStatus(challenge, 200);
-        AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
-            jsonBody(challenge), intent, challengeTime.estimatedNowEpochMs(clock.monotonicNanos()), signer
-        );
-        Map<String, String> headers = new LinkedHashMap<>(
-            protectedHeaders(session, correlationId, readPurpose)
-        );
-        headers.putAll(proof.proofHeaders());
-        headers.putAll(additionalHeaders);
-        headers.put("Accept", "application/json");
-        if (body.length > 0) headers.put("Content-Type", "application/json; charset=utf-8");
-        String url = origin + path + (canonicalQuery.isEmpty() ? "" : "?" + canonicalQuery);
-        return transport.execute(
-            method,
-            url,
-            AdminJava8Collections.copyMap(headers),
-            body.length == 0 ? null : body
-        );
+        return protectedRequests.execute(session, method, path, canonicalQuery,
+            action, readPurpose, body.length == 0 ? null : body, additionalHeaders,
+            "application/json", null).response;
     }
 
     private static AdminOperationsApi.SessionContext requireSession(
@@ -285,29 +252,6 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
             throw new IOException("administrator device binding is unavailable");
         }
         return session;
-    }
-
-    private static Map<String, String> protectedHeaders(
-        AdminOperationsApi.SessionContext session,
-        String correlationId,
-        String readPurpose
-    ) {
-        Map<String, String> headers = new LinkedHashMap<>();
-        headers.put("Authorization", "Bearer " + session.accessToken());
-        headers.put("X-WalkSafe-App-Kind", AdminSecurityHttpClient.APP_KIND);
-        headers.put("X-WalkSafe-Role", AdminSecurityHttpClient.ROLE);
-        headers.put("X-WalkSafe-Audience", AdminSecurityHttpClient.AUDIENCE);
-        headers.put("X-WalkSafe-Device-Id", session.deviceId());
-        headers.put(CORRELATION_ID_HEADER, correlationId);
-        if (readPurpose != null) headers.put(READ_PURPOSE_HEADER, readPurpose);
-        return AdminJava8Collections.copyMap(headers);
-    }
-
-    private static Map<String, String> jsonHeaders(Map<String, String> source) {
-        Map<String, String> headers = new LinkedHashMap<>(source);
-        headers.put("Accept", "application/json");
-        headers.put("Content-Type", "application/json; charset=utf-8");
-        return AdminJava8Collections.copyMap(headers);
     }
 
     private static Map<String, String> requireReconfirmation(Map<String, String> headers) {
@@ -349,11 +293,21 @@ public final class AdminIncidentHttpClient implements AdminIncidentRepository {
         return canonical;
     }
 
+    @Override public void cancelInFlightRequests() { transport.cancelInFlight(); }
+
     private static final class OkHttpTransport implements Transport {
+        private final AdminOkHttpTransport.RequestOwner requests = new AdminOkHttpTransport.RequestOwner();
+        @Override public void cancelInFlight() { requests.cancelInFlight(); }
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body)
             throws IOException {
+            return execute(null, method, url, headers, body);
+        }
+        @Override
+        public Response execute(AdminOperationsApi.SessionContext session, String method, String url,
+            Map<String, String> headers, byte[] body) throws IOException {
             AdminOkHttpTransport.Result response = AdminOkHttpTransport.execute(
+                requests, session,
                 method,
                 url,
                 headers,

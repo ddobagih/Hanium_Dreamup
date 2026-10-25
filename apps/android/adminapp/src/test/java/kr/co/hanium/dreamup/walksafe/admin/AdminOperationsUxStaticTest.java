@@ -11,6 +11,9 @@ import org.junit.Test;
 
 public final class AdminOperationsUxStaticTest {
     private final String activity = read("src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java");
+    private final String historyOwner = read("src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminReviewDeliveryState.java");
+    private final String evidenceOwner = read("src/main/java/kr/co/hanium/dreamup/walksafe/admin/OriginalEvidenceCoordinator.java");
+    private final String packageOwner = read("src/main/java/kr/co/hanium/dreamup/walksafe/admin/DeliveryPackageCoordinator.java");
     private final String reports = read("src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminReportPanel.java");
     private final String requests = read("src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminReportRequestPanel.java");
     private final String incidents = read("src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminIncidentPanel.java");
@@ -120,32 +123,32 @@ public final class AdminOperationsUxStaticTest {
         );
         String tupleOnlyBranch = between(
             connect,
-            "} else if (deliveryTupleChanged)",
-            "connectedOperationsReportId = reportId"
+            "} else if (change == AdminReviewDeliveryState.Change.DELIVERY)",
+            "reportIdInput.setText(reportId)"
         );
 
-        assertTrue(connect.contains("boolean reportChanged = connectedOperationsReportId != null"));
-        assertTrue(connect.contains("&& !reportId.equals(connectedOperationsReportId)"));
-        assertTrue(connect.contains("boolean contentRevisionChanged"));
-        assertTrue(connect.contains("boolean reviewChanged"));
-        assertTrue(connect.contains("boolean deliveryTupleChanged"));
-        assertTrue(connect.contains("if (reportChanged || contentRevisionChanged || reviewChanged)"));
-        assertTrue(connect.contains("verifiedDeliveryPackage = null"));
+        assertTrue(historyOwner.contains("boolean reportChanged = connectedOperationsReportId != null"));
+        assertTrue(historyOwner.contains("&& !reportId.equals(connectedOperationsReportId)"));
+        assertTrue(historyOwner.contains("boolean contentRevisionChanged"));
+        assertTrue(historyOwner.contains("boolean reviewChanged"));
+        assertTrue(historyOwner.contains("boolean deliveryTupleChanged"));
+        assertTrue(connect.contains("change == AdminReviewDeliveryState.Change.REVIEW"));
+        assertTrue(connect.contains("packageWorkflow.setVerified(null)"));
         assertTrue(connect.contains("resetOperationsInputsForDifferentReport()"));
-        assertTrue(connect.contains("} else if (deliveryTupleChanged)"));
+        assertTrue(connect.contains("} else if (change == AdminReviewDeliveryState.Change.DELIVERY)"));
         assertTrue(connect.contains("resetPackageBoundDeliveryDraft()"));
-        assertFalse(tupleOnlyBranch.contains("verifiedDeliveryPackage = null"));
+        assertFalse(tupleOnlyBranch.contains("packageWorkflow.setVerified(null)"));
         assertFalse(tupleOnlyBranch.contains("resetOperationsInputsForDifferentReport()"));
         assertFalse(tupleOnlyBranch.contains("clearOriginalEvidence("));
-        assertTrue(connect.contains("connectedOperationsReviewRevision = reviewRevision"));
-        assertTrue(connect.contains("connectedOperationsContentRevision = detail.contentRevision()"));
-        assertTrue(connect.contains(
+        assertTrue(historyOwner.contains("connectedOperationsReviewRevision = reviewRevision"));
+        assertTrue(historyOwner.contains("connectedOperationsContentRevision = detail.contentRevision()"));
+        assertTrue(historyOwner.contains(
             "connectedOperationsLatestDeliveryRevision = detail.latestDeliveryRevision()"
         ));
         assertTrue(connect.contains(
             "expectedRevisionInput.setText(Integer.toString(detail.latestDeliveryRevision()))"
         ));
-        assertTrue(connect.contains("verifiedDeliveryPackage.matchesFreshDetail(detail)"));
+        assertTrue(connect.contains("packageWorkflow.verified().matchesFreshDetail(detail)"));
         for (String input : new String[] {
             "reviewReasonInput", "reviewUserVisibleReasonInput", "duplicateReportIdInput",
             "institutionInput", "deliveryChannelInput", "deliveryRecipientInput",
@@ -195,9 +198,9 @@ public final class AdminOperationsUxStaticTest {
             "private void connectReportToOperations("
         );
         assertTrue(binding.contains("String reportId = normalized(reportIdInput)"));
-        assertTrue(binding.contains("connectedOperationsReportId == null"));
-        assertTrue(binding.contains("!connectedOperationsReportId.equals(reportId)"));
-        assertTrue(binding.contains("connectedOperationsContentRevision < 0"));
+        assertTrue(binding.contains("historyState.connectedOperationsReportId() == null"));
+        assertTrue(binding.contains("!historyState.connectedOperationsReportId().equals(reportId)"));
+        assertTrue(binding.contains("historyState.connectedOperationsContentRevision() < 0"));
         String recordReview = between(
             activity,
             "private void recordReviewDecision()",
@@ -217,15 +220,16 @@ public final class AdminOperationsUxStaticTest {
         );
         assertTrue(render.contains("reconcileOperationsAccessBinding("));
         assertTrue(activity.contains("!java.util.Objects.equals("));
-        assertTrue(boundary.contains("connectedOperationsReportId = null"));
-        assertTrue(boundary.contains("connectedOperationsContentRevision = -1"));
-        assertTrue(boundary.contains("connectedOperationsReviewRevision = -1"));
-        assertTrue(boundary.contains("connectedOperationsReviewDecision = null"));
-        assertTrue(boundary.contains("connectedOperationsLatestDeliveryRevision = -1"));
+        assertTrue(historyOwner.contains("connectedOperationsReportId = null"));
+        assertTrue(historyOwner.contains("connectedOperationsContentRevision = -1"));
+        assertTrue(historyOwner.contains("connectedOperationsReviewRevision = -1"));
+        assertTrue(historyOwner.contains("connectedOperationsReviewDecision = null"));
+        assertTrue(historyOwner.contains("connectedOperationsLatestDeliveryRevision = -1"));
         assertTrue(boundary.contains("reportOperationsFormGroup.setVisibility(View.GONE)"));
-        assertTrue(boundary.contains("pendingDeliveryPackage.destroy()"));
-        assertTrue(boundary.contains("pendingDeliveryPackage = null"));
-        assertTrue(boundary.contains("verifiedDeliveryPackage = null"));
+        assertTrue(boundary.contains("packageWorkflow.clearSession()"));
+        assertTrue(packageOwner.contains("pendingSave.packageValue.destroy()"));
+        assertTrue(packageOwner.contains("pendingSave = null"));
+        assertTrue(packageOwner.contains("verified = null"));
         assertTrue(boundary.contains("resetOperationsInputsForDifferentReport()"));
         assertTrue(boundary.contains("clear(reportIdInput)"));
         assertTrue(boundary.contains("expectedRevisionInput.setText(\"0\")"));
@@ -300,18 +304,18 @@ public final class AdminOperationsUxStaticTest {
             "protected void onActivityResult(",
             "private View buildContent()"
         );
-        int staleRequestGuard = result.indexOf("requestCode != pendingSafRequestCode");
+        int staleRequestGuard = result.indexOf("save == null");
         int pendingPackageRead = result.indexOf(
-            "AdminDeliveryPackage packageValue = pendingDeliveryPackage"
+            "AdminDeliveryPackage packageValue = save.packageValue"
         );
         assertTrue(staleRequestGuard > 0 && staleRequestGuard < pendingPackageRead);
-        assertTrue(activity.contains("pendingSafRequestCode = allocateSafRequestCode()"));
-        assertTrue(activity.contains("startActivityForResult(intent, pendingSafRequestCode)"));
-        assertTrue(activity.contains("saveGeneration != safSaveGeneration"));
-        assertTrue(activity.contains(
-            "workflowGeneration != reportWorkflowController.generationToken()"
-        ));
-        assertTrue(activity.contains("sessionGeneration != operationsSessionGeneration"));
+        assertTrue(activity.contains("packageWorkflow.takeSave(requestCode)"));
+        assertTrue(activity.contains("startActivityForResult(intent, save.requestCode)"));
+        assertTrue(packageOwner.contains("requestCode != pendingSave.requestCode"));
+        assertTrue(packageOwner.contains("generation == saveGeneration"));
+        assertTrue(packageOwner.contains("workflow == currentWorkflow"));
+        assertTrue(activity.contains("reportWorkflowController.generationToken(), sessionGeneration,"));
+        assertTrue(activity.contains("sessionGeneration != historyState.operationsSessionGeneration()"));
         assertTrue(result.contains("reportWorkflowController.markSaved(workflowGeneration"));
         assertTrue(result.contains("reportWorkflowController.markSaveFailed(workflowGeneration"));
         assertFalse(result.contains("reportWorkflowController.markSaved(saved.revision())"));
@@ -352,24 +356,26 @@ public final class AdminOperationsUxStaticTest {
         int serverRefresh = result.indexOf("controller.refreshAndValidateSafSaveSession(sessionId)");
         int beforeDetail = result.indexOf("AdminReportModels.Detail beforeWrite");
         int beforeEligibility = result.indexOf("packageValue.matchesFreshEligibility(beforeWrite)");
-        int persistedWrite = result.indexOf("AdminDeliveryPackageSaver.save(");
+        int persistedWrite = result.indexOf("packageWorkflow.saveVerified(");
         int afterDetail = result.indexOf("AdminReportModels.Detail afterWrite");
-        int afterEligibility = result.indexOf("packageValue.matchesFreshEligibility(afterWrite)");
+        int ownerWrite = packageOwner.indexOf("AdminDeliveryPackageSaver.save(value, destination)");
+        int ownerAfter = packageOwner.indexOf("access.detail(saved.reportId())", ownerWrite);
+        int ownerEligibility = packageOwner.indexOf("value.matchesFreshEligibility(afterWrite)", ownerAfter);
         int replaceBinding = result.indexOf("replaceVerifiedDeliveryPackage(saved)");
         String postWriteFailure = result.substring(result.lastIndexOf("} catch (Exception error) {"));
         assertTrue(serverRefresh > 0 && serverRefresh < beforeDetail);
         assertTrue(beforeDetail < beforeEligibility && beforeEligibility < persistedWrite);
-        assertTrue(persistedWrite < afterDetail && afterDetail < afterEligibility);
-        assertTrue(afterEligibility < replaceBinding);
-        assertTrue(result.contains("saved.matchesFreshDetail(afterWrite)"));
+        assertTrue(persistedWrite < afterDetail && afterDetail < replaceBinding);
+        assertTrue(ownerWrite >= 0 && ownerWrite < ownerAfter && ownerAfter < ownerEligibility);
+        assertTrue(packageOwner.contains("saved.matchesFreshDetail(afterWrite)"));
         assertTrue(result.contains("rejectSafSave(packageValue, uri, workflowGeneration"));
         assertTrue(result.contains("packageValue.destroy()"));
         assertTrue(result.contains("deleteSafDocument(uri)"));
         assertTrue(postWriteFailure.contains("deleteSafDocument(uri)"));
-        assertFalse(postWriteFailure.contains("verifiedDeliveryPackage = null"));
+        assertFalse(postWriteFailure.contains("packageWorkflow.setVerified(null)"));
         assertFalse(postWriteFailure.contains("resetPackageBoundDeliveryDraft()"));
         assertTrue(result.contains("기존 제출본 연결과 입력은 유지했습니다."));
-        assertFalse(result.contains("verifiedDeliveryPackage = null"));
+        assertFalse(result.contains("packageWorkflow.setVerified(null)"));
         assertFalse(result.contains("resetOperationsInputsForDifferentReport()"));
 
         String validation = between(
@@ -423,7 +429,7 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(begin.contains("reportWorkflowController.beginPackage("));
         assertTrue(begin.contains("detail,"));
         for (String source : new String[] {begin, launch, reject, reconnect}) {
-            assertFalse(source.contains("verifiedDeliveryPackage = null"));
+            assertFalse(source.contains("packageWorkflow.setVerified(null)"));
             assertFalse(source.contains("packageRevisionInput.setText(\"\")"));
             assertFalse(source.contains("resetOperationsInputsForDifferentReport()"));
         }
@@ -459,7 +465,7 @@ public final class AdminOperationsUxStaticTest {
             "private void replaceVerifiedDeliveryPackage("
         );
 
-        int assignment = replace.indexOf("verifiedDeliveryPackage = saved");
+        int assignment = replace.indexOf("packageWorkflow.setVerified(saved)");
         int packageRevision = replace.indexOf("packageRevisionInput.setText(");
         int draftReset = replace.indexOf("resetPackageBoundDeliveryDraft()");
         assertTrue(assignment >= 0 && assignment < packageRevision && packageRevision < draftReset);
@@ -471,8 +477,8 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(reset.contains("manualDeliveryCompletedInput.setChecked(false)"));
         assertTrue(reset.contains("observedAtInput.setText(Instant.now().toString())"));
         assertTrue(reset.contains("idempotencyKeyInput.setText(UUID.randomUUID().toString())"));
-        assertFalse(saveResult.contains("controller.recordDelivery("));
-        assertFalse(reconnect.contains("controller.recordDelivery("));
+        assertFalse(saveResult.contains("controller.deliveries().recordDelivery("));
+        assertFalse(reconnect.contains("controller.deliveries().recordDelivery("));
     }
 
     @Test
@@ -487,20 +493,20 @@ public final class AdminOperationsUxStaticTest {
             "private void recordDelivery()",
             "private void readDeliveries(boolean nextPage)"
         );
-        assertTrue(connect.contains(
+        assertTrue(historyOwner.contains(
             "connectedOperationsLatestDeliveryRevision = detail.latestDeliveryRevision()"
         ));
         assertTrue(connect.contains(
             "expectedRevisionInput.setText(Integer.toString(detail.latestDeliveryRevision()))"
         ));
         assertTrue(delivery.contains(
-            "parsedDeliveryRevision != connectedOperationsLatestDeliveryRevision"
+            "parsedDeliveryRevision != historyState.connectedOperationsLatestDeliveryRevision()"
         ));
-        assertTrue(delivery.contains("verifiedDeliveryPackage.matchesFreshDetail(detail)"));
+        assertTrue(delivery.contains("packageWorkflow.verified().matchesFreshDetail(detail)"));
         assertTrue(delivery.contains("followUp.matchesLatest(detail, latest)"));
-        assertTrue(delivery.contains("followUp.matchesSavedPackage(verifiedDeliveryPackage)"));
+        assertTrue(delivery.contains("followUp.matchesSavedPackage(packageWorkflow.verified())"));
         assertTrue(delivery.contains("deliveryStatus == AdminInstitutionDelivery.Status.SUBMITTED"));
-        assertTrue(delivery.contains("\"RESOLVED\".equals(connectedOperationsDeliveryStatus)"));
+        assertTrue(delivery.contains("\"RESOLVED\".equals(historyState.connectedOperationsDeliveryStatus())"));
         assertFalse(delivery.contains("parsedPackageRevision != connectedOperationsPackageRevision"));
         assertFalse(delivery.contains("parsedDeliveryRevision != connectedOperationsDeliveryRevision"));
     }
@@ -522,40 +528,42 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(launch.contains("Intent.FLAG_GRANT_READ_URI_PERMISSION"));
         assertFalse(launch.contains("takePersistableUriPermission"));
         assertFalse(launch.contains("ACTION_SEND"));
-        assertFalse(launch.contains("verifiedDeliveryPackage = null"));
+        assertFalse(launch.contains("packageWorkflow.setVerified(null)"));
         assertFalse(launch.contains("packageRevisionInput.setText(\"\")"));
         assertFalse(result.contains("deleteSafDocument"));
         assertFalse(result.contains("openOutputStream"));
 
-        int sessionRefresh = result.indexOf(
-            "controller.refreshAndValidateSafSaveSession(sessionId)"
+        assertTrue(result.contains("packageWorkflow.reconnect("));
+        assertTrue(result.contains("getContentResolver().openInputStream(uri)"));
+        int sessionRefresh = packageOwner.indexOf(
+            "access.refresh(sessionId)"
         );
-        int locatorRead = result.indexOf("InputStream locatorInput");
-        int locatorInspection = result.indexOf("AdminDeliveryPackageSaver.inspectUntrusted(");
-        int packageUse = result.indexOf("AdminReportModels.deliveryPackageUse(");
-        int freshDetail = result.indexOf("AdminReportModels.Detail beforeRead");
-        int proof = result.indexOf("controller.getAdminDeliveryPackageProof(");
-        int fullRead = result.indexOf("InputStream input", locatorRead + 1);
-        int verification = result.indexOf("AdminDeliveryPackageSaver.verifyExisting(");
-        int afterDetail = result.indexOf("AdminReportModels.Detail afterRead");
+        int locatorRead = packageOwner.indexOf("InputStream locatorInput");
+        int locatorInspection = packageOwner.indexOf("AdminDeliveryPackageSaver.inspectUntrusted(");
+        int packageUse = packageOwner.indexOf("AdminReportModels.deliveryPackageUse(");
+        int freshDetail = packageOwner.indexOf("AdminReportModels.Detail beforeRead");
+        int proof = packageOwner.indexOf("access.proof(");
+        int fullRead = packageOwner.indexOf("InputStream input", locatorRead + 1);
+        int verification = packageOwner.indexOf("AdminDeliveryPackageSaver.verifyExisting(");
+        int afterDetail = packageOwner.indexOf("AdminReportModels.Detail afterRead");
         assertTrue(sessionRefresh > 0 && sessionRefresh < locatorRead);
         assertTrue(locatorRead < locatorInspection && locatorInspection < packageUse);
         assertTrue(packageUse < freshDetail);
         assertTrue(freshDetail < proof && proof < fullRead && fullRead < verification);
         assertTrue(verification < afterDetail);
-        assertTrue(result.contains("reference.reportId(),"));
-        assertTrue(result.contains("reference.packageRevision(),"));
-        assertTrue(result.contains("selectedEligibility.matchesExact(beforeRead)"));
-        assertTrue(result.contains("selectedEligibility.matchesExact(afterRead)"));
-        assertTrue(result.contains("selectedFollowUp.matchesDetail(beforeRead)"));
-        assertTrue(result.contains("selectedFollowUp.matchesSavedPackage(saved)"));
-        assertTrue(result.contains("proof.matchesReference(reference)"));
-        assertTrue(result.contains("proof.matchesFreshDetail(beforeRead)"));
-        assertTrue(result.contains("proof.matchesFreshDetail(afterRead)"));
-        assertTrue(result.contains("saved.matchesProof(proof)"));
-        assertTrue(result.contains("saved.matchesFreshDetail(afterRead)"));
+        assertTrue(packageOwner.contains("reference.reportId(),"));
+        assertTrue(packageOwner.contains("reference.packageRevision())"));
+        assertTrue(packageOwner.contains("selectedEligibility.matchesExact(beforeRead)"));
+        assertTrue(packageOwner.contains("selectedEligibility.matchesExact(afterRead)"));
+        assertTrue(packageOwner.contains("selectedFollowUp.matchesDetail(beforeRead)"));
+        assertTrue(packageOwner.contains("selectedFollowUp.matchesSavedPackage(saved)"));
+        assertTrue(packageOwner.contains("proof.matchesReference(reference)"));
+        assertTrue(packageOwner.contains("proof.matchesFreshDetail(beforeRead)"));
+        assertTrue(packageOwner.contains("proof.matchesFreshDetail(afterRead)"));
+        assertTrue(packageOwner.contains("saved.matchesProof(proof)"));
+        assertTrue(packageOwner.contains("saved.matchesFreshDetail(afterRead)"));
         assertTrue(result.contains("replaceVerifiedDeliveryPackage(saved)"));
-        assertFalse(result.contains("verifiedDeliveryPackage = null"));
+        assertFalse(result.contains("packageWorkflow.setVerified(null)"));
         assertFalse(result.contains("packageRevisionInput.setText(\"\")"));
         assertTrue(result.contains("기존 제출본 연결과 입력, 선택한 원본 파일은 그대로 유지했습니다."));
 
@@ -654,11 +662,11 @@ public final class AdminOperationsUxStaticTest {
         );
         assertTrue(approval.contains("selectedDecision == AdminReportDecision.Decision.APPROVED"));
         assertTrue(approval.contains("originalEvidenceConfirmedInput.isChecked()"));
-        assertTrue(approval.contains("originalEvidence.matches("));
+        assertTrue(approval.contains("evidenceWorkflow.evidence().matches("));
         assertTrue(approval.contains("connectedOperationsContentRevision"));
         assertTrue(approval.contains("boundOperationsSessionId"));
         assertTrue(approval.contains("deviceId,"));
-        assertTrue(approval.contains("evidenceGrantId = originalEvidence.grantId()"));
+        assertTrue(approval.contains("evidenceGrantId = evidenceWorkflow.evidence().grantId()"));
         assertTrue(approval.indexOf("clearOriginalEvidence(")
             < approval.indexOf("runOperationalOperation("));
 
@@ -668,11 +676,11 @@ public final class AdminOperationsUxStaticTest {
             "private void scheduleOriginalEvidenceExpiry("
         );
         assertTrue(apply.contains(
-            "boolean currentRequest = requestGeneration == originalEvidenceGeneration"
+            "boolean currentRequest = evidenceWorkflow.isCurrent(request)"
         ));
-        assertTrue(apply.contains("|| !currentRequest"));
-        assertTrue(apply.contains("sessionGeneration != operationsSessionGeneration"));
-        assertTrue(apply.contains("loaded.close()"));
+        assertTrue(apply.contains("evidenceWorkflow.adopt(request,"));
+        assertTrue(evidenceOwner.contains("sessionGeneration == current.sessionGeneration"));
+        assertTrue(evidenceOwner.contains("loaded.close()"));
         String workerDecodeBoundary = between(
             activity,
             "private static Bitmap decodeOriginalEvidence(",
@@ -709,8 +717,9 @@ public final class AdminOperationsUxStaticTest {
             "private void clearOriginalEvidence(",
             "private static void destroyBitmap("
         );
-        assertTrue(clear.contains("originalEvidenceLoadTask.cancel(true)"));
-        assertTrue(clear.contains("originalEvidence.close()"));
+        assertTrue(clear.contains("evidenceWorkflow.clear()"));
+        assertTrue(evidenceOwner.contains("task.cancel(true)"));
+        assertTrue(evidenceOwner.contains("evidence.close()"));
         assertTrue(clear.contains("setImageDrawable(null)"));
         assertTrue(activity.contains("bitmap.eraseColor(Color.TRANSPARENT)"));
         assertTrue(activity.contains("bitmap.recycle()"));
@@ -724,7 +733,7 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(between(activity, "private void loadReportDetail(", "private void retryReportRequest()")
             .contains("clearOriginalEvidence("));
         assertTrue(activity.contains(
-            "if (reportChanged || contentRevisionChanged || reviewChanged)"
+            "change == AdminReviewDeliveryState.Change.REVIEW"
         ));
 
         assertTrue(originalEvidence.contains("Arrays.fill(bytes, (byte) 0)"));
@@ -760,7 +769,7 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(operation.contains("setInteractiveEnabled(contentRoot, true)"));
         assertTrue(operation.contains("render()"));
         assertTrue(render.contains("renderOriginalEvidenceConfirmationState()"));
-        assertTrue(confirmation.contains("originalEvidence.matches("));
+        assertTrue(confirmation.contains("evidenceWorkflow.evidence().matches("));
         assertTrue(confirmation.contains("connectedOperationsReportId"));
         assertTrue(confirmation.contains("connectedOperationsContentRevision"));
         assertTrue(confirmation.contains("boundOperationsSessionId"));
@@ -821,18 +830,18 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(operation.contains("catch (AdminOperationsApi.MutationConflictException"));
         assertTrue(operation.contains("refreshOperationalConflict("));
         assertTrue(occurrences(operation, "operation.run()") == 1);
-        assertTrue(refresh.contains("controller.getAdminReportDetail("));
-        assertTrue(refresh.contains("controller.readDeliveries("));
-        assertTrue(refresh.contains("controller.readReviewDecisions("));
+        assertTrue(refresh.contains("controller.reports().getAdminReportDetail("));
+        assertTrue(refresh.contains("controller.deliveries().readDeliveries("));
+        assertTrue(refresh.contains("controller.deliveries().readReviewDecisions("));
         assertFalse(refresh.contains("recordDelivery("));
         assertFalse(refresh.contains("recordReviewDecision("));
         assertTrue(activity.contains("operationalConflictSnapshotsMatch("));
-        assertTrue(activity.contains(
-            "refresh.detail.latestDeliveryRevision() == refresh.history.snapshotRevision()"
+        assertTrue(historyOwner.contains(
+            "detail.latestDeliveryRevision() == history.snapshotRevision()"
         ));
-        assertTrue(activity.contains("refresh.history.nextCursor() != null"));
-        assertTrue(activity.contains(
-            "latest.contentRevision() < refresh.detail.contentRevision()"
+        assertTrue(historyOwner.contains("history.nextCursor() != null"));
+        assertTrue(historyOwner.contains(
+            "latest.contentRevision() < detail.contentRevision()"
         ));
     }
 
@@ -974,9 +983,9 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(occurrences(clear, "setInteractiveEnabled(contentRoot, true)") == 1);
         assertTrue(occurrences(operational, "setInteractiveEnabled(contentRoot, true)") == 3);
         assertTrue(occurrences(security, "setInteractiveEnabled(contentRoot, true)") == 2);
-        assertTrue(occurrences(incident, "setInteractiveEnabled(contentRoot, true)") == 4);
+        assertTrue(occurrences(incident, "setInteractiveEnabled(contentRoot, true)") == 5);
         // Recent review/delivery previews add three callbacks through the same evidence boundary.
-        assertTrue(occurrences(activity, "setInteractiveEnabled(contentRoot, true)") == 20);
+        assertTrue(occurrences(activity, "setInteractiveEnabled(contentRoot, true)") == 23);
 
         assertFalse(activity.contains("private static void setInteractiveEnabled("));
         assertTrue(interactive.contains("if (view == originalEvidenceConfirmedInput)"));
@@ -987,7 +996,7 @@ public final class AdminOperationsUxStaticTest {
             < interactive.indexOf("view.setEnabled(enabled)"));
         assertFalse(activity.contains("originalEvidenceConfirmedInput.setEnabled(true)"));
 
-        int evidenceAssignment = apply.indexOf("originalEvidence = loaded");
+        int evidenceAssignment = apply.indexOf("scheduleOriginalEvidenceExpiry(loaded)");
         int operationFinished = apply.indexOf("operationInFlight = false", evidenceAssignment);
         int formReenabled = apply.indexOf(
             "setInteractiveEnabled(contentRoot, true)",
@@ -1000,39 +1009,26 @@ public final class AdminOperationsUxStaticTest {
 
     @Test
     public void queuedOriginalEvidenceCredentialsAreClearedOnCancelAndExecution() {
-        String holder = between(
-            activity,
-            "private static final class PendingOriginalEvidenceCredentials",
-            "@Override\n    protected void onCreate("
-        );
-        String load = between(
-            activity,
-            "private void loadOriginalEvidence()",
-            "private void applyLoadedOriginalEvidence("
-        );
-        String clear = between(
-            activity,
-            "private void clearOriginalEvidence(",
-            "private void renderOriginalEvidenceConfirmationState()"
-        );
-
-        assertTrue(activity.contains("AtomicReference<PendingOriginalEvidenceCredentials>"));
-        assertTrue(activity.contains(
-            "pendingOriginalEvidenceCredentials = new AtomicReference<>()"
-        ));
-        assertTrue(load.contains("new PendingOriginalEvidenceCredentials(password, totp)"));
-        assertTrue(load.contains("pendingOriginalEvidenceCredentials.set(requestCredentials)"));
-        assertTrue(load.contains("requestCredentials.password()"));
-        assertTrue(load.contains("requestCredentials.totp()"));
-        assertTrue(load.contains("requestCredentials.clear()"));
-        assertTrue(load.contains(
-            "pendingOriginalEvidenceCredentials.compareAndSet(requestCredentials, null)"
-        ));
-        assertTrue(clear.contains("pendingOriginalEvidenceCredentials.getAndSet(null)"));
-        assertTrue(clear.contains("pendingCredentials.clear()"));
-        assertTrue(holder.contains("synchronized void clear()"));
-        assertTrue(holder.contains("Arrays.fill(password, '\\0')"));
-        assertTrue(holder.contains("Arrays.fill(totp, '\\0')"));
+        String holder = between(evidenceOwner, "static final class Request {",
+            "private final ImageDisposer<I> imageDisposer");
+        String load = between(activity, "private void loadOriginalEvidence()",
+            "private void applyLoadedOriginalEvidence(");
+        String clear = between(activity, "private void clearOriginalEvidence(",
+            "private void renderOriginalEvidenceConfirmationState()");
+        assertFalse(activity.contains("PendingOriginalEvidenceCredentials"));
+        assertTrue(evidenceOwner.contains("private Request request"));
+        assertTrue(load.contains("evidenceWorkflow.begin("));
+        assertTrue(load.contains("char[][] credentials = request.takeCredentials()"));
+        assertTrue(load.contains("credentials[0]"));
+        assertTrue(load.contains("credentials[1]"));
+        assertTrue(load.contains("finally {\n                    request.clearCredentials()"));
+        assertTrue(clear.contains("evidenceWorkflow.clear()"));
+        assertTrue(evidenceOwner.contains("if (request != null) request.clearCredentials()"));
+        assertTrue(holder.contains("synchronized void clearCredentials()"));
+        assertTrue(holder.contains("credentials.takeForDispatch()"));
+        assertTrue(holder.contains("credentials.close()"));
+        assertTrue(holder.contains("Arrays.fill(dispatched[0], '\\0')"));
+        assertTrue(holder.contains("Arrays.fill(dispatched[1], '\\0')"));
     }
 
     @Test
@@ -1107,7 +1103,7 @@ public final class AdminOperationsUxStaticTest {
         );
         assertTrue(activity.contains("이 앱은 기관으로 자료를 전송하지 않습니다"));
         assertTrue(activity.contains("수동 전달 결과 기록"));
-        assertTrue(delivery.contains("controller.recordDelivery("));
+        assertTrue(delivery.contains("controller.deliveries().recordDelivery("));
         assertTrue(delivery.contains("BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED"));
         assertFalse(delivery.contains("startActivity"));
         assertFalse(delivery.contains("new Intent"));
@@ -1139,11 +1135,11 @@ public final class AdminOperationsUxStaticTest {
         assertTrue(activity.contains("deliveryHistoryNextCursor"));
         assertTrue(activity.contains("reviewHistoryTotalCount"));
         assertTrue(activity.contains(".append(items.size()).append(\"/\").append(total)"));
-        assertTrue(activity.contains("deliveryHistoryItems.size()"));
+        assertTrue(activity.contains("historyState.deliveryHistoryItems().size()"));
         assertTrue(activity.contains("첫 페이지부터 다시 조회해 주세요"));
         assertTrue(activity.contains("기존 이력과 다음 페이지 위치는 유지했습니다"));
         assertTrue(activity.contains("clearConnectedOperationsSelection()"));
-        assertTrue(activity.contains("resetReportHistoryState()"));
+        assertTrue(activity.contains("historyState.clearSelection()"));
         assertFalse(activity.contains("putString(\"reviewHistoryNextCursor"));
         assertFalse(activity.contains("putString(\"deliveryHistoryNextCursor"));
     }
@@ -1159,17 +1155,17 @@ public final class AdminOperationsUxStaticTest {
             "private void runRecentHistoryOperation(",
             "private boolean isCurrentHistoryCallback("
         );
-        assertTrue(recentRead.contains("controller.readRecentReviewDecisions("));
-        assertTrue(recentRead.contains("controller.readRecentDeliveries("));
+        assertTrue(recentRead.contains("controller.deliveries().readRecentReviewDecisions("));
+        assertTrue(recentRead.contains("controller.deliveries().readRecentDeliveries("));
         assertTrue(recentRead.contains("applyRecentHistoryPreview("));
         assertFalse(recentRead.contains("applyReportHistoryPage("));
         assertFalse(recentRead.contains("reviewHistoryItems.addAll("));
         assertFalse(recentRead.contains("deliveryHistoryItems.addAll("));
         assertFalse(recentRead.contains("deliveryCorrectionAttempt.confirmedBy("));
         String applyPreview = between(
-            activity,
-            "private void applyRecentHistoryPreview(",
-            "private void applyReportHistoryPage("
+            historyOwner,
+            "void applyRecentHistoryPreview(",
+            "void applyReportHistoryPage("
         );
         assertTrue(applyPreview.contains("reviewRecentPreview = result"));
         assertTrue(applyPreview.contains("deliveryRecentPreview = result"));
@@ -1195,20 +1191,22 @@ public final class AdminOperationsUxStaticTest {
             "private void resetSessionBoundReportState(",
             "private String requireConnectedOperationsReportId()"
         );
-        assertTrue(record.contains("connectedOperationsLatestReviewRevision\n"));
+        assertTrue(record.contains("historyState.connectedOperationsLatestReviewRevision()\n"));
         assertFalse(record.contains("Math.max(0, connectedOperationsReviewRevision)"));
-        assertTrue(connect.contains(
+        assertTrue(historyOwner.contains(
             "connectedOperationsLatestReviewRevision = detail.latestReviewRevision()"
         ));
-        assertTrue(connect.contains(
+        assertTrue(historyOwner.contains(
             "|| connectedOperationsLatestReviewRevision != detail.latestReviewRevision()"
         ));
-        // Both selection resets clear it (the field initializer is not counted).
+        // Both UI reset paths use the same state-owner reset (initializer not counted).
+        assertTrue(activity.contains("historyState.bindAccess(accessActive, currentSessionId, currentAdminId)"));
+        assertTrue(activity.contains("historyState.clearSelection()"));
         assertEquals(
-            2,
-            occurrences(activity, "\n        connectedOperationsLatestReviewRevision = -1;")
+            1,
+            occurrences(historyOwner, "\n        connectedOperationsLatestReviewRevision = -1;")
         );
-        assertTrue(boundary.contains("connectedOperationsLatestReviewRevision = -1"));
+        assertTrue(historyOwner.contains("connectedOperationsLatestReviewRevision = -1"));
     }
 
     @Test

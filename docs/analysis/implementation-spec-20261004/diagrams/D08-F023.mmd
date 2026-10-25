@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D08-023 목적지 후보 검색 중계"]
+  B["진입: GET /api/navigation/destinations/search"]
+  A --> B
+  P0["1. query 를 검증한다."]
+  B --> P0
+  P1["2. 일반 session·Backend current·privacy 및 보행 소유권을 검사한다."]
+  P0 --> P1
+  P2["3. Backend 경로로 검증된 query 를 전달한다."]
+  P1 --> P2
+  P3["4. 응답 bounded projection 과 취소를 적용한다."]
+  P2 --> P3
+  OK["정상: 목적지 후보 응답"]
+  P3 --> OK
+  C0{"키중복/unknown/위치한쪽만"}
+  X0["400"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"다른기기 active"}
+  X1["409"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"handler6.5 초/Node7 초"}
+  X2["504"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. handler6.5 초, Node7 초, upstream5 초."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-004, P-D08-011, P-D08-013, P-D08-015, P-D08-029"]
+  A -.-> POLICY

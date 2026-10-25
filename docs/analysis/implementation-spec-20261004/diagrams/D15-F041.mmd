@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-041 · 복원 원본 쓰기 fence·서명 증거 handoff<br/>재적용 CLI의 source fence 획득·signed evidence 대기"]
+  P["P-D15-041 · 전제조건<br/>source와 복원대상 구분; 기존 evidence 경로가 없어야 하며<br/>private parent/파일 권한 검증."]
+  E --> P
+  S1["1. source DB URL hash와 expected identity 대조"]
+  P --> S1
+  S2["2. maintenance exclusive file lock 후<br/>report-deletion session advisory try-lock"]
+  S1 --> S2
+  S3["3. DB runtime identity/PID·lock<br/>identity·acquired_at에 결속된 fence request 발행"]
+  S2 --> S3
+  S4["4. source lease를 계속 검증하며 signed files가 한 번<br/>게시되기를 bounded wait"]
+  S3 --> S4
+  S5["5. 파일을 no-follow FD로 pin하고 metadata/bytes<br/>stable 확인; 서명 binding 검증"]
+  S4 --> S5
+  OK["정상 결과<br/>파일을 no-follow FD로 pin하고 metadata/bytes stable<br/>확인; 서명 binding 검증"]
+  S5 --> OK
+  B1["조건 · source deletion lock busy<br/>결과 · restore_source_fence_busy"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · deadline 도달<br/>결과 · evidence_timeout"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · parent/file 교체·symlink·nlink/권한 불일치<br/>결과 · 증거 거절"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · source fence 소실<br/>결과 · 복원 apply/publish 차단"]
+  S3 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>열린 증거 FD·source connection·engine·maintenance<br/>context 정리."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_restore_handoff.py:266<br/>held_report_restore_source_fence<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

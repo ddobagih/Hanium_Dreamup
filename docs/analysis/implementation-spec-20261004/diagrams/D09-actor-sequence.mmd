@@ -1,0 +1,33 @@
+sequenceDiagram
+  autonumber
+  participant C as Gateway 호출자
+  participant M as F-D09-002 미들웨어
+  participant V as F-D09-003 v4 검증
+  participant R as Replay cache
+  participant DB as 계정 및 rate DB
+  participant A as API handler
+  Note over M,A: P-D09-002..007 · field actor 경로의 처리 순서
+  C->>M: 실제 method와 target 및 서비스 token
+  M->>M: 실제 router template와 명시 allowlist 일치
+  alt 미등록 route 또는 잘못된 역할
+    M-->>C: 401 또는 403
+  else 등록된 역할
+    M->>V: 구조와 시간 및 요청 binding precheck
+    V->>M: 허용된 body 제한으로 capture 요청
+    M->>M: body bytes 제한과 Content-Length 일치 확인
+    M->>V: body SHA256과 exact target
+    V->>V: HMAC constant-time 검증
+    V->>R: jti single-use claim
+    alt 재사용 또는 cache 포화
+      R-->>C: 401 replay 또는 503 unavailable
+    else claim 성공
+      V-->>M: verified assertion
+      M->>DB: ACTIVE account generation과 auth_epoch 확인
+      M->>DB: actor hash와 group lock 및 rate 결정
+      Note over M,DB: caller 취소 또는 timeout 후 DB worker 종료까지 slot 유지
+      DB-->>M: commit된 rate admission 또는 429
+      M->>A: verified state와 replay 가능한 body
+      A-->>C: domain 응답
+    end
+  end
+  Note over R: process-local cache이며 restart와 replica를 공유하지 않음

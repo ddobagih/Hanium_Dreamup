@@ -1,0 +1,24 @@
+flowchart TD
+ A["F-D02-017 runtime 거리 초기 활성화"] --> B["beginRuntimeMetricActivation: 현재 AR generation과 원래 시작 clock<br/>output false, navigation pending"]
+ B --> S{"P-D02-017 depth support 명시 UNSUPPORTED"}
+ S -->|"예"| U["UNSUPPORTED terminal<br/>profile 없이도 지원 불가 판정"]
+ S -->|"아니오"| P{"현재 profile 존재"}
+ P -->|"아니오"| X["UNKNOWN terminal<br/>PROFILE_UNAVAILABLE"]
+ P -->|"예"| W["IN_PROGRESS frame 관측"]
+ W --> T{"10초 deadline 도달 또는 cancel·invalid generation·frame 역행"}
+ T -->|"예"| X
+ T -->|"아니오"| F{"camera timestamp 새 증가 frame"}
+ F -->|"동일 또는 0"| W
+ F -->|"새 frame"| Q["frame pass: tracking·depth·0.2~8m valid sample 30개 이상"]
+ Q --> C{"depthSupport SUPPORTED·서로 다른10frame 이상<br/>span1초 이상·passing frame80% 이상"}
+ C -->|"아직 부족"| W
+ C -->|"충족"| AV["AVAILABLE terminal evaluator 결과"]
+ AV --> E{"Main의 현재 walk epoch·AR lease·foreground·startup와<br/>해당 현재 frame tracking·depth·30sample 모두 유효"}
+ E -->|"예"| ON["runtimeMetricOutputAllowed true<br/>현재 navigation 초기 시작"]
+ E -->|"아니오"| OFF["output false 유지<br/>오래된 callback은 새 session 변경 불가"]
+ ON --> RT["활성 이후 D07 runtime frame·freshness·acquisition 평가"]
+ RT -->|"출력 불가"| REPORT["explicit report frame evidence 삭제"]
+ RT -->|"loss"| LOSS["depth session close 후 camera fallback 요청<br/>모드 변경 SAFE_STOP 또는 재검사"]
+ U --> END["자동 AVAILABLE 승격 없음<br/>새 적법한 request와 실제 증거 필요"]
+ X --> END
+ OFF --> END

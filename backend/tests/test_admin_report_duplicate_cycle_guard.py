@@ -69,6 +69,19 @@ class _Session:
             return self.existing
         return None
 
+    def scalar(self, statement):
+        # Visibility preflight selects the ID; report reads select the entity.
+        description, = statement.column_descriptions
+        assert description["entity"] is Report
+        sql = str(statement)
+        assert "NOT (EXISTS (" in sql and "account_deletion_tombstones" in sql
+        report_id = statement.compile().params["id_1"]
+        report = self.reports.get(report_id)
+        if description["expr"] is Report.id:
+            return report.id if report is not None else None
+        assert description["expr"] is Report
+        return report
+
     def add(self, decision: ReportReviewDecision) -> None:
         self.added.append(decision)
 

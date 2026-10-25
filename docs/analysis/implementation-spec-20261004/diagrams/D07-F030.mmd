@@ -1,0 +1,12 @@
+flowchart TD
+    A["F-D07-030 · P-D07-030<br/>선택적 ARCore semantic · UNCONNECTED"]
+    A --> C{"직접 refresh로 enabled·supported 확인<br/>provider가 열려 있는가"}
+    C -->|default false · 미지원 · refresh 실패| N["semantic API 미호출<br/>원래 depth snapshot 반환"]
+    C -->|예| L["label Image 획득<br/>confidence Image 획득"]
+    L --> V{"획득과 shape·plane·byte 복사 성공"}
+    V -->|실패| F["semantic null<br/>획득한 Image는 use에서 close"]
+    V -->|성공| O["독립 clock·stride 보존하여 소유 복사<br/>두 native Image close"]
+    F --> D["원래 depth gate 유지<br/>ML 관측은 물리적 공간 권한 없음"]
+    O --> D
+    N --> D
+    A -.-> M["Main refresh·ENABLED 연결 없음<br/>직접 helper와 시험 기대만"]

@@ -132,7 +132,11 @@ class WalkConfigurationChangeRetentionTest {
                 "previousProcessHadInterruptedWalk = !walkContinuedAfterConfigurationChange &&",
             ),
         )
-        assertTrue(create.contains("interruptedAtStartup = previousProcessHadInterruptedWalk"))
+        val interrupted = ReportStaticSourceInspector.blockAfter(create, "if (previousProcessHadInterruptedWalk)")
+        assertTrue(interrupted.contains("fieldSessionLog.recordEvent("))
+        assertTrue(interrupted.contains("previous_walk_interrupted_fresh_walk_created"))
+        assertFalse(create.contains("PreviousWalkInterruptionMarker("))
+        assertFalse(create.contains("showPreviousWalkInterruptionNoticeIfNeeded("))
 
         val destroy = source.substringAfter("override fun onDestroy()").substringBefore("override fun onActivityResult(")
         val retain = destroy.substringAfter("val walkRetainedForConfigurationChange = isChangingConfigurations &&")

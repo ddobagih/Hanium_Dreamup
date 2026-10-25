@@ -1,0 +1,12 @@
+flowchart TD
+  H["P-D05-020 · F-D05-020 runtime 부하 관측·지속 악화 재점검 표시"]
+  H --> N{"normal 동일 환경 연속관측"}
+  N -->|"아니오"| C["window 중단 pending 보존"]
+  N -->|"예"| W["20 초 완료 latency 와 stale 수집"]
+  W --> Q{"10 회 이상 또는결과중단 fullwindow"}
+  Q -->|"아니오"| U["불충분"]
+  Q -->|"예"| B{"baseline 있음"}
+  B -->|"아니오 healthy"| L["baseline 학습"]
+  B -->|"예"| D{"정의된악화"}
+  D -->|"아니오"| R["연속악화 0"]
+  D -->|"3 창연속"| P["sticky pending 저장 hot swap 없음"]

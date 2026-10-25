@@ -32,10 +32,11 @@ class MainActivityWalkSessionLifecycleStaticTest {
     fun pauseTransitionsTheSessionBeforeCancellingRuntimeWork() {
         val pause = functionBlock("internal fun pauseWalkSafeRuntime()")
         val transition = pause.indexOf("WalkSessionEvent.EnteredBackground")
-        val frameInvalidation = pause.indexOf("invalidateRuntimeMetricEvidence(\"app_paused\")")
+        val frameInvalidation = pause.indexOf("runtimeMetricInvalidation.invalidate(\"app_paused\")")
 
         assertTrue(transition >= 0)
         assertTrue(frameInvalidation > transition)
+        assertTrue(MainActivityRefactorSource.property(source, "runtimeMetricInvalidation").contains("RuntimeMetricInvalidationController("))
         assertTrue(pause.contains("confirmedStartupCapabilityDecision = null"))
         assertTrue(pause.contains("persistWalkSessionInterruptionMarker()"))
         assertTrue(pause.contains("cancelVoiceCommandRecognition()"))
@@ -45,136 +46,188 @@ class MainActivityWalkSessionLifecycleStaticTest {
 
     @Test
     fun everyRuntimeEntryPointRequiresAnActiveWalkSession() {
+        fun navigationInput(startMarker: String, endMarker: String): String {
+            val factory = MainActivityRefactorSource.factory(source, "createNavigationSessions")
+            assertTrue(Regex(Regex.escape(startMarker)).findAll(factory).count() == 1)
+            assertTrue(Regex(Regex.escape(endMarker)).findAll(factory).count() == 1)
+            val start = factory.indexOf(startMarker)
+            val end = factory.indexOf(endMarker, start + startMarker.length)
+            assertTrue(start >= 0 && end > start)
+            return factory.substring(start, end)
+        }
+
         assertTrue(
-            functionBlock("private fun currentStepTrackingCollectionAllowsWork()")
+            MainActivityRefactorSource.function(source, "private fun currentStepTrackingCollectionAllowsWork()")
                 .contains("isWalkSessionRuntimeActive()"),
         )
         assertTrue(
-            functionBlock("private fun currentNavigationCollectionAllowsWork()")
+            MainActivityRefactorSource.function(source, "private fun currentNavigationCollectionAllowsWork()")
                 .contains("currentStepTrackingCollectionAllowsWork()"),
         )
         assertTrue(
-            functionBlock("private fun startDepthSession()")
-                .contains("if (!isWalkSessionRuntimeActive()) return"),
+            MainActivityRefactorSource.function(source, "private fun startDepthSession()")
+                .contains("if (!admission.runtimeActive()) return"),
         )
         assertTrue(
-            functionBlock("private fun startCameraFallbackSession(")
-                .contains("if (!isWalkSessionRuntimeActive()) return"),
+            MainActivityRefactorSource.function(source, "private fun startCameraFallbackSession(")
+                .contains("if (!admission.runtimeActive()) return"),
         )
         assertTrue(
-            functionBlock("private fun bindCameraFallbackSession()")
+            MainActivityRefactorSource.function(source, "private fun bindCameraFallbackSession()")
                 .contains("currentRuntimeEpochOrNull() ?: return"),
         )
         assertTrue(
-            functionBlock("private fun analyzeCameraFallbackFrame(")
+            MainActivityRefactorSource.member(source, "createPrimaryCameraFallbackDetectorWorker")
                 .contains("isCameraFallbackLeaseCurrent("),
         )
         assertTrue(
-            functionBlock("private fun currentRuntimeMetricOutputAllowsWork(")
-                .contains("isWalkSessionRuntimeActive()"),
+            MainActivityRefactorSource.function(source, "private fun currentRuntimeMetricOutputAllowsWork(")
+                .contains("scope.runtimeActive"),
         )
         assertTrue(
-            functionBlock("private fun handleLocationUpdate(")
-                .contains("!currentNavigationCollectionAllowsWork()"),
+            locationObservationPolicy(source)
+                .contains("!scope.navigationAllowed"),
         )
         assertTrue(
-            functionBlock("private fun prepareReportCandidate(")
+            MainActivityRefactorSource.function(source, "private fun prepareReportCandidate(")
                 .contains("currentRuntimeEpochOrNull()"),
         )
         assertTrue(
-            functionBlock("private fun requestRoute(")
-                .contains("!currentNavigationCollectionAllowsWork()"),
+            MainActivityRefactorSource.function(source, "private fun requestRoute(")
+                .contains("!facts.navigationAllowed"),
         )
         assertTrue(
-            functionBlock("private fun currentNavigationCollectionAllowsWork()")
+            MainActivityRefactorSource.function(source, "private fun currentNavigationCollectionAllowsWork()")
                 .contains("postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE)"),
         )
+        assertTrue(MainActivityRefactorSource.composition(source, "runtimeCameraLifecycle").contains("override fun runtimeActive() = isWalkSessionRuntimeActive()"))
+        assertTrue(MainActivityRefactorSource.composition(source, "runtimeMetricSession").contains("override val runtimeActive get() = isWalkSessionRuntimeActive()"))
+        assertTrue(navigationInput("positions = PositioningAssemblyBindings(", "gpsBindings = GpsAssemblyBindings(").contains("override val navigationAllowed get() = currentNavigationCollectionAllowsWork()"))
+        val positioningAssembly = MainActivityRefactorSource.composition(source, "positioningSessionController")
+        assertTrue(positioningAssembly.contains("val scope = positions.scope()"))
+        assertTrue(positioningAssembly.contains("PositioningSessionController(run, scope, sources"))
+        val acquisitionAssembly = MainActivityRefactorSource.composition(source, "routeAcquisitionController")
+        assertTrue(acquisitionAssembly.contains("override val navigationAllowed: Boolean get() = activityFacts.navigationAllowed"))
+        assertTrue(navigationInput("routes = AcquisitionAssemblyBindings(", "resources = NavigationAssemblyResources(").contains("override val navigationAllowed get() = currentNavigationCollectionAllowsWork()"))
     }
 
     @Test
     fun recheckUsesTheApprovedPromptAndOnlyExactStartCanResume() {
-        val prompt = functionBlock("private fun requestWalkSessionResumeConfirmation()")
-        val response = functionBlock("private fun handleWalkSessionResumeRecognition(")
+        val prompt = MainActivityRefactorSource.function(source, "private fun requestWalkSessionResumeConfirmation()")
+        val response = MainActivityRefactorSource.function(source, "private fun handleWalkSessionResumeRecognition(")
 
         assertTrue(
-            prompt.contains("보행 안내를 다시 시작할까요? 시작 또는 취소라고 말해 주세요"),
+            prompt.contains("재점검 뒤 진행하던 보행을 이어갈까요? 시작 또는 취소라고 말해 주세요"),
         )
-        assertTrue(prompt.contains("VoiceRecognitionPurpose.WALK_SESSION_RESUME"))
+        assertTrue(prompt.contains("effects.startResumeRecognition()"))
         assertFalse(prompt.contains("postDelayed("))
         assertTrue(response.contains("WalkSessionResumeConfirmation.fromRecognizedText("))
         assertTrue(response.contains("WalkSessionEvent.ResumeConfirmationReceived("))
         assertTrue(response.contains(
-            "if (response == WalkSessionResumeConfirmation.START && transition.changed && isWalkSessionRuntimeActive())",
+            "if (response == WalkSessionResumeConfirmation.START && transition.changed && environment.runtimeActive())",
         ))
-        assertTrue(response.contains("!recheckWalkSessionResumeBeforeConfirmation(confirmationToken)"))
-        assertTrue(response.contains("if (!activateWalkSessionRuntime())"))
+        val responseCode = ReportStaticSourceInspector.maskNonCode(response).filterNot(Char::isWhitespace)
+        assertTrue(responseCode.contains(
+            "valcurrentReadiness=if(response==WalkSessionResumeConfirmation.START){" +
+                "recheckWalkSessionResumeBeforeConfirmation(confirmationToken)?:return}elseconfirmationToken.readiness",
+        ))
+        assertTrue(responseCode.contains(
+            "walk.transition(WalkSessionEvent.ResumeConfirmationReceived(" +
+                "confirmation=response,token=confirmationToken,currentReadiness=currentReadiness,",
+        ))
+        assertTrue(response.contains("if (!effects.activateRuntime())"))
         assertFalse(response.contains("speakInteraction(PriorityUserPractice.RESUME.instructionKo)"))
         assertTrue(response.contains("walkSessionResumeRetryRequiresUserAction"))
+        val binding = MainActivityRefactorSource.composition(source, "walkSessionResumeController")
+        assertTrue(binding.contains("override fun startResumeRecognition() = startVoiceCommandRecognition(VoiceRecognitionPurpose.WALK_SESSION_RESUME)"))
+        assertTrue(binding.contains("override fun activateRuntime() = activateWalkSessionRuntime()"))
         assertTrue(
-            functionBlock("private fun maybeAdvanceWalkSessionAfterCapabilityCheck()")
-                .contains("walkSessionResumeRetryRequiresUserAction"),
+            MainActivityRefactorSource.function(source, "private fun maybeAdvanceWalkSessionAfterCapabilityCheck()")
+                .contains("resume.retryRequiresUserAction"),
         )
     }
 
     @Test
     fun failedAutomaticNoticeAndResumeResponseRequireAnExplicitRetryAction() {
-        val failure = functionBlock("private fun failStartupCapabilityConfirmation(")
-        val advance = functionBlock("private fun maybeAdvanceWalkSessionAfterCapabilityCheck()")
+        val failure = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/interaction/StartupConfirmationInteractionController.kt").readText(), "failStartupCapabilityConfirmation")
+        val advance = MainActivityRefactorSource.function(source, "private fun maybeAdvanceWalkSessionAfterCapabilityCheck()")
         val buttonAction =
-            functionBlock("private fun handleStartupCapabilityConfirmAction()")
+            MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/interaction/StartupConfirmationInteractionController.kt").readText(), "handleStartupCapabilityConfirmAction")
 
-        assertTrue(failure.contains("startupCapabilityRetryRequiresUserAction = true"))
-        assertTrue(advance.contains("startupCapabilityRetryRequiresUserAction"))
-        assertTrue(advance.contains("walkSessionResumeRetryRequiresUserAction"))
-        assertTrue(buttonAction.contains("startupCapabilityRetryRequiresUserAction = false"))
-        assertTrue(buttonAction.contains("walkSessionResumeRetryRequiresUserAction = false"))
+        val interactionFactoryStart = source.indexOf("private fun createStartupConfirmationInteraction(): StartupConfirmationInteractionController =")
+        val interactionFactoryEnd = source.indexOf("\nprivate fun handleStartupCapabilityConfirmAction()", interactionFactoryStart)
+        assertTrue(Regex(Regex.escape("private fun createStartupConfirmationInteraction(): StartupConfirmationInteractionController =")).findAll(source).count() == 1)
+        assertTrue(Regex(Regex.escape("\nprivate fun handleStartupCapabilityConfirmAction()")).findAll(source).count() == 1)
+        assertTrue(interactionFactoryStart >= 0 && interactionFactoryEnd > interactionFactoryStart)
+        val interactionBinding = MainActivityRefactorSource.composition(source, "startupConfirmationInteraction")
+        assertTrue(interactionBinding.contains("StartupConfirmationInteractionController("))
+        assertTrue(interactionBinding.contains("lifecycle = { walkSessionLifecycle }"))
+        assertTrue(interactionBinding.contains("override fun resumePermissionRecovery() = resumePermissionRecoveryFromExplicitUserAction()"))
+        assertTrue(interactionBinding.contains("override fun startFreshWalk(reason: String) = this@MainActivity.walkSessionCleanupController.startFreshWalk(reason)"))
+        assertTrue(MainActivityRefactorSource.member(source, "handleStartupCapabilityConfirmAction").contains("startupConfirmationInteraction.handleStartupCapabilityConfirmAction()"))
+        assertTrue(failure.contains("retryRequiresUserAction = true"))
+        assertTrue(advance.contains("state.startupRetryRequiresUserAction()"))
+        assertTrue(advance.contains("resume.retryRequiresUserAction"))
+        assertTrue(buttonAction.contains("retryRequiresUserAction = false"))
+        assertTrue(buttonAction.contains("effects.prepareResumeRetry()"))
         assertTrue(
-            buttonAction.indexOf("walkSessionResumeRetryRequiresUserAction = false") <
-                buttonAction.indexOf("resumePermissionRecoveryFromExplicitUserAction()"),
+            buttonAction.indexOf("effects.prepareResumeRetry()") <
+                buttonAction.indexOf("effects.resumePermissionRecovery()"),
         )
         assertTrue(
             buttonAction.contains(
                 "session.recoveryStage == WalkSessionRecoveryStage.RECHECK_REQUIRED",
             ),
         )
-        assertTrue(buttonAction.contains("refreshStartupCapabilityUi()"))
+        assertTrue(buttonAction.contains("effects.refresh()"))
+        val presenter = ReportStaticSourceInspector.functionBlock(File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/DeviceCheckPresenter.kt").readText(), "fun startupPresentation")
+        assertTrue(presenter.contains("!confirmation.capabilityConfirmationPending && !confirmation.resumePromptPending"))
+        assertTrue(MainActivityRefactorSource.composition(source, "startupCapabilityFactsRenderer").contains("override fun capabilityConfirmationPending() = startupCapabilityConfirmationPending"))
+        assertTrue(MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/runtime/WalkSessionResumeController.kt").readText(), "prepareConfirmationRetry").contains("walkSessionResumeRetryRequiresUserAction = false"))
         assertTrue(
-            Regex(
-                """!startupCapabilityConfirmationPending\s*&&\s*!walkSessionResumePromptPending""",
-            ).containsMatchIn(source),
-        )
-        assertTrue(
-            functionBlock("private fun refreshStartupCapabilityUi()")
-                .contains("mayConfirmSession"),
+            presenter.contains("mayConfirmSession"),
         )
     }
 
     @Test
     fun terminalWalkOffersFreshPreparationBeforeRecoveryAndReadinessGates() {
-        val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
-        val action = functionBlock("private fun handleStartupCapabilityConfirmAction()")
+        val refresh = ReportStaticSourceInspector.functionBlock(File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/DeviceCheckPresenter.kt").readText(), "fun startupPresentation")
+        assertTrue(MainActivityRefactorSource.function(source, "private fun refreshStartupCapabilityUi()").contains("ui.render("))
+        assertTrue(MainActivityRefactorSource.composition(source, "startupCapabilityFactsRenderer").contains("deviceCheckPresenter.renderStartupCapability(facts)"))
+        val action = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/interaction/StartupConfirmationInteractionController.kt").readText(), "handleStartupCapabilityConfirmAction")
         val freshLabel = refresh.indexOf("preparesNewWalk -> \"새 보행 준비\"")
-        val environmentLabel = refresh.indexOf("!officialEnvironmentReady")
+        val environmentLabel = refresh.indexOf("!capability.officialEnvironmentReady")
         val freshAction = action.indexOf("if (preparesNewWalk)")
         val permissionRecovery =
-            action.indexOf("resumePermissionRecoveryFromExplicitUserAction()")
+            action.indexOf("effects.resumePermissionRecovery()")
 
         assertTrue(refresh.contains("WalkSessionState.SAFE_STOP"))
         assertTrue(refresh.contains("WalkSessionState.ENDED"))
         assertTrue(refresh.contains("preparesNewWalk ||"))
-        assertTrue(refresh.contains("awaitingExplicitResume && !preparesNewWalk"))
+        assertTrue(refresh.contains("confirmation.awaitingExplicitResume && !preparesNewWalk"))
         assertTrue(freshLabel >= 0)
         assertTrue(environmentLabel > freshLabel)
+        val interactionFactoryStart = source.indexOf("private fun createStartupConfirmationInteraction(): StartupConfirmationInteractionController =")
+        val interactionFactoryEnd = source.indexOf("\nprivate fun handleStartupCapabilityConfirmAction()", interactionFactoryStart)
+        assertTrue(Regex(Regex.escape("private fun createStartupConfirmationInteraction(): StartupConfirmationInteractionController =")).findAll(source).count() == 1)
+        assertTrue(Regex(Regex.escape("\nprivate fun handleStartupCapabilityConfirmAction()")).findAll(source).count() == 1)
+        assertTrue(interactionFactoryStart >= 0 && interactionFactoryEnd > interactionFactoryStart)
+        val interactionBinding = MainActivityRefactorSource.composition(source, "startupConfirmationInteraction")
+        assertTrue(interactionBinding.contains("StartupConfirmationInteractionController("))
+        assertTrue(interactionBinding.contains("lifecycle = { walkSessionLifecycle }"))
+        assertTrue(interactionBinding.contains("override fun resumePermissionRecovery() = resumePermissionRecoveryFromExplicitUserAction()"))
+        assertTrue(interactionBinding.contains("override fun startFreshWalk(reason: String) = this@MainActivity.walkSessionCleanupController.startFreshWalk(reason)"))
+        assertTrue(MainActivityRefactorSource.member(source, "handleStartupCapabilityConfirmAction").contains("startupConfirmationInteraction.handleStartupCapabilityConfirmAction()"))
         assertTrue(action.contains("WalkSessionState.SAFE_STOP"))
         assertTrue(action.contains("WalkSessionState.ENDED"))
         assertTrue(freshAction >= 0)
         assertTrue(permissionRecovery > freshAction)
-        assertTrue(action.substring(freshAction, permissionRecovery).contains("startFreshWalk("))
+        assertTrue(action.substring(freshAction, permissionRecovery).contains("effects.startFreshWalk("))
         assertTrue(action.substring(freshAction, permissionRecovery).contains("return"))
     }
 
     @Test
-    fun processRestartMarkerPreventsFreshAutomaticRestart() {
+    fun processRestartKeepsAFreshLifecycleWithoutAPreviousWalkPopup() {
         val create = functionBlock("override fun onCreate(savedInstanceState: Bundle?)")
         val persistence = functionBlock("private fun persistWalkSessionInterruptionMarker()")
 
@@ -185,9 +238,9 @@ class MainActivityWalkSessionLifecycleStaticTest {
                 """putBoolean\(PREF_WALK_SESSION_INTERRUPTED, false\)\s*\.commit\(\)""",
             ).containsMatchIn(create),
         )
-        assertTrue(create.contains("previousWalkInterruptionMarker = PreviousWalkInterruptionMarker("))
-        assertTrue(create.contains("interruptedAtStartup = previousProcessHadInterruptedWalk"))
-        assertTrue(create.contains("putBoolean(PREF_WALK_SESSION_INTERRUPTED, currentWalkRequiresMarker)"))
+        assertFalse(source.contains("PreviousWalkInterruptionMarker"))
+        assertFalse(source.contains("showPreviousWalkInterruptionNoticeIfNeeded"))
+        assertFalse(source.contains("pendingFreshWalkActivationToken"))
         assertTrue(
             create.contains(
                 "walkSessionLifecycle = WalkSessionLifecycle(elapsedRealtimeClock = SystemClock::elapsedRealtime)",
@@ -200,79 +253,106 @@ class MainActivityWalkSessionLifecycleStaticTest {
         assertTrue(persistence.contains("WalkSessionState.ACTIVE"))
         assertTrue(persistence.contains("WalkSessionState.PAUSED"))
         assertTrue(persistence.contains("WalkSessionState.SAFE_STOP"))
-        assertTrue(persistence.contains("previousWalkInterruptionMarker.isPending"))
+        assertFalse(persistence.contains("previousWalkInterruptionMarker"))
         assertTrue(persistence.contains(".commit()"))
     }
 
     @Test
     fun runtimeFailuresEnterSafetyStopAndCancelAsynchronousOutputs() {
-        val metricInvalidation = functionBlock("private fun invalidateRuntimeMetricEvidence(")
-        val speechFailure = functionBlock("private fun handleRuntimeSpeechCapabilityFailure(")
-        val safetyStop = functionBlock("private fun enterWalkSessionSafetyStopAndCancelOutputs(")
-        val foregroundRecheck = functionBlock(
-            "private fun enterWalkSessionForegroundRecheckAndCancelOutputs(",
-        )
-        val outputCancellationEntry = functionBlock("private fun cancelWalkSessionOutputs(")
+        val metricInvalidation = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/metric/RuntimeMetricInvalidationController.kt").readText(), "invalidate")
+        val speechFailure = MainActivityRefactorSource.function(source, "private fun handleRuntimeSpeechCapabilityFailure(")
+        val safetyStop = MainActivityRefactorSource.function(source, "private fun enterWalkSessionSafetyStopAndCancelOutputs(")
+        val foregroundRecheck = MainActivityRefactorSource.function(source, "private fun enterWalkSessionForegroundRecheckAndCancelOutputs(")
+        val outputCancellationEntry = MainActivityRefactorSource.function(source, "private fun cancelWalkSessionOutputs(")
         assertTrue(outputCancellationEntry.contains("cancelWalkSessionOutputsInternal(reason, null)"))
-        val outputCancellation = functionBlock("private fun cancelWalkSessionOutputsInternal(")
-        assertTrue(source.contains("): Boolean = cancelWalkSessionOutputsInternal(reason, checkpoints)"))
-        val preflight = functionBlock("private fun canBeginRuntimeMetricPreflight()")
+        val outputCancellation = MainActivityRefactorSource.function(source, "private fun cancelWalkSessionOutputsInternal(")
+        val safetyOutputCancellation = MainActivityRefactorSource.function(source, "private fun cancelWalkSessionOutputsForSafetyStop(")
+        assertTrue(safetyOutputCancellation.contains("onLocationResult: ((Boolean) -> Unit)? = null"))
+        assertTrue(safetyOutputCancellation.contains("): Boolean = cancelWalkSessionOutputsInternal(reason, checkpoints, onLocationResult)"))
+        assertTrue(outputCancellation.contains("runLocationStopCleanupCheckpoint("))
+        assertTrue(outputCancellation.contains("checkpoints, onLocationResult ?: {},"))
+        assertTrue(outputCancellation.contains("navigation.locationCleanupSucceeded()"))
+        assertTrue(outputCancellation.contains("if (!tailComplete) complete = false"))
+        assertTrue(outputCancellation.contains("return complete"))
+        val preflight = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/metric/RuntimeMetricSessionController.kt").readText(), "canBeginRuntimeMetricPreflight")
+        assertTrue(MainActivityRefactorSource.composition(source, "runtimeMetricSession").contains("RuntimeMetricSessionController("))
+        assertTrue(MainActivityRefactorSource.property(source, "runtimeMetricInvalidation").contains("RuntimeMetricInvalidationController("))
 
-        assertTrue(metricInvalidation.contains("WalkSessionEvent.SafetyStopRequested"))
-        assertTrue(metricInvalidation.contains("runtimeFailureRequiresSafetyStop"))
+        assertTrue(metricInvalidation.contains("navigation.safetyStopAndPersist()"))
+        val invalidationBinding = MainActivityRefactorSource.property(source, "runtimeMetricInvalidation")
+        assertTrue(Regex("""RuntimeMetricInvalidationController\(\s*runtimeMetricStateLock\s*,\s*\{\s*runtimeMetricSession\s*}\s*,\s*\{\s*arSessionOwner\s*}\s*,""").containsMatchIn(invalidationBinding))
+        assertTrue(invalidationBinding.contains("override fun safetyStopAndPersist()"))
+        assertTrue(invalidationBinding.contains("transitionWalkSession(WalkSessionEvent.SafetyStopRequested)"))
+        assertTrue(invalidationBinding.contains("persistWalkSessionInterruptionMarker()"))
+        assertTrue(metricInvalidation.contains("reason.startsWith(\"runtime_\")"))
+        assertTrue(metricInvalidation.contains("lifecycleOrNull()?.snapshot()?.state == WalkSessionState.ACTIVE"))
+        assertTrue(metricInvalidation.contains("if (safetyStop) navigation.safetyStopAndPersist()"))
         assertTrue(speechFailure.contains("보행 시작/재개 불가"))
         assertTrue(speechFailure.contains("기기 점검을 다시 실행"))
         assertFalse(speechFailure.contains("다른 기능은 계속"))
         assertTrue(speechFailure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertTrue(safetyStop.contains("performWalkSessionSafetyStopCleanup(reason, persistInterruptionMarker, null, null)"))
-        val cleanup = functionBlock("private fun performWalkSessionSafetyStopCleanup(")
+        val cleanup = MainActivityRefactorSource.function(source, "private fun performWalkSessionSafetyStopCleanup(")
         assertTrue(cleanup.contains("WalkSessionEvent.SafetyStopRequested"))
         assertTrue(cleanup.contains("cancelWalkSessionOutputs(reason)"))
-        assertTrue(cleanup.contains("cancelWalkSessionOutputsForSafetyStop(reason, checkpoints)"))
+        assertTrue(cleanup.contains("if (!cancelWalkSessionOutputsForSafetyStop(reason, checkpoints, onLocationResult)) complete = false"))
         assertTrue(foregroundRecheck.contains("WalkSessionEvent.RecheckRequested"))
         assertTrue(foregroundRecheck.contains("cancelWalkSessionOutputs(reason)"))
         assertTrue(foregroundRecheck.contains("stopDepthSession(closeSession = true)"))
-        assertTrue(outputCancellation.contains("invalidateArCoreAvailabilityRecheck()"))
-        assertTrue(outputCancellation.contains("reportPrivacyConsentSession.cancelActiveCalls()"))
-        assertTrue(outputCancellation.contains("cancelNavigationRequestsForPause()"))
-        assertTrue(outputCancellation.contains("pendingTalkBackInteraction"))
-        assertTrue(outputCancellation.contains("feedbackActuator?.close()"))
-        assertTrue(outputCancellation.contains("confirmedStartupCapabilityDecision = null"))
+        assertTrue(outputCancellation.contains("native.invalidateArRecheck()"))
+        assertTrue(outputCancellation.contains("reports.cancelPrivacyUploads()"))
+        assertTrue(outputCancellation.contains("navigation.cancelRequestsForPause()"))
+        assertTrue(outputCancellation.contains("feedback.cancelTalkBack()"))
+        assertTrue(MainActivityRefactorSource.member(MainActivityRefactorSource.speech, "cancelPendingTalkBackInteraction").contains("pendingTalkBackInteraction = null"))
+        assertTrue(outputCancellation.contains("feedback.closeActuator()"))
+        assertTrue(outputCancellation.contains("admission.clearStartupState()"))
         assertTrue(preflight.contains("WalkSessionState.READY"))
         assertTrue(preflight.contains("WalkSessionState.PAUSED"))
         assertFalse(preflight.contains("WalkSessionState.SAFE_STOP"))
-        val fallbackRequest = functionBlock("private fun requestCameraFallbackStart(")
+        val cleanupBinding = MainActivityRefactorSource.composition(source, "walkSessionCleanupController")
+        assertTrue(cleanupBinding.contains("lastLocationCleanupFailure == null"))
+        assertTrue(cleanupBinding.contains("invalidateArCoreAvailabilityRecheck()"))
+        assertTrue(cleanupBinding.contains("reportPrivacyConsentSession.cancelActiveCalls()"))
+        assertTrue(cleanupBinding.contains("cancelNavigationRequestsForPause()"))
+        assertTrue(cleanupBinding.contains("speechOutputController.cancelPendingTalkBackInteraction()"))
+        assertTrue(cleanupBinding.contains("speechOutputController.closeActuator()"))
+        assertTrue(cleanupBinding.contains("confirmedStartupCapabilityDecision = null"))
+        val fallbackRequest = MainActivityRefactorSource.function(source, "private fun requestCameraFallbackStart(")
         assertTrue(fallbackRequest.contains("automaticallyContinueMetricOnlyDowngrade"))
         assertTrue(fallbackRequest.contains("CameraFallbackStartReason.RUNTIME_METRIC_LOST"))
-        assertTrue(fallbackRequest.contains("enterWalkSessionForegroundRecheckAndCancelOutputs("))
+        assertTrue(fallbackRequest.contains("readiness.enterForegroundRecheckAndCancelOutputs("))
     }
 
     @Test
     fun rejectedResumeRecognizerAndStaleDetectorWorkFailClosed() {
-        val resumePrompt = functionBlock("private fun requestWalkSessionResumeConfirmation()")
-        val voiceStart = functionBlock("private fun startVoiceCommandRecognition(")
-        val detectorFailure = functionBlock("private fun handleDetectorRuntimeFailure(")
-        val detectorScheduling = functionBlock("private fun scheduleDetectionIfDue(")
-        val fullStart = functionBlock("private fun continueDepthSessionStart(")
+        val resumePrompt = MainActivityRefactorSource.function(source, "private fun requestWalkSessionResumeConfirmation()")
+        val voiceStart = MainActivityRefactorSource.function(source, "private fun startVoiceCommandRecognition(")
+        val detectorFailure = MainActivityRefactorSource.function(source, "private fun handleDetectorRuntimeFailure(")
+        val detectorScheduling = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/primary/AndroidPrimaryArSubmissionBridge.kt").readText(), "schedule")
+        assertTrue(MainActivityRefactorSource.member(source, "scheduleDetectionIfDue").contains("primaryArSubmissionBridge.schedule("))
+        assertTrue(MainActivityRefactorSource.property(source, "primaryArSubmissionBridge").contains("AndroidPrimaryArSubmissionBridge("))
+        val fullStart = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/camera/lifecycle/RuntimeArLifecycleTransactions.kt").readText(), "start")
+        assertTrue(MainActivityRefactorSource.function(source, "private fun continueDepthSessionStart(").contains("transactions.start("))
 
         assertTrue(resumePrompt.contains("handleWalkSessionResumeRecognizerNotStarted()"))
         assertTrue(voiceStart.contains("): Boolean"))
         assertTrue(voiceStart.contains("return false"))
-        assertTrue(detectorFailure.contains("expectedDetectorGeneration"))
-        assertTrue(detectorFailure.contains("expectedWalkEpoch"))
+        assertTrue(detectorFailure.contains("generation: Int"))
+        assertTrue(detectorFailure.contains("epoch: WalkRuntimeEpoch"))
         assertTrue(
             detectorFailure.contains(
-                "isCurrentFrameGeneration(expectedDetectorGeneration, expectedWalkEpoch)",
+                "currentness.frameIsCurrent(generation, epoch)",
             ) || detectorFailure.contains(
-                "expectedDetectorGeneration,\n                                expectedWalkEpoch",
+                "expectedGeneration,\n                                expectedEpoch",
             ),
         )
         assertTrue(
             detectorScheduling.contains(
-                "isCurrentFrameGeneration(generation, expectedWalkEpoch)",
+                "authority.ownsFrame(frameGeneration, expectedWalkEpoch)",
             ),
         )
-        assertTrue(fullStart.contains("if (!detectorAvailable)"))
+        assertTrue(MainActivityRefactorSource.property(source, "primaryArSubmissionBridge").contains("override fun ownsFrame(generation: Int, epoch: WalkRuntimeEpoch) = isCurrentFrameGeneration(generation, epoch)"))
+        assertTrue(fullStart.contains("if (!admission.detectorAvailable())"))
         assertTrue(fullStart.contains("runtime_detector_start_unavailable"))
     }
 
@@ -304,20 +384,24 @@ class MainActivityWalkSessionLifecycleStaticTest {
 
     @Test
     fun activeResourceFailureAnnouncesTheSafetyStopReason() {
-        val readiness = functionBlock("private fun applyRuntimeReadinessIfActive(")
+        val readiness = MainActivityRefactorSource.function(source, "private fun applyRuntimeReadinessIfActive(")
 
-        assertTrue(readiness.contains("cancelWalkSessionOutputs(\"runtime_readiness_changed\")"))
-        assertTrue(readiness.contains("updateStatus(\"필수 기능 변경 · 안전 중지\", reason)"))
-        assertTrue(readiness.contains("speakInteraction("))
+        assertTrue(readiness.contains("runtime.cancelOutputs(\"runtime_readiness_changed\")"))
+        assertTrue(readiness.contains("runtime.status(\"필수 기능 변경 · 안전 중지\", reason)"))
+        assertTrue(readiness.contains("runtime.speak("))
         assertTrue(readiness.contains("보행 기능을 안전 중지했습니다."))
+        val binding = MainActivityRefactorSource.composition(source, "startupCapabilityCoordinator")
+        assertTrue(binding.contains("cancelWalkSessionOutputs(reason)"))
+        assertTrue(binding.contains("updateStatus(title, detail)"))
+        assertTrue(binding.contains("speakInteraction(message)"))
     }
 
     @Test
     fun permissionResultsAreOneShotAndPurposeGenerationBound() {
-        val callback = functionBlock("override fun onRequestPermissionsResult(")
-        val request = functionBlock("private fun requestPermissionsWithLease(")
-        val current = functionBlock("private fun isPermissionRequestLeaseCurrent(")
-        val walkResult = functionBlock("private fun handleWalkSessionPermissionResult()")
+        val callback = permissionResultOwner()
+        val request = MainActivityRefactorSource.function(source, "private fun requestPermissionsWithLease(")
+        val current = MainActivityRefactorSource.function(source, "private fun isPermissionRequestLeaseCurrent(")
+        val walkResult = MainActivityRefactorSource.function(source, "private fun handleWalkSessionPermissionResult()")
 
         assertTrue(callback.contains("permissionRequestLeases.remove(requestCode) ?: return"))
         assertTrue(callback.contains("if (!isPermissionRequestLeaseCurrent(lease)) return"))
@@ -329,109 +413,165 @@ class MainActivityWalkSessionLifecycleStaticTest {
             ),
         )
         assertTrue(current.contains("lease.generation"))
-        assertTrue(source.contains("val generation: Long"))
-        assertTrue(walkResult.contains("missingRequiredWalkSessionPermissions(action)"))
-        assertTrue(walkResult.contains("refreshStartupCapabilityUi()"))
+        assertTrue(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/PermissionFlowContracts.kt").readText().contains("val generation: Long"))
+        assertTrue(walkResult.contains("readiness.missingRequired(action)"))
+        assertTrue(walkResult.contains("runtime.refreshStartup()"))
         assertTrue(walkResult.contains("일부 기능 권한 없음"))
+        val binding = MainActivityRefactorSource.composition(source, "permissionFlowController")
+        assertTrue(binding.contains("missingRequiredWalkSessionPermissions(action)"))
+        assertTrue(binding.contains("override fun refreshStartup() { refreshStartupCapabilityUi() }"))
+        assertTrue(MainActivityRefactorSource.member(source, "onRequestPermissionsResult").contains("permissionFlowController.onRequestPermissionsResult(requestCode, permissions, grantResults)"))
     }
 
     @Test
     fun voiceTerminalCallbacksConsumeTheirLeaseBeforeDispatch() {
+        val voice = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/VoiceInputSessionController.kt").readText()
+        val listener = MainActivityRefactorSource.member(voice, "buildVoiceCommandRecognitionListener")
+        assertTrue(MainActivityRefactorSource.composition(source, "voiceInputController").contains("VoiceInputSessionController("))
+        assertTrue(listener.contains("override fun onError(error: Int)"))
+        assertTrue(listener.contains("override fun onResults(results: Bundle?)"))
+        val listenerCode = ReportStaticSourceInspector.maskNonCode(listener).filterNot(Char::isWhitespace)
+        assertTrue(listenerCode.contains(
+            "valsource=recognitionSource?.takeIf{it.generation==generation}" +
+                "?:RecognitionSource(generation,environment.identity(),environment.feedbackLifetimeGeneration())",
+        ))
+        assertTrue(listenerCode.contains(
+            "funcurrentLease():Boolean=recognitionSourceIsCurrent(source)&&" +
+                "isVoiceRecognitionLeaseCurrent(generation,purpose,expectedWalkEpoch," +
+                "expectedResumeToken,expectedGatewayWalkOperationId)",
+        ))
+        val sourceGuard = ReportStaticSourceInspector.maskNonCode(
+            MainActivityRefactorSource.member(voice, "recognitionSourceIsCurrent"),
+        ).filterNot(Char::isWhitespace)
+        assertTrue(sourceGuard.contains(
+            "=voiceRecognitionGeneration==source.generation&&" +
+                "environment.identity()==source.identity&&" +
+                "environment.feedbackLifetimeGeneration()==source.lifecycleGeneration&&" +
+                "environment.foreground()&&environment.microphoneGranted()",
+        ))
         listOf(
-            functionBlock("override fun onError(error: Int)"),
-            functionBlock("override fun onResults(results: Bundle?)"),
+            ReportStaticSourceInspector.functionBlock(listener, "override fun onError"),
+            ReportStaticSourceInspector.functionBlock(listener, "override fun onResults"),
         ).forEach { callback ->
-            val guard = callback.indexOf("isVoiceRecognitionLeaseCurrent(")
-            val consume = callback.indexOf("voiceRecognitionGeneration += 1")
-            val deactivate = callback.indexOf("voiceRecognitionActive = false")
-
-            assertTrue(guard >= 0)
-            assertTrue(consume > guard)
-            assertTrue(deactivate > consume)
+            val callbackCode = ReportStaticSourceInspector.maskNonCode(callback).filterNot(Char::isWhitespace)
+            assertTrue(callbackCode.startsWith(
+                "{if(!currentLease())returnvoiceRecognitionGeneration+=1" +
+                    "voiceRecognitionActive=falsevoiceRecognitionPurpose=VoiceRecognitionPurpose.COMMAND",
+            ))
+            val deactivate = callbackCode.indexOf("voiceRecognitionActive=false")
+            val dispatch = callbackCode.indexOf("commands.")
+            assertTrue("Consume the current lease before any command dispatch", dispatch > deactivate)
         }
     }
 
     @Test
     fun systemResourceChangesReevaluateAndStopAnActiveWalk() {
-        val create = functionBlock("override fun onCreate(savedInstanceState: Bundle?)")
+        val create = MainActivityRefactorSource.function(source, "override fun onCreate(savedInstanceState: Bundle?)")
         val restoreDeviceCheck =
-            functionBlock("private fun bindPostLoginDeviceCheckSession(")
+            MainActivityRefactorSource.function(source, "private fun bindPostLoginDeviceCheckSession(")
         val firstRunProbes =
-            functionBlock("private fun maybeStartFirstRunDeviceCheckProbes()")
+            MainActivityRefactorSource.function(source, "private fun maybeStartFirstRunDeviceCheckProbes()")
         val ensureResourceMonitoring =
-            functionBlock("private fun ensureWalkSessionResourceMonitoring()")
+            MainActivityRefactorSource.function(source, "private fun ensureWalkSessionResourceMonitoring()")
         val resetResourceProbe =
-            functionBlock("private fun resetWalkSessionResourceProbe()")
-        val activate = functionBlock("private fun activateWalkSessionRuntime()")
+            MainActivityRefactorSource.function(source, "private fun resetWalkSessionResourceProbe()")
+        val activate = MainActivityRefactorSource.function(source, "private fun activateWalkSessionRuntime()")
         val initialActivation =
-            functionBlock("private fun completeGatewayWalkActivation(")
+            MainActivityRefactorSource.function(source, "private fun completeGatewayWalkActivation(")
         val spokenResume =
-            functionBlock("private fun handleWalkSessionResumeRecognition(")
+            MainActivityRefactorSource.function(source, "private fun handleWalkSessionResumeRecognition(")
         val buttonResume =
-            functionBlock("private fun confirmWalkSessionResumeFromButton()")
-        val readiness = functionBlock("private fun applyRuntimeReadinessIfActive(")
-        val destroy = functionBlock("override fun onDestroy()")
+            MainActivityRefactorSource.function(source, "private fun confirmWalkSessionResumeFromButton()")
+        val readiness = MainActivityRefactorSource.function(source, "private fun applyRuntimeReadinessIfActive(")
+        val destroy = MainActivityRefactorSource.function(source, "override fun onDestroy()")
 
         assertTrue(create.contains("maybeStartFirstRunDeviceCheckProbes()"))
-        assertTrue(restoreDeviceCheck.contains("state = result.state"))
-        assertTrue(restoreDeviceCheck.contains("postLoginDeviceCheckSnapshot = restoredSnapshot"))
+        assertTrue(restoreDeviceCheck.contains("PostLoginDeviceCheckSnapshot(it.state, actorId, sessionGeneration,"))
+        assertTrue(restoreDeviceCheck.contains("publish(restoredSnapshot)"))
         assertFalse(restoreDeviceCheck.contains("ensureWalkSessionResourceMonitoring()"))
         assertTrue(firstRunProbes.contains("ensureWalkSessionResourceMonitoring()"))
         assertTrue(ensureResourceMonitoring.contains("walkSessionResourceProbeStarted) return"))
         assertTrue(ensureResourceMonitoring.contains("walkSessionResourceProbe.start"))
-        assertTrue(ensureResourceMonitoring.contains("observeWalkRuntimeResourceSafety()"))
+        assertTrue(ensureResourceMonitoring.contains("observeWalkRuntimeResourceSafety(resources = resources)"))
         assertTrue(ensureResourceMonitoring.contains("refreshStartupCapabilityUi()"))
         assertTrue(ensureResourceMonitoring.contains(".getOrDefault(false)"))
         assertTrue(
             ensureResourceMonitoring.indexOf("walkSessionResourceProbeStarted = true") <
                 ensureResourceMonitoring.indexOf("walkSessionResourceProbe.start"),
         )
-        assertTrue(activate.contains("ensureWalkSessionResourceMonitoring()"))
+        assertTrue(activate.contains("services.ensureResourceMonitoring()"))
         assertTrue(
-            activate.indexOf("ensureWalkSessionResourceMonitoring()") <
-                activate.indexOf("observeWalkRuntimeResourceSafety(runtimeEpoch)"),
+            activate.indexOf("services.ensureResourceMonitoring()") <
+                activate.indexOf("services.observeResourceSafety(runtimeEpoch)"),
         )
         assertTrue(
-            activate.indexOf("observeWalkRuntimeResourceSafety(runtimeEpoch)") <
-                activate.indexOf("activateOfficialEnvironmentRuntime()"),
+            activate.indexOf("services.observeResourceSafety(runtimeEpoch)") <
+                activate.indexOf("services.activateOfficialEnvironment()"),
         )
-        assertTrue(initialActivation.contains("activateWalkSessionRuntime()"))
-        assertTrue(spokenResume.contains("activateWalkSessionRuntime()"))
-        assertTrue(buttonResume.contains("activateWalkSessionRuntime()"))
-        assertTrue(resetResourceProbe.contains("walkSessionResourceProbe.close()"))
+        assertTrue(initialActivation.contains("runtime.activate()"))
+        assertTrue(spokenResume.contains("effects.activateRuntime()"))
+        assertTrue(buttonResume.contains("effects.activateRuntime()"))
+        assertTrue(resetResourceProbe.contains("privacyStartupResources.releaseOnUiThread(walkSessionResourceProbe)"))
         assertTrue(resetResourceProbe.contains("AndroidWalkSessionResourceProbe(this)"))
         assertTrue(resetResourceProbe.contains("walkSessionResourceProbeStarted = false"))
         assertTrue(readiness.contains("WalkSessionEvent.RuntimeReadinessChanged(readiness)"))
         assertTrue(readiness.contains("WalkSessionState.SAFE_STOP"))
-        assertTrue(readiness.contains("cancelWalkSessionOutputs(\"runtime_readiness_changed\")"))
-        assertTrue(readiness.contains("stopCameraFallbackSession(updateUi = false)"))
-        assertTrue(readiness.contains("stopDepthSession(closeSession = true)"))
-        assertTrue(destroy.contains("walkSessionResourceProbe.close()"))
+        assertTrue(readiness.contains("runtime.cancelOutputs(\"runtime_readiness_changed\")"))
+        assertTrue(readiness.contains("runtime.stopCameraFallback()"))
+        assertTrue(readiness.contains("runtime.stopDepth()"))
+        assertTrue(destroy.contains("privacyStartupResources.releaseOnUiThread(walkSessionResourceProbe)"))
+        assertTrue(MainActivityRefactorSource.member(source, "createGatewayWalkSessionController").contains("override fun activate() = activateWalkSessionRuntime()"))
+        assertTrue(MainActivityRefactorSource.composition(source, "walkSessionResumeController").contains("override fun activateRuntime() = activateWalkSessionRuntime()"))
+        val binding = MainActivityRefactorSource.composition(source, "walkRuntimeActivationController")
+        assertTrue(binding.contains("override fun ensureResourceMonitoring() = ensureWalkSessionResourceMonitoring()"))
+        assertTrue(binding.contains("override fun observeResourceSafety(epoch: WalkRuntimeEpoch) = observeWalkRuntimeResourceSafety(epoch)"))
+        assertTrue(binding.contains("override fun activateOfficialEnvironment() = activateOfficialEnvironmentRuntime()"))
+        val readinessBinding = MainActivityRefactorSource.composition(source, "startupCapabilityCoordinator")
+        assertTrue(readinessBinding.contains("cancelWalkSessionOutputs(reason)"))
+        assertTrue(readinessBinding.contains("stopCameraFallbackSession(updateUi = false)"))
+        assertTrue(readinessBinding.contains("stopDepthSession(closeSession = true)"))
     }
 
     @Test
     fun remoteNavigationAndReportActionsRevalidateExactSessionLeases() {
-        val destination = functionBlock("private fun performDestinationSearch(")
-        val route = functionBlock("private fun requestRoute(")
-        val prepare = functionBlock("private fun prepareReportCandidate(")
-        val report = functionBlock("private fun processReportCandidate(")
-        val capture = functionBlock("private fun buildReportQueueDrainTrigger(")
-        val drainContext = functionBlock("private fun reportQueueDrainContext(")
+        fun navigationInput(startMarker: String, endMarker: String): String {
+            val factory = MainActivityRefactorSource.factory(source, "createNavigationSessions")
+            assertTrue(Regex(Regex.escape(startMarker)).findAll(factory).count() == 1)
+            assertTrue(Regex(Regex.escape(endMarker)).findAll(factory).count() == 1)
+            val start = factory.indexOf(startMarker)
+            val end = factory.indexOf(endMarker, start + startMarker.length)
+            assertTrue(start >= 0 && end > start)
+            return factory.substring(start, end)
+        }
 
-        assertTrue(destination.contains("isDestinationSearchLeaseCurrent(expectedWalkEpoch, requestId)"))
-        assertTrue(destination.contains("gatewaySessionClient.revalidate("))
+        val destination = MainActivityRefactorSource.member(MainActivityRefactorSource.destination, "search")
+        assertTrue(MainActivityRefactorSource.composition(source, "destinationSearchController").contains("DestinationSearchController("))
+        assertTrue(MainActivityRefactorSource.member(source, "buildContentView").contains("destinationSearchController.search(reset = true)"))
+        val route = MainActivityRefactorSource.function(source, "private fun requestRoute(")
+        val prepare = MainActivityRefactorSource.function(source, "private fun prepareReportCandidate(")
+        val report = MainActivityRefactorSource.function(source, "private fun processReportCandidate(")
+        val capture = MainActivityRefactorSource.function(source, "private fun buildReportQueueDrainTrigger(")
+        val drainContext = MainActivityRefactorSource.function(source, "private fun reportQueueDrainContext(")
+
+        assertTrue(destination.contains("isLeaseCurrent(expectedWalkEpoch, requestId)"))
+        assertTrue(destination.contains("backend.revalidate("))
+        assertTrue(source.contains("gatewaySessionClient.revalidate(session, actorId, capacitySessionGeneration = capacitySessionGeneration)"))
         assertTrue(route.contains("isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId)"))
-        assertTrue(route.contains("gatewaySessionClient.revalidate("))
-        assertTrue(report.contains("walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch)"))
-        assertTrue(prepare.contains("walkSessionResourceProbe.snapshot()"))
-        assertTrue(report.contains("reportQueueStore.enqueue("))
+        assertTrue(route.contains("backend.revalidate("))
+        assertTrue(report.contains("authority.isRuntimeEpochCurrent(expectedWalkEpoch)"))
+        assertTrue(prepare.contains("resources.current()"))
+        assertTrue(report.contains("queue.enqueue("))
         assertFalse(report.contains("gatewaySessionClient.revalidate("))
-        assertTrue(capture.contains("val gatewaySnapshot = GatewaySessionProcessCoordinator.snapshot()"))
+        assertTrue(capture.contains("val gatewaySnapshot = sources.gatewaySnapshot()"))
         assertTrue(capture.contains("gatewaySession.isUsableFor(reporter)"))
         assertTrue(capture.contains("gatewaySessionGeneration = gatewaySnapshot.generation"))
         assertTrue(drainContext.contains("currentGateway.generation == trigger.gatewaySessionGeneration"))
         assertTrue(drainContext.contains("currentGateway.session === trigger.gatewaySession"))
         assertTrue(drainContext.contains("trigger.gatewaySession.isUsableFor(reporter)"))
+        assertTrue(MainActivityRefactorSource.composition(source, "reportCandidateController").contains("resources = ReportCandidateController.Resources { walkSessionResourceProbe.snapshot() }"))
+        assertTrue(MainActivityRefactorSource.composition(source, "reportQueueDrainController").contains("gatewaySnapshot = GatewaySessionProcessCoordinator::snapshot"))
+        assertTrue(navigationInput("routes = AcquisitionAssemblyBindings(", "resources = NavigationAssemblyResources(").contains("gatewaySessionClient.revalidate(session, actorId, capacitySessionGeneration = capacitySessionGeneration)"))
+        assertTrue(MainActivityRefactorSource.composition(source, "routeAcquisitionController").contains("backend = routes.backend()"))
     }
 
     private fun functionBlock(marker: String): String {
@@ -451,4 +591,171 @@ class MainActivityWalkSessionLifecycleStaticTest {
         }
         throw AssertionError("unterminated function body: $marker")
     }
+
+    private fun permissionResultOwner(mainSource: String = source): String {
+        MainActivityRefactorSource.composition(mainSource, "permissionFlowController")
+        val main = MainActivityRefactorSource.factory(mainSource, "onRequestPermissionsResult")
+        // Whole declaration comparison preserves guards, argument forwarding and effect order.
+        val expectedMain = """
+override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        invalidateRouteSnapshotResponseLease()
+        invalidateSpeechOutputStorageBinding()
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        permissionFlowController.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+        """.trimIndent()
+        org.junit.Assert.assertEquals("Main permission callback must retain invalidation, super and owner order", expectedMain.filterNot(Char::isWhitespace),
+            main.filterNot(Char::isWhitespace))
+        val tokens = listOf("invalidateRouteSnapshotResponseLease()", "invalidateSpeechOutputStorageBinding()",
+            "super.onRequestPermissionsResult(requestCode, permissions, grantResults)",
+            "permissionFlowController.onRequestPermissionsResult(requestCode, permissions, grantResults)")
+        var previous = -1
+        tokens.forEach { token ->
+            val next = main.indexOf(token, previous + 1)
+            assertTrue("Main permission ordering: $token", next > previous)
+            previous = next
+        }
+        return MainActivityRefactorSource.member(File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/PermissionFlowController.kt",
+        ).readText(), "onRequestPermissionsResult")
+    }
+
+
+    private fun locationObservationPolicy(
+        mainSource: String,
+        ownerSource: String = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/PositioningSessionController.kt").readText(),
+    ): String {
+        MainActivityRefactorSource.composition(mainSource, "positioningSessionController")
+        val main = MainActivityRefactorSource.factory(mainSource, "handleLocationUpdate")
+        // Whole declaration comparison preserves guards, argument forwarding and effect order.
+        val expectedMain = """
+private fun handleLocationUpdate(
+        location: Location,
+        owner: LocationCollectionOwner,
+        locationGeneration: Int,
+        binding: PositioningCollectionBinding,
+        receivedAtElapsedRealtimeMs: Long,
+    ) {
+        positioningSessionController.handleLocationUpdate(location, owner, locationGeneration, binding, receivedAtElapsedRealtimeMs)
+    }
+        """.trimIndent()
+        org.junit.Assert.assertEquals("Main location callback must directly invoke its actual owner", expectedMain.filterNot(Char::isWhitespace),
+            main.filterNot(Char::isWhitespace))
+        val owner = ownerSource
+        val update = MainActivityRefactorSource.factory(owner, "handleLocationUpdate")
+        // Whole declaration comparison preserves guards, argument forwarding and effect order.
+        val expectedUpdate = """
+fun handleLocationUpdate(
+        location: Location,
+        owner: LocationCollectionOwner,
+        locationGeneration: Int,
+        binding: PositioningCollectionBinding,
+        receivedAtElapsedRealtimeMs: Long,
+    ) {
+        // Reject a retired callback before reading any SDK values.
+        if (!isLocationObservationCurrent(owner, locationGeneration, binding)) return
+        val observation = location.toPositioningObservation(receivedAtElapsedRealtimeMs, sources.mock(location)) { atNanos ->
+            runCatching { gnssQualityObserver?.snapshot(atNanos) }.getOrNull()
+        }
+        handleLocationObservation(
+            observation, owner, locationGeneration, binding,
+            updateOrientationReference = { updateRouteOrientationReference(location) },
+            appendGnssTrace = { snapshot, matchedEvidenceCurrent ->
+                effects.appendGnssTrace(snapshot, location, matchedEvidenceCurrent)
+            },
+        )
+    }
+        """.trimIndent()
+        // Keep line boundaries: joining a // comment with the next line can disable its guard.
+        org.junit.Assert.assertEquals("SDK callback must reject retired observations before mapping and invoking the observation policy",
+            expectedUpdate.lines().map(String::trim), update.lines().map(String::trim))
+        assertTrue(update.contains("if (!isLocationObservationCurrent(owner, locationGeneration, binding)) return"))
+        assertTrue(update.indexOf("if (!isLocationObservationCurrent") < update.indexOf("location.toPositioningObservation"))
+        assertTrue(update.contains("handleLocationObservation("))
+        return MainActivityRefactorSource.member(owner, "handleLocationObservation")
+    }
+
+
+    @Test
+    fun permissionResultOwnerRejectsNonExecutingOrReorderedCallers() {
+        val mainSource = source
+        permissionResultOwner(mainSource)
+        val caller = MainActivityRefactorSource.factory(mainSource, "onRequestPermissionsResult")
+        val call = "permissionFlowController.onRequestPermissionsResult(requestCode, permissions, grantResults)"
+        org.junit.Assert.assertTrue(caller.contains(call))
+        val variants = linkedMapOf(
+            "conditional" to caller.replace(call, "if (false) { $call }"),
+            "uninvoked lambda" to caller.replace(call, "{ $call }"),
+            "comment" to caller.replace(call, "/* $call */"),
+            "additional effect" to caller.replace(call, "$call\nunexpectedEffect()"),
+            "omitted" to caller.replace(call, ""),
+            "early return" to caller.replace(call, "return\n$call"),
+        )
+
+        variants["reordered effects"] = caller.replace(call, "").replace(
+            "invalidateRouteSnapshotResponseLease()", "invalidateRouteSnapshotResponseLease()\n" + call,
+        )
+
+        val accepted = variants.filter { (_, changed) ->
+            val mainSource = mainSource.replace(caller, changed)
+            runCatching { permissionResultOwner(mainSource) }.isSuccess
+        }.keys
+        org.junit.Assert.assertTrue("Non-equivalent Main callers accepted: $accepted", accepted.isEmpty())
+    }
+
+
+    @Test
+    fun locationObservationPolicyRejectsNonExecutingMainCallers() {
+        val mainSource = source
+        locationObservationPolicy(mainSource)
+        val caller = MainActivityRefactorSource.factory(mainSource, "handleLocationUpdate")
+        val call = "positioningSessionController.handleLocationUpdate(location, owner, locationGeneration, binding, receivedAtElapsedRealtimeMs)"
+        org.junit.Assert.assertTrue(caller.contains(call))
+        val variants = linkedMapOf(
+            "conditional" to caller.replace(call, "if (false) { $call }"),
+            "uninvoked lambda" to caller.replace(call, "{ $call }"),
+            "comment" to caller.replace(call, "/* $call */"),
+            "additional effect" to caller.replace(call, "$call\nunexpectedEffect()"),
+            "omitted" to caller.replace(call, ""),
+            "early return" to caller.replace(call, "return\n$call"),
+        )
+
+        val accepted = variants.filter { (_, changed) ->
+            val mainSource = mainSource.replace(caller, changed)
+            runCatching { locationObservationPolicy(mainSource) }.isSuccess
+        }.keys
+        org.junit.Assert.assertTrue("Non-equivalent Main callers accepted: $accepted", accepted.isEmpty())
+    }
+
+
+    @Test
+    fun locationObservationPolicyRejectsNonExecutingSdkObservationCalls() {
+        val mainSource = source
+        val owner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/PositioningSessionController.kt").readText()
+        locationObservationPolicy(mainSource, owner)
+        val caller = MainActivityRefactorSource.factory(owner, "handleLocationUpdate")
+        val start = caller.indexOf("        handleLocationObservation(")
+        org.junit.Assert.assertTrue(start >= 0)
+        val call = caller.substring(start, caller.lastIndexOf("\n    }")).trim()
+        val commentBoundary = "// Reject a retired callback before reading any SDK values.\n"
+        org.junit.Assert.assertTrue(caller.contains(commentBoundary))
+        val variants = mapOf(
+            "line comment swallows guard" to caller.replace(commentBoundary, commentBoundary.trimEnd() + " "),
+            "conditional" to caller.replace(call, "if (false) { $call }"),
+            "uninvoked lambda" to caller.replace(call, "{ $call }"),
+            "comment" to caller.replace(call, "/* $call */"),
+            "additional effect" to caller.replace(call, "$call\nunexpectedEffect()"),
+            "omitted" to caller.replace(call, ""),
+            "early return" to caller.replace(call, "return\n$call"),
+        )
+        val accepted = variants.filter { (_, changed) ->
+            runCatching { locationObservationPolicy(mainSource, owner.replace(caller, changed)) }.isSuccess
+        }.keys
+        org.junit.Assert.assertTrue("Non-equivalent SDK callers accepted: $accepted", accepted.isEmpty())
+    }
+
 }

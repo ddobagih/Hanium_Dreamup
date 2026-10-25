@@ -81,18 +81,19 @@ class GuidanceStartBypassBuildContractTest {
 
     @Test
     fun activeBypassIsLabeledOnGuidanceScreenAndStartLog() {
-        val guidanceStatus = section(
-            mainSource,
-            "private fun nativeGuidanceStatusMessage(",
-            "private fun cancelNativeGuidanceAndReturnHome(",
-        )
-        val bypassStart = section(
-            mainSource,
-            "private fun beginDevelopmentGuidanceImmediately(",
-            "\n    private fun ",
-        )
-        assertTrue(guidanceStatus.contains("if (developmentGuidanceStartBypassEnabled)"))
-        assertTrue(guidanceStatus.contains("시험용 우회 켜짐 [\${BuildConfig.WALKSAFE_BUILD_MARKER}]"))
+        val guidanceStatus = MainActivityRefactorSource.member(mainSource, "nativeGuidanceStatusMessage")
+        assertTrue(guidanceStatus.contains("NativeGuidanceTextPresentation.guidanceStatus("))
+        assertTrue(guidanceStatus.contains("developmentBypassEnabled = { developmentGuidanceStartBypassEnabled }"))
+        assertTrue(guidanceStatus.contains("buildMarker = BuildConfig.WALKSAFE_BUILD_MARKER"))
+        val update = MainActivityRefactorSource.member(mainSource, "updateNativeGuidanceStatus")
+        assertTrue(update.contains("destinationSearchPresenter.renderGuidanceStatus(nativeGuidanceStatusMessage(presentation, false)"))
+        val presentation = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeGuidanceTextPresentation.kt").readText()
+        val render = MainActivityRefactorSource.member(presentation, "guidanceStatus")
+        assertTrue(render.contains("developmentBypassEnabled() ->"))
+        assertTrue(render.contains("시험용 우회 켜짐 [\$buildMarker]"))
+        assertTrue("the guidance screen must keep the bypass notice when measurements are omitted",
+            render.indexOf("developmentBypassEnabled() ->") < render.indexOf("!includeMeasurements -> null"))
+        val bypassStart = MainActivityRefactorSource.member(mainSource, "beginDevelopmentGuidanceImmediately")
         assertTrue(bypassStart.contains("event=GUIDANCE_START_BYPASS_REQUESTED"))
         assertTrue(bypassStart.contains("build_marker=\${BuildConfig.WALKSAFE_BUILD_MARKER}"))
     }

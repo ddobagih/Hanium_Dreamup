@@ -266,10 +266,13 @@ test("general actor assertions have a single issuance point in the Gateway sourc
     const legacyCalls = (text.match(/\bcreateBackendActorAssertion\(/g)?.length ?? 0) -
       (text.match(/function createBackendActorAssertion\(/g)?.length ?? 0);
     assert.equal(legacyCalls, 0, `${name} must not issue v2/v3 actor assertions`);
-    if (name === "backend.ts") {
+    if (name === "backend-request-signing.ts") {
       // pending marker (bindBackendActor), v4 signature (signBackendActorRequest),
       // and the separate request-bound account-deletion assertion.
-      assert.equal(sets, 3, "backend.ts assertion issuance points");
+      assert.equal(sets, 3, "backend-request-signing.ts assertion issuance points");
+      assert.equal(literals, 0, "the signer uses the shared header constant");
+    } else if (name === "backend-contract.ts") {
+      assert.equal(sets, 0, "the wire contract never issues assertions");
       assert.equal(literals, 1, "only the ACTOR_ASSERTION_HEADER constant names the header");
     } else {
       assert.equal(sets, 0, `${name} must not set the actor assertion header`);

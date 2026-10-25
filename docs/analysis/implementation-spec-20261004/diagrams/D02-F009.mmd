@@ -1,0 +1,28 @@
+flowchart TD
+  A["F-D02-009 기기 검사 위치 품질 선택"]
+  E["진입: 단일 또는 batch fix"]
+  G{"P-D02-009 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["순서 무관 batch 실패"]
+  G -->|"mock 하나 이상"| B0
+  B1["PASS"]
+  G -->|"fresh accurate real fix"| B1
+  B2["FAIL 또는 missing reason"]
+  G -->|"미래/30초 초과/accuracy 없음·초과"| B2
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["batch 내 mock 하나라도 있으면 mock 실패 선택"]
+    S1["mock 없으면 통과 sample 중 가장 최신 선택"]
+    S2["좌표·accuracy·time 실패를 서로 다른 reason으로 기록"]
+    S0 --> S1
+    S1 --> S2
+  end
+  E -.-> S0
+  N["정상 종료: 해당 이벤트 처리를 마치고 현재 스냅샷/결과를 반환한다."]
+  X["취소·중단: 독립 취소 API가 없는 판단 함수는 호출자의 세대 무효화로 더 이상 결과를 사용하지 않는다. /<br/>foreground·epoch·owner 조건을 잃은 결과는 재사용하지 않는다."]
+  C["정리: 순수 정책은 소유하는 외부 리소스가 없다."]
+  R["재시도·복구: 자동 재시도 없음. 호출자가 명시된 새 이벤트를 전달해야 한다. / 현재 증거와 소유권을 다시 확보해야 한다. 이전 성공을<br/>소급 복원하지 않는다."]
+  S2 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

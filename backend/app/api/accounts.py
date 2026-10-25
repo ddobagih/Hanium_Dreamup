@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import ipaddress
 from typing import Any
 
@@ -10,6 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.app.account_schemas import (
+    AccountSignupPolicyV1,
     AccountAuthenticateRequestV1,
     AccountAuthenticationResponseV1,
     AccountCreateRequestV1,
@@ -153,6 +155,47 @@ def create_router(
         else AccountEnrollmentRateLimiter(settings)
     )
     router = APIRouter(tags=["accounts"])
+
+    @router.get(
+        "/account-signup-policy",
+        response_model=AccountSignupPolicyV1,
+        responses=_ERROR_RESPONSES,
+    )
+    def signup_policy(response: Response) -> AccountSignupPolicyV1:
+        from backend.app.services.signup_documents import (
+            SIGNUP_REQUIRED_DOCUMENT_KEYS,
+            signup_document_keys_are_exact,
+        )
+        versions = getattr(settings, "account_signup_document_versions", None)
+        equivalent = getattr(settings, "account_signup_equivalent_document_versions", {})
+        prior = getattr(settings, "account_signup_prior_document_versions", {})
+        try:
+            if not isinstance(versions, Mapping) or not signup_document_keys_are_exact(versions):
+                raise ValueError("invalid signup document configuration")
+            if any(
+                not isinstance(metadata, Mapping)
+                or not set(metadata).issubset(versions)
+                or any(not isinstance(values, (list, tuple, set, frozenset)) for values in metadata.values())
+                for metadata in (equivalent, prior)
+            ):
+                raise ValueError("invalid signup version metadata")
+            policy = AccountSignupPolicyV1(documents={
+                key: {
+                    "version": version,
+                    "required": key in SIGNUP_REQUIRED_DOCUMENT_KEYS,
+                    "equivalent_versions": sorted(equivalent.get(key, ())),
+                    "prior_versions": sorted(prior.get(key, ())),
+                }
+                for key, version in versions.items()
+            })
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "account_enrollment_unavailable", "message": "Signup policy is unavailable."},
+                headers=_NO_STORE_HEADERS,
+            ) from exc
+        response.headers.update(_NO_STORE_HEADERS)
+        return policy
 
     @router.post(
         "/account-enrollments/email-otp",

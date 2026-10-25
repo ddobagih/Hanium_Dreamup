@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D02-032 동의·계정·세션에 묶인 암호화 출력 진단 저장"]
+  E["진입: publish/invalidate consent binding / enqueue output event /<br/>invalidateAndPurge/closeAndDrain"]
+  G{"P-D02-032 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["queued old event drop; 새 actor binding 사용 금지"]
+  G -->|"binding 교체/철회/삭제/epoch 변경"| B0
+  B1["best effort drop, auto retry 없음"]
+  G -->|"queue64 초과·seal/append 실패"| B1
+  B2["future false 관찰 가능, publication 계속 차단"]
+  G -->|"purge failure"| B2
+  B3["새로 부활시키지 않고 차단"]
+  G -->|"provider window removed/aged/clock rollback"| B3
+  B4["close 뒤 이전 in-flight 및 control task 처리 후 quiescence ACK<br/>executor terminated 보장은 아님"]
+  G -->|"close while crypto write 또는 purge 진행"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["publish는 currentness를 lock 밖 검사하고 admission token identity를 다시 검사하여<br/>ABA 방어"]
+    S1["observer enqueue는 짧은 admission만 수행, full/shutdown이면 drop count"]
+    S2["single worker는 crypto seal 전과 disk write 직전 privacy currentness 재검사"]
+    S3["provider는 AAD(window,ordinal)·AEAD envelope·strict path/no<br/>symlink/단일 hardlink·canonical authenticated record 검증 후 fsync append"]
+    S4["purge는 먼저 publication fence·대기 event 제거, in-flight write 뒤 같은 serial<br/>queue에서 삭제"]
+    S5["closeAndDrain은 이전 작업의 quiescence ack이며 삭제 성공과 별개"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+  E -.-> S0
+  N["정상 종료: 성공 append 또는 정해진 drop; observer는 disk ACK/청취 완료를 받지 않음."]
+  X["취소·중단: binding invalidation은 enqueue 이전/이후 task 모두 영구 차단. /<br/>foreground/actor/epoch 변경 시 현재 요청을 폐기한다."]
+  C["정리: in-flight write 뒤 serial purge<br/>drain은 앞선 작업 quiescence이며 executor terminated 또는 삭제 성공이 아님"]
+  R["재시도·복구: 검증된 deletion/reconsent가 새 lifetime/provider를 만드는 상위 흐름만 회복 가능. / 현재<br/>owner와 조건을 다시 확보해야 한다."]
+  S5 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

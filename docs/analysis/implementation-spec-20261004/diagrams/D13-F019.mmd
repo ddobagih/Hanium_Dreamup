@@ -1,0 +1,27 @@
+flowchart TD
+  A["F-D13-019<br/>만료된 계정 삭제 완료영수증 정리"]
+  P["P-D13-019<br/>영수증 수명 만료가 삭제된 계정 세대의 차단 해제를 뜻하지 않는다."]
+  A --> P
+  N0["1. 정수 batch/max bounds 와 전용 역할을 검증한다."]
+  P --> N0
+  N1["2. SECURITY DEFINER<br/>walksafe_purge_expired_account_deletion_receipts(limit)를<br/>호출한다."]
+  N0 --> N1
+  N2["3. 각 batch 를 commit 하여 누적 deleted 를 합산한다."]
+  N1 --> N2
+  N3["4. count < limit 이면 exhausted=true 로 종료, max batch 까지 꽉<br/>찼으면 exhausted=false 로 남은 가능성을 알린다."]
+  N2 --> N3
+  Z["completion receipt 만 삭제하고<br/>tombstone/request/item/event/consent 원장을 유지한다."]
+  N3 --> Z
+  B0{"역할/정수범위 부적합"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["실행전 ReceiptPurgeError"]
+  B1{"삭제영수증 만료이전"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["DB 함수의 만료조건에 의해 삭제하지 않음"]
+  B2{"max_batches 소진"}
+  P -. "예외 조건 검사" .-> B2
+  B2 -- "조건 성립" --> X2["exhausted=false; 후속 실행 필요 가능"]
+  R["재시도: 자동 반복 루프 없음. 호출자가 오류와 현재 상태를 확인 후 재호출.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 별도 취소 진입점 없음."]
+  A -. "취소 API 여부" .-> C

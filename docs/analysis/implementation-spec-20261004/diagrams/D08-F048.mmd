@@ -1,0 +1,24 @@
+flowchart TD
+ A["F-D08-048 KeyedAdmissionQueue P-D08-024"] --> TYPE{"호출 API"}
+ TYPE -->|"run"| R{"해당 key 상태 존재"}
+ R -->|"없음"| ACTION["signal 확인 후action 즉시실행"]
+ R -->|"있음"| CAP{"priority barrier 또는대기정원초과"}
+ CAP -->|"예"| BUSY["QueueAdmissionBusyError"]
+ CAP -->|"아니오"| WAIT["FIFO waiter 등록 및deadline aborthandler설치"]
+ WAIT -->|"차례도달 전abort"| ABORT["QueueAdmissionAbortedError"]
+ WAIT -->|"deadline"| BUSY
+ WAIT -->|"유효한차례도달"| ACTION
+ TYPE -->|"runPriority"| PRI{"기존priority 존재"}
+ PRI -->|"예"| BUSY
+ PRI -->|"아니오"| EVICT["일반waiter를busy로거부하고priority예약"]
+ EVICT --> PW{"현재action 존재"}
+ PW -->|"없음"| PA["priority action 실행"]
+ PW -->|"있음"| BW["현재action 종료까지대기, 강제중단안함"]
+ BW -->|"deadline"| BUSY
+ BW -->|"종료후승계"| PA
+ ACTION --> FIN["finally release, priority우선 또는다음FIFO유효waiter승계"]
+ PA --> FIN
+ LOCK["파일lock 별도: FD 및경로검증, flock helper"] --> RESULT{"helper 종료"}
+ RESULT -->|"exit0"| HELD["lock 획득, finallylease해제"]
+ RESULT -->|"exit1"| LB["ExclusiveFileLockBusyError"]
+ RESULT -->|"timeout spawn실패 기타"| LI["IntegrityError, timeout은SIGKILL후close대기"]

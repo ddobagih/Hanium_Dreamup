@@ -1,0 +1,35 @@
+sequenceDiagram
+  participant Main as MainActivity actor owner
+  participant Align as TimestampAlignedWalkingCalibration
+  participant Segment as WalkingCalibrationSegmentPolicy
+  participant Profile as PedestrianMotionProfile
+  participant Writer as SerialPedestrianProfileWriter
+  participant Store as Encrypted actor store
+  Note over Main,Store: F-D04-019부터 F-D04-022 보정 및 actor 고정 저장
+  Main->>Align: HIGH single step 원 시각·receipt
+  Main->>Align: accepted non-downweighted raw GNSS endpoint
+  alt step watermark가 fix보다 뒤이고 bracket·gap·wait 검증 통과
+    Align->>Segment: timestamp-aligned raw endpoint
+    Segment->>Segment: quality·straightness·duration·step·distance gate
+    alt 유효 segment 완성
+      Segment->>Profile: validated calibration sample
+      Profile->>Profile: 3 samples warmup / 최근7 robust bounded EWMA
+      Profile-->>Main: updated profile
+      Main->>Writer: submit actor와 profile 고정
+      Writer->>Writer: actor별 아직 대기중 값만 최신으로 합침
+      Writer->>Store: 단일 IO queue save
+      Store-->>Writer: commit 결과
+    end
+  else newestStep가 fix 이하
+    Align->>Align: bounded pending WAITING
+  else watermark 이후 bracket 또는 2초 gap/wait 조건 실패
+    Align->>Align: dequeue / segment reset / REJECTED
+  end
+  Main->>Writer: actor 변경 시 pending profile 조회
+  Main->>Store: loadResult / schema validation·migration
+  Store-->>Main: valid profile / reset-invalid / blocked
+  Main->>Writer: clearPendingAndRun reset barrier
+  Writer->>Writer: pending clear / 실행중 save 뒤 배치
+  Writer->>Store: reset all
+  Writer-->>Main: 최대10초 대기 결과
+  Note over Writer,Main: timeout false는 이미 제출된 reset 취소가 아님

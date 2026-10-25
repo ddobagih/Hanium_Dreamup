@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation.positioning
 
 import kr.co.hanium.dreamup.walksafe.navigation.RoutePoint
+import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -29,7 +30,28 @@ data class FilteredRoutePosition(
     val elapsedRealtimeMs: Long,
     val covarianceEnu: EnuPositionCovariance? = null,
     val heading: RouteHeadingEstimate? = null,
-)
+    val uncertaintyKind: HorizontalUncertaintyKind = HorizontalUncertaintyKind.LEGACY_UNSPECIFIED,
+    val navigationOnly: Boolean = false,
+) {
+    val reportedAccuracyRadius68M: ReportedAccuracyRadius68M?
+        get() = horizontalAccuracyM.takeIf {
+            uncertaintyKind == HorizontalUncertaintyKind.ANDROID_RADIUS_68 && it.isFinite() && it >= 0.0
+        }?.let(::ReportedAccuracyRadius68M)
+
+    val positionMaxAxisSigmaM: PositionMaxAxisSigmaM?
+        get() = horizontalAccuracyM.takeIf {
+            uncertaintyKind == HorizontalUncertaintyKind.FILTER_MAX_AXIS_SIGMA && it.isFinite() && it >= 0.0
+        }?.let(::PositionMaxAxisSigmaM)
+
+    internal fun toTrustedLocation(point: RoutePoint = this.point): TrustedLocation = TrustedLocation(
+        latitude = point.latitude,
+        longitude = point.longitude,
+        accuracyM = horizontalAccuracyM.toFloat(),
+        elapsedRealtimeMs = elapsedRealtimeMs,
+        uncertaintyKind = uncertaintyKind,
+        navigationOnly = navigationOnly,
+    )
+}
 
 enum class RouteMatchQuality {
     HIGH,
@@ -106,7 +128,8 @@ class RouteCorridorMatcher(
     private val config: RouteCorridorMatcherConfig = RouteCorridorMatcherConfig(),
 ) {
     private var activeRouteId: String? = null
-    private var activeRouteGeometry: List<Pair<Double, Double>>? = null
+    private var activeRouteGeometry: CachedRouteGeometry? = null
+    private var activeSegmentIndex: Int? = null
     private var activeCorridorIndex: Int? = null
     private var activeProgressM: Double? = null
     private var activeProgressAtElapsedRealtimeMs: Long? = null
@@ -119,6 +142,7 @@ class RouteCorridorMatcher(
     fun reset() {
         activeRouteId = null
         activeRouteGeometry = null
+        activeSegmentIndex = null
         activeCorridorIndex = null
         activeProgressM = null
         activeProgressAtElapsedRealtimeMs = null
@@ -167,12 +191,12 @@ class RouteCorridorMatcher(
             clearPendingSwitch()
             return unmatched(routeId, position.point, RouteMatchReason.INVALID_ROUTE)
         }
-        // Copy coordinates, not the list reference: callers may replace points in place.
-        val geometry = polyline.map { it.latitude to it.longitude }
-        if (activeRouteId != routeId || activeRouteGeometry != geometry) {
+        // Compare coordinates without allocating per fix. The cached list owns its snapshot:
+        // the public API still detects callers replacing points in place, even with the same id.
+        if (activeRouteId != routeId || activeRouteGeometry?.matchesCoordinates(polyline) != true) {
             reset()
             activeRouteId = routeId
-            activeRouteGeometry = geometry
+            activeRouteGeometry = CachedRouteGeometry(polyline)
         }
         val latestSampleTime = latestSampleElapsedRealtimeMs
         if (latestSampleTime != null && position.elapsedRealtimeMs <= latestSampleTime) {
@@ -185,9 +209,7 @@ class RouteCorridorMatcher(
         // A straight route is one geometric alternative regardless of its sampling density.
         // Choose its nearest projection before applying the progress prior, so subdividing it
         // cannot introduce extra endpoint choices that pull the match back toward old progress.
-        val candidates = buildCandidates(polyline, position, covariance)
-            .groupBy(Candidate::corridorIndex)
-            .values.map { corridor -> corridor.minBy(Candidate::crossTrackDistanceM) }
+        val candidates = buildCandidates(requireNotNull(activeRouteGeometry), position, covariance)
         if (candidates.isEmpty()) {
             clearPendingSwitch()
             return unmatched(routeId, position.point, RouteMatchReason.INVALID_ROUTE)
@@ -209,6 +231,7 @@ class RouteCorridorMatcher(
         }
         if (eligible.isEmpty()) {
             clearPendingSwitch()
+            activeSegmentIndex = null
             val nearest = candidates.minByOrNull(Candidate::crossTrackDistanceM)
             return unmatched(
                 routeId = routeId,
@@ -255,6 +278,7 @@ class RouteCorridorMatcher(
             activeProgressM = selected.candidate.geometricProgressM
             activeProgressAtElapsedRealtimeMs = position.elapsedRealtimeMs
             activeBearingDeg = selected.candidate.bearingDeg.toDouble()
+            activeSegmentIndex = selected.candidate.segmentIndex
         }
 
         return RouteCorridorMatchResult(
@@ -450,57 +474,114 @@ class RouteCorridorMatcher(
     }
 
     private fun buildCandidates(
-        polyline: List<RoutePoint>,
+        geometry: CachedRouteGeometry,
         position: FilteredRoutePosition,
         covariance: EnuPositionCovariance,
     ): List<Candidate> {
-        val result = mutableListOf<Candidate>()
-        var cumulativeM = 0.0
-        var corridorIndex = -1
-        var corridorBearingDeg = 0.0
-        polyline.zipWithNext().forEachIndexed { index, (start, end) ->
-            val segmentLengthM = haversineMeters(start, end)
-            if (segmentLengthM > ZERO_LENGTH_M && segmentLengthM.isFinite()) {
-                val bearingDeg = bearingDegrees(start, end)
-                if (corridorIndex < 0 || angleDifferenceDeg(corridorBearingDeg, bearingDeg.toDouble()) > STRAIGHT_BEARING_TOLERANCE_DEG) {
-                    corridorIndex += 1
-                    corridorBearingDeg = bearingDeg.toDouble()
-                }
-                // Only consecutive nonzero segments can share this id. Compare to the first
-                // bearing in the run, not just the previous one: small turns must not accumulate
-                // into a loop that is mistaken for one straight corridor.
-                val projection = projectToSegment(position.point, start, end)
-                val tangentEast = projection.tangentEast
-                val tangentNorth = projection.tangentNorth
-                val normalEast = -tangentNorth
-                val normalNorth = tangentEast
-                val crossVariance = projectedVariance(covariance, normalEast, normalNorth)
-                val alongVariance = projectedVariance(covariance, tangentEast, tangentNorth)
-                // effectiveCovariance already provides the scalar fallback when needed.
-                // Reapplying it here would erase valid directional uncertainty.
-                val accuracyFloor = config.minimumPositionSigmaM
-                result += Candidate(
-                    segmentIndex = index,
-                    corridorIndex = corridorIndex,
-                    fraction = projection.fraction,
-                    matchedPoint = RoutePoint(
-                        latitude = start.latitude + (end.latitude - start.latitude) * projection.fraction,
-                        longitude = wrapLongitudeDegrees(
-                            start.longitude +
-                                wrapLongitudeDegrees(end.longitude - start.longitude) * projection.fraction,
-                        ),
+        val nearest = arrayOfNulls<Candidate>(geometry.corridorCount)
+        val longitudeScale = LocalGeodesy.metersPerLongitudeDegree(position.point.latitude)
+        fun consider(segment: CachedSegment) {
+            val current = nearest[segment.corridorIndex]
+            // The bounding distance is a lower bound in the same wrapped projection frame.
+            // This global check preserves every corridor's nearest candidate, including parallel
+            // and returning legs, while avoiding full projection/variance/point allocation.
+            if (current != null && projectionBoundsDistance(
+                    position.point, segment.start, segment.end, longitudeScale,
+                ) > current.crossTrackDistanceM + 1e-9
+            ) return
+            val projection = projectToSegment(position.point, segment.start, segment.end, longitudeScale)
+            if (current != null && (projection.distanceM > current.crossTrackDistanceM ||
+                    (projection.distanceM == current.crossTrackDistanceM && segment.index > current.segmentIndex))
+            ) return
+            val tangentEast = projection.tangentEast
+            val tangentNorth = projection.tangentNorth
+            val crossVariance = projectedVariance(covariance, -tangentNorth, tangentEast)
+            val alongVariance = projectedVariance(covariance, tangentEast, tangentNorth)
+            nearest[segment.corridorIndex] = Candidate(
+                segmentIndex = segment.index,
+                corridorIndex = segment.corridorIndex,
+                fraction = projection.fraction,
+                matchedPoint = RoutePoint(
+                    latitude = segment.start.latitude + (segment.end.latitude - segment.start.latitude) * projection.fraction,
+                    longitude = wrapLongitudeDegrees(
+                        segment.start.longitude +
+                            wrapLongitudeDegrees(segment.end.longitude - segment.start.longitude) * projection.fraction,
                     ),
-                    crossTrackDistanceM = projection.distanceM,
-                    geometricProgressM = cumulativeM + segmentLengthM * projection.fraction,
-                    bearingDeg = bearingDeg,
-                    crossTrackSigmaM = max(accuracyFloor, sqrt(max(0.0, crossVariance))),
-                    alongTrackSigmaM = max(accuracyFloor, sqrt(max(0.0, alongVariance))),
-                )
-            }
-            if (segmentLengthM.isFinite()) cumulativeM += segmentLengthM
+                ),
+                crossTrackDistanceM = projection.distanceM,
+                geometricProgressM = segment.cumulativeM + segment.lengthM * projection.fraction,
+                bearingDeg = segment.bearingDeg,
+                crossTrackSigmaM = max(config.minimumPositionSigmaM, sqrt(max(0.0, crossVariance))),
+                alongTrackSigmaM = max(config.minimumPositionSigmaM, sqrt(max(0.0, alongVariance))),
+            )
         }
-        return result
+        val preferred = activeSegmentIndex
+        val nearbyStart = preferred?.minus(NEARBY_SEGMENT_RADIUS)?.coerceAtLeast(0)
+        val nearbyEnd = preferred?.plus(NEARBY_SEGMENT_RADIUS)?.coerceAtMost(geometry.points.size - 2)
+        if (nearbyStart != null && nearbyEnd != null) {
+            for (index in nearbyStart..nearbyEnd) geometry.segmentsByIndex[index]?.let(::consider)
+        }
+        // First fix, displacement, corridor exit/re-entry and other branches always retain the
+        // global search. Nearby candidates only tighten its safe distance bound.
+        for (segment in geometry.segments) {
+            if (nearbyStart == null || nearbyEnd == null || segment.index !in nearbyStart..nearbyEnd) consider(segment)
+        }
+        return nearest.filterNotNull()
     }
+
+    /** Fixed measurements and straight-run membership, computed once per coordinate snapshot. */
+    private class CachedRouteGeometry(polyline: List<RoutePoint>) {
+        val points = polyline.toList()
+        val segmentsByIndex = arrayOfNulls<CachedSegment>((points.size - 1).coerceAtLeast(0))
+        val segments: List<CachedSegment>
+        val corridorCount: Int
+
+        init {
+            val measured = mutableListOf<CachedSegment>()
+            var cumulativeM = 0.0
+            var corridorIndex = -1
+            var corridorBearingDeg = 0.0
+            for (index in 0 until points.lastIndex) {
+                val start = points[index]
+                val end = points[index + 1]
+                val lengthM = haversineMeters(start, end)
+                if (lengthM > ZERO_LENGTH_M && lengthM.isFinite()) {
+                    val bearingDeg = bearingDegrees(start, end)
+                    if (corridorIndex < 0 || angleDifferenceDeg(corridorBearingDeg, bearingDeg.toDouble()) > STRAIGHT_BEARING_TOLERANCE_DEG) {
+                        corridorIndex += 1
+                        corridorBearingDeg = bearingDeg.toDouble()
+                    }
+                    // Compare to the first bearing of this run so small turns cannot merge a loop.
+                    val segment = CachedSegment(index, start, end, lengthM, cumulativeM, bearingDeg, corridorIndex)
+                    measured += segment
+                    segmentsByIndex[index] = segment
+                }
+                if (lengthM.isFinite()) cumulativeM += lengthM
+            }
+            segments = measured
+            corridorCount = corridorIndex + 1
+        }
+
+        fun matchesCoordinates(polyline: List<RoutePoint>): Boolean {
+            if (points.size != polyline.size) return false
+            for (index in points.indices) {
+                if (points[index].latitude.toBits() != polyline[index].latitude.toBits() ||
+                    points[index].longitude.toBits() != polyline[index].longitude.toBits()
+                ) return false
+            }
+            return true
+        }
+    }
+
+    private data class CachedSegment(
+        val index: Int,
+        val start: RoutePoint,
+        val end: RoutePoint,
+        val lengthM: Double,
+        val cumulativeM: Double,
+        val bearingDeg: Float,
+        val corridorIndex: Int,
+    )
 
     private fun corridorWidth(crossTrackSigmaM: Double): Double {
         return min(
@@ -547,6 +628,7 @@ class RouteCorridorMatcher(
     )
 
     private companion object {
+        const val NEARBY_SEGMENT_RADIUS = 12
         const val ZERO_LENGTH_M = 0.01
         // Geometry tolerance only; unrelated to the location uncertainty or match thresholds.
         const val STRAIGHT_BEARING_TOLERANCE_DEG = 1.0
@@ -567,11 +649,13 @@ private data class SegmentProjection(
 // S09-52: the shared LocalGeodesy longitude wrap instead of a local copy.
 private fun wrapLongitudeDegrees(value: Double): Double = LocalGeodesy.wrapLongitudeDegrees(value)
 
-private fun projectToSegment(point: RoutePoint, start: RoutePoint, end: RoutePoint): SegmentProjection {
-    // S09-52 remaining: route projections keep their 111 320 m/deg scale (about 6 378 137 m) for now;
-    // moving it to LocalGeodesy.METERS_PER_DEGREE (0.11 % shorter) changes a matcher threshold case.
-    val latitudeScale = 111_320.0
-    val longitudeScale = latitudeScale * cos(Math.toRadians(point.latitude))
+private fun projectToSegment(
+    point: RoutePoint,
+    start: RoutePoint,
+    end: RoutePoint,
+    longitudeScale: Double,
+): SegmentProjection {
+    val latitudeScale = LocalGeodesy.METERS_PER_DEGREE
     // The query and segment share the same wrapped longitude frame rooted at start.
     val startEast = -wrapLongitudeDegrees(point.longitude - start.longitude) * longitudeScale
     val startNorth = (start.latitude - point.latitude) * latitudeScale
@@ -591,6 +675,22 @@ private fun projectToSegment(point: RoutePoint, start: RoutePoint, end: RoutePoi
         tangentEast = segmentEast / length,
         tangentNorth = segmentNorth / length,
     )
+}
+
+/** Distance to the segment's axis-aligned bounds; never exceeds its projection distance. */
+private fun projectionBoundsDistance(
+    point: RoutePoint,
+    start: RoutePoint,
+    end: RoutePoint,
+    longitudeScale: Double,
+): Double {
+    val startEast = -wrapLongitudeDegrees(point.longitude - start.longitude) * longitudeScale
+    val endEast = startEast + wrapLongitudeDegrees(end.longitude - start.longitude) * longitudeScale
+    val startNorth = (start.latitude - point.latitude) * LocalGeodesy.METERS_PER_DEGREE
+    val endNorth = (end.latitude - point.latitude) * LocalGeodesy.METERS_PER_DEGREE
+    val east = max(0.0, max(min(startEast, endEast), -max(startEast, endEast)))
+    val north = max(0.0, max(min(startNorth, endNorth), -max(startNorth, endNorth)))
+    return hypot(east, north)
 }
 
 private fun projectedVariance(covariance: EnuPositionCovariance, east: Double, north: Double): Double {

@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-016 Backend 직접 HTTP·응답 제한·deadline·취소"]
+  P["P-D12-016 HTTP 성공 응답과 서버 mutation 성공을 무조건 동일시하지 않음"]
+  A --> P
+  M0["1. 승인 origin 고정 · redirect 금지 · 명시적 재시도 루프 없음 · OkHttp retryOnConnectionFailure=false"]
+  P --> M0
+  M1["2. HttpURLConnection은 fixed-length streaming body로 플랫폼 재전송용 버퍼를 피하고 요청당 monotonic deadline을 건다."]
+  M0 --> M1
+  M2["3. report/incident PATCH는 OkHttp callTimeout과 latch 제한을 사용한다."]
+  M1 --> M2
+  M3["4. 엄격 UTF-8/JSON·정해진 status·MIME·최대 body 크기·모델 필드/종류를 검사한다."]
+  M2 --> M3
+  M4["5. 종료 시 security/operations/raw client의 취소는 sticky하게 후속 연결도 차단한다. timeout은 서버 결과 미확인으로 취급한다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 제한 내 단일 HTTP 응답을 받고 연결/stream/deadline 정리."]
+  M0 -. "관련 조건 확인" .-> B0{"connect 8초 또는 read 12초 또는 전체 20초 초과"}
+  B0 -->|"조건 해당"| R0["현재 연결 중단; 쓰기 자동 재전송 없음"]
+  M1 -. "관련 조건 확인" .-> B1{"원본 이미지 GET"}
+  B1 -->|"조건 해당"| R1["20초+bytes/64KiB/s, 최대 150초 전체 예산"]
+  M2 -. "관련 조건 확인" .-> B2{"redirect"}
+  B2 -->|"조건 해당"| R2["자격증명 forwarding 없이 응답을 오류로 처리"]
+  M3 -. "관련 조건 확인" .-> B3{"전체 body 크기 초과 또는 JSON 중복/후행/지수 숫자"}
+  B3 -->|"조건 해당"| R3["엄격 파싱 실패"]
+  A -. "중단 경계" .-> C["security/operations/raw는 close에서 sticky 취소. report/incident는 controller close에 명시 취소 연결 없음."]
+  A -. "복구 경계" .-> Q["redirect 및 일반 connection 재시도 비활성. HTTP mutation 자동 재전송 없음."]

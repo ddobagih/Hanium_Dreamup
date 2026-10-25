@@ -149,4 +149,6 @@ public interface AdminReportRepository {
         AdminOperationsApi.SessionContext session,
         AdminExternalCopyDeletionModels.EventCommand command
     ) throws IOException, GeneralSecurityException;
+    /** Non-blocking cancellation owned by this repository's client. */
+    default void cancelInFlightRequests() {}
 }

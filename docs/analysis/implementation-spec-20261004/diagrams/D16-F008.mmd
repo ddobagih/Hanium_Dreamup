@@ -1,0 +1,16 @@
+flowchart TD
+  META["F-D16-008 · P-D16-008"]
+  META --> A
+  A["자동 분석·키·기준국 후보"] --> B["최대49 hourly slot·ZIP 우선 또는 GZ/Z 계획"]
+  B --> C{"HTTPS·허용host443·자격증명 경로 적합"}
+  C -->|"아니오"| X["scope/security 오류 종료"]
+  C -->|"예"| D["GET·connect15s/read60s·payload 상한"]
+  D -->|"redirect"| C
+  D -->|"401/403"| K["NGII_KEY_REJECTED·후보 대체 없음"]
+  D -->|"cancel"| Q["disconnect·part 정리·취소 전달"]
+  D -->|"자료 수신"| E["SHA·크기·해제·hour/header/epoch 검증"]
+  E -->|"정상"| F["전체 시간대 자료 준비·DownloadedBaseData"]
+  E -->|"BASE_DATA_INVALID"| G["stationRoot 정리·다음 후보"]
+  D -->|"BASE_DATA_UNAVAILABLE"| G
+  G -->|"후보 있음"| B
+  G -->|"후보 없음"| H["BASE_DATA_UNAVAILABLE 종료"]

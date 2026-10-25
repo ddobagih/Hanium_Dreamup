@@ -26,9 +26,16 @@ public interface AdminOperationsApi {
     }
 
     final class MutationConflictException extends IOException {
-        public MutationConflictException() {
+        private final boolean institutionMismatch;
+
+        public MutationConflictException() { this(false); }
+
+        public MutationConflictException(boolean institutionMismatch) {
             super("administrator mutation conflicted with current server state");
+            this.institutionMismatch = institutionMismatch;
         }
+
+        public boolean institutionMismatch() { return institutionMismatch; }
     }
 
     /**
@@ -51,17 +58,39 @@ public interface AdminOperationsApi {
         DELIVERY_HISTORY
     }
 
-    final class SessionContext {
+    final class SessionContext implements AdminRequestAdmission {
+
         private final String accessToken;
         private final String adminId;
         private final String sessionId;
         private final String deviceId;
+        private final Runnable currentOperationCheck;
+        private final AdminRequestAdmission requestAdmission;
 
         public SessionContext(String accessToken, String adminId, String sessionId, String deviceId) {
+            this(accessToken, adminId, sessionId, deviceId, () -> {});
+        }
+
+        SessionContext(String accessToken, String adminId, String sessionId, String deviceId,
+            Runnable currentOperationCheck) {
+            this(accessToken, adminId, sessionId, deviceId, currentOperationCheck,
+                (cancel, enqueue) -> { currentOperationCheck.run(); enqueue.run(); return () -> {}; });
+        }
+
+        SessionContext(String accessToken, String adminId, String sessionId, String deviceId,
+            Runnable currentOperationCheck, AdminRequestAdmission requestAdmission) {
+            this.currentOperationCheck = currentOperationCheck;
+            this.requestAdmission = requestAdmission;
             this.accessToken = accessToken;
             this.adminId = adminId;
             this.sessionId = sessionId;
             this.deviceId = deviceId;
+        }
+
+        void requireCurrentOperation() { currentOperationCheck.run(); }
+
+        @Override public Registration dispatch(Runnable cancel, Runnable enqueue) {
+            return requestAdmission.dispatch(cancel, enqueue);
         }
 
         public String accessToken() { return accessToken; }

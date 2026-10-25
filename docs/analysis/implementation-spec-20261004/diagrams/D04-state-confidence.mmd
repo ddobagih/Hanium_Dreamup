@@ -1,0 +1,16 @@
+stateDiagram-v2
+  state "F-D04-018 초기" as Initial
+  state "안내 가능" as Healthy
+  state "LOW 또는 UNAVAILABLE 저하" as Degraded
+  state "회복 첫 HIGH 대기" as Recovery
+  [*] --> Initial
+  Initial --> Healthy: 유효 정상 quality
+  Initial --> Degraded: LOW·UNAVAILABLE·invalid time
+  Healthy --> Degraded: 품질 저하 / 안내 차단 및 token 요청
+  Degraded --> Recovery: informative 새 HIGH
+  Recovery --> Healthy: 5초 내 두 번째 informative 새 HIGH
+  Recovery --> Degraded: 품질 재저하 또는 회복 gap 초과
+  Degraded --> Degraded: motion-only·downweighted·중복은 복구 근거 아님
+  Degraded --> Degraded: 마지막 commit 30초 후 반복 token
+  Healthy --> Healthy: 같은 token과 episode commit / 전달시각 기록
+  Degraded --> Degraded: 같은 token과 episode commit / 전달시각 기록

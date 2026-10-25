@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D08-004 내부 readiness 및 의존 서비스 준비 점검"]
+  B["진입: GET /internal/ready"]
+  A --> B
+  P0["1. ready 는 관리 저장소 keyring·권한·공간·durable write 및 포화도를 검사한다."]
+  B --> P0
+  P1["2. outbox readiness 를 검사한 후 Backend/ready 와 활성 Voice/ready 를 병렬 인증 요청한다."]
+  P0 --> P1
+  P2["3. upstream 완료 후 outbox 를 다시 확인한다."]
+  P1 --> P2
+  P3["4. 전체 기한·검증 실패면 503 not_ready, 성공이면 ready 만 반환한다."]
+  P2 --> P3
+  OK["200 ready 또는 503 not_ready; liveness 와 독립"]
+  P3 --> OK
+  C0{"저장소 free space 64 KiB 미만 또는 shared ledger envelope ceiling 90% 이상"}
+  X0["not_ready"]
+  B -. "해당 단계에서 검사" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"삭제 worker paused/failed/stale 또는 stopped"}
+  X1["not_ready"]
+  B -. "해당 단계에서 검사" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"Voice disabled"}
+  X2["Voice probe 생략"]
+  B -. "해당 단계에서 검사" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"외부 peer 또는 query 존재"}
+  X3["내부 API 를 노출하지 않음"]
+  B -. "해당 단계에서 검사" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["P-D08-001, P-D08-004, P-D08-022, P-D08-023"]
+  A -.-> POLICY

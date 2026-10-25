@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.voice
 
 import android.media.AudioFormat
 import android.os.Bundle
+import android.os.SystemClock
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -11,12 +12,15 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kr.co.hanium.dreamup.walksafe.navigation.AndroidVoiceAction
 import kr.co.hanium.dreamup.walksafe.navigation.selectAndroidVoiceAction
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -32,6 +36,9 @@ class VoskOfflineCommandDeviceTest {
     fun installedModelMapsOfflineSynthesizedKoreanCommands() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
+        val preservationRoot = if (
+            InstrumentationRegistry.getArguments().getString("preserveOriginalVoskCommandSmokeInput") == "true"
+        ) File(context.cacheDir, "vosk-original-smoke-input-" + SystemClock.elapsedRealtimeNanos()) else null
         val modelDirectory = checkNotNull(BundledVoskModelInstaller.installedModelOrNull(context)) {
             "MODEL_NOT_INSTALLED: run the normal model preparation first; this test never installs it"
         }
@@ -73,8 +80,60 @@ class VoskOfflineCommandDeviceTest {
             val mismatches = mutableListOf<String>()
             for (fixture in fixtures) {
                 val scratch = File.createTempFile("walksafe-voice-fixture-", ".wav", context.cacheDir)
+                var preservedCapture: SynthesisCapture? = null
+                var preservedArtifacts: File? = null
+                var preservedReceipt: JSONObject? = null
+                var preservationInitializationError: String? = null
                 try {
-                    val capture = SynthesisCapture(fixture.id)
+                    val capture = SynthesisCapture(fixture.id, preserveLifecycle = preservationRoot != null)
+                    preservedCapture = capture
+                    val artifacts = preservationRoot?.let {
+                        runCatching { File(it, fixture.id) }
+                            .onFailure { preservationInitializationError = it.javaClass.simpleName }
+                            .getOrNull()
+                    }
+                    preservedArtifacts = artifacts
+                    val receipt = if (preservationRoot != null) runCatching {
+                        JSONObject()
+                            .put("source", "same_original_smoke_synthesis_not_human_microphone")
+                            .put("fixture_id", fixture.id)
+                            .put("requested_utterance_id", fixture.id)
+                            .put("requested_text", fixture.text)
+                            .put("synthesis_bundle", JSONObject())
+                            .put("metadata_observed", false)
+                            .put("metadata_initialization_error", JSONObject.NULL)
+                            .put("tts_engine", JSONObject.NULL)
+                            .put("requested_voice", JSONObject.NULL)
+                            .put("selected_voice", JSONObject.NULL)
+                            .put("voice_locale", JSONObject.NULL)
+                            .put("voice_requires_network", JSONObject.NULL)
+                            .put("configured_speech_rate", 1.0)
+                            .put("pitch_explicitly_set", false)
+                            .put("expected_action", fixture.expectedAction.toString())
+                            .put("decoder", JSONObject().put("sample_rate_hz", 16_000).put("chunk_frames", 512)
+                                .put("words", true).put("partial_words", false).put("max_alternatives", 0)
+                                .put("endpointer_mode", "SHORT").put("appended_silence_frames", 32_000))
+                            .put("native_results", JSONArray())
+                            .put("native_result_observed", false)
+                            .put("decode_return_observed", false)
+                            .put("transcript", JSONObject.NULL)
+                            .put("parser_action", JSONObject.NULL)
+                            .put("expected_action_match", JSONObject.NULL)
+                    }.onFailure { preservationInitializationError = it.javaClass.simpleName }.getOrNull() else null
+                    preservedReceipt = receipt
+                    if (receipt != null) {
+                        runCatching {
+                            receipt.put("tts_engine", engine.defaultEngine)
+                                .put("requested_voice", voice.name)
+                                .put("selected_voice", engine.voice?.name ?: JSONObject.NULL)
+                                .put("voice_locale", voice.locale.toLanguageTag())
+                                .put("voice_requires_network", voice.isNetworkConnectionRequired)
+                                .put("metadata_observed", true)
+                        }.onFailure { preservationInitializationError = it.javaClass.simpleName }
+                        runCatching {
+                            preservationInitializationError?.let { receipt.put("metadata_initialization_error", it) }
+                        }
+                    }
                     assertEquals(
                         "TTS_LISTENER_REJECTED",
                         TextToSpeech.SUCCESS,
@@ -83,18 +142,74 @@ class VoskOfflineCommandDeviceTest {
                     assertEquals(
                         "TTS_SYNTHESIS_REJECTED: ${fixture.id}",
                         TextToSpeech.SUCCESS,
-                        engine.synthesizeToFile(fixture.text, Bundle(), scratch, fixture.id),
+                        engine.synthesizeToFile(fixture.text, Bundle(), scratch, fixture.id).also {
+                            if (receipt != null) {
+                                runCatching { receipt.put("synthesis_return_code", it) }
+                                    .onFailure { error -> receipt.put("synthesis_metadata_error", error.javaClass.simpleName) }
+                            }
+                        },
                     )
                     assertTrue("TTS_SYNTHESIS_TIMEOUT: ${fixture.id}", capture.done.await(20, TimeUnit.SECONDS))
                     assertEquals("TTS_SYNTHESIS_FAILED: ${fixture.id}", "DONE", capture.outcome)
+                    if (artifacts != null && receipt != null) {
+                        runCatching {
+                            check(artifacts.mkdirs()) { "SMOKE_INPUT_ARTIFACT_DIRECTORY_FAILED" }
+                            val wavBytes = scratch.readBytes()
+                            File(artifacts, "original.wav").writeBytes(wavBytes)
+                            receipt.put("original_wav", preservedSmokeBytes("original.wav", wavBytes))
+                            val original = capture.diagnosticPcm()
+                            File(artifacts, "callback-original.pcm").writeBytes(original.bytes)
+                            receipt.put("callback_pcm", preservedSmokeBytes("callback-original.pcm", original.bytes)
+                                .put("sample_rate_hz", original.sampleRate).put("audio_format", original.format)
+                                .put("channels", original.channels))
+                            receipt.put("tts_callbacks", capture.preservedLifecycle())
+                            File(artifacts, "receipt.json").writeText(receipt.toString(2))
+                        }.onFailure { receipt.put("input_preservation_error", it.javaClass.simpleName) }
+                    }
                     val pcm = capture.pcmAt16Khz()
-                    val transcript = recognizeFirstFinal(model, pcm)
+                    if (artifacts != null && receipt != null) {
+                        runCatching {
+                            receipt.put("resampled_pcm", preserveSmokePcm(artifacts, "resampled-16k.s16le", pcm))
+                        }.onFailure { receipt.put("resampled_preservation_error", it.javaClass.simpleName) }
+                    }
+                    val observeDecode: ((ShortArray, Int, String?) -> Unit)? = if (artifacts != null && receipt != null) {
+                        { input, offset, rawResult ->
+                            runCatching {
+                                when {
+                                    offset == 0 -> receipt.put("decoder_feed", preserveSmokePcm(artifacts, "decoder-feed-16k.s16le", input))
+                                    rawResult != null -> {
+                                        receipt.put("native_result_observed", true)
+                                        receipt.getJSONArray("native_results").put(
+                                            JSONObject().put("offset_frames", offset).put("raw_json", rawResult),
+                                        )
+                                    }
+                                    else -> receipt.put("submitted_frames", offset)
+                                        .put("submitted_pcm_sha256", smokeSha256(pcm16Bytes(input.copyOf(offset))))
+                                }
+                            }.onFailure { receipt.put("decode_preservation_error", it.javaClass.simpleName) }
+                        }
+                    } else null
+                    val transcript = recognizeFirstFinal(model, pcm, observeDecode)
+                    if (receipt != null) {
+                        runCatching {
+                            receipt.put("decode_return_observed", true)
+                            receipt.put("transcript", transcript?.let {
+                                JSONObject().put("text", it.text).put("confidence", it.confidence ?: JSONObject.NULL)
+                            } ?: JSONObject.NULL)
+                        }.onFailure { receipt.put("transcript_preservation_error", it.javaClass.simpleName) }
+                    }
                     val results = transcript?.toSpeechRecognitionResults()
                     val action = results?.let {
                         selectAndroidVoiceAction(
                             it.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty(),
                             it.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES),
                         )
+                    }
+                    if (receipt != null) {
+                        runCatching {
+                            receipt.put("parser_action", action?.toString() ?: JSONObject.NULL)
+                            receipt.put("expected_action_match", action == fixture.expectedAction)
+                        }.onFailure { receipt.put("action_preservation_error", it.javaClass.simpleName) }
                     }
                     instrumentation.sendStatus(
                         0,
@@ -108,8 +223,36 @@ class VoskOfflineCommandDeviceTest {
                     )
                     if (action != fixture.expectedAction) mismatches += fixture.id
                 } finally {
-                    engine.stop()
-                    scratch.delete()
+                    try {
+                        val artifacts = preservedArtifacts
+                        val receipt = preservedReceipt
+                        val capture = preservedCapture
+                        if (artifacts != null && receipt != null) {
+                            runCatching {
+                                if (!artifacts.isDirectory) check(artifacts.mkdirs()) { "SMOKE_INPUT_ARTIFACT_DIRECTORY_FAILED" }
+                                receipt.put("tts_callbacks", capture?.preservedLifecycle() ?: JSONObject.NULL)
+                                    .put("tts_outcome", capture?.outcome ?: JSONObject.NULL)
+                                preservationInitializationError?.let { receipt.put("metadata_initialization_error", it) }
+                                File(artifacts, "receipt.json").writeText(receipt.toString(2))
+                            }.onFailure { error ->
+                                // Metadata only; an export failure must not replace the original smoke outcome.
+                                runCatching {
+                                    instrumentation.sendStatus(0, Bundle().apply {
+                                        putString("walksafe_voice_preservation_error", error.javaClass.simpleName)
+                                    })
+                                }
+                            }
+                        } else if (preservationInitializationError != null) {
+                            runCatching {
+                                instrumentation.sendStatus(0, Bundle().apply {
+                                    putString("walksafe_voice_preservation_error", preservationInitializationError)
+                                })
+                            }
+                        }
+                    } finally {
+                        engine.stop()
+                        scratch.delete()
+                    }
                 }
             }
             assertTrue("RECOGNITION_OR_MAPPING_FAILED: ${mismatches.joinToString()}", mismatches.isEmpty())
@@ -294,7 +437,11 @@ class VoskOfflineCommandDeviceTest {
         }
     }
 
-    private fun recognizeFirstFinal(model: Model, pcm: ShortArray): VoskTranscript? {
+    private fun recognizeFirstFinal(
+        model: Model,
+        pcm: ShortArray,
+        observe: ((ShortArray, Int, String?) -> Unit)? = null,
+    ): VoskTranscript? {
         val recognizer = Recognizer(model, 16_000f)
         try {
             recognizer.setWords(true)
@@ -304,17 +451,40 @@ class VoskOfflineCommandDeviceTest {
             // Silence exercises the production endpoint path, not an artificial finalResult flush.
             val input = pcm + ShortArray(32_000)
             var offset = 0
-            while (offset < input.size) {
-                val chunk = input.copyOfRange(offset, minOf(offset + 512, input.size))
-                offset += chunk.size
-                if (recognizer.acceptWaveForm(chunk, chunk.size)) {
-                    parseVoskTranscript(recognizer.result, isFinal = true)?.let { return it }
+            observe?.invoke(input, 0, null)
+            try {
+                while (offset < input.size) {
+                    val chunk = input.copyOfRange(offset, minOf(offset + 512, input.size))
+                    offset += chunk.size
+                    if (recognizer.acceptWaveForm(chunk, chunk.size)) {
+                        val rawResult = recognizer.result
+                        observe?.invoke(input, offset, rawResult)
+                        parseVoskTranscript(rawResult, isFinal = true)?.let { return it }
+                    }
                 }
+                return null
+            } finally {
+                observe?.invoke(input, offset, null)
             }
-            return null
         } finally {
             recognizer.close()
         }
+    }
+
+    private fun pcm16Bytes(samples: ShortArray): ByteArray = ByteBuffer.allocate(samples.size * 2)
+        .order(ByteOrder.LITTLE_ENDIAN).also { it.asShortBuffer().put(samples) }.array()
+
+    private fun smokeSha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
+        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+
+    private fun preservedSmokeBytes(name: String, bytes: ByteArray): JSONObject = JSONObject()
+        .put("file", name).put("bytes", bytes.size).put("sha256", smokeSha256(bytes))
+
+    private fun preserveSmokePcm(directory: File, name: String, samples: ShortArray): JSONObject {
+        val bytes = pcm16Bytes(samples)
+        File(directory, name).writeBytes(bytes)
+        return preservedSmokeBytes(name, bytes).put("frames", samples.size).put("sample_rate_hz", 16_000)
+            .put("channels", 1).put("format", "signed_pcm16_little_endian")
     }
 
     private data class DiagnosticPcm(
@@ -435,7 +605,10 @@ class VoskOfflineCommandDeviceTest {
 
     private data class Fixture(val id: String, val text: String, val expectedAction: AndroidVoiceAction)
 
-    private class SynthesisCapture(private val expectedId: String) : UtteranceProgressListener() {
+    private class SynthesisCapture(
+        private val expectedId: String,
+        private val preserveLifecycle: Boolean = false,
+    ) : UtteranceProgressListener() {
         val done = CountDownLatch(1)
         @Volatile var outcome = "PENDING"
             private set
@@ -443,8 +616,16 @@ class VoskOfflineCommandDeviceTest {
         private var sampleRate = 0
         private var format = 0
         private var channels = 0
+        @Volatile private var startedNanos: Long? = null
+        @Volatile private var doneNanos: Long? = null
 
-        override fun onStart(utteranceId: String?) = Unit
+        override fun onStart(utteranceId: String?) {
+            if (preserveLifecycle && utteranceId == expectedId) {
+                synchronized(this) {
+                    if (startedNanos == null) startedNanos = SystemClock.elapsedRealtimeNanos()
+                }
+            }
+        }
 
         @Synchronized
         override fun onBeginSynthesis(utteranceId: String?, sampleRateInHz: Int, audioFormat: Int, channelCount: Int) {
@@ -465,7 +646,14 @@ class VoskOfflineCommandDeviceTest {
         }
 
         override fun onDone(utteranceId: String?) {
-            if (utteranceId == expectedId) complete("DONE")
+            if (utteranceId == expectedId) {
+                if (preserveLifecycle) {
+                    synchronized(this) {
+                        if (doneNanos == null) doneNanos = SystemClock.elapsedRealtimeNanos()
+                    }
+                }
+                complete("DONE")
+            }
         }
 
         @Deprecated("Required legacy callback")
@@ -495,6 +683,15 @@ class VoskOfflineCommandDeviceTest {
             channels = channels,
             bytes = audio.toByteArray(),
         )
+
+        @Synchronized
+        fun preservedLifecycle(): JSONObject = JSONObject()
+            .put("expected_utterance_id", expectedId)
+            .put("clock", "elapsed_realtime_nanos")
+            .put("start_utterance_id", if (startedNanos != null) expectedId else JSONObject.NULL)
+            .put("start_callback_ns", startedNanos ?: JSONObject.NULL)
+            .put("done_utterance_id", if (doneNanos != null) expectedId else JSONObject.NULL)
+            .put("done_callback_ns", doneNanos ?: JSONObject.NULL)
 
         @Synchronized
         fun pcmAt16Khz(): ShortArray {

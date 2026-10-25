@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-009 · 이미지 암호화 키 공급·세대 회전<br/>startup key manager 생성, 저장/원본열람 시 synchronize"]
+  P["P-D15-009 · 전제조건<br/>secret_file 또는 kms_agent 설정; 배포는 root 권한 경계.<br/>key는 upload root 외부."]
+  E --> P
+  S1["1. 중복 JSON key·정확 필드·active key 한 개·material<br/>재사용 금지 검증"]
+  P --> S1
+  S2["2. 현재 generation 동일 hash는 shared lock, 신규 세대는<br/>exclusive DB advisory lock"]
+  S1 --> S2
+  S3["3. generation1부터 previous hash 체인 및 +1 세대 검사"]
+  S2 --> S3
+  S4["4. active→decrypt-only/compromised,<br/>decrypt-only→compromised 등 제한 전이"]
+  S3 --> S4
+  S5["5. provider manifest가 실행 중 바뀌면 restart<br/>required; active로 쓰고 active/decrypt-only만 읽기"]
+  S4 --> S5
+  OK["정상 결과<br/>provider manifest가 실행 중 바뀌면 restart required;<br/>active로 쓰고 active/decrypt-only만 읽기"]
+  S5 --> OK
+  B1["조건 · retired/destroyed 신규 전이<br/>결과 · retained backup key-use proof 미지원으로 차단"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · DB/raw object가 terminal key 참조<br/>결과 · 차단"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · manifest runtime 변경<br/>결과 · 503/readiness false; restart 필요"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · compromised<br/>결과 · material 없이 fingerprint만 보존, 복호화 거절"]
+  S1 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_image_keys.py:717<br/>synchronize_report_image_keyring<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

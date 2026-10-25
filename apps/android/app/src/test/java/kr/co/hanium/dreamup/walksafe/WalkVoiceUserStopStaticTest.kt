@@ -6,7 +6,7 @@ import org.junit.Test
 /** S04-30: the notification stop is delivered to MainActivity as a user stop and blocks automatic restarts. */
 class WalkVoiceUserStopStaticTest {
     private val activity = ReportStaticSourceInspector.read(
-        "src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/HandsFreeRuntimeSession.kt",
     )
     private val service = ReportStaticSourceInspector.read(
         "src/main/java/kr/co/hanium/dreamup/walksafe/voice/WalkVoiceForegroundService.kt",
@@ -30,34 +30,34 @@ class WalkVoiceUserStopStaticTest {
 
     @Test
     fun theOwnerRecordsTheStopForTheCurrentWalkAndClearsItsStartRequest() {
-        val attach = block("private fun attachHandsFreeVoiceController")
-        assertTrue(attach.contains("setWalkVoiceUserStopListener(::handleHandsFreeVoiceUserStop)"))
-        val handler = block("private fun handleHandsFreeVoiceUserStop")
+        val attach = block("fun attachHandsFreeVoiceController")
+        assertTrue(attach.contains("setUserStopListener(::handleHandsFreeVoiceUserStop)"))
+        val handler = block("fun handleHandsFreeVoiceUserStop")
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 handler,
                 "if (stopped !== handsFreeVoiceController",
-                "recordUserStop(walkSessionLifecycle.snapshot().epoch.walkSessionId)",
+                "recordUserStop(requireNotNull(environment.walkOrNull()).epoch.walkSessionId)",
                 "handsFreeVoiceServiceRequested = false",
                 "clearHandsFreeVoiceStartRequest()",
                 "voice_hands_free=user_stopped",
             ),
         )
-        assertTrue(block("private fun closeHandsFreeVoice").contains("setWalkVoiceUserStopListener(null)"))
+        assertTrue(block("fun closeHandsFreeVoice").contains("setUserStopListener(null)"))
     }
 
     @Test
     fun automaticStartsAreHeldOffUntilANewWalk() {
-        val start = block("private fun maybeStartHandsFreeVoiceService")
+        val start = block("fun maybeStartHandsFreeVoiceService")
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 start,
-                "!isWalkSessionRuntimeActive()",
-                "blocksAutomaticStart(walkSessionLifecycle.snapshot().epoch.walkSessionId) == true",
+                "!environment.runtimeActive()",
+                "platform.userStoppedWalk(requireNotNull(environment.walkOrNull()).epoch.walkSessionId)",
                 "voice_hands_free=user_stopped",
                 "return",
-                "app.registerWalkVoiceStartRequest(controller, ::handleWalkVoiceStartFailure)",
-                "startService(startIntent)",
+                "platform.registerStart(controller, ::handleWalkVoiceStartFailure)",
+                "platform.startService(requestId)",
             ),
         )
     }

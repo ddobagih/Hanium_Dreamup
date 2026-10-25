@@ -326,6 +326,18 @@ public final class AdminReportWorkflowController {
         }
     }
 
+    public boolean rejectSubmission(Request request) {
+        if (request == null || !request.claim()) return false;
+        try {
+            return request.kind == Request.Kind.STATUS_DETAIL_RETRY
+                ? markUpdatedDetailStale(request)
+                : fail(request, "작업을 시작하지 못했습니다. 입력을 다시 확인하고 직접 시도해 주세요.");
+        } finally {
+            request.destroy();
+            clearActiveRequest(request);
+        }
+    }
+
     public boolean execute(Request request) {
         if (request == null || !request.claim()) return false;
         try {

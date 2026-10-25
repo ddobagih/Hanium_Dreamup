@@ -1,0 +1,20 @@
+stateDiagram-v2
+  state "F-D01-013 교육·사용법·안전 장소" as Prep
+  state "F-D01-014 HAZARD_ALERT 출력 대기" as Hazard
+  state "F-D01-014 명시적 멈춤·주변 확인" as Ack
+  state "F-D01-015 PAUSE 출력 대기" as Pause
+  state "F-D01-016 RESUME 재검사와 출력" as Resume
+  state "F-D01-017 SAFE_STOP 출력" as Stop
+  state "F-D01-018 profile·완료 영수증" as Stored
+  [*] --> Prep
+  Prep --> Hazard: current device gate와 요구채널 비어있지 않음
+  Hazard --> Ack: 모든 요구 output terminal 완료
+  Ack --> Pause: 현재 token으로 사용자 위험 응답
+  Pause --> Resume: sandbox PAUSED 및 요구출력 완료
+  Resume --> Stop: sandbox explicit resume ACTIVE 및 요구출력 완료
+  Stop --> Stored: sandbox SAFE_STOP 및 요구출력 완료
+  Hazard --> Prep: 실패·취소는 새 완료 기록 없음
+  note right of Stored
+    production lifecycle reducer를 사용하는 sensor-free sandbox
+    실제 보행·route 복원이 아님
+  end note

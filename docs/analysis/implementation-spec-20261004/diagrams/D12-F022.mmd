@@ -1,0 +1,21 @@
+flowchart TD
+  A["F-D12-022 검수 이력 전체 페이지·최근 묶음"]
+  P["P-D12-022 검수 이력 snapshot 일관성"]
+  A --> P
+  M0["1. READ proof로 /reports/{id}/review-decisions를 요청한다."]
+  P --> M0
+  M1["2. 전체 이력은 snapshot revision과 total을 고정하고 연속 revision 페이지를 순서대로 누적한다."]
+  M0 --> M1
+  M2["3. 최근 조회는 position=last로 최신 suffix를 요청하고 cursor 없음 및 suffix 시작 revision을 검사한다."]
+  M1 --> M2
+  M3["4. 현재 report/history generation과 일치할 때 목록·범위 문구를 갱신한다."]
+  M2 --> M3
+  M3 --> N["정상 종료: 고정 snapshot의 전체 페이지 또는 최근25개 preview 표시."]
+  M0 -. "관련 조건 확인" .-> B0{"schema·순서·snapshot 불일치"}
+  B0 -->|"조건 해당"| R0["부분 성공으로 합치지 않고 실패"]
+  M1 -. "관련 조건 확인" .-> B1{"최근 페이지"}
+  B1 -->|"조건 해당"| R1["전체 이력 완료로 표시하지 않음"]
+  M2 -. "관련 조건 확인" .-> B2{"신고/세션 변경"}
+  B2 -->|"조건 해당"| R2["늦은 이력 응답 폐기"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["페이지 오류는 같은 snapshot 연장으로 합치지 않고 처음부터 조회."]

@@ -1,0 +1,30 @@
+flowchart TD
+  E["F-D06-023 raw 동의·정책·계정 이벤트<br/>P-D06-021"]
+  KIND{"이벤트 종류"}
+  HOLD["결정 전 previous receipt hold<br/>undecided는 process 내 보관만"]
+  TEST{"previous 존재·양쪽 RAW grant·currentRawEffective<br/>같은 installation/policy/itemVersions<br/>revision 정확히+1·receipt 변경?"}
+  CONT["RAW_CONTINUED"]
+  REVOKE["RAW_REVOKED"]
+  SAVE{"현재 policy marker 아래<br/>continuity fence 내구화 성공?"}
+  SELECT["원래 manifest receipt/walk 보존<br/>selectable receipt만 확장"]
+  UNDECIDED["process 내 kept/undecided<br/>업로드 선택 금지"]
+  DEL["predecessor chain revoke fence<br/>해당 미전송 자료 삭제 시도"]
+  AL["policy alignment<br/>이전 continuity selectable 중지"]
+  ALEND["alignment 자체는 즉시 물리삭제 아님<br/>TTL·후속 정리 계약 적용"]
+  AC["계정삭제 global fence·pointer clear<br/>live/quarantine 삭제·key destroy"]
+  VERIFY{"verified purge marker와<br/>정확한 empty 증거?"}
+  NEW["새 enrollment에서만 fresh key/reset"]
+  BLOCK["fence 유지·신규 수집/전송 차단<br/>purge 실패를 허용으로 바꾸지 않음"]
+  E --> KIND
+  KIND -->|receipt 변경| HOLD --> TEST
+  TEST -->|모두 충족| CONT --> SAVE
+  TEST -->|하나라도 불충족 또는 previous null| REVOKE --> DEL
+  SAVE -->|예| SELECT
+  SAVE -->|아니오| UNDECIDED
+  KIND -->|직접 raw 철회| DEL
+  KIND -->|새 policy 첫 alignment| AL --> ALEND
+  KIND -->|계정삭제| AC --> VERIFY
+  VERIFY -->|재가입 및 검증 성공| NEW
+  VERIFY -->|실패·미완료| BLOCK
+  DEL -->|삭제 실패| BLOCK
+  DEL -->|성공| STOP["fence 보존·active upload 취소"]

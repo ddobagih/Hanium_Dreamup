@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D01-004 OTP 가입 partial 암호화 보존과 재시작 복원"]
+  G{"앱 시작 또는 계정 화면 복원; install ID 확보 및 저장소 읽기 가능"}
+  I["partial schema android-email-enrollment-partial.v4, handle, expiry/resend, install owner SHA256, 정확 문서 versions·selections; 2..4096 chars"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 불량 partial 폐기 또는 저장소 blocked"]
+  G -->|"미충족"| X
+  N1["encrypted store restore에서 absent/restored/clearedInvalid/blocked를 구분한다."]
+  I --> N1
+  N2["owner 일치·필수선택·정확 버전·미만 expiry를 검사하고 v3는 신뢰 없이 제거한다."]
+  N1 --> N2
+  N3["유효하면 email OTP enrollment 상태를 재구성하고 선택을 복원한다."]
+  N2 --> N3
+  N4["같은 프로세스는 elapsed deadline, 재시작은 절대시각으로 create 직전 다시 검증한다."]
+  N3 --> N4
+  OK["OTP 화면 복원; email/password 등 재입력 필요"]
+  N4 --> OK
+  B0["partial clear; 새 가입 단계"]
+  N2 -->|"expired·owner mismatch·잘못된 schema"| B0
+  B1["Blocked; 가입 계속 불가"]
+  N2 -->|"clear 또는 store 접근 실패"| B1
+  B2["remaining 0으로 만료"]
+  N4 -->|"elapsed clock 역행"| B2
+  R["중단·취소: 사용자 로그인 이동 또는 만료시 partial 제거 경로 / 프로세스 중단 후 encrypted partial만 재개 근거"]
+  V["복구·재시도: v4 검증 통과 시 복원; 서버 최종 OTP 유효성은 별도 / 새 OTP는 사용자 발송 요청으로만"]
+  Q["정책 P-D01-001 · P-D01-003 · P-D01-018"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

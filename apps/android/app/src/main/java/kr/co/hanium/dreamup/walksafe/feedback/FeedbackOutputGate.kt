@@ -6,6 +6,7 @@ internal class FeedbackOutputGate(private val nowMs: () -> Long) {
     private var generation = 0L
     private var vibrationRank = Int.MIN_VALUE
     private var vibrationUntilMs = Long.MIN_VALUE
+    private var vibrationEventId: String? = null
 
     @Synchronized
     fun generation(): Long = generation
@@ -26,6 +27,7 @@ internal class FeedbackOutputGate(private val nowMs: () -> Long) {
         expectedGeneration: Long,
         validUntilMs: Long,
         validator: () -> Boolean,
+        eventId: String? = null,
         output: (LongArray) -> Boolean,
     ): Boolean {
         if (pattern == null || pattern.isEmpty() || pattern.any { it < 0L } || pattern.none { it > 0L }) return false
@@ -33,8 +35,13 @@ internal class FeedbackOutputGate(private val nowMs: () -> Long) {
         val now = nowMs()
         if (now > validUntilMs) return false
         if (now < vibrationUntilMs && rank < vibrationRank) return false
+        // A duplicate keeps the original completion time; a different event may still preempt.
+        if (now < vibrationUntilMs && rank == vibrationRank &&
+            eventId != null && eventId == vibrationEventId
+        ) return false
         if (!runCatching { output(pattern) }.getOrDefault(false)) return false
         vibrationRank = rank
+        vibrationEventId = eventId
         vibrationUntilMs = pattern.fold(now) { total, duration ->
             if (duration > Long.MAX_VALUE - total) Long.MAX_VALUE else total + duration
         }
@@ -47,5 +54,6 @@ internal class FeedbackOutputGate(private val nowMs: () -> Long) {
         generation += 1L
         vibrationRank = Int.MIN_VALUE
         vibrationUntilMs = Long.MIN_VALUE
+        vibrationEventId = null
     }
 }

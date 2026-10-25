@@ -161,6 +161,49 @@ class GatewaySessionProcessCoordinatorTest {
     }
 
     @Test
+    fun failedPasswordCheckRetainsTheVerifiedSessionAndFirstRunRecord() {
+        val session = verifiedSession(rotation = 1L)
+        val firstRun = FirstRunOnboardingPolicy.initial(epoch = 91L)
+        val login = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        assertTrue(GatewaySessionProcessCoordinator.publishVerified(login, session, firstRun))
+        val prior = GatewaySessionProcessCoordinator.snapshot()
+        val observed = mutableListOf<GatewaySessionProcessSnapshot>()
+        GatewaySessionProcessCoordinator.attach(firstOwner, observed::add)
+        val passwordCheck = requireNotNull(GatewaySessionProcessCoordinator.beginGeneralSessionOperationIfCurrent(
+            prior.generation, session,
+        ))
+
+        assertTrue(GatewaySessionProcessCoordinator.cancelOperationPreservingSession(passwordCheck))
+
+        val after = GatewaySessionProcessCoordinator.snapshot()
+        assertSame(session, after.session)
+        assertSame(firstRun, after.restoredFirstRunSnapshot)
+        assertTrue(session.isUsableFor(ACTOR_ID, nowEpochMs = NOW_EPOCH_MS))
+        assertNull(after.inFlightOperationId)
+        assertFalse(after.storageBlocked)
+        assertFalse(after.deletionRecoveryOnly)
+        assertNull(observed.last().inFlightOperationId)
+        assertTrue(after.generation > passwordCheck.generation)
+    }
+
+    @Test
+    fun anOldPasswordFailureCannotCancelANewerRequestOrClearRecoveryScope() {
+        val first = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        val recovery = deletionRecoveryVerifiedSession(1L)
+        assertTrue(GatewaySessionProcessCoordinator.publishDeletionRecoveryVerified(first, recovery, ACTOR_ID, GATEWAY_ORIGIN))
+        val failed = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+        assertTrue(GatewaySessionProcessCoordinator.cancelOperationPreservingSession(failed))
+        assertTrue(GatewaySessionProcessCoordinator.snapshot().deletionRecoveryOnly)
+        assertSame(recovery, GatewaySessionProcessCoordinator.snapshot().session)
+        val newer = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())
+
+        assertFalse(GatewaySessionProcessCoordinator.cancelOperationPreservingSession(failed))
+        assertEquals(newer.operationId, GatewaySessionProcessCoordinator.snapshot().inFlightOperationId)
+        assertSame(recovery, GatewaySessionProcessCoordinator.snapshot().session)
+        assertTrue(GatewaySessionProcessCoordinator.snapshot().deletionRecoveryOnly)
+    }
+
+    @Test
     fun detachingOwnersPreservesStateAndExecutor() {
         val session = verifiedSession(rotation = 1L)
         val operation = requireNotNull(GatewaySessionProcessCoordinator.beginOperation())

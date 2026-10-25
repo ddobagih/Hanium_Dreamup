@@ -1,0 +1,44 @@
+flowchart TD
+  A["F-D08-024 신고 이미지·metadata 전송"]
+  B["진입: POST /api/reports/v2"]
+  A --> B
+  P0["1. session/Backend/privacy/walk gate 를 body 읽기 전에 확인한다."]
+  B --> P0
+  P1["2. 이미지 rate global120 actor12 IP30/분을 precheck 하고 consent 를 확인한다."]
+  P0 --> P1
+  P2["3. 동의 확인 뒤 재검사·record 하고 global1/actor1 slot 을 잡는다."]
+  P1 --> P2
+  P3["4. multipart 를 15 초 내 읽고 transport binding 을 검사한다."]
+  P2 --> P3
+  P4["5. 전송 직전·직후 동의와 actor generation 을 다시 검사하며 signed Backend POST 한다."]
+  P3 --> P4
+  P5["6. commit 가능 후 동의가 stale 이면 결과불명 상태조회 지시를 반환한다."]
+  P4 --> P5
+  OK["정상: 신고 전송 결과 또는 결과불명·보류"]
+  P5 --> OK
+  C0{"계정에 activewalk 있음"}
+  X0["자기 holder 도 409; 종료 후 전송"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"자동 purpose"}
+  X1["automatic_reporting 동의 필수"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"cellular"}
+  X2["mobile_network_transfer 동의 필수"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"2xx 또는 5xx 후 동의 stale"}
+  X3["409 report_transport_outcome_unknown; status_query_before_retry"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  C4{"rate/slot"}
+  X4["429 또는 503"]
+  B -. "해당 단계 분기" .-> C4
+  C4 -->|"조건 충족"| X4
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. body15 초 + Backend15 초; Node40 초. stream lease 는 전달 종료까지 유지."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-011, P-D08-013, P-D08-016, P-D08-017, P-D08-029"]
+  A -.-> POLICY

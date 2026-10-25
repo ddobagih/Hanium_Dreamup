@@ -1,0 +1,37 @@
+flowchart TD
+  T["F-D06-001 신고 대기열 빌드 활성화와 전송 origin 고정"]
+  P["전제: debug AND WALKSAFE_REPORT_QUEUE_ENABLED 및 모든 정수 상한 검증;<br/>release 강제 false."]
+  T --> P
+  E1["E-D06-001-01 Gradle 구성값 로드→debug capacity 검증→프로파일 생성 또는 null"]
+  E1 --> T
+  E2["E-D06-001-02 사용자 직접 신고→queue profile 확인→비활성 안내"]
+  E2 --> T
+  A1["1. enabled와 6개 용량값을 검증한다."]
+  P --> A1
+  A2["2. automaticMaxEntries는 1 이상 total 미만, 전체-자동 바이트 여유는 최대 entry<br/>이상이어야 한다."]
+  A1 --> A2
+  A3["3. runtime은 BuildConfig.DEBUG를 다시 검사해 capacity 없으면 신규<br/>저장/조회/전송을 막는다."]
+  A2 --> A3
+  A4["4. Gateway session origin과 build-approved origin이 정확히 같아야<br/>status/POST 호출을 만든다."]
+  A3 --> A4
+  N["정상 종료: 빌드 profile 또는 null 확정."]
+  A4 --> N
+  FX["결과: 신고 버튼 enabled/설명 및 queue 생성 가능성을 결정. privacy purge/만료 정리는<br/>비활성 빌드에도 실행."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"release 또는 profile null"}
+    R1["명시 신고 UI에서 현재 빌드 사용 불가 안내; 저장 null"]
+    B1 -->|조건 성립| R1
+    B2{"developmentReportQueue 및 명시 profile 없음"}
+    R2["loopback 8081 개발 한도 적용"]
+    B2 -->|조건 성립| R2
+    B3{"로그인 origin 불일치"}
+    R3["신고 복구 전송 생성 거부"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-001"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 잘못된 enabled/capacity 설정은 Gradle require/error."]
+    X2["재시도: 실행 중 URL 입력만으로 origin 승인 변경 불가; 새 빌드 필요."]
+  end

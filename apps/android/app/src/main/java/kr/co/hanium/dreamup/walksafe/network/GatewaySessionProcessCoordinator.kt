@@ -350,6 +350,19 @@ internal object GatewaySessionProcessCoordinator {
         return true
     }
 
+    /** Ends a failed credential check without logging out the previously verified account. */
+    fun cancelOperationPreservingSession(operation: GatewaySessionOperation): Boolean {
+        val notification: Notification
+        synchronized(lock) {
+            if (inFlightOperation != operation) return false
+            inFlightOperation = null
+            advanceGenerationLocked()
+            notification = notificationLocked()
+        }
+        notification.deliver()
+        return true
+    }
+
     fun clear(operation: GatewaySessionOperation): GatewaySessionProcessSnapshot? {
         val cleared: GatewaySessionProcessSnapshot
         val notification: Notification

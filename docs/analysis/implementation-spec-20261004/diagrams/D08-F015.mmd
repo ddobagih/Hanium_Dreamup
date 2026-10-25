@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D08-015 다른 기기 선택 로그아웃"]
+  B["진입: DELETE /api/field-session?device_id={id}"]
+  A --> B
+  P0["1. 자기 device 인지 결정한다."]
+  B --> P0
+  P1["2. 다른 device 는 cookie 저장 auth_time 을 읽어 recent login 을 확인한다."]
+  P0 --> P1
+  P2["3. actor/file lock 아래 지정 slot/family 만 폐기한다."]
+  P1 --> P2
+  P3["4. 동일 보행 holder 라면 종료를 시도한다."]
+  P2 --> P3
+  OK["대상 기기 204 폐기"]
+  P3 --> OK
+  C0{"다른 device 및 로그인 5 분 초과"}
+  X0["401 reauthentication_required; 아무것도 폐기하지 않음"]
+  B -. "해당 단계에서 검사" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"자기 device"}
+  X1["recent-login 없이 허용 및 cookie clear"]
+  B -. "해당 단계에서 검사" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"auth-time 저장소 읽기 실패"}
+  X2["fail-closed typed 오류; 폐기 안 함"]
+  B -. "해당 단계에서 검사" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["P-D08-007, P-D08-008, P-D08-012, P-D08-013"]
+  A -.-> POLICY

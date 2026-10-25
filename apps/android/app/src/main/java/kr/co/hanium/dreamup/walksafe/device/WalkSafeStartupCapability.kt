@@ -87,6 +87,14 @@ data class WalkSafeStartupCapabilityDecision(
 ) {
     val mayConfirmAndStart: Boolean
         get() = tier != WalkSafeStartupCapabilityTier.BLOCKED
+
+    /** Stationary onboarding needs its output channel, not live camera/distance readiness. */
+    fun allowsTrainingOutput(requirement: WalkSafeStartupRequirement, vibrationAvailable: Boolean? = null): Boolean =
+        requirement in setOf(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS, WalkSafeStartupRequirement.VIBRATION) &&
+            (requirement != WalkSafeStartupRequirement.VIBRATION || vibrationAvailable == true) &&
+            WalkSafeStartupRequirement.ANDROID_VERSION !in unavailableRequirements &&
+            WalkSafeStartupRequirement.ANDROID_VERSION !in pendingRequirements &&
+            requirement !in unavailableRequirements && requirement !in pendingRequirements
 }
 
 object WalkSafeStartupCapabilityResolver {

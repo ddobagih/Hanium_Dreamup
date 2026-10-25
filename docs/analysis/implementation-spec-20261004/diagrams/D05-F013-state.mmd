@@ -1,0 +1,24 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-013-NEW" as NEW
+  state "S-D05-013-LOADING" as LOADING
+  state "S-D05-013-READY" as READY
+  state "S-D05-013-INFLIGHT" as INFLIGHT
+  state "S-D05-013-PENDING" as PENDING
+  state "S-D05-013-STOPPING" as STOPPING
+  state "S-D05-013-RELEASED" as RELEASED
+  state "S-D05-013-RELEASE_FAILED" as RELEASE_FAILED
+  [*] --> NEW
+  NEW --> LOADING: "start absolute deadline"
+  LOADING --> READY: "contract native ready"
+  LOADING --> STOPPING: "deadline or init error"
+  READY --> INFLIGHT: "accepted token"
+  INFLIGHT --> INFLIGHT: "latest pending replaces one pending"
+  INFLIGHT --> READY: "decode and consumer finished"
+  READY --> STOPPING: "close"
+  INFLIGHT --> STOPPING: "close or error"
+  STOPPING --> RELEASED: "copy invoke consumer drained and native closed"
+  STOPPING --> RELEASE_FAILED: "close failure"
+  note right of NEW
+    F-D05-013 P-D05-013
+  end note

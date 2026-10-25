@@ -162,13 +162,20 @@ class WalkSafeFeedbackRiskWorseningTest {
         assertNotNull(policy.evaluate(risk(2_800L, 300L, 1.1f), true, 2_800L))
     }
 
-    @Test fun weakOrUnleasedPreviousSuccessDoesNotBecomeATrustedComparison() {
-        for (previous in listOf(risk(1_000L, 8_000L, 1.1f, DepthSource.ARCORE_FULL_DEPTH).copy(confidence = .59f),
-                risk(1_000L, 8_000L, 1.1f).copy(validUntilMs = Long.MAX_VALUE))) {
-            val policy = WalkSafeFeedbackPolicy()
-            deliver(policy, previous, 1_000L)
-            assertNull(policy.evaluate(risk(1_800L, 2_000L, 1.1f, previous.source), true, 1_800L))
-        }
+    @Test fun weakPreviousSuccessDoesNotBecomeATrustedComparison() {
+        val previous = risk(1_000L, 8_000L, 1.1f, DepthSource.ARCORE_FULL_DEPTH).copy(confidence = .59f)
+        val policy = WalkSafeFeedbackPolicy()
+        deliver(policy, previous, 1_000L)
+        assertNull(policy.evaluate(risk(1_800L, 2_000L, 1.1f, previous.source), true, 1_800L))
+    }
+
+    @Test fun unleasedObservationCannotEstablishCompletedHistoryOrBlockTheFirstValidRisk() {
+        val policy = WalkSafeFeedbackPolicy()
+        val unleased = risk(1_000L, 8_000L, 1.1f).copy(validUntilMs = Long.MAX_VALUE)
+        assertNull(policy.evaluate(unleased, true, 1_000L))
+        assertFalse(policy.claimFeedbackDelivery(unleased.trackId, 1_000L, 1_000L))
+        assertFalse(policy.confirmFeedbackDelivery(unleased.trackId, 1_000L, 1_000L))
+        assertNotNull(policy.evaluate(risk(1_800L, 2_000L, 1.1f), true, 1_800L))
     }
 
     @Test fun carryingNewerHistoryInvalidatesTheTargetsOlderRiskSnapshot() {
@@ -244,5 +251,6 @@ class WalkSafeFeedbackRiskWorseningTest {
         }, timestampMs = at + 50_000L,
         trackAgeFrames = 20, trackStableMs = 4_000L, stale = false,
         validUntilMs = at + 800L, timeToCollisionMs = ttc, riskDistanceM = distance,
+        observedAtElapsedRealtimeMs = at, observationMaxAgeMs = 800L,
     )
 }

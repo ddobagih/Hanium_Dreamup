@@ -1,6 +1,9 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
 import org.junit.Assert.*
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPoint
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey
 import org.junit.Test
 
 class RiskEvidenceRegressionTest {
@@ -66,12 +69,16 @@ class RiskEvidenceRegressionTest {
         val estimator = ObjectDepthEstimator(tracker = tracker)
         val geometry = MaskPolygonExtractor().extract(DetectionCandidate("car", .95f, RectNorm(0f, 0f, 1f, 1f)))
         val mapper = LetterboxCoordinateMapper(ModelInputTransform(20, 20, 20, 20, 1f, 0f, 0f), ImageSize(20, 20))
+        // Uniform-depth fixture observes the same physical surface point in every frame.
+        val pointId = VisualMaterialPointId()
         val results = listOf(4_000, 3_500, 3_000, 2_500).mapIndexed { index, mm ->
             val at = 1_000L + index * 500L
             val pose = CameraPoseEvidence(1L, at, 0f, 0f, 0f, 0f, 0f, -1f,
                 CameraImageProjection(20, 20, 14f, 14f, 10f, 10f, 1f, 0f, 0f, 0f, 1f, 0f))
             estimator.estimate(ObjectDepthInput(at * 1_000_000L, at, geometry,
                 tracker.update(listOf(geometry), at).single(), mapper,
+                materialPoint = VisualMaterialPoint(pointId,
+                    VisualFrameKey(1L, at * 1_000_000L, at * 1_000_000L, at, 1L), Point2(.5f, .5f)),
                 rawDepth = DepthImage16(20, 20, IntArray(400) { mm }),
                 rawConfidence = ConfidenceImage8(20, 20, ByteArray(400) { 255.toByte() }),
                 rawDepthMatchesCameraFrame = true, rawDepthTimestampNs = at * 1_000_000L,

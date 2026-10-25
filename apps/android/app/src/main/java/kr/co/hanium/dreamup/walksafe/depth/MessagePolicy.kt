@@ -127,7 +127,7 @@ class MessagePolicy(
         val motionPhrase = when {
             result.trend == Trend.APPROACHING && result.objectMotion == ObjectMotion.USER_APPROACHING_STATIONARY &&
                 currentMotion?.direction == ObjectMovementDirection.STATIONARY ->
-                " 정지해 있는 것으로 보이며, 현재 이 물체에 가까워지고 있습니다."
+                " 정지해 있는 것으로 보이며, 사용자가 다가갑니다."
             result.trend == Trend.APPROACHING && result.objectMotion == ObjectMotion.OBJECT_APPROACHING &&
                 currentMotion?.direction == ObjectMovementDirection.TOWARD_USER &&
                 (currentMotion.relativeClosingSpeedMps ?: 0f) >= 0.25f ->
@@ -147,7 +147,7 @@ class MessagePolicy(
         }
         val action = if (level == MessageLevel.STOP) "멈추세요. 주변을 확인하세요." else "멈출 준비를 하세요."
         return MessagePolicyDecision(
-            userFacing = UserFacingDepth(stepsAhead = null, messageLevel = level, message = "$phrase.$motionPhrase $action"),
+            userFacing = UserFacingDepth(stepsAhead = null, messageLevel = level, message = "$phrase. $action$motionPhrase"),
             purpose = MessagePurpose.OBSTACLE_WARNING,
             reason = when {
                 level == MessageLevel.STOP -> "near metric obstacle"
@@ -253,16 +253,17 @@ class MessagePolicy(
             result.trend == Trend.APPROACHING && distance <= approachingDistance -> MessageLevel.WARNING
             else -> MessageLevel.NONE
         }
-        val ttc = result.timeToCollisionMs?.takeIf { it >= 0L && result.trend == Trend.APPROACHING }
-        val ttcLevel = when {
-            ttc == null -> MessageLevel.NONE
-            ttc <= config.ttcStopMs -> MessageLevel.STOP
-            ttc <= config.ttcWarningMs -> MessageLevel.WARNING
-            ttc <= config.ttcAwareMs -> MessageLevel.AWARE
+        val approachTime = result.approachTimeMs?.takeIf { it >= 0L && result.trend == Trend.APPROACHING }
+        val approachLevel = when {
+            approachTime == null -> MessageLevel.NONE
+            approachTime <= config.ttcStopMs -> MessageLevel.STOP
+            approachTime <= config.ttcWarningMs -> MessageLevel.WARNING
+            approachTime <= config.ttcAwareMs -> MessageLevel.AWARE
             else -> MessageLevel.NONE
         }
-        // Both paths already share the metric/confidence gate. Nearer evidence cannot hide TTC.
-        val level = maxOf(distanceLevel, ttcLevel)
+        // Approach urgency retains its existing priority even while collision evidence is UNKNOWN.
+        // These legacy-configured time thresholds do not establish physical passage overlap.
+        val level = maxOf(distanceLevel, approachLevel)
         // S11-6-F1: low spatial coverage is low certainty; it warns but never commands a stop.
         return if (result.spatiallyLimited) minOf(level, MessageLevel.WARNING) else level
     }
@@ -344,6 +345,7 @@ data class MetricDepthDecision(
     val trend: Trend,
     val confidenceFinal: Float,
     val trackKey: String? = null,
+    /** Legacy caller/constructor name for the unqualified numeric approach time. */
     val timeToCollisionMs: Long? = null,
     val objectMotion: ObjectMotion = ObjectMotion.UNKNOWN,
     val motionEstimate: ObjectMotionEstimate = ObjectMotionEstimate(),
@@ -354,7 +356,11 @@ data class MetricDepthDecision(
      * is not used for a stop command).
      */
     val spatiallyLimited: Boolean = false,
-)
+) {
+    val approachTimeMs: Long? get() = timeToCollisionMs
+    /** UNKNOWN does not cancel an existing near-obstacle or urgent-approach warning. */
+    val collisionAssessment: CollisionAssessment get() = CollisionAssessment.UNKNOWN
+}
 
 /** Only a current, leased visual trend may open the ARCore per-object qualitative gate. */
 fun TrackedObjectDepth.isCurrentQualitativeCaution(nowElapsedRealtimeMs: Long): Boolean {

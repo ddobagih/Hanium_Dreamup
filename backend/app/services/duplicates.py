@@ -8,6 +8,8 @@ meters rather than geometry degrees.
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 import math
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -156,7 +158,7 @@ def find_active_auto_report_cooldown(
 ) -> Report | None:
     starts_at = now.astimezone(timezone.utc) - timedelta(minutes=minutes)
     statement = (
-        select(Report)
+        select(Report).where(account_subject_visible(Report))
         .where(Report.class_name == class_name)
         .where(Report.location.is_not(None))
         .where(Report.created_at >= starts_at)
@@ -193,7 +195,7 @@ def duplicate_candidate_statement(
     ends_at = captured_at + timedelta(minutes=minutes)
 
     statement = (
-        select(Report)
+        select(Report).where(account_subject_visible(Report))
         .where(Report.class_name == class_name)
         .where(Report.location.is_not(None))
         .where(Report.captured_at >= starts_at)

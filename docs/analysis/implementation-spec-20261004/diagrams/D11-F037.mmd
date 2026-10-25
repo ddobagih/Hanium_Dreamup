@@ -1,0 +1,28 @@
+flowchart TD
+  A["F-D11-037 Legacy Web 출시·Full RC·공개 launcher 차단"]
+  B["P-D11-037 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. guard가 LEGACY_REFERENCE_ONLY 경계를 출력한다"]
+  B --> T0
+  T1["2. 역사 구현 import 또는 환경/서비스/tunnel side effect 전에78로 종료한다"]
+  T0 --> T1
+  T2["3. 후반 unreachable 코드는 역사적 설명으로만 보존한다"]
+  T1 --> T2
+  Z["정상 동작 자체가 exit78 차단"]
+  T2 --> Z
+  C0{"Web build/full RC/Cloudflare launcher 호출"}
+  R0["exit78"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"release evidence web-release/full profile"}
+  R1["역사 profile 차단; 전체 evidence validator 모든 profile 중지로 일반화하지 않음"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"주석-only deployment file 설치"}
+  R2["활성 Web service/config가 정의되지 않음"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

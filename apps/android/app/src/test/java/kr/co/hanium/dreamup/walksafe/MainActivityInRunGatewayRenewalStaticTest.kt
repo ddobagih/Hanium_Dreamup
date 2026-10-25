@@ -45,13 +45,13 @@ class MainActivityInRunGatewayRenewalStaticTest {
         val request = functionBlock("private fun requestInRunGatewaySessionRenewal(")
         assertInOrder(
             request,
-            "BuildConfig.WALKSAFE_LONG_LIVED_LOGIN_ENABLED",
+            "config.longLivedLoginEnabled",
             "process.session !== session",
-            "GatewayInRunRenewalPolicy.actionFor(session, trigger, System.currentTimeMillis())",
-            "gate.tryBegin(session.lease, SystemClock.elapsedRealtime(), waiter)",
+            "GatewayInRunRenewalPolicy.actionFor(session, trigger, wallClockMs())",
+            "gate.tryBegin(session.lease, elapsedRealtimeMs(), waiter)",
             "GatewayInRunRenewalGate.Admission.JOINED -> return true",
             "ActiveNetworkTransport.OFFLINE",
-            "gatewaySessionStore.restoreActive(",
+            "store.restoreActive(",
             "restored.version != session.versionOrNull",
             "GatewaySessionProcessCoordinator.beginGeneralSessionOperationIfCurrent(",
             "renewRestoredGatewaySession(",
@@ -63,16 +63,16 @@ class MainActivityInRunGatewayRenewalStaticTest {
         val renewal = functionBlock("private fun renewRestoredGatewaySession(")
         assertInOrder(
             renewal,
-            "gatewaySessionStore.reserveRenewal(",
-            "gatewaySessionClient.renew(",
-            "gatewaySessionStore.commitRenewal(",
+            "store.reserveRenewal(",
+            "remote.renew(",
+            "store.commitRenewal(",
             "GatewaySessionProcessCoordinator.publishVerified(",
             "firstRunSnapshot = inRun?.publishFirstRunSnapshot ?: restored.firstRunSnapshot",
             "GatewayInRunRenewalPolicy.failureAction(error, restored.session.lease)",
-            "gatewaySessionStore.rollbackRenewalForRetry(",
+            "store.rollbackRenewalForRetry(",
             "inRun.sourceSession, inRun.publishFirstRunSnapshot",
             "GatewaySessionProcessCoordinator.deferRenewalAfterRollback(",
-            "gatewaySessionStore.abandonRenewal(",
+            "store.abandonRenewal(",
             "} finally {",
             "inRun?.let { completeInRunGatewaySessionRenewal(it, expectedActivityLease) }",
             "catch (_: RejectedExecutionException)",
@@ -83,7 +83,7 @@ class MainActivityInRunGatewayRenewalStaticTest {
             complete,
             "finishInRunGatewaySessionRenewal(",
             "GatewaySessionProcessCoordinator.snapshot().session == null",
-            "handleGatewaySessionDowngrade(\"gateway_session_renewal_failed\"",
+            "effects.downgradeSession(\"gateway_session_renewal_failed\"",
             "scheduleInRunGatewaySessionRenewal()",
         )
     }
@@ -96,18 +96,20 @@ class MainActivityInRunGatewayRenewalStaticTest {
             "scheduleInRunGatewaySessionRenewal()",
             "renewalRetryAtElapsedMs",
         )
-        assertTrue(source.contains("onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)\n            retryPendingGatewayRenewal()"))
+        val dispatch = functionBlock("fun dispatchGatewayProcessSessionChanged(")
+        assertInOrder(dispatch, "onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)", "gateway.retryPendingRenewal()")
+        assertTrue(MainActivityRefactorSource.composition(source, "actorSessionLifecycleCoordinator").contains("override fun retryPendingRenewal() { retryPendingGatewayRenewal() }"))
         val schedule = functionBlock("private fun scheduleInRunGatewaySessionRenewal()")
         assertInOrder(
             schedule,
-            "gatewayWalkRenewalHandler.removeCallbacks(inRunGatewayRenewalRunnable)",
+            "renewalTimer.remove(inRunGatewayRenewalRunnable)",
             "GatewayInRunRenewalPolicy.proactiveDelayMsOrNull(",
-            "gatewayWalkRenewalHandler.postDelayed(inRunGatewayRenewalRunnable",
+            "renewalTimer.postDelayed(inRunGatewayRenewalRunnable",
         )
         val due = functionBlock("private fun onInRunGatewaySessionRenewalDue()")
         assertInOrder(
             due,
-            "isActivityForeground",
+            "runtime.foreground()",
             "WalkSessionState.ACTIVE",
             "WalkSessionState.PAUSED",
             "requestInRunGatewaySessionRenewal(session, GatewayInRunRenewalTrigger.PROACTIVE)",
@@ -121,16 +123,16 @@ class MainActivityInRunGatewayRenewalStaticTest {
         val renewal = functionBlock("private fun requestGatewayWalkRenewal()")
         assertInOrder(
             renewal,
-            "gatewaySessionOrNull(\"walk_renew\", speak = false)",
-            "awaitInRunGatewaySessionRenewal { gatewayWalkRenewalHandler.post(gatewayWalkRenewalRunnable) }",
+            "identity.sessionOrNull(\"walk_renew\", speak = false)",
+            "identity.awaitRenewal { scheduler.post(gatewayWalkRenewalRunnable) }",
             "handleGatewayWalkAuthorityLost(\"walk_lease_gateway_session_missing\")",
-            "if (!isCurrentGatewaySession(gatewaySession)) {",
-            "if (!isRenewedGatewaySessionContinuation(gatewaySession)) {",
+            "if (!identity.isCurrent(gatewaySession)) {",
+            "if (!identity.isRenewedContinuation(gatewaySession)) {",
             "handleGatewayWalkAuthorityLost(\"walk_lease_gateway_session_changed\")",
-            "gatewayWalkRenewalHandler.post(gatewayWalkRenewalRunnable)",
+            "scheduler.post(gatewayWalkRenewalRunnable)",
             "GatewayWalkRenewalFailurePolicy.classify(outcome.exceptionOrNull())",
             "failure == GatewayWalkRenewalFailure.LOGIN_REQUIRED",
-            "probeGatewaySessionAfterUnauthorized(gatewaySession)",
+            "identity.probeAfterUnauthorized(gatewaySession)",
             "GatewayWalkRenewalFailurePolicy.retryDelayMsOrNull(",
         )
         val await = functionBlock("private fun awaitInRunGatewaySessionRenewal(")
@@ -184,32 +186,17 @@ class MainActivityInRunGatewayRenewalStaticTest {
         assertTrue(notice.length < renewal.length)
         assertInOrder(
             notice,
-            "updateNavigationStatus(notice.statusToken)",
-            "accountAccessNotice = notice.speech",
-            "updateFirstRunOnboardingUi()",
+            "ui.status(notice.statusToken)",
+            "ui.setAccountAccessNotice(notice.speech)",
+            "ui.refreshFirstRun()",
             "GatewayInRunRenewalPolicy.liveRegionReadsNotice(",
-            "isScreenReaderActive()",
-            "accountAccessStatusText.isShown",
-            "if (!readByLiveRegion) speakInteraction(notice.speech)",
+            "runtime.screenReaderActive()",
+            "ui.accountStatusShown()",
+            "if (!readByLiveRegion) ui.speakInteraction(notice.speech)",
         )
     }
 
-    private fun functionBlock(marker: String): String {
-        val start = source.indexOf(marker)
-        assertTrue("missing block marker: $marker", start >= 0)
-        val open = source.indexOf('{', source.indexOf(')', start))
-        var depth = 0
-        for (index in open until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        throw AssertionError("unterminated block: $marker")
-    }
+    private fun functionBlock(marker: String): String = MainActivityRefactorSource.function(source, marker)
 
     private fun assertInOrder(section: String, vararg tokens: String) {
         var previous = -1

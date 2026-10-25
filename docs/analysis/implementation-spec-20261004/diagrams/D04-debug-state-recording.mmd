@@ -1,0 +1,21 @@
+stateDiagram-v2
+  state "F031 IDLE" as Idle
+  state "PREVIEW: 신규 측정행 저장 없음" as Preview
+  state "F032 RAW_PREPARING: trace lease만 있음" as Preparing
+  state "RECORDING_READY" as Ready
+  state "F034 STOPPING: 신규입력 차단" as Stopping
+  state "COMPLETED" as Complete
+  state "TRACE_FINALIZATION_PENDING" as Pending
+  [*] --> Idle
+  Idle --> Preview: 권한·동의·장착·GPS gate
+  Preview --> Preparing: fresh fix와 명시 기록
+  Preparing --> Ready: Raw open·header flush·등록 성공 후 step reset
+  Preparing --> Stopping: Raw 실패·명시 취소
+  Preparing --> Preparing: stale completion 또는 readiness token 불일치는 무시
+  Preview --> Stopping: onPause·stop·동의철회
+  Ready --> Stopping: onPause·stop·동의철회·append 실패
+  Stopping --> Complete: Raw close 뒤 trace stop 성공
+  Stopping --> Pending: trace stop 실패
+  Pending --> Complete: 명시 종료저장 재시도 성공
+  Complete --> Idle: 사용자가 새 신호확인 준비
+  Complete --> Complete: F035 명시 export 또는 취소

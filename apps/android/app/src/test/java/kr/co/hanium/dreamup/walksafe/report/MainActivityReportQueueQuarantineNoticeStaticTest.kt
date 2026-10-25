@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.report
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import kr.co.hanium.dreamup.walksafe.ReportStaticSourceInspector
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,12 +15,12 @@ class MainActivityReportQueueQuarantineNoticeStaticTest {
 
     @Test
     fun quarantinedEntryContinuesTheDrainAndProducesAVisibleNotice() {
-        val drain = ReportStaticSourceInspector.functionBlock(main, "private fun drainInitialExactReportQueue")
+        val drain = MainActivityRefactorSource.function(main, "private fun drainInitialExactReportQueue")
         val stop = drain.substringAfter("val outcome = result.outcome").substringBefore("remaining -= 1")
         assertTrue(stop.contains("outcome != ReportQueueDrainOutcome.QUARANTINED"))
         assertTrue(drain.indexOf("reportQueueDrainResultMessage(result)") < drain.indexOf("val outcome = result.outcome"))
 
-        val message = ReportStaticSourceInspector.functionBlock(main, "private fun reportQueueDrainResultMessage")
+        val message = MainActivityRefactorSource.function(main, "private fun reportQueueDrainResultMessage")
         val quarantined = message.substringAfter("ReportQueueDrainOutcome.QUARANTINED ->")
             .substringBefore("else -> null")
         assertTrue("QUARANTINED must map to a notice", quarantined.contains("기기에 보관했습니다"))

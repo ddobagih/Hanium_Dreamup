@@ -10,6 +10,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RouteNavigatorPeriodicGuidanceTest {
+    // These fixtures isolate speech completion, retry ownership, and the 6/10-second cadence.
+    // Production 1.5-second delay and immediate safety actions are covered by RouteDirectionRecheckGraceTest.
+
     @Test
     fun stoppedUserGetsTheSameDirectionTenSecondsAfterEachCompletedSentence() {
         // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
@@ -25,7 +28,7 @@ class RouteNavigatorPeriodicGuidanceTest {
             assertEquals(first.guideIndex, repeat.guideIndex)
             assertEquals(first.speechCueToken?.distanceBand, repeat.speechCueToken?.distanceBand)
             assertNotEquals(first.speechCueToken, repeat.speechCueToken)
-            assertTrue(repeat.instruction?.contains("50m 앞, 왼쪽으로 꺾으세요.") == true)
+            assertTrue(repeat.instruction?.contains("약 50미터입니다. 다음 안내 지점에서 경로 기준으로 9시 방향으로 꺾으세요.") == true)
             assertFalse(repeat.instruction?.contains("길안내를 시작합니다") == true)
             assertFalse(repeat.instruction?.contains("전체 경로") == true)
             assertFalse(repeat.cancelStaleNavigationSpeech)
@@ -53,7 +56,7 @@ class RouteNavigatorPeriodicGuidanceTest {
             val match = navigator.currentRouteMatch()
 
             val repeat = requireNotNull(navigator.retryGuidance(12_000, facingObservation = RouteFacingObservation(90.0, 5.0, 12_000)))
-            assertTrue(repeat.instruction?.contains("40m 앞, 왼쪽으로 꺾으세요.") == true)
+            assertTrue(repeat.instruction?.contains("약 40미터입니다. 다음 안내 지점에서 경로 기준으로 9시 방향으로 꺾으세요.") == true)
             assertEquals(first.speechCueToken?.distanceBand, repeat.speechCueToken?.distanceBand)
             assertSame(match, navigator.currentRouteMatch())
             assertSame(match, navigator.currentAcceptedRouteMatchFor(11_999))
@@ -148,7 +151,7 @@ class RouteNavigatorPeriodicGuidanceTest {
     @Test
     fun repeatingFinalSegmentWithNoGuideDoesNotCreateArrivalEvidence() {
         // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
-        val navigator = RouteNavigator().apply {
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L)).apply {
             setRoute(route().copy(guidePoints = emptyList()))
         }
         val first = navigator.update(fix(0.00055, 1_000), 1_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 1_000))
@@ -171,11 +174,12 @@ class RouteNavigatorPeriodicGuidanceTest {
         assertTrue(navigator.reserveInstruction(first))
         navigator.acknowledgeInstruction(first, 2_000)
         val near = navigator.update(fix(0.00082, 3_000), 3_000, false, facingObservation = RouteFacingObservation(90.0, 5.0, 3_000))
-        assertTrue(near.instruction?.contains("20m 앞, 왼쪽으로 꺾으세요.") == true)
+        assertTrue(near.instruction?.contains("다음 안내 지점까지 경로를 따라 약 20미터") == true)
+        assertTrue(near.instruction?.contains("다음 안내 지점에서 경로 기준으로 9시 방향으로 꺾으세요.") == true)
         assertTrue(navigator.reserveInstruction(near))
         val turnPassed = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 5_000), 5_000, false, facingObservation = RouteFacingObservation(0.0, 5.0, 5_000))
         assertTrue(turnPassed.cancelStaleNavigationSpeech)
-        assertTrue(turnPassed.instruction?.contains("오른쪽으로 꺾으세요.") == true)
+        assertTrue(turnPassed.instruction?.contains("3시 방향으로 꺾으세요.") == true)
         assertTrue(navigator.reserveInstruction(turnPassed))
         navigator.acknowledgeInstruction(near, 5_001)
         assertEquals("guidance_in_flight", navigator.retryGuidance(5_002, facingObservation = RouteFacingObservation(0.0, 5.0, 5_002))?.reason)
@@ -204,7 +208,7 @@ class RouteNavigatorPeriodicGuidanceTest {
     }
 
     private fun navigator(testMode: Boolean = false) =
-        RouteNavigator(allowDegradedRouteGuidance = testMode).apply { setRoute(route()) }
+        RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L), allowDegradedRouteGuidance = testMode).apply { setRoute(route()) }
 
     // Synthetic fixtures verify timing and speech ownership, not physical walking accuracy.
     private fun fix(longitude: Double, atMs: Long) = TrustedLocation(0.0, longitude, 2f, atMs)

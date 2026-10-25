@@ -1,0 +1,13 @@
+flowchart TD
+ A["F-D11-041 enrollment purge"] --> P["P-D11-041 전용 DB role과 cutoff 및 limit1..1000"]
+ P --> T{"before가 DB clock보다 미래"}
+ T -->|"예"| X["거부"]
+ T -->|"아니오"| M{"apply 지정"}
+ M -->|"아니오"| V["만료 또는 terminal updated cutoff 후보와 digest 조회"]
+ V --> VR["rollback과 preview 결과 반환"]
+ M -->|"예"| L["후보 잠금 및 정확 확인문구와 digest 대조"]
+ L --> D["같은 자격조건으로 DELETE RETURNING"]
+ D --> E{"삭제 ID 집합이 후보와 동일"}
+ E -->|"아니오"| X
+ E -->|"예"| K["commit과 결과 반환"]
+ X -.-> R["실패 transaction commit 없음. 자동 retry 없음"]

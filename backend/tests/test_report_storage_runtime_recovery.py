@@ -10,9 +10,9 @@ import uuid
 
 import pytest
 
-from backend.app.api import health
+from backend.app.services import health_readiness as health
 from backend.app.models import Report, ReportImageObject
-from backend.app.services import report_storage
+from backend.app.services import report_storage, report_commit
 from backend.app.services.report_image_crypto import encrypt_report_image
 
 
@@ -98,8 +98,8 @@ def _offline_readiness(
 
     monkeypatch.setattr(health, "SessionLocal", SimpleNamespace(begin=transaction))
     monkeypatch.setattr(
-        health.reports,
-        "_shared_report_write_lock",
+        health,
+        "shared_maintenance_write_lock",
         maintenance_lock,
     )
     settings = SimpleNamespace(
@@ -316,8 +316,9 @@ def test_runtime_recovery_waits_for_inflight_write_transaction(
                 transaction_lock.release()
 
     monkeypatch.setattr(health, "SessionLocal", SimpleNamespace(begin=transaction))
-    monkeypatch.setattr(health.reports, "_shared_report_write_lock", maintenance_lock)
-    monkeypatch.setattr(health.reports, "complete_report_image_write", deferred_cleanup)
+    monkeypatch.setattr(health, "shared_maintenance_write_lock", maintenance_lock)
+    monkeypatch.setattr(report_commit, "_shared_report_write_lock", maintenance_lock)
+    monkeypatch.setattr(report_commit, "complete_report_image_write", deferred_cleanup)
     settings = SimpleNamespace(
         upload_dir=tmp_path,
         maintenance_lock_path=lock_path,
@@ -331,7 +332,7 @@ def test_runtime_recovery_waits_for_inflight_write_transaction(
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         writer = pool.submit(
-            health.reports._commit_new_report_with_image,
+            report_commit._commit_new_report_with_image,
             writer_session,
             report,
             destination=destination,

@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D02-015 거치 IMU probe와 측정 신선도"]
+  E["진입: gyro/gravity callbacks"]
+  G{"P-D02-015 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["해당 metric null"]
+  G -->|"missing/unreliable/stale"| B0
+  B1["버림"]
+  G -->|"늦은 이전 listener callback"| B1
+  B2["현재 수치 반환"]
+  G -->|"fresh gyro+gravity"| B2
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["start에서 gyro/gravity 등록"]
+    S1["unreliable accuracy는 해당 근거 삭제"]
+    S2["gyro rad/s magnitude를 deg/s로 변환, 최근 peak 저장"]
+    S3["snapshot에서 각각 최신성 확인 후 quality input 반환"]
+    S4["stop은 generation 증가·unregister·history clear"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: 해당 이벤트 처리를 마치고 현재 스냅샷/결과를 반환한다."]
+  X["취소·중단: 독립 취소 API가 없는 판단 함수는 호출자의 세대 무효화로 더 이상 결과를 사용하지 않는다. /<br/>foreground·epoch·owner 조건을 잃은 결과는 재사용하지 않는다."]
+  C["정리: unregister와 상태 clear, 새 start는 새 generation."]
+  R["재시도·복구: 자동 재시도 없음. 호출자가 명시된 새 이벤트를 전달해야 한다. / 새 등록의 fresh samples 필요."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

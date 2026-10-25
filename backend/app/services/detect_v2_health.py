@@ -5,6 +5,9 @@ are separate budgets; an unconfirmed cleanup quarantines the owned resources.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 from dataclasses import dataclass
 import json
 import math
@@ -740,11 +743,27 @@ class DetectV2HealthSnapshots:
         return True
 
 
+_app_health_snapshots: ContextVar[DetectV2HealthSnapshots | None] = ContextVar("walksafe_detector_health", default=None)
+
+
+@contextmanager
+def use_detect_v2_health(manager):
+    token = _app_health_snapshots.set(manager)
+    try:
+        yield
+    finally:
+        _app_health_snapshots.reset(token)
+
+
 health_snapshots = DetectV2HealthSnapshots()
 _singleton_lock = Lock()
 
 
 def start_detect_v2_health(settings: Any) -> None:
+    scoped_manager = _app_health_snapshots.get()
+    if scoped_manager is not None:
+        scoped_manager.start(settings)
+        return
     policy = DetectV2HealthPolicy(
         refresh_interval_seconds=getattr(settings, "detect_v2_health_refresh_interval_seconds", 5.0),
         max_age_seconds=getattr(settings, "detect_v2_health_max_age_seconds", 10.0),
@@ -762,9 +781,9 @@ def start_detect_v2_health(settings: Any) -> None:
 
 
 def stop_detect_v2_health() -> None:
-    if not health_snapshots.close():
+    if not (_app_health_snapshots.get() or health_snapshots).close():
         raise RuntimeError("detect v2 health refresh cleanup is unconfirmed")
 
 
 def detect_v2_health_snapshot(settings: Any) -> dict[str, object]:
-    return health_snapshots.snapshot(settings)
+    return (_app_health_snapshots.get() or health_snapshots).snapshot(settings)

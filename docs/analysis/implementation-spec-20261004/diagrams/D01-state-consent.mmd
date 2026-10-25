@@ -1,0 +1,22 @@
+stateDiagram-v2
+  state "서버 권위 미확인" as Unconfirmed
+  state "현재 서버 확인된 목적별 grant" as Granted
+  state "로컬 철회와 서버반영 대기" as Withdrawn
+  state "선저장 pending mutation" as Pending
+  state "확정 CAS 거절" as Cas
+  state "재시도 대기" as Retry
+  state "차단" as Blocked
+  [*] --> Unconfirmed
+  Unconfirmed --> Pending: bootstrap 후 명시적 선택 저장
+  Pending --> Granted: exact newer confirmation 및 current authority
+  Granted --> Withdrawn: false 선택 marker commit 직후
+  Withdrawn --> Pending: denials 보존한 요청 저장
+  Pending --> Cas: previous receipt conflict 409
+  Cas --> Pending: CURRENT_CONSENT floor와 receipt·denials로 successor
+  Pending --> Retry: network 결과 불명
+  Retry --> Pending: 같은 pending replay
+  Pending --> Blocked: identity·same-revision conflict 또는 저장 실패
+  Granted --> Unconfirmed: session 교체·재확인
+  note right of Withdrawn
+    옛 grant replay는 effective deny를 뒤집지 못함
+  end note

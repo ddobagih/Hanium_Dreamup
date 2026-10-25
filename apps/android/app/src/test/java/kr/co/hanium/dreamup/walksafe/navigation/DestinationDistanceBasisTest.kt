@@ -43,9 +43,6 @@ class DestinationDistanceBasisTest {
         assertEquals("북쪽 약 300미터", destinationDirectionDistanceKo("북쪽", 320, null))
         assertEquals("직선으로 약 300미터", destinationDirectionDistanceKo(null, 320, DestinationDistanceSource.STRAIGHT_LINE, 80f))
         assertEquals("거리 미상", destinationDirectionDistanceKo(null, null, null))
-        assertEquals("직선 거리", destinationDistanceKindKo(DestinationDistanceSource.STRAIGHT_LINE))
-        assertEquals("검색 위치 기준 반경, 도보 거리 아님", destinationDistanceKindKo(DestinationDistanceSource.TMAP_RADIUS))
-        assertNull(destinationDistanceKindKo(null))
         for (spoken in listOf(
             destinationDirectionDistanceKo("북쪽", 320, DestinationDistanceSource.STRAIGHT_LINE),
             destinationDirectionDistanceKo(null, 320, DestinationDistanceSource.TMAP_RADIUS),
@@ -54,6 +51,13 @@ class DestinationDistanceBasisTest {
         }
         assertTrue(destinationDirectionDistanceKo(null, 320, DestinationDistanceSource.TMAP_RADIUS).contains("도보 거리는 아닙니다"))
         assertTrue(!destinationDirectionDistanceKo(null, 320, DestinationDistanceSource.TMAP_RADIUS).contains("직선"))
+    }
+
+    @Test
+    fun theScreenOmitsTheProviderRadiusAnnotationAndKeepsTheStraightLineLabel() {
+        assertNull(destinationDistanceKindKo(DestinationDistanceSource.TMAP_RADIUS))
+        assertEquals("직선 거리", destinationDistanceKindKo(DestinationDistanceSource.STRAIGHT_LINE))
+        assertNull(destinationDistanceKindKo(null))
     }
 
     @Test

@@ -1,0 +1,17 @@
+{
+  "enabled": false,
+  "asset": "models/walksafe_unified_yolo26n_768_float32.tflite",
+  "source_model": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+  "artifact_sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19",
+  "source_model_sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669",
+  "input_size": 768,
+  "output_format": "yolo_end_to_end_xyxy",
+  "classes": [
+    "person", "bicycle", "car", "motorcycle", "bus", "truck", "traffic light",
+    "normal_tactile_block", "damaged_tactile_block", "crosswalk", "curb_step",
+    "uneven_sidewalk", "e_scooter_obstruction"
+  ],
+  "allowlist": ["person"],
+  "thresholds": {"person": 0.35},
+  "runtime": {"delegate": "cpu", "num_threads": 4, "fallback_to_cpu": true}
+}

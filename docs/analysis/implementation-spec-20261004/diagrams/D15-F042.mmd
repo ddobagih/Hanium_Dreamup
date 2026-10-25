@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-042 · 복원 inventory와 정확 재삭제 계획<br/>서명 bundle+복원 inventory 비교"]
+  P["P-D15-042 · 전제조건<br/>bundle와 inventory data boundary/privacy HMAC<br/>key version 및 source-fence/cutoff 결속."]
+  E --> P
+  S1["1. tombstone report IDs와 복원 inventory를 join"]
+  P --> S1
+  S2["2. 행이 있으면 tombstone owner·account_generation<br/>일치 요구"]
+  S1 --> S2
+  S3["3. 삭제할 artifact의 name/hash/size/inode를 정확 결속"]
+  S2 --> S3
+  S4["4. unbound orphan은 거절; 삭제 action을 report ID로<br/>정렬"]
+  S3 --> S4
+  S5["5. plan canonical hash와 CLEAR 또는<br/>BLOCKED_REAPPLY_REQUIRED 반환"]
+  S4 --> S5
+  OK["정상 결과<br/>plan canonical hash와 CLEAR 또는<br/>BLOCKED_REAPPLY_REQUIRED 반환"]
+  S5 --> OK
+  B1["조건 · owner/generation 다름<br/>결과 · restore_tombstone_owner_mismatch"]
+  S3 -. "해당 조건 발생" .-> B1
+  B2["조건 · artifact binding 누락<br/>결과 · evidence invalid"]
+  S3 -. "해당 조건 발생" .-> B2
+  B3["조건 · tombstone 없는 orphan<br/>결과 · restore_inventory_orphan_unbound"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · actions 없음<br/>결과 · CLEAR; 단독 publish 증거는 아님"]
+  S1 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>계획 함수는 입력 bundle/inventory만 읽고 target DB/파일에<br/>mutation을 하지 않음."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_restore_tombstones.py:1910<br/>plan_report_restore_reapply<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

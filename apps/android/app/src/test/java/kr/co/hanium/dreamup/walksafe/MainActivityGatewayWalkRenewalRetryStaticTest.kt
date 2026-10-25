@@ -14,34 +14,26 @@ class MainActivityGatewayWalkRenewalRetryStaticTest {
     fun renewalFailureIsClassifiedAndRetriedOnlyInsideTheHeldLease() {
         val renewal = block("private fun requestGatewayWalkRenewal()")
         val failed = renewal.substringAfter("if (renewed == null) {")
-            .substringBefore("gatewayWalkAuthorityController.completeRenew(")
+            .substringBefore("authority.completeRenew(")
 
         assertTrue(failed.contains("GatewayWalkRenewalFailurePolicy.classify(outcome.exceptionOrNull())"))
         assertTrue(failed.contains("safeRemainingMsOrNull(operation.epoch)"))
-        assertTrue(failed.contains("gatewayWalkRenewalHandler.postDelayed(gatewayWalkRenewalRunnable, retryDelayMs)"))
+        assertTrue(failed.contains("scheduler.postDelayed(gatewayWalkRenewalRunnable, retryDelayMs)"))
         assertTrue(failed.contains("handleGatewayWalkAuthorityLost(failure.reasonCode, GatewayWalkRenewalFailurePolicy.detailKo(failure))"))
         assertFalse(failed.contains("handleGatewayWalkAuthorityLost(\"walk_lease_renew_failed\")"))
         assertTrue(renewal.contains("gatewayWalkRenewalRetries = null"))
         assertTrue(
-            renewal.indexOf("if (!isCurrentGatewaySession(gatewaySession)) {") <
+            renewal.indexOf("if (!identity.isCurrent(gatewaySession)) {") <
                 renewal.indexOf("GatewayWalkRenewalFailurePolicy.classify("),
         )
         val lost = block("private fun handleGatewayWalkAuthorityLost(")
         assertTrue(lost.contains("detailKo: String = \"서버의 단일 활성 보행 권한을 확인하지 못했습니다.\""))
-        assertTrue(lost.contains("detailKo,"))
+        assertTrue(lost.contains("output.updateStatus("))
+        assertTrue(lost.contains("\"\$detailKo\\n\\n\$restartNoticeKo\""))
+        val wiring = MainActivityRefactorSource.composition(source, "gatewayWalkSessionController")
+        assertTrue(wiring.contains("restartNoticeKo = WALK_RESTART_NOTICE_KO"))
+        assertTrue(wiring.contains("override fun updateStatus(title: String, detail: String) = this@MainActivity.updateStatus(title, detail)"))
     }
 
-    private fun block(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing: $signature" }
-        var depth = 0
-        var opened = false
-        for (index in start until source.length) {
-            when (source[index]) {
-                '{' -> { depth += 1; opened = true }
-                '}' -> { depth -= 1; if (opened && depth == 0) return source.substring(start, index + 1) }
-            }
-        }
-        error("unterminated: $signature")
-    }
+    private fun block(signature: String): String = MainActivityRefactorSource.function(source, signature)
 }

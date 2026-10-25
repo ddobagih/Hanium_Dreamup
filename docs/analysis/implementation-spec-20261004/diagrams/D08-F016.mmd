@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D08-016 계정 보행 lease 조회·만료 정리"]
+  B["진입: GET /api/field-walk"]
+  A --> B
+  P0["1. account shard lock 획득 후 server clock 을 다시 읽는다."]
+  B --> P0
+  P1["2. 정확 lease expiry 이하가 되었으면 EXPIRED audit 와 ended history 를 내구 저장한다."]
+  P0 --> P1
+  P2["3. 현재 active 및 holder 여부·server_time 을 투영한다."]
+  P1 --> P2
+  OK["정상: 보행 현재 상태, 필요한 만료 정리"]
+  P2 --> OK
+  C0{"clock 또는 ledger 무결성 실패"}
+  X0["안전 차단"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"active 없음"}
+  X1["빈 보행 상태"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"다른기기 holder"}
+  X2["소유권이 다른 active 정보"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-011, P-D08-013, P-D08-014, P-D08-021"]
+  A -.-> POLICY

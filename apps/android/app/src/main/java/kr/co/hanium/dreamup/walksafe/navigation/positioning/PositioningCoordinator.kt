@@ -1,10 +1,16 @@
 package kr.co.hanium.dreamup.walksafe.navigation.positioning
 
+import kr.co.hanium.dreamup.walksafe.navigation.StepEventConfidence
+import kr.co.hanium.dreamup.walksafe.navigation.StepEvent
+import kr.co.hanium.dreamup.walksafe.navigation.StepEventSource
 import kr.co.hanium.dreamup.walksafe.navigation.UserMotionLocationEvidence
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.gnss.GnssQualityEstimator
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.gnss.GnssQualitySnapshot
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.gnss.GnssSatelliteSignal
 import kotlin.math.sqrt
+
+// One existing GPS recheck interval distinguishes a callback burst from a persistent jump.
+private const val CORRUPT_JUMP_BURST_CONFIRMATION_MS = 3_000L
 
 internal data class PositionCoordinate(
     val latitude: Double,
@@ -20,13 +26,21 @@ internal data class PositioningRawFix(
     val coordinate: PositionCoordinate,
     val localEnu: LocalEnuPosition?,
     val reportedHorizontalAccuracyM: Double?,
+    /** Legacy weighted reported-radius proxy; excludes the model floor/default and soft gate. */
     val effectiveHorizontalAccuracyM: Double?,
     val elapsedRealtimeMs: Long,
-)
+    /** Nominal model sigma from this coordinator's estimator/config, before innovation gating. */
+    val nominalMeasurementAxisStdDevM: MeasurementAxisStdDevM? = null,
+) {
+    val reportedAccuracyRadius68M: ReportedAccuracyRadius68M?
+        get() = reportedHorizontalAccuracyM?.takeIf { it.isFinite() && it >= 0.0 }
+            ?.let(::ReportedAccuracyRadius68M)
+}
 
 internal data class PositioningFilteredFix(
     val coordinate: PositionCoordinate,
     val localEnu: LocalEnuPosition,
+    /** Posterior maximum-axis standard deviation, in metres. */
     val horizontalUncertaintyM: Double,
     val velocityEastMps: Double,
     val velocityNorthMps: Double,
@@ -36,7 +50,11 @@ internal data class PositioningFilteredFix(
      * [horizontalUncertaintyM] is its largest-axis scalar and stays the fallback.
      */
     val covarianceEnu: EnuPositionCovariance? = null,
-)
+) {
+    val positionMaxAxisSigmaM: PositionMaxAxisSigmaM?
+        get() = horizontalUncertaintyM.takeIf { it.isFinite() && it >= 0.0 }
+            ?.let(::PositionMaxAxisSigmaM)
+}
 
 internal data class PositioningSnapshot(
     val raw: PositioningRawFix?,
@@ -46,6 +64,7 @@ internal data class PositioningSnapshot(
     val gnssQuality: GnssQualitySnapshot,
     val gnssUpdate: PedestrianPositionEstimatorUpdate? = null,
     val motionUpdate: PedestrianMotionEstimatorUpdate? = null,
+    /** Selector candidate for diagnostics; [motionUpdate] reports actual step integration admission. */
     val selectedHeading: SelectedPedestrianHeading? = null,
     val selectedHeadingAccuracyDegrees: Double? = null,
     val motionTrigger: PositioningMotionTrigger? = null,
@@ -57,6 +76,8 @@ internal data class PositioningSnapshot(
      * since the last accepted fix, this one included (0 when [gnssUpdate] is not such a refusal).
      */
     val consecutiveCorruptJumpCount: Int = 0,
+    /** Time spanned by the same rejection run, using both measurement and receipt clocks. */
+    val consecutiveCorruptJumpDurationMs: Long? = null,
 ) {
     /**
      * S09-34 (originals/09.txt:94): absolute-position capability. Destination arrival or any absolute
@@ -64,7 +85,8 @@ internal data class PositioningSnapshot(
      * (e.g. more than 10 s without informative GNSS).
      */
     val absoluteArrivalConfirmable: Boolean
-        get() = filtered != null && quality != PositionQuality.UNAVAILABLE && !confidence.guidancePaused
+        get() = filtered != null && quality in setOf(PositionQuality.HIGH, PositionQuality.MEDIUM) &&
+            !confidence.guidancePaused && confidence.failureReason == null
 
     /**
      * S09-34: relative-motion capability, separate from the absolute one: fresh non-LOW step evidence
@@ -88,6 +110,19 @@ internal data class PositioningSnapshot(
             gnssUpdate.hardRejectReason == GnssHardRejectReason.CORRUPT_JUMP &&
             consecutiveCorruptJumpCount <= 1 &&
             filtered != null && quality != PositionQuality.UNAVAILABLE && !confidence.guidancePaused
+
+    /**
+     * Several fixes from one brief multipath burst are still rejected measurements, not proof
+     * that the retained position has failed. Never publish their coordinates or extend its age.
+     * A run lasting one GPS recheck interval, an expired estimate, or other rejection stays hard.
+     */
+    val transientOutlierAgainstFreshEstimate: Boolean
+        get() = singleOutlierAgainstFreshEstimate ||
+            (gnssUpdate?.disposition == GnssObservationDisposition.HARD_REJECTED &&
+                gnssUpdate.hardRejectReason == GnssHardRejectReason.CORRUPT_JUMP &&
+                consecutiveCorruptJumpCount > 1 &&
+                consecutiveCorruptJumpDurationMs?.let { it in 0L until CORRUPT_JUMP_BURST_CONFIRMATION_MS } == true &&
+                filtered != null && quality != PositionQuality.UNAVAILABLE && !confidence.guidancePaused)
 }
 
 internal enum class PositioningMotionTrigger {
@@ -120,6 +155,9 @@ internal class PositioningCoordinator(
     private var generation = 0L
     private var currentCalibrationCondition: PedestrianCalibrationCondition? = null
     private var consecutiveCorruptJumpCount = 0
+    private var corruptJumpStartedAtMeasurementMs: Long? = null
+    private var corruptJumpStartedAtReceiptMs: Long? = null
+    private var consecutiveCorruptJumpDurationMs: Long? = null
 
     /** Identity (measurement time, latitude, longitude) of the last counted CORRUPT_JUMP measurement. */
     private var lastCorruptJumpMeasurement: Triple<Long, Double, Double>? = null
@@ -132,21 +170,48 @@ internal class PositioningCoordinator(
     fun currentInputGeneration(): Long = generation
 
     @Synchronized
-    fun addGnssSignalEpoch(
-        elapsedRealtimeNanos: Long,
-        signals: List<GnssSatelliteSignal>,
-        receivedAtElapsedRealtimeNanos: Long = elapsedRealtimeNanos,
-        expectedGeneration: Long = generation,
-    ): GnssQualitySnapshot {
-        if (expectedGeneration != generation || elapsedRealtimeNanos < 0L ||
-            receivedAtElapsedRealtimeNanos < elapsedRealtimeNanos
-        ) return gnssQualityEstimator.snapshot(receivedAtElapsedRealtimeNanos.coerceAtLeast(0L))
-        return gnssQualityEstimator.addEpoch(elapsedRealtimeNanos, signals)
+    fun currentUserMotionOwner(): UserMotionStateOwner? = userMotionEstimator.currentOwner()
+
+    /** Producer admission before updating heading caches, recording a step, or posting a delayed output. */
+    @Synchronized
+    fun isUserMotionInputCurrent(measuredAtElapsedRealtimeMs: Long, expectedMotionOwner: UserMotionStateOwner?): Boolean =
+        userMotionEstimator.ownsInput(measuredAtElapsedRealtimeMs, expectedMotionOwner)
+
+    /** ADD-MOTION-015/022: retain absolute positioning and callback generation, clear physical motion only. */
+    @Synchronized
+    fun beginUserMotionEpoch(owner: UserMotionStateOwner, notBeforeElapsedRealtimeMs: Long): Boolean {
+        // beginEpoch also accepts an identical boundary. Only a new owner or an advanced
+        // accepted boundary clears heading history; repeating the current epoch keeps smoothing.
+        val epochChanged = owner != userMotionEstimator.currentOwner() ||
+            (notBeforeElapsedRealtimeMs > 0L &&
+                userMotionEstimator.ownsInput(notBeforeElapsedRealtimeMs - 1L, owner))
+        if (!userMotionEstimator.beginEpoch(owner, notBeforeElapsedRealtimeMs)) return false
+        if (epochChanged) headingSelector.reset()
+        return true
     }
 
     @Synchronized
-    fun observeGnss(observation: GnssPositionObservation, expectedGeneration: Long = generation): PositioningSnapshot {
-        if (expectedGeneration != generation) return rejectedSnapshot(observation.receivedAtElapsedRealtimeMs,
+    fun addGnssSignalEpoch(
+        elapsedRealtimeNanos: Long,
+        signals: List<GnssSatelliteSignal>,
+        receivedAtElapsedRealtimeNanos: Long? = null,
+        expectedGeneration: Long = generation,
+    ): GnssQualitySnapshot {
+        if (expectedGeneration != generation || elapsedRealtimeNanos < 0L ||
+            receivedAtElapsedRealtimeNanos?.let { it < elapsedRealtimeNanos } == true
+        ) return gnssQualityEstimator.snapshot((receivedAtElapsedRealtimeNanos ?: elapsedRealtimeNanos).coerceAtLeast(0L))
+        return gnssQualityEstimator.addEpoch(
+            elapsedRealtimeNanos, signals, receivedAtElapsedRealtimeNanos = receivedAtElapsedRealtimeNanos,
+        )
+    }
+
+    @Synchronized
+    fun observeGnss(
+        observation: GnssPositionObservation,
+        expectedGeneration: Long = generation,
+        nowElapsedRealtimeMs: Long = observation.receivedAtElapsedRealtimeMs,
+    ): PositioningSnapshot {
+        if (expectedGeneration != generation) return rejectedSnapshot(nowElapsedRealtimeMs,
             PedestrianMotionHardRejectReason.GENERATION_MISMATCH)
         val gnssQuality = gnssQualityEstimator.snapshot(toElapsedRealtimeNanos(observation.elapsedRealtimeMs))
         // The Android observer may own the signal feed. Both weights describe the same environment,
@@ -166,7 +231,18 @@ internal class PositioningCoordinator(
             }
         }
         val adjustedObservation = observation.copy(measurementNoiseMultiplier = noiseMultiplier)
-        val update = estimator.observeGnss(adjustedObservation)
+        // Receipt validates the original measurement at the source; consumption evaluates its
+        // current capability. A queued callback must not rewind a preceding watchdog evaluation.
+        // Keep the original receipt in the estimator so processing cannot legitimize a future fix.
+        val update = if (nowElapsedRealtimeMs < 0L || nowElapsedRealtimeMs < observation.receivedAtElapsedRealtimeMs) {
+            PedestrianPositionEstimatorUpdate(
+                estimate = null,
+                disposition = GnssObservationDisposition.HARD_REJECTED,
+                hardRejectReason = GnssHardRejectReason.INVALID_TIME,
+            )
+        } else {
+            estimator.observeGnss(adjustedObservation)
+        }
         val corruptJumpsInARow = countConsecutiveCorruptJumps(observation, update)
 
         if (
@@ -185,17 +261,18 @@ internal class PositioningCoordinator(
             reportedHorizontalAccuracyM = observation.horizontalAccuracyM,
             effectiveHorizontalAccuracyM = effectiveAccuracyM,
             elapsedRealtimeMs = observation.elapsedRealtimeMs,
+            nominalMeasurementAxisStdDevM = estimator.nominalGnssAxisStdDevM(adjustedObservation),
         )
         val confidence = when {
             update.disposition != GnssObservationDisposition.HARD_REJECTED && update.estimate != null ->
                 observeConfidence(
                     update.estimate.quality,
                     observation.elapsedRealtimeMs,
-                    observation.receivedAtElapsedRealtimeMs,
+                    nowElapsedRealtimeMs,
                     informativeGnss = update.estimateAtGnssMeasurement
                         ?.lastInformativeGnssAtElapsedRealtimeMs == observation.elapsedRealtimeMs,
                 )
-            else -> currentOrUnavailableConfidence(observation.receivedAtElapsedRealtimeMs)
+            else -> currentOrUnavailableConfidence(nowElapsedRealtimeMs)
         }
         return snapshot(
             raw = raw,
@@ -203,8 +280,9 @@ internal class PositioningCoordinator(
             confidence = confidence,
             gnssQuality = gnssQuality,
             gnssUpdate = update,
-            evaluatedAtElapsedRealtimeMs = observation.receivedAtElapsedRealtimeMs,
-        ).copy(consecutiveCorruptJumpCount = corruptJumpsInARow)
+            evaluatedAtElapsedRealtimeMs = nowElapsedRealtimeMs,
+        ).copy(consecutiveCorruptJumpCount = corruptJumpsInARow,
+            consecutiveCorruptJumpDurationMs = consecutiveCorruptJumpDurationMs.takeIf { corruptJumpsInARow > 0 })
     }
 
     /**
@@ -218,10 +296,21 @@ internal class PositioningCoordinator(
         if (update.disposition != GnssObservationDisposition.HARD_REJECTED) {
             consecutiveCorruptJumpCount = 0
             lastCorruptJumpMeasurement = null
+            corruptJumpStartedAtMeasurementMs = null
+            corruptJumpStartedAtReceiptMs = null
+            consecutiveCorruptJumpDurationMs = null
             return 0
         }
         if (update.hardRejectReason != GnssHardRejectReason.CORRUPT_JUMP) return 0
         val measurement = Triple(observation.elapsedRealtimeMs, observation.latitude, observation.longitude)
+        if (corruptJumpStartedAtMeasurementMs == null) {
+            corruptJumpStartedAtMeasurementMs = observation.elapsedRealtimeMs
+            corruptJumpStartedAtReceiptMs = observation.receivedAtElapsedRealtimeMs
+        }
+        consecutiveCorruptJumpDurationMs = maxOf(
+            observation.elapsedRealtimeMs - requireNotNull(corruptJumpStartedAtMeasurementMs),
+            observation.receivedAtElapsedRealtimeMs - requireNotNull(corruptJumpStartedAtReceiptMs),
+        )
         if (measurement != lastCorruptJumpMeasurement) {
             consecutiveCorruptJumpCount += 1
             lastCorruptJumpMeasurement = measurement
@@ -239,13 +328,27 @@ internal class PositioningCoordinator(
         receivedAtElapsedRealtimeMs: Long = headingInput.nowElapsedRealtimeMs,
         expectedGeneration: Long = generation,
         headingCoversWholeBatch: Boolean = false,
+        expectedMotionOwner: UserMotionStateOwner? = userMotionEstimator.currentOwner(),
+        stepEventSource: StepEventSource? = null,
+        stepEventConfidence: StepEventConfidence? = null,
+        originalStepEvent: StepEvent? = null,
     ): PositioningSnapshot {
         if (expectedGeneration != generation) return rejectedSnapshot(receivedAtElapsedRealtimeMs,
             PedestrianMotionHardRejectReason.GENERATION_MISMATCH)
         val measuredAtMs = headingInput.nowElapsedRealtimeMs
+        if (expectedMotionOwner != userMotionEstimator.currentOwner()) {
+            return rejectedOwnerSnapshot(receivedAtElapsedRealtimeMs)
+        }
+        if (!userMotionEstimator.ownsInput(measuredAtMs, expectedMotionOwner)) {
+            return rejectedSnapshot(receivedAtElapsedRealtimeMs, PedestrianMotionHardRejectReason.INVALID_TIME)
+        }
         if (measuredAtMs < 0L || receivedAtElapsedRealtimeMs < measuredAtMs) {
             return rejectedSnapshot(receivedAtElapsedRealtimeMs, PedestrianMotionHardRejectReason.INVALID_TIME)
         }
+        if (originalStepEvent != null && (!originalStepEvent.isConsistentWith(
+                stepCount, measuredAtMs, receivedAtElapsedRealtimeMs, stepEventSource, stepEventConfidence,
+            ) || !originalStepEvent.supportsPdrQuality(quality))
+        ) return rejectedSnapshot(receivedAtElapsedRealtimeMs, PedestrianMotionHardRejectReason.INVALID_STEP)
         if (receivedAtElapsedRealtimeMs - measuredAtMs > 2_000L) {
             return rejectedSnapshot(receivedAtElapsedRealtimeMs, PedestrianMotionHardRejectReason.STALE)
         }
@@ -256,20 +359,72 @@ internal class PositioningCoordinator(
         }
         userMotionEstimator.observeSteps(
             stepCount, quality, headingInput.nowElapsedRealtimeMs, receivedAtElapsedRealtimeMs,
+            expectedGeneration, expectedMotionOwner, stepEventSource, stepEventConfidence, originalStepEvent,
         )
-        val selectedHeading = headingSelector.select(headingInput)
+        val currentStepEvidence = UserMotionStepEvidence(
+            stepCount, quality, originalStepEvent?.source ?: stepEventSource,
+            originalStepEvent?.confidence ?: stepEventConfidence, originalStepEvent,
+        )
+        val userMotionForStep = userMotionEstimator.peek(receivedAtElapsedRealtimeMs)
+        val currentStepHasStationaryGnssConflict = userMotionForStep.support.conflicts.any { conflict ->
+                conflict.reason == UserMotionStateReason.STEP_WITH_STATIONARY_GNSS &&
+                    conflict.evidenceRefs.any { ref ->
+                        ref.measuredAtElapsedRealtimeMs == measuredAtMs &&
+                            ref.receivedAtElapsedRealtimeMs == receivedAtElapsedRealtimeMs &&
+                            ref.stepEvidence == currentStepEvidence
+                    } && conflict.evidenceRefs.any { ref ->
+                        ref.source == UserMotionEvidenceSource.GNSS_FIX &&
+                            ref.measuredAtElapsedRealtimeMs <= measuredAtMs
+                    }
+            }
+        val ownedHeadingInput = headingInput.copy(
+            // A declared unsupported mount cannot validate phone direction as travel direction.
+            // Later declarations must not retroactively constrain an earlier step measurement.
+            phoneForwardMounted = headingInput.phoneForwardMounted &&
+                userMotionEstimator.peek(measuredAtMs).mount != UserDeviceBodyRelationState.UNSUPPORTED_OR_CHANGED,
+            speed = headingInput.speed?.takeIf {
+                userMotionEstimator.ownsInput(it.elapsedRealtimeMs, expectedMotionOwner)
+            },
+            gpsCourse = headingInput.gpsCourse?.takeIf {
+                userMotionEstimator.ownsInput(it.elapsedRealtimeMs, expectedMotionOwner)
+            },
+            magneticTrueHeading = headingInput.magneticTrueHeading?.takeIf {
+                userMotionEstimator.ownsInput(it.elapsedRealtimeMs, expectedMotionOwner)
+            },
+            magneticTrueHeadingAtGpsCourse = headingInput.magneticTrueHeadingAtGpsCourse?.takeIf {
+                userMotionEstimator.ownsInput(it.elapsedRealtimeMs, expectedMotionOwner)
+            },
+        )
+        val selectedHeading = headingSelector.select(ownedHeadingInput)
         val selectedAccuracy = selectedHeading?.accuracyDegrees ?: when (selectedHeading?.source) {
-            PedestrianHeadingSource.GPS_COURSE -> headingInput.gpsCourse?.accuracyDegrees
-            PedestrianHeadingSource.MAGNETIC_TRUE -> headingInput.magneticTrueHeading?.accuracyDegrees
+            PedestrianHeadingSource.GPS_COURSE -> ownedHeadingInput.gpsCourse?.accuracyDegrees
+            PedestrianHeadingSource.MAGNETIC_TRUE -> ownedHeadingInput.magneticTrueHeading?.accuracyDegrees
             null -> null
         }
+        // Gyro evidence reports device rotation, not a replacement body or travel heading.
+        // A selector-validated rotation may still make an older absolute course usable.
+        val currentTurningGyro = userMotionForStep.takeIf {
+            it.deviceRotation == UserDeviceRotationState.TURNING
+        }?.evidenceRefs?.firstOrNull {
+            it.source == UserMotionEvidenceSource.GYROSCOPE_WINDOW &&
+                it.measuredAtElapsedRealtimeMs <= measuredAtMs
+        }
+        val headingPredatesCurrentDeviceTurn = currentTurningGyro?.let { gyro ->
+            selectedHeading?.let { heading ->
+                heading.sourceObservationAtElapsedRealtimeMs < gyro.measuredAtElapsedRealtimeMs &&
+                    (heading.rotationObservationAtElapsedRealtimeMs ?: heading.sourceObservationAtElapsedRealtimeMs) <
+                    gyro.measuredAtElapsedRealtimeMs
+            } == true
+        } == true
+        val withholdDirectedHeading = currentStepHasStationaryGnssConflict || headingPredatesCurrentDeviceTurn
         val update = estimator.observePdrStep(
             PdrStepObservation(
                 stepCount = stepCount,
                 stepLengthM = profile.stepLengthM,
                 stepLengthSigmaM = effectiveStepLengthSigmaM,
-                headingDegreesTrueNorth = selectedHeading?.headingDegreesTrueNorth,
-                headingAccuracyDegrees = selectedAccuracy,
+                headingDegreesTrueNorth = selectedHeading?.headingDegreesTrueNorth
+                    .takeUnless { withholdDirectedHeading },
+                headingAccuracyDegrees = selectedAccuracy.takeUnless { withholdDirectedHeading },
                 quality = quality,
                 elapsedRealtimeMs = headingInput.nowElapsedRealtimeMs,
                 receivedAtElapsedRealtimeMs = receivedAtElapsedRealtimeMs,
@@ -291,13 +446,20 @@ internal class PositioningCoordinator(
         observation: ZuptObservation,
         receivedAtElapsedRealtimeMs: Long = observation.receivedAtElapsedRealtimeMs,
         expectedGeneration: Long = generation,
+        expectedMotionOwner: UserMotionStateOwner? = userMotionEstimator.currentOwner(),
     ): PositioningSnapshot {
         if (expectedGeneration != generation) return rejectedSnapshot(receivedAtElapsedRealtimeMs,
             PedestrianMotionHardRejectReason.GENERATION_MISMATCH)
+        if (expectedMotionOwner != userMotionEstimator.currentOwner()) {
+            return rejectedOwnerSnapshot(receivedAtElapsedRealtimeMs)
+        }
+        if (!userMotionEstimator.ownsInput(observation.elapsedRealtimeMs, expectedMotionOwner)) {
+            return rejectedSnapshot(receivedAtElapsedRealtimeMs, PedestrianMotionHardRejectReason.INVALID_TIME)
+        }
         if (!observation.velocitySigmaMps.isFinite() || observation.velocitySigmaMps <= 0.0 ||
             observation.elapsedRealtimeMs < 0L || receivedAtElapsedRealtimeMs < observation.elapsedRealtimeMs
         ) return rejectedSnapshot(receivedAtElapsedRealtimeMs, PedestrianMotionHardRejectReason.INVALID_ZUPT)
-        val update = if (userMotionEstimator.claimZeroVelocityUpdate(observation.elapsedRealtimeMs, receivedAtElapsedRealtimeMs)) {
+        val update = if (userMotionEstimator.claimZeroVelocityUpdate(observation.elapsedRealtimeMs, receivedAtElapsedRealtimeMs, expectedMotionOwner)) {
             estimator.observeZupt(observation.copy(receivedAtElapsedRealtimeMs = receivedAtElapsedRealtimeMs))
         } else {
             PedestrianMotionEstimatorUpdate(estimator.estimateAt(receivedAtElapsedRealtimeMs),
@@ -316,9 +478,13 @@ internal class PositioningCoordinator(
         decision: PedestrianStationaryDecision,
         receivedAtElapsedRealtimeMs: Long,
         expectedGeneration: Long = generation,
+        expectedMotionOwner: UserMotionStateOwner? = userMotionEstimator.currentOwner(),
     ): UserMotionStateSnapshot {
         if (expectedGeneration != generation) return userMotionEstimator.rejectedGenerationSnapshot(receivedAtElapsedRealtimeMs)
-        userMotionEstimator.observeMotion(decision, receivedAtElapsedRealtimeMs)
+        if (expectedMotionOwner != userMotionEstimator.currentOwner()) {
+            return userMotionEstimator.rejectedOwnerSnapshot(receivedAtElapsedRealtimeMs)
+        }
+        userMotionEstimator.observeMotion(decision, receivedAtElapsedRealtimeMs, expectedGeneration, expectedMotionOwner)
         return userMotionEstimator.snapshot(receivedAtElapsedRealtimeMs)
     }
 
@@ -328,7 +494,42 @@ internal class PositioningCoordinator(
         evidence: UserMotionLocationEvidence,
         receivedAtElapsedRealtimeMs: Long,
         expectedGeneration: Long = generation,
-    ) = userMotionEstimator.observeSpeed(speed, evidence, receivedAtElapsedRealtimeMs, expectedGeneration)
+        expectedMotionOwner: UserMotionStateOwner? = userMotionEstimator.currentOwner(),
+    ) = userMotionEstimator.observeSpeed(speed, evidence, receivedAtElapsedRealtimeMs, expectedGeneration, expectedMotionOwner)
+
+    /** Recovery input only: records original steps without PDR displacement or calibration. */
+    @Synchronized
+    fun observeUserSteps(
+        event: StepEvent,
+        receivedAtElapsedRealtimeMs: Long,
+        expectedGeneration: Long = generation,
+        expectedMotionOwner: UserMotionStateOwner? = userMotionEstimator.currentOwner(),
+    ): UserMotionStateSnapshot {
+        if (expectedGeneration != generation) return userMotionEstimator.rejectedGenerationSnapshot(receivedAtElapsedRealtimeMs)
+        if (expectedMotionOwner != userMotionEstimator.currentOwner()) return userMotionEstimator.rejectedOwnerSnapshot(receivedAtElapsedRealtimeMs)
+        val quality = when (event.confidence) {
+            StepEventConfidence.HIGH -> PdrStepQuality.HIGH
+            StepEventConfidence.MEDIUM -> PdrStepQuality.MEDIUM
+            StepEventConfidence.LOW -> PdrStepQuality.LOW
+        }
+        userMotionEstimator.observeSteps(event.deltaSteps, quality, event.timestampMs, receivedAtElapsedRealtimeMs,
+            expectedGeneration, expectedMotionOwner, event.source, event.confidence, event)
+        return userMotionEstimator.snapshot(receivedAtElapsedRealtimeMs)
+    }
+
+    /** Explicit mount input reaches the same snapshots used by current/evaluate motion consumers. */
+    @Synchronized
+    fun observeUserMount(
+        mount: UserDeviceBodyRelationState,
+        observedAtElapsedRealtimeMs: Long,
+        receivedAtElapsedRealtimeMs: Long,
+        expectedGeneration: Long = generation,
+        expectedMotionOwner: UserMotionStateOwner? = userMotionEstimator.currentOwner(),
+    ): Boolean {
+        if (expectedGeneration != generation) return false
+        return userMotionEstimator.observeMount(mount, observedAtElapsedRealtimeMs,
+            receivedAtElapsedRealtimeMs, expectedGeneration, expectedMotionOwner)
+    }
 
     @Synchronized
     fun currentUserMotion(nowElapsedRealtimeMs: Long): UserMotionStateSnapshot =
@@ -343,8 +544,9 @@ internal class PositioningCoordinator(
     fun evaluate(nowElapsedRealtimeMs: Long, expectedGeneration: Long = generation): PositioningSnapshot {
         if (expectedGeneration != generation) return rejectedSnapshot(nowElapsedRealtimeMs,
             PedestrianMotionHardRejectReason.GENERATION_MISMATCH)
-        return snapshot(null, estimator.estimateAt(nowElapsedRealtimeMs),
-            currentOrUnavailableConfidence(nowElapsedRealtimeMs),
+        val estimate = estimator.estimateAt(nowElapsedRealtimeMs)
+        return snapshot(null, estimate,
+            currentOrUnavailableConfidence(nowElapsedRealtimeMs, estimate?.quality),
             gnssQualityEstimator.snapshot(toElapsedRealtimeNanos(nowElapsedRealtimeMs)),
             evaluatedAtElapsedRealtimeMs = nowElapsedRealtimeMs)
     }
@@ -381,6 +583,9 @@ internal class PositioningCoordinator(
         motionProfile.snapshotForPersistence()
 
     @Synchronized
+    fun isConfidenceAnnouncementCurrent(token: Long): Boolean = confidencePolicy.isAnnouncementCurrent(token)
+
+    @Synchronized
     fun commitAnnouncementDelivered(token: Long, deliveredAtElapsedRealtimeMs: Long): Boolean {
         if (!confidencePolicy.commitAnnouncementDelivered(token, deliveredAtElapsedRealtimeMs)) return false
         lastConfidenceDecision = confidencePolicy.evaluate(deliveredAtElapsedRealtimeMs)
@@ -401,6 +606,9 @@ internal class PositioningCoordinator(
         lastMotionConfidenceSampleAtMs = null
         consecutiveCorruptJumpCount = 0
         lastCorruptJumpMeasurement = null
+        corruptJumpStartedAtMeasurementMs = null
+        corruptJumpStartedAtReceiptMs = null
+        consecutiveCorruptJumpDurationMs = null
         applyProfileDynamics(motionProfile.currentSnapshot())
     }
 
@@ -433,6 +641,10 @@ internal class PositioningCoordinator(
             evaluatedAtElapsedRealtimeMs = receivedAtMs,
         )
     }
+
+    private fun rejectedOwnerSnapshot(nowMs: Long): PositioningSnapshot =
+        rejectedSnapshot(nowMs, PedestrianMotionHardRejectReason.GENERATION_MISMATCH)
+            .copy(userMotion = userMotionEstimator.rejectedOwnerSnapshot(nowMs))
 
     private fun rejectedSnapshot(nowMs: Long, reason: PedestrianMotionHardRejectReason): PositioningSnapshot =
         PositioningSnapshot(raw = null, filtered = null, quality = PositionQuality.UNAVAILABLE,
@@ -498,8 +710,11 @@ internal class PositioningCoordinator(
         return decision
     }
 
-    private fun currentOrUnavailableConfidence(nowMs: Long): PositionConfidenceDecision =
-        confidencePolicy.evaluate(nowMs).also { lastConfidenceDecision = it }
+    private fun currentOrUnavailableConfidence(
+        nowMs: Long,
+        observedQuality: PositionQuality? = null,
+    ): PositionConfidenceDecision =
+        confidencePolicy.evaluate(nowMs, observedQuality).also { lastConfidenceDecision = it }
 
     private fun observeMotionConfidence(
         quality: PositionQuality,
@@ -520,6 +735,8 @@ internal class PositioningCoordinator(
      */
     private fun stepLengthSigmaFor(profile: PedestrianMotionProfileSnapshot): Double =
         if (profile.isCalibrated && profile.calibrationConditionKnown &&
+            profile.calibrationCondition?.stepInput != null &&
+            profile.calibrationCondition.mounting != null &&
             profile.calibrationCondition == currentCalibrationCondition
         ) {
             CALIBRATED_STEP_LENGTH_SIGMA_M

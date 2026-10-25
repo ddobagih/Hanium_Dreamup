@@ -1,7 +1,5 @@
 package kr.co.hanium.dreamup.walksafe.network
 
-import java.net.HttpURLConnection
-import java.net.URL
 import kr.co.hanium.dreamup.walksafe.report.UserReportDetail
 import kr.co.hanium.dreamup.walksafe.report.UserReportContentCurrent
 import kr.co.hanium.dreamup.walksafe.report.UserReportContentRevision
@@ -294,10 +292,12 @@ internal class AndroidUserReportClient : UserReportNetworkClient {
         require(session.backendDevicePersistenceSnapshotOrNull() != null)
         require(endpoint.startsWith(session.gatewayBaseUrl.trimEnd('/') + "/api/"))
         return cancellableHttpCall { cancellation ->
-            val connection = URL(endpoint).openConnection() as HttpURLConnection
-            cancellation.attach(connection)
-            try {
-                connection.apply {
+            withJsonHttpExchange(
+                cancellation = cancellation,
+                endpoint = endpoint,
+                requestBody = requestBody,
+                maximumResponseBytes = maxResponseBytes,
+                configure = {
                     requestMethod = method
                     connectTimeout = 8_000
                     readTimeout = 15_000
@@ -308,38 +308,17 @@ internal class AndroidUserReportClient : UserReportNetworkClient {
                     setRequestProperty("Cache-Control", "no-store")
                     setRequestProperty("Connection", "close")
                     session.requestHeaders().forEach(::setRequestProperty)
-                    if (requestBody != null) {
-                        doOutput = true
-                        setRequestProperty("Content-Type", "application/json")
-                    }
-                }
-                if (requestBody != null) {
-                    connection.outputStream.use { output ->
-                        cancellation.attach(output)
-                        try {
-                            output.write(requestBody.toByteArray(Charsets.UTF_8))
-                            output.flush()
-                        } finally {
-                            cancellation.detach(output)
-                        }
-                    }
-                }
-                val response = connection.readBoundedResponse(
-                    maxResponseBytes,
-                    cancellation,
-                )
+                },
+            ) { response ->
                 if (response.statusCode !in acceptedStatusCodes) {
                     throw UserReportHttpException(response.statusCode)
                 }
-                val contentType = connection.getHeaderField("Content-Type")
+                val contentType = getHeaderField("Content-Type")
                     ?.substringBefore(';')
                     ?.trim()
                     ?.lowercase()
                 if (contentType != "application/json") throw UserReportProtocolException()
                 parse(response.body) ?: throw UserReportProtocolException()
-            } finally {
-                cancellation.detach(connection)
-                connection.disconnect()
             }
         }
     }

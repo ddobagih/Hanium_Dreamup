@@ -30,11 +30,16 @@ class RouteCompassSensorEvidenceRegressionTest {
             RouteFacingGuidance.evaluate(0.0, still, now))
     }
 
-    @Test fun moderateRotationRemovesTheClockNumberButKeepsAClearSide() {
+    @Test fun moderateRotationKeepsANominalClockWithoutPromotingReportedPrecision() {
         val observation = RouteFacingObservation(0.0, 3.0, now - 300L, angularRateDegreesPerSecond = 30.0)
         val result = RouteFacingGuidance.evaluate(270.0, observation, now)
         assertEquals(RouteFacingDirection.LEFT, result.direction)
-        assertNull(result.clockHour)
+        assertEquals(9, result.clockHour)
+        assertFalse(result.clockPrecisionAvailable)
+        assertEquals(RouteClockReferenceKind.NOMINAL_TREND_CLOCK, result.clockReferenceKind)
+        assertEquals(now - 300L, observation.observedAtElapsedRealtimeMs)
+        assertEquals(3.0, observation.headingAccuracyDegrees!!, 0.0)
+        assertNull(result.clockRange)
         assertEquals(9, RouteFacingGuidance.evaluate(270.0, observation.copy(angularRateDegreesPerSecond = 0.0), now).clockHour)
     }
 
@@ -63,7 +68,16 @@ class RouteCompassSensorEvidenceRegressionTest {
     @Test fun absentStaleOrNormalMagneticFieldDoesNotBlockAHealthyRotationVector() {
         val rv = RouteCompassHeadingResult(RouteFacingObservation(0.0, 3.0, now), RouteCompassHeadingReason.VALID)
         assertEquals(rv, RouteCompassHeading.crossCheckMagneticField(rv, null, reference, now))
-        assertEquals(rv, RouteCompassHeading.crossCheckMagneticField(rv, magnetic, reference, now))
+        val checked = RouteCompassHeading.crossCheckMagneticField(rv, magnetic, reference, now)
+        assertEquals(rv.observation, checked.observation)
+        assertEquals(rv.reason, checked.reason)
+        val evidence = requireNotNull(checked.checkEvidence)
+        assertEquals(50.0, requireNotNull(evidence.magneticFieldMicrotesla), 0.0)
+        assertEquals(50.0, requireNotNull(evidence.expectedMagneticFieldMicrotesla), 0.0)
+        assertEquals(0.0, requireNotNull(evidence.magneticFieldDeviationMicrotesla), 0.0)
+        assertEquals(12.5, requireNotNull(evidence.magneticFieldAllowanceMicrotesla), 0.0)
+        assertNull(evidence.rejectedCheck)
+        assertNull(evidence.forwardHorizontal)
         assertEquals(rv, RouteCompassHeading.crossCheckMagneticField(rv, magnetic.copy(y = -120.0, observedAtMs = now - 501L), reference, now))
         assertEquals(rv, RouteCompassHeading.crossCheckMagneticField(rv, magnetic.copy(y = -120.0), null, now))
         assertEquals(12, RouteFacingGuidance.evaluate(0.0, rv.observation, now).clockHour)
@@ -127,13 +141,19 @@ class RouteCompassSensorEvidenceRegressionTest {
 
     // --- #19: route bearing uncertainty is combined with the sensor margin.
 
-    @Test fun routeCandidatesThatRequireTheSameActionKeepTheDirectionWithoutAClockNumber() {
+    @Test fun routeCandidatesThatRequireTheSameActionKeepANominalClockWithoutReportedPrecision() {
         val facing = RouteFacingObservation(0.0, 2.0, now)
         val agreed = RouteFacingGuidance.evaluate(17.0, facing, now, routeBearingUncertaintyDegrees = 7.0)
         assertEquals(RouteFacingDirection.FRONT, agreed.direction)
-        assertNull(agreed.clockHour)
+        assertEquals(1, agreed.clockHour)
+        assertFalse(agreed.clockPrecisionAvailable)
+        assertEquals(RouteClockReferenceKind.NOMINAL_TREND_CLOCK, agreed.clockReferenceKind)
+        assertNull(agreed.clockRange)
         assertEquals(1, RouteFacingGuidance.evaluate(30.0, facing, now).clockHour)
-        assertNull(RouteFacingGuidance.evaluate(30.0, facing, now, routeBearingUncertaintyDegrees = 9.0).clockHour)
+        val uncertain = RouteFacingGuidance.evaluate(30.0, facing, now, routeBearingUncertaintyDegrees = 9.0)
+        assertEquals(1, uncertain.clockHour)
+        assertFalse(uncertain.clockPrecisionAvailable)
+        assertEquals(RouteClockReferenceKind.NOMINAL_TREND_CLOCK, uncertain.clockReferenceKind)
     }
 
     @Test fun routeCandidatesThatStraddleASectorEdgeWithholdTheDirection() {

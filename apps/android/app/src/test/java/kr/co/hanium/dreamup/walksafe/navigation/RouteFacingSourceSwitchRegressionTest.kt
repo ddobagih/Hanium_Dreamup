@@ -9,6 +9,9 @@ import org.junit.Test
  * before a turn command. The earlier source is comparison evidence only, never the current facing.
  */
 class RouteFacingSourceSwitchRegressionTest {
+    // This suite isolates source/sample confirmation, not the recheck announcement timer.
+    // Production 1.5-second delay and immediate safety actions are covered by RouteDirectionRecheckGraceTest.
+
     private val north = 1.0 / 111_320.0
 
     private fun rv(heading: Double, at: Long) = RouteFacingObservation(heading, 5.0, at)
@@ -17,7 +20,7 @@ class RouteFacingSourceSwitchRegressionTest {
     )
 
     private fun started(first: RouteFacingObservation): Pair<RouteNavigator, String> {
-        val navigator = RouteNavigator().apply {
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L)).apply {
             setRoute(WalkingRoute(
                 priority = "TEST",
                 summary = WalkingRouteSummary(200, 200),
@@ -34,12 +37,12 @@ class RouteFacingSourceSwitchRegressionTest {
     @Test
     fun firstObservationAfterAPrimaryToFallbackSwitchDoesNotCommandATurn() {
         val (navigator, first) = started(rv(90.0, 1_000L))
-        assertTrue(first, first.contains("경로는 왼쪽"))
+        assertTrue(first, first.contains("약 9시 방향"))
         val switched = requireNotNull(navigator.currentGuidance(1_100L, gravity(90.0, 1_100L))?.instruction)
         assertFalse("switch must not command immediately: $switched", switched.contains("왼쪽"))
         assertFalse(switched, switched.contains("몸을 돌리세요"))
         val confirmed = requireNotNull(navigator.currentGuidance(1_200L, gravity(90.0, 1_200L))?.instruction)
-        assertTrue(confirmed, confirmed.contains("경로는 왼쪽"))
+        assertNominalClock(confirmed, 9)
     }
 
     @Test
@@ -52,16 +55,16 @@ class RouteFacingSourceSwitchRegressionTest {
         val jumped = navigator.currentGuidance(1_200L, gravity(270.0, 1_200L))?.instruction.orEmpty()
         assertFalse(jumped, jumped.contains("오른쪽"))
         val confirmed = navigator.currentGuidance(1_300L, gravity(270.0, 1_300L))?.instruction.orEmpty()
-        assertTrue(confirmed, confirmed.contains("경로는 오른쪽"))
+        assertNominalClock(confirmed, 3)
     }
 
     @Test
     fun switchingBackToThePrimaryIsAlsoASwitch() {
         val (navigator, first) = started(gravity(90.0, 1_000L))
-        assertTrue(first, first.contains("경로는 왼쪽"))
+        assertRecheck(first)
         val back = navigator.currentGuidance(1_100L, rv(90.0, 1_100L))?.instruction.orEmpty()
         assertFalse(back, back.contains("왼쪽"))
-        assertTrue(navigator.currentGuidance(1_200L, rv(90.0, 1_200L))?.instruction.orEmpty().contains("경로는 왼쪽"))
+        assertTrue(navigator.currentGuidance(1_200L, rv(90.0, 1_200L))?.instruction.orEmpty().contains("약 9시 방향"))
     }
 
     /** 08.txt #12: a fallback whose motion check could not run is not treated as checked. */
@@ -71,18 +74,32 @@ class RouteFacingSourceSwitchRegressionTest {
             .copy(sensorQuality = RouteFacingSensorQuality.CALIBRATED_WITHOUT_MOTION_CHECK)
         val (navigator, first) = started(unchecked(90.0, 1_000L))
         assertFalse(first, first.contains("왼쪽"))
-        assertTrue(navigator.currentGuidance(1_100L, unchecked(90.0, 1_100L))?.instruction.orEmpty().contains("경로는 왼쪽"))
+        assertNominalClock(navigator.currentGuidance(1_100L, unchecked(90.0, 1_100L))?.instruction.orEmpty(), 9)
         val turned = navigator.currentGuidance(1_200L, unchecked(270.0, 1_200L))?.instruction.orEmpty()
         assertFalse(turned, turned.contains("오른쪽"))
-        assertTrue(navigator.currentGuidance(1_300L, unchecked(270.0, 1_300L))?.instruction.orEmpty().contains("경로는 오른쪽"))
-        // The same device with a checked sample is not delayed.
-        assertTrue(navigator.currentGuidance(1_400L, gravity(90.0, 1_400L))?.instruction.orEmpty().contains("경로는 왼쪽"))
+        assertNominalClock(navigator.currentGuidance(1_300L, unchecked(270.0, 1_300L))?.instruction.orEmpty(), 3)
+        // A changed nominal clock still needs fresh continuity; no numeric accuracy is invented.
+        assertRecheck(navigator.currentGuidance(1_400L, gravity(90.0, 1_400L))?.instruction.orEmpty())
+        assertRecheck(navigator.currentGuidance(1_500L, rv(90.0, 1_500L))?.instruction.orEmpty())
+        assertTrue(navigator.currentGuidance(1_600L, rv(90.0, 1_600L))?.instruction.orEmpty().contains("약 9시 방향"))
     }
 
     @Test
     fun anUnchangedSourceKeepsImmediateDirection() {
         val (navigator, _) = started(rv(90.0, 1_000L))
-        val same = navigator.currentGuidance(1_100L, rv(270.0, 1_100L))?.instruction.orEmpty()
-        assertTrue(same, same.contains("경로는 오른쪽"))
+        val changing = navigator.currentGuidance(1_100L, rv(270.0, 1_100L))?.instruction.orEmpty()
+        assertRecheck(changing)
+        val confirmed = navigator.currentGuidance(1_200L, rv(270.0, 1_200L))?.instruction.orEmpty()
+        assertTrue(confirmed, confirmed.contains("약 3시 방향"))
+    }
+    private fun assertNominalClock(text: String, hour: Int) {
+        assertTrue(text, text.contains("약 ${hour}시 방향"))
+        assertFalse(text, text.contains("시에서") || text.contains("사이 방향"))
+    }
+    private fun assertRecheck(text: String) {
+        assertTrue(text, text.contains("확정하기 어렵습니다"))
+        assertFalse(text, text.contains("시 방향"))
+        assertFalse(text, text.contains("몸을 돌리세요"))
+        assertFalse(text, text.contains("직진하세요"))
     }
 }

@@ -1,0 +1,46 @@
+flowchart TD
+  A["F-D03-029 archive 소유권·24 시간·종료/계정변경 정리"]
+  P["정책 P-D03-028, P-D03-029"]
+  A --> P
+  N0["1. archive 를 현재 계정 세대와 보행 session 에 묶어 유효기간을 제한한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. 같은 owner 의 token rotation 은 보행을 유지; 다른 owner/null bind 는 현재 lease 를 무효화하고 다른 archive 를 검증 삭제한다."]
+  N0 --> N1
+  N2["3. endWalk 는 현재 scope 만 clear 하고 lease 를 반환하며 endedScope 를 기록하여 같은 store 의 재 save 를 막는다."]
+  N1 --> N2
+  N3["4. expiry 는 wall 와 monotonic 을 함께 검사하고 reboot/큰 clock 변경이면 archive 를 무효화한다."]
+  N2 --> N3
+  N4["5. startup 은 route 없는 expiryMetadata 만 받고 복원하지 않는다; 현재 walk 만료나 필수 purge 실패는 Main 정상모드 safety stop/fence 를 건다."]
+  N3 --> N4
+  N5["6. 늦은 old Activity purge 는 다른 scope archive 를 삭제하지 않는다."]
+  N4 --> N5
+  Z["정상: end/expiry/account boundary verifiedClear."]
+  N5 --> Z
+  B0{"현재 archive 다른 expectedScope"}
+  R0["clearWalk 는 그대로두고 true"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"ciphertext 읽기불가"}
+  R1["무조건다른 scope 로 추정하지 않고 false"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"ownerless v1-v3"}
+  R2["v4 decode 실패 정리"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  B3{"detach"}
+  R3["runtime 소유권만해제,삭제 아님"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B3
+  B3 -->|"참"| R3
+  Xfailure["실패: clear/readback 실패는 gate 유지."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xtimeout["만료: 24h 정확경계에서 만료."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xtimeout
+  Xcancel["취소: route reset 은 관련 request/speech/pending 와 archive 정리."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: account generation 변경으로 old 작업 무효."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xretry["재시도: 필수 purge 는 scope-bound IO 로 재시도; 성공 전 새 route 차단."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry
+  Xcleanup["정리: storage.clear && read()==null 확인."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

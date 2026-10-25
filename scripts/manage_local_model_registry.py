@@ -11,8 +11,10 @@ import json
 import os
 import re
 import shutil
+import struct
 import sys
 import tempfile
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
@@ -22,10 +24,98 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.walksafe_dataset_integrity import DatasetIntegrityError, verify_content_hashed_manifest  # noqa: E402
+from scripts.check_android_tflite_contract_20260531 import assert_raw_tensor_contract  # noqa: E402
 
 DEFAULT_REGISTRY = REPO_ROOT / "model/registry/walksafe-model-registry.json"
 DEFAULT_DEPLOYMENT = REPO_ROOT / "model/deployments/local-deployment.json"
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+ANDROID_RUNTIME_CONFIG = "apps/android/app/src/main/assets/model-config/two_model_runtime.json"
+ANDROID_ASSETS = "apps/android/app/src/main/assets"
+
+
+def check_android_export(label: str, export: dict[str, Any], issues: list[str]) -> None:
+    if export.get("input_shape") != [1, 768, 768, 3]:
+        issues.append(f"{label}: input shape must be [1, 768, 768, 3]")
+    if export.get("format") == "tflite_float32_yolo_raw":
+        classes = export.get("classes")
+        if not isinstance(classes, list) or not classes or any(not isinstance(x, str) or not x for x in classes):
+            issues.append(f"{label}: classes must be nonempty names")
+            return
+        if len(set(classes)) != len(classes):
+            issues.append(f"{label}: classes must be unique")
+        if export.get("output_shape") != [1, 4 + len(classes), 12096]:
+            issues.append(f"{label}: raw output shape must be [1, 4 + class_count, 12096]")
+        for key in ("input_dtype", "output_dtype"):
+            if export.get(key) != "float32":
+                issues.append(f"{label}: {key} must be float32")
+    elif export.get("format") == "tflite_float32_end2end":
+        if export.get("output_shape") != [1, 300, 6]:
+            issues.append(f"{label}: output shape must be [1, 300, 6]")
+    else:
+        issues.append(f"{label}: unsupported Android export format")
+
+
+def read_tflite_tensors(path: Path) -> dict[str, Any]:
+    """Read the main graph's public tensor contract without loading an interpreter.
+
+    Stable field indices: TensorFlow v2.19.1 compiler/mlir/lite/schema/schema.fbs
+    (Model.subgraphs=2, SubGraph.tensors/inputs/outputs=0/1/2, Tensor.shape/type=0/1).
+    This bounded reader only supports the single-input/output FLOAT32 contract.
+    """
+    data = path.read_bytes()
+
+    def number(offset: int, kind: str = "I") -> int:
+        size = struct.calcsize("<" + kind)
+        if offset < 0 or offset + size > len(data):
+            raise ValueError("TFLite tensor contract has an out-of-bounds offset")
+        return int(struct.unpack_from("<" + kind, data, offset)[0])
+
+    def field(table: int, index: int) -> int | None:
+        vtable = table - number(table, "i")
+        entry = 4 + index * 2
+        if entry + 2 > number(vtable, "H"):
+            return None
+        offset = number(vtable + entry, "H")
+        return table + offset if offset else None
+
+    def vector(table: int, index: int) -> list[int]:
+        location = field(table, index)
+        if location is None:
+            raise ValueError("TFLite tensor contract is missing a vector")
+        start = location + number(location)
+        count = number(start)
+        if count > (len(data) - start - 4) // 4:
+            raise ValueError("TFLite tensor contract has an invalid vector length")
+        return [start + 4 + i * 4 for i in range(count)]
+
+    if data[4:8] != b"TFL3":
+        raise ValueError("asset is not a TFL3 FlatBuffer")
+    model = number(0)
+    version_field = field(model, 0)
+    if version_field is None or number(version_field) != 3:
+        raise ValueError("unsupported TFLite schema version")
+    graphs = vector(model, 2)
+    if not graphs:
+        raise ValueError("TFLite main graph is missing")
+    graph = graphs[0] + number(graphs[0])
+    tensors = vector(graph, 0)
+    result: dict[str, Any] = {}
+    for name, index in (("input", 1), ("output", 2)):
+        references = vector(graph, index)
+        if len(references) != 1:
+            raise ValueError(f"TFLite {name} must have exactly one tensor")
+        tensor_index = number(references[0], "i")
+        if not 0 <= tensor_index < len(tensors):
+            raise ValueError(f"TFLite {name} tensor index is invalid")
+        tensor = tensors[tensor_index] + number(tensors[tensor_index])
+        shape = [number(item, "i") for item in vector(tensor, 0)]
+        type_field = field(tensor, 1)
+        tensor_type = number(type_field, "b") if type_field is not None else 0
+        if not shape or any(size <= 0 for size in shape) or tensor_type != 0:
+            raise ValueError(f"TFLite {name} must have a positive shape and FLOAT32 type")
+        result[f"{name}_shape"] = shape
+        result[f"{name}_dtype"] = "float32"
+    return result
 
 
 def now_iso() -> str:
@@ -123,10 +213,7 @@ def verify_state(registry: dict[str, Any], deployment: dict[str, Any]) -> list[s
             )
         android_export = exports.get("android_tflite")
         if isinstance(android_export, dict):
-            if android_export.get("input_shape") != [1, 768, 768, 3]:
-                issues.append(f"{model_id}.exports.android_tflite: input shape must be [1, 768, 768, 3]")
-            if android_export.get("output_shape") != [1, 300, 6]:
-                issues.append(f"{model_id}.exports.android_tflite: output shape must be [1, 300, 6]")
+            check_android_export(f"{model_id}.exports.android_tflite", android_export, issues)
         check_hashed_path(
             f"{model_id}.dataset",
             dataset.get("manifest_path"),
@@ -168,8 +255,8 @@ def verify_state(registry: dict[str, Any], deployment: dict[str, Any]) -> list[s
     return issues
 
 
-def verify_runtime_state(registry: dict[str, Any], deployment: dict[str, Any]) -> list[str]:
-    """Verify only artifacts referenced by active runtime targets.
+def verify_manifest_artifacts(registry: dict[str, Any], deployment: dict[str, Any]) -> list[str]:
+    """Verify artifacts referenced by the historical deployment manifest.
 
     Training results and dataset manifests remain mandatory for the full ``verify``
     command, but they are intentionally not release-runtime dependencies.
@@ -207,11 +294,98 @@ def verify_runtime_state(registry: dict[str, Any], deployment: dict[str, Any]) -
             )
         android_export = exports.get("android_tflite")
         if isinstance(android_export, dict):
-            if android_export.get("input_shape") != [1, 768, 768, 3]:
-                issues.append(f"{model_id}.exports.android_tflite: input shape must be [1, 768, 768, 3]")
-            if android_export.get("output_shape") != [1, 300, 6]:
-                issues.append(f"{model_id}.exports.android_tflite: output shape must be [1, 300, 6]")
+            check_android_export(f"{model_id}.exports.android_tflite", android_export, issues)
     return issues
+
+
+def verify_android_runtime(registry: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Resolve the Android source of truth independently of manifest-only promotion."""
+    observed: dict[str, Any] = {"runtime_config": ANDROID_RUNTIME_CONFIG, "verified": False}
+    issues: list[str] = []
+    try:
+        config = load_json(repo_path(ANDROID_RUNTIME_CONFIG))
+        primary = config.get("primary_model", "unified_walksafe")
+        observed["primary_model"] = primary
+        if primary != "unified_walksafe" or config.get("fallback_model", "legacy_two_model") is not None:
+            raise ValueError("registered Android runtime requires unified primary without an unregistered fallback")
+        supplement = config.get("models", {}).get("person_supplement")
+        if supplement is not None and (not isinstance(supplement, dict) or supplement.get("enabled", True) is not False):
+            raise ValueError("Android runtime selects an unregistered person_supplement")
+        runtime = config.get("models", {}).get(primary)
+        if not isinstance(runtime, dict) or runtime.get("enabled", True) is not True:
+            raise ValueError("Android primary model is missing or disabled")
+        asset = runtime.get("asset")
+        if not isinstance(asset, str) or Path(asset).parent != Path("models"):
+            raise ValueError("Android asset must be a relative models/ path")
+        asset_relative = f"{ANDROID_ASSETS}/{asset}"
+        observed["artifact_path"] = asset_relative
+        models = registry_models(registry)
+        matches = [model for model in models.values()
+                   if model.get("exports", {}).get("android_tflite", {}).get("path") == asset_relative]
+        if len(matches) != 1:
+            raise ValueError("Android configured asset must match exactly one registered model")
+        model = matches[0]
+        exported = model["exports"]["android_tflite"]
+        artifact = model.get("artifact", {})
+        observed["model_id"] = model["model_id"]
+        observed["deployment_eligible"] = model.get("deployment_eligible") is True
+        check_android_export(f"{model['model_id']}.exports.android_tflite", exported, issues)
+        for label, expected, actual in (
+            ("artifact_sha256", exported.get("sha256"), runtime.get("artifact_sha256")),
+            ("source_model", artifact.get("path"), runtime.get("source_model")),
+            ("source_model_sha256", artifact.get("sha256"), runtime.get("source_model_sha256")),
+            ("classes", exported.get("classes"), runtime.get("classes")),
+            ("output_format", exported.get("output_format"), runtime.get("output_format")),
+        ):
+            if expected is None or expected != actual:
+                issues.append(f"Android {label} does not match the registered model")
+        check_hashed_path("Android artifact", asset_relative, exported.get("sha256"), issues)
+        check_hashed_path("Android source model", artifact.get("path"), artifact.get("sha256"), issues)
+        if runtime.get("output_format") == "yolo_raw_xywh_normalized":
+            assert_raw_tensor_contract(issues, runtime)
+        else:
+            issues.append("unsupported Android runtime output format")
+        actual_tensors = read_tflite_tensors(repo_path(asset_relative))
+        observed["tensors"] = actual_tensors
+        runtime_export = runtime.get("export", {})
+        for key, actual in actual_tensors.items():
+            if exported.get(key) != actual or runtime_export.get(key) != actual:
+                issues.append(f"Android {key} does not match the actual asset tensor")
+        # Exporter metadata is inside the hash-bound artifact, not an editable sidecar.
+        with zipfile.ZipFile(repo_path(asset_relative)) as archive:
+            metadata = json.loads(archive.read("metadata.json"))
+        names = metadata["names"]
+        classes = [names[str(index)] for index in range(len(names))]
+        if classes != runtime.get("classes"):
+            issues.append("Android classes do not match the artifact metadata order")
+        if metadata.get("imgsz") != [runtime.get("input_size")] * 2:
+            issues.append("Android input_size does not match the artifact metadata")
+        if metadata.get("end2end") is not False or metadata.get("args", {}).get("nms") is not False:
+            issues.append("Android artifact metadata does not describe the raw output contract")
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, zipfile.BadZipFile) as error:
+        issues.append(f"Android runtime binding: {error}")
+    observed["verified"] = not issues
+    return observed, issues
+
+
+def verify_runtime_state(registry: dict[str, Any], deployment: dict[str, Any]) -> dict[str, Any]:
+    manifest_issues = verify_manifest_artifacts(registry, deployment)
+    observed, runtime_issues = verify_android_runtime(registry)
+    targets = deployment.get("targets", {})
+    historical_targets = {
+        name: {key: target.get(key) for key in ("active_model_id", "previous_model_id", "runtime_state")}
+        for name, target in targets.items() if isinstance(target, dict)
+    } if isinstance(targets, dict) else {}
+    historical_android = historical_targets.get("android", {}).get("active_model_id")
+    issues = manifest_issues + runtime_issues
+    return {
+        "ok": not issues, "scope": "runtime", "issues": issues,
+        "historical_manifest": {
+            "artifacts_verified": not manifest_issues, "targets": historical_targets,
+            "android_matches_observed_runtime": historical_android is not None and historical_android == observed.get("model_id"),
+        },
+        "observed_runtime": {"android": observed, "backend": {"verified": False, "reason": "process_environment_not_inspected"}},
+    }
 
 
 @contextlib.contextmanager
@@ -285,9 +459,9 @@ def command_verify(args: argparse.Namespace) -> int:
 def command_verify_runtime(args: argparse.Namespace) -> int:
     registry = load_json(args.registry)
     deployment = load_json(args.deployment)
-    issues = verify_runtime_state(registry, deployment)
-    print(json.dumps({"ok": not issues, "scope": "runtime", "issues": issues}, ensure_ascii=False, indent=2))
-    return 0 if not issues else 1
+    result = verify_runtime_state(registry, deployment)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result["ok"] else 1
 
 
 def command_promote(args: argparse.Namespace) -> int:

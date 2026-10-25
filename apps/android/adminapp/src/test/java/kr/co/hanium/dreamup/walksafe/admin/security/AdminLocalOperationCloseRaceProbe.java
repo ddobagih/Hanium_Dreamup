@@ -35,6 +35,7 @@ public final class AdminLocalOperationCloseRaceProbe {
                             new AdminSecurityApi.SessionInfo(SESSION, DEVICE, "test", true, false,
                                 "2026-09-17T00:00:00Z")),
                             List.of(new AdminSecurityApi.DeviceInfo(DEVICE, true)));
+                    case "bindRequestAdmission":
                     case "clearLocalBinding":
                         return null;
                     default:

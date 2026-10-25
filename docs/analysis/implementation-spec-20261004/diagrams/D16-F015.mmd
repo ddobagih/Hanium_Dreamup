@@ -1,0 +1,14 @@
+flowchart TD
+  META["F-D16-015 · P-D16-015"]
+  META --> A
+  A["평가 또는 실패 outcome"] --> B["파일명 omitted·hash/크기·정책·component pin"]
+  B --> C["SAME_PHONE_POSTPROCESSED_PPK
+  NOT_INDEPENDENT·DEVELOPMENT_EVALUATION_ONLY"]
+  C --> D["canonical JSON·lastJson"]
+  D --> E{"hasResult·busy=false·사용자 저장 선택"}
+  E -->|"아니오·선택취소"| X["외부 쓰기 없음"]
+  E -->|"예"| F["CREATE_DOCUMENT URI·w mode write/flush"]
+  F -->|"성공"| G["저장 완료·stream close"]
+  F -->|"실패"| H["실패 안내·lastJson 유지
+  이미 쓴 부분 데이터 rollback 없음"]
+  H -->|"사용자 재저장"| E

@@ -8,7 +8,7 @@ internal class EmailOtpRequestRetryPolicy(
     private val elapsedRealtimeMs: () -> Long,
     private val createRequestId: () -> String,
     // S01-5: encrypted minimal record so a restarted process resends the same request ID.
-    private val pendingStore: () -> PendingEmailOtpRequestStore? = { null },
+    private val pendingStore: () -> PendingEmailOtpRequestStore?,
     private val wallClockMs: () -> Long = System::currentTimeMillis,
 ) {
     internal data class Payload(
@@ -34,28 +34,59 @@ internal class EmailOtpRequestRetryPolicy(
     private var requestId: String? = null
     private var activeAttempt: Attempt? = null
     private var retryAvailableAtMs = 0L
+    var storageFailure: Boolean = false
+        private set
 
     fun remainingWaitMs(currentPayload: Payload): Long =
-        if (currentPayload == payload) {
+        if (currentPayload.normalized() == payload) {
             (retryAvailableAtMs - elapsedRealtimeMs()).coerceAtLeast(0L)
         } else {
             0L
         }
 
     fun begin(currentPayload: Payload): Attempt? {
-        if (payload != currentPayload) {
+        storageFailure = false
+        if (runCatching { pendingStore() }.getOrNull() == null) {
+            storageFailure = true
+            return null
+        }
+        val normalizedPayload = currentPayload.normalized()
+        if (payload != normalizedPayload) {
             // A fresh process (no payload yet) may continue a persisted in-flight request.
             val restoring = payload == null && requestId == null
-            cancel(clearPersisted = !restoring)
-            payload = currentPayload
-            if (restoring) requestId = restorePendingRequestId(currentPayload)
+            cancel(clearPersisted = false) // replace only after the next recovery point is saved
+            payload = normalizedPayload
+            if (restoring) requestId = restorePendingRequestId(normalizedPayload, currentPayload.copy(dateOfBirth = normalizedPayload.dateOfBirth))
+        }
+        if (storageFailure) {
+            payload = null // the next explicit retry must read the durable record again
+            return null
         }
         if (activeAttempt != null || remainingWaitMs(currentPayload) > 0L) return null
-        val wireId = requestId ?: createRequestId().also {
-            requestId = it
-            persistPendingRequest(currentPayload, it)
+        if (requestId != null) {
+            val persisted = try {
+                pendingStore()?.loadPendingOtpRequest()
+            } catch (_: Exception) {
+                storageFailure = true
+                payload = null
+                requestId = null
+                return null
+            }
+            val oldSpelling = currentPayload.copy(dateOfBirth = normalizedPayload.dateOfBirth)
+            if (persisted == null || persisted.requestId != requestId ||
+                (!persisted.reusableFor(normalizedPayload, wallClockMs()) &&
+                    !persisted.reusableFor(oldSpelling, wallClockMs()))) requestId = null
         }
-        return Attempt(wireId, currentPayload, ++sequence).also { activeAttempt = it }
+        val wireId = requestId ?: createRequestId().let {
+            if (!persistPendingRequest(normalizedPayload, it)) {
+                storageFailure = true
+                payload = null
+                return null
+            }
+            requestId = it
+            it
+        }
+        return Attempt(wireId, normalizedPayload, ++sequence).also { activeAttempt = it }
     }
 
     fun recordFailure(
@@ -68,7 +99,7 @@ internal class EmailOtpRequestRetryPolicy(
         if (!accepts(attempt, currentPayload)) return false
         activeAttempt = null
         val pending = statusCode == 409 && serverCode == "account_enrollment_in_progress"
-        val retryable = statusCode == 0 || statusCode in 500..599 || statusCode == 429 || pending
+        val retryable = statusCode == 0 || statusCode == 408 || statusCode in 500..599 || statusCode == 429 || pending
         if (!retryable) {
             requestId = null
             retryAvailableAtMs = 0L
@@ -81,10 +112,20 @@ internal class EmailOtpRequestRetryPolicy(
         return true
     }
 
-    fun recordSuccess(attempt: Attempt, currentPayload: Payload?): Boolean {
+    fun recordSuccess(
+        attempt: Attempt,
+        currentPayload: Payload?,
+        persistResult: () -> Boolean,
+    ): Boolean {
         if (!accepts(attempt, currentPayload)) return false
+        // A process restart must keep the same wire ID until the returned handle is durable.
+        if (!runCatching(persistResult).getOrDefault(false)) {
+            activeAttempt = null
+            storageFailure = true
+            return false
+        }
         cancel()
-        return true
+        return !storageFailure
     }
 
     fun suspendForLifecycle() {
@@ -101,16 +142,26 @@ internal class EmailOtpRequestRetryPolicy(
         if (clearPersisted) clearPendingRequest()
     }
 
-    private fun restorePendingRequestId(currentPayload: Payload): String? {
-        val store = pendingStore() ?: return null
-        val pending = runCatching { store.loadPendingOtpRequest() }.getOrNull() ?: return null
-        if (pending.reusableFor(currentPayload, wallClockMs())) return pending.requestId
-        runCatching { store.clearPendingOtpRequest() }
-        return null
+    private fun restorePendingRequestId(currentPayload: Payload, previouslySerializedPayload: Payload): String? {
+        val store = runCatching { pendingStore() }.getOrNull() ?: run {
+            storageFailure = true
+            return null
+        }
+        val pending = try {
+            store.loadPendingOtpRequest()
+        } catch (_: Exception) {
+            storageFailure = true
+            return null
+        } ?: return null
+        // Pre-normalization v2 records can still match the exact email spelling the user re-entered.
+        return pending.requestId.takeIf {
+            pending.reusableFor(currentPayload, wallClockMs()) ||
+                pending.reusableFor(previouslySerializedPayload, wallClockMs())
+        }
     }
 
-    private fun persistPendingRequest(currentPayload: Payload, wireId: String) {
-        val store = pendingStore() ?: return
+    private fun persistPendingRequest(currentPayload: Payload, wireId: String): Boolean {
+        val store = runCatching { pendingStore() }.getOrNull() ?: return false
         val pending = runCatching {
             PendingEmailOtpRequest(
                 requestId = wireId,
@@ -118,21 +169,30 @@ internal class EmailOtpRequestRetryPolicy(
                 payloadSha256 = pendingEmailOtpPayloadSha256(currentPayload, wireId),
                 startedAtEpochMs = wallClockMs(),
             )
-        }.getOrNull() ?: return
-        // Best effort: without the record the in-memory retry rule still applies.
-        runCatching { store.savePendingOtpRequest(pending) }
+        }.getOrNull() ?: return false
+        return runCatching { store.savePendingOtpRequest(pending) }.getOrDefault(false)
     }
 
     private fun clearPendingRequest() {
-        runCatching { pendingStore()?.clearPendingOtpRequest() }
+        if (!runCatching { pendingStore()?.clearPendingOtpRequest() == true }.getOrDefault(false)) {
+            storageFailure = true
+        }
     }
 
     private fun accepts(attempt: Attempt, currentPayload: Payload?): Boolean {
         if (activeAttempt != attempt) return false
-        if (currentPayload != attempt.payload) {
+        if (currentPayload?.normalized() != attempt.payload) {
             cancel()
             return false
         }
         return true
+    }
+
+    private fun Payload.normalized(): Payload {
+        // Invalid edits must still differ from the active request and fence its callbacks.
+        val normalizedDate = GatewayAccountInputPolicy.normalizedDateOfBirth(dateOfBirth) ?: return this
+        val canonicalEmail = GatewayAccountInputPolicy.canonicalEmailOrNull(email) ?: return this
+        return if (dateOfBirth == normalizedDate && email == canonicalEmail) this
+        else copy(dateOfBirth = normalizedDate, email = canonicalEmail)
     }
 }

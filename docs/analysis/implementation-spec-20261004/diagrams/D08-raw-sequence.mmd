@@ -1,0 +1,23 @@
+sequenceDiagram
+  participant A as Android 종료 보행 업로드
+  participant G as Gateway
+  participant L as Session walk consent ledger
+  participant B as Backend
+  A->>G: RAW manifest chunk 또는commit
+  G->>L: 현재device generation endedwalk consent 확인
+  G->>G: global raw write slot 1개획득
+  G->>B: HEAD preflight 서명
+  B-->>G: admission
+  G->>L: write gate 재확인
+  G->>A: body read
+  A-->>G: 정확길이와digest body
+  G->>L: write gate 재확인
+  G->>B: PUT 또는POST 서명된정확bytes
+  B-->>G: ack receipt
+  G->>L: 응답전후 binding gate
+  alt 여전히유효
+    G-->>A: 검증한projection
+  else stale
+    G-->>A: 409 결과조정필요
+  end
+  G->>G: slot 및privacy lease 해제

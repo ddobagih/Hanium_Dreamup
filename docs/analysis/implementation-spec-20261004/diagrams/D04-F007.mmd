@@ -1,0 +1,26 @@
+flowchart TD
+  ID["F-D04-007 · 사용자 물리 이동·보행·장치 회전·장착 상태<br/>P-D04-007"]
+  A["owner 결속 motion·speed·step 입력"]
+  C0{"현재 epoch와 source 시각·품질을 통과하는가"}
+  R0["원 입력을 수용하지 않음"]
+  C1{"fresh step이 없는가"}
+  R1["MOVING; 독립 2회면 WALKING"]
+  C2{"이미 정지인 quiet 상태의 단일 moving GNSS인가"}
+  R2["속도 moving / quiet+정지 speed / UNKNOWN 순 평가"]
+  OK["STATIONARY 유지+GNSS_MOVEMENT_UNCONFIRMED; ZUPT 불가"]
+  END["snapshot 또는 side-effect 없는 peek; evidenceRefs 함께 반환"]
+  STOP["새 epoch/reset → 근거·watermark·mount clear"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

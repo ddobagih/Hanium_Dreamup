@@ -27,8 +27,8 @@ public final class AdminLifecycleW25StaticTest {
         int discard = close.indexOf("discardLocalSession(true);");
         assertTrue(discard >= 0);
         assertTrue(discard < close.indexOf("bestEffortCancel(api::cancelInFlightRequests)"));
-        assertTrue(discard < close.indexOf("bestEffortCancel(operationsApi::cancelInFlightRequests)"));
-        assertTrue(discard < close.indexOf("bestEffortCancel(rawCollectionRepository::cancelInFlightRequests)"));
+        assertTrue(discard < close.indexOf("bestEffortCancel(deliveries::cancelInFlightRequests)"));
+        assertTrue(discard < close.indexOf("bestEffortCancel(rawCollections::cancelInFlightRequests)"));
         assertFalse(close.contains("revokeSession("));
         for (String client : new String[] {
             "AdminSecurityHttpClient.java", "AdminOperationsHttpClient.java", "AdminRawCollectionHttpClient.java"
@@ -46,18 +46,18 @@ public final class AdminLifecycleW25StaticTest {
     public void s18_18FailedLogoutUsesTheSeparateLocalLockAndServerRevokeText() {
         String revoke = section(activity, "private void revokeSession(String sessionId, boolean currentSession) {",
             "private void reportLostDevice(");
-        assertTrue(revoke.contains("currentSession ? \"로그아웃했습니다.\""));
-        assertTrue(revoke.contains("? AdminRecoveryMessagePolicy.Phase.CURRENT_SESSION_LOGOUT"));
-        assertTrue(revoke.contains(": AdminRecoveryMessagePolicy.Phase.GENERAL"));
+        assertTrue(revoke.contains("controller.beginCurrentSessionRevocation(sessionId)"));
+        assertTrue(revoke.indexOf("controller.beginCurrentSessionRevocation(sessionId)")
+            < revoke.indexOf("runSecurityOperation("));
+        assertTrue(revoke.contains("AdminRecoveryMessagePolicy.Phase.CURRENT_SESSION_LOGOUT"));
+        assertTrue(revoke.contains("AdminRecoveryMessagePolicy.Phase.GENERAL"));
         assertTrue(revoke.contains("controller.revokeSession(sessionId)"));
         // adm-F6: the failure text is chosen with the controller's retained-session answer.
         String security = section(activity, "private void runSecurityOperation(\n        String pendingMessage,\n"
             + "        String successMessage,\n        AdminRecoveryMessagePolicy.Phase phase,\n"
             + "        SecurityOperation operation,\n        boolean credentialBound", "private void render()");
-        assertTrue(security.contains("resultText.setText(AdminRecoveryMessagePolicy.failureMessage(\n"
-            + "                        phase, error, controller != null && controller.hasRetainedSession()\n"
-            + "                    ));"));
-        assertFalse(security.contains("AdminRecoveryMessagePolicy.failureMessage(phase, error)"));
+        assertTrue(security.contains("AdminRecoveryMessagePolicy.failureMessage("));
+        assertTrue(security.contains("phase, error, owner.hasRetainedSession()"));
     }
 
     @Test
@@ -90,14 +90,14 @@ public final class AdminLifecycleW25StaticTest {
                     // adm-F7: reportHistoryGeneration alone is not advanced by onStop, so it no
                     // longer counts; history reads use the screen-bound helper instead.
                     || guard.contains("isCurrentHistoryCallback(")
-                    || guard.contains("requestGeneration == originalEvidenceGeneration"));
+                    || guard.contains("evidenceWorkflow.isCurrent(request)"));
         }
         assertTrue(checked >= 10);
         String helper = section(activity, "private boolean isCurrentOperationCallback(",
             "private void completeRawMutation(");
         assertTrue(helper.contains("!isDestroyed() && activityStarted"));
         assertTrue(helper.contains("generation == securityOperationGeneration"));
-        assertTrue(helper.contains("sessionGeneration == operationsSessionGeneration"));
+        assertTrue(helper.contains("sessionGeneration == historyState.operationsSessionGeneration()"));
     }
 
     @Test
@@ -105,9 +105,9 @@ public final class AdminLifecycleW25StaticTest {
         String incident = section(activity, "private void runIncidentStatusUpdate(", "private void ");
         int capture = incident.indexOf("long generation = securityOperationGeneration;");
         assertTrue(capture >= 0);
-        assertTrue(capture < incident.indexOf("long sessionGeneration = operationsSessionGeneration;"));
+        assertTrue(capture < incident.indexOf("long sessionGeneration = historyState.operationsSessionGeneration();"));
         assertTrue(capture < incident.indexOf("networkExecutor.execute("));
-        assertEquals(3, count(incident, "if (!isCurrentOperationCallback(generation, sessionGeneration)) return;"));
+        assertEquals(4, count(incident, "if (!isCurrentOperationCallback(generation, sessionGeneration)) return;"));
         assertFalse(incident.contains("if (isDestroyed()) return;"));
         for (String method : new String[] {"private void runRawPurposeDecision(", "private void runRawLegalHold("}) {
             String raw = section(activity, method, "    private void ");
@@ -119,16 +119,18 @@ public final class AdminLifecycleW25StaticTest {
         assertTrue(complete.startsWith(
             "private void completeRawMutation(long generation, long sessionGeneration, String message) {\n"
                 + "        if (!isCurrentOperationCallback(generation, sessionGeneration)) return;"));
-        String conflict = section(activity, "private void applyOperationalConflict(", "private static boolean ");
+        String conflict = section(activity, "private void applyOperationalConflict(", "private String operationalResultMessage(");
         assertTrue(conflict.contains("if (isDestroyed() || !activityStarted) return;"));
         // The authentication path keeps its three-way binding (S18-16 main case).
         String security = section(activity, "private void runSecurityOperation(\n        String pendingMessage,\n"
             + "        String successMessage,\n        AdminRecoveryMessagePolicy.Phase phase,\n"
             + "        SecurityOperation operation,\n        boolean credentialBound", "private void render()");
-        assertTrue(security.contains("if (!activityStarted || generation != securityOperationGeneration\n"
-            + "                    || !controller.isLocalGenerationCurrent(sessionGeneration)) return;"));
-        assertEquals(2, count(security, "if (isDestroyed() || !activityStarted\n"
-            + "                        || generation != securityOperationGeneration) return;"));
+        assertTrue(security.contains("AdminOperationRunner.execute(networkExecutor, this::runOnUiThread,"));
+        assertTrue(security.contains("() -> isCurrentScreenOwner(owner, generation, sessionGeneration)"));
+        String owner = section(activity, "private boolean isCurrentScreenOwner(", "private OperationalConflictRefresh refreshOperationalConflict(");
+        assertTrue(owner.contains("controller == owner && !isDestroyed() && activityStarted"));
+        assertTrue(owner.contains("generation == securityOperationGeneration"));
+        assertTrue(owner.contains("owner.isLocalGenerationCurrent(sessionGeneration)"));
     }
 
     @Test
@@ -136,10 +138,10 @@ public final class AdminLifecycleW25StaticTest {
         String stop = section(activity, "protected void onStop() {", "protected void onDestroy() {");
         assertTrue(stop.contains("securityOperationGeneration += 1L;"));
         String helper = section(activity, "private boolean isCurrentHistoryCallback(",
-            "private void applyReportHistoryPage(");
+            "private void finishHistoryFailure(");
         assertTrue(helper.contains("return !isDestroyed() && activityStarted"));
         assertTrue(helper.contains("securityGeneration == securityOperationGeneration"));
-        assertTrue(helper.contains("generation == reportHistoryGeneration"));
+        assertTrue(helper.contains("generation == historyState.reportHistoryGeneration()"));
         String history = section(activity, "private void runReportHistoryOperation(",
             "private void runRecentHistoryOperation(");
         int capture = history.indexOf("long securityGeneration = securityOperationGeneration;");
@@ -148,7 +150,7 @@ public final class AdminLifecycleW25StaticTest {
         assertEquals(2, count(history, "finishHistoryFailure(\n                    generation, securityGeneration,"));
         assertFalse(history.contains("if (isDestroyed() || generation != reportHistoryGeneration"));
         String recent = section(activity, "private void runRecentHistoryOperation(",
-            "private void applyRecentHistoryPreview(");
+            "private boolean isCurrentHistoryCallback(");
         assertTrue(recent.indexOf("long securityGeneration = securityOperationGeneration;")
             < recent.indexOf("networkExecutor.execute("));
         assertEquals(3, count(recent,

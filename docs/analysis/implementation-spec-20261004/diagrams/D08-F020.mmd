@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D08-020 보행 종료·세션 폐기에 따른 회수"]
+  B["진입: POST /api/field-walk action=end; session revoke callback"]
+  A --> B
+  P0["1. 만료/CAS/idempotency 를 확인한다."]
+  B --> P0
+  P1["2. active=null 및 ended record 를 기록한다."]
+  P0 --> P1
+  P2["3. ENDED audit 와 request result 를 terminal allowance 로 저장한다."]
+  P1 --> P2
+  P3["4. revoke callback 은 현재 holder 가 맞을 때만 회수한다."]
+  P2 --> P3
+  OK["정상: ENDED; 이후 종료 보행 raw 업로드 자격의 근거가 됨"]
+  P3 --> OK
+  C0{"stale end"}
+  X0["409, 새 holder 보행을 지우지 않음"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"일반 capacity 도달"}
+  X1["terminal 저장 allowance 로 종료/만료 공간 확보"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"이미 저장된 ENDED request"}
+  X2["동일 ENDED body replay"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-013, P-D08-014, P-D08-021"]
+  A -.-> POLICY

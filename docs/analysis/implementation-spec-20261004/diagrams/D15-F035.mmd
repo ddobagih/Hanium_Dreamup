@@ -1,0 +1,30 @@
+flowchart TB
+  E["F-D15-035 · 기관 전달 이력·정정 동반 조회<br/>GET deliveries; GET deliveries/history"]
+  P["P-D15-035 · 전제조건<br/>report.delivery_events read purpose·admin<br/>device proof."]
+  E --> P
+  S1["1. 원 event를 revision 순서로 조회"]
+  P --> S1
+  S2["2. event마다 해당 correction 존재 여부를 함께 붙임"]
+  S1 --> S2
+  S3["3. history는 snapshot revision/연속성·48KiB<br/>bounded paging"]
+  S2 --> S3
+  S4["4. read audit commit 후 no-store 응답"]
+  S3 --> S4
+  OK["정상 결과<br/>read audit commit 후 no-store 응답"]
+  S4 --> OK
+  B1["조건 · corrected event<br/>결과 · 원문 이력에서 제거하지 않고 correction 동반"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · last+cursor<br/>결과 · 422"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · snapshot gap/다른 stream cursor<br/>결과 · 오류"]
+  S2 -. "해당 조건 발생" .-> B3
+  B4["조건 · 새 append<br/>결과 · 기존 snapshot과 분리"]
+  S1 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/admin_report_workflow.py:1908<br/>list_report_institution_delivery_history_page<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

@@ -1,0 +1,23 @@
+flowchart TD
+  A["F-D12-025 제출용 ZIP 생성·매니페스트 검증"]
+  P["P-D12-025 현재 승인 내용에 결속된 제출본"]
+  A --> P
+  M0["1. 최신 상세로 Eligibility를 캡처한다."]
+  P --> M0
+  M1["2. 고위험 재인증 후 expected content/review revision으로 POST /admin/reports/{id}/delivery-packages한다."]
+  M0 --> M1
+  M2["3. 201 ZIP와 package/revision/export audit/길이/해시 응답 헤더를 검사한다."]
+  M1 --> M2
+  M3["4. ZIP에는 report.csv 및 manifest.json 두 파일만 허용하고 각 파일 크기와 v2 매니페스트를 검증한다."]
+  M2 --> M3
+  M4["5. row_count=1, CSV hash/길이와 package/content/review 식별자가 일치할 때 메모리 패키지를 준비한다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 검증된 v2 ZIP를 PACKAGE_READY로 넘김."]
+  M0 -. "관련 조건 확인" .-> B0{"검수 부적합/중복/전달완료/상세 stale"}
+  B0 -->|"조건 해당"| R0["생성 차단"]
+  M1 -. "관련 조건 확인" .-> B1{"ZIP 디렉터리·중복/추가 entry·허용량 초과"}
+  B1 -->|"조건 해당"| R1["패키지 폐기"]
+  M2 -. "관련 조건 확인" .-> B2{"현재 상세 결속 변경"}
+  B2 -->|"조건 해당"| R2["저장/전달 사용 금지"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["사용자 명시 동작으로 다시 시도한다. 비밀번호/TOTP를 자동 재전송하지 않는다. 상세 분기는 해당 입력·분기와 F-D12-003을 따른다."]

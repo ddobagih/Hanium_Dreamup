@@ -1,0 +1,20 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-023-CREATED" as CREATED
+  state "S-D05-023-PREPARING" as PREPARING
+  state "S-D05-023-RUNNING" as RUNNING
+  state "S-D05-023-PAUSED" as PAUSED
+  state "S-D05-023-CLOSING" as CLOSING
+  state "S-D05-023-CLOSED" as CLOSED
+  state "S-D05-023-FAILED" as FAILED
+  [*] --> CREATED
+  CREATED --> PREPARING: "resume permissions ready"
+  PREPARING --> RUNNING: "current preparedcamera"
+  PREPARING --> FAILED: "camera or model error"
+  RUNNING --> PAUSED: "pause invalidatesgeneration"
+  PAUSED --> PREPARING: "resume afterrelease"
+  PAUSED --> CLOSING: "destroy"
+  CLOSING --> CLOSED: "owners release"
+  note right of CREATED
+    F-D05-023 P-D05-023
+  end note

@@ -10,6 +10,7 @@ import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import org.json.JSONObject
+import kr.co.hanium.dreamup.walksafe.report.strictJsonObjectDocument
 
 internal data class GatewaySpeechAcoustic(
     val confidence: Double,
@@ -234,6 +235,7 @@ internal fun parseGatewaySpeechTranscript(
     body: String,
     expectedRequestId: String,
 ): GatewaySpeechTranscript? = runCatching {
+    if (!strictJsonObjectDocument(body)) return@runCatching null
     val root = JSONObject(body)
     if (root.exactKeys() != STT_RESPONSE_KEYS) return@runCatching null
     if (root.optString("schema_version") != SPEECH_STT_RESPONSE_SCHEMA) return@runCatching null

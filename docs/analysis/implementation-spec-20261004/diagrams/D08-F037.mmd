@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D08-037 전송별 동의 권한 gate·archive 검증"]
+  B["진입: authorizeIntegratedConsentRequest"]
+  A --> B
+  P0["1. 필수 header 와형식 확인"]
+  B --> P0
+  P1["2. local 현재 receipt/revision/actor/controlsecret 비교"]
+  P0 --> P1
+  P2["3. policy 와항목 version 으로재동의필요판단"]
+  P1 --> P2
+  P3["4. 요청목적별 selection true 검증"]
+  P2 --> P3
+  P4["5. 전송 전후 gate 재평가에서 사용"]
+  P3 --> P4
+  OK["정상: 허용된 동의 binding 또는 거부"]
+  P4 --> OK
+  C0{"missing header"}
+  X0["428"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"stale receipt/revision 또는 actor mismatch"}
+  X1["409"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"필요 선택 false"}
+  X2["403"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"state 손상/lockbusy"}
+  X3["503 fail-closed"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-017, P-D08-021, P-D08-024"]
+  A -.-> POLICY

@@ -196,45 +196,73 @@ enum class PermissionRecoveryGateState {
     AWAITING_EXPLICIT_RESUME,
 }
 
+/** Identity of the full recheck whose result the user is being asked to acknowledge. */
+data class PermissionRecoveryBinding(
+    val actorBindingSha256: String,
+    val gatewaySessionGeneration: Long,
+    val walkEpoch: WalkRuntimeEpoch,
+    val recheckRequestId: String,
+) {
+    init {
+        require(actorBindingSha256.matches(Regex("[0-9a-f]{64}"))) {
+            "actorBindingSha256 must be a SHA-256 digest"
+        }
+        require(gatewaySessionGeneration >= 0L) { "gatewaySessionGeneration must not be negative" }
+        require(recheckRequestId.isNotBlank()) { "recheckRequestId must not be blank" }
+    }
+}
+
 data class PermissionRecoveryGate(
     val state: PermissionRecoveryGateState = PermissionRecoveryGateState.CLEAR,
     val affectedPermissions: Set<ObservedPermission> = emptySet(),
+    val recheckBinding: PermissionRecoveryBinding? = null,
 ) {
     val blocksAutomaticResourceStart: Boolean
         get() = state != PermissionRecoveryGateState.CLEAR
 
     fun requestPending(
         requestedPermissions: Set<ObservedPermission>,
+        binding: PermissionRecoveryBinding? = recheckBinding,
     ): PermissionRecoveryGate = copy(
         state = PermissionRecoveryGateState.REQUEST_PENDING,
         affectedPermissions = requestedPermissions,
+        recheckBinding = binding,
     )
 
     fun blocked(
         missingPermissions: Set<ObservedPermission>,
+        binding: PermissionRecoveryBinding? = recheckBinding,
     ): PermissionRecoveryGate = copy(
         state = PermissionRecoveryGateState.BLOCKED,
         affectedPermissions = missingPermissions,
+        recheckBinding = binding,
     )
 
     fun settingsPending(): PermissionRecoveryGate = copy(
         state = PermissionRecoveryGateState.SETTINGS_PENDING,
     )
 
-    fun recheckRequired(): PermissionRecoveryGate = copy(
+    fun recheckRequired(
+        binding: PermissionRecoveryBinding? = recheckBinding,
+    ): PermissionRecoveryGate = copy(
         state = PermissionRecoveryGateState.RECHECK_REQUIRED,
+        recheckBinding = binding,
     )
 
     fun completeFullRecheck(
         observed: ObservedPermissionSnapshot,
         requiredPermissions: Set<ObservedPermission>,
         allPrerequisitesReady: Boolean,
+        resultBinding: PermissionRecoveryBinding? = null,
     ): PermissionRecoveryGate {
+        // A late or unscoped result must not replace the request this gate currently owns.
+        if (recheckBinding != resultBinding) return recheckRequired()
         val missing = PermissionDependencyPolicy.missing(requiredPermissions, observed)
         return when {
             missing.isNotEmpty() -> blocked(missing)
             allPrerequisitesReady -> PermissionRecoveryGate(
                 state = PermissionRecoveryGateState.AWAITING_EXPLICIT_RESUME,
+                recheckBinding = resultBinding,
             )
             else -> copy(
                 state = PermissionRecoveryGateState.RECHECK_REQUIRED,
@@ -245,7 +273,7 @@ data class PermissionRecoveryGate(
 
     fun acknowledgeExplicitResume(): PermissionRecoveryGate =
         if (state == PermissionRecoveryGateState.AWAITING_EXPLICIT_RESUME) {
-            PermissionRecoveryGate()
+            if (recheckBinding != null) recheckRequired() else PermissionRecoveryGate()
         } else {
             this
         }
@@ -253,13 +281,16 @@ data class PermissionRecoveryGate(
     /**
      * Accepts the user's explicit resume only against a permission observation taken at that
      * moment. An awaiting state computed earlier never releases resources when a required
-     * permission is missing now; it returns to the blocked recovery state instead.
+     * permission is missing now; it returns to the blocked recovery state instead. A bound
+     * recheck additionally requires the same account, session, walk and request identity.
      */
     fun acknowledgeExplicitResume(
         observed: ObservedPermissionSnapshot,
         requiredPermissions: Set<ObservedPermission>,
+        currentBinding: PermissionRecoveryBinding? = null,
     ): PermissionRecoveryGate {
         if (state != PermissionRecoveryGateState.AWAITING_EXPLICIT_RESUME) return this
+        if (recheckBinding != currentBinding) return recheckRequired()
         val missing = PermissionDependencyPolicy.missing(requiredPermissions, observed)
         return if (missing.isNotEmpty()) blocked(missing) else PermissionRecoveryGate()
     }

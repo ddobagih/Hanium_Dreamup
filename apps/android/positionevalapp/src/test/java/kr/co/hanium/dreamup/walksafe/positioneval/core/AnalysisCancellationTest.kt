@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.positioneval.core
 
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.URL
@@ -13,12 +14,49 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.HttpsURLConnection
 import kotlin.io.path.createTempDirectory
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AnalysisCancellationTest {
+    @Test
+    fun inputStreamAcquisitionFailureClosesOutputAndRemovesPartFile() {
+        val root = createTempDirectory("ngii-input-failure").toFile()
+        val destination = File(root, "base.zip")
+        val failure = IOException("input acquisition failed")
+        var output: FileOutputStream? = null
+        val connection = object : FakeHttpsConnection(
+            URL("https://geodesy.ngii.go.kr/file/ngii/test"), ByteArrayInputStream(byteArrayOf()),
+        ) {
+            override fun getInputStream(): InputStream {
+                assertTrue(requireNotNull(output).fd.valid())
+                throw failure
+            }
+        }
+        val transport = StrictHttpsTransport(
+            connectionFactory = { connection },
+            openOutput = { FileOutputStream(it).also { opened -> output = opened } },
+        )
+        try {
+            val caught = assertThrows(IOException::class.java) {
+                transport.download(
+                    "https://geodesy.ngii.go.kr/file/ngii/test", "test-key".toCharArray(), destination,
+                    AnalysisCancellation(),
+                )
+            }
+            assertSame(failure, caught)
+            assertFalse(requireNotNull(output).fd.valid())
+            assertTrue(connection.disconnected)
+            assertFalse(destination.exists())
+            assertFalse(File(root, "base.zip.part").exists())
+        } finally {
+            output?.close()
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun preCancelledSignalInvokesLateRegistrationWithoutAffectingAnotherRun() {
         val first = AnalysisCancellation()
@@ -82,7 +120,7 @@ class AnalysisCancellationTest {
         }
     }
 
-    private class FakeHttpsConnection(url: URL, private val body: InputStream) : HttpsURLConnection(url) {
+    private open class FakeHttpsConnection(url: URL, private val body: InputStream) : HttpsURLConnection(url) {
         @Volatile var disconnected = false
             private set
 

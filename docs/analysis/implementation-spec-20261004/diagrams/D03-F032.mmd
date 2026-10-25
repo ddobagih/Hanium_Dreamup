@@ -1,0 +1,20 @@
+flowchart TD
+ A["F-D03-032 현재 안내 요청 / P-D03-032"] --> C{"현재 route guide 위치와 필요한 facing 근거가 유효인가"}
+ C -->|"아니오"| X["cue 폐기 / fresh 근거 대기"]
+ C -->|"예"| D{"pending decision 또는 runtime gate 차단인가"}
+ D -->|"예"| X
+ D -->|"아니오"| I{"동일 cue 발화 중인가"}
+ I -->|"예"| Q["보통 기존 발화 유지 / 수동 반복 의도만 큐에 보존"]
+ I -->|"아니오"| B{"새 guide 또는 수동요청 또는 6초 및 periodic 10초 cadence 충족인가"}
+ B -->|"아니오"| W["다음 유효 요청 대기"]
+ B -->|"예"| R{"현재 cue 예약 성공인가"}
+ R -->|"아니오"| W
+ R -->|"예"| V{"재생 직전 context 이동추정과 facing lease가 유효인가"}
+ V -->|"아니오"| X
+ V -->|"예"| T["D02 ACTION 재생 / dispatch는 완료가 아님"]
+ T --> O{"terminal 결과와 token은 무엇인가"}
+ O -->|"현재 token DONE"| S["acknowledge / 완료 cadence 기록 / optional 정보 제공"]
+ O -->|"현재 token 실패"| F["release / 2초 뒤 fresh cue 재시도"]
+ O -->|"취소 또는 stale token"| X
+ F -->|"Main 250ms poll 중 retry 시점 도달"| C
+ Q -->|"기존 terminal 이후"| C

@@ -40,7 +40,7 @@ def caller_case(request, monkeypatch, tmp_path):
     monkeypatch.setattr(socket, "create_connection", forbid_io)
     monkeypatch.setattr(socket, "getaddrinfo", forbid_io)
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2]))
-    reports = importlib.import_module("backend.app.api.reports")
+    reports = importlib.import_module("backend.app.services.report_application")
 
     case = SimpleNamespace(
         variant=request.param,
@@ -247,7 +247,7 @@ def test_response_failure_after_confirmed_storage_has_snapshot_identity(
         if logger_fails:
             raise OSError("private-logger-failure")
 
-    reports = importlib.import_module("backend.app.api.reports")
+    reports = importlib.import_module("backend.app.services.report_application")
     monkeypatch.setattr(
         reports, "logging",
         SimpleNamespace(getLogger=lambda _name: SimpleNamespace(warning=warning)),

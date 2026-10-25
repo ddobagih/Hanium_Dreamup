@@ -1,0 +1,24 @@
+stateDiagram-v2
+ state "F-D02-024 INITIALIZING" as Init
+ state "READY" as Ready
+ state "FAILED" as Failed
+ state "LANGUAGE_UNSUPPORTED" as Lang
+ state "CLOSED" as Closed
+ [*] --> Init
+ Init --> Ready: "Korean offline voice·listener·attributes 성공"
+ Init --> Failed: "10초 timeout 또는 init 실패"
+ Init --> Lang: "설치된 Korean voice 없음"
+ Init --> Init: "요청은 UNAVAILABLE; 나중에 replay하지 않음"
+ Ready --> Failed: "현재 engine service 오류"
+ Ready --> Lang: "언어 데이터 미설치 오류"
+ Ready --> Ready: "utterance 오류는 현재 owner만 terminal"
+ Init --> Closed: "close"
+ Ready --> Closed: "close"
+ Failed --> Closed: "close"
+ Lang --> Closed: "close"
+ Closed --> Closed: "late engine callback·중복 close 무시"
+ note right of Failed
+  P-D02-024 production 자동 복구 예산 0
+  테스트의 1회 250ms 주입 설정과 구분
+  새 actuator 생성은 상위 수명주기 판단
+ end note

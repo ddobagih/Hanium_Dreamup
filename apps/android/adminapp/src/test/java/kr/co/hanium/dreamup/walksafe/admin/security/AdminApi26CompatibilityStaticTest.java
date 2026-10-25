@@ -34,7 +34,7 @@ public final class AdminApi26CompatibilityStaticTest {
             "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminReportRequestController.java"
         ));
         String securityController = read(Paths.get(
-            "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java"
+            "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminReportOperations.java"
         ));
         String client = read(Paths.get(
             "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClient.java"
@@ -64,7 +64,7 @@ public final class AdminApi26CompatibilityStaticTest {
             "src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java"
         ));
         String securityController = read(Paths.get(
-            "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java"
+            "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminReportOperations.java"
         ));
         String client = read(Paths.get(
             "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClient.java"

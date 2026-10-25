@@ -1,0 +1,15 @@
+{
+  "domain_count": 16,
+  "feature_count": 610,
+  "policy_count": 552,
+  "event_count": 992,
+  "issue_count": 127,
+  "activation_counts": {
+    "ACTIVE": 358,
+    "CONDITIONAL": 211,
+    "UNCONNECTED": 19,
+    "DISABLED": 4,
+    "LEGACY_REFERENCE": 18
+  },
+  "errors": []
+}

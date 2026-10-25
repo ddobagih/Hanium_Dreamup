@@ -28,9 +28,13 @@ const INDEX = "(?:0|[1-9][0-9]{0,3})";
 const pathPattern = (source: string): RegExp => new RegExp(`^${source}$`);
 
 const routes: readonly RouteDefinition[] = [
+  { template: "/api/account-signup-policy", path: "/api/account-signup-policy", methods: ["GET"], auth: "public", body: "strict-none", query: "none", deadline: "ordinary", family: "static" },
   { template: "/api/account-enrollments/email-otp", path: "/api/account-enrollments/email-otp", methods: ["POST"], auth: "public", body: "json", query: "none", deadline: "ordinary", family: "static" },
   { template: "/api/accounts", path: "/api/accounts", methods: ["POST"], auth: "public", body: "json", query: "none", deadline: "ordinary", family: "static" },
   { template: "/api/field-session", path: "/api/field-session", methods: ["GET", "POST", "DELETE"], auth: "session-lifecycle", body: "by-method", query: "session", deadline: "ordinary", family: "static" },
+  { template: "/api/field-diagnostics/preference", path: "/api/field-diagnostics/preference", methods: ["GET", "POST", "PUT"], auth: "field-session", body: "by-method", query: "none", deadline: "ordinary", family: "static" },
+  { template: "/api/field-diagnostics/sessions/{session_id}/batches", path: pathPattern(`/api/field-diagnostics/sessions/(?<sessionId>${REPORT_ID})/batches`), methods: ["POST"], auth: "field-session", body: "json", query: "none", deadline: "ordinary", family: "static" },
+  { template: "/api/field-diagnostics/sessions/{session_id}", path: pathPattern(`/api/field-diagnostics/sessions/(?<sessionId>${REPORT_ID})`), methods: ["GET"], auth: "field-session", body: "none", query: "none", deadline: "ordinary", family: "static" },
   { template: "/api/field-walk", path: "/api/field-walk", methods: ["GET", "POST"], auth: "field-device", body: "by-method", query: "none", deadline: "ordinary", family: "static" },
   { template: "/api/speech/stt", path: "/api/speech/stt", methods: ["POST"], auth: "field-session", body: "stream", query: "none", deadline: "ordinary", family: "static" },
   { template: "/api/speech/tts", path: "/api/speech/tts", methods: ["POST"], auth: "field-session", body: "json", query: "none", deadline: "ordinary", family: "static" },
@@ -60,7 +64,7 @@ export const GATEWAY_PUBLIC_ROUTE_TEMPLATES = Object.freeze(routes.map(route => 
 export type GatewayRouteTemplate = typeof GATEWAY_PUBLIC_ROUTE_TEMPLATES[number];
 export type GatewayRouteMatch = Readonly<Omit<RouteDefinition, "path" | "accepts"> & {
   params: Readonly<Record<string, string>>;
-  privacyVariant?: "retired" | "bootstrap" | "integrated" | "page";
+  privacyVariant?: "retired" | "bootstrap" | "integrated" | "installation-key" | "page";
   /** Some privacy variants preserve validation or retirement responses for other methods. */
   unsupportedMethod?: "bootstrap-validation" | "integrated-handler" | "retired";
 }>;
@@ -84,6 +88,10 @@ export function matchGatewayRoute(url: URL): GatewayRouteMatch | null {
     }
     if (control === "integrated-consent") {
       return { ...metadata, params: result, privacyVariant: "integrated", methods: ["GET", "PUT"],
+        auth: "consent-bound", body: "by-method", unsupportedMethod: "integrated-handler" };
+    }
+    if (control === "installation-evidence-key") {
+      return { ...metadata, params: result, privacyVariant: "installation-key", methods: ["PUT"],
         auth: "consent-bound", body: "by-method", unsupportedMethod: "integrated-handler" };
     }
     return { ...metadata, params: result, privacyVariant: "page", auth: "public", body: "none" };

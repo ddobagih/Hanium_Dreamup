@@ -15,8 +15,9 @@ class MainActivityChestHeadingMountingGateStaticTest {
 
     @Test
     fun chestHeadingNeedsAConfirmedSuitableChestMountOfThisWalk() {
-        val chest = source.substringAfter("private fun chestMountedHeadingForStep(")
-            .substringBefore("private fun applyPositioningMotionSnapshot(")
+        MainActivityRefactorSource.composition(source, "positioningSessionController")
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/PositioningSessionController.kt").readText()
+        val chest = MainActivityRefactorSource.member(owner, "chestMountedHeadingForStep", 1)
         assertTrue(chest.contains(
             "val existingChestMount = phoneMountingOutputsAllowed &&\n" +
                 "            phoneMountingRuntimeState?.epoch == walkEpoch &&\n" +
@@ -25,8 +26,11 @@ class MainActivityChestHeadingMountingGateStaticTest {
         ))
         assertTrue(chest.contains("if (!explicitFieldConfirmation && !existingChestMount) return null"))
         // A camera mounting fault in the running walk revokes mounting outputs immediately.
-        val fault = source.indexOf("mountingFault &&\n                    phoneMountingRuntimeState?.epoch == epoch")
+        val mounting = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/mounting/PhoneMountingSessionController.kt").readText()
+        MainActivityRefactorSource.composition(source, "phoneMountingSession")
+        val commit = MainActivityRefactorSource.member(mounting, "commitCameraAssessment")
+        val fault = commit.indexOf("mountingFault && phoneMountingRuntimeState?.epoch == epoch")
         assertTrue(fault >= 0)
-        assertTrue(source.substring(fault, fault + 200).contains("phoneMountingOutputsAllowed = false"))
+        assertTrue(commit.substring(fault, fault + 200).contains("phoneMountingOutputsAllowed = false"))
     }
 }

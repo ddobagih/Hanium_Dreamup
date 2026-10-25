@@ -1,0 +1,9 @@
+stateDiagram-v2
+  state "F-D08-056 응답 준비" as S0
+  state "F-D08-056 body EOF" as S1
+  state "F-D08-056 consumer 취소" as S2
+  state "F-D08-056 stream 오류" as S3
+  [*] --> S0
+  S0 --> S1: readerEOF
+  S0 --> S2: consumer cancel
+  S0 --> S3: read throws

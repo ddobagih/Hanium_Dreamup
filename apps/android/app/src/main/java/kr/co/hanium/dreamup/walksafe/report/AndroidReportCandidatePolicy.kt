@@ -6,6 +6,10 @@ import kr.co.hanium.dreamup.walksafe.depth.DepthAvailability
 import kr.co.hanium.dreamup.walksafe.navigation.LocationTrustConfig
 import kr.co.hanium.dreamup.walksafe.navigation.LocationTrustPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
+import kr.co.hanium.dreamup.walksafe.navigation.AndroidTactileFrameComposition
+import kr.co.hanium.dreamup.walksafe.navigation.TactileSnapshotFrameResult
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionSnapshot
+import kr.co.hanium.dreamup.walksafe.runtime.vision.frame.FrameRecognitionAdmission
 import org.json.JSONObject
 
 data class AndroidReportCandidateInput(
@@ -33,6 +37,7 @@ data class AndroidReportCandidateInput(
     val fallbackUsed: Boolean? = null,
     val loadedModelKey: String? = null,
     val modelLoadReason: String? = null,
+    val capturedAtElapsedRealtimeMs: Long? = null,
 )
 
 data class AndroidReportCandidate(
@@ -104,9 +109,15 @@ class AndroidReportCandidatePolicy {
             ?: return rejected(AndroidReportCandidateRejection.MODEL_NOT_ALLOWED)
         val detectionAgeMs = input.detectionAgeMs?.takeIf { it in 0L..REPORT_MAX_DETECTION_AGE_MS }
             ?: return rejected(AndroidReportCandidateRejection.DETECTION_AGE_INVALID)
+        val captureElapsed = input.capturedAtElapsedRealtimeMs
+            ?: return rejected(AndroidReportCandidateRejection.LOCATION_UNTRUSTED)
+        if (captureElapsed < 0L || input.requestElapsedRealtimeMs < captureElapsed ||
+            input.requestElapsedRealtimeMs - captureElapsed > REPORT_MAX_DETECTION_AGE_MS ||
+            input.location?.elapsedRealtimeMs?.let { it < 0L || it > captureElapsed } != false
+        ) return rejected(AndroidReportCandidateRejection.LOCATION_UNTRUSTED)
         val location = LocationTrustPolicy.freshOrNull(
             location = input.location,
-            nowElapsedRealtimeMs = input.requestElapsedRealtimeMs,
+            nowElapsedRealtimeMs = captureElapsed,
             config = REPORT_LOCATION_CONFIG,
         )?.takeIf { location ->
             location.latitude.isFinite() && location.latitude in -90.0..90.0 &&
@@ -190,6 +201,39 @@ class AndroidReportCandidatePolicy {
     }
 
     companion object {
+        /** Frozen coordinate provenance only; authority, confidence and device gates remain separate. */
+        internal fun frozenFrameCoordinateGateStatus(
+            output: TrackedObjectDepth,
+            capturedAtMs: Long,
+            reportImage: ByteArray?,
+            frozenReportCapture: Pair<DetectionSnapshot, TactileSnapshotFrameResult>?,
+            currentGeometryVersion: () -> Long,
+        ): String? {
+            val snapshot = frozenReportCapture?.first
+            val frame = frozenReportCapture?.second
+            val evidence = frame?.matchedEvidence
+            val key = evidence?.visualFrameKey
+            val mapper = evidence?.depthMapper
+            val sourceIndex = output.sourceDetectionIndex
+            // This is the existing frozen frame's validation, never a confidence/device PASS.
+            val coordinateGateStatus = if (
+                snapshot != null && frame != null && evidence != null && key != null && mapper != null &&
+                !snapshot.partial && frame.depthProcessingAttempted && evidence === snapshot.frameEvidence &&
+                AndroidTactileFrameComposition.identity(snapshot.identity, evidence.tactileFrameIdentity())
+                    .matchesCapture(evidence.tactileContext, requireDepthMapper = true) &&
+                FrameRecognitionAdmission.matchesDepth(key.cameraTimestampNs, evidence.frameId, evidence.depthSnapshot) &&
+                key.frameId == evidence.frameId && snapshot.capturedAtElapsedRealtimeMs == key.capturedAtElapsedRealtimeMs &&
+                evidence.geometryVersion == key.geometryVersion && evidence.geometryVersion == currentGeometryVersion() &&
+                mapper.imagePixelsToDepthUvMatrix(snapshot.imageWidth ?: 0, snapshot.imageHeight ?: 0) != null &&
+                mapper.imageToDepth(output.centerNorm) != null &&
+                output.frameId == evidence.frameId && output.timestampMs == evidence.frameTimestampMs &&
+                frame.guidance.outputs.any { it === output } &&
+                (sourceIndex == null || frame.depthDetections.getOrNull(sourceIndex)?.className == output.className) &&
+                snapshot.reportImage != null && snapshot.reportImage === reportImage && snapshot.capturedAtMs == capturedAtMs
+            ) "pass" else null
+            return coordinateGateStatus
+        }
+
         const val DAMAGED_TACTILE_BLOCK = "damaged_tactile_block"
 
         /**

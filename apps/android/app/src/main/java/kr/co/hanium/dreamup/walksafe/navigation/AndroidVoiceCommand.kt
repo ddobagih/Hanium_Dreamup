@@ -4,6 +4,9 @@ import java.util.Locale
 
 sealed interface AndroidVoiceCommand {
     data object CreateReport : AndroidVoiceCommand
+    data object ListLocalQuarantinedReports : AndroidVoiceCommand
+    data class SelectLocalQuarantinedReport(val number: Int) : AndroidVoiceCommand
+    data object ConfirmLocalQuarantinedReportDelete : AndroidVoiceCommand
     data object OpenSettings : AndroidVoiceCommand
     data class SetDestination(val placeName: String) : AndroidVoiceCommand
     data class SelectDestinationCandidate(val oneBasedIndex: Int) : AndroidVoiceCommand
@@ -19,7 +22,11 @@ sealed interface AndroidVoiceCommand {
     data object CancelDialog : AndroidVoiceCommand
     data object StartNavigation : AndroidVoiceCommand
     data object RepeatGuidance : AndroidVoiceCommand
+    /** Read the current state without requesting another navigation instruction. */
+    data object CurrentState : AndroidVoiceCommand
     data object Help : AndroidVoiceCommand
+    data object OpenHelp : AndroidVoiceCommand
+    data class DestinationCandidateDetail(val oneBasedIndex: Int) : AndroidVoiceCommand
     data object NextNavigationInstruction : AndroidVoiceCommand
     data object RequestReroute : AndroidVoiceCommand
     data object RecheckLocation : AndroidVoiceCommand
@@ -30,6 +37,9 @@ sealed interface AndroidVoiceCommand {
 
 sealed interface AndroidVoiceAction {
     data object CreateReport : AndroidVoiceAction
+    data object ListLocalQuarantinedReports : AndroidVoiceAction
+    data class SelectLocalQuarantinedReport(val number: Int) : AndroidVoiceAction
+    data object ConfirmLocalQuarantinedReportDelete : AndroidVoiceAction
     data object OpenSettings : AndroidVoiceAction
     data class SearchDestination(val query: String) : AndroidVoiceAction
     data class SelectDestinationCandidate(val oneBasedIndex: Int) : AndroidVoiceAction
@@ -40,7 +50,10 @@ sealed interface AndroidVoiceAction {
     data object CancelDialog : AndroidVoiceAction
     data object StartNavigation : AndroidVoiceAction
     data object SpeakCurrentGuidance : AndroidVoiceAction
+    data object SpeakCurrentState : AndroidVoiceAction
     data object SpeakVoiceHelp : AndroidVoiceAction
+    data object OpenHelp : AndroidVoiceAction
+    data class SpeakDestinationCandidateDetail(val oneBasedIndex: Int) : AndroidVoiceAction
     data object SpeakNextNavigationInstruction : AndroidVoiceAction
     data object RequestReroute : AndroidVoiceAction
     data object RecheckLocation : AndroidVoiceAction
@@ -151,22 +164,7 @@ class DestinationSearchVoiceState(
         // FP-022-DETAIL-01 (S06-37): number, name, kind, rough direction and rough distance. The address
         // is read only when another candidate in this list has the same name (S06-36 labels keep the
         // road name / dong for that). Distances are no finer than the search origin (S06-31).
-        val candidates = currentPageResults.mapIndexed { index, result ->
-            val name = result.name.toVoiceNameLabel(maxLength = 40, fallback = "이름 미상")
-            val address = if (result.sharesNameWith(results)) {
-                result.displayAddressOrNull().toVoiceAddressLabel(maxLength = 60, fallback = "주소 미상")
-            } else {
-                null
-            }
-            val direction = approximateDestinationDirectionKo(origin, result.point)
-            listOfNotNull(
-                "${pageOffset + index + 1}번 ${name}",
-                destinationCategoryLabelKo(result.category),
-                address,
-                // S06-30: the kind of distance is said with it; never a walking distance.
-                destinationDirectionDistanceKo(direction, result.distanceM, result.distanceSource, origin?.accuracyM),
-            ).joinToString(", ")
-        }.joinToString(". ")
+        val candidates = candidateVoiceParts().joinToString(". ")
         val firstNumber = pageOffset + 1
         val lastNumber = pageOffset + currentPageResults.size
         val pageRange = if (firstNumber == lastNumber) "${firstNumber}번" else "${firstNumber}번부터 ${lastNumber}번까지"
@@ -181,6 +179,42 @@ class DestinationSearchVoiceState(
         val originNotice = destinationOriginUncertaintyNoticeKo(origin)?.let { "$it " }.orEmpty()
         return "${safeQuery} 목적지 후보는 현재 ${pageRange}입니다. " + distanceBasis + ageNotice + originNotice +
             "${candidates}.${moreInstruction} 원하는 번호나 다시 듣기라고 말씀해 주세요."
+    }
+
+    private fun candidateVoiceParts(spokenAddresses: Boolean = false): List<String> {
+        return currentPageResults.mapIndexed { index, result ->
+            val name = result.name.toVoiceNameLabel(maxLength = 40, fallback = "이름 미상")
+            val address = if (result.sharesNameWith(results)) {
+                val raw = result.displayAddressOrNull()
+                if (spokenAddresses) {
+                    val expansion = raw?.let { spokenDestinationAddressKo(it).length - it.length } ?: 0
+                    spokenDestinationAddressKo(raw.toVoiceAddressLabel(maxLength = (60 - expansion).coerceAtLeast(1), fallback = "주소 미상"))
+                } else raw.toVoiceAddressLabel(maxLength = 60, fallback = "주소 미상")
+            } else {
+                null
+            }
+            val direction = approximateDestinationDirectionKo(origin, result.point)
+            listOfNotNull(
+                "${pageOffset + index + 1}번 ${name}",
+                destinationCategoryLabelKo(result.category),
+                address,
+                // S06-30: the kind of distance is said with it; never a walking distance.
+                destinationDirectionDistanceKo(direction, result.distanceM, result.distanceSource, origin?.accuracyM),
+            ).joinToString(", ")
+        }
+    }
+
+    /** One native utterance for the page header, each numbered candidate, and the answer hint. */
+    fun voicePromptParts(originAgeNotice: String? = null): List<String> {
+        val prompt = voicePrompt(originAgeNotice)
+        val candidates = candidateVoiceParts()
+        if (candidates.isEmpty()) return listOf(prompt)
+        val joined = candidates.joinToString(". ")
+        val start = prompt.indexOf(joined)
+        if (start < 0) return listOf(prompt)
+        return (listOf(prompt.substring(0, start).trim()) + candidateVoiceParts(spokenAddresses = true) +
+            prompt.substring(start + joined.length).trim().trimStart('.').trim())
+            .filter(String::isNotBlank)
     }
 
     /**
@@ -244,6 +278,9 @@ class DestinationSearchVoiceState(
 fun AndroidVoiceCommand.toAction(): AndroidVoiceAction {
     return when (this) {
         AndroidVoiceCommand.CreateReport -> AndroidVoiceAction.CreateReport
+        AndroidVoiceCommand.ListLocalQuarantinedReports -> AndroidVoiceAction.ListLocalQuarantinedReports
+        is AndroidVoiceCommand.SelectLocalQuarantinedReport -> AndroidVoiceAction.SelectLocalQuarantinedReport(number)
+        AndroidVoiceCommand.ConfirmLocalQuarantinedReportDelete -> AndroidVoiceAction.ConfirmLocalQuarantinedReportDelete
         AndroidVoiceCommand.OpenSettings -> AndroidVoiceAction.OpenSettings
         is AndroidVoiceCommand.SetDestination -> AndroidVoiceAction.SearchDestination(placeName)
         is AndroidVoiceCommand.SelectDestinationCandidate -> AndroidVoiceAction.SelectDestinationCandidate(oneBasedIndex)
@@ -254,7 +291,10 @@ fun AndroidVoiceCommand.toAction(): AndroidVoiceAction {
         AndroidVoiceCommand.CancelDialog -> AndroidVoiceAction.CancelDialog
         AndroidVoiceCommand.StartNavigation -> AndroidVoiceAction.StartNavigation
         AndroidVoiceCommand.RepeatGuidance -> AndroidVoiceAction.SpeakCurrentGuidance
+        AndroidVoiceCommand.CurrentState -> AndroidVoiceAction.SpeakCurrentState
         AndroidVoiceCommand.Help -> AndroidVoiceAction.SpeakVoiceHelp
+        AndroidVoiceCommand.OpenHelp -> AndroidVoiceAction.OpenHelp
+        is AndroidVoiceCommand.DestinationCandidateDetail -> AndroidVoiceAction.SpeakDestinationCandidateDetail(oneBasedIndex)
         AndroidVoiceCommand.NextNavigationInstruction -> AndroidVoiceAction.SpeakNextNavigationInstruction
         AndroidVoiceCommand.RequestReroute -> AndroidVoiceAction.RequestReroute
         AndroidVoiceCommand.RecheckLocation -> AndroidVoiceAction.RecheckLocation
@@ -262,6 +302,20 @@ fun AndroidVoiceCommand.toAction(): AndroidVoiceAction {
         AndroidVoiceCommand.RejectArrival -> AndroidVoiceAction.RejectArrival
         AndroidVoiceCommand.StopNavigation -> AndroidVoiceAction.StopNavigation
     }
+}
+
+/** One help text for the existing dialog and its spoken response. */
+fun voiceCommandHelpKo(paused: Boolean): String = if (paused) {
+    "일시정지 중에는 보행 재개 또는 보행 종료라고 말해 주세요. 종료할 때는 확인을 한 번 더 받습니다. " +
+        "기기 보관 내역은 기기 신고 목록이라고 말씀해 주세요."
+} else {
+    "목적지는 서울역으로 안내해줘처럼 말해 주세요. 후보 안내 뒤에는 1번 또는 첫 번째라고 선택할 수 있습니다. " +
+        "1번 상세처럼 말하면 현재 들은 후보의 주소와 거리를 읽어드립니다. " +
+        "더 듣기, 이전 후보, 목적지 취소, 안내 시작, 설정을 사용할 수 있습니다. " +
+        "보행 중에는 다음 안내 알려줘, 다시 말해줘, 경로 다시 찾아줘, 위치 다시 확인, " +
+        "현재 상태, 남은 거리, 길안내 종료, 신고해, 보행 일시정지, 보행 종료를 말할 수 있습니다. " +
+        "기기 신고 목록을 들은 뒤 기기 신고 1번 선택이라고 말씀해 주세요. 삭제하려면 선택한 안내를 듣고 기기 신고 삭제 확인이라고 말해 주세요. " +
+        "신고와 보행 종료는 확인 안내를 따라 주세요."
 }
 
 /** Executes only the recognizer's top hypothesis; lower alternatives must never override it. */
@@ -317,6 +371,13 @@ fun parseAndroidVoiceCommand(
     val compact = compactVoicePhrase(normalized)
     if (compact.isBlank() || NEGATED_COMMAND.containsMatchIn(normalized)) return null
 
+    if (compact == "기기신고목록") return AndroidVoiceCommand.ListLocalQuarantinedReports
+    if (compact == "기기신고삭제확인") return AndroidVoiceCommand.ConfirmLocalQuarantinedReportDelete
+    if (!hasAmbiguousCandidateNumber(normalized)) {
+        LOCAL_REPORT_SELECTION.matchEntire(compact)?.groupValues?.get(1)?.let { number ->
+            bareDestinationCandidateIndex(number)?.let { return AndroidVoiceCommand.SelectLocalQuarantinedReport(it) }
+        }
+    }
     if (compact in OPEN_SETTINGS_COMMANDS) return AndroidVoiceCommand.OpenSettings
     if (compact in DESTINATION_CANCEL_COMMANDS) return AndroidVoiceCommand.CancelDestination
     if (compact in DIALOG_CANCEL_COMMANDS) return AndroidVoiceCommand.CancelDialog
@@ -325,7 +386,14 @@ fun parseAndroidVoiceCommand(
     if (compact in PREVIOUS_CANDIDATES_COMMANDS) return AndroidVoiceCommand.PreviousDestinationCandidates
     if (compact in START_NAVIGATION_COMMANDS) return AndroidVoiceCommand.StartNavigation
     if (compact in setOf("다시말해줘", "다시안내해줘", "현재경로안내해줘")) return AndroidVoiceCommand.RepeatGuidance
+    if (compact in setOf("현재상태", "남은거리", "남은거리알려줘")) return AndroidVoiceCommand.CurrentState
+    if (compact in OPEN_HELP_COMMANDS) return AndroidVoiceCommand.OpenHelp
     if (compact in HELP_COMMANDS) return AndroidVoiceCommand.Help
+    if (!hasAmbiguousCandidateNumber(normalized)) {
+        DESTINATION_DETAIL.matchEntire(compact)?.groupValues?.get(1)?.let { number ->
+            bareDestinationCandidateIndex(number)?.let { return AndroidVoiceCommand.DestinationCandidateDetail(it) }
+        }
+    }
     if (compact in NEXT_NAVIGATION_COMMANDS) return AndroidVoiceCommand.NextNavigationInstruction
     if (compact in REROUTE_COMMANDS) return AndroidVoiceCommand.RequestReroute
     if (compact in LOCATION_RECHECK_COMMANDS) return AndroidVoiceCommand.RecheckLocation
@@ -534,10 +602,13 @@ private val REPORT_COMMAND = Regex(
     "(?:(?:이거|여기|위험|점자블록|점자블록손상|손상된점자블록|손상)(?:을|를)?)?(?:신고|싱고)" +
         "(?:해|해줘|해주세요|접수(?:해|해줘|해주세요)?)?",
 )
+private val LOCAL_REPORT_SELECTION = Regex("기기신고(.+?)(?:을|를)?선택(?:해줘|해주세요)?")
 private val OPEN_SETTINGS_COMMANDS = setOf(
     "설정", "설정열어줘", "설정으로이동",
     "설정열어주세요", "설정화면열어줘", "설정화면열어주세요",
 )
+private val OPEN_HELP_COMMANDS = setOf("도움말열기", "도움말열어줘", "도움말열어주세요", "도움말화면열어줘", "도움말화면열어주세요")
+private val DESTINATION_DETAIL = Regex("(?:목적지|후보)?(.+?)(?:후보)?(?:상세|자세히)(?:알려줘|알려주세요|들려줘|들려주세요)?")
 private val HELP_COMMANDS = setOf("도움말", "도움말알려줘", "도움말알려주세요")
 private val DESTINATION_SELECTION = Regex(
     "(?:목적지)?(.+?)(?:목적지)?(?:을|를)?(?:선택(?:해|해줘|해주세요)?|골라(?:줘|주세요)?)",

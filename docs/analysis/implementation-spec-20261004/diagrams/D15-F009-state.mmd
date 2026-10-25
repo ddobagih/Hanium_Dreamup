@@ -1,0 +1,26 @@
+stateDiagram-v2
+  state "S-D15-009-01 · active" as ACTIVE
+  state "S-D15-009-02 · decrypt-only" as DECRYPT
+  state "S-D15-009-03 · compromised" as COMPROMISED
+  state "S-D15-009-04 · retired" as RETIRED
+  state "S-D15-009-05 · destroyed" as DESTROYED
+  [*] --> ACTIVE: 새 key ID의 유일한 진입상태
+  ACTIVE --> ACTIVE: 같은 material 유지
+  ACTIVE --> DECRYPT: 새 active key로 generation 회전
+  ACTIVE --> COMPROMISED: compromised 전환
+  DECRYPT --> DECRYPT: 기존 해독용 key 유지
+  DECRYPT --> COMPROMISED: compromised 전환
+  COMPROMISED --> COMPROMISED: 상태복귀 금지
+  RETIRED --> RETIRED: 기존 terminal 상태 유지 검사
+  DESTROYED --> DESTROYED: 기존 terminal 상태 유지 검사
+  note right of ACTIVE
+    F-D15-009 / P-D15-009
+    keyring 전체 active는 정확1개
+    generation와 previous manifest hash를 검증
+    key ID 제거 또는 material 변경 금지
+  end note
+  note right of RETIRED
+    retired 또는 destroyed 새 진입은 차단
+    retained backup key-use proof가 없음
+    상태 이름 존재를 현재 지원되는 retirement 실행으로 해석하지 않음
+  end note

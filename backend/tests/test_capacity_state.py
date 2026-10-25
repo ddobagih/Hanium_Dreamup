@@ -682,22 +682,28 @@ def test_main_wires_one_capacity_state_singleton(monkeypatch: pytest.MonkeyPatch
         monkeypatch.delenv(name, raising=False)
 
     import backend.app.main as main_app
+    owned_app = main_app.create_app(main_app.settings)
+    owner = owned_app.state.runtime
+    owner.initialize_resources()
+    monkeypatch.setattr(owner, "initialize_resources", lambda: None)
+    from backend.app import application_runtime as runtime_module
 
     routes = [
         route
-        for route in main_app.app.routes
+        for route in owned_app.routes
         if getattr(route, "path", None) == "/internal/capacity"
         and "GET" in getattr(route, "methods", set())
     ]
 
     assert len(routes) == 1
-    assert main_app.app.state.capacity_state is main_app.capacity_state
-    assert main_app.capacity_monitor is None
-    assert main_app.app.state.capacity_monitor is None
+    assert owned_app.state.capacity_state is owner.capacity_state
+    assert owner.capacity_monitor is None
+    assert owned_app.state.capacity_monitor is None
     assert any(
-        cell.cell_contents is main_app.capacity_state
+        cell.cell_contents is owner.capacity_state
         for cell in (routes[0].endpoint.__closure__ or ())
     )
+
 
 
 def test_main_lifespan_takes_first_sample_retries_and_cancels_without_error_details(
@@ -705,6 +711,11 @@ def test_main_lifespan_takes_first_sample_retries_and_cancels_without_error_deta
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     import backend.app.main as main_app
+    owned_app = main_app.create_app(main_app.settings)
+    owner = owned_app.state.runtime
+    owner.initialize_resources()
+    monkeypatch.setattr(owner, "initialize_resources", lambda: None)
+    from backend.app import application_runtime as runtime_module
 
     class FakeMonitor:
         interval_seconds = 0.001
@@ -720,16 +731,16 @@ def test_main_lifespan_takes_first_sample_retries_and_cancels_without_error_deta
                 )
 
     monitor = FakeMonitor()
-    monkeypatch.setattr(main_app, "capacity_monitor", monitor)
-    monkeypatch.setattr(main_app, "validate_admin_credential_issuer_binding", lambda: None)
-    monkeypatch.setattr(main_app, "bind_privacy_hmac_key", lambda: None)
-    monkeypatch.setattr(main_app, "bind_account_crypto_keys", lambda: None)
-    monkeypatch.setattr(main_app, "reconcile_report_storage", lambda: None)
-    monkeypatch.setattr(main_app, "inference_runner", None)
-    caplog.set_level("WARNING", logger="backend.app.main")
+    monkeypatch.setattr(owner, "capacity_monitor", monitor)
+    monkeypatch.setattr(owner, "validate_admin_credential_issuer_binding", lambda: None)
+    monkeypatch.setattr(owner, "bind_privacy_hmac_key", lambda: None)
+    monkeypatch.setattr(owner, "bind_account_crypto_keys", lambda: None)
+    monkeypatch.setattr(owner, "reconcile_report_storage", lambda: None)
+    monkeypatch.setattr(owner, "inference_runner", None)
+    caplog.set_level("WARNING", logger="backend.app.application_runtime")
 
     async def exercise() -> None:
-        async with main_app.lifespan(main_app.app):
+        async with owner.lifespan(owned_app):
             assert monitor.calls >= 1
             for _ in range(100):
                 if monitor.calls >= 2:
@@ -749,10 +760,16 @@ def test_main_lifespan_takes_first_sample_retries_and_cancels_without_error_deta
     assert "OSError" not in caplog.text
 
 
+
 def test_main_lifespan_waits_for_an_inflight_capacity_measurement(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import backend.app.main as main_app
+    owned_app = main_app.create_app(main_app.settings)
+    owner = owned_app.state.runtime
+    owner.initialize_resources()
+    monkeypatch.setattr(owner, "initialize_resources", lambda: None)
+    from backend.app import application_runtime as runtime_module
 
     measurement_started = Event()
     release_measurement = Event()
@@ -770,15 +787,15 @@ def test_main_lifespan_waits_for_an_inflight_capacity_measurement(
                 assert release_measurement.wait(timeout=2)
 
     monitor = FakeMonitor()
-    monkeypatch.setattr(main_app, "capacity_monitor", monitor)
-    monkeypatch.setattr(main_app, "validate_admin_credential_issuer_binding", lambda: None)
-    monkeypatch.setattr(main_app, "bind_privacy_hmac_key", lambda: None)
-    monkeypatch.setattr(main_app, "bind_account_crypto_keys", lambda: None)
-    monkeypatch.setattr(main_app, "reconcile_report_storage", lambda: None)
-    monkeypatch.setattr(main_app, "inference_runner", None)
+    monkeypatch.setattr(owner, "capacity_monitor", monitor)
+    monkeypatch.setattr(owner, "validate_admin_credential_issuer_binding", lambda: None)
+    monkeypatch.setattr(owner, "bind_privacy_hmac_key", lambda: None)
+    monkeypatch.setattr(owner, "bind_account_crypto_keys", lambda: None)
+    monkeypatch.setattr(owner, "reconcile_report_storage", lambda: None)
+    monkeypatch.setattr(owner, "inference_runner", None)
 
     async def exercise() -> None:
-        manager = main_app.lifespan(main_app.app)
+        manager = owner.lifespan(owned_app)
         await manager.__aenter__()
         assert await asyncio.to_thread(measurement_started.wait, 2)
 

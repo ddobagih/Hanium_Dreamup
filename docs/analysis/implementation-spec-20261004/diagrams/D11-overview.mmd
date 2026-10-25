@@ -1,0 +1,16 @@
+flowchart LR
+  DEV["개발자와 운영자"] --> CI["F-D11-001..006 CI와 테스트 지원"]
+  DEV --> OPS["F-D11-007..018 및039..047 운영과 데이터 유지보수"]
+  DEV --> DIAG["F-D11-019..025 기기 진단과 평가 지원"]
+  DEV --> DOC["F-D11-026..030 문서 생성과 통제 기록"]
+  DEV --> WEB["F-D11-031..037 Legacy Web"]
+  DEV --> AI["F-D11-038 검토 작업 패키지"]
+  OPS --> GATE["P-D11-010 고위험 DB 권위와 일회 nonce"]
+  OPS --> LOCK["공용 maintenance lock"]
+  LOCK --> BK["F-D11-011 백업"]
+  LOCK --> RET["F-D11-014 보존 정리"]
+  LOCK --> DEL["F-D11-016 계정 삭제"]
+  WEB --> CLOSED["모든 Next 요청 410"]
+  DIAG --> OTHER["연결: D04 평가앱 및 Android·모델·data 담당"]
+  CI --> EVID["실행 정의와 이번 미실행을 분리"]
+  OPS --> EVID

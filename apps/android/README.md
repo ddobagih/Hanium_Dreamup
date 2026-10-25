@@ -1,5 +1,24 @@
 # WalkSafe Android 사용자 앱
 
+## 2026-10-10 책임과 테스트 경계
+
+`MainActivity`는 Android 화면·수명주기·실제 입력을 연결한다. 작업의 상태와 종료 권한은 다음 구성 요소가 갖는다. 새 동작을 추가할 때 Activity에 병렬 상태나 별도 재시도 타이머를 더 만들지 않고 해당 소유자의 진입점을 사용한다.
+
+| 경계 | 실제 책임 소유자 | 보존하는 계약 |
+| --- | --- | --- |
+| 시작 준비·방향 보정 | `NativeGuidanceCalibrationSession`, `WalkingCalibrationSession` | 원 측정 시각, 실제 음성 완료, 사용자·보행 세대, 프로필 저장 순서 |
+| 경로·방향 안내 | `InitialRouteRetryEpisode`, `RouteFacingContinuityGate`, `RouteRecheckNoticeCoordinator`, `RouteDecisionSpeechCoordinator` | 현재 요청에 속한 재시도·질문·완료만 반영 |
+| 음성 입력·출력 | `HandsFreeRuntimeSession`, `GuidanceSpeechPeerAdapter`, `UtteranceLedger` | 닫힌 입력 모델의 늦은 시작 차단, START/DONE/ERROR/STOP 구분 |
+| 권한·HTTP | `PermissionFlowController`, `JsonHttpExchange` | 의도별 권한 상태 변경, 호출별 취소·정리; 도메인 오류 해석은 각 클라이언트 |
+| 카메라·보조 모델 | `CameraFallbackController`, `UnknownRuntimeServiceOwner`, `UnknownCaptureAttempt` | 실제 해제 확인 전 재시작 차단, 이전 준비·캡처 결과의 새 작업 침범 방지 |
+| 거리 검사·추적 이력 | `MetricPreflightAttempt`, `TrackState` | 장치 검사와 저장 프로필 갱신의 권한 구분, 내부에서만 이력 변경 |
+| 화면 표시 | `NativePreviewPresentationPolicy`/`NativePreviewPresentationReader`, `AndroidExplicitReportPresentation`, `UserReportPresenter` | 상태 조회 순서·표시 권한·새 화면 이후 오래된 초기화 차단 |
+| 진단 앱 화면 | `CameraSessionRelease`, `OutdoorObservationCleanup`, `OutdoorLocationRelease`, `OutdoorRawGnssRegistration` | 한 종료 실패가 나머지 정리를 건너뛰지 않음; 파일 완료와 센서 해제를 별도로 확인 |
+
+기존 native SDK 소유자, 암호화 저장소, 개인정보 삭제·outbox, frozen/current frame 및 Raw/Full 거리의 별도 증거 이력은 유지한다. JNI/vendor·모델 자산·임계값을 패턴 통일 목적으로 바꾸지 않는다. 관리자와 위치 평가 앱은 독립 모듈이며 각각 [관리자 README](adminapp/README.md), [위치 평가 README](positionevalapp/README.md)를 따른다.
+
+호스트 시험은 복제된 앱 로직 대신 실제 controller/session을 호출한다. `NativeGuidanceTestFixture`의 보정 진행·재시도도 실제 `NativeGuidanceCalibrationSession`에 연결한다. [시험 코드 안내](app/src/test/README.md)의 SDK adapter가 필요한 시험은 일반 엄격 JVM 시험과 구분한다. JVM·빌드 결과는 실제 청취·카메라/센서 해제·화면 표시·야외 보행 증거가 아니다. 아래 날짜가 붙은 빌드·기기 결과는 당시의 기록이다.
+
 ## 2026-09-30 현재 작업 안내
 
 이 README는 현재 소스의 안내 문서이며, 아래에서 과거 기록으로 표시한 APK 경로·해시·시험 결과는 해당 시점의 이력이다. 새 팀원은 [인수인계 시작 문서](../../docs/handoff/2026-09-30/README.md), [현재 상태·검증 범위](../../docs/handoff/2026-09-30/status.md), [Part A: 보행·센서·카메라·안내 출력](../../docs/handoff/2026-09-30/part-a.md), [Part B: 계정·음성 입력·신고·서버](../../docs/handoff/2026-09-30/part-b.md)를 먼저 확인한다. 최신 원장 집계와 전체 시험의 실패·후속 재검증은 상태 문서에서 확인한다.
@@ -41,8 +60,11 @@ FP-004 최초 사용 경계는 전맹·저시력 사용자를 같은 우선순�
 python3 scripts/prepare_vosk_ko_small_model.py
 cd apps/android
 ./gradlew :app:testDebugUnitTest --no-daemon
+./gradlew :app:testDebugSdkAdapterUnitTest --no-daemon
 ./gradlew :app:assembleDebug --no-daemon
 ```
+
+일반 unit 시험은 엄격한 SDK stub(`returnDefaultValues=false`)을 유지한다. [3개 클래스·14개 SDK 대역 정책 시험](app/src/test/README.md#android-sdk-adapter를-사용하는-분리-jvm-시험)은 위 전용 task를 별도 Gradle 호출로 실행하며, 다른 task와 함께 지정하면 거부된다. 외부 init 스크립트는 필요 없고 [현행 runner](../../scripts/run_walksafe_test_layers_current.sh)의 `unit`·`all`과 CI가 두 호출을 자동으로 수행한다. 전용 XML은 `app/build/test-results/testDebugSdkAdapterUnitTest/`, HTML은 `app/build/reports/tests/testDebugSdkAdapterUnitTest/index.html`에서 일반 결과와 구분해 확인한다. 이 SDK 기본값 대역 결과는 실기기 동작 증거가 아니다.
 
 debug에서 commit을 주입하지 않으면 provenance는 명시적으로 `unverified`다. release APK는 정확한 40자리 commit과 승인된 단일 HTTPS gateway origin을 함께 전달하지 않으면 build가 실패한다.
 

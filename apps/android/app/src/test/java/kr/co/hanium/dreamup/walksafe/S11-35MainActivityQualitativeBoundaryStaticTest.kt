@@ -14,37 +14,40 @@ class S11_35MainActivityQualitativeBoundaryStaticTest {
 
     @Test
     fun shortMetricFrameGapDispatchesOnlyCurrentQualitativeOutputsBeforeMetricReturn() {
-        val frameAnchor = "val preparedTactileFrame = ProductionPreparedTactileFrameDispatch(currentFrame)"
-        val gapAnchor = "if (!currentRuntimeMetricOutputAllowsWork(arLease.generation)) {"
-        assertTrue(source.contains(frameAnchor))
-        val frameBoundary = source.substringAfter(frameAnchor)
-        assertTrue(frameBoundary.contains(gapAnchor))
-        val gapBranch = frameBoundary.substringAfter(gapAnchor)
-            .substringBefore("val captureLogEntry = buildCaptureLogEntry(")
-        assertTrue(gapBranch.contains("tactileFrame.guidance.outputs,\n                nowElapsedRealtimeMs = qualitativeNowMs,"))
-        assertTrue(gapBranch.contains(".filter { it.isCurrentQualitativeCaution(qualitativeNowMs) }"))
-        assertTrue(gapBranch.contains("currentRuntimeVisualDepthProcessingAllowsWork("))
-        assertTrue(gapBranch.contains("qualitativeRuntimeReady = qualitativeRuntimeReady"))
-        assertTrue(gapBranch.contains("frame = tactileFrame.copy(guidance = tactileFrame.guidance.copy(outputs = qualitativeOutputs))"))
-        assertTrue(gapBranch.contains("stale = !qualitativeRuntimeReady"))
-        assertTrue(gapBranch.contains("independentFreshOutputs = emptyList()"))
-        assertTrue(gapBranch.contains("warningContext = null"))
-        assertTrue(gapBranch.indexOf("dispatchTactileFrameFeedback(") < gapBranch.lastIndexOf("return"))
+        val publication = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/frame/FramePublicationController.kt").readText()
+        val publish = MainActivityRefactorSource.member(publication, "publish")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(publish,
+            "if (!metricOutputAllowed(scope.arGeneration))", "publishQualitative(input, frameTimestampNs)",
+            "return", "recording.buildCaptureEntry("))
+        val gap = MainActivityRefactorSource.member(publication, "publishQualitative")
+        assertTrue(gap.contains("resolveConflictingStateFeedback(input.frame.guidance.outputs, now)"))
+        assertTrue(gap.contains(".filter { it.isCurrentQualitativeCaution(now) }"))
+        assertTrue(gap.contains("visualOutputAllowed(scope.lease, frameTimestampNs(), scope.tracking)"))
+        assertTrue(gap.contains("risk.deviceGate(null, null, scope.arGeneration, outputs.firstOrNull(), visualReady)"))
+        assertTrue(gap.contains("input.frame.copy(guidance = input.frame.guidance.copy(outputs = outputs)), !visualReady"))
+        assertTrue(gap.contains("risk::qualitativeAlertsAllowed, input.receipt, null"))
+        assertTrue(gap.contains("}, emptyList(), null)"))
+        assertTrue(gap.indexOf("tactile.dispatchFeedback(") < gap.indexOf("presentation().showGap("))
+        val wiring = MainActivityRefactorSource.composition(source, "framePipelineController")
+        assertTrue(wiring.contains("FramePublicationController(frameStateLock, runtime::ownsFrame, runtime::metricOutputAllowsWork,"))
+        assertTrue(wiring.contains("runtime::visualOutputAllowsWork, tactile, risk, recording, report"))
     }
 
     @Test
     fun qualitativeDeliveryRechecksCurrentArCoreVisualLeaseNotCameraFallback() {
         val deliveryAnchor = "val currentDeliveryGateAllowsAlerts = if (action.reason == \"fresh_qualitative_depth_caution\") {"
-        assertTrue(source.contains(deliveryAnchor))
-        val delivery = source.substringAfter(deliveryAnchor).substringBefore("private fun currentFeedbackDeviceGateAllowsAlerts(")
-        assertTrue(delivery.contains("currentArCoreQualitativeFeedbackAllowsWork(nowMs)"))
+        val owner = MainActivityRefactorSource.function(source, "private fun isFeedbackActionStillDeliverable(")
+        assertTrue(owner.contains(deliveryAnchor))
+        val delivery = owner.substringAfter(deliveryAnchor)
+        assertTrue(delivery.contains("admission.qualitativeAllowsWork(nowMs)"))
         assertTrue(delivery.contains("current.deviceGateAllowsAlerts"))
-        val arCoreGate = delivery.substringAfter("private fun currentArCoreQualitativeFeedbackAllowsWork(nowMs: Long): Boolean")
+        val arCoreGate = MainActivityRefactorSource.member(source, "currentArCoreQualitativeFeedbackAllowsWork")
+        assertTrue(MainActivityRefactorSource.factory(source, "createRiskFeedbackComponents").contains("currentArCoreQualitativeFeedbackAllowsWork(nowMs)"))
         assertTrue(arCoreGate.contains("allowsRuntimeDepthGapProcessing("))
         assertTrue(arCoreGate.contains("tracking = runtimeVisualDepthFrameTracking"))
         assertTrue(arCoreGate.contains("isActivityForeground"))
         assertTrue(arCoreGate.contains("hasCameraPermission()"))
-        assertTrue(arCoreGate.contains("arSessionPurpose == ArSessionPurpose.RUNTIME"))
+        assertTrue(arCoreGate.contains("arSessionOwner.observe().purpose == ArSessionPurpose.RUNTIME"))
         assertTrue(arCoreGate.contains("!cameraFallbackRequested && !cameraFallbackRunning"))
     }
 }

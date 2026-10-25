@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D01-026 AndroidKeyStore 키·AEAD envelope와 백업 제외"]
+  G{"민감 저장소가 versioned LocalAead 사용; AndroidKeyStore 접근 가능"}
+  I["AES256 GCM,IV12bytes,tag128bits,nonempty domain AAD＜=1024bytes,current/readable/compromised version set"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 불량 자료는 상위store blocked로 전달"]
+  G -->|"미충족"| X
+  N1["현재 key version으로 randomized encryption하고 envelope version·domain을 AAD에 포함한다."]
+  I --> N1
+  N2["decode는 canonical Base64와 envelope/IV/tag/버전 범위를 검증하고 readable known key로만 decrypt한다."]
+  N1 --> N2
+  N3["compromised key는 제거,missing key generation tombstone은 임의 재생성을 막는다. 이전 readable key 자료는 rewrap 필요 표시한다."]
+  N2 --> N3
+  N4["검증된 purge/reset 경로에서만 fresh key를 만들고 caller는 plaintext buffer를 필요한 범위 후 정리한다."]
+  N3 --> N4
+  N5["manifest allowBackup=false·dataExtractionRules에서 cloud backup/device transfer 영역을 제외하고 usesCleartextTraffic=false를 선언한다."]
+  N4 --> N5
+  OK["인증된 plaintext 또는 current-version ciphertext"]
+  N5 --> OK
+  B0["decryption blocked"]
+  N2 -->|"AAD mismatch·tag 실패·unknownversion"| B0
+  B1["silent regeneration 거부"]
+  N3 -->|"키가사라졌으나 generation tombstone있음"| B1
+  B2["복호거부·키삭제"]
+  N3 -->|"compromisedversion"| B2
+  B3["fresh 정상저장 publish 금지"]
+  N4 -->|"reset 검증실패"| B3
+  R["중단·취소: 암복호 호출 중 사용자 취소 API 없음 / process crash 복구는 각 store/reset marker 계약"]
+  V["복구·재시도: 이전 readableversion은 rewrap; keylost는 verified purge 후 초기화 / 키missing자료의 blindretry로 복원 불가"]
+  Q["정책 P-D01-018 · P-D01-019"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

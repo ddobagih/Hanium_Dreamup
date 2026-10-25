@@ -1,0 +1,46 @@
+flowchart TD
+  T["F-D06-020 raw 보행 종료 후 전송 예약·배치·재검증"]
+  P["전제: READY/ENDED, app foreground, Gateway walk lease 없음, 정확<br/>current owner/RAW consent, WIFI transport+WIFI network<br/>binding, 충전 true(unknown false)."]
+  T --> P
+  E1["E-D06-020-01 walk end/앱 시작·전경 복귀/session·network 변경/충전 시작→예약"]
+  E1 --> T
+  E2["E-D06-020-02 batch 완료→남은 자료가 있으면 새 task"]
+  E2 --> T
+  E3["E-D06-020-03 새 보행/동의/network·charging 변경→cancel"]
+  E3 --> T
+  A1["1. 예약 task에서 current context를 다시 얻고 활성 upload를 revalidate한다."]
+  P --> A1
+  A2["2. 남은 partial을 먼저 seal한다."]
+  A1 --> A2
+  A3["3. current admission에 맞는 가장 오래된 COMPLETE를 선택한다."]
+  A2 --> A3
+  A4["4. 최대4개 처리 후 새 task를 enqueue하여 다른 consent/metadata 작업이 실행되게<br/>한다."]
+  A3 --> A4
+  A5["5. 각 socket/완료/로컬 삭제 경계에서 session instance/generation/device<br/>attempt/consent object/network를 비교한다."]
+  A4 --> A5
+  N["정상 종료: 4개 또는 queue 소진."]
+  A5 --> N
+  FX["결과: 백그라운드 전송 service 없음. raw 결과는 사용자 음성/화면을 방해하지 않음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"ACTIVE/PAUSED/SAFE_STOP"}
+    R1["전송 시작 안 함"]
+    B1 -->|조건 성립| R1
+    B2{"cellular 또는 비충전/unknown"}
+    R2["raw 업로드 보류"]
+    B2 -->|조건 성립| R2
+    B3{"DELETED/QUARANTINED/WALK_REJECTED"}
+    R3["동일 task의 다음 항목 가능"]
+    B3 -->|조건 성립| R3
+    B4{"그 외 실패/서버 off"}
+    R4["batch 종료"]
+    B4 -->|조건 성립| R4
+  end
+  POL["정책: P-D06-018"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 상태별 F-D06-022 처리."]
+    X2["취소: nested call 취소, plaintext zeroize."]
+    X3["재시도: 다음 허용 trigger; walk-in-progress만 105초 1회."]
+    X4["복구: 이전 앱 실행의 ended walk도 원래 ID로 전송."]
+  end

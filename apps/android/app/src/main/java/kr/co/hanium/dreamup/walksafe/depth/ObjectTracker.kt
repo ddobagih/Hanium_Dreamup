@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
+import java.util.Collections
 import kotlin.math.max
 import kotlin.math.abs
 import kotlin.math.min
@@ -19,6 +21,9 @@ data class DistanceObservation(
      * equivalent of the same capture's depth spread). Null or non-positive = unknown.
      */
     val distanceSigmaM: Float? = null,
+    /** Same-capture depth attribution in the observation's Frame clock, separate from Image ID. */
+    val depthObservedAtFrameMs: Long? = null,
+    val materialPointId: VisualMaterialPointId? = null,
 )
 
 data class IndexedObjectGeometry(
@@ -35,10 +40,16 @@ data class ApproachKinematics(
     val trend: Trend,
     val approachScore: Float,
     val approachSpeedMps: Float?,
+    /** Legacy numeric approach-time slot, not a qualified prediction of physical collision. */
     val timeToCollisionMs: Long?,
     val objectMotion: ObjectMotion = ObjectMotion.UNKNOWN,
     val motionEstimate: ObjectMotionEstimate = ObjectMotionEstimate(),
-)
+) {
+    /** Same existing distance/closing-speed time; no second calculation or independent copy state. */
+    val approachTimeMs: Long? get() = timeToCollisionMs
+    /** Point motion alone cannot prove overlap with the user's passage and object extent. */
+    val collisionAssessment: CollisionAssessment get() = CollisionAssessment.UNKNOWN
+}
 
 class TrackState(
     val trackId: String,
@@ -92,12 +103,14 @@ class TrackState(
         classEvidence[geometry.className] = (classEvidence[geometry.className] ?: 0f) + confidence
     }
 
-    internal fun visualGeometryAtOrBefore(timestampMs: Long): ObjectGeometry? =
-        visualGeometryHistory.lastOrNull { it.first <= timestampMs }?.second
+    internal fun visualObservationAtOrBefore(timestampMs: Long): Pair<Long, ObjectGeometry>? =
+        visualGeometryHistory.lastOrNull { it.first <= timestampMs }
 
     private fun rememberVisualGeometry(geometry: ObjectGeometry, timestampMs: Long) {
         visualGeometryHistory.addCapped(timestampMs to geometry, 64)
     }
+
+    internal fun observeMaterialPointIdentity(id: VisualMaterialPointId?) = motionWindow.observeMaterialPointIdentity(id)
 
     internal fun motionSamples(): List<DistanceObservation> =
         if (currentDistanceIsProximityOnly) emptyList() else motionWindow.spatialSamples(lastSeenAtMs)
@@ -111,13 +124,20 @@ class TrackState(
     }
     internal fun requiresIndependentDistance(): Boolean = independentDistanceRequired
 
-    val bboxHistory: MutableList<RectNorm> = mutableListOf()
-    val centerHistory: MutableList<Point2> = mutableListOf()
-    val polygonHistory: MutableList<List<Point2>> = mutableListOf()
+    // Stable live views avoid copying history on each frame; only this owner can mutate it.
+    private val mutableBboxHistory = mutableListOf<RectNorm>()
+    val bboxHistory: List<RectNorm> = Collections.unmodifiableList(mutableBboxHistory)
+    private val mutableCenterHistory = mutableListOf<Point2>()
+    val centerHistory: List<Point2> = Collections.unmodifiableList(mutableCenterHistory)
+    private val mutablePolygonHistory = mutableListOf<List<Point2>>()
+    val polygonHistory: List<List<Point2>> = Collections.unmodifiableList(mutablePolygonHistory)
     /** Timed visual boxes for the qualitative trend, pruned by age instead of sample count. */
-    internal val visualTrendHistory: MutableList<VisualTrendSample> = mutableListOf()
-    val distanceHistory: MutableList<DistanceObservation> = mutableListOf()
-    val confidenceHistory: MutableList<Float> = mutableListOf()
+    private val mutableVisualTrendHistory = mutableListOf<VisualTrendSample>()
+    internal val visualTrendHistory: List<VisualTrendSample> = Collections.unmodifiableList(mutableVisualTrendHistory)
+    private val mutableDistanceHistory = mutableListOf<DistanceObservation>()
+    val distanceHistory: List<DistanceObservation> = Collections.unmodifiableList(mutableDistanceHistory)
+    private val mutableConfidenceHistory = mutableListOf<Float>()
+    val confidenceHistory: List<Float> = Collections.unmodifiableList(mutableConfidenceHistory)
 
     fun markSeen(geometry: ObjectGeometry, timestampMs: Long, minStableAgeFrames: Int) {
         val resolvingMaskAmbiguity = maskAssociationUncertain
@@ -138,9 +158,9 @@ class TrackState(
         missedFrames = 0
         ageFrames += 1
         stable = ageFrames >= minStableAgeFrames && !idSwitchSuspected
-        bboxHistory.addCapped(geometry.bboxNorm, 12)
-        centerHistory.addCapped(geometry.centerNorm, 12)
-        polygonHistory.addCapped(geometry.polygonNorm, 8)
+        mutableBboxHistory.addCapped(geometry.bboxNorm, 12)
+        mutableCenterHistory.addCapped(geometry.centerNorm, 12)
+        mutablePolygonHistory.addCapped(Collections.unmodifiableList(geometry.polygonNorm), 8)
         rememberTrendSample(geometry, timestampMs)
         if (resolvingMaskAmbiguity) {
             resetMetricAndSpatialHistoryPreservingTrackId(timestampMs)
@@ -163,9 +183,9 @@ class TrackState(
             rememberVisualGeometry(geometry, timestampMs)
             hasCurrentVisualGeometry = false
             lastSeenAtMs = timestampMs
-            bboxHistory.addCapped(geometry.bboxNorm, 12)
-            centerHistory.addCapped(geometry.centerNorm, 12)
-            polygonHistory.addCapped(geometry.polygonNorm, 8)
+            mutableBboxHistory.addCapped(geometry.bboxNorm, 12)
+            mutableCenterHistory.addCapped(geometry.centerNorm, 12)
+            mutablePolygonHistory.addCapped(Collections.unmodifiableList(geometry.polygonNorm), 8)
             rememberTrendSample(geometry, timestampMs)
         }
     }
@@ -188,17 +208,19 @@ class TrackState(
         if (latestGeometry?.imageQuarterTurns != geometry.imageQuarterTurns) {
             depthGap.clear()
             visualGeometryHistory.clear()
-            bboxHistory.clear()
-            centerHistory.clear()
-            polygonHistory.clear()
-            visualTrendHistory.clear()
+            mutableBboxHistory.clear()
+            mutableCenterHistory.clear()
+            mutablePolygonHistory.clear()
+            mutableVisualTrendHistory.clear()
         }
     }
 
     private fun rememberTrendSample(geometry: ObjectGeometry, timestampMs: Long) {
-        visualTrendHistory.add(VisualTrendSample(timestampMs, geometry.bboxNorm, geometry.polygonNorm))
-        visualTrendHistory.removeAll { timestampMs - it.timestampMs > VISUAL_TREND_RETENTION_MS }
-        while (visualTrendHistory.size > MAX_VISUAL_TREND_SAMPLES) visualTrendHistory.removeAt(0)
+        mutableVisualTrendHistory.add(VisualTrendSample(
+            timestampMs, geometry.bboxNorm, Collections.unmodifiableList(geometry.polygonNorm),
+        ))
+        mutableVisualTrendHistory.removeAll { timestampMs - it.timestampMs > VISUAL_TREND_RETENTION_MS }
+        while (visualTrendHistory.size > MAX_VISUAL_TREND_SAMPLES) mutableVisualTrendHistory.removeAt(0)
     }
 
     internal fun acceptMaskAssociation(evidence: MaskAssociationEvidence) {
@@ -229,7 +251,12 @@ class TrackState(
     }
 
     /** Updates a current image observation without manufacturing a new semantic confirmation. */
-    fun markTracked(geometry: ObjectGeometry, timestampMs: Long): Boolean {
+    fun markTracked(geometry: ObjectGeometry, timestampMs: Long): Boolean =
+        markTrackedWithContinuity(geometry, timestampMs, null)
+
+    internal fun markTrackedWithContinuity(
+        geometry: ObjectGeometry, timestampMs: Long, continuity: TrackedGeometryContinuity?,
+    ): Boolean {
         if (maskAssociationUncertain || missedFrames != 0 || !sameAssociationClass(geometry.className, className) ||
             timestampMs < lastSeenAtMs) return false
         if (timestampMs == lastSeenAtMs) {
@@ -237,15 +264,19 @@ class TrackState(
             if (matches) hasCurrentVisualGeometry = true
             return matches
         }
-        if (latestGeometry?.let { continuityIsUncertain(it, geometry) } != false) return false
+        val measuredContinuity = !idSwitchSuspected && continuity?.let { proof ->
+            (hasCurrentVisualGeometry && proof.matches(latestGeometry, lastSeenAtMs, geometry, timestampMs)) ||
+                proof.matchesDetectorSource(this, geometry, timestampMs)
+        } == true
+        if (latestGeometry?.let { continuityIsUncertain(it, geometry) } != false && !measuredContinuity) return false
         clearImageHistoryOnRotationChange(geometry)
         latestGeometry = geometry
         rememberVisualGeometry(geometry, timestampMs)
         lastSeenAtMs = timestampMs
         hasCurrentVisualGeometry = true
-        bboxHistory.addCapped(geometry.bboxNorm, 12)
-        centerHistory.addCapped(geometry.centerNorm, 12)
-        polygonHistory.addCapped(geometry.polygonNorm, 8)
+        mutableBboxHistory.addCapped(geometry.bboxNorm, 12)
+        mutableCenterHistory.addCapped(geometry.centerNorm, 12)
+        mutablePolygonHistory.addCapped(Collections.unmodifiableList(geometry.polygonNorm), 8)
         rememberTrendSample(geometry, timestampMs)
         return true
     }
@@ -322,13 +353,13 @@ class TrackState(
             distanceHistory.lastOrNull()?.let { it.distanceM - observation.distanceM > maxDepthJumpM } == true
         if (decision.resetHistory) {
             depthGap.clear()
-            distanceHistory.clear()
-            confidenceHistory.clear()
+            mutableDistanceHistory.clear()
+            mutableConfidenceHistory.clear()
             motionWindow.clearSamples()
         }
         decision.observationsToAppend.forEach { accepted ->
-            distanceHistory.addCapped(accepted, 12)
-            confidenceHistory.addCapped(accepted.confidence, 12)
+            mutableDistanceHistory.addCapped(accepted, 12)
+            mutableConfidenceHistory.addCapped(accepted.confidence, 12)
             if (admission == MotionObservationAdmission.NEW) motionWindow.appendAccepted(accepted)
         }
         return decision.accepted
@@ -379,8 +410,8 @@ class TrackState(
     }
 
     private fun clearDistanceHistory() {
-        distanceHistory.clear()
-        confidenceHistory.clear()
+        mutableDistanceHistory.clear()
+        mutableConfidenceHistory.clear()
         distanceContinuity = MetricDistanceContinuityPolicy()
     }
 
@@ -422,7 +453,8 @@ class ObjectTracker(
                                maskAware: Boolean = false,
                                detectorSourceOnly: Boolean = false,
                                currentGeometries: Map<Int, ObjectGeometry> = emptyMap(),
-                               currentTimestampMs: Long = timestampMs): List<TrackState> {
+                               currentTimestampMs: Long = timestampMs,
+                               pointContinuity: Map<Int, TrackedMaterialPointContinuity> = emptyMap()): List<TrackState> {
         if (detectorSourceOnly) {
             if (timestampMs < 0L || lastSourceObservationAtMs?.let { timestampMs <= it } == true) return emptyList()
             lastSourceObservationAtMs = timestampMs
@@ -505,17 +537,46 @@ class ObjectTracker(
         ).filter { candidate ->
             anchoredMatches.none { it.trackIndex == candidate.trackIndex || it.geometryIndex == candidate.geometryIndex }
         }
-        val sourceMatches = anchoredMatches + remainingMatches
+        // S11-20: weak neighbors need not erase a complete, strongly separated correspondence.
+        // Count changes, tied costs and crossing paths still cannot inherit the old identities.
+        val distinctMatches = completeDistinctMatches(candidates,
+            eligibleTrackIndicesByClass.filterKeys { it !in completeAnchoredClasses },
+            geometryIndicesByClass, geometries, timestampMs, detectorSourceOnly, currentTimestampMs)
+        val geometryMatches = (anchoredMatches + remainingMatches + distinctMatches).distinct()
+        val pointCandidates = if (detectorSourceOnly) pointContinuity.mapNotNull { (geometryIndex, proof) ->
+            val geometry = currentGeometries[geometryIndex] ?: return@mapNotNull null
+            val trackIndex = tracks.indices.singleOrNull { index ->
+                index !in maskTrackIndices && geometryIndex !in maskGeometryIndices &&
+                    proof.matches(tracks[index], geometries[geometryIndex], geometry, timestampMs, currentTimestampMs) &&
+                    plausibleMatchIoU(tracks[index], geometry,
+                        allowMeasuredSourceHandoff = proof.hasQualifiedSourceHandoff) != null
+            } ?: return@mapNotNull null
+            MatchingCandidate(trackIndex, geometryIndex,
+                bboxIoU(requireNotNull(tracks[trackIndex].latestGeometry).bboxNorm, geometry.bboxNorm))
+        } else emptyList()
+        val uniquePointMatches = mutualUniqueMatches(pointCandidates, tracks.size, geometries.size)
+        // The proof covers the complete still-observed class, not a partial winner whose missing
+        // peer could own the point. Resolve before removing any geometric endpoint or candidate.
+        val pointMatches = uniquePointMatches.groupBy { associationClassKey(tracks[it.trackIndex].className) }
+            .flatMap { (className, matches) ->
+                if (matches.size >= 2 &&
+                    matches.map { it.trackIndex }.toSet() == eligibleTrackIndicesByClass[className].orEmpty().toSet() &&
+                    matches.map { it.geometryIndex }.toSet() == geometryIndicesByClass[className].orEmpty().toSet()
+                ) matches else emptyList()
+            }
+        val sourceMatches = (pointMatches + geometryMatches.filter { candidate ->
+            pointMatches.none { it.trackIndex == candidate.trackIndex || it.geometryIndex == candidate.geometryIndex }
+        }).distinct()
         val currentConflicts = if (detectorSourceOnly) conflictingFlowIndices(
             geometries, currentGeometries, sourceMatches, timestampMs, currentTimestampMs,
         ) else emptySet()
         // Veto only after source correspondence is resolved. Removing competing candidates
         // earlier could turn a rejected anchor's center-only alternative into a guessed ID.
         sourceMatches.filter { candidate ->
-            candidate.geometryIndex !in currentConflicts && currentAnchors.none { anchor ->
+            candidate in pointMatches || (candidate.geometryIndex !in currentConflicts && currentAnchors.none { anchor ->
                 (anchor.trackIndex == candidate.trackIndex && anchor.geometryIndex != candidate.geometryIndex) ||
                     (anchor.geometryIndex == candidate.geometryIndex && anchor.trackIndex != candidate.trackIndex)
-            }
+            })
         }.forEach { candidate ->
             val track = tracks[candidate.trackIndex]
             val geometry = geometries[candidate.geometryIndex]
@@ -591,6 +652,22 @@ class ObjectTracker(
     fun updateSourceWithAssignments(
         geometries: List<IndexedObjectGeometry>, timestampMs: Long,
         currentGeometries: List<IndexedObjectGeometry> = emptyList(), currentTimestampMs: Long = timestampMs,
+    ): List<IndexedTrackAssignment> = updateSourceAssignments(
+        geometries, timestampMs, currentGeometries, currentTimestampMs, emptyMap(),
+    )
+
+    internal fun updateSourceWithMaterialPointAssignments(
+        geometries: List<IndexedObjectGeometry>, timestampMs: Long,
+        currentGeometries: List<IndexedObjectGeometry>, currentTimestampMs: Long,
+        continuityBySourceIndex: Map<Int, TrackedMaterialPointContinuity>,
+    ): List<IndexedTrackAssignment> = updateSourceAssignments(
+        geometries, timestampMs, currentGeometries, currentTimestampMs, continuityBySourceIndex,
+    )
+
+    private fun updateSourceAssignments(
+        geometries: List<IndexedObjectGeometry>, timestampMs: Long,
+        currentGeometries: List<IndexedObjectGeometry>, currentTimestampMs: Long,
+        continuityBySourceIndex: Map<Int, TrackedMaterialPointContinuity>,
     ): List<IndexedTrackAssignment> {
         val counts = geometries.groupingBy { it.sourceDetectionIndex }.eachCount()
         val unique = geometries.filter { it.sourceDetectionIndex >= 0 && counts[it.sourceDetectionIndex] == 1 }
@@ -600,8 +677,11 @@ class ObjectTracker(
         val currentByIndex = if (currentTimestampMs >= timestampMs) unique.mapIndexedNotNull { index, indexed ->
             currentBySource[indexed.sourceDetectionIndex]?.let { index to it }
         }.toMap() else emptyMap()
+        val pointByIndex = unique.mapIndexedNotNull { index, indexed ->
+            continuityBySourceIndex[indexed.sourceDetectionIndex]?.let { index to it }
+        }.toMap()
         val observed = updateInternal(unique.map { it.geometry }, timestampMs, detectorSourceOnly = true,
-            currentGeometries = currentByIndex, currentTimestampMs = currentTimestampMs)
+            currentGeometries = currentByIndex, currentTimestampMs = currentTimestampMs, pointContinuity = pointByIndex)
             .filter { it.missedFrames == 0 }
         return unique.mapNotNull { indexed ->
             observed.singleOrNull { it.latestDetectionGeometry === indexed.geometry }?.let {
@@ -650,12 +730,21 @@ class ObjectTracker(
     fun applyTrackedObservations(
         observations: List<Pair<String, ObjectGeometry>>, timestampMs: Long,
         budgetDeferredTrackIds: Set<String> = emptySet(),
+    ): List<TrackState> = applyTrackedObservationsWithContinuity(
+        observations, timestampMs, budgetDeferredTrackIds, emptyMap(),
+    )
+
+    internal fun applyTrackedObservationsWithContinuity(
+        observations: List<Pair<String, ObjectGeometry>>, timestampMs: Long,
+        budgetDeferredTrackIds: Set<String>, continuityByTrackId: Map<String, TrackedGeometryContinuity>,
     ): List<TrackState> {
         if (!acceptGeometryTimestamp(timestampMs)) return emptyList()
         val counts = observations.groupingBy { it.first }.eachCount()
         val accepted = observations.mapNotNull { (id, geometry) ->
             if (counts[id] != 1) return@mapNotNull null
-            tracks.singleOrNull { it.trackId == id }?.takeIf { it.markTracked(geometry, timestampMs) }
+            tracks.singleOrNull { it.trackId == id }?.takeIf {
+                it.markTrackedWithContinuity(geometry, timestampMs, continuityByTrackId[id])
+            }
         }
         val acceptedIds = accepted.map { it.trackId }.toSet()
         tracks.filter { it.trackId !in acceptedIds }.forEach {
@@ -691,6 +780,8 @@ class ObjectTracker(
         requireIndependentDepthObservation: Boolean = false,
         proximityOnly: Boolean = false,
         distanceSigmaM: Float? = null,
+        depthObservedAtFrameMs: Long? = null,
+        materialPointId: VisualMaterialPointId? = null,
     ): Boolean {
         if (distanceM == null || !distanceM.isFinite() || distanceM <= 0f || !source.metric) return false
         return track.recordDistance(
@@ -703,6 +794,8 @@ class ObjectTracker(
                 objectPositionInAnchor = objectPositionInAnchor,
                 depthObservationTimestampNs = depthObservationTimestampNs,
                 distanceSigmaM = distanceSigmaM,
+                depthObservedAtFrameMs = depthObservedAtFrameMs,
+                materialPointId = materialPointId,
             ),
             maxDepthJumpM = maxDepthJumpM,
             requireIndependentDepthObservation = requireIndependentDepthObservation,
@@ -722,7 +815,7 @@ class ObjectTracker(
             (usable.last().timestampMs - usable.first().timestampMs !in 600L..4_000L ||
                 usable.zipWithNext().any { (a, b) -> b.timestampMs - a.timestampMs !in 100L..1_500L })
         ) return ApproachKinematics(Trend.UNKNOWN, 0f, null, null)
-        if (rotationOnlyMakesAxialTrendAmbiguous(track)) {
+        if (rotationMakesAxialTrendAmbiguous(track)) {
             return ApproachKinematics(Trend.UNKNOWN, 0f, null, null)
         }
         val fit = linearDistanceTrend(usable) ?: return ApproachKinematics(Trend.UNKNOWN, 0f, null, null)
@@ -738,23 +831,30 @@ class ObjectTracker(
         // can tilt the fitted line, but then the slope is not distinguishable from zero.
         val speedSupported = approachSpeed >= 0.25f &&
             fit.slopeStdErrMps?.let { approachSpeed >= TTC_MIN_SPEED_TO_STD_ERR * it } == true
-        val ttcMs = if (speedSupported) ((currentDistanceM / approachSpeed) * 1000f).toLong() else null
         val motionEstimate = ObjectMotionPolicy.estimate(track)
+        // Axial depth may decrease while a lateral relative trajectory already moves away.
+        // Preserve its distance trend, but do not publish an approach countdown against the
+        // current, independently measured spatial evidence.
+        val spatiallyNonClosing = motionEstimate.observedAtMs == track.lastSeenAtMs &&
+            motionEstimate.confidence >= 0.55f &&
+            motionEstimate.relativeClosingSpeedMps?.let { it.isFinite() && it <= 0f } == true
+        val approachTimeMs = if (speedSupported && !spatiallyNonClosing)
+            ((currentDistanceM / approachSpeed) * 1000f).toLong() else null
         return ApproachKinematics(
             trend = trend,
             approachScore = (approachSpeed / 1.5f).coerceIn(0f, 1f),
             approachSpeedMps = if (speedSupported) approachSpeed else null,
-            timeToCollisionMs = ttcMs,
+            timeToCollisionMs = approachTimeMs,
             objectMotion = ObjectMotionPolicy.classify(track, motionEstimate),
             motionEstimate = motionEstimate,
         )
     }
 
-    /** Narrow gate: good, static 3D support contradicts rotation-induced Z closing. */
-    private fun rotationOnlyMakesAxialTrendAmbiguous(track: TrackState): Boolean {
-        // Reuse the window's accepted independent spatial observations. Legacy distanceHistory
-        // can contain a short display window or timestamps rejected by the information ledger.
-        val samples = track.motionSamples()
+    /** Axial closing cannot establish TTC while the accepted camera poses rotate, including walking. */
+    private fun rotationMakesAxialTrendAmbiguous(track: TrackState): Boolean {
+        // Camera rotation concerns axial distance even without a material-point motion proof.
+        // Independent depth admission still rejects repeated/reprojected information.
+        val samples = track.kinematicSamples()
         if (samples.size < 4 || samples.last().timestampMs - samples.first().timestampMs !in 600L..4_000L ||
             samples.zipWithNext().any { (a, b) ->
                 b.timestampMs - a.timestampMs !in 100L..1_500L ||
@@ -763,20 +863,15 @@ class ObjectTracker(
             }
         ) return false
         val firstPose = samples.firstOrNull()?.cameraPoseEvidence ?: return false
-        val firstPoint = samples.firstOrNull()?.objectPositionInAnchor ?: return false
-        fun position(p: CameraPoseEvidence) = Vec3(p.positionX, p.positionY, p.positionZ)
-        fun finite(v: Vec3) = v.x.isFinite() && v.y.isFinite() && v.z.isFinite()
-        if (!finite(firstPoint) || firstPose.referenceId < 0L ||
+        if (firstPose.referenceId < 0L ||
             samples.mapNotNull {it.depthObservationTimestampNs?.takeIf { stamp -> stamp > 0L }}.distinct().size != samples.size
         ) return false
         var rotated = false
         for (sample in samples) {
             val pose = sample.cameraPoseEvidence ?: return false
-            val point = sample.objectPositionInAnchor ?: return false
             if (!sample.source.trustedForStepGuidance || sample.confidence < 0.55f || !sample.confidence.isFinite() ||
                 pose.referenceId != firstPose.referenceId || pose.timestampMs != sample.timestampMs ||
-                pose.objectCenterInAnchor(Point2(.5f,.5f),1f) == null || !finite(point)) return false
-            if ((position(pose)-position(firstPose)).norm() > .03f || (point-firstPoint).norm() > .05f) return false
+                pose.objectCenterInAnchor(Point2(.5f,.5f),1f) == null) return false
             val alignment = pose.forwardX*firstPose.forwardX + pose.forwardY*firstPose.forwardY + pose.forwardZ*firstPose.forwardZ
             if (alignment < .9961947f) rotated = true
         }
@@ -786,16 +881,63 @@ class ObjectTracker(
     private fun sourceMatchIoU(
         track: TrackState, source: ObjectGeometry, sourceTimestampMs: Long,
         currentTimestampMs: Long,
-    ): Float? {
+    ): Float? = plausibleMatchIoU(track, source,
+        sourceReference(track, sourceTimestampMs, currentTimestampMs)?.second)
+
+    private fun sourceReference(
+        track: TrackState, sourceTimestampMs: Long, currentTimestampMs: Long,
+    ): Pair<Long, ObjectGeometry>? {
         if (track.hasCurrentVisualGeometry && currentTimestampMs - track.lastSeenAtMs in 0L..maxObservationGapMs) {
-            // Use the capture itself, or its closest preceding actual observation when this
-            // pipeline did not publish that capture. Never substitute a later current box:
-            // it could hide source/current identity conflicts between published frames.
-            val atSource = track.visualGeometryAtOrBefore(sourceTimestampMs)
-            if (atSource != null) return plausibleMatchIoU(track, source, atSource)
+            // Never substitute a later current box for evidence preceding this capture.
+            track.visualObservationAtOrBefore(sourceTimestampMs)?.let { return it }
         }
-        // A budget-deferred track has only detector evidence and retains conservative matching.
-        return plausibleMatchIoU(track, source, track.latestDetectionGeometry)
+        return track.latestDetectionGeometry?.let { track.lastDetectionAtMs to it }
+    }
+
+    /** Only a complete class population can use dominant costs instead of graph degree one. */
+    private fun completeDistinctMatches(
+        candidates: List<MatchingCandidate>, tracksByClass: Map<String, List<Int>>,
+        geometriesByClass: Map<String, List<Int>>, geometries: List<ObjectGeometry>,
+        timestampMs: Long, detectorSourceOnly: Boolean, currentTimestampMs: Long,
+    ): List<MatchingCandidate> {
+        val byTrack = candidates.groupBy { it.trackIndex }
+        val byGeometry = candidates.groupBy { it.geometryIndex }
+        return tracksByClass.flatMap classMatches@ { (className, trackIndices) ->
+            val geometryIndices = geometriesByClass[className].orEmpty()
+            if (trackIndices.size < 2 || trackIndices.size != geometryIndices.size) return@classMatches emptyList()
+            val winners = trackIndices.mapNotNull { index ->
+                val choices = byTrack[index].orEmpty()
+                val best = choices.maxByOrNull { it.iou } ?: return@mapNotNull null
+                // Reuse the existing strong-anchor floor and base IoU tolerance as the minimum
+                // winner/runner-up separation on BOTH endpoints. No center-only guess is admitted.
+                if (!best.iou.isFinite() || best.iou < MIN_PARTIAL_ANCHOR_IOU ||
+                    choices.any { it != best && (!it.iou.isFinite() || best.iou - it.iou <= minIoU) } ||
+                    byGeometry[best.geometryIndex].orEmpty().any {
+                        it != best && (!it.iou.isFinite() || best.iou - it.iou <= minIoU)
+                    }) return@mapNotNull null
+                best
+            }
+            if (winners.size != trackIndices.size ||
+                winners.map { it.geometryIndex }.toSet() != geometryIndices.toSet()) return@classMatches emptyList()
+            val references = winners.map { candidate ->
+                val track = tracks[candidate.trackIndex]
+                if (detectorSourceOnly) sourceReference(track, timestampMs, currentTimestampMs)
+                else track.latestGeometry?.let { track.lastSeenAtMs to it }
+            }
+            // Different observation times cannot define one shared pair trajectory.
+            if (references.any { it == null } || references.map { it?.first }.distinct().size != 1 ||
+                references.any { timestampMs - requireNotNull(it).first !in 0L..maxObservationGapMs }
+            ) return@classMatches emptyList()
+            for (first in winners.indices) for (second in first + 1 until winners.size) {
+                if (hasAmbiguousInterpolatedOverlap(
+                        requireNotNull(references[first]).second.bboxNorm,
+                        requireNotNull(references[second]).second.bboxNorm,
+                        geometries[winners[first].geometryIndex].bboxNorm,
+                        geometries[winners[second].geometryIndex].bboxNorm,
+                    )) return@classMatches emptyList()
+            }
+            winners
+        }
     }
 
     /** Compare each pair at shared times, retaining the veto for crossing or merged flow. */
@@ -877,12 +1019,13 @@ class ObjectTracker(
 
     private fun plausibleMatchIoU(
         track: TrackState, geometry: ObjectGeometry, previous: ObjectGeometry? = track.latestGeometry,
+        allowMeasuredSourceHandoff: Boolean = false,
     ): Float? {
         if (!sameAssociationClass(track.className, geometry.className) || track.missedFrames > 0 || previous == null) return null
-        if (continuityIsUncertain(previous, geometry)) return null
+        if (continuityIsUncertain(previous, geometry, allowMeasuredSourceHandoff)) return null
         val iou = bboxIoU(previous.bboxNorm, geometry.bboxNorm)
         val centerMove = centerDistance(previous.centerNorm, geometry.centerNorm)
-        if (iou < minIoU && centerMove > maxCenterMoveNorm) return null
+        if (!allowMeasuredSourceHandoff && iou < minIoU && centerMove > maxCenterMoveNorm) return null
         return iou
     }
 
@@ -930,7 +1073,11 @@ private const val TTC_MIN_SPEED_TO_STD_ERR = 2f
 private fun continuityIsUncertain(
     previous: ObjectGeometry,
     current: ObjectGeometry,
+    allowMeasuredSourceHandoff: Boolean = false,
 ): Boolean {
+    // Only the completed source-bound common-image proof may replace these bbox heuristics.
+    // Its measured point identity, source clocks and both original geometries were validated first.
+    if (allowMeasuredSourceHandoff) return false
     if (centerDistance(previous.centerNorm, current.centerNorm) > MAX_CONTINUOUS_CENTER_MOVE_NORM) {
         return true
     }

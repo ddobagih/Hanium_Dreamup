@@ -8,7 +8,7 @@ import org.junit.Test
 /**
  * S07-32 (Root R6, 07.txt:303/305): the automatic arrival question needs consecutive
  * near-destination evidence that has lasted at least 3 s (measurement time), not only two samples.
- * A continuity break restarts that time; the user's own "arrived" request is not delayed.
+ * A continuity break restarts that time; a spoken query cannot bypass it.
  */
 class RouteArrivalDwellRegressionTest {
     @Test
@@ -50,13 +50,41 @@ class RouteArrivalDwellRegressionTest {
     }
 
     @Test
-    fun theUsersOwnArrivedRequestIsNotDelayedByTheDwell() {
+    fun theUsersArrivedQueryCannotBypassTheDwell() {
         val navigator = navigator()
         assertFalse(navigator.update(fix(1_000L), 1_000L, false).arrivalCandidate)
         val request = navigator.requestArrivalConfirmation(1_000L)
-        assertEquals("arrival_confirmation_requested_by_user", request.reason)
-        assertEquals(RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION, request.pendingUserDecision)
-        assertTrue(navigator.confirmArrival().arrived)
+        assertEquals("arrival_waiting_for_trusted_evidence", request.reason)
+        assertEquals(null, request.pendingUserDecision)
+        assertFalse(navigator.confirmArrival().arrived)
+        assertFalse(navigator.update(fix(2_000L), 2_000L, false).arrivalCandidate)
+        assertFalse(navigator.update(fix(3_000L), 3_000L, false).arrivalCandidate)
+        assertTrue(navigator.update(fix(4_000L), 4_000L, false).arrivalCandidate)
+    }
+
+    @Test fun acceptedEvidenceAndSafetyRetirementCommitAtomicallyAcrossTheDecisionDeadline() {
+        var now = 1_000L
+        val navigator = RouteNavigator(nowElapsedRealtimeMs = { now }).apply {
+            setRoute(WalkingRoute("TEST", WalkingRouteSummary(89, 90),
+                listOf(RoutePoint(37.0, 127.0), RoutePoint(37.0, 127.001)), emptyList()))
+        }
+        for (at in 1_000L..4_000L step 1_000L) {
+            now = at
+            navigator.update(fix(at), at, false)
+        }
+        val token = requireNotNull(navigator.pendingDecisionToken())
+        var retirements = 0
+        assertFalse(navigator.completeDetectedArrival(token) { false }.arrived)
+        assertTrue(navigator.hasRoute())
+        assertEquals(token, navigator.pendingDecisionToken())
+        val complete = navigator.completeDetectedArrival(token) {
+            retirements++
+            now += 30_000L // A retired owner cannot be stranded by a second TTL/expiry read.
+            true
+        }
+        assertTrue(complete.arrived)
+        assertEquals(1, retirements)
+        assertFalse(navigator.hasRoute())
     }
 
     private fun navigator() = RouteNavigator().apply {

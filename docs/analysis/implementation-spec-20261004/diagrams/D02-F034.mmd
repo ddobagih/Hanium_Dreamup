@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D02-034 Activity foreground·background·destroy와 세션 정리"]
+  E["진입: onResume/onPause/onStop/onDestroy / AR/camera/detector close 완료"]
+  G{"P-D02-034 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["전용 early cleanup 후 super.onDestroy; 미초기화 자원 사용 금지"]
+  G -->|"privacy startup inspection 미완료"| B0
+  B1["동일 walk ID/lease 보관, 자동 ACTIVE 복원 아님; 다음 foreground 재검사"]
+  G -->|"configuration change retention 성공"| B1
+  B2["gateway authority reset·새 보행 경로"]
+  G -->|"finishing/프로세스 재시작"| B2
+  B3["독립 단계 계속; 성공하지 않은 native release ACK를 조작하지 않음"]
+  G -->|"한 cleanup 단계 예외"| B3
+  B4["placeholder epoch/generation으로 retained lifecycle 변경 불가"]
+  G -->|"destroyed Activity late callback"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["pause에서 foreground input/output callback fence,<br/>wake/recognition/gateway speech·navigation·prewalk/보정 취소"]
+    S1["camera/depth/location/step/orientation·IMU evidence invalidation 및<br/>session background event"]
+    S2["destroy는 safety coordinator close·retry 제거·detector generation 증가·각<br/>executor/call authority fence"]
+    S3["configuration change는 같은 process paused lifecycle+gateway lease<br/>retention 가능; 이전 Activity는 새 placeholder lifecycle로 교체"]
+    S4["AR invalidation preparation→실제 close stage→independent cleanup tail<br/>순서"]
+    S5["feedback close·speech recognizer destroy·startup/resource probe<br/>close·async detector close"]
+    S6["RuntimeArSessionCleanupOwnership.processSingleton은 retained<br/>owner/action 하나만 보유한다. beforeClose 또는 native close가<br/>RuntimeException이면 firstFailure를 남기고 pending을 유지하며 attempted=true로<br/>같은 close를 재실행하지 않는다. 다른 owner는 그 lease를 해제하지 못한다."]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 --> S6
+  end
+  E -.-> S0
+  N["정상 종료: cleanup 단계와 callback fence 수행 또는 비동기 close 요청 뒤 onDestroy 반환<br/>실제 release 완료는 각 owner ACK이며 모든 worker를 동기 대기하지 않음"]
+  X["취소·중단: pause/destroy는 current action과 output lease를 무효화. /<br/>foreground/actor/epoch 변경 시 현재 요청을 폐기한다."]
+  C["정리: 원본 resource owner 확인; async detector/native drain은 시작 intent와 완료 ack<br/>분리. onDestroy 자체가 모든 worker 종료를 동기 보장한다고 주장하지 않음."]
+  R["재시도·복구: foreground 복귀는 full readiness와 explicit resume; 자동 active 없음. / 현재<br/>owner와 조건을 다시 확보해야 한다."]
+  S6 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

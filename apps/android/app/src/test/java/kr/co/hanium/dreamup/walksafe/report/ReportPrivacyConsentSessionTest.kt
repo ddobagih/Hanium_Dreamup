@@ -1,5 +1,9 @@
 package kr.co.hanium.dreamup.walksafe.report
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionFrameEvidence
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionSnapshot
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
@@ -77,12 +81,12 @@ class ReportPrivacyConsentSessionTest {
     @Test
     fun mainActivityPauseInvalidatesPrivateFrameStateAndInFlightGenerationWithoutReplacingDetector() {
         val activity = MainActivity()
-        val consent = MainActivity::class.java.getDeclaredField("reportPrivacyConsentSession").run {
+        val consent = MainActivityControllerTestFixture.field("reportPrivacyConsentSession").run {
             isAccessible = true
             get(activity) as ReportPrivacyConsentSession
         }
         consent.resetForNewEnrollment()
-        val detectorField = MainActivity::class.java.getDeclaredField("frameDetector").apply {
+        val detectorField = MainActivityControllerTestFixture.field("frameDetector").apply {
             isAccessible = true
         }
         val detectorBeforePause = detectorField.get(activity)
@@ -125,6 +129,13 @@ class ReportPrivacyConsentSessionTest {
         )
         consent.grantFromServerConfirmedIntegratedConsent()
         assertSame(call, consent.trackIfGranted(call))
+
+        // Keep the real invalidation path; replace only the platform monotonic clock leaf.
+        MainActivityControllerTestFixture.bindPhoneMountingClock(activity) { CAPTURED_AT_MS }
+        // The Activity has not run Android onCreate; install the real passive device-check core.
+        val deviceSnapshot = activityField("postLoginDeviceCheckSnapshot").get(activity) as
+            kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckSnapshot
+        assertNull(deviceSnapshot.bindingOrNull)
 
         // Navigation logging is unrelated to this plain-JVM privacy lifecycle test.
         activityField("latestNavigationState")
@@ -474,19 +485,19 @@ class ReportPrivacyConsentSessionTest {
         return ReportPrivacyConsentSession
     }
 
-    private fun activityField(name: String) = MainActivity::class.java.getDeclaredField(name).apply {
+    private fun activityField(name: String) = MainActivityControllerTestFixture.field(name).apply {
         isAccessible = true
     }
 
     private fun assertEmptyDetectionSnapshot(activity: MainActivity, fieldName: String) {
-        val snapshot = activityField(fieldName).get(activity) as MainActivity.DetectionSnapshot
+        val snapshot = activityField(fieldName).get(activity) as DetectionSnapshot
         assertTrue(snapshot.detections.isEmpty())
         assertNull(snapshot.capturedAtMs)
         assertNull(snapshot.reportImage)
         assertNull(snapshot.frameEvidence)
     }
 
-    private fun populatedDetectionSnapshot(): MainActivity.DetectionSnapshot = MainActivity.DetectionSnapshot(
+    private fun populatedDetectionSnapshot(): DetectionSnapshot = DetectionSnapshot(
         detections = emptyList(),
         identity = AndroidDetectionSnapshotFrameIdentity(
             captureFrameId = FRAME_ID,
@@ -504,7 +515,7 @@ class ReportPrivacyConsentSessionTest {
         frameEvidence = null,
     )
 
-    private fun detectionEvidence(): MainActivity.DetectionFrameEvidence = MainActivity.DetectionFrameEvidence(
+    private fun detectionEvidence(): DetectionFrameEvidence = DetectionFrameEvidence(
         frameId = FRAME_ID,
         frameTimestampMs = CAPTURED_AT_MS,
         depthSnapshot = DepthFrameSnapshot(

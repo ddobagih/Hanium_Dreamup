@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.voice
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -14,14 +15,7 @@ class WalkVoicePlatformStartRecoveryTest {
         File("app/src/main/java/$relativePath"),
     ).first { it.isFile }.readText()
 
-    private fun method(source: String, name: String): String {
-        val start = source.indexOf("    private fun $name(")
-        check(start >= 0)
-        val end = source.indexOf("\n    private fun ", start + 1).let {
-            if (it < 0) source.length else it
-        }
-        return source.substring(start, end)
-    }
+    private fun method(source: String, name: String): String = MainActivityRefactorSource.member(source, name)
 
     @Test
     fun expectedPlatformFailuresCleanUpBeforeReporting() {
@@ -117,12 +111,12 @@ class WalkVoicePlatformStartRecoveryTest {
     @Test
     fun serviceAndCallerKeepCleanupAndPermissionRecoveryWired() {
         val service = source("kr/co/hanium/dreamup/walksafe/voice/WalkVoiceForegroundService.kt")
-        val activity = source("kr/co/hanium/dreamup/walksafe/MainActivity.kt")
+        val activity = source("kr/co/hanium/dreamup/walksafe/voice/input/HandsFreeRuntimeSession.kt")
         val serviceStart = method(service, "startVoiceSession")
         val callerStart = method(activity, "maybeStartHandsFreeVoiceService")
         val failureUi = method(activity, "reportWalkVoiceStartFailure")
         val pendingFailureUi = method(activity, "showPendingHandsFreeVoiceStartFailure")
-        val permissionRecovery = method(activity, "applyObservedPermissionStateChange")
+        val permissionRecovery = method(source("kr/co/hanium/dreamup/walksafe/session/permission/PermissionFlowController.kt"), "applyObservedPermissionStateChange")
 
         assertTrue(serviceStart.indexOf("try {") < serviceStart.indexOf("ensureForegroundStarted()"))
         assertTrue(serviceStart.contains("handleWalkVoiceServiceStartException("))
@@ -133,25 +127,25 @@ class WalkVoicePlatformStartRecoveryTest {
         assertTrue(method(service, "ensureForegroundStarted").contains("startForeground("))
         assertFalse(method(service, "stopVoiceSession").contains("runCatching"))
 
-        assertTrue(callerStart.contains("startService(startIntent)"))
+        assertTrue(callerStart.contains("platform.startService(requestId)"))
         assertTrue(callerStart.contains("catch (error: SecurityException)"))
         assertTrue(callerStart.contains("catch (error: IllegalStateException)"))
         assertTrue(callerStart.contains("WalkVoiceStartFailure.SECURITY"))
         assertTrue(callerStart.contains("WalkVoiceStartFailure.FOREGROUND_START_RESTRICTED"))
-        assertTrue(callerStart.contains("app.reportWalkVoiceStartFailure("))
+        assertTrue(callerStart.contains("platform.reportStartFailure("))
 
         val securityGuard =
-            "if (isActivityForeground && failure == WalkVoiceStartFailure.SECURITY && !microphoneGranted) {"
+            "if (environment.foreground() && failure == WalkVoiceStartFailure.SECURITY && !microphoneGranted) {"
         val securityStart = failureUi.indexOf(securityGuard)
         val security = failureUi.substringAfter(securityGuard).substringBefore("\n        }")
         val stop = failureUi.indexOf("stopHandsFreeVoiceService()")
         assertTrue(stop >= 0 && stop < securityStart)
-        assertTrue(security.contains("applyObservedPermissionStateChange("))
+        assertTrue(security.contains("applicationEffects.permissionStateChanged("))
         assertTrue(failureUi.contains("showPendingHandsFreeVoiceStartFailure()"))
-        assertTrue(pendingFailureUi.contains("updateNavigationStatus("))
-        assertTrue(pendingFailureUi.contains("updateStatus("))
-        assertTrue(permissionRecovery.contains("stopHandsFreeVoiceService()"))
-        assertTrue(permissionRecovery.contains("cancelVoiceCommandRecognition()"))
+        assertTrue(pendingFailureUi.contains("presentation.navigationStatus("))
+        assertTrue(pendingFailureUi.contains("presentation.status("))
+        assertTrue(permissionRecovery.contains("runtime.stopHandsFree()"))
+        assertTrue(permissionRecovery.contains("runtime.cancelVoiceRecognition()"))
         assertTrue(permissionRecovery.contains("showPermissionDenialPanel(stoppedOnly, reason)"))
     }
 }

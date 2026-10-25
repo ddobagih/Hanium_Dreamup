@@ -1,0 +1,42 @@
+sequenceDiagram
+  actor U as 사용자
+  participant UI as MainActivity
+  participant F as AccountRequestFence
+  participant X as Gateway process executor
+  participant S as 계정 서버
+  participant D as 암호화 저장소
+  participant P as Process coordinator
+  U->>UI: 인증번호 받기
+  UI->>F: 현재 전경과 상태 binding으로 begin
+  alt 진행중 또는 입력 오류
+    UI-->>U: 전송 없음 및 입력·대기 안내
+  else 현재 요청
+    UI->>X: 같은 payload의 requestId로 OTP 요청
+    X->>S: POST email-otp
+    S-->>X: 202 handle와 expiry
+    X->>UI: UI callback
+    UI->>F: token과 현재 binding 검사
+    alt 과거 token
+      UI-->>UI: 응답 폐기
+    else 현재 token
+      UI->>D: owner와 선택을 partial로 commit
+      alt 저장 성공
+        UI-->>U: OTP 입력 단계
+      else 저장 실패
+        UI-->>U: 진행 제한
+      end
+    end
+  end
+  U->>UI: 계정 만들기
+  UI->>X: 유효 handle·OTP·암호·문서 선택
+  X->>S: POST accounts
+  S-->>X: 201 actor와 receipt
+  X->>UI: 현재 token의 생성 완료
+  UI->>D: partial 정리
+  UI->>X: expectedCreatedActorId로 암호 로그인
+  X->>S: POST field-session 이어서 GET status
+  S-->>X: 같은 actor GENERAL 확인
+  X->>UI: runOnUiThread callback 및 token·operation 재검사
+  UI->>D: backendDevice session 저장
+  UI->>P: 같은 operation만 publishVerified
+  UI->>UI: actor 교육·통합동의 갱신

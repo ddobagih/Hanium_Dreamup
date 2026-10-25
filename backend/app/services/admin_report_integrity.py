@@ -30,6 +30,8 @@ ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS = frozenset(
         "202609300007",
         "202609300008",
         "202609300009",
+        "202610080001",
+        "202610110001",
     }
 )
 
@@ -1644,7 +1646,7 @@ def admin_report_integrity_boundary_state(
         return None
     if current_revision not in ADMIN_REPORT_INTEGRITY_COMPATIBLE_REVISIONS:
         return False
-    if current_revision == "202609300009":
+    if current_revision in {"202609300009", "202610080001", "202610110001"}:
         boundary_sql = _DUPLICATE_REPRESENTATIVE_BOUNDARY_SQL
     elif current_revision in ADMIN_REPORT_ACCOUNT_COPY_INVENTORY_REVISIONS:
         boundary_sql = _ACCOUNT_COPY_INVENTORY_BOUNDARY_SQL

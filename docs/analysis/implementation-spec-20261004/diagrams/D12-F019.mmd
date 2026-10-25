@@ -1,0 +1,17 @@
+flowchart TD
+  A["F-D12-019 원본 단회 접근 · 실제 화면 확인"] --> G{"P-D12-019 현재 검수 draft가 APPROVED이며<br/>이유8..500 및 공통 세션 gate 유효"}
+  G -->|"아니오"| B["기존 원본 정리 · 안내 · grant 요청 안 함"]
+  G -->|"예"| R["fresh 재인증 후 단회 grant 발급"]
+  R --> V["report/content/session/device/만료/same-origin 결속 검사"]
+  V --> T["token을 한번 꺼내 이미지 GET"]
+  T --> H{"길이 · SHA256 · MIME/파일서명 · 치수 · decode 유효"}
+  H -->|"실패"| X["원본 미수신 · 같은 token 재시도 불가"]
+  H -->|"성공"| C{"UI 반영 직전 세대와 만료가 현재"}
+  C -->|"아니오"| Q["bytes/bitmap 정리 · 표시 거절"]
+  C -->|"예"| D["검증된 원본 표시"]
+  D --> U["사용자의 별도 원본 확인 checkbox"]
+  U --> N["현재 grant를 APPROVED 판단에 사용 가능"]
+  D -. "만료/선택변경/세션변경/onStop" .-> Q
+  N -. "만료/선택변경/세션변경/onStop" .-> Q
+  X --> F["사용자가 새 재인증과 새 grant 요청"]
+  F --> R

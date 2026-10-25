@@ -12,7 +12,8 @@ class DelayedGnssIntegrationTest {
     fun delayedGnssRecoveryUsesTwoDistinctMeasurementsEvenInOneCallbackBatch() {
         val policy = PositionConfidencePolicy()
         policy.observe(PositionQuality.HIGH, 1_000L)
-        policy.observeMotion(PositionQuality.LOW, 5_000L)
+        policy.observeMotion(PositionQuality.UNAVAILABLE, 2_000L)
+        assertTrue(policy.evaluate(5_000L).guidancePaused)
 
         val first = policy.observe(PositionQuality.HIGH, 4_000L, 5_100L)
         assertNull(first.failureReason)
@@ -26,25 +27,32 @@ class DelayedGnssIntegrationTest {
     }
 
     @Test
-    fun motionAndWeakGnssCannotCountTowardRecoveryButMotionDegradationClearsIt() {
+    fun motionAndWeakGnssCannotCountTowardRecoveryButMeasuredFailureClearsIt() {
         val policy = PositionConfidencePolicy()
-        policy.observe(PositionQuality.LOW, 1_000L)
-        policy.observe(PositionQuality.HIGH, 2_000L)
-        val motion = policy.observeMotion(PositionQuality.HIGH, 2_500L)
+        policy.observe(PositionQuality.UNAVAILABLE, 0L)
+        assertTrue(policy.evaluate(3_000L).guidancePaused)
+        assertEquals(1, policy.observe(PositionQuality.HIGH, 4_000L).consecutiveHighRecoverySamples)
+        val motion = policy.observeMotion(PositionQuality.HIGH, 4_500L)
         assertEquals(1, motion.consecutiveHighRecoverySamples)
-        val weak = policy.observe(PositionQuality.HIGH, 2_600L, informativeGnss = false)
+        val weak = policy.observe(PositionQuality.HIGH, 4_600L, informativeGnss = false)
         assertEquals(1, weak.consecutiveHighRecoverySamples)
         assertTrue(weak.guidancePaused)
-        policy.observeMotion(PositionQuality.LOW, 2_800L)
-        assertEquals(1, policy.observe(PositionQuality.HIGH, 3_000L).consecutiveHighRecoverySamples)
+        assertEquals(1, policy.observeMotion(PositionQuality.UNAVAILABLE, 4_700L).consecutiveHighRecoverySamples)
+        policy.observe(PositionQuality.UNAVAILABLE, 4_800L)
+        assertEquals(1, policy.observe(PositionQuality.HIGH, 5_000L).consecutiveHighRecoverySamples)
     }
 
     @Test
     fun recoveryGapUsesMeasurementTimesRatherThanBatchedReceiptTimes() {
-        val policy = PositionConfidencePolicy()
-        policy.observe(PositionQuality.LOW, 0L)
-        policy.observe(PositionQuality.HIGH, 1_000L, 8_000L)
-        val second = policy.observe(PositionQuality.HIGH, 7_000L, 8_000L)
+        // A shorter configured recovery gap isolates continuity from the 10 s sample-age gate.
+        val policy = PositionConfidencePolicy(PositionConfidencePolicyConfig(maximumHighRecoverySampleGapMs = 5_000L))
+        policy.observe(PositionQuality.UNAVAILABLE, 0L)
+        assertTrue(policy.evaluate(3_000L).guidancePaused)
+        val first = policy.observe(PositionQuality.HIGH, 4_000L, 11_000L)
+        assertNull(first.failureReason)
+        assertEquals(1, first.consecutiveHighRecoverySamples)
+        val second = policy.observe(PositionQuality.HIGH, 10_000L, 11_000L)
+        assertNull(second.failureReason)
         assertEquals(1, second.consecutiveHighRecoverySamples)
         assertTrue(second.guidancePaused)
     }

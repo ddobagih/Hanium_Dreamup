@@ -23,11 +23,14 @@ enum class WalkSessionReadinessRequirement {
     PRIORITY_USER_ONBOARDING,
     OFFICIAL_ENVIRONMENT,
     PHONE_MOUNTING,
+    // 시작·재개 진입 목적일 때만 기존 WalkStartPermissionPolicy로 확인한다.
+    // 실행 중 권한 회수는 기존 기능별 처리로 유지한다.
     PERMISSIONS,
     CAMERA,
     LOCATION,
     METRIC_DISTANCE,
     MODEL,
+    // 음성 입력 권한도 별도 시작·재개 검사와 실행 중 기능 제한으로 소비한다.
     VOICE_INPUT,
     VOICE_OUTPUT,
     ROUTE_SERVICE,
@@ -45,6 +48,7 @@ enum class WalkSessionReadinessStatus {
 data class WalkSessionReadinessPlan(
     val action: WalkSessionAction,
     val mode: WalkSessionMode,
+    val checkEntryPermissions: Boolean = false,
 ) {
     val requiredRequirements: Set<WalkSessionReadinessRequirement> = buildSet {
         add(WalkSessionReadinessRequirement.FIRST_RUN_ONBOARDING)
@@ -81,6 +85,7 @@ data class WalkSessionReadinessPlan(
     }
 
     private fun MutableSet<WalkSessionReadinessRequirement>.addWalkRuntimeRequirements() {
+        if (checkEntryPermissions) add(WalkSessionReadinessRequirement.PERMISSIONS)
         add(WalkSessionReadinessRequirement.PRIORITY_USER_ONBOARDING)
         add(WalkSessionReadinessRequirement.OFFICIAL_ENVIRONMENT)
         add(WalkSessionReadinessRequirement.PHONE_MOUNTING)
@@ -98,6 +103,29 @@ data class WalkSessionReadinessPlan(
         requirement in requiredRequirements
 }
 
+/** Original evidence used by a readiness producer; reassessment never extends its lifetime. */
+data class WalkSessionReadinessEvidence(
+    val source: String,
+    val observedAtElapsedRealtimeMs: Long,
+    val maxAgeMs: Long,
+    val sourceVersion: String,
+    val requiredVersion: String = sourceVersion,
+) {
+    init {
+        require(source.isNotBlank()) { "Evidence source must not be blank" }
+        require(observedAtElapsedRealtimeMs >= 0L) { "Evidence time must not be negative" }
+        require(maxAgeMs >= 0L) { "Evidence validity must not be negative" }
+        require(sourceVersion.isNotBlank() && requiredVersion.isNotBlank()) {
+            "Evidence versions must not be blank"
+        }
+    }
+
+    fun isStaleAt(nowElapsedRealtimeMs: Long): Boolean =
+        sourceVersion != requiredVersion ||
+            nowElapsedRealtimeMs < observedAtElapsedRealtimeMs ||
+            nowElapsedRealtimeMs - observedAtElapsedRealtimeMs > maxAgeMs
+}
+
 data class WalkSessionReadinessObservation(
     val epoch: WalkRuntimeEpoch,
     val requirement: WalkSessionReadinessRequirement,
@@ -105,12 +133,14 @@ data class WalkSessionReadinessObservation(
     val reason: String = "",
     /**
      * S03-9/S14-12: monotonic time (the snapshot clock) at which a changing condition was measured
-     * and how long that measurement stays valid. Both stay null for values read at collection time
-     * and for static records such as consent; a producer that reuses an earlier measurement must
-     * pass both so the snapshot cannot present it as current.
+     * and how long that measurement stays valid. Null remains supported for static records and
+     * callers that read a value at collection time. Producers retaining earlier measurements
+     * preserve those measurements separately in [supportingEvidence].
      */
     val observedAtElapsedRealtimeMs: Long? = null,
     val maxAgeMs: Long? = null,
+    val evidenceVersion: String? = null,
+    val supportingEvidence: List<WalkSessionReadinessEvidence> = emptyList(),
 ) {
     init {
         require(
@@ -128,10 +158,14 @@ data class WalkSessionReadinessObservation(
             "observedAtElapsedRealtimeMs must not be negative"
         }
         require(maxAgeMs == null || maxAgeMs > 0L) { "maxAgeMs must be positive" }
+        require(evidenceVersion == null || evidenceVersion.isNotBlank()) {
+            "evidenceVersion must not be blank"
+        }
     }
 
     /** A measurement taken after the assessment or older than its own validity is stale. */
     fun isStaleAt(assessedAtElapsedRealtimeMs: Long): Boolean {
+        if (supportingEvidence.any { it.isStaleAt(assessedAtElapsedRealtimeMs) }) return true
         val observedAt = observedAtElapsedRealtimeMs ?: return false
         val maxAge = maxAgeMs ?: return true
         return observedAt > assessedAtElapsedRealtimeMs ||
@@ -174,16 +208,23 @@ data class WalkSessionReadinessSnapshot(
 
     /** Required READY evidence that is no longer current at [assessedAtElapsedRealtimeMs]. */
     val staleRequirements: Set<WalkSessionReadinessRequirement>
-        get() = plan.requiredRequirements.filterTo(linkedSetOf()) { requirement ->
+        get() = staleRequirementsAt(assessedAtElapsedRealtimeMs)
+
+    fun staleRequirementsAt(nowElapsedRealtimeMs: Long): Set<WalkSessionReadinessRequirement> =
+        plan.requiredRequirements.filterTo(linkedSetOf()) { requirement ->
             val observation = observations.getValue(requirement)
             observation.status == WalkSessionReadinessStatus.READY &&
-                observation.isStaleAt(assessedAtElapsedRealtimeMs)
+                observation.isStaleAt(nowElapsedRealtimeMs)
         }
 
     val isReady: Boolean
-        get() = plan.requiredRequirements.all { requirement ->
-            observations.getValue(requirement).status == WalkSessionReadinessStatus.READY
-        } && staleRequirements.isEmpty()
+        get() = isReadyAt(assessedAtElapsedRealtimeMs)
+
+    fun isReadyAt(nowElapsedRealtimeMs: Long): Boolean =
+        nowElapsedRealtimeMs >= assessedAtElapsedRealtimeMs &&
+            plan.requiredRequirements.all { requirement ->
+                observations.getValue(requirement).status == WalkSessionReadinessStatus.READY
+            } && staleRequirementsAt(nowElapsedRealtimeMs).isEmpty()
 
     val hasUnavailableRequirement: Boolean
         get() = plan.requiredRequirements.any { requirement ->

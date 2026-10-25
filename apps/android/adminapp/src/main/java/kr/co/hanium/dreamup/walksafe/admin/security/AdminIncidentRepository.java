@@ -49,4 +49,6 @@ public interface AdminIncidentRepository {
         AdminIncidentModels.StatusRequest request,
         Map<String, String> reconfirmationHeaders
     ) throws IOException, GeneralSecurityException;
+    /** Non-blocking cancellation owned by this repository's client. */
+    default void cancelInFlightRequests() {}
 }

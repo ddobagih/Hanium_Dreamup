@@ -19,7 +19,7 @@ class AndroidStepTrackerDetectorStallTest {
         assertTrue(tracker.onStepCounterTotal(100f, 0L))
         assertTrue(tracker.onStepCounterTotal(104f, 12_000_000_000L))
 
-        assertEquals(listOf(counter(4, 12_000L)), events)
+        assertEquals(listOf(counter(4, 12_000L)), events.map { it.legacyCountAndTiming() })
     }
 
     @Test
@@ -31,7 +31,7 @@ class AndroidStepTrackerDetectorStallTest {
         listOf(1_000L, 1_600L, 2_200L).forEach { assertTrue(tracker.onStepDetected(it * MS)) }
         assertTrue(tracker.onStepCounterTotal(103f, 2_200L * MS))
 
-        assertEquals(listOf(detector(1_000L), detector(1_600L), detector(2_200L)), events)
+        assertEquals(listOf(detector(1_000L), detector(1_600L), detector(2_200L)), events.map { it.legacyCountAndTiming() })
     }
 
     @Test
@@ -52,7 +52,7 @@ class AndroidStepTrackerDetectorStallTest {
 
         assertEquals(
             listOf(detector(1_000L), detector(1_600L), detector(2_200L), counter(5, 15_000L), detector(15_600L)),
-            events,
+            events.map { it.legacyCountAndTiming() },
         )
         assertEquals(9, events.sumOf { it.deltaSteps })
         assertEquals(9, counts.last())
@@ -67,7 +67,7 @@ class AndroidStepTrackerDetectorStallTest {
 
         assertTrue(tracker.onStepCounterTotal(105f, 13_000L * MS))
 
-        assertEquals(counter(2, 13_000L), events.last())
+        assertEquals(counter(2, 13_000L), events.last().legacyCountAndTiming())
         assertEquals(5, events.sumOf { it.deltaSteps })
     }
 
@@ -85,7 +85,7 @@ class AndroidStepTrackerDetectorStallTest {
 
         assertEquals(
             listOf(detector(1_000L), detector(1_500L), detector(2_000L), counter(20, 15_000L)),
-            events,
+            events.map { it.legacyCountAndTiming() },
         )
         assertEquals(23, events.sumOf { it.deltaSteps })
         // A late detector event covered by the batch is still not counted again.
@@ -104,7 +104,7 @@ class AndroidStepTrackerDetectorStallTest {
 
         assertTrue(tracker.onStepCounterTotal(109f, 30_000L * MS))
 
-        assertEquals(counter(2, 30_000L), events.last())
+        assertEquals(counter(2, 30_000L), events.last().legacyCountAndTiming())
     }
 
     @Test
@@ -130,8 +130,8 @@ class AndroidStepTrackerDetectorStallTest {
         detectorOnly.onStepDetected(100L * MS)
         detectorOnly.onStepDetected(60_000L * MS)
 
-        assertEquals(listOf(counter(2, 500L)), counterEvents)
-        assertEquals(listOf(detector(100L), detector(60_000L)), detectorEvents)
+        assertEquals(listOf(counter(2, 500L)), counterEvents.map { it.legacyCountAndTiming() })
+        assertEquals(listOf(detector(100L), detector(60_000L)), detectorEvents.map { it.legacyCountAndTiming() })
         assertEquals(listOf(1, 2), detectorCounts)
     }
 
@@ -150,7 +150,7 @@ class AndroidStepTrackerDetectorStallTest {
         assertTrue(tracker.onStepDetected(30_500L * MS))
         assertTrue(tracker.onStepCounterTotal(201f, 30_500L * MS))
 
-        assertEquals(listOf(detector(30_500L)), events)
+        assertEquals(listOf(detector(30_500L)), events.map { it.legacyCountAndTiming() })
     }
 
     private fun bothSensorsTracker(
@@ -163,10 +163,10 @@ class AndroidStepTrackerDetectorStallTest {
     ).also { assertTrue(it.start()) }
 
     private fun counter(steps: Int, atMs: Long) =
-        StepEvent(steps, atMs, StepEventSource.STEP_COUNTER, StepEventConfidence.MEDIUM)
+        StepEvent(steps, atMs, StepEventSource.STEP_COUNTER, StepEventConfidence.MEDIUM, atMs * MS)
 
     private fun detector(atMs: Long) =
-        StepEvent(1, atMs, StepEventSource.STEP_DETECTOR, StepEventConfidence.HIGH)
+        StepEvent(1, atMs, StepEventSource.STEP_DETECTOR, StepEventConfidence.HIGH, atMs * MS)
 
     private class Registration(private val types: Set<Int>) : StepSensorRegistration {
         override fun hasSensor(type: Int): Boolean = type in types

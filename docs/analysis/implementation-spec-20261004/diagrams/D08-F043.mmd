@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D08-043 삭제 outbox 지속 전달·backoff·pause·readiness"]
+  P0["1. request 당 singleflight 와 operation 순서를보장"]
+  A --> P0
+  P1["2. due oldest roundrobin 으로독립 request 진행"]
+  P0 --> P1
+  P2["3. REQUEST 면세션폐기가성공한후 Backend 전송"]
+  P1 --> P2
+  P3["4. 일시오류는실패완료시점기준 5 초지수 backoff 최대 1 시간기록"]
+  P2 --> P3
+  P4["5. known409는 즉시terminal이다. unknown409는 operation.attempts를 먼저1증가시키고 누적 attempts＞=3이면 terminal로 만든다. 이전 일시오류 재시도도 같은 attempts를 올리므로 첫 unknown409에서 terminal일 수 있다."]
+  P3 --> P4
+  P5["6. 400/401/403·known422·잘못된 200/202 는 pause 로내구격리"]
+  P4 --> P5
+  P6["7. worker 는 drain 실패·pause·stale 를 notready 에반영"]
+  P5 --> P6
+  B0{"다른 request 느림"}
+  R0["독립 request 최대 3 병렬"]
+  A -. "해당 조건" .-> B0
+  B0 --> R0
+  B1{"same request 선행 operation pending"}
+  R1["후행 evidence 앞질러전송금지"]
+  A -. "해당 조건" .-> B1
+  B1 --> R1
+  B2{"pause"}
+  R2["자동 resume 없음; 운영자수정필요"]
+  A -. "해당 조건" .-> B2
+  B2 --> R2
+  B3{"workerstop"}
+  R3["timer 해제·abort 후실제 inflight drain 대기"]
+  A -. "해당 조건" .-> B3
+  B3 --> R3
+  B4{"빈 drain"}
+  R4["이전실패를근거없이 clear 하지않음"]
+  A -. "해당 조건" .-> B4
+  B4 --> R4
+  END["전달 ACK/RETRY_WAIT/PAUSED/TERMINAL_CONFLICT"]
+  P6 --> END
+  POLICY["P-D08-004, P-D08-019, P-D08-020, P-D08-021"]
+  A -.-> POLICY

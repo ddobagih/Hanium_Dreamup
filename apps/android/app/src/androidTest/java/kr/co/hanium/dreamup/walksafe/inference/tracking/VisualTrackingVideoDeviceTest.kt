@@ -42,6 +42,162 @@ class VisualTrackingVideoDeviceTest {
     @Test
     fun replaysBagWithoutDetectorDelayForDiagnosis() = runReplay(defaultDelayMs = 0)
 
+
+    @Test
+    fun diagnosesRecordedSource49Edge68To69WithEightFeatures() {
+        val arguments = InstrumentationRegistry.getArguments()
+        assumeTrue("Requires -e allowVisualTrackingVideoTest true",
+            arguments.getString("allowVisualTrackingVideoTest") == "true")
+        val config = VisualTrackingConfig(
+            backend = VisualTrackingBackend.OPENCV_PYRAMIDAL_LK,
+            maxFeaturesPerObject = 40,
+            allowSimilarityTransform = true,
+            maxExecutionNs = 5_000_000L,
+        )
+        // COARSE_VALID inputs from the recorded current target69, in original slot order.
+        // stage_x/y are outputs and are deliberately not used to reconstruct these features.
+        val features8 = listOf(
+            VisualMotionFeature(120, 59, floatArrayOf(), Float.fromBits(0x42bab96a), Float.fromBits(0x421cb9fc)),
+            VisualMotionFeature(117, 57, floatArrayOf(), Float.fromBits(0x42b43789), Float.fromBits(0x42148b00)),
+            VisualMotionFeature(103, 64, floatArrayOf(), Float.fromBits(0x42991c2d), Float.fromBits(0x42287eee)),
+            VisualMotionFeature(114, 57, floatArrayOf(), Float.fromBits(0x42af7180), Float.fromBits(0x4215197e)),
+            VisualMotionFeature(104, 71, floatArrayOf(), Float.fromBits(0x429c3f5f), Float.fromBits(0x42406a09)),
+            VisualMotionFeature(107, 65, floatArrayOf(), Float.fromBits(0x42a08eaf), Float.fromBits(0x422ee6ac)),
+            VisualMotionFeature(114, 62, floatArrayOf(), Float.fromBits(0x42b1a929), Float.fromBits(0x422859cf)),
+            VisualMotionFeature(111, 60, floatArrayOf(), Float.fromBits(0x42ab2d3d), Float.fromBits(0x421f79da)),
+        )
+        val box49 = readSparseSources().getValue(49).candidate
+        val gray49 = GrayTrackingFrame.copyFromLuma(key(49), WIDTH, HEIGHT,
+            ByteBuffer.wrap(decodeLuma(49)), WIDTH, 1, maxEdge = 192)
+        val gray68 = GrayTrackingFrame.copyFromLuma(key(68), WIDTH, HEIGHT,
+            ByteBuffer.wrap(decodeLuma(68)), WIDTH, 1, maxEdge = 192)
+        val gray69 = GrayTrackingFrame.copyFromLuma(key(69), WIDTH, HEIGHT,
+            ByteBuffer.wrap(decodeLuma(69)), WIDTH, 1, maxEdge = 192)
+        listOf(gray49, gray68, gray69).forEach { frame ->
+            assertEquals(192, frame.width)
+            assertEquals(144, frame.height)
+        }
+        val stages = linkedMapOf<String, OpenCvPyramidalMotionEstimator.StageSnapshot>()
+        var duplicateStageCallbacks = 0
+        var stageBoundExceeded = false
+        val estimator = OpenCvPyramidalMotionEstimator(config.maxFeaturesPerObject,
+            config.allowSimilarityTransform) { source, target, stage, snapshot ->
+            if (source == gray49.key && target == gray69.key) {
+                if (stage in stages) duplicateStageCallbacks++
+                else if (stages.size < 16) stages[stage] = snapshot()
+                else stageBoundExceeded = true
+            }
+        }
+        val initializeStarted = System.nanoTime()
+        assertTrue("OpenCV tracking backend initialization failed", estimator.initialize())
+        val initializeNs = System.nanoTime() - initializeStarted
+        val inputSlots = JSONArray(features8.mapIndexed { slot, feature ->
+            JSONObject().put("slot", slot).put("auxiliary", 0)
+                .put("source_x", feature.sourceX).put("source_y", feature.sourceY)
+                .put("previous_x", feature.currentX.toDouble()).put("previous_y", feature.currentY.toDouble())
+                .put("previous_x_float_bits", "%08x".format(feature.currentX.toRawBits()))
+                .put("previous_y_float_bits", "%08x".format(feature.currentY.toRawBits()))
+                .put("template_length", feature.template.size)
+        })
+        val budget = TrackingWorkBudget(config, System::nanoTime, System.nanoTime(), 9_999_999L)
+        var estimate: VisualMotionEstimate? = null
+        var thrownBudgetFailure: VisualTrackingFailure? = null
+        try {
+            estimate = estimator.advance(gray49, gray68, gray69, box49, features8, 17, budget, null)
+        } catch (exceeded: TrackingBudgetExceeded) {
+            thrownBudgetFailure = exceeded.failure
+        }
+        val elapsedNs = System.nanoTime() - budget.startedAtNs
+        val sha256: (ByteArray) -> String = { bytes ->
+            java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        }
+        val inputFrames = JSONArray(listOf(gray49, gray68, gray69).map { frame ->
+            val jpeg = "$BASE/color/${frame.key.frameId.toString().padStart(8, '0')}.jpg"
+            JSONObject().put("key", frameKeyJson(frame.key)).put("gray_width", frame.width)
+                .put("gray_height", frame.height).put("jpeg_asset", jpeg)
+                .put("jpeg_sha256", assets.open(jpeg).use { sha256(it.readBytes()) })
+                .put("gray_pixels_sha256", sha256(frame.copyPixels()))
+        })
+        val result = estimate?.let { actual ->
+            val transform = actual.transformNorm
+            JSONObject().put("failure", actual.failure?.name ?: JSONObject.NULL)
+                .put("quality", actual.quality).put("residual_px", actual.residual)
+                .put("surviving_feature_count", actual.features.size)
+                .put("material_point_present", actual.materialPoint != null)
+                .put("median_forward_backward_error_px", actual.diagnosticMedianForwardBackwardErrorPx ?: JSONObject.NULL)
+                .put("median_lk_error", actual.diagnosticMedianLkError ?: JSONObject.NULL)
+                .put("transform_norm", JSONObject().put("a", transform.a).put("b", transform.b)
+                    .put("c", transform.c).put("d", transform.d).put("tx", transform.tx).put("ty", transform.ty))
+                .put("features", JSONArray(actual.features.map { feature ->
+                    JSONObject().put("source_x", feature.sourceX).put("source_y", feature.sourceY)
+                        .put("current_x", feature.currentX.toDouble()).put("current_y", feature.currentY.toDouble())
+                        .put("current_x_float_bits", "%08x".format(feature.currentX.toRawBits()))
+                        .put("current_y_float_bits", "%08x".format(feature.currentY.toRawBits()))
+                }))
+        }
+        val box = box49.bboxNorm
+        val runId = UUID.randomUUID().toString()
+        val directory = File(instrumentation.targetContext.filesDir, "tracking-validation/$runId")
+        check(directory.mkdirs()) { "Cannot create test result directory" }
+        val file = File(directory, "recorded69-single-edge-diagnostic.json")
+        check(!file.exists()) { "Diagnostic must not replace an existing result" }
+        val diagnosis = JSONObject()
+            .put("scope", "RECORDED69_EIGHT_INPUT_SINGLE_EDGE_DIAGNOSTIC_NOT_TRACKER_HISTORY_OR_FIELD_VALIDATION")
+            .put("run_id", runId).put("selector", "VisualTrackingVideoDeviceTest#diagnosesRecordedSource49Edge68To69WithEightFeatures")
+            .put("target_package", instrumentation.targetContext.packageName)
+            .put("device", Build.MODEL).put("sdk", Build.VERSION.SDK_INT)
+            .put("analysis_source", "paired-analysis/paired-tracking-analysis.json")
+            .put("analysis_source_sha256", "d2872a1fb91b8a5ab8e363fe4963224a438ddc948cebe347cc59db9e65ed86f5")
+            .put("recorded_input_source", "current/results/3e54c331-adaf-4c5a-a12d-f52eff6372c9/source49-stage-observations.json")
+            .put("recorded_input_source_sha256", "cea0bb388c436a39f6b9e63423c45667e2c34ecaef85b948dae26a0d12d5b07e")
+            .put("recorded_input_stage", "COARSE_VALID").put("recorded_input_target_frame", 69)
+            .put("input_coordinate_system", "source49 and previous68 gray pixels; stage output coordinates excluded")
+            .put("frames", inputFrames).put("features", inputSlots)
+            .put("detector_source_asset", "$BASE/detector-sources.tsv")
+            .put("detector_source_sha256", assets.open("$BASE/detector-sources.tsv").use { sha256(it.readBytes()) })
+            .put("box49", JSONObject().put("class_name", box49.className).put("confidence", box49.detectionConfidence)
+                .put("x_norm", box.x).put("y_norm", box.y).put("width_norm", box.width).put("height_norm", box.height))
+            .put("box_is_detector_source_not_ground_truth", true)
+            .put("original_feature_count", 17).put("input_feature_count", features8.size)
+            .put("maximum_quality_from_input_support", 8.0 / 17.0)
+            .put("material_point_input", JSONObject.NULL).put("seed_called", false)
+            .put("backend", config.backend.name).put("max_features_per_object", config.maxFeaturesPerObject)
+            .put("allow_similarity_transform", config.allowSimilarityTransform)
+            .put("configured_initial_budget_ns", config.maxExecutionNs)
+            .put("execution_budget_ns", budget.executionBudgetNs).put("budget_started_at_ns", budget.startedAtNs)
+            .put("pixel_comparisons_charged", budget.pixelComparisons)
+            .put("max_pixel_comparisons_per_call", config.maxPixelComparisonsPerCall)
+            .put("charge_call_count", JSONObject.NULL).put("charge_call_count_exposed_by_budget", false)
+            .put("initialization_before_budget", true).put("initialization_ns", initializeNs)
+            .put("elapsed_ns", elapsedNs).put("execution_budget_overrun", elapsedNs >= budget.executionBudgetNs)
+            .put("native_hard_preemption", false).put("advance_returned", estimate != null)
+            .put("thrown_budget_failure", thrownBudgetFailure?.name ?: JSONObject.NULL)
+            .put("actual_result", result ?: JSONObject.NULL)
+            .put("stage_observer_copy_inside_budget", true).put("edge_limit", 1)
+            .put("stages_per_edge_limit", 16).put("slots_per_stage_limit", 40)
+            .put("fallback_stage_prefix", "COVERAGE_DIRECT_")
+            .put("fallback_observed", stages.keys.any { it.startsWith("COVERAGE_DIRECT_") })
+            .put("duplicate_stage_callbacks_not_recopied", duplicateStageCallbacks)
+            .put("bound_exceeded", stageBoundExceeded)
+            .put("observations", JSONArray(stages.map { (stage, snapshot) ->
+                JSONObject().put("source_key", frameKeyJson(gray49.key)).put("target_key", frameKeyJson(gray69.key))
+                    .put("stage", stage).put("stage_branch", if (stage.startsWith("COVERAGE_DIRECT_")) "COVERAGE_DIRECT" else "PRIMARY")
+                    .put("coordinate_system", snapshot.coordinateSystem)
+                    .put("values", JSONObject(snapshot.scalarValues))
+                    .put("slots", JSONArray(snapshot.slots.map { JSONObject(it) }))
+            }))
+            .put("diagnostic_only_no_algorithm_success_assertion", true)
+            .put("tracking_publication_and_quality_threshold_evaluated", false)
+            .put("accumulated_history_reproduced", false).put("field_validated", false)
+        file.writeText(diagnosis.toString(2))
+        check(!stageBoundExceeded && stages.size <= 16 && stages.values.all { it.slots.size <= 40 })
+        Log.i(TAG, diagnosis.toString())
+        instrumentation.sendStatus(0, Bundle().apply {
+            putString("stream", "\n$TAG DIAGNOSTIC ONLY; no algorithm PASS/FAIL assertion: ${file.absolutePath}\n${diagnosis}\n")
+        })
+    }
+
     private fun runReplay(defaultDelayMs: Int) {
         val arguments = InstrumentationRegistry.getArguments()
         assumeTrue("Requires -e allowVisualTrackingVideoTest true",
@@ -58,6 +214,11 @@ class VisualTrackingVideoDeviceTest {
             "false" -> false
             else -> error("visualTrackingSimilarity must be true or false, got $value")
         }
+        val observeSource49Stages = when (val value = arguments.getString("visualTrackingSource49Stages")) {
+            null, "false" -> false
+            "true" -> true
+            else -> error("visualTrackingSource49Stages must be true or false, got $value")
+        }
         val delayFrames = delayMs * FPS / 1000
         val sources = readSparseSources()
         assertEquals((1..FRAME_COUNT step 12).toList(), sources.keys.toList())
@@ -67,7 +228,25 @@ class VisualTrackingVideoDeviceTest {
             allowSimilarityTransform = similarity,
             maxExecutionNs = budgetMs * 1_000_000L,
         )
-        val tracker = InterFrameDetectionTracker(config)
+        val stageSnapshots = if (observeSource49Stages)
+            linkedMapOf<Pair<VisualFrameKey, String>, OpenCvPyramidalMotionEstimator.StageSnapshot>() else null
+        var duplicateStageCallbacks = 0
+        var stageBoundExceeded = false
+        val tracker = if (observeSource49Stages) {
+            check(defaultDelayMs == 400 && delayMs == 400 && budgetMs == 5 && adaptiveEnabled && similarity &&
+                config.maxFeaturesPerObject == 40) { "Stage observation requires unchanged Video400/5ms/adaptive/similarity/max40" }
+            val selectedSource = key(49)
+            val records = checkNotNull(stageSnapshots)
+            InterFrameDetectionTracker(config, System::nanoTime,
+                OpenCvPyramidalMotionEstimator(config.maxFeaturesPerObject, config.allowSimilarityTransform) { source, target, stage, snapshot ->
+                    if (source == selectedSource && target.frameId in 50L..69L && target == key(target.frameId.toInt())) {
+                        val edgeStage = target to stage
+                        if (edgeStage in records) duplicateStageCallbacks++
+                        else if (records.size < 20 * 16) records[edgeStage] = snapshot() // Synchronous numeric copies inside the real tracking budget.
+                        else stageBoundExceeded = true
+                    }
+                })
+        } else InterFrameDetectionTracker(config)
         val adaptiveBudget = if (adaptiveEnabled) AdaptiveVisualTrackingBudget().also { it.reset() } else null
         val initializeStarted = System.nanoTime()
         assertTrue("OpenCV tracking backend initialization failed", tracker.initialize())
@@ -193,6 +372,54 @@ class VisualTrackingVideoDeviceTest {
                 p.executionBudgetOverrun, p.reportedTrackerNs)
                 .joinToString("\t") { it?.toString().orEmpty() }) }
         }
+        val stageFile = stageSnapshots?.let { records ->
+            val beforeBoundary = output.single { it.frame == 68 }
+            val boundary = output.single { it.frame == 69 }
+            val reproduced = beforeBoundary.source == 49 && beforeBoundary.status == VisualTrackingStatus.TRACKED.name &&
+                boundary.source == 49 && boundary.failure == VisualTrackingFailure.INSUFFICIENT_COVERAGE.name && boundary.edges == 1
+            val finalSupport = records[key(69) to "FINAL_SUPPORT"]
+            val supportSpan = finalSupport?.scalarValues?.get("support_span")?.toFloat()
+            val supportArea = finalSupport?.scalarValues?.get("support_area")?.toFloat()
+            val supportObserved = supportSpan?.isFinite() == true && supportArea?.isFinite() == true &&
+                finalSupport?.slots?.any { it["auxiliary"]?.toInt() == 0 && it["kept"]?.toInt() == 1 &&
+                    it["stage_x"]?.toDouble()?.isFinite() == true && it["stage_y"]?.toDouble()?.isFinite() == true } == true
+            val observationEstablished = reproduced && supportObserved &&
+                (supportSpan?.let { it < 0.25f } == true || supportArea?.let { it < 0.10f } == true)
+            val values = JSONArray()
+            records.forEach { (edgeStage, snapshot) ->
+                values.put(JSONObject().put("source_key", frameKeyJson(key(49)))
+                    .put("target_key", frameKeyJson(edgeStage.first)).put("stage", edgeStage.second)
+                    .put("stage_branch", if (edgeStage.second.startsWith("COVERAGE_DIRECT_")) "COVERAGE_DIRECT" else "PRIMARY")
+                    .put("coordinate_system", snapshot.coordinateSystem)
+                    .put("values", JSONObject(snapshot.scalarValues))
+                    .put("slots", JSONArray(snapshot.slots.map { JSONObject(it) })))
+            }
+            val observation = JSONObject()
+                .put("scope", "SOURCE49_STAGE_OBSERVATION_WITH_REAL_BUDGET_OVERHEAD")
+                .put("source_frame", 49).put("target_frame_first", 50).put("target_frame_last", 69)
+                .put("edge_limit", 20).put("slots_per_stage_limit", 40).put("stages_per_edge_limit", 16)
+                .put("fallback_stage_prefix", "COVERAGE_DIRECT_")
+                .put("fallback_target_frames_observed", JSONArray(records.keys.filter { it.second.startsWith("COVERAGE_DIRECT_") }
+                    .map { it.first.frameId }.distinct()))
+                .put("duplicate_stage_callbacks_not_recopied", duplicateStageCallbacks)
+                .put("bound_exceeded", stageBoundExceeded)
+                .put("observer_selection_and_copy_inside_tracker_clock", true)
+                .put("missing_status_dependent_fields_are_unavailable_not_zero", true)
+                .put("auxiliary_excluded_from_fit_and_coverage", true)
+                .put("original_68_TRACKED_to_69_COVERAGE_edge1_reproduced", reproduced)
+                .put("frame69_final_support_observed", supportObserved)
+                .put("stage_observation_established", observationEstablished)
+                .put("non_reproduction_is_not_product_PASS_or_FAIL", true)
+                .put("frame68", JSONObject().put("status", beforeBoundary.status).put("failure", beforeBoundary.failure)
+                    .put("source", beforeBoundary.source).put("processed_edges", beforeBoundary.edges))
+                .put("frame69", JSONObject().put("status", boundary.status).put("failure", boundary.failure)
+                    .put("source", boundary.source).put("processed_edges", boundary.edges))
+                .put("observations", values)
+            val file = File(directory, "source49-stage-observations.json")
+            file.writeText(observation.toString(2))
+            check(!stageBoundExceeded && records.size <= 20 * 16 && records.values.all { it.slots.size <= 40 })
+            file
+        }
         val summary = JSONObject()
             .put("scope", "PUBLIC_VIDEO_2D_TRACKING_COMPONENT_REPLAY")
             .put("device", Build.MODEL).put("sdk", Build.VERSION.SDK_INT)
@@ -242,6 +469,7 @@ class VisualTrackingVideoDeviceTest {
             .put("rawOutput", raw.absolutePath)
             .put("detectorAccuracyValidated", false).put("depthValidated", false)
             .put("liveCameraCadenceValidated", false).put("activityLaunched", false)
+        if (stageFile != null) summary.put("source49StageObservation", stageFile.absolutePath)
         val summaryFile = File(directory, "summary.json")
         summaryFile.writeText(summary.toString(2))
         Log.i(TAG, summary.toString())
@@ -251,6 +479,10 @@ class VisualTrackingVideoDeviceTest {
         if (adaptiveEnabled) assertTrue("30 FPS admitted-frame budget schedule mismatch; see ${summaryFile.absolutePath}", adaptiveCadenceVerified)
         assertTrue("No intermediate video tracking; see ${summaryFile.absolutePath}", intermediateEmitted > 0)
     }
+
+    private fun frameKeyJson(key: VisualFrameKey) = JSONObject()
+        .put("epoch", key.epoch).put("frameId", key.frameId).put("cameraTimestampNs", key.cameraTimestampNs)
+        .put("capturedAtElapsedRealtimeMs", key.capturedAtElapsedRealtimeMs).put("geometryVersion", key.geometryVersion)
 
     private fun intOption(arguments: Bundle, name: String, defaultValue: Int, allowed: Set<Int>): Int {
         val raw = arguments.getString(name) ?: return defaultValue

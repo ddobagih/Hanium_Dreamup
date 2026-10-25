@@ -1,0 +1,16 @@
+stateDiagram-v2
+  state "S-D03-021-01 미낭독" as unread
+  state "S-D03-021-02 낭독중" as reading
+  state "S-D03-021-03 선택가능" as selectable
+  state "S-D03-021-04 재시도가능" as retry
+  state "S-D03-021-05 만료" as expired
+  [*] --> unread
+  unread --> reading: current prompt attempt
+  reading --> selectable: exact attempt DONE and current owner
+  reading --> retry: failed terminal opens answer window
+  selectable --> reading: repeat or page change revokes authority
+  retry --> reading: explicit retry whole page
+  selectable --> expired: answer age reaches 30s or owner changes
+  retry --> expired: 30s or owner changes
+  reading --> expired: cancel or owner changes
+  expired --> unread: repeat current visible list creates new lease

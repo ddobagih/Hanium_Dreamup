@@ -1,5 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.report
 
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
+import kr.co.hanium.dreamup.walksafe.ReportStaticSourceInspector
+
 import java.nio.file.Files
 import java.nio.file.Paths
 import kr.co.hanium.dreamup.walksafe.AndroidRiskSelectionPolicy
@@ -81,33 +84,31 @@ class ExplicitReportRejectionNoticeTest {
             Files.readAllBytes(Paths.get("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt")),
             Charsets.UTF_8,
         )
-        val publish = source.substringAfter("internal fun publishCurrentFrameReportState(")
-            .substringBefore("private fun prepareReportCandidate(")
+        val publish = MainActivityRefactorSource.function(source, "internal fun publishCurrentFrameReportState(")
         assertTrue(publish.contains("latestExplicitReportUnmeasuredDamageCapturedAtMs ="))
         assertTrue(publish.contains("if (explicitReportDamageWithoutDepth) capturedAtMs else 0L"))
         assertTrue(
-            source.contains(
-                "AndroidRiskSelectionPolicy.hasReportableDamageWithoutReportDepth(frozenReportOutputs)",
+            java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/frame/FramePublicationController.kt").readText().contains(
+                "AndroidRiskSelectionPolicy.hasReportableDamageWithoutReportDepth(input.frozenOutputs)",
             ),
         )
-        val prepare = source.substringAfter("private fun prepareExplicitReportCandidateIfCurrent(")
-            .substringBefore("private fun beginExplicitReportConfirmationDisclosure(")
+        val prepare = MainActivityRefactorSource.function(source, "private fun prepareExplicitReportCandidateIfCurrent(")
         assertTrue(prepare.contains("latestExplicitReportUnmeasuredDamageCapturedAtMs == latestExplicitReportCapturedAtMs"))
         assertTrue(prepare.contains("ExplicitReportRejectionNotice.explicitStatus(status, unmeasuredDamage)"))
-        val request = source.substringAfter("private fun requestExplicitReport(")
-            .substringBefore("private fun ensureExplicitReportAuthorityPreconditions(")
+        val request = MainActivityRefactorSource.function(source, "private fun requestExplicitReport(")
         assertTrue(request.contains("ExplicitReportRejectionNotice.messageFor(status)"))
         assertTrue(request.contains("speakInteraction(message)"))
-        assertTrue(request.contains("renderExplicitReportConfirmationIdle(message)"))
+        assertTrue(request.contains("ui.renderIdle(message)"))
         assertFalse(request.contains("\"신고할 손상 점자블록이 없습니다.\""))
         // Resets clear the capture time, which retires the marker without another reset site.
-        assertTrue(
-            source.substringAfter("private fun clearExplicitReportFrameState(")
-                .substringBefore("private fun DepthFrameSnapshot.runtimeMetricValidSampleCount(")
-                .contains("latestExplicitReportCapturedAtMs = 0L"),
-        )
-        // The live-region view that carries the refusal to TalkBack.
-        assertTrue(source.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE\n            visibility = View.GONE"))
+        val candidate = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/ReportCandidateController.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(candidate, "clearFrameCapture").contains("latestExplicitReportCapturedAtMs = 0L"))
+        val composer = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRuntimeViewComposer.kt").readText()
+        val confirmation = MainActivityRefactorSource.member(composer, "createReportConfirmation")
+        assertTrue(confirmation.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"))
+        assertTrue(confirmation.contains("visibility = View.GONE"))
+        assertTrue(source.contains("explicitReportConfirmationText = runtimeComposer.createReportConfirmation()"))
+
     }
 
     private fun damage(

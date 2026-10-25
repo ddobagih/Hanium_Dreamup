@@ -66,7 +66,8 @@ private class AndroidPreferredSpeechPlatform(
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
     override fun isOnDeviceRecognitionAvailable(): Boolean =
-        SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
 
     override fun hasMicrophonePermission(): Boolean =
         context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED

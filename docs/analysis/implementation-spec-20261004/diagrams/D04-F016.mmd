@@ -1,0 +1,28 @@
+flowchart TD
+  A["F-D04-016 · P-D04-016<br/>StepEvent와 step-time heading 입력"]
+  V{"owner·epoch·receipt age·중복·batch·보폭이 유효한가"}
+  REJ["HARD_REJECTED; 기존 상태 유지"]
+  L{"step 시각이 committed state보다 과거인가"}
+  H{"lag 2초 이하와 사용가능 checkpoint가 있는가"}
+  O["OUT_OF_ORDER; 지연 거부 통계"]
+  R["checkpoint rollback 후 이 step 삽입"]
+  DIR{"single 또는 wholeBatch·quality!=LOW·heading/error 유효<br/>conflict·현재 turn에 의해 heading이 제거되지 않았는가"}
+  YES["fix 내 step 배치 후 directed displacement와 Jacobian covariance<br/>velocity extrapolation 중단"]
+  NO["mean 유지; 양 축 covariance 확대<br/>velocity extrapolation flag는 변경 안 함"]
+  N{"수치 결과와 이후 retained replay가 유효한가"}
+  BACK["placement와 state/history rollback; reject"]
+  END["관측 history와 현재 estimate 반환"]
+  A --> V
+  V -->|"아니오"| REJ
+  V -->|"예"| L
+  L -->|"예"| H
+  H -->|"아니오"| O
+  H -->|"예"| R
+  R --> DIR
+  L -->|"아니오"| DIR
+  DIR -->|"예"| YES
+  DIR -->|"아니오"| NO
+  YES --> N
+  NO --> N
+  N -->|"아니오"| BACK
+  N -->|"예"| END

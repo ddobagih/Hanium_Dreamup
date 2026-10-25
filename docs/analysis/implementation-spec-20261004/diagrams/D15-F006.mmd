@@ -1,0 +1,28 @@
+flowchart TB
+  E["F-D15-006 · 공간·시각 중복 후보 발견과 잠금<br/>생성 중 후보 검사 및 GET /reports/duplicate-check"]
+  P["P-D15-006 · 전제조건<br/>GPS가 있어야 후보 조회/공간 잠금 가능. 직접 duplicate-check<br/>read 감사는 보안 모드 필수."]
+  E --> P
+  S1["1. 0.0005도 lock cell 및 인접 보수 범위를 계산; 경도<br/>wrap·85도 극지 hemisphere 처리"]
+  P --> S1
+  S2["2. 시간 bucket -minutes..+minutes와<br/>class/fake/spatial key를 전역 정렬해 advisory lock"]
+  S1 --> S2
+  S3["3. PostGIS geography 거리·촬영시간 inclusive<br/>window로 최대20개 최근 후보 조회"]
+  S2 --> S3
+  S4["4. 신고 payload에 duplicate_candidate flag/IDs<br/>추가; 사용자 생성응답은 IDs를 제거"]
+  S3 --> S4
+  OK["정상 결과<br/>신고 payload에 duplicate_candidate flag/IDs 추가;<br/>사용자 생성응답은 IDs를 제거"]
+  S4 --> OK
+  B1["조건 · 좌표 없음<br/>결과 · 생성 helper는 잠금·후보 없음"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · fake와 real 다름<br/>결과 · 후보 제외"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · 직접 duplicate-check 조회<br/>결과 · 후보 IDs/count 반환; 자동 병합 없음"]
+  S1 -. "해당 조건 발생" .-> B3
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/duplicates.py:180<br/>duplicate_candidate_statement<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

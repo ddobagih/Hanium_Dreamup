@@ -1,6 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
-import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.depth.DepthAgeBudget
 import kr.co.hanium.dreamup.walksafe.depth.DepthConfidenceBreakdown
 import kr.co.hanium.dreamup.walksafe.depth.DepthSource
 import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
@@ -118,7 +118,7 @@ class AndroidTactileFeedbackFairnessTest {
         } }
     }
 
-    private fun frame(outputs: List<TrackedObjectDepth>) = MainActivity.TactileSnapshotFrameResult(
+    private fun frame(outputs: List<TrackedObjectDepth>) = TactileSnapshotFrameResult(
         null, emptyList(), false,
         TactileRouteGuidanceResult(outputs, null, TactileRouteDecision(LocalRouteMode.TMAP, null, "test", null)),
     )
@@ -141,6 +141,10 @@ class AndroidTactileFeedbackFairnessTest {
             userFacing = UserFacingDepth(null, MessageLevel.WARNING, "위험 $id @$now"),
             trackAgeFrames = 20, trackStableMs = 1_900L,
             sourceValidUntilElapsedRealtimeMs = now + UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS,
+            // This output was captured at `now`; an overridden lease cannot move that observation.
+            sourceObservedAtElapsedRealtimeMs = now,
+            sourceMaxAgeMs = if (id.startsWith("unknown")) UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS
+                else DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS,
         )
     }
 

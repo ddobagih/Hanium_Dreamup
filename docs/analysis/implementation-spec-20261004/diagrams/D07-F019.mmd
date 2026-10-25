@@ -1,0 +1,13 @@
+flowchart TD
+    A["F-D07-019 · P-D07-019<br/>unknown feedback admission과 원본 lease"]
+    A --> C{"현재 epoch와 clocks 유효<br/>capture≤complete≤now · age≤800ms"}
+    C -->|실패| X["batch 거절"]
+    C -->|통과| M{"unnamed walking obstacle metric 자격<br/>Raw≥30 또는 Full≥50 · radial≤3m"}
+    M -->|실패| N["해당 후보 제외"]
+    M -->|통과| L["원본 provenance 보존<br/>min 기존 lease 와 capture+800 적용"]
+    L --> T{"batch freshness<br/>completed≤now≤capture+800"}
+    T -->|아니오| X
+    T -->|예 · equality 허용| Q["qualified unknown batch를 D02 후보로 전달"]
+    C -->|유효 retained region| R["기존 source lease의 ID 유지<br/>새 warning 또는 lease 연장 없음"]
+    R --> Q
+    Q --> D["최종 전달 시 D02가 소유권과 freshness<br/>각 output의 더 짧은 lease도 재검사"]

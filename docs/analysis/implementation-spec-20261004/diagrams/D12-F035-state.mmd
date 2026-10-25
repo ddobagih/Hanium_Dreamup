@@ -1,0 +1,11 @@
+stateDiagram-v2
+  state "OPEN" as O
+  state "ACKNOWLEDGED" as A
+  state "RESOLVED" as S
+  state "REOPENED" as R
+  [*] --> O
+  O --> A: fresh 재인증 + expected version + idempotency ID
+  R --> A: fresh 재인증 + expected version + idempotency ID
+  A --> S: 이유/관측/증거 digest 포함
+  S --> R: 재개 이유/관측/증거 digest 포함
+  note right of A: F-D12-035 / P-D12-035<br/>GET 동일 tuple은 원 ID 처리 증명 아님<br/>미확정 재요청은 같은 intent와 ID

@@ -1,0 +1,18 @@
+stateDiagram-v2
+  state "F-D04-019 endpoint 대기" as Wait
+  state "F-D04-020 직선 segment 수집" as Segment
+  state "segment 거부 또는 재시작" as Reject
+  state "F-D04-021 sample warmup" as Warmup
+  state "bounded profile 갱신" as Profile
+  [*] --> Wait
+  Wait --> Wait: newestStep 없음 또는 newestStep가 fix 이하 / pending 유지
+  Wait --> Segment: HIGH 단일 step 사이 유효 raw fix
+  Wait --> Reject: watermark 이후 bracket 없음·gap 또는 wait 2초 초과
+  Segment --> Segment: 직선성과 raw 품질 유지
+  Segment --> Reject: 회전·위치·속도·corridor·시간 위반
+  Reject --> Wait: 다음 유효 endpoint
+  Segment --> Warmup: 10초·20걸음·유의거리 충족
+  Warmup --> Warmup: 유효 sample 3개 미만
+  Warmup --> Profile: 최근7개 robust 통계와 EWMA 제한
+  Profile --> Wait: 다음 독립 segment
+  Profile --> Warmup: restore 후 신규 보정 warmup

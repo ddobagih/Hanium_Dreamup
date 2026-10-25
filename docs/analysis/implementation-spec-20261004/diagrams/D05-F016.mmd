@@ -1,0 +1,12 @@
+flowchart TD
+  H["P-D05-016 · F-D05-016 현재 검출기 instance 의 실행 검증 token"]
+  H --> B["begin exactinstance PENDING"]
+  B --> T{"asset load sample passed"}
+  T -->|"예"| V["VERIFIED exactidentity token"]
+  T -->|"아니오"| C{"3 실패 또는 deadline"}
+  C -->|"아니오"| R["1000ms 후재시도"]
+  R --> T
+  C -->|"예"| F["FAILED 출력차단"]
+  V --> A{"출력 instance generation config 일치"}
+  A -->|"예"| O["출력 gate 허용"]
+  A -->|"아니오"| X["거부"]

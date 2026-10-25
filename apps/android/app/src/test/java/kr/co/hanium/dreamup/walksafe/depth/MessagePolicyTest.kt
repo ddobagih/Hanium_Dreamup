@@ -145,7 +145,7 @@ class MessagePolicyTest {
         val unknown = MessagePolicy().buildUserFacing(approaching, 0L)
 
         assertTrue(stationary.message!!.contains("정지해 있는 것으로 보이며"))
-        assertTrue(stationary.message!!.contains("현재 이 물체에 가까워지고 있습니다"))
+        assertTrue(stationary.message!!.contains("정지해 있는 것으로 보이며, 사용자가 다가갑니다."))
         assertTrue(incoming.message!!.contains("이 물체가 사용자 쪽으로 다가오는 것으로 보입니다"))
         assertTrue(unknown.message!!.contains("거리가 줄어들고 있습니다"))
         assertFalse(unknown.message!!.contains("정지해"))
@@ -494,7 +494,9 @@ class MessagePolicyTest {
 
         assertEquals(MessagePurpose.OBSTACLE_WARNING, decision.purpose)
         assertEquals(MessageLevel.WARNING, decision.userFacing.messageLevel)
-        assertTrue(decision.userFacing.message?.endsWith("멈출 준비를 하세요.") == true)
+        val message = requireNotNull(decision.userFacing.message)
+        assertTrue(message.contains("멈출 준비를 하세요."))
+        assertTrue(message.indexOf("멈출 준비를 하세요.") < message.indexOf("거리가 줄어들고 있습니다."))
     }
 
     @Test

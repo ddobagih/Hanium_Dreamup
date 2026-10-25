@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D02-018 런타임 안전 중단 latch와 정리 완료 확인"]
+  E["진입: trust 또는 timing 관찰 / completion success/failure·retry timer"]
+  G{"P-D02-018 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["ALLOW 출력 근거 없음; known unsafe는 stop 가능"]
+  G -->|"profile 없음"| B0
+  B1["AWAITING_EVIDENCE/EVIDENCE_EXPIRED로 출력 억제; evaluate만으로 새 cause<br/>latch는 하지 않음"]
+  G -->|"evidence expiry/미도착"| B1
+  B2["EPOCH_MISMATCH; 현재 세션을 old event로 stop하지 않음"]
+  G -->|"다른 epoch"| B2
+  B3["whole stop cause에서 제외"]
+  G -->|"deferred queue/network/raw transfer"| B3
+  B4["정지 전달 완료"]
+  G -->|"cleanup＜=3회 내 성공"| B4
+  B5["exhausted; 새 보행 차단"]
+  G -->|"retry scheduler 없음/3회 소진/불확실한 정리"| B5
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["epoch와 시간 검증 후 source evidence 병합"]
+    S1["명시 distrust/resource critical/invalid time으로 cause 생성"]
+    S2["lock 안에서 stop latch와 최초 cause 확정 후 lock 밖 callback"]
+    S3["추가 cause는 합집합으로 진단/UI 갱신하고 정리 재실행을 무조건 유발하지 않음"]
+    S4["Main checkpoint cleanup의 완료를 기다리고 실패/예외면 bounded retry"]
+    S5["정리 완료 전에는 새 epoch reset/start를 허용하지 않음"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+  E -.-> S0
+  N["정상 종료: SAFE_STOP latch는 자동 해제하지 않음; cleanup ack를 별도 유지."]
+  X["취소·중단: close는 delivery generation과 retry callback을 폐기. / 늦은 이전 소유자의<br/>callback은 현 상태를 바꾸지 않는다."]
+  C["정리: 실제 camera/location/native drain까지 pending; marker commit 등<br/>idempotent 실패는 재시도. 나머지 cleanup 단계는 각 checkpoint 성공/실패 보존."]
+  R["재시도·복구: 총3회, Main retry 250ms; idempotent checkpoint만 재시도. / cause 해결 후 새<br/>보행, 단 cleanup 완료가 필요."]
+  S5 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

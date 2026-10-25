@@ -1,0 +1,26 @@
+stateDiagram-v2
+ state "F-D02-005 NOT_RUN" as N
+ state "REQUESTING_PERMISSIONS" as P
+ state "RUNNING" as R
+ state "FULL" as F
+ state "LIMITED" as L
+ state "FAIL" as X
+ [*] --> N
+ N --> P: "P-D02-005 사용자 시작·로그인·foreground·새 attempt"
+ X --> P: "사용자가 다시 검사"
+ P --> R: "현재 lease 권한 결과"
+ P --> X: "permission unavailable 또는 소유하지 않은 background"
+ R --> R: "필수 automatic probe PENDING"
+ R --> F: "완료·disabledFeatures empty"
+ R --> L: "완료·disabledFeatures nonempty"
+ R --> X: "blocking failure·wake 실패·180초·background"
+ F --> F: "late callback 또는 중복 버튼 무시"
+ L --> L: "late callback 또는 중복 버튼 무시"
+ X --> X: "late callback 무시"
+ F --> N: "binding/prerequisite 무효화"
+ L --> N: "binding/prerequisite 무효화"
+ note right of R
+  자기 permission dialog pause는 예외
+  location fix·haptic은 terminal 완료 필수 아님
+  저장 commit 실패는 다음 onboarding gate를 열지 않음
+ end note

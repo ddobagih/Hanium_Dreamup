@@ -29,8 +29,8 @@ class AndroidStepTrackerCounterInputTest {
         assertTrue(tracker.onStepCounterTotal(103f, 3_000_000_000L))
 
         assertEquals(
-            listOf(StepEvent(3, 3_000L, StepEventSource.STEP_COUNTER, StepEventConfidence.MEDIUM)),
-            events,
+            listOf(StepEvent(3, 3_000L, StepEventSource.STEP_COUNTER, StepEventConfidence.MEDIUM, 3_000_000_000L)),
+            events.map { it.legacyCountAndTiming() },
         )
         assertEquals(listOf(0, 3), counts)
     }
@@ -46,8 +46,8 @@ class AndroidStepTrackerCounterInputTest {
         assertTrue(tracker.onStepCounterTotal(12f, 3_000_000_000L))
 
         assertEquals(
-            listOf(StepEvent(2, 3_000L, StepEventSource.STEP_COUNTER, StepEventConfidence.MEDIUM)),
-            events,
+            listOf(StepEvent(2, 3_000L, StepEventSource.STEP_COUNTER, StepEventConfidence.MEDIUM, 3_000_000_000L)),
+            events.map { it.legacyCountAndTiming() },
         )
         assertEquals(listOf(0, 2), counts)
     }

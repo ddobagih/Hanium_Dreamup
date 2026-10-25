@@ -10,15 +10,14 @@ class MainActivityPositioningLateMotionStaticTest {
 
     @Test
     fun lateMotionIsRecordedForReplayedAndRefusedStepsAndZupts() {
-        val apply = source.substringAfter("private fun applyPositioningMotionSnapshot(")
-            .substringBefore("private fun handlePositioningUnavailable(")
+        val apply = MainActivityRefactorSource.function(source, "private fun applyPositioningMotionSnapshot(")
         val record = apply.indexOf("snapshot.motionUpdate?.lateMotionEventFieldsOrNull()?.let { fields ->")
         val rejectedReturn = apply.indexOf("PedestrianMotionUpdateDisposition.HARD_REJECTED")
         assertTrue(record in 0 until rejectedReturn)
-        assertTrue(apply.contains("fieldSessionLog.recordEvent(\"pdr_late_motion\", fields)"))
+        assertTrue(apply.contains("diagnostics.record(\"pdr_late_motion\", fields)"))
         // Step and ZUPT snapshots both go through this function.
-        assertTrue(source.contains("zuptSnapshot?.let { applyPositioningMotionSnapshot(it, binding) }"))
-        assertTrue(source.contains("applyPositioningMotionSnapshot(snapshot, binding)"))
+        assertTrue(MainActivityRefactorSource.function(source, "private fun startPositioningObservationSources(").contains("zuptSnapshot?.let { applyPositioningMotionSnapshot(it, binding) }"))
+        assertTrue(MainActivityRefactorSource.function(source, "private fun handlePositioningStepEvent(").contains("applyPositioningMotionSnapshot(snapshot, binding)"))
         val allowed = File("src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt").readText()
             .substringAfter("val ALLOWED_EVENT_FIELDS = setOf(").substringBefore("\n        )\n")
         listOf("\"result\"", "\"reason\"", "\"measurement_lag_ms\"", "\"replayed_event_count\"").forEach {

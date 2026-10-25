@@ -1,0 +1,15 @@
+stateDiagram-v2
+  state "NOT_REQUESTED" as N
+  state "REQUEST_SENT" as S
+  state "REPLY_ACKNOWLEDGED" as A
+  state "REPLY_DELETION_CONFIRMED" as C
+  state "REPLY_DECLINED" as D
+  [*] --> N
+  N --> S: 실제 외부 삭제 요청 사실 기록
+  S --> A: 참조 또는 회신 digest
+  S --> C: 회신 digest 필수
+  S --> D: 참조 또는 회신 digest
+  A --> C: 회신 digest 필수
+  A --> D: 참조 또는 회신 digest
+  D --> S: 다시 요청한 사실 기록
+  note right of C: F-D12-033 / P-D12-033<br/>기관 실제 삭제 실행은 앱 기능이 아님

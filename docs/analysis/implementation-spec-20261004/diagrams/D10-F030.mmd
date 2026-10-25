@@ -1,0 +1,22 @@
+flowchart TD
+  A["F-D10-030 모델 deployment manifest 이전 버전 교환"]
+  N0["1. exact approval 확인 후 lock·최신 state 읽기·전체 verify."]
+  A --> N0
+  N1["2. target과 previous 유효성 확인."]
+  N0 --> N1
+  N2["3. active←previous,previous←이전active로 교환하고 manifest_rolled_back_runtime_not_changed 상태, generation/history/time 기록."]
+  N1 --> N2
+  N3["4. backup 및 atomic JSON replace 후0."]
+  N2 --> N3
+  B0{"previous 없음"}
+  R0["rollback 거부"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"반복 rollback"}
+  R1["서로 swap하므로 반복시 앞뒤 모델을 계속 교환; idempotent 아님"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-024"]
+  P -. "코드 분기 기준" .-> A

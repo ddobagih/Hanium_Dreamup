@@ -10,12 +10,20 @@ Android 사용자 앱과 별도 Android 관리자 앱에 FastAPI 및 PostgreSQL/
 
 ## 책임 경계
 
+`GET /account-signup-policy`는 DB·SMTP 없이 현재 승인된 6개 가입 문서의 버전과 필수 여부, 동등·이전 버전을 제공한다. `POST /privacy/installation-evidence-key`는 현재 actor·계정 세대·요청 서명·설치별 확정 동의를 확인한 뒤 P-256 공개키를 최초 등록하며 같은 키 재전송만 허용한다. 선택 동의를 모두 거부한 설치도 삭제 증거에 사용할 키를 등록할 수 있다. 서명 검증은 기기의 실제 삭제 성공을 대신하지 않는다.
+
+계정 삭제 worker의 v5 저널은 신고·RAW 저장 루트의 열린 descriptor와 device/inode를 결속하고 완료 전에 빈 inventory까지 재검색한다. v1~v4 저널도 기존 복구 경계를 유지하며 안전하게 확인할 수 없는 루트는 완료로 표시하지 않는다. 먼저 삭제된 신고의 외부 사본은 계정 inventory에 합산한다. 후속 migration `202610110001`은 `202610080001` 다음에 연결하고 삭제 worker에는 subject·세대·사본 수 세 열의 조회만 허용한다.
+
+과거 사본의 전체 수와 manifest bytes는 유지한다. 최소권한 count 함수가 snapshot 완전성과 최신 삭제 확인 상태만 집계하고 `REPLY_DELETION_CONFIRMED`인 과거 사본만 미확인 수에서 제외한다. 기관·수신처·사본 상세 권한은 worker에 주지 않는다. 아직 미확인 사본이 있으면 저널을 보존하며 기존 reconcile이 늦은 확인을 다시 읽어 완료할 수 있다. 이 상태는 관리자가 기록한 외부 확인에 근거하며 실제 기관 삭제를 수행하는 기능은 아니다.
+
+최신 서명 tombstone을 백업 복원 DB에 재적용하면 해당 subject·세대의 신고·RAW 조회와 관리 업무가 거부된다. 삭제 worker는 잔존 원행을 계속 조회할 수 있다. 재적용 CLI의 종료 코드 2는 물리 재삭제가 필요한 잔존 자료를 뜻하며 실제 삭제 완료와 구분한다. SMTP는 전체 단계가 설정된 최대 30초 예산을 공유하고 DATA 수락 뒤 QUIT 오류로 재발송하지 않는다. DNS 대기는 제한된 resolver에서 예산 만료로 닫지만 OS DNS 작업 자체의 종료 시점은 제어하지 못한다.
+
 - `LEGACY_REFERENCE_ONLY`인 Web/PWA의 과거 `server-v2` 탐지는 `/detect/v2`를 사용했다. 현행 Android 사용자 앱의 탐지는 기기 내 TFLite에서 수행한다.
 - `/detect/v2`의 기본 모드는 `fake`다. 실제 추론은 운영 환경에서 768 unified 모델·runtime config를 명시하며, `/ready`가 실제 warmup 추론과 13-class 순서를 검증한다.
 - `/reports/v2`는 손상 점자블록 신고만 저장한다. 공공기관 자동 API 제출은 제공하지 않는다. 관리자는 별도 앱에서 검토 결정을 남기고 외부 기관에 수동 신고한 사실·접수번호·상태만 서버에 기록할 수 있다.
 - 현장 gateway의 역할별 service token, actor assertion, rate limit은 임시 운영 경계다. 조직 IdP·중앙 RBAC·signed upload URL을 대신하지 않으므로 외부 공개 API로 간주하지 않는다.
 - raw collection 수신은 Gateway 보행 ledger 결속 전까지 기본 비활성이다. 신규 commit은 별도 암호화 `.wsrc` 저장소에서 receipt v2, `QUARANTINED`, `RAW_QUARANTINE_14D`로 기록하며 승인 여부와 무관하게 정확히 14일 뒤 삭제 후보가 된다. 기존 receipt v1·`COMMITTED`·`RAW_ORIGINAL_180D` 행과 hash는 변경하지 않고 legacy 180일 후보로 계속 처리한다. 두 수명주기 모두 자동 scheduler 없이 최소권한 `scripts/manage_raw_collection_retention.py`의 수동 preview/apply/reconcile one-shot만 제공하며, 실제 운영 삭제는 `NOT_RUN`이다. TRAINING 승인은 최신 별도 동의, 사람 승인, 비식별 PASS와 금지 kind 제외를 요구하고 별도 sanitized artifact 및 immutable dataset revision으로 승격한다. 승인 revision의 3년 만료와 철회·계정삭제 gate 차단은 기술 목표이며 실제 운영 승격·삭제 검증은 `NOT_RUN`이다.
-- 계정 암호화·lookup HMAC·OTP HMAC 세 키와 key version은 비밀이 아닌 도메인 분리 SHA-256 fingerprint singleton에 결속한다. 예상하지 않은 키 교체는 startup/readiness와 계정 서비스에서 fail-closed하며, 운영 key rotation 절차는 아직 제공하지 않는다. OTP 전송 중단은 기본 30초의 bounded delivery lease가 지난 뒤 같은 handle의 새 코드로만 재시도한다.
+- 계정 암호화·lookup HMAC·OTP HMAC 세 키와 key version은 비밀이 아닌 도메인 분리 SHA-256 fingerprint singleton에 결속한다. 예상하지 않은 키 교체는 startup/readiness와 계정 서비스에서 fail-closed하며, 운영 key rotation 절차는 아직 제공하지 않는다. OTP 전송 중단 뒤 같은 request/handle의 코드는 delivery lease가 지나도 교체하지 않고 409로 닫는다. 재발급은 cooldown 뒤 새 request ID로 진행한다.
 - 관리자 Android 앱은 배포환경에서 `PASSWORD_TOTP` 방식만 사용한다. 정적 `WALKSAFE_ADMIN_TOKEN`은 `WALKSAFE_ADMIN_SECURITY_ENABLED=true`일 때 관리자 API를 우회할 수 없다.
 - `POST /account-enrollments/email-otp`, `POST /accounts`, `POST /accounts/authenticate`는 Gateway 전용 일반 테스트 이메일 가입·로그인 경로다. 이메일 OTP는 휴대전화 본인확인이나 정식 연령 증명을 대체하지 않는다. 생년월일은 만 14세 경계 판정에만 사용하고 저장하지 않으며, ASCII 이메일만 받아 domain을 소문자로 canonicalize한 뒤 AES-GCM 암호문과 별도 keyed lookup HMAC으로만 저장한다. 인증은 계정 존재 여부와 무관하게 PostgreSQL 전역·lookup-HMAC별 입장 제한을 먼저 적용하고, 프로세스별 scrypt 동시 실행 상한이 차면 no-store 503으로 닫는다. 제한은 429, 저장소 장애는 503이며 둘 다 민감정보를 반환하지 않는다. OTP의 IP 제한은 Gateway가 신뢰 프록시에서 검증해 새로 설정한 canonical 단일 `X-WalkSafe-Client-IP`만 사용하고, 헤더가 없으면 Backend peer IP를 사용한다. 원래 클라이언트가 보낸 동명 헤더는 전달하지 않는다.
 - 사용자 계정의 `auth_epoch`는 현재 생성 시 1인 Backend 정본이다. 비밀번호 변경·계정 잠금 기능을 추가할 때는 같은 transaction에서 epoch를 증가시키고 Gateway가 기존 세션을 재검증하도록 별도 계약을 추가해야 한다.
@@ -175,6 +183,20 @@ python scripts/provision_walksafe_admin_device_key.py \
 현행 API schema는 실제 route·Pydantic source에서 생성한 [`contracts/walksafe.openapi.json`](../contracts/walksafe.openapi.json), 로컬 환경 절차는 [개발 환경 가이드](../docs/guides/development-environment-guide.md#python과-backend)를 기준으로 본다. [`backend/.env.example`](.env.example)은 development/test 편의용이며 production 설정으로 복사하지 않는다. 운영 환경은 `deploy/config/walksafe-backend.env.example`과 `walksafe-backend-migration.env.example`, 실제 `config.py`가 정본이고 deployment에서는 repository `backend/.env`를 읽지 않는다. [`docs/backend/api_reference.md`](../docs/backend/api_reference.md)와 [`docs/backend/backend_environment.md`](../docs/backend/backend_environment.md)는 FP-046 완료 근거에 bytes가 결속된 역사 설명이므로 오래된 인증·저장·실행 문구를 현행 계약으로 사용하지 않는다.
 
 저장소 내부 구현·자동 테스트는 실제 off-phone custody, 관리자 기기 분실·새 기기 복구훈련, 운영 provisioning·서명·사설 배포, 독립 검토 또는 정식 시험을 실행한 증거가 아니다. 해당 항목과 release gate는 모두 `NOT_RUN`(미면제), 출시는 `NOT_ELIGIBLE`로 유지한다.
+
+### 앱과 업무 책임
+
+`main.create_app(settings, database=...)`는 매번 별도 FastAPI 앱과 `app.state.runtime`을 만든다. `application_runtime.BackendRuntime`은 앱별 DB 엔진·세션 팩토리, 용량·신고 저장 상태, 이미지 키 관리자, RAW 저장소, TMAP 실행기, 탐지 작업과 health 상태를 소유한다. 생성 시에는 폴더·키 파일·DB 연결·프로세스를 열지 않고 lifespan에서 초기화한다. 초기화가 취소돼도 해당 작업 완료를 회수한 뒤 정리하며, 일부 시작·종료 단계 실패와 같은 앱의 재진입을 별도 테스트한다.
+
+기존 서비스의 `database.SessionLocal` 진입점은 요청·lifespan의 앱 DB를 선택한다. CLI는 지연 생성되는 기본 DB를 사용한다. 직접 Thread를 만드는 readiness probe와 actor rate-limit executor에는 실행 문맥을 전달한다. `api/health.py`는 HTTP 응답을 조립하고 `services/health_readiness.py`가 DB·스토리지·탐지 검사를 담당한다.
+
+- `services/maintenance_lock.py`: 신고·RAW 쓰기와 startup/readiness 복구가 공유하는 기존 maintenance lock. 파일 잠금 → DB 트랜잭션 잠금 순서와 종료 시 무결성 검사를 보존한다.
+- `services/report_commit.py`: 암호화 파일 저널과 신고 DB commit/불확정 결과의 단일 처리 경계. `report_application.py`는 ingest·idempotency·조회 정책, `report_export.py`는 제한된 행/bytes의 내보내기와 audit을 담당한다. HTTP router는 기존 경로·응답과 오류를 유지한다.
+- `api/admin_context.py`: 관리자 read/action 증명이 세션·장치·상관관계·method/path 및 목적과 일치하는지 확인한다. `services/admin_operation_policy.py`에는 operation 분류와 문서 metadata, `http_security_policy.py`에는 HTTP route/actor 정책을 모은다. 실제 인증·transaction 재검증은 기존 서비스 경계에 남는다.
+- `services/diagnostic_storage.py`: 계정 삭제·동의 철회에서 호출하는 diagnostics purge와 14일 보존 정책. commit하지 않고 호출자의 트랜잭션 안에서 동일 actor subject/generation만 처리한다.
+- `services/tmap_*_normalization.py`: 응답 정규화를 transport에서 분리한다. `TmapRouteHealthState`는 성공 timestamp·최근 route 결과·reset generation을 함께 소유한다.
+
+RAW의 파일/DB coordinator와 관리자 recovery의 단일 transaction은 유지한다. RAW의 파일 journal·중복 chunk 재시도·manifest/receipt 결속은 하나의 commit 경계를 이루며, recovery의 session 폐기·코드 소비·장치와 custody 상태 전이는 같은 transaction에서 원자적으로 검증해야 한다. 길이를 줄이기 위한 분할은 이 불변조건의 검증을 어렵게 한다.
 
 ## 실행
 

@@ -136,7 +136,7 @@ def test_review_decision_idempotency_migration_preserves_existing_rows(
             "202609280002", "202609290001", "202609290002", "202609300001",
             "202609300002", "202609300003", "202609300004", "202609300005",
             "202609300006", "202609300007", "202609300008",
-            "202609300009",
+            "202609300009", "202610080001", "202610110001",
         ):
             command.upgrade(config, revision)
             assert stored_decision() == predecessor_row
@@ -193,7 +193,7 @@ def test_latest_head_acl_drift_disables_database_readiness(
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM public.alembic_version")
-            ).scalar_one() == "202609300009"
+            ).scalar_one() == "202610110001"
             assert admin_report_integrity_boundary_state(connection) is True
         assert _database_readiness(migration_url)["ready"] is True
 
@@ -482,7 +482,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
             "ready": False,
             "reason": "migration_not_at_head",
             "current_revision": "202608300005",
-            "expected_revision": "202609300009",
+            "expected_revision": "202610110001",
         }
 
         with disposable_engine.begin() as connection:
@@ -499,7 +499,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
                 "ready": False,
                 "reason": "migration_not_at_head",
                 "current_revision": "202608300005",
-                "expected_revision": "202609300009",
+                "expected_revision": "202610110001",
             }
         finally:
             with disposable_engine.begin() as connection:
@@ -557,7 +557,7 @@ def test_integrity_successor_role_graph_login_and_downgrade_boundaries(
                 "ready": False,
                 "reason": "migration_not_at_head",
                 "current_revision": "202608300005",
-                "expected_revision": "202609300009",
+                "expected_revision": "202610110001",
             }
         finally:
             with disposable_engine.begin() as connection:

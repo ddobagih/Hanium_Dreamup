@@ -1,0 +1,17 @@
+stateDiagram-v2
+  state "S-D12-019-NO_EVIDENCE" as N
+  state "S-D12-019-GRANT_ISSUED" as G
+  state "S-D12-019-TOKEN_SPENT" as T
+  state "S-D12-019-DISPLAYED" as D
+  state "S-D12-019-CONFIRMED" as C
+  state "S-D12-019-DISCARDED" as X
+  [*] --> N
+  N --> G: fresh 재인증과 grant 발급
+  G --> T: 단회 token 취득 후 GET
+  T --> D: hash · MIME · decode · 현재 결속 성공
+  T --> X: 전송 또는 검증 또는 decode 실패
+  D --> C: 사용자 원본 확인 checkbox
+  C --> X: 승인 사용으로 소비 또는 선택/세션 변경
+  D --> X: 만료 / onStop / 결속 변경
+  G --> X: 만료
+  X --> G: fresh 재인증과 새 grant

@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-035 사고 확인·종결·재개와 미확정 시도 복구"]
+  P["P-D12-035 사고 변경 의도·사용자·멱등키 결속"]
+  A --> P
+  M0["1. OPEN 또는 REOPENED→ACKNOWLEDGED→RESOLVED→REOPENED만 허용한다."]
+  P --> M0
+  M1["2. 시도에 actor/대상/목표/version/ID 및 이유·관측 digest를 결속한다."]
+  M0 --> M1
+  M2["3. 고위험 재인증 후 PATCH /admin/incidents/{id}/status를 전송한다."]
+  M1 --> M2
+  M3["4. 성공 또는 conflict 뒤 최신 이력을 조회한다."]
+  M2 --> M3
+  M4["5. 미확정 시 동일 intent와 ID로만 명시적 재요청을 허용하고 다른 actor/version 변화면 이전 시도를 지운다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 명시적 mutation response 또는 최신 상태/이력으로 결과 표시."]
+  M0 -. "관련 조건 확인" .-> B0{"같은 tuple이 GET에 존재"}
+  B0 -->|"조건 해당"| R0["idempotency key 성공 증명으로 단정하지 않고 UNCONFIRMED"]
+  M1 -. "관련 조건 확인" .-> B1{"상태/version/actor 또는 intent 변화"}
+  B1 -->|"조건 해당"| R1["CHANGED로 기존 시도 해제"]
+  M2 -. "관련 조건 확인" .-> B2{"화면 재생성"}
+  B2 -->|"조건 해당"| R2["비밀값 없는 digest recovery snapshot만 복구"]
+  M3 -. "관련 조건 확인" .-> B3{"자동 재시도"}
+  B3 -->|"조건 해당"| R3["없음; fresh 재인증 필요"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["같은 시도 ID와 새 자격증명으로 명시적 재요청만 허용."]

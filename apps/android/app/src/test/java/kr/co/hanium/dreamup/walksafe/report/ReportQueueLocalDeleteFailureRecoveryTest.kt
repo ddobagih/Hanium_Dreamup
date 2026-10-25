@@ -20,12 +20,13 @@ class ReportQueueLocalDeleteFailureRecoveryTest {
     @Test
     fun localDeleteFailureKeepsBytesAndTheNextStatusCallRecoversWithoutPost() {
         val storage = DeleteFailingStorage(FileReportQueueStorage(temporary.newFolder()))
+        var nowMs = 1_000L
         val store = AndroidReportQueueStore(
             capacityProfile = ApprovedReportQueueCapacityProfile(8, 1_024, 4_096L, 32_768L, 6, 24_576L),
             storageFactory = { storage },
             aead = Base64Aead(),
             idFactory = { UUID(0L, 7L) },
-            nowMillis = { 1_000L },
+            nowMillis = { nowMs },
             testOnly = Unit,
         )
         val report = requireNotNull(store.enqueue(
@@ -51,14 +52,29 @@ class ReportQueueLocalDeleteFailureRecoveryTest {
         assertEquals(ReportQueueDrainOutcome.LOCAL_DELETE_FAILED,
             requireNotNull(coordinator.startNext({ context() }, transport)).execute())
         assertEquals(1, store.queuedReports().size)
+        store.queuedReports().single().use { retained ->
+            assertEquals(report.payload.payloadSha256, retained.payload.payloadSha256)
+            org.junit.Assert.assertTrue(retained.retryNotBeforeEpochMs > nowMs)
+            nowMs = retained.retryNotBeforeEpochMs
+        }
 
         statusReceipt = receipt(report).copy(payloadBytes = report.payload.payloadBytes + 1)
         storage.failDelete = false
-        assertEquals(ReportQueueDrainOutcome.RECEIPT_REJECTED,
+        assertEquals(ReportQueueDrainOutcome.RECEIPT_UNCONFIRMED,
             requireNotNull(coordinator.startNext({ context() }, transport)).execute())
+        store.queuedReports().single().use { retained ->
+            assertEquals(report.payload.payloadSha256, retained.payload.payloadSha256)
+            org.junit.Assert.assertTrue(retained.retryNotBeforeEpochMs > nowMs)
+            nowMs = retained.retryNotBeforeEpochMs
+        }
         assertEquals(ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED,
             requireNotNull(coordinator.startNext({ context() }, transport.withReceipt(receipt(report))) { false }).execute())
         assertEquals(1, store.queuedReports().size)
+        store.queuedReports().single().use { retained ->
+            assertEquals(report.payload.payloadSha256, retained.payload.payloadSha256)
+            org.junit.Assert.assertTrue(retained.retryNotBeforeEpochMs > nowMs)
+            nowMs = retained.retryNotBeforeEpochMs
+        }
 
         statusReceipt = receipt(report)
         assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_STATUS,

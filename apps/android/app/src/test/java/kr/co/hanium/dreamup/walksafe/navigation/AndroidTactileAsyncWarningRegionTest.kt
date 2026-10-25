@@ -1,6 +1,5 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
-import kr.co.hanium.dreamup.walksafe.MainActivity
 import kr.co.hanium.dreamup.walksafe.depth.*
 import kr.co.hanium.dreamup.walksafe.feedback.*
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
@@ -18,8 +17,11 @@ class AndroidTactileAsyncWarningRegionTest {
   validSampleCount=80,validSampleRatio=.9f,depthMedianM=1f,depthP20M=1f,depthIqrM=.05f,trend=Trend.STABLE,
   approachScore=0f,approachSpeedMps=null,timeToCollisionMs=null,
   confidence=DepthConfidenceBreakdown(.95f,1f,1f,1f,1f,1f,1f,1f),userFacing=UserFacingDepth(null,level,message),trackAgeFrames=20,trackStableMs=1900L,
-  sourceValidUntilElapsedRealtimeMs=now+UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS)
- private fun frame(os:List<TrackedObjectDepth>)=MainActivity.TactileSnapshotFrameResult(null,emptyList(),false,TactileRouteGuidanceResult(os,null,TactileRouteDecision(LocalRouteMode.TMAP,null,"test",null)))
+  sourceValidUntilElapsedRealtimeMs=now+UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS,
+  // `now` is the capture instant here, including the asynchronous source's lagged capture.
+  sourceObservedAtElapsedRealtimeMs=now,
+  sourceMaxAgeMs=if(id.startsWith("unknown"))UnknownObjectFeedbackPolicy.MAX_SOURCE_AGE_MS else DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS)
+ private fun frame(os:List<TrackedObjectDepth>)=TactileSnapshotFrameResult(null,emptyList(),false,TactileRouteGuidanceResult(os,null,TactileRouteDecision(LocalRouteMode.TMAP,null,"test",null)))
  private fun batch(now:Long, os:List<TrackedObjectDepth>)=UnknownObjectFeedbackBatch(now*1000000L,now,now*1000000L,now,WalkRuntimeEpoch("review",0),os)
  private fun coord(p:WalkSafeFeedbackPolicy)=AndroidTactileFrameCoordinator(AndroidTactileRouteGuidance(),p,TactileFrameFeedbackActuator {})
  private fun asynchronousScene(lagMs:Long,separate:Boolean=false):List<String> {

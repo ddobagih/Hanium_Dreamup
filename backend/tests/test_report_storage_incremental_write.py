@@ -9,7 +9,7 @@ import uuid
 
 import pytest
 
-from backend.app.api import reports as report_api
+from backend.app.services import report_commit as report_api
 from backend.app.models import ReportImageObject
 from backend.app.services import report_storage
 

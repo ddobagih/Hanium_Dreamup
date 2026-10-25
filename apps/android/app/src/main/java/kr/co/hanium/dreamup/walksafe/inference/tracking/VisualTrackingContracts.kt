@@ -32,6 +32,34 @@ enum class VisualRedetectReason {
     UNTRACKED_CANDIDATES,
 }
 
+/** Identity of one measured image point; neither a detector batch nor an object track ID. */
+class VisualMaterialPointId internal constructor()
+
+/** One material point measured in this exact, unrotated CPU-image frame. */
+data class VisualMaterialPoint internal constructor(
+    val id: VisualMaterialPointId,
+    val targetKey: VisualFrameKey,
+    val imagePointNorm: Point2,
+)
+
+/** Issued only after the producer verifies unique ownership at one measured common image. */
+internal class VisualMaterialPointHandoff(
+    val previousSourceKey: VisualFrameKey,
+    val sourceKey: VisualFrameKey,
+    val commonFrameKey: VisualFrameKey,
+    val previousSourceIndex: Int,
+    val sourceIndex: Int,
+    val previousDetection: DetectionCandidate,
+    val detection: DetectionCandidate,
+    val previousGeometryAtCommonFrame: DetectionCandidate,
+    val previousTransformAtCommonFrame: VisualAffineTransform,
+    val geometryAtCommonFrame: DetectionCandidate,
+    val transformAtCommonFrame: VisualAffineTransform,
+    val pointId: VisualMaterialPointId,
+    val pointAtCommonFrame: Point2,
+    val uprightQuarterTurns: Int,
+)
+
 data class VisualTrackingObservation(
     /** Index into the authoritative detector batch, including entries not admitted for tracking. */
     val sourceIndex: Int,
@@ -49,7 +77,21 @@ data class VisualTrackingObservation(
     val residualPx: Float?,
     val polygonConstrained: Boolean,
     val transformNorm: VisualAffineTransform? = null,
-)
+    val materialPoint: VisualMaterialPoint? = null,
+) {
+    // Body storage preserves constructor/default/copy ABI. A copy loses the source-bound witness.
+    private var boundMaterialPointHandoff: VisualMaterialPointHandoff? = null
+    internal val materialPointHandoff: VisualMaterialPointHandoff? get() = boundMaterialPointHandoff
+
+    internal fun bindMaterialPointHandoff(proof: VisualMaterialPointHandoff): VisualTrackingObservation {
+        check(boundMaterialPointHandoff == null)
+        check(status == VisualTrackingStatus.TRACKED && failure == null &&
+            detectorSourceKey == proof.sourceKey && sourceIndex == proof.sourceIndex &&
+            materialPoint?.id === proof.pointId)
+        boundMaterialPointHandoff = proof
+        return this
+    }
+}
 
 data class VisualTrackingMetrics(
     val durationNs: Long,

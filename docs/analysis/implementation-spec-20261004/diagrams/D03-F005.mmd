@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D03-005 HOME 단발 온디바이스 한국어 엔진 선택"]
+  P["정책 P-D03-004, P-D03-005"]
+  A --> P
+  N0["1. HOME 의 명시적 한 번 입력에서 설치된 한국어 온디바이스 platform 엔진을 우선 선택한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. API33 미만·platform unavailable·cooldown·한국어 미설치·조회실패/3s timeout 이면 녹음 전 Vosk 를 선택한다."]
+  N0 --> N1
+  N2["3. 요청당 engine 하나만 사용; platform 선택 시 mic lease 확보; Vosk 의 캡처는 자기 lease 를 사용한다."]
+  N1 --> N2
+  N3["4. 선택 이후 오류는 그 요청을 끝내며 실패 녹음을 Vosk 로 재실행하지 않는다."]
+  N2 --> N3
+  N4["5. Main 출력중 요청은 actor/page/epoch/generation 을 보존한 deferred 100ms polling, 최대 30s 후 포기한다."]
+  N3 --> N4
+  Z["정상: 선택 engine 의 final 한 번 전달."]
+  N4 --> Z
+  B0{"preferPlatform=false"}
+  R0["Vosk 만 시도"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"support callback stale"}
+  R1["metadata 읽기 전 폐기"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"다른 센서나 출력 readiness 만 실패"}
+  R2["OneShotVoiceInputPolicy 입력 차단 근거로 사용하지 않음"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: platform 실패는 cooldown 후 다음 사용자 요청에서 재평가."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xtimeout["만료: support3s; engine phase20/10/20/10s; 출력 deferred30s."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xtimeout
+  Xcancel["취소: request fence 먼저 폐기, platform cancel/destroy 또는 Vosk destroy."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: page/foreground/actor/purpose owner 바뀌면 cancel."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xretry["재시도: 새 명시적 요청; 실패 녹음 재사용 없음."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry
+  Xcleanup["정리: unused platform·listener·timer·mic lease 반환."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

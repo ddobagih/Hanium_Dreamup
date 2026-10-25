@@ -46,8 +46,10 @@ internal class GnssQualityEstimator(
         signals: List<GnssSatelliteSignal>,
         timeSource: GnssSignalTimeSource? = null,
         timestampUncertaintyNanos: Double? = null,
+        receivedAtElapsedRealtimeNanos: Long? = null,
     ): GnssQualitySnapshot {
         require(elapsedRealtimeNanos >= 0L)
+        require(receivedAtElapsedRealtimeNanos == null || receivedAtElapsedRealtimeNanos >= elapsedRealtimeNanos)
         val highWatermark = latestEpochAtNanos
         if (highWatermark != null && elapsedRealtimeNanos <= highWatermark) {
             return buildSnapshot(highWatermark)
@@ -68,6 +70,7 @@ internal class GnssQualityEstimator(
                 frequencySummary = summarizeGnssFrequencies(signals),
                 timeSource = timeSource,
                 timestampUncertaintyNanos = timestampUncertaintyNanos,
+                receivedAtElapsedRealtimeNanos = receivedAtElapsedRealtimeNanos,
             ),
         )
         trimWindow(elapsedRealtimeNanos)
@@ -222,6 +225,7 @@ internal class GnssQualityEstimator(
             latestEpochTimeSource = latest.timeSource,
             latestEpochTimestampUncertaintyNanos = latest.timestampUncertaintyNanos,
             signalAvailability = availability,
+            latestEpochReceivedAtNanos = latest.receivedAtElapsedRealtimeNanos,
         )
     }
 
@@ -256,6 +260,7 @@ internal class GnssQualityEstimator(
         val frequencySummary: GnssFrequencySummary,
         val timeSource: GnssSignalTimeSource?,
         val timestampUncertaintyNanos: Double?,
+        val receivedAtElapsedRealtimeNanos: Long?,
     )
 
     private data class SignalIdentity(

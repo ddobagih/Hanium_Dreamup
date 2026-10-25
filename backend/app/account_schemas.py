@@ -166,6 +166,45 @@ class SignupDocumentVersionsV1(_StrictModel):
     training_reuse: DocumentVersion
 
 
+class SignupPolicyDocumentV1(_StrictModel):
+    version: DocumentVersion
+    required: StrictBool
+    equivalent_versions: list[DocumentVersion] = Field(strict=True, max_length=8)
+    prior_versions: list[DocumentVersion] = Field(strict=True, max_length=8)
+
+    @model_validator(mode="after")
+    def require_distinct_versions(self) -> "SignupPolicyDocumentV1":
+        equivalent = set(self.equivalent_versions)
+        prior = set(self.prior_versions)
+        if (
+            len(equivalent) != len(self.equivalent_versions)
+            or len(prior) != len(self.prior_versions)
+            or self.version in equivalent | prior
+            or equivalent & prior
+        ):
+            raise ValueError("signup policy versions must be distinct")
+        return self
+
+
+class AccountSignupPolicyV1(_StrictModel):
+    schema_version: Literal["walksafe.account-signup-policy.v1"] = "walksafe.account-signup-policy.v1"
+    documents: dict[str, SignupPolicyDocumentV1]
+
+    @model_validator(mode="after")
+    def require_exact_signup_documents(self) -> "AccountSignupPolicyV1":
+        from backend.app.services.signup_documents import (
+            SIGNUP_REQUIRED_DOCUMENT_KEYS,
+            signup_document_keys_are_exact,
+        )
+        if not signup_document_keys_are_exact(self.documents) or any(
+            document.required != (key in SIGNUP_REQUIRED_DOCUMENT_KEYS)
+            or (document.required and bool(document.prior_versions))
+            for key, document in self.documents.items()
+        ):
+            raise ValueError("signup policy must cover the configured signup documents")
+        return self
+
+
 class SignupConsentSelectionsV1(_StrictModel):
     terms_of_service: StrictBool
     privacy_notice: StrictBool

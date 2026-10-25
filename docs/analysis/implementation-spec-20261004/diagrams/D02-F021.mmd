@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D02-021 실시간 A/B 보정 runner와 후보 소유권 이전"]
+  E["진입: start/cancel/offerLiveImage / tryAdopt/reject"]
+  G{"P-D02-021 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["중단/부분 결과; native 완료로 간주하지 않음"]
+  G -->|"총300000ms 또는 reserve 침범"| B0
+  B1["CONFIRMED 생성 안 함"]
+  G -->|"near threshold evidence 부족/quality 불충족"| B1
+  B2["강제 interrupt로 안전 종료라고 하지 않음"]
+  G -->|"borrowed baseline native 진행"| B2
+  B3["runner가 candidate close"]
+  G -->|"candidate selection 거절"| B3
+  B4["drain ACK withheld; 새 camera owner 금지"]
+  G -->|"native/image close 실패"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["deadline/cleanup reserve를 확보하고 candidate scalar screening"]
+    S1["최종 후보에 fixture correctness·AB/BA와 confirmation 비교"]
+    S2["live baseline·candidate frame을 각자 실제 backend로 실행하고 quality 집계"]
+    S3["D05 RuntimeSelectionPolicy가 CONFIRMED인 경우에만 profile 저장 후 selection<br/>제공"]
+    S4["tryAdopt swap 성공일 때만 후보 owner transfer; 거절 또는 stale은 close"]
+    S5["draining 완료 후에만 onFinished/whenDrained ack"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+  E -.-> S0
+  N["정상 종료: 실제 drained 뒤 완료 callback."]
+  X["취소·중단: cancel은 interruption intent와 late publication fence; 실제 native<br/>반환·image close 기다림. / 늦은 이전 소유자의 callback은 현 상태를 바꾸지 않는다."]
+  C["정리: borrowed baseline 닫지 않고 owned 후보/image/timer를 정리. close 실패는 drained<br/>성공으로 보고하지 않음."]
+  R["재시도·복구: Main live entry 미연결; store가 cooldown 여부 별도 판정. / 현재 조건과 소유권을 다시<br/>검사한다."]
+  S5 --> N
+  E -.-> X
+  X --> C
+  C -.-> R
+  TEST["debug instrumentation runnerFactory는 host baseline을 빌려 실제 runner 생성, 이번 미실행"]
+  TEST --> S0

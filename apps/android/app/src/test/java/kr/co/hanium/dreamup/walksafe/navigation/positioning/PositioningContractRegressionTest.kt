@@ -103,16 +103,17 @@ class PositioningContractRegressionTest {
     @Test
     fun deliveredConfidenceAnnouncementIsNotReturnedAgainFromCoordinatorReads() {
         val coordinator = PositioningCoordinator()
-        val degraded = coordinator.observeGnss(fix(1_000L, accuracyM = 30.0))
+        coordinator.observeGnss(fix(1_000L, accuracyM = 30.0))
+        val degraded = coordinator.evaluate(4_000L)
         val request = requireNotNull(degraded.confidence.announcementRequest)
 
-        assertTrue(coordinator.commitAnnouncementDelivered(request.token, 1_000L))
-        assertFalse(coordinator.commitAnnouncementDelivered(request.token, 1_000L))
-        assertNull(coordinator.evaluate(1_000L).confidence.announcementRequest)
-        val rejectedMotion = coordinator.observeStep(1, heading(1_200L), PdrStepQuality.HIGH,
-            receivedAtElapsedRealtimeMs = 1_200L, stepLengthSigmaM = Double.NaN)
+        assertTrue(coordinator.commitAnnouncementDelivered(request.token, 4_000L))
+        assertFalse(coordinator.commitAnnouncementDelivered(request.token, 4_000L))
+        assertNull(coordinator.evaluate(4_000L).confidence.announcementRequest)
+        val rejectedMotion = coordinator.observeStep(1, heading(4_200L), PdrStepQuality.HIGH,
+            receivedAtElapsedRealtimeMs = 4_200L, stepLengthSigmaM = Double.NaN)
         assertNull(rejectedMotion.confidence.announcementRequest)
-        assertNull(coordinator.evaluate(1_300L).confidence.announcementRequest)
+        assertNull(coordinator.evaluate(4_300L).confidence.announcementRequest)
     }
 
     @Test

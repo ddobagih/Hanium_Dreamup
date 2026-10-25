@@ -384,6 +384,15 @@ class AndroidVoiceCommandTest {
     }
 
     @Test
+    fun approvedCurrentStateHasItsOwnTypedReadOnlyAction() {
+        val command = parseAndroidVoiceCommand("현재 상태")
+        assertEquals(AndroidVoiceCommand.CurrentState, command)
+        assertEquals(AndroidVoiceAction.SpeakCurrentState, command?.toAction())
+        assertEquals(AndroidVoiceAction.SpeakCurrentState,
+            selectAndroidVoiceAction(listOf("현재 상태"), floatArrayOf(0.9f)))
+    }
+
+    @Test
     fun bareNumericAndSpokenNumbersRequireDestinationSelectionContext() {
         val cases = mapOf(
             "1" to 1, "1번" to 1, "일 번" to 1, "하나" to 1, "한 번" to 1,

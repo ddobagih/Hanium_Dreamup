@@ -41,13 +41,13 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         DECISION_LOOKUP
     }
 
-    interface Clock {
+    interface Clock extends AdminProtectedRequestExecutor.Clock {
         long nowEpochMs();
 
         default long monotonicNanos() { return System.nanoTime(); }
     }
 
-    interface Transport {
+    interface Transport extends AdminProtectedRequestExecutor.Exchange<Response> {
         Response execute(String method, String url, Map<String, String> headers, byte[] body) throws IOException;
 
         default BinaryResponse executeBinary(
@@ -57,6 +57,11 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             int expectedByteCount
         ) throws IOException {
             throw new IOException("binary administrator transport is unavailable");
+        }
+
+        default BinaryResponse executeBinary(SessionContext session, String method, String url,
+            Map<String, String> headers, int expectedByteCount) throws IOException {
+            return executeBinary(method, url, headers, expectedByteCount);
         }
 
         /** S18-18: explicit cancellation of requests still in flight; never waits. */
@@ -101,11 +106,9 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
     }
 
     private final String origin;
-    private final String deviceKeyMarker;
-    private final int deviceKeyVersion;
-    private final AdminDeviceProof.Signer signer;
     private final Clock clock;
     private final Transport transport;
+    private final AdminProtectedRequestExecutor<Response> protectedRequests;
 
     public AdminOperationsHttpClient(
         String configuredOrigin,
@@ -143,11 +146,15 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             throw new IllegalArgumentException("device signer, clock, and transport are required");
         }
         this.origin = approved;
-        this.deviceKeyMarker = deviceKeyMarker;
-        this.deviceKeyVersion = deviceKeyVersion;
-        this.signer = signer;
         this.clock = clock;
         this.transport = transport;
+        this.protectedRequests = new AdminProtectedRequestExecutor<>(
+            this.origin, deviceKeyMarker, deviceKeyVersion, signer, clock, transport,
+            response -> {
+                requireExactStatus(response.statusCode, 200, "device challenge request");
+                return response.body;
+            }
+        );
     }
 
     @Override
@@ -311,48 +318,11 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         Map<String, String> safeReconfirmation = requireReconfirmation(reconfirmationHeaders);
         String correctionPath = "/reports/" + safeReportId + "/delivery-corrections";
         byte[] body = correction.requestBody();
-        String correlationId = UUID.randomUUID().toString();
-        String emptyQuery = AdminCanonicalEncoding.canonicalQuery(AdminJava8Collections.list());
-        AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
-            DELIVERY_CORRECTION_ACTION,
-            safeSession.adminId(),
-            AdminCanonicalEncoding.sha256Hex(body),
-            correlationId,
-            safeSession.deviceId(),
-            deviceKeyMarker,
-            deviceKeyVersion,
-            "POST",
-            correctionPath,
-            AdminDeviceProof.Purpose.ACTION,
-            AdminCanonicalEncoding.sha256Hex(emptyQuery.getBytes(StandardCharsets.UTF_8)),
-            null,
-            safeSession.sessionId()
-        );
-        Response challengeResponse = transport.execute(
-            "POST",
-            origin + CHALLENGE_PATH,
-            jsonHeaders(protectedHeaders(safeSession, correlationId, null)),
-            intent.challengeRequestBytes()
-        );
-        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
-        requireExactStatus(challengeResponse.statusCode, 200, "device challenge request");
-        AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
-            challengeResponse.body,
-            intent,
-            challengeTime.estimatedNowEpochMs(clock.monotonicNanos()),
-            signer
-        );
-        Map<String, String> correctionHeaders = new LinkedHashMap<>(
-            protectedHeaders(safeSession, correlationId, null)
-        );
-        correctionHeaders.putAll(proof.proofHeaders());
-        correctionHeaders.putAll(safeReconfirmation);
-        Response response = transport.execute(
-            "POST",
-            origin + correctionPath,
-            jsonHeaders(correctionHeaders),
-            body
-        );
+        AdminProtectedRequestExecutor.Result<Response> executed = protectedRequests.execute(
+            safeSession, "POST", correctionPath, "", DELIVERY_CORRECTION_ACTION, null,
+            body, safeReconfirmation, "application/json", null);
+        String correlationId = executed.correlationId;
+        Response response = executed.response;
         if (response.statusCode == 409) {
             // Review F3: an ID reused for another intent is not a state conflict; only a new
             // ID can proceed, so the caller must be able to tell the two apart.
@@ -427,49 +397,11 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         grantFields.put("reason", normalizedReason);
         grantFields.put("expected_content_revision", expectedContentRevision);
         byte[] body = AdminCanonicalEncoding.canonicalJsonBytes(grantFields);
-        String correlationId = UUID.randomUUID().toString();
-        String emptyQuery = AdminCanonicalEncoding.canonicalQuery(AdminJava8Collections.list());
-        AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
-            ORIGINAL_GRANT_ACTION,
-            safeSession.adminId(),
-            AdminCanonicalEncoding.sha256Hex(body),
-            correlationId,
-            safeSession.deviceId(),
-            deviceKeyMarker,
-            deviceKeyVersion,
-            "POST",
-            grantPath,
-            AdminDeviceProof.Purpose.ACTION,
-            AdminCanonicalEncoding.sha256Hex(emptyQuery.getBytes(StandardCharsets.UTF_8)),
-            null,
-            safeSession.sessionId()
-        );
-        Response challengeResponse = transport.execute(
-            "POST",
-            origin + CHALLENGE_PATH,
-            jsonHeaders(protectedHeaders(safeSession, correlationId, null)),
-            intent.challengeRequestBytes()
-        );
-        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
-        requireOriginalEvidenceRequestActive();
-        requireExactStatus(challengeResponse.statusCode, 200, "device challenge request");
-        AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
-            challengeResponse.body,
-            intent,
-            challengeTime.estimatedNowEpochMs(clock.monotonicNanos()),
-            signer
-        );
-        Map<String, String> grantHeaders = new LinkedHashMap<>(
-            protectedHeaders(safeSession, correlationId, null)
-        );
-        grantHeaders.putAll(proof.proofHeaders());
-        grantHeaders.putAll(safeReconfirmation);
-        Response grantResponse = transport.execute(
-            "POST",
-            origin + grantPath,
-            jsonHeaders(grantHeaders),
-            body
-        );
+        AdminProtectedRequestExecutor.Result<Response> executed = protectedRequests.execute(
+            safeSession, "POST", grantPath, "", ORIGINAL_GRANT_ACTION, null,
+            body, safeReconfirmation, "application/json",
+            AdminOperationsHttpClient::requireOriginalEvidenceRequestActive, null);
+        Response grantResponse = executed.response;
         requireOriginalEvidenceRequestActive();
         requireExactStatus(grantResponse.statusCode, 201, "original evidence grant request");
 
@@ -492,7 +424,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
                 imageHeaders.put("Pragma", "no-cache");
                 imageHeaders.put(ORIGINAL_ACCESS_GRANT_HEADER, new String(accessToken));
                 try (BinaryResponse imageResponse = transport.executeBinary(
-                    "GET",
+                    safeSession, "GET",
                     origin + grant.resourcePath(),
                     AdminJava8Collections.copyMap(imageHeaders),
                     grant.byteCount()
@@ -527,57 +459,16 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         HistoryType historyType,
         String expectedReviewDecisionId
     ) throws IOException, GeneralSecurityException {
-        String correlationId = UUID.randomUUID().toString();
-        byte[] transmittedBody = body == null ? new byte[0] : body;
-        AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
-            action,
-            session.adminId(),
-            AdminCanonicalEncoding.sha256Hex(transmittedBody),
-            correlationId,
-            session.deviceId(),
-            deviceKeyMarker,
-            deviceKeyVersion,
-            method,
-            path,
-            AdminDeviceProof.Purpose.ACTION,
-            AdminCanonicalEncoding.sha256Hex(canonicalQuery.getBytes(StandardCharsets.UTF_8)),
-            readPurpose,
-            session.sessionId()
-        );
-
-        Map<String, String> challengeHeaders = protectedHeaders(session, correlationId, null);
-        Response challengeResponse = transport.execute(
-            "POST",
-            origin + CHALLENGE_PATH,
-            jsonHeaders(challengeHeaders),
-            intent.challengeRequestBytes()
-        );
-        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
-        requireExactStatus(challengeResponse.statusCode, 200, "device challenge request");
-        AdminDeviceProof.SignedChallenge proof = AdminDeviceProof.parseAndSign(
-            challengeResponse.body,
-            intent,
-            challengeTime.estimatedNowEpochMs(clock.monotonicNanos()),
-            signer
-        );
-
-        Map<String, String> operationHeaders = new LinkedHashMap<>(
-            protectedHeaders(session, correlationId, readPurpose)
-        );
-        operationHeaders.putAll(proof.proofHeaders());
+        Map<String, String> additionalHeaders = new LinkedHashMap<>();
         if (historyType != HistoryType.NONE) {
-            operationHeaders.put("Cache-Control", "no-store");
-            operationHeaders.put("Pragma", "no-cache");
+            additionalHeaders.put("Cache-Control", "no-store");
+            additionalHeaders.put("Pragma", "no-cache");
         }
-        Map<String, String> finalHeaders = body == null
-            ? acceptHeaders(operationHeaders)
-            : jsonHeaders(operationHeaders);
-        Response operationResponse = transport.execute(
-            method,
-            origin + path + (canonicalQuery.isEmpty() ? "" : "?" + canonicalQuery),
-            finalHeaders,
-            body
-        );
+        AdminProtectedRequestExecutor.Result<Response> executed = protectedRequests.execute(
+            session, method, path, canonicalQuery, action, readPurpose, body,
+            additionalHeaders, "application/json", null);
+        String correlationId = executed.correlationId;
+        Response operationResponse = executed.response;
         if (historyType == HistoryType.DECISION_LOOKUP && operationResponse.statusCode == 404) {
             // Only the explicit "no such decision" answer resolves the attempt as absent.
             if ("review_decision_not_found".equals(errorCode(operationResponse.body))) {
@@ -592,7 +483,9 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             throw new HistoryCursorException();
         }
         if (historyType == HistoryType.NONE && operationResponse.statusCode == 409) {
-            throw new MutationConflictException();
+            throw new MutationConflictException(
+                "delivery_institution_mismatch".equals(errorCode(operationResponse.body))
+            );
         }
         requireExactStatus(
             operationResponse.statusCode,
@@ -1554,7 +1447,13 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
 
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body) throws IOException {
-            AdminHttpRequestDeadline.Owner owner = deadlines.open(url);
+            return execute(null, method, url, headers, body);
+        }
+
+        @Override
+        public Response execute(AdminOperationsApi.SessionContext session, String method, String url,
+            Map<String, String> headers, byte[] body) throws IOException {
+            AdminHttpRequestDeadline.Owner owner = deadlines.open(session, url);
             try {
                 HttpURLConnection connection = owner.connection();
                 connection.setRequestMethod(method);
@@ -1593,6 +1492,12 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             Map<String, String> headers,
             int expectedByteCount
         ) throws IOException {
+            return executeBinary(null, method, url, headers, expectedByteCount);
+        }
+
+        @Override
+        public BinaryResponse executeBinary(SessionContext session, String method, String url,
+            Map<String, String> headers, int expectedByteCount) throws IOException {
             requireOriginalEvidenceRequestActive();
             if (!"GET".equals(method)
                 || expectedByteCount < 1
@@ -1601,7 +1506,7 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
             }
             // R14 (adm-F1): 20 s + expected size at 64 KiB/s (at most 150 s) for this GET only.
             AdminHttpRequestDeadline.Owner owner = deadlines.open(
-                url,
+                session, url,
                 AdminHttpRequestDeadline.originalEvidenceBudgetNanos(expectedByteCount)
             );
             byte[] content = null;

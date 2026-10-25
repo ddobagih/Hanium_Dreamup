@@ -7,12 +7,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WalkSafePaletteContrastTest {
-    private val source =
+    private val mainSource =
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val styleSource =
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/WalkSafeViewStyle.kt").readText()
 
     private val argbColors =
         Regex("""const val (WS_COLOR_[A-Z_]+) = 0x([0-9a-fA-F]{8})\.toInt\(\)""")
-            .findAll(source)
+            .findAll(styleSource)
             .associate { match ->
                 match.groupValues[1] to match.groupValues[2].toLong(16)
             }
@@ -51,6 +53,10 @@ class WalkSafePaletteContrastTest {
 
     private fun composite(overlayName: String, underlay: Int): Int {
         val argb = requireNotNull(argbColors[overlayName]) { "missing color: $overlayName" }
+        return composite(argb, underlay)
+    }
+
+    private fun composite(argb: Long, underlay: Int): Int {
         val overlay = (argb and 0xFFFFFF).toInt()
         val alpha = ((argb ushr 24) and 0xFF).toDouble() / 255.0
         var result = 0
@@ -64,6 +70,48 @@ class WalkSafePaletteContrastTest {
         return result
     }
 
+    /** Reads the selected disabled center fill and label, including their separate alpha. */
+    private fun disabledButtonArgb(primary: Boolean): Pair<Long, Long> {
+        val start = styleSource.indexOf("fun applyWsButtonStyle(")
+        require(start >= 0) { "missing actual button style" }
+        val end = styleSource.indexOf("fun walkDivider(", start)
+        require(end > start) { "missing actual button style boundary" }
+        val style = styleSource.substring(start, end)
+        fun selected(token: String): Long {
+            val name = if (token.startsWith("WS_COLOR_")) token else {
+                val choice = requireNotNull(Regex(
+                    """val $token = if \(primary\) (WS_COLOR_[A-Z_]+) else (WS_COLOR_[A-Z_]+)""",
+                ).find(style)) { "missing button color selector: $token" }
+                choice.groupValues[if (primary) 1 else 2]
+            }
+            return requireNotNull(argbColors[name]) { "missing color: $name" }
+        }
+        fun withAlpha(argb: Long, alpha: Int): Long =
+            (argb and 0xFFFFFF) or (alpha.toLong() shl 24)
+
+        val faceArgs = requireNotNull(Regex(
+            """addState\(intArrayOf\(-android\.R\.attr\.state_enabled\), face\(([^)]*)\)\)""",
+        ).find(style)) { "missing disabled button face" }.groupValues[1]
+        var fill = selected(faceArgs.substringBefore(',').trim())
+        if (faceArgs.contains("faded = true")) {
+            val alpha = requireNotNull(Regex("""if \(faded\) alpha = (\d+)""").find(style))
+                .groupValues[1].toInt()
+            fill = withAlpha(fill, ((fill ushr 24 and 0xFF) * alpha / 255.0).roundToInt())
+        }
+        val textColors = style.substringAfter("button.setTextColor(")
+            .substringBefore("button.setPadding(")
+        val firstText = requireNotNull(Regex(
+            """intArrayOf\(\s*(WS_COLOR_[A-Z_]+|android\.graphics\.Color\.argb\()""",
+        ).find(textColors)) { "missing disabled button text" }.groupValues[1]
+        val text = if (firstText.startsWith("WS_COLOR_")) selected(firstText) else {
+            val alpha = requireNotNull(Regex("""Color\.argb\(\s*(\d+)""").find(textColors))
+                .groupValues[1].toInt()
+            val token = requireNotNull(Regex("""Color\.red\((\w+)\)""").find(textColors)).groupValues[1]
+            withAlpha(selected(token), alpha)
+        }
+        return fill to text
+    }
+
     private fun assertCompositeRatio(
         foregroundName: String,
         overlayName: String,
@@ -74,6 +122,26 @@ class WalkSafePaletteContrastTest {
         assertTrue(
             "$foregroundName on $overlayName over ${underlay.toString(16)} is $measured:1",
             measured >= minimum,
+        )
+    }
+
+    @Test
+    fun mainUsesTheStyleOwnerWhosePaletteIsMeasured() {
+        assertTrue(mainSource.contains("WalkSafeViewStyle(this)"))
+        assertTrue(mainSource.contains("= viewStyle.applyWsButtonStyle(button, minHeightDp, primary)"))
+        assertTrue(mainSource.contains("= viewStyle.applyAccessibleControlDefaults(root)"))
+        assertTrue(mainSource.contains("= viewStyle.applyWsSafetyNoticeBody(view)"))
+        assertTrue(
+            mainSource.contains(
+                "applyWsSafetyNoticeBody(firstRunOnboardingPresenter.registrationBinding().productPurposeText)",
+            ),
+        )
+        val statusEntryStart = styleSource.indexOf("fun applyWsSafetyNoticeBody(")
+        val statusEntryEnd = styleSource.indexOf("\n    }", statusEntryStart)
+        assertTrue(statusEntryStart >= 0 && statusEntryEnd > statusEntryStart)
+        assertTrue(
+            styleSource.substring(statusEntryStart, statusEntryEnd)
+                .contains("applyWsStatusCard(view)"),
         )
     }
 
@@ -104,6 +172,23 @@ class WalkSafePaletteContrastTest {
         assertTrue(
             ratio("WS_COLOR_BUTTON_DISABLED_TEXT", "WS_COLOR_BUTTON_DISABLED_FILL") >= 2.7,
         )
+    }
+
+    @Test
+    fun disabledButtonsRenderedByActualStyleKeepExistingContrastOverLightAndDarkUnderlays() {
+        val failures = mutableListOf<String>()
+        for (primary in listOf(true, false)) {
+            val (fill, text) = disabledButtonArgb(primary)
+            for (underlay in listOf(0xFFFFFF, 0x000000)) {
+                val background = composite(fill, underlay)
+                val label = composite(text, background)
+                val measured = ratio(label, background)
+                // Preserve the existing disabled palette expectation; this is no new WCAG rule.
+                if (measured < 2.7) failures +=
+                    "primary=$primary over ${underlay.toString(16)} is $measured:1"
+            }
+        }
+        assertTrue(failures.joinToString("; "), failures.isEmpty())
     }
 
     @Test

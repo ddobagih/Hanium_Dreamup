@@ -16,32 +16,43 @@ class MainActivityWalkReadinessDisabledFeatureStaticTest {
 
     @Test
     fun disabledCameraLocationAndModelAreNeverCollectedAsReady() {
-        val capture = functionBlock("private fun captureWalkSessionReadiness(")
-        val camera = capture.substringAfter("WalkSessionReadinessRequirement.CAMERA ->")
-            .substringBefore("WalkSessionReadinessRequirement.METRIC_DISTANCE ->")
-        val model = capture.substringAfter("WalkSessionReadinessRequirement.MODEL ->")
-            .substringBefore("WalkSessionReadinessRequirement.VOICE_INPUT ->")
+        val capture = owner("session/readiness/WalkReadinessCoordinator.kt", "capture")
+        val producer = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/readiness/WalkReadinessProducers.kt").readText()
+        val camera = MainActivityRefactorSource.member(producer, "camera")
+        val location = MainActivityRefactorSource.member(producer, "location")
+        val model = MainActivityRefactorSource.member(producer, "model")
+        val wiring = MainActivityRefactorSource.property(source, "walkReadinessCoordinator")
+        assertTrue(wiring.contains("WalkReadinessCoordinator("))
+        assertTrue(capture.replace(Regex("\\s+"), "").contains(
+            "producers.evaluate(requirement,effectiveDecision,epoch,officialAssessment,mountingAssessment,deviceResources,allowModelPreparationPending)",
+        ))
+        val features = MainActivityRefactorSource.property(source, "walkReadinessCoordinator")
+        assertTrue(features.contains("FeatureReadinessProducer("))
+        assertTrue(features.contains("override fun cameraEnabled() = cameraAnalysisFeaturesEnabled()"))
+        assertTrue(features.contains("PostLoginDeviceCheckFeature.LOCATION_GUIDANCE"))
 
         assertTrue(camera.contains("WalkSessionFeatureReadiness.camera("))
-        assertTrue(camera.contains("guidanceEnabled = cameraAnalysisFeaturesEnabled()"))
-        assertTrue(camera.contains("WalkSessionFeatureReadiness.location("))
-        assertTrue(camera.contains("PostLoginDeviceCheckFeature.LOCATION_GUIDANCE"))
+        assertTrue(camera.contains("guidanceEnabled = admission.cameraEnabled()"))
+        assertTrue(location.contains("WalkSessionFeatureReadiness.location("))
+        assertTrue(location.contains("guidanceEnabled = admission.locationEnabled()"))
         assertFalse(camera.contains("WalkSessionReadinessStatus.READY to \"\""))
         assertTrue(model.contains("WalkSessionFeatureReadiness.model("))
-        assertTrue(model.contains("cameraGuidanceEnabled = cameraAnalysisFeaturesEnabled()"))
-        assertFalse(capture.contains("!cameraAnalysisFeaturesEnabled() || detectorAvailable"))
+        assertTrue(model.contains("val state = detector.modelState()"))
+        assertTrue(model.contains("WalkSessionFeatureReadiness.model(admission.cameraEnabled(), state.available, state.failureReason,"))
+        assertTrue(model.contains("preparing = allowPreparationPending && state.loadInFlight && admission.cameraPermission()"))
+        assertFalse(model.contains("!admission.cameraEnabled() || detector.isAvailable()"))
     }
 
     @Test
     fun admissionBlocksDisabledCameraOrLocationBeforeCollectingReadiness() {
         val block = functionBlock("private fun walkSessionReadinessBlockReason(")
-        val afterPermissions = block.substringAfter("missingRequiredWalkSessionPermissions(action)")
+        val afterPermissions = block.substringAfter("sources.missingRequiredPermissions(action)")
 
-        assertTrue(afterPermissions.contains("if (!cameraAnalysisFeaturesEnabled())"))
+        assertTrue(afterPermissions.contains("if (!sources.cameraEnabled())"))
         assertTrue(afterPermissions.contains("카메라 장애물 안내를 사용할 수 없어 보행 안내를 시작하지 않습니다."))
         assertTrue(
             afterPermissions.contains(
-                "if (!postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE))",
+                "if (!sources.locationFeatureEnabled())",
             ),
         )
         assertTrue(afterPermissions.contains("정확한 위치를 사용할 수 없어 보행 안내를 시작하지 않습니다."))
@@ -49,15 +60,13 @@ class MainActivityWalkReadinessDisabledFeatureStaticTest {
 
     @Test
     fun storedObstacleDetectionLimitStaysRecheckable() {
-        val retryable = source
-            .substringAfter("private fun deferredCameraDependentChecksCanBeRetried()")
-            .substringBefore("private fun cameraAnalysisFeaturesEnabled()")
+        val retryable = MainActivityRefactorSource.function(source, "private fun deferredCameraDependentChecksCanBeRetried()")
 
-        assertTrue(retryable.contains("postLoginCameraDependentChecksDeferred ||"))
+        assertTrue(retryable.contains("facts.cameraChecksDeferred ||"))
         assertTrue(
             retryable.contains(
                 "PostLoginDeviceCheckFeature.OBSTACLE_DETECTION in\n" +
-                    "                    postLoginDeviceCheckSnapshot.disabledFeatures",
+                    "                    facts.snapshot.disabledFeatures",
             ),
         )
     }
@@ -68,41 +77,27 @@ class MainActivityWalkReadinessDisabledFeatureStaticTest {
         val observed = functionBlock("private fun applyObservedPermissionStateChange(")
 
         assertTrue(
-            fallbackFailure.indexOf("refreshStartupCapabilityUi()") <
+            fallbackFailure.indexOf("readiness.refreshUi()") <
                 fallbackFailure.indexOf(
-                    "if (walkSessionLifecycle.snapshot().state != WalkSessionState.ACTIVE) return",
+                    "if (walk().snapshot().state != WalkSessionState.ACTIVE) return",
                 ),
         )
         assertTrue(
             fallbackFailure.indexOf(
-                "if (walkSessionLifecycle.snapshot().state != WalkSessionState.ACTIVE) return",
-            ) < fallbackFailure.indexOf("startWalkSessionRuntimeWithoutCamera()"),
+                "if (walk().snapshot().state != WalkSessionState.ACTIVE) return",
+            ) < fallbackFailure.indexOf("readiness.startWithoutCamera()"),
         )
-        val afterRefresh = observed.substringAfter("refreshStartupCapabilityUi()")
+        val afterRefresh = observed.substringAfter("runtime.refreshStartup()")
         assertTrue(
             afterRefresh.contains(
-                "if (walkSessionLifecycle.snapshot().state == WalkSessionState.ACTIVE) {",
+                "if (authority.lifecycleOrNull()!!.snapshot().state == WalkSessionState.ACTIVE) {",
             ),
         )
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing function: $signature" }
-        var depth = 0
-        var opened = false
-        for (index in start until source.length) {
-            when (source[index]) {
-                '{' -> {
-                    depth += 1
-                    opened = true
-                }
-                '}' -> {
-                    depth -= 1
-                    if (opened && depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        error("unterminated function: $signature")
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
+
+    private fun owner(path: String, name: String): String = MainActivityRefactorSource.member(
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/$path").readText(), name,
+    )
 }

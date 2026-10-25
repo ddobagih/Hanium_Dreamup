@@ -108,6 +108,10 @@ class OutdoorPositionTestActivity : Activity() {
     private var rawStatus: OutdoorRawGnssRecorder.Status? = null
     private var rawSessionId: String? = null
     private var locationCallback: LocationCallback? = null
+    private var locationRegistration: com.google.android.gms.tasks.Task<Void>? = null
+    private var observationCleanup: OutdoorObservationCleanup? = null
+    private val nativeCleanupPending: Boolean get() = observationCleanup?.isPending == true ||
+        rawRecorder?.status?.cleanupPending == true
     private var generation = 0
     private var collecting = false
     private var stopping = false
@@ -260,6 +264,14 @@ class OutdoorPositionTestActivity : Activity() {
     }
 
     private fun startSignalCheck() {
+        if (nativeCleanupPending) {
+            retryObservationCleanup()
+            if (nativeCleanupPending) {
+                message = "이전 센서 해제가 확인되지 않아 새 수집을 시작할 수 없습니다. 종료 버튼으로 다시 확인하세요."
+                renderStatus()
+                return
+            }
+        }
         if (collecting || stopping || pendingFinalization != null || !permissionsGranted() || !mountConsent.isChecked || !storageConsent.isChecked) return
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
@@ -277,46 +289,59 @@ class OutdoorPositionTestActivity : Activity() {
         gnssCount = 0L
         stationary = PositionStationaryState.UNKNOWN
         gpsHistory.clear()
-        orientation.start()
-        qualityObserver = GnssQualityObserver(
-            source = AndroidGnssObservationSource(locationManager, Executor { handler.post(it) }),
-            onSnapshot = { quality -> if (collecting && generation == owner) latestQuality = quality },
-        ).also { it.start() }
-        motionTracker = AndroidPedestrianMotionTracker(this) { decision ->
-            if (collecting && generation == owner && decision.accepted) {
-                val nowMs = SystemClock.elapsedRealtime()
-                stationary = when (decision.state) {
-                    PedestrianStationaryState.UNKNOWN -> PositionStationaryState.UNKNOWN
-                    PedestrianStationaryState.MOVING -> PositionStationaryState.MOVING
-                    PedestrianStationaryState.CANDIDATE -> PositionStationaryState.CANDIDATE
-                    PedestrianStationaryState.STATIONARY -> PositionStationaryState.STATIONARY
-                }
-                motionObservedAtMs = nowMs
-                stationarySinceMs = decision.candidateSinceElapsedRealtimeMs ?: nowMs
-            }
-        }.also { it.start() }
-        stepTracker = AndroidStepTracker(
-            context = this,
-            onStepCountChanged = { if (collecting && generation == owner) totalSteps = it },
-            onTrackingStarted = { calibration.reset() },
-            onStepEvent = { event -> if (collecting && generation == owner) onStep(event) },
-        ).also { it.start() }
-        val callback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                if (!collecting || generation != owner) return
-                result.locations.forEach { onLocation(it) }
-            }
-        }
-        locationCallback = callback
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1_000L)
-            .setMinUpdateIntervalMillis(500L).setMaxUpdateAgeMillis(0L)
-            .setGranularity(Granularity.GRANULARITY_FINE).build()
         try {
-            fused.requestLocationUpdates(request, callback, Looper.getMainLooper())
-                .addOnSuccessListener { if (!collecting || generation != owner) fused.removeLocationUpdates(callback) }
-                .addOnFailureListener { if (collecting && generation == owner) stopEverything("위치 수신 등록에 실패했습니다. 권한과 위치 설정을 확인하세요.") }
-        } catch (_: SecurityException) {
-            stopEverything("위치 권한이 해제되었습니다. 권한 확인 후 다시 시작하세요.")
+            orientation.start()
+            qualityObserver = GnssQualityObserver(
+                source = AndroidGnssObservationSource(locationManager, Executor { handler.post(it) }),
+                onSnapshot = { quality -> if (collecting && generation == owner) latestQuality = quality },
+            )
+            qualityObserver?.start()
+            motionTracker = AndroidPedestrianMotionTracker(this) { decision ->
+                if (collecting && generation == owner && decision.accepted) {
+                    val nowMs = SystemClock.elapsedRealtime()
+                    stationary = when (decision.state) {
+                        PedestrianStationaryState.UNKNOWN -> PositionStationaryState.UNKNOWN
+                        PedestrianStationaryState.MOVING -> PositionStationaryState.MOVING
+                        PedestrianStationaryState.CANDIDATE -> PositionStationaryState.CANDIDATE
+                        PedestrianStationaryState.STATIONARY -> PositionStationaryState.STATIONARY
+                    }
+                    motionObservedAtMs = nowMs
+                    stationarySinceMs = decision.candidateSinceElapsedRealtimeMs ?: nowMs
+                }
+            }
+            motionTracker?.start()
+            stepTracker = AndroidStepTracker(
+                context = this,
+                onStepCountChanged = { if (collecting && generation == owner) totalSteps = it },
+                onTrackingStarted = { if (collecting && generation == owner) calibration.reset() },
+                onStepEvent = { event -> if (collecting && generation == owner) onStep(event) },
+            )
+            stepTracker?.start()
+            val callback = object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
+                    if (!collecting || generation != owner) return
+                    result.locations.forEach { onLocation(it) }
+                }
+            }
+            locationCallback = callback
+            val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1_000L)
+                .setMinUpdateIntervalMillis(500L).setMaxUpdateAgeMillis(0L)
+                .setGranularity(Granularity.GRANULARITY_FINE).build()
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                throw SecurityException("정확한 위치 권한이 필요합니다.")
+            }
+            val registration = fused.requestLocationUpdates(request, callback, Looper.getMainLooper())
+            locationRegistration = registration
+            registration.addOnCompleteListener(Executor { handler.post(it) }) { completed ->
+                if (!collecting || generation != owner) {
+                    retryObservationCleanup()
+                    if (!isDestroyed) renderStatus()
+                } else if (!completed.isSuccessful) {
+                    stopEverything("위치 수신 등록에 실패했습니다. 권한과 위치 설정을 확인하세요.")
+                }
+            }
+        } catch (_: RuntimeException) {
+            stopEverything("위치 수신을 등록하지 못했습니다. 권한과 위치 설정을 확인하세요.")
             return
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -567,7 +592,11 @@ class OutdoorPositionTestActivity : Activity() {
     }
 
     private fun stopEverything(reason: String) {
-        if (stopping) return
+        if (stopping || (!collecting && lease == null)) {
+            retryObservationCleanup()
+            renderStatus()
+            return
+        }
         stopping = true
         recordingReadiness.stop()
         val active = lease
@@ -575,21 +604,67 @@ class OutdoorPositionTestActivity : Activity() {
         collecting = false
         generation++
         handler.removeCallbacks(heartbeat)
-        locationCallback?.let { runCatching { fused.removeLocationUpdates(it) } }
-        locationCallback = null
-        stepTracker?.stop(); stepTracker = null
-        motionTracker?.close(); motionTracker = null
-        qualityObserver?.close(); qualityObserver = null
-        orientation.stop()
+        retainObservationCleanup()
         calibration.reset()
         gpsHistory.clear()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val raw = rawRecorder
         message = "Raw 종료 저장 중입니다. 파일 닫기가 끝날 때까지 새 기록·내보내기는 대기합니다."
-        renderStatus()
-        if (active != null && raw != null) {
+        // Retire RAW admission before any platform cleanup can fail.
+        if (raw != null) {
             raw.stop { rawStopped -> finishStoppedSession(active, raw, reason, rawStopped) }
-        } else finishStoppedSession(active, raw, reason, raw == null)
+        } else finishStoppedSession(active, null, reason, true)
+        retryObservationCleanup()
+        renderStatus()
+    }
+
+    private fun retainObservationCleanup() {
+        check(observationCleanup?.isPending != true)
+        val callback = locationCallback
+        val registration = locationRegistration
+        val steps = stepTracker
+        val motion = motionTracker
+        val quality = qualityObserver
+        locationCallback = null
+        locationRegistration = null
+        stepTracker = null
+        motionTracker = null
+        qualityObserver = null
+        val locationRelease = callback?.let {
+            OutdoorLocationRelease(it, registration, { owned -> fused.removeLocationUpdates(owned) },
+                Executor { handler.post(it) }) { succeeded -> handler.post {
+                if (succeeded) retryObservationCleanup()
+                if (!isDestroyed) renderStatus()
+            } }
+        }
+        // The orientation tracker drops its listener before unregister; a throw cannot be retried
+        // as proof of release. Keep this failure sticky instead of reopening that tracker.
+        var orientationFailed = false
+        observationCleanup = OutdoorObservationCleanup(
+            removeLocation = { locationRelease?.retry() != false },
+            stopSteps = { steps?.stop(); steps?.operationalHealth?.cleanupPending != true },
+            closeMotion = { motion?.close(); motion?.operationalHealth?.cleanupPending != true },
+            closeQuality = { quality?.close(); quality?.cleanupPending != true },
+            stopOrientation = {
+                if (orientationFailed) false else try {
+                    orientation.stop()
+                    true
+                } catch (_: RuntimeException) {
+                    orientationFailed = true
+                    false
+                }
+            },
+        )
+    }
+
+    private fun retryObservationCleanup() {
+        observationCleanup?.let { if (it.retry()) observationCleanup = null }
+        rawRecorder?.takeIf { it.status.closed }?.let { raw ->
+            if (raw.retryCleanup()) {
+                rawStatus = raw.status
+                if (rawRecorder === raw) rawRecorder = null
+            } else rawStatus = raw.status
+        }
     }
 
     private fun finishStoppedSession(active: PositionFieldSessionLease?, raw: OutdoorRawGnssRecorder?, reason: String, rawStopped: Boolean) {
@@ -608,7 +683,7 @@ class OutdoorPositionTestActivity : Activity() {
             }
         }
         rawStatus = raw?.status ?: rawStatus
-        rawRecorder = null
+        if (raw?.status?.cleanupPending != true) rawRecorder = null
         message = finalMessage
         stopping = false
         if (!isDestroyed) renderStatus()
@@ -713,14 +788,14 @@ class OutdoorPositionTestActivity : Activity() {
     }
 
     override fun onPause() {
-        if (collecting || lease != null) stopEverything("화면을 벗어나 기록을 종료했습니다. 완료 파일을 내보내거나 명시적으로 새 기록을 시작하세요.")
+        if (collecting || lease != null || nativeCleanupPending) stopEverything("화면을 벗어나 기록을 종료했습니다. 완료 파일을 내보내거나 명시적으로 새 기록을 시작하세요.")
         super.onPause()
     }
 
     override fun onResume() { super.onResume(); if (::statusText.isInitialized) renderStatus() }
 
     override fun onDestroy() {
-        if (collecting || lease != null) stopEverything("화면 종료로 기록을 종료했습니다.")
+        if (collecting || lease != null || nativeCleanupPending) stopEverything("화면 종료로 기록을 종료했습니다.")
         exportExecutor.shutdown()
         super.onDestroy()
     }
@@ -750,13 +825,15 @@ class OutdoorPositionTestActivity : Activity() {
             "Raw 상태 ${raw?.state?.name ?: "IDLE"} · 대기 ${raw?.pendingEpochCount ?: 0} · 누락/미확인 ${raw?.droppedMeasurementCount ?: 0L}\n" +
             "걸음 $totalSteps · trace $traceCount · 기준점 $checkpointOrdinal\n" +
             "정지 상태 ${stationary.name} · 시험 보폭 ${String.format(Locale.US, "%.2f", profile.stepLengthM)}m · 학습 ${profile.acceptedSampleCount}\n" +
-            "$rawWarning\n${raw?.warningMessage ?: ""}\n${raw?.errorMessage ?: ""}\n\n$message"
+            "$rawWarning\n${raw?.warningMessage ?: ""}\n${raw?.errorMessage ?: ""}\n\n$message" +
+            if (nativeCleanupPending) "\n센서 해제 미확인: ${observationCleanup?.pendingSources.orEmpty().joinToString()} ${raw?.cleanupError ?: ""}. 새 수집이 차단되었습니다." else ""
         mountConsent.isEnabled = !collecting && !stopping && !exporting
         storageConsent.isEnabled = !stopping && !exporting
-        previewButton.isEnabled = !collecting && !stopping && !exporting && pendingFinalization == null && storageReady && permissionsGranted() && mountConsent.isChecked && storageConsent.isChecked
+        previewButton.isEnabled = !collecting && !stopping && !exporting && !nativeCleanupPending && pendingFinalization == null && storageReady && permissionsGranted() && mountConsent.isChecked && storageConsent.isChecked
         startButton.isEnabled = collecting && !stopping && !active && ready && !exporting && storageConsent.isChecked
         checkpointButton.isEnabled = recordingReady
-        stopButton.isEnabled = collecting || active
+        stopButton.isEnabled = collecting || active || nativeCleanupPending
+        stopButton.text = if (nativeCleanupPending) "센서 종료 다시 확인" else "기록 종료 / 신호 확인 종료"
         exportTraceButton.isEnabled = !active && !stopping && !exporting && pendingExport == null && completedSessionId != null
         exportRawButton.isEnabled = exportTraceButton.isEnabled && completedRawFile != null
         completedButton.isEnabled = !active && !stopping && !exporting && pendingExport == null && completedSessions.isNotEmpty()

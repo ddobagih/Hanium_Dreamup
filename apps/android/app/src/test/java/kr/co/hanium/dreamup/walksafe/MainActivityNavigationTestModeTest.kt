@@ -11,6 +11,7 @@ import kr.co.hanium.dreamup.walksafe.navigation.RoutePoint
 import kr.co.hanium.dreamup.walksafe.navigation.WalkingRoute
 import kr.co.hanium.dreamup.walksafe.navigation.WalkingRouteSummary
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.GnssPositionObservation
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.PositionConfidenceTransition
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.PositionQuality
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.PositioningCoordinator
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.PositioningSnapshot
@@ -116,17 +117,33 @@ class MainActivityNavigationTestModeTest {
             val activity = MainActivity()
             setBooleanField(activity, "developmentGuidanceStartRequested", true)
             setBooleanField(activity, "positionGuidancePaused", true)
-            val snapshot = PositioningCoordinator().observeGnss(
+            val coordinator = PositioningCoordinator()
+            // A first usable LOW fix is admitted normally. This case needs an actual interruption
+            // first, so the bypass must clear Main's pause while leaving the real decision intact.
+            val unavailable = coordinator.observeGnss(GnssPositionObservation(
+                latitude = 37.0, longitude = 127.0, horizontalAccuracyM = 30.0,
+                elapsedRealtimeMs = 1_000L,
+            ))
+            assertEquals(PositionConfidenceTransition.DEGRADATION_PENDING, unavailable.confidence.transition)
+            assertTrue(unavailable.confidence.guidancePaused)
+            val degraded = coordinator.evaluate(4_000L)
+            assertEquals(PositionQuality.UNAVAILABLE, degraded.quality)
+            assertEquals(PositionConfidenceTransition.DEGRADED, degraded.confidence.transition)
+            assertTrue(degraded.confidence.guidancePaused)
+            val snapshot = coordinator.observeGnss(
                 GnssPositionObservation(
                     latitude = 37.0,
                     longitude = 127.0,
                     horizontalAccuracyM = accuracyM,
-                    elapsedRealtimeMs = 1_000L,
+                    elapsedRealtimeMs = 5_000L,
                 ),
             )
             assertEquals(expectedQuality, snapshot.quality)
             assertEquals(expectedQuality, snapshot.confidence.quality)
             assertTrue(snapshot.confidence.guidancePaused)
+            if (expectedQuality == PositionQuality.LOW) {
+                assertEquals(PositionConfidenceTransition.RECOVERY_PENDING, snapshot.confidence.transition)
+            }
 
             val interrupted = invoke(
                 activity,
@@ -181,20 +198,20 @@ class MainActivityNavigationTestModeTest {
         invoke(activity, name, Boolean::class.javaPrimitiveType!!) as Boolean
 
     private fun field(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).run {
+        MainActivityControllerTestFixture.field(name).run {
             isAccessible = true
             get(activity)
         }
 
     private fun setField(activity: MainActivity, name: String, value: Any) {
-        MainActivity::class.java.getDeclaredField(name).apply {
+        MainActivityControllerTestFixture.field(name).apply {
             isAccessible = true
             set(activity, value)
         }
     }
 
     private fun setBooleanField(activity: MainActivity, name: String, value: Boolean) {
-        MainActivity::class.java.getDeclaredField(name).apply {
+        MainActivityControllerTestFixture.field(name).apply {
             isAccessible = true
             setBoolean(activity, value)
         }

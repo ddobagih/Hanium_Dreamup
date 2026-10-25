@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D08-010 기기별 장기 family 발급·용량"]
+  B["진입: POST /api/field-session session_mode=long_lived"]
+  A --> B
+  P0["1. Backend 인증 generation/epoch 및 actor queue 에 진입한다."]
+  B --> P0
+  P1["2. 만료 family 를 정리하고 동일 device 기존 family 를 login_replaced 로 revoke 한다."]
+  P0 --> P1
+  P2["3. active32/stored64 정책으로 정리 또는 거부한다."]
+  P1 --> P2
+  P3["4. random familyID·refresh proof secret·access digest 를 생성한다."]
+  P2 --> P3
+  P4["5. 암호화 저장 성공 후 access cookie 와 refresh bundle 을 반환한다."]
+  P3 --> P4
+  OK["정상: 기기 family 활성 및 client 보관 refresh bundle"]
+  P4 --> OK
+  C0{"설정 false/미설정"}
+  X0["503 long_lived unavailable; password short 가 기본"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"idle unlimited 에서 active32 도달"}
+  X1["least-recently-rotated family capacity evict"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"유한 idle 의 active capacity 도달"}
+  X2["capacity 오류"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"postrename 결과 불명"}
+  X3["500; refresh 재시도보다 재인증"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-007, P-D08-008, P-D08-009, P-D08-021, P-D08-024"]
+  A -.-> POLICY

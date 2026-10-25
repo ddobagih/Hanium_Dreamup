@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-021 · 관리자 권리요청 ACK·해결·반려<br/>PATCH<br/>/admin/report-requests/{request_id}/status"]
+  P["P-D15-021 · 전제조건<br/>admin proof/action binding, row FOR UPDATE.<br/>request.state identity.step_up_verified_at가<br/>None이면 service 호출 전403; D14 재확인 계약 결합 미해결."]
+  E --> P
+  S1["1. 현재 request lock 후 expected_version 확인"]
+  P --> S1
+  S2["2. RECEIVED→ACKNOWLEDGED→RESOLVED/REJECTED만<br/>허용"]
+  S1 --> S2
+  S3["3. DELETE ACKNOWLEDGED→RESOLVED는 이 API에서 제거"]
+  S2 --> S3
+  S4["4. status version+1, public/internal<br/>response, ADMIN event 및 operation audit 같이<br/>commit"]
+  S3 --> S4
+  S5["5. Integrity race는 최신version 재조회해409과<br/>store503 구별"]
+  S4 --> S5
+  OK["정상 결과<br/>새 status/version·사용자 공개 응답·ADMIN event·감사를 한<br/>transaction으로 commit한 뒤 현재 요청 상태 반환."]
+  S5 --> OK
+  B1["조건 · HTTP action identity.step_up_verified_at is<br/>None<br/>결과 · 403 admin_step_up_required; service mutation에<br/>도달하지 않음"]
+  P -. "해당 조건 발생" .-> B1
+  B2["조건 · stale version<br/>결과 · 409 latest 상태 포함"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · 종료 상태 재변경 또는 동일 status<br/>결과 · 422"]
+  S3 -. "해당 조건 발생" .-> B3
+  B4["조건 · DELETE를 RESOLVED로 patch<br/>결과 · 422; 물리효과 없는 완료 금지"]
+  S1 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>동일 상태 재호출을 replay 성공으로 정의하지 않음.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_user_requests.py:745<br/>update_admin_request_status<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

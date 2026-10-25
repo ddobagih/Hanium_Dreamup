@@ -1,0 +1,15 @@
+flowchart TD
+  META["F-D16-009 · P-D16-009"]
+  META --> A
+  A["압축 또는 plain RINEX"] --> B{"확장자·magic·안전 이름 일치"}
+  B -->|"아니오"| X["거부·부분 출력 삭제"]
+  B -->|"예"| C{"ZIP entry≤64·entry≤256MiB·total≤512MiB
+  비율≤200배+1MiB·중복/중첩ZIP 없음"}
+  C -->|"아니오"| X
+  C -->|"예"| D["generated 이름으로 bounded 해제·hash·fsync"]
+  D --> E{"header 길이·version/type·END OF HEADER 유효"}
+  E -->|"아니오"| X
+  E -->|"예"| F["관측 O의 실제epoch·좌표·중복/역순·header시각 대조"]
+  F -->|"불일치"| X
+  F -->|"유효"| G["실제 first/last/max gap 반환"]
+  D -->|"전달된 token 취소"| X

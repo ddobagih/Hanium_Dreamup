@@ -14,6 +14,10 @@ export const ACCOUNT_CREATE_BODY_LIMIT_BYTES = 16 * 1024;
 export const ACCOUNT_UPSTREAM_RESPONSE_LIMIT_BYTES = 16 * 1024;
 
 const ACCOUNT_UPSTREAM_RESPONSE_TIMEOUT_MS = 5_000;
+// SMTP has a measured shared 30 s budget; reserve 10 s for account database work.
+export const ACCOUNT_ENROLLMENT_UPSTREAM_TIMEOUT_MS = 40_000;
+export const ACCOUNT_ENROLLMENT_OWN_LIMITS_MS =
+  10_000 + ACCOUNT_ENROLLMENT_UPSTREAM_TIMEOUT_MS + ACCOUNT_UPSTREAM_RESPONSE_TIMEOUT_MS;
 const BACKEND_ACCOUNT_CLIENT_IP_HEADER = "x-walksafe-client-ip";
 const SAFE_ERROR_STATUSES = new Set([400, 401, 409, 429, 503]);
 const SAFE_ERROR_CODE = /^[a-z][a-z0-9_]{0,63}$/;
@@ -127,7 +131,7 @@ function canonicalEmail(value: unknown): string | null {
   ) return null;
   const [local, rawDomain] = value.split("@") as [string, string];
   if (local.length < 1 || local.length > 64 || !EMAIL_LOCAL.test(local) ||
-    !rawDomain || rawDomain.endsWith(".") || rawDomain.includes("%")) return null;
+    !rawDomain || rawDomain.endsWith(".") || /[\u0000-\u0020\u007f%/\\?#:]/.test(rawDomain)) return null;
   const domain = domainToASCII(rawDomain);
   if (!domain || domain.endsWith(".")) return null;
   const labels = domain.split(".");
@@ -419,7 +423,8 @@ async function relayAccountRequest(
   successStatuses: ReadonlySet<number>,
   sanitizeSuccess: (value: unknown) => Record<string, unknown> | null,
   fetchImpl?: GatewayFetch,
-  initialHeaders?: HeadersInit
+  initialHeaders?: HeadersInit,
+  upstreamTimeoutMs = 15_000
 ): Promise<Response> {
   const headers = serviceHeaders(initialHeaders);
   if (headers instanceof Response) return headers;
@@ -429,9 +434,8 @@ async function relayAccountRequest(
     body: JSON.stringify(body),
     cache: "no-store"
   };
-  const upstream = fetchImpl
-    ? await fetchBackend(request, backendUrl(backendPath), init, 15_000, fetchImpl)
-    : await fetchBackend(request, backendUrl(backendPath), init);
+  const upstream = await fetchBackend(request, backendUrl(backendPath), init,
+    upstreamTimeoutMs, fetchImpl ?? globalThis.fetch);
   const decoded = await boundedUpstreamJson(upstream);
   if (decoded.timeout) return accountError(504, "gateway_upstream_response_timeout");
   if (decoded.error) return accountError(502, "gateway_account_upstream_invalid");
@@ -472,7 +476,8 @@ export async function relayAccountEnrollment(
     new Set([202]),
     enrollmentResponse,
     fetchImpl,
-    { [BACKEND_ACCOUNT_CLIENT_IP_HEADER]: clientIp }
+    { [BACKEND_ACCOUNT_CLIENT_IP_HEADER]: clientIp },
+    ACCOUNT_ENROLLMENT_UPSTREAM_TIMEOUT_MS
   );
 }
 
@@ -492,6 +497,45 @@ export async function relayAccountCreation(
     accountResponse,
     fetchImpl
   );
+}
+
+/** Policy metadata is projected independently of account creation and never cached. */
+export async function relayAccountSignupPolicy(
+  request: Request,
+  fetchImpl?: GatewayFetch
+): Promise<Response> {
+  const headers = serviceHeaders();
+  if (headers instanceof Response) return headers;
+  const upstream = await fetchBackend(request, backendUrl("/account-signup-policy"),
+    { method: "GET", headers, cache: "no-store" }, 15_000, fetchImpl ?? globalThis.fetch);
+  const decoded = await boundedUpstreamJson(upstream);
+  if (decoded.timeout) return accountError(504, "gateway_upstream_response_timeout");
+  if (decoded.error) return accountError(502, "gateway_account_upstream_invalid");
+  if (upstream.status !== 200) return projectedError(upstream, decoded.value);
+  const value = objectPayload(decoded.value);
+  const documents = objectPayload(value?.documents);
+  if (!value || !exactKeys(value, ["schema_version", "documents"]) ||
+      value.schema_version !== "walksafe.account-signup-policy.v1" || !documents ||
+      !exactKeys(documents, SIGNUP_CONSENT_DOCUMENT_KEYS)) {
+    return accountError(502, "gateway_account_upstream_invalid");
+  }
+  for (const [index, key] of SIGNUP_CONSENT_DOCUMENT_KEYS.entries()) {
+    const doc = objectPayload(documents[key]);
+    if (!doc || !exactKeys(doc, ["version", "required", "equivalent_versions", "prior_versions"]) ||
+        !validBoundedVersion(doc.version) || doc.required !== (index < 3) ||
+        ![doc.equivalent_versions, doc.prior_versions].every(versions =>
+          Array.isArray(versions) && versions.length <= 8 && versions.every(validBoundedVersion) &&
+          new Set(versions).size === versions.length)) {
+      return accountError(502, "gateway_account_upstream_invalid");
+    }
+    const equivalent = doc.equivalent_versions as string[];
+    const prior = doc.prior_versions as string[];
+    if (equivalent.includes(doc.version) || (index < 3 && prior.length > 0) ||
+        prior.includes(doc.version) || prior.some(version => equivalent.includes(version))) {
+      return accountError(502, "gateway_account_upstream_invalid");
+    }
+  }
+  return Response.json(value, { headers: { "cache-control": "no-store" } });
 }
 
 export async function authenticateBackendAccount(

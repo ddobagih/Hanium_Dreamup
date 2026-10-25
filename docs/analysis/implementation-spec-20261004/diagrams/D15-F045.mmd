@@ -1,0 +1,34 @@
+flowchart TB
+  E["F-D15-045 · 복원 게시 전 exact inventory gate<br/>재적용 후 before/post inventory와 receipt 판정"]
+  P["P-D15-045 · 전제조건<br/>source lease가 현재도 살아 있음; signed bundle<br/>binding."]
+  E --> P
+  S1["1. before plan을 다시 산출"]
+  P --> S1
+  S2["2. post inventory는 같은<br/>run/backup/receipt/source/target이고<br/>observed_at≥before이어야 함"]
+  S1 --> S2
+  S3["3. post plan에 삭제대상 action이 남으면 차단"]
+  S2 --> S3
+  S4["4. expected post=before에서 계획대상만 제외한 정확 집합과 비교"]
+  S3 --> S4
+  S5["5. actions 있었다면 exact receipt 필수; 없었으면<br/>receipt 금지"]
+  S4 --> S5
+  S6["6. gate 반환 직전 fence를 다시 검증하여 PASS 문서 생성"]
+  S5 --> S6
+  OK["정상 결과<br/>gate 반환 직전 fence를 다시 검증하여 PASS 문서 생성"]
+  S6 --> OK
+  B1["조건 · post snapshot 오래됨<br/>결과 · restore_publish_inventory_stale"]
+  S2 -. "해당 조건 발생" .-> B1
+  B2["조건 · unrelated 변경/누락<br/>결과 · restore_publish_inventory_drift"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · tombstone 대상 잔류<br/>결과 · reapply_pending"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · fence 소실<br/>결과 · publish blocked"]
+  S3 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>검증 함수 자체에 DB transaction·파일 삭제 없음. 호출 CLI가<br/>target/fence context와 signal handler를 정리."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_restore_tombstones.py:2294<br/>assert_report_restore_publishable<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

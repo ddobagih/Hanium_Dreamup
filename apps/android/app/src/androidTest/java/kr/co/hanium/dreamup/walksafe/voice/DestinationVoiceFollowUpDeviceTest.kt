@@ -1,10 +1,13 @@
 package kr.co.hanium.dreamup.walksafe.voice
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
 import android.Manifest
 import android.app.Instrumentation
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Process
+import android.os.Looper
 import android.os.SystemClock
 import android.speech.SpeechRecognizer
 import android.util.Log
@@ -18,6 +21,12 @@ import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import kr.co.hanium.dreamup.walksafe.BuildConfig
 import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.feedback.AndroidFeedbackActuator
+import kr.co.hanium.dreamup.walksafe.feedback.SpeechOutputEvent
+import kr.co.hanium.dreamup.walksafe.feedback.SpeechOutputKind
+import kr.co.hanium.dreamup.walksafe.feedback.SpeechOutputOutcome
+import kr.co.hanium.dreamup.walksafe.network.GatewaySessionProcessCoordinator
+import kr.co.hanium.dreamup.walksafe.navigation.destinationOriginAgeNoticeKo
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceCommand
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState
 import kr.co.hanium.dreamup.walksafe.session.DeviceTestAccountUiLogin
@@ -46,6 +55,7 @@ class DestinationVoiceFollowUpDeviceTest {
                 "The actual search request must advance its generation",
                 (mainField(session.activity, "destinationSearchGeneration") as Number).toInt() > initialGeneration,
             )
+            session.partObservation = CandidatePartObservation(session)
             // Stop the real capture before a new explicit button action, without cancelling the dialog.
             invokeMain(session.activity, "cancelVoiceCommandRecognition")
             assertTrue("Ordinary input cleanup must preserve the dialog", currentDialog(session.activity) === firstState)
@@ -57,13 +67,15 @@ class DestinationVoiceFollowUpDeviceTest {
         val retryState = requireNotNull(awaitCapture(session, "RETRY", candidatePromptRequired = true))
         assertTrue("Retry must preserve the existing candidate page", retryState === firstState)
         onMain(session) {
-            assertEquals("CHOICE_GUIDANCE", observeDialog(session).lastInteractionKind)
+            val facts = requireNotNull(session.partObservation).facts(retryState)
+            assertTrue("NOT_VERIFIED: current retry choice footer was not delivered: $facts", facts.choiceGuidanceObserved)
         }
         injectFinal(session, "REPLAY", "다시 듣기")
         val replayState = requireNotNull(awaitCapture(session, "REPLAY", candidatePromptRequired = true))
         assertTrue("Replay must preserve the current candidate state and page", replayState === retryState)
         onMain(session) {
-            assertEquals("CURRENT_PAGE", observeDialog(session).lastInteractionKind)
+            val facts = requireNotNull(session.partObservation).facts(replayState)
+            assertTrue("NOT_VERIFIED: current replay page parts were not delivered in order: $facts", facts.currentPageObserved)
         }
         assertTrue("BLOCKED: actual nearby results have no further candidate page", retryState.canHearMore)
 
@@ -71,6 +83,10 @@ class DestinationVoiceFollowUpDeviceTest {
         val nextState = requireNotNull(awaitCapture(session, "MORE", candidatePromptRequired = true))
         assertTrue("More must keep the same actual search query", nextState.query == QUERY)
         assertTrue("More must advance to a real candidate page", nextState.pageIndex > retryState.pageIndex)
+        onMain(session) {
+            val facts = requireNotNull(session.partObservation).facts(nextState)
+            assertTrue("NOT_VERIFIED: current next-page parts were not delivered in order: $facts", facts.currentPageObserved)
+        }
         val selection = (1..nextState.results.size).firstNotNullOfOrNull { index ->
             nextState.onCommand(DestinationSearchVoiceCommand.SelectCandidate(index)).selectedResult?.let {
                 Selection(index, it)
@@ -106,9 +122,10 @@ class DestinationVoiceFollowUpDeviceTest {
         assertTrue("BLOCKED: actual current page needs two distinct candidates", allowedIndices.size >= 2)
 
         onMain(session) {
+            session.partObservation = CandidatePartObservation(session)
             invokeMain(session.activity, "cancelVoiceCommandRecognition")
             assertTrue("Input cleanup must preserve the candidate page", currentDialog(session.activity) === original)
-            mark(session, "RECOGNIZER_ERROR_RETRY")
+            mark(session, "RECOGNIZER_ERROR_RETRY", observedResponses = 2)
             val button = mainField(session.activity, "voiceReportButton") as Button
             assertTrue("BLOCKED: actual voice retry button is unavailable", button.isShown && button.isEnabled)
             assertTrue("The real retry button must handle the click", button.performClick())
@@ -118,14 +135,14 @@ class DestinationVoiceFollowUpDeviceTest {
             session, "RECOGNIZER_ERROR_RETRY", candidatePromptRequired = true, recognizerErrorRequired = true,
         ))
         assertTrue("Recognizer error must preserve the same candidate state and page", afterError === original)
-        assertShortRetry(session)
+        assertRetryResponse(session, afterError, "말씀을 정확히 듣지 못했습니다.", recognizerErrorRequired = true)
 
         injectFinal(session, "LOW_CONFIDENCE_RETRY", "${allowedIndices[0]}번", confidence = 0.01f)
         val afterLowConfidence = requireNotNull(awaitCapture(
             session, "LOW_CONFIDENCE_RETRY", candidatePromptRequired = true,
         ))
         assertTrue("Low confidence must preserve the same candidate state and page", afterLowConfidence === original)
-        assertShortRetry(session)
+        assertRetryResponse(session, afterLowConfidence, "명령을 이해하지 못했습니다.")
 
         injectFinal(
             session, "CONFLICTING_NUMBERS_RETRY", "${allowedIndices[0]}번",
@@ -135,14 +152,14 @@ class DestinationVoiceFollowUpDeviceTest {
             session, "CONFLICTING_NUMBERS_RETRY", candidatePromptRequired = true,
         ))
         assertTrue("Conflicting numbers must preserve the same candidate state and page", afterConflict === original)
-        assertShortRetry(session)
+        assertRetryResponse(session, afterConflict, "음성 후보를 하나로 확정하지 못했습니다. 다시 말씀해 주세요.")
 
         injectFinal(session, "INVALID_NUMBER_RETRY", "${original.results.size + 1}번")
         val afterInvalidNumber = requireNotNull(awaitCapture(
             session, "INVALID_NUMBER_RETRY", candidatePromptRequired = true,
         ))
         assertTrue("Invalid number must preserve the same candidate state and page", afterInvalidNumber === original)
-        assertShortRetry(session)
+        assertRetryResponse(session, afterInvalidNumber, "안내한 후보 번호를 확인하지 못했습니다.")
 
         val selected = requireNotNull(
             original.onCommand(DestinationSearchVoiceCommand.SelectCandidate(allowedIndices[0])).selectedResult,
@@ -198,9 +215,20 @@ class DestinationVoiceFollowUpDeviceTest {
         assertNoLateCapture(session, "CANCEL", 12_000L)
     }
 
-    private fun assertShortRetry(session: DeviceSession) {
+    private fun assertRetryResponse(
+        session: DeviceSession, state: DestinationSearchVoiceState, expectedPrefix: String,
+        recognizerErrorRequired: Boolean = false,
+    ) {
         onMain(session) {
-            assertEquals("RETRY_GUIDANCE", observeDialog(session).lastInteractionKind)
+            val events = requireNotNull(session.lastCaptureEvents)
+            val facts = requireNotNull(session.partObservation).responseFacts(state, expectedPrefix, events,
+                recognizerErrorRequired)
+            assertTrue("NOT_VERIFIED: the actual reason prefix was not delivered: $facts", facts.reasonPrefixObserved)
+            assertTrue("NOT_VERIFIED: the actual whole candidate page was not delivered: $facts", facts.currentPageObserved)
+            if (recognizerErrorRequired) {
+                assertTrue("NOT_VERIFIED: initial page/READY and actual error/recovery order were not observed: $facts",
+                    facts.initialPageAndErrorRecoveryObserved)
+            }
         }
     }
 
@@ -218,7 +246,7 @@ class DestinationVoiceFollowUpDeviceTest {
                 val homeGate = mainBoolean(activity, "homeVoiceCommandAvailable")
                 val active = mainField(activity, "voiceRecognitionActive") as Boolean
                 val promptPending = mainField(activity, "voiceCommandPromptPending") as Boolean
-                val modelPreparing = mainField(activity, "handsFreeVoiceModelPreparing") as Boolean
+                val modelPreparing = MainActivityControllerTestFixture.handsFreeModelPreparing(activity)
                 readiness = "page=$page shown=$shown enabled=$enabled homeGate=$homeGate " +
                     "voiceRecognitionActive=$active voiceCommandPromptPending=$promptPending " +
                     "handsFreeVoiceModelPreparing=$modelPreparing"
@@ -314,8 +342,15 @@ class DestinationVoiceFollowUpDeviceTest {
         var observed = DialogObservation()
         while (SystemClock.elapsedRealtime() < deadline) {
             observed = onMain(session) { observeDialog(session) }
-            events = readOwnEvents(session, step)
+            events = readOwnEvents(session, step, strictRecognizerErrorOrdering = recognizerErrorRequired)
             assertFalse("A delivered candidate prompt could not request follow-up capture", events.blocked)
+            if (recognizerErrorRequired && events.readyAfterCandidateDone &&
+                events.retryableRecognizerError == "NONE"
+            ) {
+                onMain(session) {
+                    currentDialog(session.activity)?.let { session.partObservation?.confirmInitialReady(it) }
+                }
+            }
             val ready = if (candidatePromptRequired) {
                 events.readyAfterCandidateDone && observed.current && observed.queryMatches &&
                     observed.candidates > 0 && observed.searchFinished
@@ -335,7 +370,12 @@ class DestinationVoiceFollowUpDeviceTest {
                     "event=DESTINATION_DIALOG_DEVICE_READY step=$step " +
                         "candidate_done_required=$candidatePromptRequired elapsed_ms=${SystemClock.elapsedRealtime() - started}",
                 )
-                return onMain(session) { currentDialog(session.activity) }
+                return onMain(session) {
+                    val state = currentDialog(session.activity)
+                    if (candidatePromptRequired) session.partObservation?.confirmReady(requireNotNull(state))
+                    session.lastCaptureEvents = events
+                    state
+                }
             }
             SystemClock.sleep(100L)
         }
@@ -367,6 +407,7 @@ class DestinationVoiceFollowUpDeviceTest {
         assertTrue("BLOCKED: DEBUG metadata events are required", BuildConfig.DEBUG)
         val reader = Executors.newSingleThreadExecutor()
         var opened: MainActivity? = null
+        var session: DeviceSession? = null
         try {
             val activity = instrumentation.startActivitySync(
                 Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -403,10 +444,16 @@ class DestinationVoiceFollowUpDeviceTest {
                     requestInFlight = (mainField(activity, "routeRequestInFlight") as AtomicBoolean).get(),
                 )
             }
-            test(DeviceSession(instrumentation, activity, reader, SystemClock.elapsedRealtimeNanos(), before))
+            val deviceSession = DeviceSession(instrumentation, activity, reader, SystemClock.elapsedRealtimeNanos(), before)
+            session = deviceSession
+            test(deviceSession)
         } finally {
-            reader.shutdownNow()
-            opened?.let { activity -> instrumentation.runOnMainSync { activity.finish() } }
+            try {
+                session?.let { onMain(it) { it.partObservation?.restore() } }
+            } finally {
+                reader.shutdownNow()
+                opened?.let { activity -> instrumentation.runOnMainSync { activity.finish() } }
+            }
         }
     }
 
@@ -422,7 +469,9 @@ class DestinationVoiceFollowUpDeviceTest {
         )
     }
 
-    private fun readOwnEvents(session: DeviceSession, step: String): DialogEvents {
+    private fun readOwnEvents(
+        session: DeviceSession, step: String, strictRecognizerErrorOrdering: Boolean = false,
+    ): DialogEvents {
         val process = ProcessBuilder(
             "logcat", "-d", "-b", "main", "-v", "brief",
             "--pid=" + Process.myPid(), TAG + ":D", "*:S",
@@ -437,6 +486,7 @@ class DestinationVoiceFollowUpDeviceTest {
                     ) {
                         events = DialogEvents(markerSeen = true)
                     } else if (events.markerSeen) {
+                        events.eventOrdinal++
                         when (event) {
                             "OUTPUT_DONE" -> {
                                 events.outputDone = true
@@ -445,6 +495,7 @@ class DestinationVoiceFollowUpDeviceTest {
                             "DESTINATION_VOICE_PROMPT_DONE" -> {
                                 events.candidateDone = events.outputDone
                                 events.candidateDoneAfterRecognizerError = events.outputDoneAfterRecognizerError
+                                if (events.candidateDoneAfterRecognizerError) events.recoveredCandidateDoneOrdinal = events.eventOrdinal
                             }
                             "DESTINATION_VOICE_FOLLOW_UP_REQUESTED" -> {
                                 events.followUpRequested = true
@@ -454,17 +505,46 @@ class DestinationVoiceFollowUpDeviceTest {
                             "DESTINATION_VOICE_FOLLOW_UP_BLOCKED" -> events.blocked = true
                             "ONE_SHOT_UI_ERROR" -> {
                                 val code = line.substringAfter("error_code=", "").substringBefore(' ').toIntOrNull()
-                                if (events.anyReady) {
-                                    when (code) {
-                                        SpeechRecognizer.ERROR_NO_MATCH -> events.retryableRecognizerError = "NO_MATCH"
-                                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> events.retryableRecognizerError = "SPEECH_TIMEOUT"
+                                if (events.anyReady && code in setOf(SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT)) {
+                                    events.retryableRecognizerError = if (code == SpeechRecognizer.ERROR_NO_MATCH) "NO_MATCH" else "SPEECH_TIMEOUT"
+                                    events.recognizerErrorCount++
+                                    events.recognizerErrorOrdinal = events.eventOrdinal
+                                    if (strictRecognizerErrorOrdering) {
+                                        // A prior batch's completion cannot stand in for error recovery.
+                                        events.outputDone = false
+                                        events.candidateDone = false
+                                        events.orderedRequest = false
+                                        events.readyAfterCandidateDone = false
+                                        events.outputDoneAfterRecognizerError = false
+                                        events.candidateDoneAfterRecognizerError = false
+                                        events.requestAfterRecognizerError = false
+                                        events.readyAfterRecognizerError = false
                                     }
+                                }
+                            }
+                            "VOICE_DIALOG" -> {
+                                val stage = line.substringAfter("stage=", "").substringBefore(' ')
+                                val reason = line.substringAfter("reason=", "").substringBefore(' ')
+                                val context = line.substringAfter("context=", "").substringBefore(' ')
+                                val origin = line.substringAfter("origin=", "").substringBefore(' ')
+                                if (stage == "INPUT_ERROR" && context == "VALID" && origin == "MICROPHONE_PATH" &&
+                                    reason == events.retryableRecognizerError && reason in setOf("NO_MATCH", "SPEECH_TIMEOUT")
+                                ) {
+                                    events.dialogRecognizerError = reason
+                                    events.dialogRecognizerErrorOrdinal = events.eventOrdinal
+                                    events.dialogRecognizerErrorPage = line.substringAfter("page_index=", "").substringBefore(' ').toIntOrNull()
                                 }
                             }
                             "ONE_SHOT_UI_READY" -> {
                                 events.anyReady = true
                                 events.readyAfterCandidateDone = events.orderedRequest
-                                if (events.requestAfterRecognizerError) events.readyAfterRecognizerError = true
+                                if (events.readyAfterCandidateDone && events.retryableRecognizerError == "NONE") {
+                                    events.firstCandidateReadyOrdinal = events.eventOrdinal
+                                }
+                                if (events.requestAfterRecognizerError) {
+                                    events.readyAfterRecognizerError = true
+                                    events.recoveredReadyOrdinal = events.eventOrdinal
+                                }
                             }
                         }
                     }
@@ -485,7 +565,9 @@ class DestinationVoiceFollowUpDeviceTest {
         }
     }
 
-    private fun mark(session: DeviceSession, step: String) {
+    private fun mark(session: DeviceSession, step: String, observedResponses: Int = 1) {
+        session.lastCaptureEvents = null
+        session.partObservation?.beginWindow(observedResponses)
         Log.d(TAG, "event=SYNTHETIC_DESTINATION_DIALOG_STEP run_id=${session.runId} step=$step")
     }
 
@@ -499,7 +581,7 @@ class DestinationVoiceFollowUpDeviceTest {
         invokeMain(activity, name) as Boolean
 
     private fun mainField(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.get(activity)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.get(activity)
 
     private fun <T> onMain(session: DeviceSession, action: () -> T): T = onMain(session.instrumentation, action)
 
@@ -520,6 +602,248 @@ class DestinationVoiceFollowUpDeviceTest {
         val reader: ExecutorService,
         val runId: Long,
         val routeBefore: RouteBaseline,
+    ) {
+        var partObservation: CandidatePartObservation? = null
+        var lastCaptureEvents: DialogEvents? = null
+    }
+
+    /** Observes the existing actor only; messages stay in memory and never enter diagnostics. */
+    private inner class CandidatePartObservation(private val session: DeviceSession) {
+        private val activity = session.activity
+        private val actuator: AndroidFeedbackActuator = mainField(activity, "feedbackActuator") as? AndroidFeedbackActuator
+            ?: throw AssertionError("NOT_VERIFIED: existing candidate actuator is unavailable")
+        private val previous = actuator.speechOutputListener
+        private var window: PartWindow? = null
+        private var initialResponse: PartWindow? = null
+        private var responseLimit = 1
+        private val listener: (SpeechOutputEvent) -> Unit = { event ->
+            try {
+                previous?.invoke(event)
+            } finally {
+                try { record(event) } catch (_: Throwable) { window?.invalid = true }
+            }
+        }
+
+        init {
+            check(Looper.myLooper() === Looper.getMainLooper())
+            actuator.speechOutputListener = listener
+        }
+
+        fun beginWindow(observedResponses: Int = 1) {
+            check(Looper.myLooper() === Looper.getMainLooper())
+            require(observedResponses in 1..2)
+            responseLimit = observedResponses
+            initialResponse = null
+            window = PartWindow(
+                SystemClock.elapsedRealtime(), responseGeneration(),
+                mainField(activity, "reporterUserId"), mainField(activity, "feedbackLifecycleGeneration"),
+                GatewaySessionProcessCoordinator.snapshot().generation, approvalAtMs(),
+            )
+            if (actuator.speechOutputListener !== listener || mainField(activity, "feedbackActuator") !== actuator) {
+                window?.invalid = true
+            }
+        }
+
+        private fun responseGeneration() = (mainField(activity, "commandSpeechResponseGeneration") as Number).toLong()
+        private fun approvalAtMs() = (actuatorField("lastInteractionMessageAtMs") as Number).toLong()
+        private fun actuatorField(name: String): Any? =
+            actuator.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(actuator)
+
+        private fun ownerCurrent(w: PartWindow): Boolean =
+            Looper.myLooper() === Looper.getMainLooper() && actuator.speechOutputListener === listener &&
+                mainField(activity, "feedbackActuator") === actuator &&
+                mainField(activity, "reporterUserId") == w.actor &&
+                mainField(activity, "feedbackLifecycleGeneration") == w.lifetime &&
+                GatewaySessionProcessCoordinator.snapshot().generation == w.processGeneration &&
+                mainField(activity, "isActivityForeground") == true &&
+                (mainField(activity, "nativeUiPage") as Enum<*>).name == "DESTINATION_SEARCH" &&
+                (w.state == null || (currentDialog(activity) === w.state &&
+                    mainField(activity, "homeDestinationVoiceDialogLease") === w.lease &&
+                    mainField(activity, "destinationSearchGeneration") == w.searchGeneration &&
+                    responseGeneration() == w.responseGeneration &&
+                    actuatorField("ttsEngineGeneration") == w.engineGeneration))
+
+        private fun record(event: SpeechOutputEvent) {
+            var w = window ?: return
+            if (event.kind != SpeechOutputKind.INTERACTION || w.invalid) return
+            if (event.outcome == SpeechOutputOutcome.REQUESTED && w.state != null &&
+                responseGeneration() != w.responseGeneration
+            ) {
+                // A second batch is admitted only after the first exact page and real READY.
+                val sameOwner = Looper.myLooper() === Looper.getMainLooper() &&
+                    actuator.speechOutputListener === listener && mainField(activity, "feedbackActuator") === actuator &&
+                    mainField(activity, "reporterUserId") == w.actor &&
+                    mainField(activity, "feedbackLifecycleGeneration") == w.lifetime &&
+                    GatewaySessionProcessCoordinator.snapshot().generation == w.processGeneration &&
+                    mainField(activity, "isActivityForeground") == true &&
+                    (mainField(activity, "nativeUiPage") as Enum<*>).name == "DESTINATION_SEARCH" &&
+                    currentDialog(activity) === w.state &&
+                    mainField(activity, "destinationSearchGeneration") == w.searchGeneration &&
+                    actuatorField("ttsEngineGeneration") == w.engineGeneration
+                if (responseLimit != 2 || initialResponse != null || !w.readyConfirmed || !sameOwner ||
+                    w.activeMessage != null || w.requestedAtMs != null ||
+                    !w.expectedPages.any { it == w.completedParts } ||
+                    responseGeneration() <= w.responseGeneration || event.atElapsedRealtimeMs <= w.lastDoneAtMs ||
+                    mainField(activity, "homeDestinationVoiceDialogLease") === w.lease
+                ) { w.invalid = true; return }
+                initialResponse = w
+                w = PartWindow(w.startedAtMs, w.responseGeneration, w.actor, w.lifetime,
+                    w.processGeneration, w.lastApprovalAtMs)
+                window = w
+            }
+            if (!ownerCurrent(w) || event.atElapsedRealtimeMs < w.startedAtMs) { w.invalid = true; return }
+            if (w.state == null) {
+                val state = currentDialog(activity)
+                val generation = responseGeneration()
+                if (state == null || state.query != QUERY || state.currentPageResults.isEmpty() ||
+                    generation <= w.responseBefore || event.outcome != SpeechOutputOutcome.REQUESTED
+                ) { w.invalid = true; return }
+                w.state = state
+                w.lease = mainField(activity, "homeDestinationVoiceDialogLease")
+                w.searchGeneration = mainField(activity, "destinationSearchGeneration")
+                w.responseGeneration = generation
+                w.engineGeneration = actuatorField("ttsEngineGeneration")
+                // The existing DTO permits the once-per-list age notice in the exact page header.
+                val ageNotice = destinationOriginAgeNoticeKo(state.origin, event.atElapsedRealtimeMs)
+                w.expectedPages = listOf(state.voicePromptParts(), state.voicePromptParts(ageNotice)).distinct()
+            }
+            when (event.outcome) {
+                SpeechOutputOutcome.REQUESTED -> {
+                    if (w.requestedAtMs != null || w.activeMessage != null) w.invalid = true
+                    else w.requestedAtMs = event.atElapsedRealtimeMs
+                }
+                SpeechOutputOutcome.STARTED -> {
+                    val approvedAt = approvalAtMs()
+                    val message = actuatorField("lastInteractionMessage") as? String
+                    if (w.activeMessage != null || message.isNullOrBlank() ||
+                        w.requestedAtMs != approvedAt || approvedAt <= w.lastApprovalAtMs ||
+                        approvedAt < w.startedAtMs || event.atElapsedRealtimeMs < approvedAt
+                    ) { w.invalid = true; return }
+                    w.activeMessage = message
+                    w.activeStartedAtMs = event.atElapsedRealtimeMs
+                    w.lastApprovalAtMs = approvedAt
+                    w.requestedAtMs = null
+                }
+                SpeechOutputOutcome.DONE -> {
+                    val message = w.activeMessage
+                    if (message == null || actuatorField("lastInteractionMessage") != message ||
+                        approvalAtMs() != w.lastApprovalAtMs || event.atElapsedRealtimeMs < w.activeStartedAtMs ||
+                        w.completedParts.size >= 16
+                    ) { w.invalid = true; return }
+                    w.completedParts += message
+                    w.lastDoneAtMs = event.atElapsedRealtimeMs
+                    w.activeMessage = null
+                }
+                else -> w.invalid = true
+            }
+        }
+
+        fun confirmInitialReady(state: DestinationSearchVoiceState) {
+            val w = window ?: return
+            if (responseLimit == 2 && initialResponse == null && !w.invalid &&
+                w.requestedAtMs == null && w.activeMessage == null &&
+                w.expectedPages.any { it == w.completedParts }
+            ) confirmReady(state)
+        }
+
+        fun confirmReady(state: DestinationSearchVoiceState) {
+            val w = window ?: throw AssertionError("NOT_VERIFIED: candidate part window was not opened")
+            if (!ownerCurrent(w) || w.state !== state || w.invalid || w.requestedAtMs != null ||
+                w.activeMessage != null || w.completedParts.isEmpty() ||
+                mainField(activity, "voiceCommandPromptPending") != false ||
+                mainField(activity, "voiceRecognitionActive") != true ||
+                SystemClock.elapsedRealtime() < w.lastDoneAtMs
+            ) { w.invalid = true; return }
+            // Called only after the unchanged own-PID candidate-DONE -> follow-up -> READY oracle.
+            w.readyConfirmed = true
+        }
+
+        fun facts(state: DestinationSearchVoiceState): PartFacts {
+            val w = window ?: return PartFacts()
+            val valid = !w.invalid && w.readyConfirmed && w.state === state && ownerCurrent(w) &&
+                w.requestedAtMs == null && w.activeMessage == null && w.completedParts.isNotEmpty()
+            val footer = w.expectedPages.firstOrNull()?.lastOrNull()
+            return PartFacts(
+                choiceGuidanceObserved = valid && footer != null && w.completedParts.lastOrNull() == footer,
+                currentPageObserved = valid && w.expectedPages.any { it == w.completedParts },
+                completedParts = w.completedParts.size,
+                observationCurrent = valid,
+            )
+        }
+
+        fun responseFacts(
+            state: DestinationSearchVoiceState, expectedPrefix: String, events: DialogEvents,
+            recognizerErrorRequired: Boolean,
+        ): ResponseFacts {
+            val w = window ?: return ResponseFacts()
+            val first = initialResponse
+            val valid = !w.invalid && w.readyConfirmed && w.state === state && ownerCurrent(w) &&
+                w.requestedAtMs == null && w.activeMessage == null && w.completedParts.isNotEmpty()
+            val errorOrder = first != null && !first.invalid && first.readyConfirmed && first.state === state &&
+                first.expectedPages.any { it == first.completedParts } &&
+                first.actor == w.actor && first.lifetime == w.lifetime &&
+                first.processGeneration == w.processGeneration && first.engineGeneration == w.engineGeneration &&
+                first.searchGeneration == w.searchGeneration && first.responseGeneration < w.responseGeneration &&
+                first.lease !== w.lease && events.recognizerErrorCount == 1 &&
+                events.dialogRecognizerError == events.retryableRecognizerError &&
+                events.dialogRecognizerError in setOf("NO_MATCH", "SPEECH_TIMEOUT") &&
+                events.dialogRecognizerErrorPage == state.pageIndex &&
+                events.firstCandidateReadyOrdinal > 0 &&
+                events.recognizerErrorOrdinal > events.firstCandidateReadyOrdinal &&
+                events.dialogRecognizerErrorOrdinal > events.recognizerErrorOrdinal &&
+                events.recoveredCandidateDoneOrdinal > events.dialogRecognizerErrorOrdinal &&
+                events.recoveredReadyOrdinal > events.recoveredCandidateDoneOrdinal &&
+                events.readyAfterRecognizerError
+            val current = valid && if (recognizerErrorRequired) errorOrder else first == null
+            return ResponseFacts(
+                reasonPrefixObserved = current && w.completedParts.firstOrNull() == expectedPrefix,
+                currentPageObserved = current && w.expectedPages.any { listOf(expectedPrefix) + it == w.completedParts },
+                initialPageAndErrorRecoveryObserved = valid && errorOrder,
+                observedResponses = if (first != null) 2 else if (w.state != null) 1 else 0,
+                observationCurrent = current,
+            )
+        }
+
+        fun restore() {
+            check(Looper.myLooper() === Looper.getMainLooper())
+            if (actuator.speechOutputListener === listener) actuator.speechOutputListener = previous
+            window = null
+            initialResponse = null
+        }
+    }
+
+    private class PartWindow(
+        val startedAtMs: Long, val responseBefore: Long, val actor: Any?, val lifetime: Any?,
+        val processGeneration: Long, var lastApprovalAtMs: Long,
+    ) {
+        var state: DestinationSearchVoiceState? = null
+        var lease: Any? = null
+        var searchGeneration: Any? = null
+        var responseGeneration = -1L
+        var engineGeneration: Any? = null
+        var expectedPages: List<List<String>> = emptyList()
+        var requestedAtMs: Long? = null
+        var activeMessage: String? = null
+        var activeStartedAtMs = 0L
+        var lastDoneAtMs = 0L
+        val completedParts = mutableListOf<String>()
+        var readyConfirmed = false
+        var invalid = false
+    }
+
+    private data class PartFacts(
+        val choiceGuidanceObserved: Boolean = false,
+        val currentPageObserved: Boolean = false,
+        val completedParts: Int = 0,
+        val observationCurrent: Boolean = false,
+    )
+
+    private data class ResponseFacts(
+        val reasonPrefixObserved: Boolean = false,
+        val currentPageObserved: Boolean = false,
+        val initialPageAndErrorRecoveryObserved: Boolean = false,
+        val observedResponses: Int = 0,
+        val observationCurrent: Boolean = false,
     )
 
     private class RouteBaseline(val generation: Int, val destination: Any?, val active: Boolean, val requestInFlight: Boolean)
@@ -555,6 +879,15 @@ class DestinationVoiceFollowUpDeviceTest {
         var candidateDoneAfterRecognizerError: Boolean = false,
         var requestAfterRecognizerError: Boolean = false,
         var readyAfterRecognizerError: Boolean = false,
+        var eventOrdinal: Int = 0,
+        var firstCandidateReadyOrdinal: Int = 0,
+        var recognizerErrorCount: Int = 0,
+        var recognizerErrorOrdinal: Int = 0,
+        var dialogRecognizerError: String = "NONE",
+        var dialogRecognizerErrorOrdinal: Int = 0,
+        var dialogRecognizerErrorPage: Int? = null,
+        var recoveredCandidateDoneOrdinal: Int = 0,
+        var recoveredReadyOrdinal: Int = 0,
     )
 
     private companion object {

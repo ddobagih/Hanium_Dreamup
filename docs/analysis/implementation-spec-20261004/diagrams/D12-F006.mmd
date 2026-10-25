@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-006 화면 이탈 로컬 잠금과 기존 세션 재개"]
+  P["P-D12-006 화면 이탈과 늦은 작업 결과의 세대 fence"]
+  A --> P
+  M0["1. 일반 onStop에서 local generation을 증가시키고 locallyLocked=true로 즉시 변경한다."]
+  P --> M0
+  M1["2. snapshot은 로컬 잠금 동안 identity·session·device·재인증 정보를 숨긴 빈 FAIL_CLOSED 결과를 반환한다."]
+  M0 --> M1
+  M2["3. 재진입 때 retained session이 없으면 로그인 양식만 허용하고, 있으면 기기 credential 확인을 요구한다."]
+  M1 --> M2
+  M3["4. 확인된 generation의 resume가 access session을 서버에서 재검증하고 기존 고위험 허가를 지운다."]
+  M2 --> M3
+  M4["5. LocalOperation.close가 최종 generation 검사·snapshot 공개·잠금 해제·workLock release를 같은 임계구역에서 수행한다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 확인된 generation에서 서버 재검증 후 화면 접근 재개."]
+  M0 -. "관련 조건 확인" .-> B0{"SAF 선택 또는 기기 인증으로 의도적 이탈"}
+  B0 -->|"조건 해당"| R0["일반 로컬잠금 예외; 복귀 결속 검증은 유지"]
+  M1 -. "관련 조건 확인" .-> B1{"기기 인증 취소 또는 stale generation"}
+  B1 -->|"조건 해당"| R1["기존 세션 잠금 유지"]
+  M2 -. "관련 조건 확인" .-> B2{"서버 폐기 또는 재검증 오류"}
+  B2 -->|"조건 해당"| R2["잠금 유지"]
+  M3 -. "관련 조건 확인" .-> B3{"복구 토큰만 보유"}
+  B3 -->|"조건 해당"| R3["기기 확인 뒤 복구 재개; access session과 같은 서버 inventory 조회는 하지 않음"]
+  A -. "중단 경계" .-> C["기기 인증 취소·일반 이탈은 잠금 유지."]
+  A -. "복구 경계" .-> Q["사용자 명시 동작으로 다시 시도한다. 비밀번호/TOTP를 자동 재전송하지 않는다. 상세 분기는 해당 입력·분기와 F-D12-003을 따른다."]

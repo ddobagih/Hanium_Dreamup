@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D10-017 이미 생성된 detection 필터·legacy 병합·응답 변환"]
+  N0["1. mapping bbox sequence/object를 Detection으로 변환하여 필수값·범위 검사."]
+  A --> N0
+  N1["2. model config에 class가 있고 confidence≥class threshold(default fallback)이면 유지."]
+  N0 --> N1
+  N2["3. legacy merge는 custom_tactile 입력을 먼저, coco_general을 뒤에 붙인다. 모델 간 NMS를 의도적으로 하지 않는다."]
+  N1 --> N2
+  N3["4. response에 detection_count, detections, 선택 image_id와 존재하는 거리 metadata만 직렬화한다."]
+  N2 --> N3
+  B0{"legacy 배열의 model_key 불일치"}
+  R0["ValueError"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"class가 허용 목록 밖/점수 낮음"}
+  R1["해당 detection 제거"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"모델 config 누락"}
+  R2["DEFAULT_RUNTIME_CONFIG의 해당 model 정책으로 filter"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  B3{"bbox 중첩"}
+  R3["서로 의미가 다른 모델 detection을 overlap만으로 억제하지 않음"]
+  A -. "관련 분기" .-> B3
+  B3 --> R3
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-014"]
+  P -. "코드 분기 기준" .-> A

@@ -17,16 +17,28 @@ class MainActivityProgressBeepOutputOwnershipStaticTest {
         assertTrue("beep must check shared speech ownership", guard >= 0)
         assertTrue("ownership check must precede the native beep", play > guard)
         assertTrue(beep.contains("if (!isWalkSessionRuntimeActive() || !navigationEnvironmentOutputsAllowed()) return"))
-        assertTrue(beep.contains("shouldSuppressFeedbackDuringVoiceRecognition(voiceRecognitionActive, isRisk = false)"))
+        assertTrue(beep.contains("if (isGuidanceVoiceInputActive()) return"))
 
-        val owner = source.substringAfter("private fun isHandsFreeVoiceSpeechOutputActive(): Boolean {")
-            .substringBefore("private fun handleHandsFreeVoiceCommandListeningStarted(")
+        assertTrue(MainActivityRefactorSource.member(source, "isGuidanceVoiceInputActive")
+            .contains("guidanceVoiceInputActive { voiceInputController }"))
+        val peer = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/composition/VoiceControllerPeerAdapters.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(peer, "guidanceVoiceInputActive", occurrence = 1)
+            .contains("input().state.recognitionActive"))
+        val voice = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/VoiceInputSessionController.kt").readText()
+        assertTrue(MainActivityRefactorSource.property(voice, "state").contains("voiceRecognitionActive"))
+        val owner = MainActivityRefactorSource.member(source, "isHandsFreeVoiceSpeechOutputActive", occurrence = 1)
         listOf(
-            "gatewaySpeechPlayer != null",
-            "feedbackActuator?.isAppSpeechActive() == true",
-            "if (!isScreenReaderActive()) return false",
+            "voiceInputController.gateway.hasPlayer()",
+            "currentActuator?.isAppSpeechActive() == true",
+            "externalFallbackSpeechOutputActive(nowElapsedRealtimeMs(), observeScreenReaderActive())",
+        ).forEach { token -> assertTrue(token, owner.contains(token)) }
+        val gateway = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/GatewayVoiceCaptureController.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(gateway, "hasPlayer").contains("gatewaySpeechPlayer != null"))
+        val fallback = MainActivityRefactorSource.function(source, "internal fun externalFallbackSpeechOutputActive(")
+        listOf(
+            "if (!screenReaderActive) return false",
             "riskAnnouncementHoldUntilMs",
             "navigationAnnouncementHoldUntilMs",
-        ).forEach { token -> assertTrue(token, owner.contains(token)) }
+        ).forEach { token -> assertTrue(token, fallback.contains(token)) }
     }
 }

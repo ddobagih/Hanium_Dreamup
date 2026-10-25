@@ -61,7 +61,7 @@ class WalkSafeFeedbackFairnessTest {
         val stop = candidate("stop", 1_000L, MessageLevel.STOP)
         assertEquals("stop", deliver(policy, listOf(stop), 1_000L))
         assertEquals("stop", deliver(policy, listOf(candidate("new-warning", 3_500L),
-            stop.copy(timestampMs = 3_500L)), 3_500L))
+            candidate("stop", 3_500L, MessageLevel.STOP)), 3_500L))
     }
 
     @Test
@@ -102,7 +102,9 @@ class WalkSafeFeedbackFairnessTest {
             candidate("weak", 1_000L).copy(confidence = 0.54f))
         assertEquals("valid", deliver(policy, candidates, 1_000L))
         assertNull(policy.evaluateCandidates(candidates, true, 1_800L))
-        assertEquals("valid", deliver(policy, candidates, 3_500L))
+        val current = candidates.map { it.copy(timestampMs = 3_500L, observedAtElapsedRealtimeMs = 3_500L,
+            validUntilMs = 4_300L) }
+        assertEquals("valid", deliver(policy, current, 3_500L))
     }
 
     @Test
@@ -124,5 +126,6 @@ class WalkSafeFeedbackFairnessTest {
 
     private fun candidate(id: String, now: Long, level: MessageLevel = MessageLevel.WARNING) =
         FeedbackCandidate(id, "위험 $id", level, DepthSource.ARCORE_RAW_DEPTH,
-            0.9f, now, 20, 1_900L, false)
+            0.9f, now, 20, 1_900L, false, validUntilMs = now + 800L,
+            observedAtElapsedRealtimeMs = now, observationMaxAgeMs = 800L)
 }

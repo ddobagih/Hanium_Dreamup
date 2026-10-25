@@ -1,0 +1,32 @@
+flowchart TD
+  T["F-D09-012 v2 provider 선택·모델 결과 변환 / P-D09-012"]
+  N0["mode 분기"]
+  T --> N0
+  N1["모델과 config binding 확인"]
+  N0 --> N1
+  N2["unified 또는 legacy pair 선택"]
+  N1 --> N2
+  N3["lazy model 실행"]
+  N2 --> N3
+  N4["클래스 threshold와 bbox 변환"]
+  N3 --> N4
+  N5["detect.v2 응답 조립"]
+  N4 --> N5
+  Z["정상: detect.v2 모델별 ID를 보존한 detections 반환"]
+  N5 --> Z
+  B0["contract fixture 반환; 실제 인식 성능 결과 아님"]
+  N0 -->|"mode=fake"| B0
+  B1["provider=None unavailable; 상위503"]
+  N1 -->|"모델/config/binding 불가"| B1
+  B2["legacy pair를 동시에 실행하지 않음"]
+  N2 -->|"unified path 선택"| B2
+  B3["해당 detection 건 제외"]
+  N3 -->|"unknown class/nonfinite/invalid bbox"| B3
+  R["종료와 복구: 서버 자동 재시도 없음 / 원인 해소 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  C["취소와 정리: 전용 취소 API 없음 / 요청 지역 상태 반환; 공유 자원은 소유자의 lifecycle에서 정리"]
+  N5 -.-> C

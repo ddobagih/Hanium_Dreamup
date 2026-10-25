@@ -62,8 +62,12 @@ class RawStaleSegmentOutcomeTest {
             File("app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"),
             File("apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"),
         ).first(File::isFile).readText()
-        val upload = source.substringAfter("private fun scheduleRawCollectionPostWalkUpload()")
-            .substringBefore("private fun schedulePostWalkTransfers()")
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/RawCollectionTransferController.kt").readText()
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.composition(source, "rawCollectionTransferController")
+            .contains("fieldSessionLog.recordEvent(name, counters)"))
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(source, "scheduleRawCollectionPostWalkUpload")
+            .contains("rawCollectionTransferController.scheduleRawCollectionPostWalkUpload()"))
+        val upload = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(owner, "scheduleRawCollectionPostWalkUpload")
         val batch = upload.substringAfter("try {").substringBefore("} finally {")
         assertTrue(batch.contains("rawCollectionRuntimeCoordinator.startNextUpload {"))
         assertTrue(batch.contains("return@executeRawCollectionTask"))
@@ -71,12 +75,11 @@ class RawStaleSegmentOutcomeTest {
             upload.substringAfter("} finally {").trimStart()
                 .startsWith("recordRawCollectionOutcomesIfChanged()"),
         )
-        val helper = source.substringAfter("private fun recordRawCollectionOutcomesIfChanged()")
-            .substringBefore("private fun handleWalkSessionForegroundReturn()")
+        val helper = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(owner, "recordRawCollectionOutcomesIfChanged")
         // The walk-end branch keeps the first "raw_collection_outcomes" literal of the file.
-        val transition = source.indexOf("private fun handleRawCollectionTransition(")
-        assertTrue(source.indexOf("\"raw_collection_outcomes\"") > transition)
-        assertTrue(helper.contains("fieldSessionLog.recordEvent(\"raw_collection_outcomes\", outcomes)"))
+        val transition = owner.indexOf("fun handleRawCollectionTransition(")
+        assertTrue(owner.indexOf("\"raw_collection_outcomes\"") > transition)
+        assertTrue(helper.contains("log.recordEvent(\"raw_collection_outcomes\", outcomes)"))
         assertTrue(helper.contains("if (outcomes == lastLoggedRawCollectionOutcomes) return"))
         listOf("speakInteraction(", "updateStatus(", "Toast.", "announceFor").forEach { output ->
             assertFalse(output, (upload + helper).contains(output))

@@ -1,0 +1,14 @@
+flowchart TD
+ A["F-D10-020 YOLO 학습 wrapper"] --> B{"data.yaml 및 manifest/gate 지정 존재"}
+ B -->|"아니오"| X["exit1. 학습 없음"]
+ B -->|"예"| G["P-D10-016/017/018 manifest hash, signed gate, current DB 순서 검증"]
+ G -->|"실패"| X
+ G -->|"통과"| C["repository chdir 및 학습 구성 출력"]
+ C --> D{"dry-run"}
+ D -->|"예"| Z["exit0. 실제 학습 없음. hash/DB 검사는 이미 수행"]
+ D -->|"아니오"| I{"ultralytics import 가능"}
+ I -->|"아니오"| X2["설치 안내 및 exit1"]
+ I -->|"예"| T["YOLO 생성 후 data/epochs/imgsz/batch/device/project/name으로 train"]
+ T -->|"정상"| E["exit0"]
+ T -->|"예외"| F["예외 전파. 자동 retry 없음"]
+ G -.-> N["data.yaml 파일 집합과 verified manifest의 결속은 별도 미검증 경계"]

@@ -225,11 +225,16 @@ def _exercise_owned_app(scenario, root, guards, progress):
         from fastapi.routing import APIRoute
 
         holder["main"] = main
+        from backend.app import application_runtime as runtime_module
+        owner = main.app.state.runtime
+        _expect(not owned_upload.exists(), "factory_has_no_upload_io", checks)
+        owner.initialize_resources()
+        patch.setattr(owner, "initialize_resources", lambda: None)
         _expect(main.settings is settings, "main_uses_owned_test_settings", checks)
         _expect(main.settings.upload_dir == owned_upload, "owned_upload_path", checks)
         _expect(owned_upload.is_dir(), "production_import_created_owned_upload", checks)
-        _expect(main.raw_collection_storage is not None, "raw_factory_result_installed", checks)
-        _expect(main.inference_runner is inference, "owned_inference_cleanup_installed", checks)
+        _expect(owner.raw_collection_storage is not None, "raw_factory_result_installed", checks)
+        _expect(owner.inference_runner is inference, "owned_inference_cleanup_installed", checks)
         _expect(len(imports.get("keys", [])) == 1, "key_factory_called_once", checks)
         _expect(len(imports.get("prepare_raw", [])) == 1, "raw_prepare_called_once", checks)
         _expect(len(imports.get("raw_storage", [])) == 1, "raw_factory_called_once", checks)
@@ -243,7 +248,7 @@ def _exercise_owned_app(scenario, root, guards, progress):
         _expect(
             imports["raw_storage"][0]["root"] == owned_raw
             and imports["raw_storage"][0]["key_manager"] is key_manager
-            and imports["raw_storage"][0]["capacity_state"] is main.capacity_state,
+            and imports["raw_storage"][0]["capacity_state"] is owner.capacity_state,
             "raw_factory_dependencies_match", checks,
         )
         _expect(
@@ -284,7 +289,7 @@ def _exercise_owned_app(scenario, root, guards, progress):
             ("reconcile_report_storage", "report"),
             ("reconcile_raw_collection_storage", "raw"),
         ):
-            patch.setattr(main, attribute, sync_step(event))
+            patch.setattr(owner, attribute, sync_step(event))
 
         def start_health(received):
             events.append("health.start")
@@ -297,8 +302,8 @@ def _exercise_owned_app(scenario, root, guards, progress):
             if scenario == "health_stop_failure":
                 raise OwnedHealthStopFailure()
 
-        patch.setattr(main, "start_detect_v2_health", start_health)
-        patch.setattr(main, "stop_detect_v2_health", stop_health)
+        patch.setattr(runtime_module, "start_detect_v2_health", start_health)
+        patch.setattr(runtime_module, "stop_detect_v2_health", stop_health)
 
         class StorageMonitor:
             # S20-1: the lifespan owns a report-storage monitor task after the
@@ -316,8 +321,8 @@ def _exercise_owned_app(scenario, root, guards, progress):
             def stop(self):
                 events.append("storage.stop")
 
-        patch.setattr(main, "report_storage_monitor", StorageMonitor())
-        real_capacity_monitor = main.run_capacity_monitor
+        patch.setattr(owner, "report_storage_monitor", StorageMonitor())
+        real_capacity_monitor = owner.run_capacity_monitor
 
         async def observe_capacity_monitor(stop_requested):
             events.append("capacity.task.start")
@@ -328,13 +333,13 @@ def _exercise_owned_app(scenario, root, guards, progress):
                 observed["capacity_stop_requested"] = stop_requested.is_set()
                 events.append("capacity.task.stop")
 
-        patch.setattr(main, "run_capacity_monitor", observe_capacity_monitor)
+        patch.setattr(owner, "run_capacity_monitor", observe_capacity_monitor)
 
         async def exercise_lifespan():
             entered = False
             caught = None
             try:
-                async with main.lifespan(main.app):
+                async with owner.lifespan(main.app):
                     entered = True
                     events.append("lifespan.body")
                     _expect(len(runtime_instances) == 1, "one_runtime_constructed", checks)
@@ -436,7 +441,7 @@ def _exercise_owned_app(scenario, root, guards, progress):
             "events": events, "guards": dict(guards),
             "main_import": "fresh production module",
             "router_factories": "real health/navigation factories delegated",
-            "lifecycle": "production main.lifespan; dependency operations are owned spies",
+            "lifecycle": "production owner.lifespan; dependency operations are owned spies",
             "runtime_internal_resource_shutdown_proven": False,
             "http_or_middleware_success_claimed": False,
         }
@@ -598,7 +603,7 @@ def isolated_health(monkeypatch):
     monkeypatch.setattr(socket.socket, "connect_ex", deny_network)
     monkeypatch.setattr(socket, "create_connection", deny_network)
     monkeypatch.setattr(socket, "getaddrinfo", deny_network)
-    from backend.app.api import health
+    from backend.app.services import health_readiness as health
 
     yield health
     assert guards == {"database": 0, "network": 0}

@@ -73,19 +73,22 @@ class MainActivityRouteStartStateTest {
 
     @Test fun readyRouteUsesItsRequestOriginAndRetainsRealInvalidDataDiagnostics() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val setRoute = source.substringAfter("routeNavigator.setRoute(").substringBefore("routeStartStepCount =")
+        MainActivityRefactorSource.composition(source, "routeAcquisitionController")
+        MainActivityRefactorSource.composition(source, "routeGuidanceController")
+        val acquisition = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/RouteAcquisitionController.kt").readText()
+        val guidance = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/RouteGuidanceController.kt").readText()
+        val setRoute = MainActivityRefactorSource.member(acquisition, "installRequestedRoute", 1)
         assertTrue(setRoute.contains("origin = origin"))
-        val update = source.substringAfter("private fun updateRouteGuidance(")
-            .substringBefore("private fun recordRouteAlignmentDiagnostic(")
-        assertTrue(update.indexOf("if (!isRouteActive || routeRequestInFlight.get()) return") <
+        val update = MainActivityRefactorSource.member(guidance, "updateRouteGuidance")
+        assertTrue(update.indexOf("if (!isRouteActive || scope.requestPending) return") <
             update.indexOf("routeNavigator.update("))
         assertTrue(update.contains("setOf(\"route_missing\", \"polyline_missing\")"))
         assertTrue(update.contains("reason = \"route_invalid\""))
         assertFalse(update.contains("저장된 TMAP"))
         assertTrue(update.contains("facingObservation = facing"))
         assertTrue(update.contains("recordRouteAlignmentDiagnostic(update, facing"))
-        val routeView = source.substringAfter("nativeHomeRouteStatusText = TextView(this).apply")
-            .substringBefore("overlay.addView(nativeHomeRouteStatusText")
+        val home = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/HomePanel.kt").readText()
+        val routeView = ReportStaticSourceInspector.blockAfter(home, "val nativeHomeRouteStatusText = TextView(context).apply")
         assertTrue(routeView.contains("View.ACCESSIBILITY_LIVE_REGION_NONE"))
     }
 
@@ -121,7 +124,7 @@ class MainActivityRouteStartStateTest {
 
     private fun pending(activity: MainActivity) = field(activity, "routeRequestInFlight") as AtomicBoolean
     private fun field(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.get(activity)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.get(activity)
     private fun set(activity: MainActivity, name: String, value: Any) =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.set(activity, value)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.set(activity, value)
 }

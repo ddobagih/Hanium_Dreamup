@@ -1,0 +1,10 @@
+stateDiagram-v2
+  state "ISSUED 미소비" as Issued
+  state "CONSUMED" as Used
+  state "EXPIRED 논리상태" as Expired
+  [*] --> Issued: "F-D14-016 발급 commit - TTL120000ms"
+  Issued --> Used: "F-D14-017 exact request와 ACTIVE key 서명 성공 및 소비 commit"
+  Issued --> Expired: "now가 expires 이상 - 검증 거절"
+  Issued --> Issued: "검증 실패와 transaction rollback"
+  Used --> Used: "409 replay - reset 금지"
+  Expired --> Expired: "403 expired - 행 자동삭제 없음"

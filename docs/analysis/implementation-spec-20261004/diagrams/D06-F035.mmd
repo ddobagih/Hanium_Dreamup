@@ -1,0 +1,48 @@
+flowchart TD
+  T["F-D06-035 디버그 depth metadata 배치 HTTP 로그"]
+  P["전제: DEBUG factory, enabled=true, 유효 HTTP/HTTPS host endpoint,<br/>F-D06-034 admission 허용. release factory Noop."]
+  T --> P
+  E1["E-D06-035-01 사용자 server-log toggle→enabled 전환"]
+  E1 --> T
+  E2["E-D06-035-02 렌더 metadata enqueue→최대30 queue→최소2초 간격 최대5개 POST"]
+  E2 --> T
+  E3["E-D06-035-03 cancel/close→generation 변경·transport disconnect"]
+  E3 --> T
+  A1["1. encoder가 감지 bbox/class/depth/confidence/runtime/timing을<br/>선택적으로 JSON에 넣는다."]
+  P --> A1
+  A2["2. enqueue는 큐30개를 넘으면 oldest를 제거한다."]
+  A1 --> A2
+  A3["3. inFlight 하나만, 최소2000ms 간격, 한 batch5개를 worker에 보낸다."]
+  A2 --> A3
+  A4["4. worker 시작 전 generation이 달라졌으면 batch를 앞에 재삽입한다. 전송 실패한<br/>batch는 재삽입하지 않는다."]
+  A3 --> A4
+  A5["5. disable은 대기 큐를 비운다. active HTTP 취소는 별도 cancelActiveUpload<br/>경로다."]
+  A4 --> A5
+  N["정상 종료: HTTP status stream 닫고 inFlight 해제."]
+  A5 --> N
+  FX["결과: loopback HTTP JSON POST; 로컬 영속 queue나 서버 receipt 검증 없음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"disabled/closed/invalid endpoint"}
+    R1["enqueue 무시"]
+    B1 -->|조건 성립| R1
+    B2{"queue초과 30"}
+    R2["가장 오래된 metadata drop"]
+    B2 -->|조건 성립| R2
+    B3{"network I/O/RuntimeException"}
+    R3["오류를 삼키고 inFlight 해제, batch 자동재시도 없음"]
+    B3 -->|조건 성립| R3
+    B4{"worker가 시작되기 전 취소"}
+    R4["batch requeue; 이후 enable/admission 조건 필요"]
+    B4 -->|조건 성립| R4
+  end
+  POL["정책: P-D06-033, P-D06-034, P-D06-035"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 실패 batch 손실 허용 진단 로그."]
+    X2["시간: connect1000ms/read2000ms."]
+    X3["취소: generation 증가·active transport disconnect."]
+    X4["중단: pre-run 취소 batch만 앞에 재삽입."]
+    X5["재시도: 실패 batch 자동재전송 없음; 후속 sample은 가능."]
+    X6["정리: disable 큐clear, close clear·shutdownNow."]
+  end

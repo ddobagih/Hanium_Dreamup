@@ -58,7 +58,8 @@ class UserMotionGnssSpikeRegressionTest {
         val detector = confirmStationary(estimator)
 
         quiet(estimator, detector, 3_100L)
-        speed(estimator, 3_100L, 1.5, accuracy = 0.3)
+        estimator.observeSpeed(WalkingSpeedObservation(1.5, 0.3, 3_100L),
+            UserMotionLocationEvidence(3_100L, 2.0, false, observationId = 3_100L), 3_100L)
         estimator.snapshot(3_100L)
         // The same fix re-delivered with a new envelope time is not a second measurement.
         estimator.observeSpeed(

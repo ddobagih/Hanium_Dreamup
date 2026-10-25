@@ -14,19 +14,22 @@ class MainActivityRuntimeMetricProfileStaticTest {
 
     @Test
     fun everyPreflightSessionReceivesTheActiveEnvironmentProfile() {
-        val calls = Regex("""(?<![A-Za-z])RuntimeMetricPreflightSession\((.*?)\n\s*\)""", RegexOption.DOT_MATCHES_ALL)
-            .findAll(source)
-            .map { it.groupValues[1] }
-            .toList()
-        assertEquals(3, calls.size)
-        calls.forEach { call ->
-            assertTrue(call, call.contains("profile = activeEnvironmentProfiles?.runtimeMetric"))
-            assertFalse(call, call.contains("testCandidateProfile"))
+        val controller = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/metric/RuntimeMetricSessionController.kt").readText()
+        val coordinator = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/metric/RuntimeMetricPreflightCoordinator.kt").readText()
+        assertEquals(2, Regex("RuntimeMetricPreflightSession\\(").findAll(controller).count())
+        assertEquals(1, Regex("RuntimeMetricPreflightSession\\(generation").findAll(coordinator).count())
+        listOf("finishRuntimeMetricPreflightWithoutSession", "beginRuntimeMetricActivation").forEach { name ->
+            val body = MainActivityRefactorSource.member(controller, name)
+            assertTrue(body, body.contains("profile = scope.profile"))
+            assertFalse(body, body.contains("testCandidateProfile"))
         }
-        assertTrue(
-            source.contains(
-                "WalkSafeEnvironmentProfiles.active(allowTestCandidate = BuildConfig.DEBUG)",
-            ),
-        )
+        val start = MainActivityRefactorSource.member(coordinator, "startRuntimeMetricPreflightSession")
+        assertTrue(start.contains("RuntimeMetricDepthSupport.SUPPORTED, admission.profile()"))
+        assertFalse(start.contains("testCandidateProfile"))
+        assertTrue(MainActivityRefactorSource.property(source, "runtimeMetricSession")
+            .contains("override val profile get() = activeEnvironmentProfiles?.runtimeMetric"))
+        assertTrue(MainActivityRefactorSource.property(source, "runtimeMetricPreflight")
+            .contains("override fun profile() = activeEnvironmentProfiles?.runtimeMetric"))
+        assertTrue(source.contains("WalkSafeEnvironmentProfiles.active(allowTestCandidate = BuildConfig.DEBUG)"))
     }
 }

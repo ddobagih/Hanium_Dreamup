@@ -7,11 +7,36 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PrivacyAccountDeletionPolicyTest {
+    @Test fun sameRevisionSuccessClearsTheLocalRetryErrorAndRestoresTheServerPhase() {
+        for (backupState in listOf(DeletionItemState.IN_PROGRESS, DeletionItemState.RETRY_WAIT)) {
+            val machine = AccountDeletionStateMachine()
+            assertTrue(machine.requestConfirmation())
+            assertTrue(machine.begin(journal()))
+            val states = DeletionInventoryItem.entries.associateWith { DeletionItemState.IN_PROGRESS }.toMutableMap()
+            states[DeletionInventoryItem.BACKUP] = backupState
+            val received = status(revision = 2L, states = states)
+            assertEquals(AccountDeletionApplyResult.APPLIED, machine.apply(received))
+            assertTrue(machine.markRetry("http_503"))
+            assertEquals(AccountDeletionPhase.RETRY_WAIT, machine.phase())
+            assertEquals("http_503", machine.snapshotOrNull()!!.lastErrorCode)
+
+            assertEquals(AccountDeletionApplyResult.DUPLICATE, machine.apply(received))
+            val recovered = requireNotNull(machine.snapshotOrNull())
+            assertEquals(received.derivedPhase(), recovered.phase)
+            assertNull(recovered.lastErrorCode)
+            assertEquals(received.revision, recovered.serverRevision)
+            assertEquals(received.items, recovered.items)
+            assertEquals(received.requestId, recovered.requestId)
+            assertFalse(recovered.deviceEvidenceAcknowledged)
+        }
+    }
+
     @Test
     fun allNineItemsAndPolicySlaAreRequired() {
         val status = status(

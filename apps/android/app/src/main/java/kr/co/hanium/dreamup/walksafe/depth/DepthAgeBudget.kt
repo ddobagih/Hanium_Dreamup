@@ -32,8 +32,7 @@ object DepthAgeBudget {
             return output.source == DepthSource.ARCORE_RAW_DEPTH && output.depthReprojected == false
         }
         val observedAt = output.depthObservedAtMs ?: return false
-        // A depth image stamped after its use time is not older than the budget; the reprojection
-        // flag, not the age, marks that it does not belong to this camera frame.
-        return nowMs - observedAt <= requireNotNull(maxAgeMs(use))
+        // Both values are in the Frame clock after same-capture attribution, never Image time.
+        return observedAt >= 0L && nowMs >= observedAt && nowMs - observedAt <= requireNotNull(maxAgeMs(use))
     }
 }

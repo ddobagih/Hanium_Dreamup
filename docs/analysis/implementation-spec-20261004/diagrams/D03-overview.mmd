@@ -1,0 +1,18 @@
+flowchart LR
+  A["D01 권한 동의 세션 lifecycle"] --> B["F-D03-001~012 음성 모델 mic wake 및 인식"]
+  B --> C["F-D03-013~017 local 명령과 취소 scope"]
+  C --> D["F-D03-018~022 검색과 고정 후보 낭독"]
+  D --> E["F-D03-023~024 별도 시작 확인"]
+  E --> F["F-D03-025~027 경로 전송 검증 설치"]
+  F --> G["F-D03-028~029 첫 route archive와 expiry"]
+  F --> H["F-D03-030~033 진행과 현재 cue 전달"]
+  H --> I["F-D03-034~037 이탈 및 도착 결정"]
+  I -->|"명시 reroute"| F
+  H --> J["F-D03-038 최종 접근 범위 고지"]
+  K["D04 위치 alignment facing steps"] --> H
+  H --> L["D02 ACTION 및 INFORMATION TTS"]
+  L -->|"실제 DONE 또는 failure"| H
+  A --> G
+  X["F-D03-040 서버 AAC STT caller 미연결"] -.-> C
+  Y["F-D03-041 이전 wake gate default null"]
+  Z["F-D03-039 DEBUG 진단"] -.-> B

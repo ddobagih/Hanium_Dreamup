@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from copy import copy
 from datetime import UTC, datetime, timedelta
 import hashlib
 import importlib
@@ -28,7 +29,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
-import backend.app.main as main_app
+from backend.app.application_runtime import BackendRuntime
+from backend.app.config import get_settings
 
 
 def _repository_alembic_head() -> str:
@@ -2344,6 +2346,14 @@ def test_raw_b1c_privacy_fence_rejects_commit_before_receipt(
         engine.dispose()
 
 
+def _raw_reconciliation_runtime(session_factory, root, key_manager):
+    settings = copy(get_settings())
+    settings.raw_object_dir = root
+    runtime = BackendRuntime(settings, database=SimpleNamespace(session_factory=session_factory))
+    runtime.report_image_key_manager = key_manager
+    return runtime
+
+
 def test_raw_b1d_startup_removes_file_when_database_commit_failed(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2384,10 +2394,8 @@ def test_raw_b1d_startup_removes_file_when_database_commit_failed(
         assert len(list(root.glob("*.wsrc"))) == 1
         assert len(list((root / ".raw-write-journal").glob("*.json"))) == 1
 
-        monkeypatch.setattr(main_app, "SessionLocal", SessionFactory)
-        monkeypatch.setattr(main_app.settings, "raw_object_dir", root)
-        monkeypatch.setattr(main_app, "report_image_key_manager", key_manager)
-        main_app.reconcile_raw_collection_storage()
+        runtime = _raw_reconciliation_runtime(SessionFactory, root, key_manager)
+        runtime.reconcile_raw_collection_storage()
 
         assert list(root.iterdir()) == []
         with SessionFactory() as db:
@@ -2465,10 +2473,8 @@ def test_raw_b1d_startup_keeps_database_committed_file_and_clears_journal(
         assert replay.state == "READY_TO_COMMIT"
         assert not (root / ".raw-write-journal").exists()
 
-        monkeypatch.setattr(main_app, "SessionLocal", SessionFactory)
-        monkeypatch.setattr(main_app.settings, "raw_object_dir", root)
-        monkeypatch.setattr(main_app, "report_image_key_manager", key_manager)
-        main_app.reconcile_raw_collection_storage()
+        runtime = _raw_reconciliation_runtime(SessionFactory, root, key_manager)
+        runtime.reconcile_raw_collection_storage()
 
         assert encrypted_path.exists()
         assert not (root / ".raw-write-journal").exists()
@@ -2557,14 +2563,8 @@ with SessionFactory() as db:
         assert len(list(root.glob("*.wsrc"))) == 1
         assert len(list((root / ".raw-write-journal").glob("*.json"))) == 1
 
-        monkeypatch.setattr(main_app, "SessionLocal", SessionFactory)
-        monkeypatch.setattr(main_app.settings, "raw_object_dir", root)
-        monkeypatch.setattr(
-            main_app,
-            "report_image_key_manager",
-            _StaticKeyManager(),
-        )
-        main_app.reconcile_raw_collection_storage()
+        runtime = _raw_reconciliation_runtime(SessionFactory, root, _StaticKeyManager())
+        runtime.reconcile_raw_collection_storage()
 
         assert len(list(root.glob("*.wsrc"))) == expected_file_count
         assert not (root / ".raw-write-journal").exists()

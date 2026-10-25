@@ -1,0 +1,25 @@
+flowchart TD
+  IN["F-D14-006<br/>공유 인증 실패 횟수 제한"]
+  G["적용 정책<br/>P-D14-005"]
+  IN --> G
+  N1["1. 제출 admin_id 대신 설정된 admin_id와 action으로 pri<br/>ncipal digest 고정"]
+  G --> N1
+  N2["2. PostgreSQL action/principal advisory lock<br/>으로 source 변경 동시 요청도 직렬화"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. observed_at &gt;= now-window의 success=false만<br/> source 및 계정 집계"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. source&gt;=attempts 또는 total&gt;=attempts*4면 42<br/>9 Retry-After"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 실패·차단도 failure attempt 추가하고 DENIED 감사 com<br/>mit; 성공은 success=true 추가"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>source의 가장 이른 실패를 기준으로 남은 창 시간 ceil, 최소 1초"]
+  N4 -->|"source 한계 도달"| B1
+  B2["분기 결과<br/>계정의 가장 이른 실패로 Retry-After"]
+  N4 -->|"source 한계 미도달이나 계정 4배 한계 도달"| B2
+  B3["분기 결과<br/>실패 이력 삭제/초기화하지 않으며 count에서 제외"]
+  N5 -->|"성공 기록"| B3
+  N5 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. attempt 행 보존; rate limit 만료는 논리적 <br/>제외."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

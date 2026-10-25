@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D03-007 HOME 호출어 대기와 기기점검 probe"]
+  P["정책 P-D03-006, P-D03-007"]
+  A --> P
+  N0["1. 기기 점검의 bounded 호출어 증명과 HOME 의 지속 대기를 동일 probe 로 제공한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. partial 은 첫 관측 진단만; final wake/command 검증은 F-D03-006 을 적용한다."]
+  N0 --> N1
+  N2["3. HOME 만 동일 문장의 검증된 commandTranscript 를 handoff 하며 capability probe 는 명령을 실행하지 않는다."]
+  N1 --> N2
+  N3["4. terminal 전에 timer·stream 을 detach/stop/close 하고 main 에 결과를 post; cleanup 중 입력 generation 변경 시 AVAILABLE 대신 CANCELLED 를 전달한다."]
+  N2 --> N3
+  Z["정상: 한 번 terminal 결과."]
+  N3 --> Z
+  B0{"일반 probe listening20s 초과"}
+  R0["TIMEOUT"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"HOME 준비 완료"}
+  R1["ready 이후 wake 까지 대기"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"terminal probe 재시작"}
+  R2["false; 새 인스턴스 필요"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: START_FAILED/STREAM_ERROR/TIMEOUT 구분."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xtimeout["만료: 준비 20s; non-HOME listening20s."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xtimeout
+  Xcancel["취소: CANCELLED terminal 후 정리."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: 출력/입력 generation 불일치 final 무효."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xretry["재시도: HOME 실패 latch 후 자동 반복 없음; 화면 재진입/명시 입력 경로."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry
+  Xcleanup["정리: timeout cancel, stream.stop+close 먼저 수행."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

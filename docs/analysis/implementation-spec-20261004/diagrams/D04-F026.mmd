@@ -1,0 +1,18 @@
+flowchart TD
+  ID["F-D04-026 · 깊이·상태 UI용 사용자 속도와 두 종류 방향<br/>P-D04-026"]
+  A["원 GPS motion와 phone heading"]
+  C0{"위치와 동일 시각 speed가 유효한가"}
+  R0["speed/course null"]
+  C1{"speed lower bound가 0.5 이상이며 같은 시각 course인가"}
+  R1["course null"]
+  OK["유효 speed/course + 독립 fresh phone heading → depth와 상태 UI"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END

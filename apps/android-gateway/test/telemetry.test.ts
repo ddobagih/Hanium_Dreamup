@@ -61,6 +61,26 @@ function allowedRouteCases(secret: string, deletionId: string): RouteCase[] {
     "x-request-id": CANONICAL_REQUEST_ID
   };
   return [
+    ...["GET", "POST", "PUT"].map(method => ({
+      template: "/api/field-diagnostics/preference",
+      request: () => new Request("http://127.0.0.1:8081/api/field-diagnostics/preference", {
+        method, headers
+      })
+    })),
+    {
+      template: "/api/field-diagnostics/sessions/{session_id}/batches",
+      request: () => new Request("http://127.0.0.1:8081/api/field-diagnostics/sessions/11111111-1111-4111-8111-111111111111/batches", {
+        method: "POST", headers
+      })
+    },
+    {
+      template: "/api/field-diagnostics/sessions/{session_id}",
+      request: () => new Request("http://127.0.0.1:8081/api/field-diagnostics/sessions/11111111-1111-4111-8111-111111111111", { headers })
+    },
+    {
+      template: "/api/account-signup-policy",
+      request: () => new Request("http://127.0.0.1:8081/api/account-signup-policy", { headers })
+    },
     {
       template: "/api/account-enrollments/email-otp",
       request: () => new Request(
@@ -257,6 +277,21 @@ function allowedRouteCases(secret: string, deletionId: string): RouteCase[] {
       request: () => new Request(
         "http://127.0.0.1:8081/api/raw-collections/00000000-0000-0000-0000-000000000001/commit",
         { method: "POST", headers }
+      )
+    },
+    {
+      template: "/privacy/rights",
+      request: () => new Request(
+        "http://127.0.0.1:8081/privacy/rights", { method: "HEAD", headers }
+      )
+    },
+    {
+      template: "/privacy/rights",
+      request: () => new Request(
+        "http://127.0.0.1:8081/privacy/rights?control=installation-evidence-key", {
+          method: "PUT", headers: { ...headers, "content-type": "application/json" },
+          body: JSON.stringify({ installation_id: deletionId, public_key: secret })
+        }
       )
     },
     {

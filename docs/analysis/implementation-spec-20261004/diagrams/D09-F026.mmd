@@ -1,0 +1,26 @@
+flowchart TD
+  title["F-D09-026 · 디버그 저장소 이전·quota·보존기간 정리<br/>P-D09-026"]
+  N0["잠금 및 private 저장소 검사"]
+  N1["schema와 legacy import 확인"]
+  N2["기한과 quota 계산"]
+  N3["만료 row transaction 삭제"]
+  N4["참조 없는 소유 이미지 정리"]
+  N5["다음 주기 또는 shutdown"]
+  title --> N0
+  N0 --> N1
+  N1 --> N2
+  N2 --> N3
+  N3 --> N4
+  N4 --> N5
+  N5 --> OK["정상: 저장소 일관성 유지 또는 한 번의 sweep 완료"]
+  N1 -->|"legacy signature가 import 이후 바뀜"| B0["동시 구형 writer로 간주하여 저장소 작업 거절"]
+  B0 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N2 -->|"quota 초과"| B1["새 쓰기 거절; quota를 맞추려 미만료 기존 자료를 강제 축출하지 않음"]
+  B1 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N0 -->|"파일이 symlink·다른 소유자·여러 link 또는 권한 부적합"| B2["안전한 private 파일로 취급하지 않음"]
+  B2 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N5 -->|"periodic sweep 실패"| B3["종류만 경고하고 다음 주기 유지"]
+  B3 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  title -.-> CANCEL["취소: stop event 뒤 진행 중 worker 종료를 기다림"]
+  CANCEL --> CLEAN["정리: SQLite close와 flock 해제; 소유 이미지 unlink 뒤 parent fsync"]
+  title -.-> RETRY["재시도: sweep 오류 뒤 다음 3600초 주기 재시도"]

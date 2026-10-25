@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 _HELPER_CHILD = r"""
 from contextlib import contextmanager
 import json
+import os
 from pathlib import Path
 import socket
 import sys
@@ -50,7 +51,7 @@ try:
         database_statement_timeout_ms=1000,
     )
     from fastapi import HTTPException
-    from backend.app.api import reports
+    from backend.app.services import report_commit as reports
     from backend.app.services import report_storage
 
     events = []
@@ -199,8 +200,8 @@ try:
     reports.ReportImageObject = lambda **fields: SimpleNamespace(**fields)
     reports.logging.getLogger = lambda *args, **kwargs: logger
     Path.unlink = deny_delete
-    reports.os.unlink = deny_delete
-    reports.os.remove = deny_delete
+    os.unlink = deny_delete
+    os.remove = deny_delete
 
     phase = "helper"
     outcome = object()

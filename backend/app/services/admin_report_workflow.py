@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 from datetime import UTC, datetime
 from typing import Any, NoReturn
 import uuid
@@ -49,6 +51,10 @@ from backend.app.services.admin_security import (
 from backend.app.services.admin_report_integrity import (
     admin_report_integrity_boundary_state,
 )
+from backend.app.services.report_status_transition import (
+    allowed_next_statuses,
+    decide_report_status_transition,
+)
 from backend.app.services.report_delivery_effective import (
     uncorrected_delivery_event_clause,
 )
@@ -60,11 +66,6 @@ _DELIVERY_TRANSITIONS: dict[str | None, frozenset[str]] = {
     "SUBMITTED": frozenset({"ACKNOWLEDGED", "FAILED"}),
     "ACKNOWLEDGED": frozenset({"RESOLVED"}),
     "RESOLVED": frozenset(),
-}
-_REPORT_STATUS_TRANSITIONS: dict[str, tuple[str, ...]] = {
-    "new": ("reviewed", "resolved"),
-    "reviewed": ("new", "resolved"),
-    "resolved": ("reviewed",),
 }
 
 
@@ -86,13 +87,6 @@ class AdminReportWorkflowError(RuntimeError):
 
 def _database_sqlstate(exc: BaseException) -> str | None:
     return getattr(getattr(exc, "orig", None), "sqlstate", None)
-
-
-def allowed_next_statuses(status: str) -> tuple[str, ...]:
-    try:
-        return _REPORT_STATUS_TRANSITIONS[status]
-    except KeyError as exc:
-        raise ValueError("unknown report status") from exc
 
 
 def update_admin_report_status(
@@ -124,7 +118,8 @@ def update_admin_report_status(
             status_code=409,
             latest_status=latest,
         )
-    if payload.status == report.status or payload.status not in allowed_next_statuses(report.status):
+    transition = decide_report_status_transition(report.status, current_version, payload.status)
+    if transition.outcome != "allowed":
         _rollback_or_database_unavailable(db)
         raise AdminReportWorkflowError(
             "report_status_transition_invalid",
@@ -140,9 +135,9 @@ def update_admin_report_status(
         )
 
     changed_at = _as_utc(now or datetime.now(UTC))
-    previous_status = report.status
-    report.status = payload.status
-    report.status_version = current_version + 1
+    previous_status = transition.previous_status
+    report.status = transition.status
+    report.status_version = transition.status_version
     report.updated_at = changed_at
     try:
         db.add(
@@ -219,7 +214,7 @@ def _as_utc(value: datetime) -> datetime:
 def _locked_report(db: Session, report_id: uuid.UUID) -> Report:
     try:
         report = db.execute(
-            select(Report).where(Report.id == report_id).with_for_update()
+            select(Report).where(account_subject_visible(Report)).where(Report.id == report_id).with_for_update()
         ).scalar_one_or_none()
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
@@ -231,6 +226,23 @@ def _locked_report(db: Session, report_id: uuid.UUID) -> Report:
             status_code=404,
         )
     return report
+
+
+def _require_visible_report(db: Session, report_id: uuid.UUID) -> None:
+    """Fence replays and secured database calls before reading their history."""
+    try:
+        visible_id = db.scalar(
+            select(Report.id).where(
+                Report.id == report_id, account_subject_visible(Report)
+            )
+        )
+    except SQLAlchemyError as exc:
+        _raise_database_unavailable(db, exc)
+    if visible_id is None:
+        _rollback_or_database_unavailable(db)
+        raise AdminReportWorkflowError(
+            "report_not_found", "Report was not found.", status_code=404
+        )
 
 
 def _latest_review_decision(
@@ -530,6 +542,8 @@ def append_report_review_decision(
 ) -> ReportReviewDecision:
     """Append one decision without changing the report lifecycle projection."""
 
+    _require_visible_report(db, report_id)
+
     try:
         secured_dml = _secured_review_dml_required(db)
     except SQLAlchemyError as exc:
@@ -555,7 +569,7 @@ def append_report_review_decision(
 
     if existing is None and secured_dml:
         try:
-            report = db.get(Report, report_id)
+            report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
         except SQLAlchemyError as exc:
             _raise_database_unavailable(db, exc)
         if report is None:
@@ -584,7 +598,10 @@ def append_report_review_decision(
         try:
             duplicate_target_missing = (
                 payload.duplicate_of_report_id is not None
-                and db.get(Report, payload.duplicate_of_report_id) is None
+                and db.scalar(select(Report.id).where(
+                    Report.id == payload.duplicate_of_report_id,
+                    account_subject_visible(Report),
+                )) is None
             )
         except SQLAlchemyError as exc:
             _raise_database_unavailable(db, exc)
@@ -917,7 +934,7 @@ def list_report_review_decisions(
     report_id: uuid.UUID,
 ) -> list[ReportReviewDecision]:
     try:
-        report = db.get(Report, report_id)
+        report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
     if report is None:
@@ -953,7 +970,7 @@ def get_report_review_decision(
     """
 
     try:
-        report = db.get(Report, report_id)
+        report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
     if report is None:
@@ -993,7 +1010,7 @@ def _report_history_snapshot(
                 func.max(history_model.revision),
             )
             .outerjoin(history_model, history_model.report_id == Report.id)
-            .where(Report.id == report_id)
+            .where(Report.id == report_id, account_subject_visible(Report))
             .group_by(Report.id)
         ).one_or_none()
     except SQLAlchemyError as exc:
@@ -1233,7 +1250,7 @@ def append_report_institution_delivery_event(
         _raise_database_unavailable(db, exc)
     if secured_dml:
         try:
-            report = db.get(Report, report_id)
+            report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
         except SQLAlchemyError as exc:
             _raise_database_unavailable(db, exc)
         if report is None:
@@ -1722,6 +1739,8 @@ def correct_report_institution_delivery_event(
     which event was wrong, why, and who recorded that.
     """
 
+    _require_visible_report(db, report_id)
+
     try:
         secured_dml = _secured_delivery_event_dml_required(db)
     except SQLAlchemyError as exc:
@@ -1884,7 +1903,7 @@ def list_report_institution_delivery_events(
     report_id: uuid.UUID,
 ) -> list[ReportInstitutionDeliveryEvent]:
     try:
-        report = db.get(Report, report_id)
+        report = db.scalar(select(Report).where(Report.id == report_id, account_subject_visible(Report)))
     except SQLAlchemyError as exc:
         _raise_database_unavailable(db, exc)
     if report is None:

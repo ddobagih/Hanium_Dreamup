@@ -1,0 +1,16 @@
+flowchart TD
+  A["F-D04-038 · P-D04-038<br/>clock·measurement·callback 시각"]
+  G{"FullBias·leap0..64·finite offset/bias·정수 subtract 유효"}
+  GC["GNSS_CLOCK<br/>GPS epoch + floor ms - reported leap"]
+  P{"chipset elapsed가 0..callback elapsed인가"}
+  DP["DEVICE_UTC_PROJECTED<br/>callback wallclock에서 elapsed 차를 뺌"]
+  DC["DEVICE_UTC_CALLBACK"]
+  CSV["Raw marker +27 named fields =28 CSV values·nullable 빈칸·원 시각출처 보존<br/>comma와 줄바꿈은 space 치환"]
+  A --> G
+  G -->|"예"| GC
+  G -->|"아니오"| P
+  P -->|"예"| DP
+  P -->|"아니오"| DC
+  GC --> CSV
+  DP --> CSV
+  DC --> CSV

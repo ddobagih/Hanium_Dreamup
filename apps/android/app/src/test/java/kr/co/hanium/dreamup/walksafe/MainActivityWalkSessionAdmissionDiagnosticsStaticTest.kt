@@ -19,7 +19,7 @@ class MainActivityWalkSessionAdmissionDiagnosticsStaticTest {
     @Test
     fun resumeRecognitionUsesAllAlternatives() {
         val recognition = functionBlock("private fun handleWalkSessionResumeRecognition(")
-        assertTrue(recognition.contains("WalkSessionResumeConfirmation.fromRecognizedText(phrases)"))
+        assertTrue(recognition.contains("phrases, confidenceScores, effects::acceptsControlConfidence,"))
         assertFalse(recognition.contains("phrases.firstOrNull()"))
     }
 
@@ -27,7 +27,7 @@ class MainActivityWalkSessionAdmissionDiagnosticsStaticTest {
     fun rejectedAdmissionsAreLoggedWithReasonButWithoutTokens() {
         val transition = functionBlock("private fun transitionWalkSession(")
         val rejection = transition.indexOf("WalkSessionTransitionDiagnostics.rejectionOrNull(event, transition)")
-        assertTrue(rejection > transition.indexOf("walkSessionLifecycle.handle(event)"))
+        assertTrue(rejection > transition.indexOf("lifecycle().handle(event, effects::beforePublication)"))
         val record = transition.substring(rejection)
             .substringAfter("\"walk_session_transition_rejected\"")
             .substringBefore("handleRawCollectionTransition(")
@@ -37,20 +37,5 @@ class MainActivityWalkSessionAdmissionDiagnosticsStaticTest {
         assertFalse(record.contains("readiness"))
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing $signature" }
-        val open = source.indexOf('{', source.indexOf(')', start))
-        var depth = 0
-        for (index in open until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        error("unterminated $signature")
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
 }

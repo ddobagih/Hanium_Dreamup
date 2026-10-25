@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D02-011 부가 저장 기능 여유 공간 gate"]
+  E["진입: write 요청 전"]
+  G{"P-D02-011 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["해당 부가 write hold"]
+  G -->|"공간＜2*maxItem"| B0
+  B1["허용"]
+  G -->|"공간=reserve"| B1
+  B2["이 부가 gate 대상 아님"]
+  G -->|"explicit report·consent/security write"| B2
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["기능별 reserve 산출"]
+    S1["allocatable＞=reserve이면 허용"]
+    S2["불명/부족은 그 기능 hold만 기록"]
+    S3["같은 기능 성공 관찰은 해당 hold 해제"]
+    S4["공간 검사 통과 뒤 실제 write 실패도 IO_FAILURE hold로 기록한다. 같은 기능 write 성공만<br/>clear하며 count는 Long.MAX_VALUE 포화다."]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: 해당 이벤트 처리를 마치고 현재 스냅샷/결과를 반환한다."]
+  X["취소·중단: 독립 취소 API가 없는 판단 함수는 호출자의 세대 무효화로 더 이상 결과를 사용하지 않는다. /<br/>foreground·epoch·owner 조건을 잃은 결과는 재사용하지 않는다."]
+  C["정리: 순수 정책은 소유하는 외부 리소스가 없다."]
+  R["재시도·복구: 자동 재시도 없음. 호출자가 명시된 새 이벤트를 전달해야 한다. / 현재 증거와 소유권을 다시 확보해야 한다. 이전 성공을<br/>소급 복원하지 않는다."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

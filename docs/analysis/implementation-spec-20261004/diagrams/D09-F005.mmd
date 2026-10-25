@@ -1,0 +1,29 @@
+flowchart TD
+  T["F-D09-005 actor별 원자적 요청 수 제한 / P-D09-005"]
+  N0["검증 actor와 rate 그룹"]
+  T --> N0
+  N1["즉시 실행슬롯 예약"]
+  N0 --> N1
+  N2["DB advisory lock와 만료행 삭제"]
+  N1 --> N2
+  N3["현재 count와 limit 비교"]
+  N2 --> N3
+  N4["한행 insert 또는 Retry-After"]
+  N3 --> N4
+  N5["commit 이후 결과"]
+  N4 --> N5
+  Z["정상: 허용 요청 한 건을 원자적 계수한 후 업무 handler 호출"]
+  N5 --> Z
+  B0["429 actor_rate_limit_exceeded + Retry-After"]
+  N2 -->|"그룹 count >= limit"| B0
+  B1["503 actor_rate_limit_store_unavailable"]
+  N0 -->|"실행슬롯/lock 획득 불가, deadline, DB 실패"| B1
+  B2["dispatcher quarantine; 불확실 slot 재사용 금지"]
+  N0 -->|"executor submit 결과 불확실"| B2
+  R["종료와 복구: 서버 자동 재시도 없음 / 원인 해소 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  C["취소와 정리: caller 취소는 budget cancel+future.cancel 시도; worker가 실행 중이면 정리 종료까지 slot 유지 / worker가 session을 닫은 뒤 release-once; uncertain submit은 quarantine 유지"]
+  N5 -.-> C

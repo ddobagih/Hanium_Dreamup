@@ -14,18 +14,30 @@ import org.junit.Test
 class RouteFacingInFlightAngleReversalRegressionTest {
     @Test
     fun anAheadCueIsRevokedOnceTheRouteIsFarMoreThanARightAngleOff() {
-        for ((relative, side) in listOf(120.0 to "경로는 오른쪽입니다", 140.0 to "경로는 오른쪽입니다", -120.0 to "경로는 왼쪽입니다")) {
+        for (relative in listOf(120.0, 140.0, -120.0)) {
             val nav = navigator()
             val ahead = nav.update(fix(), 1_000, false, facingObservation = facing(1_000, 0.0))
-            assertTrue(ahead.instruction?.contains("앞쪽이 경로 진행 방향입니다") == true)
+            assertTrue(ahead.instruction?.contains("약 12시 방향") == true)
             assertTrue(nav.reserveInstruction(ahead))
-            val turned = requireNotNull(nav.retryGuidance(1_100, facing(1_100, relative)))
-            assertEquals("relative=$relative", "route_guidance", turned.reason)
+            val observation = facing(1_100, relative)
+            val turned = requireNotNull(nav.retryGuidance(1_100, observation))
             assertTrue("relative=$relative", turned.cancelStaleNavigationSpeech)
-            assertTrue(turned.instruction, turned.instruction?.contains(side) == true)
-            assertFalse(turned.instruction?.contains("앞쪽이 경로 진행 방향입니다") == true)
+            // A cold nominal replacement needs a distinct second actual observation; range speech is forbidden.
+            assertEquals("relative=$relative", "guidance_facing_recheck_wait", turned.reason)
+            assertEquals(null, turned.instruction)
+            assertFalse(nav.reserveInstruction(turned))
+            if (relative == 140.0) {
+                val nextObservation = facing(1_200L, relative)
+                val confirmed = requireNotNull(nav.retryGuidance(1_200L, nextObservation))
+                assertTrue(confirmed.instruction.orEmpty().contains("약 5시 방향"))
+                assertFalse(confirmed.instruction.orEmpty().contains("사이 방향"))
+                assertEquals(RouteClockReferenceKind.NOMINAL_TREND_CLOCK, confirmed.facingDiagnostic?.clockReferenceKind)
+                assertTrue(nav.reserveInstruction(confirmed))
+                assertTrue(nav.isInstructionCurrent(confirmed, 1_700L, nextObservation))
+                assertFalse(nav.isInstructionCurrent(confirmed, 1_701L, nextObservation))
+            }
+            assertFalse(turned.instruction?.contains("약 12시 방향") == true)
             assertFalse(nav.reserveInstruction(ahead))
-            assertTrue(nav.reserveInstruction(turned))
         }
     }
 
@@ -46,16 +58,22 @@ class RouteFacingInFlightAngleReversalRegressionTest {
         for ((offered, flipped, kept) in listOf(Triple(-90.0, 30.0, 5.0), Triple(90.0, -30.0, -5.0))) {
             val nav = navigator()
             val side = nav.update(fix(), 1_000, false, facingObservation = facing(1_000, offered))
-            assertTrue(side.instruction?.contains(if (offered < 0) "경로는 왼쪽입니다" else "경로는 오른쪽입니다") == true)
+            assertTrue(side.instruction?.contains(if (offered < 0) "약 9시 방향" else "약 3시 방향") == true)
             assertTrue(nav.reserveInstruction(side))
             val withinMargin = requireNotNull(nav.retryGuidance(1_100, facing(1_100, kept)))
             assertEquals("offered=$offered kept=$kept", "guidance_in_flight", withinMargin.reason)
             assertFalse(withinMargin.cancelStaleNavigationSpeech)
             val reversed = requireNotNull(nav.retryGuidance(1_200, facing(1_200, flipped)))
             assertTrue("offered=$offered flipped=$flipped", reversed.cancelStaleNavigationSpeech)
-            assertTrue(reversed.instruction, reversed.instruction?.contains("앞쪽이 경로 진행 방향입니다") == true)
+            assertEquals("route_guidance", reversed.reason)
+            val hour = if (flipped > 0.0) 1 else 11
+            assertTrue(reversed.instruction.orEmpty().contains("약 ${hour}시 방향"))
+            assertFalse(reversed.instruction.orEmpty().contains("사이 방향"))
+            assertEquals(RouteClockReferenceKind.REPORTED_ERROR, reversed.facingDiagnostic?.clockReferenceKind)
             assertFalse(nav.reserveInstruction(side))
             assertTrue(nav.reserveInstruction(reversed))
+            assertTrue(nav.isInstructionCurrent(reversed, 1_700L, facing(1_200L, flipped)))
+            assertFalse(nav.isInstructionCurrent(reversed, 1_701L, facing(1_200L, flipped)))
         }
     }
 

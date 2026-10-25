@@ -16,6 +16,7 @@ class MainActivityObjectDepthPipelineWiringStaticTest {
         .first { it.isFile }.readText()
 
     private val main by lazy { read("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt") }
+    private val synthesis by lazy { read("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/frame/FrameSynthesisController.kt") }
     private val cameraTest by lazy { read("src/debug/java/kr/co/hanium/dreamup/walksafe/CameraTestActivity.kt") }
     private val coordinator by lazy {
         read("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileFrameCoordinator.kt")
@@ -37,7 +38,7 @@ class MainActivityObjectDepthPipelineWiringStaticTest {
 
     @Test
     fun everyRuntimeAndDiagnosticPipelineSetsRawOnlyMotionExplicitly() {
-        val production = calls(main, "ObjectDepthRuntimePipeline(")
+        val production = calls(synthesis, "ObjectDepthRuntimePipeline(")
         val diagnostic = calls(cameraTest, "ObjectDepthRuntimePipeline(")
         assertTrue(production.size >= 4)
         assertEquals(1, diagnostic.size)
@@ -48,10 +49,10 @@ class MainActivityObjectDepthPipelineWiringStaticTest {
 
     @Test
     fun productionDepthCallsNeverFallBackToTheIdentityMapper() {
-        val legacyCalls = calls(main, "objectDepthPipeline.process(")
+        val legacyCalls = calls(synthesis, "objectDepthPipeline.process(")
         assertEquals(1, legacyCalls.size)
         assertTrue(legacyCalls.single().contains("mapper = requireNotNull(evidence.depthMapper)"))
-        val currentCalls = calls(main, "currentObjectDepthPipeline.processTrackedObservation(")
+        val currentCalls = calls(synthesis, "currentObjectDepthPipeline.processTrackedObservation(")
         assertEquals(1, currentCalls.size)
         assertTrue(currentCalls.single().contains("mapper = requireNotNull(evidence.depthMapper)"))
         assertTrue(currentCalls.single().contains("mapperFrameId = evidence.depthMapper.frameId"))
@@ -63,12 +64,13 @@ class MainActivityObjectDepthPipelineWiringStaticTest {
 
     @Test
     fun visualEpochOrGeometryResetReplacesPipelineAndTracker() {
-        val reset = main.substringAfter("private fun resetVisualTrackingState()")
-            .substringBefore("private fun hasFreshVisualSource(")
-        assertTrue(reset.contains("visualGeometryVersion += 1L"))
+        assertTrue(main.contains("frameSynthesisOwner.advanceGeometry()"))
+        assertTrue(main.contains("frameSynthesisOwner.resetCurrentCaptureHistory("))
+        val reset = MainActivityRefactorSource.member(synthesis, "resetCurrentCaptureHistory")
+        assertTrue(MainActivityRefactorSource.member(synthesis, "advanceGeometry").contains("visualGeometryVersion += 1L"))
         assertTrue(reset.contains("currentObjectDepthPipeline = ObjectDepthRuntimePipeline("))
         assertTrue(reset.contains("tracker = ObjectTracker(trackIdPrefix = \"visual-\$visualGeometryVersion-track-\")"))
-        val admission = main.substringAfter("val admission = visualFrameTracker.offerFrame(gray)")
+        val admission = synthesis.substringAfter("val admission = visualFrameTracker.offerFrame(gray)")
             .substringBefore("lastVisualFrameKey = gray.key")
         assertTrue(admission.contains("if (admission.reset) {"))
         assertTrue(admission.substringAfter("if (admission.reset) {")

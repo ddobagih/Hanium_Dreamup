@@ -10,13 +10,11 @@ class MainActivityWithdrawalStaticTest {
 
     @Test
     fun durableMutationCommitPrecedesCancellationAndHttp() {
-        val function = source.substringAfter(
-            "private fun persistIntegratedConsentDraft(announce: Boolean)",
-        ).substringBefore("private fun retryPendingIntegratedConsentMutation")
+        val function = MainActivityRefactorSource.function(source, "private fun persistIntegratedConsentDraft(")
 
         val commit = function.indexOf(".commit()")
         val cancellation = function.indexOf("integratedConsentCall?.cancel()")
-        val http = function.indexOf("integratedConsentClient.saveCall(")
+        val http = function.indexOf("remote.saveCall(")
 
         assertTrue(commit >= 0)
         assertTrue(cancellation > commit)
@@ -31,9 +29,7 @@ class MainActivityWithdrawalStaticTest {
             onCreate.indexOf("restorePrivacyControlStateFromPrefs()") <
                 onCreate.indexOf("resumePrivacyControlOperations()"),
         )
-        val apply = source.substringAfter(
-            "private fun applyIntegratedConsentConfirmation(",
-        ).substringBefore("private fun persistedIntegratedConsentSelections")
+        val apply = MainActivityRefactorSource.function(source, "private fun applyIntegratedConsentConfirmation(")
         assertTrue(
             apply.indexOf("editor.commit()") <
                 apply.indexOf("applyExactPendingConfirmation"),

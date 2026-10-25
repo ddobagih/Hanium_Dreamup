@@ -76,9 +76,9 @@ class MainActivityLongLivedLoginStaticTest {
             restore,
             "val operation = GatewaySessionProcessCoordinator.beginOperation() ?: return",
             "permissionSessionPolicy.authenticationExpired()",
-            "if (!BuildConfig.WALKSAFE_LONG_LIVED_LOGIN_ENABLED)",
+            "if (!config.longLivedLoginEnabled)",
         )
-        assertTrue(restore.contains("gatewaySessionStore.purgeDisabled()"))
+        assertTrue(restore.contains("store.purgeDisabled()"))
         assertTrue(restore.contains("stageRestoredGatewayRevocation(restored, operation)"))
         assertTrue(restore.contains("GatewaySessionProcessCoordinator.markStorageBlocked(operation)"))
         assertTrue(
@@ -88,18 +88,22 @@ class MainActivityLongLivedLoginStaticTest {
         )
         assertTrue(restore.contains("permissionSessionPolicy.rememberActor(actorId)"))
         assertFalse(restore.contains("permissionSessionPolicy.authenticated("))
+        assertInOrder(restore, "profile.restoreFirstRun(restored.firstRunSnapshot, expectedFirstRun)",
+            "profile.reporterActorId = actorId", "val effectiveRestored = restored.copy(firstRunSnapshot = profile.firstRunSnapshot)",
+            "GatewaySessionProcessCoordinator.publishRestoredUnverified(")
         assertInOrder(
             restore,
             "GatewaySessionProcessCoordinator.publishRestoredUnverified(",
-            "renewRestoredGatewaySession(restored, renewalOperation)",
+            "firstRunSnapshot = effectiveRestored.firstRunSnapshot",
+            "renewRestoredGatewaySession(effectiveRestored, renewalOperation)",
         )
 
         val renewal = functionBlock("private fun renewRestoredGatewaySession(")
         assertInOrder(
             renewal,
-            "gatewaySessionStore.reserveRenewal(",
-            "gatewaySessionClient.renew(",
-            "gatewaySessionStore.commitRenewal(",
+            "store.reserveRenewal(",
+            "remote.renew(",
+            "store.commitRenewal(",
             "GatewaySessionProcessCoordinator.publishVerified(",
         )
     }
@@ -111,7 +115,7 @@ class MainActivityLongLivedLoginStaticTest {
         assertInOrder(
             login,
             "enableLongLivedSession =",
-            "BuildConfig.WALKSAFE_LONG_LIVED_LOGIN_ENABLED",
+            "config.longLivedLoginEnabled",
         )
         assertTrue(
             login.contains(
@@ -119,7 +123,7 @@ class MainActivityLongLivedLoginStaticTest {
             ),
         )
         assertTrue(login.contains("commitLoggedInGatewaySession("))
-        assertFalse(login.contains("gatewaySessionStore.saveInitialIfAbsent("))
+        assertFalse(login.contains("store.saveInitialIfAbsent("))
         assertFalse(login.contains("GatewaySessionProcessCoordinator.publishVerified("))
     }
 
@@ -132,7 +136,7 @@ class MainActivityLongLivedLoginStaticTest {
             "!processSnapshot.storageBlocked",
             "processSnapshot.session === session",
         )
-        assertTrue(ready.contains("currentReporterUserId()"))
+        assertTrue(ready.contains("profile.currentReporterActorId()"))
         assertTrue(
             ready.contains(
                 "GatewaySessionVerificationState.VERIFIED",
@@ -152,14 +156,16 @@ class MainActivityLongLivedLoginStaticTest {
         assertTrue(current.contains("isGatewaySessionReadyForCurrentActor("))
         val lookup = functionBlock("private fun gatewaySessionOrNull(")
         assertTrue(lookup.contains("isGatewaySessionReadyForCurrentActor("))
-        val gatewayReadiness = sourceSection(
-            source,
-            "WalkSessionReadinessRequirement.GATEWAY ->",
-            "WalkSessionReadinessRequirement.DEVICE_RESOURCES ->",
-        )
-        assertTrue(gatewayReadiness.contains("isGatewaySessionReadyForCurrentActor("))
+        val readinessComposition = MainActivityRefactorSource.composition(source, "walkReadinessCoordinator")
+        assertTrue(readinessComposition.contains("GatewayReadinessProducer(::isGatewaySessionReadyForCurrentActor)"))
+        val producers = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/readiness/WalkReadinessProducers.kt").readText()
+        assertTrue(producers.contains("WalkSessionReadinessRequirement.GATEWAY -> gateway.evaluate()"))
+        val gatewayReadiness = producers.substringAfter("internal class GatewayReadinessProducer")
+            .substringBefore("internal class WalkReadinessProducers")
+        assertTrue(gatewayReadiness.contains("if (currentActorReady()) WalkSessionReadinessStatus.READY"))
         val blockReason = functionBlock("private fun walkSessionReadinessBlockReason(")
-        assertTrue(blockReason.contains("isGatewaySessionReadyForCurrentActor("))
+        assertTrue(blockReason.contains("sources.gatewayReadyForCurrentActor()"))
+        assertTrue(MainActivityRefactorSource.composition(source, "walkReadinessBlockController").contains("override fun gatewayReadyForCurrentActor() = isGatewaySessionReadyForCurrentActor()"))
     }
 
     @Test
@@ -172,11 +178,11 @@ class MainActivityLongLivedLoginStaticTest {
             "session.verificationState != GatewaySessionVerificationState.VERIFIED",
             "!session.isUsableFor(actorId)",
             "actorId != session.actorId",
-            "priorityUserOnboardingActorId != session.actorId",
+            "profile.priorityActorId() != session.actorId",
         )
         assertInOrder(
             commit,
-            "gatewaySessionStore.saveInitialIfAbsent(",
+            "store.saveInitialIfAbsent(",
             "GatewaySessionProcessCoordinator.publishVerified(",
         )
         assertTrue(commit.contains("stored != GatewaySessionStoreResult.COMMITTED"))
@@ -201,9 +207,7 @@ class MainActivityLongLivedLoginStaticTest {
             "return true",
         )
 
-        val applySnapshot = functionBlock(
-            "private fun onGatewayProcessSessionChanged(",
-        )
+        val applySnapshot = actorSessionChange(source)
         assertInOrder(
             applySnapshot,
             "val verifiedActorSession = session?.takeIf",
@@ -212,8 +216,8 @@ class MainActivityLongLivedLoginStaticTest {
             "current.isUsableFor(current.actorId)",
             "if (\n            verifiedActorSession != null",
             "verifiedActorSession.isUsableFor(actorId)",
-            "priorityUserOnboardingActorId == actorId",
-            "permissionSessionPolicy.authenticated(actorId)",
+            "profiles.actorId == actorId",
+            "permissions.authenticate(actorId)",
         )
     }
 
@@ -226,13 +230,13 @@ class MainActivityLongLivedLoginStaticTest {
             "GatewaySessionProcessCoordinator.beginGeneralSessionOperationIfCurrent(",
             "GatewaySessionProcessCoordinator.beginOperation()",
             "} ?: return null",
-            "gatewaySessionStore.moveActiveToPendingRevocation(",
+            "store.moveActiveToPendingRevocation(",
             "GatewaySessionProcessCoordinator.publishPendingRevocation(operation)",
             "permissionSessionPolicy.authenticationExpired()",
         )
         assertTrue(clear.contains("GatewaySessionProcessCoordinator.markStorageBlocked(operation)"))
-        assertTrue(clear.contains("handleGatewaySessionDowngrade("))
-        assertFalse(clear.contains("gatewaySessionStore.clear()"))
+        assertTrue(clear.contains("effects.downgradeSession("))
+        assertFalse(clear.contains("store.clear()"))
 
         val persistedTransition = functionBlock(
             persistedLoginStateSource,
@@ -277,14 +281,14 @@ class MainActivityLongLivedLoginStaticTest {
                 "enterWalkSessionForegroundRecheckAndCancelOutputs(reason)",
             ),
         )
-        assertTrue(downgrade.contains("walkSessionResumeConfirmationToken = null"))
+        assertTrue(downgrade.contains("walkSessionResumeController.clearConfirmation()"))
 
         val recheck = functionBlock(
             "private fun enterWalkSessionForegroundRecheckAndCancelOutputs(",
         )
         assertTrue(
             recheck.contains(
-                "transitionWalkSession(WalkSessionEvent.RecheckRequested)",
+                "walk.transition(WalkSessionEvent.RecheckRequested)",
             ),
         )
         assertTrue(recheck.contains("cancelWalkSessionOutputs(reason)"))
@@ -300,18 +304,18 @@ class MainActivityLongLivedLoginStaticTest {
         assertTrue(button.contains("확인 중"))
         assertFalse(
             clear.contains(
-                "runCatching { gatewaySessionClient.logout(previous) }",
+                "runCatching { remote.logout(previous) }",
             ),
         )
         assertInOrder(
             clear,
             "val confirmed = runCatching",
-            "gatewaySessionClient.logout(previous)",
+            "remote.logout(previous)",
             "remoteLogoutResult(confirmed)",
         )
-        assertTrue(source.contains("remote_revoke_confirmed"))
-        assertTrue(source.contains("remote_revoke_unconfirmed"))
-        assertTrue(source.contains("확인하지 못"))
+        assertTrue(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/GatewaySessionController.kt").readText().contains("remote_revoke_confirmed"))
+        assertTrue(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/GatewaySessionController.kt").readText().contains("remote_revoke_unconfirmed"))
+        assertTrue(button.contains("확인하지 못"))
     }
 
     @Test
@@ -346,7 +350,7 @@ class MainActivityLongLivedLoginStaticTest {
 
         // login()/logout() 은 IOException 을 감싸지 않는다. RuntimeException 만 잡으면
         // Gateway 가 닿지 않을 때 실행자 스레드에서 빠져나가 프로세스가 종료된다.
-        assertTrue(clicked.contains("gatewaySessionClient.login("))
+        assertTrue(clicked.contains("remote.login("))
         assertFalse(clicked.contains("catch (_: RuntimeException)"))
         assertTrue(clicked.contains("catch (_: Exception)"))
     }
@@ -363,7 +367,7 @@ class MainActivityLongLivedLoginStaticTest {
         return text.substring(start, end)
     }
 
-    private fun functionBlock(marker: String): String = functionBlock(source, marker)
+    private fun functionBlock(marker: String): String = MainActivityRefactorSource.function(source, marker)
 
     private fun functionBlock(text: String, marker: String): String =
         nestedBlock(text, marker, includeMarker = true)
@@ -403,4 +407,56 @@ class MainActivityLongLivedLoginStaticTest {
             previous = current
         }
     }
+    private fun actorSessionChange(mainSource: String): String {
+        MainActivityRefactorSource.composition(mainSource, "actorSessionLifecycleCoordinator")
+        val main = MainActivityRefactorSource.factory(mainSource, "onGatewayProcessSessionChanged")
+        // Whole declaration comparison preserves guards, argument forwarding and effect order.
+        val expectedMain = """
+private fun onGatewayProcessSessionChanged(
+        snapshot: GatewaySessionProcessSnapshot,
+        consentAuthorityChanged: Boolean,
+    ) {
+        actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)
+        refreshGuidanceDiagnosticAuthority()
+    }
+        """.trimIndent()
+        org.junit.Assert.assertEquals("Main gateway callback must invoke the owner before diagnostic refresh", expectedMain.filterNot(Char::isWhitespace),
+            main.filterNot(Char::isWhitespace))
+        val call = main.indexOf("actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)")
+        org.junit.Assert.assertTrue(call >= 0)
+        org.junit.Assert.assertTrue(main.indexOf("refreshGuidanceDiagnosticAuthority()") > call)
+        return MainActivityRefactorSource.member(java.io.File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/ActorSessionLifecycleCoordinator.kt",
+        ).readText(), "onGatewayProcessSessionChanged")
+    }
+
+
+
+    @Test
+    fun actorSessionChangeRejectsNonExecutingOrReorderedCallers() {
+        val mainSource = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        actorSessionChange(mainSource)
+        val caller = MainActivityRefactorSource.factory(mainSource, "onGatewayProcessSessionChanged")
+        val call = "actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)"
+        org.junit.Assert.assertTrue(caller.contains(call))
+        val variants = linkedMapOf(
+            "conditional" to caller.replace(call, "if (false) { $call }"),
+            "uninvoked lambda" to caller.replace(call, "{ $call }"),
+            "comment" to caller.replace(call, "/* $call */"),
+            "additional effect" to caller.replace(call, "$call\nunexpectedEffect()"),
+            "omitted" to caller.replace(call, ""),
+            "early return" to caller.replace(call, "return\n$call"),
+        )
+
+        variants["reordered effects"] = caller.replace(call, "").replace(
+            "refreshGuidanceDiagnosticAuthority()", "refreshGuidanceDiagnosticAuthority()\n" + call,
+        )
+
+        val accepted = variants.filter { (_, changed) ->
+            val mainSource = mainSource.replace(caller, changed)
+            runCatching { actorSessionChange(mainSource) }.isSuccess
+        }.keys
+        org.junit.Assert.assertTrue("Non-equivalent Main callers accepted: $accepted", accepted.isEmpty())
+    }
+
 }

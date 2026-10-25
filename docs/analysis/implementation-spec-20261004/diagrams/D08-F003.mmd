@@ -1,0 +1,46 @@
+flowchart TD
+  A["F-D08-003 요청 target·신뢰 IP·JSON body 한계"]
+  B["진입: createGatewayNodeServer / readBoundedJsonBody"]
+  A --> B
+  P0["1. Node adapter 는 target 이 /로 시작하고 //·역슬래시가 없음을 검사한다."]
+  B --> P0
+  P1["2. GET/HEAD 에 nonzero body framing 을 거부한다."]
+  P0 --> P1
+  P2["3. production 은 설정된 trusted IP header 하나의 canonical IPv4/IPv6 를 요구한다."]
+  P1 --> P2
+  P3["4. JSON reader 가 chunk 누적 크기·UTF-8·중복 key 와 syntax 를 확인한다."]
+  P2 --> P3
+  P4["5. reader 종료 및 타이머 해제로 각 handler 에 검증 결과를 반환한다."]
+  P3 --> P4
+  OK["정상: 검증된 JSON 또는 고정 오류"]
+  P4 --> OK
+  C0{"content type 부적합"}
+  X0["415"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"크기 초과"}
+  X1["413"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"읽기 10 초 초과"}
+  X2["408"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"abort"}
+  X3["499"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  C4{"중복 key·잘못된 UTF-8"}
+  X4["400"]
+  B -. "해당 단계 분기" .-> C4
+  C4 -->|"조건 충족"| X4
+  C5{"production trusted IP 없거나 malformed"}
+  X5["Node adapter 503"]
+  B -. "해당 단계 분기" .-> C5
+  C5 -->|"조건 충족"| X5
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-002, P-D08-003, P-D08-004"]
+  A -.-> POLICY

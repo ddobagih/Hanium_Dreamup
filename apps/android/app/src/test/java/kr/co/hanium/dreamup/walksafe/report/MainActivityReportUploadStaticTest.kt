@@ -12,10 +12,15 @@ class MainActivityReportUploadStaticTest {
 
     @Test
     fun activeCandidatePathOnlyEnqueuesFrozenInputAndDoesNotOpenNetwork() {
-        val process = source.substringAfter("private fun processReportCandidate(")
-            .substringBefore("private fun requestExplicitReport(")
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/ReportCandidateController.kt").readText()
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(source, "publishCurrentFrameReportState").contains("reportCandidateController.publishCurrentFrameReportState("))
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(owner, "prepareReportCandidate").contains("processReportCandidate("))
+        val wiring = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.composition(source, "reportCandidateController")
+        assertTrue(wiring.contains("reportQueueStore.enqueue("))
 
-        assertTrue(process.contains("reportQueueStore.enqueue("))
+        val process = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(owner, "processReportCandidate")
+
+        assertTrue(process.contains("queue.enqueue("))
         assertTrue(process.contains("candidate.metadata.toString().toByteArray(Charsets.UTF_8)"))
         assertTrue(process.contains("imageJpeg = imageJpeg"))
         assertTrue(process.contains("walkSessionId = expectedWalkEpoch.walkSessionId"))
@@ -28,21 +33,24 @@ class MainActivityReportUploadStaticTest {
 
     @Test
     fun gatewayCapacityBlocksOnlyAutomaticPreparationWhileEnqueueBoundaryStaysOffline() {
-        val prepare = source.substringAfter("private fun prepareReportCandidate(")
-            .substringBefore("private fun processReportCandidate(")
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/ReportCandidateController.kt").readText()
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(source, "publishCurrentFrameReportState").contains("reportCandidateController.publishCurrentFrameReportState("))
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(owner, "prepareReportCandidate").contains("processReportCandidate("))
+        val wiring = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.composition(source, "reportCandidateController")
+        assertTrue(wiring.contains("reportQueueStore.enqueue("))
+
+        val prepare = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(owner, "prepareReportCandidate")
 
         assertFalse(prepare.contains("gatewaySessionOrNull"))
         assertTrue(prepare.contains("!explicitRequest &&"))
         assertTrue(prepare.contains("GatewayCapacityProcessState.admission("))
         assertTrue(prepare.contains("automaticReportCandidateAllowed"))
         // S14-39: same filesDir root; the OS allocatable bytes of that volume gate automatic candidates.
-        assertTrue(source.contains(
-            "AndroidReportQueueStore(\n" +
-                "            applicationContext.filesDir,\n" +
-                "            allocatableBytes = AndroidAllocatableBytes(applicationContext, applicationContext.filesDir),\n" +
-                "        )",
-        ))
-        assertTrue(source.contains("reportCandidate=queue_disabled_or_rejected"))
+        val queue = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.property(source, "reportQueueStore")
+        assertTrue(queue.contains("val reportFilesDirectory = applicationContext.filesDir.canonicalFile"))
+        assertTrue(queue.contains("AndroidReportQueueStore("))
+        assertTrue(queue.contains("allocatableBytes = AndroidAllocatableBytes(applicationContext, reportFilesDirectory)"))
+        assertTrue(owner.contains("reportCandidate=queue_disabled_or_rejected"))
     }
 
     @Test
@@ -58,7 +66,14 @@ class MainActivityReportUploadStaticTest {
     @Test
     fun legacyPendingQueuePurgeBoundaryRemainsIntact() {
         assertTrue(source.contains("scheduleLegacyPendingReportQueuePurge()"))
-        assertTrue(source.contains("purgeLegacyPendingReportQueueOnCleanupThread()"))
-        assertTrue(source.contains("legacyPendingReportQueuePurgeInFlight"))
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(
+            File("src/main/java/kr/co/hanium/dreamup/walksafe/session/deletion/runtime/LegacyPendingReportQueuePurgeController.kt").readText(), "schedule",
+        ).contains("purgeOnWorker()"))
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/deletion/runtime/LegacyPendingReportQueuePurgeController.kt").readText()
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(owner, "schedule").contains("if (inFlight)"))
+        val assembly = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.composition(source, "legacyPendingReportQueuePurgeController")
+        assertTrue(assembly.contains("purgeLegacyStore = purgeLegacyStore"))
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.factory(source, "createPrivacyLegacyPurge").contains("purgeAllWithoutLoading"))
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.member(source, "scheduleLegacyPendingReportQueuePurge").contains("legacyPendingReportQueuePurgeController.schedule(onComplete)"))
     }
 }

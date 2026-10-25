@@ -1,0 +1,189 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D06 독립 명세 검토 — D02 담당</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="../index.html">WalkSafe 기능과 처리 명세</a> · <a href="../02-features.html">기능</a> · <a href="../03-policies.html">정책</a> · <a href="../05-scenarios.html">시나리오</a> · <a href="../gallery.html">그림 모음</a> · <a href="../08-review.html">검수</a></header><main><h1>D06 독립 명세 검토 — D02 담당</h1>
+<p>[결과]</p>
+<ul>
+<li>판정: 아래 7개 핵심 기능의 지정 주장·정책·관련 도표를 고정 코드와 대조했다. 문서 오류 6묶음을 작성자에게 전달했고, 작성자가 반영한 최종본에서 해결을 확인했다. 이 범위에 남은 중대한 문서 불일치를 발견하지 못했다. D06 전체 정확성 또는 제품 동작 성공을 보증하지 않는다.</li>
+<li>작성자: <code>/root/reports_admin</code>. 독립 검토자: <code>/root/lifecycle_feedback</code>. 검토자는 D06 JSON·도표·제품 코드를 수정하지 않았으며 이 검토서만 작성했다.</li>
+<li>제품 실행·테스트·빌드·기기·서버·외부 전송은 수행하지 않았다. 코드와 문서 읽기, SHA-256 확인만 수행했다. Mermaid 렌더링과 시각 검증은 Root 담당이다.</li>
+</ul>
+<p>[기준 버전]</p>
+<ul>
+<li>소스: <code>/tmp/walksafe-spec-20261004-source</code>, 수집 시점 <code>2026-10-04T10:33:40+09:00</code>, base commit <code>2e5744725a8c033a1817f3cc8a8ec679bc15ac9d</code> + 당시 WIP. 원본 저장소의 현재 상태 또는 과거 DONE 기록을 이번 실행 증거로 사용하지 않았다.</li>
+<li>검토 대상: <code>domains/D06.json</code>과 아래 13개 Mermaid 원본.</li>
+<li>작성 종료 확인 후 최초 JSON SHA-256: <code>385be57fc52dc353dda28b4b1fd1ddb6a1b371711bcbcf948868795df7107045</code>.</li>
+<li>첫 수정본 JSON SHA-256: <code>0e53e8b440962cf6a13257c6a5f2c1606a61fabec68d83cc9ca56cf61bfe3aad</code>. 해당 변경의 F004/P004·F007·F023 및 수정 도표를 다시 읽었다.</li>
+<li>마지막 F029/P027 healthy raw-consent 예외 보완 후 최종 JSON SHA-256: <code>b05231bd312a8a649a6db638e2cb2e2f9ee35f3b1eacf9f9cd7a474be9aa469c</code>. 최종 읽기 전후 동일하다. 그 사이의 도표 전용 수정도 해당 파일을 다시 읽고 아래 SHA로 고정했다.</li>
+</ul>
+<p>[검토 범위와 판정]</p>
+<ul>
+<li>아래 코드 경로의 공통 접두사는 <code>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/</code>이다. 표의 줄 번호는 고정 소스 기준이다. 각 표 행은 해당 기능 전체 파일 전수 검토가 아니라 적힌 주장과 코드 구간을 검토한 결과다.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>기능·정책</th>
+<th>코드 근거</th>
+<th>대조한 주장·판정</th>
+<th>관련 도표</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>F-D06-004 / P-D06-004</td>
+<td><code>report/ExplicitReportConfirmationPolicy.kt:1~226</code>, <code>MainActivity.kt:40538~40727</code></td>
+<td>disclosure 기본 120000ms, armed 기본 30000ms는 경과가 경계와 같으면 유효하고 초과/시계 역행이면 거부한다. 동일 actor·walk·recovery·receipt·gateway generation 문맥에서 frozen bytes를 한 번만 소비한다. VOICE는 TTS 완료, ON_SCREEN은 첫 OnDraw 후 posted delivered에서 문맥을 재검사해 arm한다. 화면 draw를 사용자의 인지·TalkBack 청취 증거로 해석하지 않았다. 취소·교체·오류 시 zeroize 및 generation 방어를 확인했다. 최종 문서 일치.</td>
+<td>D06-F004, D06-explicit-state</td>
+</tr>
+<tr>
+<td>F-D06-007 / P-D06-007·008</td>
+<td><code>report/ReportQueueDrainPolicy.kt:1~143</code>, <code>report/ReportQueueDrainCoordinator.kt:123~330</code></td>
+<td>READY/ENDED·전경·현재 권한/망/동의 문맥에서 단일 lease로 status 최대 1회, 미접수일 때만 POST 최대 1회다. 기존 exact receipt면 재전송 없이 검증·내구 commit·삭제로 간다. 상태와 목적 동의가 변하면 현재성 검사로 중단하고 원본을 보존한다. 400/413/415/422 격리, 401/403 권한 차단, Retry-After 내구 보류는 status와 POST 공통 catch에 적용된다. finally 및 cancel에서 lease release, exact outer만 activeDrain 해제, nested cancel을 확인했다. Main의 전체 drain loop는 이 리뷰에서 전수 검토하지 않았다. 최종 문서 일치.</td>
+<td>D06-F007, D06-report-sequence, D06-report-queue-state</td>
+</tr>
+<tr>
+<td>F-D06-009 / P-D06-009·010</td>
+<td><code>report/ReportPrivacyConsentSession.kt:1~223</code>, <code>report/AndroidReportQueueStore.kt:337~375,828~949</code></td>
+<td>전체 privacy 철회는 permit 세대와 양 목적을 무효화한다. 목적별 취소는 해당 purpose 세대만 무효화한다. full purge/account delete의 영속 fence·키 폐기와 automatic-only opt-out의 항목별 fence를 구분했다. 자동 철회가 explicit 항목/공유키를 무조건 지우는 것으로 연결되면 안 된다. 실패 시 차단/의도 유지와 enrollment reset 경계를 확인했다. 최종 문서 일치.</td>
+<td>D06-F009</td>
+</tr>
+<tr>
+<td>F-D06-020 / P-D06-018</td>
+<td><code>rawcollection/RawCollectionRuntimeCoordinator.kt:1023~1147</code>, <code>session/PostWalkTransferPolicy.kt:1~24</code>, <code>MainActivity.kt:28263~28358</code></td>
+<td>raw upload는 READY/ENDED·전경·Wi-Fi transport와 실제 bound Wi-Fi network·충전·현재 GENERAL session/device check/RAW receipt를 요구한다. SAFE_STOP은 seal 가능한 종료 상태이지만 transfer는 허용하지 않는다. 세션/동의/망 lease의 현재성을 재검사하며, Main은 task당 최대 4건 뒤 후속 task를 예약한다. sealed source walk와 현재 post-walk를 동일 UUID로 강제하지 않는 계약을 구분했다. 실망 전송·충전 관측은 미실행. 최종 문서 일치.</td>
+<td>D06-F020, D06-raw-sequence</td>
+</tr>
+<tr>
+<td>F-D06-023 / P-D06-021</td>
+<td><code>rawcollection/RawCollectionRuntimeCoordinator.kt:307~315,952~1015,1165~1181</code>, <code>rawcollection/RawCollectionStore.kt:533~563,630~664,822~855</code></td>
+<td>receipt continuation은 previous 존재, 양쪽 RAW grant, currentRawEffective, 동일 installation/policy/itemVersions, revision +1, receipt 변경을 모두 요구한다. 이 조건은 기능 전체의 전제가 아니라 CONTINUED 분기다. undecided hold는 메모리 보호만 제공하고 durable continuity 전에는 선택되지 않는다. 철회는 이전 chain까지 fence/삭제하며 policy alignment 자체는 즉시 삭제가 아니다. 계정삭제와 검증된 재가입을 별도 이벤트로 확인했다. 최종 문서 일치.</td>
+<td>D06-F023</td>
+</tr>
+<tr>
+<td>F-D06-029 / P-D06-024·027</td>
+<td><code>fieldlog/FieldSessionLog.kt:115~146,357~535,1242~1316,1377~1381</code>, <code>fieldlog/DebugCollectionArtifacts.kt:1~32</code></td>
+<td>기본 4MiB segment/32MiB session, 완료 보존 20개/14일 및 공유 speech window 범위를 대조했다. 완료 age &gt;14일 또는 index &gt;=20, 활성 age &gt;=14일 경계를 구분했다. 일반 retention, raw/account purge, raw 재동의, 새 enrollment, 별도 debug purge를 분리했다. purge는 키·root·fsync·fence·verified marker 전체 결과를 확인하고 늦은 account intent가 우선한다. raw 재동의는 cryptoBlocked/marker가 있으면 검증 복구, 둘 다 없으면 raw-only fence clear/prune 후 재검사다. enrollment는 항상 verified purge 증거를 요구한다. symlink를 따라가지 않는 debug root 삭제 경계도 확인했다. 최종 문서 일치.</td>
+<td>D06-F029, D06-fieldlog-state의 관련 purge/reset 전이</td>
+</tr>
+<tr>
+<td>F-D06-032 / P-D06-028·031의 export 관련 부분</td>
+<td><code>fieldlog/PositionFieldSessionRecorder.kt:225~299</code>, <code>MainActivity.kt:48135~48290</code></td>
+<td>debug/storage/account 및 VERIFIED GENERAL authority에서 scope·walkEpoch에 묶인 완료 세션만 선택한다. SAF 복귀 시 pending 요청을 먼저 소비하고 캡처한 actor/gateway generation/scope/walk와 현재 권한을 재검사한다. 무결성 전체 검사 후 NDJSON header/records/footer를 쓰며 실패한 부분 목적지는 delete 후 truncate를 시도한다. 둘 다 실패하면 잔존 가능 안내가 필요하다. recorder 일반 수집/복원 전체는 미검토. 최종 문서 일치.</td>
+<td>D06-F032, D06-position-export-sequence</td>
+</tr>
+</tbody></table>
+<p>[발견사항과 반영 확인]</p>
+<table>
+<thead>
+<tr>
+<th>구분</th>
+<th>최초 문서 문제</th>
+<th>반영 확인</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DOC-D06-R01 문서 오류</td>
+<td>F007 도표가 기존 receipt 처리 뒤 404 POST로 직렬 연결되었고 cleanup은 없다고 적혔다. 최초 수정 도표에는 status HTTP 오류의 공통 catch도 빠졌다.</td>
+<td>status existing/404 분리, JSON에 finally/exact outer/nested cancel 추가, status·POST 모두 QUAR/AUTH/RETRY로 분기하는 최종 D06-F007 확인.</td>
+</tr>
+<tr>
+<td>DOC-D06-R02 문서 오류</td>
+<td>F009 full purge → fresh key → automatic-only purge가 하나의 순서처럼 그려져 목적별 철회의 차이가 사라졌다.</td>
+<td>전체 철회·자동 opt-out·계정삭제 등 요청 종류를 나눈 D06-F009 확인.</td>
+</tr>
+<tr>
+<td>DOC-D06-R03 문서 오류</td>
+<td>F023 전체 전제에 RAW_CONTINUED 조건이 들어가 철회·null·버전 gap을 배제했고, continuity → revoke → account delete가 직렬 연결되었다.</td>
+<td>일반 이벤트 진입 전제와 CONTINUED의 전체 조건을 분리하고 continuation/철회/policy/account 이벤트를 나눈 JSON·D06-F023 확인.</td>
+</tr>
+<tr>
+<td>DOC-D06-R04 문서 오류</td>
+<td>F004/P004 및 explicit 상태도에 TTS 경로만 있어 ON_SCREEN draw 전달 경로가 빠졌다.</td>
+<td>VOICE onCompleted와 ON_SCREEN 첫 OnDraw → posted delivered 및 문맥 재검사를 JSON·정책·상태도에서 확인.</td>
+</tr>
+<tr>
+<td>DOC-D06-R05 문서 오류</td>
+<td>D06-F029의 <code>&gt;=</code> 치환이 <code>초과 =</code>로 표시되어 archive index와 활성 age 경계가 흐려졌다.</td>
+<td>index 20 이상·활성 age 14일 이상, 완료 age 14일 초과로 구분한 최종 도표 확인.</td>
+</tr>
+<tr>
+<td>DOC-D06-R06 문서 오류</td>
+<td>F029 일반 보존→전체 purge→재동의가 직렬로 연결되었다. 재작성 도표가 healthy raw 재동의에도 verified purge 증거를 요구했고, 공용 실패 노드는 모든 실패에 marker 삭제를 적용하는 것처럼 보였다.</td>
+<td>retention/purge/reset/debug purge 분리, healthy raw-fence 경로와 verified/enrollment 경로 분리, 실패 라벨을 purge와 reset 경로별로 구분한 JSON/P027·최종 D06-F029 확인.</td>
+</tr>
+</tbody></table>
+<ul>
+<li>위 항목은 명세 표현·분기 조건의 오류다. 이번 검토에서 제품 코드의 실행 결함을 재현한 것이 아니다. 작성자에게 수정 요청했고 수정본만 읽기 전용으로 재확인했다.</li>
+</ul>
+<p>[미검토와 증거 한계]</p>
+<ul>
+<li>D06 나머지 30개 기능의 전제·분기·정책·도표는 독립 전수 검토하지 않았다. 전체 inventory 확인이나 인접 호출 읽기를 해당 기능 검증으로 세지 않았다.</li>
+<li>P024는 F029 보존 한도와 관련 부분, P028은 F032 export binding 관련 부분만 확인했다. P008의 모든 protocol parsing, report/raw 암호 저장 내부 전체, 녹화/프레임 수집, recorder live 수집·복원, debug 측정, 외부 provider/server/API 실제 동작은 미검토다.</li>
+<li>관련 state/sequence도는 표에 적은 기능 연결·분기만 확인했다. 예를 들어 D06-fieldlog-state의 ACTIVE 측정/복원 전체는 이번 독립 검토 범위가 아니다.</li>
+<li>테스트 경로·기대는 제품 실행 결과가 아니다. 이 리뷰에서는 테스트 본문 전체 재검토나 테스트 실행을 하지 않았다. 실제 SAF/파일시스템 장애/계정삭제 경쟁/네트워크 재접속/음성 청취 결과는 미확인이다.</li>
+<li>SVG 렌더·레이아웃·도표 전체 연결 검사와 도메인 간 통합은 Root의 별도 검증 대상이다. 이 기록은 아래 버전에서 검토한 범위의 코드-명세 대조 근거다.</li>
+</ul>
+<p>[최종 검토 도표 SHA-256]</p>
+<table>
+<thead>
+<tr>
+<th>파일</th>
+<th>SHA-256</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>diagrams/D06-F004.mmd</code></td>
+<td><code>43c32872da0676805d44fa9606c7b5faa7ca864c9dad36eba29fc83714f23c2d</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-F007.mmd</code></td>
+<td><code>78d97c58f046197a77b3c6b69a3217b36b1b6a5a31da6057494d055468c1907a</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-F009.mmd</code></td>
+<td><code>a45572680945fd85bf39b6d860e469b883970fdb470e27d18141e764d425676b</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-F020.mmd</code></td>
+<td><code>4177f03d30b41ff9d0e75ba7780c351aabd52647380365efe91f292abed9e8b8</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-F023.mmd</code></td>
+<td><code>a47c6aee48afecbd18fb8a7b2318b36ab7b42b5e9c0b9e9576078823704cd273</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-F029.mmd</code></td>
+<td><code>2a14ded1a00980f9929ae179862f556559e2b86eddc93d7c908858eac4781f26</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-F032.mmd</code></td>
+<td><code>3488679c01c37f7d749aaeb913b804f661681a918edc5cf6a4ee65555c51fb5b</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-explicit-state.mmd</code></td>
+<td><code>dad846d7dab0211e11f152b7d3b9c7cb46eb85e5be7016372ce756954a941b4e</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-fieldlog-state.mmd</code></td>
+<td><code>9080de41f662ff1923e45097a2e0464b67a61707f869848791cc844141f968db</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-position-export-sequence.mmd</code></td>
+<td><code>12d659a33fd6d05b795825f5914366756bbe52da1ddd7b588e98f55ca599b693</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-raw-sequence.mmd</code></td>
+<td><code>d1c415af2ed4bd90e9bcc4813a781008fa4ce84bcca98a73579fcfa4f357dee4</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-report-queue-state.mmd</code></td>
+<td><code>3cbc8b771765d66ab9d0bd52cf0020a7a5ecfaa4806721bfe248756cb779575a</code></td>
+</tr>
+<tr>
+<td><code>diagrams/D06-report-sequence.mmd</code></td>
+<td><code>05c6d0a4d0ee46d181878ba50b1891faa75a080437d265e7b70da191365f8eb7</code></td>
+</tr>
+</tbody></table>
+<ul>
+<li>최종 JSON 읽기 전 SHA-256: <code>b05231bd312a8a649a6db638e2cb2e2f9ee35f3b1eacf9f9cd7a474be9aa469c</code></li>
+<li>최종 JSON 읽기 후 SHA-256: <code>b05231bd312a8a649a6db638e2cb2e2f9ee35f3b1eacf9f9cd7a474be9aa469c</code></li>
+<li>표의 도표 SHA도 검토서 저장 직전 다시 확인하여 동일했다.</li>
+</ul>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

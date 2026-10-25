@@ -12,3 +12,5 @@ PYTHONPATH=. python scripts/generate_walksafe_openapi.py --check
 ```
 
 Client contract tests must consume examples derived from this schema or backend models instead of maintaining an independent payload shape.
+
+가입 사전 조회는 `GET /account-signup-policy`, 설치 삭제 증거 키 등록은 `POST /privacy/installation-evidence-key`로 제공한다. 키 등록 본문은 `installation_id`와 canonical Base64url P-256 SPKI DER `public_key`만 허용하고 성공 응답은 204다. 키 등록과 기본 삭제 영수증, 요청 시 선택하는 `device-verification.v1` 조회는 서로 다른 계약이며 동적인 기기 조회를 canonical 영속 본문에 넣지 않는다. 이메일 공통 입력은 `test-vectors/account-email.json`의 53개 벡터를 사용하고 Backend는 Gateway가 정규화한 ASCII wire 형식만 받는다.

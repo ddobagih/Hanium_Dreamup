@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-024 내부 신고 업무 상태 변경·확정 후 재조회"]
+  P["P-D12-024 서버 변경 확정과 상세 표시 분리"]
+  A --> P
+  M0["1. 허용 상태 입력과 자격증명을 검증하고 request 1회 실행권을 만든다."]
+  P --> M0
+  M1["2. 재인증 후 전송 직전 dispatch fence를 검사하고 PATCH /admin/reports/{id}/status를 전송한다."]
+  M0 --> M1
+  M2["3. 응답 report/목표상태/version=expected+1을 확인해 PATCH_CONFIRMED를 기록한다."]
+  M1 --> M2
+  M3["4. 상세를 GET해 방금 확정한 상태·version과 대조한다."]
+  M2 --> M3
+  M4["5. 일치하면 SUCCEEDED, 오래된 상세면 UPDATED_DETAIL_STALE, 이후 변경이면 CONFLICT로 표시한다."]
+  M3 --> M4
+  M4 --> N["정상 종료: PATCH 확인과 상세 일치가 모두 성립하면 SUCCEEDED."]
+  M0 -. "관련 조건 확인" .-> B0{"PATCH 전에 취소"}
+  B0 -->|"조건 해당"| R0["서버 전송 없이 CANCELLED"]
+  M1 -. "관련 조건 확인" .-> B1{"PATCH 후 통신/화면 중단"}
+  B1 -->|"조건 해당"| R1["자동 PATCH 재시도 없이 상세 조회 복구"]
+  M2 -. "관련 조건 확인" .-> B2{"GET 상태만 목표와 같고 PATCH 확인 응답 없음"}
+  B2 -->|"조건 해당"| R2["원 요청 성공으로 단정하지 않음"]
+  M3 -. "관련 조건 확인" .-> B3{"409 conflict"}
+  B3 -->|"조건 해당"| R3["최신 상태 조회 후 사용자 판단"]
+  A -. "중단 경계" .-> C["dispatch 전에는 PATCH 취소; dispatch 이후에는 결과 미확정 또는 확인된 변경으로 구분."]
+  A -. "복구 경계" .-> Q["statusDetailRecovery는 GET만 재시도."]

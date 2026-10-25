@@ -730,7 +730,7 @@ private fun JSONObject.strictNonNegativeLong(name: String): Long {
     return parsed
 }
 
-private fun strictJsonObjectDocument(value: String): Boolean =
+internal fun strictJsonObjectDocument(value: String): Boolean =
     runCatching { StrictJsonDocumentReader(value).readObjectDocument() }.isSuccess
 
 private class StrictJsonDocumentReader(
@@ -889,7 +889,8 @@ private val UTC_TIMESTAMP =
 private val USER_REPORT_CURSOR = Regex("^[A-Za-z0-9_-]{1,1024}$")
 private val LOWER_SHA256 = Regex("^[0-9a-f]{64}$")
 private val CONTROL_CHARACTER = Regex("\\p{C}")
-private val WHITESPACE = Regex("(?U)\\s+")
+// Controls are rejected first; remaining Unicode whitespace belongs to separator categories.
+private val WHITESPACE = Regex("\\p{Z}+")
 private const val MAX_SAFE_JSON_INTEGER = 9_007_199_254_740_991L
 private const val USER_REPORT_REQUEST_HISTORY_MAX_ITEMS = 25
 private const val STRICT_JSON_MAX_DEPTH = 16

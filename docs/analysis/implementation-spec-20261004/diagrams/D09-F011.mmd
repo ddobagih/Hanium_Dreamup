@@ -1,0 +1,32 @@
+flowchart TD
+  T["F-D09-011 추론 자식 프로세스·deadline·재시작 제한 / P-D09-011"]
+  N0["submission과 executor 소유권 예약"]
+  T --> N0
+  N1["runner lock 획득"]
+  N0 --> N1
+  N2["restart rate와 worker 준비"]
+  N1 --> N2
+  N3["framed job 실행"]
+  N2 --> N3
+  N4["identity schema deadline 검증"]
+  N3 --> N4
+  N5["완료 callback lease 해제"]
+  N4 --> N5
+  Z["정상: 검증된 현재 job 결과만 caller에게 반환"]
+  N5 --> Z
+  B0["InferenceRestartAdmissionLimited; 신규spawn 없음"]
+  N1 -->|"worker creation <5초 간격 또는60초창3회 이상"| B0
+  B1["성공 채택하지 않고 worker retire"]
+  N3 -->|"late result 또는 잘못된 job/envelope"| B1
+  B2["replacement worker 생성 전 기존 정리 재시도, handle 유지"]
+  N4 -->|"cleanup exit 미확인"| B2
+  B3["RuntimeError 응답이지만 worker 보존"]
+  N4 -->|"trusted malformed input/precondition"| B3
+  R["종료와 복구: 동일 추론 자동재실행 없음; 다음 새 요청은 restart admission을 다시 통과해야 함 / 원인 해소 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  C["취소와 정리: Future를 caller가 취소하지 않음; runner가 실제 작업과 capacity 소유 / terminate→join0.5→kill→join0.5; exitcode와 endpoint close 확인. close 실패 후 상태를 정상으로 초기화하지 않음"]
+  N5 -.-> C

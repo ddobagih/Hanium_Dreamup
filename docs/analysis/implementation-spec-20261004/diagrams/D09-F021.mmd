@@ -1,0 +1,16 @@
+flowchart TD
+  T["F-D09-021 저비용 liveness / P-D09-021"]
+  N0["field 인가"]
+  T --> N0
+  N1["status ok 조립"]
+  N0 --> N1
+  N2["선택 source commit추가"]
+  N1 --> N2
+  N3["HTTP200"]
+  N2 --> N3
+  Z["정상: HTTP200 status ok"]
+  N3 --> Z
+  R["복구: 서버 자동 재시도 없음 / 조건 복구 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  C["취소와 정리: 전용 취소 API 없음 / 요청 지역 메모리 반환; 공유 자원은 runtime 소유자가 정리"]
+  N3 -.-> C

@@ -1,0 +1,22 @@
+stateDiagram-v2
+    state "F-D13-001 P-D13-001 신규 발급" as New
+    state "PENDING_DELIVERY" as Pending
+    state "ACTIVE" as Active
+    state "DELIVERY_FAILED" as Failed
+    state "EXPIRED" as Expired
+    state "EXHAUSTED" as Exhausted
+    state "CONSUMED" as Consumed
+    [*] --> New
+    New --> Pending: 코드와 HMAC 저장 commit
+    Pending --> Active: F-D13-002 SMTP 성공 CAS
+    Pending --> Failed: 전달 오류와 OTP HMAC 삭제
+    Pending --> Expired: cooldown 후 새로운 요청 ID
+    Active --> Expired: 새 발급 또는 계정 생성 시 만료
+    Failed --> Expired: cooldown 후 새로운 요청 ID
+    Active --> Exhausted: F-D13-003 오답 횟수 한도 도달
+    Active --> Consumed: 계정 생성 또는 기존 이메일 충돌
+    Consumed --> Consumed: F-D13-004 정확한 성공 요청만 결과 재생
+    note right of Pending
+      동일 request_id의 lease 만료가
+      새 코드 발급을 허용하지는 않음
+    end note

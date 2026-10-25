@@ -1,0 +1,24 @@
+stateDiagram-v2
+  state "S-D09-014-UNINITIALIZED · candidate 없음" as Uninitialized
+  state "S-D09-014-REFRESHING · 한 child 갱신" as Refreshing
+  state "S-D09-014-READY · 기한 내 candidate" as Ready
+  state "S-D09-014-UNAVAILABLE · 실패 또는 만료" as Unavailable
+  state "S-D09-014-STOPPED · 종료 확인" as Stopped
+  state "S-D09-014-QUARANTINED · cleanup 미확인" as Quarantined
+  [*] --> Uninitialized
+  Uninitialized --> Refreshing: lifespan start
+  Ready --> Refreshing: interval 또는 settings generation 변경
+  Unavailable --> Refreshing: 다음 갱신
+  Refreshing --> Ready: generation과 attempt 및 fingerprint 일치
+  Refreshing --> Unavailable: timeout 또는 invalid candidate
+  Ready --> Unavailable: age가 max age 이상
+  Refreshing --> Unavailable: 늦은 결과 또는 generation 불일치
+  Refreshing --> Stopped: stop과 자원 정리 완료
+  Ready --> Stopped: stop
+  Unavailable --> Stopped: stop
+  Refreshing --> Quarantined: child 또는 pipe 정리 미확인
+  note right of Ready
+    F-D09-014 / P-D09-014
+    조회는 memory snapshot만 읽음
+    refresh 실패가 이전 ready를 계속 유지하지 않음
+  end note

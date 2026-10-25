@@ -1,0 +1,22 @@
+flowchart TD
+  A["F-D10-026 damage-area 사람 검수 결정 template 작성"]
+  N0["1. queue CSV가 비어 있으면 중단."]
+  A --> N0
+  N1["2. mixed FN/FP·missed damage-area·hard-negative 유형에 검토 focus와 비구속 suggested_default_decision을 채운다."]
+  N0 --> N1
+  N2["3. review_decision/bbox_source/manual boxes/confirm remove/notes는 빈 값으로 유지한다."]
+  N1 --> N2
+  N3["4. template CSV, issue counts JSON, 사람이 채운 뒤 apply하도록 안내하는 workflow 문서를 출력."]
+  N2 --> N3
+  B0{"제안 라벨 또는 prediction 존재"}
+  R0["review_decision을 자동 승인하지 않음"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"기존 out 파일"}
+  R1["write 모드로 덮어씀; create-only 보호 없음"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-022"]
+  P -. "코드 분기 기준" .-> A

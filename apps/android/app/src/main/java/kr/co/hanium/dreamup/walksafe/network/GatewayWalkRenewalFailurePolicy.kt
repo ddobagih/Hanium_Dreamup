@@ -68,7 +68,7 @@ object GatewayWalkRenewalFailurePolicy {
         GatewayWalkRenewalFailure.LOGIN_REQUIRED ->
             "로그인 확인이 필요해 보행을 안전 중지했습니다. 다시 로그인한 뒤 새 보행을 시작해 주세요."
         GatewayWalkRenewalFailure.TRANSIENT ->
-            "서버 연결을 확인하지 못한 채 보행 권한 유효시간이 끝나 안전 중지했습니다. " +
+            "서버 연결을 확인하지 못해 보행을 안전 중지했습니다. " +
                 "연결을 확인한 뒤 새 보행을 시작해 주세요."
         GatewayWalkRenewalFailure.DEVICE_CLOCK_CHECK_REQUIRED ->
             "기기 시간이 서버 시간과 크게 달라 보행 권한을 확인하지 못해 안전 중지했습니다. " +

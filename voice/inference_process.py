@@ -18,7 +18,7 @@ class VoiceInferenceTimeout(RuntimeError):
 def _execute(kind: str, action: str, arguments: tuple[Any, ...]) -> Any:
     # Import inside spawned workers so CUDA/model initialization never occurs
     # in the ASGI parent process.
-    from voice.server import get_stt_engine, get_tts_engine
+    from voice.engine_factory import get_stt_engine, get_tts_engine
 
     if kind == "stt":
         engine = get_stt_engine()
@@ -61,16 +61,18 @@ class IsolatedInferencePool:
         try:
             future = executor.submit(_execute, self.kind, action, arguments)
             result = await asyncio.wait_for(asyncio.wrap_future(future), timeout=timeout)
-            self._ready = True
+            with self._lock:
+                if self._executor is executor:
+                    self._ready = True
             return result
         except TimeoutError as exc:
-            self.abort()
+            self.abort(expected_executor=executor)
             raise VoiceInferenceTimeout(f"{self.kind} inference exceeded its hard deadline") from exc
         except asyncio.CancelledError:
-            self.abort()
+            self.abort(expected_executor=executor)
             raise
         except BrokenProcessPool:
-            self.abort()
+            self.abort(expected_executor=executor)
             raise
 
     @property
@@ -82,9 +84,12 @@ class IsolatedInferencePool:
             processes = list(getattr(executor, "_processes", {}).values())
             return bool(processes) and all(process.is_alive() for process in processes)
 
-    def abort(self) -> None:
+    def abort(self, *, expected_executor: ProcessPoolExecutor | None = None) -> None:
         with self._lock:
             executor = self._executor
+            # An old request may fail after another request replaced its pool.
+            if expected_executor is not None and executor is not expected_executor:
+                return
             self._executor = None
             self._ready = False
         if executor is None:

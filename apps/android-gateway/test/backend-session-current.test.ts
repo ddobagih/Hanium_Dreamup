@@ -179,3 +179,45 @@ test("the currentness deadline remains active when a live request signal is supp
     clearTimeout(watchdog);
   }
 });
+
+test("every nonempty currentness response is cancelled without reading its body", async () => {
+  for (const [status, expected] of [[401, "denied"], [503, "unavailable"], [200, "unavailable"]] as const) {
+    let cancellations = 0;
+    let reads = 0;
+    const transport: GatewayFetch = async () => new Response(new ReadableStream({
+      pull() { reads += 1; },
+      cancel() { cancellations += 1; }
+    }, { highWaterMark: 0 }), { status });
+    assert.equal(await checkBackendAccountSessionCurrent(BINDING, transport), expected);
+    assert.equal(cancellations, 1, `status ${status}`);
+    assert.equal(reads, 0, `status ${status}`);
+  }
+});
+
+test("a response arriving after client cancellation still releases its unread body", async () => {
+  const controller = new AbortController();
+  let cancellations = 0;
+  const transport: GatewayFetch = async () => {
+    controller.abort();
+    return new Response(new ReadableStream({
+      cancel() { cancellations += 1; }
+    }, { highWaterMark: 0 }), { status: 401 });
+  };
+  assert.equal(await checkBackendAccountSessionCurrent(BINDING, transport, 1_000, controller.signal),
+    "unavailable");
+  assert.equal(cancellations, 1);
+});
+
+test("a rejected or stalled body cancellation does not replace the currentness decision", async () => {
+  for (const stalled of [false, true]) {
+    let cancellations = 0;
+    const transport: GatewayFetch = async () => new Response(new ReadableStream({
+      cancel() {
+        cancellations += 1;
+        return stalled ? new Promise<void>(() => {}) : Promise.reject(new Error("cleanup failed"));
+      }
+    }, { highWaterMark: 0 }), { status: 401 });
+    assert.equal(await checkBackendAccountSessionCurrent(BINDING, transport), "denied");
+    assert.equal(cancellations, 1);
+  }
+});

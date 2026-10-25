@@ -27,6 +27,7 @@ from backend.app.models import (
 from backend.app.services.privacy_lifecycle import (
     TRAINING_SOURCE_WALK_RAW_DIAGNOSTIC,
     consent_event_is_current,
+    lock_privacy_subject_shared,
     training_consent_allows,
 )
 
@@ -150,6 +151,11 @@ def register_sanitized_artifact(
     )
     if collection is None or source is None:
         raise TrainingDatasetLifecycleError("training source does not exist")
+    # Serialize consent withdrawal/account deletion against this entire write,
+    # including the storage verification below. The transaction owns the lock.
+    lock_privacy_subject_shared(
+        db, collection.privacy_subject_hmac, collection.account_generation
+    )
     _require_current_consent(
         db,
         privacy_subject_hmac=collection.privacy_subject_hmac,
@@ -239,6 +245,14 @@ def approve_dataset_revision(
     }
     if set(artifacts) != set(artifact_ids):
         raise TrainingDatasetLifecycleError("dataset artifact is missing")
+    # Acquire all subject fences before reading any consent. Deterministic order
+    # avoids inversions for revisions containing multiple subjects/generations.
+    subjects = sorted({
+        (artifact.privacy_subject_hmac, artifact.account_generation)
+        for artifact in artifacts.values()
+    })
+    for subject, generation in subjects:
+        lock_privacy_subject_shared(db, subject, generation)
     normalized = []
     for member in members:
         if member.split not in {"train", "val", "test"}:

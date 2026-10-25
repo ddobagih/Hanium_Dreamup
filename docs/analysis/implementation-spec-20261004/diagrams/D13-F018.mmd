@@ -1,0 +1,31 @@
+flowchart TD
+  A["F-D13-018<br/>기관 외부 사본을 계정 삭제 미완료로 유지"]
+  P["P-D13-018<br/>기관전달은 수동 전달사실의 기록. D15 신고삭제 외부 copy event 원장과 이 account<br/>item 은 별도 체계다."]
+  A --> P
+  N0["1. 서버원본과 신고행은 manifest 증거로 COMPLETED 처리한다."]
+  P --> N0
+  N1["2. 격리수가 양수면 COMPLETED,0 이면 NOT_APPLICABLE 과 명시근거,legacy<br/>None 이면 과거 별도저장소없음 근거를 사용한다."]
+  N0 --> N1
+  N2["3. 기관사본수가 양수면 server_copies 를 EXTERNAL_PENDING 으로 두며<br/>terminal evidence/time 을 넣지 않는다."]
+  N1 --> COPIES{"external_copy_count"}
+  COPIES -- "양수" --> N2
+  N3["4. 기관사본수가 0 이면 NOT_APPLICABLE,legacy None 은 과거 fixed basis<br/>로 처리한다."]
+  COPIES -- "0 또는 legacy None" --> N3
+  N2 --> N4
+  N4["5. 다른항목이 모두 끝나도 EXTERNAL_PENDING 이면 overall PARTIAL 을<br/>유지한다."]
+  N3 --> N4
+  Z["사용자에게 기관 사본 대기 상태가 남음. 서버삭제와 외부삭제의 근거를 분리."]
+  N4 --> Z
+  B0{"이미 terminal 상태가 manifest 의 예상상태/digest/basis 와 다름"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["409 manifest_conflict"]
+  B1{"external_copy_count >0"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["서버 내부 manifest 만으로 COMPLETED 금지"]
+  B2{"legacy inventory count None"}
+  P -. "예외 조건 검사" .-> B2
+  B2 -- "조건 성립" --> X2["별도 legacy 근거로 NOT_APPLICABLE; 최신인벤토리로 오인 금지"]
+  R["재시도: 자동 반복 루프 없음. 호출자가 오류와 현재 상태를 확인 후 재호출.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 별도 취소 진입점 없음."]
+  A -. "취소 API 여부" .-> C

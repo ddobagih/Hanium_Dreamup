@@ -1,0 +1,89 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>전체 구성과 진입점</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="index.html">WalkSafe 기능과 처리 명세</a> · <a href="02-features.html">기능</a> · <a href="03-policies.html">정책</a> · <a href="05-scenarios.html">시나리오</a> · <a href="gallery.html">그림 모음</a> · <a href="08-review.html">검수</a></header><main><h1>전체 구성과 진입점</h1>
+<p><a href="index.html">전체 목차</a> · <a href="02-features.html">분야별 기능 목록</a> · <a href="evidence/entrypoint-inventory.json">진입점 인벤토리</a></p>
+<p>이 지도는 고정 작업트리에 실제 존재하는 구성요소와 연결을 설명한다. 선언·설정·코드의 존재, 제품 활성 경로, 운영 환경에서의 실제 실행은 별개다.</p>
+<p><img src="rendered/architecture.svg" alt="전체 구성"></p>
+<p><a href="diagrams/architecture.mmd">Mermaid 원본</a> · <a href="rendered/architecture-detail.svg">앱 내부와 서버 상세 연결도</a> · <a href="diagrams/architecture-detail.mmd">상세 Mermaid</a></p>
+<h2>구성요소와 실행 시작</h2>
+<table>
+<thead>
+<tr>
+<th>구성요소</th>
+<th>실행 진입점</th>
+<th>담당 분야와 활성 경계</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>사용자 Android</td>
+<td>app manifest → WalkSafeApplication / MainActivity</td>
+<td>D01–D07. MainActivity는 계정·온보딩·홈·목적지·안내·설정을 조합</td>
+</tr>
+<tr>
+<td>사용자 음성 서비스</td>
+<td>WalkVoiceForegroundService START/STOP intent</td>
+<td>D03. foreground 서비스·앱 전경 입력 사이 소유권 연결</td>
+</tr>
+<tr>
+<td>신고 정리 Job</td>
+<td>WalkSafeApplication → ReportQueueCleanupJobService</td>
+<td>D06. UI와 독립된 정리 진입점</td>
+</tr>
+<tr>
+<td>관리자 Android</td>
+<td>adminapp manifest → AdminBoundaryActivity</td>
+<td>D12. 보안 기능 활성, 운영 기능은 release/default 비활성·debug 설정 조건</td>
+</tr>
+<tr>
+<td>위치 평가 Android</td>
+<td>positionevalapp manifest → MainActivity / AnalysisCoordinator</td>
+<td>D16. 별도 설치 앱; 제품 앱의 GNSS/PDR 실행과 구분</td>
+</tr>
+<tr>
+<td>Android Gateway</td>
+<td>server.ts → node-adapter → routes / route-registry</td>
+<td>D08. 사용자 클라이언트의 계정·세션·업무 proxy와 삭제 outbox</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td>app/main.py FastAPI → router와 lifespan</td>
+<td>D09·D13–D15. 추론/경로, 계정/privacy/raw, 관리자보안, 신고·저장</td>
+</tr>
+<tr>
+<td>Voice</td>
+<td>voice/server.py FastAPI → inference_process</td>
+<td>D10. STT/TTS/intent·worker·model integrity</td>
+</tr>
+<tr>
+<td>모델·데이터</td>
+<td>model/*.py, data_sources/scripts, 관련 scripts CLI</td>
+<td>D10. Python 모델 runtime 일부는 Backend에서 import; Android 자산 설정은 D05</td>
+</tr>
+<tr>
+<td>운영·검증</td>
+<td>deploy/systemd, .github/workflows, scripts, tests, tools</td>
+<td>D11. 실행 파일과 과거 통제자료 구분; 설치/활성 운영상태는 이번 조사 대상 실행 증거 없음</td>
+</tr>
+<tr>
+<td>Web</td>
+<td>apps/web/proxy.ts</td>
+<td>D11. 전 경로 410, 제품 경계 LEGACY_REFERENCE_ONLY. 보존 소스 존재를 활성 서비스로 그리지 않음</td>
+</tr>
+</tbody></table>
+<h2>사용자 앱의 주요 시작점</h2>
+<p>기준 경로 <code>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/</code>의 MainActivity는 <code>onCreate</code>, <code>onResume</code>, <code>onPause</code>, <code>onDestroy</code>, <code>onRequestPermissionsResult</code>를 통해 준비·중단·복구를 조정한다. 화면 이벤트 외에 충전 broadcast, 네트워크 callback, 위치 callback, GNSS/걸음/방향 callback, CameraX analyzer, ARCore frame, 세션 갱신 타이머, 경로 snapshot 만료와 발화 재전달 작업이 있다.</p>
+<p><code>NativeUiPage</code>는 HOME, DESTINATION_SEARCH, DESTINATION_CONFIRM, GUIDANCE, VOICE_COMMAND, SETTINGS를 구분한다. 실제 화면 수는 홈 버튼 수와 같지 않다. <code>handleVoiceCommandPhrases</code> → <code>AndroidVoiceCommand</code> → <code>executeVoiceAction</code>은 UI 버튼과 별개 진입 경로다.</p>
+<p>코드 근거: <a href="/home/ddobagi/Hanium_Dreamup/apps/android/app/src/main/AndroidManifest.xml" data-source-line="31" title="고정 사본 기준 31행 · 현재 파일 열기">manifest</a>, <a href="/home/ddobagi/Hanium_Dreamup/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt" data-source-line="2916" title="고정 사본 기준 2916행 · 현재 파일 열기">MainActivity 초기화</a>, <a href="/home/ddobagi/Hanium_Dreamup/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt" data-source-line="15701" title="고정 사본 기준 15701행 · 현재 파일 열기">화면 상태</a>, <a href="/home/ddobagi/Hanium_Dreamup/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt" data-source-line="41623" title="고정 사본 기준 41623행 · 현재 파일 열기">음성 명령</a>.</p>
+<h2>연결을 오해하기 쉬운 경계</h2>
+<ul>
+<li><strong>관리자 앱은 Backend에 직접 연결한다.</strong> AdminBoundaryActivity는 WALKSAFE_ADMIN_API_ORIGIN으로 보안·운영 client를 구성한다. 사용자용 Gateway를 필수 경유하지 않는다.</li>
+<li><strong>현재 사용자 영상 추론은 Android TFLite 경로다.</strong> Backend /detect와 /detect/v2 API도 존재하지만 Gateway 공개 route 목록에는 없으며 사용자 앱 필수 추론 단계라는 근거가 없다.</li>
+<li><strong>Android 현재 모델 설정과 과거 배포 기록은 다르다.</strong> Android config는 unified_walksafe·21class walkmate YOLO11n·fallback null이다. model/deployments의 13class 기록을 현재 Android 사실로 사용하지 않는다.</li>
+<li><strong>평가 앱은 별도 launcher다.</strong> 평가용 trace/RINEX 분석은 제품 보행 동작이나 현장 위치 정확도 검증 완료를 의미하지 않는다.</li>
+<li><strong>시각 시험 overlay는 격리 지원 코드다.</strong> tools/visual-test/overlay 및 prepare_visual_test_workspace.sh의 결과를 원본 앱 동작으로 혼동하지 않는다.</li>
+<li><strong>systemd 파일 존재는 활성 서비스 증거가 아니다.</strong> timer/service의 설정 동작은 설명하지만 이번 작업에서 서비스 설치·재시작·실행 상태 검증을 수행하지 않았다.</li>
+</ul>
+<p>근거: <a href="/home/ddobagi/Hanium_Dreamup/apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java" data-source-line="542" title="고정 사본 기준 542행 · 현재 파일 열기">관리자 API 연결</a>, <a href="/home/ddobagi/Hanium_Dreamup/apps/android/adminapp/build.gradle.kts" data-source-line="80" title="고정 사본 기준 80행 · 현재 파일 열기">관리자 빌드 조건</a>, <a href="/home/ddobagi/Hanium_Dreamup/backend/app/main.py" data-source-line="543" title="고정 사본 기준 543행 · 현재 파일 열기">Backend router</a>, <a href="/home/ddobagi/Hanium_Dreamup/apps/android/app/src/main/assets/model-config/two_model_runtime.json" data-source-line="3" title="고정 사본 기준 3행 · 현재 파일 열기">Android 모델 설정</a>, <a href="/home/ddobagi/Hanium_Dreamup/apps/web/proxy.ts" data-source-line="3" title="고정 사본 기준 3행 · 현재 파일 열기">Web 차단</a>.</p>
+<h2>분야를 나눈 기준과 기존 목록의 관계</h2>
+<p>새 분야는 실제 실행 책임·상태·호출 경계로 분리했다. 기존 21분야와 추가 motion은 개선 항목의 분류이며 새 기능의 개수나 활성 상태를 결정하지 않는다. 기존 항목→분야 후보는 탐색용, 개별 source_id→기능 연결은 명시 근거가 있을 때만 직접 대응으로 기록한다. 자세한 대응과 미연결은 <a href="04-traceability.html">추적표</a>에 남긴다.</p>
+<h2>조사 범위의 한계</h2>
+<p>선언 패턴 인벤토리는 HTTP route, CLI main, Android component/callback, UI listener, systemd 진입을 추출한다. 동적 문자열, 반사, 조건부 등록, 배포 환경 값과 호출 가능성을 완전하게 해석하는 정적 call graph는 아니다. 각 분야의 읽은 파일·부분 확인·미검토를 <a href="08-review.html">검수 보고</a>와 상세본에서 확인한다. 외부 라이브러리 내부 전체, 대규모 vendor 코드와 모든 역사 문서의 전문은 전수 검토하지 않았다.</p>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

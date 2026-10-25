@@ -78,14 +78,17 @@ def create_router(
     async def get_walking_navigation_health() -> dict[str, object]:
         if settings.walking_route_provider == "tmap_pedestrian":
             dependency = tmap_dependency_readiness(settings.tmap_readiness_success_max_age_seconds)
-            configured = bool(settings.tmap_app_key) and dependency["route_recent"] is True
+            configured = bool(settings.tmap_app_key)
+            ready = configured and dependency["route_recent"] is True
             return {
                 "provider": "tmap_pedestrian",
-                "status": "ready" if configured else "unavailable",
-                "reason": None if configured else (
+                "status": "ready" if ready else "unavailable",
+                "reason": None if ready else (
                     "tmap_route_recent_success_unavailable" if settings.tmap_app_key else "tmap_app_key_missing"
                 ),
                 "walking_directions_url": settings.tmap_pedestrian_route_url,
+                "configured": configured,
+                "dependency_state": dependency["route_state"] if configured else "unverified",
             }
 
         raise invalid_walking_route_provider()

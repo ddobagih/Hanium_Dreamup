@@ -1,0 +1,47 @@
+sequenceDiagram
+participant U as 사용자·Android F-D01-027
+participant A as 삭제 coordinator F-D01-032
+participant G as Gateway F-D08-040/043
+participant B as Backend F-D13-012/017
+participant E as 외부사본·보존 F-D13-018
+U->>A: 최종 확인
+A->>A: runtime fence·pref/noBackup durable intent
+alt 준비 실패·권위 불일치
+A-->>U: fail-closed·복구 안내
+else durable 준비 성공
+A->>G: 동일 request·capability 삭제 접수
+G->>G: generation fence·outbox 내구저장·세션폐기
+G->>B: signed 삭제 요청
+alt Backend 수락
+B->>B: credential fence·inventory·worker
+B-->>G: 상태/revision
+G-->>A: 202 또는 replay200
+else 일시 장애
+G-->>A: retry 안내·outbox 유지
+G->>B: backoff 후 재전송 (pause 오류는 운영 교정)
+end
+alt Android가 현재 accepted journal·요청 수락 상태 확인
+A->>A: 음성/경로/report/raw/로그 정리 barrier
+alt 필수 로컬 정리 전체 성공
+A->>G: device-evidence
+G->>B: 선행 요청 이후 증거 전달
+B-->>A: Gateway 경유 정확한 ACK·상태
+else 일부 실패
+A->>G: FAILED device-evidence 저장·제출
+G->>B: 실패 정리 증거 전달
+A-->>U: 증거 ACK와 정리성공 구분·미완료 재시도
+end
+B->>E: 외부 사본/보존 상태 집계
+E-->>B: EXTERNAL_PENDING·LEGAL_HOLD 또는 완료 근거
+A->>G: 상태 조회·현재 lease/revision 검증
+G->>B: 현재 상태 조회
+B-->>A: Gateway 경유 inventory·최종 영수증
+alt 필수 inventory terminal·기기 ACK·최종 증거 충족
+A-->>U: 완료 및 단계별 로컬 최종 초기화 F-D01-031
+else 보류·실패·미접속 기기·외부 사본 잔존
+A-->>U: 항목별 미완료 이유·복구 상태
+end
+else Android 수락상태 미확인
+A-->>U: 동일요청/status 복구 대기·Gateway outbox 유지
+end
+end

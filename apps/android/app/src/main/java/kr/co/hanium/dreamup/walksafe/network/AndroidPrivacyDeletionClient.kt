@@ -1,7 +1,5 @@
 package kr.co.hanium.dreamup.walksafe.network
 
-import java.net.HttpURLConnection
-import java.net.URL
 import java.security.MessageDigest
 import kr.co.hanium.dreamup.walksafe.session.ACCOUNT_DELETION_ACCESS_SECRET_HEADER
 import kr.co.hanium.dreamup.walksafe.session.ACCOUNT_DELETION_REQUEST_SCHEMA_VERSION
@@ -27,9 +25,13 @@ data class DeviceDeletionEvidence(
     val result: String,
     val completedAt: String,
     val evidenceSha256: String,
+    val installationSignature: String? = null,
 )
 
-class AndroidPrivacyDeletionClient {
+class AndroidPrivacyDeletionClient(
+    private val signEvidence: ((AccountDeletionJournal, String) -> String?)? = null,
+    private val onDeviceVerification: ((AccountDeletionStatus, DeviceDeletionVerification?) -> Unit)? = null,
+) {
     fun requestDeletionCall(
         gatewayBaseUrl: String,
         trustedGatewayOrigin: String,
@@ -128,6 +130,7 @@ class AndroidPrivacyDeletionClient {
             session = null,
             requestBody = null,
             acceptedResponseCodes = setOf(200),
+            includeDeviceVerification = true,
         )
     }
 
@@ -167,6 +170,7 @@ class AndroidPrivacyDeletionClient {
         require(evidence.requestReceiptSha256 == journal.requestReceiptSha256)
         require(evidence.clientRevision == journal.clientRevision)
         require(evidence.expectedStatusRevision > 0L)
+        require(journal.accountGeneration != null && journal.accountGeneration > 0L)
         require(evidence.evidenceSha256 == deviceDeletionEvidenceSha256(evidence))
         return requestCall(
             endpoint = journal.gatewayOrigin.trimEnd('/') +
@@ -176,7 +180,11 @@ class AndroidPrivacyDeletionClient {
             accessSecret = accessSecret,
             requestId = journal.requestId,
             session = null,
-            requestBody = deviceDeletionEvidenceBody(evidence),
+            requestBody = null,
+            prepareBody = {
+                deviceDeletionEvidenceBody(evidence.copy(installationSignature =
+                    evidence.installationSignature ?: signEvidence?.invoke(journal, evidence.evidenceSha256)))
+            },
             acceptedResponseCodes = setOf(200),
         )
     }
@@ -191,12 +199,19 @@ class AndroidPrivacyDeletionClient {
         requestBody: String?,
         acceptedResponseCodes: Set<Int>,
         reauthenticationRequiredOnNotFound: Boolean = false,
+        prepareBody: (() -> String)? = null,
+        includeDeviceVerification: Boolean = false,
     ): CancellableNetworkCall<AccountDeletionStatus> =
         cancellableHttpCall { cancellation ->
-            val connection = URL(endpoint).openConnection() as HttpURLConnection
-            cancellation.attach(connection)
-            try {
-                connection.apply {
+            cancellation.throwIfCancelled()
+            val outgoingBody = prepareBody?.invoke() ?: requestBody
+            cancellation.throwIfCancelled()
+            withJsonHttpExchange(
+                cancellation = cancellation,
+                endpoint = endpoint,
+                requestBody = outgoingBody,
+                maximumResponseBytes = ACCOUNT_DELETION_MAX_RESPONSE_BYTES,
+                configure = {
                     requestMethod = method
                     connectTimeout = 8_000
                     readTimeout = 12_000
@@ -204,42 +219,27 @@ class AndroidPrivacyDeletionClient {
                     instanceFollowRedirects = false
                     setRequestProperty("Accept", "application/json")
                     setRequestProperty("Connection", "close")
+                    if (includeDeviceVerification) setRequestProperty("x-walksafe-deletion-status-view", "device-verification.v1")
                     setRequestProperty(ACCOUNT_DELETION_ACCESS_SECRET_HEADER, accessSecret)
                     session?.requestHeaders()?.forEach(::setRequestProperty)
-                    if (requestBody != null) {
-                        doOutput = true
-                        setRequestProperty("Content-Type", "application/json")
-                    }
-                }
-                if (requestBody != null) {
-                    connection.outputStream.use { output ->
-                        cancellation.attach(output)
-                        try {
-                            output.write(requestBody.toByteArray(Charsets.UTF_8))
-                            output.flush()
-                        } finally {
-                            cancellation.detach(output)
-                        }
-                    }
-                }
-                val response = connection.readBoundedResponse(
-                    ACCOUNT_DELETION_MAX_RESPONSE_BYTES,
-                    cancellation,
-                )
+                },
+            ) { response ->
                 if (response.statusCode == 404 && reauthenticationRequiredOnNotFound) {
                     throw AccountDeletionReauthenticationRequiredException(response.body)
                 }
                 if (response.statusCode !in acceptedResponseCodes) {
                     throw AccountDeletionHttpException(response.statusCode, response.body)
                 }
-                validatedAccountDeletionStatusOrNull(
+                if (includeDeviceVerification) {
+                    val view = validatedAccountDeletionStatusViewOrNull(response.body, installationId, requestId)
+                        ?: throw AccountDeletionProtocolException()
+                    onDeviceVerification?.invoke(view.canonicalStatus, view.deviceVerification)
+                    view.canonicalStatus
+                } else validatedAccountDeletionStatusOrNull(
                     body = response.body,
                     expectedInstallationId = installationId,
                     expectedRequestId = requestId,
                 ) ?: throw AccountDeletionProtocolException()
-            } finally {
-                cancellation.detach(connection)
-                connection.disconnect()
             }
         }
 }
@@ -265,9 +265,18 @@ internal fun deviceDeletionEvidenceSha256(evidence: DeviceDeletionEvidence): Str
     return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
 }
 
-internal fun deviceDeletionEvidenceBody(evidence: DeviceDeletionEvidence): String =
-    deviceDeletionEvidenceStatement(evidence).dropLast(1) +
-        ",\"evidence_sha256\":${JSONObject.quote(evidence.evidenceSha256)}}"
+internal fun deviceDeletionEvidenceBody(evidence: DeviceDeletionEvidence): String {
+    val signature = evidence.installationSignature
+    require(signature == null || validInstallationEvidenceSignatureEncoding(signature))
+    return deviceDeletionEvidenceStatement(evidence).dropLast(1) +
+        ",\"evidence_sha256\":${JSONObject.quote(evidence.evidenceSha256)}" +
+        (signature?.let { ",\"installation_signature\":${JSONObject.quote(it)}" } ?: "") + "}"
+}
+
+private fun validInstallationEvidenceSignatureEncoding(value: String): Boolean = runCatching {
+    val bytes = java.util.Base64.getUrlDecoder().decode(value)
+    bytes.size in 64..75 && value == java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+}.getOrDefault(false)
 
 private fun deviceDeletionEvidenceStatement(evidence: DeviceDeletionEvidence): String {
     require(REQUEST_ID.matches(evidence.requestId))

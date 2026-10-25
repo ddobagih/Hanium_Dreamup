@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.voice
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -93,25 +94,22 @@ class WalkVoiceSilencedAfterLeavingTest {
 
     @Test
     fun mainActivityWiresTheForegroundStateTheReturnGuardAndTheRepeatedNotice() {
-        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val resume = source.substringAfter("override fun onResume() {").substringBefore("accountRequestFence.enteredForeground()")
-        assertTrue(resume.contains(
-            "if (pendingHandsFreeVoiceStartFailure == null ||\n" +
-                "            handsFreeVoiceStartRecovery.retriesOnNextForegroundReturn && !voiceInputHeldElsewhere()\n" +
-                "        ) {\n" +
-                "            handsFreeVoiceStartRecovery.onForegroundReturn()",
-        ))
-        val report = source.substringAfter("private fun reportWalkVoiceStartFailure(")
-            .substringBefore("private fun showPendingHandsFreeVoiceStartFailure(")
-        assertTrue(report.contains("appInForeground = isActivityForeground,"))
-        val show = source.substringAfter("private fun showPendingHandsFreeVoiceStartFailure(")
-            .substringBefore("private fun voiceInputHeldElsewhere(")
-        assertTrue(show.indexOf("updateStatus(\"호출어 음성 시작 실패\", presentation.guidance)") <
-            show.indexOf("handsFreeVoiceStartRecovery.spokenNoticeOnReturn(presentation)?.let(::speakInteraction)"))
-        val held = source.substringAfter("private fun voiceInputHeldElsewhere(): Boolean").substringBefore("\n    }.getOrDefault(false)")
-        assertTrue(held.contains("android.media.AudioManager.MODE_IN_CALL"))
-        assertTrue(held.contains("android.media.AudioManager.MODE_IN_COMMUNICATION"))
+        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/HandsFreeRuntimeSession.kt").readText()
+        val resume = MainActivityRefactorSource.member(source, "onBeforeForegroundReturn")
+        assertTrue(resume.contains("pendingHandsFreeVoiceStartFailure == null ||"))
+        assertTrue(resume.contains("handsFreeVoiceStartRecovery.retriesOnNextForegroundReturn && !platform.inputHeldElsewhere()"))
+        assertTrue(resume.contains("handsFreeVoiceStartRecovery.onForegroundReturn()"))
+        val report = MainActivityRefactorSource.member(source, "reportWalkVoiceStartFailure")
+        assertTrue(report.contains("appInForeground = environment.foreground(),"))
+        val show = MainActivityRefactorSource.member(source, "showPendingHandsFreeVoiceStartFailure")
+        assertTrue(show.indexOf("presentation.status(\"호출어 음성 시작 실패\", failurePresentation.guidance)") in
+            0 until show.indexOf("handsFreeVoiceStartRecovery.spokenNoticeOnReturn(failurePresentation)?.let(output::speakInteraction)"))
+        val held = MainActivityRefactorSource.member(File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/AndroidVoiceInputPlatform.kt").readText(), "inputHeldElsewhere")
+        assertTrue(held.contains("AudioManager.MODE_IN_CALL"))
+        assertTrue(held.contains("AudioManager.MODE_IN_COMMUNICATION"))
         assertTrue(held.contains("audio.activeRecordingConfigurations.isNotEmpty()"))
+
     }
 
     /** MainActivity.onStop. */

@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-034 · 잘못 기록한 기관 전달 event 정정<br/>POST<br/>/reports/{report_id}/delivery-corrections"]
+  P["P-D15-034 · 전제조건<br/>report.delivery.correct HIGH risk<br/>재확인·action/device proof."]
+  E --> P
+  S1["1. secured DB 함수 또는 report lock 아래<br/>intent/revision 확인"]
+  P --> S1
+  S2["2. 대상은 같은 report의 최신 effective event여야 함"]
+  S1 --> S2
+  S3["3. 원 event bytes 유지, correction row와 success<br/>audit append"]
+  S2 --> S3
+  S4["4. 후속 조회·user status·proof·전이 계산에서 corrected<br/>event 제외"]
+  S3 --> S4
+  OK["정상 결과<br/>후속 조회·user status·proof·전이 계산에서 corrected<br/>event 제외"]
+  S4 --> OK
+  B1["조건 · 동일 correction UUID 다른 intent<br/>결과 · 409"]
+  S3 -. "해당 조건 발생" .-> B1
+  B2["조건 · 이미 정정됨/최신 effective 아님<br/>결과 · 409"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · 다른 report 대상/없음<br/>결과 · 404"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · 현재 latest recorded revision 불일치<br/>결과 · 409"]
+  S3 -. "해당 조건 발생" .-> B4
+  B5["조건 · 권한 재확인 실패<br/>결과 · 403"]
+  S1 -. "해당 조건 발생" .-> B5
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>exact correction intent replay는 원 correction<br/>반환.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/admin_report_workflow.py:1706<br/>correct_report_institution_delivery_event<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

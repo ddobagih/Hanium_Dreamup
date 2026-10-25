@@ -13,17 +13,17 @@ class RouteNavigatorTurnPassageStateTest {
     fun approachThenUncertainPassageThenNextGuideWithoutRepeatingTheOldTurn() {
         val navigator = navigator()
         sample(navigator, 90.0, 1_000, 90.0)
-        assertTrue(navigator.currentInstruction(fix(90.0, 1_000))!!.contains("10m 앞, 오른쪽으로 꺾으세요."))
+        assertTrue(navigator.currentInstruction(fix(90.0, 1_000))!!.contains("10m 앞, 3시 방향으로 꺾으세요."))
 
         // Past the turn point but inside the passage margin: the state is "passage unconfirmed".
         val passing = sample(navigator, 101.0, 2_000, 180.0)
         assertEquals(0, passing.guideIndex)
         assertEquals("안내 지점 통과 여부를 확인 중입니다.", navigator.currentInstruction(fix(101.0, 2_000)))
-        assertFalse(passing.instruction.orEmpty().contains("오른쪽으로 꺾으세요"))
+        assertFalse(passing.instruction.orEmpty().contains("3시 방향으로 꺾으세요"))
 
         val passed = sample(navigator, 110.0, 3_000, 180.0)
         assertEquals(1, passed.guideIndex)
-        assertFalse(navigator.currentInstruction(fix(110.0, 3_000)).orEmpty().contains("오른쪽으로 꺾으세요"))
+        assertFalse(navigator.currentInstruction(fix(110.0, 3_000)).orEmpty().contains("3시 방향으로 꺾으세요"))
     }
 
     private fun navigator() = RouteNavigator().apply {

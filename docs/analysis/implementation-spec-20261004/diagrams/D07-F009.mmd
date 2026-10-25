@@ -1,0 +1,20 @@
+flowchart TD
+    A["F-D07-009 · P-D07-009<br/>짧은 depth 공백의 표시 전용 예측"]
+    A --> C{"현재 context·stable·pose 연속성 유효"}
+    C -->|아니오| U["seed 폐기 · UNAVAILABLE"]
+    C -->|예| P{"기존 spatial seed의 actual point 소유 유지"}
+    P -->|아니오| R["spatial seed 영구 retire<br/>scalar history와 원래 deadline 유지"]
+    P -->|예| H["cadence 두 배로 horizon100..600ms"]
+    R --> H
+    H --> G{"age≤horizon 및 3개 이상 span≥200ms<br/>slope·residual·error gate 통과"}
+    G -->|horizon 초과| U
+    G -->|표본 또는 오차 자격 부족| T["TEMPORARILY_UNAVAILABLE"]
+    G -->|통과| B["scalar 또는 qualified spatial 계산<br/>error horizon으로 더 짧게 제한"]
+    B --> EH{"age≤오차로 축소된 horizon"}
+    EH -->|아니오| U
+    EH -->|예| E{"계산 결과 유한·양수<br/>error 허용 및 예측 하한>0"}
+    E -->|실패| T
+    E -->|성공| O["PREDICTED 표시만 반환<br/>metric distance·TTC·보수 없음"]
+    U --> Z["새 실측에서 재자격<br/>반복 호출로 deadline 연장 없음"]
+    T --> Z
+    O --> Z

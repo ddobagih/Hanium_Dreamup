@@ -1,0 +1,24 @@
+flowchart TD
+  A["F-D10-002 내부 Voice 인증·CORS·OpenAPI 보안 계약"]
+  N0["1. OPTIONS는 CORS 처리에 넘기며 STT/TTS 경로는 no-store를 붙인다."]
+  A --> N0
+  N1["2. 나머지는 loopback도 예외 없이 expected token 구성과 compare_digest 일치를 검사한다."]
+  N0 --> N1
+  N2["3. 인증 성공 후 endpoint 실행; OpenAPI 모든 get/post/put/patch/delete operation에 VoiceServiceToken 및 401/503 응답을 문서화한다."]
+  N1 --> N2
+  B0{"expected 길이 <24 또는 기존 gateway/backend 자격과 같음"}
+  R0["503 service_token_not_configured"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"후보 누락/불일치"}
+  R1["401 service_token_invalid"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"OPTIONS"}
+  R2["토큰 검사 생략"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N2 --> Z
+  P["적용 정책 · P-D10-001"]
+  P -. "코드 분기 기준" .-> A

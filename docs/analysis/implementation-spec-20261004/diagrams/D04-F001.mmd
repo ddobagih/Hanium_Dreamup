@@ -1,0 +1,21 @@
+flowchart TD
+  ID["F-D04-001 · 제품 위치 수집 수명주기<br/>P-D04-001"]
+  A["시작 또는 owner 변경"]
+  C0{"전경·권한·세션 또는 DEBUG field owner가 유효한가"}
+  R0["기존 수집 stop"]
+  C1{"기존 FLP 해제 acknowledgement가 끝났는가"}
+  R1["pending cancellation 보존"]
+  OK["새 binding과 세대 생성 → FLP main Looper 등록 → GNSS·IMU·나침반 시작"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  STOP["binding retire → 세대 증가 → FLP Task 해제 → 관측원 close"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

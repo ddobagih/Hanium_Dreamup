@@ -22,7 +22,7 @@ class S07RouteResponseInstallationTest {
         guidePoints = emptyList(),
     )
 
-    @Test fun movedAlongTheReturnedRouteAndProviderStartOffsetRemainConnected() {
+    @Test fun movedAlongTheReturnedRouteStaysConnectedAndProviderOffsetUsesClosestApproach() {
         val atStart = TrustedLocation(0.0, 0.0, 3f, 1_000)
         val movedAlongRoute = TrustedLocation(0.0, 0.0008, 3f, 1_000)
         val providerStartOffset = TrustedLocation(0.000135, 0.0, 3f, 1_000)
@@ -30,13 +30,14 @@ class S07RouteResponseInstallationTest {
         listOf(atStart, movedAlongRoute, providerStartOffset).forEach { fix ->
             val requestOrigin = if (fix == providerStartOffset) providerStartOffset else atStart
             assertEquals(
-                RouteResponseInstallLocationStatus.CONNECTED,
+                if (fix == providerStartOffset) RouteResponseInstallLocationStatus.APPROACH_REQUIRED
+                else RouteResponseInstallLocationStatus.CONNECTED,
                 routeResponseInstallLocationStatus(route, requestOrigin, fix, 1_500),
             )
         }
     }
 
-    @Test fun missingStaleAndOffRouteFixesCannotInstallTheDelayedResponse() {
+    @Test fun missingStaleAndFarFixesCannotInstallWhileBoundedOffsetsUseClosestApproach() {
         val origin = TrustedLocation(0.0, 0.0, 3f, 1_000)
         assertEquals(
             RouteResponseInstallLocationStatus.LOCATION_UNAVAILABLE,
@@ -47,50 +48,67 @@ class S07RouteResponseInstallationTest {
             routeResponseInstallLocationStatus(route, origin, origin, 11_001),
         )
         assertEquals(
-            RouteResponseInstallLocationStatus.ROUTE_DISCONNECTED,
+            RouteResponseInstallLocationStatus.APPROACH_REQUIRED,
             routeResponseInstallLocationStatus(
                 route, origin, TrustedLocation(0.0008, 0.0005, 3f, 1_500), 2_000,
             ),
         )
-        // 33 m is inside the old 35 m corridor bound but outside the actual 8 m guidance search.
+        // A current fix outside the 8 m match search can approach the nearest configured point.
         assertEquals(
-            RouteResponseInstallLocationStatus.ROUTE_DISCONNECTED,
+            RouteResponseInstallLocationStatus.APPROACH_REQUIRED,
             routeResponseInstallLocationStatus(
                 route, origin, TrustedLocation(0.000297, 0.0005, 3f, 1_500), 2_000,
             ),
         )
+        assertEquals(RouteResponseInstallLocationStatus.ROUTE_DISCONNECTED,
+            routeResponseInstallLocationStatus(route, origin,
+                TrustedLocation(0.001, 0.0005, 3f, 1_500), 2_000))
     }
 
     @Test fun lateAResponseCannotPassTheCurrentOwnerGateOrReachInstallationBeforeLocationCheck() {
-        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val selection = source.substringAfter("private fun onDestinationSelected(")
-            .substringBefore("\n    private fun ")
-        val request = source.substringAfter("private fun requestRoute(")
-            .substringBefore("\n    private fun isRouteRequestLeaseCurrent(")
-        assertTrue(selection.indexOf("cancelNavigationRequestsForDestinationSelection()") <
-            selection.indexOf("requestRoute("))
+        val owned = ReportStaticSourceInspector.read("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/RouteAcquisitionController.kt")
+        fun method(name: String, occurrence: Int = 0) = MainActivityRefactorSource.member(owned, name, occurrence)
+        val main = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        val selection = method("onDestinationSelected")
+        val request = method("requestRoute", 1)
+        assertTrue(selection.indexOf("cancelNavigationRequestsForDestinationSelection()") < selection.indexOf("requestRoute("))
         assertTrue(selection.contains("clearActiveRouteRequestState("))
-        val cancellation = source.substringAfter("private fun clearActiveRouteRequestState(")
-            .substringBefore("private fun suspendNavigationForRecovery(")
-        assertTrue(cancellation.contains("invalidateActiveRouteRequestLease()"))
+        assertTrue(method("clearActiveRouteRequestState").contains("invalidateActiveRouteRequestLease()"))
         assertTrue(request.contains("val requestId = ++routeRequestGeneration"))
         assertTrue(request.contains("isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId)"))
-
-        val response = request.substringAfter("val route = routeCall.execute()")
-        val save = response.indexOf("routeSnapshotStore.saveFirstRoute(")
-        val install = response.indexOf("routeNavigator.setRoute(")
-        val currentOwnerCheck = response.indexOf(
-            "routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)",
-        )
-        val currentLocationCheck = response.indexOf("routeResponseInstallLocationStatus(")
-        val rejection = response.substringAfter("if (installLocationStatus != RouteResponseInstallLocationStatus.CONNECTED)")
-            .substringBefore("val connectedInstallLocation")
+        val response = request.substringAfter("val route = archive.captureRouteSnapshotResponseRoute(routeCall.execute())")
+        val save = response.indexOf("archive.submitRouteSnapshotResponseStorage(")
+        val install = response.indexOf("installRequestedRoute(route, destination, origin,")
+        val currentOwnerCheck = response.indexOf("routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)")
+        val currentLocationCheck = response.indexOf("val installLocationStatus = routeResponseLocationStatus(")
+        val rejection = response.substringAfter("fun rejectDisconnectedResponse(").substringBefore("val owner = archive.routeSnapshotOwnerOrNull(")
+        assertTrue(rejection.contains("installLocationStatus != RouteResponseInstallLocationStatus.CONNECTED &&"))
+        val rejectedBranch = rejection.substringAfter("installLocationStatus != RouteResponseInstallLocationStatus.APPROACH_REQUIRED)")
+        assertTrue(rejectedBranch.contains("rejectDisconnectedResponse(installLocationStatus)"))
+        assertTrue(rejectedBranch.contains("return@postToUi"))
         assertTrue(currentOwnerCheck in 0 until currentLocationCheck)
         assertTrue(currentLocationCheck in 0 until save)
         assertTrue(save in 0 until install)
-        assertTrue(rejection.contains("routeRequestInFlight.set(false)"))
+        assertTrue(rejection.contains("if (!finishCurrentRouteRequest()) return"))
+        assertTrue(method("finishRouteRequestIfCurrent").contains("finishOwnedRouteRequest(expectedWalkEpoch, expectedRequestId, expectedSession.actorId,"))
+        assertTrue(method("finishOwnedRouteRequest").contains("routeRequestInFlight.compareAndSet(true, false)"))
         assertTrue(rejection.contains("retainExistingRouteAfterFailure(detail)"))
-        assertTrue(rejection.contains("return@runOnUiThread"))
+        assertTrue(rejection.contains("return@postToUi"))
+        assertTrue(method("routeResponseLocationStatus").contains("allowInitialStartConnector = false"))
+        assertTrue(method("installRequestedRoute").contains("installRequestedRoute(route, destination, origin, coordinateEvidence, reason,"))
+        assertTrue(method("installRequestedRoute", 1).contains("routeNavigator.setRoute("))
+        assertTrue(method("installRequestedRoute", 1).contains("waitForInitialRouteJoin = approachRequired"))
+        val completion = response.substringAfter("postToUi completeSnapshot@")
+        assertTrue(completion.contains("completedLocationStatus != RouteResponseInstallLocationStatus.CONNECTED &&"))
+        assertTrue(completion.contains("completedLocationStatus != RouteResponseInstallLocationStatus.APPROACH_REQUIRED)"))
+        assertTrue(completion.contains("completedLocationStatus == RouteResponseInstallLocationStatus.APPROACH_REQUIRED"))
+        assertTrue(completion.indexOf("!routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)") < completion.indexOf("val completedLocation = facts.currentLocation"))
+        assertTrue(completion.indexOf("val completedLocationStatus = routeResponseLocationStatus(") < completion.indexOf("installRequestedRoute(route, destination, origin,"))
+        val wire = MainActivityRefactorSource.composition(main, "routeAcquisitionController")
+        assertTrue(wire.contains("override val currentLocation get() = positioning.value.currentRouteLocationOrNull()"))
+        assertTrue(wire.contains("override val environmentOutputsAllowed: Boolean get() = activityFacts.environmentOutputsAllowed"))
+        assertTrue(ReportStaticSourceInspector.blockAfter(MainActivityRefactorSource.factory(main, "createNavigationSessions"), "facts = { object : AcquisitionActivityFacts").contains("override val environmentOutputsAllowed get() = navigationEnvironmentOutputsAllowed()"))
+        assertTrue(MainActivityRefactorSource.member(main, "requestRoute", 1).contains("routeAcquisitionController.requestRoute("))
     }
 
     @Test fun completedAResponseWaitingOnUiCannotOverwriteSelectedAndInstalledB() {
@@ -149,13 +167,13 @@ class S07RouteResponseInstallationTest {
     }
 
     private fun getField(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).run {
+        MainActivityControllerTestFixture.field(name).run {
             isAccessible = true
             get(activity)
         }
 
     private fun setField(activity: MainActivity, name: String, value: Any?) {
-        MainActivity::class.java.getDeclaredField(name).apply {
+        MainActivityControllerTestFixture.field(name).apply {
             isAccessible = true
             set(activity, value)
         }

@@ -1,0 +1,46 @@
+flowchart TD
+  T["F-D06-037 유계 로컬 runtime 진단 파일과 typed metadata"]
+  P["전제: BuildConfig.DEBUG와 initialize 완료. 외부 공개 API는 arbitrary<br/>text/exception/audio/identity를 받지 않음."]
+  T --> P
+  E1["E-D06-037-01 앱 initialize→무작위 run ID·run_start 예약→writer 공개"]
+  E1 --> T
+  E2["E-D06-037-02 recordState/recordVoiceInput→typed<br/>formatter→bounded queue"]
+  E2 --> T
+  E3["E-D06-037-03 worker append→파일회전 또는 drop count"]
+  E3 --> T
+  A1["1. cache/runtime-diagnostics에 run_start를 먼저 enqueue하고 writer를<br/>공개한다."]
+  P --> A1
+  A2["2. 부트 단조시각과 프로세스 무작위8byte run ID, dropped_total을 typed<br/>metadata에 붙인다."]
+  A1 --> A2
+  A3["3. 단일 daemon worker queue64에 넣고 포화면 drop을 증가시킨다."]
+  A2 --> A3
+  A4["4. 한 record1024bytes 초과면 drop. events.log와<br/>events.previous.log를 각128KiB 이내로 회전한다."]
+  A3 --> A4
+  A5["5. I/O 실패는 drop count로 남기고 caller 예외로 퍼뜨리지 않는다."]
+  A4 --> A5
+  N["정상 종료: worker append 완료."]
+  A5 --> N
+  FX["결과: 로컬 cache 평문 숫자/enum metadata. 네트워크 전송 없음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"release/미초기화"}
+    R1["기록 안 함"]
+    B1 -->|조건 성립| R1
+    B2{"queue full/record초과 1024/IO실패"}
+    R2["drop count 증가"]
+    B2 -->|조건 성립| R2
+    B3{"현재파일+record초과 128KiB"}
+    R3["previous 제거 후 current 회전"]
+    B3 -->|조건 성립| R3
+    B4{"Android cache eviction"}
+    R4["파일 소실 가능, 감사기록으로 사용 불가"]
+    B4 -->|조건 성립| R4
+  end
+  POL["정책: P-D06-037"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: best effort drop, 제품 기능 영향 최소화."]
+    X2["재시도: 실패 record 재시도 없음; 후속 기록은 계속 가능."]
+    X3["복구: 다음 프로세스의 새 run ID로 이전 파일과 구분."]
+    X4["정리: 두 고정 cache 파일 외 삭제하지 않음; Android cache 삭제 가능."]
+  end

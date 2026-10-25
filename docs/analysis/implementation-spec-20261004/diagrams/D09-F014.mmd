@@ -1,0 +1,32 @@
+flowchart TD
+  T["F-D09-014 v2 탐지 health snapshot 갱신·조회 / P-D09-014"]
+  N0["settings projection generation 확정"]
+  T --> N0
+  N1["single child refresh"]
+  N0 --> N1
+  N2["artifact fingerprint와 frame exit 검증"]
+  N1 --> N2
+  N3["현재 attempt와 deadline 검증"]
+  N2 --> N3
+  N4["memory snapshot publish"]
+  N3 --> N4
+  N5["GET age검사 DTO"]
+  N4 --> N5
+  Z["정상: 현재설정의 유효 memory health DTO 반환"]
+  N5 --> Z
+  B0["unavailable not_checked"]
+  N0 -->|"초기 미검사·projection 다름"| B0
+  B1["refresh_timeout; 해당attempt 늦은성공 폐기"]
+  N3 -->|"refresh elapsed >=5초 기본"| B1
+  B2["expired; 조회로 age 연장 없음"]
+  N4 -->|"snapshot age >=10초 기본"| B2
+  B3["quarantine; replacement 없음"]
+  N5 -->|"child cleanup 미확인"| B3
+  R["복구: coordinator가 refresh interval 후 다음 검사를 수행; failed cleanup resource는 교체하지 않음 / 조건 복구 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  C["취소와 정리: GET 취소는 coordinator를 취소하지 않음; lifespan stop이 owner 종료 / child terminate/kill/wait 및 pipes/selector, coordinator join; 확인실패는 resource 유지"]
+  N5 -.-> C

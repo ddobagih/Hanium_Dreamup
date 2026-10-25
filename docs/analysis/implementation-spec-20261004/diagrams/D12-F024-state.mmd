@@ -1,0 +1,23 @@
+stateDiagram-v2
+  state "S-D12-024-IDLE" as I
+  state "S-D12-024-LOADING" as L
+  state "S-D12-024-PATCH_DISPATCHED" as D
+  state "S-D12-024-PATCH_CONFIRMED" as C
+  state "S-D12-024-SUCCEEDED" as S
+  state "S-D12-024-UPDATED_DETAIL_STALE" as T
+  state "S-D12-024-CONFLICT" as F
+  state "S-D12-024-CANCELLED" as X
+  state "S-D12-024-ERROR" as E
+  [*] --> I
+  I --> L: 입력 및 재인증 시작
+  L --> X: dispatch 전 generation 변경
+  L --> D: 실제 PATCH dispatch claim
+  D --> C: exact target/version 확인 응답
+  D --> F: 409 또는 결과 미확정 후 GET만 일치
+  D --> E: 검증/통신 실패
+  C --> S: GET 상세 exact 일치
+  C --> T: GET 실패 또는 오래된 상세
+  C --> F: GET 더 새롭거나 다른 상태
+  T --> S: 재조회 GET exact 일치
+  T --> F: 재조회에서 다른 최신 상태
+  note right of T: 자동 PATCH 재전송 없음

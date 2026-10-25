@@ -1,0 +1,25 @@
+flowchart TD
+  IN["F-D14-003<br/>단일 관리자 초기 자격 provision"]
+  G["적용 정책<br/>P-D14-002 / P-D14-003"]
+  IN --> G
+  N1["1. 입력 recovery code와 canonical Base32 TOTP 검<br/>증"]
+  G --> N1
+  N2["2. PostgreSQL singleton advisory lock 후 기존 c<br/>ontrol 전체 조회"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 기존 control이 없을 때 NORMAL/version1 및 UNATTE<br/>STED control 저장"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 개인 capability 테이블에 TOTP fingerprint와 issu<br/>er SHA256 저장"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. recovery code digest 행 및 security.provisi<br/>on SUCCESS 감사와 함께 commit"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>ValueError로 두 번째 관리자 생성 금지"]
+  N2 -->|"기존 control 존재"| B1
+  B2["분기 결과<br/>DB 저장 전 거절"]
+  N1 -->|"코드 부족·짧음·중복/TOTP decoded 20바이트 미만"| B2
+  B3["분기 결과<br/>rollback 후 503"]
+  N5 -->|"SQL 오류"| B3
+  N5 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

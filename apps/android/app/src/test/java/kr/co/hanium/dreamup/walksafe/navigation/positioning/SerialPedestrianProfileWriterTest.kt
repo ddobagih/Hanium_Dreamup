@@ -111,14 +111,12 @@ class SerialPedestrianProfileWriterTest {
 
     @Test fun mainActivityNoLongerCommitsTheProfileOnItsOwnThread() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val persist = source.substringAfter("private fun persistPositioningProfileForCurrentActor() {")
-            .substringBefore("private fun updatePositioningHeadingInputs(")
+        val persist = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.function(source, "private fun persistPositioningProfileForCurrentActor(")
         assertFalse(persist.contains("runCatching { pedestrianProfileStore?.save("))
+        assertFalse(persist.substringBefore(".submit(").contains(".save("))
         assertTrue(persist.contains("SerialPedestrianProfileWriter.shared"))
         assertTrue(persist.contains(".submit(actorId, profile) { id, value -> store.save(id, value) }"))
-        val restore = source.substringAfter("private fun ensurePositioningProfileForCurrentActor() {")
-            .substringBefore("private fun persistPositioningProfileForCurrentActor() {")
-        // S09-56: the store read is loadResult(id) (status kept for the field log).
+        val restore = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.function(source, "private fun ensurePositioningProfileForCurrentActor(")
         assertTrue(restore.indexOf(".pendingProfileOrNull(id)") in 0 until restore.indexOf("pedestrianProfileStore?.loadResult(id)"))
     }
 }

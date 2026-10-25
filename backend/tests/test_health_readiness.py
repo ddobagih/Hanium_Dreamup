@@ -11,11 +11,12 @@ import time
 from types import SimpleNamespace
 import uuid
 
-import backend.app.api.health as health_api
+import backend.app.services.health_readiness as health_api
+import backend.app.api.health as health_router
 import httpx
 from fastapi import FastAPI
 import pytest
-from backend.app.main import app, settings as app_settings, report_storage_monitor as app_report_monitor, report_image_key_manager as app_key_manager
+from backend.app.main import app, settings as app_settings
 from backend.app.services.report_storage import ReportStorageInventorySetMismatch
 from asgi_client import ASGITestClient
 
@@ -27,6 +28,9 @@ _REAL_REPORT_STORAGE_INVENTORY_READINESS = (
 
 @pytest.fixture(autouse=True)
 def isolate_report_storage_inventory_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    app.state.runtime.initialize_resources()
+    app_report_monitor = app.state.runtime.report_storage_monitor
+    app_key_manager = app.state.runtime.report_image_key_manager
     # Route tests isolate DB locking while retaining each test's upload result.
     monkeypatch.setattr(
         health_api,
@@ -58,7 +62,7 @@ def isolate_report_storage_inventory_probe(monkeypatch: pytest.MonkeyPatch) -> N
         upload=health_api._upload_readiness(app_settings.upload_dir),
         encryption=health_api._report_image_encryption_readiness(app_settings, app_key_manager),
     )
-    original_router = health_api.create_router
+    original_router = health_router.create_router
 
     def router_with_checked_snapshot(settings, warmup, manager=None, **kwargs):
         manager = manager or app_key_manager
@@ -71,7 +75,7 @@ def isolate_report_storage_inventory_probe(monkeypatch: pytest.MonkeyPatch) -> N
         return original_router(settings, warmup, manager,
             report_storage_monitor=SimpleNamespace(checks=lambda: snapshot), **kwargs)
 
-    monkeypatch.setattr(health_api, "create_router", router_with_checked_snapshot)
+    monkeypatch.setattr(health_router, "create_router", router_with_checked_snapshot)
 
 
 async def _navigation_ready(_settings, *, runtime_provider=None) -> dict[str, object]:
@@ -656,7 +660,7 @@ def test_uncooperative_readiness_probe_does_not_block_process_exit() -> None:
     script = """
 import asyncio
 import threading
-import backend.app.api.health as health
+import backend.app.services.health_readiness as health
 
 health.READINESS_LOCAL_CHECK_TIMEOUT_SECONDS = 0.01
 never = threading.Event()
@@ -713,7 +717,7 @@ def test_concurrent_readiness_requests_share_one_tmap_live_probe_and_failure_coo
 
     monkeypatch.setattr(health_api, "probe_tmap_dependencies", stalled_tmap_probe)
     isolated_app = FastAPI()
-    isolated_app.include_router(health_api.create_router(app_settings, lambda: None))
+    isolated_app.include_router(health_router.create_router(app_settings, lambda: None))
 
     async def exercise() -> tuple[list[httpx.Response], httpx.Response]:
         transport = httpx.ASGITransport(app=isolated_app)
@@ -853,7 +857,7 @@ def test_readiness_route_passes_runtime_provider_to_live_navigation_probe(monkey
     monkeypatch.setattr(health_api, "probe_tmap_dependencies", fake_probe)
     isolated_app = FastAPI()
     isolated_app.include_router(
-        health_api.create_router(
+        health_router.create_router(
             app_settings,
             lambda: None,
             object(),  # type: ignore[arg-type]
@@ -1082,7 +1086,7 @@ def test_readiness_returns_503_for_enabled_raw_root_drift(
     )
     isolated_app = FastAPI()
     isolated_app.include_router(
-        health_api.create_router(
+        health_router.create_router(
             settings,  # type: ignore[arg-type]
             lambda: None,
             manager,  # type: ignore[arg-type]
@@ -1182,7 +1186,7 @@ def test_readiness_rejects_post_start_report_storage_drift(
 
     isolated_app = FastAPI()
     isolated_app.include_router(
-        health_api.create_router(
+        health_router.create_router(
             app_settings,
             lambda: None,
             manager,  # type: ignore[arg-type]

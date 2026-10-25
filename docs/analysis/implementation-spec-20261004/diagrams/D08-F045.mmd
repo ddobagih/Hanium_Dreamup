@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D08-045 민감 JSON 암호화·keyring·원자 저장"]
+  B["진입: encryptGatewayStateJson / decryptGatewayStateJson"]
+  A --> B
+  P0["1. O_NOFOLLOW 와 fstat 로 keyring 파일/권한/owner/nlink 검증"]
+  B --> P0
+  P1["2. 동일 keymaterial·fingerprint 중복 및 상태검증"]
+  P0 --> P1
+  P2["3. active 키로 encrypt 하고 size 상한 envelope 생성"]
+  P1 --> P2
+  P3["4. decrypt 는 AAD·tag·UTF8·duplicateJSONkey·plaintextschema 검증"]
+  P2 --> P3
+  P4["5. unknown/compromised/plaintext 는 runtime 거부"]
+  P3 --> P4
+  P5["6. temp0600/fsync/rename/dirfsync 순서로각 writer 가내구저장"]
+  P4 --> P5
+  OK["정상: 종류·record 에 결합한 암호문 저장; 실패 fail-closed"]
+  P5 --> OK
+  C0{"decrypt-only"}
+  X0["기존읽기만; 새쓰기 active"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"compromised/unknown"}
+  X1["복호화및 rotate 차단"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"rename 후 dirsync 실패"}
+  X2["GatewayStorageOutcomeUnknownError"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"runtime keyring 교체"}
+  X3["ready probe 에서 cachedkeyring 과차이감지"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-021, P-D08-022, P-D08-023"]
+  A -.-> POLICY

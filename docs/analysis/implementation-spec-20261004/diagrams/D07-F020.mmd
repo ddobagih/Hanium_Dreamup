@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-020<br/>점자블록 실제 contact depth와 TMAP corridor 관측<br/>상태 ACTIVE"]
+    P0["capture와 decision의 위치 방향 카메라 freshness 검사"]
+    A --> D
+    P1["bottom contact own depth 주변 지지 검사"]
+    P0 --> P1
+    P2["K pose orientation location으로 투영"]
+    P1 --> P2
+    P3["segment 거리와 오차합 15m 기준으로 관측"]
+    P2 --> P3
+    D{"P-D07-020<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["contact 관측 거절"]
+    D -->|"mask median 유효하지만 contact 주변 depth 없음"| B0
+    B1["관측 없음"]
+    D -->|"location/orientation/pose age 또는 정합 실패"| B1
+    B2["OVERLAPS 관측; 보행 허가 아님"]
+    D -->|"distance+error≤15m"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

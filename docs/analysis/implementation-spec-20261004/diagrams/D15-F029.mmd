@@ -1,0 +1,34 @@
+flowchart TB
+  E["F-D15-029 · 검토 결정·원본 증거 결속·중복 대표 보호<br/>POST /reports/{report_id}/review-decisions"]
+  P["P-D15-029 · 전제조건<br/>typed admin proof; DB integrity boundary면 전용<br/>secured append v4 함수 재인가."]
+  E --> P
+  S1["1. decision ID 기존 intent/actor/report와 비교하여<br/>exact replay 판정"]
+  P --> S1
+  S2["2. content revision 및 report-wide review<br/>revision CAS"]
+  S1 --> S2
+  S3["3. APPROVED는 모든 체크 true, 현재 session의<br/>소비·미만료·미사용 report_review grant와<br/>LOCATION_DISCLOSED/ACCESS_GRANTED 성공감사 둘 모두<br/>필요"]
+  S2 --> S3
+  S4["4. DUPLICATE는 자기/없는 target/cycle/다른 duplicate<br/>target/활성 dependent 대표의 duplicate화 거절"]
+  S3 --> S4
+  S5["5. review revision append와 evidence grant 1회<br/>binding을 commit; legacy lifecycle status는 변경<br/>안 함"]
+  S4 --> S5
+  OK["정상 결과<br/>review revision append와 evidence grant 1회<br/>binding을 commit; legacy lifecycle status는 변경<br/>안 함"]
+  S5 --> OK
+  B1["조건 · decision ID 재사용 다른 intent/report/actor<br/>결과 · 409"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · content 또는 review revision 충돌<br/>결과 · 각각 별도409"]
+  S3 -. "해당 조건 발생" .-> B2
+  B3["조건 · APPROVED 증거 부재·만료<br/>결과 · 409"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · DUPLICATE cycle/비대표<br/>결과 · 422"]
+  S1 -. "해당 조건 발생" .-> B4
+  B5["조건 · secured DB role/권한 재인가 실패<br/>결과 · 403/503"]
+  S1 -. "해당 조건 발생" .-> B5
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>exact decision replay는 원래 결정 반환; secured 경로는<br/>DB 보안 계약 재검사.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/admin_report_workflow.py:518<br/>append_report_review_decision<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

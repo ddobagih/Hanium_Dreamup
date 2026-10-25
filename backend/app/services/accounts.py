@@ -16,8 +16,10 @@ import json
 import re
 import secrets
 import smtplib
+import socket
 import ssl
-from threading import BoundedSemaphore, Lock
+from threading import BoundedSemaphore, Event, Lock, Thread, Timer
+from time import monotonic
 from typing import Any, Protocol
 import uuid
 from zoneinfo import ZoneInfo
@@ -557,6 +559,105 @@ def assert_account_crypto_keys_bound(
     return binding
 
 
+# A resolver can remain inside an OS call after the caller's deadline. Bound
+# these daemon workers; they only resolve addresses and never open connections.
+_SMTP_DNS_SLOTS = BoundedSemaphore(4)
+
+
+class _DeadlineSmtp(smtplib.SMTP):
+    """Expose connect/TLS sockets to the delivery deadline before blocking I/O.
+
+    smtplib's normal connection seam resolves DNS outside the socket timeout and
+    publishes an implicit TLS socket only after its handshake. Override that
+    seam so one deadline covers DNS, every address attempt, and TLS too.
+    """
+
+    def __init__(self, *, deadline_at, context, implicit_tls, **kwargs):
+        self._deadline_at = deadline_at
+        self._tls_context = context
+        self._implicit_tls = implicit_tls
+        super().__init__(**kwargs)
+
+    def _remaining(self):
+        remaining = self._deadline_at - monotonic()
+        if remaining <= 0:
+            raise TimeoutError("SMTP delivery deadline exceeded")
+        return remaining
+
+    def _get_socket(self, host, port, timeout):
+        del timeout  # Every blocking operation uses the original deadline.
+        resolved = Event()
+        addresses = []
+        failures = []
+        if not _SMTP_DNS_SLOTS.acquire(blocking=False):
+            raise OSError("SMTP resolver capacity unavailable")
+
+        def resolve():
+            try:
+                addresses.extend(socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM))
+            except OSError as exc:
+                failures.append(exc)
+            finally:
+                _SMTP_DNS_SLOTS.release()
+                resolved.set()
+
+        worker = Thread(target=resolve, name="walksafe-smtp-resolver", daemon=True)
+        try:
+            worker.start()
+        except RuntimeError:
+            _SMTP_DNS_SLOTS.release()
+            raise OSError("SMTP resolver unavailable") from None
+        if not resolved.wait(self._remaining()):
+            raise TimeoutError("SMTP DNS deadline exceeded")
+        self._remaining()  # A late DNS result must never begin a connection.
+        if failures:
+            raise failures[0]
+        last_failure = None
+        for family, kind, protocol, _, address in addresses:
+            connection = socket.socket(family, kind, protocol)
+            self.sock = connection
+            try:
+                connection.settimeout(self._remaining())
+                connection.connect(address)
+                if self._implicit_tls:
+                    connection = self._wrap_tls(connection, self._tls_context)
+                return connection
+            except OSError as exc:
+                last_failure = exc
+                if self.sock is not None:
+                    self.sock.close()
+                connection.close()
+                self.sock = None
+                self._remaining()
+        raise last_failure or OSError("SMTP DNS returned no usable address")
+
+    def _wrap_tls(self, connection, context):
+        # Publish the TLS socket before handshake so the timer can interrupt it.
+        secured = context.wrap_socket(
+            connection, server_hostname=self._host, do_handshake_on_connect=False,
+        )
+        self.sock = secured
+        secured.settimeout(self._remaining())
+        secured.do_handshake()
+        self._remaining()
+        return secured
+
+    def starttls(self, *, context=None):
+        self.ehlo_or_helo_if_needed()
+        if not self.has_extn("starttls"):
+            raise smtplib.SMTPNotSupportedError("STARTTLS extension not supported by server")
+        code, reply = self.docmd("STARTTLS")
+        if code != 220:
+            raise smtplib.SMTPResponseException(code, reply)
+        self._wrap_tls(self.sock, context or self._tls_context)
+        self.file = None
+        # RFC 3207: capabilities learned before TLS must be discarded.
+        self.helo_resp = self.ehlo_resp = None
+        self.esmtp_features = {}
+        self.does_esmtp = False
+        return code, reply
+
+
 class SmtpOtpSender:
     def __init__(
         self,
@@ -602,31 +703,69 @@ class SmtpOtpSender:
             f"{code}. It expires in {minutes} minutes.\n"
             "If you did not request this, you can ignore this message."
         )
+        deadline = monotonic() + self.timeout_seconds
         context = ssl.create_default_context()
+        client = None
+        timer = None
         try:
-            if self.security == "implicit_tls":
-                client_factory = smtplib.SMTP_SSL
-            else:
-                client_factory = smtplib.SMTP
-            with client_factory(
-                self.host,
-                self.port,
+            client = _DeadlineSmtp(
                 timeout=self.timeout_seconds,
+                local_hostname=self.from_address.rsplit("@", 1)[1],
+                deadline_at=deadline,
                 context=context,
-            ) if self.security == "implicit_tls" else client_factory(
-                self.host,
-                self.port,
-                timeout=self.timeout_seconds,
-            ) as client:
+                implicit_tls=self.security == "implicit_tls",
+            )
+
+            def interrupt_delivery() -> None:
+                # A socket's per-read timeout alone lets a slow stream extend the send forever.
+                connection = client.sock
+                if connection is not None:
+                    try:
+                        connection.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        pass
+
+            def budget() -> None:
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("SMTP delivery deadline exceeded")
+                client.timeout = remaining
+                if client.sock is not None:
+                    client.sock.settimeout(remaining)
+
+            timer = Timer(max(0, deadline - monotonic()), interrupt_delivery)
+            timer.daemon = True
+            timer.start()
+            budget()
+            # smtplib keeps the TLS SNI/verification hostname in _host, not connect().
+            client._host = self.host
+            greeting, reply = client.connect(self.host, self.port)
+            if greeting != 220:
+                raise smtplib.SMTPConnectError(greeting, reply)
+            budget()
+            client.ehlo()
+            if self.security == "starttls":
+                budget()
+                client.starttls(context=context)
+                budget()
                 client.ehlo()
-                if self.security == "starttls":
-                    client.starttls(context=context)
-                    client.ehlo()
-                if self.username:
-                    client.login(self.username, self.password)
-                client.send_message(message)
+            if self.username:
+                budget()
+                client.login(self.username, self.password)
+            budget()
+            client.send_message(message)
         except (OSError, TimeoutError, smtplib.SMTPException, ssl.SSLError) as exc:
             raise OtpDeliveryError("secure SMTP delivery failed") from exc
+        finally:
+            if timer is not None:
+                timer.cancel()
+                timer.join()
+            if client is not None:
+                # DATA acceptance is the result. A slow/failing QUIT must not undo it.
+                try:
+                    client.close()
+                except (OSError, smtplib.SMTPException):
+                    pass
 
 
 class UnavailableOtpSender:

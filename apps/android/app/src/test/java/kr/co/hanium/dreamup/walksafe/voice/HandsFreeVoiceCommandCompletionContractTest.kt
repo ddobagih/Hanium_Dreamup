@@ -222,6 +222,26 @@ class HandsFreeVoiceCommandCompletionContractTest {
         assertNull(f.controller.dispatchingCommandId())
     }
 
+    @Test fun multipartProgressMayExceedTheTotalStallWindowWhileEachPartMakesProgress() = withFixture { f ->
+        f.trackedSpeech=CommandSpeechProgress.PENDING
+        val start=f.dispatchCommand("도움말")
+        f.speak(from=start,untilMs=start+150_000L)
+        f.runtime.advanceTo(start+50_000L); f.speechRevision++
+        f.runtime.advanceTo(start+100_000L); f.speechRevision++
+        f.runtime.advanceTo(start+140_000L)
+        assertTrue(f.failures.isEmpty()); assertFalse(f.returnedToWakeSinceLastDispatch())
+        f.trackedSpeech=CommandSpeechProgress.COMPLETED; f.speechRevision++
+        f.runtime.advanceTo(start+140_200L)
+        assertTrue(f.failures.isEmpty()); assertTrue(f.returnedToWakeSinceLastDispatch())
+    }
+    @Test fun actualCommandDoneReleasesItsWaitWithoutWaitingForUnrelatedGlobalQuiet() = withFixture { f ->
+        f.trackedSpeech=CommandSpeechProgress.PENDING
+        val start=f.dispatchCommand("도움말"); f.speak(from=start,untilMs=start+20_000L)
+        f.runtime.advanceTo(start+1000L); f.trackedSpeech=CommandSpeechProgress.COMPLETED;f.speechRevision++
+        f.runtime.advanceTo(start+1200L)
+        assertTrue(f.returnedToWakeSinceLastDispatch());assertTrue(f.failures.isEmpty())
+    }
+
     private fun withFixture(test: (Fixture) -> Unit) {
         val fixture = Fixture()
         try {
@@ -239,6 +259,8 @@ class HandsFreeVoiceCommandCompletionContractTest {
         val work = mutableMapOf<Long, Boolean>()
         val workQueries = mutableListOf<Long>()
         var workThrows = false
+        var trackedSpeech=CommandSpeechProgress.NOT_TRACKED
+        var speechRevision=0L
         private val speech = mutableListOf<LongRange>()
         lateinit var stream: FakeStream
 
@@ -266,6 +288,8 @@ class HandsFreeVoiceCommandCompletionContractTest {
             },
             onStatus = { statuses.add(runtime.nowMs(), it) },
             onTerminalFailure = { failures += it },
+            commandSpeechProgress = { trackedSpeech },
+            commandSpeechRevision = { speechRevision },
             isCommandWorkPending = { commandId ->
                 workQueries += commandId
                 if (workThrows) error("work state unavailable")

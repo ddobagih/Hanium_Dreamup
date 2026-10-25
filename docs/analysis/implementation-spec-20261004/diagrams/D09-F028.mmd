@@ -1,0 +1,18 @@
+flowchart TD
+  title["F-D09-028 · 기한이 있는 내부 용량 상태 조회<br/>P-D09-028"]
+  N0["정확 field route 인가"]
+  N1["snapshot 존재와 expiry 검사"]
+  N2["응답 schema 검증"]
+  N3["no-store 부착"]
+  title --> N0
+  N0 --> N1
+  N1 --> N2
+  N2 --> N3
+  N3 --> OK["정상: 200 coarse snapshot 다섯 필드"]
+  N1 -->|"snapshot 없거나 now>=expires_at"| B0["503 capacity_state_unavailable"]
+  B0 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N0 -->|"다른 역할 token 또는 등록되지 않은 method/path"| B1["공통 인가의 401/403"]
+  B1 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  title -.-> CANCEL["취소: 전용 취소 API 없음"]
+  CANCEL --> CLEAN["정리: 지역 응답 자원만 반환"]
+  title -.-> RETRY["재시도: HTTP 실패의 서버 자동 재시도 없음"]

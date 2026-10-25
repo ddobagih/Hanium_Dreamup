@@ -4,6 +4,7 @@ import java.io.File
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -13,13 +14,11 @@ import org.junit.Test
  * grammar cannot drift apart. A new example in the help text fails until its intent is listed below.
  */
 class VoiceHelpExamplesParseTest {
-    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/VoiceCommandInteractionController.kt").readText()
 
     @Test
     fun everySpokenHelpExampleParsesToItsIntendedCommand() {
-        val help = literals(
-            source.substringAfter("AndroidVoiceAction.SpeakVoiceHelp -> {").substringBefore("speakInteraction(help)"),
-        )
+        val help = voiceCommandHelpKo(paused = false) + " " + voiceCommandHelpKo(paused = true)
         val examples = sentences(help).flatMap(::examplesIn)
         assertTrue("help examples found: $examples", examples.size >= 18)
         for (example in examples) assertIntended(example)
@@ -31,7 +30,10 @@ class VoiceHelpExamplesParseTest {
             source.substringAfter("private fun unrecognizedCommandHintKo(): String = when {").substringBefore("\n    }\n"),
         )
         val examples = sentences(hints).flatMap(::examplesIn)
-        assertTrue("hint examples found: $examples", examples.size >= 14)
+        // The two former arrival choices have been withdrawn; every remaining hint stays parseable.
+        assertTrue("hint examples found: $examples", examples.size >= 12)
+        assertFalse(examples.contains("도착했어"))
+        assertFalse(examples.contains("아직 도착 아니야"))
         for (example in examples) assertIntended(example)
     }
 
@@ -43,6 +45,8 @@ class VoiceHelpExamplesParseTest {
         assertEquals(listOf("위치 다시 확인"), examplesIn("위치 다시 확인이라고 말씀해 주세요."))
         assertEquals(listOf("도움말"), examplesIn("목적지를 말하거나 도움말이라고 말씀해 주세요."))
         assertEquals(listOf("새 경로 요청", "길안내 종료"), examplesIn("새 경로 요청, 길안내 종료 중에서 말씀해 주세요."))
+        assertEquals(listOf("기기 신고 1번 선택"), examplesIn("기기 신고 목록을 들은 뒤 기기 신고 1번 선택이라고 말씀해 주세요."))
+        assertEquals(listOf("기기 신고 삭제 확인"), examplesIn("삭제하려면 선택한 안내를 듣고 기기 신고 삭제 확인이라고 말씀해 주세요."))
         assertEquals(emptyList<String>(), examplesIn("신고와 보행 종료는 확인 안내를 따라 주세요."))
     }
 
@@ -77,6 +81,10 @@ class VoiceHelpExamplesParseTest {
     private companion object {
         val INTENDED: Map<String, Any> = mapOf(
             "서울역으로 안내해줘" to AndroidVoiceCommand.SetDestination("서울역"),
+            "1번 상세" to AndroidVoiceCommand.DestinationCandidateDetail(1),
+            "기기 신고 목록" to AndroidVoiceCommand.ListLocalQuarantinedReports,
+            "기기 신고 1번 선택" to AndroidVoiceCommand.SelectLocalQuarantinedReport(1),
+            "기기 신고 삭제 확인" to AndroidVoiceCommand.ConfirmLocalQuarantinedReportDelete,
             "1번" to AndroidVoiceCommand.SelectDestinationCandidate(1),
             "첫 번째" to AndroidVoiceCommand.SelectDestinationCandidate(1),
             "더 듣기" to AndroidVoiceCommand.HearMoreDestinationCandidates,
@@ -90,8 +98,8 @@ class VoiceHelpExamplesParseTest {
             "경로 다시 찾아줘" to AndroidVoiceCommand.RequestReroute,
             "새 경로 요청" to AndroidVoiceCommand.RequestReroute,
             "위치 다시 확인" to AndroidVoiceCommand.RecheckLocation,
-            "도착했어" to AndroidVoiceCommand.ConfirmArrival,
-            "아직 도착 아니야" to AndroidVoiceCommand.RejectArrival,
+            "현재 상태" to AndroidVoiceCommand.CurrentState,
+            "남은 거리" to AndroidVoiceCommand.CurrentState,
             "길안내 종료" to AndroidVoiceCommand.StopNavigation,
             "신고해" to AndroidVoiceCommand.CreateReport,
             "보행 일시정지" to WalkSessionVoiceAction.PAUSE,
@@ -108,7 +116,7 @@ class VoiceHelpExamplesParseTest {
         val SENTENCE_END = Regex("(?<=[.?])\\s*")
         val MARKER = Regex("처럼 말|라고 선택|라고 말|을 사용할 수|를 말할 수| 중에서 말")
         val ITEM_SEPARATOR = Regex(", | 또는 |거나 ")
-        val TOPIC = Regex("(?<!또)는 ")
+        val TOPIC = Regex("(?<!또)(?:는|은) ")
 
         fun literals(code: String): String = LITERAL.findAll(code).joinToString(" ") { it.groupValues[1] }
 
@@ -117,6 +125,8 @@ class VoiceHelpExamplesParseTest {
         fun examplesIn(sentence: String): List<String> {
             val marker = MARKER.find(sentence) ?: return emptyList()
             var body = sentence.substring(0, marker.range.first)
+            // Remove sequence instructions before the topic scan; "들은 뒤" is not a topic.
+            body = body.removePrefix("기기 신고 목록을 들은 뒤 ").removePrefix("삭제하려면 선택한 안내를 듣고 ")
             // Drop the topic ("보행 중에는 ", "목적지는 "); "또는" is a separator, not a topic.
             body = when {
                 body.contains("에는 ") -> body.substringAfterLast("에는 ")

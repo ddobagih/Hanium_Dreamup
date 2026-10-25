@@ -1,0 +1,26 @@
+flowchart TD
+  A["F-D10-023 AIHub513 한국 점자블록 초기 dataset 빌드"]
+  N0["1. JSON member path 점자블럭 또는 facility2_09 또는 tactile annotation을 대상으로 선택. label_name 점자블럭이고 is_defect가 불량으로 시작한 bbox/polygon을 이미지 경계에 clip."]
+  A --> N0
+  N1["2. w/h>1px인 box만 normalize; filename 기준 sample에 box를 합친다. box 있으면 positive, 없으면 negative."]
+  N0 --> N1
+  N2["3. positive/negative 각 cap 후 seed shuffle; val/test 비율합<1 및 음수 아닌지 검사하고 두 bucket별 split."]
+  N1 --> N2
+  N3["4. --dry-run은 label scan·image index·missing count 후 파일 없이 종료. 실제는 기본 target reset, 선택 이미지 member만 copy와 class0 label/empty negative 작성, summary."]
+  N2 --> N3
+  B0{"이미지 누락"}
+  R0["dry-run exit1; 실제 build는 skip·warning 후0"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"--no-reset"}
+  R1["기존 target 삭제 생략하지만 필요한 split 폴더 생성도 reset에서만 하므로 빈 target에서는 쓰기 실패 가능"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"박스가 무효인 불량 annotation만 있음"}
+  R2["boxes 비어 negative로 분류됨"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-020 · P-D10-021"]
+  P -. "코드 분기 기준" .-> A

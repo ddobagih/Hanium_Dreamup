@@ -47,7 +47,7 @@ internal class WalkSessionVoiceControlPolicy(
             pendingEnd = null
             return NO_OP_DECISION
         }
-        if (!confidence.isFinite() || confidence !in minimumConfidence..1f) {
+        if (!acceptsConfidence(confidence)) {
             return NO_OP_DECISION
         }
         return when (compactVoicePhrase(phrase)) {
@@ -80,6 +80,9 @@ internal class WalkSessionVoiceControlPolicy(
     fun invalidatePendingEnd() {
         pendingEnd = null
     }
+
+    fun acceptsConfidence(confidence: Float): Boolean =
+        confidence.isFinite() && confidence in minimumConfidence..1f
 
     private fun consumePending(
         epoch: WalkRuntimeEpoch,

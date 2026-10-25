@@ -1,0 +1,10 @@
+stateDiagram-v2
+  state "RECEIVED 권리요청 접수" as R
+  state "ACKNOWLEDGED 처리 시작" as A
+  state "RESOLVED 정정 처리 완료" as S
+  state "REJECTED 반려" as X
+  [*] --> R
+  R --> A: expected version + 재인증 PATCH
+  A --> S: CORRECTION 유형만 허용
+  A --> X: CORRECTION 또는 DELETE
+  note right of A: F-D12-031 / P-D12-031<br/>DELETE는 일반 PATCH에서 RESOLVED 금지<br/>실제 삭제 처리기는 별도 서버 경로

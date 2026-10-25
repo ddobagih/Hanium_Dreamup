@@ -16,12 +16,13 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 import pytest
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.exc import SQLAlchemyError
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 import backend.app.api.raw_collections as raw_collections_api  # noqa: E402
-import backend.app.api.reports as reports_api  # noqa: E402
+import backend.app.services.maintenance_lock as maintenance_lock_service  # noqa: E402
 import backend.app.field_test_security as field_test_security  # noqa: E402
 from backend.app.api.raw_collections import create_router  # noqa: E402
 from backend.app.config import Settings  # noqa: E402
@@ -94,6 +95,19 @@ OBJECT_ID = "123e4567-e89b-42d3-a456-426614174001"
 WALK_ID = "123e4567-e89b-42d3-a456-426614174002"
 SEGMENT_ID = "123e4567-e89b-42d3-a456-426614174003"
 CONSENT_RECEIPT = "a" * 64
+
+
+@pytest.fixture(autouse=True)
+def raw_actor_account_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    # These transport tests use one configured legacy actor. Account authority
+    # and store failures are verified separately in the auth-epoch tests.
+    monkeypatch.setattr(
+        field_test_security,
+        "_actor_account_session_is_current",
+        lambda actor, generation, epoch: (
+            actor == ACTOR_ID and generation == 1 and epoch is None
+        ),
+    )
 
 
 def _manifest_payload(**overrides: object) -> dict[str, object]:
@@ -282,6 +296,25 @@ def _headers(
             )
         )
     return headers
+
+
+@pytest.mark.parametrize("unavailable", [False, True], ids=["revoked", "store-unavailable"])
+def test_raw_contract_still_checks_account_authority_before_ingest_gate(monkeypatch, unavailable) -> None:
+    def authority(_actor, _generation, _epoch):
+        if unavailable:
+            raise SQLAlchemyError("synthetic account store failure")
+        return False
+
+    monkeypatch.setattr(field_test_security, "_actor_account_session_is_current", authority)
+    client = ASGITestClient(_app(enabled=False))
+    path = f"/raw-collections/{COLLECTION_ID}/manifest"
+    response = client.request(
+        "PUT", path, json=_manifest_payload(), headers=_headers(method="PUT", path=path),
+    )
+    assert response.status_code == (503 if unavailable else 401)
+    assert response.json()["detail"]["code"] == (
+        "account_authentication_unavailable" if unavailable else "account_authentication_stale"
+    )
 
 
 def _app(
@@ -1159,7 +1192,7 @@ def test_maintenance_lock_rejection_stops_before_raw_gate_and_storage(
     lock_path.write_bytes(b"walksafe-maintenance-lock\n")
     lock_path.chmod(0o600)
     monkeypatch.setattr(
-        reports_api,
+        maintenance_lock_service,
         "_trusted_maintenance_lock_parent",
         lambda *_args: True,
     )

@@ -14,8 +14,11 @@ data class RuntimeMetricPreflightProfile(
         require(profileId.isNotBlank()) { "profileId must not be blank" }
         require(maximumDurationMs > 0L) { "maximumDurationMs must be positive" }
         require(minimumDistinctFrames > 0) { "minimumDistinctFrames must be positive" }
-        require(minimumObservationSpanMs in 1L..maximumDurationMs) {
-            "minimumObservationSpanMs must be positive and within maximumDurationMs"
+        require(
+            minimumObservationSpanMs in 0L..maximumDurationMs &&
+                (minimumObservationSpanMs > 0L || minimumDistinctFrames == 1),
+        ) {
+            "minimumObservationSpanMs must be within maximumDurationMs; zero requires a single-frame profile"
         }
         require(minimumValidSamplesPerPassingFrame > 0) {
             "minimumValidSamplesPerPassingFrame must be positive"
@@ -36,15 +39,15 @@ data class RuntimeMetricPreflightProfile(
 
 object RuntimeMetricPreflightPolicy {
     const val MAX_DURATION_MS = 10_000L
-    const val MIN_DISTINCT_FRAMES = 10
-    const val MIN_OBSERVATION_SPAN_MS = 1_000L
-    const val MIN_VALID_SAMPLES_PER_PASSING_FRAME = 30
-    const val MIN_PASSING_PERCENT = 80
+    const val MIN_DISTINCT_FRAMES = 1
+    const val MIN_OBSERVATION_SPAN_MS = 0L
+    const val MIN_VALID_SAMPLES_PER_PASSING_FRAME = 1
+    const val MIN_PASSING_PERCENT = 100
     const val MIN_VALID_DISTANCE_METERS = 0.2
     const val MAX_VALID_DISTANCE_METERS = 8.0
 
     val testCandidateProfile = RuntimeMetricPreflightProfile(
-        profileId = "runtime-metric-test-candidate-r001",
+        profileId = "runtime-metric-test-candidate-r002",
         maximumDurationMs = MAX_DURATION_MS,
         minimumDistinctFrames = MIN_DISTINCT_FRAMES,
         minimumObservationSpanMs = MIN_OBSERVATION_SPAN_MS,

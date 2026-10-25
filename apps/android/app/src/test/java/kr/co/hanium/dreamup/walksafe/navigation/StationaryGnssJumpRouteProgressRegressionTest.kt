@@ -89,10 +89,12 @@ class StationaryGnssJumpRouteProgressRegressionTest {
     fun sustainedStationaryJumpNeverConfirmsPassageOrArrival() {
         val navigator = navigator()
         for (at in 1_000L..3_000L step 1_000L) {
-            assertEquals(0, navigator.update(location(0.0, at), at, false, 0.0, null).guideIndex)
+            assertEquals(0, navigator.update(location(0.0, at), at, false, stepProgressM = 0.0,
+                facingObservation = RouteFacingObservation(90.0, 2.0, at)).guideIndex)
         }
         for (at in 4_000L..10_000L step 1_000L) {
-            val jumped = navigator.update(location(30.0, at), at, false, 0.0, null)
+            val jumped = navigator.update(location(30.0, at), at, false, stepProgressM = 0.0,
+                facingObservation = RouteFacingObservation(90.0, 2.0, at))
             assertEquals("at=$at", 0, jumped.guideIndex)
             assertFalse(jumped.arrived)
             assertFalse(jumped.arrivalCandidate)

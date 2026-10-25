@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.network
 
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import java.io.File
 import java.security.MessageDigest
 import java.util.Locale
@@ -19,6 +20,29 @@ import org.junit.Test
  */
 class EmailOtpPendingRequestRecoveryTest {
     @Test
+    fun restartedProcessReusesCanonicalPayloadWhenBirthDateFormatChanges() {
+        for ((firstDate, secondDate) in listOf(
+            "20000229" to "2000-02-29",
+            "2000-02-29" to "20000229",
+        )) {
+            val store = MemoryStore()
+            val first = requireNotNull(policy(store, { START }, ID).begin(payload(dateOfBirth = firstDate)))
+            val pending = requireNotNull(store.loadPendingOtpRequest())
+            assertEquals("2000-02-29", first.payload.dateOfBirth)
+            assertEquals(pendingEmailOtpPayloadSha256(payload(), ID), pending.payloadSha256)
+            assertFalse(requireNotNull(store.value).contains(firstDate))
+
+            val restarted = policy(store, { START + 1_000L }, "request_second_000001")
+            val changedFormat = payload(signupAttempt = "epoch-2", dateOfBirth = secondDate)
+            val resumed = requireNotNull(restarted.begin(changedFormat))
+            assertEquals(first.requestId, resumed.requestId)
+            assertEquals("2000-02-29", resumed.payload.dateOfBirth)
+            assertTrue(restarted.recordSuccess(resumed, changedFormat, persistResult = { true }))
+            assertNull(store.value)
+        }
+    }
+
+    @Test
     fun restartedProcessReusesTheSameRequestIdForTheSamePayload() {
         val store = MemoryStore()
         var now = START
@@ -31,7 +55,7 @@ class EmailOtpPendingRequestRecoveryTest {
         val second = policy(store, { now }, "request_second_000001")
         val resumed = requireNotNull(second.begin(payload(signupAttempt = "epoch-2")))
         assertEquals("request_first_0000001", resumed.requestId)
-        assertTrue(second.recordSuccess(resumed, payload(signupAttempt = "epoch-2")))
+        assertTrue(second.recordSuccess(resumed, payload(signupAttempt = "epoch-2"), persistResult = { true }))
         assertNull("success clears the record", store.value)
     }
 
@@ -129,13 +153,87 @@ class EmailOtpPendingRequestRecoveryTest {
     }
 
     @Test
+    fun preNormalizationRecordStillReplaysTheSameIdForTheExactEnteredEmail() {
+        val entered = payload(email = "Person@EXAMPLE.com")
+        val store = MemoryStore().apply {
+            value = PendingEmailOtpRequestCodec.encode(PendingEmailOtpRequest(
+                ID, OWNER, pendingEmailOtpPayloadSha256(entered, ID), START,
+            ))
+        }
+        val resumed = requireNotNull(policy(store, { START + 1_000L }, "request_other_0000001").begin(entered))
+        assertEquals(ID, resumed.requestId)
+        assertEquals("Person@example.com", resumed.payload.email)
+    }
+
+    @Test
+    fun missingStoreReadFailureAndSaveFailureBlockDispatch() {
+        val missing = EmailOtpRequestRetryPolicy({ 0L }, { ID }, pendingStore = { null })
+        assertNull(missing.begin(payload()))
+        assertTrue(missing.storageFailure)
+        for (readFailure in listOf(true, false)) {
+            val store = MemoryStore().apply { this.readFailure = readFailure; saveAllowed = false }
+            val retry = policy(store, { START }, ID)
+            assertNull(retry.begin(payload()))
+            assertTrue(retry.storageFailure)
+            assertNull(store.value)
+        }
+    }
+
+    @Test
+    fun cachedWireIdCannotBypassARecoveryReadFailureOnAnExplicitRetry() {
+        val store = MemoryStore()
+        val retry = policy(store, { START }, ID)
+        val first = requireNotNull(retry.begin(payload()))
+        assertTrue(retry.recordFailure(first, payload(), 0, null, null))
+        store.readFailure = true
+        assertNull(retry.begin(payload()))
+        assertTrue(retry.storageFailure)
+        assertNotNull(store.value)
+    }
+
+    @Test
+    fun replacingPayloadDoesNotEraseThePreviousDurableRecoveryPointOnSaveFailure() {
+        val store = MemoryStore()
+        val retry = policy(store, { START }, ID)
+        requireNotNull(retry.begin(payload()))
+        val saved = store.value
+        store.saveAllowed = false
+        assertNull(retry.begin(payload(email = "replacement@example.com")))
+        assertTrue(retry.storageFailure)
+        assertEquals(saved, store.value)
+        val restarted = policy(store, { START + 1_000L }, "request_other_0000001")
+        assertEquals(ID, requireNotNull(restarted.begin(payload())).requestId)
+    }
+
+    @Test
+    fun returnedEnrollmentMustBeDurableBeforeTheReplayIdIsCleared() {
+        val store = MemoryStore()
+        val retry = policy(store, { START }, ID)
+        val attempt = requireNotNull(retry.begin(payload()))
+        val saved = store.value
+        assertFalse(retry.recordSuccess(attempt, payload(), persistResult = { false }))
+        assertTrue(retry.storageFailure)
+        assertEquals(saved, store.value)
+        val restarted = policy(store, { START + 1_000L }, "request_other_0000001")
+        val resumed = requireNotNull(restarted.begin(payload()))
+        assertEquals(ID, resumed.requestId)
+        assertTrue(restarted.recordSuccess(resumed, payload()) {
+            assertEquals(saved, store.value)
+            true
+        })
+        assertNull(store.value)
+    }
+
+    @Test
     fun mainActivityWiresTheEncryptedEnrollmentStore() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt")
             .readText(Charsets.UTF_8)
-        val construction = source.substringAfter("EmailOtpRequestRetryPolicy(")
-            .substringBefore("private val gatewayAccountClient")
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/account/EmailAccountController.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(source, "createEmailAccountController").contains("EmailAccountController("))
+        assertTrue(source.contains("emailAccountController.initializeStorage("))
+        val construction = MainActivityRefactorSource.property(owner, "emailOtpRequestRetryPolicy")
         assertTrue(construction.contains("pendingStore = {"))
-        assertTrue(construction.contains("::emailEnrollmentStore.isInitialized && !emailEnrollmentStorageBlocked"))
+        assertTrue(construction.contains("::storage.isInitialized && !emailEnrollmentStorageBlocked"))
     }
 
     private fun unsaltedV1Digest(value: EmailOtpRequestRetryPolicy.Payload): String =
@@ -167,9 +265,12 @@ class EmailOtpPendingRequestRecoveryTest {
     private class MemoryStore : PendingEmailOtpRequestStore {
         var value: String? = null
         var corrupt = false
+        var saveAllowed = true
+        var readFailure = false
         override fun loadPendingOtpRequest(): PendingEmailOtpRequest? =
-            if (corrupt) PendingEmailOtpRequestCodec.decode("{\"schema_version\":1}") else value?.let(PendingEmailOtpRequestCodec::decode)
+            if (readFailure) error("synthetic read failure") else if (corrupt) PendingEmailOtpRequestCodec.decode("{\"schema_version\":1}") else value?.let(PendingEmailOtpRequestCodec::decode)
         override fun savePendingOtpRequest(request: PendingEmailOtpRequest): Boolean {
+            if (!saveAllowed) return false
             corrupt = false
             value = PendingEmailOtpRequestCodec.encode(request)
             return true

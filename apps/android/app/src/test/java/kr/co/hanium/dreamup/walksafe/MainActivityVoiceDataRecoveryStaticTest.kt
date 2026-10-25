@@ -20,90 +20,54 @@ class MainActivityVoiceDataRecoveryStaticTest {
                 "AndroidStartupCapabilityProbe.kt",
         ).readText()
 
+    private fun owner(path: String) = File("src/main/java/kr/co/hanium/dreamup/walksafe/$path").readText()
+    private val recoverySource = owner("startup/interaction/VoiceDataSettingsRecoveryController.kt")
+    private fun member(text: String, name: String) = MainActivityRefactorSource.member(text, name)
+
     @Test
     fun onlyOfflineKoreanTtsIsUserInstallable() {
-        val installableRequirements = section(
-            capabilitySource,
-            "val USER_INSTALLABLE_REQUIREMENTS",
-            "data class WalkSafeStartupCapabilityInput(",
-        )
-        val requirementNames = Regex("WalkSafeStartupRequirement\\.([A-Z_]+)")
-            .findAll(installableRequirements)
-            .map { it.groupValues[1] }
-            .toList()
-
-        assertEquals(listOf("OFFLINE_KOREAN_TTS"), requirementNames)
-        assertTrue(source.contains("private lateinit var voiceDataInstallButton: Button"))
-        assertTrue(source.contains("addView(voiceDataInstallButton)"))
-        assertTrue(
-            source.contains(
-                "if (installableUnavailable.isEmpty()) View.GONE else View.VISIBLE",
-            ),
-        )
+        val installable = section(capabilitySource, "val USER_INSTALLABLE_REQUIREMENTS", "data class WalkSafeStartupCapabilityInput(")
+        val names = Regex("WalkSafeStartupRequirement\\.([A-Z_]+)").findAll(installable).map { it.groupValues[1] }.toList()
+        assertEquals(listOf("OFFLINE_KOREAN_TTS"), names)
+        val panel = owner("ui/OnboardingReadinessPanel.kt")
+        val presenter = owner("ui/DeviceCheckPresenter.kt")
+        assertTrue(panel.contains("val voiceDataInstallButton: Button"))
+        assertTrue(panel.contains("addView(voiceDataInstallButton)"))
+        assertTrue(presenter.contains("voiceDataInstallVisible = capability.installableUnavailableLabels.isNotEmpty()"))
+        assertTrue(presenter.contains("panel.voiceDataInstallButton.visibility = if (presentation.voiceDataInstallVisible) View.VISIBLE else View.GONE"))
     }
 
     @Test
     fun recoveryTriesTtsInstallThenTtsSettingsThenAppSettings() {
-        val block = section(
-            source,
-            "private fun openVoiceDataInstallSettings()",
-            "private fun requireFirstRunOnboardingComplete(",
-        )
-        assertInOrder(
-            block,
-            "TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA",
-            "Intent(ANDROID_TTS_SETTINGS_ACTION)",
-            "Settings.ACTION_APPLICATION_DETAILS_SETTINGS",
-            "candidates.any",
-            "if (opened)",
-            "voiceDataInstallRecheckPending = true",
-            "return",
-            "updateStatus",
-        )
-        assertTrue(
-            source.contains(
-                "const val ANDROID_TTS_SETTINGS_ACTION = " +
-                    "\"com.android.settings.TTS_SETTINGS\"",
-            ),
-        )
-        assertFalse(block.contains("Settings.ACTION_VOICE_INPUT_SETTINGS"))
+        val native = owner("startup/interaction/AndroidStartupSettingsNative.kt")
+        val candidates = member(owner("startup/interaction/StartupSettingsNavigation.kt"), "openVoiceCandidates")
+        val open = member(recoverySource, "openVoiceDataInstallSettings")
+        assertTrue(native.contains("Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)"))
+        assertTrue(native.contains("Intent(\"com.android.settings.TTS_SETTINGS\")"))
+        assertTrue(native.contains("Settings.ACTION_APPLICATION_DETAILS_SETTINGS"))
+        assertInOrder(candidates, "native.installVoiceData()", "native.chooseVoiceEngine()",
+            "if (preferEngine) chooseEngine else installVoiceData", "if (preferEngine) installVoiceData else chooseEngine",
+            "native.applicationSettings()", "candidates.any")
+        assertInOrder(open, "settings.openVoiceCandidates(", "if (opened)", "recheckPending = true", "return", "effects.status")
+        assertTrue(source.contains("const val ANDROID_TTS_SETTINGS_ACTION = \"com.android.settings.TTS_SETTINGS\""))
+        assertFalse(native.contains("Settings.ACTION_VOICE_INPUT_SETTINGS"))
     }
 
     @Test
     fun returningFromSettingsRequestsAFreshOfflineKoreanTtsProbe() {
-        val resume = section(
-            source,
-            "private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()",
-            "private fun scheduleOfficialEnvironmentRuntimeWatchdog(",
-        )
-        val activityRecheck = section(
-            source,
-            "private fun recheckVoiceDataAfterSettingsIfNeeded()",
-            "private fun completeVoiceDataInstallRecheckIfPossible()",
-        )
-        val recheck = section(
-            probeSource,
-            "fun recheckOfflineKoreanTextToSpeech()",
-            "fun snapshot(): WalkSafeStartupCapabilityInput",
-        )
-
+        val resume = member(source, "resumeWalkSafeRuntimeAfterPrivacyStartupInspection")
+        val recheck = member(recoverySource, "recheckVoiceDataAfterSettingsIfNeeded")
+        val replace = member(recoverySource, "startReplacedProbe")
+        val factory = MainActivityRefactorSource.factory(source, "createVoiceDataSettingsRecovery")
         assertTrue(resume.contains("recheckVoiceDataAfterSettingsIfNeeded()"))
-        assertTrue(
-            activityRecheck.contains(
-                "startupCapabilityProbe.recheckOfflineKoreanTextToSpeech()",
-            ),
-        )
-        assertTrue(
-            activityRecheck.contains(
-                "startupCapabilityProbe = AndroidStartupCapabilityProbe(this)",
-            ),
-        )
-        assertTrue(activityRecheck.contains("startupCapabilityProbeStarted = false"))
-        assertTrue(
-            recheck.contains(
-                "probeOfflineKoreanTextToSpeech(currentGeneration, notifyPending = true)",
-            ),
-        )
+        assertTrue(recheck.contains("probe.recheck()"))
+        assertTrue(recheck.contains("startReplacedProbe()"))
+        assertTrue(factory.contains("startupCapabilityProbe.recheckOfflineKoreanTextToSpeech()"))
+        assertTrue(factory.contains("override fun close() = privacyStartupResources.releaseOnUiThread(startupCapabilityProbe)"))
+        assertTrue(factory.contains("startupCapabilityProbe = privacyStartupResources.acquireOnUiThread({ AndroidStartupCapabilityProbe(this@MainActivity) { onChanged() } }, { it.close() })"))
+        assertTrue(recheck.contains("probe.started = false"))
+        assertInOrder(replace, "probe.close()", "probe.replace", "probe.started = true", "probe.start()")
+        assertTrue(member(probeSource, "recheckOfflineKoreanTextToSpeech").contains("probeOfflineKoreanTextToSpeech(currentGeneration, notifyPending = true)"))
         assertTrue(probeSource.contains("offlineKoreanTextToSpeechProbeState.begin()"))
         assertTrue(probeSource.contains("offlineKoreanTextToSpeechProbeState.complete("))
         assertTrue(probeSource.contains("offlineKoreanTextToSpeechProbeState.close()"))
@@ -112,69 +76,39 @@ class MainActivityVoiceDataRecoveryStaticTest {
 
     @Test
     fun successfulRecheckRemovesOnlyVoiceGuidanceAndPersistsTheRecoveredResult() {
-        val removal = Regex(
-            "disabledFeatures\\s*-\\s*PostLoginDeviceCheckFeature\\.VOICE_GUIDANCE",
-        ).find(source)
-        checkNotNull(removal) { "Missing VOICE_GUIDANCE restriction removal" }
-        val recovery = privateFunctionContaining(removal.range.first)
-
-        assertTrue(recovery.contains("val current = postLoginDeviceCheckSnapshot"))
-        assertTrue(recovery.contains("current.copy("))
-        assertTrue(recovery.contains("PostLoginDeviceCheckState.FULL"))
-        assertTrue(recovery.contains("PostLoginDeviceCheckState.LIMITED"))
-        assertTrue(recovery.contains("disabledFeatures = remaining"))
-        assertTrue(recovery.contains("postLoginDeviceCheckResultStore.save("))
-        assertTrue(recovery.contains("postLoginDeviceCheckSnapshot ="))
-        assertTrue(recovery.contains("offlineKoreanTextToSpeechCapabilityOverride = true"))
-        assertTrue(
-            "Recovered result must be saved before it becomes the active snapshot",
-            recovery.indexOf("postLoginDeviceCheckResultStore.save(") <
-                recovery.lastIndexOf("postLoginDeviceCheckSnapshot ="),
-        )
+        val device = owner("device/PostLoginDeviceCheckController.kt")
+        val recovered = member(device, "recoverKoreanSpeechPassedGate")
+        assertTrue(recovered.contains("current.disabledFeatures - PostLoginDeviceCheckFeature.VOICE_GUIDANCE"))
+        assertTrue(recovered.contains("current.copy("))
+        assertTrue(recovered.contains("PostLoginDeviceCheckState.FULL"))
+        assertTrue(recovered.contains("PostLoginDeviceCheckState.LIMITED"))
+        assertTrue(recovered.contains("disabledFeatures = remaining"))
+        assertInOrder(recovered, "savedResults.save(next, binding", "publish(next)")
+        assertTrue(member(device, "publish").contains("current = next"))
+        val completion = member(recoverySource, "completeVoiceDataInstallRecheckIfPossible")
+        assertInOrder(completion, "if (!effects.recoverPassedGate())", "return", "effects.offlineTtsOverride = true")
+        val factory = MainActivityRefactorSource.factory(source, "createVoiceDataSettingsRecovery")
+        assertTrue(factory.contains("postLoginDeviceCheckController.recoverKoreanSpeechPassedGate()"))
+        assertTrue(factory.contains("offlineKoreanTextToSpeechCapabilityOverride = value"))
     }
 
     @Test
     fun missingKoreanTtsBlocksDeviceCheckAndWalkStartOrResume() {
-        val observation = section(
-            source,
-            "private fun currentPostLoginDeviceCheckObservation()",
-            "private fun completePostLoginDeviceCheckPass(",
-        )
-        assertTrue(
-            observation.contains(
-                "koreanTextToSpeechAvailable == false ->\n" +
-                    "                    PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE",
-            ),
-        )
-
-        val restrictions = section(
-            source,
-            "private fun applyPostLoginDeviceFeatureRestrictions(",
-            "/** Active route/risk work",
-        )
-        assertTrue(
-            restrictions.contains(
-                "WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in unavailable",
-            ),
-        )
+        val device = owner("device/PostLoginDeviceCheckController.kt")
+        assertTrue(device.contains("koreanTextToSpeechAvailable == false -> PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE"))
+        val restrictions = MainActivityRefactorSource.function(source, "private fun applyPostLoginDeviceFeatureRestrictions(")
+        assertTrue(restrictions.contains("WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in unavailable"))
         assertTrue(restrictions.contains("WalkSafeStartupCapabilityTier.BLOCKED"))
-        assertTrue(restrictions.contains("KOREAN_TTS_WALK_BLOCK_DETAIL"))
-
-        val readiness = section(
-            source,
-            "private fun walkSessionReadinessBlockReason(",
-            "private fun missingRequiredWalkSessionPermissions(",
-        )
-        assertTrue(readiness.contains("PostLoginDeviceCheckFeature.VOICE_GUIDANCE"))
-        assertTrue(readiness.contains("WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS"))
-        assertTrue(readiness.contains("return KOREAN_TTS_WALK_BLOCK_DETAIL"))
-
-        val confirmation = section(
-            source,
-            "private fun confirmStartupCapabilityDecision()",
-            "private fun deliverStartupCapabilityNotice(",
-        )
-        assertFalse(confirmation.contains("사용 가능한 기능으로 계속합니다"))
+        assertTrue(restrictions.contains("koreanTtsBlockDetail"))
+        val readiness = owner("session/readiness/WalkReadinessBlockController.kt")
+        assertTrue(readiness.contains("!sources.voiceFeatureEnabled()"))
+        assertTrue(readiness.contains("!sources.offlineTtsAllowed(decision)"))
+        assertTrue(readiness.contains("return koreanTtsBlockDetail"))
+        val factory = MainActivityRefactorSource.factory(source, "createWalkReadinessBlockController")
+        assertTrue(factory.contains("PostLoginDeviceCheckFeature.VOICE_GUIDANCE"))
+        assertTrue(factory.contains("WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS"))
+        assertTrue(factory.contains("koreanTtsBlockDetail = KOREAN_TTS_WALK_BLOCK_DETAIL"))
+        assertFalse(MainActivityRefactorSource.function(source, "private fun confirmStartupCapabilityDecision()").contains("사용 가능한 기능으로 계속합니다"))
     }
 
     @Test
@@ -197,19 +131,13 @@ class MainActivityVoiceDataRecoveryStaticTest {
 
     @Test
     fun ttsFailureShowsOneInstallActionAndSuccessfulProbeExplainsRecheck() {
-        val settings = section(
-            source,
-            "postLoginDeviceCheckSettingsButton.apply",
-            "text = when {",
-        )
+        val render = member(owner("ui/DeviceCheckPresenter.kt"), "renderStartupCapability")
+        val settings = render.substringAfter("panel.postLoginDeviceCheckSettingsButton.apply {")
+            .substringBefore("panel.voiceDataInstallButton.visibility")
         assertFalse(settings.contains("PostLoginDeviceCheckFailure.KOREAN_TTS_UNAVAILABLE"))
-        val recovery = section(
-            source,
-            "private fun completeVoiceDataInstallRecheckIfPossible()",
-            "private fun requireFirstRunOnboardingComplete(",
-        )
-        assertTrue(recovery.contains("한국어 음성 재점검 완료"))
-        assertTrue(recovery.contains("기기 점검 결과를 확인한 뒤 보행을 시작하거나 재개하세요"))
+        val complete = member(recoverySource, "completeVoiceDataInstallRecheckIfPossible")
+        assertTrue(complete.contains("한국어 음성 재점검 완료"))
+        assertTrue(complete.contains("기기 점검 결과를 확인한 뒤 보행을 시작하거나 재개하세요"))
     }
 
     private fun section(text: String, startMarker: String, endMarker: String): String {

@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -96,6 +97,7 @@ class ObjectTrackerTest {
         centersX: List<Float> = distances.indices.map { centerX },
     ): Pair<TrackState, ApproachKinematics> {
         val tracker = ObjectTracker()
+        val materialPointId = VisualMaterialPointId() // This fixture specifies one physical trajectory.
         var latest: TrackState? = null
         distances.forEachIndexed { index, distance ->
             val at = timestamps[index]
@@ -108,6 +110,7 @@ class ObjectTrackerTest {
                 cameraPose,
                 cameraPose?.objectCenterInAnchor(Point2(centersX[index], 0.5f), distance),
                 depthObservationTimestampNs = 9_000_000_000L + at * 1_000_000L,
+                materialPointId = materialPointId,
             )
             latest = track
         }

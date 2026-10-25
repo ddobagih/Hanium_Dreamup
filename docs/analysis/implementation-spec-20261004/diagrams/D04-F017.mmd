@@ -1,0 +1,23 @@
+flowchart TD
+  ID["F-D04-017 · 확정 정지 구간의 영속도 교정<br/>P-D04-017"]
+  A["motion callback → 통합 상태"]
+  C0{"통합 STATIONARY·STABLE이고 1초 호출 간격이 지났는가"}
+  R0["ZUPT 없음"]
+  C1{"같은 측정 sample·새 GNSS·비중첩 accel window인가"}
+  R1["MOTION_NOT_CONFIRMED"]
+  C2{"estimator 초기화와 replay/time/sigma가 유효한가"}
+  R2["HARD_REJECTED"]
+  OK["velocity만 0 방향 교정 → APPLIED에만 Main marker 갱신"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END

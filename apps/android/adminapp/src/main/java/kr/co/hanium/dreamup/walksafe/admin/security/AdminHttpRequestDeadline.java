@@ -121,11 +121,19 @@ final class AdminHttpRequestDeadline {
      * the existing connect/read phase timeouts. The caller must {@link Owner#close()} it in finally.
      */
     Owner open(String url) throws IOException {
-        return open(url, REQUEST_TIMEOUT_NANOS);
+        return open(null, url, REQUEST_TIMEOUT_NANOS);
     }
 
     /** Same as {@link #open(String)} with an explicit overall budget (original image only). */
     Owner open(String url, long budgetNanos) throws IOException {
+        return open(null, url, budgetNanos);
+    }
+
+    Owner open(AdminRequestAdmission admission, String url) throws IOException {
+        return open(admission, url, REQUEST_TIMEOUT_NANOS);
+    }
+
+    Owner open(AdminRequestAdmission admission, String url, long budgetNanos) throws IOException {
         if (budgetNanos < 1L || budgetNanos > ORIGINAL_EVIDENCE_MAX_TIMEOUT_NANOS) {
             throw new IllegalArgumentException("HTTP request budget is invalid");
         }
@@ -139,6 +147,7 @@ final class AdminHttpRequestDeadline {
         try {
             // adm-F2: a cancellation that ran before this registration was visible still wins.
             if (closed) owner.markCancelled();
+            if (admission != null) owner.registration = admission.dispatch(owner::cancel, () -> {});
             owner.check();
             owner.alarm = scheduler.schedule(owner::expire, Math.max(0L, owner.remainingNanos()));
             owner.check();
@@ -176,6 +185,7 @@ final class AdminHttpRequestDeadline {
         private final AtomicInteger state = new AtomicInteger(ACTIVE);
         private final AtomicBoolean disconnectClaimed = new AtomicBoolean();
         private volatile Cancellation alarm;
+        private AdminRequestAdmission.Registration registration;
 
         private Owner(HttpURLConnection connection, long startedAtNanos, long budgetNanos) {
             this.connection = connection;
@@ -239,7 +249,8 @@ final class AdminHttpRequestDeadline {
                     if (!state.compareAndSet(ACTIVE, FINISHED)) check();
                 } finally {
                     Cancellation current = alarm;
-                    if (current != null) current.cancel();
+                    try { if (current != null) current.cancel(); }
+                    finally { if (registration != null) registration.close(); }
                 }
             }
         }

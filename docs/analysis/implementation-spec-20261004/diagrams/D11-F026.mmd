@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D11-026 제출 문서·그림·화면자료 생성·검증"]
+  B["P-D11-026 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. source HEAD/index/tracked bytes 및 허용 generated 외 untracked closure를 확인한다"]
+  B --> T0
+  T1["2. third-party import 전에 pinned runtime·site closure를 검증한다"]
+  T0 --> T1
+  T2["3. 허용된 builder/validator만 dispatcher로 실행한다"]
+  T1 --> T2
+  T3["4. 그림과 작업 문서 및 receipt를 생성한다"]
+  T2 --> T3
+  T4["5. 호출 후 source·library bytes를 재검증하고 임시 HOME/sys.path marker를 정리한다"]
+  T3 --> T4
+  Z["검사 또는 처리 결과를 반환하고 해당 호출 종료"]
+  T4 --> Z
+  C0{"verify-only와 command 동시 지정"}
+  R0["거부"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"비허용 command·다른 checkout·extra distribution"}
+  R1["작업 전 차단"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"실행 중 source/site closure 변함"}
+  R2["실패"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

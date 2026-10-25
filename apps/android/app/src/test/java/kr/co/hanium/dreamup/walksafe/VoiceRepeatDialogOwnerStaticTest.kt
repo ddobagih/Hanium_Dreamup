@@ -15,7 +15,13 @@ class VoiceRepeatDialogOwnerStaticTest {
         "src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
     )
 
-    private fun block(signature: String) = ReportStaticSourceInspector.functionBlock(activity, signature)
+    private val command = ReportStaticSourceInspector.read("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/VoiceCommandInteractionController.kt")
+    private val dialog = ReportStaticSourceInspector.read("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/DestinationVoiceDialogController.kt")
+    private val peers = ReportStaticSourceInspector.read("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/VoiceInteractionControllers.kt")
+    private fun block(signature: String): String {
+        val name = signature.substringAfter("fun ").substringBefore("(")
+        return MainActivityRefactorSource.member(if (name == "executeVoiceAction") command else dialog, name)
+    }
 
     @Test
     fun parserMappingIsUnchanged() {
@@ -26,14 +32,18 @@ class VoiceRepeatDialogOwnerStaticTest {
     @Test
     fun repeatGuidanceDuringAnOpenCandidateDialogRepeatsTheCandidatePage() {
         val execute = block("private fun executeVoiceAction")
+        MainActivityRefactorSource.composition(activity, "voiceInteractionControllers.commands")
+        MainActivityRefactorSource.composition(activity, "voiceInteractionControllers.destinations")
+        assertTrue(peers.contains("dialog = { destinations }"))
         val branch = execute.substringAfter("AndroidVoiceAction.SpeakCurrentGuidance -> {")
             .substringBefore("AndroidVoiceAction.SpeakVoiceHelp -> {")
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 branch,
-                "if (activeVoiceCandidateDialogOrNull() != null) repeatVoiceDestinationCandidates()",
-                "else if (isWalkSessionRuntimeActive()) speakNextNavigationInstruction()",
-                "else speakInteraction(",
+                "if (dialog().activeVoiceCandidateDialogOrNull() != null) dialog().repeatVoiceDestinationCandidates()",
+                "else if (dialog().repeatPendingWalkingDestinationChange()) Unit",
+                "else if (walk.runtimeActive()) speakNextNavigationInstruction()",
+                "else output.speakInteraction(",
             ),
         )
     }
@@ -41,13 +51,14 @@ class VoiceRepeatDialogOwnerStaticTest {
     @Test
     fun repeatCandidatesWithoutADialogFallsBackToTheCurrentGuidanceThenExplains() {
         val repeat = block("private fun repeatVoiceDestinationCandidates")
+        assertTrue(peers.contains("repeatGuidance = { commands.speakNextNavigationInstruction() }"))
         val rejected = repeat.substringAfter("if (transition == null || !transition.accepted) {")
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 rejected,
-                "if (!destinationSearchInFlight && isWalkSessionRuntimeActive() && isRouteActive) {",
-                "speakNextNavigationInstruction()",
-                "speakInteraction(noVoiceDestinationCandidatesMessage())",
+                "if (!search().state.inFlight && walk.runtimeActive() && routeRun().active) {",
+                "repeatGuidance()",
+                "output.speakInteraction(noVoiceDestinationCandidatesMessage())",
                 "return",
                 "speakHomeDestinationVoicePrompt(transition.state)",
             ),
@@ -56,14 +67,13 @@ class VoiceRepeatDialogOwnerStaticTest {
 
     @Test
     fun theOwningDialogIsTheValidLeaseAtHomeOrTheCurrentQueryPageWhileWalking() {
-        val owner = activity.substringAfter("private fun activeVoiceCandidateDialogOrNull()")
-            .substringBefore("private fun ")
+        val owner = MainActivityRefactorSource.member(dialog, "activeVoiceCandidateDialogOrNull")
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 owner,
-                "if (nativeHomeFeatureContextAvailable()) {",
+                "if (ui.homeContextAvailable()) {",
                 "currentVoiceDestinationDialogState()",
-                "destinationSearchVoiceState?.takeIf { it.query == destinationSearchQuery && !destinationSearchInFlight }",
+                "search().state.voicePage?.takeIf { it.query == search().state.query && !search().state.inFlight }",
             ),
         )
     }

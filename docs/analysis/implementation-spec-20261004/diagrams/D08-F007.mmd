@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D08-007 이메일·암호 단기 로그인"]
+  B["진입: POST /api/field-session grant_type=password"]
+  A --> B
+  P0["1. 전체 로그인 admission 을 먼저 기록한다."]
+  B --> P0
+  P1["2. Backend /accounts/authenticate 가 actor UUID·positive generation/auth_epoch 를 반환하는지 검증한다."]
+  P0 --> P1
+  P2["3. 실패 credentials 만 실패 budget 을 기록한다."]
+  P1 --> P2
+  P3["4. Backend generation 을 로컬 privacy 상태에 바인딩하고 삭제 fence 를 확인한다."]
+  P2 --> P3
+  P4["5. device_id 가 있으면 v7 device slot, 없으면 v6 singleton 을 암호화 내구 저장한다."]
+  P3 --> P4
+  P5["6. 저장 성공 후 HMAC 쿠키를 응답한다."]
+  P4 --> P5
+  OK["정상: 최대 12 시간 단기 인증 세션"]
+  P5 --> OK
+  C0{"Backend 400/401/409"}
+  X0["401 invalid_account_credentials 및 실패 budget"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"인증 서비스 429/503"}
+  X1["등록된 code/status 만 전달; credential 실패로 세지 않음"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"generation/epoch rollback"}
+  X2["409 stale"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"rename 후 fsync 실패"}
+  X3["500 outcome_unknown; 재인증 요구"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-005, P-D08-006, P-D08-007, P-D08-008, P-D08-011, P-D08-021"]
+  A -.-> POLICY

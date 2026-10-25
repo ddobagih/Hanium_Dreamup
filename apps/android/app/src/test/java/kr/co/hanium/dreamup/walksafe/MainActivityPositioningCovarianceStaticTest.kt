@@ -14,18 +14,28 @@ class MainActivityPositioningCovarianceStaticTest {
 
     @Test
     fun routeGuidancePassesTheCovarianceOfTheSameTrustedFix() {
-        val guidance = block("private fun updateRouteGuidance(")
+        val guidance = NavigationPolicySource.guidance(source)
         val position = guidance.substringAfter("filteredPosition = FilteredRoutePosition(").substringBefore("heading =")
-        assertTrue(position, position.contains("covarianceEnu = latestTrustedLocationCovariance?.takeIf { it.first == location }?.second"))
+        assertTrue(guidance.contains("filteredPosition = FilteredRoutePosition("))
+        assertTrue(position, position.contains("covarianceEnu = position.covariance?.takeIf { !location.navigationOnly && it.first == location }?.second"))
+        assertTrue(MainActivityRefactorSource.composition(source, "routeGuidanceController").contains("override val covariance get() = positioning.value.trustedCovariance"))
+        MainActivityRefactorSource.composition(source, "positioningSessionController")
+        assertTrue(MainActivityRefactorSource.property(source, "latestTrustedLocationCovariance").contains("positioningSessionController.trustedCovariance"))
     }
 
     @Test
     fun everyTrustedFixFromTheFilterRecordsItsCovarianceRightAfterIt() {
-        val assignments = Regex("""latestTrustedLocation = (filtered\.toTrustedLocation\(\)|filteredTrusted)\n\s+(\S+)""")
-            .findAll(source).map { it.groupValues[2] }.toList()
-        assertEquals(listOf("rememberTrustedLocationCovariance(filtered)", "rememberTrustedLocationCovariance(filtered)"), assignments)
-        val remember = block("private fun rememberTrustedLocationCovariance(")
+        val positioning = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/PositioningSessionController.kt").readText()
+        assertEquals(2, Regex("""latestTrustedLocation = (filtered\.toTrustedLocation\(\)|filteredTrusted)""")
+            .findAll(positioning).count())
+        val motion = MainActivityRefactorSource.member(positioning, "applyPositioningMotionSnapshot")
+        assertTrue(motion.contains("latestTrustedLocation = filtered.toTrustedLocation()\n        rememberTrustedLocationCovariance(filtered)"))
+        val location = NavigationPolicySource.observation(source)
+        assertTrue(location.contains("val filteredTrusted = warmingSelection?.location ?: filtered.toTrustedLocation()"))
+        assertTrue(location.contains("latestTrustedLocation = filteredTrusted\n        if (warmingSelection != null) latestTrustedLocationCovariance = null\n        else rememberTrustedLocationCovariance(filtered)"))
+        val remember = MainActivityRefactorSource.function(source, "private fun rememberTrustedLocationCovariance(")
         assertTrue(remember.contains("latestTrustedLocation?.let { location -> filtered.covarianceEnu?.let { location to it } }"))
+        MainActivityRefactorSource.composition(source, "positioningSessionController")
     }
 
     private fun block(marker: String): String {

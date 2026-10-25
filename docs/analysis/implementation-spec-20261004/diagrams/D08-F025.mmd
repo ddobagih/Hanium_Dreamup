@@ -1,0 +1,26 @@
+flowchart TD
+  A["F-D08-025 신고 transport 상태 확인"]
+  B["진입: GET /api/reports/v2/{report_id}/status"]
+  A --> B
+  P0["1. 인증·Backend current·privacy operation 을 검사한다."]
+  B --> P0
+  P1["2. report_id 와 actor assertion 으로 Backend status GET 한다."]
+  P0 --> P1
+  P2["3. owner/status/transport receipt 필드만 검증해 투영한다."]
+  P1 --> P2
+  OK["정상: 최소 저장 상태 및 transport receipt"]
+  P2 --> OK
+  C0{"인증/소유/부재 은닉 조건"}
+  X0["같은 404 계열"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"upstream 오류·계약 위반"}
+  X1["허용 error 또는 502"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-011, P-D08-016, P-D08-018, P-D08-029"]
+  A -.-> POLICY

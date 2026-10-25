@@ -10,17 +10,21 @@ class MainActivityHomeWakeInputGenerationStaticTest {
     private val actuator = File("src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt").readText()
 
     @Test fun homeProbeReadsThePersistentAtomicInputGeneration() {
-        assertTrue(main.contains("foregroundHomeWakeInputGeneration = AtomicLong(0L)"))
+        val wake = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/ForegroundWakeInputController.kt").readText()
+        assertTrue(MainActivityRefactorSource.composition(main, "voiceInputController.wake").contains("VoiceInputSessionController("))
+        assertTrue(wake.contains("foregroundHomeWakeInputGeneration = AtomicLong(0L)"))
         val home = method("refreshForegroundHomeWakeListening")
         assertTrue(home.contains("inputGeneration = foregroundHomeWakeInputGeneration::get"))
-        assertTrue(home.contains("voiceRecognitionActive || isHandsFreeVoiceRecognitionBlocked()"))
+        assertTrue(home.contains("session.state().recognitionActive || session.recognitionBlocked()"))
         assertTrue(method("invalidateForegroundHomeWakeInput").contains("foregroundHomeWakeInputGeneration.incrementAndGet()"))
         before(method("cancelForegroundHomeWakeListening"), "invalidateForegroundHomeWakeInput()", "probe?.cancel()")
     }
 
     @Test fun everyActuatorSpeechUsesTheMainInvalidationBoundary() {
-        assertTrue(method("ensureFeedbackActuator").contains("speechAllowed = ::authorizeActuatorSpeechForHomeWakeInput"))
-        val authorize = method("authorizeActuatorSpeechForHomeWakeInput")
+        assertTrue(method("ensureFeedbackActuator").contains("actuatorFactory.create("))
+        assertTrue(method("createSpeechOutputController").contains("speechAllowed = ::authorizeActuatorSpeechForHomeWakeInput"))
+        assertTrue(method("authorizeActuatorSpeechForHomeWakeInput").contains("authorizeNativeFeedbackSpeech(SystemClock.elapsedRealtime(), isScreenReaderActive())"))
+        val authorize = main.substringAfter("internal fun authorizeNativeFeedbackSpeech(").substringBefore("private fun ")
         before(authorize, "if (!navigationSpeechCapabilityAllowed()) return false", "invalidateForegroundHomeWakeInput()")
         before(authorize, "invalidateForegroundHomeWakeInput()", "return true")
         // Both speech submission and progress beep consult the injected Main boundary.
@@ -29,7 +33,12 @@ class MainActivityHomeWakeInputGenerationStaticTest {
     }
 
     @Test fun talkBackAndQueuedInteractionInvalidateBeforeTheyBlockInput() {
-        val talkBack = method("announceForTalkBack")
+        val talkBack = method("recordAcceptedTalkBackAnnouncement")
+        val peers = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/composition/VoiceControllerPeerAdapters.kt").readText()
+        assertTrue(method("createSpeechOutputController").contains("input = SpeechInputPeerAdapter({ voiceInputController }, { voiceInteractionControllers })"))
+        assertTrue(peers.contains("private val input: () -> VoiceInputSessionController"))
+        assertTrue(MainActivityRefactorSource.member(peers, "invalidateHomeWakeInput").contains("input().invalidateForegroundHomeWakeInput()"))
+        assertTrue(method("announceForTalkBack").contains("recordAcceptedTalkBackAnnouncement("))
         listOf(
             "riskAnnouncementHoldUntilMs = nowMs",
             "lastInteractionAnnouncementMs = nowMs",
@@ -37,26 +46,25 @@ class MainActivityHomeWakeInputGenerationStaticTest {
             "navigationAnnouncementHoldUntilMs = nowMs",
         ).forEach { assignment ->
             assertTrue("TalkBack $assignment must invalidate old PCM before holding input",
-                Regex("invalidateForegroundHomeWakeInput\\(\\)\\s+" + Regex.escape(assignment)).containsMatchIn(talkBack))
+                Regex("input\\.invalidateHomeWakeInput\\(\\)\\s+" + Regex.escape(assignment)).containsMatchIn(talkBack))
         }
-        before(method("scheduleTalkBackInteraction"), "invalidateForegroundHomeWakeInput()", "pendingTalkBackInteraction = delivery")
+        before(method("scheduleTalkBackInteraction"), "input.invalidateHomeWakeInput()", "pendingTalkBackInteraction = delivery")
     }
 
     @Test fun acknowledgementCommandGatewayAndRecognitionInvalidateBeforeStarting() {
         before(method("acknowledgeForegroundHomeWake"), "invalidateForegroundHomeWakeInput()", "player.play")
-        before(method("speakCommandResponse"), "invalidateForegroundHomeWakeInput()", "++commandSpeechResponseGeneration")
-        assertTrue(Regex("invalidateForegroundHomeWakeInput\\(\\)\\s+gatewaySpeechPlayer = player").containsMatchIn(main))
-        val starts = Regex("voiceRecognitionActive = true").findAll(main).count()
-        val invalidatedStarts = Regex("invalidateForegroundHomeWakeInput\\(\\)\\s+voiceRecognitionActive = true").findAll(main).count()
+        before(method("speakCommandResponse"), "input.invalidateHomeWakeInput()", "++commandSpeechResponseGeneration")
+        val gateway = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/GatewayVoiceCaptureController.kt").readText()
+        val input = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/VoiceInputSessionController.kt").readText()
+        assertTrue(MainActivityRefactorSource.composition(main, "voiceInputController.gateway").contains("VoiceInputSessionController("))
+        assertTrue(Regex("inputSession.invalidateHomeWakeInput\\(\\)\\s+gatewaySpeechPlayer = player").containsMatchIn(gateway))
+        val starts = Regex("voiceRecognitionActive = true").findAll(input).count()
+        val invalidatedStarts = Regex("wake.invalidateForegroundHomeWakeInput\\(\\)\\s+voiceRecognitionActive = true").findAll(input).count()
         assertTrue("Every actual recognition start must invalidate queued HOME input", starts > 0 && starts == invalidatedStarts)
     }
 
-    private fun method(name: String): String {
-        val start = main.indexOf("    private fun $name(")
-        check(start >= 0) { "Missing Main method $name" }
-        val next = main.indexOf("\n    private ", start + 1).let { if (it < 0) main.length else it }
-        return main.substring(start, next)
-    }
+    private fun method(name: String): String =
+        MainActivityRefactorSource.function(main, "private fun $name(")
 
     private fun before(source: String, first: String, second: String) {
         val firstIndex = source.indexOf(first)

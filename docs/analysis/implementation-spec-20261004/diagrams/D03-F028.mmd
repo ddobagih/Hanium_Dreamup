@@ -1,0 +1,20 @@
+flowchart TD
+ A["F-D03-028 첫 경로 archive / P-D03-028"] --> O{"현재 account와 walk lease가 일치하는가"}
+ O -->|"아니오"| F["false / 저장하지 않음"]
+ O -->|"예"| V{"새 destination provenance 검증 통과인가"}
+ V -->|"아니오"| F
+ V -->|"예"| R["기존 archive 읽기와 유효기간 검사"]
+ R --> C{"유효한 같은 scope archive가 있는가"}
+ C -->|"예"| K["true / 최초 archive 유지 / 덮어쓰지 않음"]
+ C -->|"아니오"| D{"기존 다른 archive를 검증 삭제했거나 저장소가 비었는가"}
+ D -->|"아니오"| F
+ D -->|"예"| T{"시각 TTL overflow 및 monotonic 값 유효인가"}
+ T -->|"아니오"| F
+ T -->|"예"| S["v4 payload AEAD seal / plaintext 지우기"]
+ S --> W{"write 성공과 readback 일치인가"}
+ W -->|"아니오"| F
+ W -->|"예"| K
+ K --> L["Main response IO가 동일 scope load 확인"]
+ L --> M{"현재 response token으로 UI publish 가능한가"}
+ M -->|"예"| Y["F-D03-027에 저장확인 반환 / archive 자체로 route 복원 안 함"]
+ M -->|"아니오"| X["stale callback 폐기 / 다른 owner archive 수정 금지"]

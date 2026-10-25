@@ -6,6 +6,8 @@ import java.util.UUID
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.TimeUnit
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckSnapshot
 import kr.co.hanium.dreamup.walksafe.device.PostLoginDeviceCheckState
@@ -529,6 +531,369 @@ class RawCollectionRuntimeCoordinatorTest {
         assertEquals(1, f.store.readyManifests(OWNER).size)
     }
 
+    @Test fun discardFailureKeepsBothConsentAndWalkRejectionsAsLocalFailure() {
+        for (code in listOf("raw_source_collection_consent_required", "raw_collection_walk_not_uploadable")) {
+            val f = fixture(); prepareUpload(f)
+            f.storage.failDelete = true
+            f.client.httpFailure = 409
+            f.client.errorBody = "{\"detail\":{\"code\":\"$code\"}}"
+            assertEquals(RawCollectionUploadOutcome.LOCAL_READ_FAILED,
+                requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+            assertEquals(1, f.storage.collectionCount)
+            assertTrue(f.client.lastPlaintexts.all { bytes -> bytes.all { it == 0.toByte() } })
+        }
+    }
+
+    @Test fun unexpectedClientFactoryFailureReleasesUploadAndErasesPlaintextForRetry() {
+        val f = fixture(); prepareUpload(f); f.client.factoryFailure = true
+        assertEquals(RawCollectionUploadOutcome.RETRYABLE_FAILURE,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(1, f.storage.collectionCount)
+        assertTrue(f.client.lastPlaintexts.all { bytes -> bytes.all { it == 0.toByte() } })
+        f.client.factoryFailure = false
+        assertNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        f.coordinator.cancelActiveUpload()
+    }
+
+    @Test fun unexpectedLocalDecryptFailureIsLocalFailureAndDoesNotCallTransport() {
+        val f = fixture(); prepareUpload(f); f.aead.throwOnOpen = true
+        assertEquals(RawCollectionUploadOutcome.LOCAL_READ_FAILED,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(0, f.client.calls)
+        assertEquals(1, f.storage.collectionCount)
+    }
+
+    @Test fun retryAfterHoldsOwnerUntilMonotonicDeadlineWithoutDeletingSegment() {
+        var elapsed = NOW_ELAPSED_MS
+        val f = fixture(elapsedClock = { elapsed }); prepareUpload(f)
+        f.client.httpFailure = 429; f.client.retryAfter = "120"
+        assertEquals(RawCollectionUploadOutcome.RETRYABLE_FAILURE,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(120_000L, f.coordinator.nextUploadRetryDelayMs(f.context(WalkSessionState.ENDED)))
+        assertNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        assertEquals(RawReadyStatus.GateBlocked(RawCollectionGateReason.RETRY_DELAY),
+            f.coordinator.uploadStatus(f.context(WalkSessionState.ENDED)))
+        elapsed += 119_999L
+        assertNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        elapsed += 1L; f.client.httpFailure = null
+        assertEquals(1, f.storage.collectionCount)
+        assertEquals(RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+    }
+
+    @Test fun missingOrDifferentSnapshotIdentityCannotCreateRawSegment() {
+        val f = fixture()
+        for (sample in listOf(detectionSample().copy(windowIdentity = null),
+            detectionSample().copy(windowIdentity = RawRuntimeWindowIdentity()))) {
+            assertEquals(RawMetadataCaptureResult.INVALID_WINDOW,
+                f.coordinator.captureMetadataBatch(f.context(WalkSessionState.ACTIVE), sample, performanceSample()))
+        }
+        assertEquals(0, f.storage.collectionCount)
+    }
+
+    @Test fun deletionDeadlineIncludesAStalledTransportCancellationCallback() {
+        val f = fixture(); prepareUpload(f)
+        val entered = CountDownLatch(1); val releaseUpload = CountDownLatch(1)
+        val cancelEntered = CountDownLatch(1); val releaseCancel = CountDownLatch(1)
+        f.client.beforeReturn = { entered.countDown(); check(releaseUpload.await(3L, TimeUnit.SECONDS)) }
+        f.client.onCancel = { cancelEntered.countDown(); check(releaseCancel.await(3L, TimeUnit.SECONDS)) }
+        val call = requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        val worker = Executors.newFixedThreadPool(2)
+        try {
+            val upload = worker.submit<RawCollectionUploadOutcome> { call.execute() }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            val elapsed = AtomicLong()
+            val deletion = worker.submit<Boolean> {
+                val started = System.nanoTime()
+                f.coordinator.onAccountDeleted(timeoutMs = 100L).also { elapsed.set(System.nanoTime() - started) }
+            }
+            assertTrue(cancelEntered.await(350L, TimeUnit.MILLISECONDS))
+            assertFalse(deletion.get(350L, TimeUnit.MILLISECONDS))
+            assertTrue(TimeUnit.NANOSECONDS.toMillis(elapsed.get()) < 350L)
+            println("RAW stalled cancel termination_ms=" + TimeUnit.NANOSECONDS.toMillis(elapsed.get()))
+            assertTrue(call.isCancelled())
+            assertEquals(0, f.storage.purgeCalls)
+            assertTrue(f.client.lastPlaintexts.any { bytes -> bytes.any { it != 0.toByte() } })
+            releaseCancel.countDown(); releaseUpload.countDown()
+            assertEquals(RawCollectionUploadOutcome.CANCELLED, upload.get(2L, TimeUnit.SECONDS))
+            assertTrue(f.client.lastPlaintexts.all { bytes -> bytes.all { it == 0.toByte() } })
+            assertTrue(f.coordinator.onAccountDeleted(timeoutMs = 500L))
+            assertEquals(1, f.storage.purgeCalls)
+        } finally { releaseCancel.countDown(); releaseUpload.countDown(); worker.shutdownNow() }
+    }
+
+    @Test fun uploadTerminationDeadlineDoesNotAcquireHeldCoordinatorMonitorBeforeCancellingSocket() {
+        val f = fixture(); prepareUpload(f)
+        val entered = CountDownLatch(1); val releaseUpload = CountDownLatch(1)
+        val monitorHeld = CountDownLatch(1); val releaseMonitor = CountDownLatch(1)
+        val cancelEntered = CountDownLatch(1)
+        f.client.beforeReturn = { entered.countDown(); check(releaseUpload.await(3L, TimeUnit.SECONDS)) }
+        f.client.onCancel = { cancelEntered.countDown() }
+        val call = requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        val worker = Executors.newFixedThreadPool(3)
+        try {
+            val upload = worker.submit<RawCollectionUploadOutcome> { call.execute() }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            val held = worker.submit { synchronized(f.coordinator) {
+                monitorHeld.countDown(); check(releaseMonitor.await(3L, TimeUnit.SECONDS))
+            } }
+            assertTrue(monitorHeld.await(2L, TimeUnit.SECONDS))
+            val elapsed = AtomicLong()
+            val termination = worker.submit<Boolean> {
+                val started = System.nanoTime()
+                f.coordinator.cancelAndAwaitUploadTermination(100L).also { elapsed.set(System.nanoTime() - started) }
+            }
+            assertTrue(cancelEntered.await(350L, TimeUnit.MILLISECONDS))
+            assertFalse(termination.get(350L, TimeUnit.MILLISECONDS))
+            assertTrue(TimeUnit.NANOSECONDS.toMillis(elapsed.get()) < 350L)
+            println("RAW held monitor termination_ms=" + TimeUnit.NANOSECONDS.toMillis(elapsed.get()))
+            assertTrue(call.isCancelled()); assertEquals(0, f.storage.purgeCalls)
+            releaseMonitor.countDown(); releaseUpload.countDown()
+            held.get(2L, TimeUnit.SECONDS)
+            assertEquals(RawCollectionUploadOutcome.CANCELLED, upload.get(2L, TimeUnit.SECONDS))
+            assertTrue(f.coordinator.cancelAndAwaitUploadTermination(500L))
+        } finally { releaseMonitor.countDown(); releaseUpload.countDown(); worker.shutdownNow() }
+    }
+
+    @Test fun recreatedDeletionDeadlineIncludesMetadataProducerOutsideUploadRegistry() {
+        val f = fixture()
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        f.storage.beforeListing = { entered.countDown(); check(release.await(3L, TimeUnit.SECONDS)) }
+        val worker = Executors.newFixedThreadPool(2)
+        try {
+            val capture = worker.submit<RawMetadataCaptureResult> {
+                f.coordinator.captureMetadataBatch(f.context(WalkSessionState.ACTIVE), detectionSample(), performanceSample())
+            }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            val recreated = RawCollectionRuntimeCoordinator(f.store, RuntimeFakeClient(), UUID::randomUUID,
+                { NOW_ELAPSED_MS }, 30_000L, testOnly = Unit)
+            val elapsed = AtomicLong()
+            val deletion = worker.submit<Boolean> {
+                val started = System.nanoTime()
+                recreated.onAccountDeleted(100L).also { elapsed.set(System.nanoTime() - started) }
+            }
+            assertFalse(deletion.get(350L, TimeUnit.MILLISECONDS))
+            assertTrue(TimeUnit.NANOSECONDS.toMillis(elapsed.get()) < 350L)
+            println("RAW metadata producer termination_ms=" + TimeUnit.NANOSECONDS.toMillis(elapsed.get()))
+            assertEquals(0, f.storage.purgeCalls)
+            release.countDown(); capture.get(2L, TimeUnit.SECONDS)
+            f.storage.beforeListing = null
+            assertTrue(recreated.onAccountDeleted(500L))
+            assertEquals(1, f.storage.purgeCalls)
+            assertEquals(0, f.storage.collectionCount)
+            assertEquals(RawMetadataCaptureResult.GATE_BLOCKED,
+                f.coordinator.captureMetadataBatch(f.context(WalkSessionState.ACTIVE), detectionSample(), performanceSample()))
+        } finally { release.countDown(); worker.shutdownNow() }
+    }
+
+    @Test fun collectedFirstPathOwnerCannotRemoveSurvivingCoordinatorFromProducerRegistry() {
+        val f = fixture()
+        val scopeText = "/isolated/raw-registry-" + UUID.randomUUID()
+        val old = registerFirstPathOwner(f.store, scopeText)
+        val survivingScope = String(scopeText.toCharArray())
+        val surviving = RawCollectionRuntimeCoordinator(f.store, RuntimeFakeClient(), UUID::randomUUID,
+            { NOW_ELAPSED_MS }, 30_000L, testOnly = Unit, processScope = survivingScope)
+        repeat(100) { if (old.first.get() != null) { System.gc(); Thread.sleep(10L) } }
+        assertNull("isolated first coordinator must have been collected for this counterexample", old.first.get())
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        f.storage.beforeListing = { entered.countDown(); check(release.await(3L, TimeUnit.SECONDS)) }
+        val worker = Executors.newFixedThreadPool(2)
+        try {
+            val capture = worker.submit<RawMetadataCaptureResult> {
+                surviving.captureMetadataBatch(f.context(WalkSessionState.ACTIVE), detectionSample(), performanceSample())
+            }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            val latest = RawCollectionRuntimeCoordinator(f.store, RuntimeFakeClient(), UUID::randomUUID,
+                { NOW_ELAPSED_MS }, 30_000L, testOnly = Unit, processScope = String(scopeText.toCharArray()))
+            val deletion = worker.submit<Boolean> { latest.onAccountDeleted(100L) }
+            assertFalse(deletion.get(350L, TimeUnit.MILLISECONDS))
+            assertNotNull("canonical path must remain strongly held while an equal-path owner is alive", old.second.get())
+            assertEquals(0, f.storage.purgeCalls)
+            release.countDown(); capture.get(2L, TimeUnit.SECONDS)
+            f.storage.beforeListing = null
+            assertTrue(latest.onAccountDeleted(500L))
+            assertEquals(0, f.storage.collectionCount)
+        } finally { release.countDown(); worker.shutdownNow() }
+    }
+
+    private fun registerFirstPathOwner(store: RawCollectionStore, scopeText: String):
+        Pair<java.lang.ref.WeakReference<RawCollectionRuntimeCoordinator>, java.lang.ref.WeakReference<String>> {
+        val firstScope = String(scopeText.toCharArray())
+        val first = RawCollectionRuntimeCoordinator(store, RuntimeFakeClient(), UUID::randomUUID,
+            { NOW_ELAPSED_MS }, 30_000L, testOnly = Unit, processScope = firstScope)
+        return java.lang.ref.WeakReference(first) to java.lang.ref.WeakReference(firstScope)
+    }
+
+    @Test fun deletionEnteringDuringResetStorageAckCannotReleaseNewActorAdmission() {
+        val queued = java.util.concurrent.ConcurrentLinkedQueue<Runnable>()
+        var defer = false
+        val control = Executor { if (defer) queued.add(it) else it.run() }
+        val f = fixture(cancellationExecutor = control)
+        assertTrue(f.coordinator.onAccountDeleted(500L))
+        val oldActivity = RawCollectionRuntimeCoordinator(f.store, RuntimeFakeClient(), UUID::randomUUID,
+            { NOW_ELAPSED_MS }, 30_000L, testOnly = Unit, cancellationExecutor = control)
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        f.storage.beforeClearFences = { entered.countDown(); check(release.await(3L, TimeUnit.SECONDS)) }
+        val context = f.context(WalkSessionState.ACTIVE)
+        val newSession = v7Session(actorId = "123e4567-e89b-42d3-a456-426614174009")
+        val newDeviceCheck = context.deviceCheck.copy(actorId = newSession.actorId)
+        val worker = Executors.newSingleThreadExecutor()
+        try {
+            val reset = worker.submit<Boolean> {
+                f.coordinator.resetForNewEnrollment(newSession, context.sessionGeneration, newDeviceCheck)
+            }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS)); defer = true
+            assertFalse(oldActivity.onAccountDeleted(0L))
+            assertEquals(2, queued.size)
+            release.countDown()
+            assertFalse(reset.get(2L, TimeUnit.SECONDS))
+            val freshContext = context.copy(session = newSession, deviceCheck = newDeviceCheck,
+                gatewayWalkLease = requireNotNull(context.gatewayWalkLease).copy(actorId = newSession.actorId))
+            assertEquals(RawMetadataCaptureResult.GATE_BLOCKED,
+                f.coordinator.captureMetadataBatch(freshContext, detectionSample(), performanceSample()))
+            while (true) (queued.poll() ?: break).run()
+            f.storage.beforeClearFences = null; defer = false
+            assertTrue(oldActivity.onAccountDeleted(500L))
+            assertTrue(f.coordinator.resetForNewEnrollment(newSession, context.sessionGeneration, newDeviceCheck))
+            assertEquals(RawMetadataCaptureResult.CAPTURED,
+                f.coordinator.captureMetadataBatch(freshContext, detectionSample(), performanceSample()))
+            assertEquals(1, f.storage.collectionCount)
+        } finally { release.countDown(); worker.shutdownNow(); while (true) (queued.poll() ?: break).run() }
+    }
+
+    @Test fun immediateAdmissionFenceInvalidatesResetStorageAckWithoutQueuingPurge() {
+        val f = fixture()
+        assertTrue(f.coordinator.onAccountDeleted(500L))
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        f.storage.beforeClearFences = { entered.countDown(); check(release.await(3L, TimeUnit.SECONDS)) }
+        val worker = Executors.newFixedThreadPool(2)
+        val context = f.context(WalkSessionState.ACTIVE)
+        try {
+            val reset = worker.submit<Boolean> {
+                f.coordinator.resetForNewEnrollment(requireNotNull(context.session), context.sessionGeneration, context.deviceCheck)
+            }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            worker.submit { f.coordinator.fenceAccountDeletionAdmission() }.get(350L, TimeUnit.MILLISECONDS)
+            assertEquals(1, f.storage.purgeCalls) // fence only; no second purge is queued.
+            release.countDown(); assertFalse(reset.get(2L, TimeUnit.SECONDS))
+            assertEquals(RawMetadataCaptureResult.GATE_BLOCKED,
+                f.coordinator.captureMetadataBatch(context, detectionSample(), performanceSample()))
+            f.storage.beforeClearFences = null
+            assertTrue(f.coordinator.onAccountDeleted(500L))
+        } finally { release.countDown(); worker.shutdownNow() }
+    }
+
+    @Test fun secondActivityCannotResetWhileFirstResetStorageAckIsPending() {
+        val f = fixture()
+        assertTrue(f.coordinator.onAccountDeleted(500L))
+        val other = RawCollectionRuntimeCoordinator(f.store, RuntimeFakeClient(), UUID::randomUUID,
+            { NOW_ELAPSED_MS }, 30_000L, testOnly = Unit)
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        f.storage.beforeClearFences = { entered.countDown(); check(release.await(3L, TimeUnit.SECONDS)) }
+        val worker = Executors.newFixedThreadPool(2)
+        val context = f.context(WalkSessionState.ACTIVE)
+        try {
+            val first = worker.submit<Boolean> {
+                f.coordinator.resetForNewEnrollment(requireNotNull(context.session), context.sessionGeneration, context.deviceCheck)
+            }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            val competing = worker.submit<Boolean> {
+                other.resetForNewEnrollment(requireNotNull(context.session), context.sessionGeneration, context.deviceCheck)
+            }
+            assertFalse(competing.get(350L, TimeUnit.MILLISECONDS))
+            release.countDown(); assertTrue(first.get(2L, TimeUnit.SECONDS))
+            assertEquals(RawMetadataCaptureResult.CAPTURED,
+                f.coordinator.captureMetadataBatch(context, detectionSample(), performanceSample()))
+            assertEquals(1, f.storage.collectionCount)
+        } finally { release.countDown(); worker.shutdownNow() }
+    }
+
+    @Test fun resetEnteringDuringDeletionStorageAckCannotPublishFreshActor() {
+        val f = fixture()
+        val otherActivity = RawCollectionRuntimeCoordinator(f.store, RuntimeFakeClient(), UUID::randomUUID,
+            { NOW_ELAPSED_MS }, 30_000L, testOnly = Unit)
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        f.storage.beforePurge = { entered.countDown(); check(release.await(3L, TimeUnit.SECONDS)) }
+        val worker = Executors.newFixedThreadPool(2)
+        try {
+            val deletion = worker.submit<Boolean> { otherActivity.onAccountDeleted(500L) }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            val context = f.context(WalkSessionState.ACTIVE)
+            val reset = worker.submit<Boolean> {
+                f.coordinator.resetForNewEnrollment(requireNotNull(context.session), context.sessionGeneration, context.deviceCheck)
+            }
+            assertFalse(reset.get(350L, TimeUnit.MILLISECONDS))
+            release.countDown(); assertTrue(deletion.get(2L, TimeUnit.SECONDS))
+        } finally { release.countDown(); worker.shutdownNow() }
+    }
+
+    @Test fun pendingDeletionBarrierCannotRunAfterNewEnrollment() {
+        val queued = java.util.concurrent.ConcurrentLinkedQueue<Runnable>()
+        var defer = false
+        val control = Executor { if (defer) queued.add(it) else it.run() }
+        val f = fixture(cancellationExecutor = control)
+        assertTrue(f.coordinator.onAccountDeleted(500L))
+        defer = true
+        val deferred = RawCollectionRuntimeCoordinator(f.store, RuntimeFakeClient(), UUID::randomUUID,
+            { NOW_ELAPSED_MS }, 30_000L, testOnly = Unit, cancellationExecutor = control)
+        assertFalse(deferred.onAccountDeleted(0L))
+        assertFalse(deferred.onAccountDeleted(0L))
+        assertEquals(2, queued.size) // one barrier per live coordinator; retry joins both.
+        val context = f.context(WalkSessionState.ACTIVE)
+        val newSession = v7Session(actorId = "123e4567-e89b-42d3-a456-426614174009")
+        val newDeviceCheck = context.deviceCheck.copy(actorId = newSession.actorId)
+        assertFalse(deferred.resetForNewEnrollment(newSession, context.sessionGeneration, newDeviceCheck))
+        while (true) (queued.poll() ?: break).run()
+        assertTrue(deferred.resetForNewEnrollment(newSession, context.sessionGeneration, newDeviceCheck))
+        val newContext = context.copy(session = newSession, deviceCheck = newDeviceCheck,
+            gatewayWalkLease = requireNotNull(context.gatewayWalkLease).copy(actorId = newSession.actorId))
+        assertEquals(RawMetadataCaptureResult.CAPTURED,
+            deferred.captureMetadataBatch(newContext, detectionSample(), performanceSample()))
+        assertTrue(queued.isEmpty())
+        assertEquals(1, f.storage.collectionCount)
+        assertEquals(RawSegmentSealResult.SEALED,
+            deferred.sealActiveSegment(newContext.copy(walk = f.context(WalkSessionState.ENDED).walk,
+                gatewayWalkLease = null)))
+        assertEquals(1, f.storage.collectionCount)
+    }
+
+    @Test fun recreatedCoordinatorCannotProveDeletionUntilOldUploadActuallyErasesPlaintext() {
+        val f = fixture(); prepareUpload(f)
+        val entered = CountDownLatch(1); val release = CountDownLatch(1)
+        f.client.beforeReturn = { entered.countDown(); check(release.await(3L, TimeUnit.SECONDS)) }
+        val call = requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        val worker = Executors.newSingleThreadExecutor()
+        try {
+            val result = worker.submit<RawCollectionUploadOutcome> { call.execute() }
+            assertTrue(entered.await(2L, TimeUnit.SECONDS))
+            f.coordinator.cancelActiveUpload()
+            val recreated = RawCollectionRuntimeCoordinator(f.store, RuntimeFakeClient(), UUID::randomUUID,
+                { NOW_ELAPSED_MS }, 30_000L, testOnly = Unit)
+            assertFalse(recreated.onAccountDeleted(timeoutMs = 0L))
+            assertEquals(1, f.storage.collectionCount)
+            assertTrue(f.client.lastPlaintexts.any { bytes -> bytes.any { it != 0.toByte() } })
+            assertNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+            release.countDown()
+            assertEquals(RawCollectionUploadOutcome.CANCELLED, result.get(2L, TimeUnit.SECONDS))
+            assertTrue(f.client.lastPlaintexts.all { bytes -> bytes.all { it == 0.toByte() } })
+            assertTrue(recreated.onAccountDeleted(timeoutMs = 500L))
+            assertEquals(0, f.storage.collectionCount)
+        } finally { release.countDown(); worker.shutdownNow() }
+    }
+
+    @Test fun deletionBeforeExecutionReleasesLeaseWithoutOpeningPlaintextOrNetwork() {
+        val f = fixture(); prepareUpload(f)
+        val call = requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+        assertTrue(f.coordinator.onAccountDeleted(timeoutMs = 500L))
+        assertThrows(CancellationException::class.java) { call.execute() }
+        assertEquals(0, f.client.calls)
+    }
+
+    @Test fun remainingRawCopyPreventsDeletionSuccessEvenWhenDeleteApiReturnsTrue() {
+        val f = fixture(); prepareUpload(f); f.storage.failEmptyVerification = true
+        assertFalse(f.coordinator.onAccountDeleted())
+    }
+
     private fun prepareUpload(f: RuntimeFixture) {
         assertEquals(RawMetadataCaptureResult.CAPTURED,
             f.coordinator.captureMetadataBatch(f.context(WalkSessionState.ACTIVE), detectionSample(), performanceSample()))
@@ -562,18 +927,28 @@ class RawCollectionRuntimeCoordinatorTest {
     private fun fixture(
         storeNowEpochMs: Long = NOW_EPOCH_MS,
         clock: () -> Long = { storeNowEpochMs },
+        elapsedClock: () -> Long = { NOW_ELAPSED_MS },
+        cancellationExecutor: Executor? = null,
     ): RuntimeFixture {
         val storage = RuntimeFakeStorage()
         val aead = RuntimeFakeAead()
         val store = RawCollectionStore(storage, aead, clock, testOnly = Unit)
         val client = RuntimeFakeClient()
-        val coordinator = RawCollectionRuntimeCoordinator(
+        val coordinator = if (cancellationExecutor == null) RawCollectionRuntimeCoordinator(
             store = store,
             client = client,
             idFactory = { UUID.fromString(COLLECTION_ID) },
-            elapsedRealtimeMs = { NOW_ELAPSED_MS },
+            elapsedRealtimeMs = elapsedClock,
             minimumCaptureIntervalMs = 30_000L,
             testOnly = Unit,
+        ) else RawCollectionRuntimeCoordinator(
+            store = store,
+            client = client,
+            idFactory = { UUID.fromString(COLLECTION_ID) },
+            elapsedRealtimeMs = elapsedClock,
+            minimumCaptureIntervalMs = 30_000L,
+            testOnly = Unit,
+            cancellationExecutor = cancellationExecutor,
         )
         val consentSession = IntegratedConsentSession()
         assertTrue(consentSession.accept(confirmation()))
@@ -590,6 +965,7 @@ class RawCollectionRuntimeCoordinatorTest {
     }
 
     private fun detectionSample() = RawDetectionMetadataSample(
+        windowIdentity = RAW_TEST_WINDOW_IDENTITY,
         runtimeIdentity = RawDetectorRuntimeIdentity(
             modelArtifactSha256 = "1".repeat(64),
             runtimeConfigSha256 = "2".repeat(64),
@@ -609,6 +985,7 @@ class RawCollectionRuntimeCoordinatorTest {
     private fun performanceSample(
         thermalThrottled: Boolean? = false,
     ) = RawPerformanceMetadataSample(
+        windowIdentity = RAW_TEST_WINDOW_IDENTITY,
         windowStartedAtEpochMs = NOW_EPOCH_MS - 30_000L,
         capturedAtEpochMs = NOW_EPOCH_MS,
         processedFrameCount = 30,
@@ -617,10 +994,10 @@ class RawCollectionRuntimeCoordinatorTest {
         thermalThrottled = thermalThrottled,
     )
 
-    private fun v7Session(): GatewayFieldSession = GatewayFieldSession.backendAccountDeviceSession(
+    private fun v7Session(actorId: String = ACTOR_ID): GatewayFieldSession = GatewayFieldSession.backendAccountDeviceSession(
         gatewayBaseUrl = "http://127.0.0.1:8081",
         binding = BackendAccountDeviceCookieBinding(
-            actorId = ACTOR_ID,
+            actorId = actorId,
             accountGeneration = 1L,
             authEpoch = 1L,
             deviceId = DEVICE_ID,
@@ -762,7 +1139,11 @@ private fun endedWalkSnapshot(epoch: WalkRuntimeEpoch): WalkSessionSnapshot = Wa
 private class RuntimeFakeClient : RawCollectionNetworkClient {
     var calls = 0
     var beforeReturn: (() -> Unit)? = null
+    var onCancel: (() -> Unit)? = null
     var httpFailure: Int? = null
+    var errorBody = ""
+    var retryAfter: String? = null
+    var factoryFailure = false
     var lastPlaintexts: List<ByteArray> = emptyList()
     var lastPayloadSnapshots: List<ByteArray> = emptyList()
     var lastChunkMetadata: List<RawChunkMetadata> = emptyList()
@@ -780,12 +1161,16 @@ private class RuntimeFakeClient : RawCollectionNetworkClient {
         lastPlaintexts = chunks.map(RawPlaintextChunk::plaintext)
         lastPayloadSnapshots = chunks.map { it.plaintext.copyOf() }
         lastChunkMetadata = chunks.map(RawPlaintextChunk::metadata)
-        return CancellableNetworkCall.blocking {
-            check(isCurrent())
-            beforeReturn?.invoke()
-            httpFailure?.let { throw RawCollectionHttpException(it) }
-            exactRuntimeReceipt(backendManifest)
-        }
+        if (factoryFailure) throw IllegalStateException("controlled client factory failure")
+        return CancellableNetworkCall(
+            executeBlock = {
+                check(isCurrent())
+                beforeReturn?.invoke()
+                httpFailure?.let { throw RawCollectionHttpException(it, errorBody, retryAfter) }
+                exactRuntimeReceipt(backendManifest)
+            },
+            cancelBlock = { onCancel?.invoke() },
+        )
     }
 }
 
@@ -820,6 +1205,11 @@ private class RuntimeFakeStorage : RawCollectionStorage {
     var failChunkOrdinal: Int? = null
     var failDelete = false
     var failListing = false
+    var failEmptyVerification = false
+    var beforeListing: (() -> Unit)? = null
+    var beforeClearFences: (() -> Unit)? = null
+    var beforePurge: (() -> Unit)? = null
+    var purgeCalls = 0
     val activeCollectionId: String?
         get() = activeId
     val collectionCount: Int
@@ -848,6 +1238,7 @@ private class RuntimeFakeStorage : RawCollectionStorage {
     override fun deleteChunk(collectionId: String, ordinal: Int): Boolean =
         chunks.remove(collectionId to ordinal) != null
     override fun listCollectionIds(): Set<String> {
+        beforeListing?.invoke()
         if (failListing) throw RawCollectionStorageReadException("test listing")
         return manifests.keys.toSet()
     }
@@ -858,11 +1249,13 @@ private class RuntimeFakeStorage : RawCollectionStorage {
         return true
     }
     override fun deleteAllCollections(): Boolean {
+        beforePurge?.invoke()
+        purgeCalls += 1
         manifests.clear()
         chunks.clear()
         return true
     }
-    override fun verifiedEmptyAfterAccountPurge(): Boolean = manifests.isEmpty() && chunks.isEmpty()
+    override fun verifiedEmptyAfterAccountPurge(): Boolean = !failEmptyVerification && manifests.isEmpty() && chunks.isEmpty()
     override fun hasFence(name: String): Boolean = name in fences
     override fun readFence(name: String): String? = fences[name]
     override fun writeFenceAtomically(name: String, value: String): Boolean {
@@ -871,12 +1264,14 @@ private class RuntimeFakeStorage : RawCollectionStorage {
     }
     override fun listFenceNames(): Set<String> = fences.keys
     override fun clearAllFences(): Boolean {
+        beforeClearFences?.invoke()
         fences.clear()
         return true
     }
 }
 
 private class RuntimeFakeAead : LocalAead {
+    var throwOnOpen = false
     private val values = mutableMapOf<String, ByteArray>()
     private var ordinal = 0
 
@@ -885,9 +1280,11 @@ private class RuntimeFakeAead : LocalAead {
         values[envelope] = plaintext.copyOf()
         return AeadSealResult.Sealed(envelope)
     }
-    override fun open(envelope: String, domainAad: ByteArray, limits: AeadLimits): AeadOpenResult =
-        values[envelope]?.copyOf()?.let { AeadOpenResult.Opened(it, 1, false) }
+    override fun open(envelope: String, domainAad: ByteArray, limits: AeadLimits): AeadOpenResult {
+        if (throwOnOpen) throw IllegalStateException("controlled decrypt failure")
+        return values[envelope]?.copyOf()?.let { AeadOpenResult.Opened(it, 1, false) }
             ?: AeadOpenResult.Blocked(AeadBlockReason.MALFORMED_ENVELOPE)
+    }
     override fun destroyVersion(version: Int): Boolean = true
     override fun destroyKnownVersions(): Boolean {
         values.clear()
@@ -895,3 +1292,5 @@ private class RuntimeFakeAead : LocalAead {
     }
     override fun createFreshAfterVerifiedPurge(): Boolean = true
 }
+
+private val RAW_TEST_WINDOW_IDENTITY = RawRuntimeWindowIdentity()

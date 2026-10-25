@@ -14,8 +14,12 @@ class AndroidPedestrianMotionTrackerStaticTest {
     fun registersBothAvailableMotionSensorsAndAcceptsPartialAvailability() {
         assertTrue(source.contains("Sensor.TYPE_ACCELEROMETER"))
         assertTrue(source.contains("Sensor.TYPE_GYROSCOPE"))
-        assertTrue(source.contains("accelerometerRegistered = accelerometer?.let"))
-        assertTrue(source.contains("gyroscopeRegistered = gyroscope?.let"))
+        assertTrue(source.contains("accelerometerRegistered = accelerometerAvailable &&"))
+        assertTrue(source.contains("registration.register(listener, Sensor.TYPE_ACCELEROMETER)"))
+        assertTrue(source.contains("gyroscopeRegistered = gyroscopeAvailable &&"))
+        assertTrue(source.contains("registration.register(listener, Sensor.TYPE_GYROSCOPE)"))
+        assertTrue(source.contains("val accelerometerAvailable = registration.hasSensor(Sensor.TYPE_ACCELEROMETER)"))
+        assertTrue(source.contains("val gyroscopeAvailable = registration.hasSensor(Sensor.TYPE_GYROSCOPE)"))
         assertTrue(source.contains("started = accelerometerRegistered || gyroscopeRegistered"))
     }
 
@@ -36,7 +40,7 @@ class AndroidPedestrianMotionTrackerStaticTest {
     fun acceptsCrossSensorReorderingAgainstIndependentHighWatermarks() {
         assertTrue(source.contains("private var lastAccelerometerTimestampNs = NO_TIMESTAMP"))
         assertTrue(source.contains("private var lastGyroscopeTimestampNs = NO_TIMESTAMP"))
-        assertTrue(source.contains("if (!acceptTimestamp(event.sensor.type, timestampNs)) return"))
+        assertTrue(source.contains("if (!acceptTimestamp(sensorType, timestampNs)) return false"))
         assertTrue(source.contains("lastAccelerometerTimestampNs = timestampNs"))
         assertTrue(source.contains("lastGyroscopeTimestampNs = timestampNs"))
         assertFalse(source.contains("private var lastAcceptedTimestampNs"))

@@ -1,7 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.network
 
-import java.net.IDN
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
 import kr.co.hanium.dreamup.walksafe.account.ACCOUNT_CREATE_SCHEMA
@@ -40,6 +40,15 @@ internal class GatewayAccountClient(
 ) {
     private val originGuard = GatewayAccountOriginGuard(approvedReleaseOrigin, allowDebugOrigin)
 
+    fun signupUnavailableOptionalDocuments(gatewayBaseUrl: String): Set<String> {
+        requireApprovedRequestOrigin(gatewayBaseUrl)
+        val response = transport.get(gatewayBaseUrl.trimEnd('/') + "/api/account-signup-policy", emptyMap())
+        if (response.statusCode != 200) throw response.toAccountException("signup_policy_unavailable")
+        val value = response.exactJsonOrNull(setOf("schema_version", "documents"))
+            ?: throw GatewayAccountHttpException(0, "invalid_signup_policy")
+        return kr.co.hanium.dreamup.walksafe.account.SignupPolicyPreflight.unavailableOptional(value)
+    }
+
     fun requestEmailOtp(
         gatewayBaseUrl: String,
         email: String,
@@ -47,19 +56,22 @@ internal class GatewayAccountClient(
         requestId: String,
     ): EmailOtpEnrollmentResponse {
         requireApprovedRequestOrigin(gatewayBaseUrl)
+        val normalizedDateOfBirth = GatewayAccountInputPolicy.normalizedDateOfBirth(dateOfBirth)
+        val canonicalEmail = GatewayAccountInputPolicy.canonicalEmailOrNull(email)
         if (
-            !GatewayAccountInputPolicy.validEmail(email) ||
-            !GatewayAccountInputPolicy.validDateOfBirth(dateOfBirth) ||
+            canonicalEmail == null ||
+            normalizedDateOfBirth == null ||
             !REQUEST_ID.matches(requestId)
         ) throw GatewayAccountHttpException(0, "invalid_account_enrollment_input")
         val body = JSONObject()
             .put("schema_version", EMAIL_ENROLLMENT_SCHEMA)
-            .put("email", email)
-            .put("date_of_birth", dateOfBirth)
+            .put("email", canonicalEmail)
+            .put("date_of_birth", normalizedDateOfBirth)
             .put("request_id", requestId)
         val response = transport.postJson(
             gatewayBaseUrl.trimEnd('/') + "/api/account-enrollments/email-otp",
             body.toString(),
+            totalTimeoutMs = EMAIL_OTP_REQUEST_TOTAL_TIMEOUT_MS,
         )
         if (response.statusCode != 202) throw response.toAccountException("email_otp_request_failed")
         val value = response.exactJsonOrNull(
@@ -91,17 +103,18 @@ internal class GatewayAccountClient(
         otpCode: String,
         password: String,
         selections: SignupConsentSelections,
+        documentVersions: Map<String, String> = SIGNUP_DOCUMENT_VERSIONS,
     ): CreatedEmailAccount {
         requireApprovedRequestOrigin(gatewayBaseUrl)
         if (
             !validEnrollmentHandle(enrollmentHandle) ||
             !OTP.matches(otpCode) ||
             !GatewayAccountInputPolicy.validNewPassword(password) ||
-            !selections.requiredGranted
+            !selections.requiredGranted || documentVersions != SIGNUP_DOCUMENT_VERSIONS
         ) throw GatewayAccountHttpException(0, "invalid_account_create_input")
         val consent = JSONObject()
             .put("schema_version", SIGNUP_CONSENT_SCHEMA)
-            .put("document_versions", JSONObject(SIGNUP_DOCUMENT_VERSIONS))
+            .put("document_versions", JSONObject(documentVersions))
             .put("selections", selections.toWireJson())
         val body = JSONObject()
             .put("schema_version", ACCOUNT_CREATE_SCHEMA)
@@ -157,33 +170,32 @@ internal class GatewayAccountOriginGuard(
 }
 
 internal object GatewayAccountInputPolicy {
-    private val LOCAL =
-        Regex("^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$")
-    private val DOMAIN_LABEL =
-        Regex("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
     private val DATE = DateTimeFormatter.ofPattern("uuuu-MM-dd")
         .withResolverStyle(ResolverStyle.STRICT)
+    private val COMPACT_DATE = Regex("^[0-9]{8}$")
+    private val ISO_DATE = Regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+    private val ACCOUNT_DATE_ZONE = ZoneId.of("Asia/Seoul")
 
-    fun validEmail(value: String): Boolean {
-        if (value != value.trim() || value.length !in 3..254 || value.count { it == '@' } != 1) {
-            return false
-        }
-        val local = value.substringBefore('@')
-        val rawDomain = value.substringAfter('@')
-        if (local.length !in 1..64 || !LOCAL.matches(local) || rawDomain.endsWith('.')) return false
-        val domain = runCatching { IDN.toASCII(rawDomain).lowercase() }.getOrNull() ?: return false
-        val labels = domain.split('.')
-        return domain.length in 1..253 &&
-            local.length + domain.length + 1 <= 254 &&
-            labels.size >= 2 &&
-            labels.all { label ->
-                DOMAIN_LABEL.matches(label) &&
-                    (label.startsWith("xn--") || label.drop(2).take(2) != "--")
-            }
-    }
+    fun validEmail(value: String): Boolean = canonicalEmailOrNull(value) != null
+
+    fun canonicalEmailOrNull(value: String): String? =
+        kr.co.hanium.dreamup.walksafe.security.AccountEmailNormalizer.canonicalOrNull(value)
 
     fun validDateOfBirth(value: String): Boolean =
-        value.length == 10 && runCatching { LocalDate.parse(value, DATE) }.isSuccess
+        normalizedDateOfBirth(value) != null
+
+    fun normalizedDateOfBirth(value: String): String? {
+        val canonical = when {
+            COMPACT_DATE.matches(value) ->
+                "${value.substring(0, 4)}-${value.substring(4, 6)}-${value.substring(6, 8)}"
+            ISO_DATE.matches(value) -> value
+            else -> return null
+        }
+        val date = runCatching { LocalDate.parse(canonical, DATE) }.getOrNull() ?: return null
+        // The server remains authoritative for the minimum age, using the Seoul calendar date.
+        if (date.year < 1 || date.isAfter(LocalDate.now(ACCOUNT_DATE_ZONE))) return null
+        return canonical
+    }
 
     // Login keeps the existing 10..128 range for accounts created before FP-010-DETAIL-02.
     fun validPassword(value: String): Boolean =
@@ -234,3 +246,6 @@ private val BACKEND_ACTOR_ID =
     Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 private val SHA256 = Regex("^[0-9a-f]{64}$")
 private val SAFE_SERVER_CODE = Regex("^[a-z][a-z0-9_]{0,63}$")
+
+// SMTP 30s < Gateway upstream 40s < Gateway adapter 60s < this OTP-only call budget.
+internal const val EMAIL_OTP_REQUEST_TOTAL_TIMEOUT_MS = 70_000L

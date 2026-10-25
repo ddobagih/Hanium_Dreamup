@@ -1,0 +1,1541 @@
+[
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253620_493499076309a072.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      14,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253703_df85c8d797502383.jpg",
+    "selected_for_classes": [
+      4,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253723_65e31d01ca375adc.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253724_aac1eca376b2bc1d.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253742_f49c3cf11b863cc9.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      7,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253774_0cd0bc539aab8ce5.jpg",
+    "selected_for_classes": [
+      4,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253791_0f9c8f6f2b2793cc.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      8,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253824_5b84356c83dba9d2.jpg",
+    "selected_for_classes": [
+      6,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253846_e66cd0ba59856e8f.jpg",
+    "selected_for_classes": [
+      4,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253911_2ed1faadf0cdfe39.jpg",
+    "selected_for_classes": [
+      4,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254477_fb601cfccacfa528.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254522_23a5449ee41d6eec.jpg",
+    "selected_for_classes": [
+      4,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254564_65a8b3bde44f7775.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254598_4c4fe06785813238.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      7,
+      8,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254727_45600a975a817787.jpg",
+    "selected_for_classes": [
+      4,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254900_a351f427c49def6d.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254904_59edf0997801aa27.jpg",
+    "selected_for_classes": [
+      4,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254981_69d36e0ad89036fa.jpg",
+    "selected_for_classes": [
+      4,
+      14,
+      16
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255029_e6451a65af3cef2f.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255246_925258911179d06d.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255363_5dd7da4dd0cd4850.jpg",
+    "selected_for_classes": [
+      4,
+      8,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255450_167dcdaa44a1903b.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      16
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255496_a0c4dd24ff27d043.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255732_b66bd8ac89f80153.jpg",
+    "selected_for_classes": [
+      4,
+      8,
+      10,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255736_025d902063e4f78f.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      10,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256006_7cd76073c4dad334.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      8,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256007_94f7136bdea4f579.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256042_cb5bada9f2e0f767.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256064_0da64ed559808cae.jpg",
+    "selected_for_classes": [
+      5,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256111_76e0cbcfa8138826.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256868_4a9fbbaf9a96fff0.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      7,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256869_1b4a0b0347a1040b.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256871_1151b82ac4b21b48.jpg",
+    "selected_for_classes": [
+      4,
+      7,
+      10,
+      11,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256953_1dc5e8b10eeb0cae.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      8,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256955_0f2698c9c8e43b63.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257005_4faa1c970bd03c63.jpg",
+    "selected_for_classes": [
+      4,
+      8,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257047_215f1708abfc22bc.jpg",
+    "selected_for_classes": [
+      4,
+      7,
+      8,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257055_8e7637aeaf1895e1.jpg",
+    "selected_for_classes": [
+      4,
+      7,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257057_fc5ff349e58dcab0.jpg",
+    "selected_for_classes": [
+      4,
+      7,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257080_185c19a4ea5edc79.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      10,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257179_4ad54609d384adee.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257227_d02350b734f899c2.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      8,
+      11,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257230_60cf372d1aab3608.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      11,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257236_873a69ec6404cd04.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257309_d60c3fd42420dc12.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      8,
+      11,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257439_65cea941290b014c.jpg",
+    "selected_for_classes": [
+      4,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257441_96023158c613b766.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      8,
+      11,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257462_50867825127b29d3.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257463_a69b672d8c0e7221.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257529_f3b2068550da3e21.jpg",
+    "selected_for_classes": [
+      4,
+      8,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257530_78afc13923d3cabd.jpg",
+    "selected_for_classes": [
+      4,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257589_7292a08d30985c75.jpg",
+    "selected_for_classes": [
+      4,
+      7,
+      11,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257609_ea82a3bc3d58bc79.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257664_b98599d3316dc7e3.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      7,
+      11,
+      16,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257670_b9c2df09f7741fa8.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257680_7af30343809ecbe8.jpg",
+    "selected_for_classes": [
+      4,
+      7,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257690_5f580c76cfe74da2.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257763_24bbb4e3c5ec4325.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257768_7a8477e8f1450d36.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257776_986e30b0421fa300.jpg",
+    "selected_for_classes": [
+      4,
+      7,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257875_5c11e653d306b3e1.jpg",
+    "selected_for_classes": [
+      7,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257980_45418ba9630c3aa0.jpg",
+    "selected_for_classes": [
+      4,
+      8,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257996_5ea067a1c0ad6fb1.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258001_a7beacf271e78331.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258007_9226b4f17fe3543e.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258012_16978378e7cee0af.jpg",
+    "selected_for_classes": [
+      4,
+      7,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258128_012bac9ac507ede8.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258130_611310d6d9916b79.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      7,
+      11,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258145_e66f52292ecc8f2e.jpg",
+    "selected_for_classes": [
+      4,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258154_b81cf797cc5283f5.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258160_4777ceb114ebe201.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      8,
+      11,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258228_166fdbf91cf4d135.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      7,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258280_507182776cb94cf0.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258401_58cd55fb04524fde.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      14,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258404_c4217c077fd8190e.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      16
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258406_56bc7f2c655c32d8.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      7,
+      11,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258525_93cfb127b1b22ba5.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258580_fec8aa8003ad74f5.jpg",
+    "selected_for_classes": [
+      4,
+      8,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258604_096e7849d2123d67.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258879_a434ae2ba8bb7065.jpg",
+    "selected_for_classes": [
+      4,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258889_ee237693f8d49055.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_258963_98acb80e27fafecf.jpg",
+    "selected_for_classes": [
+      6,
+      11,
+      16
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259201_a03c33418a36c57a.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259204_19856c5bde1706dd.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259222_735ef71e60948712.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      7,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259238_c4bbe4ca1c27dc16.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259239_873fee4920a38d30.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259241_414a291a4d468965.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259244_6de836fdd5100eea.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259245_d7b3d57b6cd90acd.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259247_c62b3a59fef3972f.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259373_c1c318aa40df44af.jpg",
+    "selected_for_classes": [
+      4,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259438_6483ba74638ec982.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      14,
+      16,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259558_4c7192cc7b6f7256.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259563_5d325745bd90d643.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259564_cb64c9946e55715c.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259587_12faba71c77ab988.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259588_0daef2817f8beb80.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259598_0ad681afb40ad9e2.jpg",
+    "selected_for_classes": [
+      7,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259632_7c4604218b32b5b4.jpg",
+    "selected_for_classes": [
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259708_dcc8d3409bc0a90b.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259723_81fd04233a3c3de4.jpg",
+    "selected_for_classes": [
+      4,
+      11,
+      16,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259870_aa49ea6bcc3341c4.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259871_d3e536000a34dfc0.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259876_e595921d077ff94a.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259884_d5df466bd75fcb83.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260245_c76d9820b549e3b0.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      14,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260252_952cd57e486ab9d9.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260257_72cdf776bc5a4e99.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260258_ee3cc99336a44f6a.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260393_7f361b687ed0115a.jpg",
+    "selected_for_classes": [
+      5,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260400_528daaf5b207db95.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260428_9bc62f934cf35769.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      7,
+      8,
+      11,
+      14,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260474_e9c07e9e7743a5bb.jpg",
+    "selected_for_classes": [
+      4,
+      7,
+      14,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260486_29cbf52307a99344.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260602_1c6d51f2ec91d69f.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      14,
+      16,
+      17,
+      19
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260651_a7aa3fe6bb26e8da.jpg",
+    "selected_for_classes": [
+      4,
+      5,
+      7,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260795_c03a7c6a94e814f7.jpg",
+    "selected_for_classes": [
+      4,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260801_ea7020288b9d09a5.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_260815_3c0451d22b706756.jpg",
+    "selected_for_classes": [
+      6,
+      8,
+      11,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261010_fd4bce2a235650d9.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261011_7688fa02ac25a587.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261012_8a262d5d24657845.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261013_5eb2e4d6591696d8.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261014_91eb768ddf2b6213.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      8,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261040_ee440b0937d7a5a4.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261041_5066cc994a67308d.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261042_5ea61f1d60455fc1.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261043_890dd9d8d3141d90.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261051_45d0514021b48e12.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261052_99f07a90105d36a1.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261053_deca730cb6742a6d.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261054_676080256b0ad0c7.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261055_b10b7ace397da27a.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261056_64ae16c77e4ab1af.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261057_0b31b8fceacdbb83.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261058_0e4f2e786e65b4ac.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261059_83432021bf5ebb85.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261060_7e3587891dcf93dc.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261061_e979ab69eba21396.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261062_9cc3325fc1bba79d.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261063_fddb0101b7137a7c.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261064_117f57d93151727b.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_261095_04aefccc385c1e58.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      15
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_264255_0cf18bddcf8dcd8e.png",
+    "selected_for_classes": [
+      13
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_264380_48ac17f581f6db85.png",
+    "selected_for_classes": [
+      13
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_270679_9ed23428dd98d469.png",
+    "selected_for_classes": [
+      4,
+      5,
+      11,
+      14,
+      16,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_271234_09833f73514e22b2.jpg",
+    "selected_for_classes": [
+      4,
+      6,
+      11,
+      14,
+      17
+    ]
+  },
+  {
+    "image": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_271238_dd5ec310af0600e3.jpg",
+    "selected_for_classes": [
+      6,
+      7,
+      14,
+      16,
+      17,
+      19
+    ]
+  }
+]

@@ -1,0 +1,11 @@
+stateDiagram-v2
+  state "F-D08-055 cache 없음" as S0
+  state "F-D08-055 공유 fetch" as S1
+  state "F-D08-055 유효 snapshot" as S2
+  state "F-D08-055 만료 snapshot" as S3
+  [*] --> S0
+  S0 --> S1: 인증status조회
+  S1 --> S2: 유효단조snapshot저장
+  S2 --> S3: expires이하현재시간
+  S1 --> S2: upstream실패시유효cache
+  S1 --> S0: 유효cache없음

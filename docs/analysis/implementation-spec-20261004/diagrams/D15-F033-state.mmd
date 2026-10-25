@@ -1,0 +1,21 @@
+stateDiagram-v2
+  state "S-D15-033-01 · 전달 기록 없음" as EMPTY
+  state "S-D15-033-02 · SUBMITTED" as SUBMITTED
+  state "S-D15-033-03 · ACKNOWLEDGED" as ACK
+  state "S-D15-033-04 · RESOLVED" as RESOLVED
+  state "S-D15-033-05 · FAILED" as FAILED
+  [*] --> EMPTY
+  EMPTY --> SUBMITTED: 승인된 v2 package의 수동 제출 기록
+  EMPTY --> FAILED: 시도 실패 기록
+  SUBMITTED --> ACK: 같은 제출 package 접수 회신
+  SUBMITTED --> FAILED: 실패 회신
+  ACK --> RESOLVED: 같은 package 처리 회신
+  FAILED --> SUBMITTED: 재시도 기록
+  FAILED --> FAILED: 재시도 실패
+  RESOLVED --> EMPTY: 새 내용·더 높은 package revision의 새 cycle
+  note right of ACK
+    P-D15-033
+    재검토 뒤 늦은 회신도 원래 제출 package에 결속
+    정정된 event는 유효 상태에서 제외
+    revision CAS는 정정 여부와 무관한 최신 기록 기준
+  end note

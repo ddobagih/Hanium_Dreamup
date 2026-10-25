@@ -1,0 +1,22 @@
+flowchart TD
+  title["F-D09-027 · 파일시스템 용량 측정과 단조 버전 발행 / P-D09-027"]
+  N0["파일시스템 identity 검사"]
+  N1["available blocks 용량 측정 및 UTC 시각 생성"]
+  N2["잠금 후 counter 검증"]
+  N3["counter fsync와 version 증가"]
+  N4["publish: used_percent 유효성 및 level 계산"]
+  N5["증가 version, observed_at 비감소 및 유효기간 검증 후 snapshot 발행"]
+  W["다음 interval 대기"]
+  title --> N0 --> N1 --> N2 --> N3 --> N4 --> N5 --> W
+  N4 -.-> LEVEL["정상 level: 70 미만 NORMAL, 70 이상 WARNING, 85 이상 PAUSE, 95 이상 HOLD RAW, 100 이상 HOLD CANDIDATES"]
+  N0 -->|"경로 identity 실패"| FAIL["새 snapshot 미발행; 기존 snapshot의 expiry 불변"]
+  N1 -->|"실측 또는 시각 오류"| FAIL
+  N2 -->|"counter 검증 실패"| FAIL
+  N3 -->|"counter 예약 실패"| FAIL
+  N4 -->|"유효하지 않은 사용률"| FAIL
+  N5 -->|"version 비증가 또는 시각 rollback 등"| FAIL
+  FAIL --> W
+  W -->|"stop 아님"| N0
+  W -->|"shutdown"| END["종료"]
+  title -.-> CANCEL["shutdown은 진행 중 측정 종료를 기다림"]
+  CANCEL -.-> CLEAN["counter descriptor/flock 반환, 실패한 임시 파일 정리"]

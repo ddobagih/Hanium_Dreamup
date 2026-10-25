@@ -1,6 +1,11 @@
 # WalkSafe 21개 분야 기능 개선 실행계획
 
-## 현재 협업 기준 — 2026-09-30 rev119
+사용자 A의 재개 목표·고정189개·단계별 구현·직접검증 진행은 [2026-09-30 A 완료 계획](walksafe-part-a-completion-plan-20260930.md)을 따릅니다. 전체 분담의 시작 상태와 이전 진행 기록은 아래에 보존합니다.
+
+## 분담 시작 기준 — 2026-09-30 rev119
+
+현재 A 실행 결과는 [A 완료 계획](walksafe-part-a-completion-plan-20260930.md)과 최신 daylog를 따른다. rev125 A18DONE·잔여171(PARTIAL112·미정합59)이며, 사용자 요청으로 현재 묶음을 종료하고 후속 실행을 중지했다. 아래 rev119 분담과 과거 Wave 기록은 해당 시점의 이력으로 보존한다.
+
 
 최신 상태·실제 검증·잔여는 [인계 현황](../handoff/2026-09-30/status.md)을 확인한다. 사용자 지시로 진행 중 묶음을 완료하고 중단했으며 시간별 Kiro 인수 자동화도 일시정지했다. 이번 후속 작업은 커밋·푸시·문서 최신화·분담 준비이고 새 기능 개선을 시작하지 않는다.
 
@@ -245,3 +250,14 @@ S11-31은 실제producer의600ms 소프트웨어 경로만 검증했고 원문�
 - Gateway cwd: `/home/ddobagi/Hanium_Dreamup/apps/android-gateway`. Node22.22.1, 설치 TypeScript6.0.3. 배치 담당 한 명이 타입/빌드를 수행하고 동일 출력에서 관련 Node 시험을 실행한다. 필요하면 `/tmp`의 private output에 package 타입·node_modules 해석을 연결해 기존 dist를 보존한다.
 - Backend cwd: `/home/ddobagi/Hanium_Dreamup`. `/home/ddobagi/Hanium_Dreamup/.venv-backend/bin/python -m pytest -p no:cacheprovider -q <대상>`를 사용한다. 해당 환경은 Python3.12.13/pytest8.4.2. 시스템 Python에는 pytest가 없으므로 사용하지 않는다. 기존 conftest의 시험 DB 보호와 임시 업로드 경로를 유지한다.
 - 첫 묶음은 Android 두 정책의 직접 시험, Gateway `backend-session-current-route`와 관련 Backend client 시험, Backend `test_report_storage_runtime_recovery.py`·관련 `test_health_readiness.py`를 대상으로 한다. 구체 클래스/선택식은 현재 파일과 반례에 맞춰 담당자가 확정한다.
+
+
+## 2026-10-01 rev133 현재 진행
+
+- A189 DONE46/PARTIAL98/미정합45·잔여143, 전체942 DONE599/PARTIAL253/미정합78/해당없음12. 새 원문 로컬 완료는 S09-16·S11-34·S13-9이며 S09-38 미정합→PARTIAL은 완료 증가가 아니다.
+- 현재 단계와 실제 시험·남은 범위는 [A 완료 계획](walksafe-part-a-completion-plan-20260930.md) 및 [최근 일지](../../daylog/2026-10-01.md)를 따른다. 최신59c 앱 빌드·기기 시험 소스 컴파일은 성공했으며 설치/기기/현장 미검증과 정식 출시 경계는 유지한다. 기능 개선 Goal은 active이고 Root/경로/인식의 파일 단독 소유를 유지하며 계속 진행한다.
+
+### 2026-10-01 rev135 착수 묶음 종료·새4세션 인계
+
+- 최신 전체942 DONE601/P256/U73/N/A12, 사용자 A189 DONE48/P101/U40·잔여141(총괄46/경로56/인식39), 팀원 B188 보존. 원문 localDONE와 U→P정합4 및 남은 기능을 구분한다.
+- 기존 착수 묶음의 직접 검증·독립 수용·최신 앱/AndroidTest sourcecompile는 완료, 실기기·현장·정식출시는 미검증이다. 최신 요청으로 기존 Goal은 최종 인계 후 paused로 보존하며 새 총괄1+개발3이 원래 DONE 목표를 이어간다. 소유권·실제 상태는 [A 완료 계획](walksafe-part-a-completion-plan-20260930.md)과 [공통 인계](../handoff/2026-10-01/part-a-two-session.md)에서 확인한다.

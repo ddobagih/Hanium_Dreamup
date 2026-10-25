@@ -318,7 +318,12 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
     assert 'export PATH="${LOCKED_NODE_BIN_DIR}:/usr/bin:/bin"' in runner
     assert '/usr/bin/env -i "${npm_environment[@]}" "${LOCKED_NODE_BIN_DIR}/npm" "$@"' in runner
     assert len(re.findall(r"(?m)^\s*run_locked_npm(?:\(\)|\s)", runner)) == 5
-    assert len(re.findall(r"(?m)^\s*run_locked_gateway_npm(?:\(\)|\s)", runner)) == 3
+    assert len(re.findall(r"(?m)^\s*run_locked_gateway_npm(?:\(\)|\s)", runner)) == 4
+    functional_runner = runner[runner.index("run_functional() {") : runner.index("run_integration() {")]
+    assert functional_runner.index("run_locked_gateway_npm run build") < functional_runner.index(
+        "run_python_tests python-functional"
+    )
+    assert 'WALKSAFE_GATEWAY_BUILD_DIR="${REPO_ROOT}/apps/android-gateway/dist"' in functional_runner
     assert len(re.findall(r"(?m)^\s*run_locked_npm_in(?:\(\)|\s)", runner)) == 3
     all_start = runner.index("  all)\n")
     all_dispatch = runner[all_start : runner.index("\n    ;;", all_start)]
@@ -371,12 +376,12 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
     postgres_runtime_acl = "backend/tests/test_admin_runtime_acl_hardening.py"
     assert postgres_runtime_acl not in unit_layer
     assert postgres_runtime_acl in functional_layer
-    assert "./gradlew testDebugUnitTest --no-daemon --rerun-tasks" in runner
+    assert "./gradlew :app:testDebugUnitTest :adminapp:testDebugUnitTest --no-daemon --rerun-tasks" in runner
     run_unit_start = runner.index("run_unit() (")
     run_unit_end = runner.index("\n)\n\nrun_active_session_control", run_unit_start)
     run_unit = runner[run_unit_start:run_unit_end]
     assert run_unit.index('run_python_tests python-unit "${PYTHON_BIN}"') < run_unit.index(
-        "./gradlew testDebugUnitTest"
+        "./gradlew :app:testDebugUnitTest :adminapp:testDebugUnitTest"
     )
     assert (
         'WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-'
@@ -393,7 +398,13 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
         'https://walksafe.invalid}" \\\n'
         '      WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-'
         'https://admin.walksafe.invalid}" \\\n'
-        "      ./gradlew testReleaseUnitTest lintRelease assembleRelease --no-daemon"
+        "      ./gradlew \\\n"
+        "        :app:verifyReleaseBuildConfigIsolation :app:lintRelease :app:assembleRelease \\\n"
+        "        :adminapp:verifyReleaseBuildConfigIsolation :adminapp:lintRelease :adminapp:assembleRelease \\\n"
+        "        -PdevelopmentQuickStart=true -PdevelopmentReportQueue=true \\\n"
+        "        -Pwalksafe.guidanceStartBypass=true -PWALKSAFE_ADMIN_OPERATIONAL_DEBUG=true \\\n"
+        "        -Pwalksafe.expectedDevelopmentQuickStart=false -Pwalksafe.expectedReportQueue=false \\\n"
+        "        -Pwalksafe.expectedGuidanceStartBypass=false --no-daemon"
     )
     assert release_block.count(release_command) == 1
 

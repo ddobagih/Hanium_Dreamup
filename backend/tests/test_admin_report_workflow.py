@@ -252,6 +252,17 @@ class _FakeSession:
         assert self.execute_results, "unexpected database execute"
         return _ScalarResult(self.execute_results.pop(0))
 
+    def scalar(self, statement: object) -> object | None:
+        # The in-memory fixture has visible reports and no account tombstones.
+        # PostgreSQL restore tests exercise the actual correlated predicate.
+        key = statement.compile().params["id_1"]
+        if statement.column_descriptions[0]["name"] == "Report":
+            return self.get(Report, key)
+        if key == REPORT_ID:
+            return None if self.execute_results and self.execute_results[0] is None else key
+        report = self.get_results.get((Report, key))
+        return None if report is None else report.id
+
     def get(
         self,
         model: type[object],
@@ -320,11 +331,17 @@ class _HistorySession:
     def scalars(self, _statement: object) -> _HistoryRowsResult:
         return _HistoryRowsResult(self.rows)
 
+    def scalar(self, _statement: object) -> object | None:
+        return self.report
+
     def get(self, _model: type[object], _key: object) -> object | None:
         return self.report
 
 
 class _UnavailableSession(_FakeSession):
+    def scalar(self, statement: object) -> object | None:
+        return self.execute(statement).scalar_one_or_none()
+
     def execute(self, _statement: object) -> _ScalarResult:
         raise SQLAlchemyError("simulated workflow store failure")
 
@@ -1844,7 +1861,10 @@ def test_review_decision_id_reuse_with_different_intent_report_or_actor_conflict
     existing = _stored_review_decision()
     db = _FakeSession(
         [],
-        get_results={(ReportReviewDecision, DECISION_ID): existing},
+        get_results={
+            (ReportReviewDecision, DECISION_ID): existing,
+            (Report, report_id): Report(id=report_id),
+        },
     )
 
     with pytest.raises(AdminReportWorkflowError) as captured:

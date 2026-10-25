@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-001 · v1 호환 신고 접수<br/>POST /reports"]
+  P["P-D15-001 · 전제조건<br/>FIELD 경로 권한은 D09 미들웨어; privacy subject가 있으면<br/>계정·동의 lock."]
+  E --> P
+  S1["1. actor와 세대, metadata 크기·ReportMetadata 검사"]
+  P --> S1
+  S2["2. 보안 모드 Android source를 거절하고 GPS 누락 거절"]
+  S1 --> S2
+  S3["3. 이미지 원본 방향 검사와 메타데이터 제거"]
+  S2 --> S3
+  S4["4. 스레드에서 privacy lock→내용 멱등 조회→중복 후보 잠금·조회"]
+  S3 --> S4
+  S5["5. 암호화 저장·DB commit 후 CREATED 또는 기존 REPLAYED<br/>응답"]
+  S4 --> S5
+  OK["정상 결과<br/>암호화 저장·DB commit 후 CREATED 또는 기존 REPLAYED 응답"]
+  S5 --> OK
+  B1["조건 · secured &amp;&amp; source=android<br/>결과 · 422 android_provenance_gate_failed; v2 이용"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · GPS 없음<br/>결과 · 422"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · 같은 촬영·사진, 다른 metadata digest<br/>결과 · 409 report_idempotency_conflict"]
+  S3 -. "해당 조건 발생" .-> B3
+  B4["조건 · commit 후 응답 변환 실패<br/>결과 · 503 및 저장된 report_id 반환"]
+  S5 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>known actor의<br/>subject·generation·class·captured_at·정제 이미지<br/>hash로 advisory lock. metadata hash 일치만<br/>REPLAYED.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/api/reports.py:2531 create_report<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

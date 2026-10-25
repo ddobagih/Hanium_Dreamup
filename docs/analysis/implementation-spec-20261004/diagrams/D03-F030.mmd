@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D03-030 경로 설치·현재 진행도·품질 중단 상태"]
+  P["정책 P-D03-030"]
+  A --> P
+  N0["1. 현재 위치의 경로상 진행도를 업데이트하고 근거가 부족하면 움직임 안내를 멈춘다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. providerRouteId 또는 geometry/summary SHA fingerprint 로 route identity 를 만들고 setRoute 마다 revision 을 올린다."]
+  N0 --> N1
+  N2["3. 진행은 가장 멀리 갔던 값이 아닌 이번 accepted alignment 의 현재 위치를 따른다."]
+  N1 --> N2
+  N3["4. HIGH/MEDIUM accepted match 만 정상 진행·도착·이탈 증거; LOW 는 허용된 degraded 경로에서 제한된 설명만 가능하다."]
+  N2 --> N3
+  N4["5. 동일 fix 는 speech 재시도만 허용하며 stale/future/backward/non-new 관측은 연속증거·기존 cue 를 끊는다."]
+  N3 --> N4
+  N5["6. clear 는 route/decision/speech/geometry state 를 함께 무효화한다."]
+  N4 --> N5
+  Z["정상: RouteNavigatorUpdate 반환."]
+  N5 --> Z
+  B0{"Main request inFlight"}
+  R0["기존 route 있더라도 guidance update 반환"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"untrusted 위치"}
+  R1["정상모드 위치재확인/suspension"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"unknown match"}
+  R2["진행 증거 없이 제한 방향참조; 통행 연결 증명 아님"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: 근거부족은 failclosed 이동 안내 보류."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xcancel["취소: clear/setRoute 가 revision 을 변경."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: onPositionEvidenceInterrupted 가 연속증거/cue 무효화."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xcleanup["정리: 경로교체/clear 시 cached alignment·speech·pending 모두 reset."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

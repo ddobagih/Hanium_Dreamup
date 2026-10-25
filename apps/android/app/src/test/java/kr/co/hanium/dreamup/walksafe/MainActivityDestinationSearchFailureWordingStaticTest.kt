@@ -11,8 +11,7 @@ import org.junit.Test
 /** S06-42: destination search failures use search wording with a next step, never route wording. */
 class MainActivityDestinationSearchFailureWordingStaticTest {
     private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-    private val search = source.substringAfter("private fun performDestinationSearch(reset: Boolean)")
-        .substringBefore("private fun isDestinationSearchLeaseCurrent(")
+    private val search = MainActivityRefactorSource.function(source, "private fun performDestinationSearch(reset: Boolean)")
 
     @Test fun searchFailureBranchUsesTheSearchMessageSet() {
         val failureBranch = search.substringAfter("catch (error: Exception)").substringBefore("finally")
@@ -20,7 +19,7 @@ class MainActivityDestinationSearchFailureWordingStaticTest {
         assertTrue(failureBranch.contains("failure.kind.destinationSearchUserMessage"))
         assertFalse(failureBranch.contains("failure.kind.userMessage"))
         assertTrue(failureBranch.contains("destinationSearchLocationMessage = searchFailureMessage"))
-        assertTrue(failureBranch.contains("speakInteraction(searchFailureMessage)"))
+        assertTrue(failureBranch.contains("actions.speak(searchFailureMessage)"))
     }
 
     @Test fun everySearchFailureMessageAvoidsRouteWordingAndNamesANextStep() {

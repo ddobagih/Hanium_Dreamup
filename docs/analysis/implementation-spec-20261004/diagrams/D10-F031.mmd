@@ -1,0 +1,26 @@
+flowchart TD
+  A["F-D10-031 보존 제외 모델 retention 계획·격리 이동"]
+  N0["1. retention-plan은 전체 state verification 후 destructive_action=false와 후보 목록만 반환."]
+  A --> N0
+  N1["2. quarantine은 exact approval·flock 후 최신 후보 재계산. eligible candidate 아니면 거부."]
+  N0 --> N1
+  N2["3. repo-bound source를 model/artifacts/quarantine/<model-id>/<basename>으로 replace; 목적지 기존파일이면 거부."]
+  N1 --> N2
+  N3["4. artifact.original_path 기록, path 변경, stage=quarantined, 시간 갱신 및 registry backup/atomic write. JSON 쓰기 실패하면 파일을 source로 되돌린다."]
+  N2 --> N3
+  B0{"retention retain 누락/true 또는 active/previous 참조"}
+  R0["후보 제외"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"quarantine"}
+  R1["영구 삭제 기능 아님"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"quarantine 실행"}
+  R2["retention-plan과 달리 verify_state/hash를 먼저 재검사하지 않음"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-025"]
+  P -. "코드 분기 기준" .-> A

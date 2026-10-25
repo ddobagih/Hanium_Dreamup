@@ -41,7 +41,7 @@ from backend.app.field_test_security import (
 )
 from backend.app.main import app, settings
 from backend.app.schemas import ReportV2Metadata
-from backend.app.services import duplicates
+from backend.app.services import duplicates, report_application, report_export
 from backend.app.services.report_image_crypto import encrypt_report_image
 from backend.app.services.report_storage import (
     ReportImageCommitMetadata,
@@ -376,15 +376,15 @@ def test_transport_replay_precedes_freshness_but_new_ids_obey_cooldown(
 ) -> None:
     subject = "a" * 64
     prior = object()
-    monkeypatch.setattr(reports, "_privacy_report_binding", lambda **_kwargs: (subject, 1))
-    monkeypatch.setattr(reports, "lock_report_ingest_transaction", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(reports, "_report_transport_replay", lambda *_args, **_kwargs: prior if replay else None)
-    monkeypatch.setattr(reports, "_field_creation_response", lambda value, *, creation_outcome: value)
+    monkeypatch.setattr(report_application, "_privacy_report_binding", lambda **_kwargs: (subject, 1))
+    monkeypatch.setattr(report_application, "lock_report_ingest_transaction", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(report_application, "_report_transport_replay", lambda *_args, **_kwargs: prior if replay else None)
+    monkeypatch.setattr(report_application, "_field_creation_response", lambda value, *, creation_outcome: value)
     gate_calls: list[bool] = []
-    monkeypatch.setattr(reports, "_enforce_secured_auto_report_gate", lambda *_args, **_kwargs: gate_calls.append(True))
-    monkeypatch.setattr(reports, "lock_auto_report_cooldown", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(reports, "find_active_auto_report_cooldown", lambda *_args, **_kwargs: prior)
-    monkeypatch.setattr(reports, "_commit_new_report_with_image", lambda *_args, **_kwargs: pytest.fail("must not store"))
+    monkeypatch.setattr(report_application, "_enforce_secured_auto_report_gate", lambda *_args, **_kwargs: gate_calls.append(True))
+    monkeypatch.setattr(report_application, "lock_auto_report_cooldown", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(report_application, "find_active_auto_report_cooldown", lambda *_args, **_kwargs: prior)
+    monkeypatch.setattr(report_application, "_commit_new_report_with_image", lambda *_args, **_kwargs: pytest.fail("must not store"))
     contract = reports.ReportTransportContract(uuid.uuid4(), "b" * 64, 10)
 
     def persist() -> object:
@@ -907,7 +907,9 @@ def test_s20_12_cooldown_query_keeps_origin_and_existing_bounds(is_fake: bool) -
     parameters = compiled.params
     assert "reports.source = " in sql
     assert sql.count(" OR ") == 3
-    assert ("NOT (" in sql) is (not is_fake)
+    # The account tombstone fence has its own NOT EXISTS. Match the original
+    # source/fake payload group so that fence cannot mask a fake-filter bug.
+    assert ("NOT (reports.source = " in sql) is (not is_fake)
     payload_column = duplicates.Report.payload.property.columns[0]
     assert sql.count(f"{payload_column} @>") == 4
     assert parameters["source_1"] == "fake"
@@ -1012,18 +1014,18 @@ def test_s20_12_persist_passes_origin_without_changing_cooldown_response_order(
         events.append("response")
         return value
 
-    monkeypatch.setattr(reports, "_privacy_report_binding", binding)
+    monkeypatch.setattr(report_application, "_privacy_report_binding", binding)
     monkeypatch.setattr(
-        reports, "lock_report_ingest_transaction",
+        report_application, "lock_report_ingest_transaction",
         lambda *_args, **_kwargs: events.append("privacy_lock"),
     )
-    monkeypatch.setattr(reports, "_report_transport_replay", replay)
-    monkeypatch.setattr(reports, "_enforce_secured_auto_report_gate", gate)
-    monkeypatch.setattr(reports, "lock_auto_report_cooldown", lock)
-    monkeypatch.setattr(reports, "find_active_auto_report_cooldown", query)
-    monkeypatch.setattr(reports, "_field_creation_response", response)
+    monkeypatch.setattr(report_application, "_report_transport_replay", replay)
+    monkeypatch.setattr(report_application, "_enforce_secured_auto_report_gate", gate)
+    monkeypatch.setattr(report_application, "lock_auto_report_cooldown", lock)
+    monkeypatch.setattr(report_application, "find_active_auto_report_cooldown", query)
+    monkeypatch.setattr(report_application, "_field_creation_response", response)
     monkeypatch.setattr(
-        reports, "_commit_new_report_with_image",
+        report_application, "_commit_new_report_with_image",
         lambda *_args, **_kwargs: pytest.fail("replay/cooldown must not create a report"),
     )
     contract = (
@@ -1158,25 +1160,25 @@ def _s20_5_legacy_fixture(monkeypatch: pytest.MonkeyPatch, kind: str) -> SimpleN
         events.append("gate")
         return real_gate(*args, **kwargs)
 
-    monkeypatch.setattr(reports, "_privacy_report_binding", binding)
+    monkeypatch.setattr(report_application, "_privacy_report_binding", binding)
     monkeypatch.setattr(
-        reports, "lock_report_ingest_transaction",
+        report_application, "lock_report_ingest_transaction",
         lambda *_args, **_kwargs: events.append("privacy_lock"),
     )
-    monkeypatch.setattr(reports, "_enforce_secured_auto_report_gate", gate)
+    monkeypatch.setattr(report_application, "_enforce_secured_auto_report_gate", gate)
     monkeypatch.setattr(
-        reports, "lock_auto_report_cooldown",
+        report_application, "lock_auto_report_cooldown",
         lambda *_args, **_kwargs: events.append("cooldown_lock"),
     )
-    monkeypatch.setattr(reports, "find_active_auto_report_cooldown", cooldown_query)
+    monkeypatch.setattr(report_application, "find_active_auto_report_cooldown", cooldown_query)
     monkeypatch.setattr(
-        reports, "lock_duplicate_candidate_window",
+        report_application, "lock_duplicate_candidate_window",
         lambda *_args, **_kwargs: events.append("duplicate_lock"),
     )
-    monkeypatch.setattr(reports, "find_duplicate_candidates", duplicate_query)
-    monkeypatch.setattr(reports, "find_duplicate_candidates_v2", duplicate_query)
-    monkeypatch.setattr(reports, "_commit_new_report_with_image", commit)
-    monkeypatch.setattr(reports, "_field_creation_response", response)
+    monkeypatch.setattr(report_application, "find_duplicate_candidates", duplicate_query)
+    monkeypatch.setattr(report_application, "find_duplicate_candidates_v2", duplicate_query)
+    monkeypatch.setattr(report_application, "_commit_new_report_with_image", commit)
+    monkeypatch.setattr(report_application, "_field_creation_response", response)
 
     def enriched(value):
         if kind == "v1":
@@ -1407,13 +1409,14 @@ def test_s20_5_normalized_equivalent_metadata_is_an_exact_replay(
 @pytest.fixture
 def export_grid_report(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr(
-        reports,
+        report_application,
         "report_to_response",
         lambda report: SimpleNamespace(
             location_quality="high",
             review_flags=["fake_source"] if report.source == "fake" else [],
         ),
     )
+    monkeypatch.setattr(report_export, "report_to_response", report_application.report_to_response)
     return SimpleNamespace(
         id=uuid.UUID("00000000-0000-4000-8000-000000000036"),
         status="new", class_name="damaged_tactile_block", confidence=0.91,
@@ -1803,6 +1806,7 @@ def manifest_export_route(
     orderings: list[tuple[object, ...]] = []
     limits: list[int] = []
     selections: list[object] = []
+    closed: list[object] = []
     records = [export_grid_report]
     statement = SimpleNamespace()
 
@@ -1816,22 +1820,34 @@ def manifest_export_route(
 
     statement.order_by = order_by
     statement.limit = limit
-    statement.with_only_columns = lambda *_columns: statement
-    statement.execution_options = lambda **_options: statement
+    def with_only_columns(*columns: object) -> SimpleNamespace:
+        assert str(columns[-1]).startswith("CASE WHEN")
+        assert columns[-1].name == "payload"
+        return statement
+
+    def execution_options(**options: object) -> SimpleNamespace:
+        assert options == {"yield_per": 1}
+        return statement
+
+    statement.with_only_columns = with_only_columns
+    statement.execution_options = execution_options
 
     def query(**kwargs: object) -> SimpleNamespace:
         queries.append(kwargs)
         return statement
 
-    def scalar_rows(selected: object) -> SimpleNamespace:
+    def execute_rows(selected: object) -> SimpleNamespace:
         assert selected is statement
         selections.append(selected)
-        return SimpleNamespace(all=lambda: list(records))
+        return SimpleNamespace(
+            mappings=lambda: (vars(record) for record in records),
+            close=lambda: closed.append(selected),
+        )
 
     monkeypatch.setattr(settings, "field_test_security_enabled", False)
-    monkeypatch.setattr(reports, "_reauthorize_admin_high_risk_in_transaction", lambda *_args: None)
-    monkeypatch.setattr(reports, "_filtered_reports_statement", query)
-    monkeypatch.setattr(reports, "_persist_export_audit", lambda _db, **kwargs: audits.append(kwargs))
+    monkeypatch.setattr(report_export, "_reauthorize_admin_high_risk_in_transaction", lambda *_args: None)
+    monkeypatch.setattr(report_export, "_filtered_reports_statement", query)
+    monkeypatch.setattr(report_export, "_persist_export_audit", lambda _db, **kwargs: audits.append(kwargs))
     endpoint = next(
         route.endpoint for route in app.routes
         if getattr(route, "path", None) == "/reports/export" and "GET" in route.methods
@@ -1839,7 +1855,7 @@ def manifest_export_route(
 
     def invoke(**overrides: object):
         arguments = {
-            "request": SimpleNamespace(), "db": SimpleNamespace(scalars=scalar_rows),
+            "request": SimpleNamespace(), "db": SimpleNamespace(execute=execute_rows),
             "format": "json", "status": None, "class_name": None, "source": None,
             "demo_filter": "all", "model_key": None, "trigger": None,
             "auto_reported": None, "performance_excluded": None,
@@ -1850,7 +1866,10 @@ def manifest_export_route(
             "requested_audit_id": None, "x_walksafe_actor_id": "fixture.reader@example.com",
         }
         arguments.update(overrides)
-        return endpoint(**arguments)
+        try:
+            return endpoint(**arguments)
+        finally:
+            assert len(closed) == len(selections)
 
     return SimpleNamespace(
         call=invoke, queries=queries, audits=audits, orderings=orderings,

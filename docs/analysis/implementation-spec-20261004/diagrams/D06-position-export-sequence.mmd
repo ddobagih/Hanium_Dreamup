@@ -1,0 +1,35 @@
+sequenceDiagram
+  participant U as DEBUG 사용자
+  participant M as MainActivity
+  participant R as PositionFieldSessionRecorder
+  participant A as 현재 actor·walk·Gateway 권한
+  participant F as SAF 선택창
+  participant O as 목적지 OutputStream
+  U->>M: F-D06-032 최근 완료 기록 내보내기
+  M->>A: GENERAL VERIFIED·scope·actor·generation·walk
+  A-->>M: captured authority
+  M->>R: same binding 최신 COMPLETED
+  M->>F: ACTION_CREATE_DOCUMENT
+  Note over M,F: 외부 선택창 동안 계정·보행 변경 가능
+  F-->>M: 결과 URI 또는 취소
+  M->>M: pending 단회 소비
+  M->>A: 현재 authority 재조회
+  alt authority와 generation 정확 일치
+    M->>R: export sessionId + binding
+    R->>R: 모든 AEAD record·seq·time·count 검증
+    alt 원본 완전
+      R->>O: header·records·count/SHA footer
+      O-->>R: write 결과
+      R-->>M: EXPORTED 또는 DESTINATION_WRITE_FAILED
+    else 원본 손상/미완료
+      R-->>M: CORRUPT_SOURCE 또는 NOT_COMPLETED
+    end
+  else 취소·stale 권한
+    M->>M: export 거부
+  end
+  opt 부분출력 또는 stale URI 정리 필요
+    M->>O: delete 또는 0바이트 truncate
+    alt 둘 다 실패
+      M-->>U: 정확 위치가 파일에 남을 수 있음
+    end
+  end

@@ -10,35 +10,27 @@ class MainActivityRouteSnapshotEndedWalkStaticTest {
 
     @Test
     fun firstRouteSaveReplacesOnlyAfterTheCurrentWalkLeaseIsRechecked() {
-        val request = functionBlock("private fun requestRoute(")
-        val save = request.indexOf("routeSnapshotStore.saveFirstRoute(")
-        val call = request.substring(save, request.indexOf(")", save) + 1)
-        val uiCommit = request.lastIndexOf("runOnUiThread {", save)
-        val lease = request.indexOf(
-            "routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)", uiCommit,
-        )
-
-        assertTrue(call.contains("scope = scope"))
+        MainActivityRefactorSource.composition(source, "routeAcquisitionController")
+        MainActivityRefactorSource.composition(source, "routeArchiveController")
+        val acquisition = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/RouteAcquisitionController.kt").readText()
+        val archive = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/RouteArchiveController.kt").readText()
+        val request = MainActivityRefactorSource.member(acquisition, "requestRoute", 1)
+        val admission = ReportStaticSourceInspector.blockAfter(request, "fun storageAdmissionCurrent()")
         assertTrue(request.contains("RouteSnapshotScope(owner, expectedWalkEpoch.walkSessionId)"))
-        assertTrue(request.contains("if (routeSnapshotWalkScope != scope) return@runCatching null"))
-        assertTrue(uiCommit >= 0 && lease in uiCommit until save)
-        assertTrue(request.indexOf("isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId)") in 0 until save)
-    }
-
-    private fun functionBlock(marker: String): String {
-        val markerIndex = source.indexOf(marker)
-        require(markerIndex >= 0) { "missing function marker: $marker" }
-        val openingBrace = source.indexOf('{', markerIndex + marker.length)
-        var depth = 0
-        for (index in openingBrace until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(markerIndex, index + 1)
-                }
-            }
-        }
-        error("missing closing brace: $marker")
+        assertTrue(request.contains("archive.walkScope != scope"))
+        assertTrue(admission.contains("lifecycleOwner.isRuntimeEpochCurrent(expectedWalkEpoch)"))
+        assertTrue(admission.contains("routeRequestGeneration == requestId"))
+        assertTrue(admission.contains("isCurrentRouteRequest()"))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(request,
+            "isRouteRequestLeaseCurrent(expectedWalkEpoch, requestId)", "routeCall.execute()",
+            "postToUi {", "routeResponseInstallLeaseCurrent(requestId, ::isCurrentRouteRequest)",
+            "archive.submitRouteSnapshotResponseStorage(lane, lease,", "::storageAdmissionCurrent, scope, route, destination"))
+        val submission = MainActivityRefactorSource.member(archive, "submitRouteSnapshotResponseStorage")
+        assertTrue(submission.contains("lane.submit<StoredRouteSnapshot?>(lease, null, current)"))
+        assertTrue(submission.contains("routeSnapshotResponseArchive(store, scope, captured, destination, provenance)"))
+        val save = MainActivityRefactorSource.member(archive, "routeSnapshotResponseArchive")
+        assertTrue(save.contains("store.saveFirstRoute(scope = scope, route = route, destination = destination"))
+        assertTrue(save.contains("if (!saved) null else store.load(scope, nowEpochMs = nowEpochMs)"))
+        assertTrue(save.contains("it.walkSessionId == scope.walkSessionId"))
     }
 }

@@ -1,0 +1,295 @@
+{
+  "checked_at": "2026-10-04T02:50:08.366Z",
+  "page_count": 47,
+  "pages": [
+    {
+      "file": "index.html",
+      "horizontal_overflow": false,
+      "images": 1,
+      "broken_images": []
+    },
+    {
+      "file": "00-baseline.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "01-repository-map.html",
+      "horizontal_overflow": false,
+      "images": 1,
+      "broken_images": []
+    },
+    {
+      "file": "02-features.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "03-policies.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "04-traceability.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "05-scenarios.html",
+      "horizontal_overflow": false,
+      "images": 7,
+      "broken_images": []
+    },
+    {
+      "file": "06-concurrency.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "07-review-items.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "08-review.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "09-inventory.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D01.html",
+      "horizontal_overflow": false,
+      "images": 67,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D02.html",
+      "horizontal_overflow": false,
+      "images": 51,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D03.html",
+      "horizontal_overflow": false,
+      "images": 53,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D04.html",
+      "horizontal_overflow": false,
+      "images": 131,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D05.html",
+      "horizontal_overflow": false,
+      "images": 41,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D06.html",
+      "horizontal_overflow": false,
+      "images": 51,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D07.html",
+      "horizontal_overflow": false,
+      "images": 39,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D08.html",
+      "horizontal_overflow": false,
+      "images": 83,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D09.html",
+      "horizontal_overflow": false,
+      "images": 47,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D10.html",
+      "horizontal_overflow": false,
+      "images": 45,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D11.html",
+      "horizontal_overflow": false,
+      "images": 49,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D12.html",
+      "horizontal_overflow": false,
+      "images": 54,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D13.html",
+      "horizontal_overflow": false,
+      "images": 59,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D14.html",
+      "horizontal_overflow": false,
+      "images": 42,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D15.html",
+      "horizontal_overflow": false,
+      "images": 82,
+      "broken_images": []
+    },
+    {
+      "file": "domains/D16.html",
+      "horizontal_overflow": false,
+      "images": 19,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D01-by-D12.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D02-by-D06.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D03-by-D04.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D04-by-D03.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D04-debug-by-D11.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D05-by-D07.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D06-by-D02.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D07-by-D05.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D08-by-D14.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D09-by-D08.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D10-by-D09.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D11-by-D10.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D12-by-D01.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D13-by-D11.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D14-by-D15.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D15-by-D13.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/D16-by-baseline.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/scenarios-01-03-by-baseline.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "reviews/scenarios-04-07-by-D10.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    },
+    {
+      "file": "gallery.html",
+      "horizontal_overflow": false,
+      "images": 0,
+      "broken_images": []
+    }
+  ],
+  "svg_image_decode_count": 766,
+  "svg_image_decode_failures": [],
+  "ui_checks": [
+    "feature ID search -> 1 card",
+    "D12 domain filter -> 45 cards"
+  ],
+  "errors": []
+}

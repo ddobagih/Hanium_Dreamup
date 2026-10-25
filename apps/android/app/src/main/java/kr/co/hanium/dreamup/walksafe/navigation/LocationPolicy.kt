@@ -1,5 +1,9 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.LocalGeodesy
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.HorizontalUncertaintyKind
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.PositionMaxAxisSigmaM
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.ReportedAccuracyRadius68M
 // Validates fresh, accurate fixes and bounds route-distance calculations.
 
 import kotlin.math.atan2
@@ -13,7 +17,20 @@ data class TrustedLocation(
     val longitude: Double,
     val accuracyM: Float,
     val elapsedRealtimeMs: Long,
-)
+    val uncertaintyKind: HorizontalUncertaintyKind = HorizontalUncertaintyKind.LEGACY_UNSPECIFIED,
+    /** Route planning/reference only; never precise progress, arrival, or calibration evidence. */
+    val navigationOnly: Boolean = false,
+) {
+    val reportedAccuracyRadius68M: ReportedAccuracyRadius68M?
+        get() = accuracyM.takeIf {
+            uncertaintyKind == HorizontalUncertaintyKind.ANDROID_RADIUS_68 && it.isFinite() && it >= 0f
+        }?.let { ReportedAccuracyRadius68M(it.toDouble()) }
+
+    val positionMaxAxisSigmaM: PositionMaxAxisSigmaM?
+        get() = accuracyM.takeIf {
+            uncertaintyKind == HorizontalUncertaintyKind.FILTER_MAX_AXIS_SIGMA && it.isFinite() && it >= 0f
+        }?.let { PositionMaxAxisSigmaM(it.toDouble()) }
+}
 
 data class LocationTrustConfig(
     val maxAccuracyM: Float = 15f,
@@ -66,9 +83,9 @@ fun haversineMeters(
     lat2: Double,
     lon2: Double,
 ): Double {
-    val earthRadiusM = 6_371_000.0
+    val earthRadiusM = LocalGeodesy.EARTH_RADIUS_M
     val dLat = Math.toRadians(lat2 - lat1)
-    val dLon = Math.toRadians(lon2 - lon1)
+    val dLon = Math.toRadians(LocalGeodesy.wrapLongitudeDegrees(lon2 - lon1))
     val rLat1 = Math.toRadians(lat1)
     val rLat2 = Math.toRadians(lat2)
     val a = sin(dLat / 2).pow(2) + cos(rLat1) * cos(rLat2) * sin(dLon / 2).pow(2)
@@ -83,7 +100,7 @@ fun bearingDegrees(
 ): Float {
     val fromLatRad = Math.toRadians(fromLat)
     val toLatRad = Math.toRadians(toLat)
-    val deltaLon = Math.toRadians(toLon - fromLon)
+    val deltaLon = Math.toRadians(LocalGeodesy.wrapLongitudeDegrees(toLon - fromLon))
     val x = kotlin.math.sin(deltaLon) * kotlin.math.cos(toLatRad)
     val y = kotlin.math.cos(fromLatRad) * kotlin.math.sin(toLatRad) -
         kotlin.math.sin(fromLatRad) * kotlin.math.cos(toLatRad) * kotlin.math.cos(deltaLon)

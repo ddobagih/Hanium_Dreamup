@@ -14,6 +14,7 @@ import kr.co.hanium.dreamup.walksafe.security.AeadOpenResult
 import kr.co.hanium.dreamup.walksafe.security.AeadSealResult
 import kr.co.hanium.dreamup.walksafe.security.LocalAead
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionState
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -22,6 +23,57 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ReportQueueDrainCoordinatorTest {
+    @Test fun responseLossKeepsExactPayloadAndReturnsTypedUnconfirmedWithPersistentBackoff() {
+        val f = fixture()
+        var observed: QueuedReport? = null
+        val transport = object : ReportQueueTransport {
+            override fun statusCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt?> {
+                observed = report
+                return CancellableNetworkCall.blocking { throw java.io.IOException("response lost") }
+            }
+            override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> = error("must query status first")
+        }
+        val result = requireNotNull(f.coordinator.startNextWithResult({ context() }, transport)).execute()
+        assertEquals(ReportQueueDrainOutcome.RECEIPT_UNCONFIRMED, result.outcome)
+        val retained = f.store.queuedReports().single()
+        retained.use {
+            assertEquals(f.report.payload.payloadSha256, it.payload.payloadSha256)
+            assertTrue(it.retryNotBeforeEpochMs > it.createdAtEpochMs)
+            assertEquals(1, it.retryAttempts)
+        }
+        assertNull(f.store.nextForRecoveryDrain(ACTOR_ID))
+        assertThrows(IllegalStateException::class.java) { requireNotNull(observed).payload.imageJpeg() }
+    }
+
+    @Test fun previousCoordinatorMustFinishPlaintextFinallyBeforeDeletionEvidence() {
+        val f = fixture()
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val finish = java.util.concurrent.CountDownLatch(1)
+        var observed: QueuedReport? = null
+        val transport = object : ReportQueueTransport {
+            override fun statusCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt?> {
+                observed = report
+                return CancellableNetworkCall.blocking { entered.countDown(); finish.await(); null }
+            }
+            override fun uploadCall(report: QueuedReport): CancellableNetworkCall<ReportQueueReceipt> = error("cancelled")
+        }
+        val call = requireNotNull(f.coordinator.startNextWithResult({ context() }, transport))
+        val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
+        val task = worker.submit<ReportQueueDrainResult> { call.execute() }
+        val replacement = ReportQueueDrainCoordinator(f.store)
+        try {
+            assertTrue(entered.await(2L, java.util.concurrent.TimeUnit.SECONDS))
+            assertFalse(replacement.cancelAndAwaitDrainTermination(1L))
+            assertEquals(1, f.store.queuedReports().size)
+            assertNotNull(requireNotNull(observed).payload.imageJpeg())
+            finish.countDown()
+            assertEquals(ReportQueueDrainOutcome.CANCELLED, task.get(2L, java.util.concurrent.TimeUnit.SECONDS).outcome)
+            assertThrows(IllegalStateException::class.java) { requireNotNull(observed).payload.imageJpeg() }
+            assertTrue(replacement.onAccountDeleted())
+            assertTrue(f.store.queuedReports().isEmpty())
+        } finally { finish.countDown(); worker.shutdownNow(); replacement.onAccountDeleted() }
+    }
+
     @Test
     fun createdAndReplayedReturnDistinctMetadataOnlyAfterReceiptCommitAndDelete() {
         listOf(ReportCreationOutcome.CREATED, ReportCreationOutcome.REPLAYED, null).forEach { creation ->
@@ -344,7 +396,7 @@ class ReportQueueDrainCoordinatorTest {
             fixture.coordinator.startNext({ context() }, transport),
         ).execute()
 
-        assertEquals(ReportQueueDrainOutcome.RECEIPT_REJECTED, outcome)
+        assertEquals(ReportQueueDrainOutcome.RECEIPT_UNCONFIRMED, outcome)
         assertEquals(0, postCalls)
         assertEquals(1, fixture.store.queuedReports().size)
     }
@@ -747,6 +799,13 @@ private class CoordinatorStorage : ReportQueueStorage {
         override fun delete(reportId: String): Boolean = this@CoordinatorStorage.delete(reportId)
         override fun hasFence(name: String): Boolean = this@CoordinatorStorage.hasFence(name)
         override fun measureUsage(): ReportQueueStorageUsage = this@CoordinatorStorage.measureUsage()
+        override fun replace(reportId: String, envelope: String, storedEntryByteLimit: Long, storedByteLimit: Long): Boolean {
+            val previous = values[reportId] ?: return false
+            val size = envelope.toByteArray().size.toLong()
+            if (size > storedEntryByteLimit || measureUsage().totalBytes - previous.toByteArray().size + size > storedByteLimit) return false
+            values[reportId] = envelope
+            return true
+        }
     }
     override fun listReportIds(): Set<String> = values.keys
     override fun read(reportId: String): String? = values[reportId]

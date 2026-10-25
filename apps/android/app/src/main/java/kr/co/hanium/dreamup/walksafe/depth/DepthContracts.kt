@@ -189,6 +189,9 @@ data class PredictedDepthEstimate(
     val rangeUpperBoundM: Float? = null,
 )
 
+/** Missing passage/extent/error evidence is unknown, never collision-free or safe. */
+enum class CollisionAssessment { UNKNOWN }
+
 data class TrackedObjectDepth(
     val frameId: Long,
     val timestampMs: Long,
@@ -213,6 +216,7 @@ data class TrackedObjectDepth(
     val trend: Trend,
     val approachScore: Float,
     val approachSpeedMps: Float?,
+    /** Compatibility backing slot for [approachTimeMs]; not a physical collision countdown. */
     val timeToCollisionMs: Long?,
     val confidence: DepthConfidenceBreakdown,
     val userFacing: UserFacingDepth,
@@ -228,7 +232,7 @@ data class TrackedObjectDepth(
     val depthAvailability: DepthAvailability = if (source.metric && riskDistanceM != null) {
         DepthAvailability.MEASURED
     } else DepthAvailability.UNAVAILABLE,
-    /** Original independent depth capture in the camera's millisecond clock, when known. */
+    /** Original independent depth capture in the output's AR Frame millisecond clock, when known. */
     val depthObservedAtMs: Long? = null,
     val prediction: PredictedDepthEstimate? = null,
     /** Source lease in the output clock, not the camera timestamp or the processing time. */
@@ -255,7 +259,44 @@ data class TrackedObjectDepth(
      * apart from [depthObservedAtMs]. Null when no metric source was used.
      */
     val depthReprojected: Boolean? = null,
+    /** Original source observation translated at capture into the elapsed-realtime clock. */
+    val sourceObservedAtElapsedRealtimeMs: Long? = null,
+    /** The producer's actual age budget for [sourceObservedAtElapsedRealtimeMs]. */
+    val sourceMaxAgeMs: Long? = null,
 ) {
+    /** Original numeric approach time, with the original capture/lease and retirement behavior. */
+    val approachTimeMs: Long? get() = timeToCollisionMs
+    /** No producer currently supplies synchronized passage, whole-object extent and error bounds. */
+    val collisionAssessment: CollisionAssessment get() = CollisionAssessment.UNKNOWN
+    /** Captured point CPA only; it neither establishes passage overlap nor changes risk level. */
+    val pointClosestApproach: PointClosestApproach?
+        get() = motionEstimate.pointClosestApproach?.takeIf {
+            val publication = it.publication ?: return@takeIf false
+            source == it.source && depthAvailability == DepthAvailability.MEASURED &&
+                !spatialCoverageLimited && depthReprojected == false &&
+                depthObservedAtMs == timestampMs && it.observedAtMs == timestampMs &&
+                frameId == publication.frameId &&
+                sourceObservedAtElapsedRealtimeMs == publication.sourceObservedAtElapsedRealtimeMs &&
+                sourceValidUntilElapsedRealtimeMs == publication.sourceValidUntilElapsedRealtimeMs &&
+                sourceMaxAgeMs == publication.sourceMaxAgeMs
+        }
+
+    /** Uses the original published elapsed lease/age; never renews or converts the CPA clock. */
+    fun pointClosestApproachAt(nowElapsedRealtimeMs: Long): PointClosestApproach? =
+        pointClosestApproach?.takeIf {
+            val observed = sourceObservedAtElapsedRealtimeMs ?: return@takeIf false
+            val until = sourceValidUntilElapsedRealtimeMs ?: return@takeIf false
+            val age = sourceMaxAgeMs ?: return@takeIf false
+            nowElapsedRealtimeMs in observed..until && nowElapsedRealtimeMs - observed <= age
+        }
+
+    /** Binds only the lease already calculated by the actual runtime publication path. */
+    internal fun bindPointClosestApproachPublication(): TrackedObjectDepth {
+        val bound = motionEstimate.bindPointClosestApproachPublication(frameId,
+            sourceObservedAtElapsedRealtimeMs, sourceValidUntilElapsedRealtimeMs, sourceMaxAgeMs)
+        return if (bound === motionEstimate) this else copy(motionEstimate = bound)
+    }
+
     val uprightBottomContactNorm: Point2?
         get() = bottomContactNorm?.let { sensorPointToUpright(it, imageQuarterTurns) }
 }

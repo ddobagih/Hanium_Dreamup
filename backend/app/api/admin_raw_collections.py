@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 from datetime import datetime
 from typing import Literal
 import uuid
@@ -10,9 +12,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from backend.app.api.admin_reports import (
-    _require_admin_report_action_context,
-    _require_admin_report_read_context,
+from backend.app.api.admin_context import (
+    require_admin_action_context as _require_admin_report_action_context,
+    require_admin_read_context as _require_admin_report_read_context,
 )
 from backend.app.database import get_db
 from backend.app.models import (
@@ -33,6 +35,12 @@ from backend.app.services.raw_collection_lifecycle import (
     RawCollectionLifecycleError,
     record_legal_hold,
     record_purpose_decision,
+)
+from backend.app.services.admin_security import (
+    AdminSecurityError,
+    authorize_admin_protected_work,
+    load_admin_credential_issuer_key_for_settings,
+    record_admin_security_denial,
 )
 
 
@@ -61,6 +69,68 @@ def _identity(request: Request, *, action: str | None) -> LifecycleAdminIdentity
     )
 
 
+def _reauthorize_mutation(
+    request: Request,
+    db: Session,
+    identity: LifecycleAdminIdentity,
+    *,
+    action: str,
+) -> None:
+    """Keep the existing administrator control fence until the RAW commit.
+
+    Middleware already consumed the action nonce and verified the device proof.
+    Only current authority is rechecked here, before any collection row lock.
+    """
+    settings = request.app.state.runtime.settings
+    scheme, separator, token = request.headers.get("authorization", "").strip().partition(" ")
+    if not separator or scheme.lower() != "bearer":
+        token = ""
+    try:
+        current = authorize_admin_protected_work(
+            db,
+            token.strip(),
+            action,
+            method=request.method,
+            path=request.url.path,
+            runtime_totp_secret=settings.admin_totp_secret,
+            credential_issuer_key=load_admin_credential_issuer_key_for_settings(settings),
+            device_id=request.headers.get("x-walksafe-device-id"),
+            app_kind=request.headers.get("x-walksafe-app-kind"),
+            role=request.headers.get("x-walksafe-role"),
+            audience=request.headers.get("x-walksafe-audience"),
+        )
+        if (current.admin_id, current.session_id, current.device_id) != (
+            identity.admin_id, identity.session_id, identity.device_id
+        ):
+            raise AdminSecurityError(
+                "admin_session_invalid",
+                "The administrator session no longer matches the verified proof.",
+                status_code=401,
+            )
+    except AdminSecurityError as exc:
+        # Release the protected transaction before writing an independent audit.
+        db.rollback()
+        response_error = exc
+        try:
+            record_admin_security_denial(
+                action=action,
+                reason=exc.code,
+                method=request.method,
+                path=request.url.path,
+                device_id=identity.device_id,
+            )
+        except AdminSecurityError as audit_exc:
+            response_error = audit_exc
+        raise HTTPException(
+            status_code=response_error.status_code,
+            detail={"code": response_error.code, "message": response_error.message},
+            headers=(
+                {"Retry-After": str(response_error.retry_after)}
+                if response_error.retry_after is not None else None
+            ),
+        ) from response_error
+
+
 def _latest_decision(
     db: Session, collection_id: uuid.UUID, scope: str
 ) -> RawCollectionPurposeDecision | None:
@@ -86,7 +156,9 @@ def create_router() -> APIRouter:
         db: Session = Depends(get_db),
     ) -> AdminRawCollectionListV1:
         _identity(request, action=None)
-        statement = select(RawCollection).where(RawCollection.lifecycle_version == 2)
+        statement = select(RawCollection).where(
+            RawCollection.lifecycle_version == 2, account_subject_visible(RawCollection)
+        )
         if state == "QUARANTINED":
             statement = statement.where(RawCollection.state == "QUARANTINED")
         rows = db.scalars(
@@ -147,6 +219,9 @@ def create_router() -> APIRouter:
         identity = _identity(
             request, action="admin.raw_collection.purpose_decide"
         )
+        _reauthorize_mutation(
+            request, db, identity, action="admin.raw_collection.purpose_decide"
+        )
         try:
             event, created = record_purpose_decision(
                 db,
@@ -172,6 +247,9 @@ def create_router() -> APIRouter:
         db: Session = Depends(get_db),
     ) -> RawLegalHoldResponseV1:
         identity = _identity(request, action="admin.raw_collection.legal_hold")
+        _reauthorize_mutation(
+            request, db, identity, action="admin.raw_collection.legal_hold"
+        )
         try:
             event, created = record_legal_hold(
                 db,

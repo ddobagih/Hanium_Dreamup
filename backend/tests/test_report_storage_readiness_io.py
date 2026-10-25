@@ -53,7 +53,7 @@ def _run_reopen_race(root: Path, replacement: str) -> dict[str, object]:
     """Run the real readiness thread and filesystem fault inside an owned child."""
     import asyncio
 
-    from backend.app.api import health
+    from backend.app.services import health_readiness as health
 
     encrypted, destination, entry = _inventory(root)
     real_open, real_close, real_read = os.open, os.close, os.read

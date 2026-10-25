@@ -13,16 +13,17 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from backend.app.api.reports import (
+from backend.app.api.reports import _bounded_summary_reports
+from backend.app.services.report_application import _agency_review_was_named
+from backend.app.services.report_commit import _commit_new_report_with_image
+from backend.app.services.report_export import (
     _agency_export_row,
-    _agency_review_was_named,
-    _bounded_summary_reports,
-    _commit_new_report_with_image,
     _durable_export_audit_filters,
     _minimum_export_row,
     _report_export_row,
 )
 import backend.app.api.reports as reports_api
+from backend.app.services import maintenance_lock, report_export
 from backend.app.models import Report
 from backend.app.schemas import ReportV2Metadata
 from backend.app.services.report_policy import ensure_report_v2_allowed, report_v2_source
@@ -221,7 +222,7 @@ def test_export_row_escapes_formula_like_review_flags() -> None:
     assert row["review_flags"] == "\t=HYPERLINK(bad)"
     original_row = dict(row)
     for bom in (False, True):
-        exported = reports_api._csv_export_text([row], bom=bom)
+        exported = report_export._csv_export_text([row], bom=bom)
         assert exported.startswith("\ufeff") is bom
         decoded = list(csv.DictReader(io.StringIO(exported.removeprefix("\ufeff"))))
         assert len(decoded) == 1
@@ -354,7 +355,11 @@ def test_report_commit_failure_rolls_back_and_removes_written_image(tmp_path) ->
     with pytest.raises(RuntimeError, match="database unavailable"):
         _commit_new_report_with_image(  # type: ignore[arg-type]
             session,
-            SimpleNamespace(id=report_id),
+            SimpleNamespace(
+                id=report_id,
+                image_path=f"/uploads/{report_id}.jpg",
+                image_content_type="image/jpeg",
+            ),
             destination=destination,
             content=b"image",
             content_type="image/jpeg",
@@ -382,7 +387,7 @@ def test_report_write_fails_closed_while_maintenance_has_exclusive_lock(
         def add(self, _report: object) -> None:
             raise AssertionError("database write must not start during maintenance")
 
-    monkeypatch.setattr(reports_api, "_trusted_maintenance_lock_parent", lambda *_args: True)
+    monkeypatch.setattr(maintenance_lock, "_trusted_maintenance_lock_parent", lambda *_args: True)
     lock_path = tmp_path / "maintenance.lock"
     lock_path.touch(mode=0o600)
     descriptor = os.open(lock_path, os.O_RDONLY | os.O_NOFOLLOW)
@@ -414,10 +419,10 @@ def test_report_write_requires_preprovisioned_single_link_maintenance_leaf(
 ) -> None:
     tmp_path.chmod(0o700)
     lock_path = tmp_path / "maintenance.lock"
-    monkeypatch.setattr(reports_api, "_trusted_maintenance_lock_parent", lambda *_args: True)
+    monkeypatch.setattr(maintenance_lock, "_trusted_maintenance_lock_parent", lambda *_args: True)
 
     with pytest.raises(HTTPException) as missing:
-        with reports_api._shared_report_write_lock(lock_path):
+        with maintenance_lock._shared_report_write_lock(lock_path):
             pytest.fail("missing maintenance lock must not be entered")
     assert missing.value.detail["code"] == "maintenance_lock_unavailable"
     assert not lock_path.exists()
@@ -425,7 +430,7 @@ def test_report_write_requires_preprovisioned_single_link_maintenance_leaf(
     lock_path.touch(mode=0o600)
     os.link(lock_path, tmp_path / "maintenance.alias")
     with pytest.raises(HTTPException) as aliased:
-        with reports_api._shared_report_write_lock(lock_path):
+        with maintenance_lock._shared_report_write_lock(lock_path):
             pytest.fail("hard-linked maintenance lock must not be entered")
     assert aliased.value.detail["code"] == "maintenance_lock_unavailable"
 
@@ -440,7 +445,7 @@ def test_backend_shared_leaf_lock_blocks_retention(
     lock_path = tmp_path / "maintenance.lock"
     lock_path.touch(mode=0o600)
     monkeypatch.setattr(
-        reports_api,
+        maintenance_lock,
         "_trusted_maintenance_lock_parent",
         lambda *_args: True,
     )
@@ -450,7 +455,7 @@ def test_backend_shared_leaf_lock_blocks_retention(
         lambda *_args: None,
     )
 
-    with reports_api._shared_report_write_lock(lock_path):
+    with maintenance_lock._shared_report_write_lock(lock_path):
         with pytest.raises(TimeoutError, match="timed out acquiring maintenance lock"):
             with retention.exclusive_maintenance_lock(lock_path, timeout_seconds=0):
                 pytest.fail("retention must not enter while Backend holds the leaf")
@@ -463,15 +468,15 @@ def test_report_write_rejects_maintenance_lock_acl_inspection_failure(
     tmp_path.chmod(0o700)
     lock_path = tmp_path / "maintenance.lock"
     lock_path.touch(mode=0o600)
-    monkeypatch.setattr(reports_api, "_trusted_maintenance_lock_parent", lambda *_args: True)
+    monkeypatch.setattr(maintenance_lock, "_trusted_maintenance_lock_parent", lambda *_args: True)
     monkeypatch.setattr(
-        reports_api.os,
+        maintenance_lock.os,
         "listxattr",
         lambda _descriptor: (_ for _ in ()).throw(OSError(errno.EACCES, "denied")),
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        with reports_api._shared_report_write_lock(lock_path):
+        with maintenance_lock._shared_report_write_lock(lock_path):
             pytest.fail("uninspectable ACL state must not be entered")
     assert exc_info.value.detail["code"] == "maintenance_lock_unavailable"
 
@@ -502,9 +507,9 @@ def test_maintenance_lock_authority_rejects_root_service(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     descriptor = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
-    monkeypatch.setattr(reports_api.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(maintenance_lock.os, "geteuid", lambda: 0)
     try:
-        assert reports_api._trusted_maintenance_lock_parent(tmp_path, descriptor) is False
+        assert maintenance_lock._trusted_maintenance_lock_parent(tmp_path, descriptor) is False
     finally:
         os.close(descriptor)
 
@@ -565,10 +570,10 @@ def test_maintenance_lock_authority_rejects_user_owned_higher_ancestor(
         )
 
     descriptor = os.open(lock_parent, os.O_RDONLY | os.O_DIRECTORY)
-    monkeypatch.setattr(reports_api.os, "fstat", only_higher_ancestor_remains_user_owned)
-    monkeypatch.setattr(reports_api.os, "access", simulated_safe_ancestors_appear_non_writable)
+    monkeypatch.setattr(maintenance_lock.os, "fstat", only_higher_ancestor_remains_user_owned)
+    monkeypatch.setattr(maintenance_lock.os, "access", simulated_safe_ancestors_appear_non_writable)
     try:
-        assert reports_api._trusted_maintenance_lock_parent(lock_parent, descriptor) is False
+        assert maintenance_lock._trusted_maintenance_lock_parent(lock_parent, descriptor) is False
         assert higher_ancestor_identity in visited_identities
     finally:
         os.close(descriptor)
@@ -587,7 +592,7 @@ def test_maintenance_lock_authority_rejects_inode_binding_change(
         pytest.skip("requires a non-root Linux runtime with /run/user")
     descriptor = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
     try:
-        assert reports_api._trusted_maintenance_lock_parent(parent, descriptor) is True
+        assert maintenance_lock._trusted_maintenance_lock_parent(parent, descriptor) is True
         real_stat = os.stat
         real_fstat = os.fstat
         root_identity = (Path("/").stat().st_dev, Path("/").stat().st_ino)
@@ -624,8 +629,8 @@ def test_maintenance_lock_authority_rejects_inode_binding_change(
             fields[1] += 1
             return os.stat_result(fields)
 
-        monkeypatch.setattr(reports_api.os, "stat", changed_inode)
-        assert reports_api._trusted_maintenance_lock_parent(parent, descriptor) is False
+        monkeypatch.setattr(maintenance_lock.os, "stat", changed_inode)
+        assert maintenance_lock._trusted_maintenance_lock_parent(parent, descriptor) is False
     finally:
         os.close(descriptor)
 
@@ -638,7 +643,7 @@ def test_maintenance_lock_authority_rejects_effective_acl_write_access(
         pytest.skip("requires a non-root Linux runtime with /run/user")
     descriptor = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
     try:
-        assert reports_api._trusted_maintenance_lock_parent(parent, descriptor) is True
+        assert maintenance_lock._trusted_maintenance_lock_parent(parent, descriptor) is True
         real_access = os.access
         real_fstat = os.fstat
         run_identity = (Path("/run").stat().st_dev, Path("/run").stat().st_ino)
@@ -663,8 +668,8 @@ def test_maintenance_lock_authority_rejects_effective_acl_write_access(
                 follow_symlinks=follow_symlinks,
             )
 
-        monkeypatch.setattr(reports_api.os, "access", writable_through_acl)
-        assert reports_api._trusted_maintenance_lock_parent(parent, descriptor) is False
+        monkeypatch.setattr(maintenance_lock.os, "access", writable_through_acl)
+        assert maintenance_lock._trusted_maintenance_lock_parent(parent, descriptor) is False
     finally:
         os.close(descriptor)
 
@@ -675,9 +680,9 @@ def test_report_write_rejects_maintenance_lock_not_owned_by_service_user(
 ) -> None:
     lock_path = tmp_path / "maintenance.lock"
     lock_path.touch(mode=0o600)
-    monkeypatch.setattr(reports_api, "_trusted_maintenance_lock_parent", lambda *_args: True)
+    monkeypatch.setattr(maintenance_lock, "_trusted_maintenance_lock_parent", lambda *_args: True)
     monkeypatch.setattr(
-        "backend.app.api.reports.os.geteuid",
+        "backend.app.services.maintenance_lock.os.geteuid",
         lambda: os.stat(lock_path).st_uid + 1,
     )
 

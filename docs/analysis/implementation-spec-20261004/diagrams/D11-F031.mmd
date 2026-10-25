@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D11-031 Legacy Web 전체 요청 폐쇄·loopback 회귀 실행"]
+  B["P-D11-031 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. npm wrapper가 허용 loopback command만 받는다"]
+  B --> T0
+  T1["2. protected environment이면 single process lock을 획득한다"]
+  T0 --> T1
+  T2["3. Next 요청은 proxy에서 no-store 410 text로 종료한다"]
+  T1 --> T2
+  T3["4. 기존 page/admin/API route는 현재 요청 경계에서 도달하지 않는다"]
+  T2 --> T3
+  Z["모든 Next 요청410 종료"]
+  T3 --> Z
+  C0{"어떤 Next 경로 요청"}
+  R0["410 Gone·legacy-web-closed header"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"dev/start 인자 override 또는 arbitrary command"}
+  R1["wrapper 차단"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"lint/typecheck/build/test"}
+  R2["레거시 회귀 허용; 제품 활성화 아님"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

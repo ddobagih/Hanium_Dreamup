@@ -1,0 +1,33 @@
+flowchart TD
+  IN["F-D14-031<br/>고정 revision 사고 이력 페이지"]
+  G["적용 정책<br/>P-D14-018 / P-D14-019 / P-D14-020"]
+  IN --> G
+  N1["1. read purpose admin.incident.history, 허용 q<br/>uery limit/cursor 단일 값 검사"]
+  G --> N1
+  N2["2. cursor의 resource/stream/정수0&lt;after&lt;snapsho<br/>t&lt;=BIGINT 및 canonical 형식 검증"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 한 SQL statement로 mutable projection+event<br/> count/max를 함께 조회"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. count=max=projection.version&gt;=1 확인; 최초 ma<br/>x 또는 cursor snapshot 선택"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. snapshot/after boundary event와 after&lt;revi<br/>sion&lt;=snapshot의 limit개 행 조회"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. 연속 revision과 transition 검사; 현재 projection<br/> 대신 snapshot event 기준 summary 사용"]
+  N5 -->|"계속 가능한 경우"| N6
+  N7["7. UTF8 JSON96KiB 이하인 가장 긴 연속 prefix를 선택하여 n<br/>ext cursor 생성"]
+  N6 -->|"계속 가능한 경우"| N7
+  N8["8. operation audit commit 후 no-store 반환"]
+  N7 -->|"계속 가능한 경우"| N8
+  B1["분기 결과<br/>422 cursor invalid"]
+  N4 -->|"cursor snapshot&gt;현재 maximum"| B1
+  B2["분기 결과<br/>503 history integrity invalid"]
+  N6 -->|"count/max/version 불일치 또는 boundary/event gap"| B2
+  B3["분기 결과<br/>503"]
+  N7 -->|"한 item도96KiB 예산에 안 들어감"| B3
+  B4["분기 결과<br/>이미 발급된 cursor의 snapshot revision 밖은 제외"]
+  N6 -->|"새 event append"| B4
+  N8 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

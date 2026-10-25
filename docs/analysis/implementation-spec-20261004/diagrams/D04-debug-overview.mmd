@@ -1,0 +1,26 @@
+flowchart LR
+  LAUNCH["debug manifest exported launcher<br/>OutdoorPositionTestActivity F031"]
+  PRE["권한·장착·저장동의·GPS preview"]
+  READY["F032 trace lease + Raw 준비 완료 barrier"]
+  SENSOR["GNSS·step·local profile<br/>route match 없음"]
+  CP["F033 device 정지 checkpoint<br/>제품 통합 지면정지와 별개"]
+  RAW["F036 native Raw callback"]
+  FORMAT["F038 원 필드 CSV·UTC 출처"]
+  WRITER["F037 bounded writer<br/>part→close→완료 txt"]
+  D06["D06 encrypted trace recorder"]
+  STOP["F034 stop·Raw close 후 trace finalize"]
+  EXPORT["F035 완료목록 선택·SAF export"]
+  D16["D16 별도 평가 앱·외부 분석"]
+  LAUNCH --> PRE
+  PRE --> READY
+  READY --> SENSOR
+  SENSOR --> CP
+  SENSOR --> D06
+  CP --> D06
+  READY --> RAW
+  RAW --> FORMAT
+  FORMAT --> WRITER
+  D06 --> STOP
+  WRITER --> STOP
+  STOP --> EXPORT
+  EXPORT --> D16

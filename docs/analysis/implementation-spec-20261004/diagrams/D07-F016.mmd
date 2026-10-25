@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-016<br/>unknown mask identity·material point·supported extent<br/>상태 ACTIVE"]
+    P0["actual mask correspondence와 typed point 검사"]
+    A --> D
+    P1["token rotation unique point own mask 확인"]
+    P0 --> P1
+    P2["support scope 또는 calibration 변화 시 history 초기화"]
+    P1 --> P2
+    P3["extent는 진단만 전달하고 작은 물체를 숨기지 않음"]
+    P2 --> P3
+    D{"P-D07-016<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["motion continuity 폐기"]
+    D -->|"mask id는 같지만 point identity 변경"| B0
+    B1["whole-mask distance 권한 없음"]
+    D -->|"부분 mask/새 지원 영역"| B1
+    B2["이유만으로 obstacle 숨김 없음"]
+    D -->|"작은 extent diagnostic"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

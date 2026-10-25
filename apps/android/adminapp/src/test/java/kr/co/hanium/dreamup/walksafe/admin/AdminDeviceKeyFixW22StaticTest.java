@@ -47,10 +47,10 @@ public final class AdminDeviceKeyFixW22StaticTest {
             "credentialBound ? null : () ->"
         ));
         String lost = between(activity, "private void reportLostDevice(", "private void requestLocalSessionResume()");
-        assertTrue(lost.indexOf("preflightDeviceKeySignature();")
-            < lost.indexOf("controller.reportLostDevice("));
+        assertTrue(lost.contains("runCredentialOperation("));
+        assertTrue(lost.contains("new AdminMutableCredentials(password, totp), true,"));
+        assertTrue(lost.contains("controller.reportLostDevice("));
         assertTrue(lost.contains("Arrays.fill(password, '\\0')"));
-        assertTrue(lost.contains("true\n        );"));
         String result = between(activity, "protected void onActivityResult(", "if (requestCode == CONFIRM_LOCAL_SESSION)");
         assertTrue(result.contains("Decision.REENTER_CREDENTIALS"));
         assertTrue(activity.contains("기기 인증을 마쳤습니다. 비밀번호와 새 인증번호를 다시 입력해 주세요."));

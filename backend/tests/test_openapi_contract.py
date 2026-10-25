@@ -24,6 +24,35 @@ WALKING_ROUTE_FIXTURE_PATH = REPO_ROOT / "contracts" / "fixtures" / "walking-rou
 HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
 
 
+def test_signup_policy_and_installation_key_contract_match_strict_runtime_boundaries() -> None:
+    for schema in (app.openapi(), json.loads(CANONICAL_OPENAPI_PATH.read_text())):
+        components = schema["components"]["schemas"]
+        policy = components["AccountSignupPolicyV1"]
+        assert set(policy["required"]) == {"schema_version", "documents"}
+        documents = policy["properties"]["documents"]
+        assert documents["additionalProperties"] is False
+        assert set(documents["required"]) == {
+            "terms_of_service", "privacy_notice", "location_terms",
+            "raw_original", "automatic_reporting", "training_reuse",
+        }
+        for key, descriptor in documents["properties"].items():
+            constraints = descriptor["allOf"][1]["properties"]
+            required = key in {"terms_of_service", "privacy_notice", "location_terms"}
+            assert constraints["required"]["const"] is required
+            if required:
+                assert constraints["prior_versions"]["maxItems"] == 0
+        key_schema = components["InstallationEvidenceKeyV1"]
+        assert key_schema["additionalProperties"] is False
+        assert set(key_schema["required"]) == {"installation_id", "public_key"}
+        operation = schema["paths"]["/privacy/installation-evidence-key"]["post"]
+        assert "content" not in operation["responses"]["204"]
+        assert "403" in operation["responses"]
+        security = operation["security"][0]
+        assert {"WalkSafeActorAssertion", "WalkSafeActorId", "WalkSafeAccountGeneration"} <= set(security)
+        signup_security = schema["paths"]["/account-signup-policy"]["get"]["security"][0]
+        assert "WalkSafeActorAssertion" not in signup_security
+
+
 def _operations(schema: dict):
     for path, path_item in schema["paths"].items():
         for method, operation in path_item.items():
@@ -342,12 +371,12 @@ def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
     }
     assert state_response["additionalProperties"] is False
     sessions_response = schema["components"]["schemas"]["SessionsResponse"]
-    assert set(sessions_response["required"]) == {"sessions", "devices"}
+    assert set(sessions_response["required"]) == {"sessions", "devices", "device_total", "devices_complete"}
     assert sessions_response["additionalProperties"] is False
     assert sessions_response["properties"]["sessions"]["maxItems"] == 100
     assert sessions_response["properties"]["devices"]["maxItems"] == 100
     device_item = schema["components"]["schemas"]["DeviceItem"]
-    assert set(device_item["required"]) == {"device_id", "current"}
+    assert set(device_item["required"]) == {"device_id", "current", "device_label", "last_seen_at", "key_version", "key_marker_prefix"}
     assert device_item["additionalProperties"] is False
     recovery_complete_responses = schema["paths"][
         "/admin/security/recovery/complete"

@@ -29,15 +29,11 @@ class MainActivityPostWalkActivityOriginalStaticTest {
         }
         assertTrue(functionBlock("private fun currentActivityOriginalWalkState(").contains("else WalkSessionState.ACTIVE"))
         val transition = functionBlock("private fun transitionWalkSession(")
-        assertTrue(transition.contains("activityOriginalUploadAdmission.onWalkStateChanged("))
+        assertTrue(transition.contains("reports.onWalkStateChanged(transition.current.state)"))
+        assertTrue(source.contains("activityOriginalUploadAdmission.onWalkStateChanged(state, ::cancelActivityOriginalUploads)"))
         assertFalse(source.contains("activityOriginalUploadAdmission.onSensorSample("))
         assertFalse(source.contains("activityOriginalUploadAdmission.stationarySnapshot("))
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "Missing function: $signature" }
-        val next = Regex("""\n    (private |internal |override )?fun """).find(source, start + signature.length)
-        return if (next == null) source.substring(start) else source.substring(start, next.range.first)
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
 }

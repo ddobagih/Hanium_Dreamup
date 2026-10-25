@@ -80,14 +80,50 @@ class LocalGeodesySharedContractTest {
         assertEquals(tenNorth.latitude, estimate.latitude, 1e-12)
         assertEquals(tenNorth.longitude, estimate.longitude, 1e-12)
 
-        // Route matcher and navigator projections measure the same offset identically. Their metre
-        // scale (111 320 m/deg) is not yet LocalGeodesy's (S09-52 remaining, about 0.11 %).
+        // Route matcher and navigator projections use the same physical metre convention as ENU.
         val route = listOf(RoutePoint(origin.latitude, origin.longitude), RoutePoint(twentyEast.latitude, twentyEast.longitude + 0.0002))
         val match = RouteCorridorMatcher().match(
             "r", route, FilteredRoutePosition(RoutePoint(tenNorth.latitude, tenNorth.longitude), 3.0, 1_000L),
         )
         val navigatorDistance = distanceToPolylineMeters(TrustedLocation(tenNorth.latitude, tenNorth.longitude, 3f, 1_000L), route)
         assertEquals(requireNotNull(match.crossTrackDistanceM), navigatorDistance, 1e-9)
-        assertEquals(10.0, navigatorDistance, 0.02)
+        assertEquals(10.0, navigatorDistance, 1e-6)
+    }
+
+    @Test
+    fun distantQueryCannotTurnAShortAntimeridianSegmentIntoAnOppositeHemisphereRoute() {
+        for (route in listOf(
+            listOf(RoutePoint(37.5, 179.99995), RoutePoint(37.5, -179.99995)),
+            listOf(RoutePoint(37.5, -179.99995), RoutePoint(37.5, 179.99995)),
+        )) {
+            val query = RoutePoint(37.5, 0.0)
+            val match = RouteCorridorMatcher().match("r", route, FilteredRoutePosition(query, 3.0, 1_000L))
+            val navigatorDistance = distanceToPolylineMeters(TrustedLocation(query.latitude, query.longitude, 3f, 1_000L), route)
+
+            // This is a projection-contract boundary, not a claim of global ENU distance accuracy.
+            assertTrue(navigatorDistance > 10_000_000.0)
+            assertEquals(requireNotNull(match.crossTrackDistanceM), navigatorDistance, 1e-6)
+        }
+    }
+
+    @Test
+    fun projectionOffsetsKeepTheirMetreMeaningAtDomesticAndAntimeridianLongitudes() {
+        for (longitude in listOf(127.0, 179.99995, -179.99995)) {
+            val frame = LocalGeodesy.Frame(37.5, longitude)
+            val start = frame.toCoordinate(-20.0, 0.0)
+            val end = frame.toCoordinate(20.0, 0.0)
+            val route = listOf(RoutePoint(start.latitude, start.longitude), RoutePoint(end.latitude, end.longitude))
+            for (north in listOf(-10.0, 0.0, 10.0)) {
+                val coordinate = frame.toCoordinate(0.0, north)
+                val point = RoutePoint(coordinate.latitude, coordinate.longitude)
+                val match = RouteCorridorMatcher().match("r", route, FilteredRoutePosition(point, 3.0, 1_000L))
+                val navigatorDistance = distanceToPolylineMeters(
+                    TrustedLocation(point.latitude, point.longitude, 3f, 1_000L), route,
+                )
+                assertEquals(kotlin.math.abs(north), requireNotNull(match.crossTrackDistanceM), 1e-6)
+                assertEquals(kotlin.math.abs(north), navigatorDistance, 1e-6)
+                assertEquals(requireNotNull(match.crossTrackDistanceM), navigatorDistance, 1e-6)
+            }
+        }
     }
 }

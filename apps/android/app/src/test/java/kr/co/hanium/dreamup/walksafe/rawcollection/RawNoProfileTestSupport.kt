@@ -110,6 +110,7 @@ internal class NoProfileRawFixture {
     ): RawMetadataCaptureResult = coordinator.captureMetadataBatch(
         context(WalkSessionState.ACTIVE),
         RawDetectionMetadataSample(
+        windowIdentity = RAW_TEST_WINDOW_IDENTITY,
             windowStartedAtEpochMs = start, capturedAtEpochMs = end, processedFrameCount = 30,
             detectionCount = 3, averageInferenceMs = 30L, detectorAvailable = detectorAvailable,
             modelRevision = model, maxInferenceMs = 50L,
@@ -120,6 +121,7 @@ internal class NoProfileRawFixture {
             runtimeIdentity = identity,
         ),
         RawPerformanceMetadataSample(
+        windowIdentity = RAW_TEST_WINDOW_IDENTITY,
             windowStartedAtEpochMs = start, capturedAtEpochMs = end, processedFrameCount = 30,
             droppedFrameCount = 1, averageFrameDurationMs = 100L, thermalThrottled = false,
             maxFrameDurationMs = 150L, frameDurationMsHistogram = listOf(0, 0, 10, 19, 0, 0, 0),
@@ -299,3 +301,5 @@ private fun noProfileActiveWalk(epoch: WalkRuntimeEpoch): WalkSessionSnapshot {
         isForeground = true, readiness = WalkSessionReadinessSnapshot(epoch, plan, 1L, observations),
     )
 }
+
+private val RAW_TEST_WINDOW_IDENTITY = RawRuntimeWindowIdentity()

@@ -5,7 +5,8 @@ import threading
 
 import pytest
 
-from backend.app.api import health
+from backend.app.services import health_readiness as health
+from backend.app.api import health as health_router
 from backend.app.config import Settings
 
 
@@ -337,7 +338,7 @@ def test_s20_48_create_router_gives_only_the_detector_probe_the_warmup_threshold
             thresholds[name] = self._stuck_threshold
 
     monkeypatch.setattr(health, "_OffloadedReadinessProbe", RecordingProbe)
-    health.create_router(settings, lambda: None, object())  # type: ignore[arg-type]
+    health_router.create_router(settings, lambda: None, object())  # type: ignore[arg-type]
     assert thresholds.pop("detector") == 125.0
     assert thresholds and set(thresholds.values()) == {health.READINESS_PROBE_STUCK_SECONDS}
 

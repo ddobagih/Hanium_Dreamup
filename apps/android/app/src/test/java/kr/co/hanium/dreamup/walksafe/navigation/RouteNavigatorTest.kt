@@ -5,6 +5,7 @@ import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteHeadingEstimate
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteMatchQuality
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteMatchReason
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -31,14 +32,15 @@ class RouteNavigatorTest {
         assertTrue(legacyDefaultBridgeExists)
         val navigator = RouteNavigator().apply { setRoute(route()) }
         assertEquals(
-            "route_guidance",
+            "guidance_facing_recheck_wait",
             navigator.update(locationNearStart(), nowMs = 1_000L, requestInFlight = false).reason,
         )
     }
 
     @Test
     fun emitsFallbackInstructionWhenGuideInstructionMissing() {
-        val navigator = RouteNavigator()
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L))
         navigator.setRoute(route(guideInstruction = null))
 
         val update = navigator.update(locationNearStart(), nowMs = 1_000L, requestInFlight = false)
@@ -68,9 +70,10 @@ class RouteNavigatorTest {
 
     @Test
     fun tmapCrosswalkTurnTypesKeepReferenceNoticeWithoutRawCrossingCommands() {
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
         // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
         listOf(211, 212, 213).forEach { turnType ->
-            val navigator = RouteNavigator()
+            val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L))
             val rawCommand = "신호가 초록색이니 지금 건너세요."
             val baseRoute = route(guideInstruction = rawCommand)
             navigator.setRoute(
@@ -86,7 +89,7 @@ class RouteNavigatorTest {
 
             assertTrue(current?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
             assertTrue(update.instruction?.contains(CROSSWALK_REFERENCE_NOTICE_KO) == true)
-            assertTrue(update.instruction?.contains("m 앞") == true)
+            assertTrue(update.instruction?.contains("다음 안내 지점까지 경로를 따라 약 50미터") == true)
             assertFalse(current?.contains(rawCommand) == true)
             assertFalse(current?.contains("지금 건너세요") == true)
         }
@@ -174,7 +177,7 @@ class RouteNavigatorTest {
             assertTrue(update.userDecisionRequired)
             assertEquals(RouteNavigatorUserDecision.REROUTE, update.pendingUserDecision)
             assertEquals("off_route_user_decision_required", update.reason)
-            assertTrue(update.instruction?.contains("사용자 선택이 필요") == true)
+            assertTrue(update.instruction?.contains("새 경로 요청, 위치 다시 확인, 길안내 종료 중에서 선택해 주세요") == true)
             assertFalse(update.instruction?.contains("직진하세요") == true)
             assertFalse(update.instruction?.contains("다시 찾습니다") == true)
         }
@@ -276,7 +279,7 @@ class RouteNavigatorTest {
         assertFalse(update.shouldReroute)
         assertTrue(update.userDecisionRequired)
         assertEquals("off_route_user_decision_required", update.reason)
-        assertTrue(update.instruction?.contains("사용자 선택이 필요") == true)
+        assertTrue(update.instruction?.contains("새 경로 요청, 위치 다시 확인, 길안내 종료 중에서 선택해 주세요") == true)
         assertFalse(update.instruction?.contains("오른쪽") == true)
         assertEquals(null, navigator.currentInstruction(offRouteLocation()))
     }
@@ -316,26 +319,27 @@ class RouteNavigatorTest {
     }
 
     @Test
-    fun untrustedLocationRequiresExplicitRecheckBeforeFreshGpsCanResumeGuidance() {
-        // Positive maneuver fixture: independent, fresh camera-facing observation; raw fixes are unchanged.
+    fun untrustedInitialLocationNeedsTwoFreshFixesToResumeGuidanceWithoutAChoice() {
         val navigator = RouteNavigator()
         navigator.setRoute(route(guideInstruction = "직진하세요."))
-
-        val untrusted = navigator.onUntrustedLocation()
-        val recoverySignalOnly = navigator.update(locationNearStart().copy(elapsedRealtimeMs = 2_000L), nowMs = 2_000L, requestInFlight = false, facingObservation = RouteFacingObservation(0.0, 5.0, 2_000L))
-        val blocked = navigator.currentInstruction(locationNearStart())
-        navigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION)
-        val freshAfterRecheck = navigator.update(locationNearStart().copy(elapsedRealtimeMs = 3_000L), nowMs = 3_000L, requestInFlight = false, facingObservation = RouteFacingObservation(0.0, 5.0, 3_000L))
-
-        assertEquals("location_untrusted_recheck_required", untrusted?.reason)
-        assertEquals(RouteNavigatorUserDecision.LOCATION_RECHECK, untrusted?.pendingUserDecision)
-        assertTrue(untrusted?.instruction?.contains("현재 위치 정확도를 신뢰할 수 없어") == true)
-        assertTrue(untrusted?.instruction?.contains("위치 다시 확인을 선택할 때까지") == true)
-        assertEquals("off_route_location_recheck_required", recoverySignalOnly.reason)
-        assertEquals(null, blocked)
-        assertEquals("route_guidance", freshAfterRecheck.reason)
-        assertTrue(freshAfterRecheck.instruction?.contains("안내 지점") == true)
-        assertFalse(freshAfterRecheck.instruction?.contains("직진하세요") == true)
+        val untrusted = requireNotNull(navigator.onUntrustedLocation())
+        assertEquals("location_untrusted_recheck_required", untrusted.reason)
+        assertEquals(RouteNavigatorUserDecision.LOCATION_RECHECK, untrusted.pendingUserDecision)
+        assertTrue(untrusted.cancelStaleNavigationSpeech)
+        assertFalse(untrusted.instruction.orEmpty().contains("직진하세요"))
+        assertFalse(untrusted.instruction.orEmpty().contains("선택할 때까지"))
+        val firstFix = locationNearStart().copy(elapsedRealtimeMs = 2_000L)
+        val recovering = navigator.update(firstFix, 2_000L, false,
+            facingObservation = RouteFacingObservation(0.0, 5.0, 2_000L))
+        assertEquals("route_geometry_recheck_wait", recovering.reason)
+        assertNull(recovering.speechCueToken); assertNull(navigator.currentInstruction(firstFix))
+        val secondFix = locationNearStart().copy(elapsedRealtimeMs = 3_000L)
+        val recovered = navigator.update(secondFix, 3_000L, false,
+            facingObservation = RouteFacingObservation(0.0, 5.0, 3_000L))
+        assertEquals("route_guidance", recovered.reason)
+        assertNotNull(recovered.speechCueToken); assertNull(navigator.pendingDecisionToken())
+        assertTrue(recovered.instruction.orEmpty().contains("안내 지점"))
+        assertFalse(recovered.instruction.orEmpty().contains("직진하세요"))
     }
 
     @Test
@@ -417,7 +421,7 @@ class RouteNavigatorTest {
         assertTrue(second.userDecisionRequired)
         assertEquals(RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION, second.pendingUserDecision)
         assertEquals("arrival_confirmation_required", second.reason)
-        assertTrue(second.instruction?.contains("도착 후보") == true)
+        assertEquals("도착했습니다. 안내를 종료합니다", second.instruction)
         assertTrue(navigator.hasRoute())
 
         navigator.acknowledgeInstruction(second, spokenAtMs = 4_000L)
@@ -502,8 +506,9 @@ class RouteNavigatorTest {
 
     @Test
     fun stepProgressOnlyReportsConsistencyAndNeverChangesTheRouteDecision() {
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
         fun decisionWith(stepProgressM: Double?): RouteNavigatorUpdate {
-            val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+            val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
             navigator.setRoute(route())
             return navigator.update(
                 location = locationNearStart(),
@@ -624,7 +629,8 @@ class RouteNavigatorTest {
 
     @Test
     fun oneAcceptedJumpCannotConsumeTwoNearbyTurnsWithoutSequentialMovement() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         navigator.setRoute(twoImportantTurnRoute())
         val start = TrustedLocation(37.0, 127.0, 5f, 1_000L)
         val jump = TrustedLocation(37.00063, 127.0, 5f, 31_000L)
@@ -667,7 +673,8 @@ class RouteNavigatorTest {
 
     @Test
     fun nearbyImportantTurnAdvancesAfterIntermediateBeyondAndForwardObservations() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         val base = twoImportantTurnRoute()
         navigator.setRoute(base.copy(
             guidePoints = base.guidePoints.map { guide ->
@@ -697,7 +704,8 @@ class RouteNavigatorTest {
 
     @Test
     fun closeImportantTurnsAdvanceWithSequentialAcceptedProgress() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         navigator.setRoute(closeImportantTurnRoute())
         val samples = listOf(
             TrustedLocation(37.000232, 127.0, 5f, 1_000L),
@@ -716,9 +724,10 @@ class RouteNavigatorTest {
 
     @Test
     fun closeImportantTurnsRejectSingleJumpAndCompressedFixes() {
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
         val route = closeImportantTurnRoute()
         val first = TrustedLocation(37.000232, 127.0, 5f, 1_000L)
-        val jumpedNavigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        val jumpedNavigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         jumpedNavigator.setRoute(route)
         assertEquals(1, jumpedNavigator.update(first, 1_000L, false).guideIndex)
         listOf(19_000L, 27_000L).forEach { atMs ->
@@ -726,7 +735,7 @@ class RouteNavigatorTest {
             assertEquals(1, jumpedNavigator.update(jump, atMs, false).guideIndex)
         }
 
-        val compressedNavigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        val compressedNavigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         compressedNavigator.setRoute(route)
         listOf(37.000232, 37.000245, 37.00036, 37.00048).forEachIndexed { index, latitude ->
             val atMs = 1_000L + index
@@ -737,7 +746,8 @@ class RouteNavigatorTest {
 
     @Test
     fun millisecondCompressedFixesCannotConsumeTheNextImportantTurn() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         val base = twoImportantTurnRoute()
         navigator.setRoute(base.copy(
             guidePoints = base.guidePoints.map { guide ->
@@ -764,7 +774,8 @@ class RouteNavigatorTest {
 
     @Test
     fun scaledSummaryTurnAdvancesAfterMappedIntermediateBeyondAndForwardObservations() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         navigator.setRoute(scaledSummaryTwoImportantTurnRoute())
         val samples = listOf(
             TrustedLocation(37.00025, 127.0, 2f, 1_000L),
@@ -783,6 +794,7 @@ class RouteNavigatorTest {
 
     @Test
     fun acceptedJitterAndOneTwelveMeterJumpCannotReplaceSequentialTurnEvidence() {
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
         val base = twoImportantTurnRoute()
         val closeTurns = base.copy(
             guidePoints = base.guidePoints.map { guide ->
@@ -793,7 +805,7 @@ class RouteNavigatorTest {
                 ) else guide
             },
         )
-        val jumpedNavigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        val jumpedNavigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         jumpedNavigator.setRoute(closeTurns)
         val beforeSecondTurn = TrustedLocation(37.000315, 127.0, 2f, 1_000L)
         val jitter = TrustedLocation(37.0003159, 127.0, 2f, 2_000L) // About 0.1m forward.
@@ -808,7 +820,7 @@ class RouteNavigatorTest {
         val duplicate = jumpedNavigator.update(jump, 3_000L, false)
         assertEquals(1, duplicate.guideIndex)
 
-        val observedNavigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        val observedNavigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         observedNavigator.setRoute(closeTurns)
         val observed = listOf(
             TrustedLocation(37.000232, 127.0, 2f, 1_000L),
@@ -842,7 +854,8 @@ class RouteNavigatorTest {
 
     @Test
     fun twoMeterStepsAccumulateAgainstTheFirstTurnAnchor() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         navigator.setRoute(twoImportantTurnRoute())
         assertEquals(1, navigator.update(
             TrustedLocation(37.000232, 127.0, 2f, 1_000L), 1_000L, false,
@@ -862,7 +875,8 @@ class RouteNavigatorTest {
 
     @Test
     fun sidewaysRawFixesCannotCorroborateFilteredRouteProgress() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         navigator.setRoute(twoImportantTurnRoute())
         assertEquals(1, navigator.update(
             TrustedLocation(37.000232, 127.0, 5f, 1_000L), 1_000L, false,
@@ -886,7 +900,8 @@ class RouteNavigatorTest {
 
     @Test
     fun hugeRawAccuracyWithZeroRawFilteredGapCannotAccumulateTurnEvidence() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         navigator.setRoute(twoImportantTurnRoute())
         assertEquals(1, navigator.update(
             TrustedLocation(37.000232, 127.0, 2f, 1_000L), 1_000L, false,
@@ -928,7 +943,8 @@ class RouteNavigatorTest {
 
     @Test
     fun elevenSecondSpacedMeaningfulAdvancesReleaseSecondTurn() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         navigator.setRoute(twoImportantTurnRoute())
         val samples = listOf(
             TrustedLocation(37.000232, 127.0, 2f, 1_000L),
@@ -956,7 +972,8 @@ class RouteNavigatorTest {
     }
 
     private fun assertMatchedLoopReleasesSecondTurn(distanceSource: WalkingRouteDistanceSource?) {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         val loop = WalkingRoute(
             priority = "STAIR_AVOID",
             summary = WalkingRouteSummary(distanceM = 250, durationS = 300),
@@ -1034,17 +1051,18 @@ class RouteNavigatorTest {
         val stillBefore = navigator.update(beforeGuide, nowMs = 1_001L, requestInFlight = false,
             facingObservation = RouteFacingObservation(0.0, 5.0, 1_001L))
 
-        assertTrue(offered.instruction?.contains("왼쪽으로 꺾으세요") == true)
+        assertTrue(offered.instruction?.contains("9시 방향으로 꺾으세요") == true)
         assertEquals("guidance_already_completed", stillBefore.reason)
         val current = navigator.currentInstruction(beforeGuide)
-        assertTrue(current?.contains("왼쪽으로 꺾으세요") == true)
-        assertFalse(current?.contains("오른쪽으로 꺾으세요") == true)
+        assertTrue(current?.contains("9시 방향으로 꺾으세요") == true)
+        assertFalse(current?.contains("3시 방향으로 꺾으세요") == true)
         assertFalse(current?.contains("첫 회전") == true)
     }
 
     @Test
     fun guidanceCooldownStartsOnlyAfterCallerAcknowledgesSpeech() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 6_000L))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 6_000L))
         navigator.setRoute(route(guideInstruction = "직진하세요."))
 
         val first = navigator.update(locationNearStart(), nowMs = 1_000L, requestInFlight = false)
@@ -1069,7 +1087,10 @@ class RouteNavigatorTest {
         assertTrue(offRoute.userDecisionRequired)
         assertFalse(afterReplacement.shouldReroute)
         assertFalse(afterReplacement.userDecisionRequired)
-        assertEquals("route_guidance", afterReplacement.reason)
+        assertEquals("guidance_facing_recheck_wait", afterReplacement.reason)
+        assertNull(afterReplacement.instruction)
+        assertNotNull(navigator.currentAcceptedRouteMatchFor(1_000L))
+        assertNull(navigator.currentAcceptedRouteMatchFor(2_000L))
     }
 
     @Test
@@ -1249,8 +1270,12 @@ class RouteNavigatorTest {
 
         assertEquals(RouteMatchReason.AMBIGUOUS_CANDIDATES, pending.reason)
         assertEquals(RouteMatchQuality.LOW, pending.quality)
-        assertEquals(null, pendingUpdate.instruction)
-        assertEquals("route_match_untrusted", pendingUpdate.reason)
+        assertNull(pendingUpdate.instruction)
+        assertNull(pendingUpdate.pendingUserDecision)
+        assertFalse(pendingUpdate.offRoute)
+        assertFalse(pendingUpdate.shouldReroute)
+        assertEquals("guidance_facing_recheck_wait", pendingUpdate.reason)
+        assertNull(navigator.currentAcceptedRouteMatchFor(2_000L))
         assertEquals(RouteMatchReason.AMBIGUOUS_CANDIDATES, confirmed.reason)
         assertEquals(RouteMatchQuality.LOW, confirmed.quality)
         assertEquals(null, navigator.currentBearingDeg())
@@ -1258,7 +1283,8 @@ class RouteNavigatorTest {
 
     @Test
     fun ambiguousLoopObservationCannotAdvanceAnImportantTurn() {
-        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        // Isolate route progress/wording or speech ownership from the default recheck timer.
+        val navigator = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = 0))
         navigator.setRoute(WalkingRoute(
             priority = "STAIR_AVOID",
             summary = WalkingRouteSummary(distanceM = 400, durationS = 300),
@@ -1283,10 +1309,19 @@ class RouteNavigatorTest {
         val crossing = TrustedLocation(37.0, 127.0, 3f, 2_000L)
         val ambiguous = navigator.update(crossing, 2_000L, false, filteredPosition(crossing, 180.0))
         assertEquals(RouteMatchReason.AMBIGUOUS_CANDIDATES, navigator.currentRouteMatch()?.reason)
-        assertEquals("route_match_untrusted", ambiguous.reason)
+        assertEquals("route_guidance", ambiguous.reason)
+        assertEquals(1, ambiguous.guideIndex)
+        assertFalse(ambiguous.cancelStaleNavigationSpeech)
         assertEquals(null, navigator.currentAcceptedRouteMatchFor(2_000L))
         val westAgain = west.copy(elapsedRealtimeMs = 3_000L)
-        assertEquals(1, navigator.update(westAgain, 3_000L, false, filteredPosition(westAgain, 90.0)).guideIndex)
+        val stillPaused = navigator.update(westAgain, 3_000L, false, filteredPosition(westAgain, 90.0))
+        assertEquals(1, stillPaused.guideIndex)
+        assertNull(navigator.currentAcceptedRouteMatchFor(3_000L))
+        assertNull(stillPaused.pendingUserDecision)
+        assertEquals("reroute_decision_missing",
+            navigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION).reason)
+        val recheckedWest = west.copy(elapsedRealtimeMs = 4_000L)
+        assertEquals(1, navigator.update(recheckedWest, 4_000L, false, filteredPosition(recheckedWest, 90.0)).guideIndex)
     }
 
     @Test
@@ -1311,11 +1346,17 @@ class RouteNavigatorTest {
         val match = requireNotNull(navigator.currentRouteMatch())
 
         assertFalse(update.offRoute)
-        assertEquals(null, update.instruction)
-        assertEquals("route_match_untrusted", update.reason)
+        assertNull(update.instruction)
+        assertFalse(update.instruction?.contains("도로를 건너") == true)
+        assertNull(update.pendingUserDecision)
+        assertEquals("route_geometry_recheck_wait", update.reason)
+        assertFalse(update.shouldReroute)
+        assertFalse(update.arrived)
         assertEquals(RouteMatchQuality.LOW, match.quality)
         assertEquals(RouteMatchReason.AMBIGUOUS_CANDIDATES, match.reason)
         assertEquals(null, navigator.currentBearingDeg())
+        assertEquals("reroute_decision_missing",
+            navigator.selectDeviationChoice(RouteDeviationChoice.RECHECK_LOCATION).reason)
     }
 
     @Test
@@ -1355,12 +1396,14 @@ class RouteNavigatorTest {
         assertFalse(duplicate.arrivalCandidate)
         assertFalse(outOfOrder.arrivalCandidate)
         assertFalse(secondFresh.arrivalCandidate)
-        // S07-32 (R6): the evidence restarted at 2 s, so 3 s of it is reached at 5 s, not at 4 s.
+        // Two fresh fixes first restore location authority at 3 s; the three-second arrival window then ends at 6 s.
         for (at in listOf(3_000L, 4_000L)) {
             assertFalse(navigator.update(nearEnd.copy(elapsedRealtimeMs = at), nowMs = at, requestInFlight = false).arrivalCandidate)
         }
         val thirdFresh = navigator.update(nearEnd.copy(elapsedRealtimeMs = 5_000L), nowMs = 5_000L, requestInFlight = false)
-        assertTrue(thirdFresh.arrivalCandidate)
+        assertFalse(thirdFresh.arrivalCandidate)
+        val afterReacquisition = navigator.update(nearEnd.copy(elapsedRealtimeMs = 6_000L), 6_000L, false)
+        assertTrue(afterReacquisition.arrivalCandidate)
     }
 
     @Test
@@ -1403,7 +1446,7 @@ class RouteNavigatorTest {
             nowMs = 2_000L,
             requestInFlight = false,
         )
-        // S07-32 (R6): the evidence restarted at 2 s, so 3 s of it is reached at 5 s, not at 4 s.
+        // Two fresh fixes first restore location authority at 3 s; the three-second arrival window then ends at 6 s.
         for (at in listOf(3_000L, 4_000L)) {
             assertFalse(navigator.update(nearEnd.copy(elapsedRealtimeMs = at), nowMs = at, requestInFlight = false).arrivalCandidate)
         }
@@ -1417,7 +1460,9 @@ class RouteNavigatorTest {
         assertFalse(firstRecovered.arrivalCandidate)
         assertFalse(firstRecovered.arrived)
         assertTrue(navigator.hasRoute())
-        assertTrue(secondRecovered.arrivalCandidate)
+        assertFalse(secondRecovered.arrivalCandidate)
+        val afterReacquisition = navigator.update(nearEnd.copy(elapsedRealtimeMs = 6_000L), 6_000L, false)
+        assertTrue(afterReacquisition.arrivalCandidate)
     }
 
     @Test
@@ -1426,18 +1471,20 @@ class RouteNavigatorTest {
         fun facing(degrees: Double, observedAtMs: Long) = RouteFacingObservation(degrees, 0.0, observedAtMs)
         fun guidance(nowMs: Long, degrees: Double, observedAtMs: Long = nowMs) =
             navigator.currentGuidance(nowMs, facing(degrees, observedAtMs))?.instruction
-        fun hasClock(instruction: String?) = instruction?.contains("시 방향") == true
+        fun hasClock(instruction: String?) = instruction?.let { Regex("""약 (?:1[0-2]|[1-9])시 방향""").containsMatchIn(it) } == true
 
         // S08-5: with no spoken sector yet, the first fresh sample is spoken; only a change waits.
         val first = navigator.update(locationNearStart(), 1_000L, false, facingObservation = facing(355.0, 1_000L))
         assertTrue(first.instruction?.contains("12시 방향") == true)
         assertTrue(guidance(1_001L, 355.0, 1_000L)?.contains("12시 방향") == true)
         assertTrue(guidance(1_002L, 355.0)?.contains("12시 방향") == true)
-        assertFalse(hasClock(guidance(1_003L, 335.0)))
+        assertTrue(guidance(1_003L, 335.0)?.contains("12시 방향") == true)
+        assertFalse(guidance(1_003L, 335.0, 1_003L)?.contains("약 1시 방향") == true)
         assertTrue(guidance(1_004L, 355.0)?.contains("12시 방향") == true)
-        assertFalse(hasClock(guidance(1_005L, 335.0)))
+        assertTrue(guidance(1_005L, 335.0)?.contains("12시 방향") == true)
         // Repeating the same sensor sample is not a second fresh observation of the new sector.
-        assertFalse(hasClock(guidance(1_006L, 335.0, 1_005L)))
+        assertTrue(guidance(1_006L, 335.0, 1_005L)?.contains("12시 방향") == true)
+        assertFalse(guidance(1_006L, 335.0, 1_005L)?.contains("약 1시 방향") == true)
         assertTrue(guidance(1_007L, 335.0)?.contains("1시 방향") == true)
 
         val independent = RouteNavigator().apply { setRoute(route()) }
@@ -1449,13 +1496,14 @@ class RouteNavigatorTest {
     fun invalidFacingAndRouteReplacementClearConfirmedClockSector() {
         val navigator = RouteNavigator().apply { setRoute(route()) }
         fun facing(observedAtMs: Long, degrees: Double = 355.0) = RouteFacingObservation(degrees, 0.0, observedAtMs)
-        fun hasClock(instruction: String?) = instruction?.contains("시 방향") == true
+        fun hasClock(instruction: String?) = instruction?.let { Regex("""약 (?:1[0-2]|[1-9])시(?: 방향|에서 (?:1[0-2]|[1-9])시 사이 방향)""").containsMatchIn(it) } == true
 
         navigator.update(locationNearStart(), 1_000L, false, facingObservation = facing(1_000L))
         val confirmed = requireNotNull(navigator.currentGuidance(1_001L, facing(1_001L)))
         assertTrue(confirmed.instruction?.contains("12시 방향") == true)
         assertFalse(navigator.isInstructionCurrent(confirmed, 1_002L, null))
-        assertFalse(hasClock(navigator.currentGuidance(1_002L, null)?.instruction))
+        assertTrue(navigator.currentGuidance(1_002L, null)?.instruction?.contains("12시 방향") == true)
+        assertEquals(RouteDirectionGraceMode.GRACE_RETAINED, navigator.currentDirectionGraceSnapshot()?.mode)
         // S08-5: the invalid sample cleared 12 o'clock, so a different fresh sector is spoken at once
         // instead of waiting as a change from a sector that is no longer confirmed.
         assertTrue(navigator.currentGuidance(1_003L, facing(1_003L, 335.0))?.instruction?.contains("1시 방향") == true)

@@ -60,6 +60,54 @@ class GnssQualityObserverStatusCn0FallbackTest {
     }
 
     @Test
+    fun expiredStatusOnlyEvidenceRemainsDistinctFromNeverObservedSignals() {
+        val source = StatusFallbackSource(rawRegistered = false)
+        val observer = GnssQualityObserver(source = source, onSnapshot = {})
+        observer.start()
+        val before = observer.snapshot(SECOND)
+        assertFalse(before.isStale)
+        assertEquals(GnssSignalAvailability.UNSUPPORTED, before.signalAvailability)
+        source.status(epoch(SECOND, cn0DbHz = 15.0))
+
+        val expired = observer.snapshot(7 * SECOND)
+
+        assertTrue(expired.isStale)
+        assertEquals(GnssSignalAvailability.LOST_EXPIRED, expired.signalAvailability)
+        assertFalse(expired.cn0FromSatelliteStatus)
+        assertEquals(SignalEnvironmentRisk.UNKNOWN, expired.signalEnvironmentRisk)
+        assertEquals(1.0, expired.measurementNoiseMultiplier, 0.0)
+        source.status(epoch(8 * SECOND, cn0DbHz = 35.0))
+        assertFalse(observer.snapshot(8 * SECOND).isStale)
+        assertEquals(GnssSignalAvailability.OBSERVING, observer.snapshot(8 * SECOND).signalAvailability)
+    }
+
+    @Test
+    fun invalidRawReceiptCannotPublishOrConsumeTheMeasurementTimestamp() {
+        val source = StatusFallbackSource(rawRegistered = true)
+        val published = mutableListOf<GnssQualitySnapshot>()
+        val observer = GnssQualityObserver(source = source, onSnapshot = published::add)
+        observer.start()
+        source.raw(epoch(SECOND, 35.0).copy(receivedAtElapsedRealtimeNanos = SECOND - 1L))
+        assertTrue(published.isEmpty())
+        source.raw(epoch(SECOND, 35.0).copy(receivedAtElapsedRealtimeNanos = SECOND + 100_000_000L))
+        assertEquals(1, published.size)
+        assertEquals(SECOND + 100_000_000L, observer.snapshot(SECOND).latestEpochReceivedAtNanos)
+    }
+
+    @Test
+    fun invalidStatusReceiptCannotPublishOrConsumeTheMeasurementTimestamp() {
+        val source = StatusFallbackSource(rawRegistered = false)
+        val published = mutableListOf<GnssQualitySnapshot>()
+        val observer = GnssQualityObserver(source = source, onSnapshot = published::add)
+        observer.start()
+        source.status(epoch(SECOND, 35.0).copy(receivedAtElapsedRealtimeNanos = SECOND - 1L))
+        assertTrue(published.isEmpty())
+        source.status(epoch(SECOND, 35.0).copy(receivedAtElapsedRealtimeNanos = SECOND + 100_000_000L))
+        assertEquals(1, published.size)
+        assertEquals(SECOND + 100_000_000L, observer.snapshot(SECOND).latestEpochReceivedAtNanos)
+    }
+
+    @Test
     fun stopClearsTheStatusCn0Window() {
         val source = StatusFallbackSource(rawRegistered = false)
         val observer = GnssQualityObserver(source = source, onSnapshot = {})

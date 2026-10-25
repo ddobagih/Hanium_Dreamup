@@ -269,6 +269,7 @@ jobs:
       - name: Prepare pinned Korean voice model
         run: |
           "${WALKSAFE_GENERAL_PYTHON_BIN:?}" -I -S -B scripts/prepare_vosk_ko_small_model.py
+      # The unit layer runs strict JVM policies and the allowlisted inert-SDK task separately.
       - name: Run commit-stable test layers
         env:
           WALKSAFE_RUN_ANDROID_DEVICE_TESTS: "false"

@@ -12,10 +12,13 @@ class PermissionSessionLifecycleStaticTest {
 
     @Test
     fun accountLogoutDoesNotMutatePermissionsOrConsentPreferences() {
-        val logout = functionBlock("private fun onAccountLogoutClicked()")
+        val logout = MainActivityRefactorSource.function(source, "private fun onAccountLogoutClicked()")
 
-        assertTrue(logout.contains("permissionSessionPolicy.explicitLogout()"))
-        assertTrue(logout.contains("remove(PREF_REPORTER_USER_ID_KEY)"))
+        assertTrue(logout.contains("identity.explicitLogout()"))
+        assertTrue(logout.contains("identity.forgetStoredReporterActor()"))
+        val binding = MainActivityRefactorSource.composition(source, "accountAccessInteractionOwner")
+        assertTrue(binding.contains("override fun explicitLogout() { permissionSessionPolicy.explicitLogout() }"))
+        assertTrue(binding.contains("override fun forgetStoredReporterActor() { stepLengthPrefs.edit().remove(PREF_REPORTER_USER_ID_KEY).commit() }"))
         assertFalse(logout.contains("withdrawReportPrivacyConsent"))
         assertFalse(logout.contains("PREF_REPORT_PRIVACY_CONSENT_KEY"))
         assertFalse(logout.contains("PREF_AUTOMATIC_REPORT_CONSENT_KEY"))
@@ -24,8 +27,8 @@ class PermissionSessionLifecycleStaticTest {
 
     @Test
     fun lifecycleBoundariesCancelTransfersButKeepTheConsentDecision() {
-        val pause = functionBlock("internal fun pauseWalkSafeRuntime()")
-        val destroy = functionBlock("override fun onDestroy()")
+        val pause = MainActivityRefactorSource.function(source, "internal fun pauseWalkSafeRuntime()")
+        val destroy = MainActivityRefactorSource.function(source, "override fun onDestroy()")
 
         assertTrue(pause.contains("reportPrivacyConsentSession.cancelActiveCalls()"))
         assertFalse(pause.contains("withdrawReportPrivacyConsent"))
@@ -33,35 +36,53 @@ class PermissionSessionLifecycleStaticTest {
         assertFalse(destroy.contains("withdrawReportPrivacyConsent"))
         assertTrue(
             destroy.contains(
-                "GatewaySessionProcessCoordinator.detach(gatewaySessionOwner)",
+                "privacyStartupResources.releaseOnUiThread(gatewaySessionController)",
             ),
         )
         assertFalse(destroy.contains("clearGatewaySession("))
+        val gateway = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/GatewaySessionController.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(gateway, "detach").contains("GatewaySessionProcessCoordinator.detach(owner)"))
+        assertTrue(MainActivityRefactorSource.property(gateway, "owner").contains("private val owner = Any()"))
     }
 
     @Test
     fun protectedNetworkEntryPointsApplyTheIndependentNetworkPreference() {
+        fun navigationInput(startMarker: String, endMarker: String): String {
+            val factory = MainActivityRefactorSource.factory(source, "createNavigationSessions")
+            assertTrue(Regex(Regex.escape(startMarker)).findAll(factory).count() == 1)
+            assertTrue(Regex(Regex.escape(endMarker)).findAll(factory).count() == 1)
+            val start = factory.indexOf(startMarker)
+            val end = factory.indexOf(endMarker, start + startMarker.length)
+            assertTrue(start >= 0 && end > start)
+            return factory.substring(start, end)
+        }
+
         assertTrue(manifest.contains("android.permission.ACCESS_NETWORK_STATE"))
         assertTrue(
-            functionBlock("private fun onGatewaySessionButtonClicked()")
-                .contains("isGatewayNetworkAllowed(reason = \"gateway_login\")"),
+            MainActivityRefactorSource.function(source, "private fun onGatewaySessionButtonClicked()")
+                .contains("runtime.gatewayNetworkAllowed(reason = \"gateway_login\")"),
         )
+        val search = MainActivityRefactorSource.member(MainActivityRefactorSource.destination, "search")
+        assertTrue(MainActivityRefactorSource.composition(source, "destinationSearchController").contains("DestinationSearchController("))
+        assertTrue(MainActivityRefactorSource.member(source, "buildContentView").contains("destinationSearchController.search(reset = true)"))
+        assertTrue(search.contains("if (!actions.networkAllowed()) return false"))
+        assertTrue(source.contains("override fun networkAllowed() = isGatewayNetworkAllowed(reason = \"destination_search\")"))
         assertTrue(
-            functionBlock("private fun performDestinationSearch(")
-                .contains("isGatewayNetworkAllowed(reason = \"destination_search\")"),
+            MainActivityRefactorSource.function(source, "private fun requestRoute(")
+                .contains("effects.networkAllowed(reason = \"walking_route\")"),
         )
-        assertTrue(
-            functionBlock("private fun requestRoute(")
-                .contains("isGatewayNetworkAllowed(reason = \"walking_route\")"),
-        )
-        val process = functionBlock("private fun processReportCandidate(")
-        assertTrue(process.contains("reportQueueStore.enqueue("))
+        assertTrue(MainActivityRefactorSource.composition(source, "gatewaySessionController").contains("isGatewayNetworkAllowed(reason = reason)"))
+        assertTrue(navigationInput("routes = AcquisitionAssemblyBindings(", "resources = NavigationAssemblyResources(").contains("isGatewayNetworkAllowed(reason = reason)"))
+        assertTrue(MainActivityRefactorSource.composition(source, "routeAcquisitionController").contains("override fun networkAllowed(reason: String): Boolean = activityEffects.networkAllowed(reason)"))
+        assertTrue(MainActivityRefactorSource.composition(source, "reportQueueDrainController").contains("override fun currentBinding() = networkStateProbe.currentIntegratedConsentBinding()"))
+        val process = MainActivityRefactorSource.function(source, "private fun processReportCandidate(")
+        assertTrue(process.contains("queue.enqueue("))
         assertFalse(process.contains("uploadCall("))
-        val capture = functionBlock("private fun buildReportQueueDrainTrigger(")
+        val capture = MainActivityRefactorSource.function(source, "private fun buildReportQueueDrainTrigger(")
         assertTrue(capture.contains("AndroidNetworkTransferPolicy.isAllowed("))
-        assertTrue(capture.contains("currentIntegratedConsentBinding() ?: return null"))
+        assertTrue(capture.contains("network.currentBinding() ?: return null"))
         assertTrue(capture.contains("networkBinding.matches(networkTransport)"))
-        val context = functionBlock("private fun reportQueueDrainContext(")
+        val context = MainActivityRefactorSource.function(source, "private fun reportQueueDrainContext(")
         assertTrue(context.contains("trigger.networkBinding.isSameNetworkBinding(currentBinding)"))
         assertTrue(context.contains("AndroidNetworkTransferPolicy.isAllowed("))
         assertTrue(context.contains("runtime.networkGeneration == trigger.networkGeneration"))
@@ -69,16 +90,31 @@ class PermissionSessionLifecycleStaticTest {
 
     @Test
     fun permissionsAreReobservedWithoutClearingUnrelatedState() {
-        val application = functionBlock("private fun applyObservedPermissionStateChange(")
+        val application = MainActivityRefactorSource.function(source, "private fun applyObservedPermissionStateChange(")
 
         assertTrue(source.contains("applyObservedPermissionStateChange(\"app_resumed\")"))
-        assertTrue(application.contains("stopDepthSession(closeSession = true)"))
-        assertTrue(application.contains("stopCameraFallbackSession(updateUi = false)"))
-        assertTrue(application.contains("stopLocationUpdates()"))
-        assertTrue(application.contains("cancelVoiceCommandRecognition()"))
-        assertTrue(application.contains("stopStepTracking()"))
+        assertTrue(application.contains("runtime.stopDepth()"))
+        assertTrue(application.contains("runtime.stopCameraFallback()"))
+        assertTrue(application.contains("runtime.stopLocation()"))
+        assertTrue(application.contains("runtime.cancelVoiceRecognition()"))
+        assertTrue(application.contains("runtime.stopSteps()"))
         assertTrue(application.contains("해당 기능만 중지하고 나머지 기능은 계속 사용합니다."))
-        assertFalse(application.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        val binding = MainActivityRefactorSource.composition(source, "permissionFlowController")
+        assertTrue(binding.contains("override fun stopDepth() { stopDepthSession(closeSession = true) }"))
+        assertTrue(binding.contains("override fun stopCameraFallback() { stopCameraFallbackSession(updateUi = false) }"))
+        assertTrue(binding.contains("override fun stopLocation() { stopLocationUpdates() }"))
+        assertTrue(binding.contains("override fun cancelVoiceRecognition() { cancelVoiceCommandRecognition() }"))
+        assertTrue(binding.contains("override fun stopSteps() { stopStepTracking() }"))
+        assertTrue(binding.contains("override fun safetyStop(reason: String) { enterWalkSessionSafetyStopAndCancelOutputs(reason) }"))
+        assertTrue(application.contains("PermissionDependencyPolicy.evaluate("))
+        assertTrue(application.contains(
+            ").requiresWholeWalkSafetyStop\n        ) {\n            runtime.safetyStop(\"core_guidance_permissions_unavailable\")",
+        ))
+        val limitation = application.substringAfter("val stateAfterRefresh =")
+            .substringBefore("else if (")
+        assertTrue(limitation.contains("stateAfterRefresh in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)"))
+        assertTrue(limitation.contains("readiness.hasDeviceRestrictions()"))
+        assertFalse(limitation.contains("runtime.safetyStop("))
         assertFalse(application.contains("permissionSessionPolicy"))
         assertFalse(application.contains("withdrawReportPrivacyConsent"))
     }
@@ -99,23 +135,32 @@ class PermissionSessionLifecycleStaticTest {
 
     @Test
     fun settingsReturnRequiresFullRecheckWithoutAutomaticResourceStart() {
-        val resume = functionBlock("override fun onResume()")
+        val resume = MainActivityRefactorSource.function(source, "override fun onResume()")
         val resumeRuntime =
-            functionBlock("private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()")
-        val recheck = functionBlock("private fun completePermissionRecoveryRecheckIfPossible()")
-        val prerequisites = functionBlock("private fun permissionRecoveryPrerequisitesReady(")
+            MainActivityRefactorSource.function(source, "private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()")
+        val recheck = MainActivityRefactorSource.function(source, "private fun completePermissionRecoveryRecheckIfPossible()")
+        val prerequisites = MainActivityRefactorSource.function(source, "private fun permissionRecoveryPrerequisitesReady(")
 
         assertTrue(resume.contains("resumeWalkSafeRuntimeAfterPrivacyStartupInspection()"))
-        assertTrue(resumeRuntime.contains("permissionRecoveryGate.recheckRequired()"))
+        assertTrue(resumeRuntime.contains("permissionFlowController.requirePermissionRecoveryRecheckAfterPrivacyInspection()"))
+        val privacyRecheck = MainActivityRefactorSource.function(source, "fun requirePermissionRecoveryRecheckAfterPrivacyInspection(")
+        assertTrue(privacyRecheck.contains("if (permissionRecoveryGate.blocksAutomaticResourceStart)"))
+        assertTrue(privacyRecheck.contains("permissionRecoveryGate.recheckRequired()"))
+        assertTrue(privacyRecheck.contains("persistPermissionRecoveryGate()"))
         assertTrue(resumeRuntime.contains("updateIntegratedConsentUi()"))
         assertTrue(resumeRuntime.contains("updateReportPrivacyConsentUi()"))
         assertTrue(resumeRuntime.contains("completePermissionRecoveryRecheckIfPossible()"))
         assertTrue(recheck.contains("permissionRecoveryPrerequisitesReady(decision)"))
-        assertTrue(prerequisites.contains("firstRunOnboardingComplete()"))
-        assertTrue(prerequisites.contains("currentReporterUserId()"))
-        assertTrue(prerequisites.contains("isGatewaySessionReadyForCurrentActor()"))
+        assertTrue(prerequisites.contains("authority.firstRunComplete()"))
+        assertTrue(prerequisites.contains("authority.currentActorId()"))
+        assertTrue(prerequisites.contains("readiness.gatewayReady()"))
         assertTrue(prerequisites.contains("decision.mayConfirmAndStart"))
-        assertTrue(prerequisites.contains("walkSessionReadinessBlockReason(decision)"))
+        assertTrue(prerequisites.contains("readiness.blockReason(decision)"))
+        val binding = MainActivityRefactorSource.composition(source, "permissionFlowController")
+        assertTrue(binding.contains("override fun firstRunComplete() = firstRunOnboardingComplete()"))
+        assertTrue(binding.contains("override fun currentActorId() = currentReporterUserId()"))
+        assertTrue(binding.contains("override fun gatewayReady() = isGatewaySessionReadyForCurrentActor()"))
+        assertTrue(binding.contains("walkSessionReadinessBlockReason(decision)"))
         assertTrue(recheck.contains("completeFullRecheck("))
         val transitionIndex =
             recheck.indexOf("permissionRecoveryGate.completeFullRecheck(")
@@ -145,25 +190,38 @@ class PermissionSessionLifecycleStaticTest {
 
     @Test
     fun walkPermissionDenialLimitsFeaturesWithoutBlockingOrExitingTheApp() {
-        val create = functionBlock("override fun onCreate(savedInstanceState: Bundle?)")
-        val request = functionBlock("private fun requestPermissionsWithLease(")
-        val callback = functionBlock("override fun onRequestPermissionsResult(")
-        val barrier = functionBlock("private fun enterPermissionRecoveryBarrier(")
-        val confirmation = functionBlock("private fun onPermissionDenialConfirmed()")
-        val fieldToggle = functionBlock("private fun toggleFieldSessionLog()")
+        val create = MainActivityRefactorSource.function(source, "override fun onCreate(savedInstanceState: Bundle?)")
+        val request = MainActivityRefactorSource.function(source, "private fun requestPermissionsWithLease(")
+        val callback = permissionResultOwner()
+        val barrier = MainActivityRefactorSource.function(source, "private fun enterPermissionRecoveryBarrier(")
+        val confirmation = MainActivityRefactorSource.function(source, "private fun onPermissionDenialConfirmed()")
+        val fieldToggle = MainActivityRefactorSource.function(source, "private fun toggleFieldSessionLog()")
 
         assertTrue(create.contains("restorePermissionRecoveryGateFromPrefs()"))
         assertTrue(create.contains("fieldSessionLog.blockActiveSessionRestore()"))
-        assertTrue(request.indexOf("persistPermissionRecoveryGate()") < request.indexOf("requestPermissions("))
-        assertTrue(callback.contains("lease.requestedPermissions"))
-        assertTrue(callback.contains("filterNot(observed::isGranted)"))
+        assertTrue(request.indexOf("persistPermissionRecoveryGate()") < request.indexOf("platform.launchRequest("))
+        assertTrue(callback.contains("isPermissionRequestLeaseCurrent(lease)"))
+        assertTrue(callback.contains("permission !in lease.requestedAndroidPermissions"))
+        assertTrue(callback.contains("PermissionRequestPurpose.WALK_SESSION -> handleWalkSessionPermissionResult()"))
+        val walkResult = MainActivityRefactorSource.function(source, "private fun handleWalkSessionPermissionResult()")
+        assertTrue(walkResult.contains("readiness.missingRequired(action)"))
+        assertTrue(walkResult.contains("readiness.missingForDecision(decision)"))
         assertFalse(callback.contains("enterPermissionRecoveryBarrier("))
         assertTrue(callback.contains("showPermissionDenialPanel("))
-        assertTrue(callback.contains("permissionRecoveryGate = PermissionRecoveryGate()"))
-        assertTrue(barrier.contains("fieldSessionLog.blockActiveSessionRestore()"))
+        assertTrue(callback.contains("permissionRecoveryGate.recheckRequired()"))
+        assertTrue(callback.contains("PermissionRecoveryGate()"))
+        assertTrue(barrier.contains("runtime.blockFieldSessionRestore()"))
+        val binding = MainActivityRefactorSource.composition(source, "permissionFlowController")
+        assertTrue(binding.contains("override fun blockFieldSessionRestore() { if (::fieldSessionLog.isInitialized) fieldSessionLog.blockActiveSessionRestore() }"))
+        assertTrue(binding.contains("missingRequiredWalkSessionPermissions(action)"))
+        assertTrue(binding.contains("missingWalkSessionPermissions(decision)"))
+        val ui = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/AndroidPermissionUi.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(ui, "hidePanel").contains("permissionDenialPanel.visibility = View.GONE"))
         assertFalse(confirmation.contains("finishAndRemoveTask()"))
-        assertTrue(confirmation.contains("permissionRecoveryGate = PermissionRecoveryGate()"))
-        assertTrue(confirmation.contains("permissionDenialPanel.visibility = View.GONE"))
+        assertTrue(confirmation.contains("permissionRecoveryGate.recheckBinding != null"))
+        assertTrue(confirmation.contains("permissionRecoveryGate.recheckRequired()"))
+        assertTrue(confirmation.contains("PermissionRecoveryGate()"))
+        assertTrue(confirmation.contains("ui.hidePanel()"))
         assertTrue(fieldToggle.contains("permissionRecoveryGate.blocksAutomaticResourceStart"))
         assertTrue(fieldToggle.contains("startAfterUserConfirmation()"))
         assertFalse(fieldToggle.contains("fieldSessionLog.start()"))
@@ -171,21 +229,23 @@ class PermissionSessionLifecycleStaticTest {
 
     @Test
     fun reportBoundaryChecksPermissionsBeforeFreezingAndUsesGatedQueueDrain() {
-        val prepare = functionBlock("private fun prepareReportCandidate(")
-        val process = functionBlock("private fun processReportCandidate(")
-        val drain = functionBlock("private fun drainInitialExactReportQueue(")
+        val prepare = MainActivityRefactorSource.function(source, "private fun prepareReportCandidate(")
+        val process = MainActivityRefactorSource.function(source, "private fun processReportCandidate(")
+        val drain = MainActivityRefactorSource.function(source, "private fun drainInitialExactReportQueue(")
 
         assertTrue(prepare.contains("reportPermissionsAllowWork()"))
         assertTrue(process.contains("reportPermissionsAllowWork()"))
         val permissionGate = process.indexOf("reportPermissionsAllowWork()")
-        val enqueue = process.indexOf("reportQueueStore.enqueue(")
+        val enqueue = process.indexOf("queue.enqueue(")
         assertTrue(
             permissionGate >= 0 && enqueue > permissionGate,
         )
         assertFalse(process.contains("uploadCall("))
-        assertTrue(drain.contains("AndroidReportQueueTransport("))
+        assertTrue(drain.contains("transportFactory(trigger)"))
+        assertTrue(MainActivityRefactorSource.composition(source, "reportQueueDrainController").contains("AndroidReportQueueTransport("))
+        assertTrue(MainActivityRefactorSource.composition(source, "reportCandidateController").contains("reportQueueStore.enqueue("))
         val baseGate = drain.indexOf("if (!context.allRequiredBaseGatesAllowed()) break")
-        val startNext = drain.indexOf("reportQueueDrainCoordinator.startNext(")
+        val startNext = drain.indexOf("reportQueueDrainCoordinator.startNextWithResult(")
         val execute = drain.indexOf("call.execute()")
         assertTrue(baseGate >= 0 && startNext > baseGate)
         assertTrue(execute > startNext)
@@ -193,9 +253,9 @@ class PermissionSessionLifecycleStaticTest {
 
     @Test
     fun permissionRecheckAcknowledgementNeverStartsOrAdvancesTheRuntime() {
-        val confirmation = functionBlock("private fun onPermissionDenialConfirmed()")
-        val actionButtonMarker = "actionButton = Button(this).apply"
-        val debugUploadButtonMarker = "debugUploadButton = Button(this).apply"
+        val confirmation = MainActivityRefactorSource.function(source, "private fun onPermissionDenialConfirmed()")
+        val actionButtonMarker = "actionButton = runtimeComposer.createDepthAction("
+        val debugUploadButtonMarker = "debugUploadButton = runtimeComposer.createDebugUploadAction("
         assertTrue(source.contains(actionButtonMarker))
         assertTrue(source.contains(debugUploadButtonMarker))
         val actionControl = source
@@ -217,17 +277,25 @@ class PermissionSessionLifecycleStaticTest {
             .substringAfter(awaitingMarker)
             .substringBefore(otherStatesMarker)
 
-        assertTrue(awaitingConfirmation.contains("permissionDenialPanel.visibility = View.GONE"))
-        assertTrue(awaitingConfirmation.contains("updateStatus("))
+        assertTrue(awaitingConfirmation.contains("ui.hidePanel()"))
+        assertTrue(awaitingConfirmation.contains("runtime.status("))
         assertFalse(awaitingConfirmation.contains("acknowledgeExplicitResume("))
         assertFalse(awaitingConfirmation.contains("persistPermissionRecoveryGate()"))
         assertFalse(awaitingConfirmation.contains("maybeAdvanceFirstRunOnboarding()"))
         assertFalse(awaitingConfirmation.contains("refreshStartupCapabilityUi()"))
         assertTrue(awaitingConfirmation.contains("renderAwaitingExplicitResumeControl()"))
         assertFalse(awaitingConfirmation.contains("ensurePermissionsThenStart()"))
+        assertFalse(awaitingConfirmation.contains("runtime.startAfterPermissionRecovery("))
+        assertFalse(awaitingConfirmation.contains("runtime.refreshStartup("))
+        val permissionUi = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/AndroidPermissionUi.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(permissionUi, "hidePanel").contains("permissionDenialPanel.visibility = View.GONE"))
+        assertTrue(MainActivityRefactorSource.composition(source, "permissionFlowController").contains("permissionFlowStatusPresenter(status, detail)"))
+        assertTrue(MainActivityRefactorSource.property(source, "permissionFlowStatusPresenter").contains("= ::updateStatus"))
+        val runtimeViews = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRuntimeViewComposer.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(runtimeViews, "createDepthAction").contains("setOnClickListener { onClick() }"))
 
         val explicitResume =
-            functionBlock("private fun resumePermissionRecoveryFromExplicitUserAction(): Boolean")
+            MainActivityRefactorSource.function(source, "private fun resumePermissionRecoveryFromExplicitUserAction(): Boolean")
         assertTrue(startAction.contains("resumePermissionRecoveryFromExplicitUserAction()"))
         assertTrue(startAction.contains("ensurePermissionsThenStart()"))
         assertFalse(startAction.contains("acknowledgeExplicitResume("))
@@ -236,85 +304,93 @@ class PermissionSessionLifecycleStaticTest {
         val clearIndex = explicitResume.indexOf("acknowledgeExplicitResume(")
         assertTrue(explicitResume.contains("observed = currentObservedPermissionSnapshot()"))
         val persistIndex = explicitResume.indexOf("persistPermissionRecoveryGate()")
-        val ensureIndex = explicitResume.indexOf("ensurePermissionsThenStart()")
+        val ensureIndex = explicitResume.indexOf("runtime.startAfterPermissionRecovery()")
+        assertTrue(MainActivityRefactorSource.composition(source, "permissionFlowController").contains("override fun startAfterPermissionRecovery() { ensurePermissionsThenStart() }"))
         assertTrue(clearIndex < persistIndex && persistIndex < ensureIndex)
         assertTrue(
-            Regex(Regex.escape("acknowledgeExplicitResume(")).findAll(source).count() == 1,
+            Regex(Regex.escape("acknowledgeExplicitResume(")).findAll(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/PermissionFlowController.kt").readText()).count() == 1,
         )
         assertTrue(
             Regex(
-                Regex.escape("resumePermissionRecoveryFromExplicitUserAction()"),
+                "(?<![.])" + Regex.escape("resumePermissionRecoveryFromExplicitUserAction()"),
             ).findAll(source).count() == 3,
         )
     }
 
     @Test
     fun awaitingPermissionRecoveryUsesTheReachableExternalResumeControl() {
-        val externalButtonMarker = "startupCapabilityConfirmButton = Button(this).apply"
-        val externalButtonEnd = "permissionDenialPanel = LinearLayout(this).apply"
+        val panel = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/OnboardingReadinessPanel.kt").readText()
+        val externalButtonMarker = "startupCapabilityConfirmButton = Button(context).apply"
+        val externalButtonEnd = "permissionDenialPanel = LinearLayout(context).apply"
         val clickMarker = "setOnClickListener {"
-        val normalClickMarker = "val session = walkSessionLifecycle.snapshot()"
-        val refreshButtonMarker = "startupCapabilityConfirmButton.apply {"
-        val refreshButtonEnd = "updatePriorityUserOnboardingUi(decision)"
-        val runtimeVisibilityMarker = "runtimeControls.visibility ="
-        listOf(
-            externalButtonMarker,
-            externalButtonEnd,
-            clickMarker,
-            normalClickMarker,
-            refreshButtonMarker,
-            refreshButtonEnd,
-            runtimeVisibilityMarker,
-        ).forEach { marker ->
-            assertTrue("Missing exact source marker: $marker", source.contains(marker))
+        val normalClickMarker = "val session = lifecycle().snapshot()"
+        val refreshButtonMarker = "ui.render("
+        val refreshButtonEnd = "ui.updatePriority(decision)"
+        val runtimeVisibilityMarker = "runtimeVisible ="
+        for (marker in listOf(externalButtonMarker, externalButtonEnd, clickMarker)) {
+            assertTrue("Missing actual SDK control marker: $marker", panel.contains(marker))
         }
-
-        val externalButton = source
-            .substringAfter(externalButtonMarker)
-            .substringBefore(externalButtonEnd)
+        assertTrue(MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/interaction/StartupConfirmationInteractionController.kt").readText(), "handleStartupCapabilityConfirmAction").contains(normalClickMarker))
+        assertTrue(MainActivityRefactorSource.function(source, "private fun refreshStartupCapabilityUi()").contains(refreshButtonMarker))
+        assertTrue(MainActivityRefactorSource.function(source, "private fun refreshStartupCapabilityUi()").contains(refreshButtonEnd))
+        assertTrue(MainActivityRefactorSource.function(source, "private fun updateFirstRunOnboardingUi()").contains(runtimeVisibilityMarker))
+        val externalButton = panel.substringAfter(externalButtonMarker).substringBefore(externalButtonEnd)
+        assertTrue(externalButton.contains("setOnClickListener { actions.readiness.onStartupConfirmed() }"))
+        assertTrue(MainActivityRefactorSource.member(source, "buildContentView").contains("onStartupConfirmed = { handleStartupCapabilityConfirmAction() }"))
         val explicitClick =
-            functionBlock("private fun handleStartupCapabilityConfirmAction()")
-        val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
-        val refreshButton = refresh
-            .substringAfter(refreshButtonMarker)
-            .substringBefore(refreshButtonEnd)
+            MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/interaction/StartupConfirmationInteractionController.kt").readText(), "handleStartupCapabilityConfirmAction")
+        val refresh = MainActivityRefactorSource.function(source, "private fun refreshStartupCapabilityUi()")
+        val renderer = MainActivityRefactorSource.function(source, "private fun renderStartupCapabilityFacts(")
+        val rendererBinding = MainActivityRefactorSource.composition(source, "startupCapabilityFactsRenderer")
+        val refreshButton = rendererBinding
+        assertTrue(renderer.contains("if (effects.render(startupUiFacts)) effects.renderExplicitResume()"))
         val runtimeVisibility =
-            functionBlock("private fun updateFirstRunOnboardingUi()")
+            MainActivityRefactorSource.function(source, "private fun updateFirstRunOnboardingUi()")
                 .substringAfter(runtimeVisibilityMarker)
         val automaticRecheck =
-            functionBlock("private fun completePermissionRecoveryRecheckIfPossible()")
+            MainActivityRefactorSource.function(source, "private fun completePermissionRecoveryRecheckIfPossible()")
         val automaticAdvance =
-            functionBlock("private fun maybeAdvanceWalkSessionAfterCapabilityCheck()")
-        val restoredGate =
-            functionBlock("private fun restorePermissionRecoveryGateFromPrefs()")
-        val pureRender =
-            functionBlock("private fun renderAwaitingExplicitResumeControl()")
+            MainActivityRefactorSource.function(source, "private fun maybeAdvanceWalkSessionAfterCapabilityCheck()")
+        val restoredGate = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/AndroidPermissionPreferences.kt").readText(), "restoreRecovery")
+        assertTrue(MainActivityRefactorSource.function(source, "private fun restorePermissionRecoveryGateFromPrefs()").contains("preferences.restoreRecovery()"))
+        val pureRender = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/AndroidPermissionUi.kt").readText(), "renderResumeControl")
+        assertTrue(MainActivityRefactorSource.function(source, "private fun renderAwaitingExplicitResumeControl()").contains("ui.renderResumeControl()"))
 
-        assertTrue(explicitClick.contains("resumePermissionRecoveryFromExplicitUserAction()"))
+        assertTrue(explicitClick.contains("effects.resumePermissionRecovery()"))
         assertTrue(
             explicitClick.contains(
-                "if (resumePermissionRecoveryFromExplicitUserAction()) return",
+                "if (effects.resumePermissionRecovery()) return",
             ),
         )
         assertTrue(
-            explicitClick.indexOf("startupCapabilityRetryRequiresUserAction = false") <
-                explicitClick.indexOf("resumePermissionRecoveryFromExplicitUserAction()"),
+            explicitClick.indexOf("retryRequiresUserAction = false") <
+                explicitClick.indexOf("effects.resumePermissionRecovery()"),
         )
         assertTrue(
-            explicitClick.indexOf("walkSessionResumeRetryRequiresUserAction = false") <
-                explicitClick.indexOf("resumePermissionRecoveryFromExplicitUserAction()"),
+            explicitClick.indexOf("effects.prepareResumeRetry()") <
+                explicitClick.indexOf("effects.resumePermissionRecovery()"),
         )
+        val interactionFactoryStart = source.indexOf("private fun createStartupConfirmationInteraction(): StartupConfirmationInteractionController =")
+        val interactionFactoryEnd = source.indexOf("\nprivate fun handleStartupCapabilityConfirmAction()", interactionFactoryStart)
+        assertTrue(Regex(Regex.escape("private fun createStartupConfirmationInteraction(): StartupConfirmationInteractionController =")).findAll(source).count() == 1)
+        assertTrue(Regex(Regex.escape("\nprivate fun handleStartupCapabilityConfirmAction()")).findAll(source).count() == 1)
+        assertTrue(interactionFactoryStart >= 0 && interactionFactoryEnd > interactionFactoryStart)
+        val clickBinding = MainActivityRefactorSource.composition(source, "startupConfirmationInteraction")
+        assertTrue(clickBinding.contains("StartupConfirmationInteractionController("))
+        assertTrue(clickBinding.contains("lifecycle = { walkSessionLifecycle }"))
+        assertTrue(clickBinding.contains("override fun prepareResumeRetry() = walkSessionResumeController.prepareConfirmationRetry()"))
+        assertTrue(clickBinding.contains("override fun resumePermissionRecovery() = resumePermissionRecoveryFromExplicitUserAction()"))
         assertTrue(refreshButton.contains("PermissionRecoveryGateState.AWAITING_EXPLICIT_RESUME"))
         assertTrue(refreshButton.contains("renderAwaitingExplicitResumeControl()"))
         assertTrue(pureRender.contains("startupCapabilityConfirmButton.visibility = View.VISIBLE"))
         assertTrue(pureRender.contains("startupCapabilityConfirmButton.isEnabled = true"))
         assertTrue(pureRender.contains("startupCapabilityConfirmButton.text = \"보행 안내 다시 시작\""))
         assertTrue(pureRender.contains("runtimeControls.visibility = View.GONE"))
-        assertTrue(runtimeVisibility.contains("!permissionRecoveryGate.blocksAutomaticResourceStart"))
-        assertTrue(runtimeVisibility.contains("View.GONE"))
+        assertTrue(runtimeVisibility.contains("!facts.permissionRecoveryBlocksStart()"))
+        assertTrue(MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/FirstRunOnboardingPresenter.kt").readText(), "renderRuntime").contains("View.GONE"))
 
         listOf(refresh, automaticRecheck, restoredGate).forEach { automatic ->
-            assertFalse(automatic.contains("acknowledgeExplicitResume()"))
+            assertFalse(automatic.contains("acknowledgeExplicitResume("))
             assertFalse(automatic.contains("resumePermissionRecoveryFromExplicitUserAction()"))
         }
         assertFalse(refresh.contains("permissionRecoveryGate ="))
@@ -325,20 +401,28 @@ class PermissionSessionLifecycleStaticTest {
             "acknowledgeExplicitResume()",
             "ensurePermissionsThenStart()",
             "refreshStartupCapabilityUi()",
+            "runtime.refreshStartup(",
+            "runtime.startAfterPermissionRecovery(",
         ).forEach { forbiddenCall ->
             assertFalse(pureRender.contains(forbiddenCall))
         }
         assertFalse(refresh.contains("completePermissionRecoveryRecheckIfPossible()"))
+        assertTrue(MainActivityRefactorSource.composition(source, "firstRunPresentationCoordinator").contains("permissionRecoveryGate.blocksAutomaticResourceStart"))
+        assertTrue(MainActivityRefactorSource.composition(source, "walkSessionAdmissionController").contains("completePermissionRecoveryRecheckIfPossible()"))
+        assertTrue(MainActivityRefactorSource.composition(source, "permissionFlowController").contains("ui = permissionFlowUi"))
+        assertTrue(MainActivityRefactorSource.composition(source, "permissionFlowUi").contains("AndroidPermissionUi(this,"))
         assertTrue(automaticAdvance.contains("if (createdConfirmationToken)"))
-        assertTrue(automaticAdvance.contains("refreshStartupCapabilityUi()"))
-        assertTrue(automaticAdvance.contains("completePermissionRecoveryRecheckIfPossible()"))
+        assertTrue(automaticAdvance.contains("effects.refreshReadinessUi()"))
+        assertTrue(automaticAdvance.contains("effects.completePermissionRecoveryRecheck()"))
         assertFalse(automaticRecheck.contains("refreshStartupCapabilityUi()"))
+        assertFalse(automaticRecheck.contains("runtime.refreshStartup("))
+        assertFalse(automaticRecheck.contains("runtime.startAfterPermissionRecovery("))
         assertFalse(automaticRecheck.contains("maybeAdvanceWalkSessionAfterCapabilityCheck()"))
-        assertTrue(automaticAdvance.contains("permissionRecoveryGate.blocksAutomaticResourceStart"))
+        assertTrue(automaticAdvance.contains("state.permissionRecoveryBlocksStart()"))
         assertFalse(source.contains("maybeAdvanceFirstRunOnboarding"))
         assertTrue(
             restoredGate.contains(
-                "persistedState == PermissionRecoveryGateState.CLEAR",
+                "persisted == PermissionRecoveryGateState.CLEAR",
             ),
         )
         assertTrue(restoredGate.contains("PermissionRecoveryGate.restoredBlocked(affected)"))
@@ -368,26 +452,27 @@ class PermissionSessionLifecycleStaticTest {
             recheckSignature,
             restoreSignature,
         ).forEach { marker ->
-            assertTrue("Missing exact source marker: $marker", source.contains(marker))
+            assertTrue("Missing exact source marker: $marker", MainActivityRefactorSource.function(source, marker).contains("fun "))
         }
 
-        val create = functionBlock(createSignature)
-        val restore = functionBlock(restoreSignature)
-        val nonClearRestoreMarker = "val affected = stepLengthPrefs"
+        val create = MainActivityRefactorSource.function(source, createSignature)
+        val restore = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/AndroidPermissionPreferences.kt").readText(), "restoreRecovery")
+        assertTrue(MainActivityRefactorSource.function(source, restoreSignature).contains("preferences.restoreRecovery()"))
+        val nonClearRestoreMarker = "val affected = preferences()"
         assertTrue(restore.contains(nonClearRestoreMarker))
         val nonClearRestore = restore.substringAfter(nonClearRestoreMarker)
-        val advance = functionBlock(advanceSignature)
+        val advance = MainActivityRefactorSource.function(source, advanceSignature)
         val activation =
-            functionBlock("private fun completeGatewayWalkActivation(")
-        val permissionResult = functionBlock(permissionResultSignature)
+            MainActivityRefactorSource.function(source, "private fun completeGatewayWalkActivation(")
+        val permissionResult = permissionResultOwner()
         val automaticSlices = listOf(
-            functionBlock(resumeSignature),
-            functionBlock(cameraResultSignature),
-            functionBlock(navigationResultSignature),
-            functionBlock(voiceResultSignature),
-            functionBlock(refreshSignature),
+            MainActivityRefactorSource.function(source, resumeSignature),
+            MainActivityRefactorSource.function(source, cameraResultSignature),
+            MainActivityRefactorSource.function(source, navigationResultSignature),
+            MainActivityRefactorSource.function(source, voiceResultSignature),
+            MainActivityRefactorSource.function(source, refreshSignature),
             advance,
-            functionBlock(recheckSignature),
+            MainActivityRefactorSource.function(source, recheckSignature),
             nonClearRestore,
         )
         listOf(
@@ -395,17 +480,35 @@ class PermissionSessionLifecycleStaticTest {
             "resumePermissionRecoveryFromExplicitUserAction()",
             "acknowledgeExplicitResume(",
             "ensurePermissionsThenStart()",
+            "runtime.startAfterPermissionRecovery(",
         ).forEach { forbidden ->
             automaticSlices.forEach { automatic ->
                 assertFalse(automatic.contains(forbidden))
             }
         }
-        assertTrue(permissionResult.contains("permissionRecoveryGate = PermissionRecoveryGate()"))
+        assertTrue(permissionResult.contains("if (!isPermissionRequestLeaseCurrent(lease)) return"))
+        assertTrue(
+            Regex(
+                """permissionRecoveryGate = if \(permissionRecoveryGate\.recheckBinding != null\) \{\s*""" +
+                    """permissionRecoveryGate\.recheckRequired\(\)\s*\} else \{\s*PermissionRecoveryGate\(\)\s*\}""",
+            ).containsMatchIn(permissionResult),
+        )
+        assertFalse(permissionResult.contains("acknowledgeExplicitResume("))
         assertFalse(permissionResult.contains("ensurePermissionsThenStart()"))
+        assertFalse(permissionResult.contains("runtime.startAfterPermissionRecovery("))
+        val explicitResume = MainActivityRefactorSource.function(source, "private fun resumePermissionRecoveryFromExplicitUserAction(")
+        assertTrue(explicitResume.contains("val confirmedBinding = permissionRecoveryGate.recheckBinding"))
+        assertTrue(explicitResume.contains("currentPermissionRecoveryBinding(it.recheckRequestId)"))
+        assertTrue(explicitResume.contains("acknowledgeExplicitResume("))
+        assertTrue(explicitResume.contains("observed = currentObservedPermissionSnapshot()"))
+        assertTrue(explicitResume.contains("currentBinding = currentBinding"))
+        val explicitGate = explicitResume.indexOf("if (permissionRecoveryGate.blocksAutomaticResourceStart)")
+        val explicitStart = explicitResume.indexOf("runtime.startAfterPermissionRecovery()")
+        assertTrue(explicitGate >= 0 && explicitStart > explicitGate)
         assertTrue(nonClearRestore.contains("PermissionRecoveryGate.restoredBlocked(affected)"))
 
         val guardMarker =
-            "if (permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled) {"
+            "if (state.permissionRecoveryBlocksStart() && !state.developmentBypassEnabled()) {"
         assertTrue(
             Regex(
                 """private val developmentGuidanceStartBypassEnabled:\s*Boolean\s+""" +
@@ -415,12 +518,12 @@ class PermissionSessionLifecycleStaticTest {
         )
         assertTrue(
             activation.contains(
-                "permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled",
+                "runtime.blocksAutomaticStart()",
             ),
         )
-        val recheckCallMarker = "completePermissionRecoveryRecheckIfPossible()"
+        val recheckCallMarker = "effects.completePermissionRecoveryRecheck()"
         val blockedReturnMarker =
-            "if (permissionRecoveryGate.blocksAutomaticResourceStart) return"
+            "if (state.permissionRecoveryBlocksStart()) return"
         val requestWalkLeaseMarker = "requestGatewayWalkStart(token)"
         listOf(
             guardMarker,
@@ -442,9 +545,9 @@ class PermissionSessionLifecycleStaticTest {
         )
 
         val permissionGateMarker =
-            "permissionRecoveryGate.blocksAutomaticResourceStart"
-        val startRequestedMarker = "WalkSessionEvent.StartRequested"
-        val activateMarker = "activateWalkSessionRuntime()"
+            "runtime.blocksAutomaticStart()"
+        val startRequestedMarker = "runtime.startRequested(token, currentReadiness)"
+        val activateMarker = "runtime.activate()"
         listOf(
             permissionGateMarker,
             startRequestedMarker,
@@ -464,9 +567,17 @@ class PermissionSessionLifecycleStaticTest {
                 startRequestedIndex < activateIndex,
         )
 
+        val admissionBinding = MainActivityRefactorSource.composition(source, "walkSessionAdmissionController")
+        assertTrue(admissionBinding.contains("override fun permissionRecoveryBlocksStart() = permissionRecoveryGate.blocksAutomaticResourceStart"))
+        assertTrue(admissionBinding.contains("override fun developmentBypassEnabled() = developmentGuidanceStartBypassEnabled"))
+        assertTrue(admissionBinding.contains("completePermissionRecoveryRecheckIfPossible()"))
+        val gatewayBinding = MainActivityRefactorSource.composition(source, "gatewayWalkSessionController")
+        assertTrue(gatewayBinding.contains("permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled"))
+        assertTrue(gatewayBinding.contains("activateWalkSessionRuntime()"))
+        assertTrue(gatewayBinding.contains("transitionWalkSession(WalkSessionEvent.StartRequested(token, readiness))"))
         val restoreCallMarker = "restorePermissionRecoveryGateFromPrefs()"
         val fieldLogBlockMarker = "fieldSessionLog.blockActiveSessionRestore()"
-        val probeMarker = "startupCapabilityProbe = AndroidStartupCapabilityProbe(this) {"
+        val probeMarker = "startupCapabilityProbe = privacyStartupResources.acquireOnUiThread(create = { AndroidStartupCapabilityProbe(this) {"
         val progressionMarker = "maybeStartFirstRunDeviceCheckProbes()"
         val refreshMarker = "refreshStartupCapabilityUi()"
         listOf(
@@ -493,13 +604,14 @@ class PermissionSessionLifecycleStaticTest {
 
     @Test
     fun rightsRequestSurfaceDoesNotRequireAnInstalledLoginSession() {
-        val rights = functionBlock("private fun openPrivacyRightsPage()")
+        val rights = MainActivityRefactorSource.function(source, "private fun openPrivacyRightsPage()")
 
         assertTrue(rights.contains("Intent.ACTION_VIEW"))
         assertTrue(rights.contains("/privacy/rights"))
         assertFalse(rights.contains("gatewaySessionOrNull"))
         assertFalse(rights.contains("requireReporterUserId"))
-        assertTrue(source.contains("개인정보 열람·동의 철회·서버 자료 삭제 요청"))
+        assertTrue(MainActivityRefactorSource.member(source, "buildContentView").contains("onPrivacyRights = { openPrivacyRightsPage() }"))
+        assertTrue(MainActivityRefactorSource.property(File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/SettingsPrivacyPanel.kt").readText(), "privacyRightsButton").contains("개인정보 열람·동의 철회·서버 자료 삭제 요청"))
     }
 
     private fun functionBlock(signature: String): String {
@@ -508,4 +620,78 @@ class PermissionSessionLifecycleStaticTest {
         val next = source.indexOf("\n    private fun ", start + signature.length)
         return if (next < 0) source.substring(start) else source.substring(start, next)
     }
+
+    @Test
+    fun acquiredGatewayRetiresItsOriginalObserverWithoutClearingSession() {
+        val source = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        val create = MainActivityRefactorSource.member(source, "onCreate")
+        assertTrue(create.contains("{ gatewaySessionController }, { try { it.detach() } finally { it.unregisterGatewayCapacityNetworkObserver() } }"))
+        val resources = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/PrivacyStartupResources.kt").readText()
+        val release = MainActivityRefactorSource.member(resources, "release")
+        assertTrue(release.contains("it.resource === resource"))
+        assertTrue(release.indexOf("lane.entries.removeAt(index)") < release.indexOf("entry?.release?.invoke()"))
+        assertFalse(release.contains("clearGatewaySession"))
+    }
+
+
+    private fun permissionResultOwner(mainSource: String = source): String {
+        MainActivityRefactorSource.composition(mainSource, "permissionFlowController")
+        val main = MainActivityRefactorSource.factory(mainSource, "onRequestPermissionsResult")
+        // Whole declaration comparison preserves guards, argument forwarding and effect order.
+        val expectedMain = """
+override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        invalidateRouteSnapshotResponseLease()
+        invalidateSpeechOutputStorageBinding()
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        permissionFlowController.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+        """.trimIndent()
+        org.junit.Assert.assertEquals("Main permission callback must retain invalidation, super and owner order", expectedMain.filterNot(Char::isWhitespace),
+            main.filterNot(Char::isWhitespace))
+        val tokens = listOf("invalidateRouteSnapshotResponseLease()", "invalidateSpeechOutputStorageBinding()",
+            "super.onRequestPermissionsResult(requestCode, permissions, grantResults)",
+            "permissionFlowController.onRequestPermissionsResult(requestCode, permissions, grantResults)")
+        var previous = -1
+        tokens.forEach { token ->
+            val next = main.indexOf(token, previous + 1)
+            assertTrue("Main permission ordering: $token", next > previous)
+            previous = next
+        }
+        return MainActivityRefactorSource.member(File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/PermissionFlowController.kt",
+        ).readText(), "onRequestPermissionsResult")
+    }
+
+
+    @Test
+    fun permissionResultOwnerRejectsNonExecutingOrReorderedCallers() {
+        val mainSource = source
+        permissionResultOwner(mainSource)
+        val caller = MainActivityRefactorSource.factory(mainSource, "onRequestPermissionsResult")
+        val call = "permissionFlowController.onRequestPermissionsResult(requestCode, permissions, grantResults)"
+        org.junit.Assert.assertTrue(caller.contains(call))
+        val variants = linkedMapOf(
+            "conditional" to caller.replace(call, "if (false) { $call }"),
+            "uninvoked lambda" to caller.replace(call, "{ $call }"),
+            "comment" to caller.replace(call, "/* $call */"),
+            "additional effect" to caller.replace(call, "$call\nunexpectedEffect()"),
+            "omitted" to caller.replace(call, ""),
+            "early return" to caller.replace(call, "return\n$call"),
+        )
+
+        variants["reordered effects"] = caller.replace(call, "").replace(
+            "invalidateRouteSnapshotResponseLease()", "invalidateRouteSnapshotResponseLease()\n" + call,
+        )
+
+        val accepted = variants.filter { (_, changed) ->
+            val mainSource = mainSource.replace(caller, changed)
+            runCatching { permissionResultOwner(mainSource) }.isSuccess
+        }.keys
+        org.junit.Assert.assertTrue("Non-equivalent Main callers accepted: $accepted", accepted.isEmpty())
+    }
+
 }

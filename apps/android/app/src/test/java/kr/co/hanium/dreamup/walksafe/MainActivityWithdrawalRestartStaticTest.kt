@@ -9,11 +9,18 @@ class MainActivityWithdrawalRestartStaticTest {
 
     @Test
     fun withdrawalMarkerCommitPrecedesFenceCancelAndHttp() {
+        val owner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/consent/IntegratedConsentController.kt").readText()
+        val wiring = MainActivityRefactorSource.composition(source, "integratedConsentController")
+
+        assertTrue(MainActivityRefactorSource.member(source, "updateIntegratedConsentDraft").contains("integratedConsentController.updateIntegratedConsentDraft(item, granted)"))
+        val composition = MainActivityRefactorSource.member(source, "buildContentView")
+        val save = composition.substringAfter("onConsentSave = {").substringBefore("},")
+        assertTrue(save.contains("this@MainActivity.integratedConsentController.persistIntegratedConsentDraft(announce = true)"))
+        assertTrue(wiring.contains("IntegratedConsentController("))
+        assertTrue(wiring.contains("consentClient().saveCall("))
+        assertTrue(MainActivityRefactorSource.factory(source, "createPrivacyAuthorityComposition").contains("consentClient = { integratedConsentClient }"))
         val update =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun updateIntegratedConsentDraft",
-            )
+            MainActivityRefactorSource.member(owner, "updateIntegratedConsentDraft")
         assertTrue(
             appearsInOrder(
                 update,
@@ -28,32 +35,32 @@ class MainActivityWithdrawalRestartStaticTest {
         assertTrue(update.contains("integratedConsentSession.failClosed()"))
 
         val persist =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun persistIntegratedConsentDraft",
-            )
+            MainActivityRefactorSource.member(owner, "persistIntegratedConsentDraft")
         assertTrue(
             appearsInOrder(
                 persist,
                 "integratedConsentHttpBlocked()",
-                "integratedConsentClient.saveCall(",
+                "remote.saveCall(",
             ),
         )
     }
 
     @Test
     fun rawWithdrawalBlocksFieldLogAndOnlyExactGrantReleasesIt() {
+        val owner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/consent/IntegratedConsentController.kt").readText()
+        val wiring = MainActivityRefactorSource.composition(source, "integratedConsentController")
+
+        assertTrue(wiring.contains("raw = ports.raw"))
+        val rawPorts = MainActivityRefactorSource.factory(source, "createPrivacyConsent")
+        assertTrue(rawPorts.contains("fieldSessionLog.blockForRawSourceWithdrawal()"))
+        assertTrue(rawPorts.contains("fieldSessionLog.resetRawSourceAfterConfirmedConsent()"))
+        assertTrue(MainActivityRefactorSource.member(owner, "updateIntegratedConsentDraft").contains("applyImmediateConsentWithdrawals(setOf(item))"))
+        assertTrue(MainActivityRefactorSource.member(owner, "startIntegratedConsentRequest").contains("applyIntegratedConsentConfirmation("))
         val withdrawal =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun applyImmediateConsentWithdrawals",
-            )
-        assertTrue(withdrawal.contains("fieldSessionLog.blockForRawSourceWithdrawal()"))
+            MainActivityRefactorSource.member(owner, "applyImmediateConsentWithdrawals")
+        assertTrue(withdrawal.contains("raw.blockFieldLogIfReady()"))
         val confirmation =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun applyIntegratedConsentConfirmation",
-            )
+            MainActivityRefactorSource.member(owner, "applyIntegratedConsentConfirmation")
         assertTrue(
             confirmation.contains(
                 "exactPending && confirmation.selections.rawSourceCollection",
@@ -61,125 +68,127 @@ class MainActivityWithdrawalRestartStaticTest {
         )
         assertTrue(
             confirmation.contains(
-                "fieldSessionLog.resetRawSourceAfterConfirmedConsent()",
+                "raw.resetFieldLogAfterConfirmedConsentIfActive()",
             ),
         )
     }
 
     @Test
     fun deletionAndRawMarkersBlockBeforeFieldLogRestore() {
-        val creation =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "override fun onCreate",
-            )
+        val creation = MainActivityRefactorSource.member(source, "onCreate")
         assertTrue(creation.contains("initiallyBlockedForAccountDeletion"))
         assertTrue(creation.contains("accountDeletionMarkerPresentAtStartup()"))
         assertTrue(creation.contains("initiallyBlockedForRawSourceCollection"))
-        assertTrue(
-            appearsInOrder(
-                creation,
-                "readAccountDeletionFallbackMarkerAtStartup()",
-                "initiallyBlockedForAccountDeletion",
-                "reconcileAccountDeletionResetAtStartup()",
-                "fieldSessionLog.recordEvent(\"app_created\")",
-                "reconcileAccountDeletionFallbackMarkerAtStartup()",
-            ),
-        )
-
-        val deletion =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun onAccountDeletionConfirmClicked",
-            )
-        val preparation =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun startAccountDeletionPreparation",
-            )
-        val confirmationPreparation =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun startAccountDeletionConfirmationPreparation",
-            )
-        val markerPreparation =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun prepareAccountDeletionRecoveryMarker",
-            )
-        assertTrue(
-            appearsInOrder(
-                deletion,
-                "gatewaySessionOrNull(",
-                "sensitivePrefs.isBlocked()",
-                "applyAccountDeletionRuntimeFence()",
-                "startAccountDeletionConfirmationPreparation(",
-            ),
-        )
-        assertTrue(
-            appearsInOrder(
-                confirmationPreparation + "\n" + markerPreparation + "\n" + preparation,
-                "accountDeletionCleanupExecutor.execute",
-                "Phase.PREPARED",
-                "accountDeletionFallbackMarker.create(record)",
-                "prepareAccountDeletionPendingJournal(",
-            ),
-        )
-
-        val read =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun readAccountDeletionFallbackMarkerAtStartup",
-            )
-        assertTrue(
-            appearsInOrder(
-                read,
-                "accountDeletionFallbackMarker.read()",
-                "accountDeletionStartupFallbackState = state",
-                "state !is AndroidAccountDeletionFallbackMarker.State.Absent",
-            ),
-        )
-        val reconcile =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun reconcileAccountDeletionFallbackMarkerAtStartup",
-            )
-        assertTrue(
-            appearsInOrder(
-                reconcile,
-                "accountDeletionStartupFallbackState",
-                "accountDeletionFallbackPresentAtStartup",
-                "applyAccountDeletionRuntimeFence()",
-                "when (state)",
-            ),
-        )
-        val recovery =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun startAccountDeletionFallbackRecoveryAfterRestore",
-            )
-        assertTrue(
-            appearsInOrder(
-                recovery,
-                "AndroidAccountDeletionFallbackMarker.State.Present",
-                "continueAccountDeletionFromMarker(state.record)",
-                "AndroidAccountDeletionFallbackMarker.State.Corrupt",
-                "AndroidAccountDeletionFallbackMarker.State.Unavailable",
-                "accountDeletionRemoteResumeBlocked = true",
-                "applyAccountDeletionRuntimeFence()",
-                "accountDeletion=recovery_blocked:fallback_marker_storage",
-            ),
-        )
-        assertTrue(!recovery.contains("purgeAccountDeletionLocalDataOnCleanupThread"))
+        assertTrue(appearsInOrder(creation,
+            "readAccountDeletionFallbackMarkerAtStartup()",
+            "initiallyBlockedForAccountDeletion",
+            "accountDeletionInstallationResetController.restoreStartupHandoffAfterResourcesPrepared()",
+            "accountDeletionInstallationResetController.inspectStartupReset(speechOutputPurgeCompleted)",
+            "fieldSessionLog.recordEvent(\"app_created\")",
+            "reconcileAccountDeletionFallbackMarkerAtStartup()",
+        ))
+        val inspection = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/PrivacyStartupInspectionController.kt").readText()
+        val inspectionWiring = MainActivityRefactorSource.property(source, "privacyStartupInspectionController")
+        assertTrue(inspectionWiring.contains("PrivacyStartupInspectionController("))
+        assertTrue(inspectionWiring.contains("stateMachine = { accountDeletionStateMachine }"))
+        assertTrue(inspectionWiring.contains("activityLease = { accountDeletionActivityLease }"))
+        assertTrue(inspectionWiring.contains("capturePrivacyStartupResetPreparation()"))
+        assertTrue(MainActivityRefactorSource.member(source, "startPrivacyStartupInspection")
+            .contains("privacyStartupInspectionController.startInspection(prepare, inspect, onReady)"))
+        assertTrue(creation.contains("startPrivacyStartupInspection("))
+        val inspect = MainActivityRefactorSource.member(inspection, "startInspection")
+        assertTrue(appearsInOrder(inspect, "prepare()", "resetPreparation.prepare()",
+            "preparation.awaitOriginalAcknowledgements()", "!preparation.isCurrent()", "inspect(purgedAndDrained)",
+            "if (!stateMachine().activityLeaseIsCurrent(activityLease()))", "if (result != PrivacyStartupInspectionResult.READY)",
+            "pendingPrivacyStartupReadyAction = PendingReady(generation, onReady)",
+        ))
+        assertTrue(inspect.contains("privacyStartupResourcesClosed || !isCurrent(generation)"))
+        assertTrue(inspect.contains("generation == privacyStartupInspectionGeneration"))
+        assertTrue(MainActivityRefactorSource.member(inspection, "isCurrent", occurrence = 1)
+            .contains("stateMachine().activityLeaseIsCurrent(activityLease())"))
+        val capture = MainActivityRefactorSource.member(source, "capturePrivacyStartupResetPreparation")
+        listOf("prepareSpeech = ::prepareSpeechOutputAccountPurgeOnWorker", "prepareRoute = ::prepareRouteSnapshotAccountPurge",
+            "awaitSpeech = ::awaitPreparedSpeechOutputAccountPurge", "awaitRoute = ::awaitRouteSnapshotAccountPurgeOnWorker",
+            "speechIsCurrent = ::speechOutputResetPreparationIsCurrent", "routeIsCurrent = ::routeSnapshotResetPreparationIsCurrent",
+        ).forEach { assertTrue(capture.contains(it)) }
+        val participants = ReportStaticSourceInspector.functionBlock(inspection, "fun <S, R> capture")
+        assertTrue(participants.contains("awaitSpeech(speech)"))
+        assertTrue(participants.contains("awaitRoute(route)"))
+        assertTrue(participants.contains("speechPurgedAndDrained && routePurged"))
+        assertTrue(participants.contains("speechIsCurrent(speech) && route?.let(routeIsCurrent) == true"))
+        val resetOwner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/deletion/reset/AccountDeletionInstallationResetController.kt").readText()
+        val resetWiring = MainActivityRefactorSource.composition(source, "accountDeletionInstallationResetController")
+        assertTrue(resetWiring.contains("AccountDeletionInstallationResetController("))
+        assertTrue(resetWiring.contains("stateMachine = { stateMachine() }"))
+        assertTrue(resetWiring.contains("activityLease = { activityLease() }"))
+        val authority = MainActivityRefactorSource.factory(source, "createPrivacyAuthorityComposition")
+        assertTrue(authority.contains("stateMachine = { accountDeletionStateMachine }"))
+        assertTrue(authority.contains("activityLease = { accountDeletionActivityLease }"))
+        assertTrue(resetWiring.contains("storage = accountDeletionResetStorage"))
+        assertTrue(resetWiring.contains("fieldLog().blockForAccountDeletion()"))
+        assertTrue(authority.contains("fieldLog = { fieldSessionLog }"))
+        val reset = MainActivityRefactorSource.member(resetOwner, "reconcileResetAtStartup")
+        assertTrue(reset.contains("if (speechOutputPurgeCompleted == false) return AccountDeletionResetResult.BLOCKED"))
+        assertTrue(reset.contains("if (speechOutputPurgeCompleted != true) return AccountDeletionResetResult.BLOCKED"))
+        val resetInspection = MainActivityRefactorSource.member(resetOwner, "inspectStartupReset")
+        assertTrue(resetInspection.contains("AccountDeletionResetResult.BLOCKED -> if (!blockForResetFailure()) return InstallationResetStartupResult.FINISH"))
+        assertTrue(resetInspection.contains("if (fresh == null || !fresh.publish()) return InstallationResetStartupResult.FINISH"))
+        val resetFailure = MainActivityRefactorSource.member(resetOwner, "blockForResetFailure")
+        assertTrue(appearsInOrder(resetFailure, "stateMachine().failClosed(activityLease()", "storage.blockSensitiveAndAuthorityForResetFailure()",
+            "actions.blockPrivacyForResetFailure()", "storage.markRawSourceFieldLogBlocked()"))
+        val handoff = MainActivityRefactorSource.member(resetOwner, "restoreStartupHandoffAfterResourcesPrepared")
+        assertTrue(appearsInOrder(handoff, "stateMachine().activityLeaseIsCurrent(activityLease())",
+            "stateMachine().resetForNewEnrollment(activityLease())", "startupHandoff.pending = false"))
+        val preparationOwner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/deletion/runtime/AccountDeletionPreparationController.kt").readText()
+        val storeOwner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/deletion/runtime/AccountDeletionRecoveryStore.kt").readText()
+        val progressOwner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/deletion/runtime/AccountDeletionProgressController.kt").readText()
+        val preparationWiring = MainActivityRefactorSource.composition(source, "accountDeletionPreparationController")
+        assertTrue(preparationWiring.contains("store = accountDeletionRecoveryStore"))
+        assertTrue(preparationWiring.contains("queries = queries"))
+        val preparationPorts = MainActivityRefactorSource.factory(source, "createPrivacyPreparation")
+        assertTrue(preparationPorts.contains("gatewaySessionOrNull("))
+        assertTrue(preparationPorts.contains("sensitivePrefs.isBlocked()"))
+        assertTrue(preparationWiring.contains("accountDeletionRuntimeFenceController.value.apply()"))
+        assertTrue(MainActivityRefactorSource.member(source, "onAccountDeletionConfirmClicked").contains("accountDeletionPreparationController.onConfirmClicked()"))
+        val deletion = MainActivityRefactorSource.member(preparationOwner, "onConfirmClicked")
+        val confirmationPreparation = MainActivityRefactorSource.member(preparationOwner, "startConfirmationPreparation")
+        val markerPreparation = MainActivityRefactorSource.member(storeOwner, "prepareRecoveryMarker")
+        val preparation = MainActivityRefactorSource.member(preparationOwner, "startPreparation")
+        assertTrue(appearsInOrder(deletion, "queries.generalSession()", "queries.sensitiveStorageBlocked()",
+            "if (!effects.applyRuntimeFence())", "startConfirmationPreparation("))
+        assertTrue(appearsInOrder(confirmationPreparation, "cleanupExecutor().execute", "stages.durable(workerAttempt)", "store.prepareRecoveryMarker(") &&
+            appearsInOrder(markerPreparation, "Phase.PREPARED", "fallbackMarker.create(record)") &&
+            appearsInOrder(preparation, "cleanupExecutor().execute", "stages.durable(workerAttempt)", "store.preparePendingJournal("))
+        val read = MainActivityRefactorSource.member(storeOwner, "readFallbackAtStartup")
+        assertTrue(appearsInOrder(read, "fallbackMarker.read()", "startupFallbackState = state",
+            "state !is AndroidAccountDeletionFallbackMarker.State.Absent"))
+        assertTrue(MainActivityRefactorSource.member(source, "readAccountDeletionFallbackMarkerAtStartup").contains("accountDeletionRecoveryStore.readFallbackAtStartup()"))
+        val storeWiring = MainActivityRefactorSource.composition(source, "accountDeletionRecoveryStore")
+        assertTrue(storeWiring.contains("accountDeletionRuntimeFenceController.value.apply()"))
+        val reconcile = MainActivityRefactorSource.member(storeOwner, "reconcileFallbackAtStartup")
+        assertTrue(appearsInOrder(reconcile, "startupFallbackState", "fallbackPresentAtStartup", "effects.applyRuntimeFence()", "when (state)"))
+        assertTrue(MainActivityRefactorSource.member(source, "reconcileAccountDeletionFallbackMarkerAtStartup").contains("accountDeletionRecoveryStore.reconcileFallbackAtStartup()"))
+        val recovery = MainActivityRefactorSource.member(progressOwner, "startFallbackRecoveryAfterRestore")
+        assertTrue(appearsInOrder(recovery, "AndroidAccountDeletionFallbackMarker.State.Present", "continueFromMarker(state.record)",
+            "AndroidAccountDeletionFallbackMarker.State.Corrupt", "AndroidAccountDeletionFallbackMarker.State.Unavailable",
+            "store.setRemoteResumeBlocked(true)", "effects.applyRuntimeFence()", "accountDeletion=recovery_blocked:fallback_marker_storage"))
+        assertTrue(!recovery.contains("purgeLocalDataOnWorker"))
+        assertTrue(MainActivityRefactorSource.composition(source, "accountDeletionProgressController").contains("accountDeletionRuntimeFenceController.value.apply()"))
+        assertTrue(MainActivityRefactorSource.member(source, "startAccountDeletionFallbackRecoveryAfterRestore").contains("accountDeletionProgressController.startFallbackRecoveryAfterRestore()"))
     }
 
     @Test
     fun durableConfirmationRestoresBeforePendingMutation() {
+        val owner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/consent/IntegratedConsentController.kt").readText()
+        val wiring = MainActivityRefactorSource.composition(source, "integratedConsentController")
+
+        assertTrue(MainActivityRefactorSource.member(source, "restorePrivacyControlStateFromPrefs").contains("privacyStartupRestoreCoordinator.restore()"))
+        val startupWiring = MainActivityRefactorSource.composition(source, "privacyStartupRestoreCoordinator")
+        assertTrue(startupWiring.contains("integratedConsentController.value.restoreConsentState()"))
+        val startupOwner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/PrivacyStartupRestoreCoordinator.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(startupOwner, "restore").contains("consent.restoreConsentState()"))
         val restore =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun restorePrivacyControlStateFromPrefs",
-            )
+            MainActivityRefactorSource.member(owner, "restoreConsentState")
         // Decode the pending/CAS journal for tuple validation; publish it only after confirmation.
         assertTrue(restore.contains("PREF_PENDING_INTEGRATED_CONSENT_MUTATION"))
         assertTrue(
@@ -197,7 +206,7 @@ class MainActivityWithdrawalRestartStaticTest {
         assertTrue(
             appearsInOrder(
                 pending,
-                "!restoredPendingPreservesConfirmation(",
+                "!persistence.restoredPendingPreservesConfirmation(",
                 "integratedConsentSession.failClosed()",
                 "restorePendingMutation(mutation, retry = true)",
                 "pendingMutationOrNull() != mutation",
@@ -207,10 +216,7 @@ class MainActivityWithdrawalRestartStaticTest {
         assertTrue(!pending.contains("mutation.copy("))
 
         val confirmation =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun applyIntegratedConsentConfirmation",
-            )
+            MainActivityRefactorSource.member(owner, "applyIntegratedConsentConfirmation")
         assertTrue(
             confirmation.contains("PREF_INTEGRATED_CONSENT_SERVER_CONFIRMATION"),
         )
@@ -219,11 +225,16 @@ class MainActivityWithdrawalRestartStaticTest {
 
     @Test
     fun legacyRevisionFloorRestoresBeforeAnyFullConfirmation() {
+        val owner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/consent/IntegratedConsentController.kt").readText()
+        val wiring = MainActivityRefactorSource.composition(source, "integratedConsentController")
+
+        assertTrue(MainActivityRefactorSource.member(source, "restorePrivacyControlStateFromPrefs").contains("privacyStartupRestoreCoordinator.restore()"))
+        val startupWiring = MainActivityRefactorSource.composition(source, "privacyStartupRestoreCoordinator")
+        assertTrue(startupWiring.contains("integratedConsentController.value.restoreConsentState()"))
+        val startupOwner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/PrivacyStartupRestoreCoordinator.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(startupOwner, "restore").contains("consent.restoreConsentState()"))
         val restore =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun restorePrivacyControlStateFromPrefs",
-            )
+            MainActivityRefactorSource.member(owner, "restoreConsentState")
         assertTrue(
             appearsInOrder(
                 restore,
@@ -233,10 +244,7 @@ class MainActivityWithdrawalRestartStaticTest {
         )
 
         val legacy =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun restoreLegacyIntegratedConsentRevisionFloor",
-            )
+            MainActivityRefactorSource.member(owner, "restoreLegacyIntegratedConsentRevisionFloor")
         assertTrue(legacy.contains("PREF_INTEGRATED_CONSENT_REVISION"))
         assertTrue(legacy.contains("PREF_INTEGRATED_CONSENT_CLIENT_REVISION"))
         assertTrue(legacy.contains("PREF_INTEGRATED_CONSENT_BACKEND_RECEIPT_SHA256"))
@@ -246,11 +254,16 @@ class MainActivityWithdrawalRestartStaticTest {
 
     @Test
     fun fullConfirmationMustMatchEveryLegacyScalarCommitTupleField() {
+        val owner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/consent/IntegratedConsentController.kt").readText()
+        val wiring = MainActivityRefactorSource.composition(source, "integratedConsentController")
+
+        assertTrue(MainActivityRefactorSource.member(source, "restorePrivacyControlStateFromPrefs").contains("privacyStartupRestoreCoordinator.restore()"))
+        val startupWiring = MainActivityRefactorSource.composition(source, "privacyStartupRestoreCoordinator")
+        assertTrue(startupWiring.contains("integratedConsentController.value.restoreConsentState()"))
+        val startupOwner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/PrivacyStartupRestoreCoordinator.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(startupOwner, "restore").contains("consent.restoreConsentState()"))
         val restore =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun restorePrivacyControlStateFromPrefs",
-            )
+            MainActivityRefactorSource.member(owner, "restoreConsentState")
 
         assertTrue(restore.contains("!legacyFloorRestored"))
         assertTrue(restore.contains("confirmation.installationId != installationId"))

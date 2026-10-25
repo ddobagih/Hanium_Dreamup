@@ -1,0 +1,30 @@
+flowchart TB
+  E["F-D15-016 · 내 신고 목록·상세와 사용자 상태 투영<br/>GET /reports/mine; GET<br/>/reports/mine/{report_id}"]
+  P["P-D15-016 · 전제조건<br/>FIELD assertion과 header identity 일치. privacy<br/>HMAC rotation resolver, shared subject lock,<br/>계정삭제 tombstone 없어야 함."]
+  E --> P
+  S1["1. subject·generation에 속한 행만 created_at/id<br/>desc로 조회"]
+  P --> S1
+  S2["2. 현재 content revision의 uncorrected delivery<br/>및 latest review만 상태에 반영"]
+  S1 --> S2
+  S3["3. RESOLVED 전달 존재 우선, 다음<br/>SUBMITTED/ACKNOWLEDGED, 다음<br/>REJECTED/DUPLICATE, 그 외 RECEIVED"]
+  S2 --> S3
+  S4["4. 최신 사용자 권리요청 요약을 결합; 필터·owner 결속 cursor 발행"]
+  S3 --> S4
+  S5["5. 상세는 최소 요약만 반환, 사진·정확 위치·내부 메모 비노출"]
+  S4 --> S5
+  OK["정상 결과<br/>상세는 최소 요약만 반환, 사진·정확 위치·내부 메모 비노출"]
+  S5 --> OK
+  B1["조건 · actor/generation/assertion 또는 owner 불일치<br/>결과 · 404 은폐"]
+  S3 -. "해당 조건 발생" .-> B1
+  B2["조건 · query unknown/duplicate 또는 cursor mismatch<br/>결과 · 422"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · 상태가 legacy reviewed/resolved로만 변함<br/>결과 · typed user status에 자동 반영하지 않음"]
+  S3 -. "해당 조건 발생" .-> B3
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회에는 새 행 없음; cursor는 필터와 owner를 고정하지만 이력<br/>snapshot cursor와는 다른 created_at keyset.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/api/report_user_requests.py:428<br/>list_my_reports<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

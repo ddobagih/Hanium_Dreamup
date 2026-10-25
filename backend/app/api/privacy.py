@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 from typing import Literal
 
@@ -12,7 +14,10 @@ from sqlalchemy.orm import Session
 
 from backend.app.config import Settings
 from backend.app.database import get_db
-from backend.app.field_test_security import VerifiedPrivacyDeletionAssertion
+from backend.app.field_test_security import (
+    VerifiedActorAssertion,
+    VerifiedPrivacyDeletionAssertion,
+)
 from backend.app.schemas import (
     ACCOUNT_DELETION_DEVICE_VERIFICATION_VIEW,
     ACCOUNT_DELETION_STATUS_VIEW_HEADER,
@@ -21,6 +26,7 @@ from backend.app.schemas import (
     AccountDeletionStatusV2,
     AccountDeletionStatusWithDeviceVerificationV2,
     DeviceDeletionEvidenceV2,
+    InstallationEvidenceKeyV1,
     PrivacyConsentBootstrapV1,
     PrivacyConsentEventV2,
     PrivacyEvidenceId,
@@ -34,6 +40,7 @@ from backend.app.services.privacy_lifecycle import (
     get_account_deletion_status,
     record_consent_event,
     record_device_deletion_evidence,
+    register_installation_evidence_key,
 )
 from backend.app.services.signup_documents import signup_equivalent_document_versions
 
@@ -44,7 +51,7 @@ _DELETION_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 _NO_STORE_HEADERS = {"Cache-Control": "no-store", "Pragma": "no-cache"}
 _PRIVACY_ERROR_RESPONSES = {
     code: {"model": PrivacyErrorResponseV2}
-    for code in (400, 401, 404, 409, 413, 422, 429, 503)
+    for code in (400, 401, 403, 404, 409, 413, 422, 429, 503)
 }
 
 
@@ -128,6 +135,68 @@ def _raise_store_error(db: Session, exc: SQLAlchemyError) -> None:
 
 def create_router(settings: Settings) -> APIRouter:
     router = APIRouter(prefix="/privacy", tags=["privacy"])
+
+    @router.post(
+        "/installation-evidence-key",
+        status_code=204,
+        responses=_PRIVACY_ERROR_RESPONSES,
+    )
+    def register_evidence_key(
+        payload: InstallationEvidenceKeyV1,
+        request: Request,
+        x_walksafe_actor_id: str = Header(alias="x-walksafe-actor-id"),
+        x_walksafe_account_generation: str = Header(
+            alias="x-walksafe-account-generation"
+        ),
+        _x_walksafe_actor_assertion: str | None = Header(
+            default=None, alias="x-walksafe-actor-assertion"
+        ),
+        db: Session = Depends(get_db),
+    ) -> Response:
+        generation = _generation(x_walksafe_account_generation)
+        if _ACTOR_ID.fullmatch(x_walksafe_actor_id) is None:
+            raise HTTPException(
+                422,
+                detail={"code": "privacy_consent_binding_invalid"},
+                headers=_NO_STORE_HEADERS,
+            )
+        if settings.field_test_security_enabled:
+            verified = getattr(request.state, "verified_actor_assertion", None)
+            if not isinstance(verified, VerifiedActorAssertion) or (
+                verified.actor_id != x_walksafe_actor_id
+                or verified.account_generation != generation
+            ):
+                raise HTTPException(
+                    401,
+                    detail={"code": "actor_assertion_invalid"},
+                    headers=_NO_STORE_HEADERS,
+                )
+        try:
+            raw = base64.urlsafe_b64decode(
+                payload.public_key + "=" * (-len(payload.public_key) % 4)
+            )
+            if base64.urlsafe_b64encode(raw).decode().rstrip("=") != payload.public_key:
+                raise ValueError("noncanonical key")
+            register_installation_evidence_key(
+                db,
+                actor_id=x_walksafe_actor_id,
+                account_generation=generation,
+                installation_id=payload.installation_id,
+                public_key_der=raw,
+                secret=settings.privacy_hmac_secret,
+                key_version=settings.privacy_hmac_key_version,
+            )
+        except (ValueError, binascii.Error):
+            raise HTTPException(
+                422,
+                detail={"code": "installation_evidence_key_invalid"},
+                headers=_NO_STORE_HEADERS,
+            ) from None
+        except PrivacyLifecycleError as exc:
+            _raise_privacy_error(db, exc)
+        except SQLAlchemyError as exc:
+            _raise_store_error(db, exc)
+        return Response(status_code=204, headers=_NO_STORE_HEADERS)
 
     @router.get(
         "/consent-bootstrap",

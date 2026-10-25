@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 import hashlib
 import uuid
 
@@ -11,6 +13,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from backend.app.api.admin_context import (
+    require_admin_read_context as _require_admin_report_read_context,
+    require_admin_action_context as _require_admin_report_action_context,
+)
 from backend.app.config import Settings
 from backend.app.database import get_db
 from backend.app.field_test_security import ADMIN_RECONFIRM_NONCE_HEADER_NAME
@@ -100,76 +106,8 @@ ADMIN_AUDIT_LIST_QUERY_FIELDS = frozenset(
 )
 
 
-def _require_admin_report_read_context(
-    request: Request,
-    *,
-    expected_operation: str,
-) -> tuple[AdminSessionIdentity, VerifiedAdminDeviceProof]:
-    identity = getattr(request.state, "admin_security_identity", None)
-    if not isinstance(identity, AdminSessionIdentity):
-        raise HTTPException(
-            status_code=401,
-            detail={
-                "code": "admin_session_required",
-                "message": "An authenticated administrator session is required.",
-            },
-        )
-    proof = getattr(request.state, "admin_device_proof", None)
-    if not isinstance(proof, VerifiedAdminDeviceProof):
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "code": "admin_device_proof_required",
-                "message": "A verified administrator device proof is required.",
-            },
-        )
-    if (
-        proof.admin_id != identity.admin_id
-        or proof.session_id != identity.session_id
-        or proof.device_id != identity.device_id
-        or proof.correlation_id is None
-        or proof.action is not None
-        or proof.purpose != "ACTION"
-        or proof.read_purpose != expected_operation
-        or proof.method != request.method.upper()
-        or proof.path != request.url.path
-    ):
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "code": "admin_device_proof_invalid",
-                "message": "The administrator device proof does not match this request.",
-            },
-        )
-    return identity, proof
 
 
-def _require_admin_report_action_context(
-    request: Request,
-    *,
-    expected_action: str,
-) -> tuple[AdminSessionIdentity, VerifiedAdminDeviceProof]:
-    identity = getattr(request.state, "admin_security_identity", None)
-    if not isinstance(identity, AdminSessionIdentity):
-        raise HTTPException(status_code=401, detail={"code": "admin_session_required", "message": "An authenticated administrator session is required."})
-    proof = getattr(request.state, "admin_device_proof", None)
-    if not isinstance(proof, VerifiedAdminDeviceProof):
-        raise HTTPException(status_code=403, detail={"code": "admin_device_proof_required", "message": "A verified administrator device proof is required."})
-    if identity.step_up_verified_at is None:
-        raise HTTPException(status_code=403, detail={"code": "admin_step_up_required", "message": "Recent administrator reauthentication is required."})
-    if (
-        proof.admin_id != identity.admin_id
-        or proof.session_id != identity.session_id
-        or proof.device_id != identity.device_id
-        or proof.correlation_id is None
-        or proof.action != expected_action
-        or proof.read_purpose is not None
-        or proof.purpose != "ACTION"
-        or proof.method != request.method.upper()
-        or proof.path != request.url.path
-    ):
-        raise HTTPException(status_code=403, detail={"code": "admin_device_proof_invalid", "message": "The administrator device proof does not match this request."})
-    return identity, proof
 
 
 def require_admin_report_list_context(
@@ -415,7 +353,7 @@ def list_admin_reports(
             },
         ) from exc
 
-    statement = select(*admin_report_list_columns())
+    statement = select(*admin_report_list_columns()).where(account_subject_visible(Report))
     if filters.report_id is not None:
         statement = statement.where(Report.id == filters.report_id)
     if filters.status is not None:
@@ -564,7 +502,9 @@ def get_admin_report_detail(
 
     try:
         report_row = db.execute(
-            select(*admin_report_detail_columns()).where(Report.id == parsed_report_id)
+            select(*admin_report_detail_columns()).where(
+                Report.id == parsed_report_id, account_subject_visible(Report)
+            )
         ).one_or_none()
         if report_row is not None:
             report = coerce_admin_report_detail_row(report_row)

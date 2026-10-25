@@ -1,0 +1,14 @@
+flowchart TD
+ A["F-D11-015 단기 로그와 rate-event 유지보수"] --> P["P-D11-015 독립 실행경로"]
+ P --> C{"선택 entrypoint"}
+ C -->|"telemetry CLI 또는 log runner"| V["date folder endUTC와 sidecar mtime cutoff 계산. 기본7일 및 sidecar 추가1일"]
+ V --> M{"apply 지정"}
+ M -->|"아니오"| PV["후보 계획만 반환 후 종료"]
+ M -->|"예"| G["정확 확인과 absolute lock 및 관리자 gate"]
+ G --> D["기간 지난 실제 디렉터리와 sidecar 정리"]
+ D --> R["log runner라면 두 scope의 날짜 receipt 저장"]
+ C -->|"rate timer 설정"| RT["boot5분 또는 종료후5분과 random30초 이후 service 요청"]
+ RT --> RS["Backend actor_rate_limit_retention --apply --batch-size500"]
+ RS --> Z["서비스 종료. 설치와 enable 및 실행 증거는 미확인"]
+ G -->|"권위 실패"| X["거부"]
+ R --> Z

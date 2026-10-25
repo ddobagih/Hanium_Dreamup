@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-011 복구자료 외부 보관 사용자 확인 기록"]
+  P["P-D12-011 사용자 진술과 실제 복구 검증 분리"]
+  A --> P
+  M0["1. 확인란을 요구하고 클릭 시 확인 상태를 해제한다."]
+  P --> M0
+  M1["2. admin/device에 결속된 PENDING 시도를 PreferencesCustodyAttemptStore에 전송 전 commit한다."]
+  M0 --> M1
+  M2["3. 동일 결속의 미확정 시도면 기존 material/reference/version을 재사용한다."]
+  M1 --> M2
+  M3["4. POST /admin/security/recovery-custody/attest를 proof로 보내고 NORMAL 및 ATTESTED를 확인한다."]
+  M2 --> M3
+  M4["5. 확인 완료 시 시도 저장을 제거하고 재인증 허가를 지운다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 서버 NORMAL+ATTESTED 확인 후 pending store 제거."]
+  M0 -. "관련 조건 확인" .-> B0{"저장 commit 실패"}
+  B0 -->|"조건 해당"| R0["전송 차단"]
+  M1 -. "관련 조건 확인" .-> B1{"CUSTODY_STATE_VERSION_CONFLICT"}
+  B1 -->|"조건 해당"| R1["이전 시도 폐기 및 FAIL_CLOSED; 최신 state에서 새 확인"]
+  M2 -. "관련 조건 확인" .-> B2{"응답 분실"}
+  B2 -->|"조건 해당"| R2["기존 reference 유지"]
+  M3 -. "관련 조건 확인" .-> B3{"다른 admin/device로 정상 로그인"}
+  B3 -->|"조건 해당"| R3["이전 결속 시도 폐기"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["같은 admin/device pending reference/material/version을 재사용하며 새 reference를 임의로 만들지 않는다."]

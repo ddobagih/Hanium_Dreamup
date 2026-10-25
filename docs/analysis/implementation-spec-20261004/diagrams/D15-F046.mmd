@@ -1,0 +1,30 @@
+flowchart TB
+  E["F-D15-046 · 민감 신고 읽기·관리자 작업 감사<br/>신고/원본/관리자 읽기 응답 직전 감사 저장"]
+  P["P-D15-046 · 전제조건<br/>required 보안 읽기는 actor와 purpose 필수; local은<br/>local-development/local_development fallback."]
+  E --> P
+  S1["1. identity와 purpose 형식 검사"]
+  P --> S1
+  S2["2. ReportReadAudit 또는 AdminOperationAudit를 응답<br/>대상·질의 digest와 결속"]
+  S1 --> S2
+  S3["3. 감사 transaction commit이 성공한 다음 민감 응답 반환"]
+  S2 --> S3
+  S4["4. commit BaseException이면 rollback 후503으로 데이터<br/>보류"]
+  S3 --> S4
+  OK["정상 결과<br/>감사 commit 후 호출자에게 반환하여 응답 진행."]
+  S4 --> OK
+  B1["조건 · 필수 actor/purpose 없음·형식 오류<br/>결과 · 422"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · SUCCEEDED인데 count 없음/음수 또는 error_code 있음<br/>결과 · admin audit binding invalid503"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · DENIED/ERROR인데 count가 있거나 error_code 무효<br/>결과 · admin audit binding invalid503"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · 감사 commit 실패<br/>결과 · read_audit_unavailable 또는<br/>admin_operation_audit_unavailable503"]
+  S4 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>각 읽기는 감사 행 추가 가능. 이 helper는 읽기 idempotency<br/>key를 제공하지 않음.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_read_audit.py:62<br/>persist_report_read_audit<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

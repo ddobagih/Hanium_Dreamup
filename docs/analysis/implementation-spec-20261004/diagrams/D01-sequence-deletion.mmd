@@ -1,0 +1,34 @@
+sequenceDiagram
+  actor U as 사용자
+  participant UI as MainActivity
+  participant P as Deletion process coordinator
+  participant D as Intent와 journal 저장
+  participant L as Local data stores
+  participant S as Gateway와 서버 삭제
+  U->>UI: 계정 삭제 최종 확인
+  UI->>UI: runtime privacy fence
+  UI->>P: current Activity lease로 preparation 예약
+  P->>D: noBackup confirmed와 encrypted authority
+  P->>D: PREPARED marker와 pending journal
+  P->>S: current network lease로 삭제 POST
+  S-->>P: accepted inventory
+  P->>D: journal과 ACCEPTED marker 저장
+  P->>L: route·speech barrier 및 raw/report purge
+  L-->>P: 필수 정리 완료 결과
+  alt 모든 정리 성공
+    P->>D: bound device evidence 저장
+    P->>S: device evidence POST
+    S-->>P: evidence ack와 status
+    P->>D: exact newer status 저장
+  else 정리 실패
+    P->>D: FAILED evidence와 EVIDENCE_PENDING journal 저장
+    P->>S: FAILED device evidence POST
+    S-->>P: 실패 결과를 포함한 status와 acknowledgement
+  end
+  opt 전체 inventory terminal과 evidence ack
+    P->>D: TERMINAL_RECEIPT와 cleanup
+    P->>P: reset reservation
+    P->>D: 단계별 session·sensitive·plain·field·intent reset
+    P-->>UI: current lease에 재가입 필요 상태
+  end
+  Note over UI,P: detach는 network 취소와 generation 변경. durable 삭제 의사는 보존

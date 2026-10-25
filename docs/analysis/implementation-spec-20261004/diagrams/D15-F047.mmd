@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-047 · 신고 이미지 envelope 암호화·엄격 해독<br/>정제 이미지 저장 또는 grant 원본 열람이 crypto helper 호출"]
+  P["P-D15-047 · 전제조건<br/>키 공급 F-D15-009; 사용자 이미지 검증 F-D15-003 이후 저장<br/>F-D15-008 또는 원본 F-D15-028."]
+  E --> P
+  S1["1. 저장은 plaintext SHA256와 report ID를 canonical<br/>header에 기록"]
+  P --> S1
+  S2["2. magic·header 길이·header·report UUID<br/>binding을 AAD로 하여 AES-256-GCM 암호화"]
+  S1 --> S2
+  S3["3. 해독 전 magic/version/header4096바이트 cap·정확<br/>field set·중복 JSON key·canonical<br/>bytes·base64url·report ID·길이 검사"]
+  S2 --> S3
+  S4["4. AESGCM 인증 후 plaintext 길이와 SHA256를<br/>constant-time digest 비교"]
+  S3 --> S4
+  S5["5. 검증이 끝난 bytes와 content type만 반환"]
+  S4 --> S5
+  OK["정상 결과<br/>EncryptedReportImage 또는 DecryptedReportImage<br/>반환."]
+  S5 --> OK
+  B1["조건 · legacy plaintext 또는 지원하지 않는 version<br/>결과 · ReportImageFormatError; fallback decoder 없음"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · 다른 report ID·header 중복/추가 field·비canonical 값<br/>결과 · format error"]
+  S3 -. "해당 조건 발생" .-> B2
+  B3["조건 · tag/key/AAD 인증 실패 또는 plaintext hash/length<br/>불일치<br/>결과 · ReportImageAuthenticationError"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · 정상 envelope<br/>결과 · 완전 검증 후 전체 plaintext 반환"]
+  S1 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>helper 자체 취소 API 없음.<br/>파일/DB mutation은 helper 외부에서 수행."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>같은 plaintext도 저장 시 기본 random nonce로 다른<br/>envelope가 될 수 있음. 내용 멱등은 상위 서비스 계약.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>함수는 파일/DB를 열지 않음. Python 메모리의 안전한 소거를 보장하는<br/>계약은 없음."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_image_crypto.py:153<br/>encrypt_report_image<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

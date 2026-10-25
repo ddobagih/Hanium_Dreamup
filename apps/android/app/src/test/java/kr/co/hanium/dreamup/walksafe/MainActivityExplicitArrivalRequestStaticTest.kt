@@ -1,46 +1,27 @@
 package kr.co.hanium.dreamup.walksafe
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.navigation.*
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 07.txt #36: "도착했어" without an open question opens one new confirmation, never an end. */
+/** Arrival queries must never provide the evidence that ends a walk. */
 class MainActivityExplicitArrivalRequestStaticTest {
-    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/VoiceCommandInteractionController.kt").readText()
 
     @Test
-    fun voiceArrivalWithoutAnOpenQuestionAsksAgainInsteadOfDeadEnding() {
-        val confirm = functionBlock("private fun confirmArrivalFromVoice(expectedToken: RouteNavigatorDecisionToken?)")
-        val nullBranch = confirm.substringAfter("if (expectedToken == null) {").substringBefore("}")
-        assertTrue(nullBranch.contains("requestArrivalConfirmationFromVoice()"))
-        assertFalse(nullBranch.contains("아직 도착 안내가 없습니다."))
-
-        val request = functionBlock("private fun requestArrivalConfirmationFromVoice()")
-        assertTrue(request.contains("routeNavigator.pendingUserDecision() != null"))
-        assertTrue(request.contains("routeNavigator.requestArrivalConfirmation(SystemClock.elapsedRealtime())"))
-        assertTrue(request.contains("applyRouteDeviationSafetyUpdate(update)"))
-        assertTrue(request.indexOf("RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION") <
-            request.indexOf("applyRouteDeviationSafetyUpdate(update)"))
-        // Opening a question is not an arrival: only a later token-bound confirmation ends guidance.
-        assertFalse(request.contains("resetRouteState("))
-        assertFalse(request.contains("confirmArrival("))
-    }
-
-    private fun functionBlock(marker: String): String {
-        val markerIndex = source.indexOf(marker)
-        require(markerIndex >= 0) { "missing function marker: $marker" }
-        val openingBrace = source.indexOf('{', markerIndex + marker.length)
-        var depth = 0
-        for (index in openingBrace until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(markerIndex, index + 1)
-                }
-            }
+    fun voiceArrivalRequestsReadStateWithoutOpeningAConfirmation() {
+        val dispatch = MainActivityRefactorSource.member(source, "executeVoiceAction")
+        assertTrue(dispatch.contains("AndroidVoiceAction.ConfirmArrival,"))
+        assertTrue(dispatch.contains("AndroidVoiceAction.RejectArrival -> output.speakCurrentState()"))
+        assertFalse(source.contains("requestArrivalConfirmation("))
+        assertFalse(source.contains("route.confirmArrival("))
+        assertFalse(source.contains("navigator.rejectArrival("))
+        for (phrase in listOf("현재 상태", "남은 거리", "남은 거리 알려줘")) {
+            assertEquals(phrase, AndroidVoiceAction.SpeakCurrentState,
+                selectAndroidVoiceAction(listOf(phrase), floatArrayOf(.9f)))
         }
-        error("missing closing brace: $marker")
     }
 }

@@ -16,7 +16,7 @@ from backend.app.account_schemas import (
     AccountCreateRequestV1,
     EmailOtpEnrollmentRequestV1,
 )
-import backend.app.api.health as health_api
+import backend.app.services.health_readiness as health_api
 from backend.app.services.accounts import (
     AccountEmailCrypto,
     AccountService,
@@ -163,6 +163,11 @@ def run_production_startup(
     import asyncio
 
     import backend.app.main as main_app
+    owned_app = main_app.create_app(main_app.settings)
+    owner = owned_app.state.runtime
+    owner.initialize_resources()
+    monkeypatch.setattr(owner, "initialize_resources", lambda: None)
+    from backend.app import application_runtime as runtime_module
 
     configured = configured or _settings()
     for name in (
@@ -171,25 +176,26 @@ def run_production_startup(
         "account_otp_hmac_key",
         "account_email_key_version",
     ):
-        monkeypatch.setattr(main_app.settings, name, getattr(configured, name))
-    monkeypatch.setattr(main_app, "SessionLocal", session_local)
+        monkeypatch.setattr(owner.settings, name, getattr(configured, name))
+    monkeypatch.setattr(owner.database, "_session_factory", session_local)
     for name in (
         "validate_admin_credential_issuer_binding",
         "bind_privacy_hmac_key",
         "reconcile_report_storage",
         "reconcile_raw_collection_storage",
     ):
-        monkeypatch.setattr(main_app, name, lambda: None)
-    monkeypatch.setattr(main_app, "capacity_monitor", None)
-    monkeypatch.setattr(main_app, "inference_runner", None)
+        monkeypatch.setattr(owner, name, lambda: None)
+    monkeypatch.setattr(owner, "capacity_monitor", None)
+    monkeypatch.setattr(owner, "inference_runner", None)
     served: list[bool] = []
 
     async def exercise() -> None:
-        async with main_app.lifespan(main_app.app):
+        async with owner.lifespan(owned_app):
             served.append(True)
 
     asyncio.run(exercise())
     return served == [True]
+
 
 
 def test_s01_14_lifespan_starts_with_otp_only_key_change_and_logs_purpose(
@@ -197,12 +203,12 @@ def test_s01_14_lifespan_starts_with_otp_only_key_change_and_logs_purpose(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     stored = _binding_for(otp=b"Q" * 32)
-    caplog.set_level("WARNING", logger="backend.app.main")
+    caplog.set_level("WARNING", logger="backend.app.application_runtime")
     assert run_production_startup(monkeypatch, _stored_session_local(stored)) is True
     warnings = [
         record.getMessage()
         for record in caplog.records
-        if record.name == "backend.app.main"
+        if record.name == "backend.app.application_runtime"
     ]
     assert any("otp_hmac" in message for message in warnings), warnings
     configured_fingerprints = AccountService(_settings())._crypto().key_fingerprints

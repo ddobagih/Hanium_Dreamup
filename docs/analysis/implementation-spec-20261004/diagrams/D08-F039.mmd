@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D08-039 계정 generation·진행 작업 lease·삭제 fence"]
+  B["진입: bindBackendActorGenerationAsync / beginPrivacyOperation"]
+  A --> B
+  P0["1. 현재 generation 을 내구 ledger 와 바인딩"]
+  B --> P0
+  P1["2. 삭제 fence 면 새 operation 을 거부"]
+  P0 --> P1
+  P2["3. operation controller 를 메모리에 등록"]
+  P1 --> P2
+  P3["4. upstream 전후 또는 response stream 종료까지 current generation 검사"]
+  P2 --> P3
+  P4["5. 삭제수락시 해당 generation active operation 을 abort"]
+  P3 --> P4
+  P5["6. finally finish 로 등록 제거"]
+  P4 --> P5
+  OK["정상: 옛 generation 작업 중단 및 데이터 전송 fencing"]
+  P5 --> OK
+  C0{"generation rollback 또는삭제 actor 재활성화"}
+  X0["409 inactive/stale"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"ledger 손상/분실"}
+  X1["503 fail-closed"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"삭제중 응답늦게도착"}
+  X2["body cancel 및 inactive 응답; 새성공으로노출하지않음"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-011, P-D08-019, P-D08-021, P-D08-024"]
+  A -.-> POLICY

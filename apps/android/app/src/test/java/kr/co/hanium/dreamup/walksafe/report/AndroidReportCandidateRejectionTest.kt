@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.report
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import kr.co.hanium.dreamup.walksafe.ReportStaticSourceInspector
 import kr.co.hanium.dreamup.walksafe.depth.DepthAvailability
 import kr.co.hanium.dreamup.walksafe.depth.DepthConfidenceBreakdown
@@ -82,7 +83,7 @@ class AndroidReportCandidateRejectionTest {
     @Test
     fun mainActivityStatusKeepsTheRejectionReasonButNoInputValue() {
         val main = File(MAIN_PATH).readText()
-        val prepare = ReportStaticSourceInspector.functionBlock(main, "private fun prepareReportCandidate")
+        val prepare = MainActivityRefactorSource.function(main, "private fun prepareReportCandidate")
         assertTrue(prepare.contains("reportCandidatePolicy.evaluate("))
         assertFalse(prepare.contains("reportCandidatePolicy.prepare("))
         assertTrue(
@@ -103,6 +104,7 @@ class AndroidReportCandidateRejectionTest {
         threshold = 0.35f,
         capturedAtMs = 1_782_907_200_000L,
         requestElapsedRealtimeMs = 2_000L,
+        capturedAtElapsedRealtimeMs = 1_900L,
         trigger = AndroidReportCandidatePolicy.TRIGGER_AUTO,
         reporterUserId = "user-123",
         traceId = "trace-1",

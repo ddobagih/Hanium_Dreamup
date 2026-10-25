@@ -22,6 +22,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.api import reports
+from backend.app.services import report_application
 from backend.app.config import get_settings
 from backend.app.models import Report, ReportImageObject
 from backend.app.schemas import (
@@ -193,14 +194,14 @@ def test_s19_33_consent_and_final_report_commit_serialize(
             )
 
     if first == "report":
-        original_lock = reports.lock_report_ingest_transaction
+        original_lock = report_application.lock_report_ingest_transaction
 
         def lock_and_pause(*args, **kwargs):
             original_lock(*args, **kwargs)
             lock_held.set()
             assert release_first.wait(timeout=10)
 
-        monkeypatch.setattr(reports, "lock_report_ingest_transaction", lock_and_pause)
+        monkeypatch.setattr(report_application, "lock_report_ingest_transaction", lock_and_pause)
 
     try:
         with ThreadPoolExecutor(max_workers=2) as executor:

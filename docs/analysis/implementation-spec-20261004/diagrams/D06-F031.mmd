@@ -1,0 +1,37 @@
+flowchart TD
+  T["F-D06-031 정밀 위치 평가 checkpoint와 원본 레코드 무결성"]
+  P["전제: 현재 유효 ACTIVE lease, 정지상태 STATIONARY, 동일 세션 stationary<br/>since, 유지 이상 1500ms."]
+  T --> P
+  E1["E-D06-031-01 checkpoint 버튼→현재 motion 다시 조회→동일 세션 정지1500ms<br/>확인→CPnnn 저장"]
+  E1 --> T
+  E2["E-D06-031-02 export 준비→전체 record count/seq/time/checkpoint 검사"]
+  E2 --> T
+  A1["1. 버튼 시점의 motion을 새로 읽어 stale 정지값을 쓰지 않는다."]
+  P --> A1
+  A2["2. 정지1500ms와 lease 결합을 통과하면 checkpoint ordinal/time를 검증해<br/>append한다."]
+  A1 --> A2
+  A3["3. 성공한 경우만 Main ordinal을 증가시킨다."]
+  A2 --> A3
+  A4["4. 내보내기 전 각 AEAD record의<br/>session/scope/generation/epoch/seq/type/time와 manifest count를<br/>확인하고 checkpoint 순서·정지1500ms도 다시 검사한다."]
+  A3 --> A4
+  N["정상 종료: checkpoint 성공/거부 Boolean."]
+  A4 --> N
+  FX["결과: 암호화 checkpoint record, UI checkpoint 순번. D04 ground truth<br/>검증 자체를 제공하지 않음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"움직임/UNKNOWN/짧은 정지/다른 세션"}
+    R1["checkpoint 생성 거부"]
+    B1 -->|조건 성립| R1
+    B2{"record 누락/중복/순서역전/허용 type 외/AEAD 오류"}
+    R2["export source 무결성 실패"]
+    B2 -->|조건 성립| R2
+    B3{"UTC anchor 없음"}
+    R3["단조 timestamp만 저장하며 UTC를 생성하지 않음"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-028, P-D06-030"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 실패시 ordinal 증가 없음."]
+    X2["복구: stationary 조건 재충족 후 사용자 재입력 가능."]
+  end

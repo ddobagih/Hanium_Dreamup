@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D01-006 이메일·비밀번호 로그인과 계정 상태 결속"]
+  G{"전경·네트워크·스토리지 정상·기존 active session 없음; backend restore pending이면 복원 경로 우선"}
+  I["email,pw10..128,install deviceId,rememberMe=true; optional expectedCreatedActorId"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: invalid credentials·busy·rate·network 오류 표시"]
+  G -->|"미충족"| X
+  N1["계정 fence 및 process operation을 예약하고 password grant POST /field-session을 보낸다."]
+  I --> N1
+  N2["GENERAL cookie 응답 뒤 GET status authenticated 및 actor binding을 검증한다."]
+  N1 --> N2
+  N3["생성계정 actor mismatch면 받은 세션을 logout하고 거부한다."]
+  N2 --> N3
+  N4["같은 actor 재인증 또는 교육 복원이면 진행을 보존하고, 새 actor이면 VERIFIED_14_PLUS 교육·로그인 증거를 새로 구성한다."]
+  N3 --> N4
+  N5["backendDevice 세션을 저장한 뒤 process publishVerified; actor를 기억하고 통합동의를 서버 refresh한다. 입력을 지운다."]
+  N4 --> N5
+  OK["검증된 GENERAL session 및 후속 onboarding/복원 UI"]
+  N5 --> OK
+  B0["원격 세션 정리·로그인 거부"]
+  N2 -->|"GET 인증·scope·actor 불일치"| B0
+  B1["원격 logout 후 실패"]
+  N3 -->|"생성 actor와 로그인 actor 다름"| B1
+  B2["publish 거부; blocked 또는 오래된 응답 폐기"]
+  N5 -->|"저장 실패·stale operation"| B2
+  R["중단·취소: 배경/새작업으로 응답 폐기; 사용자 로그아웃 F-D01-008 / Activity callback lease와 process generation 둘 다 확인"]
+  V["복구·재시도: 같은 actor의 유효 training profile은 보존 가능 / 오류 정정 후 사용자 로그인; 무한 자동로그인 없음"]
+  Q["정책 P-D01-002 · P-D01-005 · P-D01-006 · P-D01-024"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

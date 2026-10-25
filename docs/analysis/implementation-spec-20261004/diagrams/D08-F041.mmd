@@ -1,0 +1,42 @@
+flowchart TD
+  A["F-D08-041 삭제 상태 capability 조회·키 전환"]
+  B["진입: GET /privacy/account-deletions/{request_id}/status"]
+  A --> B
+  P0["1. capability 를저장 verifier 와대조"]
+  B --> P0
+  P1["2. decrypt-only/legacy verifier 는 유효 secret 제시 때 active key verifier 로전환"]
+  P0 --> P1
+  P2["3. 필요한 pending request 를전달"]
+  P1 --> P2
+  P3["4. Backend statusGET 후 128KiB/schema/revision/inventory 검증"]
+  P2 --> P3
+  P4["5. 내구상태를갱신하여반환"]
+  P3 --> P4
+  P5["6. 전체 상태는 항목에서 재계산한다: 전부 COMPLETED/NOT_APPLICABLE 이면 COMPLETED, 다음 LEGAL_HOLD→RESTRICTED, FAILED, RETRY_WAIT, 일부 EXTERNAL_PENDING/완료→PARTIAL, 나머지 PROCESSING 순이다."]
+  P4 --> P5
+  P6["7. COMPLETED 일 때만 completion receipt SHA 가 있어야 한다. terminal item COMPLETED/NOT_APPLICABLE 은 evidence 와 terminal_at 을 요구하고 NOT_APPLICABLE 은 disposition_basis 를 요구한다. due_at 은 accepted_at+항목별 최대목표시간 이하여야 한다."]
+  P5 --> P6
+  OK["정상: 9 개 저장계층과 전체 처리 상태"]
+  P6 --> OK
+  C0{"오류 secret/없음"}
+  X0["404"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"영구 conflict"}
+  X1["409 exact code; 반복 fetch 하지않음"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"paused/pending"}
+  X2["503 RetryAfter"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"구키 material 없음/compromised"}
+  X3["fail-closed; envelope 회전만으로 capability 복구안됨"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-019, P-D08-020, P-D08-021, P-D08-029"]
+  A -.-> POLICY

@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.voice
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
 import android.Manifest
 import android.app.Instrumentation
 import android.content.Intent
@@ -266,7 +268,7 @@ class MainVoiceMicrophoneReentryDeviceTest {
     }
 
     private fun mainField(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.get(activity)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.get(activity)
 
     private fun mainBoolean(activity: MainActivity, name: String): Boolean =
         MainActivity::class.java.getDeclaredMethod(name).apply {

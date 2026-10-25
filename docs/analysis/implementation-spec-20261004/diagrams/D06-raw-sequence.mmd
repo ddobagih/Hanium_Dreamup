@@ -1,0 +1,39 @@
+sequenceDiagram
+  participant V as 탐지·보행 runtime
+  participant A as 30초 accumulator
+  participant R as RawRuntimeCoordinator
+  participant S as RawCollectionStore
+  participant C as Raw HTTP Client
+  participant G as D08 Gateway·D13 Backend
+  V->>A: 완료 inference·busy drop·thermal·motion
+  A->>R: F-D06-017 metadata pair
+  R->>R: identity·30초·동의 검사
+  R->>S: F-D06-018 active aggregate atomic replace
+  alt replace 실패
+    S-->>R: 이전 PARTIAL 유지
+  else 경계·종료
+    R->>S: pair 검증 뒤 SEALED
+  end
+  Note over R,S: SAFE_STOP은 seal 가능·송신 불가
+  V->>R: READY 또는 ENDED·전경·충전·Wi-Fi
+  R->>S: F-D06-020 오래된 uploadable 선택
+  R->>C: 현재 authority lease로 upload
+  C->>G: manifest
+  C->>G: status
+  alt 이미 COMMITTED v2 receipt
+    G-->>C: 정확 receipt
+  else upload 필요
+    loop 객체 chunk
+      C->>G: SHA 결합 chunk PUT
+    end
+    C->>G: commit hash
+    G-->>C: 정확 v2 receipt
+  end
+  C-->>R: response 또는 cancelled/protocol failure
+  R->>S: F-D06-022 exact receipt 검증
+  alt 검증 성공
+    S->>S: ACK 상태 내구화 후 원본 제거
+  else 실패·stale·receipt mismatch
+    S->>S: 보존·격리·재시도 상태
+  end
+  Note over V,G: 보행 재시작·동의·세션 변화는 lease를 취소<br/>서버응답과 물리삭제 성공은 별개

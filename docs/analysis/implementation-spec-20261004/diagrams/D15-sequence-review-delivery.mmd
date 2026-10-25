@@ -1,0 +1,26 @@
+sequenceDiagram
+  participant A as 관리자
+  participant API as 신고 API
+  participant DB as 신고 DB
+  participant FS as 원본 저장소
+  participant I as 외부 기관
+  A->>API: original grant 요청·내용 revision
+  API->>DB: 세션·proof·키·현재 내용 결속·발급 감사
+  API-->>A: 한 번 쓸 grant·정확 위치
+  A->>API: grant로 원본 열람
+  API->>FS: 암호화 envelope 인증·해독
+  API->>DB: grant 소비·열람 감사 commit
+  API-->>A: 검토할 원본
+  A->>API: APPROVED·증거 grant·review/content CAS
+  API->>DB: 두 증거 감사 확인·grant 1회 binding·결정 append
+  A->>API: v2 package 생성
+  Note over A,API: F-D15-031은 HTTP stepup 경계 문제 R-D15-006<br/>아래 패키지 생성은 그 전제조건 통과 시 구현 경로
+  API->>DB: package·export 감사 commit
+  API-->>A: ZIP·package hash/revision
+  A->>I: 관리자가 직접 전달
+  A->>API: SUBMITTED 수기 기록
+  API->>DB: idempotency·revision·package 검증 후 append
+  I-->>A: 외부 회신
+  A->>API: ACK 또는 RESOLVED 관찰 기록
+  API->>DB: 원래 제출 package 결속·전이/CAS
+  Note over A,DB: F-D15-027~034 / P-D15-033<br/>정정 후 도착한 회신도 원래 제출 package 증거를 유지

@@ -1,0 +1,47 @@
+flowchart TD
+  E["F-D06-007 보행 종료·전경 복귀·로그인·네트워크 trigger"]
+  G{"P-D06-007<br/>READY 또는 ENDED·전경·현재 authority·허용망?"}
+  WAIT["원본 보존·다음 허용 trigger 대기<br/>신고는 충전 불필요"]
+  PICK["현재 단일 lease 획득<br/>초기 queue 수 이내·explicit 우선"]
+  ST["GET status 최대1회"]
+  SD{"P-D06-008 status 결과"}
+  REC["exact receipt 검증"]
+  PG{"미접수404<br/>현재 목적 동의·lease 유효?"}
+  POST["exact payload POST 최대1회"]
+  PR{"POST 결과"}
+  COM["현재 lease 재검사<br/>automatic cooldown 먼저 내구 commit"]
+  DEL{"commit 및 deleteAfterReceipt 성공?"}
+  OK["서버 접수 확인·원본 제거<br/>기관 전달 완료 아님"]
+  HOLD["원본 유지<br/>다음 status로 POST 없이 복구 가능"]
+  QUAR["400·413·415·422: 격리<br/>TTL·개인정보 정리 대상"]
+  AUTH["401·403: authority 차단·배수 종료"]
+  RETRY["Retry-After 내구 not-before<br/>409 walk-in-progress는 같은 post-walk 105초 후1회"]
+  CANCEL["상태·세대·network 변경<br/>outer 및 nested call 취소"]
+  FINAL["finally: policy.release<br/>activeDrain.call이 exact outer일 때만 해제"]
+  E --> G
+  G -->|아니오| WAIT
+  G -->|예| PICK --> ST --> SD
+  SD -->|기존 exact receipt| REC
+  SD -->|404 미접수| PG
+  SD -->|receipt 불일치·일시 오류| HOLD
+  SD -->|400·413·415·422| QUAR
+  SD -->|401·403| AUTH
+  SD -->|Retry-After·409| RETRY
+  PG -->|예| POST --> PR
+  PG -->|아니오| HOLD
+  PR -->|정확 receipt| REC
+  PR -->|영구 4xx| QUAR
+  PR -->|권한 4xx| AUTH
+  PR -->|Retry-After·409 등| RETRY
+  PR -->|protocol·일시 실패| HOLD
+  REC --> COM --> DEL
+  DEL -->|예| OK
+  DEL -->|아니오| HOLD
+  ST -. "현재성 상실" .-> CANCEL
+  POST -. "현재성 상실" .-> CANCEL
+  OK --> FINAL
+  HOLD --> FINAL
+  QUAR --> FINAL
+  AUTH --> FINAL
+  RETRY --> FINAL
+  CANCEL --> FINAL

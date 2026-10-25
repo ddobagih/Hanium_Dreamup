@@ -11,7 +11,8 @@ from fastapi import HTTPException
 import pytest
 from sqlalchemy.engine import Engine
 
-from backend.app.api import reports
+from backend.app.services import report_commit as reports
+from backend.app.services import report_application, maintenance_lock
 from backend.app.models import Report
 from backend.app.services import report_storage
 
@@ -66,7 +67,7 @@ def test_shared_lock_outcome_after_confirmed_commit(
         trusted_checks.append(True)
         return not (case == "lock-exit-failure" and len(trusted_checks) == 4)
 
-    monkeypatch.setattr(reports, "_trusted_maintenance_lock_parent", trusted_parent)
+    monkeypatch.setattr(maintenance_lock, "_trusted_maintenance_lock_parent", trusted_parent)
     monkeypatch.setattr(
         reports, "lock_report_storage_write_transaction",
         lambda _db: events.append("storage-lock"),
@@ -150,6 +151,14 @@ def test_shared_lock_outcome_after_confirmed_commit(
         def execute(self, *_args, **_kwargs):
             return object()
 
+        def scalar(self, statement):
+            description, = statement.column_descriptions
+            assert description["expr"] is Report
+            report_id = statement.compile().params["id_1"]
+            sql = str(statement)
+            assert "NOT (EXISTS (" in sql and "account_deletion_tombstones" in sql
+            return self.get(Report, report_id)
+
         def get(self, model, identifier):
             assert model is Report and identifier == REPORT_ID
             return self.committed
@@ -202,17 +211,17 @@ def test_shared_lock_outcome_after_confirmed_commit(
         assert isinstance(caught.__cause__, reports._ReportWriteLockExitError)
 
     # Existing same-owner status projection and fixed-ID resend resolve the outcome.
-    statement = reports._report_transport_status_statement(
+    statement = report_application._report_transport_status_statement(
         REPORT_ID, privacy_subject=SUBJECT, account_generation=7,
     )
     assert "reports.privacy_subject_hmac =" in str(statement)
     assert "reports.account_generation =" in str(statement)
-    status = reports._report_transport_status_response(db.committed)
+    status = report_application._report_transport_status_response(db.committed)
     assert status.persistence_state == "PERSISTED"
     assert status.transport_receipt.report_id == REPORT_ID
-    assert reports._report_transport_replay(
+    assert report_application._report_transport_replay(
         db,
-        contract=reports.ReportTransportContract(REPORT_ID, PAYLOAD_SHA256, 123),
+        contract=report_application.ReportTransportContract(REPORT_ID, PAYLOAD_SHA256, 123),
         privacy_subject=SUBJECT,
         account_generation=7,
     ) is db.committed

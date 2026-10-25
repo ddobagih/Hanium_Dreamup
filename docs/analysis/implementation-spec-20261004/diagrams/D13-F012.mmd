@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D13-012<br/>계정 삭제 수락과 즉시 credential fence"]
+  P["P-D13-012<br/>DB 영속 tombstone 이 모든 후속 수집의 삭제 fence 가 된다. 내부 endpoint 에는<br/>별도 intent/commit 2 단계가 없고 Gateway/UI 확인 흐름과 구분한다."]
+  A --> P
+  N0["1. request_id advisory lock 과 모든 후보 subject exclusive lock<br/>후 소유 subject 를 확정한다."]
+  P --> N0
+  N1["2. 동일 request_id 면 capability·body<br/>SHA256·client_revision·credential fence 를 확인하고 기존 상태 200 을<br/>재생한다."]
+  N0 --> Q{"동일 request_id인가?"}
+  Q -- "기존 요청" --> N1
+  N2["3. 새 요청은 기존 tombstone 을 거부하고 credential 계정 및 동의원장에 나타난 모든<br/>installation HMAC 를 고정한다."]
+  N1 --> EARLY["기존 결과 반환; 신규 변경 없음"]
+  Q -- "신규 요청" --> N2
+  N3["4. 대상설치도 계정도 없으면 409. 계정만 있으면 device 항목 NOT_APPLICABLE 과<br/>근거 digest 를 만든다."]
+  N2 --> N3
+  N4["5. DB clock 으로 accepted_at 을 기록하고 계정을<br/>DISABLED/auth_epoch+1 로 변경한다."]
+  N3 --> N4
+  N5["6. tombstone, request, frozen device targets, 9 항목,<br/>REQUEST_ACCEPTED event 를 단일 commit 한다."]
+  N4 --> N5
+  N6["7. 서버 4 항목 PENDING, 기기/학습 3 종/backup 은 EXTERNAL_PENDING 으로<br/>시작하며 접수 receipt 와 tombstone 을 반환한다."]
+  N5 --> N6
+  Z["새 202 또는 동일 200 no-store. 계정 로그인 차단과 삭제 접수는 즉시지만 파일 삭제 완료를<br/>뜻하지 않음."]
+  N6 --> Z
+  B0{"기존 generation tombstone"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["409 재수락 거부"]
+  B1{"credential auth_epoch >= 9007199254740991"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["409 exhausted; 안전한 fence 불가"]
+  B2{"같은 request_id 본문이나 revision 달라짐"}
+  P -. "예외 조건 검사" .-> B2
+  B2 -- "조건 성립" --> X2["409 request_conflict"]
+  B3{"기존 요청 credential 이 아직 ACTIVE"}
+  P -. "예외 조건 검사" .-> B3
+  B3 -- "조건 성립" --> X3["503 fence_invalid"]
+  R["재시도: 자동 반복 루프 없음. 호출자가 오류와 현재 상태를 확인 후 재호출.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 수락 후 철회/계정 복구 API 없음. tombstone 제거 경로 아님."]
+  A -. "취소 API 여부" .-> C

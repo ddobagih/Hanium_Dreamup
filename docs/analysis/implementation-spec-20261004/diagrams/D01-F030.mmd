@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D01-030 삭제 intent 재시작 복구·rev0 전용 재인증"]
+  G{"startup inspection 또는 deletion recovery; configuredorigin/current scope; durableconfirmed 또는 failclosed authority"}
+  I["파일intent state,pref authority,journalrev0,PREPARED marker,actor SHA,session scope ACCOUNT_DELETION_RECOVERY"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 모호한 intent·binding은 failClosed/restricted"]
+  G -->|"미충족"| X
+  N1["startup은 file+pref authority를 조합하고 file FAIL_CLOSED를 예전 journal보다 우선한다."]
+  I --> N1
+  N2["confirmed file인데 journal이 없으면 정상앱으로 돌아가지 않고 durable confirmation 복구를 유지한다."]
+  N1 --> N2
+  N3["PREPARED marker와 rev0 REQUEST_PENDING/RETRY_WAIT·actorhash·origin/install/request/clientrev가 맞을 때만 삭제복구 재인증을 허용한다."]
+  N2 --> N3
+  N4["검증 RECOVERY scope 세션을 process deletionRecoveryOnly로 publish하여 일반기능에서 제외한다."]
+  N3 --> N4
+  N5["복구 POST로 기존요청 acceptance를 확인하고 rev＞0 binding이 확보되면 정확 marker/recovery session을 retire한다."]
+  N4 --> N5
+  OK["원래 삭제request journal 재확보 및 서버진행 이어감"]
+  N5 --> OK
+  B0["failClosed; 임의 초기화 금지"]
+  N1 -->|"corrupt/symlink/hardlink/unknown intent"| B0
+  B1["명시복구 atomicmove+barrier 가능"]
+  N2 -->|"일치PREPARED와 full confirmed temp"| B1
+  B2["삭제 후 사용자 재확인; unknown temp 거부"]
+  N2 -->|"엄격한 미완성prefix temp"| B2
+  B3["복구 HTTP 차단"]
+  N3 -->|"wrongactor/oldsession/remoteBlocked"| B3
+  B4["재인증 필요; 기존삭제 완료로 가정 안 함"]
+  N5 -->|"404 recovery"| B4
+  R["중단·취소: durableconfirmed 이후 삭제취소 없음 / process shutdown 후 noBackup authority 및 encrypted journal로 복구"]
+  V["복구·재시도: 정확 PREPARED 증거 기반 temp 복구는 정상startup 자동수용과 구분 / 서버결과불명은 동일request replay; 새일반로그인 권위로 우회 금지"]
+  Q["정책 P-D01-020 · P-D01-021 · P-D01-022"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

@@ -1,0 +1,48 @@
+sequenceDiagram
+  participant OS as Android sensors / FLP
+  participant Main as MainActivity current owner
+  participant Dir as Orientation HandlerThread
+  participant Motion as UserMotionStateEstimator
+  participant Coord as PositioningCoordinator
+  participant Filter as PedestrianPositionEstimator
+  participant Route as D03 RouteNavigator
+  participant Other as Depth / RAW / field trace
+  Note over OS,Other: D04 비동기 입력의 원 측정 시각·receipt·generation 분리
+  Main->>OS: 현재 owner binding 등록
+  OS-->>Dir: RV / magnetic 원 timestamp ns
+  Dir->>Dir: route compass와 strict chest gate 각각 적용
+  Dir-->>Main: history 및 latest snapshot
+  OS-->>Main: GNSS Location 원 elapsed + receipt
+  Main->>Main: binding·owner·generation 및 raw gate
+  Main->>Motion: raw speed 근거 입력
+  Main->>Coord: GNSS + 관측시각 GNSS risk
+  Coord->>Filter: GNSS update
+  alt history 범위 내 늦은 GNSS
+    Filter->>Filter: rollback 후 correction 및 이후 motion replay
+  else 현재 또는 새 GNSS
+    Filter->>Filter: initialize / predict / soft weighted correction
+  end
+  Filter-->>Coord: measured-time estimate + replayed live estimate
+  Coord-->>Main: position snapshot 및 disposition
+  Main->>Route: fresh filtered 위치 + uncertainty + heading
+  Main->>Other: measurement trace / 별도 live sensor trace
+  OS-->>Main: HIGH single step 또는 MEDIUM batch
+  Main->>Motion: 원 step 시각 근거
+  Main->>Dir: step 이전 chest heading 조회
+  Dir-->>Main: mounted strict heading 또는 null
+  Main->>Coord: packet + speed/course history + profile
+  Coord->>Filter: directional PDR 또는 covariance-only
+  Filter-->>Main: 현재 estimate 및 quality
+  Main->>Other: profile 기반 step length / 독립 typed motion
+  OS-->>Main: 완전 IMU window
+  Main->>Motion: quiet·rotation 근거
+  Main->>Motion: 현재 통합 snapshot
+  alt 독립 GNSS와 quiet stationary 근거 충족
+    Main->>Coord: ZUPT 원 motion time
+    Coord->>Filter: velocity-only correction / 필요 시 replay
+  end
+  Main->>Other: RAW 동의·ACTIVE일 때 aggregate only
+  Main->>Main: stop 시 먼저 binding retire 및 generation 증가
+  Main->>OS: remove / unregister
+  OS-->>Main: late callback
+  Main->>Main: owner·generation 불일치로 무시

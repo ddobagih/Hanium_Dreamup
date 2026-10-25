@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D02-026 위험 진동·청취 cue·교육 진동·진행음"]
+  E["진입: 진동 또는 progress tone 요청"]
+  G{"P-D02-026 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["완료 전 재시작/완료시각 연장 금지"]
+  G -->|"같은 STOP event와 연장된 lease"| B0
+  B1["억제"]
+  G -->|"낮은 rank cue가 위험 진동 중"| B1
+  B2["close 동안 지정 실패 패턴 보존"]
+  G -->|"init/final TTS failure STOP"| B2
+  B3["false/실패; 음성 capability 전체 성공으로 치환 안 함"]
+  G -->|"vibrator 미지원/예외"| B3
+  B4["tone만 retire; 새 speech focus 보존"]
+  G -->|"진행음 중 speech 또는 stale timer"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["현재 rank·동일 event의 completion time·pattern duplicate를 판정"]
+    S1["높은 rank는 선점, 진행 STOP의 동일 event 재요청은 원래 완료 시각까지 거절"]
+    S2["vibrator 호출 성공은 요청 수락; physical felt 확인과 분리"]
+    S3["교육 waveform370ms elapsed 뒤 completion callback, 교체/취소면 failure"]
+    S4["progress beep은 no speech와 focus 조건 아래80ms·volume0..100, 종료+50ms에<br/>focus release"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: 교육 timer는 요청된 waveform 시간 경과만 의미; 실제 진동 체감 완료가 아님."]
+  X["취소·중단: 교육 completion runnable exact identity로 취소; STOP 유지 예외를 고려. /<br/>foreground/actor/epoch 변경 시 현재 요청을 폐기한다."]
+  C["정리: vibrator cancel·tone release·focus owner 해제; native 예외 뒤 cleanup 계속."]
+  R["재시도·복구: 자동 재시도 없음; 새 적법한 이벤트 필요. / 현재 owner와 조건을 다시 확보해야 한다."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

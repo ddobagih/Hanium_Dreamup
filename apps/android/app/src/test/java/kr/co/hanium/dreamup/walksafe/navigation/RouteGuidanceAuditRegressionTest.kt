@@ -6,16 +6,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RouteGuidanceAuditRegressionTest {
-    @Test fun coarseOrUnmeasuredHeadingErrorNeverBecomesAPreciseClockNumber() {
+    @Test fun coarseOrUnmeasuredHeadingErrorNeverBecomesReportedClockPrecision() {
         val coarse = RouteFacingGuidance.evaluate(90.0, RouteFacingObservation(0.0, 30.0, 1_000L), 1_000L)
         assertEquals(RouteFacingDirection.RIGHT, coarse.direction)
-        assertNull(coarse.clockHour)
+        assertEquals(3, coarse.clockHour)
+        assertFalse(coarse.clockPrecisionAvailable)
+        assertEquals(RouteClockReferenceKind.NOMINAL_TREND_CLOCK, coarse.clockReferenceKind)
+        assertNull(coarse.clockRange)
         val fallback = RouteFacingGuidance.evaluate(90.0, RouteFacingObservation(0.0, null, 1_000L,
             RouteFacingSource.GRAVITY_MAGNETIC, RouteFacingSensorQuality.CALIBRATED_SENSOR_CHECKS, null), 1_000L)
         assertEquals(RouteFacingDirection.RIGHT, fallback.direction)
-        assertNull(fallback.clockHour)
+        assertEquals(3, fallback.clockHour)
+        assertFalse(fallback.clockPrecisionAvailable)
+        assertEquals(RouteClockReferenceKind.NOMINAL_TREND_CLOCK, fallback.clockReferenceKind)
+        assertNull(fallback.clockRange)
         assertEquals(12, RouteFacingGuidance.evaluate(0.0, RouteFacingObservation(359.0, 3.0, 1_000L), 1_000L).clockHour)
-        assertNull(RouteFacingGuidance.evaluate(15.0, RouteFacingObservation(0.0, 3.0, 1_000L), 1_000L).clockHour)
+        val edge = RouteFacingGuidance.evaluate(15.0, RouteFacingObservation(0.0, 3.0, 1_000L), 1_000L)
+        assertEquals(1, edge.clockHour)
+        assertFalse(edge.clockPrecisionAvailable)
+        assertEquals(RouteClockReferenceKind.NOMINAL_TREND_CLOCK, edge.clockReferenceKind)
+        assertNull(edge.clockRange)
     }
 
     @Test fun sensorLossCancelsInFlightRelativeGuidanceAndOmitsMovementCommand() {
@@ -23,9 +33,15 @@ class RouteGuidanceAuditRegressionTest {
         val initial = navigator.update(fix(1_000L), 1_000L, false, facingObservation = facing(1_000L))
         assertTrue(navigator.reserveInstruction(initial))
         val invalid = requireNotNull(navigator.retryGuidance(1_600L, facing(1_000L)))
-        assertTrue(invalid.cancelStaleNavigationSpeech)
+        assertFalse(invalid.cancelStaleNavigationSpeech)
+        assertEquals("guidance_in_flight", invalid.reason)
         assertFalse(invalid.instruction.orEmpty().contains("꺾으세요"))
-        assertFalse(navigator.isInstructionCurrent(initial, 1_600L, facing(1_600L)))
+        // The sample gap began after the old lease: it cannot grant this expired NORMAL queue.
+        assertFalse(navigator.isInstructionCurrent(initial, 1_600L, facing(1_000L)))
+        assertEquals(3_001L, navigator.currentDirectionGraceSnapshot()?.deadlineElapsedRealtimeMs)
+        assertFalse(navigator.retryGuidance(3_000L, facing(1_000L))!!.cancelStaleNavigationSpeech)
+        assertTrue(navigator.retryGuidance(3_001L, facing(1_000L))!!.cancelStaleNavigationSpeech)
+        assertFalse(navigator.isInstructionCompletionCurrent(initial, 3_001L))
     }
 
     @Test fun playbackValidationRejectsExpiredOrTurnedFacingAndPreviousRoute() {
@@ -72,7 +88,7 @@ class RouteGuidanceAuditRegressionTest {
     @Test fun directionAlignmentAndImmediateTurnCommandAreNotSpokenTogether() {
         val navigator = navigator()
         val update = navigator.update(fix(1_000L), 1_000L, false, facingObservation = facing(1_000L, 270.0))
-        assertTrue(update.instruction.orEmpty().contains("몸을 돌리"))
+        assertTrue(update.instruction.orEmpty().contains("몸을 돌려주세요"))
         assertFalse(update.instruction.orEmpty().contains("꺾으세요"))
     }
 

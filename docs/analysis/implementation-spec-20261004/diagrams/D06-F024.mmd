@@ -1,0 +1,38 @@
+flowchart TD
+  T["F-D06-024 raw 수집·전송 결과 집계와 내부 진단"]
+  P["전제: counter는 메모리; field event 저장은 field log 활성 조건에 따름."]
+  T --> P
+  E1["E-D06-024-01 capture/upload 결과→closed enum counter 증가"]
+  E1 --> T
+  E2["E-D06-024-02 walk 종료/batch 종료→changed snapshot만 field event"]
+  E2 --> T
+  A1["1. RawReadyStatus.Count(0), GateBlocked(reason), ReadFailed를<br/>구분한다."]
+  P --> A1
+  A2["2. capture/upload 경계마다 해당 counter를 증가한다."]
+  A1 --> A2
+  A3["3. 0이 아닌 항목만 stable key map으로 내보낸다."]
+  A2 --> A3
+  A4["4. 마지막 저장 snapshot과 바뀐 경우 및 보행 종료에서 field 로그에 기록한다."]
+  A3 --> A4
+  N["정상 종료: counter/snapshot 기록."]
+  A4 --> N
+  FX["결과: 좌표·식별자·payload/time series 없는 집계. 화면·음성 알림 없음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"counter overflow 가능"}
+    R1["Long.MAX_VALUE로 포화"]
+    B1 -->|조건 성립| R1
+    B2{"동일 snapshot"}
+    R2["중복 event 생략"]
+    B2 -->|조건 성립| R2
+    B3{"field log 없음/비활성"}
+    R3["로그 저장 없음"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-016, P-D06-022"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 진단 저장 실패가 보행을 중단하는 경로 없음."]
+    X2["재시도: 다음 변경 때 기록."]
+    X3["복구: process-local counters 재시작 초기화."]
+  end

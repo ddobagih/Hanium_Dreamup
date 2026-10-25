@@ -191,6 +191,7 @@ from time import monotonic as real_monotonic  # noqa: E402
 
 from backend.app.api import health as health_api  # noqa: E402
 from backend.app.services import tmap_pedestrian as pedestrian_module  # noqa: E402
+from backend.app.services import tmap_response_normalization as response_normalization  # noqa: E402
 from backend.app.services.tmap_runtime import (  # noqa: E402
     TmapCallBudgetExhausted,
     TmapReadinessProbeDeferred,
@@ -205,6 +206,7 @@ def shared_clock(monkeypatch: pytest.MonkeyPatch) -> _Clock:
     value.now = float(int(real_monotonic()))
     monkeypatch.setattr(runtime_module, "monotonic", value)
     monkeypatch.setattr(pedestrian_module, "monotonic", value)
+    monkeypatch.setattr(response_normalization, "monotonic", value)
     pedestrian_module.reset_tmap_success_cache()
     yield value
     pedestrian_module.reset_tmap_success_cache()

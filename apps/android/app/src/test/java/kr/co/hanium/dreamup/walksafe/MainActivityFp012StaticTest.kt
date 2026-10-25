@@ -21,14 +21,20 @@ class MainActivityFp012StaticTest {
         val result = functionBlock("private fun handleGatewayWalkStartResult(")
         val activation = functionBlock("private fun completeGatewayWalkActivation(")
 
-        assertTrue(advance.contains("requestGatewayWalkStart(token)"))
-        assertFalse(advance.contains("WalkSessionEvent.StartRequested(token)"))
-        assertTrue(result.contains("gatewayWalkAuthorityController.completeStart("))
-        assertTrue(activation.contains("gatewayWalkAuthorityController.activeLeaseOrNull("))
+        assertTrue(advance.contains("gateway.requestGatewayWalkStart(token)"))
+        assertFalse(advance.contains("runtime.startRequested(token, currentReadiness)"))
+        assertTrue(result.contains("authority.completeStart("))
+        assertTrue(activation.contains("authority.activeLeaseOrNull("))
         assertTrue(
-            activation.indexOf("gatewayWalkAuthorityController.activeLeaseOrNull(") <
-                activation.indexOf("WalkSessionEvent.StartRequested(token)"),
+            activation.indexOf("authority.activeLeaseOrNull(") <
+                activation.indexOf("runtime.startRequested(token, currentReadiness)"),
         )
+        val mainPorts = MainActivityRefactorSource.composition(source, "gatewayWalkSessionController")
+        assertTrue(mainPorts.contains("authority = gatewayWalkAuthorityController"))
+        assertTrue(mainPorts.contains("requests = GatewayWalkClientRequests(gatewayWalkSessionClient)"))
+        assertTrue(mainPorts.contains("override fun currentStartReadinessOrNull(token: WalkSessionConfirmationToken) = currentGatewayWalkStartReadinessOrNull(token)"))
+        assertTrue(mainPorts.contains("transitionWalkSession(WalkSessionEvent.StartRequested(token, readiness))"))
+
     }
 
     @Test
@@ -38,31 +44,40 @@ class MainActivityFp012StaticTest {
         val recapture = functionBlock("private fun currentGatewayWalkStartReadinessOrNull(")
 
         assertTrue(
-            request.indexOf("currentGatewayWalkStartReadinessOrNull(token)") <
-                request.indexOf("gatewayWalkSessionClient.startWithOwnedWalkRecovery("),
+            request.indexOf("runtime.currentStartReadinessOrNull(token)") <
+                request.indexOf("requests.startWithOwnedWalkRecovery("),
         )
         assertTrue(
-            activation.indexOf("currentGatewayWalkStartReadinessOrNull(token)") <
-                activation.indexOf("WalkSessionEvent.StartRequested(token)"),
+            activation.indexOf("runtime.currentStartReadinessOrNull(token)") <
+                activation.indexOf("runtime.startRequested(token, currentReadiness)"),
         )
-        assertTrue(activation.contains("gatewayWalkAuthorityController.beginEnd(token.epoch)"))
+        assertTrue(activation.contains("authority.beginEnd(token.epoch)"))
         assertTrue(activation.contains("endGatewayWalkBestEffort("))
         assertTrue(recapture.contains("captureWalkSessionReadiness("))
         assertTrue(recapture.contains("it.isReady"))
         assertTrue(recapture.contains("it.plan.mode == token.readiness.plan.mode"))
+        val mainPorts = MainActivityRefactorSource.composition(source, "gatewayWalkSessionController")
+        assertTrue(mainPorts.contains("authority = gatewayWalkAuthorityController"))
+        assertTrue(mainPorts.contains("requests = GatewayWalkClientRequests(gatewayWalkSessionClient)"))
+        assertTrue(mainPorts.contains("override fun currentStartReadinessOrNull(token: WalkSessionConfirmationToken) = currentGatewayWalkStartReadinessOrNull(token)"))
+        assertTrue(mainPorts.contains("transitionWalkSession(WalkSessionEvent.StartRequested(token, readiness))"))
+
     }
 
     @Test
     fun centralSafetyStopEndsTheServerLeaseBestEffort() {
         val safetyStop =
-            functionBlock("private fun enterWalkSessionSafetyStopAndCancelOutputs(")
+            functionBlock("private fun performWalkSessionSafetyStopCleanup(")
 
-        assertTrue(safetyStop.contains("gatewayWalkAuthorityController.beginEnd(it.epoch)"))
+        assertTrue(safetyStop.contains("authority.beginEnd(it.epoch)"))
         assertTrue(safetyStop.contains("endGatewayWalkBestEffort("))
         assertTrue(
-            safetyStop.indexOf("gatewayWalkAuthorityController.beginEnd(it.epoch)") <
+            safetyStop.indexOf("authority.beginEnd(it.epoch)") <
                 safetyStop.indexOf("WalkSessionEvent.SafetyStopRequested"),
         )
+        assertTrue(MainActivityRefactorSource.member(source, "enterWalkSessionSafetyStopAndCancelOutputs").contains("performWalkSessionSafetyStopCleanup(reason, persistInterruptionMarker, null, null)"))
+        MainActivityRefactorSource.composition(source, "walkSessionCleanupController")
+
     }
 
     @Test
@@ -71,13 +86,15 @@ class MainActivityFp012StaticTest {
         val recognition = functionBlock("private fun handleGatewayWalkTakeoverRecognition(")
         val takeover = functionBlock("private fun executeGatewayWalkTakeover(")
 
-        assertTrue(prompt.contains("VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER"))
+        assertTrue(prompt.contains("output.startTakeoverRecognition(operation.operationId)"))
         assertTrue(prompt.contains("예 또는 아니요"))
         assertTrue(recognition.contains("GatewayWalkTakeoverConfirmation.YES"))
         assertTrue(recognition.contains("GatewayWalkTakeoverConfirmation.NO"))
-        assertTrue(takeover.contains("gatewayWalkSessionClient.takeover("))
+        assertTrue(takeover.contains("requests.takeover("))
         assertTrue(gatewayWalkSource.contains(".put(\"confirmation\", \"voice_confirmed\")"))
         assertFalse(prompt.contains("postDelayed("))
+        assertTrue(MainActivityRefactorSource.composition(source, "gatewayWalkSessionController").contains("purpose = VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER"))
+
     }
 
     @Test
@@ -86,8 +103,10 @@ class MainActivityFp012StaticTest {
         val result = functionBlock("private fun handleGatewayWalkStartResult(")
         val takeover = functionBlock("private fun executeGatewayWalkTakeover(")
         val cancelled = functionBlock("private fun cancelGatewayWalkTakeoverConfirmation(")
-        val retry = functionBlock("private fun makeGatewayWalkStartRetryAvailable(")
-        val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
+        val retryOwner = functionBlock("private fun makeGatewayWalkStartRetryAvailable(")
+        assertTrue(retryOwner.contains("output.makeStartRetryAvailable(detail, spoken)"))
+        val retry = MainActivityRefactorSource.composition(source, "gatewayWalkSessionController")
+        val refresh = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/presentation/StartupCapabilityFactsRenderer.kt").readText(), "renderStartupCapabilityFacts")
 
         assertTrue(request.contains("makeGatewayWalkStartRetryAvailable("))
         assertTrue(result.contains("makeGatewayWalkStartRetryAvailable("))
@@ -96,11 +115,9 @@ class MainActivityFp012StaticTest {
         assertTrue(retry.contains("confirmedStartupCapabilityDecision = null"))
         assertTrue(retry.contains("startupCapabilityRetryRequiresUserAction = true"))
         assertTrue(retry.contains("refreshStartupCapabilityUi()"))
-        assertTrue(
-            refresh.contains(
-                "startupCapabilityRetryRequiresUserAction -> \"보행 시작 다시 시도\"",
-            ),
-        )
+        assertTrue(refresh.contains("retryRequiresUserAction = facts.retryRequiresUserAction()"))
+        val presenter = ReportStaticSourceInspector.functionBlock(File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/DeviceCheckPresenter.kt").readText(), "fun startupPresentation")
+        assertTrue(presenter.contains("confirmation.retryRequiresUserAction -> \"보행 시작 다시 시도\""))
     }
 
     @Test
@@ -112,13 +129,17 @@ class MainActivityFp012StaticTest {
 
         assertTrue(source.contains("GATEWAY_WALK_RENEW_INTERVAL_MS = 30_000L"))
         assertTrue(scheduling.contains("nextRenewDelayMs("))
-        assertTrue(renewal.contains("gatewayWalkSessionClient.renew("))
+        assertTrue(renewal.contains("requests.renew("))
         assertTrue(renewal.contains("currentOperationStatus(operation)"))
         assertTrue(renewal.contains("walk_lease_expired_during_renew"))
-        assertTrue(lost.contains("enterWalkSessionSafetyStopAndCancelOutputs(reason)"))
+        assertTrue(lost.contains("runtime.safetyStop(reason)"))
         assertTrue(runtime.contains("gatewayWalkAuthorityController.activeLeaseOrNull("))
         assertFalse(renewal.contains("gatewaySessionGeneration"))
         assertFalse(renewal.contains("recoveryGeneration"))
+        val binding = MainActivityRefactorSource.composition(source, "gatewayWalkSessionController")
+        assertTrue(binding.contains("override fun safetyStop(reason: String) = enterWalkSessionSafetyStopAndCancelOutputs(reason)"))
+        assertTrue(binding.contains("renewIntervalMs = GATEWAY_WALK_RENEW_INTERVAL_MS"))
+
     }
 
     @Test
@@ -129,7 +150,7 @@ class MainActivityFp012StaticTest {
         val destroy = functionBlock("override fun onDestroy()")
 
         assertTrue(
-            transition.indexOf("walkSessionLifecycle.handle(event)") <
+            transition.indexOf("lifecycle().handle(event, effects::beforePublication)") <
                 transition.indexOf("endGatewayWalkBestEffort("),
         )
         assertTrue(end.contains("runCatching"))
@@ -138,23 +159,11 @@ class MainActivityFp012StaticTest {
         assertFalse(source.contains("restoreGatewayWalkLease"))
         assertFalse(readiness.contains("WALK_AUTHORITY"))
         assertFalse(readiness.contains("WALK_LEASE"))
+        MainActivityRefactorSource.composition(source, "walkSessionTransitionController")
+        assertTrue(MainActivityRefactorSource.composition(source, "gatewayWalkSessionController").contains("authority = gatewayWalkAuthorityController"))
+
     }
 
-    private fun functionBlock(marker: String): String {
-        val start = source.indexOf(marker)
-        assertTrue("missing source marker: $marker", start >= 0)
-        val bodyStart = source.indexOf('{', start)
-        assertTrue("missing function body: $marker", bodyStart >= 0)
-        var depth = 0
-        for (index in bodyStart until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        throw AssertionError("unterminated function body: $marker")
-    }
+    private fun functionBlock(marker: String): String = MainActivityRefactorSource.function(source, marker)
+
 }

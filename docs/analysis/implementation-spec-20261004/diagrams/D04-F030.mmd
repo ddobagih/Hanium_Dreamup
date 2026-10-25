@@ -1,0 +1,18 @@
+flowchart TD
+  ID["F-D04-030 · 위치·방향 좌표계와 uncertainty 자료 계약<br/>P-D04-030"]
+  A["raw radius·posterior covariance·sensor matrix"]
+  C0{"원래 자료 타입/좌표 frame이 알려졌는가"}
+  R0["LEGACY_UNSPECIFIED 또는 해당 accessor null"]
+  C1{"origin/matrix 유효성 검사를 통과하는가"}
+  R1["계산 거부"]
+  OK["local ENU·진북 변환 및 uncertainty tag를 보존해 consumer에 전달"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END

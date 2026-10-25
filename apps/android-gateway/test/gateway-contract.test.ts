@@ -261,8 +261,12 @@ async function reportConsentHeaders(
 
 const EXPECTED_GATEWAY_METHODS: Readonly<Record<string, readonly string[]>> = {
   "/api/account-enrollments/email-otp": ["post"],
+  "/api/account-signup-policy": ["get"],
   "/api/accounts": ["post"],
   "/api/field-session": ["delete", "get", "post"],
+  "/api/field-diagnostics/preference": ["get", "post", "put"],
+  "/api/field-diagnostics/sessions/{session_id}/batches": ["post"],
+  "/api/field-diagnostics/sessions/{session_id}": ["get"],
   "/api/field-walk": ["get", "post"],
   "/api/speech/stt": ["post"],
   "/api/speech/tts": ["post"],
@@ -282,7 +286,7 @@ const EXPECTED_GATEWAY_METHODS: Readonly<Record<string, readonly string[]>> = {
   "/api/raw-collections/{collection_id}/objects/{object_id}/chunks/{index}": ["put"],
   "/api/raw-collections/{collection_id}": ["get"],
   "/api/raw-collections/{collection_id}/commit": ["post"],
-  "/privacy/rights": ["get", "put"],
+  "/privacy/rights": ["get", "head", "put"],
   "/privacy/account-deletions": ["post"],
   "/privacy/account-deletions/{request_id}/status": ["get"],
   "/privacy/account-deletions/{request_id}/device-evidence": ["post"]
@@ -294,6 +298,7 @@ test("S19-54 dispatch registry has the independent public path and method contra
     const pathname = template
       .replace("/privacy/account-deletions/{request_id}",
         "/privacy/account-deletions/probe_request_000001")
+      .replaceAll("{session_id}", id)
       .replaceAll("{report_id}", id)
       .replaceAll("{collection_id}", id)
       .replaceAll("{object_id}", id)
@@ -310,6 +315,8 @@ test("S19-54 dispatch registry has the independent public path and method contra
     new URL(`http://gateway.invalid/privacy/rights?control=${control}`)
   );
   assert.deepEqual(privacy("integrated-consent")?.methods, ["GET", "PUT"]);
+  assert.deepEqual(privacy("installation-evidence-key")?.methods, ["PUT"]);
+  assert.deepEqual(privacy("")?.methods, ["GET", "HEAD"]);
   assert.deepEqual(privacy("integrated-consent-bootstrap")?.methods, ["GET"]);
   assert.equal(privacy("integrated-consent-bootstrap")?.unsupportedMethod,
     "bootstrap-validation");

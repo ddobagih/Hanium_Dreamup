@@ -1,0 +1,26 @@
+flowchart TD
+  H["F-D05-002 native 생성 delegate 전환 종료 P-D05-002"]
+  H --> A["asset SHA와 입력 계약 검사"]
+  A -->|"계약 실패"| F["FAILED CPU fallback 금지"]
+  A --> G["요청 backend 생성"]
+  G -->|"성공"| T["FP32 exact tensor 검증"]
+  G -->|"cached GPU 복구 가능 초기화 실패"| D{"이전 GPU 자원 정상 해제"}
+  D -->|"아니오"| F
+  D -->|"예"| U["cache 없는 GPU 초기화 1회"]
+  U -->|"성공 GPU 유지"| T
+  U -->|"복구 가능한 GPU 오류"| C{"비CPU와 explicit CPU fallback 허용"}
+  G -->|"그 밖의 복구 가능한 delegate 오류"| C
+  C -->|"아니오"| F
+  C -->|"예 이전해제 성공"| B["CPU 생성"]
+  B -->|"실패"| F
+  B -->|"성공"| T
+  T -->|"위반"| F
+  T -->|"통과"| R["READY 실제 backend 기록"]
+  R --> I["owner invoke"]
+  I -->|"비CPU delegate 실행 오류"| C
+  I -->|"CPU 오류 또는 비재시도 오류"| F
+  I -->|"성공"| P["F-D05-004 parse"]
+  R -->|"close"| S["새 call 차단 수락 작업 drain"]
+  S --> Z["동일 owner native close"]
+  Z -->|"성공"| E["CLOSED"]
+  Z -->|"해제 실패"| F

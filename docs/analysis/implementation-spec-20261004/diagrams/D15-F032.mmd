@@ -1,0 +1,30 @@
+flowchart TB
+  E["F-D15-032 · 전달 패키지 proof·중단 후 재개 근거<br/>GET<br/>/admin/reports/{report_id}/delivery-packages/{package_revision}/proof"]
+  P["P-D15-032 · 전제조건<br/>admin read proof와 report row lock; v2<br/>schema/approval binding."]
+  E --> P
+  S1["1. current content approval 및 latest<br/>uncorrected event 조회"]
+  P --> S1
+  S2["2. 이미 submitted workflow의 패키지는 과거<br/>review/content binding으로 recovery proof 허용"]
+  S1 --> S2
+  S3["3. 그 외 current content/current approved<br/>review와 package 일치 요구"]
+  S2 --> S3
+  S4["4. 패키지에 허용되는 다음 delivery 상태를 계산"]
+  S3 --> S4
+  S5["5. hash·byte count·content/review/package<br/>revisions만 반환"]
+  S4 --> S5
+  OK["정상 결과<br/>hash·byte count·content/review/package<br/>revisions만 반환"]
+  S5 --> OK
+  B1["조건 · package v1/불일치/없음<br/>결과 · 409 ineligible"]
+  S3 -. "해당 조건 발생" .-> B1
+  B2["조건 · 이미 RESOLVED이며 다음 전이 없음<br/>결과 · 409 delivery_package_proof_resolved"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · 이후 내용/검토 변경<br/>결과 · 기존 submitted package 후속 회신용 proof는 유지 가능"]
+  S1 -. "해당 조건 발생" .-> B3
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>앱 로컬 ZIP과 proof byte/hash를 대조하는 과정은 D12. 이<br/>API는 ZIP 재전송 자체가 아님."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/admin_report_delivery_package.py:643<br/>get_admin_report_delivery_package_proof<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

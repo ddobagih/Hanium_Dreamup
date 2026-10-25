@@ -1,0 +1,11 @@
+{
+  "counts": {
+    "CONFIG_IDENTIFIER": 316,
+    "TEST_FILE": 1438,
+    "SCREEN_MENU_DECLARATION": 6,
+    "VOICE_COMMAND_OR_ACTION": 38,
+    "NATIVE_UI_PAGE": 6
+  },
+  "test_files_with_explicit_feature_link": 304,
+  "scope": "선언/파일 인벤토리. 모든 테스트 단언 또는 모든 설정 사용처를 읽었다는 뜻이 아니다. 설정 값과 비밀값은 수집하지 않음."
+}

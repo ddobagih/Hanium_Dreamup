@@ -42,6 +42,11 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     interface Transport {
         Response execute(String method, String url, Map<String, String> headers, byte[] body) throws IOException;
 
+        default Response execute(AdminRequestAdmission admission, String method, String url,
+            Map<String, String> headers, byte[] body) throws IOException {
+            return execute(method, url, headers, body);
+        }
+
         /** S18-18: explicit cancellation of requests still in flight; never waits. */
         default void cancelInFlight() {}
     }
@@ -66,6 +71,13 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
 
     private final String origin;
     private final Transport transport;
+    private volatile AdminRequestAdmission requestAdmission = AdminRequestAdmission.UNBOUND;
+
+    @Override public void bindRequestAdmission(AdminRequestAdmission admission) {
+        if (admission == null) throw new IllegalArgumentException("request admission is required");
+        requestAdmission = admission;
+    }
+
     private final String deviceKeyMarker;
     private final int deviceKeyVersion;
     private final AdminDeviceProof.Signer signer;
@@ -386,6 +398,24 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             ? post(path, new JSONObject(), protectedHeaders(accessToken))
             : actionProofPost(path, "session.revoke", accessToken, new byte[0]);
         return parseState(response);
+    }
+
+    @Override
+    public StateSnapshot revokeSession(String accessToken, String sessionId, String deviceId,
+        AdminRequestAdmission admission) throws IOException {
+        String path = "/admin/security/sessions/" + requireCanonicalUuid(sessionId, "invalid_session_id") + "/revoke";
+        Map<String, String> headers = new LinkedHashMap<>(publicHeaders(deviceId));
+        headers.put("Authorization", "Bearer " + requireToken(accessToken));
+        headers.put("Accept", "application/json");
+        headers.put("Content-Type", "application/json; charset=utf-8");
+        Response response = transport.execute(admission, "POST", origin + path,
+            AdminJava8Collections.copyMap(headers), "{}".getBytes(StandardCharsets.UTF_8));
+        if (response.statusCode != 200) {
+            AdminSecurityApiException typedError = parseTypedError(response);
+            if (typedError != null) throw typedError;
+            throw new IOException("administrator revoke returned unexpected status=" + response.statusCode);
+        }
+        return parseState(parseJsonResponse(response.body));
     }
 
     @Override
@@ -940,22 +970,15 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         );
         Map<String, String> challengeHeaders = new LinkedHashMap<>(baseHeaders);
         challengeHeaders.put(AdminOperationsHttpClient.CORRELATION_ID_HEADER, correlationId);
-        Response challenge = executeRaw(
-            "POST",
-            AdminOperationsHttpClient.CHALLENGE_PATH,
-            AdminJava8Collections.copyMap(challengeHeaders),
-            intent.challengeRequestBytes()
-        );
-        AdminChallengeTime challengeTime = new AdminChallengeTime(clock.nowEpochMs(), clock.monotonicNanos());
-        requireExactStatus(challenge.statusCode, 200, "administrator device challenge");
         final AdminDeviceProof.SignedChallenge proof;
         try {
-            proof = AdminDeviceProof.parseAndSign(
-                challenge.body,
-                intent,
-                challengeTime.estimatedNowEpochMs(clock.monotonicNanos()),
-                signer
-            );
+            proof = AdminProtectedRequestExecutor.challengeAndSign(
+                () -> executeRaw("POST", AdminOperationsHttpClient.CHALLENGE_PATH,
+                    AdminJava8Collections.copyMap(challengeHeaders), intent.challengeRequestBytes()),
+                response -> {
+                    requireExactStatus(response.statusCode, 200, "administrator device challenge");
+                    return response.body;
+                }, intent, clock, signer);
         } catch (GeneralSecurityException | IllegalArgumentException error) {
             throw new IOException("administrator device proof could not be signed", error);
         }
@@ -978,7 +1001,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         requestHeaders.put("Accept", "application/json");
         if (body != null) requestHeaders.put("Content-Type", "application/json; charset=utf-8");
         requestHeaders.putAll(headers);
-        Response response = transport.execute(method, origin + path, AdminJava8Collections.copyMap(requestHeaders), body);
+        Response response = transport.execute(requestAdmission, method, origin + path, AdminJava8Collections.copyMap(requestHeaders), body);
         if (response.statusCode < 200 || response.statusCode > 299) {
             AdminSecurityApiException typedError = parseTypedError(response);
             if (typedError != null) throw typedError;
@@ -1486,16 +1509,24 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
 
         @Override
         public Response execute(String method, String url, Map<String, String> headers, byte[] body) throws IOException {
+            return execute(null, method, url, headers, body);
+        }
+
+        @Override
+        public Response execute(AdminRequestAdmission admission, String method, String url,
+            Map<String, String> headers, byte[] body) throws IOException {
             // adm-F2: a closed transport opens nothing.
             if (closed) throw new IOException(CANCELLED_MESSAGE);
             long startedAtNanos = monotonicClock.nanoTime();
             HttpURLConnection connection = connections.open(url);
             RequestOwner owner = new RequestOwner(connection, monotonicClock, startedAtNanos);
             Cancellation deadline = null;
+            AdminRequestAdmission.Registration registration = null;
             inFlight.add(owner);
             try {
                 // adm-F2: a cancellation that ran before this registration was visible still wins.
                 if (closed) owner.markCancelled();
+                if (admission != null) registration = admission.dispatch(owner::cancel, () -> {});
                 owner.checkDeadline();
                 deadline = deadlines.schedule(owner::cancelAtDeadline, Math.max(0L, owner.remainingNanos()));
                 owner.checkDeadline();
@@ -1540,7 +1571,8 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
                         // or an explicit cancellation.
                         owner.finish();
                     } finally {
-                        if (deadline != null) deadline.cancel();
+                        try { if (deadline != null) deadline.cancel(); }
+                        finally { if (registration != null) registration.close(); }
                     }
                 }
             }

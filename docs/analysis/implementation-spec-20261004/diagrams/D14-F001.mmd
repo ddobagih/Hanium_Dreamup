@@ -1,0 +1,25 @@
+flowchart TD
+  IN["F-D14-001<br/>자격 발급 전용 키 파일 로드"]
+  G["적용 정책<br/>P-D14-001"]
+  IN --> G
+  N1["1. 경로 각 디렉터리를 dir_fd 및 O_NOFOLLOW로 열고 소유권·쓰기<br/> 권한 검사"]
+  G --> N1
+  N2["2. 최종 파일은 regular file, link 수 1, 크기 최대 44바이<br/>트로 검사"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 43자 key를 32바이트로 복호화한 뒤 canonical 재인코딩 대조"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 읽기 전후 inode·mode·owner·size·mtime·ctime 및<br/> 모든 열린 디렉터리 identity 재검사"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 키를 반환하고 finally에서 파일·디렉터리 descriptor를 역순으<br/>로 닫음"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>상위 경로는 root 소유, group/other writable 금지; 파일 <br/>root 소유 0440 및 서비스 gid"]
+  N2 -->|"배포 field/staging/production"| B1
+  B2["분기 결과<br/>파일 0400 또는 0600, root 또는 euid 소유; euid 소유 마지<br/>막 부모는 group/other 권한 없음"]
+  N2 -->|"개발 모드"| B2
+  B3["분기 결과<br/>AdminCredentialIssuerKeyError, 서비스 adapter에서<br/>는 issuer unavailable 503"]
+  N4 -->|"symlink·hardlink·FIFO·메타데이터 변경·비canonical ke<br/>y"| B3
+  N5 --> END["정상 종료<br/>원문 키는 request/service instance 메모리에만 반환. 경로는<br/> 오류에 노출하지 않음."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. finally에서 모든 열린 descriptor 종료."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

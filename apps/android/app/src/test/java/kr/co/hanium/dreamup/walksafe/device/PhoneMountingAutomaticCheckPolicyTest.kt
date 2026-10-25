@@ -16,6 +16,33 @@ class PhoneMountingAutomaticCheckPolicyTest {
     }
 
     @Test
+    fun actualFrameAssessmentCompletesMountingWithoutAnyShakeCondition() {
+        for (shake in listOf(null, Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, -1.0, 1_000.0)) {
+            val camera = assessedFrame(shake)
+            val result = assess(camera = camera)
+
+            assertEquals("shake=$shake", EnvironmentEvidenceStatus.PASS, camera.status)
+            assertTrue("shake=$shake", result.canStartOrResumeDetection)
+            assertEquals(PhoneMountingReason.SENSOR_CHECK_PASSED, result.reason)
+        }
+    }
+
+    @Test
+    fun ignoringShakeDoesNotWaiveMountingAngleBrightnessOcclusionOrFrameAvailability() {
+        for (observation in listOf(
+            frame().copy(mountPitchDegrees = 90.0),
+            frame().copy(mountPitchDegrees = null),
+            frame().copy(normalizedBrightness = 0.1),
+            frame().copy(occludedFraction = 0.9),
+            frame().copy(frameAvailable = false),
+            frame().copy(observedAtElapsedRealtimeMs = 7_000L),
+        )) {
+            val camera = CameraFrameQualityPolicy.assess(EPOCH, 10_500L, observation, CAMERA_PROFILE)
+            assertFalse(assess(camera = camera).canStartOrResumeDetection)
+        }
+    }
+
+    @Test
     fun observationBeforeOrAtRequestCannotAuthorizeStart() {
         for (observedAt in listOf(9_999L, 10_000L)) {
             val result = assess(camera = camera(observedAt))
@@ -143,11 +170,24 @@ class PhoneMountingAutomaticCheckPolicyTest {
         },
     )
 
+    private fun assessedFrame(shake: Double?) = CameraFrameQualityPolicy.assess(
+        EPOCH, 10_500L, frame().copy(angularShakeDegreesPerSecond = shake), CAMERA_PROFILE,
+    )
+
+    private fun frame() = CameraFrameQualityObservation(
+        epoch = EPOCH, observedAtElapsedRealtimeMs = 10_100L, frameAvailable = true,
+        normalizedBrightness = 0.6, occludedFraction = 0.1,
+        angularShakeDegreesPerSecond = null, mountPitchDegrees = 45.0,
+    )
+
     private companion object {
         val EPOCH = WalkRuntimeEpoch("synthetic-walk", 1L)
         val REQUEST = PhoneMountingCheckRequest(EPOCH, 1L, 10_000L)
         val PROFILE = ApprovedPhoneMountingProfile(
             "synthetic-mount-profile", "synthetic-camera-profile", 2_000L, 2,
+        )
+        val CAMERA_PROFILE = ApprovedCameraFrameQualityProfile(
+            "synthetic-camera-profile", 0.4, 0.2, 8.0, 25.0, 65.0, 2_000L,
         )
     }
 }

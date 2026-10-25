@@ -40,7 +40,11 @@ data class RawWalkingCalibrationFix(
  * returns that prevent an untrusted observation from reaching observe.
  */
 class WalkingCalibrationSegmentPolicy {
-    private data class Anchor(val fix: RawWalkingCalibrationFix, val totalStepCount: Int)
+    private data class Anchor(
+        val fix: RawWalkingCalibrationFix,
+        val totalStepCount: Int,
+        val stepBracket: WalkingCalibrationStepBracket?,
+    )
 
     private var anchor: Anchor? = null
     private var previousFix: RawWalkingCalibrationFix? = null
@@ -50,6 +54,9 @@ class WalkingCalibrationSegmentPolicy {
     private var minimumCourseOffsetDegrees = 0.0
     private var maximumCourseOffsetDegrees = 0.0
 
+    var lastDecision: WalkingCalibrationDecision? = null
+        private set
+
     fun reset() {
         anchor = null
         previousFix = null
@@ -58,37 +65,53 @@ class WalkingCalibrationSegmentPolicy {
         speedDistanceM = 0.0
         minimumCourseOffsetDegrees = 0.0
         maximumCourseOffsetDegrees = 0.0
+        lastDecision = null
     }
 
-    fun observe(fix: RawWalkingCalibrationFix, totalStepCount: Int): WalkingCalibrationSample? {
-        if (!isCredible(fix) || totalStepCount < 0) {
+    fun observe(fix: RawWalkingCalibrationFix, totalStepCount: Int): WalkingCalibrationSample? =
+        observe(fix, totalStepCount, stepBracket = null)
+
+    fun observe(
+        fix: RawWalkingCalibrationFix,
+        totalStepCount: Int,
+        stepBracket: WalkingCalibrationStepBracket?,
+    ): WalkingCalibrationSample? {
+        val invalidReason = credibilityRejectionReason(fix)
+            ?: WalkingCalibrationReason.INVALID_TOTAL_STEP_COUNT.takeIf { totalStepCount < 0 }
+        if (invalidReason != null) {
             reset()
-            return null
+            return finish(WalkingCalibrationOutcome.REJECTED, invalidReason)
         }
+        // Optional contradictory metadata is unknown; it does not change the original numeric gates.
+        val endpointStepBracket = stepBracket?.takeIf { it.containsFix(fix.elapsedRealtimeMs) }
         val start = anchor
         val previous = previousFix
         if (start == null || previous == null) {
-            begin(fix, totalStepCount)
-            return null
+            begin(fix, totalStepCount, endpointStepBracket)
+            return finish(WalkingCalibrationOutcome.WAITING, WalkingCalibrationReason.NEW_SEGMENT_ANCHOR)
         }
 
         val gapMs = fix.elapsedRealtimeMs - previous.elapsedRealtimeMs
         if (gapMs <= 0L) {
             // A duplicate or older fix must not become a replacement anchor.
             reset()
-            return null
+            return finish(WalkingCalibrationOutcome.REJECTED, WalkingCalibrationReason.FIX_ORDER)
         }
         val durationMs = fix.elapsedRealtimeMs - start.fix.elapsedRealtimeMs
-        if (gapMs > MAXIMUM_FIX_GAP_MS || durationMs > MAXIMUM_SEGMENT_DURATION_MS ||
-            totalStepCount < previousStepCount
-        ) {
-            begin(fix, totalStepCount)
-            return null
+        val continuityFailure = when {
+            gapMs > MAXIMUM_FIX_GAP_MS -> WalkingCalibrationReason.FIX_GAP
+            durationMs > MAXIMUM_SEGMENT_DURATION_MS -> WalkingCalibrationReason.SEGMENT_DURATION_EXCEEDED
+            totalStepCount < previousStepCount -> WalkingCalibrationReason.STEP_COUNT_REGRESSED
+            else -> null
+        }
+        if (continuityFailure != null) {
+            begin(fix, totalStepCount, endpointStepBracket)
+            return finish(WalkingCalibrationOutcome.REJECTED, continuityFailure)
         }
         if (totalStepCount > previousStepCount) lastStepProgressAtMs = fix.elapsedRealtimeMs
         if (fix.elapsedRealtimeMs - lastStepProgressAtMs > MAXIMUM_STEP_SILENCE_MS) {
             reset()
-            return null
+            return finish(WalkingCalibrationOutcome.REJECTED, WalkingCalibrationReason.STEP_SILENCE)
         }
 
         val courseOffset = signedAngleDifference(fix.courseDegrees!!, start.fix.courseDegrees!!)
@@ -96,14 +119,14 @@ class WalkingCalibrationSegmentPolicy {
         maximumCourseOffsetDegrees = maxOf(maximumCourseOffsetDegrees, courseOffset)
         if (maximumCourseOffsetDegrees - minimumCourseOffsetDegrees > MAXIMUM_COURSE_SPREAD_DEGREES) {
             reset()
-            return null
+            return finish(WalkingCalibrationOutcome.REJECTED, WalkingCalibrationReason.COURSE_SPREAD)
         }
 
         val intervalSpeedDistanceM = (previous.speedMps!! + fix.speedMps!!) * 0.5 * gapMs / 1_000.0
         val intervalAccuracyM = hypot(previous.horizontalAccuracyM!!, fix.horizontalAccuracyM!!)
         if (displacement(previous, fix).distanceM > intervalSpeedDistanceM + 2.0 * intervalAccuracyM) {
             reset()
-            return null
+            return finish(WalkingCalibrationOutcome.REJECTED, WalkingCalibrationReason.POSITION_JUMP)
         }
         speedDistanceM += intervalSpeedDistanceM
 
@@ -114,64 +137,104 @@ class WalkingCalibrationSegmentPolicy {
         val lateralM = displacement.eastM * cos(courseRadians) - displacement.northM * sin(courseRadians)
         val corridorAllowanceM = max(2.5, 2.0 * endpointAccuracyM)
         val directionCheckDistanceM = max(8.0, 3.0 * endpointAccuracyM)
-        if (forwardM < -corridorAllowanceM || abs(lateralM) > corridorAllowanceM ||
-            (displacement.distanceM >= directionCheckDistanceM &&
+        val corridorFailure = when {
+            forwardM < -corridorAllowanceM -> WalkingCalibrationReason.REVERSED_DISPLACEMENT
+            abs(lateralM) > corridorAllowanceM -> WalkingCalibrationReason.LATERAL_DISPLACEMENT
+            displacement.distanceM >= directionCheckDistanceM &&
                 abs(signedAngleDifference(displacement.courseDegrees, start.fix.courseDegrees)) >
-                MAXIMUM_DISPLACEMENT_COURSE_DIFFERENCE_DEGREES)
-        ) {
+                    MAXIMUM_DISPLACEMENT_COURSE_DIFFERENCE_DEGREES -> WalkingCalibrationReason.DISPLACEMENT_COURSE_MISMATCH
+            else -> null
+        }
+        if (corridorFailure != null) {
             reset()
-            return null
+            return finish(WalkingCalibrationOutcome.REJECTED, corridorFailure)
         }
 
         previousFix = fix
         previousStepCount = totalStepCount
         val steps = totalStepCount - start.totalStepCount
         val minimumDistanceM = max(MINIMUM_SEGMENT_DISTANCE_M, 5.0 * endpointAccuracyM)
-        if (steps < MINIMUM_SEGMENT_STEPS || durationMs < MINIMUM_SEGMENT_DURATION_MS ||
-            displacement.distanceM < minimumDistanceM
-        ) return null
+        val waitingReason = when {
+            steps < MINIMUM_SEGMENT_STEPS -> WalkingCalibrationReason.INSUFFICIENT_STEPS
+            durationMs < MINIMUM_SEGMENT_DURATION_MS -> WalkingCalibrationReason.INSUFFICIENT_DURATION
+            displacement.distanceM < minimumDistanceM -> WalkingCalibrationReason.INSUFFICIENT_DISTANCE
+            else -> null
+        }
+        if (waitingReason != null) return finish(WalkingCalibrationOutcome.WAITING, waitingReason)
 
         // Doppler/platform speed is only a consistency check, not the learned distance.
         if (abs(displacement.distanceM - speedDistanceM) > max(2.0, 0.25 * speedDistanceM)) {
             reset()
-            return null
+            return finish(WalkingCalibrationOutcome.REJECTED, WalkingCalibrationReason.SPEED_DISTANCE_MISMATCH)
         }
         val sample = WalkingCalibrationSample(
             distanceM = displacement.distanceM,
             stepCount = steps,
             durationMs = durationMs,
             trustedPositionSegment = true,
+            startEndpointEvidence = start.fix.endpointEvidence(start.stepBracket),
+            endEndpointEvidence = fix.endpointEvidence(endpointStepBracket),
         )
         // Adjacent samples may share an endpoint, but never share steps or intervals.
-        begin(fix, totalStepCount)
+        begin(fix, totalStepCount, endpointStepBracket)
+        return finish(WalkingCalibrationOutcome.SAMPLE_READY, WalkingCalibrationReason.STRAIGHT_SEGMENT_READY, sample)
+    }
+
+    private fun finish(
+        outcome: WalkingCalibrationOutcome,
+        reason: WalkingCalibrationReason,
+        sample: WalkingCalibrationSample? = null,
+    ): WalkingCalibrationSample? {
+        lastDecision = WalkingCalibrationDecision(WalkingCalibrationStage.STRAIGHT_SEGMENT, outcome, reason)
         return sample
     }
 
-    private fun begin(fix: RawWalkingCalibrationFix, totalStepCount: Int) {
+    private fun begin(
+        fix: RawWalkingCalibrationFix,
+        totalStepCount: Int,
+        stepBracket: WalkingCalibrationStepBracket?,
+    ) {
         reset()
-        anchor = Anchor(fix, totalStepCount)
+        anchor = Anchor(fix, totalStepCount, stepBracket)
         previousFix = fix
         previousStepCount = totalStepCount
         lastStepProgressAtMs = fix.elapsedRealtimeMs
     }
 
-    internal fun isCredible(fix: RawWalkingCalibrationFix): Boolean {
-        if (!fix.trustedRawFix || !fix.latitude.isFinite() || fix.latitude !in -90.0..90.0 ||
-            !fix.longitude.isFinite() || fix.longitude !in -180.0..180.0 ||
-            fix.elapsedRealtimeMs < 0L || fix.receivedAtElapsedRealtimeMs < fix.elapsedRealtimeMs ||
-            fix.receivedAtElapsedRealtimeMs - fix.elapsedRealtimeMs > MAXIMUM_FIX_AGE_MS
-        ) return false
-        val accuracyM = fix.horizontalAccuracyM ?: return false
-        val speedMps = fix.speedMps ?: return false
-        val speedAccuracyMps = fix.speedAccuracyMps ?: return false
-        val courseDegrees = fix.courseDegrees ?: return false
-        val courseAccuracyDegrees = fix.courseAccuracyDegrees ?: return false
-        return accuracyM.isFinite() && accuracyM > 0.0 && accuracyM <= 3.0 &&
-            speedMps.isFinite() && speedMps in 0.6..2.4 &&
-            speedAccuracyMps.isFinite() && speedAccuracyMps in 0.0..0.35 &&
-            speedMps - speedAccuracyMps >= 0.4 &&
-            courseDegrees.isFinite() && courseDegrees >= 0.0 && courseDegrees < 360.0 &&
-            courseAccuracyDegrees.isFinite() && courseAccuracyDegrees in 0.0..15.0
+    private fun RawWalkingCalibrationFix.endpointEvidence(stepBracket: WalkingCalibrationStepBracket?) =
+        WalkingCalibrationEndpointEvidence(
+            elapsedRealtimeMs = elapsedRealtimeMs,
+            gateAccuracyProxyM = requireNotNull(horizontalAccuracyM),
+            stepBracket = stepBracket,
+        )
+
+    internal fun isCredible(fix: RawWalkingCalibrationFix): Boolean = credibilityRejectionReason(fix) == null
+
+    /** First evaluated failure, in the original credibility check order; no state is changed. */
+    internal fun credibilityRejectionReason(fix: RawWalkingCalibrationFix): WalkingCalibrationReason? {
+        if (!fix.trustedRawFix) return WalkingCalibrationReason.UNTRUSTED_RAW_FIX
+        if (!fix.latitude.isFinite() || fix.latitude !in -90.0..90.0 ||
+            !fix.longitude.isFinite() || fix.longitude !in -180.0..180.0
+        ) return WalkingCalibrationReason.INVALID_FIX_COORDINATE
+        if (fix.elapsedRealtimeMs < 0L || fix.receivedAtElapsedRealtimeMs < fix.elapsedRealtimeMs) {
+            return WalkingCalibrationReason.INVALID_FIX_TIME
+        }
+        if (fix.receivedAtElapsedRealtimeMs - fix.elapsedRealtimeMs > MAXIMUM_FIX_AGE_MS) {
+            return WalkingCalibrationReason.STALE_FIX
+        }
+        val accuracyM = fix.horizontalAccuracyM ?: return WalkingCalibrationReason.MISSING_FIX_ACCURACY
+        val speedMps = fix.speedMps ?: return WalkingCalibrationReason.MISSING_SPEED
+        val speedAccuracyMps = fix.speedAccuracyMps ?: return WalkingCalibrationReason.MISSING_SPEED_ACCURACY
+        val courseDegrees = fix.courseDegrees ?: return WalkingCalibrationReason.MISSING_COURSE
+        val courseAccuracyDegrees = fix.courseAccuracyDegrees ?: return WalkingCalibrationReason.MISSING_COURSE_ACCURACY
+        if (!accuracyM.isFinite() || accuracyM <= 0.0 || accuracyM > 3.0) return WalkingCalibrationReason.UNSUITABLE_FIX_ACCURACY
+        if (!speedMps.isFinite() || speedMps !in 0.6..2.4) return WalkingCalibrationReason.UNSUITABLE_SPEED
+        if (!speedAccuracyMps.isFinite() || speedAccuracyMps !in 0.0..0.35 || speedMps - speedAccuracyMps < 0.4) {
+            return WalkingCalibrationReason.UNSUITABLE_SPEED_ACCURACY
+        }
+        if (!courseDegrees.isFinite() || courseDegrees < 0.0 || courseDegrees >= 360.0) return WalkingCalibrationReason.UNSUITABLE_COURSE
+        if (!courseAccuracyDegrees.isFinite() || courseAccuracyDegrees !in 0.0..15.0) return WalkingCalibrationReason.UNSUITABLE_COURSE_ACCURACY
+        return null
     }
 
     private data class Displacement(val eastM: Double, val northM: Double) {
@@ -181,11 +244,11 @@ class WalkingCalibrationSegmentPolicy {
 
     private fun displacement(from: RawWalkingCalibrationFix, to: RawWalkingCalibrationFix): Displacement {
         // A local tangent approximation is adequate for the bounded walking segment.
-        val longitudeDelta = signedAngleDifference(to.longitude, from.longitude)
+        val longitudeDelta = LocalGeodesy.wrapLongitudeDegrees(to.longitude - from.longitude)
         return Displacement(
-            eastM = EARTH_RADIUS_M * Math.toRadians(longitudeDelta) *
+            eastM = LocalGeodesy.METERS_PER_DEGREE * longitudeDelta *
                 cos(Math.toRadians((from.latitude + to.latitude) * 0.5)),
-            northM = EARTH_RADIUS_M * Math.toRadians(to.latitude - from.latitude),
+            northM = LocalGeodesy.METERS_PER_DEGREE * (to.latitude - from.latitude),
         )
     }
 
@@ -193,7 +256,6 @@ class WalkingCalibrationSegmentPolicy {
         (first - second + 540.0) % 360.0 - 180.0
 
     private companion object {
-        const val EARTH_RADIUS_M = 6_371_000.0
         const val MAXIMUM_FIX_AGE_MS = 500L
         const val MAXIMUM_FIX_GAP_MS = 2_500L
         const val MAXIMUM_STEP_SILENCE_MS = 2_000L

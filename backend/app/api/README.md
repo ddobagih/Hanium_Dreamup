@@ -7,7 +7,8 @@
 | `health.py` | `/health`, `/ready`와 DB·모델·외부 의존성, 관리자 TOTP·private issuer-key DB 결속 readiness |
 | `detect.py` | v1/v2 이미지 탐지 |
 | `navigation.py` | 목적지 검색과 보행 경로 |
-| `privacy.py` | 동의 event와 계정 삭제 v2 backend lifecycle |
+| `accounts.py` | 가입 문서 정책 사전 조회, 이메일 OTP·계정 생성·로그인과 현재 session 권한 확인 |
+| `privacy.py` | 동의 event, 설치별 삭제 증거 공개키 등록과 계정 삭제 v2 lifecycle |
 | `reports.py` | 신고 생성·조회·요약·export, 검토 결정과 수동 전달 이력 |
 | `uploads.py` | 목적 제한 grant를 사용한 암호화 신고 원본 조회 |
 | `android_debug.py` | local/dev Android depth log와 frame capture |
@@ -16,6 +17,8 @@
 ## 요청 경계
 
 API router 앞의 `FieldTestSecurityMiddleware`가 field와 admin 역할을 분리한다. actor가 필요한 작업은 Gateway가 서명한 짧은 수명의 actor assertion도 검증한다. 알 수 없는 신규 route는 보안 기능이 켜진 환경에서 admin 전용으로 fail-closed 된다. 개인정보 경로에는 body limit, no-store와 privacy 오류 변환 middleware도 적용된다.
+
+`accounts.py`의 `GET /account-signup-policy`는 field service token만 요구하며 actor 생성 전에도 DB·SMTP 없이 strict 문서 metadata를 제공한다. 설치키 `POST /privacy/installation-evidence-key`는 actor assertion·account generation·privacy 요청 상한을 모두 적용하며 요청 본문은 정확히 `installation_id`, `public_key` 두 필드다. Backend 성공 응답은 본문 없는 204이고 Gateway의 설치 control PUT으로 중계한다.
 
 custody 확인과 분실 기기 신고는 bearer·관리자 앱 종류·역할·audience·현재 기기 ID에 더해 요청 원문에 결속된 `ACTION` device proof를 요구한다. custody request schema는 opaque 참조를 Base64url 43자로 제한하고 service가 decode·re-encode해 canonical 32바이트인지 추가 검증한다. 요청은 `OFF_PHONE`과 별도 암호화 백업 확인만 받고, 분실 신고는 현재 호출 기기가 아닌 대상 기기 ID와 빈 JSON 본문만 받는다. 상태 응답은 정확히 `security_state`, 문자열 `state_version`, `observed_at`, `recovery_custody_state`, nullable timezone-aware `recovery_custody_attested_at` 다섯 필드이며 custody 상태와 확인 시각이 일치해야 한다. Pydantic route source와 생성된 [`contracts/walksafe.openapi.json`](../../../contracts/walksafe.openapi.json)이 공개 계약이며 JSON은 직접 고치지 않는다. 이 내부 구현은 실제 off-phone 보관이나 분실 복구훈련을 완료했다는 증거가 아니다.
 

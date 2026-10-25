@@ -82,6 +82,15 @@ public final class AdminSecurityBoundaryStaticTest {
         assertFalse(controller.contains("SharedPreferences"));
         assertFalse(controller.contains("FileOutputStream"));
         assertFalse(controller.contains("private String custodyReference"));
+        for (String owner : new String[] {"OriginalEvidenceCoordinator", "DeliveryPackageCoordinator",
+            "AdminKeyWorkflowCoordinator"}) {
+            String source = read("src/main/java/kr/co/hanium/dreamup/walksafe/admin/" + owner + ".java");
+            assertFalse(source.contains("SharedPreferences"));
+            assertFalse(source.contains("android.util.Log"));
+            assertFalse(source.contains("putString("));
+            assertFalse(source.contains("private String accessToken"));
+        }
+
     }
 
     @Test

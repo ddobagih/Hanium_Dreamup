@@ -9,12 +9,17 @@ import kotlin.math.sqrt
 data class GnssPositionObservation(
     val latitude: Double,
     val longitude: Double,
+    /** Reported Android 68% horizontal radius; the filter's noise proxy is defined separately. */
     val horizontalAccuracyM: Double?,
     val elapsedRealtimeMs: Long,
     val receivedAtElapsedRealtimeMs: Long = elapsedRealtimeMs,
     val mock: Boolean = false,
     val measurementNoiseMultiplier: Double = 1.0,
-)
+) {
+    val reportedAccuracyRadius68M: ReportedAccuracyRadius68M?
+        get() = horizontalAccuracyM?.takeIf { it.isFinite() && it >= 0.0 }
+            ?.let(::ReportedAccuracyRadius68M)
+}
 
 enum class PdrStepQuality {
     HIGH,
@@ -94,6 +99,7 @@ enum class PedestrianMotionHardRejectReason {
 data class EstimatedLocation(
     val latitude: Double,
     val longitude: Double,
+    /** Maximum-axis posterior standard deviation, not Android's 68% accuracy radius. */
     val horizontalUncertaintyM: Double,
     val velocityEastMps: Double,
     val velocityNorthMps: Double,
@@ -102,7 +108,11 @@ data class EstimatedLocation(
     val quality: PositionQuality,
     /** S09-45: the filter's 2x2 east/north position covariance (m²) behind [horizontalUncertaintyM]. */
     val positionCovarianceEnu: EnuPositionCovariance? = null,
-)
+) {
+    val positionMaxAxisSigmaM: PositionMaxAxisSigmaM?
+        get() = horizontalUncertaintyM.takeIf { it.isFinite() && it >= 0.0 }
+            ?.let(::PositionMaxAxisSigmaM)
+}
 
 data class PedestrianPositionEstimatorUpdate(
     val estimate: EstimatedLocation?,
@@ -162,6 +172,7 @@ data class PedestrianPositionEstimatorConfig(
     val corruptJumpMinimumDistanceM: Double = 500.0,
     val corruptJumpSpeedMps: Double = 80.0,
     val corruptJumpSigmaMultiplier: Double = 10.0,
+    /** Quality thresholds use the posterior maximum-axis sigma, in metres. */
     val highQualityMaximumUncertaintyM: Double = 2.0,
     val mediumQualityMaximumUncertaintyM: Double = 5.0,
     val lowQualityMaximumUncertaintyM: Double = 15.0,
@@ -320,15 +331,20 @@ class PedestrianPositionEstimator(
         return update.copy(estimateAtGnssMeasurement = update.estimate)
     }
 
+    /** Numeric model parameter only: does not admit the observation or include soft-gate inflation. */
+    internal fun nominalGnssAxisStdDevM(observation: GnssPositionObservation): MeasurementAxisStdDevM? {
+        val reportedRadiusM = observation.horizontalAccuracyM
+        if (reportedRadiusM != null && (!reportedRadiusM.isFinite() || reportedRadiusM < 0.0)) return null
+        val multiplier = observation.measurementNoiseMultiplier
+        if (!multiplier.isFinite() || multiplier < 1.0) return null
+        val sigmaM = max(reportedRadiusM ?: config.missingAccuracySigmaM, config.minimumGnssSigmaM) * sqrt(multiplier)
+        return sigmaM.takeIf { it.isFinite() && (it * it).isFinite() }?.let(::MeasurementAxisStdDevM)
+    }
+
     private fun applyGnssInOrder(observation: GnssPositionObservation): PedestrianPositionEstimatorUpdate {
         val currentTime = stateElapsedRealtimeMs
-        val gnssSigmaM = max(
-            observation.horizontalAccuracyM ?: config.missingAccuracySigmaM,
-            config.minimumGnssSigmaM,
-        ) * sqrt(observation.measurementNoiseMultiplier)
-        if (!gnssSigmaM.isFinite() || !(gnssSigmaM * gnssSigmaM).isFinite()) {
-            return rejected(GnssHardRejectReason.NUMERICAL_FAILURE)
-        }
+        val gnssSigmaM = nominalGnssAxisStdDevM(observation)?.meters
+            ?: return rejected(GnssHardRejectReason.NUMERICAL_FAILURE)
         if (state == null || currentTime == null) {
             return initialize(observation, gnssSigmaM, GnssObservationDisposition.INITIALIZED)
         }

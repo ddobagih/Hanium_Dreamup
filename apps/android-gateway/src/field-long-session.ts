@@ -1,70 +1,46 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import {
-  chmodSync,
-  closeSync,
-  constants as fsConstants,
-  fstatSync,
-  fsyncSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  realpathSync,
-  renameSync,
-  rmSync,
-  writeFileSync
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { type FieldLongSessionConfig, resolveFieldLongSessionConfig } from "./config.js";
+import { createHash, timingSafeEqual, createHmac, randomBytes } from "node:crypto";
+import { QueueAdmissionAbortedError, QueueAdmissionBusyError } from "./keyed-admission-queue.js";
+import { ExclusiveFileLockBusyError, withExclusiveFileLockAsync } from "./exclusive-file-lock.js";
+import { GatewayStorageOutcomeUnknownError } from "./encrypted-json-store.js";
+import { lstatSync } from "node:fs";
 import path from "node:path";
-
-import { resolveFieldLongSessionConfig, type FieldLongSessionConfig } from "./config.js";
 import {
-  ExclusiveFileLockBusyError,
-  withExclusiveFileLockAsync
-} from "./exclusive-file-lock.js";
+  type BackendEmailAccountBinding,
+  MAX_REFRESH_ROTATION_NUMBER,
+  MAX_REFRESH_ROTATIONS,
+  type FieldSessionFamily,
+  OPAQUE_ID,
+  ACTOR_ID,
+  DEVICE_ID,
+  isSafeEpoch,
+  type FieldSessionActorState,
+  backendFamilies,
+  type FieldSessionRevokeReason,
+  MAX_STORED_FAMILIES,
+  validBackendBinding,
+  type BackendFieldSessionFamily
+} from "./field-long-session-codec.js";
 import {
-  decryptGatewayStateJson,
-  encryptGatewayStateJson,
-  GatewayStorageOutcomeUnknownError,
-  maxGatewayStateEnvelopeBytes
-} from "./encrypted-json-store.js";
-import {
-  KeyedAdmissionQueue,
-  QueueAdmissionAbortedError,
-  QueueAdmissionBusyError
-} from "./keyed-admission-queue.js";
+  readActorState,
+  injectStorageFaultForTests,
+  FieldSessionStorageOutcomeUnknownError,
+  writeActorState,
+  stateParentDirectory,
+  withActorLock,
+  actorAdmission,
+  actorLockPath
+} from "./field-long-session-store.js";
 
 const FIELD_COOKIE = "walksafe_field_session";
-const ACTOR_ID = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$/;
-const DEVICE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const OPAQUE_ID = /^[A-Za-z0-9_-]{24,128}$/;
-const REFRESH_TOKEN = /^[A-Za-z0-9_-]{48,256}$/;
-const SHA256_DIGEST = /^[0-9a-f]{64}$/;
-// S19-7/S01-25: refresh tokens carry a per-family HMAC proof of (family, rotation), so a
-// consumed token is recognized cryptographically instead of by an ever-growing digest list.
-const REFRESH_PROOF_KEY = /^[A-Za-z0-9_-]{43}$/;
-const REFRESH_TOKEN_RANDOM_CHARS = 43;
-const PROOF_REFRESH_TOKEN = /^[A-Za-z0-9_-]{86}$/;
-const MAX_ACTIVE_DEVICES = 32;
-const MAX_STORED_FAMILIES = 64;
-const MAX_REFRESH_ROTATIONS = 4096;
-// Owner decision 2 (S19-8): with an unlimited absolute lifetime the 4096-rotation cap would
-// be a hidden maximum login age (4096 x access TTL), so it applies only to finite lifetimes.
-// This bound only keeps stored and parsed rotation numbers finite.
-const MAX_REFRESH_ROTATION_NUMBER = 2_147_483_647;
-export const FIELD_LONG_SESSION_MAX_STATE_FILE_BYTES = 4 * 1024 * 1024;
-const actorAdmission = new KeyedAdmissionQueue(32, 1_000);
-// "auth_time_read": S19-44 auth-time re-read of the family (GWBE-10 tests).
-type StorageFaultPoint = "file_fsync" | "rename" | "directory_fsync" | "auth_time_read";
-let storageFaultPointForTests: StorageFaultPoint | null = null;
-let actorAdmissionHoldForTests: Promise<void> | null = null;
 
-class FieldSessionStorageOutcomeUnknownError extends GatewayStorageOutcomeUnknownError {
-  constructor() {
-    super("field long-session");
-    this.name = "FieldSessionStorageOutcomeUnknownError";
-  }
-}
+const REFRESH_TOKEN = /^[A-Za-z0-9_-]{48,256}$/;
+
+const REFRESH_TOKEN_RANDOM_CHARS = 43;
+
+const PROOF_REFRESH_TOKEN = /^[A-Za-z0-9_-]{86}$/;
+
+const MAX_ACTIVE_DEVICES = 32;
 
 export class FieldLongSessionStorageUnavailableError extends Error {
   constructor() {
@@ -73,69 +49,9 @@ export class FieldLongSessionStorageUnavailableError extends Error {
   }
 }
 
-type FieldSessionRevokeReason =
-  | "login_replaced"
-  | "logout"
-  | "selective_revoke"
-  | "account_lock"
-  | "security_incident"
-  | "refresh_token_reuse"
-  | "refresh_idle_expired"
-  | "refresh_absolute_expired"
-  | "refresh_rotation_limit"
-  | "backend_binding_denied"
-  // Root decision R2 (login-F2): with an unlimited idle window the least recently rotated
-  // device family makes room for a new login at the 32-device cap.
-  | "capacity_evicted";
-
-export type BackendEmailAccountBinding = {
-  actorId: string;
-  accountGeneration: number;
-  authEpoch: number;
-  deviceId: string;
-};
-
 export type BackendEmailAccountCheckCurrent = (
   binding: Readonly<BackendEmailAccountBinding>
 ) => Promise<"current" | "denied" | "unavailable">;
-
-type FieldSessionFamily = {
-  device_id: string;
-  family_id: string;
-  rotation: number;
-  current_refresh_digest_sha256: string | null;
-  /** Legacy digest history only; frozen once refresh_proof_key_b64url exists. */
-  consumed_refresh_digests_sha256: string[];
-  /** Per-family key for refresh-token proofs; absent only on pre-S19-7 families. */
-  refresh_proof_key_b64url?: string;
-  current_access_digest_sha256: string | null;
-  access_expires_at_epoch_ms: number;
-  /** null = no idle expiry (owner decision 2: `unlimited`). */
-  idle_expires_at_epoch_ms: number | null;
-  /** null = no absolute expiry (owner decision 2: `unlimited`). */
-  absolute_expires_at_epoch_ms: number | null;
-  created_at_epoch_ms: number;
-  last_rotated_at_epoch_ms: number;
-  revoked_at_epoch_ms: number | null;
-  revoke_reason: FieldSessionRevokeReason | null;
-};
-
-type BackendFieldSessionFamily = FieldSessionFamily & {
-  binding: BackendEmailAccountBinding;
-};
-
-type FieldSessionActorState = {
-  schema_version: 1;
-  actor_id: string;
-  families: FieldSessionFamily[];
-  backend_families?: BackendFieldSessionFamily[];
-  /**
-   * login-F3: when a refresh-token reuse last ended every device of the actor. Written in the
-   * same atomic state write as the family revocation, so short sessions (v5/v6/v7) issued at
-   * or before it are rejected by auth.ts even if their own store could not be updated.
-   */
-  reuse_revoked_at_epoch_ms?: number;
-};
 
 export type FieldLongSessionIdentity = {
   actorId: string;
@@ -177,73 +93,6 @@ type ParsedAccessToken = {
   expiresAtEpochMs: number;
 };
 
-export function setFieldLongSessionStorageFaultForTests(
-  point: StorageFaultPoint | null
-): void {
-  if (process.env.NODE_ENV !== "test") {
-    throw new Error("field long-session storage fault injection is test-only");
-  }
-  storageFaultPointForTests = point;
-}
-
-export function setFieldLongSessionAdmissionHoldForTests(hold: Promise<void> | null): void {
-  if (process.env.NODE_ENV !== "test") {
-    throw new Error("field long-session admission hold is test-only");
-  }
-  actorAdmissionHoldForTests = hold;
-}
-
-function injectStorageFaultForTests(point: StorageFaultPoint): void {
-  if (storageFaultPointForTests !== point) return;
-  storageFaultPointForTests = null;
-  throw new Error(`injected field long-session storage fault: ${point}`);
-}
-
-function ownedByCurrentProcess(uid: number): boolean {
-  return typeof process.getuid !== "function" || uid === process.getuid();
-}
-
-function stateParentDirectory(): string {
-  const configured = process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR?.trim() ?? "";
-  if (process.env.NODE_ENV === "production" && !configured) {
-    throw new Error("WALKSAFE_GATEWAY_RATE_LIMIT_DIR is required in production");
-  }
-  const directory = configured || path.join(tmpdir(), "walksafe-gateway-rate-limit-v1");
-  if (!path.isAbsolute(directory)) throw new Error("gateway state directory must be absolute");
-  return path.resolve(directory);
-}
-
-function secureDirectory(directory: string, context: string): string {
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const metadata = lstatSync(directory);
-  const resolved = realpathSync(directory);
-  if (!metadata.isDirectory() || metadata.isSymbolicLink() || resolved !== directory) {
-    throw new Error(`${context} must be a real directory without symlinks`);
-  }
-  if (!ownedByCurrentProcess(metadata.uid) || (metadata.mode & 0o077) !== 0) {
-    throw new Error(`${context} must be owned by this process and mode 0700`);
-  }
-  return directory;
-}
-
-function stateDirectory(): string {
-  const parent = secureDirectory(stateParentDirectory(), "gateway state directory");
-  return secureDirectory(path.join(parent, "field-long-sessions"), "field long-session directory");
-}
-
-function statePath(actorId: string): string {
-  const digest = createHash("sha256").update(`field-long-session\0${actorId}`).digest("hex");
-  return path.join(stateDirectory(), `${digest}.json`);
-}
-
-function actorLockPath(actorId: string): string {
-  return `${statePath(actorId)}.lock`;
-}
-
-function isSafeEpoch(value: unknown): value is number {
-  return Number.isSafeInteger(value) && Number(value) > 0;
-}
-
 /** Owner decision 2: a null expiry (configured `unlimited`) never expires. */
 function expiredAt(nowEpochMs: number, expiresAtEpochMs: number | null): boolean {
   return expiresAtEpochMs !== null && nowEpochMs >= expiresAtEpochMs;
@@ -265,31 +114,6 @@ function refreshRotationLimit(config: FieldLongSessionConfig): number {
     : MAX_REFRESH_ROTATIONS;
 }
 
-function isRevokeReason(value: unknown): value is FieldSessionRevokeReason | null {
-  return value === null || [
-    "login_replaced",
-    "logout",
-    "selective_revoke",
-    "account_lock",
-    "security_incident",
-    "refresh_token_reuse",
-    "refresh_idle_expired",
-    "refresh_absolute_expired",
-    "refresh_rotation_limit",
-    "backend_binding_denied",
-    "capacity_evicted"
-  ].includes(String(value));
-}
-
-function validBackendBinding(value: unknown): value is BackendEmailAccountBinding {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const binding = value as Partial<BackendEmailAccountBinding>;
-  return typeof binding.actorId === "string" && ACTOR_ID.test(binding.actorId) &&
-    typeof binding.deviceId === "string" && DEVICE_ID.test(binding.deviceId) &&
-    Number.isSafeInteger(binding.accountGeneration) && Number(binding.accountGeneration) >= 1 &&
-    Number.isSafeInteger(binding.authEpoch) && Number(binding.authEpoch) >= 1;
-}
-
 function sameBackendBinding(
   left: BackendEmailAccountBinding,
   right: BackendEmailAccountBinding
@@ -298,218 +122,6 @@ function sameBackendBinding(
     left.accountGeneration === right.accountGeneration &&
     left.authEpoch === right.authEpoch &&
     left.deviceId === right.deviceId;
-}
-
-function backendFamilies(state: Pick<FieldSessionActorState, "backend_families">): BackendFieldSessionFamily[] {
-  return state.backend_families ?? [];
-}
-
-function validFamily(value: unknown): value is FieldSessionFamily {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const family = value as Partial<FieldSessionFamily>;
-  return (
-    typeof family.device_id === "string" &&
-    DEVICE_ID.test(family.device_id) &&
-    typeof family.family_id === "string" &&
-    OPAQUE_ID.test(family.family_id) &&
-    Number.isSafeInteger(family.rotation) &&
-    Number(family.rotation) >= 0 &&
-    Number(family.rotation) <= MAX_REFRESH_ROTATION_NUMBER &&
-    (family.current_refresh_digest_sha256 === null ||
-      (typeof family.current_refresh_digest_sha256 === "string" &&
-        SHA256_DIGEST.test(family.current_refresh_digest_sha256))) &&
-    Array.isArray(family.consumed_refresh_digests_sha256) &&
-    family.consumed_refresh_digests_sha256.length <= MAX_REFRESH_ROTATIONS &&
-    family.consumed_refresh_digests_sha256.every(
-      (digest) => typeof digest === "string" && SHA256_DIGEST.test(digest)
-    ) &&
-    new Set(family.consumed_refresh_digests_sha256).size ===
-      family.consumed_refresh_digests_sha256.length &&
-    (family.current_access_digest_sha256 === null ||
-      (typeof family.current_access_digest_sha256 === "string" &&
-        SHA256_DIGEST.test(family.current_access_digest_sha256))) &&
-    (family.refresh_proof_key_b64url === undefined ||
-      (typeof family.refresh_proof_key_b64url === "string" &&
-        REFRESH_PROOF_KEY.test(family.refresh_proof_key_b64url))) &&
-    isSafeEpoch(family.access_expires_at_epoch_ms) &&
-    (family.idle_expires_at_epoch_ms === null || isSafeEpoch(family.idle_expires_at_epoch_ms)) &&
-    (family.absolute_expires_at_epoch_ms === null ||
-      isSafeEpoch(family.absolute_expires_at_epoch_ms)) &&
-    // An unlimited idle window exists only under an unlimited absolute lifetime.
-    (family.idle_expires_at_epoch_ms !== null || family.absolute_expires_at_epoch_ms === null) &&
-    isSafeEpoch(family.created_at_epoch_ms) &&
-    isSafeEpoch(family.last_rotated_at_epoch_ms) &&
-    (family.revoked_at_epoch_ms === null || isSafeEpoch(family.revoked_at_epoch_ms)) &&
-    isRevokeReason(family.revoke_reason) &&
-    ((family.revoked_at_epoch_ms === null && family.revoke_reason === null) ||
-      (family.revoked_at_epoch_ms !== null && family.revoke_reason !== null))
-  );
-}
-
-function validActorState(value: unknown, actorId: string): value is FieldSessionActorState {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const state = value as Partial<FieldSessionActorState>;
-  if (
-    state.schema_version !== 1 ||
-    state.actor_id !== actorId ||
-    !ACTOR_ID.test(actorId) ||
-    !Array.isArray(state.families) ||
-    state.families.length > MAX_STORED_FAMILIES ||
-    !state.families.every(validFamily) ||
-    (state.reuse_revoked_at_epoch_ms !== undefined &&
-      !isSafeEpoch(state.reuse_revoked_at_epoch_ms)) ||
-    (state.backend_families !== undefined && (
-      !Array.isArray(state.backend_families) ||
-      state.backend_families.length > MAX_STORED_FAMILIES ||
-      !state.backend_families.every((family) =>
-        validFamily(family) && validBackendBinding(family.binding) &&
-        family.binding.actorId === actorId && family.binding.deviceId === family.device_id
-      )
-    ))
-  ) {
-    return false;
-  }
-  const familyIds = state.families.map((family) => family.family_id);
-  const activeDevices = state.families
-    .filter((family) => family.revoked_at_epoch_ms === null)
-    .map((family) => family.device_id);
-  const backend = backendFamilies(state);
-  const backendFamilyIds = backend.map((family) => family.family_id);
-  const activeBackendDevices = backend
-    .filter((family) => family.revoked_at_epoch_ms === null)
-    .map((family) => family.device_id);
-  return (
-    new Set(familyIds).size === familyIds.length &&
-    new Set(activeDevices).size === activeDevices.length &&
-    new Set(backendFamilyIds).size === backendFamilyIds.length &&
-    new Set(activeBackendDevices).size === activeBackendDevices.length
-  );
-}
-
-export function validFieldLongSessionStateForMaintenance(
-  value: unknown,
-  recordId: string
-): boolean {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const actorId = (value as Partial<FieldSessionActorState>).actor_id;
-  if (typeof actorId !== "string" || !validActorState(value, actorId)) return false;
-  const digest = createHash("sha256")
-    .update(`field-long-session\0${actorId}`)
-    .digest("hex");
-  return recordId === `${digest}.json`;
-}
-
-let actorStateReadsForTests = 0;
-
-/** Tests only (S19-10): how many times an actor state file was opened for reading. */
-export function fieldLongSessionStateReadsForTests(): number {
-  if (process.env.NODE_ENV !== "test") {
-    throw new Error("field long-session read counter is test-only");
-  }
-  return actorStateReadsForTests;
-}
-
-function readActorState(
-  actorId: string,
-  missingIsUnavailable = false
-): FieldSessionActorState {
-  actorStateReadsForTests += 1;
-  const target = statePath(actorId);
-  let descriptor: number | null = null;
-  try {
-    descriptor = openSync(target, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
-    const metadata = fstatSync(descriptor);
-    if (
-      !metadata.isFile() ||
-      !ownedByCurrentProcess(metadata.uid) ||
-      metadata.nlink !== 1 ||
-      (metadata.mode & 0o777) !== 0o600 ||
-      metadata.size > maxGatewayStateEnvelopeBytes(FIELD_LONG_SESSION_MAX_STATE_FILE_BYTES)
-    ) {
-      throw new Error("field long-session state must be an owned regular file with mode 0600");
-    }
-    const decoded = decryptGatewayStateJson(
-      { kind: "field-long-session", recordId: path.basename(target) },
-      readFileSync(descriptor, "utf8"),
-      FIELD_LONG_SESSION_MAX_STATE_FILE_BYTES
-    ).value;
-    if (!validActorState(decoded, actorId)) throw new Error("invalid field long-session state");
-    return decoded;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT" && !missingIsUnavailable) {
-      return { schema_version: 1, actor_id: actorId, families: [] };
-    }
-    throw error;
-  } finally {
-    if (descriptor !== null) closeSync(descriptor);
-  }
-}
-
-function writeActorState(state: FieldSessionActorState): void {
-  const target = statePath(state.actor_id);
-  const serialized = encryptGatewayStateJson(
-    { kind: "field-long-session", recordId: path.basename(target) },
-    state,
-    FIELD_LONG_SESSION_MAX_STATE_FILE_BYTES
-  );
-  const temporary = `${target}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
-  let descriptor: number | null = null;
-  let directoryDescriptor: number | null = null;
-  let committed = false;
-  try {
-    descriptor = openSync(
-      temporary,
-      fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW,
-      0o600
-    );
-    writeFileSync(descriptor, serialized, "utf8");
-    injectStorageFaultForTests("file_fsync");
-    fsyncSync(descriptor);
-    closeSync(descriptor);
-    descriptor = null;
-    chmodSync(temporary, 0o600);
-    injectStorageFaultForTests("rename");
-    renameSync(temporary, target);
-    committed = true;
-    try {
-      directoryDescriptor = openSync(
-        path.dirname(target),
-        fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
-      );
-      injectStorageFaultForTests("directory_fsync");
-      fsyncSync(directoryDescriptor);
-    } catch (error) {
-      throw new FieldSessionStorageOutcomeUnknownError();
-    }
-  } finally {
-    if (descriptor !== null) closeSync(descriptor);
-    if (directoryDescriptor !== null) {
-      try {
-        closeSync(directoryDescriptor);
-      } catch (error) {
-        if (!committed) throw error;
-      }
-    }
-    try {
-      rmSync(temporary, { force: true });
-    } catch (error) {
-      if (!committed) throw error;
-    }
-  }
-}
-
-function withActorLock<T>(
-  actorId: string,
-  action: () => Promise<T> | T,
-  signal?: AbortSignal
-): Promise<T> {
-  return actorAdmission.run(
-    actorId,
-    () => actorAdmissionHoldForTests
-      ? actorAdmissionHoldForTests.then(() => withExclusiveFileLockAsync(actorLockPath(actorId), action))
-      : withExclusiveFileLockAsync(actorLockPath(actorId), action),
-    signal
-  );
 }
 
 function sessionSecret(): string | null {
@@ -1183,13 +795,14 @@ function notifyAllDevicesRevoked(
 function sessionResponse(
   request: Request,
   actorId: string,
-  family: FieldSessionFamily,
+  family: FieldSessionFamily | BackendFieldSessionFamily,
   refreshToken: string,
   accessCookie: string,
   config: FieldLongSessionConfig
 ): Response {
   const serialized = JSON.stringify({
     session_scope: "general",
+    ...("binding" in family ? { account_generation: family.binding.accountGeneration } : {}),
     actor_id: actorId,
     device_id: family.device_id,
     family_id: family.family_id,
@@ -1734,7 +1347,8 @@ export async function refreshPublicFieldLongSession(
 function currentLongSessionIdentity(
   request: Request,
   nowEpochMs: number
-): { identity: FieldLongSessionIdentity; backend: boolean } | null {
+): { identity: FieldLongSessionIdentity; backend: false } |
+   { identity: BackendFieldLongSessionIdentity; backend: true } | null {
   if (hasFieldLongSessionCookie(request)) {
     const identity = fieldLongSessionIdentity(request, nowEpochMs);
     return identity ? { identity, backend: false } : null;
@@ -1749,18 +1363,20 @@ function longSessionFamilies(state: FieldSessionActorState, backend: boolean): F
 
 export function fieldLongSessionStatus(request: Request, nowEpochMs = Date.now()): Response | null {
   if (!hasFieldLongSessionCookie(request) && !isBackendFieldLongSessionCookie(request)) return null;
-  const identity = currentLongSessionIdentity(request, nowEpochMs)?.identity ?? null;
-  if (!identity) {
+  const current = currentLongSessionIdentity(request, nowEpochMs);
+  if (!current) {
     return Response.json(
       { required: true, authenticated: false, actor_id: null, session_scope: null },
       { headers: { "cache-control": "no-store" } }
     );
   }
+  const { identity } = current;
   return Response.json(
     {
       required: true,
       authenticated: true,
       actor_id: identity.actorId,
+      ...(current.backend ? { account_generation: current.identity.binding.accountGeneration } : {}),
       session_scope: "general",
       session_mode: "long_lived",
       device_id: identity.deviceId,
@@ -1963,3 +1579,14 @@ export async function revokeAllFieldLongSessions(
     return revoked;
   }));
 }
+
+export {
+  FIELD_LONG_SESSION_MAX_STATE_FILE_BYTES,
+  setFieldLongSessionStorageFaultForTests,
+  setFieldLongSessionAdmissionHoldForTests,
+  fieldLongSessionStateReadsForTests
+} from "./field-long-session-store.js";
+export {
+  type BackendEmailAccountBinding,
+  validFieldLongSessionStateForMaintenance
+} from "./field-long-session-codec.js";

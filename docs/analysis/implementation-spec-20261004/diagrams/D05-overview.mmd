@@ -1,0 +1,23 @@
+flowchart LR
+  H["F-D05-001 / P-D05-001 활성 21 종과별도 FastSAM"] --> A["F001 config SHA class threshold"]
+  A --> B["D02 fixed selector 와 F016 현재실행검증"]
+  B --> C["F002 주 detector owner"]
+  D["D07 ARCore CPUimage 와 depthreceipt"] --> E["F007 Main epoch geometry admission"]
+  F["CameraX nonmetric"] --> E
+  E --> P["F003 ownedYUV upright bilinear"]
+  P --> C
+  C --> G["F004 raw21 decode"]
+  G --> V["F010 F011 시각 ring LK actualpoint"]
+  V --> R["D07 depth motion risk 와 D02feedback"]
+  E --> U["F012 ownedluma lease"]
+  E --> S["F013 FastSAM 별도 model postowners"]
+  S --> M["F014 actualmask"]
+  M --> U
+  U --> R
+  G --> J["F015 samecapture tactile association"]
+  M --> J
+  J --> R
+  E --> Q["F008 pacing F009 failure stall F020load"]
+  Z["F023 debug CameraTest"] --> Z2["F024 unknown 표시 F025 경고조정"]
+  X["미선택 F005legacy F006person 보완"] --> A
+  X2["미연결 F019livecalibration F021bundle F022overlap"] --> K["코드존재와제품활성구분"]

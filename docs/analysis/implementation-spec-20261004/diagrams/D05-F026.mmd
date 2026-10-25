@@ -1,0 +1,12 @@
+flowchart TD
+  H["P-D05-026 · F-D05-026 unknown 조합 profile 저장·재검증·주검출 비퇴화"]
+  H --> B["전체조합 length-prefix SHA binding"]
+  B --> L{"저장 profile exactbinding evidence 유효"}
+  L -->|"예"| R["start 시후보사용"]
+  L -->|"아니오"| N["null 기본요청 GPU"]
+  B --> C["F019 조건부비교결과"]
+  C --> P{"F018 confirmed 와 primary 비퇴화"}
+  P -->|"아니오"| X["profile 발급안함"]
+  P -->|"예"| S{"worker schema bound commit 성공"}
+  S -->|"아니오"| X
+  S -->|"예"| V["VALID_PROFILE current 확인후 adopt"]

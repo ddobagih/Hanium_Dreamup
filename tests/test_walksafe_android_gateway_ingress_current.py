@@ -30,6 +30,8 @@ UUID_PATTERN = (
     r"[0-9a-f]{4}-[0-9a-f]{12}"
 )
 REPORT_STATUS_PATTERN = rf"^/api/reports/v2/{UUID_PATTERN}/status$"
+DIAGNOSTIC_SESSION_PATTERN = rf"^/api/field-diagnostics/sessions/{UUID_PATTERN}$"
+DIAGNOSTIC_BATCH_PATTERN = rf"^/api/field-diagnostics/sessions/{UUID_PATTERN}/batches$"
 MY_REPORT_DETAIL_PATTERN = rf"^/api/reports/mine/{UUID_PATTERN}$"
 MY_REPORT_CONTENT_PATTERN = rf"^/api/reports/mine/{UUID_PATTERN}/content$"
 MY_REPORT_CORRECTIONS_PATTERN = rf"^/api/reports/mine/{UUID_PATTERN}/corrections$"
@@ -171,8 +173,12 @@ class WalkSafeAndroidGatewayIngressCurrentTest(unittest.TestCase):
     def test_ingress_proxies_only_current_openapi_routes(self) -> None:
         expected_headers = [
             "location = /api/account-enrollments/email-otp {",
+            "location = /api/account-signup-policy {",
             "location = /api/accounts {",
             "location = /api/field-session {",
+            "location = /api/field-diagnostics/preference {",
+            f'location ~ "{DIAGNOSTIC_BATCH_PATTERN}" {{',
+            f'location ~ "{DIAGNOSTIC_SESSION_PATTERN}" {{',
             "location = /api/speech/stt {",
             "location = /api/speech/tts {",
             "location = /api/navigation/walking {",
@@ -226,6 +232,10 @@ class WalkSafeAndroidGatewayIngressCurrentTest(unittest.TestCase):
 
     def test_each_upstream_location_has_the_expected_body_limit(self) -> None:
         exact_limits = {
+            "location = /api/account-signup-policy": "1k",
+            "location = /api/field-diagnostics/preference": "256k",
+            f'location ~ "{DIAGNOSTIC_BATCH_PATTERN}"': "256k",
+            f'location ~ "{DIAGNOSTIC_SESSION_PATTERN}"': "1k",
             "location = /api/field-session": "4k",
             "location = /api/navigation/walking": "16k",
             "location = /api/navigation/destinations/search": "1k",
@@ -265,6 +275,36 @@ class WalkSafeAndroidGatewayIngressCurrentTest(unittest.TestCase):
             for path in invalid_paths:
                 with self.subTest(suffix=suffix, invalid_path=path):
                     self.assertIsNone(pattern.fullmatch(path))
+
+    def test_signup_policy_and_diagnostics_are_exact_with_explicit_methods(self) -> None:
+        headers_and_methods = {
+            "location = /api/account-signup-policy": "if ($request_method != GET)",
+            "location = /api/field-diagnostics/preference": "if ($request_method !~ ^(GET|POST|PUT)$)",
+            f'location ~ "{DIAGNOSTIC_BATCH_PATTERN}"': "if ($request_method != POST)",
+            f'location ~ "{DIAGNOSTIC_SESSION_PATTERN}"': "if ($request_method != GET)",
+        }
+        for header, method_guard in headers_and_methods.items():
+            with self.subTest(location=header):
+                block = location_block(self.nginx, header)
+                self.assertIn(method_guard, block)
+                self.assertIn("return 405;", block)
+                self.assertIn("proxy_read_timeout 40s;", block)
+        session_id = "abcdefab-cdef-cdef-cdef-abcdefabcdef"
+        for suffix, pattern in (("", DIAGNOSTIC_SESSION_PATTERN), ("/batches", DIAGNOSTIC_BATCH_PATTERN)):
+            path = f"/api/field-diagnostics/sessions/{session_id}{suffix}"
+            self.assertIsNotNone(re.fullmatch(pattern, path))
+            for invalid in (path + "/", path + "/extra", path.replace(session_id, session_id.upper()),
+                            path.replace(session_id, "not-a-uuid"), path.replace("/api/", "/api/admin/")):
+                with self.subTest(invalid=invalid):
+                    self.assertIsNone(re.fullmatch(pattern, invalid))
+
+    def test_otp_upstream_budget_is_isolated_from_other_existing_routes(self) -> None:
+        otp = location_block(self.nginx, "location = /api/account-enrollments/email-otp")
+        self.assertIn("proxy_read_timeout 65s;", otp)
+        self.assertEqual(self.nginx.count("proxy_read_timeout 65s;"), 1)
+        self.assertIn("    proxy_read_timeout 20s;", self.nginx)
+        self.assertNotIn("proxy_read_timeout", location_block(self.nginx, "location = /api/accounts"))
+        self.assertNotIn("proxy_read_timeout", location_block(self.nginx, "location = /privacy/rights"))
 
     def test_ingress_safety_boundaries_remain_fail_closed(self) -> None:
         catch_all = location_block(self.nginx, "location /")

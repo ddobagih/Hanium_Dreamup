@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D02-027 경로 음성 전달과 TalkBack 대체 채널"]
+  E["진입: navigation instruction / unavailable/async fail/complete / TalkBack<br/>announcement 요청"]
+  G{"P-D02-027 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["낮은 risk/경로/참고 억제, interaction은 지연"]
+  G -->|"higher active TalkBack risk"| B0
+  B1["assertive live region; 나머지는 polite"]
+  G -->|"TalkBack risk"| B1
+  B2["표시하지 않음"]
+  G -->|"stale UI runnable 또는 target invisible"| B2
+  B3["risk hold clear, 다른 risk 없으면 pending interaction 실행"]
+  G -->|"risk track 사라짐"| B3
+  B4["risk 외 announcement 억제; failure guidance는500ms recheck 가능"]
+  G -->|"STT active"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["current output guard로 요청 예약"]
+    S1["앱 TTS navigation request와 explicit terminal callbacks 등록"]
+    S2["UNAVAILABLE/async failure에만 fallback 한 번; SUPPRESSED/cancel은<br/>fallback 아님"]
+    S3["TalkBack active·instruction current일 때 우선순위 검사 후 live region에 표시"]
+    S4["Main fallback dispatched는 failOnce로 caller reservation을 해제하고 route<br/>progress를 완료시키지 않음"]
+    S5["TTS DONE의 current callback만 complete once"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+  E -.-> S0
+  N["정상 종료: 앱 DONE만 route completion; TalkBack fallback은 표시 요청 후 reservation<br/>failure/retry 경로."]
+  X["취소·중단: pause/teardown pending interaction runnable 제거, exact generation<br/>predicate 폐기. / foreground/actor/epoch 변경 시 현재 요청을 폐기한다."]
+  C["정리: 순수 판단 로직은 외부 자원을 소유하지 않는다."]
+  R["재시도·복구: TalkBack 지연 interaction은 current일 때만 다시 판정; route 재시도 규칙은<br/>Dnavigation 소유. / 현재 owner와 조건을 다시 확보해야 한다."]
+  S5 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

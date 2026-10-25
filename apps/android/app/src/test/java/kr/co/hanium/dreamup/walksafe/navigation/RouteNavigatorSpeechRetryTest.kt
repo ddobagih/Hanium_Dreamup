@@ -12,6 +12,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RouteNavigatorSpeechRetryTest {
+    // These fixtures isolate speech retry backoff and the original position timestamps.
+    // Production 1.5-second delay and immediate safety actions are covered by RouteDirectionRecheckGraceTest.
+
     @Test
     fun initializingTtsCanRetryThreeSecondsLaterAndCompleteWithoutAnotherFix() {
         listOf(false, true).forEach { testMode ->
@@ -57,7 +60,7 @@ class RouteNavigatorSpeechRetryTest {
         assertEquals("guidance_rate_limited", navigator.retryGuidance(7_000, facingObservation = RouteFacingObservation(90.0, 5.0, 7_000))?.reason)
         val nextStage = requireNotNull(navigator.retryGuidance(7_001, facingObservation = RouteFacingObservation(90.0, 5.0, 7_001)))
         assertEquals("route_guidance", nextStage.reason)
-        assertTrue(nextStage.instruction?.contains("50m 앞") == true)
+        assertTrue(nextStage.instruction?.contains("다음 안내 지점까지 경로를 따라 약 50미터") == true)
         assertFalse(nextStage.instruction?.contains("길안내를 시작합니다") == true)
         assertTrue(navigator.reserveInstruction(nextStage))
     }
@@ -130,7 +133,7 @@ class RouteNavigatorSpeechRetryTest {
         navigator.releaseInstruction(first, 1_001)
         val next = navigator.update(TrustedLocation(0.00018, 0.001, 2f, 4_000), 4_000, false, facingObservation = RouteFacingObservation(0.0, 5.0, 4_000))
         assertNotEquals(first.guideIndex, next.guideIndex)
-        assertTrue(next.instruction?.contains("오른쪽으로 꺾으세요") == true)
+        assertTrue(next.instruction?.contains("3시 방향으로 꺾으세요") == true)
         navigator.acknowledgeInstruction(first, 4_001)
         val retry = requireNotNull(navigator.retryGuidance(4_002, facingObservation = RouteFacingObservation(0.0, 5.0, 4_002)))
         assertEquals(next.guideIndex, retry.guideIndex)
@@ -258,7 +261,7 @@ class RouteNavigatorSpeechRetryTest {
     }
 
     private fun navigator(testMode: Boolean = false, guidanceIntervalMs: Long = 0) =
-        RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = guidanceIntervalMs), allowDegradedRouteGuidance = testMode)
+        RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L, guidanceIntervalMs = guidanceIntervalMs), allowDegradedRouteGuidance = testMode)
             .apply { setRoute(route()) }
 
     // Synthetic fixtures exercise retry state, not live TMAP or a recorded physical walk.

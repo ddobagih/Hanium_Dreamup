@@ -1,0 +1,39 @@
+sequenceDiagram
+participant U as 사용자·Activity
+participant C as Coordinator F-D16-013
+participant W as 단일 worker
+participant N as NGII 또는 수동자료
+participant J as JNI F-D16-010
+U->>C: 입력 반입·분석 시작
+C->>C: 입력 gate·generation 생성·이전결과 폐기
+C->>W: 작업 제출
+W->>W: trace·GNSS 변환
+W->>N: 기준국 준비 P-D16-006/008
+N-->>W: 검증 자료 또는 오류
+alt 기준자료 준비 성공
+W->>J: 버전·입출력 검사 후 PPK
+alt JNI 성공
+J-->>W: UTC LLH
+W->>W: FIX 격자 평가·JSON
+else JNI 취소
+J-->>W: AnalysisCancelledException
+W->>W: 결과 JSON 없이 취소 처리 F-D16-014
+else JNI 일반 오류
+J-->>W: 엔진·출력 오류
+W->>W: FailurePolicy에 따른 processingFailure JSON
+end
+else 기준자료 오류·변환 오류
+W->>W: FailurePolicy 분류 후 실패 JSON (취소는 JSON 없음)
+end
+alt 현재 generation·취소 아님·JSON 있음
+W-->>C: 결과 commit
+C-->>U: 결과 또는 실패 안내
+else 취소·오래된 callback
+W-->>C: 결과 폐기
+end
+W->>W: workRoot 정리
+opt 결과 보유·사용자 명시 저장 F-D16-015
+U->>C: 결과 저장 URI
+C->>W: SAF URI write
+W-->>U: 저장 완료 또는 실패
+end

@@ -1,0 +1,36 @@
+flowchart LR
+  U["사용자·보행 lifecycle"]
+  C["F-D06-001..010 신고 후보·확인·암호화 queue"]
+  MY["F-D06-011..015 내 신고·정정·삭제 요청"]
+  ACC["F-D06-016 account-deletion fallback marker<br/>D01 계정삭제 state machine 연결"]
+  RAW["F-D06-017..024 raw 30초 metadata pair"]
+  FL["F-D06-025..029 현장 log·heartbeat·보존"]
+  POS["F-D06-030..033 정확 위치평가 기록·export"]
+  DBG["F-D06-034..036 DEBUG HTTP metadata·frame"]
+  RT["F-D06-037 DEBUG typed runtime cache log"]
+  G["D08 Gateway<br/>reports v2·mine·raw-collections"]
+  B["D13/D15 Backend<br/>접수 receipt·요청 처리·삭제·raw 저장"]
+  ADM["D12 관리자 Android<br/>서버 직접 연결의 운영 UI"]
+  FS["앱 전용 AEAD 파일<br/>queue·raw·현장·위치 각각 별도 계약"]
+  SAF["사용자 선택 SAF 파일<br/>정확 좌표 포함 평문 NDJSON"]
+  DEV["loopback 개발 debug endpoint"]
+  U --> C
+  U --> MY
+  U --> RAW
+  U --> FL
+  U --> POS
+  U --> DBG
+  U --> RT
+  C --> FS
+  RAW --> FS
+  FL --> FS
+  POS --> FS
+  POS -->|"완료기록·권한 재확인"| SAF
+  C -->|"READY 또는 ENDED·허용망<br/>신고는 충전 불필요"| G
+  MY --> G
+  RAW -->|"READY 또는 ENDED·충전·Wi-Fi"| G
+  G --> B
+  ADM --> B
+  ACC -. "삭제 fence와 복구" .-> FS
+  DBG -->|"DEBUG·raw 동의·보행후·충전·Wi-Fi"| DEV
+  RT --> CACHE["두 cache 파일·각128KiB<br/>감사로그 아님"]

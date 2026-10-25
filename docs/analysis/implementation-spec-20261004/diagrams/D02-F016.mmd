@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D02-016 현재 기기 점검의 Depth API 지원 확인"]
+  E["진입: Depth 검사 또는 저장 결과의 선택 재확인 / availability async result"]
+  G{"P-D02-016 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["UNKNOWN; true로 추정하지 않음"]
+  G -->|"camera permission 없음/ARCore 미설치/일반 예외"| B0
+  B1["기기 지원 flag true, 실제 거리 출력은 아직 false"]
+  G -->|"API supported"| B1
+  B2["미터 안내 제한"]
+  G -->|"명시 unsupported"| B2
+  B3["무시"]
+  G -->|"늦은 generation 또는 owner 불일치"| B3
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["ARCore transient availability이면 async로 재조회"]
+    S1["SUPPORTED_INSTALLED이면 임시 Session을 열어 AUTOMATIC depth support 조회"]
+    S2["finally에서 support Session.close"]
+    S3["지원 결과는 SUPPORTED/EXPLICITLY_UNSUPPORTED/UNKNOWN로 저장 및 feature 제한 갱신"]
+    S4["generation 증가·owner NONE·runtimeMetricOutputAllowed=false로 종료"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: 기기 점검/저장 결과 refresh에 support-only 결과 전달."]
+  X["취소·중단: caller가 소유 세대/lease를 무효화하면 새 출력에 사용하지 않는다. / 늦은 이전 소유자의 callback은 현<br/>상태를 바꾸지 않는다."]
+  C["정리: 임시 ARCore Session.close; 종료 시 권한/first-run binding/owner 폐기."]
+  R["재시도·복구: 현재 UI의 재검사 또는 stored depth selective refresh; callback의 자동 무한 재시도<br/>없음. / 현재 조건과 소유권을 다시 검사한다."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

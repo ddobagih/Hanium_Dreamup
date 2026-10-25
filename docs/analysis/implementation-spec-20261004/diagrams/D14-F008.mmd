@@ -1,0 +1,27 @@
+flowchart TD
+  IN["F-D14-008<br/>Bearer 세션 및 client 역할 검증"]
+  G["적용 정책<br/>P-D14-001 / P-D14-002 / P-D14-004 / P-D14-006"]
+  IN --> G
+  N1["1. 앱 kind/role/audience 허용값 확인 후 token SHA25<br/>6로 session 조회"]
+  G --> N1
+  N2["2. session 존재·not revoked·expires_at &gt; now 및<br/> device 일치 검사"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. PG issuer/control 잠금 및 runtime TOTP finge<br/>rprint 일치 검사"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. control NORMAL 여부 확인"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. PG walksafe_touch_admin_session 또는 ORM la<br/>st_seen 갱신 후 identity 반환"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>401"]
+  N2 -->|"누락 token/미존재·폐기·만료"| B1
+  B2["분기 결과<br/>403"]
+  N1 -->|"다른 기기 또는 잘못된 역할·audience"| B2
+  B3["분기 결과<br/>409"]
+  N4 -->|"복구 상태"| B3
+  B4["분기 결과<br/>503, fail closed"]
+  N3 -->|"factor/issuer/store 문제"| B4
+  N5 --> END["정상 종료<br/>호출자 transaction에서 last_seen flush; 최종 commit<br/>은 호출자 책임."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

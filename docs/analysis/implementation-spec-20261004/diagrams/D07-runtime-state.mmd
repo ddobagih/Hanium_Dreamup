@@ -1,0 +1,19 @@
+stateDiagram-v2
+    state "S-D07-013-WAITING" as W
+    state "S-D07-013-ACCEPTED" as A
+    state "S-D07-013-REJECTED" as R
+    state "S-D07-013-RETIRED" as X
+    [*] --> W
+    W --> A: 현재 session과 새 유효 frame
+    A --> A: 새 유효 frame만 lastValid 갱신
+    A --> A: 동일 frame과 fresh이면 갱신 없이 허용
+    A --> R: sample 실패와 짧은 공백
+    R --> A: 새 유효 frame
+    R --> X: 마지막 유효 age 2000ms 이상
+    A --> X: fatal 또는 frame 시각 역행
+    X --> W: 새 session 자격 획득
+    note right of R
+        P-D07-013
+        Tracking 동일 최신 frame이며
+        age 600ms 이내 gap 계산만 가능
+    end note

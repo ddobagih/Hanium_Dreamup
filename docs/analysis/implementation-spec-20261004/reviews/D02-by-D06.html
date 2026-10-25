@@ -1,0 +1,177 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D02 독립 명세 검토 — D06 작성자</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="../index.html">WalkSafe 기능과 처리 명세</a> · <a href="../02-features.html">기능</a> · <a href="../03-policies.html">정책</a> · <a href="../05-scenarios.html">시나리오</a> · <a href="../gallery.html">그림 모음</a> · <a href="../08-review.html">검수</a></header><main><h1>D02 독립 명세 검토 — D06 작성자</h1>
+<p>[결과]</p>
+<ul>
+<li>보행 세션·준비 집계·Depth 지원/거리 활성화·안전정지·음성 출력·암호화 출력 저장·Activity 정리의 <strong>8개 핵심 기능</strong>을 고정 소스와 대조했다.</li>
+<li>문서 지적 DOC-D02-01~05를 작성자에게 전달했고 최종 수정본에서 모두 해결을 확인했다. 검토한 범위에서 추가 미해결 문서 지적은 없다.</li>
+<li>제품 결함을 확정하거나 앱·서버·빌드·테스트·실기기를 실행한 검토가 아니다. Markdown/JSON/Mermaid 원본을 읽고 경로·조건·상수를 정적으로 대조했다.</li>
+<li>검토자는 D02 JSON·Mermaid·제품 코드를 수정하지 않았다. 이 파일만 작성했다.</li>
+</ul>
+<p>[기준 버전과 변경 통제]</p>
+<ul>
+<li>소스: <code>/tmp/walksafe-spec-20261004-source</code>, <code>2026-10-04T10:33:40+09:00</code>, base <code>2e5744725a8c033a1817f3cc8a8ec679bc15ac9d</code> + 당시 WIP.</li>
+<li>작성자의 읽기 전용 검토 가능 회신을 받은 뒤 시작했다.</li>
+<li>첫 읽기 D02 JSON SHA-256: <code>de3d0234a616674286e17e5e533a66521709a8a110e644cade6ce934102e0d4c</code>.</li>
+<li>검토 중 작성자가 지적을 수정했다. 새 JSON SHA-256: <code>cb5b7c5ede4df04260b684f6370b3afe1747d14d55376235328ec265ab402ae1</code>.</li>
+<li>변경된 P001/P018, F016/P016 근거, F032/F034 본문·도표, F017 도표를 다시 읽었다. 소스 snapshot은 수정하지 않았다.</li>
+</ul>
+<p>[검토 범위]</p>
+<p>아래 소스 경로의 공통 앞부분은 <code>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/</code>이다.</p>
+<table>
+<thead>
+<tr>
+<th>기능·정책</th>
+<th>확인 주장 및 판정</th>
+<th>직접 대조한 소스</th>
+<th>대조 도표</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>F/P-D02-001</td>
+<td>exact confirmation·foreground·원본 freshness와 30초 포함 경계, background generation, SAFE_STOP 직접 재개 금지 일치. mutable 표기는 DOC01 해결.</td>
+<td>session/WalkSessionLifecycle.kt:197–544, 특히 204·489–502</td>
+<td>D02-F001, state-session, seq-start-resume</td>
+</tr>
+<tr>
+<td>F/P-D02-002</td>
+<td>START/RESUME·검색·route·report별 필수 집합, LIMITED metric 제외, 누락 오류, 원본 evidence 시각/버전 유지 일치.</td>
+<td>session/WalkSessionReadiness.kt:48–297</td>
+<td>D02-F002</td>
+</tr>
+<tr>
+<td>F/P-D02-016</td>
+<td>Depth API 지원 사실은 runtime 거리 활성화와 별개이고 일반 오류 UNKNOWN·명시 비호환 UNSUPPORTED, 임시 Session finally close 일치. helper 근거 누락 DOC02 해결.</td>
+<td>MainActivity.kt:30953–31079</td>
+<td>D02-F016</td>
+</tr>
+<tr>
+<td>F/P-D02-017</td>
+<td>profile 부재 UNKNOWN, sample 수용 전 deadline, 증가 프레임·1초·80%·30sample, Main의 current runtime 후속 gate 일치. terminal 분기 도표 DOC05 수정·보충 해결 확인. 수치는 testCandidate 기준이며 production 승인과 분리.</td>
+<td>device/RuntimeMetricPreflight.kt:1–308, MainActivity.kt:15200–15412</td>
+<td>D02-F017</td>
+</tr>
+<tr>
+<td>F/P-D02-018</td>
+<td>production profile null, 명시 unsafe latch와 evaluate의 단순 evidence suppression 분리, cause 합집합, 총3회 completion retry, 실제 camera/location 결과 합산과 새 epoch 차단 일치. attempts mutable DOC01 해결.</td>
+<td>device/WalkRuntimeSafetyCoordinator.kt:103–385 및 553–555, MainActivity.kt:39446–39516</td>
+<td>D02-state-safety, seq-safety-cleanup</td>
+</tr>
+<tr>
+<td>F/P-D02-025</td>
+<td>focus risk/nonrisk gain, duplicate 800/1000/2000ms, stale exact cancellation이 successor를 stop하지 않는 소유권 경계 일치. dispatch를 청취 완료로 승격하지 않음.</td>
+<td>feedback/AndroidFeedbackActuator.kt:183–185, 723–835, 929–998, 1550–1735; FeedbackOutputGate.kt:1–59</td>
+<td>D02-F025</td>
+</tr>
+<tr>
+<td>F/P-D02-032</td>
+<td>reference binding·ABA token·64 queue·seal 전/append 전 currentness, in-flight 뒤 serial purge, drain과 삭제 성공 구별 일치. executor terminated 오해 DOC03 해결.</td>
+<td>feedback/ConsentBoundSpeechOutputStore.kt:61–244; FieldSpeechOutputStorageProvider.kt:25–195; MainActivity.kt:38434–38507</td>
+<td>D02-F032 변경 부분, state-speech-storage</td>
+</tr>
+<tr>
+<td>F/P-D02-034</td>
+<td>configuration retention 후 placeholder epoch, privacy startup early cleanup, generation fence, AR close 소유권과 native 실패 재실행 금지 일치. onDestroy 동기 완료 과장 DOC04 해결.</td>
+<td>MainActivity.kt:13161–13207,13325–13639; device/RuntimeArSessionCleanupOwnership.kt:1–64</td>
+<td>D02-F034</td>
+</tr>
+</tbody></table>
+<p>[발견사항과 조치]</p>
+<ul>
+<li><strong>DOC-D02-01 — 문서 오류, 해결 확인</strong><ul>
+<li>P001의 TTL은 생성자 설정값이 아니라 <code>CONFIRMATION_TOKEN_TTL_MS=30_000L</code> const다. P018 최대 정리 시도는 <code>MAX_STOP_DELIVERY_ATTEMPTS=3</code> private const다.</li>
+<li>수정본 두 mutable 필드가 코드 고정임을 명시했다. 값·경계 자체는 처음부터 코드와 일치했다.</li>
+</ul>
+</li>
+<li><strong>DOC-D02-02 — 근거 범위 누락, 해결 확인</strong><ul>
+<li>F016/P016이 최초에 Main 30953–30973 dispatcher만 인용하여 실제 support 조회·finally close·결과 저장 근거가 빠졌다.</li>
+<li>수정본은 <code>continueRuntimeMetricPreflightStart</code> 30974–31021과 <code>finishDeviceMetricDepthSupportCheck</code> 31023–31079를 추가했다.</li>
+</ul>
+</li>
+<li><strong>DOC-D02-03 — 완료 의미 과장, 해결 확인</strong><ul>
+<li>F032의 “drain ACK는 실제 worker 종료 뒤”는 <code>result.complete(acknowledged)</code>가 worker task 내부에서 실행되는 코드보다 강하다.</li>
+<li>수정본은 이전 in-flight/control task의 직렬 처리 뒤 quiescence ACK이며 executor terminated 보장은 아니라고 고쳤다. purge future의 삭제 성공과도 분리했다.</li>
+</ul>
+</li>
+<li><strong>DOC-D02-04 — 완료 의미 내부 충돌, 해결 확인</strong><ul>
+<li>F034 정상 종료 문장은 모든 owner 실제 close 후 Activity 반환처럼 읽혔으나 <code>closeDetectorAsync()</code> 등은 요청 후 비동기로 끝난다.</li>
+<li>수정본 JSON과 F034 도표 N이 cleanup 단계/요청·fence와 각 owner의 실제 release ACK를 분리했다.</li>
+</ul>
+</li>
+<li><strong>DOC-D02-05 — 도표 대안 경로 오류, 해결 확인</strong><ul>
+<li>최초 F017은 UNSUPPORTED terminal→profile null UNKNOWN terminal→qualification AVAILABLE을 직렬 연결했다.</li>
+<li>작성자가 support/profile 분기에서 terminal을 별도 종료로 수정했다.</li>
+<li>재검토에서 일반 evaluator의 <code>depthSupport == SUPPORTED</code> 최종 성공 조건과 timestamp 0 대기를 추가 요청했고 최종 도표 C/F에서 해결을 확인했다. Main은 SUPPORTED로 생성하므로 이것은 현재 Main 오동작 지적이 아니라 일반 평가기 도표 조건 누락이었다.</li>
+</ul>
+</li>
+</ul>
+<p>[시험 기대·미검토·한계]</p>
+<ul>
+<li><code>WalkSessionLifecycleTest.startConfirmationExpiresImmediatelyAfterTtlBoundaryAndRequiresFreshCheck</code>, <code>WalkRuntimeSafetyStopDeliveryRetryTest.threeFailedAttemptsExhaustAndBlockNewEpoch</code>, <code>ConsentBoundSpeechOutputStoreTest.closeReturnsWhileOriginalAdmittedSealIsStillInFlight</code>와 drain/purge 관련 선언·기대 범위를 정적으로 확인했다. 실행 결과로 취급하지 않았다.</li>
+<li>37개 기능 전체와 모든 테스트 assertion을 전수 검토하지 않았다. F003–015, F019–024, F026–031, F033, F035–037의 전반적 정확성은 이 검토가 보증하지 않는다.</li>
+<li>검토한 F025도 거대한 actuator의 모든 경쟁 interleaving을 재증명하지 않았다. F032 provider의 모든 파일 검증 helper 및 Main 전체 lifecycle 진입점을 전수 검토하지 않았다.</li>
+<li>기존 R009 TalkBack 정적 테스트/현재 코드 차이는 작성자가 공유한 기존 이슈다. 이 검토는 그 제품 동작을 실행하거나 새로 검증하지 않았다.</li>
+<li>Mermaid 문법 렌더링·레이아웃·실기기 출력·실제 native close 완료·센서/ARCore 품질·서버 효과는 미검증이다. 통합 담당이 렌더·시각 확인을 수행한다.</li>
+</ul>
+<p>[최종 재확인]</p>
+<ul>
+<li>작성자가 shared 영역 참조 확정 및 F035의 D03 F040 제품 진입 미연결 조건을 후속 수정했다고 통보했다. shared 연결값은 확인했으며, F035 기능 자체는 이 검토의 8개 상세 검토 범위 밖이다.</li>
+<li>최종 D02 JSON 읽기 전/후 SHA-256: <code>65aba742d4ca1649baa113329e916072829c880ed9ccd8049de8f01c975c77cb</code> / 동일.</li>
+<li>DOC01~05 수정 영역을 재대조했고 F017 최종 도표에 SUPPORTED 성공 조건과 timestamp 0 대기까지 반영되었다.</li>
+<li>테스트·제품 실행 없음. 최종 렌더링과 Root 통합 완료 판단은 남아 있다.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>검토 도표</th>
+<th>최종 SHA-256</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>D02-F001.mmd</td>
+<td><code>3a26a04341dec782c24cd6db7bb91387af39947f7387ccf687ff58c5733b90cb</code></td>
+</tr>
+<tr>
+<td>D02-F002.mmd</td>
+<td><code>1423a18e3aee82e1689e424566af4f7498145648e17ac7a6ba090f1c923c0500</code></td>
+</tr>
+<tr>
+<td>D02-F016.mmd</td>
+<td><code>f88c9c7869284622ad3ae34f352af66daf079ee3deb22efb82c457f00ecf25e9</code></td>
+</tr>
+<tr>
+<td>D02-F017.mmd</td>
+<td><code>c1b079711706559716ddd9c18ee49d547785a5da65537168e2812a9488f155c1</code></td>
+</tr>
+<tr>
+<td>D02-state-session.mmd</td>
+<td><code>384778f993c0839bc4df28e1ce2ad33618bcedd61abbfa0fc0077352f40bf106</code></td>
+</tr>
+<tr>
+<td>D02-seq-start-resume.mmd</td>
+<td><code>2799be5d02115bd61da265e3bc7a885e16de5227fc22134a56d4408e17c42953</code></td>
+</tr>
+<tr>
+<td>D02-state-safety.mmd</td>
+<td><code>63dc5435d1dbc1a8f856d6fda41ee3420b8df3a357533c408ccba5229c92ff42</code></td>
+</tr>
+<tr>
+<td>D02-seq-safety-cleanup.mmd</td>
+<td><code>7282990d54b4703340d1c8463259b662f308cf20bbd2b8da0ef54880fa90bd6c</code></td>
+</tr>
+<tr>
+<td>D02-F025.mmd</td>
+<td><code>ef866e707bdd6457073dd32fc25367b2aa6cad576656d4ace17bb60def93298e</code></td>
+</tr>
+<tr>
+<td>D02-F032.mmd</td>
+<td><code>aa1ddda35c9412dd5183d3725a948b0e2aaf5f50f843cbb5e0353fc8c02043b1</code></td>
+</tr>
+<tr>
+<td>D02-state-speech-storage.mmd</td>
+<td><code>65a4ac7693c837a56cb4c166b1990256029db62c43b508ffe4750b2bb0242c15</code></td>
+</tr>
+<tr>
+<td>D02-F034.mmd</td>
+<td><code>8815d5116448dee9d18527e78e7299ffb47bcdb367c145dce5e939208516c726</code></td>
+</tr>
+</tbody></table>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

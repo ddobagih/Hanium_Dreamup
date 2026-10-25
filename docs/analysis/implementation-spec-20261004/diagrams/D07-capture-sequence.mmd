@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant Main as Main camera owner
+    participant AR as ArCoreFrameProvider
+    participant Vision as D05 recognition
+    participant Depth as D07 pipeline
+    participant Q as D02 feedback
+    Main->>AR: F-D07-001 current Frame 획득
+    AR-->>Main: camera Image와 owner epoch receipt
+    Main->>Vision: 원본 RGB luma token 복사
+    Main->>AR: Image close 후 receipt로 depth 요청
+    AR->>AR: Raw pair 복사 close 후 선택적 Full
+    AR-->>Main: frame CPU Image clocks와 owned snapshot
+    Main->>Depth: source index와 current target evidence
+    Depth->>Depth: P-D07-007 capture 검사 및 독립 Raw history
+    alt 원본 source age 800ms 이내
+        Depth-->>Main: risk 또는 UNKNOWN과 원본 lease
+        Main->>Q: current owner와 receipt 확인 후 후보
+    else stale 또는 capture 불일치
+        Depth-->>Main: 빈 결과 또는 metric 권한 없음
+    end

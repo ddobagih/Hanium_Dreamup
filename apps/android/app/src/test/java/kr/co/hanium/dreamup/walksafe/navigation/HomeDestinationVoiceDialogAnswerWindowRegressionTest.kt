@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -74,11 +75,10 @@ class HomeDestinationVoiceDialogAnswerWindowRegressionTest {
 
     @Test
     fun mainActivityOpensTheAnswerWindowOnlyFromThePromptTerminalCallbacks() {
-        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val prompt = source.substringAfter("private fun speakHomeDestinationVoicePrompt(")
-            .substringBefore("\n    private fun ")
-        assertTrue(Regex("""HomeDestinationVoiceDialogLease\([^)]*answerWindowStartsAfterPrompt = true""")
-            .containsMatchIn(prompt))
+        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/DestinationVoiceDialogController.kt").readText()
+        val prompt = MainActivityRefactorSource.member(source, "speakHomeDestinationVoicePrompt")
+        val creation = prompt.substringAfter("HomeDestinationVoiceDialogLease(").substringBefore(") else null")
+        assertTrue(creation.contains("answerWindowStartsAfterPrompt = true"))
         assertEquals(2, Regex("""lease\?\.openAnswerWindow\(\)""").findAll(prompt).count())
         val completed = prompt.substringAfter("onCompleted = {").substringBefore("onFailed = {")
         val failed = prompt.substringAfter("onFailed = {")

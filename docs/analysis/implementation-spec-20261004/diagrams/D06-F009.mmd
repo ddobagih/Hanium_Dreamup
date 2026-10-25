@@ -1,0 +1,29 @@
+flowchart TD
+  E["F-D06-009 권한·동의·계정 이벤트"]
+  C["P-D06-009 해당 permit 세대 무효화<br/>목적별 active call 취소"]
+  TYPE{"어떤 변경인가"}
+  ALL["전체 신고 권한 철회<br/>lifecycle-pending 내구화"]
+  ACCOUNT["계정삭제 global fence<br/>terminal account intent 유지"]
+  AUTO["자동신고만 opt-out<br/>automatic pending fence"]
+  OTHER["raw·학습·통신 선택 변경"]
+  PURGE["전체 queue 자료·키 lifecycle 정리<br/>P-D06-010"]
+  FRESH{"계정삭제 intent 없는<br/>일반 consent purge 성공?"}
+  KEY["향후 승인 빌드용 빈 fresh key<br/>해당 consent fence는 유지"]
+  NOK["account fence 유지<br/>새 enrollment 전 fresh key 만들지 않음"]
+  ADEL["각 automatic 생성 receipt fence<br/>automatic 항목만 삭제"]
+  AP["explicit queue와 공유키 보존"]
+  RECHECK["진행 전송 재검증·취소<br/>explicit queue 자체 삭제 안 함"]
+  FAIL["삭제·키 lifecycle 실패<br/>pending 유지·범위별 신규/조회 차단"]
+  DONE["대상 범위 정리 결과 반환<br/>후속 privacy hook은 미완료 의도 복구"]
+  E --> C --> TYPE
+  TYPE -->|전체 신고 철회| ALL --> PURGE
+  TYPE -->|계정삭제| ACCOUNT --> PURGE
+  TYPE -->|자동만 철회| AUTO --> ADEL
+  TYPE -->|다른 선택 변경| OTHER --> RECHECK --> DONE
+  PURGE -->|실패| FAIL
+  PURGE -->|성공| FRESH
+  FRESH -->|예| KEY --> DONE
+  FRESH -->|아니오| NOK --> DONE
+  ADEL -->|성공| AP --> DONE
+  ADEL -->|실패| AF["automatic만 차단<br/>explicit·공유키 유지"] --> DONE
+  FAIL --> DONE

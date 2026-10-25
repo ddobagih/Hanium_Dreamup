@@ -1,0 +1,13 @@
+flowchart TD
+  H["P-D05-018 · F-D05-018 runtime 후보 큐·반복비교 판정·확정 profile"]
+  H --> D{"작업과 reserve 가남은 deadline 미만"}
+  D -->|"아니오"| P["PARTIAL cursor 보존"]
+  D -->|"예"| C["GPU CPU thread 후보"]
+  C --> F{"fixture output 실제 backend 환경일치"}
+  F -->|"아니오"| R["REJECTED 또는 INCONCLUSIVE"]
+  F -->|"예"| B["AB BA CONFIRM 과 AA 잡음"]
+  B --> G{"세 block noise 초과 gain"}
+  G -->|"아니오"| K["baseline 유지 또는미확정"]
+  G -->|"예"| L{"live10 회 10 초와모든비퇴화"}
+  L -->|"아니오"| R
+  L -->|"예"| V["CONFIRMED binding profile"]

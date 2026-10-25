@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D01-024 RAW·자동신고·모바일전송·학습 동의의 즉시 철회"]
+  G{"해당 consent toggle을 false로 변경; 저장소 접근 가능; 기존 grant 여부와 무관하게 철회 의사 보존"}
+  I["IntegratedConsentItem 네 값과 desired false; actor-bound local withdrawal marker"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: storagefailure는 failClosed"]
+  G -->|"미충족"| X
+  N1["false 변경은 encrypted local withdrawal marker를 저장하고 RAW이면 추가 plain field-log block marker를 먼저 commit한다."]
+  I --> N1
+  N2["session.withdrawImmediately로 effective deny를 적용하고 진행 consent call을 취소한다."]
+  N1 --> N2
+  N3["RAW는 speech-output storage·debug original/upload·raw upload/window를 막고 raw coordinator 재검증/정리를 연결한다."]
+  N2 --> N3
+  N4["자동신고는 safety generation 증가·자동 queue 및 old receipt 정리를, 모바일은 WIFI_ONLY 및 현재 cellular 전송중단을, 학습은 training reuse false를 적용한다."]
+  N3 --> N4
+  N5["이후 서버 pending mutation으로 전달하되 old confirmation replay와 재시작에서도 local denial이 계속 우선한다."]
+  N4 --> N5
+  OK["로컬 철회 효력 즉시; 서버 ack 후 pending 해제"]
+  N5 --> OK
+  B0["전체 consent failClosed; 성공이라고 안내하지 않음"]
+  N1 -->|"철회 marker commit 실패"| B0
+  B1["다른 독립 목적 선택을 자동 false로 만들지는 않음"]
+  N3 -->|"RAW만 철회"| B1
+  B2["모바일 preference는 WiFiOnly로 바꾸고 future gate 적용"]
+  N4 -->|"현재 cellular 아님"| B2
+  B3["effective deny 유지·WITHDRAWAL_PENDING"]
+  N5 -->|"서버 old grant replay"| B3
+  R["중단·취소: 철회 전송 취소가 이미 저장된 deny를 취소하지 않음 / 재시작에서 marker+pending denial 복원"]
+  V["복구·재시도: marker-only withdrawal도 정책reconsent reset으로 삭제하지 않음 / 연결복구 후 durable withdrawal replay; old grant로 재시도 payload 만들지 않음"]
+  Q["정책 P-D01-015 · P-D01-017 · P-D01-018"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

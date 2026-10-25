@@ -1,0 +1,18 @@
+flowchart TD
+  A["F-D11-045 학습 artifact retention"] --> P["P-D11-045 입력과 DB 및 training root 검증"]
+  P --> R["매 호출 선행 reconcile. receipt 있으면 recovery 파일 삭제, 없으면 원본 복원"]
+  R -->|"원본과 recovery 모호"| X["오류 종료"]
+  R --> C{"apply 지정"}
+  C -->|"아니오"| V["후보와 제거 사유 조회. 새 후보 삭제 없음"]
+  V --> VR["DB rollback 후 PREVIEW JSON으로 종료"]
+  C -->|"예, 정확 확인문구 필요"| L["reconcile 재확인과 후보 행 FOR UPDATE"]
+  L --> N{"후보 있음"}
+  N -->|"아니오"| Z["APPLY 삭제0 결과로 종료"]
+  N -->|"예"| M["파일 hash와 size 확인 후 private recovery로 이동"]
+  M --> D["삭제 receipt 추가와 artifact row 삭제"]
+  D --> K{"DB commit 성공"}
+  K -->|"아니오"| F["rollback 후 이동파일 역순 원복 가능한 항목 복구"]
+  K -->|"예"| S["recovery 파일 unlink"]
+  F --> E["비어 있는 recovery dir 정리 후 오류 전파"]
+  S --> Q["빈 recovery dir 정리와 삭제 ID JSON 반환"]
+  Q -.-> I["자동 retry 없음. 중단 흔적은 다음 호출 reconcile 대상으로 보존"]

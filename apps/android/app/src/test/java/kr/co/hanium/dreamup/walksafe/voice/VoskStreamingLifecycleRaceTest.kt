@@ -15,6 +15,37 @@ import org.junit.Test
 
 class VoskStreamingLifecycleRaceTest {
     @Test
+    fun preparationFailureKeepsTheEarlierTerminalInputFailure() {
+        val notified = CountDownLatch(1)
+        val errors = java.util.concurrent.CopyOnWriteArrayList<VoskStreamingError>()
+        val transcriber = VoskStreamingTranscriber(
+            context = null,
+            modelDirectory = File("unused-prepared-model"),
+            isInputSuppressed = { false },
+            listener = object : VoskStreamingListener {
+                override fun onReady(runId: Long) = error("Preparation cannot become ready")
+                override fun onTranscript(runId: Long, transcript: VoskTranscript) = Unit
+                override fun onError(runId: Long, error: VoskStreamingError) {
+                    errors.add(error)
+                    notified.countDown()
+                }
+            },
+            preparedRunFactory = { reportFailure ->
+                reportFailure(PCM_INPUT_ROUTE_CHANGED_CODE)
+                throw IllegalStateException("Preparation subsequently failed")
+            },
+        )
+        try {
+            assertNotNull(transcriber.start())
+            assertTrue(notified.await(2, TimeUnit.SECONDS))
+            assertFalse(transcriber.isRunning())
+            assertEquals(listOf(VoskStreamingError.AUDIO_ROUTE_CHANGED), errors.toList())
+        } finally {
+            transcriber.close()
+        }
+    }
+
+    @Test
     fun fatalAudioStopStillCompletesCleanupAndNotifiesStartFailureOnce() {
         val stopFailure = AssertionError("audio stop failed")
         var recognizerCloseCount = 0
@@ -187,6 +218,9 @@ class VoskStreamingLifecycleRaceTest {
         val oldModelEntered = CountDownLatch(1)
         val allowOldModel = CountDownLatch(1)
         val oldSourceStopped = CountDownLatch(1)
+        val oldDecoderClosed = CountDownLatch(1)
+        val oldDecoderCloseCount = AtomicInteger()
+        val oldReleaseOrder = java.util.concurrent.CopyOnWriteArrayList<String>()
         val nextModelEntered = CountDownLatch(1)
         val nextReady = CountDownLatch(1)
         val nextSourceStopped = CountDownLatch(1)
@@ -206,9 +240,22 @@ class VoskStreamingLifecycleRaceTest {
                 VoskPreparedRun(
                     audioSource = object : VoskPcmSource {
                         override fun start() = Unit
-                        override fun stop() { oldSourceStopped.countDown() }
+                        override fun stop() {
+                            oldReleaseOrder.add("audio")
+                            oldSourceStopped.countDown()
+                        }
                     },
-                    recognizer = null,
+                    recognizer = object : VoskDecoder {
+                        override fun acceptWaveForm(samples: ShortArray, length: Int): Boolean = error("Stale decoder cannot run")
+                        override val result: String get() = error("Stale decoder cannot run")
+                        override val partialResult: String get() = error("Stale decoder cannot run")
+                        override fun reset() = error("Stale decoder cannot run")
+                        override fun close() {
+                            oldReleaseOrder.add("decoder")
+                            oldDecoderCloseCount.incrementAndGet()
+                            oldDecoderClosed.countDown()
+                        }
+                    },
                     model = null,
                 )
             },
@@ -249,9 +296,12 @@ class VoskStreamingLifecycleRaceTest {
             assertTrue(oldLoader.awaitTermination(2, TimeUnit.SECONDS))
             assertTrue(nextLoader.awaitTermination(2, TimeUnit.SECONDS))
             assertTrue(oldSourceStopped.await(2, TimeUnit.SECONDS))
+            assertTrue(oldDecoderClosed.await(2, TimeUnit.SECONDS))
             assertTrue(nextSourceStopped.await(2, TimeUnit.SECONDS))
         }
         assertEquals(0, oldReadyCount.get())
+        assertEquals(1, oldDecoderCloseCount.get())
+        assertEquals(listOf("audio", "decoder"), oldReleaseOrder.toList())
     }
 
     @Test

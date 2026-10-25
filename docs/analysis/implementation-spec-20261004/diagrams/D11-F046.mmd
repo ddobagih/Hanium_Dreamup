@@ -1,0 +1,18 @@
+flowchart TD
+  A["F-D11-046 학습 데이터 lifecycle CLI"] --> P["P-D11-046 공통 DB URL과 입력 검증"]
+  P --> C{"선택한 command 하나"}
+  C -->|"register-artifact"| R["원본 승인결정과 객체 및 암호화 가공물 metadata 등록 서비스 호출"]
+  R --> RZ["artifact ID 결과 후 종료"]
+  C -->|"approve"| A1["manifest hash와 members 및 expected parent 읽기"]
+  A1 --> A2["승인 서비스가 dataset lock과 부모 CAS 및 동의를 확인"]
+  A2 --> AZ["revision ID와 expiry 결과 후 종료"]
+  C -->|"export-gate"| K{"HMAC key 32byte 이상"}
+  K -->|"아니오"| X["오류 종료"]
+  K -->|"예"| V["현재 승인 revision과 manifest 및 source 동의 확인"]
+  V --> EX["expiry는 dataset expiry와 now+10분 중 이른 값"]
+  EX --> G["HMAC gate를 create-only 파일로 기록"]
+  G --> GZ["gate 출력 경로와 결과 후 종료"]
+  G -->|"출력 이미 존재"| X
+  A2 -->|"부모 또는 동의 불일치"| X
+  V -->|"만료 또는 current 불일치"| X
+  X -.-> N["자동 재시도와 다음 command 자동 실행 없음"]

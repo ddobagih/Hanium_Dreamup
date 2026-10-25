@@ -155,17 +155,17 @@ final class TfliteFastSamEngine implements FastSamEngine {
         try {
             token=cacheToken(FastSamModelContract.SHA256,options.numThreads,options.gpuPrecisionLossAllowed,
                 TensorFlowLite.runtimeVersion(),Build.FINGERPRINT,Build.HARDWARE,Build.SUPPORTED_ABIS,Build.VERSION.SDK_INT);
-            return new SerializationCache(privateCacheDirectory(context.getCodeCacheDir(),token),token,"prepared",null);
+            return new SerializationCache(privateCacheDirectory(context.getNoBackupFilesDir(),token),token,"prepared",null);
         } catch(IOException|RuntimeException|LinkageError unavailable) {
             return new SerializationCache(null,token,"unavailable",failureSummary(unavailable));
         }
     }
-    static File privateCacheDirectory(File codeCacheDir,String token)throws IOException {
-        if(codeCacheDir==null || token==null || !token.matches("[a-f0-9]{64}"))
-            throw new IOException("Private code cache/token unavailable");
-        File parent=new File(codeCacheDir,"walksafe-fastsam-gpu-v1");
+    static File privateCacheDirectory(File nativeCacheRoot,String token)throws IOException {
+        if(nativeCacheRoot==null || token==null || !token.matches("[a-f0-9]{64}"))
+            throw new IOException("Private native cache/token unavailable");
+        File parent=new File(nativeCacheRoot,"walksafe-fastsam-gpu-v1");
         File directory=new File(parent,token);
-        if(!parent.getCanonicalFile().getParentFile().equals(codeCacheDir.getCanonicalFile())
+        if(!parent.getCanonicalFile().getParentFile().equals(nativeCacheRoot.getCanonicalFile())
                 || !directory.getCanonicalFile().getParentFile().equals(parent.getCanonicalFile())
                 || (!(directory.isDirectory() || directory.mkdirs())) || !directory.isDirectory() || !directory.canWrite())
             throw new IOException("FastSAM GPU serialization directory unavailable");

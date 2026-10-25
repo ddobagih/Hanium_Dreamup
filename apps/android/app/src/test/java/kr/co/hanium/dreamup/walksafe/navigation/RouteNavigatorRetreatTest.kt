@@ -11,12 +11,12 @@ class RouteNavigatorRetreatTest {
     fun remainingDistanceTracksApproachRetreatAndReapproachWithoutFreezingOrJumpingForward() {
         // Camera facing is supplied independently of the optional GPS movement heading.
         listOf(false, true).forEach { degraded ->
-            val navigator = navigator(degraded)
+            val navigator = navigator(degraded, recheckGraceMs = 0L)
             listOf(30.0, 80.0, 30.0, 91.0, 80.0, 30.0).forEachIndexed { index, progress ->
                 val now = 1_000L + index * 20_000L
                 val update = sample(navigator, progress, now, facingHeading = 90.0)
                 assertEquals("guide at $progress", 0, update.guideIndex)
-                assertTrue("at $progress: ${update.instruction}", update.instruction?.contains("${(100 - progress).toInt()}m 앞") == true)
+                assertTrue("at $progress: ${update.instruction}", update.instruction?.contains("다음 안내 지점까지 경로를 따라 약 ${(100 - progress).toInt()}미터") == true)
                 assertTrue(navigator.reserveInstruction(update))
                 navigator.acknowledgeInstruction(update, now + 1)
             }
@@ -26,13 +26,13 @@ class RouteNavigatorRetreatTest {
     @Test
     fun oppositeGpsCourseOnSameCorridorRemainsPositionEvidence() {
         // Camera facing is supplied independently of the optional GPS movement heading.
-        val navigator = navigator()
+        val navigator = navigator(recheckGraceMs = 0L)
         sample(navigator, 80.0, 1_000, 90.0, facingHeading = 90.0)
         val retreat = sample(navigator, 70.0, 11_000, 270.0, facingHeading = 90.0)
         assertNotNull(retreat.instruction)
         assertTrue(navigator.currentRouteMatch()?.quality in setOf(RouteMatchQuality.HIGH, RouteMatchQuality.MEDIUM))
         assertNotNull(navigator.currentAcceptedRouteMatchFor(11_000))
-        assertTrue(retreat.instruction?.contains("30m 앞") == true)
+        assertTrue(retreat.instruction?.contains("다음 안내 지점까지 경로를 따라 약 30미터") == true)
         assertFalse(retreat.offRoute)
     }
 
@@ -47,7 +47,7 @@ class RouteNavigatorRetreatTest {
     @Test
     fun twoFreshPositionsBehindPassedGuideRestoreItAndOneOutlierDoesNot() {
         // Camera facing is supplied independently of the optional GPS movement heading.
-        val navigator = navigator()
+        val navigator = navigator(recheckGraceMs = 0L)
         sample(navigator, 90.0, 1_000, 90.0, facingHeading = 90.0)
         val passed = sample(navigator, 115.0, 11_000, 180.0, facingHeading = 180.0)
         assertEquals(1, passed.guideIndex)
@@ -57,15 +57,16 @@ class RouteNavigatorRetreatTest {
         sample(navigator, 80.0, 41_000, 270.0, facingHeading = 90.0)
         val restored = sample(navigator, 70.0, 42_000, 270.0, facingHeading = 90.0)
         assertEquals(0, restored.guideIndex)
-        assertTrue(restored.instruction?.contains("30m 앞, 오른쪽으로 꺾으세요.") == true)
+        assertTrue(restored.instruction?.contains("다음 안내 지점까지 경로를 따라 약 30미터") == true)
+        assertTrue(restored.instruction?.contains("다음 안내 지점에서 경로 기준으로 3시 방향으로 꺾으세요.") == true)
         val reapproach = sample(navigator, 71.0, 52_000, 90.0, facingHeading = 90.0)
         assertEquals(0, reapproach.guideIndex)
-        assertTrue(reapproach.instruction?.contains("29m 앞") == true)
+        assertTrue(reapproach.instruction?.contains("다음 안내 지점까지 경로를 따라 약 29미터") == true)
     }
 
     @Test
     fun repeatedCoordinatesAndTimerRetriesCannotConfirmARewind() {
-        val navigator = navigator()
+        val navigator = navigator(recheckGraceMs = 0L)
         sample(navigator, 90.0, 1_000, 90.0)
         sample(navigator, 115.0, 11_000, 180.0)
         val raw = fix(80.0, 21_000)
@@ -79,7 +80,7 @@ class RouteNavigatorRetreatTest {
 
     @Test
     fun interruptionBreaksTheRewindConfirmationSequence() {
-        val navigator = navigator(true)
+        val navigator = navigator(true, recheckGraceMs = 0L)
         sample(navigator, 90.0, 1_000, 90.0)
         sample(navigator, 115.0, 11_000, 180.0)
         sample(navigator, 80.0, 21_000, 270.0)
@@ -120,7 +121,9 @@ class RouteNavigatorRetreatTest {
         assertTrue(sample(navigator, 298.0, 33_000, 180.0).arrivalCandidate)
     }
 
-    private fun navigator(degraded: Boolean = false) = RouteNavigator(allowDegradedRouteGuidance = degraded).apply {
+    // Tests inspecting emitted guide progress may opt out; arrival controls retain the production default.
+    private fun navigator(degraded: Boolean = false, recheckGraceMs: Long = 1_500L) =
+        RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = recheckGraceMs), allowDegradedRouteGuidance = degraded).apply {
         setRoute(WalkingRoute("TEST", WalkingRouteSummary(300, 300),
             listOf(point(0.0), point(100.0), point(100.0, -200.0)), listOf(
                 WalkingRouteGuidePoint(0, point(100.0), null, 100, 200, turnType = 13),

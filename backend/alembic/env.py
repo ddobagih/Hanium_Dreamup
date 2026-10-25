@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT))
 
 from backend.app.config import migration_database_url  # noqa: E402
 from backend.app.models import Base  # noqa: E402
+from backend.app import field_session_log_models  # noqa: E402,F401 - register diagnostic tables
 
 
 config = context.config

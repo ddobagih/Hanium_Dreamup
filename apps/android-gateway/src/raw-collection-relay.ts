@@ -114,6 +114,7 @@ export type RawCollectionRoute = {
 };
 
 export type RawCollectionRelayDependencies = {
+  admissionController?: RawWriteAdmissionController;
   fetchImpl?: GatewayFetch;
   bindingResolver?: (request: Request) => GatewayFieldLongSessionBinding | null;
 };
@@ -131,8 +132,6 @@ type RawHeaderBinding = {
 type ExactBodyResult =
   | { bytes: Uint8Array; sha256: string; error?: never }
   | { bytes?: never; sha256?: never; error: Response };
-
-let rawWriteInFlight = false;
 
 function jsonError(status: number, code: string, message: string, headers?: HeadersInit): Response {
   return Response.json(
@@ -949,21 +948,6 @@ async function fetchRawBackend(
     : fetchBackend(request, backendUrl(route.backendPath), init, RAW_BACKEND_TIMEOUT_MS);
 }
 
-function acquireRawWrite(): (() => void) | null {
-  if (rawWriteInFlight) return null;
-  rawWriteInFlight = true;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    rawWriteInFlight = false;
-  };
-}
-
-export function resetRawCollectionRelayForTests(): void {
-  rawWriteInFlight = false;
-}
-
 export async function relayRawCollection(
   request: Request,
   dependencies: RawCollectionRelayDependencies = {}
@@ -1032,7 +1016,7 @@ export async function relayRawCollection(
       }
       return projected;
     }
-    releaseWrite = acquireRawWrite();
+    releaseWrite = (dependencies.admissionController ?? defaultRawWriteAdmission).acquireRawWrite();
     if (!releaseWrite) {
       return jsonError(503, "raw_collection_busy", "Another raw write is in progress.", {
         "retry-after": "1"
@@ -1110,3 +1094,32 @@ export async function relayRawCollection(
     if (lease) finishPrivacyOperation(lease);
   }
 }
+
+/** Owns one server's admission/cache lifetime; never constructed per request. */
+export function createRawWriteAdmission() {
+
+
+  let rawWriteInFlight = false;
+
+
+  function acquireRawWrite(): (() => void) | null {
+    if (rawWriteInFlight) return null;
+    rawWriteInFlight = true;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      rawWriteInFlight = false;
+    };
+  }
+
+
+  function resetRawCollectionRelayForTests(): void {
+    rawWriteInFlight = false;
+  }
+  return { resetRawCollectionRelayForTests, acquireRawWrite };
+}
+
+export type RawWriteAdmissionController = ReturnType<typeof createRawWriteAdmission>;
+export const defaultRawWriteAdmission = createRawWriteAdmission();
+export const resetRawCollectionRelayForTests: RawWriteAdmissionController["resetRawCollectionRelayForTests"] = (...args) => defaultRawWriteAdmission.resetRawCollectionRelayForTests(...args);

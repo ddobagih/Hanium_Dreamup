@@ -1,0 +1,31 @@
+flowchart TD
+  A["F-D13-008<br/>가입 인증 잔여 행 수동 정리"]
+  P["P-D13-008<br/>후보 selection 에 행 잠금을 실제 적용하지 않고 DELETE 의 조건·returning 집합<br/>재검증으로 변경을 검출한다."]
+  A --> P
+  N0["1. expires_at <= before 또는 terminal state 이고 updated_at <=<br/>before 인 행을 정렬·limit 하여 후보 UUID 집합을 만든다."]
+  P --> N0
+  N1["2. preview 는 후보 digest/count 를 반환하고 rollback 한다."]
+  N0 --> MODE{"apply 모드인가?"}
+  MODE -- "preview" --> N1
+  N2["3. apply 는 정확 confirmation 과 preview digest 를 재계산해 비교한다."]
+  N1 --> END["preview 결과 반환; DELETE 없음"]
+  MODE -- "apply" --> N2
+  N3["4. DELETE 에서도 eligibility 를 다시 적용하고 returning 된 UUID 집합이<br/>예상과 정확히 같은지 검사한다."]
+  N2 --> N3
+  N4["5. 일치 시 commit 하고 실패 시 오류 JSON 을 출력한다."]
+  N3 --> N4
+  Z["원문 이메일/OTP 를 출력하지 않는 정리 결과 JSON."]
+  N4 --> Z
+  B0{"before > database_now"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["미래 cutoff 거부"]
+  B1{"후보 digest/DELETE returning 집합 변경"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["삭제 확정 거부"]
+  B2{"CONSUMED 성공재생 enrollment 도 보존 조건상 후보"}
+  P -. "예외 조건 검사" .-> B2
+  B2 -- "조건 성립" --> X2["정리 후 해당 handle 의 재생 데이터는 사라짐"]
+  R["재시도: 자동 반복 루프 없음. 호출자가 오류와 현재 상태를 확인 후 재호출.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 별도 취소 진입점 없음."]
+  A -. "취소 API 여부" .-> C

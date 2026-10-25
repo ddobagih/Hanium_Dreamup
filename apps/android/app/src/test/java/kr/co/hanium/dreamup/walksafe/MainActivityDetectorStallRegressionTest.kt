@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe
 
+import kr.co.hanium.dreamup.walksafe.inference.DetectorStallWatchdog
 import java.io.File
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
@@ -52,11 +53,11 @@ class MainActivityDetectorStallRegressionTest {
     @Test
     fun watchdogStopsAtBudgetWithoutWaitingForTheNativeWorkerAndRejectsLateCompletion() {
         val now = AtomicLong(0L)
-        val watchdog = MainActivity.DetectorStallWatchdog(800L, now::get)
+        val watchdog = DetectorStallWatchdog(800L, now::get)
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
         val accepted = AtomicBoolean(true)
-        val active = AtomicReference<MainActivity.DetectorStallWatchdog.Flight>()
+        val active = AtomicReference<DetectorStallWatchdog.Flight>()
         val worker = Thread {
             val flight = requireNotNull(watchdog.begin())
             active.set(flight)
@@ -81,7 +82,7 @@ class MainActivityDetectorStallRegressionTest {
     @Test
     fun completedNativeWorkDoesNotFalseStopAtTheDeadline() {
         val now = AtomicLong(0L)
-        val watchdog = MainActivity.DetectorStallWatchdog(800L, now::get)
+        val watchdog = DetectorStallWatchdog(800L, now::get)
         val flight = watchdog.begin()
         assertNotNull(flight)
         now.set(799L)
@@ -95,7 +96,7 @@ class MainActivityDetectorStallRegressionTest {
     @Test
     fun overdueNativeCompletionFailsClosedBeforeTheHandlerRuns() {
         val now = AtomicLong(0L)
-        val watchdog = MainActivity.DetectorStallWatchdog(800L, now::get)
+        val watchdog = DetectorStallWatchdog(800L, now::get)
         val flight = requireNotNull(watchdog.begin())
         now.set(801L)
 
@@ -108,7 +109,7 @@ class MainActivityDetectorStallRegressionTest {
     @Test
     fun partialPublicationAt801MsIsRejectedBeforeDelayedTimeoutBut799MsIsAccepted() {
         val now = AtomicLong(0L)
-        val watchdog = MainActivity.DetectorStallWatchdog(800L, now::get)
+        val watchdog = DetectorStallWatchdog(800L, now::get)
         val flight = requireNotNull(watchdog.begin())
         var publications = 0
 
@@ -141,7 +142,7 @@ class MainActivityDetectorStallRegressionTest {
     @Test
     fun oldBlockedFlightRejectsNewActiveWalkAndRequestsItsStopOnlyOnce() {
         val now = AtomicLong(0L)
-        val watchdog = MainActivity.DetectorStallWatchdog(800L, now::get)
+        val watchdog = DetectorStallWatchdog(800L, now::get)
         val oldFlight = requireNotNull(watchdog.begin())
         val newEpoch = WalkRuntimeEpoch("new-walk", 0L)
         val stopRequests = mutableListOf<WalkRuntimeEpoch>()
@@ -158,7 +159,7 @@ class MainActivityDetectorStallRegressionTest {
     @Test
     fun walkEntryRejectsUnfinishedOldFlightBeforeDetectorExecutorDrainsAndAllowsCompletedNextWalk() {
         val now = AtomicLong(0L)
-        val watchdog = MainActivity.DetectorStallWatchdog(800L, now::get)
+        val watchdog = DetectorStallWatchdog(800L, now::get)
         val oldEpoch = WalkRuntimeEpoch("old-walk", 0L)
         val newEpoch = WalkRuntimeEpoch("new-walk", 0L)
         val activity = MainActivity()
@@ -205,7 +206,7 @@ class MainActivityDetectorStallRegressionTest {
     @Test
     fun newWalkAdmissionRejectsAnOldFrameThatReachesNativeBeginLater() {
         val now = AtomicLong(0L)
-        val watchdog = MainActivity.DetectorStallWatchdog(800L, now::get)
+        val watchdog = DetectorStallWatchdog(800L, now::get)
         val oldEpoch = WalkRuntimeEpoch("old-walk", 0L)
         val newEpoch = WalkRuntimeEpoch("new-walk", 0L)
         val stopRequests = mutableListOf<WalkRuntimeEpoch>()
@@ -222,7 +223,7 @@ class MainActivityDetectorStallRegressionTest {
     @Test
     fun normalCompletedFlightAllowsNextWalkWithoutRequestingSafetyStop() {
         val now = AtomicLong(0L)
-        val watchdog = MainActivity.DetectorStallWatchdog(800L, now::get)
+        val watchdog = DetectorStallWatchdog(800L, now::get)
         val flight = requireNotNull(watchdog.begin())
         val nextEpoch = WalkRuntimeEpoch("next-walk", 0L)
         val stopRequests = mutableListOf<WalkRuntimeEpoch>()
@@ -236,27 +237,33 @@ class MainActivityDetectorStallRegressionTest {
 
     @Test
     fun cameraAndArcoreEntrypointsCloseSourceBeforeOwnedNativeDetection() {
-        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val preflight = source.substringAfter("val detectorSucceeded = try {")
-            .substringBefore("// Count successful camera/model invocations")
-        val fallback = source.substringAfter("private fun analyzeCameraFallbackFrame(")
-            .substringBefore("private fun recordCameraFallbackFrameAnalyzedOnce(")
-        val arcore = source.substringAfter("private fun scheduleDetectionIfDue(")
-            .substringBefore("private fun encodeDebugFrameJpeg(")
-        assertTrue(preflight.indexOf("imageProxy.close()") < preflight.indexOf("frameDetector.detect("))
-        assertTrue(fallback.indexOf("imageProxy.close()") < fallback.indexOf("frameDetector.detectOriented("))
-        assertTrue(arcore.indexOf("cameraImage.close()") < arcore.indexOf("frameDetector.detectOriented("))
-        assertTrue(fallback.contains("beginNativeDetectorFlight("))
-        assertTrue(arcore.contains("beginNativeDetectorFlight("))
-        assertTrue(arcore.contains("nativeFlight = flight"))
-        assertTrue(source.contains("detectorWatchdogHandler.postDelayed("))
-        assertTrue(source.contains("detectorStallWatchdog.publishIfCurrent(nativeFlight.ticket)"))
-        assertTrue(source.contains("if (rejectBlockedNativeDetectorWork()) return@synchronized null"))
-        assertTrue(source.contains("!rejectBlockedNativeDetectorWork()"))
-        assertTrue(source.contains("nativeDetectorStallOwnsWalk("))
-        assertTrue(source.contains("riskTrusted = false"))
-        assertTrue(source.contains("flight.stopClaim.compareAndSet(false, true)"))
-        assertTrue(source.contains("detectorStallWatchdog.blocksNewWork() ||"))
+        fun owner(path: String) = File("src/main/java/kr/co/hanium/dreamup/walksafe/$path.kt").readText()
+        val main = owner("MainActivity")
+        val preflight = owner("device/postlogin/AndroidPostLoginDeviceProbes")
+            .substringAfter("val succeeded = try").substringBefore("finally { if (!closed)")
+        assertTrue(preflight.indexOf("image.close()") >= 0)
+        assertTrue(preflight.indexOf("image.close()") < preflight.indexOf("detector().detect("))
+        val fallback = owner("runtime/vision/primary/PrimaryCameraFallbackDetectorWorker")
+        assertTrue(fallback.contains("invocationWorker.invoke(prepared, { frameCapture.copyOwnedInputAndClose()?.cameraFrame }"))
+        val owned = MainActivityRefactorSource.member(owner("runtime/camera/CameraFallbackController"), "copyOwnedInputAndClose")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(owned, "copyOwnedFrame()", "close()", "return CameraFallbackFrameInput("))
+        val recognition = owner("runtime/vision/frame/ArFrameRecognitionCapture")
+        assertTrue(recognition.contains("packet?.image?.use(copyInput)"))
+        assertTrue(recognition.contains("val ownedFrame = OwnedYuvFrame.copyOf(image)"))
+        val invocation = owner("runtime/vision/primary/PrimaryDetectorInvocationWorker")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(invocation, "val ownedFrame = copyOwnedFrame()",
+            "detectorOwner.beginNativeFlight(", "detectorOwner.detectOriented(ownedFrame,"))
+        val ar = owner("runtime/vision/primary/PrimaryArDetectorWorker")
+        assertTrue(ar.contains("invocationWorker.invoke(prepared, { consumeOwnedInput(work.input) }"))
+        assertTrue(ar.contains("flight = partial.flight"))
+        val execution = owner("runtime/vision/primary/PrimaryDetectorExecutionOwner")
+        assertTrue(execution.contains("watchdog.publishIfCurrent(flight.ticket, publish)"))
+        assertTrue(execution.contains("rejectBlockedWork()"))
+        assertTrue(execution.contains("stopClaim.compareAndSet(false, true)"))
+        assertTrue(execution.contains("watchdog.blocksNewWork()"))
+        assertTrue(main.contains("detectorWatchdogHandler.postDelayed("))
+        assertTrue(main.contains("!rejectBlockedNativeDetectorWork()"))
+        assertTrue(main.contains("nativeDetectorStallOwnsWalk(")); assertTrue(main.contains("riskTrusted = false"))
     }
 
     private fun floats(buffer: ByteBuffer, count: Int): FloatArray = FloatArray(count).also {

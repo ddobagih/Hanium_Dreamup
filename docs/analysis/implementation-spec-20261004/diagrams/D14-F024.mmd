@@ -1,0 +1,27 @@
+flowchart TD
+  IN["F-D14-024<br/>만료된 복구의 정리와 제한된 proof 통과"]
+  G["적용 정책<br/>P-D14-015 / P-D14-016"]
+  IN --> G
+  N1["1. PG startup classifier가 정확한 expired bindin<br/>g 하나/active0이면 RECOVERY_EXPIRED_CANDIDATE 허용"]
+  G --> N1
+  N2["2. proof context는 새 TOTP·private token diges<br/>t·expiry·이전 fingerprint·device·ACTIVE key ex<br/>act인 만료 요청에만 키 반환"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 정상 P256 proof 검증을 거쳐 complete_recovery까지 <br/>진행"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 서비스가 신규 활성 transaction 존재 여부 확인"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 새 활성 복구가 있으면 RECOVERY_IN_PROGRESS 유지, 없으면<br/> RECOVERY_REQUIRED로 전이"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. 만료 DENIED 감사와 실패 attempt commit 후410 admi<br/>n_recovery_expired"]
+  N5 -->|"계속 가능한 경우"| N6
+  B1["분기 결과<br/>410 또는403/503로 조기 거절; arbitrary old key 통과 없<br/>음"]
+  N2 -->|"expired인데 exact key/candidate 결속 불명확"| B1
+  B2["분기 결과<br/>새 복구 상태를 되돌리지 않음"]
+  N5 -->|"늦게 도착한 이전 만료 transaction이나 새 활성 복구 존재"| B2
+  B3["분기 결과<br/>만료 처리"]
+  N6 -->|"expiry가 정확 now"| B3
+  N6 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 사용하지 않은 복구 code로 새 start 가능; 폐<br/>기된 session/타기기 키를 자동 되살리지 않음."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

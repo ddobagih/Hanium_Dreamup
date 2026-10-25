@@ -93,6 +93,7 @@ data class DepthSampleOptions(
  * Invalid/confidence-gated pixels and median-absolute-deviation outliers never enter the result.
  */
 class DepthSampler {
+    private val motionSampleOptions = DepthSampleOptions()
     /** Samples only the contact's five-by-five depth-pixel neighborhood, never the object median. */
     fun sampleContactDepth(
         depthImage: DepthImage16,
@@ -100,6 +101,17 @@ class DepthSampler {
         polygonDepthNorm: List<Point2>,
         contactDepthNorm: Point2,
         minConfidence: Float?,
+    ): ContactDepthEstimate? = samplePointNeighborhood(depthImage, confidenceImage, polygonDepthNorm,
+        contactDepthNorm, minConfidence, CONTACT_MIN_DEPTH_M, CONTACT_MAX_DEPTH_M)
+
+    private fun samplePointNeighborhood(
+        depthImage: DepthImage16,
+        confidenceImage: ConfidenceImage8?,
+        polygonDepthNorm: List<Point2>,
+        contactDepthNorm: Point2,
+        minConfidence: Float?,
+        minDepthM: Float,
+        maxDepthM: Float,
     ): ContactDepthEstimate? {
         if (polygonDepthNorm.size < 3 || !contactDepthNorm.x.isFinite() || !contactDepthNorm.y.isFinite() ||
             contactDepthNorm.x !in 0f..1f || contactDepthNorm.y !in 0f..1f ||
@@ -118,7 +130,7 @@ class DepthSampler {
                 if (!pointInPolygon(point, polygonDepthNorm)) continue
                 eligiblePixels += 1
                 val depth = depthImage.depthMetersAt(x, y) ?: continue
-                if (depth !in CONTACT_MIN_DEPTH_M..CONTACT_MAX_DEPTH_M) continue
+                if (depth !in minDepthM..maxDepthM) continue
                 if (minConfidence != null && (confidenceImage?.confidenceAt(x, y) ?: 0f) < minConfidence) continue
                 depths += depth
             }
@@ -134,6 +146,32 @@ class DepthSampler {
             spreadM = spread,
             validSampleCount = depths.size,
         )
+    }
+
+    /** A motion point needs its own valid center pixel as well as local surface support. */
+    internal fun sampleMaterialPointDepth(
+        depthImage: DepthImage16,
+        confidenceImage: ConfidenceImage8?,
+        polygonDepthNorm: List<Point2>,
+        pointDepthNorm: Point2,
+        minConfidence: Float?,
+    ): Float? {
+        if (!pointDepthNorm.x.isFinite() || !pointDepthNorm.y.isFinite() ||
+            pointDepthNorm.x !in 0f..1f || pointDepthNorm.y !in 0f..1f ||
+            (confidenceImage != null && (confidenceImage.width != depthImage.width || confidenceImage.height != depthImage.height)) ||
+            polygonDepthNorm.size < 3 || !pointInPolygon(pointDepthNorm, polygonDepthNorm)
+        ) return null
+        val x = (pointDepthNorm.x * (depthImage.width - 1)).roundToInt()
+        val y = (pointDepthNorm.y * (depthImage.height - 1)).roundToInt()
+        val pixel = Point2(x / max(1f, (depthImage.width - 1).toFloat()),
+            y / max(1f, (depthImage.height - 1).toFloat()))
+        if (!pointInPolygon(pixel, polygonDepthNorm)) return null
+        val depth = depthImage.depthMetersAt(x, y)?.takeIf { it in motionSampleOptions.minDepthM..motionSampleOptions.maxDepthM } ?: return null
+        if (minConfidence != null && (confidenceImage?.confidenceAt(x, y) ?: 0f) < minConfidence) return null
+        samplePointNeighborhood(depthImage, confidenceImage, polygonDepthNorm, pointDepthNorm, minConfidence,
+            motionSampleOptions.minDepthM, motionSampleOptions.maxDepthM) ?: return null
+        // Neighbors validate support but cannot substitute their median for the actual point.
+        return depth
     }
 
     fun sampleObjectDepth(
@@ -184,11 +222,6 @@ class DepthSampler {
             DepthSample(depthM = depth, confidence = confidence, candidate = candidate)
         }
         val rejected = DepthSampleRejections(invalidZero, tooNear, tooFar, lowConfidence)
-
-        if (samples.size < options.minValidSamples) {
-            return emptyStats(validSampleCount = samples.size, totalSampleCount = candidates.size)
-                .copy(rejectedSamples = rejected)
-        }
 
         return robustStats(samples, candidates.size, options, candidates).copy(rejectedSamples = rejected)
     }
@@ -265,6 +298,9 @@ class DepthSampler {
         ) {
             return emptyStats(validSampleCount = samples.size, totalSampleCount = totalSampleCount,
                 foregroundAmbiguous = true)
+        }
+        if (samples.size < options.minValidSamples) {
+            return emptyStats(validSampleCount = samples.size, totalSampleCount = totalSampleCount)
         }
         val kept = samples.filter { abs(it.depthM - med) <= band }
         if (kept.size < options.minValidSamples) {

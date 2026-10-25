@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.device
 
 import kr.co.hanium.dreamup.walksafe.session.EnvironmentEvidenceStatus
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
+import kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessEvidence
 
 enum class PhoneMountingMethod {
     CHEST_FORWARD,
@@ -70,6 +71,8 @@ data class PhoneMountingRuntimeState(
     val correctionRequiredSinceElapsedRealtimeMs: Long? = null,
     val failedRuntimeRetryAttempts: Int = 0,
     val safetyStopRequired: Boolean = false,
+    // Existing fault states remain conservative; only a known camera-quality episode clears this.
+    val requiresExplicitCorrection: Boolean = true,
 ) {
     init {
         require(failedRuntimeRetryAttempts >= 0) {
@@ -100,7 +103,7 @@ enum class PhoneMountingReason(
         "보행을 시작하거나 다시 시작하기 전 주변 안전을 한 번 더 확인하세요.",
     ),
     SENSOR_CHECK_PASSED(
-        "카메라 방향과 흔들림, 영상 품질이 실제 센서 점검 기준을 충족했습니다.",
+        "카메라 방향과 영상 품질이 실제 센서 점검 기준을 충족했습니다.",
         "장착 방식을 자동 판별한 결과는 아닙니다. 휴대전화를 앞을 향하게 안정적으로 유지하세요.",
     ),
     CHECK_REQUEST_EPOCH_MISMATCH(
@@ -153,7 +156,7 @@ enum class PhoneMountingReason(
         speakReason = false,
     ),
     CAMERA_EVIDENCE_MISSING(
-        "카메라 방향과 가림, 흔들림, 영상 품질을 확인할 수 없습니다.",
+        "카메라 방향과 가림, 영상 품질을 확인할 수 없습니다.",
         "렌즈가 앞을 향하고 가리지 않았는지 확인한 뒤 다시 검사하세요.",
     ),
     CAMERA_EPOCH_MISMATCH(
@@ -178,11 +181,16 @@ enum class PhoneMountingReason(
     ),
     CAMERA_QUALITY_UNKNOWN(
         "카메라 장착 품질을 신뢰할 수 있는 근거가 부족합니다.",
-        "렌즈 방향과 가림, 흔들림을 확인한 뒤 다시 검사하세요.",
+        "렌즈 방향과 가림을 확인한 뒤 다시 검사하세요.",
+        speakReason = false,
+    ),
+    CAMERA_ANGLE_RECHECK(
+        "휴대전화 기울기의 작은 변화를 다시 확인하고 있습니다.",
+        "휴대전화를 앞을 향하게 유지하면 새 측정으로 자동 확인합니다.",
         speakReason = false,
     ),
     CAMERA_QUALITY_FAILED(
-        "카메라 방향, 가림, 흔들림 또는 영상 품질이 장착 기준에 맞지 않습니다.",
+        "카메라 방향, 가림 또는 영상 품질이 장착 기준에 맞지 않습니다.",
         "휴대전화 위치와 렌즈 가림을 바로잡은 뒤 다시 검사하세요.",
         speakReason = false,
     ),
@@ -220,6 +228,8 @@ data class PhoneMountingAssessment(
     val profileId: String?,
     val nextState: PhoneMountingRuntimeState,
     val retryAllowed: Boolean,
+    val assessedAtElapsedRealtimeMs: Long? = null,
+    val readinessEvidence: List<WalkSessionReadinessEvidence> = emptyList(),
 ) {
     val canStartOrResumeDetection: Boolean
         get() = status == PhoneMountingStatus.SUITABLE
@@ -232,14 +242,22 @@ data class PhoneMountingAssessment(
             phase == PhoneMountingAssessmentPhase.ACTIVE &&
                 status == PhoneMountingStatus.UNUSABLE
 
+    private val cameraOnlyRestriction: Boolean
+        get() = phase == PhoneMountingAssessmentPhase.ACTIVE &&
+            status == PhoneMountingStatus.CORRECTION_REQUIRED && !nextState.requiresExplicitCorrection
+
     val accessibleReasonKo: String
-        get() = reason.accessibleReasonKo
+        get() = if (cameraOnlyRestriction) "카메라 영상 품질을 다시 확인하고 있습니다." else reason.accessibleReasonKo
 
     val accessibleActionKo: String
-        get() = reason.accessibleActionKo
+        get() = if (cameraOnlyRestriction) {
+            "렌즈가 앞을 향하고 가리지 않게 유지하세요. 새 영상이 확인되면 카메라 안내가 자동으로 회복됩니다."
+        } else reason.accessibleActionKo
 
     val spokenGuidanceKo: String
-        get() = if (
+        get() = if (cameraOnlyRestriction) {
+            "$accessibleReasonKo $accessibleActionKo"
+        } else if (
             phase == PhoneMountingAssessmentPhase.ACTIVE &&
             status == PhoneMountingStatus.CORRECTION_REQUIRED &&
             reason in setOf(
@@ -253,7 +271,7 @@ data class PhoneMountingAssessment(
                 PhoneMountingReason.CAMERA_QUALITY_FAILED,
             )
         ) {
-            // Runtime faults require an explicit correction before fresh frames restore output.
+            // Physical mounting and invalid evidence faults still need an explicit correction.
             "휴대전화를 앞을 향하게 고정하고 렌즈 가림을 바로잡은 뒤 화면에서 장착 교정을 확인하세요."
         } else {
             reason.spokenGuidanceKo
@@ -285,6 +303,57 @@ object PhoneMountingPolicy {
         previousState: PhoneMountingRuntimeState,
         runtimeRetryRequested: Boolean = false,
         checkRequest: PhoneMountingCheckRequest? = null,
+    ): PhoneMountingAssessment = assessCurrentEvidence(
+        phase = phase,
+        currentEpoch = currentEpoch,
+        nowElapsedRealtimeMs = nowElapsedRealtimeMs,
+        userConfirmation = userConfirmation,
+        cameraFrameQuality = cameraFrameQuality,
+        previousState = previousState,
+        runtimeRetryRequested = runtimeRetryRequested,
+        checkRequest = checkRequest,
+    ).let { assessment ->
+        val profile = previousState.approvedProfile
+        assessment.copy(
+            assessedAtElapsedRealtimeMs = nowElapsedRealtimeMs,
+            readinessEvidence = if (profile != null && assessment.canStartOrResumeDetection) {
+                buildList {
+                    val camera = checkNotNull(cameraFrameQuality)
+                    add(
+                        WalkSessionReadinessEvidence(
+                            source = "phone_mounting:camera",
+                            observedAtElapsedRealtimeMs = checkNotNull(camera.observedAtElapsedRealtimeMs),
+                            maxAgeMs = minOf(profile.maximumEvidenceAgeMs, checkNotNull(camera.maximumEvidenceAgeMs)),
+                            sourceVersion = checkNotNull(camera.profileId),
+                            requiredVersion = profile.cameraFrameQualityProfileId,
+                        ),
+                    )
+                    if (checkRequest == null) {
+                        add(
+                            WalkSessionReadinessEvidence(
+                                source = "phone_mounting:user_confirmation",
+                                observedAtElapsedRealtimeMs = checkNotNull(userConfirmation).confirmedAtElapsedRealtimeMs,
+                                maxAgeMs = profile.maximumUserConfirmationAgeMs,
+                                sourceVersion = profile.profileId,
+                            ),
+                        )
+                    }
+                }
+            } else {
+                emptyList()
+            },
+        )
+    }
+
+    private fun assessCurrentEvidence(
+        phase: PhoneMountingAssessmentPhase,
+        currentEpoch: WalkRuntimeEpoch,
+        nowElapsedRealtimeMs: Long,
+        userConfirmation: PhoneMountingUserConfirmation?,
+        cameraFrameQuality: CameraFrameQualityAssessment?,
+        previousState: PhoneMountingRuntimeState,
+        runtimeRetryRequested: Boolean,
+        checkRequest: PhoneMountingCheckRequest?,
     ): PhoneMountingAssessment {
         require(
             phase == PhoneMountingAssessmentPhase.ACTIVE || !runtimeRetryRequested,
@@ -323,6 +392,11 @@ object PhoneMountingPolicy {
             checkRequest = checkRequest,
         )
         if (failureReason != null) {
+            val runtimeReason = if (phase == PhoneMountingAssessmentPhase.ACTIVE &&
+                failureReason == PhoneMountingReason.CAMERA_QUALITY_FAILED &&
+                cameraFrameQuality?.reason == CameraFrameQualityReason.MOUNT_ANGLE_RECHECK_PENDING &&
+                (state.correctionRequiredSinceElapsedRealtimeMs == null || !state.requiresExplicitCorrection)
+            ) PhoneMountingReason.CAMERA_ANGLE_RECHECK else failureReason
             if (phase == PhoneMountingAssessmentPhase.PREFLIGHT) {
                 return preflightCorrection(
                     profile = profile,
@@ -334,8 +408,11 @@ object PhoneMountingPolicy {
                 nowElapsedRealtimeMs = nowElapsedRealtimeMs,
                 profile = profile,
                 previousState = state,
-                reason = failureReason,
+                reason = runtimeReason,
                 runtimeRetryRequested = runtimeRetryRequested,
+                cameraOnlyFailure = isRecoverableCameraOnlyFailure(
+                    runtimeReason, cameraFrameQuality, state, nowElapsedRealtimeMs,
+                ),
             )
         }
 
@@ -350,32 +427,36 @@ object PhoneMountingPolicy {
                     runtimeRetryRequested = runtimeRetryRequested,
                 )
             }
-            val correctionRequestedAt = if (checkRequest != null) {
-                checkRequest.requestedAtElapsedRealtimeMs.takeIf { it > faultSince }
-            } else {
-                userConfirmation?.takeIf {
-                    it.postFaultCorrectionConfirmed && it.confirmedAtElapsedRealtimeMs > faultSince
+            if (state.requiresExplicitCorrection) {
+                val sensorCheckAt = checkRequest?.requestedAtElapsedRealtimeMs?.takeIf { it > faultSince }
+                val explicitCorrectionAt = userConfirmation?.takeIf {
+                    it.epoch == currentEpoch && it.method in allowedMethods &&
+                        it.postFaultCorrectionConfirmed && it.confirmedAtElapsedRealtimeMs > faultSince &&
+                        isFresh(it.confirmedAtElapsedRealtimeMs, nowElapsedRealtimeMs, profile.maximumUserConfirmationAgeMs)
                 }?.confirmedAtElapsedRealtimeMs
-            }
-            if (correctionRequestedAt == null) {
-                return correctionAfterFaultOrStop(
-                    profile = profile,
-                    previousState = state,
-                    reason = if (checkRequest != null) {
-                        PhoneMountingReason.POST_FAULT_CHECK_REQUEST_REQUIRED
-                    } else {
-                        PhoneMountingReason.POST_FAULT_CONFIRMATION_REQUIRED
-                    },
-                    runtimeRetryRequested = runtimeRetryRequested,
-                )
-            }
-            if (cameraObservedAt <= correctionRequestedAt) {
-                return correctionAfterFaultOrStop(
-                    profile = profile,
-                    previousState = state,
-                    reason = PhoneMountingReason.POST_FAULT_CAMERA_EVIDENCE_REQUIRED,
-                    runtimeRetryRequested = runtimeRetryRequested,
-                )
+                // The native start request remains the sensor owner; a later explicit correction
+                // is also valid, but its own identity, method and lifetime must still be checked.
+                val correctionRequestedAt = listOfNotNull(sensorCheckAt, explicitCorrectionAt).maxOrNull()
+                if (correctionRequestedAt == null) {
+                    return correctionAfterFaultOrStop(
+                        profile = profile,
+                        previousState = state,
+                        reason = if (checkRequest != null) {
+                            PhoneMountingReason.POST_FAULT_CHECK_REQUEST_REQUIRED
+                        } else {
+                            PhoneMountingReason.POST_FAULT_CONFIRMATION_REQUIRED
+                        },
+                        runtimeRetryRequested = runtimeRetryRequested,
+                    )
+                }
+                if (cameraObservedAt <= correctionRequestedAt) {
+                    return correctionAfterFaultOrStop(
+                        profile = profile,
+                        previousState = state,
+                        reason = PhoneMountingReason.POST_FAULT_CAMERA_EVIDENCE_REQUIRED,
+                        runtimeRetryRequested = runtimeRetryRequested,
+                    )
+                }
             }
         }
 
@@ -390,6 +471,38 @@ object PhoneMountingPolicy {
             ),
             retryAllowed = false,
         )
+    }
+
+    private fun isRecoverableCameraOnlyFailure(
+        reason: PhoneMountingReason,
+        camera: CameraFrameQualityAssessment?,
+        previousState: PhoneMountingRuntimeState,
+        nowMs: Long,
+    ): Boolean {
+        if (previousState.correctionRequiredSinceElapsedRealtimeMs != null &&
+            previousState.requiresExplicitCorrection
+        ) return false
+        val measured = camera ?: return false
+        val cameraOnlyQualityFailure = measured.status == EnvironmentEvidenceStatus.FAIL &&
+            measured.reason in setOf(
+                CameraFrameQualityReason.FRAME_UNAVAILABLE,
+                CameraFrameQualityReason.BRIGHTNESS_OUTSIDE_APPROVED_RANGE,
+                CameraFrameQualityReason.OCCLUSION_OUTSIDE_APPROVED_RANGE,
+                CameraFrameQualityReason.SHAKE_OUTSIDE_APPROVED_RANGE,
+                CameraFrameQualityReason.MOUNT_ANGLE_RECHECK_PENDING,
+            )
+        if (reason in setOf(PhoneMountingReason.CAMERA_QUALITY_FAILED, PhoneMountingReason.CAMERA_ANGLE_RECHECK)) return cameraOnlyQualityFailure
+        // Expiry of a known PASS restricts output until a new frame passes; it does not establish
+        // a physical mounting fault. Existing rejected causes still keep their original boundary.
+        val observedAt = measured.observedAtElapsedRealtimeMs ?: return false
+        val maximumAge = measured.maximumEvidenceAgeMs ?: return false
+        val knownPriorPass = measured.status == EnvironmentEvidenceStatus.PASS &&
+            measured.reason == CameraFrameQualityReason.PASSED
+        return reason == PhoneMountingReason.CAMERA_EVIDENCE_STALE &&
+            (knownPriorPass || cameraOnlyQualityFailure &&
+                previousState.correctionRequiredSinceElapsedRealtimeMs != null &&
+                !previousState.requiresExplicitCorrection) && observedAt >= 0L &&
+            nowMs >= observedAt && maximumAge >= 0L
     }
 
     private fun preflightCorrection(
@@ -491,10 +604,11 @@ object PhoneMountingPolicy {
         previousState: PhoneMountingRuntimeState,
         reason: PhoneMountingReason,
         runtimeRetryRequested: Boolean,
+        cameraOnlyFailure: Boolean,
     ): PhoneMountingAssessment {
         val retryAttempts = previousState.failedRuntimeRetryAttempts +
             if (
-                runtimeRetryRequested &&
+                !cameraOnlyFailure && runtimeRetryRequested &&
                 previousState.correctionRequiredSinceElapsedRealtimeMs != null
             ) {
                 1
@@ -502,8 +616,10 @@ object PhoneMountingPolicy {
                 0
             }
         if (
-            profile.maximumRuntimeRetryAttempts == 0 ||
-            retryAttempts >= profile.maximumRuntimeRetryAttempts
+            !cameraOnlyFailure && (
+                profile.maximumRuntimeRetryAttempts == 0 ||
+                    retryAttempts >= profile.maximumRuntimeRetryAttempts
+            )
         ) {
             return unusable(
                 phase = PhoneMountingAssessmentPhase.ACTIVE,
@@ -520,6 +636,7 @@ object PhoneMountingPolicy {
                 nowElapsedRealtimeMs,
             ),
             failedRuntimeRetryAttempts = retryAttempts,
+            requiresExplicitCorrection = !cameraOnlyFailure,
         )
         return PhoneMountingAssessment(
             phase = PhoneMountingAssessmentPhase.ACTIVE,
@@ -538,8 +655,8 @@ object PhoneMountingPolicy {
         runtimeRetryRequested: Boolean,
     ): PhoneMountingAssessment {
         val retryAttempts = previousState.failedRuntimeRetryAttempts +
-            if (runtimeRetryRequested) 1 else 0
-        if (retryAttempts >= profile.maximumRuntimeRetryAttempts) {
+            if (runtimeRetryRequested && previousState.requiresExplicitCorrection) 1 else 0
+        if (previousState.requiresExplicitCorrection && retryAttempts >= profile.maximumRuntimeRetryAttempts) {
             return unusable(
                 phase = PhoneMountingAssessmentPhase.ACTIVE,
                 previousState = previousState.copy(
@@ -570,6 +687,7 @@ object PhoneMountingPolicy {
         reason = reason,
         profileId = previousState.approvedProfile?.profileId,
         nextState = previousState.copy(
+            requiresExplicitCorrection = true,
             safetyStopRequired =
                 previousState.safetyStopRequired ||
                     phase == PhoneMountingAssessmentPhase.ACTIVE,

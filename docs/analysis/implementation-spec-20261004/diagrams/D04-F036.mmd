@@ -1,0 +1,26 @@
+flowchart TD
+  ID["F-D04-036 · 야외 Raw GNSS 구독·측정 변환·운영 상태<br/>P-D04-036"]
+  A["Raw start"]
+  C0{"fine 권한과 private immutable path가 유효한가"}
+  R0["ERROR"]
+  C1{"writer open+header flush 후 current token인가"}
+  R1["start(false)"]
+  C2{"native register가 수락되는가"}
+  R2["unregister→writer.fail→start(false)"]
+  OK["start(true) → current generation Raw epoch batch → bounded writer"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  STOP["writer.stop로 admission retire → native unregister → flush/close callback"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D03-002 PCM 캡처와 프로세스 마이크 단일 소유"]
+  P["정책 P-D03-002"]
+  A --> P
+  N0["1. 음성을 저장하지 않고 callback 소유의 PCM 배열로 전달한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. lease 획득 후 초기화·start 성공을 확인하고 오디오 우선순위 capture thread 를 시작한다."]
+  N0 --> N1
+  N2["3. read buffer 를 복사하여 전달하며 시스템 silenced 는 무음 사용자와 다른 오류 코드로 보고한다."]
+  N1 --> N2
+  N3["4. stop 은 running 해제→record.stop→bounded join→release 완료 대기; releaseOnce 가 native/lease 를 한 번만 해제한다."]
+  N2 --> N3
+  Z["정상: stop 후 session IDLE."]
+  N3 --> Z
+  B0{"RUNNING 또는 STOPPING 에서 start"}
+  R0["아무 동작 없음"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"권한/lease/초기화 실패"}
+  R1["자원 반환 뒤 실패"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"read<0 또는 callback 예외"}
+  R2["terminal audio error; finally 자원 정리"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: 읽기/초기화 실패는 소유권 해제."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xtimeout["만료: 각 join 500ms 이나 native stop/release 및 releaseComplete 대기는 전체 1 초 상한이 아니다."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xtimeout
+  Xcancel["취소: stop 으로 캡처 종료."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: join interrupt 에서도 release 완료 처리 뒤 interrupt 복원."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xcleanup["정리: silencing callback 해제→stop→record.release→microphone lease release."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

@@ -1,0 +1,17 @@
+flowchart TD
+  H["P-D05-019 · F-D05-019 FastSAM 과 고정 주 검출기 조합의 실시간 calibration"]
+  H --> N["현재 Main 진입 UNCONNECTED"]
+  N -->|"명시 caller 가호출한다면"| R["CPU1 fixture reference"]
+  R --> G["후보 open warmup"]
+  G --> A["AB BA CONFIRM fixture 와 live"]
+  A --> V{"출력동등 auxiliary 향상 primary 비퇴화"}
+  V -->|"예"| O["warm service adoption 제안"]
+  V -->|"아니오"| P["거부 또는 pendingcursor"]
+  O --> C{"current healthy swap 승인"}
+  C -->|"예"| S["ADOPTED"]
+  C -->|"아니오"| D["drain release"]
+  P --> D
+  G -->|"deadline 취소"| D
+  D --> F{"native release 확인"}
+  F -->|"예"| E["finished callback"]
+  F -->|"아니오"| X["RELEASE_FAILED slot 보유"]

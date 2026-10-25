@@ -12,33 +12,41 @@ class MainActivityInitialPermissionStaticTest {
 
     @Test
     fun firstEntryRequestsEveryMissingRuntimePermissionInOneBatchOnlyOnce() {
-        val resume = functionBlock("private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()")
-        val request = functionBlock("private fun requestInitialAppEntryPermissionsIfNeeded()")
-        val launch = functionBlock("private fun launchInitialAppEntryPermissionRequest(")
-        val required = functionBlock("private fun requiredPostLoginDeviceCheckPermissions()")
+        val resume = MainActivityRefactorSource.function(source, "private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()")
+        val request = MainActivityRefactorSource.function(source, "private fun requestInitialAppEntryPermissionsIfNeeded()")
+        val launch = MainActivityRefactorSource.function(source, "private fun launchInitialAppEntryPermissionRequest(")
+        val required = MainActivityRefactorSource.function(source, "private fun requiredPostLoginDeviceCheckPermissions()")
 
         assertTrue(resume.contains("requestInitialAppEntryPermissionsIfNeeded()"))
-        assertTrue(request.contains("PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED"))
-        assertTrue(request.contains("PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED"))
+        assertTrue(request.contains("preferences.initialCompleted()"))
+        assertTrue(request.contains("preferences.initialStarted()"))
         assertTrue(
             request.indexOf("permissionRequestLeases.values.any") <
-                request.indexOf("PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED"),
+                request.indexOf("preferences.initialStarted()"),
         )
         assertTrue(request.contains("launchInitialAppEntryPermissionRequest(missing)"))
         assertTrue(launch.contains("if (requestCode == null)"))
-        assertTrue(request.contains(".remove(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED)"))
-        assertTrue(launch.contains(".remove(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED)"))
+        assertTrue(request.contains("preferences.markInitialCompleted()"))
+        assertTrue(launch.contains("preferences.clearInitialStarted()"))
         assertTrue(request.contains("requiredPostLoginDeviceCheckPermissions()"))
         assertTrue(launch.contains("missing.toTypedArray()"))
         assertTrue(launch.contains("PermissionRequestPurpose.INITIAL_APP_ENTRY"))
         assertTrue(ReportStaticSourceInspector.appearsInOrder(
             launch,
-            ".putBoolean(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED, true)",
+            "preferences.markInitialStarted()",
             "if (!attemptSaved)",
             "requestPermissionsWithLease(",
             "if (requestCode == null)",
-            ".remove(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED)",
+            "preferences.clearInitialStarted()",
         ))
+        val preferenceSource = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/AndroidPermissionPreferences.kt").readText()
+        val binding = MainActivityRefactorSource.composition(source, "permissionFlowController")
+        assertTrue(binding.contains("PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED, PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED"))
+        assertTrue(MainActivityRefactorSource.member(preferenceSource, "initialStarted").contains("getBoolean(initialStartedKey, false)"))
+        assertTrue(MainActivityRefactorSource.member(preferenceSource, "initialCompleted").contains("getBoolean(initialCompletedKey, false)"))
+        assertTrue(MainActivityRefactorSource.member(preferenceSource, "markInitialStarted").contains("putBoolean(initialStartedKey, true).commit()"))
+        assertTrue(MainActivityRefactorSource.member(preferenceSource, "clearInitialStarted").contains("remove(initialStartedKey).commit()"))
+        assertTrue(MainActivityRefactorSource.member(preferenceSource, "markInitialCompleted").contains("remove(initialStartedKey).commit()"))
         assertTrue(required.contains("Manifest.permission.CAMERA"))
         assertTrue(required.contains("Manifest.permission.ACCESS_FINE_LOCATION"))
         assertTrue(required.contains("Manifest.permission.ACCESS_COARSE_LOCATION"))
@@ -49,53 +57,80 @@ class MainActivityInitialPermissionStaticTest {
 
     @Test
     fun initialDenialIsRememberedAndRequiresExitWhenAnyRequiredPermissionIsMissing() {
-        val result = functionBlock("private fun handleInitialAppEntryPermissionResult()")
-        val limitations = functionBlock("private fun showInitialAppPermissionLimitations(")
-        val exit = functionBlock("private fun showRequiredAppPermissionExit(")
-        val postLoginRequest = functionBlock("private fun requestedPostLoginDeviceCheckPermissions()")
+        val result = MainActivityRefactorSource.function(source, "private fun handleInitialAppEntryPermissionResult()")
+        val limitations = MainActivityRefactorSource.function(source, "private fun showInitialAppPermissionLimitations(")
+        val exit = MainActivityRefactorSource.function(source, "private fun showRequiredAppPermissionExit(")
+        val postLoginRequest = MainActivityRefactorSource.function(source, "private fun requestedPostLoginDeviceCheckPermissions()")
 
-        assertTrue(result.contains("PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED"))
-        assertTrue(result.contains(".remove(PREF_INITIAL_APP_PERMISSION_REQUEST_STARTED)"))
+        val preferenceSource = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/AndroidPermissionPreferences.kt").readText()
+        val dialog = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/AndroidPermissionUi.kt").readText(), "showRequiredExit")
+        val binding = MainActivityRefactorSource.composition(source, "permissionFlowController")
+        val uiBinding = MainActivityRefactorSource.composition(source, "permissionFlowUi")
+        assertTrue(binding.contains("override fun cancelPrewalk() { cancelNativePrewalkPreparation(cancelFeatureEntry = true) }"))
+        assertTrue(binding.contains("override fun safetyStop(reason: String) { enterWalkSessionSafetyStopAndCancelOutputs(reason) }"))
+        assertTrue(binding.contains("ui = permissionFlowUi"))
+        assertTrue(uiBinding.contains("::openAppSettings, ::finishAndRemoveTask"))
+        assertTrue(result.contains("preferences.markInitialCompleted()"))
+        assertTrue(MainActivityRefactorSource.member(preferenceSource, "markInitialCompleted").contains("remove(initialStartedKey).commit()"))
         assertTrue(result.contains("showInitialAppPermissionLimitations"))
         assertTrue(result.contains("if (missingAtResult.isNotEmpty())"))
         assertTrue(limitations.contains("showRequiredAppPermissionExit(missing)"))
         assertTrue(exit.contains("initialAppPermissionExitRequired = true"))
-        assertTrue(exit.contains("cancelNativePrewalkPreparation(cancelFeatureEntry = true)"))
-        assertTrue(exit.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
-        assertTrue(exit.contains("필수 권한이 없어 보행을 시작할 수 없습니다. 설정에서 "))
-        assertTrue(exit.contains("missing.joinToString { it.permissionLabelKo() }"))
-        assertTrue(exit.contains("setOnClickListener { openAppSettings() }"))
-        assertTrue(exit.contains(".setCancelable(false)"))
-        assertTrue(exit.contains("finishAndRemoveTask()"))
+        assertTrue(exit.contains("runtime.cancelPrewalk()"))
+        assertTrue(exit.contains("runtime.safetyStop("))
+        assertTrue(dialog.contains("필수 권한이 없어 보행을 시작할 수 없습니다. 설정에서 "))
+        assertTrue(dialog.contains("missing.joinToString { PermissionExplanationText.permissionLabelKo(it) }"))
+        assertTrue(dialog.contains("setOnClickListener { openSettings() }"))
+        assertTrue(dialog.contains(".setCancelable(false)"))
+        assertTrue(dialog.contains("setOnClickListener { finishTask() }"))
         assertTrue(postLoginRequest.contains("emptyList()"))
-        assertTrue(postLoginRequest.contains("PREF_INITIAL_APP_PERMISSION_REQUEST_COMPLETED"))
+        assertTrue(postLoginRequest.contains("preferences.initialCompleted()"))
     }
 
     @Test
     fun optionalPermissionsAreObservedAfterInitialBatchWithoutFeaturePathRerequests() {
-        val walkRequest = functionBlock("private fun maybeRequestMissingWalkSessionPermissions(")
-        val navigationRequest = functionBlock("private fun ensureNavigationPermissions(")
-        val voiceAction = functionBlock("private fun ensureVoicePermissionThenListen()")
-        val voiceControls = functionBlock("private fun updateVoiceCommandButton(")
-        val settings = functionBlock("private fun openAppSettings()")
-        val observedState = functionBlock("private fun applyObservedPermissionStateChange(")
-        val resume = functionBlock("private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()")
+        val walkRequest = MainActivityRefactorSource.function(source, "private fun maybeRequestMissingWalkSessionPermissions(")
+        val navigationRequest = MainActivityRefactorSource.function(source, "private fun ensureNavigationPermissions(")
+        val voiceAction = MainActivityRefactorSource.function(source, "private fun ensureVoicePermissionThenListen()")
+        val voiceControls = MainActivityRefactorSource.function(source, "private fun updateVoiceCommandButton(")
+        val settings = MainActivityRefactorSource.member(source, "openAppSettings")
+        val observedState = MainActivityRefactorSource.function(source, "private fun applyObservedPermissionStateChange(")
+        val resume = MainActivityRefactorSource.function(source, "private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()")
 
-        assertTrue(walkRequest.contains("permission == Manifest.permission.RECORD_AUDIO"))
-        assertTrue(walkRequest.contains("permission == Manifest.permission.ACTIVITY_RECOGNITION"))
-        assertTrue(walkRequest.contains("requestable.toTypedArray()"))
+        val prepareSettings = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/PermissionFlowController.kt").readText(), "prepareForAppSettings")
+        val binding = MainActivityRefactorSource.composition(source, "permissionFlowController")
+        assertTrue(binding.contains("requiredWalkPermissions = ::requiredWalkSessionPermissionsForObservedSnapshot"))
+        assertTrue(settings.contains("permissionFlowController.prepareForAppSettings()"))
+        val voiceBinding = MainActivityRefactorSource.composition(source, "voiceInputController")
+        assertTrue(voiceBinding.contains("override fun showMicrophoneDenial()"))
+        assertTrue(voiceBinding.contains("showPermissionDenialPanel("))
+        val uiSource = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/permission/AndroidPermissionUi.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(uiSource, "hidePanel").contains("permissionDenialPanel.visibility = View.GONE"))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            walkRequest,
+            "observedPermissions = ::currentObservedPermissionSnapshot",
+            "missingPermissionsForObservedSnapshot = requiredWalkPermissions",
+        ))
+        assertTrue(walkRequest.contains("requestPermissionsWithLease(permissions, PermissionRequestPurpose.WALK_SESSION)"))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            MainActivityRefactorSource.function(source, "internal fun requestSelectedWalkSessionPermissions("),
+            "if (requestable.isEmpty()) return false",
+            "walkSessionPermissionRequestAttempted = true",
+            "walkSessionPermissionRequestInFlight = true",
+            "requestPermissions(requestable.toTypedArray())",
+        ))
         assertFalse(navigationRequest.contains("missing += Manifest.permission.ACTIVITY_RECOGNITION"))
         assertTrue(navigationRequest.contains("step_tracking_limited"))
         assertFalse(voiceAction.contains("PermissionRequestPurpose.VOICE_COMMAND"))
-        assertTrue(voiceAction.contains("showPermissionDenialPanel("))
+        assertTrue(voiceAction.contains("applicationEffects.showMicrophoneDenial()"))
         assertTrue(voiceControls.contains("hasRecordAudioPermission()"))
         assertTrue(
-            settings.contains(
+            prepareSettings.contains(
                 "if (missing.isNotEmpty() || permissionRecoveryGate.blocksAutomaticResourceStart)",
             ),
         )
         assertTrue(observedState.contains("WalkSessionState.ACTIVE, WalkSessionState.PAUSED"))
-        assertTrue(observedState.contains("permissionDenialPanel.visibility = View.GONE"))
+        assertTrue(observedState.contains("ui.hidePanel()"))
         assertTrue(
             resume.indexOf("applyObservedPermissionStateChange(\"app_resumed\")") <
                 resume.indexOf("syncActiveSessionScreenPolicy()"),

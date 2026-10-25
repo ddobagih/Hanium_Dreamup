@@ -1,5 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPoint
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.math.PI
@@ -63,7 +66,11 @@ class DepthGapPredictionTest {
 
     @Test fun originalDepthCaptureClockIsPreservedWhenCameraTimestampIsLater() {
         val fixture = Fixture()
-        (1..4).forEach { fixture.measured(it * 200L, 3_000, depthAtMs = it * 200L - 20L) }
+        (1..4).forEach {
+            val captured = it * 200L - 20L
+            fixture.measured(captured, 3_000)
+            fixture.measured(it * 200L, 3_000, depthAtMs = captured, synchronized = false)
+        }
         val gap = fixture.gap(900L)
         assertEquals(780L, gap.depthObservedAtMs)
         assertEquals(780L, gap.prediction!!.observedAtMs)
@@ -114,7 +121,7 @@ class DepthGapPredictionTest {
     }
 
     @Test fun currentPoseCompensatesChangedCameraSpeedUsingObservedObjectVelocity() {
-        val fixture = Fixture()
+        val fixture = Fixture(knownPhysicalPoint = true)
         (0..3).forEach { i -> fixture.measured(i * 200L, 4_000 - i * 200, pose = pose(i * 200L, -i * 0.2f)) }
         val history = fixture.track.distanceHistory.toList()
         val predicted = fixture.gap(800L, pose = pose(800L, -1f)).prediction!!
@@ -203,30 +210,45 @@ class DepthGapPredictionTest {
         assertNull(noisy.gap(700L).prediction)
     }
 
-    private class Fixture(private val imageSize: Int = 10) {
+    private class Fixture(private val imageSize: Int = 10, private val knownPhysicalPoint: Boolean = false) {
         val tracker = ObjectTracker()
         val estimator = ObjectDepthEstimator(tracker = tracker)
         var geometry = MaskPolygonExtractor().extract(DetectionCandidate("car", 0.95f, RectNorm(0f, 0f, 1f, 1f)))
         private val fixtureMapper = LetterboxCoordinateMapper(
             ModelInputTransform(imageSize, imageSize, imageSize, imageSize, 1f, 0f, 0f), ImageSize(imageSize, imageSize))
         lateinit var track: TrackState
+        private val pointId = VisualMaterialPointId()
+        private fun frameId(at: Long) = if (knownPhysicalPoint) at * 1_000_000L else at
+        // This synthetic scene explicitly follows the same center image point. In the camera
+        // speed test, its measured depth and pose reconstruct the fixed world point (0, 0, -4).
+        // Other fixtures supply no physical correspondence and retain their scalar-only inputs.
+        private fun materialPoint(at: Long) = if (knownPhysicalPoint) VisualMaterialPoint(pointId,
+            VisualFrameKey(1L, frameId(at), at * 1_000_000L + 1L, at, 1L), geometry.centerNorm) else null
         fun measured(at: Long, mm: Int, pose: CameraPoseEvidence? = null, depthAtMs: Long = at,
                      synchronized: Boolean = true, full: Boolean = false, trackingQuality: Float = 1f): TrackedObjectDepth {
             track = tracker.update(listOf(geometry), at).single()
             val depth = DepthImage16(imageSize, imageSize, IntArray(imageSize * imageSize) { mm })
-            return estimator.estimate(ObjectDepthInput(at, at, geometry, track, fixtureMapper,
+            return estimator.estimate(ObjectDepthInput(frameId(at), at, geometry, track, fixtureMapper,
                 rawDepth = depth.takeUnless { full },
                 rawConfidence = if (full) null else ConfidenceImage8(imageSize, imageSize, ByteArray(imageSize * imageSize) { 255.toByte() }),
                 rawDepthTimestampNs = (depthAtMs * 1_000_000L + 1L).takeUnless { full },
                 rawDepthMatchesCameraFrame = synchronized && !full,
                 fullDepth = depth.takeIf { full }, fullDepthTimestampNs = (depthAtMs * 1_000_000L + 1L).takeIf { full },
                 fullDepthMatchesCameraFrame = synchronized && full, requireIndependentDepthObservation = true,
-                motionContext = MotionContext(cameraPoseEvidence = pose, trackingQuality = trackingQuality)))
+                // This pure fixture knows its simulated original Frame capture independently
+                // of the Image ID. Production obtains this mapping from verified snapshots.
+                depthCaptureTimes = DepthCaptureTimes(
+                    DepthObservationTime(DepthSource.ARCORE_RAW_DEPTH, depthAtMs * 1_000_000L + 1L, depthAtMs, null).takeUnless { full },
+                    DepthObservationTime(DepthSource.ARCORE_FULL_DEPTH, depthAtMs * 1_000_000L + 1L, depthAtMs, null).takeIf { full },
+                ),
+                motionContext = MotionContext(cameraPoseEvidence = pose, trackingQuality = trackingQuality),
+                materialPoint = materialPoint(at)))
         }
         fun gap(at: Long, pose: CameraPoseEvidence? = null, trackingQuality: Float = 1f): TrackedObjectDepth {
             track = tracker.update(listOf(geometry), at).single()
-            return estimator.estimateUnavailable(ObjectDepthInput(at, at, geometry, track, fixtureMapper,
-                motionContext = MotionContext(cameraPoseEvidence = pose, trackingQuality = trackingQuality)))
+            return estimator.estimateUnavailable(ObjectDepthInput(frameId(at), at, geometry, track, fixtureMapper,
+                motionContext = MotionContext(cameraPoseEvidence = pose, trackingQuality = trackingQuality),
+                materialPoint = materialPoint(at)))
         }
     }
 

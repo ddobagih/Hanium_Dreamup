@@ -16,16 +16,18 @@ class MainActivityStoredMetricDepthRefreshStaticTest {
         val start = functionBlock("private fun maybeStartStoredMetricDepthRefresh()")
 
         assertTrue(bind.contains("restored.metricDepthProbePolicyCurrent"))
-        assertTrue(bind.contains("prepareStoredMetricDepthRefresh("))
+        assertTrue(bind.contains("prepareStoredMetricRefresh("))
         assertFalse(bind.contains("startPostLoginDeviceCheckRuntime("))
         assertFalse(bind.contains("beginPostLoginDeviceCheckFromUserAction("))
         assertTrue(prepare.contains("snapshot.disabledFeatures.toSet()"))
-        assertTrue(prepare.contains("cameraDependentChecksDeferred"))
-        assertTrue(start.contains("isActivityForeground"))
-        assertTrue(start.contains("hasCameraPermission()"))
-        assertTrue(start.contains("runtimeCameraStartBlockedByAnotherOwner()"))
-        assertTrue(start.contains("isWalkSessionRuntimeActive()"))
-        assertTrue(start.contains("startRuntimeMetricPreflight("))
+        assertTrue(prepare.contains("deferred"))
+        assertTrue(start.contains("facts.actor().foreground"))
+        assertTrue(start.contains("probes.mayStartStoredMetricRefresh(context.binding)"))
+        val native = MainActivityRefactorSource.property(source, "postLoginDeviceProbesHolder")
+        assertTrue(native.contains("hasCameraPermission() && !isWalkSessionRuntimeActive()"))
+        assertTrue(native.contains("!runtimeCameraStartBlockedByAnotherOwner()"))
+        assertTrue(native.contains("runtimeMetricSession.beginStoredDepthRefresh(binding)"))
+        assertTrue(start.contains("probes.startStoredMetricRefresh(context.binding)"))
         assertFalse(start.contains("requestPermissionsWithLease("))
         assertFalse(start.contains("startPostLoginDeviceCheckRuntime("))
     }
@@ -39,33 +41,35 @@ class MainActivityStoredMetricDepthRefreshStaticTest {
             "private fun isRuntimeMetricPreflightAttemptCurrent(",
         )
 
-        assertTrue(current.contains("snapshot.bindingOrNull == context.binding"))
-        assertTrue(current.contains("snapshot.state == context.state"))
-        assertTrue(current.contains("snapshot.disabledFeatures == context.disabledFeatures"))
-        assertTrue(current.contains("sessionBinding.actorId == context.binding.actorId"))
+        assertTrue(current.contains("current.bindingOrNull == context.binding"))
+        assertTrue(current.contains("current.state == context.state"))
+        assertTrue(current.contains("current.disabledFeatures == context.disabledFeatures"))
+        assertTrue(current.contains("binding.actorId == context.binding.actorId"))
         assertTrue(
             current.contains(
-                "sessionBinding.sessionGeneration == context.binding.sessionGeneration",
+                "binding.sessionGeneration == context.binding.sessionGeneration",
             ),
         )
-        assertTrue(preflightCurrent.contains("RuntimeMetricPreflightOwner.DEVICE_CHECK"))
-        assertTrue(
-            preflightCurrent.contains(
-                "RuntimeMetricPreflightOwner.STORED_DEPTH_REFRESH",
-            ),
-        )
-        assertTrue(preflightCurrent.contains("firstRunDeviceCheckAllowsPreflight()"))
-        assertTrue(preflightCurrent.contains("isStoredMetricDepthRefreshContextCurrent(it)"))
+        assertTrue(preflightCurrent.contains("attempt.ownerCurrent(device)"))
+        assertTrue(preflightCurrent.contains("device.bindingLive(binding)"))
+        val deviceOwner = metric.substringAfter("private class DeviceCheckOwner").substringBefore("private class StoredRefreshOwner")
+        assertTrue(deviceOwner.contains("RuntimeMetricPreflightOwner.DEVICE_CHECK"))
+        assertTrue(deviceOwner.contains("device.firstRunAllowsPreflight"))
+        val storedOwner = metric.substringAfter("private class StoredRefreshOwner").substringBefore("private class MetricPreflightAttempt")
+        assertTrue(storedOwner.contains("RuntimeMetricPreflightOwner.STORED_DEPTH_REFRESH"))
+        assertTrue(storedOwner.contains("device.storedRefreshCurrent(binding)"))
+        assertTrue(MainActivityRefactorSource.composition(source, "runtimeMetricSession").contains("isStoredMetricDepthRefreshContextCurrent(it)"))
+
     }
 
     @Test
     fun conclusiveSupportResultChangesOnlyMetricFeatureAndPublishesAfterSave() {
         val complete = functionBlock("private fun completeStoredMetricDepthRefresh(")
-        val save = complete.indexOf("postLoginDeviceCheckResultStore.save(")
-        val publish = complete.indexOf("postLoginDeviceCheckSnapshot = updatedSnapshot")
-        val override = complete.indexOf("metricDistanceCapabilityOverride =")
+        val save = complete.indexOf("savedResults.save(")
+        val publish = complete.indexOf("publish(next)")
+        val override = complete.indexOf("effects.metricCapabilityChanged(available)")
 
-        assertTrue(complete.contains("val metricDistanceAvailable = metricDistanceSupported ?: return false"))
+        assertTrue(complete.contains("val available = supported ?: return false"))
         assertTrue(complete.contains("PostLoginMetricDepthState.SUPPORTED"))
         assertTrue(complete.contains("PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED"))
         assertFalse(complete.contains("RuntimeMetricPreflightStatus."))
@@ -92,39 +96,26 @@ class MainActivityStoredMetricDepthRefreshStaticTest {
     @Test
     fun supportOnlyCheckAndLifecycleKeepAutomaticRetryPending() {
         val supportCheck = functionBlock("private fun continueRuntimeMetricPreflightStart(")
-        val invalidate = functionBlock("private fun invalidateRuntimeMetricEvidence(")
+        val invalidate = MainActivityRefactorSource.member(metric, "invalidateEvidence")
         val resume = functionBlock(
             "private fun resumeWalkSafeRuntimeAfterPrivacyStartupInspection()",
         )
-        val allowRetry = resume.indexOf("storedMetricDepthRefreshRetryAllowed = true")
+        val allowRetry = resume.indexOf("postLoginDeviceCheckController.allowStoredMetricRetry()")
         val retry = resume.indexOf("maybeStartStoredMetricDepthRefresh()")
 
         assertTrue(supportCheck.contains("availability != ArCoreApk.Availability.SUPPORTED_INSTALLED"))
-        assertTrue(supportCheck.contains("supportSession.isDepthModeSupported("))
+        assertTrue(supportCheck.contains("probe.automaticDepthSupported()"))
+        val sdkProbe = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/metric/AndroidRuntimeMetricPreflight.kt").readText()
+        assertTrue(sdkProbe.contains("session.isDepthModeSupported(Config.DepthMode.AUTOMATIC)"))
         assertTrue(supportCheck.contains("finishDeviceMetricDepthSupportCheck("))
         assertFalse(supportCheck.contains("requestInstall("))
         assertFalse(supportCheck.contains("startRuntimeMetricPreflightSession("))
-        assertTrue(invalidate.contains("metricPreflightOwner = RuntimeMetricPreflightOwner.NONE"))
+        assertTrue(invalidate.contains("metricPreflightAttempt = metricPreflightAttempt.retired()"))
         assertFalse(invalidate.contains("clearStoredMetricDepthRefresh()"))
         assertTrue(allowRetry >= 0)
         assertTrue(retry > allowRetry)
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "Missing function: $signature" }
-        val bodyStart = source.indexOf('{', start)
-        check(bodyStart >= 0) { "Missing function body: $signature" }
-        var depth = 0
-        for (index in bodyStart until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        error("Unterminated function: $signature")
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
+    private val metric = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/metric/RuntimeMetricSessionController.kt").readText()
 }

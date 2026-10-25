@@ -190,11 +190,15 @@ internal class AndroidSensitivePreferenceStore private constructor(
         fun clear(): Editor = apply { clearRequested = true }
 
         fun commit(): Boolean = commitEditor(clearRequested, updates)
+
+        /** Authority recovery needs a fresh disk acknowledgement even when values are identical. */
+        fun commitPersisted(): Boolean = commitEditor(clearRequested, updates, forcePersistence = true)
     }
 
     private fun commitEditor(
         clearRequested: Boolean,
         updates: Map<String, StoredValue?>,
+        forcePersistence: Boolean = false,
     ): Boolean = synchronized(this) {
         synchronized(PROCESS_LOCK) {
             if (blocked || isStaleLocked()) return@synchronized false
@@ -202,6 +206,8 @@ internal class AndroidSensitivePreferenceStore private constructor(
             updates.forEach { (key, value) ->
                 if (value == null) next.remove(key) else next[key] = value
             }
+            // Clearing always persists; only a current, unblocked owner may skip an identical edit.
+            if (!clearRequested && !forcePersistence && next == values) return@synchronized true
             persist(next)
         }
     }

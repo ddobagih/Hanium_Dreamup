@@ -1,0 +1,20 @@
+flowchart TD
+ A["F-D08-011 refresh P-D08-010"] --> B["제출family 본검사전 IP family global admission"]
+ B --> C{"family와 proof 예비검사"}
+ C -->|"invalid"| X["401 전체폐기 안 함"]
+ C -->|"Backend current proof"| D["Backend session current 조회"]
+ C -->|"Backend consumed 또는legacy family"| E["Backend 조회 생략"]
+ D -->|"unavailable"| U["503 family 유지"]
+ D -->|"current 또는denied"| L["actor queue 및filelock 안 상태 재읽기"]
+ E --> L
+ L --> P{"잠금 안 proof와family 현재성"}
+ P -->|"확인된 소비proof, family 활성"| R["계정 모든short long 폐기 및401 reuse"]
+ P -->|"이미 폐기된 family"| Q["현재 revoke 오류, 새로그인 추가폐기 안 함"]
+ P -->|"invalid 또는stale"| X
+ P -->|"current"| T{"Backend binding denied 또는TTL/rotation cap"}
+ T -->|"예"| V["family 폐기401"]
+ T -->|"아니오"| W["privacy commit guard 아래 새rotation 내구저장"]
+ W -->|"commit성공"| Y["새access cookie와refresh bundle"]
+ W -->|"postcommit실패"| Z["500 outcome unknown 재인증"]
+ L -. "대기취소 busy 또는storage실패" .-> ERR["499 또는503, commit여부 분리"]
+ Y --> END["lock 및admission 반납"]

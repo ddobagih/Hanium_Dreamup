@@ -1,0 +1,26 @@
+stateDiagram-v2
+  state "S-D03-009-01 Stopped" as stopped
+  state "S-D03-009-02 WaitingForWakeWord" as wake
+  state "S-D03-009-03 AcknowledgingWake" as ack
+  state "S-D03-009-04 WaitingForCommand" as command
+  state "S-D03-009-05 ProcessingCommand" as processing
+  state "S-D03-009-06 Speaking" as speaking
+  state "S-D03-009-07 WaitingForCommandResult" as result
+  [*] --> stopped
+  stopped --> wake: eligible and stream ready
+  wake --> ack: trusted wake
+  ack --> command: cue terminal and current owner
+  ack --> processing: trusted same utterance command
+  command --> processing: trusted final
+  command --> wake: 6s timeout or second low confidence
+  processing --> result: pending work and 1.2s without output
+  processing --> speaking: output starts
+  result --> ack: new trusted wake
+  result --> speaking: result output starts
+  speaking --> wake: work ended and quiet 500ms
+  result --> stopped: work 30s timeout
+  speaking --> stopped: stalled output 130s
+  wake --> stopped: stop or eligibility lost
+  command --> stopped: stop or eligibility lost
+  ack --> stopped: stop or owner lost
+  processing --> stopped: terminal failure

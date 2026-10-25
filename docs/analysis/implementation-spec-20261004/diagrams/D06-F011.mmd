@@ -1,0 +1,44 @@
+flowchart TD
+  T["F-D06-011 내 신고 목록·상태 필터·상세 조회"]
+  P["전제: 완료된 first-run actor binding, GENERAL VERIFIED<br/>backend/device/accountGeneration session, local identity<br/>epoch, 허용 네트워크. 계정삭제/복구전용/storageBlocked 제외."]
+  T --> P
+  E1["E-D06-011-01 내 신고 새로고침/필터 변경→25건 첫 페이지"]
+  E1 --> T
+  E2["E-D06-011-02 다음 페이지→현재 cursor/filter 확인→추가"]
+  E2 --> T
+  E3["E-D06-011-03 리스트 항목 선택→동일 report 상세 조회"]
+  E3 --> T
+  A1["1. bound authority와 현재 session 객체/generation/local epoch가 일치할<br/>때만 단일 호출을 시작한다."]
+  P --> A1
+  A2["2. 목록 새로고침 동안 기존 list를 유지하고 상세/정정 선택을 초기화한다."]
+  A1 --> A2
+  A3["3. cursor 재반복·중복 report ID를 거부하고 page를 이어붙인다."]
+  A2 --> A3
+  A4["4. 목록 안의 ID만 상세 열고 반환 reportId 일치를 검증한다."]
+  A3 --> A4
+  A5["5. 기관 제출/처리 완료 label은 관리자가 수동 기록한 전달 상태라고 표시한다."]
+  A4 --> A5
+  N["정상 종료: 조회 결과 게시."]
+  A5 --> N
+  FX["결과: 목록·상세·status/filter 버튼과 접근성 문구. 기관 외부 전송 호출 없음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"목록 404"}
+    R1["전체 신고 메모리 정리, NOT_FOUND_OR_SIGNED_OUT"]
+    B1 -->|조건 성립| R1
+    B2{"네트워크 제한/변경"}
+    R2["진행 취소, 이전 캐시 복원 및 명시 retry"]
+    B2 -->|조건 성립| R2
+    B3{"session 만료/교체"}
+    R3["민감 UI 및 pending 의도 제거"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-011, P-D06-012"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 프로토콜/서버 오류와 retry 상태."]
+    X2["시간: connect8초/read15초."]
+    X3["취소: 권한·network·destroy 취소."]
+    X4["재시도: 사용자 retry; 자동 복구는 history cursor 별도 기능."]
+    X5["정리: 권한 변경 때 전체 사용자 신고 메모리 초기화."]
+  end

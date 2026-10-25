@@ -1,0 +1,38 @@
+stateDiagram-v2
+  state "S-D09-011-IDLE · 작업 없음" as Idle
+  state "S-D09-011-RESERVED · submission 소유" as Reserved
+  state "S-D09-011-COLD · child 생성과 kind 준비" as Cold
+  state "S-D09-011-RUNNING · job 처리" as Running
+  state "S-D09-011-RETIRING · worker 정리 시도" as Retiring
+  state "S-D09-011-QUARANTINED · 미확인 worker handle 보존" as Quarantined
+  state "S-D09-011-CLOSE_BLOCKED · executor retire 또는 submission 미완료" as CloseBlocked
+  state "S-D09-011-CLOSED · close 정리 확인" as Closed
+  [*] --> Idle
+  Idle --> Reserved: submit 승인
+  Reserved --> Cold: worker 없음 또는 kind가 cold
+  Reserved --> Running: warm contract
+  Reserved --> Retiring: 남은 worker handle 정리 재시도
+  Cold --> Running: restart 정책과 startup 기한 통과
+  Running --> Idle: 정상 또는 typed recoverable 오류와 owner 반환
+  Running --> Retiring: fatal 오류 또는 실행 deadline
+  Cold --> Retiring: 준비 실패 또는 기한 초과
+  Retiring --> Idle: 일반 실패의 정리 및 owner 반환 완료
+  Retiring --> Cold: 새 submission의 기존 정리 완료 후 restart 허용
+  Retiring --> Quarantined: worker cleanup 미확인
+  Quarantined --> Reserved: 일반 cleanup 실패 뒤 owner 반환 및 새 submit
+  Quarantined --> Retiring: close가 worker 정리 재시도
+  Idle --> Retiring: close 요청
+  Reserved --> Retiring: close 요청
+  Running --> Retiring: close 요청 후 grace 만료
+  Retiring --> Closed: close의 executor 및 worker 정리 확인
+  Retiring --> CloseBlocked: executor retire 또는 submission 종료 미확인
+  CloseBlocked --> CloseBlocked: retiring 또는 submission 보유 중 submit 거절
+  CloseBlocked --> Retiring: close 재시도
+  Closed --> Idle: 모든 close 완료 후 shutdown flag 해제, 재사용 가능
+  note right of Quarantined
+    F-D09-011 / P-D09-011 문서 상태 모델
+    기존 handle 정리 전 새 worker 생성 금지
+    일반 cleanup 실패가 모든 새 submit을 막는 것은 아님
+    close 실패의 shutdown flag는 worker 준비를 차단할 수 있음
+    caller 취소만으로 IDLE 전이 금지
+  end note

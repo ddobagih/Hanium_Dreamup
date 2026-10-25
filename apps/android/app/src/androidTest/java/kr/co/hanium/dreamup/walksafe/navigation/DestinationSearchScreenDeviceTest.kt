@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
 import android.content.Intent
 import android.graphics.Rect
 import android.os.Handler
@@ -242,7 +244,7 @@ class DestinationSearchScreenDeviceTest {
     private fun page(activity: MainActivity): String = (field(activity, "nativeUiPage") as Enum<*>).name
 
     private fun field(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.get(activity)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.get(activity)
 
     private fun invokeBoolean(activity: MainActivity, name: String): Boolean =
         MainActivity::class.java.getDeclaredMethod(name).apply { isAccessible = true }.invoke(activity) as Boolean

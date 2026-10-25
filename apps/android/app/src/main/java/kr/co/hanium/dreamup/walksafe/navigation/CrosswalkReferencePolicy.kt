@@ -1,10 +1,10 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
 const val CROSSWALK_REFERENCE_NOTICE_KO =
-    "횡단보도 정보는 참고용입니다. 신호와 차량 등 주변 안전을 직접 확인하세요. 이 안내는 건너도 안전하다는 판단을 대신하지 않습니다."
+    "횡단보도 참고 안내입니다. 주변을 확인하세요. 횡단 판단은 대신하지 않습니다."
 
 object CrosswalkReferencePolicy {
-    private val tmapCrosswalkTurnTypes = setOf(211, 212, 213)
+    private val tmapCrosswalkTurnTypes = setOf(211, 212, 213, 214, 215, 216, 217)
     private val crosswalkTextMarkers = listOf("횡단보도", "crosswalk", "zebra")
     private val detectorClassNames = setOf("crosswalk", "zebra")
 

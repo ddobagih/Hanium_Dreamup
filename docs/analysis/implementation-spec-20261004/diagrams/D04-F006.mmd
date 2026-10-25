@@ -1,0 +1,28 @@
+flowchart TD
+  ID["F-D04-006 · 장치 움직임·정지 후보 상태<br/>P-D04-006"]
+  A["Motion sample"]
+  C0{"시간·수치가 유효하며 새 sample인가"}
+  R0["rejected decision; 기존 상태 유지"]
+  C1{"step 또는 움직임 근거가 없는가"}
+  R1["MOVING"]
+  C2{"충분한 quiet accel 및 gyro 조건인가"}
+  R2["UNKNOWN"]
+  C3{"독립 accel 끝 시각으로 1.5초 또는 3초 dwell이 지났는가"}
+  R3["CANDIDATE"]
+  OK["장치 STATIONARY decision; 통합 state가 추가 GNSS 검사"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C3 -->|"아니오"| R3
+  C3 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  C2 -->|"예"| C3
+  R2 --> END
+  R3 --> END

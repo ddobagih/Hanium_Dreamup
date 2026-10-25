@@ -1,0 +1,19 @@
+stateDiagram-v2
+  state "F-D04-012 source 없음" as None
+  state "GPS" as Gps
+  state "MAGNETIC" as Mag
+  state "전환 후보 대기" as Pending
+  state "오래된 course 보류" as Withheld
+  [*] --> None
+  None --> Gps: 유효 속도와 GPS 선호
+  None --> Mag: 속도 0.5m/s 이하와 chest 유효
+  Gps --> Pending: magnetic 선호로 변화
+  Mag --> Pending: 속도 0.8m/s 이상과 GPS 유효
+  Pending --> Gps: GPS 새 관측 2개와 hold 1500ms
+  Pending --> Mag: magnetic 새 관측 2개와 hold 1500ms
+  Gps --> Mag: GPS 소실과 허용 magnetic 대체
+  Mag --> None: 저속 magnetic 소실
+  Gps --> Withheld: 회전 확인 후 GPS 회전 보정 실패
+  Withheld --> Gps: 유효 새 course 또는 회전 전달
+  Gps --> None: 속도·source 무효 또는 stale
+  Mag --> None: 속도·source 무효 또는 stale

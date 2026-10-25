@@ -1,0 +1,48 @@
+flowchart TD
+  A["F-D08-051 원본 collection manifest 전송"]
+  B["진입: PUT /api/raw-collections/{collection_id}/manifest"]
+  A --> B
+  P0["1. rawheaders 와 framing 검증"]
+  B --> P0
+  P1["2. globalwrite1slot 획득"]
+  P0 --> P1
+  P2["3. writeGate→Backend HEADpreflight→writeGate"]
+  P1 --> P2
+  P3["4. 정확 Content-Length 만큼 body15 초내읽고 canonicalJSON/inventory/digest 검증"]
+  P2 --> P3
+  P4["5. writeGate 후 BackendPUT20 초"]
+  P3 --> P4
+  P5["6. 후속 gate/projection"]
+  P4 --> P5
+  OK["정상: manifest 중계결과"]
+  P5 --> OK
+  C0{"content-encoding/transfer-encoding/digest/trailer"}
+  X0["400"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"query 존재"}
+  X1["400"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"다른 rawwrite 진행"}
+  X2["503 RetryAfter1"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"activewalk/종료기록없음"}
+  X3["409"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  C4{"binding/consent 가중간에변함"}
+  X4["409;upstreambodycancel"]
+  B -. "해당 단계 분기" .-> C4
+  C4 -->|"조건 충족"| X4
+  C5{"upstreamprojection 불가"}
+  X5["502"]
+  B -. "해당 단계 분기" .-> C5
+  C5 -->|"조건 충족"| X5
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-004, P-D08-011, P-D08-013, P-D08-017, P-D08-026, P-D08-029"]
+  A -.-> POLICY

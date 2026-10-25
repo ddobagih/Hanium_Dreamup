@@ -1,0 +1,116 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D09 독립 명세 검토 — D08 작성자</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="../index.html">WalkSafe 기능과 처리 명세</a> · <a href="../02-features.html">기능</a> · <a href="../03-policies.html">정책</a> · <a href="../05-scenarios.html">시나리오</a> · <a href="../gallery.html">그림 모음</a> · <a href="../08-review.html">검수</a></header><main><h1>D09 독립 명세 검토 — D08 작성자</h1>
+<p>[판정]</p>
+<ul>
+<li>상태: 표본 검토 및 수정본 재검토 완료. 아래 7개 기능·7개 정책·12개 도표 표본에서 RV01~06을 모두 해결했으며, 표본 범위에 남은 중요 문서 수정 요청은 없다. 전체 D09 정확성 또는 제품 실행 성공을 보증하지 않는다.</li>
+<li>검토자는 D08 작성자이며 D09 작성자가 아니다. 검토자는 D09 JSON·Mermaid 및 제품 코드를 수정하지 않았다. 이 리뷰 파일만 작성했다.</li>
+<li>제품 테스트·빌드·서버·API·모델·DB·외부 공급자 실행은 모두 미수행. 테스트 파일은 기대행동의 출처로만 읽었다.</li>
+</ul>
+<p>[기준과 버전]</p>
+<ul>
+<li>고정 소스: <code>/tmp/walksafe-spec-20261004-source</code>, 기준시각 <code>2026-10-04T10:33:40+09:00</code>, base commit <code>2e5744725a8c033a1817f3cc8a8ec679bc15ac9d</code> + 당시 WIP.</li>
+<li>문서 루트: <code>/home/ddobagi/Hanium_Dreamup/docs/analysis/implementation-spec-20261004</code>.</li>
+<li>작성자가 쓰기 종료·freeze를 통보한 뒤 <code>domains/D09.json</code>과 도표를 읽었다.</li>
+<li>최초 JSON SHA256: <code>c5b4e5720ac9e76fb5ae389c1d787c6841028b83efaeb91cd1f875ab728eba39</code>.</li>
+<li>작성자 제공 최초 JSON+40 Mermaid 경로/내용 집계 SHA256: <code>55aea3980e2bd0c676edeb3be83a33a40413c3770029a015a1c50303d2fae233</code>.</li>
+<li>수정본 JSON SHA256(재검토 읽기 전후 일치): <code>1ad7df6aa60f04b05d6a74ce3efb2829655743ceea336f1ca5741e13446434e3</code>. 최초 SHA와의 변경은 작성자가 RV05 조건·복구·상태 및 RV06 참조를 수정한 결과이며 해당 변경을 재검토했다.</li>
+</ul>
+<p>[핵심 표본과 확인한 주장]</p>
+<table>
+<thead>
+<tr>
+<th>기능·정책</th>
+<th>실제 확인한 코드</th>
+<th>확인한 주장·판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>F-D09-003 / P-D09-003</td>
+<td><code>backend/app/field_test_security.py:1132–1160, 1309–1537, 2486–2643</code></td>
+<td>v4 구조/시간/kid/actor/generation/method/target precheck는 body 읽기보다 먼저다. 허용 후 bounded body capture, request MAC, jti claim, field 현재 DB 계정 검사 순서다. <code>iat &lt; exp &lt;= iat+30</code>, 미래 5초 이내, now==exp 허용, replay cache 100000개 한도, exp+5를 넘은 항목만 정리하는 설명과 일치. DB 미등록은 epoch 없는 legacy만 허용하며 DB 계정은 ACTIVE/generation/epoch가 맞아야 한다. 도표 실패 노드 연결은 RV01에서 수정 후 재검토했다.</td>
+</tr>
+<tr>
+<td>F-D09-007 / P-D09-007</td>
+<td><code>backend/app/request_limits.py:12–55, 62–211, 226–385</code>; <code>backend/app/api/request_validation.py:17–56</code>; <code>backend/app/main.py:356–522</code></td>
+<td>계정 3개 경로만 16KiB, privacy32KiB, raw manifest512KiB/chunk8MiB/commit16KiB, correction4KiB, 나머지 upload+metadata+256KiB. <code>/accounts/session-current</code>는 계정 16KiB 집합에 없다. Content-Length 사전 거절과 실제 누적 읽기 제한은 별도. privacy/raw/report/uploads 캐시·오류 투영 설명을 표본 대조했다. RV02 실제 수신 분기와 RV06 참조 위치는 수정 후 재검토했다. Content-Length 조기 거절 화살표도 최종본에서 확인했다.</td>
+</tr>
+<tr>
+<td>F-D09-010 / P-D09-010</td>
+<td><code>backend/app/services/_detection_preprocessing.py:153–570, 617–690</code>; <code>backend/app/uploads.py:179–316</code>; <code>backend/app/api/detect.py:32–38</code></td>
+<td>동시 2개의 즉시 semaphore, 전처리 전용 inference timeout, 원문/정제 후 byte 상한, dimension8192/pixels20000000, EXIF 방향 반영·새 pixel 재인코딩. timeout/cancel은 request_close를 요청하고 실제 child/IPC 정리 확인 전 slot을 반환하지 않는다. <code>_complete</code>의 한번 전달과 reaper 정리 재시도를 확인. 표본 설명 일치.</td>
+</tr>
+<tr>
+<td>F-D09-011 / P-D09-011</td>
+<td><code>backend/app/services/inference_process.py:24–37, 402–484, 532–701, 703–917</code>; <code>backend/app/api/detect.py:154–199</code></td>
+<td>단일 submission, queue/실행 기한 분리, kind별 cold30초/warm2초 기본값, 정확 job/schema/deadline 검증, typed recoverable 오류만 worker 보존, 60초창 생성3회와 최소5초 간격, close grace1초/전체4초, caller가 Future를 취소하지 않는 소유권은 일치. close 성공 후 재접수와 일반 retirement 재시도 경계는 RV05에서 수정 후 재검토했다.</td>
+</tr>
+<tr>
+<td>F-D09-018 / P-D09-018</td>
+<td><code>backend/app/services/tmap_runtime.py:22–41, 169–225, 454–482, 560–897</code>; <code>backend/app/services/tmap_pedestrian.py:236–317, 2028–2055</code></td>
+<td>2개의 lease, owner loop에서 await 없는 예산 check/spend, fixed60/86400초 window, 기본60/5000 호출예산, 429 cooldown30–300초, 2MiB raw body 제한, identity encoding, cancelled caller와 owned cleanup 분리, cleanup 실패 시 lease/참조 보존과 admission stop을 확인. readiness probe는 별도 allowance지만 호출 전 user budget 소진도 검사한다. 서술과 일치; RV06 source line도 보완 후 재검토했다.</td>
+</tr>
+<tr>
+<td>F-D09-027 / P-D09-027</td>
+<td><code>backend/app/services/capacity_state.py:71–324, 326–364, 391–499</code>; <code>backend/app/main.py:267–341</code></td>
+<td>version 증가, observed_at 비감소, TTL&gt;interval, canonical/private counter와 lock·fsync·rename, statvfs bavail 기준 비율, 정확70/85/95/100 경계, 실패 시 기존 snapshot expiry를 늘리지 않는 조건과 일치. startup 최초 측정 뒤 주기 측정, shutdown 진행 측정 대기를 확인. threshold 정상 publish 흐름은 RV03에서 수정 후 재검토했다.</td>
+</tr>
+<tr>
+<td>F-D09-028 / P-D09-028</td>
+<td><code>backend/app/api/capacity.py:25–55</code>; <code>backend/app/services/capacity_state.py:108–115</code>; <code>backend/app/field_test_security.py</code>의 명시 route 정책과 <code>requires_actor_identity:491–506</code></td>
+<td>exact GET/internal/capacity의 field 역할, named actor 없는 서비스 호출 가능, 유효 snapshot 5필드만 노출, now&gt;=expires_at이면503, 200/503 no-store를 확인. RV04 snapshot 실패 도표 연결은 수정 후 재검토했다.</td>
+</tr>
+</tbody></table>
+<p>[읽은 도표]</p>
+<ul>
+<li><code>D09-F003.mmd</code>, <code>D09-actor-sequence.mmd</code>, <code>D09-F007.mmd</code>, <code>D09-F010.mmd</code>, <code>D09-F011.mmd</code>, <code>D09-inference-sequence.mmd</code>, <code>D09-inference-state.mmd</code>, <code>D09-F018.mmd</code>, <code>D09-tmap-sequence.mmd</code>, <code>D09-F027.mmd</code>, <code>D09-F028.mmd</code>, <code>D09-capacity-state.mmd</code> — 모두 <code>diagrams/</code> 아래 파일.</li>
+<li>단계 조건, 종료/복구와 상태 전이를 소스에 대조했다. SVG 렌더 및 시각 레이아웃 검사는 이 독립 검토 범위가 아니다.</li>
+</ul>
+<p>[발견사항 — 최초본의 문서 오류와 수정 이력]</p>
+<ul>
+<li>RV01: <code>D09-F003.mmd</code>에서 시간 precheck 실패 B0가 bounded body N1 뒤에 연결되어 있었다. 실제 <code>field_test_security.py:2516–2541</code>은 precheck 실패 시 body를 읽지 않으므로 N0에서 거절해야 한다. 본문은 올바른 순서를 이미 설명했다. 작성자에게 수정 요청.</li>
+<li>RV02: <code>D09-F007.mmd</code>에서 실제 수신 byte 초과가 Content-Length 검사 N1에 연결되어 있었다. 실제 누적은 <code>request_limits.py:308–314</code>의 receive 단계이므로 N2에서 분기하며 Content-Length 초과와 별개로 표시해야 한다. 작성자에게 수정 요청.</li>
+<li>RV03: <code>D09-F027.mmd</code>의 70/85/95/100 threshold 분기가 B2에서 실패 END로 빠져 counter 예약·publish 공통경로를 건너뛰었다. <code>capacity_state.py:309–321</code>은 모든 정상 level에 version 예약과 publish를 수행한다. 정상 level 결정 경로와 측정/counter/publish 실패를 구분하도록 요청.</li>
+<li>RV04: <code>D09-F028.mmd</code>의 snapshot 없음/만료가 인가 N0에 연결되어 있었다. <code>api/capacity.py:43–50</code>은 인가 뒤 current() 검사이므로 N1에서 실패해야 한다. 작성자에게 수정 요청.</li>
+<li>RV05: <code>D09-inference-state.mmd</code>는 Closed를 영구 접수중지처럼 표현하고 Quarantined에서 새 submit 자체를 거절하는 self-loop만 제시했다. 실제 <code>inference_process.py:864–868, 913–917</code>은 성공한 close 뒤 executor retiring/shutdown 상태를 해제하여 같은 인스턴스를 재사용할 수 있다. 일반 fatal cleanup 미확인은 다음 submission이 <code>:646–654</code>에서 기존 자원 정리를 다시 확인한 뒤에만 새 worker를 만든다. shutdown 실패로 executor_retiring이 남은 경우와 이를 구분해야 한다. JSON 조건·상태 및 도표 수정 요청.</li>
+<li>RV06: F007 entrypoint의 RequestBodyLimitMiddleware 시작은236이 아니라251이며 max_request_body_bytes 전체는226–248이다. 기존 참조210–233은 privacy/raw/기본 cap 분기를 빠뜨린다. P018 cooldown source661은 probe allowance 위치이며 실제666–689다. 작성자에게 참조 보완 요청.</li>
+</ul>
+<p>[제품 정적 관찰과 테스트 기대]</p>
+<ul>
+<li>R-D09-004는 문서 오류로 보지 않는다. STAIR_AVOID의 미확인 facility/turn code가 <code>tmap_pedestrian.py:1298–1310</code>에서 <code>route_safety_code_unknown</code>으로 발생하고, runtime 허용 오류 집합에 없어 <code>tmap_runtime.py:454–482</code>에서503 <code>tmap_processing_unavailable</code>로 바뀌며 <code>:837–841</code>에서 admission을 중지하는 경로를 확인했다.</li>
+<li><code>backend/tests/test_navigation_road_type_worker_error_regression.py:101–113</code>은 502→503 분류를 명시적으로 기대한다. 이는 테스트를 실행한 결과가 아니며 실제 provider 응답·운영 runtime 정지 발생을 관찰했다는 뜻이 아니다. 수정 필요성·제품 결함 판정은 별도 과제다.</li>
+<li><code>backend/tests/test_actor_assertion_v4.py:130–171</code>에서 exp 정각/다음초·미래5초·replay retention 경계 기대를 읽었다.</li>
+<li><code>backend/tests/test_capacity_state.py:80–135, 592–638</code>에서 threshold와 회복, version/time rollback 거절,5필드/no-store/정확만료503 및 route 분류 기대를 읽었다.</li>
+<li>과거 실행 기록의 현재 snapshot 재현 여부는 확인하지 않았으며 현재 성공 증거로 인용하지 않았다.</li>
+</ul>
+<p>[미검토와 한계]</p>
+<ul>
+<li>D09의 31개 기능 중 독립 심층 표본은 위 7개다. F001/002/004–006/008–009/012–017/019–026/029–031 전체 기능은 전수 대조하지 않았다. 연관 caller/정책 일부 읽기는 해당 기능 전체 검토를 의미하지 않는다.</li>
+<li>모든 API method/path 목록의 전수 일치, DB rate limiter와 retention 전 분기, provider/model 출력 의미, navigation geometry 전부, debug storage 암호화·migration·quota, DB TLS/DDL와 OpenAPI 전수 차이는 검토하지 않았다.</li>
+<li>실제 환경값, 다중 worker/replica 실행, 운영 DB/파일 권한·용량·backup, 부하/경쟁·취소·프로세스 kill, Android–Gateway–Backend 통합은 실행·검증하지 않았다.</li>
+<li>12개 도표의 의미를 표본 코드에 대조했으며 전체40개 도표 문법/렌더/연결 정확성을 보증하지 않는다. 발견되지 않은 오류가 없다는 보증이 아니다.</li>
+</ul>
+<p>[재검토 기록]</p>
+<ul>
+<li><p>작성자가 수정본을 freeze했다고 통보한 뒤 JSON 변경 F007/P007, F011/P011, P018 및 <code>D09-F003/F007/F027/F028.mmd</code>, <code>D09-inference-state.mmd</code>를 재독했다. 관련 기존 flow <code>D09-F011.mmd</code>도 함께 대조했다.</p>
+</li>
+<li><p>RV01: 시간 거절이 N0에 연결됨. 해결.</p>
+</li>
+<li><p>RV02: 실제 byte 초과는 N2, 민감 validation 거절은 N3로 이동. N1 Content-Length 조기413 화살표도 마지막 수정본에서 확인. 해결.</p>
+</li>
+<li><p>RV03: 모든 유효 level은 version 예약·publish 공통경로를 통과하며 측정/counter/publish 실패는 기존 expiry를 연장하지 않고 다음 interval로 간다. 해결.</p>
+</li>
+<li><p>RV04: snapshot 없음/만료는 N1에서 분기한다. 해결.</p>
+</li>
+<li><p>RV05: 일반 worker handle 미확인은 새 submission의 정리 재시도로 이어지며 executor/submission 종료 미확인 상태는 CloseBlocked로 분리했다. close 성공 뒤 모든 closer 종료와 shutdown flag 해제 후 같은 runner 재사용을 명시했다. 해결.</p>
+</li>
+<li><p>RV06: F007 entry251, F/P007 함수226–248, P018 cooldown666–689를 확인했다. 해결.</p>
+</li>
+<li><p>수정본 JSON 읽기 전후 모두 <code>1ad7df6aa60f04b05d6a74ce3efb2829655743ceea336f1ca5741e13446434e3</code>이다. 최종 Mermaid 변경 확인 후 JSON을 다시 읽은 SHA도 동일하다.</p>
+</li>
+<li><p>최종 <code>D09-F007.mmd</code> SHA256: <code>176c2d8fe7969721773eb76090ae7bd5d08c29f4fb9723b9e396c9de2ef5a5f6</code>. N1 선언 Content-Length 초과와 N2 실제 누적 bytes 초과의 별도413 화살표를 확인했다.</p>
+</li>
+<li><p>작성자 제공 최종 JSON+40 Mermaid 집계 SHA256: <code>f20e3509b34dcac49cabd774f309c0f04a4b6cd169cefcd36a7bec67812eb2ce</code>. 집계 산식 자체를 재현하지는 않았으며 검토자는 JSON과 변경 F007의 실제 파일 SHA를 직접 확인했다.</p>
+</li>
+<li><p>위 수정 내용은 문서와 도표의 정확성 보완이다. 제품 코드는 수정하지 않았으며 정적 표본 검토의 범위와 미실행 조건은 그대로다.</p>
+</li>
+</ul>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

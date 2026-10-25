@@ -7,8 +7,6 @@ import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
-import org.vosk.Model
-import org.vosk.Recognizer
 
 internal enum class VoskStreamingError {
     MODEL_UNAVAILABLE,
@@ -17,11 +15,16 @@ internal enum class VoskStreamingError {
     AUDIO_READ_FAILED,
     /** S04-27: the system silenced this capture; not a user who stayed quiet. */
     AUDIO_SILENCED,
+    AUDIO_ROUTE_CHANGED,
     INFERENCE_FAILED,
 }
 
 internal fun voskAudioInputFailure(code: Int): VoskStreamingError =
-    if (code == PCM_INPUT_SILENCED_CODE) VoskStreamingError.AUDIO_SILENCED else VoskStreamingError.AUDIO_READ_FAILED
+    when (code) {
+        PCM_INPUT_SILENCED_CODE -> VoskStreamingError.AUDIO_SILENCED
+        PCM_INPUT_ROUTE_CHANGED_CODE -> VoskStreamingError.AUDIO_ROUTE_CHANGED
+        else -> VoskStreamingError.AUDIO_READ_FAILED
+    }
 
 internal interface VoskStreamingListener {
     fun onReady(runId: Long)
@@ -61,8 +64,8 @@ internal object VoskStreamingWorker {
 
 internal data class VoskPreparedRun(
     val audioSource: VoskPcmSource,
-    val recognizer: Recognizer?,
-    val model: Model?,
+    val recognizer: VoskDecoder?,
+    val model: Closeable?,
 )
 
 /**
@@ -94,8 +97,8 @@ internal class VoskStreamingTranscriber(
     private val decoderLock = Any()
     private var state = State.STOPPED
     private var generation = 0L
-    private var model: Model? = null
-    private var recognizer: Recognizer? = null
+    private var model: Closeable? = null
+    private var recognizer: VoskDecoder? = null
     private var audioSource: VoskPcmSource? = null
     private var failureReportedGeneration: Long? = null
     private var startupReadError: VoskStreamingError? = null
@@ -176,26 +179,14 @@ internal class VoskStreamingTranscriber(
             failStart(startGeneration, VoskStreamingError.MODEL_UNAVAILABLE)
             return
         }
-        val openedModel = try {
-            Model(verifiedDirectory.absolutePath)
-        } catch (_: Exception) {
-            failStart(startGeneration, VoskStreamingError.MODEL_LOAD_FAILED)
-            return
-        }
         val openedRecognizer = try {
-            Recognizer(openedModel, SAMPLE_RATE_HZ.toFloat()).apply {
-                setWords(true)
-                setPartialWords(false)
-                setMaxAlternatives(0)
-                setEndpointerMode(Recognizer.EndpointerMode.SHORT)
-                if (homeWakeEndpointing) {
-                    // Native endpoint durations are seconds; only HOME waits for a short wake.
-                    // Keep real endpoint results and their original word confidences.
-                    setEndpointerDelays(5.0f, 0.35f, 5.0f)
-                }
-            }
+            RemoteVoskDecoder.open(
+                context = checkNotNull(context),
+                modelDirectory = verifiedDirectory,
+                homeWakeEndpointing = homeWakeEndpointing,
+                onFailure = { handleRuntimeFailure(startGeneration, VoskStreamingError.INFERENCE_FAILED) },
+            )
         } catch (_: Exception) {
-            runCatching { openedModel.close() }
             failStart(startGeneration, VoskStreamingError.MODEL_LOAD_FAILED)
             return
         }
@@ -204,7 +195,7 @@ internal class VoskStreamingTranscriber(
             onPcm16 = { samples -> processPcm(startGeneration, openedRecognizer, samples) },
             onReadError = { code -> handleRuntimeFailure(startGeneration, voskAudioInputFailure(code)) },
         )
-        enqueuePrepared(startGeneration, VoskPreparedRun(source, openedRecognizer, openedModel))
+        enqueuePrepared(startGeneration, VoskPreparedRun(source, openedRecognizer, null))
     }
 
     private fun enqueuePrepared(startGeneration: Long, prepared: VoskPreparedRun) {
@@ -276,27 +267,27 @@ internal class VoskStreamingTranscriber(
 
     private fun processPcm(
         callbackGeneration: Long,
-        activeRecognizer: Recognizer,
+        activeRecognizer: VoskDecoder,
         samples: ShortArray,
     ) {
         synchronized(decoderLock) {
             if (!isCurrentRunning(callbackGeneration, activeRecognizer)) return
             try {
-            val capturedInputGeneration = runCatching(inputGeneration).getOrNull()
-            if (runCatching(isInputSuppressed).getOrDefault(true)) {
-                if (!decoderSuppressed) {
-                    decoderSuppressed = true
+                val capturedInputGeneration = runCatching(inputGeneration).getOrNull()
+                if (runCatching(isInputSuppressed).getOrDefault(true)) {
+                    if (!decoderSuppressed) {
+                        decoderSuppressed = true
+                        activeRecognizer.reset()
+                        lastPartial = ""
+                    }
+                    return
+                }
+                if (decoderSuppressed || decoderInputGeneration != capturedInputGeneration) {
+                    decoderSuppressed = false
                     activeRecognizer.reset()
                     lastPartial = ""
                 }
-                return
-            }
-            if (decoderSuppressed || decoderInputGeneration != capturedInputGeneration) {
-                decoderSuppressed = false
-                activeRecognizer.reset()
-                lastPartial = ""
-            }
-            decoderInputGeneration = capturedInputGeneration
+                decoderInputGeneration = capturedInputGeneration
                 if (activeRecognizer.acceptWaveForm(samples, samples.size)) {
                     listener.onAudioEnd(callbackGeneration, capturedInputGeneration)
                     emitTranscript(
@@ -317,7 +308,7 @@ internal class VoskStreamingTranscriber(
 
     private fun maybeEmitPartial(
         callbackGeneration: Long,
-        activeRecognizer: Recognizer,
+        activeRecognizer: VoskDecoder,
         capturedInputGeneration: Long?,
     ) {
         val nowNanos = System.nanoTime()
@@ -376,21 +367,24 @@ internal class VoskStreamingTranscriber(
         startGeneration: Long,
         error: VoskStreamingError,
     ) {
+        var reportedError = error
         val accepted = synchronized(stateLock) {
             if (state != State.STARTING || generation != startGeneration) {
                 false
             } else {
+                reportedError = startupReadError ?: error
+                startupReadError = null
                 state = State.STOPPED
                 generation += 1L
                 true
             }
         }
-        if (accepted) listener.onError(startGeneration, error)
+        if (accepted) listener.onError(startGeneration, reportedError)
     }
 
     private fun isCurrentRunning(
         callbackGeneration: Long,
-        activeRecognizer: Recognizer,
+        activeRecognizer: VoskDecoder,
     ): Boolean = synchronized(stateLock) {
         state == State.RUNNING &&
             generation == callbackGeneration &&
@@ -424,8 +418,8 @@ internal class VoskStreamingTranscriber(
 
     private data class Resources(
         val audioSource: VoskPcmSource?,
-        val recognizer: Recognizer?,
-        val model: Model?,
+        val recognizer: VoskDecoder?,
+        val model: Closeable?,
     )
 
     private companion object {

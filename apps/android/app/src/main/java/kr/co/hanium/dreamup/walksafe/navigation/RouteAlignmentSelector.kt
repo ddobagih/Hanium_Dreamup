@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.FilteredRoutePosition
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.LocalGeodesy
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteCorridorMatchResult
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteMatchQuality
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.RouteMatchReason
@@ -59,11 +60,31 @@ internal class RouteAlignmentSelector {
     private var requestOrigin: TrustedLocation? = null
     private var firstPosition: FilteredRoutePosition? = null
     private var observedMovement = false
+    private var geometry: RouteGeometryCache? = null
+    private var cachedSegments: List<Segment> = emptyList()
 
     fun reset(origin: TrustedLocation? = null) {
         requestOrigin = origin
         firstPosition = null
         observedMovement = false
+    }
+
+    /** Evidence interruptions retain the installed shape; route removal releases it explicitly. */
+    fun clearGeometry() {
+        geometry = null
+        cachedSegments = emptyList()
+    }
+
+    /** Called at navigator installation; direct selector callers lazily install their snapshot. */
+    fun installGeometry(geometry: RouteGeometryCache) {
+        this.geometry = geometry
+        var cumulativeM = 0.0
+        cachedSegments = geometry.segments.mapNotNull { segment ->
+            // Preserve the selector's original convention: sub-centimetre/invalid legs do not
+            // contribute to its progress, even though navigator summary scaling includes them.
+            if (segment.lengthM <= 0.01 || !segment.lengthM.isFinite()) return@mapNotNull null
+            Segment(segment, cumulativeM).also { cumulativeM += segment.lengthM }
+        }
     }
 
     fun select(
@@ -81,11 +102,11 @@ internal class RouteAlignmentSelector {
         if (position.horizontalAccuracyM > 100.0) return unavailable(RouteAlignmentReason.POSITION_TOO_COARSE)
         if (route.polyline.size < 2 || route.polyline.any { !it.valid() }) return unavailable(RouteAlignmentReason.ROUTE_INVALID)
 
-        var cumulativeM = 0.0
-        val segments = route.polyline.zipWithNext().mapIndexedNotNull { index, (start, end) ->
-            val lengthM = distance(start, end)
-            if (lengthM <= 0.01 || !lengthM.isFinite()) return@mapIndexedNotNull null
-            Segment(index, start, end, lengthM, cumulativeM, project(position.point, start, end)).also { cumulativeM += lengthM }
+        if (geometry?.matchesPoints(route.polyline) != true) installGeometry(RouteGeometryCache(route.polyline))
+        val segments = cachedSegments
+        val longitudeScale = LocalGeodesy.metersPerLongitudeDegree(position.point.latitude)
+        for (segment in segments) {
+            segment.projection = project(position.point, segment.start, segment.end, longitudeScale)
         }
         val first = segments.firstOrNull() ?: return unavailable(RouteAlignmentReason.ROUTE_INVALID)
         val nearest = segments.minByOrNull { it.projection.distanceM } ?: return unavailable(RouteAlignmentReason.NO_ROUTE_BEARING)
@@ -120,7 +141,10 @@ internal class RouteAlignmentSelector {
                 it.elapsedRealtimeMs >= 0L && it.elapsedRealtimeMs <= position.elapsedRealtimeMs &&
                 distance(it.point(), first.start) <= maximumDistanceToRouteM &&
                 project(it.point(), first.start, first.end).fraction * first.lengthM <= maxOf(8.0, it.accuracyM.toDouble()) &&
-                distance(it.point(), position.point) <= maxOf(8.0, hypot(it.accuracyM.toDouble(), position.horizontalAccuracyM))
+                distance(it.point(), position.point) <= maxOf(8.0, hypot(it.accuracyM.toDouble(), position.horizontalAccuracyM)) &&
+                // Without an accepted branch, a closer later leg must use the normal local
+                // candidate/ambiguity rules rather than the request's first-leg departure role.
+                (accepted != null || nearest.index == first.index)
         }
         val local = segments.filter { it.projection.distanceM <= searchRadiusM }.ifEmpty {
             // The provider may snap the requested origin to a path outside the GPS error area.
@@ -148,11 +172,14 @@ internal class RouteAlignmentSelector {
         }
 
         if (origin != null && (accepted == null || accepted.index == first.index)) {
-            // A lateral provider snap remains a connector even if the location projects a few
-            // metres inside the first leg. Along-route progress alone must not send the user back.
+            // A provider snap can leave the user beside the first leg. Reference its closest
+            // point, never send the user backwards to the provider's original start point.
             if (first.projection.distanceM > maxOf(8.0, 2.0 * hypot(origin.accuracyM.toDouble(), position.horizontalAccuracyM))) {
-                return selected(first, RouteAlignmentReason.DEPARTURE_CONNECTOR, position.point, first.start)
+                return selected(first, RouteAlignmentReason.DEPARTURE_CONNECTOR, position.point,
+                    first.pointAt(first.projection.fraction))
             }
+            // A request anchor preserves the departure role, not a walkway onto the selected leg.
+            val lateralOffset = first.projection.distanceM > maxOf(8.0, position.horizontalAccuracyM)
             // Describe the planned departure leg, not certainty that the user is at its first point.
             if (first.lengthM < DEPARTURE_MINIMUM_BEARING_BASELINE_M) {
                 // A sub-metre first leg is below positioning/walking resolution: it may be
@@ -161,9 +188,11 @@ internal class RouteAlignmentSelector {
                 val target = continuingDepartureTarget(segments)
                     ?: return unavailable(RouteAlignmentReason.NO_ROUTE_BEARING)
                 return selected(first, RouteAlignmentReason.DEPARTURE_SEGMENT, first.start, target)
+                    .copy(lateralOffsetBeyondUncertainty = lateralOffset)
             }
             val target = first.pointAt(minOf(15.0, first.lengthM) / first.lengthM)
             return selected(first, RouteAlignmentReason.DEPARTURE_SEGMENT, first.start, target)
+                .copy(lateralOffsetBeyondUncertainty = lateralOffset)
         }
 
         if (distance(position.point, segments.last().end) <= searchRadiusM && !observedMovement) {
@@ -187,6 +216,8 @@ internal class RouteAlignmentSelector {
         if (current.projection.fraction >= 1.0 && current != segments.last()) {
             current = segments[segments.indexOf(current) + 1]
         }
+        // S08-20: withholding a turn bearing does not establish a walkway onto the selected leg.
+        val lateralOffset = current.projection.distanceM > maxOf(8.0, position.horizontalAccuracyM)
         // S08-18: bearing selection and turn speech share one phase. Before the navigator passes
         // the guide at this vertex (with its accuracy margin), a leg beyond that vertex may not
         // supply the bearing: the turn sentence still describes the vertex. At or past the vertex
@@ -202,7 +233,9 @@ internal class RouteAlignmentSelector {
             val nearVertexM = pendingGuide.passageMarginM.takeIf { it.isFinite() && it >= 0.0 }
                 ?: MINIMUM_GUIDE_PASSAGE_MARGIN_M
             if (here.progressM - (heldIncoming.startProgressM + heldIncoming.lengthM) <= nearVertexM) {
-                return unavailable(RouteAlignmentReason.TURN_PASSAGE_PENDING).copy(beyondPendingTurnVertex = true)
+                return unavailable(RouteAlignmentReason.TURN_PASSAGE_PENDING).copy(
+                    beyondPendingTurnVertex = true, lateralOffsetBeyondUncertainty = lateralOffset,
+                )
             }
         }
         val remainingM = current.lengthM * (1.0 - current.projection.fraction)
@@ -222,7 +255,6 @@ internal class RouteAlignmentSelector {
         // S08-20: an accepted leg can lie farther away than the 8 m search floor when the reported
         // radius is large. An offset beyond both is not explained by the position uncertainty, so
         // the user is beside the leg and its progress bearing is not a way onto it.
-        val lateralOffset = current.projection.distanceM > maxOf(8.0, position.horizontalAccuracyM)
         return selected(current, reason, from, target, candidateSpreadDegrees)
             .copy(beyondPendingTurnVertex = beyondPendingVertex, lateralOffsetBeyondUncertainty = lateralOffset)
     }
@@ -293,15 +325,23 @@ internal class RouteAlignmentSelector {
 
     private fun unavailable(reason: RouteAlignmentReason) = RouteAlignmentSelection(RouteAlignmentDiagnostic(reason))
     private data class Projection(val fraction: Double, val distanceM: Double)
-    private data class Segment(
-        val index: Int, val start: RoutePoint, val end: RoutePoint, val lengthM: Double,
-        val startProgressM: Double, val projection: Projection,
+    private class Segment(
+        geometry: RouteGeometrySegment,
+        val startProgressM: Double,
     ) {
-        val bearing: Double get() = bearing(start, end)
+        val index = geometry.index
+        val start = geometry.start
+        val end = geometry.end
+        val lengthM = geometry.lengthM
+        val bearing = geometry.bearingDeg.toDouble() % 360.0
+        // Per-observation projection stays separate from the fixed shape measurements. These
+        // private segments never escape this stateful selector or the navigator's lock.
+        var projection = Projection(0.0, Double.POSITIVE_INFINITY)
         val progressM: Double get() = startProgressM + lengthM * projection.fraction
         fun pointAt(fraction: Double) = RoutePoint(
             start.latitude + (end.latitude - start.latitude) * fraction,
-            start.longitude + (end.longitude - start.longitude) * fraction,
+            LocalGeodesy.wrapLongitudeDegrees(start.longitude +
+                LocalGeodesy.wrapLongitudeDegrees(end.longitude - start.longitude) * fraction),
         )
     }
 
@@ -319,11 +359,15 @@ internal class RouteAlignmentSelector {
         fun distance(a: RoutePoint, b: RoutePoint) = haversineMeters(a.latitude, a.longitude, b.latitude, b.longitude)
         fun bearing(a: RoutePoint, b: RoutePoint) = bearingDegrees(a.latitude, a.longitude, b.latitude, b.longitude).toDouble() % 360.0
         fun angleDistance(a: Double, b: Double) = abs((a - b + 540.0) % 360.0 - 180.0)
-        fun project(point: RoutePoint, start: RoutePoint, end: RoutePoint): Projection {
-            // S09-52: wrapped longitude differences (shared convention); the route projection scale is unchanged.
-            val latScale = 111_320.0
-            val lonScale = 111_320.0 * cos(Math.toRadians(point.latitude))
-            val wrap = kr.co.hanium.dreamup.walksafe.navigation.positioning.LocalGeodesy::wrapLongitudeDegrees
+        fun project(
+            point: RoutePoint,
+            start: RoutePoint,
+            end: RoutePoint,
+            longitudeScale: Double = LocalGeodesy.metersPerLongitudeDegree(point.latitude),
+        ): Projection {
+            val latScale = LocalGeodesy.METERS_PER_DEGREE
+            val lonScale = longitudeScale
+            val wrap = LocalGeodesy::wrapLongitudeDegrees
             val ax = wrap(start.longitude - point.longitude) * lonScale
             val ay = (start.latitude - point.latitude) * latScale
             val dx = wrap(end.longitude - start.longitude) * lonScale

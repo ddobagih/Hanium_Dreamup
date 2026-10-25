@@ -1,0 +1,32 @@
+flowchart TB
+  E["F-D15-004 · 전송 계약·저장 영수증·확인 조회<br/>v2 transport header 또는 GET<br/>/reports/v2/{report_id}/status"]
+  P["P-D15-004 · 전제조건<br/>3개 transport header는 전부 없거나 전부 존재. 존재하면<br/>actor·generation 필수."]
+  E --> P
+  S1["1. 원본 metadata+image payload_bytes와 digest 일치<br/>확인"]
+  P --> S1
+  S2["2. report UUID별 advisory xact lock 후 기존<br/>Report 조회"]
+  S1 --> S2
+  S3["3. 동일 digest·bytes·owner·세대·persistence<br/>marker이면 REPLAYED"]
+  S2 --> S3
+  S4["4. 새 저장 시 persistence UUID와<br/>DATABASE_AND_ENCRYPTED_IMAGE_STORE receipt 반환"]
+  S3 --> S4
+  S5["5. status 조회는 동일 owner·세대·receipt 필드 있는 행만<br/>PERSISTED 및 사용자 상태 반환"]
+  S4 --> S5
+  OK["정상 결과<br/>status 조회는 동일 owner·세대·receipt 필드 있는 행만<br/>PERSISTED 및 사용자 상태 반환"]
+  S5 --> OK
+  B1["조건 · header 일부만 있음<br/>결과 · 422 incomplete"]
+  S3 -. "해당 조건 발생" .-> B1
+  B2["조건 · UUID 이미 사용되었지만 계약 또는 소유자 다름<br/>결과 · 409 report_transport_id_conflict"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · status ID/actor assertion 불일치·행 없음<br/>결과 · 404 report_transport_status_not_found"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · response loss 후 동일 계약 재요청<br/>결과 · 새 행/사진 없이 기존 receipt"]
+  S3 -. "해당 조건 발생" .-> B4
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>UUID별 전송 replay가 cooldown 및 신규 저장보다 앞선다.<br/>transport exact replay는 신규 freshness gate 전에<br/>반환.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>POST 응답이 유실되면 동일 UUID status 조회 또는 정확히 같은<br/>payload 재전송으로 확인."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/api/reports.py:2026<br/>_report_transport_replay<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D03-009 보행 중 hands-free 음성 상태기계"]
+  P["정책 P-D03-009"]
+  A --> P
+  N0["1. 보행 중 호출어와 명령 수신을 명시적인 7 상태로 관리한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. WaitingForWakeWord 에서 신뢰 호출을 받아 AcknowledgingWake 를 거친다."]
+  N0 --> N1
+  N2["3. WaitingForCommand final 을 ProcessingCommand 로 한 번 이동하고 local dispatcher 를 호출한다."]
+  N1 --> N2
+  N3["4. Speaking 동안 입력 억제; 비동기 결과 대기는 WaitingForCommandResult 로 따로 관리한다."]
+  N2 --> N3
+  Z["정상: 새 호출을 기다리는 순환; session stop 이면 종료."]
+  N3 --> Z
+  B0{"state/generation/run 불일치"}
+  R0["callback 무시"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"inactive/동의철회/모델불가"}
+  R1["Stopped"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"출력이 command window 에 끼어듦"}
+  R2["창 닫고 출력 종료 후 재대기"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: terminal failure 를 Main 에 전달."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xtimeout["만료: 모델 20s; 나머지 단계 F-D03-010/011."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xtimeout
+  Xcancel["취소: Stopped 전이 먼저 수행 후 fallible stop."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: eligibility 상실 즉시 입력 중단."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xretry["재시도: Main 에서 내부실패 500ms 재시작; 입력 silenced/지속실패 별도 차단."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry
+  Xcleanup["정리: handler timers·transcriber·pending command 폐기."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

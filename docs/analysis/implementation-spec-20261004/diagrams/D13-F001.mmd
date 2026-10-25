@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D13-001<br/>이메일 OTP 발급과 동일 요청 재생"]
+  P["P-D13-001<br/>연령·키 결속 후 이메일 단위 직렬화. 같은 요청의 모호한 SMTP 결과는 새 코드 발급으로 덮어쓰지<br/>않는다."]
+  A --> P
+  N0["1. 서울 날짜로 연령을 검사하고 정규 이메일·request HMAC 을 계산한다."]
+  P --> N0
+  N1["2. 이메일 lookup HMAC 별 advisory transaction lock 을 잡고<br/>request_id 행을 FOR UPDATE 로 읽는다."]
+  N0 --> N1
+  N2["3. 동일 본문 ACTIVE 요청은 기존 handle/만료를 재생하며 SMTP 재전송과 이메일 송신<br/>quota 를 소비하지 않는다."]
+  N1 --> Q{"동일 본문 ACTIVE 요청인가?"}
+  Q -- "기존 요청" --> N2
+  N3["4. 새 request_id 는 최근 이메일 cooldown 과 송신 quota 를 확인하고 이전<br/>PENDING_DELIVERY·ACTIVE·DELIVERY_FAILED 를 EXPIRED 로 변경하며<br/>OTP HMAC 을 지운다."]
+  N2 --> EARLY["기존 결과 반환; 신규 변경 없음"]
+  Q -- "신규 요청" --> N3
+  N4["5. 새 enrollment 의 암호화 이메일·OTP HMAC·만료·재발급시각을<br/>PENDING_DELIVERY 로 저장하고 commit 한다."]
+  N3 --> N4
+  N5["6. 라우터는 반환된 delivery 가 있을 때만 SMTP 전송 기능을 수행한다."]
+  N4 --> N5
+  Z["202 및 handle/expires_at/resend_available_at; 응답 no-store.<br/>DB 에 원문 OTP 와 생년월일은 저장하지 않음."]
+  N5 --> Z
+  B0{"request HMAC 불일치 또는 EXPIRED/EXHAUSTED/CONSUMED 또는 ACTIVE<br/>expires_at <= now"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["409 idempotency conflict; 같은 ID 를 새 코드로 바꾸지 않음"]
+  B1{"PENDING_DELIVERY 이며 now < updated_at+lease"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["409 in_progress 와 남은 Retry-After"]
+  B2{"PENDING_DELIVERY lease 경과 또는 DELIVERY_FAILED cooldown 경과"}
+  P -. "예외 조건 검사" .-> B2
+  B2 -- "조건 성립" --> X2["409 ambiguous replay; 새로운 request_id 필요"]
+  B3{"now < resend_not_before"}
+  P -. "예외 조건 검사" .-> B3
+  B3 -- "조건 성립" --> X3["429 와 Retry-After"]
+  R["재시도: 같은 ACTIVE 요청은 기존 결과 재생. terminal·만료·모호한 delivery 는 새<br/>request_id 로 명시 재요청. 자동 재발송 없음.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 별도 취소 진입점 없음."]
+  A -. "취소 API 여부" .-> C

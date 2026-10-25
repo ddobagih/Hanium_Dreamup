@@ -1,0 +1,28 @@
+flowchart TB
+  E["F-D15-048 · 과거 오프라인 복원 검사 CLI의 fence 미연결<br/>CLI --ledger/--inventory 또는<br/>--post-inventory/--reapply-receipt"]
+  P["P-D15-048 · 전제조건<br/>CLI가 코드에 남아 있으나 현재 planning/gate에 필요한<br/>source_fence 인자를 제공하지 않음."]
+  E --> P
+  S1["1. argparse로 필수 서명·inventory 파일과 optional<br/>post 삼중항 검사"]
+  P --> S1
+  S2["2. 서명 bundle와 anchored inventory 읽기"]
+  S1 --> S2
+  S3["3. plan_report_restore_reapply 또는<br/>assert_report_restore_publishable를<br/>source_fence 없이 호출"]
+  S2 --> S3
+  S4["4. 현재 서비스의 _require_source_fence가<br/>restore_source_fence_required를 발생시키면<br/>BLOCKED/NOT_RUN 출력·exit2"]
+  S3 --> S4
+  OK["정상 결과<br/>현재 snapshot의 호출 결합으로 정상 PASS를 확인할 수 없음."]
+  S4 --> OK
+  B1["조건 · post 관련 일부 인자만 제공<br/>결과 · argparse error"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · 정상 형식 bundle/inventory까지 읽음<br/>결과 · source fence 미전달로 현재 계획/게시 gate 진입 차단"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · I/O 또는 서명 오류<br/>결과 · BLOCKED 오류 payload·exit2"]
+  S1 -. "해당 조건 발생" .-> B3
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>파일읽기 중 중단은 target mutation을 발생시키지 않음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>같은 입력은 현재 동일 fence 결합 결함으로 차단됨.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>fence를 보유하는 F-D15-041·043의 별도 CLI 진입 경로 참조."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>CLI는 read-only; DB/파일 복원 mutation 없음."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · scripts/check_report_restore_tombstones.py:72<br/>main<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

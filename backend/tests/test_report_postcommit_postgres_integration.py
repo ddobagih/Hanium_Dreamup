@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.app.api import reports
 from backend.app.config import get_settings
 from backend.app.models import Report, ReportImageObject
-from backend.app.services import report_storage
+from backend.app.services import report_application, report_commit, report_storage
 from backend.app.services.report_image_keys import create_report_image_key_manager
 from backend.app.services.report_storage_recovery import (
     locked_report_storage_session,
@@ -122,8 +122,8 @@ def test_postcommit_real_rows_status_replay_and_recovery(
 
     app.dependency_overrides[reports.get_db] = request_database
     original_remove = report_storage.remove_image_file
-    original_complete = reports.complete_report_image_write
-    original_response = reports._field_creation_response
+    original_complete = report_commit.complete_report_image_write
+    original_response = report_application._field_creation_response
 
     def remove(path):
         if path == journal and active_fault and failure_point in {"journal-unlink", "journal-logger"}:
@@ -157,12 +157,12 @@ def test_postcommit_real_rows_status_replay_and_recovery(
             raise reports._ReportWriteLockExitError()
 
     monkeypatch.setattr(report_storage, "remove_image_file", remove)
-    monkeypatch.setattr(reports, "complete_report_image_write", complete)
-    monkeypatch.setattr(reports, "_field_creation_response", response)
-    monkeypatch.setattr(reports, "_shared_report_write_lock", maintenance_lock)
-    monkeypatch.setattr(reports, "logging", SimpleNamespace(
-        getLogger=lambda _name: SimpleNamespace(warning=warning),
-    ))
+    monkeypatch.setattr(report_commit, "complete_report_image_write", complete)
+    monkeypatch.setattr(report_application, "_field_creation_response", response)
+    monkeypatch.setattr(report_commit, "_shared_report_write_lock", maintenance_lock)
+    logger_factory = SimpleNamespace(getLogger=lambda _name: SimpleNamespace(warning=warning))
+    monkeypatch.setattr(report_commit, "logging", logger_factory)
+    monkeypatch.setattr(report_application, "logging", logger_factory)
 
     image = io.BytesIO()
     Image.new("RGB", (4, 4), color=(70, 90, 120)).save(image, format="JPEG")

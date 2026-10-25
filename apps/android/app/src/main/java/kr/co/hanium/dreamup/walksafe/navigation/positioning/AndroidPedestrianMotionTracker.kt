@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.SystemClock
 import java.util.ArrayDeque
 import kotlin.math.sqrt
 
@@ -15,14 +16,17 @@ import kotlin.math.sqrt
  * only builds rolling-window motion statistics; stationary policy remains in
  * [PedestrianStationaryDetector].
  */
-class AndroidPedestrianMotionTracker(
-    context: Context,
+class AndroidPedestrianMotionTracker internal constructor(
+    private val registration: MotionSensorRegistration,
     private val detector: PedestrianStationaryDetector = PedestrianStationaryDetector(),
     private val onDecision: (PedestrianStationaryDecision) -> Unit,
 ) : AutoCloseable {
-    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    private val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-    private val gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+    constructor(
+        context: Context,
+        detector: PedestrianStationaryDetector = PedestrianStationaryDetector(),
+        onDecision: (PedestrianStationaryDecision) -> Unit,
+    ) : this(AndroidMotionSensorRegistration(context), detector, onDecision)
+
     private val accelerationWindow = ArrayDeque<TimedMagnitude>()
     private val gyroscopeWindow = ArrayDeque<TimedMagnitude>()
     private val stepEvidenceLock = Any()
@@ -38,20 +42,51 @@ class AndroidPedestrianMotionTracker(
     private var gyroscopeRegistered = false
     private var lastAccelerometerTimestampNs = NO_TIMESTAMP
     private var lastGyroscopeTimestampNs = NO_TIMESTAMP
+    // Callback receipts share one serial clock; per-source measurement order stays independent.
+    private var lastKnownReceiptNs: Long? = null
     @Volatile
     private var lastEmittedTimestampMs = NO_TIMESTAMP
     private var lastRecordedStepTimestampMs = NO_TIMESTAMP
     private var pendingStepTimestampMs: Long? = null
     private var pendingStepGeneration = NO_GENERATION
 
+    private val health = SensorTrackerHealthRecorder(listOf(
+        TrackedSensorSource.ACCELEROMETER, TrackedSensorSource.GYROSCOPE,
+    ))
+
+    /** Registration, accepted input and cleanup facts; current permission is checked by the caller. */
+    val operationalHealth: SensorTrackerHealthSnapshot
+        get() = health.snapshot
+
     fun start(): Boolean {
         if (closed) return false
         if (started) return true
-        if (accelerometer == null && gyroscope == null) return false
+        // A failed unregister still owns its listener; release it before creating another one.
+        if (currentListener != null) {
+            try {
+                stop(SensorTrackerStoppedReason.FAILED_START)
+            } catch (failure: RuntimeException) {
+                health.retire(registrationGeneration, SensorTrackerStoppedReason.FAILED_START, currentListener != null)
+                throw failure
+            }
+        }
+        health.beginAttempt(registrationGeneration)
+        val anySensorAvailable = try {
+            probeSensorAvailability(Sensor.TYPE_ACCELEROMETER, TrackedSensorSource.ACCELEROMETER) ||
+                probeSensorAvailability(Sensor.TYPE_GYROSCOPE, TrackedSensorSource.GYROSCOPE)
+        } catch (failure: RuntimeException) {
+            health.retire(registrationGeneration, SensorTrackerStoppedReason.FAILED_START, currentListener != null)
+            throw failure
+        }
+        if (!anySensorAvailable) {
+            health.retire(registrationGeneration, SensorTrackerStoppedReason.FAILED_START, false)
+            return false
+        }
 
         clearMotionState()
         detector.reset()
         val generation = ++registrationGeneration
+        health.generationStarted(generation)
         lateinit var listener: SensorEventListener
         listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
@@ -62,19 +97,38 @@ class AndroidPedestrianMotionTracker(
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
         currentListener = listener
-        accelerometerRegistered = accelerometer?.let {
-            sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME)
-        } == true
-        gyroscopeRegistered = gyroscope?.let {
-            sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME)
-        } == true
+        try {
+            val accelerometerAvailable = registration.hasSensor(Sensor.TYPE_ACCELEROMETER)
+            health.availability(TrackedSensorSource.ACCELEROMETER, accelerometerAvailable)
+            accelerometerRegistered = accelerometerAvailable &&
+                health.register(TrackedSensorSource.ACCELEROMETER) {
+                    registration.register(listener, Sensor.TYPE_ACCELEROMETER)
+                }
+            val gyroscopeAvailable = registration.hasSensor(Sensor.TYPE_GYROSCOPE)
+            health.availability(TrackedSensorSource.GYROSCOPE, gyroscopeAvailable)
+            gyroscopeRegistered = gyroscopeAvailable &&
+                health.register(TrackedSensorSource.GYROSCOPE) {
+                    registration.register(listener, Sensor.TYPE_GYROSCOPE)
+                }
+        } catch (failure: RuntimeException) {
+            try {
+                stop(SensorTrackerStoppedReason.FAILED_START)
+            } catch (cleanupFailure: RuntimeException) {
+                if (cleanupFailure !== failure) failure.addSuppressed(cleanupFailure)
+            }
+            throw failure
+        }
         started = accelerometerRegistered || gyroscopeRegistered
         if (!started && currentListener === listener) {
-            currentListener = null
-            sensorManager.unregisterListener(listener)
+            stop(SensorTrackerStoppedReason.FAILED_START)
+        } else if (started) {
+            health.activate()
         }
         return started
     }
+
+    private fun probeSensorAvailability(type: Int, source: TrackedSensorSource): Boolean =
+        registration.hasSensor(type).also { health.availability(source, it) }
 
     fun recordStep(timestampMs: Long): Boolean {
         if (timestampMs < 0L) return false
@@ -102,22 +156,30 @@ class AndroidPedestrianMotionTracker(
         }
     }
 
-    fun stop() {
+    fun stop() = stop(SensorTrackerStoppedReason.EXPLICIT_STOP)
+
+    private fun stop(reason: SensorTrackerStoppedReason) {
         registrationGeneration += 1
         val listener = currentListener
-        currentListener = null
         started = false
-        listener?.let(sensorManager::unregisterListener)
-        accelerometerRegistered = false
-        gyroscopeRegistered = false
-        clearMotionState()
-        detector.reset()
+        val effectiveReason = if (closed) SensorTrackerStoppedReason.CLOSED else reason
+        health.retire(registrationGeneration, effectiveReason, listener != null)
+        try {
+            listener?.let(registration::unregister)
+            if (currentListener === listener) currentListener = null
+        } finally {
+            accelerometerRegistered = false
+            gyroscopeRegistered = false
+            clearMotionState()
+            detector.reset()
+            health.retire(registrationGeneration, effectiveReason, currentListener != null)
+        }
     }
 
     override fun close() {
-        if (closed) return
+        if (closed && currentListener == null) return
         closed = true
-        stop()
+        stop(SensorTrackerStoppedReason.CLOSED)
     }
 
     private fun isCurrentRegistration(
@@ -130,14 +192,31 @@ class AndroidPedestrianMotionTracker(
             currentListener === listener
 
     private fun handleSensorChanged(event: SensorEvent) {
-        val timestampNs = event.timestamp
-        val targetWindow = when (event.sensor.type) {
-            Sensor.TYPE_ACCELEROMETER -> accelerationWindow
-            Sensor.TYPE_GYROSCOPE -> gyroscopeWindow
-            else -> return
+        val receivedAtNs = SystemClock.elapsedRealtimeNanos()
+        onSensorSample(event.sensor.type, event.values, event.timestamp, receivedAtNs)
+    }
+
+    /** The real callback's input path; unknown legacy receipt stays null in the health snapshot. */
+    internal fun onSensorSample(sensorType: Int, values: FloatArray, timestampNs: Long,
+        receivedAtNs: Long? = null): Boolean {
+        if (!started || closed || currentListener == null) return false
+        val generation = registrationGeneration
+        val source = when (sensorType) {
+            Sensor.TYPE_ACCELEROMETER -> TrackedSensorSource.ACCELEROMETER
+            Sensor.TYPE_GYROSCOPE -> TrackedSensorSource.GYROSCOPE
+            else -> return false
         }
-        val magnitude = vectorMagnitude(event.values) ?: return
-        if (!acceptTimestamp(event.sensor.type, timestampNs)) return
+        if (health.snapshot.source(source)?.acceptingSamples != true) return false
+        if (receivedAtNs != null && receivedAtNs < timestampNs) return false
+        if (receivedAtNs != null && lastKnownReceiptNs?.let { receivedAtNs < it } == true) return false
+        val targetWindow = when (sensorType) {
+            Sensor.TYPE_ACCELEROMETER -> accelerationWindow
+            else -> gyroscopeWindow
+        }
+        val magnitude = vectorMagnitude(values) ?: return false
+        if (!acceptTimestamp(sensorType, timestampNs)) return false
+        if (receivedAtNs != null) lastKnownReceiptNs = receivedAtNs
+        health.acceptedSample(source, generation, timestampNs, receivedAtNs)
 
         targetWindow.addLast(TimedMagnitude(timestampNs, magnitude))
         val oldestAllowedTimestampNs = (timestampNs - WINDOW_DURATION_NS).coerceAtLeast(0L)
@@ -145,7 +224,7 @@ class AndroidPedestrianMotionTracker(
         trimBefore(gyroscopeWindow, oldestAllowedTimestampNs)
 
         val timestampMs = timestampNs / NANOS_PER_MILLISECOND
-        if (timestampMs <= lastEmittedTimestampMs) return
+        if (timestampMs <= lastEmittedTimestampMs) return true
         lastEmittedTimestampMs = timestampMs
 
         val acceleration = magnitudeStatistics(accelerationWindow, timestampNs)
@@ -164,6 +243,7 @@ class AndroidPedestrianMotionTracker(
                 ),
             ),
         )
+        return true
     }
 
     private fun consumeRecentStep(sampleTimestampMs: Long): Boolean =
@@ -200,6 +280,7 @@ class AndroidPedestrianMotionTracker(
         gyroscopeWindow.clear()
         lastAccelerometerTimestampNs = NO_TIMESTAMP
         lastGyroscopeTimestampNs = NO_TIMESTAMP
+        lastKnownReceiptNs = null
         lastEmittedTimestampMs = NO_TIMESTAMP
         synchronized(stepEvidenceLock) {
             clearStepEvidenceLocked()
@@ -305,5 +386,34 @@ class AndroidPedestrianMotionTracker(
         const val NANOS_PER_MILLISECOND = 1_000_000L
         const val NO_TIMESTAMP = -1L
         const val NO_GENERATION = -1
+    }
+}
+
+internal interface MotionSensorRegistration {
+    fun hasSensor(type: Int): Boolean
+    fun register(listener: SensorEventListener, type: Int): Boolean
+    fun unregister(listener: SensorEventListener?)
+}
+
+private class AndroidMotionSensorRegistration(context: Context) : MotionSensorRegistration {
+    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+    private val gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+
+    override fun hasSensor(type: Int): Boolean = sensorFor(type) != null
+
+    override fun register(listener: SensorEventListener, type: Int): Boolean =
+        sensorFor(type)?.let {
+            sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME)
+        } == true
+
+    override fun unregister(listener: SensorEventListener?) {
+        listener?.let(sensorManager::unregisterListener)
+    }
+
+    private fun sensorFor(type: Int): Sensor? = when (type) {
+        Sensor.TYPE_ACCELEROMETER -> accelerometer
+        Sensor.TYPE_GYROSCOPE -> gyroscope
+        else -> null
     }
 }

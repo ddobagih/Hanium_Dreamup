@@ -1,0 +1,31 @@
+flowchart TD
+  A["F-D13-006<br/>Gateway 계정 세션 최신성 검사"]
+  P["P-D13-006<br/>middleware 우회 개발 설정에서도 이 엔드포인트의 인증은 생략하지 않는다."]
+  A --> P
+  N0["1. field-test token 을 constant-time 비교하고 actor/generation<br/>형식을 검증한다."]
+  P --> N0
+  N1["2. v4 는 body-free 조건과 request target 을 검증해 auth_epoch 를<br/>추출하고 replay cache 에서 assertion 을 claim 한다."]
+  N0 --> VER{"v4 assertion인가?"}
+  VER -- "예" --> N1
+  N2["3. legacy 는 D09 legacy_actor_assertion_allowed 와<br/>verify_actor_assertion 조건을 따르며 auth_epoch 필수."]
+  VER -- "legacy" --> N2
+  N1 --> N3
+  N3["4. _actor_account_session_is_current 로 ACTIVE 계정의<br/>generation/epoch 를 확인한다."]
+  N2 --> N3
+  N4["5. 참이면 204 no-store; identity body 없이 종료한다."]
+  N3 --> N4
+  Z["204 는 현재 세션 일치만 의미. 삭제 후 old epoch 는 거부."]
+  N4 --> Z
+  B0{"token/assertion/identity/current state 부적합"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["401 일반 authentication_failed"]
+  B1{"v4 replay cache 가득 참 또는 DB 오류"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["503 authentication_unavailable"]
+  B2{"v4 nonempty body 또는 Transfer-Encoding 존재"}
+  P -. "예외 조건 검사" .-> B2
+  B2 -- "조건 성립" --> X2["401"]
+  R["재시도: 자동 반복 루프 없음. 호출자가 오류와 현재 상태를 확인 후 재호출.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 별도 취소 진입점 없음."]
+  A -. "취소 API 여부" .-> C

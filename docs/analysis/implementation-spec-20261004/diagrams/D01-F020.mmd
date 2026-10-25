@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D01-020 목적별 OS 권한 요청 lease와 설명"]
+  G{"requestAndroidPermissions 호출; 목적별 active flow·전경·현재 generation"}
+  I["requestCode3201..65534,PermissionRequestPurpose,firstRun attempt lease,walk epoch; requested permissions 결과 길이 일치"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: code범위 전부 사용 시 오류; 부정 결과는 후속 미실행"]
+  G -->|"미충족"| X
+  N1["새 requestCode와 purpose/current scope를 registry에 등록하고 OS 요청을 보낸다. WALK 목적은 recovery REQUEST_PENDING을 먼저 설정한다."]
+  I --> N1
+  N2["onRequestPermissionsResult는 speech/route lease를 무효화하고 등록 요청을 consume한다."]
+  N1 --> N2
+  N3["등록 token·purpose·generation·walk epoch·전경을 검사한 뒤 요청한 권한과 실제 OS grant를 비교한다."]
+  N2 --> N3
+  N4["단일카메라·음성·보행·초기권한 등 purpose별 continuation으로 보낸 후 관측변화를 적용한다."]
+  N3 --> N4
+  OK["현재 요청의 목적별 후속 동작 또는 거부 안내"]
+  N4 --> OK
+  B0["결과 무시"]
+  N2 -->|"알수없는 code·이미소모됨"| B0
+  B1["후속 센서/보행 시작 안 함"]
+  N3 -->|"전경아님·stale scope"| B1
+  B2["precise 필요 설명"]
+  N3 -->|"coarse만 있음"| B2
+  B3["NO_RATIONALE_SIGNAL; 영구거부 확정이라고 주장 안 함"]
+  N3 -->|"shouldShowRationale=false"| B3
+  R["중단·취소: 사용자 OS 거부; superseded scope의 callback 무시 / 배경·walk epoch 변경·new generation에서 stale 처리"]
+  V["복구·재시도: 설정복귀는 별도 재관측·recovery gate / 새 사용자 목적 요청으로 새 code 등록"]
+  Q["정책 P-D01-012 · P-D01-013"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D08-058 세션 오류→Android 다음 행동 계약"]
+  B["진입: FIELD_SESSION_ERROR_CONTRACT"]
+  A --> B
+  P0["1. Backendpassword429/503 는등록쌍만중계"]
+  B --> P0
+  P1["2. typedstoragebusy/unavailable 와 postcommitunknown 분리"]
+  P0 --> P1
+  P2["3. client499·Node500/504 는 outcomeunknown 으로분류"]
+  P1 --> P2
+  P3["4. validator 가 code/status/flag 불일치검출"]
+  P2 --> P3
+  OK["정상: Android D01 의 안전한 후속 행동 계약"]
+  P3 --> OK
+  C0{"storagebusy/unavailable beforecommit"}
+  X0["503 retry_safe"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"postrenameunknown"}
+  X1["500 retryablefalse 재인증"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"deadline/clientclosed"}
+  X2["OUTCOME_UNKNOWN"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"reuse/expired/denied"}
+  X3["세션폐기또는재인증"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-004, P-D08-008, P-D08-010, P-D08-021"]
+  A -.-> POLICY

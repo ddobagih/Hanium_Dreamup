@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import hmac
@@ -120,7 +122,7 @@ def record_purpose_decision(
     identity: LifecycleAdminIdentity,
 ) -> tuple[RawCollectionPurposeDecision, bool]:
     collection = db.scalar(
-        select(RawCollection)
+        select(RawCollection).where(account_subject_visible(RawCollection))
         .where(RawCollection.collection_id == collection_id)
         .with_for_update()
     )
@@ -256,7 +258,7 @@ def record_legal_hold(
     identity: LifecycleAdminIdentity,
 ) -> tuple[RawCollectionLegalHoldEvent, bool]:
     collection = db.scalar(
-        select(RawCollection)
+        select(RawCollection).where(account_subject_visible(RawCollection))
         .where(RawCollection.collection_id == collection_id)
         .with_for_update()
     )

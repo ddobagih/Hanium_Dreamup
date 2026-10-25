@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.voice
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
 import android.Manifest
 import android.app.Activity
 import android.app.ActivityManager
@@ -12,13 +14,17 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import android.widget.TextView
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import kr.co.hanium.dreamup.walksafe.MainActivity
 import kr.co.hanium.dreamup.walksafe.session.WalkSessionState
+import kr.co.hanium.dreamup.walksafe.voice.input.VoiceInputSessionController
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.assertEquals
@@ -71,10 +77,6 @@ class WalkVoiceForegroundServiceStartupFailureDeviceTest {
             ) as MainActivity
             launchedActivity = activity
             awaitResumedStatusViews(instrumentation, activity, resumedActivity)
-            val report = MainActivity::class.java.getDeclaredMethod(
-                "reportWalkVoiceStartFailure",
-                WalkVoiceStartFailure::class.java,
-            ).apply { isAccessible = true }
             val visibilityDeadline = SystemClock.elapsedRealtime() + 10_000L
             while (true) {
                 var reported = false
@@ -85,11 +87,13 @@ class WalkVoiceForegroundServiceStartupFailureDeviceTest {
                     val focused = activity.hasWindowFocus()
                     diagnostic = "resumed=$resumed foreground=$foreground focused=$focused"
                     if (resumed && foreground && focused) {
-                        report.invoke(activity, WalkVoiceStartFailure.SECURITY)
+                        val voice = MainActivityControllerTestFixture.controller(activity, "voiceInputController") as
+                            VoiceInputSessionController
+                        voice.reportWalkVoiceStartFailure(WalkVoiceStartFailure.SECURITY)
                         assertFailureUi(activity, "마이크 권한은 허용", "자동 재시도를 중단")
                         assertTrue(recovery(activity).blocksAutomaticRetry)
 
-                        report.invoke(activity, WalkVoiceStartFailure.FOREGROUND_START_RESTRICTED)
+                        voice.reportWalkVoiceStartFailure(WalkVoiceStartFailure.FOREGROUND_START_RESTRICTED)
                         assertFailureUi(activity, "음성 서비스 시작을 제한", "자동 재시도를 중단")
                         assertTrue(recovery(activity).blocksAutomaticRetry)
                         reported = true
@@ -151,7 +155,7 @@ class WalkVoiceForegroundServiceStartupFailureDeviceTest {
         field(activity, "handsFreeVoiceStartRecovery") as WalkVoiceStartRecovery
 
     private fun field(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.get(activity)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.get(activity)
 }
 
 /**
@@ -398,44 +402,57 @@ class WalkVoiceForegroundServiceLateFailureDeviceTest {
             mainScenario = launchedMain
             launchedMain.onActivity { activity = it }
             val main = checkNotNull(activity) { "MainActivity was not created" }
-            awaitCondition("foreground MainActivity status views before seeded request") {
-                var ready = false
-                instrumentation.runOnMainSync {
-                    ready = field(main, "isActivityForeground") == true &&
-                        field(main, "statusText") is TextView &&
-                        field(main, "detailText") is TextView &&
-                        !main.isDestroyed
-                }
-                ready
-            }
-            val handleFailure = MainActivity::class.java.getDeclaredMethod(
-                "handleWalkVoiceStartFailure",
-                java.lang.Long.TYPE,
-                WalkVoiceSessionController::class.java,
-                WalkVoiceStartFailure::class.java,
-            ).apply { isAccessible = true }
+            lateinit var failureOwner: VoiceInputSessionController
             val onFailure: (Long, WalkVoiceSessionController, WalkVoiceStartFailure) -> Unit =
                 { id, failedController, failure ->
                     callbackCount.incrementAndGet()
-                    handleFailure.invoke(main, id, failedController, failure)
+                    failureOwner.handleWalkVoiceStartFailure(id, failedController, failure)
                     Unit
                 }
-            instrumentation.runOnMainSync {
-                val existing = field(main, "handsFreeVoiceController") as? HandsFreeVoiceController
-                if (existing == null) {
-                    requireProbe(app.walkVoiceSessionController == null, "unexpected_provider_controller")
-                    val replacement = noStartController()
-                    setField(main, "handsFreeVoiceController", replacement)
-                    app.attachWalkVoiceSessionController(replacement)
-                    controller = replacement
-                    injectedController = true
-                } else {
-                    assertSame(existing, app.walkVoiceSessionController)
-                    controller = existing
+            var lastReadinessSnapshot: String? = null
+            awaitCondition("resumed MainActivity status views before seeded request") {
+                val scenarioResumed = launchedMain.state == Lifecycle.State.RESUMED
+                var ready = false
+                instrumentation.runOnMainSync {
+                    val stage = ActivityLifecycleMonitorRegistry.getInstance().getLifecycleStageOf(main)
+                    val foreground = field(main, "isActivityForeground") == true
+                    val focused = main.hasWindowFocus()
+                    val microphoneDenied = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+                        PackageManager.PERMISSION_DENIED
+                    val statusReady = field(main, "statusText") is TextView
+                    val detailReady = field(main, "detailText") is TextView
+                    val destroyed = main.isDestroyed
+                    val readinessSnapshot = "scenarioResumed=$scenarioResumed stage=$stage " +
+                        "foreground=$foreground focused=$focused microphoneDenied=$microphoneDenied " +
+                        "statusReady=$statusReady detailReady=$detailReady destroyed=$destroyed"
+                    if (readinessSnapshot != lastReadinessSnapshot) {
+                        Log.d("WalkSafeFgsLateSdk", "event=LATE_READINESS $readinessSnapshot")
+                        lastReadinessSnapshot = readinessSnapshot
+                    }
+                    // This seeded relay test does not require user input or window focus.
+                    ready = scenarioResumed && stage == Stage.RESUMED && foreground &&
+                        microphoneDenied && statusReady && detailReady && !destroyed
+                    if (!ready) return@runOnMainSync
+                    failureOwner = MainActivityControllerTestFixture.voiceInput(main)
+                    val existing = field(main, "handsFreeVoiceController") as? HandsFreeVoiceController
+                    if (existing == null) {
+                        requireProbe(app.walkVoiceSessionController == null, "unexpected_provider_controller")
+                        val replacement = noStartController()
+                        setField(main, "handsFreeVoiceController", replacement)
+                        app.attachWalkVoiceSessionController(replacement)
+                        controller = replacement
+                        injectedController = true
+                    } else {
+                        assertSame(existing, app.walkVoiceSessionController)
+                        controller = existing
+                    }
+                    val currentController = checkNotNull(controller) { "No controller for service request" }
+                    prePauseRequestId = app.registerWalkVoiceStartRequest(currentController, onFailure)
+                    setField(main, "handsFreeVoiceStartRequestId", prePauseRequestId)
+                    Log.d("WalkSafeFgsLateSdk", "event=LATE_REQUEST_SEEDED requestId=$prePauseRequestId " +
+                        "elapsedMs=${SystemClock.elapsedRealtime()} foreground=$foreground focused=$focused")
                 }
-                val currentController = checkNotNull(controller) { "No controller for service request" }
-                prePauseRequestId = app.registerWalkVoiceStartRequest(currentController, onFailure)
-                setField(main, "handsFreeVoiceStartRequestId", prePauseRequestId)
+                ready
             }
             val launchedHost = ActivityScenario.launch<WalkVoiceForegroundServiceTestHostActivity>(
                 Intent(context, WalkVoiceForegroundServiceTestHostActivity::class.java)
@@ -501,8 +518,7 @@ class WalkVoiceForegroundServiceLateFailureDeviceTest {
 
                 newerRequestId = app.registerWalkVoiceStartRequest(currentController, onFailure)
                 setField(main, "handsFreeVoiceStartRequestId", newerRequestId)
-                handleFailure.invoke(
-                    main,
+                failureOwner.handleWalkVoiceStartFailure(
                     failedRequestId,
                     currentController,
                     WalkVoiceStartFailure.FOREGROUND_START_RESTRICTED,
@@ -632,10 +648,10 @@ class WalkVoiceForegroundServiceLateFailureDeviceTest {
     }
 
     private fun field(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.get(activity)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.get(activity)
 
     private fun setField(activity: MainActivity, name: String, value: Any?) {
-        MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.set(activity, value)
+        MainActivityControllerTestFixture.field(name).apply { isAccessible = true }.set(activity, value)
     }
 
     @Suppress("DEPRECATION")

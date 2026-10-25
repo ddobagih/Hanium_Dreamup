@@ -1,0 +1,36 @@
+flowchart TB
+  E["F-D15-026 · 관리자 신고 운영 상태 CAS 변경<br/>PATCH /admin/reports/{report_id}/status"]
+  P["P-D15-026 · 전제조건<br/>typed admin action proof, Report row lock.<br/>request.state identity.step_up_verified_at가<br/>None이면 service 호출 전403; D14 재확인 계약 결합 미해결."]
+  E --> P
+  S1["1. 현재 status/version lock"]
+  P --> S1
+  S2["2. expected_version 불일치면 latest<br/>status/version/allowed transitions와409"]
+  S1 --> S2
+  S3["3. 허용 상태 변화만 version+1로 적용"]
+  S2 --> S3
+  S4["4. ReportStatusAudit·AdminOperationAudit를 같은<br/>transaction으로 commit"]
+  S3 --> S4
+  S5["5. refresh 후 current status DTO"]
+  S4 --> S5
+  OK["정상 결과<br/>refresh 후 current status DTO"]
+  S5 --> OK
+  B1["조건 · HTTP action identity.step_up_verified_at is<br/>None<br/>결과 · 403 admin_step_up_required; service mutation에<br/>도달하지 않음"]
+  P -. "해당 조건 발생" .-> B1
+  B2["조건 · new<br/>결과 · reviewed 또는 resolved 가능"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · reviewed<br/>결과 · new 또는 resolved 가능"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · resolved<br/>결과 · reviewed만 가능"]
+  S1 -. "해당 조건 발생" .-> B4
+  B5["조건 · 같은 status/금지전이<br/>결과 · 422 transition invalid"]
+  S3 -. "해당 조건 발생" .-> B5
+  B6["조건 · stale version<br/>결과 · 409"]
+  S1 -. "해당 조건 발생" .-> B6
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>동일 expected_version 재시도는 최신 상태 확인 필요; 별도<br/>idempotency key 없음.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/admin_report_workflow.py:98<br/>update_admin_report_status<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

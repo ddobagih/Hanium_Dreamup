@@ -40,6 +40,10 @@ public final class AdminRecoveryMessagePolicy {
             + "서버 세션 폐기는 확인하지 못했습니다(서버가 처리했는지 알 수 없음). "
             + "다시 로그인한 뒤 세션 목록에 이 기기의 이전 세션이 남아 있으면 폐기하세요.";
 
+    public static final String RECOVERY_PREPARATION_KO =
+        "복구 완료 전 신뢰할 수 있는 로컬 운영자가 서버의 TOTP 비밀키를 새 값으로 교체해야 합니다. "
+            + "교체가 끝난 뒤 이전과 다른 새 비밀번호와 새 TOTP의 6자리 코드를 입력하세요. 확인 전까지 관리자 업무는 잠겨 있습니다.";
+
     private AdminRecoveryMessagePolicy() {}
 
     /**

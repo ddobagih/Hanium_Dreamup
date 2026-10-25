@@ -1,0 +1,18 @@
+stateDiagram-v2
+ state "결정 빈칸 template" as T
+ state "pending_decisions" as P
+ state "ready_to_build_not_run" as R
+ state "materializing" as M
+ state "built" as B
+ [*] --> T
+ T --> P: "blank · invalid · missing manual boxes"
+ P --> T: "사람이 CSV 수정"
+ T --> R: "모든 결정 유효 · build 없음"
+ R --> M: "build 옵션으로 다시 실행"
+ T --> M: "모든 결정 유효 · build 있음"
+ M --> B: "이미지 및 label · manifest 작성"
+ B --> [*]
+ note right of P
+ "F-D10-027 · P-D10-022"
+ "pending도 exit 0"
+ end note

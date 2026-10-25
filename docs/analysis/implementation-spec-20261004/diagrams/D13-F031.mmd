@@ -1,0 +1,26 @@
+flowchart TD
+  A["F-D13-031<br/>관리자 원시 격리목록 조회"]
+  P["P-D13-031<br/>관리자는최신판단 revision 을받아후속결정 CAS 에사용한다."]
+  A --> P
+  N0["1. 관리자 readcontext 와 operationproof 를검증한다."]
+  P --> N0
+  N1["2. lifecycle_version2 만선택하며기본은 stateQUARANTINED 로제한한다."]
+  N0 --> N1
+  N2["3. committed_at 내림차순 limit 행을조회한다."]
+  N1 --> N2
+  N3["4. 각 collection 의 REPORT/TRAINING 최대 revision 판단과최신 hold<br/>를조회한다."]
+  N2 --> N3
+  N4["5. 최신 hold APPLY 이며 expiry>현재시각일때만 legal_hold_active=true<br/>로응답한다."]
+  N3 --> N4
+  Z["collection metadata 와 CAS revision 을반환. 원시영상/음성다운로드 API<br/>를제공하는기능은아님."]
+  N4 --> Z
+  B0{"state=ALL"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["v2 전체상태를조회;legacyv1 은포함하지 않음"]
+  B1{"hold 만료/RELEASE/없음"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["active=false"]
+  R["재시도: 자동 반복 루프 없음. 호출자가 오류와 현재 상태를 확인 후 재호출.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 별도 취소 진입점 없음."]
+  A -. "취소 API 여부" .-> C

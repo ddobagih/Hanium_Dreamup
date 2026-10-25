@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
 import kr.co.hanium.dreamup.walksafe.navigation.UserMotionEstimate
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
 import kotlin.math.abs
 
 data class MotionContext(
@@ -101,6 +102,38 @@ enum class ObjectMovementDirection {
 }
 
 /**
+ * Nominal closest approach of one measured point in one captured anchor, not body collision.
+ * Time is signed seconds relative to [observedAtMs] in the AR Frame clock. A negative time is
+ * past. Null time means exact zero relative velocity: distance is constant, no unique CPA time.
+ * No measurement error/extent/user passage is supplied or inferred here.
+ */
+data class PointClosestApproach internal constructor(
+    val referenceId: Long,
+    val observedAtMs: Long,
+    val source: DepthSource,
+    /** Original Image clock/identity, never converted to the Frame or elapsed-realtime clock. */
+    val depthObservationTimestampNs: Long,
+    val materialPointId: VisualMaterialPointId,
+    val motionWindowMs: Long,
+    val motionConfidence: Float,
+    val relativePositionInAnchorM: Vec3,
+    val relativeVelocityInAnchorMps: Vec3,
+    val signedTimeSeconds: Double?,
+    val distanceM: Double,
+    /** Original actual publication; absent in unleased direct motion estimates. */
+    internal val publication: Publication? = null,
+) {
+    data class Publication internal constructor(
+        val frameId: Long,
+        val sourceObservedAtElapsedRealtimeMs: Long,
+        val sourceValidUntilElapsedRealtimeMs: Long,
+        val sourceMaxAgeMs: Long,
+    )
+
+    val relativeVelocityIsZero: Boolean get() = signedTimeSeconds == null
+}
+
+/**
  * Metric velocities in one AR anchor. Camera displacement compensates ego motion; it is not
  * substituted for the user's GNSS movement course. Missing evidence stays null, including speed.
  */
@@ -117,7 +150,36 @@ data class ObjectMotionEstimate(
     val relativeClosingSpeedMps: Float? = null,
     val direction: ObjectMovementDirection = ObjectMovementDirection.UNKNOWN,
     val confidence: Float = 0f,
-)
+    /** Producer-captured paired basis; a copied clock/reference/velocity must not retag it. */
+    private val capturedPointClosestApproach: PointClosestApproach? = null,
+) {
+    val pointClosestApproach: PointClosestApproach?
+        get() = capturedPointClosestApproach?.takeIf {
+            referenceId == it.referenceId && observedAtMs == it.observedAtMs &&
+                elapsedMs == it.motionWindowMs && confidence == it.motionConfidence &&
+                relativeVelocityInAnchorMps == it.relativeVelocityInAnchorMps &&
+                isCurrentMeasuredMotion(it.observedAtMs)
+        }
+    val relativePositionInAnchorM: Vec3? get() = pointClosestApproach?.relativePositionInAnchorM
+
+    /** Called only after the existing runtime has published its original capture/lease values. */
+    internal fun bindPointClosestApproachPublication(
+        frameId: Long, observedElapsedMs: Long?, validUntilElapsedMs: Long?, maxAgeMs: Long?,
+    ): ObjectMotionEstimate {
+        val cpa = pointClosestApproach ?: return this
+        val binding = if (frameId > 0L && frameId / 1_000_000L == cpa.observedAtMs &&
+            observedElapsedMs != null && observedElapsedMs >= 0L &&
+            validUntilElapsedMs != null && validUntilElapsedMs >= observedElapsedMs &&
+            maxAgeMs != null && maxAgeMs >= 0L
+        ) PointClosestApproach.Publication(frameId, observedElapsedMs, validUntilElapsedMs, maxAgeMs) else null
+        // An already published basis must never be reissued under a different receipt or lease.
+        if (binding == null || (cpa.publication != null && cpa.publication != binding)) {
+            return copy(capturedPointClosestApproach = null)
+        }
+        if (cpa.publication == binding) return this
+        return copy(capturedPointClosestApproach = cpa.copy(publication = binding))
+    }
+}
 
 fun routeBearingAlignmentQuality(headingDeg: Float?, routeBearingDeg: Float?): Float {
     val heading = headingDeg?.takeIf { it.isFinite() } ?: return 1f

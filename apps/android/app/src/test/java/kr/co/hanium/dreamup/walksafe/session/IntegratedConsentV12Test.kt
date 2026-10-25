@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.session
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import kr.co.hanium.dreamup.walksafe.network.validatedIntegratedConsentBootstrapOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -100,20 +101,5 @@ class IntegratedConsentV12Test {
         assertTrue(bootstrap.contains("integratedConsent=reconsent_required policy="))
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing $signature" }
-        val open = source.indexOf('{', source.indexOf(')', start))
-        var depth = 0
-        for (index in open until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        error("unterminated $signature")
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
 }

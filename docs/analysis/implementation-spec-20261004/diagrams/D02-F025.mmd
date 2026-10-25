@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D02-025 음성 우선순위·audio focus·정확한 취소 소유권"]
+  E["진입: speech dispatch / focus grant/denial/loss"]
+  G{"P-D02-025 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["nonrisk suppress, risk 허용"]
+  G -->|"STT active"| B0
+  B1["UNAVAILABLE, pending retire; engine retry 예산 소비하지 않음"]
+  G -->|"audio focus denied/exception"| B1
+  B2["B 유지"]
+  G -->|"cancel B 이전 A의 late focus loss"| B2
+  B3["재생 없이 SUPPRESSED; TalkBack fallback 유발 안 함"]
+  G -->|"duplicate/suppressed"| B3
+  B4["정책 replacement lease 없으면 차단"]
+  G -->|"same rank 위험"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["risk admission은 낮은 출력 flush; active risk는 strictly higher rank 또는<br/>policy-approved same-rank replacement만 허용"]
+    S1["protected education/consent는 다른 nonrisk 차단; advisory는 idle만,<br/>navigation은 advisory만 교체 가능"]
+    S2["REQUESTED 진단 뒤 reservation을 만들고 focus 요청"]
+    S3["focus 복귀 후 owner/currentness 재검사; grant late/stale면 해당 request만<br/>release"]
+    S4["native speak 및 START에서 validator 재검사"]
+    S5["focus loss/duck 또는 explicit cancellation은 현재 소유 음성·tone만 retire"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+  E -.-> S0
+  N["정상 종료: 유효한 결과를 현재 호출자에게 반환한다."]
+  X["취소·중단: 취소 receipt가 현재 utterance와 일치할 때만 native stop; 이미 교체된 owner는<br/>successor를 stop하지 않음. / 늦은 이전 소유자의 callback은 현 상태를 바꾸지 않는다."]
+  C["정리: focus token registration generation 확인 후 abandon; tone과 speech owner<br/>분리."]
+  R["재시도·복구: 자동 재시도 없음; 새 적법한 요청이 필요하다. / 현재 조건과 소유권을 다시 검사한다."]
+  S5 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

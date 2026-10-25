@@ -1,0 +1,17 @@
+stateDiagram-v2
+ state "S-D10-006-COLD executor 없음" as C
+ state "S-D10-006-RUNNING 작업 실행" as R
+ state "S-D10-006-WARM ready flag true" as W
+ state "S-D10-006-ABORTING 프로세스 회수" as A
+ [*] --> C
+ C --> R: "run · spawn"
+ R --> W: "결과 성공"
+ W --> R: "다음 infer 또는 ready"
+ R --> A: "timeout · cancel · BrokenProcessPool"
+ W --> A: "close"
+ A --> C: "참조 제거 · terminate 및 kill"
+ C --> [*]: "서비스 종료"
+ note right of C
+ "F-D10-006 · P-D10-006"
+ "이전 요청 자동 retry 없음"
+ end note

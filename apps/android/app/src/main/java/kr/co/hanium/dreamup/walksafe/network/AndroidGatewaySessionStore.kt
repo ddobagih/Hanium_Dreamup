@@ -343,11 +343,18 @@ internal class AndroidGatewaySessionStore(
         if (current.state != null) return null
         val (persisted, firstRun) = loadBackendDeviceLocked() ?: return null
         val deviceId = runCatching { readInstallDeviceIdLocked(false) }.getOrNull()
-        if (persisted.gatewayBaseUrl != expectedGatewayBaseUrl || persisted.deviceId != deviceId) {
+        if (persisted.deviceId != deviceId) {
             markFailClosedLocked()
             return null
         }
         val version = persisted.version()
+        if (persisted.gatewayBaseUrl != expectedGatewayBaseUrl) {
+            // A configured endpoint change expires this local login. Never transfer its
+            // cookie or authenticated first-run authority to the new endpoint. Device and
+            // ciphertext checks above still fail closed; fresh credentials are required.
+            removeBackendDeviceIfCurrent(version)
+            return null
+        }
         if (nowEpochMs >= persisted.expiresAtEpochMs) {
             removeBackendDeviceIfCurrent(version)
             return null
@@ -1147,6 +1154,7 @@ internal class AndroidGatewaySessionStore(
             .put("idle_expires_at_epoch_ms", session.idleExpiresAtEpochMs)
             .put("absolute_expires_at_epoch_ms", session.absoluteExpiresAtEpochMs)
             .apply {
+                session.accountGeneration?.let { put("account_generation", it) }
                 session.serverAccessExpiresAtEpochMs?.let {
                     put("server_access_expires_at_epoch_ms", it)
                 }
@@ -1154,7 +1162,8 @@ internal class AndroidGatewaySessionStore(
 
     private fun decodeSession(session: JSONObject): GatewayFieldSessionPersistence {
         val keys = session.jsonKeys()
-        require(keys == SESSION_FIELDS || keys == SESSION_FIELDS_WITH_SERVER_EXPIRY)
+        require(keys - setOf("account_generation") == SESSION_FIELDS ||
+            keys - setOf("account_generation") == SESSION_FIELDS_WITH_SERVER_EXPIRY)
         val persistence = GatewayFieldSessionPersistence(
             gatewayBaseUrl = session.getString("gateway_base_url"),
             actorId = session.getString("actor_id"),
@@ -1166,6 +1175,13 @@ internal class AndroidGatewaySessionStore(
             accessExpiresAtEpochMs = session.getLong("access_expires_at_epoch_ms"),
             idleExpiresAtEpochMs = session.getLong("idle_expires_at_epoch_ms"),
             absoluteExpiresAtEpochMs = session.getLong("absolute_expires_at_epoch_ms"),
+            accountGeneration = if (session.has("account_generation")) {
+                when (val generation = session.opt("account_generation")) {
+                    is Int -> generation.toLong()
+                    is Long -> generation
+                    else -> error("invalid account generation")
+                }.also { require(it in 1L..MAX_ACCOUNT_GENERATION) }
+            } else null,
             serverAccessExpiresAtEpochMs = if (session.has("server_access_expires_at_epoch_ms")) {
                 session.getLong("server_access_expires_at_epoch_ms")
             } else {

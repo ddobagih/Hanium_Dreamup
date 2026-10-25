@@ -12,38 +12,47 @@ class AndroidReportSuccessorStaticTest {
         val store = ReportStaticSourceInspector.read(QUEUE_STORE_PATH)
 
         val process =
-            ReportStaticSourceInspector.functionBlock(
+            MainActivityRefactorSource.function(
                 main,
                 "private fun processReportCandidate",
             )
         assertTrue(
             appearsInOrder(
                 process,
-                "walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch)",
-                "!walkSafetyOutputsAllowed()",
+                "authority.isRuntimeEpochCurrent(expectedWalkEpoch)",
+                "!authority.walkSafetyOutputsAllowed()",
                 "integratedConsentSession.currentConfirmationOrNull()",
-                "reportQueueStore.enqueue(",
+                "queue.enqueue(",
                 "walkSessionId = expectedWalkEpoch.walkSessionId",
                 "consentReceiptSha256 =",
                 "consentConfirmation.backendConsentReceiptSha256",
             ),
         )
         assertFalse(process.contains("uploadCall("))
+        val candidateWiring = MainActivityRefactorSource.composition(main, "reportCandidateController")
+        assertTrue(candidateWiring.contains("override fun isRuntimeEpochCurrent(epoch: WalkRuntimeEpoch) = walkSessionLifecycle.isRuntimeEpochCurrent(epoch)"))
+        assertTrue(candidateWiring.contains("override fun walkSafetyOutputsAllowed() = this@MainActivity.walkSafetyOutputsAllowed()"))
+        assertTrue(candidateWiring.contains("= reportQueueStore.enqueue("))
+        assertTrue(candidateWiring.contains("expectedReporterActorId, metadataUtf8, imageJpeg, priority, walkSessionId, consentReceiptSha256, accountGeneration"))
 
         val capture =
-            ReportStaticSourceInspector.functionBlock(
+            MainActivityRefactorSource.function(
                 main,
                 "private fun buildReportQueueDrainTrigger",
             )
         assertTrue(
             appearsInOrder(
                 capture,
-                "val reporter = currentReporterUserId() ?: return null",
-                "val gatewaySnapshot = GatewaySessionProcessCoordinator.snapshot()",
+                "val reporter = sources.reporterActorId() ?: return null",
+                "val gatewaySnapshot = sources.gatewaySnapshot()",
                 "gatewaySession.isUsableFor(reporter)",
                 "gatewaySessionGeneration = gatewaySnapshot.generation",
             ),
         )
+
+        val drainWiring = MainActivityRefactorSource.composition(main, "reportQueueDrainController")
+        assertTrue(drainWiring.contains("gatewaySnapshot = GatewaySessionProcessCoordinator::snapshot"))
+        assertTrue(drainWiring.contains("reporterActorId = ::currentReporterUserId"))
 
         val queuedUpload =
             ReportStaticSourceInspector.functionBlock(uploader, "internal fun queuedUploadResultCall")
@@ -119,30 +128,38 @@ class AndroidReportSuccessorStaticTest {
             "private fun completeReceipt",
         )
         val cooldownCommit =
-            "if (!beforeDelete(report)) return ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED"
+            "if (!beforeDelete(report)) {"
         assertTrue(completion.contains(cooldownCommit))
+        val commitFailure = ReportStaticSourceInspector.blockAfter(completion, cooldownCommit.removeSuffix(" {"))
+        assertTrue(appearsInOrder(commitFailure,
+            "store.recordUploadFailure(report, false)",
+            "return ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED"))
         assertTrue(
             appearsInOrder(
                 completion.substringBefore(cooldownCommit),
-                "if (call.isCancelled() || !policy.isCurrent(lease, contextProvider()))",
+                "if (!currentAdmission() || !policy.isCurrent(lease, contextProvider()))",
                 "return ReportQueueDrainOutcome.CANCELLED",
-                "if (!receipt.matches(report)) return ReportQueueDrainOutcome.RECEIPT_REJECTED",
+                "if (!receipt.matches(report)) {",
+                "store.recordUploadFailure(report, false)",
+                "ReportQueueDrainOutcome.RECEIPT_UNCONFIRMED",
+                "else ReportQueueDrainOutcome.LOCAL_COMMIT_FAILED",
             ),
         )
         assertTrue(
             appearsInOrder(
                 completion.substringAfter(cooldownCommit),
-                "if (call.isCancelled() || !policy.isCurrent(lease, contextProvider()))",
+                "if (!currentAdmission() || !policy.isCurrent(lease, contextProvider()))",
                 "return ReportQueueDrainOutcome.CANCELLED",
                 "return if (store.deleteAfterReceipt(lease.reporterActorId, receipt)) success",
-                "else ReportQueueDrainOutcome.LOCAL_DELETE_FAILED",
+                "store.recordUploadFailure(report, false)",
+                "ReportQueueDrainOutcome.LOCAL_DELETE_FAILED",
             ),
         )
         assertTrue(startNext.contains("finally"))
         assertTrue(startNext.contains("policy.release(lease)"))
 
         val drain =
-            ReportStaticSourceInspector.functionBlock(main, "private fun drainInitialExactReportQueue")
+            MainActivityRefactorSource.function(main, "private fun drainInitialExactReportQueue")
         assertTrue(
             appearsInOrder(
                 drain,
@@ -158,7 +175,11 @@ class AndroidReportSuccessorStaticTest {
                     "                        ::persistAutomaticReportCooldownBeforeQueueDelete",
             ),
         )
-        val commit = ReportStaticSourceInspector.functionBlock(
+        assertTrue(MainActivityRefactorSource.composition(main, "reportQueueDrainController")
+            .contains("persistCooldownForSuccess = ::persistReportCooldownForSuccess"))
+        assertTrue(MainActivityRefactorSource.composition(main, "reportCandidateController")
+            .contains("attempts = { reportAttemptStore }"))
+        val commit = MainActivityRefactorSource.function(
             main,
             "private fun persistAutomaticReportCooldownBeforeQueueDelete",
         )
@@ -166,13 +187,13 @@ class AndroidReportSuccessorStaticTest {
             appearsInOrder(
                 commit,
                 "report.automaticCooldownScopeOrNull()",
-                "persistReportCooldownForSuccess(",
+                "persistCooldownForSuccess(",
                 "reportAttemptStore.markSucceeded(",
                 "reportAttemptStore.release(",
             ),
         )
 
-        val process = ReportStaticSourceInspector.functionBlock(
+        val process = MainActivityRefactorSource.function(
             main,
             "private fun processReportCandidate",
         )
@@ -180,9 +201,9 @@ class AndroidReportSuccessorStaticTest {
             appearsInOrder(
                 process,
                 "automaticReportCooldownScopeOrNull(candidate.metadata)",
-                "reportAttemptStore.acquire(",
-                "reportQueueStore.enqueue(",
-                "reportAttemptStore::release",
+                "attempts().acquire(",
+                "queue.enqueue(",
+                "attempts()::release",
             ),
         )
     }
@@ -219,7 +240,7 @@ class AndroidReportSuccessorStaticTest {
         )
 
         val drain =
-            ReportStaticSourceInspector.functionBlock(main, "private fun drainInitialExactReportQueue")
+            MainActivityRefactorSource.function(main, "private fun drainInitialExactReportQueue")
         val failure = ReportStaticSourceInspector.blockAfter(drain, "catch (_: Exception)")
         assertTrue(failure.contains("break"))
         assertFalse(failure.contains("deleteAfterReceipt"))

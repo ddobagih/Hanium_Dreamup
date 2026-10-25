@@ -1,0 +1,15 @@
+flowchart TD
+ A["F-D10-036 apply 및 exact confirmation"] --> B["P-D10-028 이전 recovery 조정"]
+ B --> C["P-D10-027 후보 FOR UPDATE · envelope hash 확인"]
+ C --> D{"후보 있음"}
+ D -- "없음" --> Z["0개 적용 결과"]
+ D -- "있음" --> E["recovery 0700 생성"]
+ E --> F["파일을 복구 이름으로 이동"]
+ F --> G["삭제 영수증 insert · artifact row delete"]
+ G --> H{"DB commit 성공"}
+ H -- "아니오" --> I["rollback · 파일 역순 원위치 복원"]
+ H -- "예" --> J["staged 파일 unlink"]
+ J -- "실패 또는 중단" --> K["다음 reconcile에서 receipt 확인 후 삭제"]
+ J -- "성공" --> L["빈 recovery dir 제거"]
+ I --> M["실패 보고 · 잔여는 reconcile 대상"]
+ L --> N["적용 결과 반환"]

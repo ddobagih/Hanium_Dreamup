@@ -1,0 +1,34 @@
+flowchart TD
+  T["F-D09-018 TMAP 공유 실행 슬롯·호출 예산·취소 정리 / P-D09-018"]
+  N0["runtime availability와2슬롯"]
+  T --> N0
+  N1["공유budget 또는probe allowance"]
+  N0 --> N1
+  N2["bounded HTTP stream"]
+  N1 --> N2
+  N3["isolated response job"]
+  N2 --> N3
+  N4["envelope과deadline검사"]
+  N3 --> N4
+  N5["HTTP child reader cleanup"]
+  N4 --> N5
+  N6["확인후lease반환"]
+  N5 --> N6
+  Z["정상: 정상 normalized result 또는 bounded rejection; 정리가 확인되면 슬롯복구"]
+  N6 --> Z
+  B0["503 tmap_capacity_exceeded"]
+  N0 -->|"lease2개 소유"| B0
+  B1["503 tmap_rate_limited"]
+  N1 -->|"공통예산 또는429 cooldown"| B1
+  B2["502 invalid_tmap_response"]
+  N3 -->|"HTTP content-encoding 압축 또는body>2MiB"| B2
+  B3["503 processing_unavailable와 stop admission"]
+  N4 -->|"invalid worker envelope/cleanup 실패"| B3
+  R["복구: provider 자동재시도없음; cleanup실패runtime은새startup 필요 / 일시budget/cooldown은시각경과후새요청; stopped runtime은별도재시작 필요"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  C["취소와 정리: caller취소→abandoned owner task.cancel; cleanup task들은shield / child terminate/kill+reader완료+streamclose후슬롯반환; 불확실참조유지"]
+  N6 -.-> C

@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D02-019 고정 이미지 CPU/GPU 실행기 선택"]
+  E["진입: fixed fixture selection 요청"]
+  G{"P-D02-019 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["CPU 0 timings 결과 기억; 정확도 승인 아님"]
+  G -->|"CPU 기준 fixture output 거절"| B0
+  B1["GPU 거절·CPU 선택"]
+  G -->|"GPU output/backend/fallback 불일치"| B1
+  B2["결과 전달/소유권 이전 금지"]
+  G -->|"cancel/currentness 변경"| B2
+  B3["메모리 결과 가능, durable 저장 성공 아님"]
+  G -->|"prefs commit false"| B3
+  B4["실패 전파; 누수 없다고 주장하지 않음"]
+  G -->|"close 실패"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["selector lock을 50ms tryLock하며 cancellation 확인"]
+    S1["유효 cache는 저장된 runtime을 load하고 한 fixture로 재검증"]
+    S2["invalid cache는 INVALID로 표시하고 CPU fallback; 새 비교를 몰래 수행하지 않음"]
+    S3["새 비교는 CPU/GPU 각 warmup, fixture output gate, 2회 AB/BA·4 frame 총 각8<br/>timing"]
+    S4["GPU 평균이 CPU보다 strictly 작을 때 GPU, 같거나 느리면 CPU"]
+    S5["탈락 detector release 뒤 결과 저장 및 selected detector 소유권 이전"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+  E -.-> S0
+  N["정상 종료: 최대2 detector 중 selected만 caller로 transfer."]
+  X["취소·중단: lock 대기/각 native 전후 current predicate 확인; 이미 진행 native 호출은 강제 drain<br/>완료로 간주하지 않음. / 늦은 이전 소유자의 callback은 현 상태를 바꾸지 않는다."]
+  C["정리: 탈락/미인수 후보를 먼저 close; 선택 소유권 이전 뒤 selector가 다시 닫지 않음."]
+  R["재시도·복구: cached invalid는 CPU fallback; 사용자 명시 재검사 경로로만 비교. / 현재 조건과 소유권을 다시<br/>검사한다."]
+  S5 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

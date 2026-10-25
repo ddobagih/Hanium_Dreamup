@@ -264,6 +264,38 @@ class UserReportModelsTest {
     }
 
     @Test
+    fun correctionDescriptionNormalizesUnicodeSeparatorsAndNfc() {
+        val separators = listOf(
+            '\u0020', '\u00a0', '\u1680', '\u2000', '\u2001', '\u2002', '\u2003',
+            '\u2004', '\u2005', '\u2006', '\u2007', '\u2008', '\u2009', '\u200a',
+            '\u2028', '\u2029', '\u202f', '\u205f', '\u3000',
+        )
+        separators.forEach { separator ->
+            assertEquals("U+${separator.code.toString(16)}", "café 파손",
+                canonicalUserReportCorrectionDescriptionOrNull("${separator}cafe\u0301${separator}${separator}파손${separator}"))
+            assertNull(canonicalUserReportCorrectionDescriptionOrNull("$separator$separator"))
+        }
+        assertEquals("café 파손", canonicalUserReportCorrectionDescriptionOrNull(
+            "\u00a0cafe\u0301\u2009\u202f파손\u3000\u2028\u2029"))
+    }
+
+    @Test
+    fun correctionDescriptionStillRejectsWhitespaceControlsAndFormatControls() {
+        val controls = listOf(
+            '\u0000', '\t', '\n', '\r', '\u000b', '\u000c', '\u0085',
+            '\u200b', '\u200c', '\u200d', '\u202e', '\u2060', '\ufeff',
+        )
+        controls.forEach { control ->
+            val value = "cafe\u0301${control}파손"
+            assertNull("U+${control.code.toString(16)}", canonicalUserReportCorrectionDescriptionOrNull(value))
+            assertThrows(IllegalArgumentException::class.java) {
+                UserReportCorrectionIntent(reportId(1), 0L, IDEMPOTENCY_KEY,
+                    userDescription = UserReportCorrectionPatch.Value(value))
+            }
+        }
+    }
+
+    @Test
     fun deletionStatusParserAcceptsOnlyExactPhysicalDeletionStatesAndBounds() {
         UserReportDeletionState.entries.forEach { state ->
             val parsed = validatedUserReportDeletionStatusOrNull(

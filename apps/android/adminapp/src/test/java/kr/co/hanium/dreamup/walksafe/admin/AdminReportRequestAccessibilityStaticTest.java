@@ -142,7 +142,7 @@ public final class AdminReportRequestAccessibilityStaticTest {
         assertTrue(activity.contains("revokeCurrentButton = button(\"로그아웃\")"));
         assertTrue(activity.contains("session.isCurrent() ? \"로그아웃\""));
         assertTrue(activity.contains("controller.revokeSession(sessionId)"));
-        assertTrue(activity.contains("currentSession ? \"로그아웃했습니다.\""));
+        assertTrue(activity.contains("controller.beginCurrentSessionRevocation(sessionId)"));
         assertFalse(activity.contains("button(\"현재 기기 세션 폐기\")"));
     }
 

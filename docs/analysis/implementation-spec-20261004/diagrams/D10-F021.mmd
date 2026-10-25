@@ -1,0 +1,28 @@
+flowchart TD
+  A["F-D10-021 YOLO 오탐·미탐 실패 후보 샘플링"]
+  N0["1. output failure_candidates.csv가 있으면 --overwrite 없이는1. positive/negative를 약 절반씩 섞고 부족분 보충하여 seed 재현 선택."]
+  A --> N0
+  N1["2. 이미지마다 model.predict하고 normalized prediction/GT의 같은 class 최대 IoU를 찾는다."]
+  N0 --> N1
+  N2["3. GT maxIoU<.5면 면적≤.015는 small_or_far, 나머지 missed_defect. prediction maxIoU<.5면 empty label은 false_positive_normal_tactile, 아니면 false_positive_extra_box."]
+  N1 --> N2
+  N3["4. bucket별50·전체200 행 한도에 따라 candidate CSV 작성, privacy_review_required=yes와 미수동검수 표기."]
+  N2 --> N3
+  N4["5. 10이미지마다 checkpoint와 마지막 complete checkpoint, 최종 summary JSON을 쓴다. prediction 이미지/contact sheet는 생성하지 않는다."]
+  N3 --> N4
+  B0{"candidate cap 도달"}
+  R0["CSV 추가만 제한; 나머지 선택 이미지 추론/통계는 계속"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"GT와 prediction 다대일 중첩"}
+  R1["최대IoU 비교이며 one-to-one 평가 매칭이 아님"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"label 없음"}
+  R2["negative로 처리; annotation completeness는 이 도구가 검증하지 않음"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N4 --> Z
+  P["적용 정책 · P-D10-019"]
+  P -. "코드 분기 기준" .-> A

@@ -44,10 +44,12 @@ def _receipt_bytes(
     compact: bool = True,
     null_plan: bool = False,
 ) -> tuple[bytes, str]:
+    # The hash and wire document must use the same canonical UTC timestamp,
+    # including fractional seconds whose trailing zeroes are omitted.
+    applied_at_text = applied_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")
+    applied_at_text = applied_at_text.rstrip("0").rstrip(".") + "Z"
     payload: dict[str, object] = {
-        "applied_at": applied_at.astimezone(UTC).strftime(
-            "%Y-%m-%dT%H:%M:%S.%fZ"
-        ).replace(".000000Z", "Z"),
+        "applied_at": applied_at_text,
         "data_boundary_id": "walksafe-report-production",
         "plan_sha256": None if null_plan else plan_sha256,
         "restore_run_id": str(restore_run_id),
@@ -396,7 +398,8 @@ def test_restore_migration_fail_closed_role_receipt_and_downgrade_boundaries(
                 reject=True,
             )
 
-        applied_at = datetime.now(UTC)
+        # Keep a trailing fractional zero to exercise canonical hash binding.
+        applied_at = datetime.now(UTC).replace(microsecond=340190)
         plan_sha256 = hashlib.sha256(uuid.uuid4().bytes).hexdigest()
         restore_run_id = uuid.uuid4()
         target_identity_sha256 = hashlib.sha256(uuid.uuid4().bytes).hexdigest()

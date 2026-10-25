@@ -1,0 +1,11 @@
+stateDiagram-v2
+  state "F-D08-045 legacy 평문" as S0
+  state "F-D08-045 active 키 암호문" as S1
+  state "F-D08-045 decrypt-only 암호문" as S2
+  state "F-D08-045 unknown compromised integrity failure" as S3
+  [*] --> S0
+  S0 --> S1: 오프라인migrateplaintext
+  S2 --> S1: 오프라인rotate
+  S1 --> S2: 운영자가기존키를decryptonly로지정
+  S1 --> S3: 키소실 또는무결성실패
+  S3 --> S3: runtime복호화와rotate거부

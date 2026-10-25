@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D01-003 이메일 OTP 요청·발송 대기·동일 요청 재시도"]
+  G{"현재 email enrollment stage·전경·저장소 정상·OFFLINE 아님·필수동의·가입 입력 유효"}
+  I["origin+owner SHA+email+정규화 DOB+signup epoch; requestId16..128; 서버202 handle/expiry/resend"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: serverCode별 age·rate·conflict 메시지; terminal 오류는 retry ID 폐기"]
+  G -->|"미충족"| X
+  N1["입력과 현재 owner/origin을 검증한 뒤 RetryPolicy.begin 및 AccountRequestFence.begin을 얻는다."]
+  I --> N1
+  N2["같은 payload 재시도는 동일 requestId로 POST /api/account-enrollments/email-otp; gateway executor에서 수행한다."]
+  N1 --> N2
+  N3["현재 token·state·payload인지 확인하고 응답 schema·handle·시간 범위를 검증한다."]
+  N2 --> N3
+  N4["encrypted partial 저장 성공 후 ACCOUNT_CREATED 단계와 elapsed deadline을 만들고 OTP focus를 준다."]
+  N3 --> N4
+  OK["유효 partial 저장 후 OTP 입력 단계"]
+  N4 --> OK
+  B0["추가 송신 거부; 자동 재발송 없음"]
+  N1 -->|"진행중 또는 retry wait 남음"| B0
+  B1["wire ID 유지 및 대기 정책; 사용자 재시도"]
+  N3 -->|"status0·5xx·429·409 in_progress"| B1
+  B2["UI·partial commit 없음"]
+  N3 -->|"과거 응답·payload 변경"| B2
+  B3["단계 진행 차단; 저장 오류"]
+  N4 -->|"partial 저장 실패"| B3
+  R["중단·취소: 가입 닫기/명시 cancel은 retry state 제거; 이미 서버 적용된 발송 취소 보장 없음 / background가 계정 token 무효화; lifecycleInterrupted는 activeAttempt만 해제"]
+  V["복구·재시도: fresh process 저장 pending owner+payload digest+age 검증 후 재사용 / 동일payload+허용 대기 후 사용자 재요청; Pending 복원 재사용 수명30분"]
+  Q["정책 P-D01-002 · P-D01-003 · P-D01-004 · P-D01-005 · P-D01-024"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

@@ -1,0 +1,45 @@
+flowchart TD
+  T["F-D06-025 현장 로그 시작·중지와 활성 포인터 복원"]
+  P["전제: DEBUG; 시작 UI는 permission recovery 차단 없음, ACTIVE 보행, 필수 권한<br/>충족, 신규 raw session 용량 허용. 저장소 account/raw/crypto fence가 없어야<br/>한다."]
+  T --> P
+  E1["E-D06-025-01 현장 로그 버튼→DEBUG·권한·ACTIVE·용량 확인→시작 또는 중지"]
+  E1 --> T
+  E2["E-D06-025-02 앱 시작→암호화 active pointer와 manifest 검사→복원 또는 차단"]
+  E2 --> T
+  E3["E-D06-025-03 Activity close→app_process_closed 기록→활성 포인터 유지"]
+  E3 --> T
+  A1["1. Main은 startAfterUserConfirmation을 호출하고 성공하면 위치·걸음 서비스를<br/>유지한다."]
+  P --> A1
+  A2["2. 새 세션은 디렉터리, AEAD manifest와 active pointer를 기록한다. 포인터 쓰기 실패는<br/>해당 신규 디렉터리만 제거하고 crypto block한다."]
+  A1 --> A2
+  A3["3. 이미 활성 세션이면 같은 ID를 반환한다. 중지는 summary/event와 completed<br/>manifest를 기록하고 active pointer를 제거한다."]
+  A2 --> A3
+  A4["4. 프로세스 재생성은 활성 포인터를 검증하고 이어쓴다. 앱·모델 provenance가 달라졌으면 이전 세션을<br/>종료하고 새 세션을 시작한다."]
+  A3 --> A4
+  N["정상 종료: stop은 완료 요약과 manifest를 저장한다."]
+  A4 --> N
+  FX["결과: field_sessions 내부 암호문과 화면 상태/요약, 위치·걸음 구독 유지. 서버 자동 전송 기능<br/>아님."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"release"}
+    R1["NoopFieldSessionLog: 영속 기록하지 않음"]
+    B1 -->|조건 성립| R1
+    B2{"권한/ACTIVE/raw/account/crypto gate 실패"}
+    R2["시작 거부 또는 null, UI 안내"]
+    B2 -->|조건 성립| R2
+    B3{"꼬리 삭제/순서·manifest·암호화 불일치"}
+    R3["cryptoBlocked; 미검증 세션 이어쓰기 거부"]
+    B3 -->|조건 성립| R3
+    B4{"close 호출"}
+    R4["일반 stop과 다르게 restart 복구용 활성 상태 유지"]
+    B4 -->|조건 성립| R4
+  end
+  POL["정책: P-D06-023, P-D06-024"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 포인터/AEAD/manifest 실패시 crypto block한다."]
+    X2["시간: 활성 age  이상 14일이면 삭제 후 새 시작 판단."]
+    X3["중단: close는 active pointer를 남겨 재시작 복원 허용."]
+    X4["복구: provenance·tail chain 확인 후에만 복원; 승인 시작으로 restore-only<br/>block 해제 가능."]
+    X5["정리: stop 후 권한·route 등 다른 위치 사용자가 없으면 Main이 위치/걸음 서비스를 중지."]
+  end

@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D08-050 서버 TTS 중계·WAV 검증"]
+  B["진입: POST /api/speech/tts"]
+  A --> B
+  P0["1. speechadmission 및 Voiceconfig 확인"]
+  B --> P0
+  P1["2. 텍스트검증후 Voice 에 text,use_cache=false,allow_fallback=false 전송"]
+  P0 --> P1
+  P2["3. 기본 65 초 deadline 에서 audio/wav 수신"]
+  P1 --> P2
+  P3["4. 기본 4MiB·RIFF 길이·fmt/data·channels1..2·sampleRate8000..192000·duration＞0＜=30 초검증"]
+  P2 --> P3
+  P4["5. 40hexmodelrevision 과 requestidheader 만노출"]
+  P3 --> P4
+  OK["검증된 WAV200 no-store"]
+  P4 --> OK
+  C0{"textcontrol/초과"}
+  X0["422"]
+  B -. "해당 단계에서 검사" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"WAV 형식/길이/모델 revision 잘못됨"}
+  X1["502"]
+  B -. "해당 단계에서 검사" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"deadline/abort"}
+  X2["504/499"]
+  B -. "해당 단계에서 검사" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"rate/capacity"}
+  X3["429/503"]
+  B -. "해당 단계에서 검사" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["P-D08-004, P-D08-011, P-D08-025"]
+  A -.-> POLICY

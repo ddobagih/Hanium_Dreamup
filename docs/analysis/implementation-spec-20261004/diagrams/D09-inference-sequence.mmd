@@ -1,0 +1,36 @@
+sequenceDiagram
+  autonumber
+  participant C as HTTP caller
+  participant A as F-D09-008 또는 009
+  participant P as F-D09-010 전처리 owner
+  participant I as F-D09-011 inference owner
+  participant SP as 요청별 정제 child
+  participant W as persistent 추론 child
+  Note over A,W: P-D09-010..012 · deadline과 자원 종료는 별도 사건
+  C->>A: image와 context
+  A->>A: context 및 공통 인가 검증
+  A->>P: 2개 중 즉시 slot 예약
+  P->>SP: request-owned sanitation child 실행
+  SP-->>P: 정제된 image 또는 typed 오류
+  P->>P: child와 socket 및 IPC 종료 확인
+  P-->>A: image 및 slot 반환
+  A->>I: 새로운 absolute request deadline으로 submit
+  I->>I: 단일 submission 소유와 restart 제한 확인
+  I->>W: persistent child의 job ID와 contract 요청
+  alt 정상 deadline 내 응답
+    W-->>I: job ID 및 결과
+    I->>I: envelope와 DTO 및 남은 기한 검증
+    I-->>A: result
+    A-->>C: HTTP200
+  else typed malformed 또는 provider precondition
+    W-->>I: 제한된 recoverable 오류
+    I-->>A: worker를 보존한 오류
+    A-->>C: 고정 오류 응답
+  else timeout 또는 fatal 오류
+    I->>W: terminate 및 필요 시 kill
+    I->>I: process와 IPC의 실제 종료 확인
+    I-->>A: 503
+    A-->>C: 새 frame으로 재요청할 오류
+  end
+  Note over A,I: caller 취소가 background future의 소유권을 즉시 반환하지 않음
+  Note over I,W: cleanup 불확실 시 참조 보존과 신규 admission 차단

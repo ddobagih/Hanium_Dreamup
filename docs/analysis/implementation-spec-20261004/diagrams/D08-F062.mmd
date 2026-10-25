@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D08-062 퇴역 v1 삭제 접수·항목 전이 helper"]
+  B["진입: acceptAccountDeletionRequest / transitionAccountDeletionItem (공개 HTTP 연결 없음)"]
+  A --> B
+  P0["1. 직접함수호출시 capability 성격 statussecret 과 requestbodyhash 로 replay 검사"]
+  B --> P0
+  P1["2. 신규접수는 activegeneration 을 null 로하고 processingepoch 증가/tombstone 저장"]
+  P0 --> P1
+  P2["3. 항목은 EXTERNAL_PENDING 으로초기화하며요청별 dueat 생성"]
+  P1 --> P2
+  P3["4. 전이는 operationidpayloadhash replay 와 request/item CAS 검증"]
+  P2 --> P3
+  P4["5. statusmetadata 를전이상태에맞춰설정/삭제하고 hashchain event 추가"]
+  P3 --> P4
+  OK["정상: 직접 호출 시 v1 원장 전이; 현재 제품 HTTP 에서는 퇴역 응답"]
+  P4 --> OK
+  C0{"같은 operation 다른 payload"}
+  X0["conflict"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"terminal 인데증거/시간없음"}
+  X1["conflict"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"request/itemrevision 바뀜"}
+  X2["CASconflict"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"공개 privacycontrolaccount-deletion 호출"}
+  X3["dispatcher410;이함수호출없음"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 독립취소 API 없음;제품 HTTP 연결없음. 동기 ledger 검사·파일 처리 자체에 독립 timeout 은 없다. 호출 HTTP/maintenance lock 의 기한과 실행 맥락을 따른다."]
+  B -. "중단 조건" .-> T
+  R["재시도: helper 자체 자동 retry 없음;직접호출자의책임."]
+  T -.-> R
+  POLICY["정책: P-D08-019, P-D08-021, P-D08-024"]
+  A -.-> POLICY

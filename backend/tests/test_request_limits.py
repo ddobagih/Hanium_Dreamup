@@ -308,9 +308,11 @@ def test_report_family_preserves_handled_http_errors(path, status_code):
 @pytest.mark.parametrize("debug", [False, True])
 def test_report_family_outer_500_preserves_framework_error(path, method, debug):
     results = []
-    failure = RuntimeError("outer report family fixture")
     for application_type in (FastAPI, _PrivacyNoStoreFastAPI):
         application = application_type(debug=debug)
+        # Each application needs a fresh exception: reraising the same instance
+        # accumulates earlier traceback frames in the debug response body.
+        failure = RuntimeError("outer report family fixture")
 
         async def fail():
             raise failure

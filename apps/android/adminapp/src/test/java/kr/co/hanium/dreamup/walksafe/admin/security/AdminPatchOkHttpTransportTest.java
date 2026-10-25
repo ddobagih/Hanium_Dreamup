@@ -41,6 +41,65 @@ public final class AdminPatchOkHttpTransportTest {
     );
 
     @Test
+    public void closedOwnerCannotLeaveALifecycleRegistration() throws Exception {
+        AdminOkHttpTransport.RequestOwner owner = new AdminOkHttpTransport.RequestOwner();
+        owner.cancelInFlight();
+        java.util.concurrent.atomic.AtomicInteger admissions = new java.util.concurrent.atomic.AtomicInteger();
+        AdminOperationsApi.SessionContext session = new AdminOperationsApi.SessionContext(
+            TOKEN, "admin-001", AdminDeviceProofTest.SESSION_ID, AdminDeviceProofTest.DEVICE_ID,
+            () -> {}, (cancel, enqueue) -> { admissions.incrementAndGet(); enqueue.run(); return () -> {}; });
+        assertThrows(IOException.class, () -> AdminOkHttpTransport.execute(owner, session,
+            "PATCH", "http://127.0.0.1:1/closed", Map.of(), new byte[0], 1024,
+            "cancelled", "no progress", "too large"));
+        assertEquals(0, admissions.get());
+    }
+
+    @Test
+    public void reportAndIncidentCancellationOwnTheirCallsWithoutCancellingTheOtherClient() throws Exception {
+        try (MockWebServer server = new MockWebServer()) {
+            server.start();
+            for (int i = 0; i < 2; i++) server.enqueue(new MockResponse.Builder().code(200)
+                .bodyDelay(5, TimeUnit.SECONDS).body("delayed challenge").build());
+            AdminReportHttpClient reports = reportClient(server.url("/").toString());
+            AdminIncidentHttpClient incidents = incidentClient(server.url("/").toString());
+            AtomicReference<Throwable> reportFailure = new AtomicReference<>();
+            AtomicReference<Throwable> incidentFailure = new AtomicReference<>();
+            Thread report = new Thread(() -> {
+                try { reports.detail(SESSION, REPORT_ID); }
+                catch (Throwable failure) { reportFailure.set(failure); }
+            });
+            Thread incident = new Thread(() -> {
+                try { incidents.detail(SESSION, INCIDENT_ID); }
+                catch (Throwable failure) { incidentFailure.set(failure); }
+            });
+            try {
+                report.start();
+                RecordedRequest reportRequest = server.takeRequest(2, TimeUnit.SECONDS);
+                assertNotNull("report request failed before dispatch: " + reportFailure.get(), reportRequest);
+                incident.start();
+                assertNotNull(server.takeRequest(2, TimeUnit.SECONDS));
+                reports.cancelInFlightRequests();
+                report.join(2_000);
+                assertFalse("report cancellation must end its blocked challenge", report.isAlive());
+                assertTrue(reportFailure.get() instanceof IOException);
+                assertTrue("report cancellation must not cancel incident calls", incident.isAlive());
+                incidents.cancelInFlightRequests();
+                incident.join(2_000);
+                assertFalse("incident cancellation must end its blocked challenge", incident.isAlive());
+                assertTrue(incidentFailure.get() instanceof IOException);
+                assertThrows(IOException.class, () -> reports.detail(SESSION, REPORT_ID));
+                assertThrows(IOException.class, () -> incidents.detail(SESSION, INCIDENT_ID));
+                assertNull("cancelled challenges must not dispatch final reads", server.takeRequest(100, TimeUnit.MILLISECONDS));
+            } finally {
+                reports.cancelInFlightRequests();
+                incidents.cancelInFlightRequests();
+                report.join(2_000);
+                incident.join(2_000);
+            }
+        }
+    }
+
+    @Test
     public void realTransportSendsAllThreePatchContracts() throws Exception {
         List<RecordedRequest> patches = new CopyOnWriteArrayList<>();
         try (MockWebServer server = new MockWebServer()) {

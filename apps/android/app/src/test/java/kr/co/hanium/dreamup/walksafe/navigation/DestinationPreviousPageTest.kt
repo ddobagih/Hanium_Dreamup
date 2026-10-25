@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -61,16 +62,16 @@ class DestinationPreviousPageTest {
 
     @Test fun mainActivityDispatchesPreviousPageLocallyAndListsItInHelp() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val dispatch = source.substringAfter("private fun executeVoiceAction(").substringBefore("private fun unrecognizedCommandHintKo()")
+        val dispatch = MainActivityRefactorSource.function(source, "fun executeVoiceAction(")
         assertTrue(dispatch.contains("AndroidVoiceAction.PreviousDestinationCandidates,"))
-        assertTrue(dispatch.contains("AndroidVoiceAction.PreviousDestinationCandidates -> previousVoiceDestinationCandidates()"))
-        assertTrue(dispatch.contains("더 듣기, 이전 후보, 목적지 취소"))
-        val previous = source.substringAfter("private fun previousVoiceDestinationCandidates() {")
-            .substringBefore("private fun startVoiceDestinationSearch(")
+        assertTrue(dispatch.contains("AndroidVoiceAction.PreviousDestinationCandidates -> dialog().previousVoiceDestinationCandidates()"))
+        assertTrue(dispatch.contains("voiceCommandHelpKo("))
+        assertTrue(voiceCommandHelpKo(paused = false).contains("더 듣기, 이전 후보, 목적지 취소"))
+        val previous = MainActivityRefactorSource.function(source, "fun previousVoiceDestinationCandidates()")
         assertTrue(previous.contains("state.onCommand(DestinationSearchVoiceCommand.PreviousPage)"))
         assertTrue(previous.contains("speakHomeDestinationVoicePrompt(transition.state)"))
         assertTrue(previous.contains("첫 번째 후보 목록입니다."))
-        assertFalse(previous.contains("performDestinationSearch("))
+        assertFalse(previous.contains("search().search("))
         assertFalse(previous.contains("SelectCandidate"))
     }
 }

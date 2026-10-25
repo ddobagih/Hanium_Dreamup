@@ -1,0 +1,29 @@
+sequenceDiagram
+  participant U as 사용자
+  participant API as 권리요청 API
+  participant OP as 관리자와 수동 worker
+  participant DB as 원본 DB
+  participant FS as 원본 저장소
+  participant SIGN as 외부 서명 제공자
+  participant REST as 격리 복원 worker
+  participant TARGET as 복원 DB·저장소
+  U->>API: DELETE 요청 idempotency key
+  API->>DB: RECEIVED·FIELD event commit
+  OP->>API: ACKNOWLEDGED CAS
+  Note over OP,API: ACK HTTP stepup 경계 R-D15-006
+  OP->>DB: preview digest·deletion/storage advisory locks·후보 lock
+  DB-->>OP: ACK DELETE 후보·active legal hold 확인
+  OP->>FS: 파일 quarantine stage
+  OP->>DB: tombstone·외부사본 snapshot·Report DELETE commit
+  OP->>FS: commit 확인 뒤 finalize
+  OP->>DB: 외부사본 REQUEST_SENT·REPLY 상태 수기 기록
+  REST->>DB: source fence 획득·보유 검증
+  REST-->>SIGN: fence request 출력
+  SIGN-->>REST: signed ledger·head·binding 파일 게시
+  REST->>REST: 서명·anchor·파일 안정성 검증
+  REST->>TARGET: source와 다른 격리 target inventory·plan
+  REST->>TARGET: 정확 action·receipt atomic commit·파일 finalize
+  REST->>DB: source fence 여전히 보유 확인
+  REST->>TARGET: post inventory와 receipt 재검증
+  REST-->>OP: PASS gate 또는 BLOCKED
+  Note over REST,OP: F-D15-023·024·040~045 / P-D15-045<br/>PASS 문서가 ingress를 자동으로 개방하지 않음

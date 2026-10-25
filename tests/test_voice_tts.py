@@ -19,6 +19,102 @@ from voice.tts import LocalTTSEngine, TTSResult
 MODEL_REVISION = "a" * 40
 
 
+@pytest.mark.parametrize("configured", [False, True])
+def test_tts_factory_preserves_environment_and_one_lazy_cached_engine(monkeypatch, configured) -> None:
+    from voice import engine_factory
+
+    expected = {
+        "model_id": "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+        "model_revision": None,
+        "model_manifest_path": None,
+        "model_manifest_sha256": None,
+        "device_map": None,
+        "dtype": "bfloat16",
+        "attn_implementation": None,
+        "language": "Korean",
+        "mode": "custom",
+        "voice_instruct": "차분하고 명확한 한국어 보행 안전 안내 음성. 너무 빠르지 않게 말하세요.",
+        "speaker": "Sohee",
+        "ref_audio": None,
+        "ref_text": None,
+        "cache_dir": "outputs/voice/cache",
+        "cache_max_files": 256,
+        "cache_max_bytes": 512 * 1024 * 1024,
+    }
+    overrides = {
+        "VOICE_TTS_MODEL": ("model_id", "fixture/tts"),
+        "VOICE_TTS_MODEL_REVISION": ("model_revision", MODEL_REVISION),
+        "VOICE_TTS_MODEL_MANIFEST_PATH": ("model_manifest_path", "/fixture/tts.json"),
+        "VOICE_TTS_MODEL_MANIFEST_SHA256": ("model_manifest_sha256", "b" * 64),
+        "VOICE_TTS_DEVICE_MAP": ("device_map", "cpu"),
+        "VOICE_TTS_DTYPE": ("dtype", "float32"),
+        "VOICE_TTS_ATTENTION": ("attn_implementation", "eager"),
+        "VOICE_TTS_LANGUAGE": ("language", "English"),
+        "VOICE_TTS_MODE": ("mode", "design"),
+        "VOICE_TTS_INSTRUCT": ("voice_instruct", "fixture instruction"),
+        "VOICE_TTS_SPEAKER": ("speaker", "Vivian"),
+        "VOICE_TTS_REF_AUDIO": ("ref_audio", "/fixture/voice.wav"),
+        "VOICE_TTS_REF_TEXT": ("ref_text", "fixture reference"),
+        "VOICE_TTS_CACHE_DIR": ("cache_dir", "/fixture/cache"),
+        "VOICE_TTS_CACHE_MAX_FILES": ("cache_max_files", 17),
+        "VOICE_TTS_CACHE_MAX_BYTES": ("cache_max_bytes", 2 * 1024 * 1024),
+    }
+    for name, (argument, value) in overrides.items():
+        monkeypatch.delenv(name, raising=False)
+        if configured:
+            monkeypatch.setenv(name, str(value))
+            expected[argument] = value
+
+    created = []
+
+    class Engine:
+        def __init__(self, **arguments):
+            self.arguments = arguments
+            created.append(self)
+
+        def load(self):
+            raise AssertionError("factory construction must not load a model")
+
+    monkeypatch.setattr(engine_factory, "LocalTTSEngine", Engine)
+    factory = engine_factory.get_tts_engine
+    factory.cache_clear()
+    try:
+        assert voice_server.get_tts_engine is factory
+        engine = voice_server.get_tts_engine()
+        assert engine.arguments == expected
+        monkeypatch.setenv("VOICE_TTS_MODEL", "changed-after-construction")
+        assert factory() is engine
+        assert len(created) == 1
+        voice_server.get_tts_engine.cache_clear()
+        assert factory() is not engine
+        assert created[-1].arguments["model_id"] == "changed-after-construction"
+    finally:
+        factory.cache_clear()
+
+
+@pytest.mark.parametrize(
+    ("files", "size", "expected_files", "expected_size"),
+    [
+        ("invalid", "invalid", 256, 512 * 1024 * 1024),
+        ("0", "0", 1, 1024 * 1024),
+        ("10001", str(11 * 1024 * 1024 * 1024), 10000, 10 * 1024 * 1024 * 1024),
+    ],
+)
+def test_tts_factory_keeps_cache_configuration_bounds(monkeypatch, files, size, expected_files, expected_size):
+    from voice import engine_factory
+
+    monkeypatch.setenv("VOICE_TTS_CACHE_MAX_FILES", files)
+    monkeypatch.setenv("VOICE_TTS_CACHE_MAX_BYTES", size)
+    monkeypatch.setattr(engine_factory, "LocalTTSEngine", lambda **arguments: SimpleNamespace(**arguments))
+    engine_factory.get_tts_engine.cache_clear()
+    try:
+        engine = engine_factory.get_tts_engine()
+        assert engine.cache_max_files == expected_files
+        assert engine.cache_max_bytes == expected_size
+    finally:
+        engine_factory.get_tts_engine.cache_clear()
+
+
 def _wav_bytes(duration_seconds: float = 0.1, sample_rate: int = 8_000) -> bytes:
     output = BytesIO()
     with wave.open(output, "wb") as audio:

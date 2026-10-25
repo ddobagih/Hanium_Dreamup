@@ -1,6 +1,10 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPoint
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
+import kotlin.math.abs
 import kotlin.math.ln
+import kotlin.math.max
 
 data class ObjectDepthInput(
     val frameId: Long,
@@ -23,6 +27,9 @@ data class ObjectDepthInput(
     val requireIndependentDepthObservation: Boolean = false,
     /** Full Depth may supply proximity while only independent Raw captures supply motion. */
     val rawDepthMotionOnly: Boolean = false,
+    /** Age attribution is separate from the stricter depth IDs admitted to motion history. */
+    val depthCaptureTimes: DepthCaptureTimes? = null,
+    val materialPoint: VisualMaterialPoint? = null,
 )
 
 /** Only current, valid rotation-corrected image geometry can support a screen-side phrase. */
@@ -67,7 +74,8 @@ class ObjectDepthEstimator(
         return buildMetricResult(source, stats, input, supportedPositionInAnchor)
     }
 
-    fun estimate(input: ObjectDepthInput): TrackedObjectDepth {
+    @JvmOverloads
+    fun estimate(input: ObjectDepthInput, riskGuidanceNowElapsedRealtimeMs: Long? = null): TrackedObjectDepth {
         val depthPolygon = input.mapper.imagePolygonToDepthPolygon(input.geometry.polygonNorm)
         if (depthPolygon.size < 3) {
             return buildPseudoTrendResult(input, reasonHardGate = 0f)
@@ -88,8 +96,14 @@ class ObjectDepthEstimator(
         if (rawStats?.foregroundAmbiguous == true) return buildPseudoTrendResult(input, reasonHardGate = 0f)
         val rawUsable = rawStats != null && rawStats.validSampleCount >= MIN_RAW_VALID_SAMPLES && rawStats.medianM != null &&
             hasUsableCandidateConfidence(DepthSource.ARCORE_RAW_DEPTH, rawStats, input)
-        if (rawUsable && checkNotNull(rawStats).hasSpatialSupport()) {
-            return buildMetricResult(DepthSource.ARCORE_RAW_DEPTH, rawStats, input, interpretPose = true)
+        val rawSupported = rawStats?.takeIf { rawUsable && it.hasSpatialSupport() }
+        // S12-29: an old Raw capture may still be displayed, but cannot hide a Full capture
+        // whose original observation is within the existing guidance age budget.
+        val evaluateFreshFull = rawSupported != null &&
+            !input.hasRiskAge(DepthSource.ARCORE_RAW_DEPTH, riskGuidanceNowElapsedRealtimeMs) &&
+            input.hasRiskAge(DepthSource.ARCORE_FULL_DEPTH, riskGuidanceNowElapsedRealtimeMs)
+        if (rawSupported != null && !evaluateFreshFull) {
+            return buildMetricResult(DepthSource.ARCORE_RAW_DEPTH, rawSupported, input, interpretPose = true)
         }
         // S11-6-F1: a usable Raw source without spatial support is kept aside as proximity-only
         // evidence; it is used only if no spatially supported source follows.
@@ -106,7 +120,8 @@ class ObjectDepthEstimator(
         }
         if (fullStats?.foregroundAmbiguous == true) {
             // Full ambiguity cannot release nearer Raw proximity evidence either.
-            return rawLimited?.let { spatiallyLimitedResult(DepthSource.ARCORE_RAW_DEPTH, it, input) }
+            return rawSupported?.let { buildMetricResult(DepthSource.ARCORE_RAW_DEPTH, it, input, interpretPose = true) }
+                ?: rawLimited?.let { spatiallyLimitedResult(DepthSource.ARCORE_RAW_DEPTH, it, input) }
                 ?: buildPseudoTrendResult(input, reasonHardGate = 0f)
         }
         val fullUsable = fullStats != null && fullStats.validSampleCount >= MIN_FULL_VALID_SAMPLES && fullStats.medianM != null &&
@@ -114,6 +129,8 @@ class ObjectDepthEstimator(
         if (fullUsable && checkNotNull(fullStats).hasSpatialSupport()) {
             return buildMetricResult(DepthSource.ARCORE_FULL_DEPTH, fullStats, input, interpretPose = true)
         }
+        // Failed Full admission does not remove Raw's separate, longer display allowance.
+        rawSupported?.let { return buildMetricResult(DepthSource.ARCORE_RAW_DEPTH, it, input, interpretPose = true) }
         rawLimited?.let { return spatiallyLimitedResult(DepthSource.ARCORE_RAW_DEPTH, it, input) }
         fullStats?.takeIf { fullUsable && admitsSpatiallyLimited(DepthSource.ARCORE_FULL_DEPTH, it, input) }
             ?.let { return spatiallyLimitedResult(DepthSource.ARCORE_FULL_DEPTH, it, input) }
@@ -121,6 +138,17 @@ class ObjectDepthEstimator(
         // Candidate evaluation never records an unsupported metric observation. Only the
         // selected usable source reaches buildMetricResult and updates distance tracking.
         return buildPseudoTrendResult(input)
+    }
+
+    private fun ObjectDepthInput.hasRiskAge(source: DepthSource, nowElapsedRealtimeMs: Long?): Boolean {
+        val observation = depthObservationTime(source) ?: return false
+        val maxAge = DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS
+        if (timestampMs - observation.frameTimestampMs > maxAge) return false
+        // Pre-aligned callers have only Frame time. Runtime callers also keep the capture's
+        // original elapsed receipt; evaluation/rendering never renews that receipt.
+        if (nowElapsedRealtimeMs == null) return true
+        val capturedAt = observation.capturedAtElapsedRealtimeMs ?: return false
+        return capturedAt >= 0L && nowElapsedRealtimeMs >= capturedAt && nowElapsedRealtimeMs - capturedAt <= maxAge
     }
 
     /**
@@ -158,6 +186,8 @@ class ObjectDepthEstimator(
                                   supportedPositionInAnchor: Vec3? = null,
                                   interpretPose: Boolean = false,
                                   spatiallyLimited: Boolean = false): TrackedObjectDepth {
+        input.track.observeMaterialPointIdentity(input.materialPoint?.id)
+        val depthObservation = input.depthObservationTime(source)
         val riskDistance = chooseRiskDistance(input.geometry.className, stats, input.groundDistanceM)
         val contactDepth = contactDepthFor(source, stats, input)
         val provisionalConfidence = computeConfidence(
@@ -175,6 +205,7 @@ class ObjectDepthEstimator(
         // user-facing risk distance takes the smallest same-capture pose interpretation.
         val userRisk = conservativeRiskDistance(input.geometry.className, stats, input.groundDistanceM,
             input.geometry.centerNorm, cameraPose?.takeIf { interpretPose })
+        val spatialPoint = materialPointInAnchor(source, stats, input, cameraPose)
         val proximityOnly = spatiallyLimited || (input.rawDepthMotionOnly && source != DepthSource.ARCORE_RAW_DEPTH)
         val metricObservationAccepted = tracker.recordDistance(
             track = input.track,
@@ -183,7 +214,8 @@ class ObjectDepthEstimator(
             confidence = provisionalConfidence.finalScore,
             timestampMs = input.timestampMs,
             cameraPoseEvidence = cameraPose,
-            objectPositionInAnchor = supportedPositionInAnchor ?: stats.medianM?.let { cameraPose?.objectCenterInAnchor(input.geometry.centerNorm, it) },
+            objectPositionInAnchor = spatialPoint?.second,
+            materialPointId = spatialPoint?.first,
             depthObservationTimestampNs = when (source) {
                 DepthSource.ARCORE_RAW_DEPTH -> input.rawDepthTimestampNs?.takeIf { it > 0L && input.rawDepthMatchesCameraFrame }
                 DepthSource.ARCORE_FULL_DEPTH -> input.fullDepthTimestampNs?.takeIf { it > 0L && input.fullDepthMatchesCameraFrame }
@@ -193,6 +225,7 @@ class ObjectDepthEstimator(
             proximityOnly = proximityOnly,
             // S11-24: the capture's own depth spread as a normal-sigma equivalent (IQR / 1.349).
             distanceSigmaM = stats.iqrM?.takeIf { it.isFinite() && it > 0f }?.div(IQR_PER_NORMAL_SIGMA),
+            depthObservedAtFrameMs = depthObservation?.frameTimestampMs,
         )
         if (!metricObservationAccepted) {
             // Continuity is a final safety veto, not permission to replace a rejected near
@@ -231,7 +264,7 @@ class ObjectDepthEstimator(
                 trend = kinematics.trend,
                 confidenceFinal = confidence.finalScore,
                 trackKey = input.track.trackId,
-                timeToCollisionMs = kinematics.timeToCollisionMs,
+                timeToCollisionMs = kinematics.approachTimeMs,
                 objectMotion = kinematics.objectMotion,
                 motionEstimate = kinematics.motionEstimate,
                 cameraScreenLateralPosition = input.geometry.cameraScreenLateralPosition(),
@@ -242,14 +275,13 @@ class ObjectDepthEstimator(
         // S11-6-F1: limited evidence neither seeds nor extends a short-gap distance prediction.
         if (metricObservationAccepted && !spatiallyLimited) {
             input.track.depthGap.observe(input, source, stats, riskDistance, confidence.finalScore, cameraPose,
-                supportedPositionInAnchor ?: stats.medianM?.let {
-                    cameraPose?.objectCenterInAnchor(input.geometry.centerNorm, it)
-                }, kinematics.motionEstimate)
+                spatialPoint?.second, kinematics.motionEstimate,
+                materialPoint = input.materialPoint?.takeIf { it.id === spatialPoint?.first })
         } else input.track.depthGap.clear()
         return input.toTrackedObjectDepth(
             source = source,
             zDistanceM = stats.medianM,
-            rayDistanceM = input.rayDistanceM,
+            rayDistanceM = input.rayDistanceM ?: userRisk?.rayM,
             groundDistanceM = input.groundDistanceM,
             riskDistanceM = userRisk?.distanceM ?: riskDistance,
             stats = stats,
@@ -261,23 +293,55 @@ class ObjectDepthEstimator(
             riskDistanceKind = userRisk?.kind,
             horizontalDistanceM = userRisk?.horizontalM,
             spatialCoverageLimited = spatiallyLimited,
-            depthObservedAtMs = when (source) {
-                DepthSource.ARCORE_RAW_DEPTH -> input.rawDepthTimestampNs
-                DepthSource.ARCORE_FULL_DEPTH -> input.fullDepthTimestampNs
-                else -> null
-            }?.takeIf { it > 0L }?.div(1_000_000L),
+            depthObservedAtMs = depthObservation?.frameTimestampMs,
+            sourceObservedAtElapsedRealtimeMs = depthObservation?.capturedAtElapsedRealtimeMs,
+            // Unknown original depth cannot be leased by a later evaluation or publisher.
+            sourceValidUntilElapsedRealtimeMs = if (depthObservation == null) Long.MIN_VALUE else null,
             depthReprojected = when (source) {
-                DepthSource.ARCORE_RAW_DEPTH -> !input.rawDepthMatchesCameraFrame
-                DepthSource.ARCORE_FULL_DEPTH -> !input.fullDepthMatchesCameraFrame
+                DepthSource.ARCORE_RAW_DEPTH -> !input.rawDepthMatchesCameraFrame || depthObservation?.frameTimestampMs != input.timestampMs
+                DepthSource.ARCORE_FULL_DEPTH -> !input.fullDepthMatchesCameraFrame || depthObservation?.frameTimestampMs != input.timestampMs
                 else -> null
             },
         )
     }
 
     /** The reliable camera pose of this capture, when the selected depth source matches it. */
+    private fun materialPointInAnchor(
+        source: DepthSource, stats: DepthStats, input: ObjectDepthInput, pose: CameraPoseEvidence?,
+    ): Pair<VisualMaterialPointId, Vec3>? {
+        val point = input.materialPoint ?: return null
+        val sameDepthCapture = when (source) {
+            DepthSource.ARCORE_RAW_DEPTH -> input.rawDepthMatchesCameraFrame && (input.rawDepthTimestampNs ?: 0L) > 0L
+            DepthSource.ARCORE_FULL_DEPTH -> !input.rawDepthMotionOnly && input.fullDepthMatchesCameraFrame &&
+                (input.fullDepthTimestampNs ?: 0L) > 0L
+            else -> false
+        }
+        if (!sameDepthCapture || point.targetKey.frameId != input.frameId ||
+            point.targetKey.frameId / 1_000_000L != input.timestampMs || pose == null ||
+            !input.geometry.polygonNorm.let { polygon ->
+                polygon.size >= 3 && input.geometry.bboxNorm.let { box ->
+                    point.imagePointNorm.x in box.x..(box.x + box.width) &&
+                        point.imagePointNorm.y in box.y..(box.y + box.height)
+                }
+            }
+        ) return null
+        val depth = if (source == DepthSource.ARCORE_RAW_DEPTH) input.rawDepth else input.fullDepth
+        if (depth == null) return null
+        val confidence = if (source == DepthSource.ARCORE_RAW_DEPTH) input.rawConfidence ?: return null else null
+        val mapped = input.mapper.imageToDepth(point.imagePointNorm) ?: return null
+        val polygon = input.mapper.imagePolygonToDepthPolygon(input.geometry.polygonNorm)
+        val z = sampler.sampleMaterialPointDepth(depth, confidence, polygon, mapped,
+            if (source == DepthSource.ARCORE_RAW_DEPTH) RAW_CONFIDENCE_MIN else null) ?: return null
+        // The point must belong to the supported depth population, not a farther background patch.
+        val median = stats.medianM ?: return null
+        if (abs(z - median) > max(0.25f, (stats.madM ?: 0f) * 3f)) return null
+        return pose.objectCenterInAnchor(point.imagePointNorm, z)?.let { point.id to it }
+    }
+
     private fun sameCapturePose(source: DepthSource, input: ObjectDepthInput): CameraPoseEvidence? =
         input.motionContext.reliableCameraPoseEvidence()?.takeIf {
             it.timestampMs == input.timestampMs && input.depthFreshnessQuality(source) >= 0.8f &&
+                input.depthObservationTime(source)?.frameTimestampMs == input.timestampMs &&
                 when (source) {
                     DepthSource.ARCORE_RAW_DEPTH -> input.rawDepthMatchesCameraFrame
                     DepthSource.ARCORE_FULL_DEPTH -> input.fullDepthMatchesCameraFrame
@@ -313,6 +377,7 @@ class ObjectDepthEstimator(
         reasonHardGate: Float = 1f,
         nearSuspicion: Boolean = false,
     ): TrackedObjectDepth {
+        input.track.observeMaterialPointIdentity(input.materialPoint?.id)
         if (reasonHardGate <= 0f) input.track.depthGap.clear()
         val gap = input.track.depthGap.gap(input)
         input.track.invalidateMotionEvidence(input.timestampMs)
@@ -441,7 +506,8 @@ class ObjectDepthEstimator(
         }
     }
 
-    private data class RiskDistanceChoice(val distanceM: Float, val kind: RiskDistanceKind, val horizontalM: Float?)
+    /** Centre ray at the class-specific risk Z; independent of the chosen risk interpretation. */
+    private data class RiskDistanceChoice(val distanceM: Float, val kind: RiskDistanceKind, val horizontalM: Float?, val rayM: Float?)
 
     /**
      * S11-9: camera Z is depth along the optical axis, not the user's distance. A chest camera
@@ -469,10 +535,10 @@ class ObjectDepthEstimator(
         val ground = groundDistanceM?.takeIf { it.isFinite() && it > 0f }
         // minBy keeps the first of equal values, so plain camera Z wins a tie.
         return listOfNotNull(
-            RiskDistanceChoice(z, RiskDistanceKind.CAMERA_Z, horizontal),
-            ray?.let { RiskDistanceChoice(it, RiskDistanceKind.CAMERA_RAY_RANGE, horizontal) },
-            horizontal?.let { RiskDistanceChoice(it, RiskDistanceKind.HORIZONTAL_RANGE, horizontal) },
-            ground?.let { RiskDistanceChoice(it, RiskDistanceKind.GROUND_DISTANCE, horizontal) },
+            RiskDistanceChoice(z, RiskDistanceKind.CAMERA_Z, horizontal, ray),
+            ray?.let { RiskDistanceChoice(it, RiskDistanceKind.CAMERA_RAY_RANGE, horizontal, ray) },
+            horizontal?.let { RiskDistanceChoice(it, RiskDistanceKind.HORIZONTAL_RANGE, horizontal, ray) },
+            ground?.let { RiskDistanceChoice(it, RiskDistanceKind.GROUND_DISTANCE, horizontal, ray) },
         ).minBy { it.distanceM }
     }
 
@@ -564,7 +630,7 @@ class ObjectDepthEstimator(
             trend = kinematics.trend,
             approachScore = kinematics.approachScore,
             approachSpeedMps = kinematics.approachSpeedMps,
-            timeToCollisionMs = kinematics.timeToCollisionMs,
+            timeToCollisionMs = kinematics.approachTimeMs,
             confidence = confidence,
             userFacing = userFacing,
             trackAgeFrames = track.ageFrames,

@@ -1,8 +1,12 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionFrameEvidence
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionSnapshot
 import java.io.File
 import kr.co.hanium.dreamup.walksafe.MainActivity
-import kr.co.hanium.dreamup.walksafe.FrozenImageToTextureCoordinateMapper
+import kr.co.hanium.dreamup.walksafe.depth.FrozenImageToTextureCoordinateMapper
 import kr.co.hanium.dreamup.walksafe.depth.ContactDepthEstimate
 import kr.co.hanium.dreamup.walksafe.depth.DepthConfidenceBreakdown
 import kr.co.hanium.dreamup.walksafe.depth.DepthSource
@@ -59,6 +63,8 @@ class AndroidTactileRouteGuidanceTest {
             "-p",
             "-c",
             MainActivity::class.java.name,
+            "kr.co.hanium.dreamup.walksafe.runtime.vision.frame.FramePipelineController",
+            "kr.co.hanium.dreamup.walksafe.runtime.vision.frame.FramePublicationController",
         ).redirectErrorStream(true).start()
         val disassembly = process.inputStream.bufferedReader().use { it.readText() }
 
@@ -70,10 +76,13 @@ class AndroidTactileRouteGuidanceTest {
         val onDrawFrame = disassembly
             .substringAfter(onDrawSignature)
             .substringBefore(nextMethodSignature)
-        assertTrue(onDrawFrame.contains("Method prepareTactileFrameDispatch"))
-        assertTrue(
-            onDrawFrame.contains("Method dispatchTactileFrameFeedback"),
-        )
+        assertTrue(onDrawFrame.contains("FramePipelineController.draw:"))
+        val pipeline = disassembly.substringAfter("final class kr.co.hanium.dreamup.walksafe.runtime.vision.frame.FramePipelineController")
+            .substringBefore("final class kr.co.hanium.dreamup.walksafe.runtime.vision.frame.FramePublicationController")
+        assertTrue(pipeline.contains("FrameTactileResultPeer.prepareFrozen:"))
+        assertTrue(pipeline.contains("FramePublicationController.publish:"))
+        val publication = disassembly.substringAfter("final class kr.co.hanium.dreamup.walksafe.runtime.vision.frame.FramePublicationController")
+        assertTrue(publication.contains("FrameTactileResultPeer.dispatchFeedback:"))
     }
 
     @Test
@@ -124,6 +133,7 @@ class AndroidTactileRouteGuidanceTest {
             maxDetectionSourceAgeMs = MAX_DETECTION_AGE_MS,
             maxDetectionFrameDeltaMs = MAX_DETECTION_AGE_MS,
             detectionAgeMs = 100L,
+            decisionElapsedRealtimeMs = NOW_MS,
         ) { _, _ ->
             depthCalls += 1
             listOf(tactileOutput().copy(frameId = evidenceFrameId))
@@ -142,7 +152,7 @@ class AndroidTactileRouteGuidanceTest {
         val activity = MainActivity()
         configureLiveRouteState(activity, navigationActive = true, tmapOnRoute = true)
         configureLiveRouteState(activity, navigationActive = true, tmapOnRoute = true)
-        fun process(captureRouteInstalls: Int): MainActivity.TactileSnapshotFrameResult {
+        fun process(captureRouteInstalls: Int): TactileSnapshotFrameResult {
             val snapshot = publishSnapshot(
                 activity = activity,
                 detectionFrameId = FRAME_ID,
@@ -155,6 +165,7 @@ class AndroidTactileRouteGuidanceTest {
                 maxDetectionSourceAgeMs = MAX_DETECTION_AGE_MS,
                 maxDetectionFrameDeltaMs = MAX_DETECTION_AGE_MS,
                 detectionAgeMs = 100L,
+                decisionElapsedRealtimeMs = NOW_MS,
             ) { _, _ -> listOf(tactileOutput()) }
         }
         val earlierInstall = process(captureRouteInstalls = 1)
@@ -185,10 +196,10 @@ class AndroidTactileRouteGuidanceTest {
             evidence = detectionFrameEvidence(frameId = FRAME_ID, tmapOnRoute = false),
         )
         fun process(
-            snapshot: MainActivity.DetectionSnapshot,
+            snapshot: DetectionSnapshot,
             navigationActive: Boolean = true,
             tmapOnRoute: Boolean = true,
-        ): MainActivity.TactileSnapshotFrameResult {
+        ): TactileSnapshotFrameResult {
             configureLiveRouteState(activity, navigationActive, tmapOnRoute)
             return activity.processTactileSnapshotFrame(
                 detectionSnapshot = snapshot,
@@ -197,6 +208,7 @@ class AndroidTactileRouteGuidanceTest {
                 maxDetectionSourceAgeMs = MAX_DETECTION_AGE_MS,
                 maxDetectionFrameDeltaMs = MAX_DETECTION_AGE_MS,
                 detectionAgeMs = 100L,
+                decisionElapsedRealtimeMs = NOW_MS,
             ) { _, _ -> listOf(tactileOutput()) }
         }
 
@@ -239,6 +251,7 @@ class AndroidTactileRouteGuidanceTest {
             maxDetectionSourceAgeMs = MAX_DETECTION_AGE_MS,
             maxDetectionFrameDeltaMs = MAX_DETECTION_AGE_MS,
             detectionAgeMs = snapshot.sourceAgeMs(NOW_MS),
+            decisionElapsedRealtimeMs = NOW_MS,
         ) { _, detections ->
             depthDetections = detections
             listOf(tactileOutput())
@@ -276,6 +289,7 @@ class AndroidTactileRouteGuidanceTest {
             maxDetectionSourceAgeMs = MAX_DETECTION_AGE_MS,
             maxDetectionFrameDeltaMs = MAX_DETECTION_AGE_MS,
             detectionAgeMs = snapshot.sourceAgeMs(NOW_MS),
+            decisionElapsedRealtimeMs = NOW_MS,
         ) { _, _ -> listOf(tactileOutput()) }
         val actuator = RecordingTactileFrameFeedbackActuator()
         val coordinator = createProductionAndroidTactileFrameCoordinator(
@@ -336,6 +350,7 @@ class AndroidTactileRouteGuidanceTest {
                 maxDetectionSourceAgeMs = MAX_DETECTION_AGE_MS,
                 maxDetectionFrameDeltaMs = MAX_DETECTION_AGE_MS,
                 detectionAgeMs = snapshot.sourceAgeMs(NOW_MS),
+                decisionElapsedRealtimeMs = NOW_MS,
             ) { _, _ ->
                 depthCalls += 1
                 depthOutputs
@@ -370,6 +385,7 @@ class AndroidTactileRouteGuidanceTest {
                 location = TrustedLocation(37.0, 127.0, 2f, NOW_MS),
                 nowMs = NOW_MS,
                 requestInFlight = false,
+                facingObservation = RouteFacingObservation(0.0, 3.0, NOW_MS),
             )
             assertNotNull(caseName, tmapUpdate.instruction)
         }
@@ -713,6 +729,7 @@ class AndroidTactileRouteGuidanceTest {
             location = TrustedLocation(37.0, 127.0, 2f, NOW_MS),
             nowMs = NOW_MS,
             requestInFlight = false,
+            facingObservation = RouteFacingObservation(0.0, 3.0, NOW_MS),
         )
         assertNotNull(update.instruction)
         assertEquals("route-1", navigator.currentRouteId())
@@ -721,9 +738,9 @@ class AndroidTactileRouteGuidanceTest {
     private fun publishSnapshot(
         activity: MainActivity,
         detectionFrameId: Long,
-        evidence: MainActivity.DetectionFrameEvidence,
+        evidence: DetectionFrameEvidence,
         detections: List<DetectionCandidate> = listOf(tactileDetectionCandidate()),
-    ): MainActivity.DetectionSnapshot = requireNotNull(
+    ): DetectionSnapshot = requireNotNull(
         activity.publishDetectionSnapshot(
             result = AndroidDetectionResult(detections = detections),
             generation = 0,
@@ -762,7 +779,7 @@ class AndroidTactileRouteGuidanceTest {
         tmapOnRoute: Boolean = true,
         includeDepthMapper: Boolean = true,
         captureRouteInstalls: Int = 1,
-    ): MainActivity.DetectionFrameEvidence {
+    ): DetectionFrameEvidence {
         val depthTransform = requireNotNull(
             FrozenImageToDepthTransform.create(
                 frameId = frameId,
@@ -775,7 +792,7 @@ class AndroidTactileRouteGuidanceTest {
                 mappedCenter = Point2(0.5f, 0.5f),
             ),
         )
-        return MainActivity.DetectionFrameEvidence(
+        return DetectionFrameEvidence(
             frameId = frameId,
             frameTimestampMs = NOW_MS,
             depthSnapshot = DepthFrameSnapshot(
@@ -805,30 +822,31 @@ class AndroidTactileRouteGuidanceTest {
         navigationActive: Boolean,
         tmapOnRoute: Boolean,
     ) {
-        MainActivity::class.java.getDeclaredField("isRouteActive").apply {
+        MainActivityControllerTestFixture.field("isRouteActive").apply {
             isAccessible = true
             setBoolean(activity, navigationActive)
         }
-        MainActivity::class.java.getDeclaredField("latestTmapOnRoute").apply {
+        MainActivityControllerTestFixture.field("latestTmapOnRoute").apply {
             isAccessible = true
             setBoolean(activity, tmapOnRoute)
         }
-        MainActivity::class.java.getDeclaredField("routeRequestInFlight").apply {
+        MainActivityControllerTestFixture.field("routeRequestInFlight").apply {
             isAccessible = true
             (get(activity) as AtomicBoolean).set(false)
         }
-        MainActivity::class.java.getDeclaredField("routeNavigator").apply {
+        MainActivityControllerTestFixture.field("routeNavigator").apply {
             isAccessible = true
             (get(activity) as RouteNavigator).apply {
                 setRoute(productionRoute())
                 val fix = liveRouteFix()
-                update(fix, nowMs = fix.elapsedRealtimeMs, requestInFlight = false)
+                update(fix, nowMs = fix.elapsedRealtimeMs, requestInFlight = false,
+                    facingObservation = RouteFacingObservation(0.0, 3.0, fix.elapsedRealtimeMs))
             }
         }
     }
 
     private fun routeNavigator(activity: MainActivity): RouteNavigator {
-        return MainActivity::class.java.getDeclaredField("routeNavigator").run {
+        return MainActivityControllerTestFixture.field("routeNavigator").run {
             isAccessible = true
             get(activity) as RouteNavigator
         }
@@ -977,6 +995,7 @@ class AndroidTactileRouteGuidanceTest {
             navigationActiveNow = true,
             tmapOnRouteNow = true,
             activeRouteId = context.expectedRouteId,
+            decisionElapsedRealtimeMs = context.nowElapsedRealtimeMs,
         )
     }
 

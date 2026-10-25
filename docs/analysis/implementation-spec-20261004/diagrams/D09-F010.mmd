@@ -1,0 +1,35 @@
+flowchart TD
+  T["F-D09-010 탐지 이미지 전처리와 소유권 정리 / P-D09-010"]
+  N0["semaphore 슬롯 확보"]
+  T --> N0
+  N1["MIME와 bytes 검증"]
+  N0 --> N1
+  N2["spawn child decode EXIF 정리"]
+  N1 --> N2
+  N3["deadline 안 결과 수신"]
+  N2 --> N3
+  N4["child와 IPC 정리 확인"]
+  N3 --> N4
+  N5["slot 반환"]
+  N4 --> N5
+  Z["정상: metadata 없는 이미지 bytes와 MIME를 추론으로 전달"]
+  N5 --> Z
+  B0["503 detect_preprocessing_capacity_exceeded"]
+  N0 -->|"동시에2개 소유"| B0
+  B1["413 upload_too_large/image_dimensions_too_large/sanitized_image_too_large"]
+  N1 -->|"byte/dimension 초과"| B1
+  B2["400 invalid_image_content 등"]
+  N2 -->|"decode/signature/type 불일치"| B2
+  B3["503 detect_preprocessing_deadline_exceeded Retry-After1"]
+  N2 -->|"전처리deadline"| B3
+  B4["resource와 slot 유지, reaper 재정리; 정상 capacity로 재사용 안 함"]
+  N3 -->|"cleanup 확인불가"| B4
+  R["종료와 복구: 서버 자동 재시도 없음 / reaper가0.25초 간격 정리를 반복; runtime close가 최종 소유 작업 정리"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  B4 -.-> R
+  C["취소와 정리: deadline/CancelledError에서 request_close→reaper, caller 대기 종료와 실제 cleanup 종료 분리 / child 종료·socket·IPC thread 종료 확인 후 release; 실패는 보유 유지"]
+  N5 -.-> C

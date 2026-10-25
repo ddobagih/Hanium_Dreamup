@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D01-031 삭제 완료 후 단계별 로컬 초기화와 재가입"]
+  G{"terminalCleanupComplete 및 확인된 deletion journal; current reset worker lease"}
+  I["noBackup reset journal phase,process completionepoch,confirmed request binding"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 중간 실패는 RESET_PENDING/차단"]
+  G -->|"미충족"| X
+  N1["Main은 완료조건을 확인하고 reset worker를 예약한 뒤 speech/route IO와 소유권 barrier를 기다린다."]
+  I --> N1
+  N2["AccountDeletionResetCoordinator.begin은 STARTED를 기록하고 legacy intent를 저장한다."]
+  N1 --> N2
+  N3["gateway 설치scope reset→sensitive destroyAndClear→plain state reset→field reset→intent fence clear를 순서대로 수행한다."]
+  N2 --> N3
+  N4["모든 단계 성공 후 journal clear·completionepoch를 publish하며 old coordinator는 COMPLETED_ELSEWHERE로 끝낸다."]
+  N3 --> N4
+  N5["UI current lease에서 초기상태/재가입 흐름을 구성하고 실패시 reset pending을 유지한다."]
+  N4 --> N5
+  OK["로컬 reset 완료 및 재가입 필요 상태"]
+  N5 --> OK
+  B0["reset 시작 안 함"]
+  N1 -->|"server/device terminal cleanup 미완료"| B0
+  B1["journal 보존·reset pending; 완료표시 금지"]
+  N3 -->|"어느 단계 실패"| B1
+  B2["COMPLETED_ELSEWHERE; 오래된 UI완료미적용"]
+  N4 -->|"다른 current coordinator 이미완료"| B2
+  B3["자동정상복원 안 함; explicit begin 계약으로 복구"]
+  N2 -->|"startup journal손상"| B3
+  R["중단·취소: 삭제 완료reset을 사용자취소로 되돌리는 API 없음 / crash 후 noBackup journal을 읽어 같은 sequence 재수행"]
+  V["복구·재시도: regular file·singlehardlink·no symlink·최대128bytes·정확payload journal 검증 / 실패단계를 포함한 전체 idempotent replay"]
+  Q["정책 P-D01-018 · P-D01-019 · P-D01-020 · P-D01-023"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

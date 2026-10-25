@@ -8,6 +8,9 @@ import org.junit.Test
 class MainActivityFp016StaticTest {
     private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
 
+    private fun ui(name: String) = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/$name.kt").readText()
+    private fun member(text: String, name: String) = MainActivityRefactorSource.member(text, name)
+
     @Test
     fun activeAndPausedScreensUseTheSingleScrollableProductSurfaceInEveryBuild() {
         assertTrue(source.contains("private lateinit var controlsScroll: ScrollView"))
@@ -28,7 +31,8 @@ class MainActivityFp016StaticTest {
         assertTrue(cameraScreen.contains("controlsScroll.visibility = if (cameraScreenVisible) View.GONE else View.VISIBLE"))
         assertTrue(cameraScreen.contains("cameraScreenControls.visibility = if (cameraScreenVisible) View.VISIBLE else View.GONE"))
         assertTrue(policy.contains("renderMainUi()"))
-        assertTrue(blockAt("private fun renderMainUi()").contains("updateLiveCameraScreenVisibility()"))
+        assertTrue(blockAt("private fun renderMainUi()").contains("pages.updateLiveVisibility()"))
+        assertTrue(MainActivityRefactorSource.composition(source, "nativeWorkflowController").contains("this@MainActivity.updateLiveCameraScreenVisibility()"))
         assertTrue(
             policy.contains(
                 "walkSafetyOverlay.visibility = View.GONE",
@@ -36,7 +40,8 @@ class MainActivityFp016StaticTest {
         )
         assertFalse(policy.contains("!BuildConfig.DEBUG"))
 
-        val overlay = blockAt("walkSafetyOverlay = LinearLayout(this).apply {")
+        assertTrue(source.contains("walkSafetyOverlay = runtimeComposer.createWalkSafetyOverlay("))
+        val overlay = member(ui("NativeRuntimeViewComposer"), "createWalkSafetyOverlay")
         assertFalse(overlay.contains("addView(safetySummaryText)"))
         assertFalse(overlay.contains("addView(runtimeControls)"))
         assertFalse(overlay.contains("Button("))
@@ -51,56 +56,80 @@ class MainActivityFp016StaticTest {
             Regex("""if\s*\(\s*BuildConfig\.DEBUG\s*\)\s*addView\([A-Za-z0-9_]+\)""")
                 .findAll(source).map { it.range }.toList()
         assertTrue("BuildConfig.DEBUG UI guard is missing", debugBlocks.isNotEmpty())
+        val runtime = ui("NativeRuntimeViewComposer")
         val developerControls = listOf(
-            "backendUrlInput" to "EditText(",
-            "destinationLatInput" to "EditText(",
-            "destinationLngInput" to "EditText(",
-            "debugUploadButton" to "Button(",
-            "debugFrameCaptureButton" to "Button(",
-            "fieldSessionLogButton" to "Button(",
+            Triple("destinationLatInput", "createDestinationLatitudeInput", "EditText(context)"),
+            Triple("destinationLngInput", "createDestinationLongitudeInput", "EditText(context)"),
+            Triple("debugUploadButton", "createDebugUploadAction", "Button(context)"),
+            Triple("debugFrameCaptureButton", "createDebugCaptureAction", "Button(context)"),
+            Triple("fieldSessionLogButton", "createFieldSessionAction", "Button(context)"),
         )
-        developerControls.forEach { (name, type) ->
-            assertOnlyInsideDebugBlocks("$name = $type", debugBlocks)
+        assertTrue(member(source, "buildContentView").contains("val runtimeComposer = NativeRuntimeViewComposer(this, viewStyle)"))
+        developerControls.forEach { (name, factory, type) ->
+            assertOnlyInsideDebugBlocks("$name = runtimeComposer.$factory(", debugBlocks)
+            assertTrue(member(runtime, factory).contains(type))
             val attachment = "addView($name)"
             if (source.contains(attachment)) assertOnlyInsideDebugBlocks(attachment, debugBlocks)
         }
+        val url = MainActivityRefactorSource.property(ui("SettingsPrivacyPanel"), "backendUrlInput")
+        assertTrue(url.contains("if (BuildConfig.DEBUG) {"))
+        assertTrue(url.contains("EditText(context)"))
+        assertTrue(url.contains("} else {\n        null"))
+        assertTrue(ui("SettingsPrivacyPanel").contains("backendUrlInput?.let { addView(it) }"))
+        val build = member(source, "buildContentView")
+        assertTrue(build.contains("val settingsPanel = SettingsPrivacyPanel("))
+        assertTrue(build.contains("if (BuildConfig.DEBUG) NativeRuntimeViewComposer.DeveloperControls("))
+        assertTrue(build.contains("positionFieldExportButton, positionFieldDeleteButton, destinationLatInput, destinationLngInput,"))
+        assertTrue(build.contains(") else null,"))
+        assertTrue(member(runtime, "createRuntimeDebugControls").contains("if (developer != null)"))
     }
 
     @Test
     fun releaseGatewaySurfaceIsAvailableOnlyForDeletionRecovery() {
-        val tokenCreation = occurrenceIndices("backendFieldTokenInput = EditText(")
-        val buttonCreation = occurrenceIndices("backendAuthApplyButton = Button(")
-        val tokenAttachment = occurrenceIndices("addView(backendFieldTokenInput)")
-        val buttonAttachment = occurrenceIndices("addView(backendAuthApplyButton)")
-        listOf(tokenCreation, buttonCreation, tokenAttachment, buttonAttachment).forEach {
-            assertTrue(it.size == 1)
+        val panel = ui("SettingsPrivacyPanel")
+        listOf("val backendFieldTokenInput: EditText = EditText(context)",
+            "val backendAuthApplyButton: Button = Button(context)",
+            "addView(backendFieldTokenInput)", "addView(backendAuthApplyButton)").forEach { anchor ->
+            assertTrue("one gateway control owner: $anchor", panel.split(anchor).size - 1 == 1)
         }
+        val build = member(source, "buildContentView")
+        assertTrue(build.contains("settingsPrivacyPresenter = SettingsPrivacyPresenter(settingsPanel, onboardingPanel)"))
+        assertTrue(build.contains("settingsPrivacyPresenter.publishGatewayInputTarget()"))
+        assertTrue(build.contains("settingsPrivacyPresenter.publishGatewayActionTarget()"))
 
         val click = blockAt("private fun onGatewaySessionButtonClicked()")
         assertTrue(
             click.contains(
-                "if (!BuildConfig.DEBUG && !deletionRecoverySurface) return",
+                "if (!config.debug && !deletionRecoverySurface) return",
             ),
         )
+        assertTrue(MainActivityRefactorSource.composition(source, "gatewaySessionController").contains(
+            "BuildConfig.DEBUG, BuildConfig.WALKSAFE_LONG_LIVED_LOGIN_ENABLED, BuildConfig.WALKSAFE_GATEWAY_ORIGIN,"))
         val visibility = blockAt("private fun updateBackendAuthButtonText()")
+        assertTrue(visibility.contains("val passwordRecoverySurface = accountDeletionPasswordRecoveryBindingOrNull() != null"))
         assertTrue(
             visibility.contains(
-                "val surfaceVisible = BuildConfig.DEBUG || deletionRecoverySurface",
+                "val surfaceVisible = (BuildConfig.DEBUG || deletionRecoverySurface) && !passwordRecoverySurface",
             ),
         )
-        assertTrue(visibility.contains("backendFieldTokenInput.visibility ="))
-        assertTrue(visibility.contains("backendAuthApplyButton.visibility ="))
-        assertTrue(visibility.contains("if (!surfaceVisible) backendFieldTokenInput.text?.clear()"))
-        assertTrue(
-            visibility.contains(
-                "backendFieldTokenInput.isEnabled = backendAuthApplyButton.isEnabled",
-            ),
-        )
+        assertTrue(visibility.contains("settingsPrivacyPresenter.renderGatewayControls("))
+        assertTrue(visibility.contains("surfaceVisible, requestInFlight, deletionRecoverySessionReady,"))
+        val presenter = member(ui("SettingsPrivacyPresenter"), "renderGatewayControls")
+        assertTrue(presenter.contains("GatewayControlsRenderer.render("))
+        assertTrue(presenter.contains("override fun showToken(visible: Boolean) { token.visibility = if (visible) android.view.View.VISIBLE else android.view.View.GONE }"))
+        assertTrue(presenter.contains("override fun showAction(visible: Boolean) { action.visibility = if (visible) android.view.View.VISIBLE else android.view.View.GONE }"))
+        assertTrue(presenter.contains("override fun clearToken() { token.text?.clear() }"))
+        assertTrue(presenter.contains("override fun setTokenEnabled(enabled: Boolean) { token.isEnabled = enabled }"))
+        val rendering = member(ui("GatewayControlsRenderer"), "render")
+        assertTrue(rendering.contains("target.showToken(surfaceVisible)"))
+        assertTrue(rendering.contains("target.showAction(surfaceVisible)"))
+        assertTrue(rendering.contains("if (!surfaceVisible) target.clearToken()"))
+        assertTrue(rendering.contains("target.setTokenEnabled(target.actionEnabled())"))
     }
 
     @Test
     fun systemBackReturnsFromFeaturesOrEndsTheWalkAfterCancellingOutputs() {
-        assertTrue(source.contains("class MainActivity : Activity()"))
+        assertTrue(source.contains(") : Activity(), GLSurfaceView.Renderer"))
         val callback = blockAt(
             "private val walkScreenBackCallback = object : OnBackPressedCallback(true)",
         )
@@ -138,7 +167,7 @@ class MainActivityFp016StaticTest {
         assertTrue(marker > end)
         assertTrue(cancellation > marker)
         assertTrue(finish > cancellation)
-        val features = blockAt("private fun handleNativeFeatureBackPressed()")
+        val features = member(source, "handleNativeFeatureBackPressed")
         assertTrue(features.contains("cancelNativeDestinationSearchAndReturnHome()"))
         assertTrue(features.contains("cancelNativeVoiceCommandAndReturnHome()"))
         assertTrue(features.contains("showNativeUiPage(NativeUiPage.HOME)"))
@@ -146,8 +175,17 @@ class MainActivityFp016StaticTest {
 
     @Test
     fun appOwnedSpeechStatusRemainsDiscoverableWithoutDuplicateLiveAnnouncements() {
-        listOf("safetySummaryText", "statusText", "gatewayVoiceStatusText", "walkSafetyVoiceStatusText").forEach { name ->
-            val block = blockAt("$name = TextView(this).apply {")
+        val build = member(source, "buildContentView")
+        val runtime = ui("NativeRuntimeViewComposer")
+        val statuses = listOf("safetySummaryText" to "createSafetySummary", "statusText" to "createRuntimeStatus",
+            "walkSafetyVoiceStatusText" to "createWalkVoiceStatus")
+        val blocks = statuses.map { (name, factory) ->
+            assertTrue(build.contains("$name = runtimeComposer.$factory()"))
+            member(runtime, factory)
+        } + MainActivityRefactorSource.property(ui("DestinationGuidancePanel"), "gatewayVoiceStatusText")
+        assertTrue(build.contains("val destinationPanel = DestinationGuidancePanel("))
+        assertTrue(build.contains("nativeScreenPresenter.publishVoiceTargets(destinationPanel)"))
+        blocks.forEach { block ->
             assertTrue(block.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
             assertTrue(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE"))
             assertFalse(block.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"))
@@ -177,6 +215,8 @@ class MainActivityFp016StaticTest {
     }
 
     private fun blockAt(marker: String): String {
+        if (marker.startsWith("private fun ")) return MainActivityRefactorSource.function(source, marker)
+        if (marker.startsWith("override fun ")) return member(source, marker.substringAfter("fun ").substringBefore('('))
         val markerIndex = source.indexOf(marker)
         assertTrue("missing block marker: $marker", markerIndex >= 0)
         val range = bracedBlockRange(markerIndex)

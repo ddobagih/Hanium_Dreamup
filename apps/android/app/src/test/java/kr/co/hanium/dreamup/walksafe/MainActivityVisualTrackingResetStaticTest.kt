@@ -13,23 +13,30 @@ class MainActivityVisualTrackingResetStaticTest {
 
     @Test
     fun resetDiscardsTheEndingGenerationsFeedbackBeforeAdvancingIt() {
-        val reset = source.substringAfter("private fun resetVisualTrackingState() = synchronized(frameStateLock) {")
-            .substringBefore("private fun hasFreshVisualSource(")
-        val discard = reset.indexOf("feedbackPolicy.discardUnstartedFeedbackForTrackPrefix(\"visual-\$visualGeometryVersion-\")")
-        val advance = reset.indexOf("visualGeometryVersion += 1L")
-        val pipeline = reset.indexOf("currentObjectDepthPipeline = ObjectDepthRuntimePipeline(")
+        val reset = MainActivityRefactorSource.member(source, "resetVisualTrackingState")
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/frame/FrameSynthesisController.kt").readText()
+        MainActivityRefactorSource.composition(source, "frameSynthesisOwner")
+        val discard = reset.indexOf("riskFeedbackComponents.delivery.discardUnstartedFeedbackForTrackPrefix(\"visual-\$visualGeometryVersion-\")")
+        val advance = reset.indexOf("frameSynthesisOwner.advanceGeometry()")
+        val pipeline = reset.indexOf("frameSynthesisOwner.resetCurrentCaptureHistory(")
         assertTrue(discard in 0 until advance)
         assertTrue(advance < pipeline)
+        assertTrue(MainActivityRefactorSource.member(owner, "advanceGeometry").contains("visualGeometryVersion += 1L"))
+        assertTrue(MainActivityRefactorSource.member(owner, "resetCurrentCaptureHistory").contains("currentObjectDepthPipeline = ObjectDepthRuntimePipeline("))
         // The discarded prefix is exactly the one the generation's tracker used.
-        assertTrue(reset.contains("trackIdPrefix = \"visual-\$visualGeometryVersion-track-\""))
+        assertTrue(MainActivityRefactorSource.member(owner, "resetCurrentCaptureHistory").contains("trackIdPrefix = \"visual-\$visualGeometryVersion-track-\""))
     }
 
     @Test
     fun admissionResetDiscardsThePreviousTrackersFeedbackBeforeReplacingIt() {
-        val capture = source.substringAfter("private fun captureVisualTrackingFrame(")
-            .substringBefore("private fun startFieldSessionHeartbeat(")
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/frame/FrameSynthesisController.kt").readText()
+        val capture = MainActivityRefactorSource.member(owner, "captureVisualTrackingFrame")
+        MainActivityRefactorSource.composition(source, "frameSynthesisOwner")
+        val binding = MainActivityRefactorSource.property(source, "frameSynthesisHolder")
+        assertTrue(binding.contains("override fun retireUnstartedFeedback(trackPrefix: String)"))
+        assertTrue(binding.contains("discardUnstartedFeedbackForTrackPrefix(trackPrefix)"))
         val admission = capture.substringAfter("if (admission.reset) {")
-        val discard = admission.indexOf("feedbackPolicy.discardUnstartedFeedbackForTrackPrefix(\"visual-\$geometryVersion-\")")
+        val discard = admission.indexOf("authority.retireUnstartedFeedback(\"visual-\$geometryVersion-\")")
         val replace = admission.indexOf("currentObjectDepthPipeline = ObjectDepthRuntimePipeline(")
         assertTrue(discard in 0 until replace)
         assertTrue(admission.contains("trackIdPrefix = \"visual-\$geometryVersion-\${gray.key.frameId}-track-\""))

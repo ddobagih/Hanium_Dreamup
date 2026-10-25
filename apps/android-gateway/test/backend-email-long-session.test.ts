@@ -10,6 +10,8 @@ import { after, afterEach, before, test } from "node:test";
 import {
   gatewayFieldLongSessionBinding,
   gatewaySessionAuthenticatedAtEpochMs,
+  gatewaySessionScope,
+  isGatewayGeneralSessionAuthorized,
   isGatewaySessionAuthorized
 } from "../src/auth.js";
 import type { GatewayFetch } from "../src/backend.js";
@@ -73,6 +75,7 @@ const backendFetch: GatewayFetch = async (input) => {
 };
 
 type LongSession = {
+  account_generation: number;
   actor_id: string;
   device_id: string;
   family_id: string;
@@ -89,12 +92,12 @@ function nextClientIp(): string {
   return `198.51.100.${ipSuffix % 250}`;
 }
 
-function post(body: Record<string, unknown>): Promise<Response> {
+function post(body: Record<string, unknown>, fetchImpl: GatewayFetch = backendFetch): Promise<Response> {
   return handleGatewayRequest(new Request("https://gateway.invalid/api/field-session", {
     method: "POST",
     headers: { "content-type": "application/json", "cf-connecting-ip": nextClientIp() },
     body: JSON.stringify(body)
-  }), { fetchImpl: backendFetch });
+  }), { fetchImpl });
 }
 
 function passwordLogin(extra: Record<string, unknown> = {}): Promise<Response> {
@@ -115,9 +118,10 @@ async function longSession(response: Response): Promise<LongSession> {
   assert.match(setCookie, /^walksafe_field_session=v6\.[^;]+; Path=\/; HttpOnly; SameSite=Strict; Max-Age=60; Secure$/);
   const body = await response.json() as Omit<LongSession, "cookie">;
   assert.deepEqual(Object.keys(body).sort(), [
-    "absolute_expires_at_epoch_ms", "access_expires_at_epoch_ms", "actor_id", "device_id", "family_id",
+    "absolute_expires_at_epoch_ms", "access_expires_at_epoch_ms", "account_generation", "actor_id", "device_id", "family_id",
     "idle_expires_at_epoch_ms", "refresh_token", "rotation", "session_scope"
   ]);
+  assert.equal(body.account_generation, 1);
   return { ...body, cookie: setCookie.split(";", 1)[0]! };
 }
 
@@ -166,6 +170,7 @@ test("decision 2 email login opts into an unlimited device-bound refresh family"
     required: true,
     authenticated: true,
     actor_id: BACKEND_ACTOR,
+    account_generation: 1,
     session_scope: "general",
     session_mode: "long_lived",
     device_id: "email-long-device-a",
@@ -271,4 +276,126 @@ test("decision 1 reuse on an email long family logs out every device of the acco
   const relogged = await longSession(await passwordLogin({ device_id: "email-long-device-b" }));
   await expectCode(await refresh(first), 401, "field_session_revoked_reuse_detected");
   assert.equal((await (await status(relogged.cookie)).json() as { authenticated: boolean }).authenticated, true);
+});
+
+
+test("lost refresh response can log out only its own family using the prior proof and repeat safely", async () => {
+  const owner = await longSession(await passwordLogin({ device_id: "lost-refresh-owner" }));
+  const survivor = await longSession(await passwordLogin({ device_id: "lost-refresh-survivor" }));
+  const rotated = await refresh(owner);
+  assert.equal(rotated.status, 200);
+  // Deliberately discard the new refresh credentials, as on a lost HTTP response.
+  await rotated.arrayBuffer();
+  const proof = { actor_id: owner.actor_id, device_id: owner.device_id, family_id: owner.family_id,
+    rotation: owner.rotation, refresh_token: owner.refresh_token };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await handleGatewayRequest(new Request("https://gateway.invalid/api/field-session", {
+      method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify(proof)
+    }), { fetchImpl: backendFetch });
+    assert.equal(response.status, 204);
+    assert.match(response.headers.get("set-cookie") ?? "", /Max-Age=0/);
+  }
+  const denied = await status(owner.cookie);
+  assert.equal((await denied.json() as { authenticated: boolean }).authenticated, false);
+  const surviving = await status(survivor.cookie);
+  const survivingBody = await surviving.json() as { authenticated: boolean; account_generation: number };
+  assert.equal(survivingBody.authenticated, true); assert.equal(survivingBody.account_generation, 1);
+  const next = await longSession(await refresh(survivor));
+  assert.equal(next.rotation, 1);
+});
+
+test("password deletion recovery mints signed v6, proves current status and denies general operations", async () => {
+  const currentProofs: Array<{ headers: Headers; bodyAbsent: boolean }> = [];
+  const credentialBodies: Array<Record<string, unknown>> = [];
+  const fetch: GatewayFetch = async (input, init) => {
+    const pathname = new URL(String(input)).pathname;
+    if (pathname === "/accounts/authenticate") {
+      credentialBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+    }
+    if (pathname === "/accounts/session-current") {
+      currentProofs.push({
+        headers: new Headers(init?.headers),
+        bodyAbsent: init?.body == null
+      });
+    }
+    return backendFetch(input, init);
+  };
+  const response = await post({
+    grant_type: "password", email: "long@example.org", password: "long-lived-password-1234",
+    remember_me: false, purpose: "account_deletion_recovery"
+  }, fetch);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { session_scope: "account_deletion_recovery" });
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const setCookie = response.headers.get("set-cookie") ?? "";
+  assert.match(setCookie, /^walksafe_field_session=v6\./);
+  assert.doesNotMatch(setCookie, /Max-Age=|Expires=/);
+  assert.match(setCookie, /HttpOnly; SameSite=Strict; Secure$/);
+  const cookie = setCookie.split(";", 1)[0]!;
+  const parts = cookie.slice("walksafe_field_session=".length).split(".");
+  assert.equal(parts.length, 8);
+  assert.equal(Buffer.from(parts[1]!, "base64url").toString("utf8"), BACKEND_ACTOR);
+  assert.deepEqual(parts.slice(2, 5), ["1", "1", "account_deletion_recovery"]);
+  assert.deepEqual(Object.keys(credentialBodies[0]!).sort(), ["email", "password", "schema_version"]);
+  assert.equal(credentialBodies.length, 1);
+  assert.equal(gatewaySessionScope(withCookie(cookie)), "account_deletion_recovery");
+  assert.equal(isGatewayGeneralSessionAuthorized(withCookie(cookie)), false);
+  assert.equal(isGatewaySessionAuthorized(withCookie(cookie.replace("account_deletion_recovery", "general"))), false);
+
+  const described = await handleGatewayRequest(withCookie(cookie), { fetchImpl: fetch });
+  assert.equal(described.status, 200);
+  const body = await described.json() as Record<string, unknown>;
+  assert.equal(body.required, true);
+  assert.equal(body.authenticated, true);
+  assert.equal(body.actor_id, BACKEND_ACTOR);
+  assert.equal(body.session_scope, "account_deletion_recovery");
+  assert.equal(currentProofs.length, 1);
+  assert.equal(currentProofs[0]!.headers.get("x-walksafe-actor-id"), BACKEND_ACTOR);
+  assert.equal(currentProofs[0]!.headers.get("x-walksafe-account-generation"), "1");
+  assert.equal(currentProofs[0]!.bodyAbsent, true);
+  assert.match(currentProofs[0]!.headers.get("x-walksafe-actor-assertion") ?? "", /^v4\./);
+
+  let forwarded = 0;
+  for (const [route, method, status] of [
+    ["/api/reports/mine", "GET", 404],
+    ["/api/navigation/walking", "POST", 403]
+  ] as const) {
+    const denied = await handleGatewayRequest(new Request("https://gateway.invalid" + route, {
+      method, headers: { cookie, ...(method === "POST" ? { "content-type": "application/json" } : {}) },
+      ...(method === "POST" ? { body: "{}" } : {})
+    }), { fetchImpl: async () => { forwarded += 1; return new Response(null, { status: 204 }); } });
+    assert.equal(denied.status, status);
+    assert.equal(denied.headers.get("cache-control"), "no-store");
+    if (method === "POST") assert.equal((await denied.json() as { code: string }).code, "gateway_forbidden");
+  }
+  assert.equal(forwarded, 0);
+  accountCurrent = false;
+  await expectCode(await status(cookie), 401, "gateway_auth_required");
+});
+
+test("password recovery rejects other purposes, device, remember and long mode before credential checks", async () => {
+  let credentialChecks = 0;
+  const fetch: GatewayFetch = async () => { credentialChecks += 1; return new Response(null, { status: 500 }); };
+  for (const extra of [
+    { purpose: "general" }, { purpose: "admin" }, { purpose: null }, { purpose: 1 },
+    { remember_me: true }, { remember_me: null }, { remember_me: undefined },
+    { device_id: "recovery-device" }, { device_id: "" }, { device_id: null },
+    { session_mode: "long_lived" }, { session_mode: null }
+  ]) {
+    await expectCode(await post({
+      grant_type: "password", email: "long@example.org", password: "long-lived-password-1234",
+      remember_me: false, purpose: "account_deletion_recovery", ...extra
+    }, fetch), 400, "field_session_request_invalid");
+  }
+  assert.equal(credentialChecks, 0);
+});
+
+test("password without purpose preserves the backend general v6 compatibility session", async () => {
+  const response = await post({
+    grant_type: "password", email: "long@example.org", password: "long-lived-password-1234",
+    remember_me: false
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { session_scope: "general" });
+  assert.match(response.headers.get("set-cookie") ?? "", /^walksafe_field_session=v6\./);
 });

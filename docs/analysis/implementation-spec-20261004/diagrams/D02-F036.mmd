@@ -1,0 +1,16 @@
+flowchart TD
+ A["F-D02-036 목적별 DeviceGate"] --> G{"P-D02-036 camera AR depth config detector session 모두 준비"}
+ G -->|"아니오"| X["공통 첫 차단 사유"]
+ G -->|"예"| S{"staleReason 없음"}
+ S -->|"아니오"| X
+ S -->|"예"| P{"목적"}
+ P -->|"ACTUATOR_READINESS"| Y["일반 출력 준비 허용"]
+ P -->|"RISK_ALERT"| R{"fresh metric 또는 qualitative object"}
+ P -->|"REPORT_CANDIDATE"| M{"fresh metric object"}
+ R -->|"예"| Y
+ M -->|"예"| Y
+ R -->|"아니오"| N["fresh object missing 차단"]
+ M -->|"아니오"| N
+ X --> Z["새 source facts로만 재평가; 자동 복구 없음"]
+ N --> Z
+ Y --> E["allows true 및 blockedReason null; Main 추가 gate 적용"]

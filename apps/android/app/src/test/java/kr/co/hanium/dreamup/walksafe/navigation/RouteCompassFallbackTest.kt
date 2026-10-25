@@ -94,9 +94,17 @@ class RouteCompassFallbackTest {
         }
     }
 
-    @Test fun rawAccelerationDetectsMotionHiddenByFusedGravity() {
-        assertReason(RouteCompassHeadingReason.GRAVITY_UNSTABLE, fallback(acceleration = gravity.copy(x = 4.0)))
-        assertReason(RouteCompassHeadingReason.GRAVITY_UNSTABLE, fallback(acceleration = gravity.copy(y = 15.0)))
+    @Test fun rawAccelerationMotionRemainsExplicitWhileHealthyFusedGravitySupportsDirection() {
+        for (acceleration in listOf(gravity.copy(x = 4.0), gravity.copy(y = 15.0))) {
+            val result = fallback(acceleration = acceleration)
+            assertEquals(RouteCompassHeadingReason.VALID, result.reason)
+            val observation = requireNotNull(result.observation)
+            assertEquals(RouteFacingSensorQuality.CALIBRATED_DURING_MOTION, observation.sensorQuality)
+            assertEquals(RouteFacingSource.GRAVITY_MAGNETIC, observation.source)
+            assertEquals(now, observation.observedAtElapsedRealtimeMs)
+            assertNull(observation.headingAccuracyDegrees)
+            assertNull(observation.reportedHeadingAccuracyDegrees)
+        }
         assertReason(RouteCompassHeadingReason.GRAVITY_UNSTABLE, fallback(acceleration = gravity.copy(x = Double.NaN)))
     }
 
@@ -121,7 +129,11 @@ class RouteCompassFallbackTest {
             assertReason(RouteCompassHeadingReason.INVALID_ROTATION,
                 fallback(magnetic = sample(0.0, sqrt(2500.0 - horizontal * horizontal), -horizontal)))
         }
-        assertNotNull(fallback(magnetic = sample(0.0, sqrt(2500.0 - 36.0), -6.0)).observation)
+        // Isolate the existing horizontal-basis boundary with a reference matching this field.
+        val vertical = sqrt(2500.0 - 36.0)
+        assertNotNull(fallback(magnetic = sample(0.0, vertical, -6.0),
+            reference = reference.copy(inclinationDegrees = Math.toDegrees(kotlin.math.atan2(-vertical, 6.0))))
+            .observation)
     }
 
     @Test fun rearCameraVerticalRemainsUnavailable() {
@@ -133,12 +145,13 @@ class RouteCompassFallbackTest {
         assertEquals(355.0, fallback(reference = reference.copy(declinationDegrees = -725.0)).observation!!.degreesTrueNorth, 0.00001)
     }
 
-    @Test fun primaryMissingOrUnboundedErrorAllowsFallbackButExplicitPoorRvDoesNot() {
+    @Test fun primaryLowQualityPermitsIndependentFallbackButInvalidNumericEvidenceDoesNot() {
         listOf(RouteCompassHeadingReason.SENSOR_UNAVAILABLE, RouteCompassHeadingReason.ORIENTATION_MISSING,
-            RouteCompassHeadingReason.HEADING_ACCURACY_UNAVAILABLE, RouteCompassHeadingReason.STALE).forEach {
+            RouteCompassHeadingReason.HEADING_ACCURACY_UNAVAILABLE, RouteCompassHeadingReason.STALE,
+            RouteCompassHeadingReason.QUALITY_LOW).forEach {
             assertTrue(RouteCompassHeading.permitsFallback(RouteCompassHeadingResult(null, it)))
         }
-        listOf(RouteCompassHeadingReason.QUALITY_LOW, RouteCompassHeadingReason.HEADING_ACCURACY,
+        listOf(RouteCompassHeadingReason.HEADING_ACCURACY,
             RouteCompassHeadingReason.INVALID_ROTATION, RouteCompassHeadingReason.REAR_AXIS_VERTICAL,
             RouteCompassHeadingReason.INVALID_TIMESTAMP).forEach {
             assertFalse(RouteCompassHeading.permitsFallback(RouteCompassHeadingResult(null, it)))
@@ -179,7 +192,7 @@ class RouteCompassFallbackTest {
             val rearWorld = rotate(q, doubleArrayOf(0.0, 0.0, -1.0))
             val horizontal = sqrt(rearWorld[0] * rearWorld[0] + rearWorld[1] * rearWorld[1])
             val result = fallback(sample(*deviceGravity), magnetic = sample(*deviceMagnetic), reference = reference.copy(declinationDegrees = -7.3))
-            if (horizontal < 0.5) assertReason(RouteCompassHeadingReason.REAR_AXIS_VERTICAL, result)
+            if (horizontal < 0.3) assertReason(RouteCompassHeadingReason.REAR_AXIS_VERTICAL, result)
             else {
                 accepted++
                 val expected = ((Math.toDegrees(atan2(rearWorld[0], rearWorld[1])) - 7.3) % 360.0 + 360.0) % 360.0

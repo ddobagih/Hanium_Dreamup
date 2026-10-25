@@ -1,0 +1,23 @@
+flowchart TD
+  A["F-D12-037 원시수집 REPORT 목적 승인·반려"]
+  P["P-D12-037 목적별 revision 독립과 증거 필드 제한"]
+  A --> P
+  M0["1. 현재 collection의 REPORT revision과 command를 결속한다."]
+  P --> M0
+  M1["2. TRAINING 전용 동의·비식별화·dataset 증거가 섞이지 않도록 거절한다."]
+  M0 --> M1
+  M2["3. 고위험 proof로 POST /admin/raw-collections/{id}/decisions를 전송한다."]
+  M1 --> M2
+  M3["4. 응답 source manifest/receipt binding, actor/상태/revision=expected+1을 확인한다."]
+  M2 --> M3
+  M4["5. 선택 metadata를 갱신 대상으로 표시하고 새 인증 조회를 요구한다."]
+  M3 --> M4
+  M4 --> N["정상 종료: REPORT 결정 receipt 검증 후 refresh-required 표시."]
+  M0 -. "관련 조건 확인" .-> B0{"scope별 금지 증거 필드 포함"}
+  B0 -->|"조건 해당"| R0["전송 전 거절"]
+  M1 -. "관련 조건 확인" .-> B1{"409"}
+  B1 -->|"조건 해당"| R1["최신 metadata 재조회 필요"]
+  M2 -. "관련 조건 확인" .-> B2{"응답 미확정"}
+  B2 -->|"조건 해당"| R2["자동 재시도 없음; 같은 scope intent key 보관 범위 내 명시적 재시도"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["자동 재전송 없음; 현재 scope revision/key 확인 후 새 재인증으로 사용자가 재시도."]

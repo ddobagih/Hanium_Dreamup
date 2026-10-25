@@ -184,7 +184,7 @@ async function indexGatewaySources(): Promise<ReadonlyMap<string, DeclarationInd
       current?.push(line);
     }
     const imports = new Map<string, readonly [string, string]>();
-    for (const match of text.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*"\.\/([\w-]+)\.js"/g)) {
+    for (const match of text.matchAll(/(?:import|export)\s*(?:type\s*)?\{([^}]*)\}\s*from\s*"\.\/([\w-]+)\.js"/g)) {
       for (const specifier of match[1]!.split(",").map((part) => part.trim()).filter(Boolean)) {
         if (specifier.startsWith("type ")) continue;
         const [imported, local = imported] = specifier.split(/\s+as\s+/) as [string, string?];
@@ -215,7 +215,12 @@ function reachableDeclarations(
     if (reached.has(key)) continue;
     const module = index.get(file);
     const body = module?.declarations.get(name);
-    if (!module || body === undefined) continue;
+    if (!module) continue;
+    if (body === undefined) {
+      const forwarded = module.imports.get(name);
+      if (forwarded) queue.push(forwarded);
+      continue;
+    }
     reached.set(key, body);
     for (const match of body.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\b/g)) {
       const identifier = match[1]!;
@@ -252,9 +257,9 @@ function fieldSessionBackendSource(
   for (const [where, body] of reached) {
     const file = where.split(":", 1)[0]!;
     const names = new Set([...index.get(file)!.imports]
-      .filter(([, [module, name]]) => module === "backend.ts" && name === "fetchBackend")
+      .filter(([, [module, name]]) => (module === "backend.ts" || module === "backend-transport.ts") && name === "fetchBackend")
       .map(([local]) => local));
-    if (file === "backend.ts") names.add("fetchBackend");
+    if (file === "backend-transport.ts") names.add("fetchBackend");
     const parsed = ts.createSourceFile(file, body, ts.ScriptTarget.Latest, true);
     const visit = (node: ts.Node): void => {
       if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && names.has(node.expression.text)) {
@@ -269,7 +274,7 @@ function fieldSessionBackendSource(
     visit(parsed);
   }
   assert.ok(calls > 0, "the field-session graph must include its Backend fetch calls");
-  const text = reached.get("backend.ts:fetchBackend")!;
+  const text = reached.get("backend-transport.ts:fetchBackend")!;
   const parsed = ts.createSourceFile("backend.ts", text, ts.ScriptTarget.Latest, true);
   const declaration = parsed.statements.find(ts.isFunctionDeclaration)!;
   const limit = declaration.parameters.find((parameter) => parameter.name.getText(parsed) === "maxBufferedBodyBytes");
@@ -379,9 +384,9 @@ test("S01-20 every error code reachable from the field-session route is register
     ["field-long-session.ts", "fieldLongSessionStorageUnavailableResponse"]
   ]);
   for (const helper of [
-    "routes.ts:fieldSessionQueryInvalid",
-    "routes.ts:privacyOperationInactive",
-    "routes.ts:backendAccountSessionGate",
+    "session-routes.ts:fieldSessionQueryInvalid",
+    "request-scope.ts:privacyOperationInactive",
+    "route-responses.ts:backendAccountSessionGate",
     "account-relay.ts:authenticateBackendAccount",
     "field-long-session.ts:listFieldLongSessionDevices",
     "auth.ts:revokeBackendDeviceGatewaySession",
@@ -390,7 +395,7 @@ test("S01-20 every error code reachable from the field-session route is register
   const found = new Map<string, string>();
   const unboundedBackend = fieldSessionBackendSource(index, reached);
   for (const [where, body] of reached) {
-    scanCodes(where === "backend.ts:fetchBackend" ? unboundedBackend : body, found, where);
+    scanCodes(where === "backend-transport.ts:fetchBackend" ? unboundedBackend : body, found, where);
   }
   // The Node adapter wraps every route, including /api/field-session.
   scanCodes(await readFile(path.join(process.cwd(), "src", "node-adapter.ts"), "utf8"), found,

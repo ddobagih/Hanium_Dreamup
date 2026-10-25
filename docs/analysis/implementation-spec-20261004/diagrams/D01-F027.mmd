@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D01-027 계정 삭제 확인·취소·이중 durable intent"]
+  G{"계정삭제 UI·일치actor 일반/복구세션 또는 복구모드; 저장소/삭제상태 정상"}
+  I["확인 이벤트,configuredorigin,installationId,requestId,actor hash,clientRevision; 확인문구 DELETE_MY_ACCOUNT API body"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: durable authority를 확보하지 못하면 정상 작업 지속을 허용하지 않음"]
+  G -->|"미충족"| X
+  N1["계정 삭제 주 버튼은 IDLE에서 CONFIRM_REQUIRED와 설명을 열고 완료 상태에서는 reset을 연결한다."]
+  I --> N1
+  N2["사용자는 durable 준비 전에는 cancelConfirmation으로 돌아갈 수 있다."]
+  N1 --> N2
+  N3["최종 확인은 현재 actor/session/origin을 검증하고 runtime privacy fence를 먼저 세운 뒤 preparation worker를 시작한다."]
+  N2 --> N3
+  N4["encrypted preference와 noBackup intent에 confirmed를 쓰고 파일 verified write를 확인한 뒤 요청 journal 준비를 진행한다."]
+  N3 --> N4
+  OK["삭제 요청 준비 또는 확인전 취소"]
+  N4 --> OK
+  B0["취소 거부; 삭제 복구 안내"]
+  N2 -->|"durable 확인/prepare가 이미 시작됨"| B0
+  B1["요청 보내지 않고 제한/복구유지"]
+  N3 -->|"actor/scope mismatch·sensitiveblocked"| B1
+  B2["failClosed 및 일반기능 차단"]
+  N4 -->|"파일쓰기 실패·authority충돌"| B2
+  B3["이중권위의 file authority를 보존하고 복구 경로"]
+  N4 -->|"파일성공·pref실패"| B3
+  R["중단·취소: durable 준비 전 cancel만 가능 / Activity lease 교체에도 durable intent 보존"]
+  V["복구·재시도: file confirmed+journal없음은 확인사실 유지한 복구 / 실패한 준비는 authority/journal 복구 절차; 새임의request 남발 없음"]
+  Q["정책 P-D01-020 · P-D01-022"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

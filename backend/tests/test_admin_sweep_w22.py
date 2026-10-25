@@ -655,6 +655,14 @@ class _LookupDb:
         self.report = report
         self.decision = decision
 
+    def scalar(self, statement):
+        description, = statement.column_descriptions
+        assert description["expr"] is admin_report_workflow.Report
+        assert statement.compile().params["id_1"] == REPORT_ID
+        sql = str(statement)
+        assert "NOT (EXISTS (" in sql and "account_deletion_tombstones" in sql
+        return self.report
+
     def get(self, model: Any, key: Any) -> Any:
         if model is admin_report_workflow.Report:
             return self.report if key == REPORT_ID else None

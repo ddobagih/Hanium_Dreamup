@@ -1,0 +1,26 @@
+flowchart TD
+  A["F-D10-022 초기 공개자료 4클래스 dataset 재구성"]
+  N0["1. target images/labels train/val/test를 만들고 .gitkeep 외 직접 파일과 labels/*.cache를 삭제한다."]
+  A --> N0
+  N1["2. source train/valid/test를 모아5column,정수source class,좌표[0,1],w/h>0만 추출. empty labels는 제외."]
+  N0 --> N1
+  N2["3. 각 source 전체를 seed shuffle하여70/20/10 비율로 새 split. source prefix를 붙여 이미지 copy2와 label 작성."]
+  N1 --> N2
+  N3["4. 클래스별 box count와 class0 비어있음 note를 BUILD_SUMMARY.md에 쓴다."]
+  N2 --> N3
+  B0{"target 기존 파일"}
+  R0["추가 승인/--reset 없이 항상 reset"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"source split 폴더 누락"}
+  R1["해당 source split 건너뜀"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"tactile 데이터 없음"}
+  R2["클래스 선언은 있으나 label0은 생성하지 않음"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-020"]
+  P -. "코드 분기 기준" .-> A

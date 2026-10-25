@@ -1,0 +1,38 @@
+flowchart TD
+  T["F-D06-027 프레임 독립 heartbeat와 로그 생존 상태 분류"]
+  P["전제: 현장 세션 활성. 로그 비활성이면 이전 상태와 gap 메타데이터 초기화."]
+  T --> P
+  E1["E-D06-027-01 1초 heartbeat tick→렌더/프레임 age·위치신뢰 검사→상태변화 또는10초<br/>gap 기록"]
+  E1 --> T
+  E2["E-D06-027-02 render/frame callback→마지막 관측 시각 갱신"]
+  E2 --> T
+  A1["1. 렌더 없음 또는 age초과 3000ms를 먼저 RENDERING_STOPPED로 분류한다."]
+  P --> A1
+  A2["2. 렌더가 살아있지만 frame 없음/age초과 3000ms면 NO_FRAME, 위치 신뢰 없으면<br/>SENSOR_NOT_READY, 나머지는 FRAMES_FLOWING이다."]
+  A1 --> A2
+  A3["3. gap 전이시 즉시 기록하고 동일 gap은 최소10000ms 뒤 다시 기록한다."]
+  A2 --> A3
+  A4["4. FRAMES_FLOWING 회복시 한번 기록하고 끝난 gap duration을 붙인다."]
+  A3 --> A4
+  N["정상 종료: tick 후 다음 예약 tick까지 반환."]
+  A4 --> N
+  FX["결과: field_heartbeat 암호화 event. 사용자에게 이 값만으로 센서 정확도/보행 안전을 확정하지<br/>않음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"inactive"}
+    R1["state/gap 타이머 초기화, 기록 없음"]
+    B1 -->|조건 성립| R1
+    B2{"동일 gap이고10초 미만"}
+    R2["기록 생략"]
+    B2 -->|조건 성립| R2
+    B3{"정상 상태 계속"}
+    R3["매 tick 기록하지 않음"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-026"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["시간: 3000ms 초과 분류,10초 이상 gap 반복."]
+    X2["중단: 현장 로그 비활성→측정 상태 초기화."]
+    X3["정리: Main heartbeat 작업 생명주기에 따라 예약 해제."]
+  end

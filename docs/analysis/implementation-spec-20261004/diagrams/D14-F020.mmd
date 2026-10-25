@@ -1,0 +1,35 @@
+flowchart TD
+  IN["F-D14-020<br/>고위험 작업 일회 재확인 소비 및 재검증"]
+  G["적용 정책<br/>P-D14-007 / P-D14-008 / P-D14-014"]
+  IN --> G
+  N1["1. HIGH 분류와 nonce/max age 입력 검증"]
+  G --> N1
+  N2["2. singleton control 일관성→NORMAL→custody ATTE<br/>STED 우선 확인"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. bearer 및 runtime factor 확인"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 현재 ContextVar의 body-bound digest 후보를 먼저, <br/>plain nonce digest를 뒤에 조회"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. session/device/action/method/path exact, <br/>unused, expires&gt;now, verified_at&gt;=now-maxage<br/> 및 &lt;=now 확인"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. reconfirmation 소비와 SUCCESS 감사 commit; mat<br/>ched verified_at를 identity에 전달하지 않고 기존 ident<br/>ity 반환"]
+  N5 -->|"계속 가능한 경우"| N6
+  N7["7. D09는 이후 ACTION proof 검증·소비 후 route 호출; ti<br/>mestamp를 요구하는 incident/report route는 정상 재확인 <br/>경로에서403(R-D14-008)"]
+  N6 -->|"계속 가능한 경우"| N7
+  N8["8. route 문맥을 통과한 업무 서비스/다른 caller는 사업 transa<br/>ction에서 control과 bearer를 재확인"]
+  N7 -->|"계속 가능한 경우"| N8
+  B1["분기 결과<br/>409 state_blocks_operation, nonce 소비 전"]
+  N2 -->|"복구 상태"| B1
+  B2["분기 결과<br/>409 recovery_custody_required, nonce 소비 전"]
+  N2 -->|"custody 미확인"| B2
+  B3["분기 결과<br/>403 reconfirmation_required"]
+  N5 -->|"승인 없음·만료·이미 소비·너무 오래됨"| B3
+  B4["분기 결과<br/>이미 commit한 승인 소비는 유지"]
+  N8 -->|"후속 사업 작업 실패"| B4
+  B5["분기 결과<br/>이미 commit한 nonce는 재사용 불가; step_up 시각 None이면 <br/>incident/report route403"]
+  N7 -->|"nonce 소비 뒤 ACTION proof 오류 또는 downstream con<br/>text 거절"| B5
+  N8 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>실패한 사업 요청을 재시도하려면 새 일회 재확인 필요. service가 자동 재<br/>확인하지 않음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

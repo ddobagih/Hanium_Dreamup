@@ -1,0 +1,31 @@
+flowchart TB
+  E["F-D15-024 · 기관 보유사본 삭제 회신 기록<br/>P-D15-024"]
+  E --> EVIDENCE{"REPLY_*는 reference 또는 SHA256 존재<br/>REPLY_DELETION_CONFIRMED는 SHA256 필수"}
+  EVIDENCE -->|"아니오"| INVALID["422 반환"]
+  EVIDENCE -->|"예 또는 REQUEST_SENT"| LOCK["관리자 proof·copy/tombstone lock·총수 증거 확인"]
+  LOCK --> EXIST{"같은 idempotency key event가 있는가"}
+  EXIST -->|"예"| EQ{"정확 intent가 같은가"}
+  EQ -->|"아니오"| IC["409 intent conflict 반환"]
+  EQ -->|"예"| RAUD["기존 event의 성공감사 commit"]
+  RAUD -->|"성공"| REPLAY["기존 상태 즉시 반환<br/>새 event·revision 검사 없음"]
+  RAUD -->|"실패"| ERR["503 반환"]
+  EXIST -->|"아니오"| CAS{"expected_revision 일치"}
+  CAS -->|"아니오"| RC["409 latest revision 반환"]
+  CAS -->|"예"| STATE{"허용 전이인가"}
+  STATE -->|"아니오"| INVALID
+  STATE -->|"예"| TIME{"previous.observed_at ≤ payload.observed_at ≤ recorded_at"}
+  TIME -->|"아니오"| INVALID
+  TIME -->|"예"| APPEND["event revision+1·성공감사 commit"]
+  APPEND -->|"성공"| OK["새 event 상태 반환"]
+  APPEND -->|"경합"| RECHECK["rollback·key intent 또는 latest revision 재조회"]
+  RECHECK -->|"같은 intent 존재"| RAUD
+  RECHECK -->|"같은 intent가 없거나 다름"| LATEST{"현재 revision이 expected와 다른가"}
+  LATEST -->|"예"| RC
+  LATEST -->|"아니오 또는 조회 오류"| ERR
+  APPEND -->|"DB 오류"| ERR
+  TRANS["NOT_REQUESTED → REQUEST_SENT<br/>REQUEST_SENT → REPLY_ACKNOWLEDGED 또는 REPLY_DELETION_CONFIRMED 또는 REPLY_DECLINED<br/>REPLY_ACKNOWLEDGED → REPLY_DELETION_CONFIRMED 또는 REPLY_DECLINED<br/>REPLY_DECLINED → REQUEST_SENT<br/>REPLY_DELETION_CONFIRMED은 종료"]
+  STATE -.-> TRANS
+  NOTE["실제 기관 통신·사본삭제를 수행하지 않음<br/>자동 retry·취소 API 없음·회신 증거는 수기 기록"]
+  E -.-> NOTE
+  SRC["근거 · report_external_copy_deletions.py:369 record_admin_external_copy_deletion_event"]
+  E -.-> SRC

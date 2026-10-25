@@ -22,7 +22,7 @@ class WalkSessionDeviceResourceSnapshotTest {
         )
 
         assertEquals(WalkSessionReadinessStatus.READY, snapshot.readinessStatus)
-        assertEquals("", snapshot.reason)
+        assertEquals("thermal_throttled", snapshot.reason)
         assertEquals(true, snapshot.thermalThrottled)
     }
 

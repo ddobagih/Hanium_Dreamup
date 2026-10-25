@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D02-003 권한 묶음 검사와 설정 복귀의 명시 회복"]
+  E["진입: 권한 요청·설정 열기·복귀 후 명시 재개 / permission 결과·foreground 권한 재조회"]
+  G{"P-D02-003 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["camera guidance·metric·report 전송 차단"]
+  G -->|"camera 해제"| B0
+  B1["navigation·report 전송 차단"]
+  G -->|"precise location 해제"| B1
+  B2["각 음성 입력/step 기능 차단"]
+  G -->|"mic/활동권한 해제"| B2
+  B3["whole walk safety stop"]
+  G -->|"camera와 precise 모두 없음"| B3
+  B4["개별 기능 차단 외 세션 SAFE_STOP도 가능"]
+  G -->|"Main ACTIVE readiness가 camera/location 필수 실패"| B4
+  B5["새 recheck 요구; grant 성공 반영 금지"]
+  G -->|"late callback binding 다름"| B5
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["현재 실제 권한을 조회하고 request purpose별 lease 발급"]
+    S1["permission result는 lease·actor·epoch를 검사"]
+    S2["CLEAR 이외 회복 상태는 자동 센서 시작을 차단"]
+    S3["설정 복귀는 FULL recheck; 권한이 모두 있어도 AWAITING_EXPLICIT_RESUME"]
+    S4["명시 재개 시 실제 권한과 binding을 다시 조회"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: 해당 이벤트 처리를 마치고 현재 스냅샷/결과를 반환한다."]
+  X["취소·중단: 거절/권한창 취소는 ready로 간주하지 않음. / 일반 background는 pending 소유권 무효화; 기기 검사<br/>자신이 연 permission dialog 예외는 F-D02-005."]
+  C["정리: 순수 정책은 소유하는 외부 리소스가 없다."]
+  R["재시도·복구: 자동 재시도 없음. 호출자가 명시된 새 이벤트를 전달해야 한다. / full recheck→explicit<br/>acknowledgement; 설정 복귀만으로 ACTIVE 금지."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

@@ -716,7 +716,7 @@ def test_s18_40_postgres_correction_restores_effective_state_and_keeps_every_eve
             )
         with SessionFactory() as db:
             assert db.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == (
-                "202609300009"
+                "202610110001"
             )
 
         # Correction-unaware predecessors are no longer runtime-callable, and

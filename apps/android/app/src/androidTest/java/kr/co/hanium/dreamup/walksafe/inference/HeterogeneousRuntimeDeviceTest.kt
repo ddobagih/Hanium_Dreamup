@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
-import kr.co.hanium.dreamup.walksafe.FrozenImageToTextureCoordinateMapper
+import kr.co.hanium.dreamup.walksafe.depth.FrozenImageToTextureCoordinateMapper
 import kr.co.hanium.dreamup.walksafe.depth.ArCoreFrameProvider
 import kr.co.hanium.dreamup.walksafe.depth.CoordinateMapper
 import kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot

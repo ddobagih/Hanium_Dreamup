@@ -18,10 +18,16 @@ import java.util.concurrent.atomic.AtomicLong
  * Acquires camera and depth images tied to one ARCore [Frame]. Every returned [Image] owns a scarce
  * native buffer; callers must close it directly or close the returned [ArCoreDepthBundle].
  */
-class ArCoreFrameProvider(private val session: Session) : Closeable {
+class ArCoreFrameProvider(
+    private val session: Session,
+    private val timingClockNs: () -> Long = System::nanoTime,
+) : Closeable {
     private var motionAnchor: Anchor? = null
     private var motionReferenceId = 0L
     private var closed = false
+    private var semanticAcquisitionEnabled = false
+    private val cameraTimestampOwner = Any()
+    private var cameraTimestampEpoch = 0L
     private var preflightFrameCount = 0
     private var preflightTrackingFrameCount = 0
     private var preflightFullFrameCount = 0
@@ -38,12 +44,96 @@ class ArCoreFrameProvider(private val session: Session) : Closeable {
         return depthSupported
     }
 
+    /**
+     * Call after the owner successfully configures this session, before captures resume. Camera
+     * configuration changes require another configure/refresh at that same stopped boundary; a
+     * replacement Session requires a new provider. External configuration changes are not polled
+     * per frame. This only reads configuration/support and never enables or configures semantics.
+     */
+    @Synchronized
+    fun refreshSemanticAcquisitionConfiguration(): Boolean {
+        semanticAcquisitionEnabled = !closed && try {
+            session.config.semanticMode == Config.SemanticMode.ENABLED &&
+                session.isSemanticModeSupported(Config.SemanticMode.ENABLED)
+        } catch (_: Exception) {
+            false
+        }
+        return semanticAcquisitionEnabled
+    }
+
     fun acquireCameraImageOrNull(frame: Frame): Image? =
         tryAcquire(DepthAcquisitionStage.CAMERA_IMAGE) { frame.acquireCameraImage() }
 
     /** S11-18: the same acquisition with its consumer counted separately (camera.<consumer>). */
     fun acquireCameraImageOrNull(frame: Frame, consumer: CameraImageConsumer): Image? =
         tryAcquire(DepthAcquisitionStage.CAMERA_IMAGE, cameraConsumer = consumer) { frame.acquireCameraImage() }
+
+    /**
+     * Acquires the recognition image once and records its actual CPU clock at that same boundary.
+     * Only a successfully processed recognition image's receipt should be passed to depth. The
+     * caller still owns and closes the returned image; depth never retains or closes that image.
+     */
+    @Synchronized
+    fun acquireRecognitionCameraImageOrNull(
+        frame: Frame,
+        consumer: CameraImageConsumer? = null,
+    ): RecognitionCameraImage? {
+        if (closed) return null
+        // A newer attempt, including a failed one, cannot reuse an earlier successful receipt.
+        invalidateRecognitionCameraImageTimestamps()
+        val frameTimestampNs = frame.timestamp
+        if (frameTimestampNs <= 0L || frame.camera.trackingState != TrackingState.TRACKING) {
+            return null
+        }
+        val image = tryAcquire(DepthAcquisitionStage.CAMERA_IMAGE, cameraConsumer = consumer) {
+            frame.acquireCameraImage()
+        } ?: return null
+        val cameraImageTimestampNs = try {
+            image.timestamp.takeIf {
+                it > 0L && frame.timestamp == frameTimestampNs &&
+                    frame.camera.trackingState == TrackingState.TRACKING
+            }
+        } catch (error: Exception) {
+            image.close()
+            recordAcquisitionFailure(DepthAcquisitionStage.CAMERA_IMAGE, null, error, consumer)
+            return null
+        }
+        if (cameraImageTimestampNs == null) {
+            image.close()
+            return null
+        }
+        return RecognitionCameraImage(
+            image,
+            CameraImageTimestampEvidence(
+                cameraTimestampOwner, cameraTimestampEpoch, frame, frameTimestampNs, cameraImageTimestampNs,
+            ),
+        )
+    }
+
+    /**
+     * Keeps RGB-only recognition available when this frame starts PAUSED/STOPPED. Choose this
+     * path before acquiring an image; it is never a retry for a failed TRACKING capture. No CPU
+     * clock receipt or depth qualification is created. The caller owns and closes the image.
+     */
+    @Synchronized
+    fun acquireUntrackedRecognitionCameraImageOrNull(
+        frame: Frame,
+        consumer: CameraImageConsumer? = null,
+    ): Image? {
+        if (closed) return null
+        if (frame.camera.trackingState == TrackingState.TRACKING) return null
+        invalidateRecognitionCameraImageTimestamps()
+        clearCameraMotion()
+        return tryAcquire(DepthAcquisitionStage.CAMERA_IMAGE, cameraConsumer = consumer) {
+            frame.acquireCameraImage()
+        }
+    }
+
+    /** Cancel/pause or a replaced capture generation invalidates receipts without owning images. */
+    @Synchronized
+    fun invalidateRecognitionCameraImageTimestamps() {
+        cameraTimestampEpoch += 1L
+    }
 
     /** Bounded operational failure counts by stage and reason; preflight keeps its own summary. */
     fun runtimeAcquisitionDiagnostics(): String = runtimeAcquisitionFailures.summaryText()
@@ -66,12 +156,48 @@ class ArCoreFrameProvider(private val session: Session) : Closeable {
     fun consumeRuntimeAcquisitionFailure(): DepthAcquisitionFailureReason? =
         runtimeAcquisitionFailures.consumeMostSevereSinceLastCheck()
 
+    @Synchronized
     fun acquireDepthBundle(
         frame: Frame,
         includeFullDepthWhenRawAvailable: Boolean = true,
+        fullDepthTimingObserver: ((FullDepthTiming) -> Unit)? = null,
     ): ArCoreDepthBundle {
         // Read the actual CPU image clock. Frame and Android camera metadata timestamps can differ.
         val cameraImageTimestampNs = acquireCameraImageOrNull(frame, CameraImageConsumer.DEPTH)?.use { it.timestamp }
+        return acquireDepthBundleWithTimestamp(frame, includeFullDepthWhenRawAvailable, cameraImageTimestampNs,
+            fullDepthTimingObserver)
+    }
+
+    /** Explicitly shared path: missing/foreign/expired receipts never fall back to acquisition. */
+    @Synchronized
+    fun acquireDepthBundle(
+        frame: Frame,
+        cameraImageTimestampEvidence: CameraImageTimestampEvidence?,
+        includeFullDepthWhenRawAvailable: Boolean = true,
+        fullDepthTimingObserver: ((FullDepthTiming) -> Unit)? = null,
+    ): ArCoreDepthBundle {
+        if (closed) return ArCoreDepthBundle(0L, null, null, null, null)
+        return acquireDepthBundleWithTimestamp(
+            frame, includeFullDepthWhenRawAvailable, recognitionCameraTimestamp(frame, cameraImageTimestampEvidence),
+            fullDepthTimingObserver,
+        )
+    }
+
+    private fun recognitionCameraTimestamp(frame: Frame, evidence: CameraImageTimestampEvidence?): Long? {
+        if (closed) return null
+        if (frame.camera.trackingState != TrackingState.TRACKING) {
+            invalidateRecognitionCameraImageTimestamps()
+            return null
+        }
+        return evidence?.timestampFor(cameraTimestampOwner, cameraTimestampEpoch, frame)
+    }
+
+    private fun acquireDepthBundleWithTimestamp(
+        frame: Frame,
+        includeFullDepthWhenRawAvailable: Boolean,
+        cameraImageTimestampNs: Long?,
+        fullDepthTimingObserver: ((FullDepthTiming) -> Unit)?,
+    ): ArCoreDepthBundle {
         val rawPair = acquireMatchingRawDepthPair(
             acquireRawDepth = { tryAcquire(DepthAcquisitionStage.RAW_DEPTH) { frame.acquireRawDepthImage16Bits() } },
             acquireRawConfidence = {
@@ -84,23 +210,45 @@ class ArCoreFrameProvider(private val session: Session) : Closeable {
         )
         val rawDepth = rawPair?.first
         val rawConfidence = rawPair?.second
-        val fullDepth = if (
-            includeFullDepthWhenRawAvailable || rawDepth == null || rawConfidence == null
-        ) {
-            tryAcquire(DepthAcquisitionStage.FULL_DEPTH) { frame.acquireDepthImage16Bits() }
-        } else {
-            null
+        val needsFullDepth = includeFullDepthWhenRawAvailable || rawDepth == null || rawConfidence == null
+        val fullTiming = if (needsFullDepth) fullDepthTimingObserver?.let {
+            FullDepthTimingCapture(
+                if (rawDepth == null || rawConfidence == null) FullDepthRequestPurpose.RAW_UNAVAILABLE_FALLBACK
+                else FullDepthRequestPurpose.RAW_AVAILABLE_SUPPLEMENT,
+                timingClockNs, it,
+            )
+        } else null
+        var fullDepth: Image? = null
+        try {
+            if (needsFullDepth) fullDepth = acquireFullDepth(frame, fullTiming)
+            return ArCoreDepthBundle(
+                frameTimestampNs = frame.timestamp,
+                rawDepthTimestampNs = rawDepth?.timestamp,
+                rawDepth = rawDepth,
+                rawConfidence = rawConfidence,
+                fullDepth = fullDepth,
+                fullDepthTimestampNs = fullDepth?.timestamp,
+                cameraImageTimestampNs = cameraImageTimestampNs,
+                rawConfidenceTimestampNs = rawConfidence?.timestamp,
+            ).also { if (fullDepth != null) it.fullDepthTimingCapture = fullTiming }
+        } catch (error: Throwable) {
+            closeDepthImages(rawDepth, rawConfidence, failure = error) {
+                // Failed acquisition already reports its timing; only acquired images are closed.
+                fullDepth?.let { image ->
+                    if (fullTiming == null) image.close() else fullTiming.close { image.close() }
+                }
+            }
+            throw error
         }
-        return ArCoreDepthBundle(
-            frameTimestampNs = frame.timestamp,
-            rawDepthTimestampNs = rawDepth?.timestamp,
-            rawDepth = rawDepth,
-            rawConfidence = rawConfidence,
-            fullDepth = fullDepth,
-            fullDepthTimestampNs = fullDepth?.timestamp,
-            cameraImageTimestampNs = cameraImageTimestampNs,
-            rawConfidenceTimestampNs = rawConfidence?.timestamp,
-        )
+    }
+
+    private fun acquireFullDepth(
+        frame: Frame,
+        timing: FullDepthTimingCapture?,
+        preflightSource: String? = null,
+    ): Image? = tryAcquire(DepthAcquisitionStage.FULL_DEPTH, preflightSource) {
+        if (timing == null) frame.acquireDepthImage16Bits()
+        else timing.acquire { frame.acquireDepthImage16Bits() }
     }
 
     /** Copies this frame's raw pair before acquiring full depth, releasing scarce native buffers. */
@@ -108,29 +256,83 @@ class ArCoreFrameProvider(private val session: Session) : Closeable {
     fun acquireDepthSnapshot(
         frame: Frame,
         includeFullDepthWhenRawAvailable: Boolean = true,
+        fullDepthTimingObserver: ((FullDepthTiming) -> Unit)? = null,
+    ): DepthFrameSnapshot = acquireDepthSnapshotWithTimestamp(frame, includeFullDepthWhenRawAvailable,
+        fullDepthTimingObserver) {
+        acquireCameraImageOrNull(frame, CameraImageConsumer.DEPTH)?.use { it.timestamp }
+    }.let { withSemanticObservation(frame, it) }
+
+    /** Reuses the recognition CPU clock only for the receipt's exact frame and provider epoch. */
+    @Synchronized
+    fun acquireDepthSnapshot(
+        frame: Frame,
+        cameraImageTimestampEvidence: CameraImageTimestampEvidence?,
+        includeFullDepthWhenRawAvailable: Boolean = true,
+        fullDepthTimingObserver: ((FullDepthTiming) -> Unit)? = null,
+    ): DepthFrameSnapshot = acquireDepthSnapshotWithTimestamp(frame, includeFullDepthWhenRawAvailable,
+        fullDepthTimingObserver) {
+        recognitionCameraTimestamp(frame, cameraImageTimestampEvidence)
+    }.let { withSemanticObservation(frame, it) }
+
+    /** Optional copied observations never decide the depth gate or change Full timing/results. */
+    private fun withSemanticObservation(frame: Frame, snapshot: DepthFrameSnapshot): DepthFrameSnapshot {
+        if (closed || !semanticAcquisitionEnabled) return snapshot
+        val semantic = try {
+            frame.acquireSemanticImage().use { labels ->
+                frame.acquireSemanticConfidenceImage().use { confidence ->
+                    SemanticFrameSnapshot(
+                        frameTimestampNs = snapshot.frameTimestampNs,
+                        cameraImageTimestampNs = snapshot.cameraImageTimestampNs,
+                        cameraPoseReferenceId = snapshot.cameraPoseEvidence?.referenceId,
+                        labels = SemanticImage8Snapshot.copyOf(labels),
+                        confidence = SemanticImage8Snapshot.copyOf(confidence),
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            null
+        }
+        return if (semantic == null) snapshot else snapshot.copy(semanticFrame = semantic)
+    }
+
+    private inline fun acquireDepthSnapshotWithTimestamp(
+        frame: Frame,
+        includeFullDepthWhenRawAvailable: Boolean,
+        noinline fullDepthTimingObserver: ((FullDepthTiming) -> Unit)?,
+        cameraTimestamp: () -> Long?,
     ): DepthFrameSnapshot {
         if (closed) return DepthFrameSnapshot(0L, null, null, null)
         // S14-25-F1: only this call's own depth-stage attempts decide the gate's fatal signal.
         runtimeAcquisitionFailures.beginDepthAcquisition()
         val cameraPoseEvidence = captureCameraPose(frame)
-        val snapshot = acquireDepthBundle(
+        val snapshot = acquireDepthBundleWithTimestamp(
             frame,
             includeFullDepthWhenRawAvailable = false,
+            cameraImageTimestampNs = cameraTimestamp(),
+            fullDepthTimingObserver = fullDepthTimingObserver,
         ).toSnapshotAndClose().copy(
             cameraPoseEvidence = cameraPoseEvidence,
         )
         if (!includeFullDepthWhenRawAvailable || !snapshot.hasMetricRawDepth) return snapshot
-        return tryAcquire(DepthAcquisitionStage.FULL_DEPTH) { frame.acquireDepthImage16Bits() }?.use { fullDepth ->
+        val fullTiming = fullDepthTimingObserver?.let {
+            FullDepthTimingCapture(FullDepthRequestPurpose.RAW_AVAILABLE_SUPPLEMENT, timingClockNs, it)
+        }
+        val fullDepth = acquireFullDepth(frame, fullTiming) ?: return snapshot
+        val copyFullDepth = { image: Image ->
             snapshot.copy(
-                fullDepth = fullDepth.toDepthImage16Snapshot(),
-                fullDepthTimestampNs = fullDepth.timestamp,
+                fullDepth = if (fullTiming == null) image.toDepthImage16Snapshot()
+                    else fullTiming.convert { image.toDepthImage16Snapshot() },
+                fullDepthTimestampNs = image.timestamp,
             )
-        } ?: snapshot
+        }
+        return if (fullTiming == null) fullDepth.use(copyFullDepth)
+        else fullTiming.useAndClose(fullDepth, copyFullDepth)
     }
 
     private fun captureCameraPose(frame: Frame): CameraPoseEvidence? {
         val camera = frame.camera
         if (frame.timestamp <= 0L || camera.trackingState != TrackingState.TRACKING) {
+            invalidateRecognitionCameraImageTimestamps()
             clearCameraMotion()
             return null
         }
@@ -218,6 +420,8 @@ class ArCoreFrameProvider(private val session: Session) : Closeable {
     override fun close() {
         if (closed) return
         closed = true
+        semanticAcquisitionEnabled = false
+        invalidateRecognitionCameraImageTimestamps()
         clearCameraMotion()
     }
 
@@ -226,19 +430,28 @@ class ArCoreFrameProvider(private val session: Session) : Closeable {
     }
 
     @Synchronized
-    fun acquirePreflightDepthBundle(frame: Frame): ArCoreDepthBundle {
+    fun acquirePreflightDepthBundle(
+        frame: Frame,
+        fullDepthTimingObserver: ((FullDepthTiming) -> Unit)? = null,
+    ): ArCoreDepthBundle {
         preflightFrameCount += 1
         if (frame.camera.trackingState == TrackingState.TRACKING) preflightTrackingFrameCount += 1
         val cameraImageTimestampNs = tryAcquire(DepthAcquisitionStage.CAMERA_IMAGE, "camera") {
             frame.acquireCameraImage()
         }?.use { it.timestamp }
+        val fullTiming = fullDepthTimingObserver?.let {
+            FullDepthTimingCapture(FullDepthRequestPurpose.PREFLIGHT_PRIMARY, timingClockNs, it)
+        }
         val bundle = acquirePreflightDepth(
-            acquireFullDepth = { tryAcquire(DepthAcquisitionStage.FULL_DEPTH, "full") { frame.acquireDepthImage16Bits() } },
+            acquireFullDepth = { acquireFullDepth(frame, fullTiming, "full") },
             acquireRawDepth = { tryAcquire(DepthAcquisitionStage.RAW_DEPTH, "raw") { frame.acquireRawDepthImage16Bits() } },
             acquireRawConfidence = {
                 tryAcquire(DepthAcquisitionStage.RAW_CONFIDENCE, "confidence") { frame.acquireRawDepthConfidenceImage() }
             },
             isMatchingRawPair = ::matchingRawConfidenceImages,
+            closeFullDepth = { image ->
+                if (fullTiming == null) image.close() else fullTiming.close { image.close() }
+            },
         ) { full, raw, confidence ->
             ArCoreDepthBundle(
                 frame.timestamp,
@@ -249,10 +462,13 @@ class ArCoreFrameProvider(private val session: Session) : Closeable {
                 full?.timestamp,
                 cameraImageTimestampNs = cameraImageTimestampNs,
                 rawConfidenceTimestampNs = confidence?.timestamp,
-            )
+            ).also {
+                if (full != null) it.fullDepthTimingCapture = fullTiming
+                // Metadata validation is still part of assembly, before ownership transfers.
+                if (it.hasFullDepth) preflightFullFrameCount += 1
+                if (it.hasRawDepth) preflightRawFrameCount += 1
+            }
         }
-        if (bundle.hasFullDepth) preflightFullFrameCount += 1
-        if (bundle.hasRawDepth) preflightRawFrameCount += 1
         return bundle
     }
 
@@ -311,7 +527,7 @@ internal fun <T : AutoCloseable, R> acquirePreflightDepth(
     acquireRawConfidence: () -> T?,
     createBundle: (full: T?, raw: T?, confidence: T?) -> R,
 ): R = acquirePreflightDepth(
-    acquireFullDepth, acquireRawDepth, acquireRawConfidence, { _, _ -> true }, createBundle,
+    acquireFullDepth, acquireRawDepth, acquireRawConfidence, { _, _ -> true }, createBundle = createBundle,
 )
 
 internal fun <T : AutoCloseable, R> acquirePreflightDepth(
@@ -320,13 +536,24 @@ internal fun <T : AutoCloseable, R> acquirePreflightDepth(
     acquireRawConfidence: () -> T?,
     isMatchingRawPair: (T, T) -> Boolean,
     createBundle: (full: T?, raw: T?, confidence: T?) -> R,
+): R = acquirePreflightDepth(
+    acquireFullDepth, acquireRawDepth, acquireRawConfidence, isMatchingRawPair, { it.close() }, createBundle,
+)
+
+internal fun <T : AutoCloseable, R> acquirePreflightDepth(
+    acquireFullDepth: () -> T?,
+    acquireRawDepth: () -> T?,
+    acquireRawConfidence: () -> T?,
+    isMatchingRawPair: (T, T) -> Boolean,
+    closeFullDepth: (T) -> Unit,
+    createBundle: (full: T?, raw: T?, confidence: T?) -> R,
 ): R {
     val full = acquireFullDepth()
     if (full != null) {
         try {
             return createBundle(full, null, null)
-        } catch (error: Exception) {
-            full.close()
+        } catch (error: Throwable) {
+            closeDepthImages(null, null, failure = error) { closeFullDepth(full) }
             throw error
         }
     }
@@ -334,8 +561,8 @@ internal fun <T : AutoCloseable, R> acquirePreflightDepth(
         ?: return createBundle(null, null, null)
     try {
         return createBundle(null, pair.first, pair.second)
-    } catch (error: Exception) {
-        closeRawPairAfterFailure(pair.first, pair.second, error)
+    } catch (error: Throwable) {
+        closeDepthImages(pair.first, pair.second, failure = error)
         throw error
     }
 }
@@ -365,28 +592,35 @@ internal fun <T : AutoCloseable> acquireMatchingRawDepthPair(
         confidence = acquireRawConfidence()
         if (confidence != null && isMatchingPair(raw, confidence)) return raw to confidence
         if (confidence != null) onPairMismatch()
-    } catch (error: Exception) {
-        closeRawPairAfterFailure(raw, confidence, error)
+    } catch (error: Throwable) {
+        closeDepthImages(raw, confidence, failure = error)
         throw error
     }
-    closeRawPair(raw, confidence)
+    closeDepthImages(raw, confidence)
     return null
 }
 
-private fun closeRawPair(raw: AutoCloseable?, confidence: AutoCloseable?) {
-    try {
-        raw?.close()
-    } finally {
-        confidence?.close()
+/** Attempt every release, retaining the operation failure or otherwise the first close failure. */
+private fun closeDepthImages(
+    raw: AutoCloseable?,
+    confidence: AutoCloseable?,
+    failure: Throwable? = null,
+    closeFullDepth: () -> Unit = {},
+) {
+    var primaryFailure = failure
+    fun attemptClose(close: () -> Unit) {
+        try {
+            close()
+        } catch (cleanupError: Throwable) {
+            val primary = primaryFailure
+            if (primary == null) primaryFailure = cleanupError
+            else if (primary !== cleanupError) primary.addSuppressed(cleanupError)
+        }
     }
-}
-
-private fun closeRawPairAfterFailure(raw: AutoCloseable?, confidence: AutoCloseable?, error: Exception) {
-    try {
-        closeRawPair(raw, confidence)
-    } catch (cleanupError: Exception) {
-        error.addSuppressed(cleanupError)
-    }
+    attemptClose { raw?.close() }
+    attemptClose { confidence?.close() }
+    attemptClose(closeFullDepth)
+    primaryFailure?.let { throw it }
 }
 
 private fun matchingRawConfidenceImages(raw: Image, confidence: Image): Boolean =
@@ -404,14 +638,25 @@ data class ArCoreDepthBundle(
     val cameraImageTimestampNs: Long? = null,
     val rawConfidenceTimestampNs: Long? = null,
 ) : Closeable {
+    internal var fullDepthTimingCapture: FullDepthTimingCapture? = null
+
     val hasRawDepth: Boolean
         get() = rawDepth != null && rawConfidence != null && matchingRawConfidenceImages(rawDepth, rawConfidence)
     val hasFullDepth: Boolean get() = fullDepth != null
 
+    /** Only this Full image's copy is measured; Raw/confidence conversion stays outside. */
+    internal fun copyFullDepthSnapshot(): DepthImage16? {
+        val image = fullDepth ?: return null
+        val timing = fullDepthTimingCapture
+        return if (timing == null) image.toDepthImage16Snapshot()
+        else timing.convert { image.toDepthImage16Snapshot() }
+    }
+
     override fun close() {
-        rawDepth?.close()
-        rawConfidence?.close()
-        fullDepth?.close()
+        closeDepthImages(rawDepth, rawConfidence) {
+            val timing = fullDepthTimingCapture
+            if (timing == null) fullDepth?.close() else timing.close { fullDepth?.close() }
+        }
     }
 }
 

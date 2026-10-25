@@ -1,0 +1,22 @@
+flowchart TD
+  A["F-D10-033 학습 dataset revision 수동 승인 CLI"]
+  N0["1. manifest strict resolve하고 SHA256를 계산한다."]
+  A --> N0
+  N1["2. members-json이 list인지 검사 후 각 artifact UUID와 split을 DatasetMemberInput으로 변환."]
+  N0 --> N1
+  N2["3. Backend approve_dataset_revision에 expected parent·manifest digest·members·admin·correlation을 전달."]
+  N1 --> N2
+  N3["4. dataset/revision IDs,revision,expires_at를 출력."]
+  N2 --> N3
+  B0{"members-json malformed/UUID invalid"}
+  R0["TrainingDatasetLifecycleError/exit1"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"승인 서비스가 충돌·부적격 판단"}
+  R1["실패 전파; wrapper가 우회하지 않음"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-026"]
+  P -. "코드 분기 기준" .-> A

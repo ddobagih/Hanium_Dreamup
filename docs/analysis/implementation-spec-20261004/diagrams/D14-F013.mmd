@@ -1,0 +1,25 @@
+flowchart TD
+  IN["F-D14-013<br/>다른 관리자 기기 분실 신고"]
+  G["적용 정책<br/>P-D14-008 / P-D14-011"]
+  IN --> G
+  N1["1. 등록 HIGH action 경로 확인→middleware 인증·custod<br/>y·step-up·proof"]
+  G --> N1
+  N2["2. 서비스에서 control NORMAL/caller session 재검사"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 현재 device 대상 차단, 대상의 모든 key/session 조회"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. ACTIVE/PENDING 키 및 미폐기 session 폐기"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 변경 있으면 state_version 증가; 개수·idempotent 감사<br/>와 commit"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>422 admin_current_device_cannot_report_lost <br/>및 DENIED 감사"]
+  N3 -->|"자신의 현재 기기 지정"| B1
+  B2["분기 결과<br/>404 admin_device_not_found"]
+  N3 -->|"key도 session도 없음"| B2
+  B3["분기 결과<br/>idempotent SUCCESS, 상태 버전 유지"]
+  N4 -->|"이미 모두 폐기"| B3
+  N5 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 사용 가능한 별도 session이 없으면 recover<br/>y code emergency 경로를 사용하도록 코드 주석 연결. 자동 복구 없<br/>음."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. key/session durable row는 남기고 revo<br/>ked 상태만 변경."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

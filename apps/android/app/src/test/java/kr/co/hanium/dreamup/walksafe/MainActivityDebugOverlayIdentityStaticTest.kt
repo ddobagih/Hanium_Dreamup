@@ -10,8 +10,9 @@ class MainActivityDebugOverlayIdentityStaticTest {
 
     @Test
     fun bestOutputOverlayBoxCarriesTheTrackIdentity() {
-        val builder = activity.substringAfter("private fun buildDebugOverlayBoxes(")
-            .substringBefore("private fun createFrozenDepthMapper(")
+        val builder = MainActivityRefactorSource.member(
+            File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/frame/ArFrameGeometryFreezer.kt").readText(), "buildDebugOverlayBoxes")
+        assertTrue(MainActivityRefactorSource.property(activity, "framePipelineController").contains("frameSynthesisOwner, frameGeometry, frameRouteEvidence"))
         val bestBox = builder.substringAfter("val bestBox = bestOutput?.let { output ->")
         assertTrue(bestBox.contains("best = true,"))
         assertTrue(bestBox.contains("trackKey = output.trackId,"))

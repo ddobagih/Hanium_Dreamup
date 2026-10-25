@@ -1,0 +1,16 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-008-IDLE" as IDLE
+  state "S-D05-008-IN_FLIGHT" as IN_FLIGHT
+  state "S-D05-008-COOLDOWN" as COOLDOWN
+  state "S-D05-008-THERMAL_HOLD" as THERMAL_HOLD
+  [*] --> IDLE
+  IDLE --> IN_FLIGHT: "due and idle ticket"
+  IN_FLIGHT --> COOLDOWN: "owned completion"
+  COOLDOWN --> IDLE: "nextEligible"
+  IDLE --> THERMAL_HOLD: "thermal true"
+  THERMAL_HOLD --> IN_FLIGHT: "thermal minimum500ms due"
+  THERMAL_HOLD --> IDLE: "thermal false"
+  note right of IDLE
+    F-D05-008 P-D05-008
+  end note

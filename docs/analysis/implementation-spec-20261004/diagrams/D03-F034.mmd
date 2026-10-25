@@ -1,0 +1,15 @@
+flowchart TD
+ A["F-D03-034 위치 문제 / P-D03-034"] --> R{"route가 있고 정상 안내 mode인가"}
+ R -->|"아니오"| X["해당없음 또는 degraded 전용 결과"]
+ R -->|"예"| L{"이미 confirmed deviation latch인가"}
+ L -->|"예"| K["REROUTE 유지 / recheck로 자동재개 안 함"]
+ L -->|"아니오"| P{"불신뢰 위치 또는 ambiguity 또는 첫 확실 offroute인가"}
+ P -->|"아니오"| N["현재 fresh 근거로 일반 update"]
+ P -->|"예"| S["이동안내 suspend / LOCATION_RECHECK token 생성"]
+ S --> U{"현재 token의 사용자 선택인가"}
+ U -->|"stale 또는 30초 만료"| E["질문권한 폐기 / 이탈 latch 자동해제 아님"]
+ U -->|"위치 다시 확인"| A0["센서 재확인 허용 / 새 독립 위치 근거 대기"]
+ U -->|"END_NAVIGATION 선택"| C["LOCATION_RECHECK에서는 선택 거절 / 질문 유지"]
+ A -.->|"별도의 일반 종료 명령"| G["F-D03-017 종료 명령과 pending decision gate 적용"]
+ A0 -->|"fresh valid evidence"| N
+ A0 -->|"근거 계속 부족"| S

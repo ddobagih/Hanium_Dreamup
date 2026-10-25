@@ -1,0 +1,20 @@
+flowchart TD
+  A["F-D10-015 음성 intent 최소화 telemetry payload helper"]
+  N0["1. intent policy를 acoustic 인자 없이 계산한다."]
+  A --> N0
+  N1["2. schema_version,intent,confidence_bucket,action,should_execute,reason,정렬 slot_keys,normalized_length만 payload에 넣는다."]
+  N0 --> N1
+  N2["3. schema endpoint는 raw audio/transcript storage=False 및 필드 목록을 반환한다."]
+  N1 --> N2
+  B0{"실제 STT 응답 생성"}
+  R0["서버는 이 payload helper를 호출하거나 저장하지 않음; schema 제공만 연결"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"음향 execution False 원본이 있는 경우"}
+  R1["helper 입력에는 acoustic 인자가 없어 policy metadata가 실제 STT 실행 gate와 다를 수 있음"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  Z["종료 · 자동 재시도 없음"]
+  N2 --> Z
+  P["적용 정책 · P-D10-013"]
+  P -. "코드 분기 기준" .-> A

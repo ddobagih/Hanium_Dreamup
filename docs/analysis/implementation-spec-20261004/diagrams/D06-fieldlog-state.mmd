@@ -1,0 +1,27 @@
+stateDiagram-v2
+  state "F-D06-025 IDLE" as IDLE
+  state "ACTIVE" as ACTIVE
+  state "COMPLETED" as COMPLETED
+  state "CRYPTO_BLOCKED" as CRYPTO
+  state "RAW_BLOCKED" as RAW
+  state "ACCOUNT_BLOCKED" as ACCOUNT
+  state "PURGE_VERIFIED" as PURGED
+  [*] --> IDLE
+  IDLE --> ACTIVE: DEBUG·명시확인·권한·fence 통과
+  ACTIVE --> ACTIVE: 1초 telemetry·heartbeat
+  ACTIVE --> ACTIVE: close 후 재시작 chain 검증 복원
+  ACTIVE --> COMPLETED: 명시 stop
+  ACTIVE --> COMPLETED: provenance 변경
+  COMPLETED --> ACTIVE: 새 세션 시작
+  ACTIVE --> CRYPTO: chain/AEAD/manifest 실패
+  ACTIVE --> RAW: raw 철회
+  ACTIVE --> ACCOUNT: 계정삭제
+  RAW --> ACCOUNT: 늦은 계정삭제 intent
+  RAW --> PURGED: 공유키·root·fsync·marker 검증
+  ACCOUNT --> PURGED: 검증된 계정 purge
+  CRYPTO --> PURGED: 검증된 purge
+  PURGED --> IDLE: 목적에 맞는 재동의/재가입·fresh key
+  note right of PURGED
+    P-D06-027
+    raw 재동의는 account fence를 낮추지 않음
+  end note

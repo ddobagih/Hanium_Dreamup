@@ -1,0 +1,18 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-022-EMPTY" as EMPTY
+  state "S-D05-022-PREPARING" as PREPARING
+  state "S-D05-022-READY" as READY
+  state "S-D05-022-INFLIGHT" as INFLIGHT
+  state "S-D05-022-CLOSED" as CLOSED
+  [*] --> EMPTY
+  EMPTY --> PREPARING: "free ownedslot"
+  PREPARING --> READY: "valid tensor and source"
+  READY --> INFLIGHT: "claimlatest"
+  INFLIGHT --> EMPTY: "releaseexactlease"
+  READY --> READY: "replaceoldready"
+  EMPTY --> CLOSED: "close"
+  INFLIGHT --> CLOSED: "close stopsnewpublish drainsactive"
+  note right of EMPTY
+    F-D05-022 P-D05-022
+  end note

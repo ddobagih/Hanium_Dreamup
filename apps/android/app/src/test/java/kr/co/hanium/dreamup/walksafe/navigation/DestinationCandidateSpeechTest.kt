@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
+
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -123,17 +125,19 @@ class DestinationCandidateSpeechTest {
 
     @Test fun mainActivityCarriesTheOriginWithTheList() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val search = source.substringAfter("private fun performDestinationSearch(reset: Boolean)")
-            .substringBefore("private fun isDestinationSearchLeaseCurrent(")
+        val search = MainActivityRefactorSource.function(source, "private fun performDestinationSearch(reset: Boolean)")
         assertTrue(search.contains("searchOriginOrNull(lease)"))
         assertTrue(search.contains("if (resetSearch) destinationSearchOrigin = searchOrigin"))
         assertTrue(search.contains("origin = destinationSearchOrigin,"))
-        val shown = source.substringAfter("private fun voiceStateForShownDestinationResultsOrNull()")
-            .substringBefore("private fun noVoiceDestinationCandidatesMessage()")
-        assertTrue(shown.contains("origin = destinationSearchOrigin,"))
-        val clear = source.substringAfter("private fun clearNativeDestinationSearchState()")
-            .substringBefore("private fun cancelNativeDestinationSearchAndReturnHome()")
-        assertTrue(clear.contains("destinationSearchOrigin = null"))
+        val dialog = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/DestinationVoiceDialogController.kt").readText()
+        val shown = MainActivityRefactorSource.member(dialog, "voiceStateForShownDestinationResultsOrNull")
+        assertTrue(shown.contains("origin = search().state.origin,"))
+        val workflow = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/workflow/NativeWorkflowController.kt").readText()
+        val clear = MainActivityRefactorSource.member(workflow, "clearNativeDestinationSearchState")
+        assertTrue(clear.contains("destinations.cancelSearchRequestsAndResetEntry()"))
+        val destinations = MainActivityRefactorSource.composition(source, "nativeWorkflowController")
+        assertTrue(destinations.contains("this@MainActivity.destinationSearchController.resetForSearchEntry()"))
+        assertTrue(MainActivityRefactorSource.member(MainActivityRefactorSource.destination, "resetForSearchEntry").contains("destinationSearchOrigin = null"))
     }
 
     private fun candidate(

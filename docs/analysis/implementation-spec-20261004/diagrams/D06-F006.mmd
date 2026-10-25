@@ -1,0 +1,43 @@
+flowchart TD
+  T["F-D06-006 신고 암호화 대기열 저장·용량 예약·원자 복구"]
+  P["전제: F-D06-001 profile, canonical actor/walk UUID/receipt,<br/>priority와 metadata trigger 일치, privacy fence 없음."]
+  T --> P
+  E1["E-D06-006-01 후보/명시 확인 payload→enqueue→암호화 entry 게시"]
+  E1 --> T
+  E2["E-D06-006-02 게시 후 fsync 불확실→동일 ID 내용 재확인"]
+  E2 --> T
+  A1["1. actor와 trigger/auto_reported로 priority를 검증하고 TTL/용량/중복 후보를<br/>검사한다."]
+  P --> A1
+  A2["2. 고유 report UUID와 길이 접두어 포함 domain-separated SHA-256을 생성한다."]
+  A1 --> A2
+  A3["3. 같은 OS file lock 안에서 자동 중복·fence·실제 encrypted footprint를 다시<br/>검사한다."]
+  A2 --> A3
+  A4["4. AEAD schema2/AAD report ID로 봉인 후 temp fsync→atomic<br/>move→file/dir fsync 한다."]
+  A3 --> A4
+  A5["5. UNCERTAIN은 같은 ID/hash/전체 데이터 재조회가 일치해야 저장 성공으로 취급한다."]
+  A4 --> A5
+  N["정상 종료: QueuedReport 반환."]
+  A5 --> N
+  FX["결과: files/report_queue_v1/reports/*.aead와 fences. 생성<br/>receipt/actor/account generation 보존."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"symlink·특수 파일·예상 밖 폴더·측정불가"}
+    R1["신규 저장 거부, 임의 삭제 없음"]
+    B1 -->|조건 성립| R1
+    B2{"자동 한도 도달"}
+    R2["명시 신고 reserve를 보존하고 자동 저장 거부"]
+    B2 -->|조건 성립| R2
+    B3{"게시 전 실패"}
+    R3["FAILED 반환"]
+    B3 -->|조건 성립| R3
+    B4{"게시 후 sync 실패"}
+    R4["UNCERTAIN→동일 entry 확인"]
+    B4 -->|조건 성립| R4
+  end
+  POL["정책: P-D06-001, P-D06-006"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: null; 부분 게시 시 exact recheck."]
+    X2["복구: 이전 보행/앱의 same actor 항목을 현재 동의로 복구 전송."]
+    X3["정리: TTL/receipt/privacy purge만 제거; 공간 확보를 위한 유효 미전송 삭제 없음."]
+  end

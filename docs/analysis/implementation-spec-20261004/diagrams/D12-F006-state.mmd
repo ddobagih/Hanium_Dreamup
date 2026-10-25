@@ -1,0 +1,14 @@
+stateDiagram-v2
+  state "S-D12-006-FOREGROUND 접근 공개" as F
+  state "S-D12-006-LOCALLY_LOCKED 로컬 잠금" as L
+  state "S-D12-006-AWAITING_DEVICE_CONFIRMATION 기기 확인" as C
+  state "S-D12-006-RESUME_VALIDATING 서버 재검증" as V
+  [*] --> F
+  F --> L: 일반 onStop / generation 증가
+  F --> F: 의도된 SAF 또는 credential 이동
+  L --> C: retained session + 재개 클릭
+  C --> L: 취소 또는 stale generation
+  C --> V: 현재 generation의 기기 확인 성공
+  V --> F: access server 검증 + 원자적 최종 공개
+  V --> L: 서버 오류 또는 generation 변경
+  L --> F: retained session 없음 / 로그인 양식만 새 접근

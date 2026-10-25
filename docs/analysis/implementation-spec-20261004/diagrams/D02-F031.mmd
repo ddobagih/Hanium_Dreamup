@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D02-031 텍스트 없는 출력 진단 집계"]
+  E["진입: SpeechOutputEvent / snapshot/drain"]
+  G{"P-D02-031 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["포화 유지"]
+  G -->|"count Int.MAX_VALUE"| B0
+  B1["추가 key 생략; 기존16 count는 계속"]
+  G -->|"17번째 새로운 errorCode"| B1
+  B2["등록/소유권 폐기 증거; 실제 재생 ACK 아님"]
+  G -->|"REQUESTED/CANCELLED_RISK/CANCELLED_ADVISORY"| B2
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["kind/outcome별 count 포화 증가"]
+    S1["distinct platform errorCode 최대16개"]
+    S2["lastEventAt은 받은 원본 시각 유지"]
+    S3["snapshot은 nonzero만; drain은 현재 aggregate 반환 후 clear"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+  end
+  E -.-> S0
+  N["정상 종료: 현재 owner에 결과 전달."]
+  X["취소·중단: 소유권을 폐기하면 늦은 결과가 새 요청을 변경하지 못한다. / foreground/actor/epoch 변경 시 현재<br/>요청을 폐기한다."]
+  C["정리: drain으로 capture window 집계 clear; state 소유 외 리소스 없음."]
+  R["재시도·복구: 자동 재시도 없음; 새 적법한 이벤트 필요. / 현재 owner와 조건을 다시 확보해야 한다."]
+  S3 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D08-006 OTP 확인·계정 생성 중계"]
+  B["진입: POST /api/accounts"]
+  A --> B
+  P0["1. schema 와 정확 필드를 검사한다."]
+  B --> P0
+  P1["2. terms_of_service/privacy_notice/location_terms 는 true 를 요구한다. raw_original/automatic_reporting/training_reuse 는 독립 bool 로 전달한다."]
+  P0 --> P1
+  P2["3. 서비스 인증으로 Backend /accounts POST 한다."]
+  P1 --> P2
+  P3["4. 201 응답을 최소 account 응답으로 투영한다."]
+  P2 --> P3
+  OK["정상: 계정 생성 결과 반환; 자동 로그인은 이 handler 가 수행하지 않음"]
+  P3 --> OK
+  C0{"암호·OTP·필수 동의 형식 거부"}
+  X0["422"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"Backend 흔한 비밀번호/OTP·가입 판단 거부"}
+  X1["허용 오류만 전달"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"201 payload 계약 위반"}
+  X2["502"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-003, P-D08-005"]
+  A -.-> POLICY

@@ -2,9 +2,26 @@ package kr.co.hanium.dreamup.walksafe.network
 
 import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentSelections
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class AndroidIntegratedConsentAuthenticationStaleTest {
+    @Test
+    fun onlyCurrentConsentGetTreatsNotFoundAsAbsenceBeforeParsing() {
+        LocalHttpTestServer { _, socket -> socket.writeFixedResponse(404, "not-json".toByteArray()) }.use { server ->
+            val session = GatewayFieldSession.verified(server.baseUrl, "fixture-actor", "fixture=session", Long.MAX_VALUE)
+            assertNull(AndroidIntegratedConsentClient().fetchCurrentCall(
+                server.baseUrl, session, INSTALLATION_ID, "b".repeat(64),
+            ).execute())
+            for (save in listOf(false, true)) {
+                val error = assertThrows(IntegratedConsentHttpException::class.java) { consentCall(session, save).execute() }
+                assertEquals(404, error.statusCode)
+                assertEquals("not-json", error.errorBody)
+            }
+        }
+    }
+
     @Test
     fun bootstrapCurrentStaleResponseClearsOnce() = exercise(false, StaleAuthenticationResponseTiming.CURRENT)
 

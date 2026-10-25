@@ -1,0 +1,32 @@
+flowchart TD
+  T["F-D09-015 TMAP 보행 경로 HTTP 요청 / P-D09-015"]
+  N0["인증 및 WalkingRouteRequest 검증"]
+  T --> N0
+  N1["runtime와 appKey 확인"]
+  N0 --> N1
+  N2["TMAP body와 요청 deadline"]
+  N1 --> N2
+  N3["budget 소비와 network POST"]
+  N2 --> N3
+  N4["response 정규화와 schema"]
+  N3 --> N4
+  N5["현재 runtime 성공관측 후 응답"]
+  N4 --> N5
+  Z["정상: 검증된 경로·steps·guide·start/end gap 반환"]
+  N5 --> Z
+  B0["503 processing unavailable/app_key_missing"]
+  N1 -->|"runtime 미시작 또는 appKey 없음"| B0
+  B1["504 tmap_timeout"]
+  N2 -->|"provider timeout"| B1
+  B2["502 고정 public error; provider 원문 비노출"]
+  N3 -->|"network/provider/auth 오류"| B2
+  B3["provider task.cancel 후 CancelledError"]
+  N2 -->|"caller disconnect 먼저 완료"| B3
+  R["복구: 자동 provider retry 없음; 새 요청은 새 budget 소비 / 조건 복구 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  C["취소와 정리: http.disconnect 또는 coroutine취소→work.cancel; finally await/gather / HTTP stream/child/reader 정리 확인까지 runtime lease 유지"]
+  N5 -.-> C

@@ -1,0 +1,29 @@
+flowchart TD
+  IN["F-D14-014<br/>신뢰된 기기 공개키 등록·대기 교체·긴급 교체"]
+  G["적용 정책<br/>P-D14-011"]
+  IN --> G
+  N1["1. CLI는 DB 접속 전에 SPKI와 expected marker 대조"]
+  G --> N1
+  N2["2. recovery fence 및 singleton control 잠금; 복구<br/> 중이면 정확 활성 recovery device만 허용"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 동일 version/key/state/선택적 level은 idempoten<br/>t; 이외 version은 기존 최대보다 커야 함"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 새 version에 hardware security_level 필수"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. NORMAL에서 ACTIVE가 있고 replace=false면 새 PEND<br/>ING, 기존 ACTIVE 유지; 이전 PENDING은 REVOKED"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. 그 외 새 ACTIVE 및 이전 ACTIVE/PENDING 폐기; NORM<br/>AL 긴급 replace이면 해당 device session도 폐기/versio<br/>n 증가/감사"]
+  N5 -->|"계속 가능한 경우"| N6
+  N7["7. commit 후 공개 식별 메타데이터만 출력"]
+  N6 -->|"계속 가능한 경우"| N7
+  B1["분기 결과<br/>등록 거절"]
+  N4 -->|"SOFTWARE/알 수 없는 security level"| B1
+  B2["분기 결과<br/>기존 일치 replay만 허용; 새 row는 level 필수"]
+  N3 -->|"legacy same-version row와 security_level 누락"| B2
+  B3["분기 결과<br/>409 provisioning not allowed"]
+  N2 -->|"복구중 다른 기기·활성복구 다중/없음"| B3
+  N7 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 공개키 이력은 REVOKED 상태로 남음. private k<br/>ey 입력 받지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

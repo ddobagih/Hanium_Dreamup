@@ -10,13 +10,15 @@ class MainActivityDestinationDistanceKindStaticTest {
 
     @Test
     fun theScreenListAndTheConfirmationSayTheDistanceKind() {
-        val list = source.substringAfter("private fun updateDestinationSearchUi()")
-            .substringBefore("private fun updateRouteButtonText()")
-        assertTrue(list.contains("approximateDestinationDistanceKo(result.distanceM, originAccuracyM) +"))
-        assertTrue(list.contains("navigation.destinationDistanceKindKo(result.distanceSource)"))
-        val confirmation = source.substringAfter("private fun nativeDestinationConfirmationMessage(): String {")
-            .substringBefore("private fun selectedDestinationSpeechKo(")
-        assertTrue(confirmation.contains("navigation.destinationDistanceKindKo(destination.distanceSource)"))
-        assertTrue(confirmation.contains("listOfNotNull(destination.name, address, distance, distanceKind, originNotice"))
+        assertTrue(MainActivityRefactorSource.member(source, "updateDestinationSearchUi")
+            .contains("destinationSearchPresenter.renderSearch("))
+        val list = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/DestinationSearchPresenter.kt").readText()
+        assertTrue(list.contains("approximateDestinationDistanceKo(result.distanceM, state.origin?.accuracyM) +"))
+        assertTrue(list.contains("destinationDistanceKindKo(result.distanceSource)"))
+        assertTrue(MainActivityRefactorSource.member(source, "nativeDestinationConfirmationMessage")
+            .contains("NativeGuidanceTextPresentation.destinationConfirmation(pendingUiDestination, { destinationSearchOrigin }, SystemClock::elapsedRealtime)"))
+        val confirmation = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeGuidanceTextPresentation.kt").readText()
+        assertTrue(confirmation.contains("destinationDistanceKindKo(selected.distanceSource)"))
+        assertTrue(confirmation.contains("listOfNotNull(selected.name, address, distance, distanceKind, originNotice"))
     }
 }

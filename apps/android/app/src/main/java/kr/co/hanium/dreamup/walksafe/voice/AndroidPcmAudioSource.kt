@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioRouting
+import android.os.Handler
+import android.os.Looper
 import android.media.AudioRecord
 import android.media.AudioRecordingConfiguration
 import android.media.MediaRecorder
@@ -71,6 +74,8 @@ internal class AndroidPcmAudioSource(
         lateinit var worker: Thread
         @Volatile
         var unwatchSilencing: () -> Unit = {}
+        val routeGuard = VoiceInputRouteGuard()
+        var unwatchRoute: () -> Unit = {}
 
         fun releaseOnce() {
             if (released.compareAndSet(false, true)) {
@@ -140,9 +145,10 @@ internal class AndroidPcmAudioSource(
                     { capture(session) },
                     CAPTURE_THREAD_NAME,
                 )
-                watchSystemSilencing(session)
                 state = State.RUNNING
                 activeSession = session
+                watchInputRoute(session)
+                watchSystemSilencing(session)
                 session.worker.start()
             } catch (failure: Throwable) {
                 activeSession?.running?.set(false)
@@ -183,6 +189,24 @@ internal class AndroidPcmAudioSource(
         }
     }
 
+    private fun rejectChangedRoute(session: CaptureSession): Boolean {
+        if (!session.running.get()) return true
+        if (!session.routeGuard.observe(runCatching { session.record.routedDevice?.id }.getOrNull())) return false
+        if (session.running.compareAndSet(true, false)) onReadError(PCM_INPUT_ROUTE_CHANGED_CODE)
+        return true
+    }
+
+    private fun watchInputRoute(session: CaptureSession) {
+        session.routeGuard.observe(runCatching { session.record.routedDevice?.id }.getOrNull())
+        val callback = AudioRouting.OnRoutingChangedListener {
+            if (session.running.get()) rejectChangedRoute(session)
+        }
+        runCatching {
+            session.record.addOnRoutingChangedListener(callback, Handler(Looper.getMainLooper()))
+            session.unwatchRoute = { runCatching { session.record.removeOnRoutingChangedListener(callback) }; Unit }
+        }
+    }
+
     /** API 29+: the system reports when it silences this client's capture. */
     private fun watchSystemSilencing(session: CaptureSession) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
@@ -214,7 +238,7 @@ internal class AndroidPcmAudioSource(
                     readBuffer.size,
                     AudioRecord.READ_BLOCKING,
                 )
-                if (!session.running.get()) break
+                if (!session.running.get() || rejectChangedRoute(session)) break
                 if (read > 0) {
                     onPcm16(readBuffer.copyOf(read))
                 } else if (read < 0) {
@@ -230,6 +254,7 @@ internal class AndroidPcmAudioSource(
             }
         } finally {
             try {
+                session.unwatchRoute()
                 session.unwatchSilencing()
                 runCatching { session.record.stop() }
                 session.releaseOnce()

@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D08-002 공개 경로 allowlist·메서드·query 분기"]
+  B["진입: handleGatewayRequest / matchGatewayRoute"]
+  A --> B
+  P0["1. 경로 정규식으로 template 와 route policy 를 결정한다."]
+  B --> P0
+  P1["2. privacy/rights 의 control=integrated-consent-bootstrap, integrated-consent, account-deletion 을 별도 match 로 분기한다."]
+  P0 --> P1
+  P2["3. 지원 메서드 외 요청은 경로별 concealed 정책 및 Allow 계약으로 거부한다."]
+  P1 --> P2
+  P3["4. 개별 handler 의 query·body·auth policy 를 적용한다."]
+  P2 --> P3
+  P4["5. 등록 밖 경로는 404 이며 Web/admin fallback 을 호출하지 않는다."]
+  P3 --> P4
+  OK["정상: 등록된 Android handler 로만 전달"]
+  P4 --> OK
+  C0{"control=account-deletion"}
+  X0["retired 경로 410; recovery scope 의 제한도 별도 적용"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"올바르지 않은 raw index 또는 UUID"}
+  X1["등록 경로가 아니므로 404"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"등록 경로의 지원하지 않는 method"}
+  X2["정책에 따라 405 Allow 또는 concealed 404"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-002, P-D08-003"]
+  A -.-> POLICY

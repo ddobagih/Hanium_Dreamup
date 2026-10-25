@@ -1,0 +1,13 @@
+flowchart LR
+  A["D01 Android 계정 음성 보행 신고 동의 삭제"] --> P["D08 proxy 및 route allowlist"]
+  P --> S["D08 세션 Backend binding privacy lease"]
+  S --> R["D08 제한된 relay와 요청 assertion"]
+  R --> B["D09 Backend 권위 계정 동의 원본 신고 삭제"]
+  R --> V["Voice STT TTS loopback 전용 인증"]
+  S --> L["D08 암호화 ledger 및 보행 fencing"]
+  S --> O["D08 삭제 fence와 outbox worker"]
+  O --> B
+  B --> M["D06 관리자 권리 처리 및 capacity"]
+  X["운영자 오프라인 inspect migrate rotate resume"] --> L
+  X --> O
+  W["D11 apps web legacy"] -. "제품 fallback 연결 없음" .-> P

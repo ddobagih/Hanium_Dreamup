@@ -1,0 +1,17 @@
+flowchart TD
+  META["F-D16-012 · P-D16-012"]
+  META --> A
+  A["trace·ParsedPpk 평가"] --> B{"기간≥30s·위치≥2·정렬/Q/fixedCount 일치"}
+  B -->|"아니오"| X["TRUTH_INSUFFICIENT·metrics 없음"]
+  B -->|"예"| C["1초 inclusive grid"]
+  C --> D["정확 Q1 또는 양끝Q1·gap≤1500ms 보간"]
+  D --> E{"eligible≥30·coverage≥0.90"}
+  E -->|"아니오"| X
+  E -->|"예"| F["채널별 최신 과거 표본·age≤2000ms"]
+  F --> G["명시적 unmatched 재평가는 이전 match 무효화"]
+  G --> H{"채널 표본≥20"}
+  H -->|"아니오"| I["통계 null·count/coverage/availability 유지"]
+  H -->|"예"| J["haversine·nearest-rank P50/P95·RMSE·max"]
+  J --> K["2m이내 비율·availability 분모는 eligible truth 전체"]
+  I --> L["평가 결과·참조 비독립성 표시"]
+  K --> L

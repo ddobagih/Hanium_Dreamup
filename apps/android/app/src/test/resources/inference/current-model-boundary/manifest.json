@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "model_sha256": "d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57",
+  "config_sha256": "2d75fe233d7a321347575673172495635045dcad88b54f3c3f6e2d6ce166489e",
+  "source_model_sha256": "6f8ae9d2bb82f91e4391e42957a1b374bd4b14efa4702a86f7283454bc38cee0",
+  "input_shape": [
+    1,
+    768,
+    768,
+    3
+  ],
+  "output_shape": [
+    1,
+    25,
+    12096
+  ],
+  "tensor_encoding": "FLOAT32_LITTLE_ENDIAN",
+  "runtime": {
+    "tensorflow": "2.19.1",
+    "opencv": "4.13.0",
+    "delegate": "host_cpu_default_XNNPACK",
+    "threads": 2
+  },
+  "preprocessing": "OpenCV JPEG decode to RGB uint8, INTER_LINEAR, round-to-even resize and integer pad114, float32 /255",
+  "near_threshold_window": 0.02,
+  "android_runtime_verified": false,
+  "rows": [
+    {
+      "fixture_id": "coco_785",
+      "source_asset": "runtime-calibration/images/000000000785.jpg",
+      "source_sha256": "83981537a7baeafbeb9c8cb67b3484dc26433f574b3685d021fa537e277e4726",
+      "source_dimensions": [
+        640,
+        425
+      ],
+      "source": {
+        "dataset": "COCO val2017",
+        "image_id": 785,
+        "coco_url": "http://images.cocodataset.org/val2017/000000000785.jpg",
+        "flickr_original_jpeg_url": "http://farm8.staticflickr.com/7015/6795644157_f019453ae7_z.jpg",
+        "photo_page": "https://www.flickr.com/photos/nickwebb/6795644157/",
+        "title": "Han",
+        "creator": "Nick Webb",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0/",
+        "modifications": "COCO val2017 provided JPEG reused without any additional transformation",
+        "attribution_verified_date": "2026-09-08",
+        "attribution_verification": "Official Flickr page HTTP 200; ImageObject author/creator/license, og:title and photoModel.license=4 checked."
+      },
+      "rgb_file": "coco_785.rgb.gz",
+      "rgb_sha256": "1433c58c81eabef72c45eb03229268a3499551feefe591b03ccba900cd44c59b",
+      "input_sha256": "bde11a10dbd701e2172de8c9b5b858cddfc3a0d58c5e5c01952ff879442dd832",
+      "raw_file": "coco_785.raw-f32le.gz",
+      "raw_sha256": "31b5b3744896785822858a8341268fd91ec2ac52bf4acf10940c18b533995f4c",
+      "near_count": 0,
+      "examples": []
+    },
+    {
+      "fixture_id": "coco_885",
+      "source_asset": "runtime-calibration/images/000000000885.jpg",
+      "source_sha256": "1c67b783f78b18ddb5dd20aaba4d4aacaf98e5277051688a96da096afa9cdf1f",
+      "source_dimensions": [
+        640,
+        427
+      ],
+      "source": {
+        "dataset": "COCO val2017",
+        "image_id": 885,
+        "coco_url": "http://images.cocodataset.org/val2017/000000000885.jpg",
+        "flickr_original_jpeg_url": "http://farm4.staticflickr.com/3715/9639200419_ee41490b2a_z.jpg",
+        "photo_page": "https://www.flickr.com/photos/rhythmstrip/9639200419/",
+        "title": "US Open 2013",
+        "creator": "Edwin Martinez",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0/",
+        "modifications": "COCO val2017 provided JPEG reused without any additional transformation",
+        "attribution_verified_date": "2026-09-08",
+        "attribution_verification": "Official Flickr page HTTP 200; ImageObject author/creator/license, og:title and photoModel.license=4 checked."
+      },
+      "rgb_file": "coco_885.rgb.gz",
+      "rgb_sha256": "ec2bc2c057436629cd7f9d9f604d1a3977f53a2303f8a926ed6b874c69866e9a",
+      "input_sha256": "4c97d6b76418e636a0dec74700122ec74316788436ab76cc4f445e488b8abbf7",
+      "raw_file": "coco_885.raw-f32le.gz",
+      "raw_sha256": "18d55c17dfbc51a2ba106a09acf5b462803f73e8d06735e1c933c0f5dd116a95",
+      "near_count": 3,
+      "examples": [
+        {
+          "anchor": 11782,
+          "class_id": 10,
+          "class_name": "moving_e_scooter",
+          "score": 0.15374556183815002,
+          "threshold": 0.15000000596046448,
+          "box_xywh_normalized": [
+            0.9299812316894531,
+            0.20749403536319733,
+            0.07016605138778687,
+            0.34940752387046814
+          ]
+        },
+        {
+          "anchor": 11917,
+          "class_id": 10,
+          "class_name": "moving_e_scooter",
+          "score": 0.1450473666191101,
+          "threshold": 0.15000000596046448,
+          "box_xywh_normalized": [
+            0.4391724467277527,
+            0.40045058727264404,
+            0.30946406722068787,
+            0.38609063625335693
+          ]
+        },
+        {
+          "anchor": 11807,
+          "class_id": 10,
+          "class_name": "moving_e_scooter",
+          "score": 0.1566007435321808,
+          "threshold": 0.15000000596046448,
+          "box_xywh_normalized": [
+            0.93074631690979,
+            0.2076592594385147,
+            0.06963205337524414,
+            0.35002169013023376
+          ]
+        }
+      ]
+    },
+    {
+      "fixture_id": "coco_11149",
+      "source_asset": "runtime-calibration/images/000000011149.jpg",
+      "source_sha256": "5973b8f1d5a30de98b1dcb715f1c94928a676fff8e45283515d0474e51ac0abc",
+      "source_dimensions": [
+        500,
+        375
+      ],
+      "source": {
+        "dataset": "COCO val2017",
+        "image_id": 11149,
+        "coco_url": "http://images.cocodataset.org/val2017/000000011149.jpg",
+        "flickr_original_jpeg_url": "http://farm4.staticflickr.com/3625/3323418866_ea5017538d_z.jpg",
+        "photo_page": "https://www.flickr.com/photos/ubrayj02/3323418866/",
+        "title": "Some chucklehead riding his god damned motorcycle on the LA River bike path",
+        "creator": "Umberto Brayj",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0/",
+        "modifications": "COCO val2017 provided JPEG reused without any additional transformation",
+        "attribution_verified_date": "2026-09-08",
+        "attribution_verification": "Official Flickr page HTTP 200; ImageObject author/creator/license, og:title and photoModel.license=4 checked."
+      },
+      "rgb_file": "coco_11149.rgb.gz",
+      "rgb_sha256": "469680a21e22aa7498cf9386ab18fe7083b854235e4ab55345212373bf498c83",
+      "input_sha256": "0917b69fc61c4a99d5b10a2b2d7761461f017744f7896246bf6cb703ba1fe317",
+      "raw_file": "coco_11149.raw-f32le.gz",
+      "raw_sha256": "481e273a2786853d9d9113fd37e13f0413be7062e8dd1d277b83f0fb7f09edcb",
+      "near_count": 3,
+      "examples": [
+        {
+          "anchor": 11773,
+          "class_id": 8,
+          "class_name": "bicycle",
+          "score": 0.13678935170173645,
+          "threshold": 0.15000000596046448,
+          "box_xywh_normalized": [
+            0.3844677209854126,
+            0.312899649143219,
+            0.36940860748291016,
+            0.262939989566803
+          ]
+        },
+        {
+          "anchor": 11802,
+          "class_id": 8,
+          "class_name": "bicycle",
+          "score": 0.1653331071138382,
+          "threshold": 0.15000000596046448,
+          "box_xywh_normalized": [
+            0.6156041026115417,
+            0.31793147325515747,
+            0.22626888751983643,
+            0.35776346921920776
+          ]
+        },
+        {
+          "anchor": 9601,
+          "class_id": 5,
+          "class_name": "bus",
+          "score": 0.13065436482429504,
+          "threshold": 0.15000000596046448,
+          "box_xywh_normalized": [
+            2.2329390048980713e-05,
+            0.1317136585712433,
+            0.09527762979269028,
+            0.15573471784591675
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "Measured host-model boundary selection and production-code replay; not Android delegate equivalence or accuracy evaluation"
+}

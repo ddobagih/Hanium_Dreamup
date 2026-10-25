@@ -1,0 +1,18 @@
+stateDiagram-v2
+    state "S-D07-028-WAITING" as W
+    state "S-D07-028-QUALIFYING" as Q
+    state "S-D07-028-ACCEPTED" as A
+    state "S-D07-028-REJECTED" as R
+    state "S-D07-028-RETIRED" as X
+    [*] --> W
+    W --> Q: explicit measured registration
+    Q --> A: provenance 오차 bounds 정규화 모두 유효
+    Q --> R: 누락 또는 invalid registration
+    A --> A: exact capture own cell point clearance
+    A --> X: owner reference 변경 또는 capture 교체
+    X --> W: 새 측정 등록 필요
+    note right of A
+        P-D07-028
+        Main 연결 없음
+        한 점 간격은 충돌 확정이 아님
+    end note

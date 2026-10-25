@@ -1,0 +1,22 @@
+stateDiagram-v2
+  state "S-D15-043-01 · 계획" as PLAN
+  state "S-D15-043-02 · DRY_RUN 또는 NO_ACTION" as NOOP
+  state "S-D15-043-03 · target transaction 시작" as BEGUN
+  state "S-D15-043-04 · commit 시도" as ATTEMPT
+  state "S-D15-043-05 · APPLIED" as APPLIED
+  state "S-D15-043-06 · REPLAYED" as REPLAYED
+  state "S-D15-043-07 · 차단 또는 복구 필요" as BLOCKED
+  [*] --> PLAN
+  PLAN --> NOOP: dry_run 또는 actions 없음
+  PLAN --> REPLAYED: exact receipt 이미 존재
+  PLAN --> BEGUN: 확인문자·source fence 검증
+  BEGUN --> ATTEMPT: 모든 action와 receipt 생성
+  BEGUN --> BLOCKED: precommit 실패 및 rollback
+  ATTEMPT --> APPLIED: commit와 fence 재검사 성공
+  ATTEMPT --> REPLAYED: 응답 유실 뒤 exact receipt 확인
+  ATTEMPT --> BLOCKED: receipt 모호 또는 semantic postcommit 오류
+  note right of BLOCKED
+    P-D15-043
+    semantic postcommit 오류를 replay 성공으로 덮지 않음
+    게시 허용은 F-D15-045의 별도 판정
+  end note

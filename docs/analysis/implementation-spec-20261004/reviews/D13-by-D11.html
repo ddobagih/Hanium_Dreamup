@@ -1,0 +1,151 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D13 독립 검토 — D11 담당 ops_support</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="../index.html">WalkSafe 기능과 처리 명세</a> · <a href="../02-features.html">기능</a> · <a href="../03-policies.html">정책</a> · <a href="../05-scenarios.html">시나리오</a> · <a href="../gallery.html">그림 모음</a> · <a href="../08-review.html">검수</a></header><main><h1>D13 독립 검토 — D11 담당 ops_support</h1>
+<ul>
+<li>대상 작성자 <code>backend_accounts_raw</code>와 다른 인스턴스의 검토다. 작성자는 검토 가능/수정 종료 및 최초 SHA를 메시지로 확인했다.</li>
+<li>대상: <code>domains/D13.json</code>, 선택한 8기능의 Mermaid 및 연결 상태/시퀀스. 원본 산출물 수정 없이 이 보고서만 작성했다.</li>
+<li>소스: <code>/tmp/walksafe-spec-20261004-source</code>, 2026-10-04T10:33:40+09:00, <code>2e5744725a8c033a1817f3cc8a8ec679bc15ac9d</code> + 당시 WIP.</li>
+<li>최초 JSON SHA256: <code>0ab05b4b1e92edf20303943bdf50e26d654566596e3ac958af813f717b6f166a</code>.</li>
+<li>범위: F/P-D13-010,012,017,018,026,028,039,042. JSON 본문/정책과 지정 함수 본문, 선택 testcase 본문을 정적으로 비교했다. 제품 실행·DB mutation·pytest·빌드·서비스·기기 동작은 수행하지 않았다.</li>
+<li>최종 판정: 선택한 8기능의 핵심 정책을 대조했고 발견5항목은 작성자 수정 후 영향부분 재확인으로 해결했다. 선택범위의 남은 수정 요청은 없다. D13 전수 정확성 또는 실행 성공을 보증하지 않는다.</li>
+</ul>
+<h2>발견사항</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>분류/영향</th>
+<th>기능·정책·도식</th>
+<th>근거와 수정 요청</th>
+<th>최종 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RV-D13-D11-01</td>
+<td>문서 오류 / 중간</td>
+<td>F/P010·012·026 및 D13-F010/F012/F026.mmd</td>
+<td>이미 존재하는 요청/chunk의 정확 재생은 반환 후 종료한다. 최초 그림은 F010 N2→N3, F012 N1→N2, F026 N2→N3으로 새 mutation 경로까지 직렬 연결한다. <code>privacy_lifecycle.py:3085-3123,1568-1598</code>, <code>raw_collection_storage.py:2810-2833</code>의 return과 신규 분기를 분리해야 한다.</td>
+<td>작성자 수정 후 해결 확인</td>
+</tr>
+<tr>
+<td>RV-D13-D11-02</td>
+<td>문서 오류 / 중간</td>
+<td>F/P028, D13-F028.mmd</td>
+<td>기존 terminal receipt는 재생 반환한다. 신규 commit은 <code>lifecycle_version == 1</code>이면 180일 COMMITTED, 그 외 14일 QUARANTINED로 상호 배타적이다. 최초 그림은 replay→신규 처리와 v2→v1을 연속 연결한다. <code>raw_collection_storage.py:3062-3155</code>의 return/if-else로 고쳐야 한다.</td>
+<td>작성자 수정 후 해결 확인</td>
+</tr>
+<tr>
+<td>RV-D13-D11-03</td>
+<td>문서 오류 / 중간</td>
+<td>F/P018, D13-F018.mmd</td>
+<td><code>external_copy_count</code> None/0/&gt;0은 각각 legacy N/A, 현재 N/A, EXTERNAL_PENDING이다. 최초 N2→N3은 대기를 곧바로 N/A로 바꾸는 듯하다. <code>privacy_lifecycle.py:2692-2722</code>의 세 분기를 그려야 한다.</td>
+<td>작성자 수정 후 해결 확인</td>
+</tr>
+<tr>
+<td>RV-D13-D11-04</td>
+<td>문서 누락 / 중간</td>
+<td>F/P042, D13-F042.mmd</td>
+<td><code>main</code>은 preview/apply 분기 전에 <code>reconcile</code>을 호출하므로 preview도 기존 recovery 파일 삭제/복원을 수행할 수 있다. 최초 기능은 apply 상세만 기술하고 CLI의 preview 입력/종료·부작용을 누락했다. <code>manage_training_artifact_retention.py:165-187,251-281</code>를 근거로 이 실행 경계를 입력·효과·도식에 추가해야 한다.</td>
+<td>작성자 수정 후 해결 확인</td>
+</tr>
+<tr>
+<td>RV-D13-D11-05</td>
+<td>문서 오류 / 낮음</td>
+<td>F018/F028 async_context</td>
+<td>F018은 <code>_finish_committed_journal</code>이 호출하는 동기 CLI 내부 서비스이며 HTTP route로 확인되지 않았다(<code>account_deletion_worker.py:2171-2261</code>). F028은 async HTTP handler가 <code>await to_thread.run_sync</code>로 동기 storage를 호출한다(<code>api/raw_collections.py:746-828</code>). 두 곳의 공통 “FastAPI 동기 handler” 문구를 실제 맥락으로 바꿔야 한다.</td>
+<td>작성자 수정 후 해결 확인</td>
+</tr>
+</tbody></table>
+<ul>
+<li>위 발견은 문서 오류/누락이다. 재현된 제품 결함을 주장하지 않는다.</li>
+<li>source consent 조회에 subject fence가 없는 training 승인 경쟁은 D13 기존 이슈/본문 한계가 이미 밝힌 내용이며 이번에 신규 결함으로 중복 등록하지 않는다.</li>
+<li>D11에서 별도로 발견·수정한 preview와 subcommand 도식 오류를 D13에도 동일하게 적용한 것이며, 작성자 소유 JSON/Mermaid를 검토자가 고치지 않았다.</li>
+</ul>
+<h2>핵심 기능별 확인</h2>
+<h3>F-D13-010 / P-D13-010 동의 변경</h3>
+<ul>
+<li>현재 정책/항목 버전, 후보 subject 배타 잠금, 설치 HMAC, tombstone 검사, 기존 request receipt와 직전 receipt 결속, 계정 최신 receipt CAS와 설치 revision 연속성, 단일 append/commit을 확인했다.</li>
+<li>HTTP handler가 created를 201, 정확 재생을 200으로 반환하며 no-store를 설정한다. 철회 즉시 파일 삭제나 worker 예약 호출은 함수에 없다.</li>
+<li>본문은 일치. 최초 Mermaid의 RV-01은 수정본에서 해결 확인했다.</li>
+<li>판독: <code>backend/app/services/privacy_lifecycle.py:3030-3196</code>; <code>backend/app/api/privacy.py:194-246</code>. helper인 HMAC 키 회전·resolve 내부 전체는 이번에 재감사하지 않았다.</li>
+</ul>
+<h3>F-D13-012 / P-D13-012 삭제 수락</h3>
+<ul>
+<li>request advisory lock과 subject fence, 정확 재생 body/revision/capability 확인, linked credential이 DISABLED인지 재확인, 최초 client_revision1과 tombstone 거부를 확인했다.</li>
+<li>frozen installation targets, 계정만 있고 설치가 없을 때 device N/A, DB clock accepted_at, credential DISABLED/auth_epoch+1, tombstone/요청/9항목/접수 이벤트 단일 commit이 코드에 있다.</li>
+<li>상한 9007199254740991과 due24시간/7일/30일/35일, 전체 상태 집계의 terminal→LEGAL_HOLD→FAILED→RETRY_WAIT→PARTIAL→PROCESSING 우선순위를 대조했다.</li>
+<li>수락 API는 tombstone header를 금지하고 새202/재생200을 반환한다. 별도 사용자 확인 UI나 intent HTTP 단계가 이 내부 API에 구현됐다고 쓰지 않은 점은 맞다. 기기·학습·기관·backup 완료는 별도다.</li>
+<li>본문은 일치. 최초 Mermaid의 RV-01은 수정본에서 해결 확인했다.</li>
+<li>판독: <code>privacy_lifecycle.py:48-105,1345-1392,1534-1771</code>; <code>api/privacy.py:260-313</code>.</li>
+<li>시험 근거: <code>backend/tests/test_privacy_lifecycle.py:test_exact_inventory_states_and_slas</code>의 읽은 부분(58-89)은 9항목/state 집합 assertion이다. 나머지 fixture와 testcase 및 SLA assertion 후반은 이번 검토에서 읽지 않았고 실행하지 않았다.</li>
+</ul>
+<h3>F-D13-017 / P-D13-017 서버 삭제 worker</h3>
+<ul>
+<li>HTTP 작업이 아니라 전용 DB role/동일 filesystem/maintenance lock을 요구하는 one-shot이다. run_once는 모든 기존 journal을 먼저 reconcile한 뒤 bounded pending batch를 처리하고 한 요청 예외는 전파한다. 내부 무한 retry는 없다.</li>
+<li>process_request가 request identity를 재확인하고 subject/storage/capacity lock 및 RAW pending write를 확인한다. PREPARED journal→파일 quarantine→DB row 삭제→외부사본수 재조회와 inventory0→DB commit→후처리 순서를 확인했다.</li>
+<li>commit_attempted 이전 실패는 파일을 원복한다. commit acknowledgement가 모호하면 임의 원복하지 않고 다음 reconcile에 맡긴다. journal PREPARED이면서 실제 row count가 기대치와 같을 때만 RESTORED, 전부0이면 후처리를 계속하고 부분 삭제/불일치는 거부한다.</li>
+<li>후처리에는 객체 삭제 후 DB0/tombstone1/item9/보존 signup receipt/동의 대상 검증, create-only manifest, 서버상태 반영, quarantine/journal 정리가 있다. manifest 생성이 전체 계정 삭제 완료를 뜻하지 않는 설명은 맞다.</li>
+<li>본문/선택 도식 핵심 흐름 일치. timeout 일반문구는 전역 job timeout 부재로 좁게 해석하며, 본문에 기록된 lock1..300초를 없애지 않는다. 실제 systemd15분/stop30초 배치는 D11 연결 범위다.</li>
+<li>판독: <code>scripts/account_deletion_worker.py:2171-2263,2264-2489,2515-2578</code>; <code>privacy_lifecycle.py:2725-2885</code>. 파일 검증/권위/SQL inventory helper 전체는 독립 재감사하지 않았다.</li>
+</ul>
+<h3>F-D13-018 / P-D13-018 기관 사본 미완료</h3>
+<ul>
+<li><code>package_id</code> 또는 unpackaged event ID 단위 distinct count이며 마지막 delivery 상태와 무관하게 외부 사본으로 집계한다. 내부 원본 삭제는 외부 기관 삭제를 증명하지 않는다.</li>
+<li>count None/0/&gt;0 구분, terminal일 때만 evidence와 terminal_at 기록, 이미 terminal 상태의 exact manifest replay 검사, account item의 별도 상태체계를 확인했다. D15의 신고 외부사본 event와 자동 연결됐다고 주장하지 않는다.</li>
+<li>terminal 업데이트 뒤 전체 집계가 PARTIAL을 유지할 수 있다는 설명은 맞다. actor에 기관 담당자가 있어도 이 함수의 실제 직접 호출자는 worker다.</li>
+<li>RV-03/05는 수정본에서 해결 확인했다.</li>
+<li>판독: <code>account_deletion_worker.py:1446-1468,2171-2263</code>; <code>privacy_lifecycle.py:2692-2885</code>.</li>
+</ul>
+<h3>F-D13-026 / P-D13-026 RAW chunk</h3>
+<ul>
+<li>raw flag, FIELD actor와 request-bound proof, exact application/octet-stream, 누적8MiB, 실제 Content-Length/hash 확인 뒤 anyio thread로 guard와 storage를 호출한다. 선언 Content-Length의 ge/le validation과 누적 초과413은 서로 다른 경계다.</li>
+<li>shared maintenance lock과 subject ingest fence/consent chain 재검증 뒤 storage write lock과 collection 행 잠금이 적용된다. manifest/owner/purpose/walk/receipt/index 결속, exact chunk 재생, 완료 candidate의 object digest 검사, key synchronize와 AES envelope journal→file→DBcommit→cache→journal 정리를 확인했다.</li>
+<li>신규 ack201/정확 재생200, 일부 수신 응답 RECEIVING와 전체 DB READY_TO_COMMIT, digest_rejected 영속 표지와 모호한 commit503 설명은 맞다.</li>
+<li>RV-01 도식은 수정본에서 해결 확인했다. HTTP 취소 시 worker thread 내부 atomicity나 실제 filesystem crash recovery 성공은 실행하지 않아 확인하지 않았다.</li>
+<li>판독: <code>api/raw_collections.py:97-225,253-287,617-684</code>; <code>services/raw_collection_ingest.py:180-253</code>; <code>raw_collection_storage.py:2736-2955</code>. 암호 primitive/하위 FD publish/검증 cache 전체는 미검토다.</li>
+</ul>
+<h3>F-D13-028 / P-D13-028 RAW commit</h3>
+<ul>
+<li>commit proof/header/body/path 결속, guarded thread 호출, 수량·bytes inventory 일치, terminal exact replay와 READY_TO_COMMIT 신규 경로, 모든 chunk 복호화 후 object digest 검증을 확인했다.</li>
+<li>현재 lifecycle v2는 whole-second 시각+14일 QUARANTINED, legacy1은 +180일 COMMITTED이며 각각 receipt hash를 DB에 남긴다. 자동 학습승격 호출은 없다.</li>
+<li>RV-02/05는 수정본에서 해결 확인했다. 잘못된 source reference가 Protocol 정의만 가리킨 부분은 실제 async route 행 범위를 추가하면 추적성이 개선된다.</li>
+<li>판독: <code>api/raw_collections.py:758-829</code>; <code>raw_collection_storage.py:3016-3155</code>.</li>
+</ul>
+<h3>F-D13-039 / P-D13-039 dataset revision 승인</h3>
+<ul>
+<li>dataset 단위 advisory transaction lock, latest parent CAS, nonempty/중복/누락/split 검사, source tombstone/current consent/exact receipt, canonical sorted member-set digest, DB whole-second 승인시각+달력3년, APPROVED 생성 및 parent RETIRED event를 같은 commit에 넣는 설명이 일치한다.</li>
+<li>current revision 재조회는 latest revision/expiry/latest APPROVED/members 및 source 현재 동의를 다시 확인한다. source subject fence 부재를 본문에 밝혔으므로 강한 동시성 보장을 잘못 주장하지 않는다.</li>
+<li>parent RETIRED event revision2 고정의 전체 변형 충돌은 문서와 같이 미검증이다. 실제 학습 실행이나 배포가 이 CLI의 결과로 발생하지 않는다.</li>
+<li>판독: <code>backend/app/services/training_dataset_lifecycle.py:55-92,204-401</code>. artifact 등록 서비스 후반·훈련 wrapper 전체는 이번 대상 밖이다.</li>
+</ul>
+<h3>F-D13-042 / P-D13-042 training retention</h3>
+<ul>
+<li>ACCOUNT_DELETED→CONSENT_WITHDRAWN→모든 연결 expiry&lt;=as_of 순서, 빈 expiry 목록의 비삭제, exact receipt가 바뀌면 consent 사유 후보, envelope hash/size, apply FOR UPDATE를 확인했다.</li>
+<li>recovery에 receipt가 있으면 unlink, 없으면 original 부재일 때만 복원하고 모호하면 거부한다. apply는 파일이동→삭제 receipt+row 삭제→commit, finally에서 commit 여부별 복구/정리를 한다.</li>
+<li><code>main</code>의 기본 preview도 reconcile을 먼저 하므로 완전한 읽기 전용 작업이 아니다. RV-04에 따라 작성자가 CLI entrypoint·effects·steps와 모드분기를 추가했고 입력오류는 reconcile 이전 종료함도 최종 그림에서 확인했다.</li>
+<li>판독: <code>scripts/manage_training_artifact_retention.py:82-240,251-294</code>. artifact path helper와 SQL schema trigger 전체는 미검토다.</li>
+</ul>
+<h2>도식과 미검토 경계</h2>
+<ul>
+<li>기능도 8개: <code>D13-F010/F012/F017/F018/F026/F028/F039/F042.mmd</code>를 읽었다. 추가 <code>D13-deletion-states.mmd</code>, <code>D13-deletion-sequence.mmd</code>, <code>D13-raw-sequence.mmd</code>, <code>D13-raw-states.mmd</code>, <code>D13-training-states.mmd</code>는 연결 맥락을 확인했다. Mermaid SVG 렌더/시각 검증은 Root 담당이며 이 리뷰에서 수행하지 않았다.</li>
+<li>위 8개 외 36기능은 전체 검토하지 않았다. OTP/SMTP/키 회전·기기 evidence·RAW manifest/예비검사·법정 hold·운영 RAW retention·model lineage·DB migration 전체·모든 테스트는 미검토다.</li>
+<li>각 함수의 외부 helper/시스템 경계가 실제 배포에서 작동함, 권한이 live DB에 적용됨, 파일 crash 복구가 실제 성공함을 보증하지 않는다.</li>
+</ul>
+<h2>수정본 재확인</h2>
+<ul>
+<li>작성자 수정 종료 확인 후 변경된 JSON F018/F022..028 실행 맥락과 F042 CLI/effects/steps/code_refs를 읽고 이미 판독한 코드와 대조했다. F010/F012/F018/F026/F028/F042 그림을 다시 읽어 replay 반환, count 분기, lifecycle 버전 분기, preview 선행 reconcile을 확인했다.</li>
+<li>F042 1차 수정은 잘못된 apply confirmation이 preview로 갈 수 있는 듯한 조건을 남겼다. 재요청 후 최종 그림은 공통 입력검증 실패→reconcile 이전 exit1, 검증통과→reconcile→apply 여부로 구분한다. 이 수정도 해결 확인했다.</li>
+<li>JSON 중간 전달 SHA <code>cfcdf527311562435627642ce543bbfcd9317c5092dd4e2095984e19852bb76e</code> 뒤 작성자가 coverage CLI 표기를 보완했다. 실제 재검토 bytes는 아래 최종 SHA이며 읽기 전후 동일했다.</li>
+<li>최종 JSON SHA256: <code>d4955e245f869acd4af53e3222edb5743076395c05c8772bddc911cfa180a843</code>.</li>
+<li>작성자가 추가 수정한 다른 기능의 도식은 이번 8기능 검토 범위에 자동 포함하지 않는다. 추가 조기반환 보완의 전수 재검토는 수행하지 않았다.</li>
+</ul>
+<h3>최종 선택 기능도 SHA256</h3>
+<ul>
+<li><code>D13-F010.mmd</code>: <code>f881859d67dfaae165f5dc3eae4a29c9cc6374fe365da76bde8124694f553c96</code>.</li>
+<li><code>D13-F012.mmd</code>: <code>ebd20fb0045f0f90afb06a87289bb15fceb46c4ff968660f295dc50a637f02cb</code>.</li>
+<li><code>D13-F017.mmd</code>: <code>4e378da614585e37fdd27b34e1d97955899ec2345371dfc122a3a695f42be1de</code>.</li>
+<li><code>D13-F018.mmd</code>: <code>8d1595609a8f12d6cfabb90d4720fc87182c700f2d8866c1396ed179c85fbed2</code>.</li>
+<li><code>D13-F026.mmd</code>: <code>a0ea2849a56bb340761a00a6359e37808681c2e8f74061d465986c39ff829bb8</code>.</li>
+<li><code>D13-F028.mmd</code>: <code>953a1e11a493d860f810e28e8a647e2b91f112bb7d868606e842d732dd2a7db7</code>.</li>
+<li><code>D13-F039.mmd</code>: <code>6158b9152b9c96443c7283f43a7702dff92efe29d35263af16ac386e49b2992a</code>.</li>
+<li><code>D13-F042.mmd</code>: <code>2278bf90a767120876e82ad89daef001710abe10b895eec8da01a80d59d67b3a</code>.</li>
+</ul>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

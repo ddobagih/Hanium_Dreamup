@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -186,6 +187,7 @@ class ObjectMotionEstimateTest {
                 fixture.track, last.distanceM, last.source, last.confidence, last.timestampMs,
                 last.cameraPoseEvidence, last.objectPositionInAnchor,
                 depthObservationTimestampNs = last.depthObservationTimestampNs,
+                materialPointId = last.materialPointId,
             )
         }
 
@@ -341,6 +343,7 @@ class ObjectMotionEstimateTest {
         confidenceAt: (Int) -> Float = { 0.9f },
     ): Fixture {
         val tracker = ObjectTracker()
+        val materialPointId = VisualMaterialPointId() // Known physical point of this synthetic trajectory.
         val up = Vec3(0f, 1f, 0f)
         var latest: TrackState? = null
         timestamps.forEachIndexed { index, at ->
@@ -372,6 +375,7 @@ class ObjectMotionEstimateTest {
                 track, depth, sourceAt(index), confidenceAt(index), at, pose,
                 pose?.objectCenterInAnchor(center, depth),
                 depthObservationTimestampNs = 9_000_000_000L + at * 1_000_000L,
+                materialPointId = materialPointId,
             )
             latest = track
         }

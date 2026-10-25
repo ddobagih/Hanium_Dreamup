@@ -12,16 +12,19 @@ import org.junit.Test
  */
 class MainActivityDestinationSearchUnfinishedStateStaticTest {
     private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-    private val search = source.substringAfter("private fun performDestinationSearch(reset: Boolean)")
-        .substringBefore("private fun isDestinationSearchLeaseCurrent(")
-    private val ui = source.substringAfter("private fun updateDestinationSearchUi()")
-        .substringBefore("private fun updateRouteButtonText()")
+    private val search = MainActivityRefactorSource.function(source, "private fun performDestinationSearch(reset: Boolean)")
+    private val ui = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/DestinationSearchPresenter.kt").readText().also {
+        assertTrue(MainActivityRefactorSource.member(source, "updateDestinationSearchUi")
+            .contains("destinationSearchPresenter.renderSearch("))
+        assertTrue(MainActivityRefactorSource.property(source, "destinationSearchPresenter")
+            .contains("= DestinationSearchPresenter()"))
+    }
 
     @Test
     fun theZeroResultTextNeedsAFinishedEmptySearchForThisQuery() {
-        val empty = ui.substringAfter("if (destinationSearchResults.isEmpty())").substringBefore("val density")
-        val searching = empty.indexOf("destinationSearchInFlight -> \"목적지를 검색하고 있습니다.")
-        val unfinished = empty.indexOf("destinationSearchZeroResultQuery != destinationSearchQuery ->")
+        val empty = ui.substringAfter("if (state.results.isEmpty())").substringBefore("val density")
+        val searching = empty.indexOf("state.inFlight -> \"목적지를 검색하고 있습니다.")
+        val unfinished = empty.indexOf("state.zeroResultQuery != state.query ->")
         val zero = empty.indexOf("else -> \"검색 결과가 없습니다. 다른 장소명으로 다시 검색해 주세요.\"")
         assertTrue(searching >= 0 && unfinished > searching && zero > unfinished)
         assertTrue(empty.contains("\"검색이 끝나지 않았습니다. 다시 검색하려면 검색을 누르거나 목적지를 말씀해 주세요.\""))
@@ -32,18 +35,16 @@ class MainActivityDestinationSearchUnfinishedStateStaticTest {
         val reset = search.substringAfter("if (resetSearch) {").substringBefore("val searchLocationLease")
         assertTrue(reset.contains("destinationSearchZeroResultQuery = null"))
         val success = search.substringAfter("destinationSearchResults.addAll(")
-            .substringBefore("updateNavigationStatus(\"navigation=search_results")
+            .substringBefore("actions.navigationStatus(\"navigation=search_results")
         assertTrue(success.contains("destinationSearchZeroResultQuery = if (destinationSearchResults.isEmpty()) query else null"))
-        assertTrue(success.indexOf("destinationSearchZeroResultQuery =") < success.indexOf("updateDestinationSearchUi()"))
+        assertTrue(success.indexOf("destinationSearchZeroResultQuery =") < success.indexOf("actions.render()"))
         // Cancel, failure and a late location answer never mark a zero result.
         assertFalse(search.substringAfter("catch (error: Exception)").substringBefore("finally")
             .contains("destinationSearchZeroResultQuery"))
-        val cancel = source.substringAfter("private fun clearDestinationSearchState(transportWasActive: Boolean) {")
-            .substringBefore("private fun onDestinationSelected(")
+        val cancel = MainActivityRefactorSource.function(source, "private fun clearDestinationSearchState(transportWasActive: Boolean) {")
         assertFalse(cancel.contains("destinationSearchZeroResultQuery"))
-        val location = source.substringAfter("private fun requestDestinationSearchLocation(")
-            .substringBefore("private fun performDestinationSearch(")
+        val location = MainActivityRefactorSource.function(source, "private fun requestDestinationSearchLocation(")
         assertFalse(location.contains("destinationSearchZeroResultQuery"))
-        assertTrue(source.contains("private var destinationSearchZeroResultQuery: String? = null"))
+        assertTrue(MainActivityRefactorSource.destination.contains("private var destinationSearchZeroResultQuery: String? = null"))
     }
 }

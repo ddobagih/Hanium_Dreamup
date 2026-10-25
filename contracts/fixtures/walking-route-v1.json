@@ -74,6 +74,7 @@
           }
         ],
         "road_name": null,
+        "road_type": null,
         "turn_type": 11
       }
     ],

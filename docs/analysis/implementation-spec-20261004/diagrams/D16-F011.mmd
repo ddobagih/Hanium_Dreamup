@@ -1,0 +1,14 @@
+flowchart TD
+  META["F-D16-011 · P-D16-011"]
+  META --> A
+  A["native .pos 파일"] --> B{"64MiB 이하·UTC LLH·줄/행 상한"}
+  B -->|"아니오"| X["output contract 오류"]
+  B -->|"예"| C["strict PpkPosParser"]
+  C --> D{"날짜 [1980-01-06,2027-01-01)
+  Q1..6·ns0..255·좌표/숫자 유한"}
+  D -->|"아니오·Q7 포함"| X
+  D -->|"예"| E["시간계와 날짜별 윤초 변환"]
+  E --> F{"UTC epoch 엄격 증가"}
+  F -->|"중복·역순"| X
+  F -->|"예"| G["ParsedPpk·fixedCount 반환"]
+  S["String parser 호출"] -->|"UTC 또는 GPST 지원"| C

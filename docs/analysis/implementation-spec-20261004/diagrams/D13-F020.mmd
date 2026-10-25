@@ -1,0 +1,24 @@
+flowchart TD
+  A["F-D13-020<br/>삭제 tombstone 서명 원장 내보내기"]
+  P["P-D13-020<br/>원장에는 actor 원문이 아니라 subject HMAC 과<br/>generation/tombstone/receipt 가 들어간다."]
+  A --> P
+  N0["1. 시간/tombstone 순으로 row 를 읽고 HMAC key 지문을 수집한 뒤 DBrollback<br/>한다."]
+  P --> N0
+  N1["2. 각 entry 에 sequence 와 previous_entry_sha256 및<br/>domain-separated SHA256 을 결속한다."]
+  N0 --> N1
+  N2["3. canonical JSON 에 entry_count/head_sha256/key<br/>fingerprint 를 포함한다."]
+  N1 --> N2
+  N3["4. Ed25519 로 domain+원장 bytes 를 서명하고 별도 descriptor 에<br/>key_id/원장 SHA256/signature 를 생성한다."]
+  N2 --> N3
+  Z["원장 bytes 와 signature descriptor bytes 반환. 실제 외부 backup<br/>저장이나 자동 동기화를 수행하지 않는다."]
+  N3 --> Z
+  B0{"entry count >1000000"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["원장생성 거부"]
+  B1{"private key 형식 부적합"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["예외로 종료"]
+  R["재시도: 자동 반복 루프 없음. 호출자가 오류와 현재 상태를 확인 후 재호출.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 별도 취소 진입점 없음."]
+  A -. "취소 API 여부" .-> C

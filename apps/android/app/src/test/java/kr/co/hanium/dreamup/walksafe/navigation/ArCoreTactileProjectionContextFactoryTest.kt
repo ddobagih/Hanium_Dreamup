@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
+import kr.co.hanium.dreamup.walksafe.depth.FrozenImageToTextureCoordinateMapper
 import com.google.ar.core.Camera
 import com.google.ar.core.CameraIntrinsics
 import com.google.ar.core.Frame
@@ -17,12 +18,22 @@ import org.junit.Test
 class ArCoreTactileProjectionContextFactoryTest {
     @Test
     fun compiledMainActivityProjectionBuilderUsesTheTestedArCoreFactory() {
-        val disassembly = disassembleMainActivity()
+        val owner = Class.forName("kr.co.hanium.dreamup.walksafe.runtime.vision.capture.FrameMotionEvidenceComposer", false, MainActivity::class.java.classLoader)
+        val javap = File(System.getProperty("java.home"), "bin/javap")
+        val process = ProcessBuilder(javap.absolutePath, "-classpath",
+            File(owner.protectionDomain.codeSource.location.toURI()).absolutePath,
+            "-p", "-c", "-l", owner.name).redirectErrorStream(true).start()
+        val disassembly = process.inputStream.bufferedReader().readText()
+        assertEquals(disassembly.take(400), 0, process.waitFor())
+        val main = disassembleMainActivity()
+        val constructor = "runtime/vision/capture/FrameMotionEvidenceComposer.\"<init>\":"
+        assertEquals(1, Regex(Regex.escape(constructor)).findAll(main).count())
+        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        val factory = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.composition(source, "frameMotionEvidence")
+        assertTrue(factory.contains("FrameMotionEvidenceComposer({ positioningSessionController }, { routeNavigator },"))
         val builderSignature = "buildTactileProjectionContext(com.google.ar.core.Frame, long);"
         assertTrue(disassembly.contains(builderSignature))
-        val builder = disassembly
-            .substringAfter(builderSignature)
-            .substringBefore("private final void attemptStepCalibration")
+        val builder = compiledMethod(disassembly, "buildTactileProjectionContext")
         val factoryInstance = "Field kr/co/hanium/dreamup/walksafe/navigation/ArCoreTactileProjectionContextFactory.INSTANCE:Lkr/co/hanium/dreamup/walksafe/navigation/ArCoreTactileProjectionContextFactory;"
         val factoryCall = "ArCoreTactileProjectionContextFactory.create:(Lcom/google/ar/core/Frame;JLjava/lang/String;Lkr/co/hanium/dreamup/walksafe/navigation/ActiveRouteProjection;Lkr/co/hanium/dreamup/walksafe/navigation/TrustedLocation;Lkr/co/hanium/dreamup/walksafe/navigation/DeviceEarthOrientation;Ljava/lang/Float;)Lkr/co/hanium/dreamup/walksafe/navigation/TactileProjectionContext;"
         assertTrue(builder.contains(factoryInstance))
@@ -40,123 +51,219 @@ class ArCoreTactileProjectionContextFactoryTest {
 
     @Test
     fun compiledDrawAndDetectionChainPassesSessionFrameIntoFrameEvidence() {
-        val disassembly = disassembleMainActivity()
-        val onDrawFrame = compiledMethod(disassembly, "onDrawFrame")
-        val drawInstructions = bytecodeInstructions(onDrawFrame)
+        fun disassembleOwner(name: String): String {
+            val owner = Class.forName(name, false, MainActivity::class.java.classLoader)
+            val javap = File(System.getProperty("java.home"), "bin/javap")
+            val process = ProcessBuilder(javap.absolutePath, "-classpath",
+                File(owner.protectionDomain.codeSource.location.toURI()).absolutePath,
+                "-p", "-c", "-l", owner.name).redirectErrorStream(true).start()
+            val text = process.inputStream.bufferedReader().readText()
+            assertEquals(text.take(400), 0, process.waitFor())
+            return text
+        }
+        fun assertOperationsWindow(instructions: List<String>, expected: List<String>) {
+            assertTrue("missing original inputs: $expected",
+                instructions.map(::operation).windowed(expected.size).any { it == expected })
+        }
+        val namespace = "kr.co.hanium.dreamup.walksafe.runtime.vision.frame."
+        val main = disassembleMainActivity()
+        val renderer = disassembleOwner(namespace + "ArFrameRenderController")
+        val recognition = disassembleOwner(namespace + "ArFrameRecognitionCapture")
+        val pipeline = disassembleOwner(namespace + "FramePipelineController")
+        val geometry = disassembleOwner(namespace + "ArFrameGeometryFreezer")
+        val submission = disassembleOwner("kr.co.hanium.dreamup.walksafe.runtime.vision.primary.AndroidPrimaryArSubmissionBridge")
+        val motion = disassembleOwner("kr.co.hanium.dreamup.walksafe.runtime.vision.capture.FrameMotionEvidenceComposer")
+        assertTrue(compiledMethod(main, "onDrawFrame").contains("FramePipelineController.draw:()V"))
+        assertTrue(compiledMethod(pipeline, "draw").contains("ArFrameRenderController.draw:"))
+        val drawContinuation = compiledMethod(pipeline, "draw\$lambda\$1")
+        assertTrue(drawContinuation.indexOf("qualify:") < drawContinuation.indexOf("synthesize:"))
+        assertTrue(drawContinuation.contains("ifnonnull"))
+        val draw = compiledMethod(renderer, "draw")
+        val drawInstructions = bytecodeInstructions(draw)
         val sessionUpdate = "com/google/ar/core/Session.update:()Lcom/google/ar/core/Frame;"
-        assertEquals(1, Regex(Regex.escape(sessionUpdate)).findAll(disassembly).count())
-        val frameLoad = localLoad(onDrawFrame, "frame", "a")
-        val providerLoad = localLoad(onDrawFrame, "provider", "a")
-        val timestampLoad = localLoad(onDrawFrame, "timestampMs", "l")
-        val elapsedLoad = localLoad(onDrawFrame, "elapsedRealtimeMs", "l")
-        val snapshotLoad = localLoad(onDrawFrame, "snapshot", "a")
+        assertEquals(1, Regex(Regex.escape(sessionUpdate)).findAll(renderer).count())
+        assertEquals(0, Regex(Regex.escape(sessionUpdate)).findAll(main).count())
+        val frameLoad = localLoad(draw, "frame", "a")
+        val leaseLoad = localLoad(draw, "lease", "a")
+        val elapsedLoad = localLoad(draw, "elapsedMs", "l")
+        val timestampLoad = localLoad(draw, "timestampMs", "l")
+        val originalTimestampLoad = localLoad(draw, "originalFrameTimestampNs", "l")
+        val snapshotLoad = localLoad(draw, "snapshot", "a")
         val displayGeometryCall = "Frame.hasDisplayGeometryChanged:()Z"
         val displayIndex = drawInstructions.indexOfFirst { it.contains(displayGeometryCall) }
         assertTrue(displayIndex > 0)
         assertEquals(frameLoad, operation(drawInstructions[displayIndex - 1]))
-        // Kotlin may copy the try-expression result through temporary locals. Follow those
-        // copies back to Session.update instead of assuming a particular local slot.
         assertLocalOrigin(drawInstructions.take(displayIndex), frameLoad, sessionUpdate)
-        assertTrue(
-            onDrawFrame.substringAfter(sessionUpdate).substringBefore(displayGeometryCall)
-                .contains("isArSessionLeaseCurrent"),
-        )
+        assertTrue(draw.substringAfter(sessionUpdate).substringBefore(displayGeometryCall)
+            .contains("ArFrameRenderSource.leaseIsCurrent:"))
         assertLocalNotReassigned(drawInstructions.drop(displayIndex), frameLoad)
-        assertFrameTimestampReceivers(onDrawFrame, frameLoad)
-        val timestampConversion = drawInstructions.windowed(4).single {
-            it[0].contains(FRAME_TIMESTAMP_CALL) && it[1].contains("long 1000000l")
+        assertFrameTimestampReceivers(draw, frameLoad)
+        val conversion = drawInstructions.windowed(4).single {
+            operation(it[0]) == originalTimestampLoad && it[1].contains("long 1000000l") && opcode(it[2]) == "ldiv"
         }
-        assertEquals(listOf("invokevirtual", "ldc2_w", "ldiv", "lstore"), timestampConversion.map(::opcode))
-        assertEquals(timestampLoad.replaceFirst("load", "store"), operation(timestampConversion.last()))
-        assertLocalNotReassigned(drawInstructions.dropWhile { it != timestampConversion.last() }.drop(1), timestampLoad)
-
-        val depthCall = "ArCoreFrameProvider.acquireDepthSnapshot:(Lcom/google/ar/core/Frame;Z)Lkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;"
-        val depthArguments = bytecodeInstructions(onDrawFrame.substringBefore(depthCall)).takeLast(4)
-        assertTrue(onDrawFrame.contains(depthCall))
-        assertEquals(listOf(providerLoad, frameLoad), depthArguments.take(2).map(::operation))
-        assertTrue(operation(depthArguments[2]).startsWith("iload"))
-        val snapshotStore = bytecodeInstructions(onDrawFrame.substringAfter(depthCall)).first()
-        assertEquals(snapshotLoad.replaceFirst("load", "store"), operation(snapshotStore))
-        assertLocalNotReassigned(drawInstructions.dropWhile { it != snapshotStore }.drop(1), snapshotLoad)
-
-        val gateCall = "updateRuntimeMetricOutputGate:"
-        val duplicateRead = "Field lastRuntimeCameraFrameId:J"
-        assertTrue("duplicate frames must still reach the elapsed-time quality gate", onDrawFrame.contains(duplicateRead))
-        assertTrue(onDrawFrame.indexOf(gateCall) in 0 until onDrawFrame.indexOf(duplicateRead))
-        assertTrue(onDrawFrame.indexOf(duplicateRead) < onDrawFrame.indexOf("captureVisualTrackingFrame:"))
-
-        val scheduleCall = "scheduleDetectionIfDue:(Lkr/co/hanium/dreamup/walksafe/depth/ArCoreFrameProvider;Lcom/google/ar/core/Frame;JJJLkr/co/hanium/dreamup/walksafe/depth/DepthFrameSnapshot;ILkr/co/hanium/dreamup/walksafe/session/WalkRuntimeEpoch;JLkr/co/hanium/dreamup/walksafe/inference/tracking/VisualFrameKey;)V"
-        assertTrue(onDrawFrame.contains(scheduleCall))
-        val scheduleSetup = bytecodeInstructions(
-            onDrawFrame.substringAfter("captureVisualTrackingFrame:").substringBefore(scheduleCall),
-        )
-        assertEquals(localLoad(onDrawFrame, "grayFrame", "a").replaceFirst("load", "store"), operation(scheduleSetup.first()))
-        val unknownCallIndex = scheduleSetup.indexOfLast {
-            it.contains("scheduleUnknownDetectionIfDue:")
+        assertEquals(listOf("lload", "ldc2_w", "ldiv", "lstore"), conversion.map(::opcode))
+        assertEquals(timestampLoad.replaceFirst("load", "store"), operation(conversion.last()))
+        assertLocalNotReassigned(drawInstructions.dropWhile { it != conversion.last() }.drop(1), timestampLoad)
+        val recognitionCall = "ArFrameRecognitionCapture.acquireFrameRecognitionCapture\$app:"
+        assertTrue(draw.contains(recognitionCall))
+        val recognitionArguments = bytecodeInstructions(draw.substringBefore(recognitionCall))
+        val providerIndex = recognitionArguments.indexOfLast { it.contains("FrameArResources.getProvider:") }
+        assertTrue(providerIndex > 0)
+        assertEquals(leaseLoad, operation(recognitionArguments[providerIndex - 1]))
+        assertEquals(frameLoad, operation(recognitionArguments[providerIndex + 1]))
+        val copyLambda = compiledMethod(renderer, "draw\$lambda\$2")
+        assertTrue(copyLambda.contains("ArFrameRecognitionCapture.copyFrameRecognitionInput:"))
+        assertOperationsWindow(bytecodeInstructions(copyLambda), listOf("aload 1", "lload 2", "iload 4", "aload 5"))
+        val acquire = compiledMethod(recognition, "acquireFrameRecognitionCapture\$app")
+        val acquireInstructions = bytecodeInstructions(acquire)
+        val acquiredFrameLoad = localLoad(acquire, "frame", "a")
+        val providerLoad = localLoad(acquire, "provider", "a")
+        assertLocalNotReassigned(acquireInstructions, acquiredFrameLoad)
+        val cameraCall = "ArCoreFrameProvider.acquireRecognitionCameraImageOrNull\$default:"
+        assertEquals(listOf(providerLoad, acquiredFrameLoad),
+            bytecodeInstructions(acquire.substringBefore(cameraCall)).takeLast(6).take(2).map(::operation))
+        val depthCall = "ArCoreFrameProvider.acquireDepthSnapshot\$default:"
+        assertTrue(acquire.contains(depthCall))
+        assertOperationsWindow(bytecodeInstructions(acquire.substringAfter(cameraCall).substringBefore(depthCall)),
+            listOf(providerLoad, acquiredFrameLoad))
+        assertTrue(acquire.contains("RecognitionCameraImage.getTimestampEvidence:"))
+        assertTrue(acquire.contains("AutoCloseableKt.closeFinally:"))
+        assertTrue(draw.contains("FrameRecognitionCapture.getDepthSnapshot:"))
+        val scopeConstructor = "ScopedArFrameCapture.\"<init>\":"
+        assertOperationsWindow(bytecodeInstructions(draw.substringBefore(scopeConstructor)), listOf(
+            frameLoad, leaseLoad, localLoad(draw, "frameGeneration", "i"), localLoad(draw, "epoch", "a"),
+            originalTimestampLoad, timestampLoad, localLoad(draw, "wallClockMs", "l"), elapsedLoad,
+            localLoad(draw, "captured", "a"), snapshotLoad,
+        ))
+        assertTrue(draw.substringAfter(scopeConstructor).contains("Function1.invoke:"))
+        val qualify = compiledMethod(pipeline, "qualify")
+        val nativeLoad = localLoad(qualify, "native", "a")
+        assertLocalOrigin(bytecodeInstructions(qualify), nativeLoad, "ScopedArFrameCapture.getFrame:")
+        val qualifiedInstructions = bytecodeInstructions(qualify)
+        val nativeAssignment = qualifiedInstructions.indexOfFirst {
+            operation(it) == nativeLoad.replaceFirst("load", "store")
         }
-        assertTrue(unknownCallIndex >= 0)
-        val scheduleArguments = scheduleSetup.drop(unknownCallIndex + 1)
-        // The nullable visual key adds branches after the stable capture arguments;
-        // do not count instructions backwards from the invocation.
-        assertEquals(
-            listOf(
-                "aload 0", providerLoad, frameLoad, timestampLoad,
-                localLoad(onDrawFrame, "nowMs", "l"), elapsedLoad, snapshotLoad,
-                localLoad(onDrawFrame, "frameGeneration", "i"),
-                localLoad(onDrawFrame, "walkEpoch", "a"),
-                localLoad(onDrawFrame, "arLease", "a"),
-            ),
-            scheduleArguments.take(10).map(::operation),
-        )
-        assertTrue(scheduleArguments[10].contains("ArSessionLease.getGeneration:()J"))
-        assertEquals(localLoad(onDrawFrame, "grayFrame", "a"), operation(scheduleArguments[11]))
-        assertTrue(scheduleArguments.any { it.contains("GrayTrackingFrame.getKey:") })
-
-        val schedule = compiledMethod(disassembly, "scheduleDetectionIfDue")
-        val scheduledFrameLoad = localLoad(schedule, "frame", "a")
-        val scheduledTimestampLoad = localLoad(schedule, "timestampMs", "l")
-        val scheduledElapsedLoad = localLoad(schedule, "elapsedRealtimeMs", "l")
-        val scheduledDepthLoad = localLoad(schedule, "capturedDepthSnapshot", "a")
-        val cameraImageCall = "ArCoreFrameProvider.acquireCameraImageOrNull:(Lcom/google/ar/core/Frame;)Landroid/media/Image;"
-        assertTrue(schedule.contains(cameraImageCall))
-        assertEquals(
-            listOf(localLoad(schedule, "provider", "a"), scheduledFrameLoad),
-            bytecodeInstructions(schedule.substringBefore(cameraImageCall)).takeLast(3).take(2).map(::operation),
-        )
-        for (load in listOf(scheduledFrameLoad, scheduledTimestampLoad, scheduledElapsedLoad, scheduledDepthLoad)) {
+        assertTrue(nativeAssignment > 0)
+        assertLocalNotReassigned(qualifiedInstructions.drop(nativeAssignment + 1), nativeLoad)
+        assertTrue(qualify.indexOf("FrameRuntimePeer.updateMetricOutput:") < qualify.indexOf("FrameSynthesisController.admitRuntimeFrame:"))
+        assertTrue(qualify.indexOf("FrameSynthesisController.admitRuntimeFrame:") < qualify.indexOf("FrameSynthesisController.captureVisualTrackingFrame:"))
+        val scheduleCall = "FrameDetectionSchedulingPeer.scheduleNamed:"
+        val scheduleArguments = bytecodeInstructions(qualify.substringBefore(scheduleCall))
+        assertTrue(qualify.contains(scheduleCall))
+        val scheduleFrame = scheduleArguments.indexOfLast { operation(it) == nativeLoad }
+        assertTrue(scheduleFrame >= 0)
+        val scheduleTail = scheduleArguments.drop(scheduleFrame + 1)
+        assertTrue(scheduleTail[1].contains("ScopedArFrameCapture.getTimestampMs:"))
+        assertTrue(scheduleTail[3].contains("ScopedArFrameCapture.getWallClockMs:"))
+        assertTrue(scheduleTail[5].contains("ScopedArFrameCapture.getCapturedElapsedMs:"))
+        assertTrue(scheduleTail[7].contains("ScopedArFrameCapture.getSnapshot:"))
+        assertTrue(scheduleTail.any { it.contains("FrameArResources.getGeneration:") })
+        val mainSchedule = compiledMethod(main, "scheduleDetectionIfDue")
+        val borrowedFrame = localLoad(mainSchedule, "frame", "a")
+        val borrowedTimestamp = localLoad(mainSchedule, "timestampMs", "l")
+        val borrowedElapsed = localLoad(mainSchedule, "elapsedRealtimeMs", "l")
+        val borrowedDepth = localLoad(mainSchedule, "capturedDepthSnapshot", "a")
+        assertFalse(mainSchedule.contains(FRAME_TIMESTAMP_CALL))
+        for (load in listOf(borrowedFrame, borrowedTimestamp, borrowedElapsed, borrowedDepth)) {
+            assertLocalNotReassigned(bytecodeInstructions(mainSchedule), load)
+        }
+        val submissionCall = "AndroidPrimaryArSubmissionBridge.schedule:"
+        assertTrue(mainSchedule.contains(submissionCall))
+        assertOperationsWindow(bytecodeInstructions(mainSchedule.substringBefore(submissionCall)), listOf(
+            borrowedFrame, borrowedTimestamp, localLoad(mainSchedule, "capturedAtMs", "l"), borrowedElapsed, borrowedDepth,
+        ))
+        val mainSource = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        val bridgeFactory = kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.property(mainSource, "primaryArSubmissionBridge")
+        assertTrue(bridgeFactory.contains("AndroidPrimaryArSubmissionBridge(frameStateLock, frameCaptureRequested,"))
+        assertTrue(bridgeFactory.contains("frameRouteEvidence, { primaryArDetectorWorker }"))
+        assertTrue(kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource.property(mainSource, "framePipelineController").contains("frameRouteEvidence"))
+        val schedule = compiledMethod(submission, "schedule")
+        val scheduledFrame = localLoad(schedule, "frame", "a")
+        val scheduledTimestamp = localLoad(schedule, "timestampMs", "l")
+        val scheduledElapsed = localLoad(schedule, "elapsedRealtimeMs", "l")
+        val scheduledDepth = localLoad(schedule, "capturedDepthSnapshot", "a")
+        for (load in listOf(scheduledFrame, scheduledTimestamp, scheduledElapsed, scheduledDepth)) {
             assertLocalNotReassigned(bytecodeInstructions(schedule), load)
         }
-        assertFrameTimestampReceivers(schedule, scheduledFrameLoad)
-        // takeIf on visualFrameKey can spill constructor arguments before `new`.
-        // Start after the preceding identity construction, retaining their producers.
+        assertFrameTimestampReceivers(schedule, scheduledFrame)
         val sourceEvidence = schedule.substringAfter("AndroidDetectionSnapshotFrameIdentity.\"<init>\"")
-            .substringBefore("MainActivity\$DetectionFrameEvidence.\"<init>\"")
-        assertEvidenceInputs(
-            sourceEvidence, scheduledFrameLoad, scheduledTimestampLoad,
-            scheduledElapsedLoad, scheduledDepthLoad, allowMissingDepth = false,
-        )
-        val defaultMapper = compiledMethod(disassembly, "createFrozenDepthMapper\$default")
-        val defaultInstructions = bytecodeInstructions(defaultMapper)
-        assertEquals(
-            listOf("iload 8", "bipush 32", "iand"),
-            defaultInstructions.take(3).map(::operation),
-        )
+            .substringBefore("runtime/DetectionFrameEvidence.\"<init>\"")
+        val defaultMapperCall = "createFrozenDepthMapper\$default:"
+        assertTrue(sourceEvidence.contains(defaultMapperCall))
+        val mapperArguments = bytecodeInstructions(sourceEvidence.substringBefore(defaultMapperCall))
+        assertOperationsWindow(mapperArguments, listOf(scheduledFrame, scheduledFrame))
+        assertEquals(listOf(scheduledDepth, "iconst_0", "bipush 32", "aconst_null"),
+            mapperArguments.dropLast(1).takeLast(4).map(::operation))
+        val projectionCall = "FrameRouteEvidencePeer.projectionContext:(Lcom/google/ar/core/Frame;J)Lkr/co/hanium/dreamup/walksafe/navigation/TactileProjectionContext;"
+        assertEquals(1, Regex(Regex.escape(projectionCall)).findAll(sourceEvidence).count())
+        assertEquals(listOf(scheduledFrame, scheduledElapsed),
+            bytecodeInstructions(sourceEvidence.substringBefore(projectionCall)).dropLast(1).takeLast(2).map(::operation))
+        val allDefaultInstructions = bytecodeInstructions(compiledMethod(geometry, "createFrozenDepthMapper\$default"))
+        val defaultMaskStart = allDefaultInstructions.indexOfFirst { operation(it) == "iload 8" }
+        assertTrue(defaultMaskStart >= 0)
+        if (defaultMaskStart > 0) {
+            assertEquals("aload 9", operation(allDefaultInstructions[0]))
+            assertEquals("ifnull", opcode(allDefaultInstructions[1]))
+            assertTrue(allDefaultInstructions[2].contains("UnsupportedOperationException"))
+            assertEquals("athrow", opcode(allDefaultInstructions[defaultMaskStart - 1]))
+        }
+        val defaultInstructions = allDefaultInstructions.drop(defaultMaskStart)
+        assertEquals(listOf("iload 8", "bipush 32", "iand"), defaultInstructions.take(3).map(::operation))
         assertEquals("ifeq", opcode(defaultInstructions[3]))
-        assertEquals(
-            listOf("iconst_0", "istore 7"),
-            defaultInstructions.drop(4).take(2).map(::operation),
-        )
-        assertEquals(
-            listOf("aload 0", "aload 1", "lload 2", "iload 4", "iload 5", "aload 6", "iload 7"),
-            defaultInstructions.drop(6).take(7).map(::operation),
-        )
+        assertEquals(listOf("iconst_0", "istore 7"), defaultInstructions.drop(4).take(2).map(::operation))
+        assertEquals(listOf("aload 0", "aload 1", "lload 2", "iload 4", "iload 5", "aload 6", "iload 7"),
+            defaultInstructions.drop(6).take(7).map(::operation))
         assertTrue(defaultInstructions[13].contains("createFrozenDepthMapper:"))
-        val currentEvidence = onDrawFrame.substringAfter("// class kr/co/hanium/dreamup/walksafe/MainActivity\$DetectionFrameEvidence")
-            .substringBefore("MainActivity\$DetectionFrameEvidence.\"<init>\"")
-        assertEvidenceInputs(
-            currentEvidence, frameLoad, timestampLoad, elapsedLoad, snapshotLoad,
-            allowMissingDepth = true,
-        )
+        val synthesize = compiledMethod(pipeline, "synthesize")
+        val currentFrame = localLoad(synthesize, "native", "a")
+        val currentSource = localLoad(synthesize, "source", "a")
+        assertLocalOrigin(bytecodeInstructions(synthesize), currentFrame, "ScopedArFrameCapture.getFrame:")
+        val synthesizedInstructions = bytecodeInstructions(synthesize)
+        val currentAssignment = synthesizedInstructions.indexOfFirst {
+            operation(it) == currentFrame.replaceFirst("load", "store")
+        }
+        assertTrue(currentAssignment > 0)
+        assertLocalNotReassigned(synthesizedInstructions.drop(currentAssignment + 1), currentFrame)
+        assertFrameTimestampReceivers(synthesize, currentFrame)
+        val currentEvidence = synthesize.substringAfter("// class kr/co/hanium/dreamup/walksafe/runtime/DetectionFrameEvidence")
+            .substringBefore("runtime/DetectionFrameEvidence.\"<init>\"")
+        val currentMapper = "ArFrameGeometryFreezer.createFrozenDepthMapper:"
+        assertTrue(currentEvidence.contains(currentMapper))
+        assertOperationsWindow(bytecodeInstructions(currentEvidence.substringBefore(currentMapper)), listOf(currentFrame, currentFrame))
+        val currentMapperTail = bytecodeInstructions(currentEvidence.substringBefore(currentMapper)).dropLast(1).takeLast(3)
+        assertEquals(currentSource, operation(currentMapperTail[0]))
+        assertTrue(currentMapperTail[1].contains("ScopedArFrameCapture.getSnapshot:"))
+        assertEquals("iconst_1", operation(currentMapperTail[2]))
+        val routeProjection = "FrameRouteEvidencePeer.projectionContext:"
+        assertEquals(1, Regex(Regex.escape(routeProjection)).findAll(currentEvidence).count())
+        val routeArguments = bytecodeInstructions(currentEvidence.substringBefore(routeProjection)).dropLast(1).takeLast(3)
+        assertEquals(listOf(currentFrame, currentSource), routeArguments.take(2).map(::operation))
+        assertTrue(routeArguments.last().contains("ScopedArFrameCapture.getCapturedElapsedMs:"))
+        val bridges = Regex("""Method (kr/co/hanium/dreamup/walksafe/MainActivity\$[^\s.:]+)\."<init>":""")
+            .findAll(main).map { it.groupValues[1].replace('/', '.') }.distinct()
+            .filter { name -> Class.forName(name, false, MainActivity::class.java.classLoader)
+                .interfaces.any { it.name == namespace + "FrameRouteEvidencePeer" } }
+            .toList()
+        assertEquals(1, bridges.size)
+        assertTrue(main.contains(bridges.single().replace('.', '/') + ".\"<init>\":"))
+        val routeBridge = compiledMethod(disassembleOwner(bridges.single()), "projectionContext")
+        val ownedProjection = "FrameMotionEvidenceComposer.buildTactileProjectionContext:"
+        assertTrue(routeBridge.contains("access\$getFrameMotionEvidence:"))
+        assertTrue(routeBridge.contains(ownedProjection))
+        assertEquals(listOf("aload_1", "lload_2"), bytecodeInstructions(routeBridge.substringBefore(ownedProjection)).dropLast(1).takeLast(2).map(::opcode))
+        assertTrue(compiledMethod(motion, "buildTactileProjectionContext").contains("ArCoreTactileProjectionContextFactory.create:"))
+        val geometryCapture = compiledMethod(geometry, "createFrozenDepthMapper")
+        assertTrue(geometryCapture.contains("Frame.transformCoordinates2d:"))
+        assertTrue(geometryCapture.contains("DepthFrameSnapshot.getRawDepth:"))
+        assertTrue(geometryCapture.contains("DepthFrameSnapshot.getFullDepth:"))
+        val geometryInstructions = bytecodeInstructions(geometryCapture)
+        val allowMissing = geometryInstructions.indexOfFirst { operation(it) == "iload 7" }
+        assertTrue(allowMissing >= 0)
+        assertEquals("ifeq", opcode(geometryInstructions[allowMissing + 1]))
+        assertEquals(listOf("iconst_1", "iconst_1"), geometryInstructions.drop(allowMissing + 4).take(2).map(::operation))
+        assertTrue(geometryCapture.contains("Class java/lang/RuntimeException"))
+        assertTrue(geometryCapture.contains("aconst_null"))
+        assertTrue(geometryCapture.contains("FrozenImageToTextureCoordinateMapper.\"<init>\":"))
     }
 
     private fun assertEvidenceInputs(

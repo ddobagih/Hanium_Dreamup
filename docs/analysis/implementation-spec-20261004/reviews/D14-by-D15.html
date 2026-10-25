@@ -1,0 +1,103 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D14 독립 명세 검토 — D15 작성자</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="../index.html">WalkSafe 기능과 처리 명세</a> · <a href="../02-features.html">기능</a> · <a href="../03-policies.html">정책</a> · <a href="../05-scenarios.html">시나리오</a> · <a href="../gallery.html">그림 모음</a> · <a href="../08-review.html">검수</a></header><main><h1>D14 독립 명세 검토 — D15 작성자</h1>
+<p>[판정]</p>
+<ul>
+<li>선택한 핵심 9개 기능의 입력·수치·반환·transaction 경계와 11개 Mermaid 원본을 대조했다. 문서 수정 요청 3건은 작성자의 수정본에서 해결됐음을 재확인했다.</li>
+<li>전체 33개 기능의 전수 정확성을 승인한 검토가 아니다. 알려진 제품 정적 연결 불일치 R-D14-008과 미실행 범위는 유지한다.</li>
+<li>제품 코드·대상 JSON·Mermaid는 직접 수정하지 않았다. 이 검토 파일만 작성했다.</li>
+</ul>
+<p>[기준 버전]</p>
+<ul>
+<li>고정 코드: <code>/tmp/walksafe-spec-20261004-source</code>, 2026-10-04T10:33:40+09:00, base <code>2e5744725a8c033a1817f3cc8a8ec679bc15ac9d</code> 및 WIP snapshot.</li>
+<li>시작 D14 JSON SHA256: <code>afe1b0e4e9423c3e586ae38a437fff340f890fe8ebffc7517820e688fa26c952</code>.</li>
+<li>중간에 작성자가 요청 3건을 수정했다. 영향 범위 F-D14-026·F-D14-033의 JSON·도표를 다시 읽고 실제 코드와 대조했다.</li>
+<li>종료 D14 JSON SHA256: <code>684f009acbd721bb09e28bccf834386b7d1cb400d49153139872b1ff3f4a4d45</code>.</li>
+<li>검토자는 별도 D15 작성자이며 D14 작성자와 다르다. 대상 기능 상태 CONDITIONAL과 운영 설치·기기·외부 보장 분리를 확인했다.</li>
+</ul>
+<p>[대조한 기능·정책]</p>
+<table>
+<thead>
+<tr>
+<th>기능</th>
+<th>정책</th>
+<th>확인 주장과 코드 근거</th>
+<th>판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>F-D14-001 issuer 파일</td>
+<td>P-D14-001</td>
+<td>admin_credential_issuer_key.py:73-189: no-follow 디렉터리/파일, nlink1·정확 mode·owner/GID, 최대44byte, 43자 canonical base64url→32byte, 읽기 전후 identity 검사, finally 역순 FD 정리. admin_security.py:564-586 설정 adapter.</td>
+<td>핵심 입력/실패·정리 일치. 실제 키 파일은 열지 않음.</td>
+</tr>
+<tr>
+<td>F-D14-007 로그인</td>
+<td>P-D14-001/003/004/005/006/008</td>
+<td>admin_security.py:2057-2228: rate limit→control/issuer→runtime factor→password→NORMAL→활성기기 조건→fresh TOTP→rehash/issue→감사·commit. :1957-2055 token hash만 저장·동일 device 기존 session revoke·expires 고정.</td>
+<td>서비스 순서와 replay 한계 일치. LOGIN proof HTTP 전제는 등록/호출 경계 수준만 대조.</td>
+</tr>
+<tr>
+<td>F-D14-008 bearer</td>
+<td>P-D14-001/002/004/006</td>
+<td>admin_security.py:1260-1382: token≤512, client binding, not revoked·expires&gt;now, runtime factor/NORMAL, last_seen 갱신 및 기존 step_up 값 identity 반환.</td>
+<td>만료와 기기 불일치 분리·expires 연장 없음·caller commit 설명 일치.</td>
+</tr>
+<tr>
+<td>F-D14-016 challenge</td>
+<td>P-D14-001/008/012</td>
+<td>admin_device_proof.py:870-1096: exact binding, millisecond issued_at, TTL120000ms, active key marker, source120초4회, purpose pool8, nonce32byte, challenge와 admission의 동일 commit/rollback.</td>
+<td>핵심 quota·TTL·nonce·실패 commit 경계 일치. source admission은 sessionless source가 제공된 경로에 적용.</td>
+</tr>
+<tr>
+<td>F-D14-017 proof 검증</td>
+<td>P-D14-008/012/013</td>
+<td>admin_device_proof.py:1099-1263: canonical UUID/signature, consumed 우선, issued≤now&lt;expires, body/query digest exact, nonce/signing_payload 무결성, 현재 ACTIVE key 재확인, ECDSA, 소비 flush.</td>
+<td>재전송409·만료403·현재키 확인·caller commit 경계 일치. 부작용 실패가 이미 소비된 proof를 되살리지 않는다는 설명 확인.</td>
+</tr>
+<tr>
+<td>F-D14-019 재확인</td>
+<td>P-D14-004/005/008/014</td>
+<td>admin_security.py:3160-3414 중 binding·password/TOTP·발급 분기, :464-500 지원하지 않는 body-bound action/nonce digest. :3303-3318 Python step_up NULL, migration 202608120001:1597-1607 PG step_up NULL.</td>
+<td>nonce16byte와 발급 TTL, 기존 pending 대체, timestamp NULL 및 R8 설명 일치.</td>
+</tr>
+<tr>
+<td>F-D14-020 고위험 소비</td>
+<td>P-D14-007/008/014</td>
+<td>admin_security.py:1412-1550, :1590-1675: custody/NORMAL 선행, bearer, nonce 후보, verified_after≤verified_at≤now 및 expires&gt;now, nonce+SUCCESS 감사 독립 commit 후 기존 identity 반환. 중앙 caller가 max-age 인자를 넘기지 않아 기본300초.</td>
+<td>소비 선행·업무 실패 후 복원 없음·R2/R8 한계 설명 일치. body-bound 우선 순회는 PG 경로이며 nonPG는 후보 SQL IN으로 조회하므로 모든 DB에서 순차 쿼리라는 뜻으로 확장하지 않음.</td>
+</tr>
+<tr>
+<td>F-D14-026 감사</td>
+<td>P-D14-017</td>
+<td>admin_security.py:898-1017·1044-1105: 중첩 민감 key 차단→PG advisory lock→sequence/hash→flush; helper별 commit. failure helper는 alert details를 append 전에 생성.</td>
+<td>아래 C2 수정 후 JSON/도표 일치. 외부 알림·공증과 구분 유지.</td>
+</tr>
+<tr>
+<td>F-D14-033 offline gate</td>
+<td>P-D14-014/022</td>
+<td>scripts/walksafe_admin_high_risk_gate.py:42-203 및 admin_security.py:1678-1785: deployment disabled 차단, local opt-in, nonce commit→recovery fence→protected-work 재인가→yield·caller commit/rollback.</td>
+<td>아래 C1/C3 수정 후 입력 예외·frozen 범위·업무 오류 분리 일치. 자동 운영 실행으로 해석하지 않음.</td>
+</tr>
+</tbody></table>
+<p>[도표 대조]</p>
+<ul>
+<li>실제 읽은 Mermaid 원본: <code>D14-F001.mmd</code>, <code>D14-F007.mmd</code>, <code>D14-F008.mmd</code>, <code>D14-F016.mmd</code>, <code>D14-F017.mmd</code>, <code>D14-proof-state.mmd</code>, <code>D14-F019.mmd</code>, <code>D14-F020.mmd</code>, <code>D14-security-sequence.mmd</code>, <code>D14-F026.mmd</code>, <code>D14-F033.mmd</code>.</li>
+<li><code>D14-proof-state.mmd</code>: 발급/소비/논리만료를 구분하며 만료 행 물리삭제를 주장하지 않는다. consumed 검사는 시간검사보다 우선한다.</li>
+<li><code>D14-security-sequence.mmd</code>: nonce commit→ACTION proof 소비→같은 identity의 route 호출 순서 및 step_up None403 분기가 JSON·교차 source 관찰과 일치한다. 모든 관리자 쓰기가 이 timestamp 검사로 실패한다고 확대하지 않는다.</li>
+<li>수정된 F026 도표는 failure helper의 사전 metadata 구성을 별도 분기로 두며 일반 감사에 alert가 무조건 붙지 않는다. 수정된 F033은 try 이전/try 내부/yield 이후 예외 경계를 나눈다.</li>
+<li>이 리뷰에서 Mermaid parser 또는 시각 렌더를 직접 실행하지 않았다. 작성자의 39개 parse/render 성공 메시지는 별도 수행자의 보고이며 본인의 실행 증거로 사용하지 않았다.</li>
+</ul>
+<p>[발견사항과 수정 확인]</p>
+<ul>
+<li>C1 — 문서 연결 오류, 해결: F033 cleanup/도표의 운영 도구 담당 <code>D16</code>을 <code>D11</code>로 교정하도록 요청했다. 종료 SHA에서 JSON과 F033 도표 모두 D11을 확인했다.</li>
+<li>C2 — 문서 처리 순서 오류, 해결: 기존 F026 도표의 <code>commit→failure helper alert fields</code> 직렬 흐름은 코드와 달랐다. <code>record_admin_security_failure</code>는 details를 <code>_append_admin_security_audit</code>에 먼저 전달한다. 종료 SHA에서 <code>helper 분기→details→검증/hash/flush→caller별 commit</code>으로 교정된 것을 확인했다.</li>
+<li>C3 — 문서 예외 범위 오류, 해결: F033의 모든 진입 전 예외를 frozen으로 변환한다는 문구와 SQL 오류→HTTP503 기본문구가 CLI 계약을 과장했다. 코드의 action/enabled/필수입력 검사는 try 밖 자체 RuntimeError, try 안 mutation scope 진입 전 오류만 frozen, yield 이후 오류는 원예외다. 종료 SHA에서 JSON·도표·failure 계약의 교정을 확인했다.</li>
+<li>P1 — 알려진 제품 정적 연결 불일치, 유지: R-D14-008의 재확인 timestamp NULL→기존 identity 반환→특정 업무 context403은 D15 caller(admin_reports.py:147-172, :776-898; report_user_requests.py:245-285, :1301)와 대조된다. 제품 코드 수정이나 실제 HTTP/PostgreSQL 재현은 이 문서 작업에서 수행하지 않았다.</li>
+</ul>
+<p>[실제 검증과 미검토]</p>
+<ul>
+<li>실제 수행: JSON 읽기·SHA256 계산, 지정 코드와 SQL 조각의 정적 열람, 11개 도표 원문 대조, 수정본의 영향부분 재검토. 비밀키·토큰·실제 사용자 자료 열람 없음.</li>
+<li>제품 시험/빌드/서버/CLI 운영 호출/DB migration/외부기관·기기·HSM 검증은 실행하지 않았다. 테스트 본문이나 과거 DONE 기록을 이번 통과 실적으로 인용하지 않았다.</li>
+<li>미검토: 나머지24개 기능 상세, 복구 transaction/token rotation 전체, 모든 PG security-definer·ACL·trigger DDL, 모든 감사 projection, 전체 네트워크 미들웨어와 Android 기기서명 구현. 선택한 코드의 호출자 전수·동시성 및 보안 독립감사도 이 검토 범위가 아니다.</li>
+<li>Root가 전체 산출물 통합과 완료 판정을 담당한다. 현재 리뷰의 세 문서 수정요청은 해소됐으나 제품 정적 불일치/운영 미검증을 DONE으로 전환하지 않는다.</li>
+</ul>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

@@ -122,6 +122,8 @@ internal class VoskWakePhraseProbe internal constructor(
         },
         listenUntilWake: Boolean = false,
         inputGeneration: () -> Long? = { null },
+        // Endpoint 지연은 연속 청취 여부와 별도로 선택하며 기존 호출은 같은 설정을 유지한다.
+        wakeEndpointing: Boolean = listenUntilWake,
     ) : this(
         streamFactory = VoskWakePhraseStreamFactory { listener ->
             AndroidVoskWakePhraseStream(
@@ -130,7 +132,7 @@ internal class VoskWakePhraseProbe internal constructor(
                 isInputSuppressed = isInputSuppressed,
                 listener = listener,
                 onDiagnostic = onDiagnostic,
-                homeWakeEndpointing = listenUntilWake,
+                homeWakeEndpointing = wakeEndpointing,
                 inputGeneration = inputGeneration,
             )
         },

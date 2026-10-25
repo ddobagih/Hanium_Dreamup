@@ -1,0 +1,13 @@
+stateDiagram-v2
+  state "F-D08-036 현재 동의" as S0
+  state "F-D08-036 revision 및 receipt CAS" as S1
+  state "F-D08-036 Backend 수락" as S2
+  state "F-D08-036 로컬 기록 완료" as S3
+  state "F-D08-036 결과 불명" as S4
+  state "F-D08-036 충돌" as S5
+  [*] --> S0
+  S0 --> S1: 새선택 또는철회
+  S1 --> S5: stale revision 또는동일id다른내용
+  S1 --> S2: Backendreceipt수락
+  S2 --> S3: localwrite성공
+  S2 --> S4: local기록실패

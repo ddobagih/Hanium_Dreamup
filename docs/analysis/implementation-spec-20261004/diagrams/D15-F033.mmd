@@ -1,0 +1,26 @@
+flowchart TB
+  E["F-D15-033 · 기관 수동 전달·늦은 회신<br/>P-D15-033"]
+  E --> LOOK["신고 lock·기존 idempotency event 조회"]
+  LOOK --> EXIST{"같은 key가 있는가"}
+  EXIST -->|"예"| EQ{"exact intent가 같은가"}
+  EQ -->|"예"| REPLAY["기존 event 즉시 반환<br/>revision·현재 승인 검사로 이어지지 않음"]
+  EQ -->|"아니오"| IC["409 idempotency conflict 반환"]
+  EXIST -->|"아니오"| CAS{"report-wide 최신 기록 revision CAS 일치"}
+  CAS -->|"아니오"| RC["409 revision conflict 반환"]
+  CAS -->|"예"| PREV["latest uncorrected event·package 읽기"]
+  PREV --> FOLLOW{"이전 상태 SUBMITTED 또는 ACKNOWLEDGED<br/>같은 package_revision이며 새 status가 SUBMITTED가 아닌가"}
+  FOLLOW -->|"예 · 기존 제출 후속"| OLD["원래 제출 package/review에 결속<br/>현재 content가 재검토되어도 후속 회신 가능"]
+  FOLLOW -->|"아니오 · 신규나 재시도"| CURRENT["현재 content의 latest APPROVED와 v2 package 요구"]
+  CURRENT -->|"승인·내용·package 불일치"| PC["409 package 또는 latest approval conflict 반환"]
+  CURRENT -->|"충족"| VALID{"기관 일치·package 전이·관찰시각 유효"}
+  OLD --> VALID
+  VALID -->|"아니오"| INVALID["422 또는409 반환"]
+  VALID -->|"예"| APPEND["event append·commit"]
+  APPEND -->|"성공"| OK["새 기록 반환"]
+  APPEND -->|"DB/감사 실패"| ERR["rollback·503 반환"]
+  POLICY["같은 package: 없음 또는 FAILED → SUBMITTED/FAILED<br/>SUBMITTED → ACKNOWLEDGED/FAILED<br/>ACKNOWLEDGED → RESOLVED<br/>같은 package RESOLVED은 종료<br/>새 내용 package는 새 cycle·미해결 v1 동일내용 v2는 SUBMITTED 예외"]
+  VALID -.-> POLICY
+  NOTE["기관 자동전송 없음·관리자 수기 관찰 기록<br/>자동 retry·취소 API 없음<br/>정정된 event는 상태 기준에서 제외하되 revision CAS에는 기록 이력 반영"]
+  E -.-> NOTE
+  SRC["근거 · admin_report_workflow.py:1216 append_report_institution_delivery_event"]
+  E -.-> SRC

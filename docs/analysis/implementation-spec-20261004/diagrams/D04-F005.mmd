@@ -1,0 +1,21 @@
+flowchart TD
+  ID["F-D04-005 · 가속도·자이로 구간 통계와 운용 상태<br/>P-D04-005"]
+  A["가속도 또는 gyro 콜백"]
+  C0{"현재 등록 source와 측정·receipt 순서가 유효한가"}
+  R0["입력 거부"]
+  C1{"1초 창에 5개·200ms·gap 250ms 이내인가"}
+  R1["그 source 통계 null"]
+  OK["통계+coverage+최근 step → PedestrianStationaryDetector → onDecision"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  STOP["stop/close → 세대 retire → 창·step·detector reset"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

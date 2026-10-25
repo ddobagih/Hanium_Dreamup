@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 import base64
 import binascii
 from dataclasses import dataclass
@@ -259,29 +262,44 @@ def privacy_hmac_secret_fingerprint(secret: str) -> str:
 
 
 # S1617-50: lookup-only privacy HMAC keys (older keys kept to identify rows that
-# were written before a rotation). Configured once per process from settings.
+# were written before a rotation). App contexts override the standalone CLI default.
 _CONFIGURED_LOOKUP_KEYS: tuple[tuple[int, str], ...] = ()
+_APP_LOOKUP_KEYS: ContextVar[tuple[tuple[int, str], ...] | None] = ContextVar("walksafe_privacy_lookup_keys", default=None)
 
 
-def configure_privacy_hmac_lookup_keys(keys: Mapping[int, str] | None) -> None:
-    global _CONFIGURED_LOOKUP_KEYS
+@contextmanager
+def use_privacy_hmac_lookup_keys(keys):
+    token = _APP_LOOKUP_KEYS.set(_normalized_privacy_hmac_lookup_keys(keys))
+    try:
+        yield
+    finally:
+        _APP_LOOKUP_KEYS.reset(token)
+
+
+
+def _normalized_privacy_hmac_lookup_keys(keys: Mapping[int, str] | None) -> tuple[tuple[int, str], ...]:
     normalized = tuple(sorted((int(version), secret) for version, secret in (keys or {}).items()))
     for version, secret in normalized:
         if version < 1:
             raise ValueError("privacy HMAC lookup key versions must be positive")
         _require_hmac_secret(secret)
-    _CONFIGURED_LOOKUP_KEYS = normalized
+    return normalized
+
+
+def configure_privacy_hmac_lookup_keys(keys: Mapping[int, str] | None) -> None:
+    global _CONFIGURED_LOOKUP_KEYS
+    _CONFIGURED_LOOKUP_KEYS = _normalized_privacy_hmac_lookup_keys(keys)
 
 
 def configured_privacy_hmac_lookup_keys() -> tuple[tuple[int, str], ...]:
-    return _CONFIGURED_LOOKUP_KEYS
+    return _APP_LOOKUP_KEYS.get() if _APP_LOOKUP_KEYS.get() is not None else _CONFIGURED_LOOKUP_KEYS
 
 
 def _lookup_keys(
     lookup_keys: Mapping[int, str] | None,
 ) -> tuple[tuple[int, str], ...]:
     if lookup_keys is None:
-        return _CONFIGURED_LOOKUP_KEYS
+        return configured_privacy_hmac_lookup_keys()
     return tuple(sorted((int(version), secret) for version, secret in lookup_keys.items()))
 
 
@@ -736,14 +754,38 @@ def assert_account_deletion_worker_database_role(db: Session) -> None:
             "AND has_column_privilege(current_user, "
             "'public.report_institution_delivery_events', 'report_id', 'SELECT') "
             "AND has_column_privilege(current_user, "
-            "'public.report_institution_delivery_events', 'package_id', 'SELECT')) "
+            "'public.report_institution_delivery_events', 'package_id', 'SELECT') "
+            "AND has_column_privilege(current_user, 'public.report_deletion_tombstones', "
+            "'privacy_subject_hmac', 'SELECT') "
+            "AND has_column_privilege(current_user, 'public.report_deletion_tombstones', "
+            "'account_generation', 'SELECT') "
+            "AND has_column_privilege(current_user, 'public.report_deletion_tombstones', "
+            "'external_copy_count', 'SELECT') "
+            "AND has_function_privilege(current_user, "
+            "'public.walksafe_account_prior_report_copy_inventory(text,bigint)', "
+            "'EXECUTE') AND EXISTS (SELECT 1 FROM pg_proc AS copy_projection "
+            "JOIN pg_roles AS projection_owner ON projection_owner.oid = copy_projection.proowner "
+            "WHERE copy_projection.oid = to_regprocedure("
+            "'public.walksafe_account_prior_report_copy_inventory(text,bigint)') "
+            "AND copy_projection.prosecdef AND copy_projection.provolatile = 's' "
+            "AND 'search_path=pg_catalog' = ANY(copy_projection.proconfig) "
+            "AND projection_owner.rolname = 'walksafe_report_evidence_owner' "
+            "AND NOT (projection_owner.rolsuper OR projection_owner.rolcreaterole "
+            "OR projection_owner.rolcreatedb OR projection_owner.rolcanlogin "
+            "OR projection_owner.rolinherit OR projection_owner.rolreplication "
+            "OR projection_owner.rolbypassrls) "
+            "AND NOT EXISTS (SELECT 1 FROM aclexplode(coalesce(copy_projection.proacl, "
+            "acldefault('f', copy_projection.proowner))) AS projection_acl "
+            "WHERE projection_acl.grantee = 0 AND projection_acl.privilege_type = 'EXECUTE'))) "
             "AS can_read_delivery_copy_inventory, "
             "(has_column_privilege(current_user, "
             "'public.report_institution_delivery_events', 'recipient', 'SELECT') "
             "OR has_column_privilege(current_user, "
             "'public.report_institution_delivery_events', 'reason', 'SELECT') "
             "OR has_column_privilege(current_user, "
-            "'public.report_institution_delivery_events', 'evidence_sha256', 'SELECT')) "
+            "'public.report_institution_delivery_events', 'evidence_sha256', 'SELECT') "
+            "OR has_column_privilege(current_user, 'public.report_deletion_tombstones', "
+            "'request_id', 'SELECT')) "
             "AS can_read_delivery_details, "
             "has_table_privilege(current_user, 'public.signup_consent_receipts', "
             "'SELECT') AS can_read_all_signup_receipts, "
@@ -830,10 +872,13 @@ def assert_account_deletion_worker_database_role(db: Session) -> None:
             "WHERE function_namespace.nspname = 'public' "
             "AND security_definer_function.prosecdef "
             # S1617-52-F1: the worker may complete a request with the server
-            # manifest, so it may run exactly the installation key purge,
-            # which deletes keys only of COMPLETED subject generations.
+            # manifest, so it may purge completed installation keys and read
+            # only the count projection of prior report copy confirmations.
             "AND security_definer_function.oid IS DISTINCT FROM "
             "to_regprocedure('public.walksafe_purge_privacy_installation_evidence_keys"
+            "(text, bigint)')::oid "
+            "AND security_definer_function.oid IS DISTINCT FROM "
+            "to_regprocedure('public.walksafe_account_prior_report_copy_inventory"
             "(text, bigint)')::oid "
             "AND has_function_privilege(current_user, "
             "security_definer_function.oid, 'EXECUTE')) "
@@ -1101,7 +1146,7 @@ def _require_lookup_subjects(
     lookup_subjects: Collection[str] | None,
 ) -> Collection[str]:
     if lookup_subjects is None:
-        if _CONFIGURED_LOOKUP_KEYS:
+        if configured_privacy_hmac_lookup_keys():
             # S1617-50: after a rotation every tombstone check must also search
             # the lookup-only subjects; a caller that cannot supply them fails
             # closed instead of missing a tombstone written under an older key.
@@ -1227,7 +1272,12 @@ def _subjects_with_rows(
 ) -> set[str]:
     ordered = sorted(set(subjects))
     owners: set[str] = set()
-    for subject_column, generation_column in _SUBJECT_OWNER_COLUMNS:
+    columns = _SUBJECT_OWNER_COLUMNS
+    from backend.app.field_session_log_models import GuidanceDiagnosticPreference
+    from backend.app.services.diagnostic_storage import diagnostic_schema_present
+    if diagnostic_schema_present(db):
+        columns += ((GuidanceDiagnosticPreference.privacy_subject_hmac, GuidanceDiagnosticPreference.account_generation),)
+    for subject_column, generation_column in columns:
         owners.update(
             db.scalars(
                 select(subject_column)
@@ -1710,6 +1760,9 @@ def accept_account_deletion(
     db.flush()
     db.add(request)
     db.flush()
+    # Test diagnostics share the existing generation deletion transaction; no RAW data is affected.
+    from backend.app.services.diagnostic_storage import purge_diagnostics_on_account_deletion
+    purge_diagnostics_on_account_deletion(db, lookup_subjects, account_generation)
     for installation_hmac in installation_targets:
         db.add(
             AccountDeletionDeviceTarget(
@@ -2264,6 +2317,22 @@ def register_installation_evidence_key(
         installation_id, privacy_subject, resolved.secret
     )
     assert_report_ingest_active(db, privacy_subject, account_generation, lookup_subjects)
+    confirmed = db.scalar(
+        select(PrivacyConsentEvent)
+        .where(
+            PrivacyConsentEvent.privacy_subject_hmac == privacy_subject,
+            PrivacyConsentEvent.account_generation == account_generation,
+            PrivacyConsentEvent.installation_subject_hmac == installation_hmac,
+        )
+        .order_by(PrivacyConsentEvent.client_revision.desc())
+        .limit(1)
+    )
+    if confirmed is None or not consent_event_is_current(confirmed):
+        raise PrivacyLifecycleError(
+            "installation_evidence_key_consent_required",
+            "Current confirmed consent from this installation is required.",
+            status_code=403,
+        )
     public_key_sha256 = hashlib.sha256(public_key_der).hexdigest()
     existing = db.get(
         PrivacyInstallationEvidenceKey,
@@ -2689,17 +2758,42 @@ _NO_COPIES_BASIS = (
 )
 
 
+def load_prior_report_copy_inventory(
+    db: Session, privacy_subject: str, account_generation: int,
+) -> tuple[int, int]:
+    """Read only total/pending counts; never expose external copy identities."""
+    row = db.execute(
+        text("SELECT * FROM public.walksafe_account_prior_report_copy_inventory("
+             "CAST(:subject AS text), CAST(:generation AS bigint))"),
+        {"subject": privacy_subject, "generation": account_generation},
+    ).mappings().one()
+    total, pending = row["total_count"], row["pending_count"]
+    if (row["consistent"] is not True or type(total) is not int
+            or type(pending) is not int or not 0 <= pending <= total <= 10_000):
+        raise PrivacyLifecycleError(
+            "account_deletion_prior_copy_inventory_inconsistent",
+            "Prior report copy evidence is incomplete.", status_code=503,
+        )
+    return total, pending
+
+
 def _server_manifest_transitions(
     *,
     quarantined_raw_collection_count: int | None,
     external_copy_count: int | None,
+    pending_external_copy_count: int | None = None,
 ) -> tuple[tuple[str, str, str | None], ...]:
     for name, value in (
         ("quarantined_raw_collection_count", quarantined_raw_collection_count),
         ("external_copy_count", external_copy_count),
+        ("pending_external_copy_count", pending_external_copy_count),
     ):
         if value is not None and (type(value) is not int or not 0 <= value <= 10_000):
             raise ValueError(f"{name} must be an integer between 0 and 10000")
+    if pending_external_copy_count is not None and (
+        external_copy_count is None or pending_external_copy_count > external_copy_count
+    ):
+        raise ValueError("pending external copies exceed the frozen inventory")
     if quarantined_raw_collection_count is None:
         quarantine = ("server_quarantine", "NOT_APPLICABLE", _LEGACY_QUARANTINE_BASIS)
     elif quarantined_raw_collection_count:
@@ -2711,7 +2805,11 @@ def _server_manifest_transitions(
     elif external_copy_count:
         # S1617-59: a delivered copy is deleted by its institution, not by the
         # worker; the item stays open until that deletion is confirmed.
-        copies = ("server_copies", "EXTERNAL_PENDING", None)
+        copies = (
+            "server_copies",
+            "COMPLETED" if pending_external_copy_count == 0 else "EXTERNAL_PENDING",
+            None,
+        )
     else:
         copies = ("server_copies", "NOT_APPLICABLE", _NO_COPIES_BASIS)
     return (
@@ -2730,6 +2828,7 @@ def complete_server_deletion_inventory_from_manifest(
     terminal_at: datetime,
     quarantined_raw_collection_count: int | None,
     external_copy_count: int | None,
+    reconcile_prior_report_copies: bool = False,
 ) -> AccountDeletionStatusV2:
     """Atomically bind the server-owned deletion states to one manifest.
 
@@ -2742,10 +2841,6 @@ def complete_server_deletion_inventory_from_manifest(
 
     if _SHA256.fullmatch(manifest_sha256) is None:
         raise ValueError("manifest_sha256 must be one lowercase SHA-256 digest")
-    transitions = _server_manifest_transitions(
-        quarantined_raw_collection_count=quarantined_raw_collection_count,
-        external_copy_count=external_copy_count,
-    )
     assert_account_deletion_worker_database_role(db)
     request = db.get(AccountDeletionRequest, request_id)
     if request is None:
@@ -2763,6 +2858,23 @@ def complete_server_deletion_inventory_from_manifest(
     )
     if request is None:
         raise _not_found()
+    pending_copies = None
+    if reconcile_prior_report_copies:
+        prior_total, prior_pending = load_prior_report_copy_inventory(
+            db, request.privacy_subject_hmac, request.account_generation,
+        )
+        if prior_total > (external_copy_count or 0):
+            raise PrivacyLifecycleError(
+                "account_deletion_prior_copy_inventory_missing",
+                "The frozen manifest omits prior report copies.", status_code=409,
+            )
+        if external_copy_count is not None:
+            pending_copies = external_copy_count - prior_total + prior_pending
+    transitions = _server_manifest_transitions(
+        quarantined_raw_collection_count=quarantined_raw_collection_count,
+        external_copy_count=external_copy_count,
+        pending_external_copy_count=pending_copies,
+    )
     inventory = db.scalars(
         select(AccountDeletionItem)
         .where(AccountDeletionItem.request_id == request_id)
@@ -2786,6 +2898,11 @@ def complete_server_deletion_inventory_from_manifest(
         for key, _state, _basis in transitions
         if by_key[key].state in TERMINAL_ITEM_STATES
     ]
+    copies_confirmed = (
+        reconcile_prior_report_copies
+        and by_key["server_copies"].state == "EXTERNAL_PENDING"
+        and ("server_copies", "COMPLETED", None) in transitions
+    )
     if terminal_items:
         # Replay: every terminal state this manifest sets must already match.
         # An EXTERNAL_PENDING copy item may have moved on by another path.
@@ -2794,6 +2911,7 @@ def complete_server_deletion_inventory_from_manifest(
             and compare_digest(by_key[key].evidence_sha256 or "", manifest_sha256)
             and by_key[key].disposition_basis == basis
             for key, next_state, basis in terminal_transitions
+            if not (copies_confirmed and key == "server_copies")
         )
         if not exact:
             raise PrivacyLifecycleError(
@@ -2801,9 +2919,10 @@ def complete_server_deletion_inventory_from_manifest(
                 "Server-owned deletion state conflicts with the worker manifest.",
                 status_code=409,
             )
-        response = _status(db, request)
-        db.commit()
-        return response
+        if not copies_confirmed:
+            response = _status(db, request)
+            db.commit()
+            return response
 
     now = db.execute(text("SELECT clock_timestamp()")).scalar_one()
     _require_time_window(
@@ -2815,10 +2934,17 @@ def complete_server_deletion_inventory_from_manifest(
     )
     for item_key, next_state, disposition_basis in transitions:
         item = by_key[item_key]
+        if item.state in TERMINAL_ITEM_STATES:
+            continue
         terminal = next_state in TERMINAL_ITEM_STATES
         if not terminal and item.state == next_state:
             continue
         operation_id = f"server-delete-{manifest_sha256}-{item_key}"
+        if copies_confirmed and item_key == "server_copies":
+            operation_id += "-confirmed"
+        transition_terminal_at = (
+            now if copies_confirmed and item_key == "server_copies" else terminal_at
+        )
         operation_sha256 = hashlib.sha256(
             b"walksafe/account-deletion-server-manifest-transition/v1\0"
             + _canonical_json(
@@ -2829,7 +2955,7 @@ def complete_server_deletion_inventory_from_manifest(
                     "next_state": next_state,
                     "operation_id": operation_id,
                     "request_id": request_id,
-                    "terminal_at": _iso(terminal_at),
+                    "terminal_at": _iso(transition_terminal_at),
                 }
             )
         ).hexdigest()
@@ -2837,7 +2963,10 @@ def complete_server_deletion_inventory_from_manifest(
         # A non-terminal state (EXTERNAL_PENDING copies) carries no evidence
         # or terminal time; the manifest binding stays in operation_sha256.
         item_evidence = manifest_sha256 if terminal else None
-        item_terminal_at = terminal_at if terminal else None
+        item_terminal_at = (
+            now if copies_confirmed and item_key == "server_copies"
+            else terminal_at if terminal else None
+        )
         item.state = next_state
         item.item_revision += 1
         item.updated_at = now
@@ -3286,6 +3415,7 @@ __all__ = [
     "ResolvedPrivacySubject",
     "rotate_privacy_hmac_key",
     "register_installation_evidence_key",
+    "load_prior_report_copy_inventory",
     "installation_evidence_signature_message",
     "device_verification_summary",
     "overall_deletion_status",

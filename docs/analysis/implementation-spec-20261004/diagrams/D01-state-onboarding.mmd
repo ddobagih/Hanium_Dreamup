@@ -1,0 +1,24 @@
+stateDiagram-v2
+  state "S-D01-011-EMAIL_OTP_ENROLLMENT" as OTP
+  state "S-D01-011-ACCOUNT_CREATED 계정 생성 대기" as Create
+  state "S-D01-011-VERIFIED_LOGIN" as Login
+  state "S-D01-011-PURPOSE_AND_SAFETY" as Safety
+  state "S-D01-011-JIT_PERMISSION_OBSERVATION" as Jit
+  state "S-D01-011-DEVICE_CHECK" as Device
+  state "S-D01-011-FP004_TRAINING" as Train
+  state "S-D01-011-COMPLETE" as Done
+  [*] --> OTP
+  OTP --> Create: 유효 OTP enrollment와 저장
+  Create --> Login: 서버 계정 생성 뒤 검증 로그인
+  OTP --> Login: 기존 계정 검증 로그인
+  Login --> Safety: 로그인 증거
+  Safety --> Jit: 목적·안전 확인
+  Jit --> Device: 현재 권한 관측
+  Device --> Train: 현재 기기 통과·과거 training 없음
+  Device --> Done: 검증된 과거 training 보존
+  Train --> Done: 네 연습·native receipt 저장
+  Done --> Jit: receipt-prefix 복원 시 새 검사 필요
+  note right of Done
+    native 완료 profile 복원은 별도 binding 검사
+    보행 현재 readiness는 D02가 다시 판단
+  end note

@@ -35,7 +35,7 @@ class HomeCommandFeedbackIntegrationStaticTest {
         val speak = source.substringAfter("private fun speak(")
             .substringBefore("private fun speakReady(")
 
-        assertTrue(ordinary.contains("speak(message, SpeechPriority.INTERACTION)"))
+        assertTrue(ordinary.contains("speak(message, SpeechPriority.INTERACTION, messageFamily = SpeechMessageFamily.INTERACTION)"))
         assertTrue(training.contains("NavigationSpeechDispatchResult = speak("))
         assertTrue(training.contains("requiresExplicitTerminalCallback = true"))
         assertTrue(speak.contains("if (!speechAllowed()) return NavigationSpeechDispatchResult.UNAVAILABLE"))

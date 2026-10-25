@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.report
 
 import java.io.File
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -52,8 +53,7 @@ class AndroidReportPurposeHeaderStaticTest {
         val source =
             File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt")
                 .readText()
-        val process = source.substringAfter("private fun processReportCandidate(")
-            .substringBefore("private fun requestExplicitReport(")
+        val process = MainActivityRefactorSource.function(source, "fun processReportCandidate(")
 
         assertTrue(
             process.contains(

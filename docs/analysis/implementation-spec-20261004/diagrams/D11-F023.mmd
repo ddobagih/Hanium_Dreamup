@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D11-023 진단용 loopback tunnel reverse proxy"]
+  B["P-D11-023 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. path/method와 tunnel client IP를 검증한다"]
+  B --> T0
+  T1["2. Content-Length 및 streaming received byte를 검사한다"]
+  T0 --> T1
+  T2["3. hop-by-hop·client IP header를 제거하고 x-real-ip·https forwarding을 새로 설정한다"]
+  T1 --> T2
+  T3["4. upstream에 pipe하고 no-store 응답을 전달한다"]
+  T2 --> T3
+  T4["5. disconnect/timeout/error이면 upstream을 종료한다"]
+  T3 --> T4
+  Z["검사 또는 처리 결과를 반환하고 해당 호출 종료"]
+  T4 --> Z
+  C0{"허용 path 아님"}
+  R0["404"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"tunnel IP header 부적합"}
+  R1["403"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"body10MiB 초과"}
+  R2["413"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  C3{"upstream timeout/error"}
+  R3["502"]
+  B -. "관련 조건 분기" .-> C3
+  C3 -->|"해당"| R3
+  C4{"Upgrade/CONNECT"}
+  R4["403 또는 socket destroy"]
+  B -. "관련 조건 분기" .-> C4
+  C4 -->|"해당"| R4
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

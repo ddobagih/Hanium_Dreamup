@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D11-035 Legacy Next BFF·로그 API·요청본문 helper"]
+  B["P-D11-035 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. route 내부는 authorizeProxyRequest 후 upstream header와 bounded body를 준비한다"]
+  B --> T0
+  T1["2. detect는 image admission 획득 후 bounded multipart를 전달하고 finally에서 release한다"]
+  T0 --> T1
+  T2["3. JSON helper는 content type·declared/actual bytes·UTF8·JSON을 검사한다"]
+  T1 --> T2
+  T3["4. AbortSignal은 request disconnect와10초 body-read timer를 결합한다"]
+  T2 --> T3
+  T4["5. API handler 결과를 no-store 형태로 전달한다"]
+  T3 --> T4
+  Z["검사 또는 처리 결과를 반환하고 해당 호출 종료"]
+  T4 --> Z
+  C0{"content type JSON 아님"}
+  R0["415"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"declared/stream bytes 초과"}
+  R1["413"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"body timeout"}
+  R2["408"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  C3{"client abort"}
+  R3["499"]
+  B -. "관련 조건 분기" .-> C3
+  C3 -->|"해당"| R3
+  C4{"현재 HTTP path"}
+  R4["410; route 내부가 실행되지 않음"]
+  B -. "관련 조건 분기" .-> C4
+  C4 -->|"해당"| R4
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

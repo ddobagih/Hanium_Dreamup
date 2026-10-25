@@ -23,8 +23,9 @@ class MainActivityMonotonicClockWiringStaticTest {
             ),
         )
         assertTrue(
-            source.contains("collector.build(assessedAtElapsedRealtimeMs = SystemClock.elapsedRealtime())"),
+            sourceFile("session/readiness/WalkReadinessCoordinator.kt").readText().contains("collector.build(assessedAtElapsedRealtimeMs = clock())"),
         )
+        assertTrue(MainActivityRefactorSource.property(source, "walkReadinessCoordinator").contains("SystemClock::elapsedRealtime"))
         assertFalse(source.contains("walkSessionLifecycle = WalkSessionLifecycle()"))
         assertFalse(source.contains("assessedAtEpochMs"))
         assertTrue(readinessSource.contains("val assessedAtElapsedRealtimeMs: Long"))
@@ -40,12 +41,12 @@ class MainActivityMonotonicClockWiringStaticTest {
             ).containsMatchIn(source),
         )
         val leaseClockArguments = Regex("""localNowElapsedMs = ([^,\n]+)""")
-            .findAll(source)
+            .findAll(sourceFile("session/runtime/GatewayWalkSessionController.kt").readText())
             .map { it.groupValues[1].trim() }
             .toList()
         assertEquals(2, leaseClockArguments.size)
-        assertTrue(leaseClockArguments.all { it == "SystemClock.elapsedRealtime()" })
-        assertTrue(source.contains("nowElapsedMs = { SystemClock.elapsedRealtime() }"))
+        assertTrue(leaseClockArguments.all { it == "scheduler.nowMs()" })
+        assertTrue(MainActivityRefactorSource.factory(source, "createGatewayWalkSessionController").contains("override fun nowMs() = SystemClock.elapsedRealtime()"))
     }
 
     private fun sourceFile(relative: String): File = listOf(

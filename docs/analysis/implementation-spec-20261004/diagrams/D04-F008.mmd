@@ -1,0 +1,16 @@
+flowchart TD
+  ID["F-D04-008 · 방향 센서 전용 스레드·관측 이력·제한 재등록<br/>P-D04-008"]
+  A["방향 start"]
+  C0{"RV 또는 magnetic+gravity/accel 등록 가능한가"}
+  R0["unregister·thread quit → SENSOR_UNAVAILABLE"]
+  OK["전용 스레드에서 원 ns 수용 → RV/route/chest 각각 갱신 → 조회 시 watchdog"]
+  END["RouteNavigator / D07 AR·tactile / PDR 조회"]
+  STOP["stop → generation 변경 → history clear → unregister → quitSafely"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C0 -->|"예"| OK
+  OK --> END
+  R0 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

@@ -1,0 +1,33 @@
+flowchart TD
+  IN["F-D14-017<br/>기기 서명 검증·일회 소비"]
+  G["적용 정책<br/>P-D14-008 / P-D14-012 / P-D14-013"]
+  IN --> G
+  N1["1. header 형태·signature 길이·expected path와 que<br/>ry canonicalization 검사"]
+  G --> N1
+  N2["2. challenge 행 FOR UPDATE 조회"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. consumed 먼저 검사 후 issued&lt;=now&lt;expires, 정확 <br/>TTL/schema/type 등 검사"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. admin/device/session/action/method/path/r<br/>ead/correlation 및 raw body SHA256/query SHA2<br/>56 비교"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 32바이트 nonce와 저장 signing_payload의 canonica<br/>l exact18 재계산"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. 현재 ACTIVE 공개키를 다시 잠금·검증하여 revoke/rotation<br/> 이후 구키 차단"]
+  N5 -->|"계속 가능한 경우"| N6
+  N7["7. P256 ECDSA SHA256 signature 확인 후 consumed<br/>_at 설정·flush하고 VerifiedAdminDeviceProof 반환"]
+  N6 -->|"계속 가능한 경우"| N7
+  B1["분기 결과<br/>409 admin_device_proof_replayed"]
+  N3 -->|"consumed_at 존재"| B1
+  B2["분기 결과<br/>403 admin_device_proof_expired"]
+  N3 -->|"now&lt;issued 또는 now&gt;=expires"| B2
+  B3["분기 결과<br/>403 binding_mismatch"]
+  N4 -->|"요청 digest/identity/path 등 불일치"| B3
+  B4["분기 결과<br/>403 signature_invalid"]
+  N7 -->|"서명 불일치"| B4
+  B5["분기 결과<br/>503"]
+  N5 -->|"nonce/payload/key marker 저장 무결성 오류"| B5
+  N7 --> END["정상 종료<br/>소비 flush이며 commit은 middleware 호출 transaction<br/> 책임. D09가 downstream 이전 소비 commit 수행."]
+  RET["재시도와 복구 계약<br/>자동 재시도 없음. 새 challenge를 받아 새 요청 서명 필요. 실패 원인<br/>을 해소한 새 요청 또는 명시된 복구 기능 사용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

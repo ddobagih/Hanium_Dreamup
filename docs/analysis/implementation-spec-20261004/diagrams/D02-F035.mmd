@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D02-035 gateway 임시 WAV 재생과 파일 소유권"]
+  E["진입: validated temporary WAV file / completion/error /<br/>cancelGatewaySpeechInteraction"]
+  G{"P-D02-035 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["identity 불일치 무시"]
+  G -->|"old MediaPlayer callback"| B0
+  B1["현재 file 삭제; 이전 callback가 새 파일을 지우지 못함"]
+  G -->|"cancel/replacement"| B1
+  B2["false 반환; 재생 성공 아님"]
+  G -->|"missing file/prepare/start error"| B2
+  B3["현재 player 정리 후 onCompleted"]
+  G -->|"completion"| B3
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["play는 이전 active player/file을 취소·삭제"]
+    S1["새 file isFile 아니면 삭제 시도 후 false"]
+    S2["assistance accessibility/speech attributes와 exact player listener 설정"]
+    S3["setDataSource→prepare→start; synchronous failure는 release/delete 후<br/>false"]
+    S4["current completion/error만 active clear·listener<br/>detach·stop/release·file delete 뒤 callback"]
+    S5["Main은 screen reader 활성 또는 synthesis bind/execute 실패 때 local<br/>interaction으로 fallback한다. stale gateway 결과의 file은 삭제하고 재생하지 않는다.<br/>completion/error는 releaseGatewaySpeechPlayerIfOwned(player)일 때만<br/>interaction을 종료한다."]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+  end
+  E -.-> S0
+  N["정상 종료: MediaPlayer current completion은 해당 파일 재생 완료 callback; 실제 청취 증거는 아님."]
+  X["취소·중단: cancel은 active refs를 먼저 null로 하고 listener 제거/stop/release/delete. /<br/>foreground/actor/epoch 변경 시 현재 요청을 폐기한다."]
+  C["정리: delete() 반환값 검사/재시도는 없음; 실제 삭제 성공 보장하지 않음."]
+  R["재시도·복구: 자동 재시도 없음; 새 적법한 이벤트 필요. / 현재 owner와 조건을 다시 확보해야 한다."]
+  S5 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

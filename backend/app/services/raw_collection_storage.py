@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 import base64
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -2167,7 +2169,8 @@ class RawCollectionStorage:
         list[tuple[RawCollectionObject, list[RawCollectionChunk]]],
     ] | None:
         statement = select(RawCollection).where(
-            RawCollection.collection_id == collection_id
+            RawCollection.collection_id == collection_id,
+            account_subject_visible(RawCollection),
         )
         if for_update:
             statement = statement.with_for_update(of=RawCollection)

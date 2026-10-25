@@ -34,6 +34,8 @@ class ObjectDepthRuntimePipeline(
     private var visualAssignments: Map<Int, String> = emptyMap()
     private var lastVisualOutputs: List<TrackedObjectDepth> = emptyList()
     private var sourceIndexByGeometry: Map<ObjectGeometry, Int> = emptyMap()
+    // Capture provenance belongs to the camera pipeline, including across step-length changes.
+    private val depthCaptureClock = DepthCaptureClock()
 
     fun setUserStepLength(stepLengthM: Float) {
         messagePolicy = messagePolicy.withStepLength(stepLengthM)
@@ -59,11 +61,12 @@ class ObjectDepthRuntimePipeline(
         mapperFrameId: Long,
         motionContext: MotionContext = MotionContext(),
         imageQuarterTurns: Int? = 0,
+        capturedAtElapsedRealtimeMs: Long? = null,
     ): List<TrackedObjectDepth> {
         if (mapperFrameId != frameId) return emptyList()
         return processMapped(
             snapshot, frameId, timestampMs, detections, detectionSequenceId, detectionCompleted,
-            mapper, motionContext, imageQuarterTurns,
+            mapper, motionContext, imageQuarterTurns, capturedAtElapsedRealtimeMs,
         )
     }
 
@@ -80,12 +83,13 @@ class ObjectDepthRuntimePipeline(
         detectionCompleted: Boolean = true,
         motionContext: MotionContext = MotionContext(),
         imageQuarterTurns: Int? = 0,
+        capturedAtElapsedRealtimeMs: Long? = null,
     ): List<TrackedObjectDepth> {
         val depthWidth = snapshot.rawDepth?.width ?: snapshot.fullDepth?.width ?: DEFAULT_DEPTH_SIZE
         val depthHeight = snapshot.rawDepth?.height ?: snapshot.fullDepth?.height ?: DEFAULT_DEPTH_SIZE
         return processMapped(
             snapshot, frameId, timestampMs, detections, detectionSequenceId, detectionCompleted,
-            identityMapper(depthWidth, depthHeight), motionContext, imageQuarterTurns,
+            identityMapper(depthWidth, depthHeight), motionContext, imageQuarterTurns, capturedAtElapsedRealtimeMs,
         )
     }
 
@@ -99,10 +103,12 @@ class ObjectDepthRuntimePipeline(
         effectiveMapper: CoordinateMapper,
         motionContext: MotionContext,
         imageQuarterTurns: Int?,
+        capturedAtElapsedRealtimeMs: Long?,
     ): List<TrackedObjectDepth> {
         // Partial legacy-model output is useful for the overlay, but must never count as one of
         // the three completed detector observations required by the warning/report safety gate.
         if (!detectionCompleted) return emptyList()
+        depthCaptureClock.observe(snapshot, timestampMs, capturedAtElapsedRealtimeMs)
         val sourceDetections = detections ?: detectionProvider.detect(frameId, timestampMs)
         val indexedGeometries = sourceDetections.mapIndexedNotNull { index, detection ->
             extractor.extract(detection, imageQuarterTurns = imageQuarterTurns)
@@ -136,8 +142,24 @@ class ObjectDepthRuntimePipeline(
         }
 
         val tracksById = activeTracks.associateBy { it.trackId }
-        return estimateTracks(snapshot, frameId, timestampMs, activeTracks, effectiveMapper, motionContext).map { output ->
-            output.copy(sourceDetectionIndex = tracksById[output.trackId]?.latestGeometry?.let { sourceIndexByGeometry[it] })
+        return estimateTracks(snapshot, frameId, timestampMs, activeTracks, effectiveMapper, motionContext,
+            capturedAtElapsedRealtimeMs = capturedAtElapsedRealtimeMs).map { output ->
+            // Legacy report consumers also need the first depth receipt, rather than an age
+            // translated from whichever camera receipt happens to publish this output.
+            val originalElapsed = output.sourceObservedAtElapsedRealtimeMs?.takeIf {
+                output.depthObservedAtMs != null && capturedAtElapsedRealtimeMs != null &&
+                    it in 0L..capturedAtElapsedRealtimeMs
+            }
+            output.copy(
+                sourceDetectionIndex = tracksById[output.trackId]?.latestGeometry?.let { sourceIndexByGeometry[it] },
+                sourceValidUntilElapsedRealtimeMs = if (!output.source.metric) output.sourceValidUntilElapsedRealtimeMs
+                    else if (originalElapsed == null) Long.MIN_VALUE else minOf(
+                        output.sourceValidUntilElapsedRealtimeMs ?: Long.MAX_VALUE,
+                        originalElapsed + DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS,
+                    ),
+                sourceMaxAgeMs = if (output.source.metric && originalElapsed != null)
+                    DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS else output.sourceMaxAgeMs,
+            ).bindPointClosestApproachPublication()
         }
     }
 
@@ -184,6 +206,9 @@ class ObjectDepthRuntimePipeline(
             IndexedObjectGeometry(tracked.sourceIndex, geometry)
         }
         val sourceChanged = observation.sourceKey != lastVisualSourceKey
+        val pointContinuity = if (sourceChanged) TrackedMaterialPointContinuity.fromSourceChange(
+            previous, observation, visualAssignments, extractor, imageQuarterTurns,
+        ) else emptyMap()
         if (sourceChanged) {
             // Equal source frame IDs with changed metadata are never another completed detection.
             if (lastVisualSourceKey?.frameId == observation.sourceKey.frameId) return emptyList()
@@ -198,9 +223,10 @@ class ObjectDepthRuntimePipeline(
                     .takeIf { it.detectionConfidence >= MIN_DETECTION_CONFIDENCE }
                     ?.let { IndexedObjectGeometry(index, it) }
             }
-            val assignments = tracker.updateSourceWithAssignments(
+            val assignments = tracker.updateSourceWithMaterialPointAssignments(
                 sourceGeometry, observation.sourceKey.frameId / 1_000_000L,
                 currentGeometries = indexed, currentTimestampMs = observation.timestampMs,
+                continuityBySourceIndex = pointContinuity,
             )
             visualAssignments = assignments.associate { it.sourceDetectionIndex to it.track.trackId }
             lastVisualSourceKey = observation.sourceKey
@@ -208,13 +234,31 @@ class ObjectDepthRuntimePipeline(
         val deferredIds = observation.observations.filter {
             it.failure == VisualTrackingFailure.OBJECT_BUDGET_EXCEEDED
         }.mapNotNull { visualAssignments[it.sourceIndex] }.toSet()
-        val tracks = tracker.applyTrackedObservations(
+        val continuity = indexed.mapNotNull { indexedGeometry ->
+            val id = visualAssignments[indexedGeometry.sourceDetectionIndex] ?: return@mapNotNull null
+            val proof = if (sourceChanged) {
+                pointContinuity[indexedGeometry.sourceDetectionIndex]?.currentGeometryContinuity(id)
+                    ?: TrackedGeometryContinuity.fromDetectorSource(
+                        observation, indexedGeometry.sourceDetectionIndex, id, extractor, imageQuarterTurns,
+                    )
+            } else TrackedGeometryContinuity.from(previous, observation, indexedGeometry.sourceDetectionIndex,
+                extractor, imageQuarterTurns)
+            proof?.let { id to it }
+        }.toMap()
+        val tracks = tracker.applyTrackedObservationsWithContinuity(
             indexed.mapNotNull { indexedGeometry ->
                 visualAssignments[indexedGeometry.sourceDetectionIndex]?.let { it to indexedGeometry.geometry }
             },
             observation.timestampMs,
             budgetDeferredTrackIds = deferredIds,
+            continuityByTrackId = continuity,
         )
+        // This is the actual tracker assignment, not a geometric correspondence guessed later.
+        val sourceIndicesByTrackId = visualAssignments.entries.groupBy({ it.value }, { it.key })
+            .mapValues { (_, indices) -> indices.singleOrNull() }
+        val materialPoints = observation.trackedObservations.mapNotNull { tracked ->
+            visualAssignments[tracked.sourceIndex]?.let { id -> tracked.materialPoint?.let { id to it } }
+        }.toMap()
         val visualQualities = observation.trackedObservations.mapNotNull { tracked ->
             visualAssignments[tracked.sourceIndex]?.let { it to tracked.trackingQuality }
         }.toMap()
@@ -222,26 +266,42 @@ class ObjectDepthRuntimePipeline(
         lastVisualOutputs = estimateTracks(
             snapshot, observation.targetKey.frameId, observation.timestampMs, tracks, mapper, motionContext, visualQualities,
             requireIndependentDepthObservation = true,
+            capturedAtElapsedRealtimeMs = observation.targetKey.capturedAtElapsedRealtimeMs,
+            materialPoints = materialPoints,
+            riskGuidanceNowElapsedRealtimeMs = nowElapsedRealtimeMs,
         ).map { output ->
             // The existing depth-gap policy requires this same visual-tracking quality before
             // trusting a gap. A low-quality optical-flow box cannot establish pseudo approach.
             val currentOutput = if (output.source == DepthSource.POLYGON_TREND_PSEUDO_DEPTH &&
                 output.userFacing.messageLevel == MessageLevel.CAUTION &&
-                visualQualities[output.trackId]?.let { it.isFinite() && it >= MIN_QUALITATIVE_TRACKING_QUALITY } != true
+                visualQualities[output.trackId]?.let { it.isFinite() && it >= CurrentTrackedFrameObservation.MIN_QUALITATIVE_TRACKING_QUALITY } != true
             ) output.copy(userFacing = UserFacingDepth(null, MessageLevel.NONE, null)) else output
-            // A pseudo frame is leased by current visual capture, not the last metric sample.
-            val depthAgeMs = if (currentOutput.source.metric) currentOutput.depthObservedAtMs?.let { observed ->
-                (observation.timestampMs - observed).coerceAtLeast(0L)
-            } ?: 0L else 0L
             // S11-11: guidance keeps its own depth-age budget from the first depth observation, and a
             // TTC exists only for the capture's own non-reprojected Raw observation.
             val budgetedOutput = if (currentOutput.timeToCollisionMs != null &&
                 !DepthAgeBudget.admits(DepthUse.TIME_TO_COLLISION, currentOutput, observation.timestampMs)
             ) currentOutput.copy(timeToCollisionMs = null, approachSpeedMps = null) else currentOutput
-            budgetedOutput.copy(sourceValidUntilElapsedRealtimeMs = minOf(
-                observation.sourceKey.capturedAtElapsedRealtimeMs + CurrentTrackedFrameObservation.MAX_SOURCE_AGE_MS,
-                observation.targetKey.capturedAtElapsedRealtimeMs - depthAgeMs + DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS,
-            ))
+            // Same-capture attribution already recorded the first elapsed receipt. A later
+            // Frame/receipt must never translate or renew the old Image clock again.
+            val depthObservedAtElapsedMs = if (budgetedOutput.source.metric) {
+                budgetedOutput.sourceObservedAtElapsedRealtimeMs?.takeIf {
+                    it in 0L..observation.targetKey.capturedAtElapsedRealtimeMs && budgetedOutput.depthObservedAtMs != null
+                }
+            } else observation.targetKey.capturedAtElapsedRealtimeMs
+            val observedAtElapsedRealtimeMs = depthObservedAtElapsedMs?.let {
+                minOf(observation.sourceKey.capturedAtElapsedRealtimeMs, it)
+            }
+            budgetedOutput.copy(
+                sourceDetectionIndex = sourceIndicesByTrackId[budgetedOutput.trackId],
+                sourceValidUntilElapsedRealtimeMs = if (observedAtElapsedRealtimeMs == null) Long.MIN_VALUE else minOf(
+                    budgetedOutput.sourceValidUntilElapsedRealtimeMs ?: Long.MAX_VALUE,
+                    observation.sourceKey.capturedAtElapsedRealtimeMs + CurrentTrackedFrameObservation.MAX_SOURCE_AGE_MS,
+                    observedAtElapsedRealtimeMs + DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS,
+                ),
+                sourceObservedAtElapsedRealtimeMs = observedAtElapsedRealtimeMs,
+                sourceMaxAgeMs = minOf(budgetedOutput.sourceMaxAgeMs ?: DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS,
+                    CurrentTrackedFrameObservation.MAX_SOURCE_AGE_MS, DepthAgeBudget.RISK_GUIDANCE_MAX_AGE_MS),
+            ).bindPointClosestApproachPublication()
         }
         return lastVisualOutputs
     }
@@ -255,7 +315,12 @@ class ObjectDepthRuntimePipeline(
         motionContext: MotionContext,
         visualQualities: Map<String, Float> = emptyMap(),
         requireIndependentDepthObservation: Boolean = false,
-    ): List<TrackedObjectDepth> = tracks.filter { it.missedFrames == 0 }.mapNotNull { track ->
+        capturedAtElapsedRealtimeMs: Long? = null,
+        materialPoints: Map<String, kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPoint> = emptyMap(),
+        riskGuidanceNowElapsedRealtimeMs: Long? = capturedAtElapsedRealtimeMs,
+    ): List<TrackedObjectDepth> {
+        val captureTimes = depthCaptureClock.observe(snapshot, timestampMs, capturedAtElapsedRealtimeMs)
+        return tracks.filter { it.missedFrames == 0 }.mapNotNull { track ->
             val geometry = track.latestGeometry ?: return@mapNotNull null
             val hasValidatedRawPair = snapshot.rawConfidenceMatchesRawDepth
             estimator.estimate(
@@ -276,10 +341,13 @@ class ObjectDepthRuntimePipeline(
                     visualTrackingQuality = visualQualities[track.trackId] ?: 1f,
                     requireIndependentDepthObservation = requireIndependentDepthObservation || rawDepthMotionOnly,
                     rawDepthMotionOnly = rawDepthMotionOnly,
+                    depthCaptureTimes = captureTimes,
+                    materialPoint = materialPoints[track.trackId],
                     motionContext = motionContext.copy(
                         cameraPoseEvidence = snapshot.cameraPoseEvidence,
                     ),
                 ),
+                riskGuidanceNowElapsedRealtimeMs,
             ).let { output ->
                 // S11-21: a compatible-class flicker keeps the track's accumulated class name.
                 val accumulated = track.accumulatedClassName
@@ -288,6 +356,7 @@ class ObjectDepthRuntimePipeline(
                 } else output
             }
         }
+    }
 
     private fun identityMapper(width: Int, height: Int): LetterboxCoordinateMapper {
         return LetterboxCoordinateMapper(
@@ -306,8 +375,6 @@ class ObjectDepthRuntimePipeline(
 
     private companion object {
         const val MIN_DETECTION_CONFIDENCE = 0.10f
-        // Reuse ShortDepthGapState.validContext's visual-tracking admission floor.
-        const val MIN_QUALITATIVE_TRACKING_QUALITY = 0.65f
         const val DEFAULT_DEPTH_SIZE = 1
     }
 }

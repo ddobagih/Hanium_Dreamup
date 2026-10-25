@@ -1,0 +1,29 @@
+flowchart TD
+  IN["F-D14-019<br/>작업별 password·TOTP 재확인 발급"]
+  G["적용 정책<br/>P-D14-004 / P-D14-005 / P-D14-008 / P-D14-014"]
+  IN --> G
+  N1["1. HIGH operation과 action exact, nonce canon<br/>ical 및 intent 지원 범위 검사"]
+  G --> N1
+  N2["2. 계정/source 실패 제한 적용"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. control/session 조회 및 runtime TOTP/NORMAL <br/>검증"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. password와 fresh TOTP 검증 후 공통 last_totp_ti<br/>mecode 전진"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 기존 미소비 reconfirmation supersede; session.<br/>step_up_verified_at=NULL로 설정(Python 및 PG)"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. action/method/path/device/session과 nonce <br/>digest 또는 nonce+exact body intent digest로 새 <br/>row 발급"]
+  N5 -->|"계속 가능한 경우"| N6
+  N7["7. 기본300초 expires 및 reauthenticated_until_ep<br/>och_ms/action/method/path 반환"]
+  N6 -->|"계속 가능한 경우"| N7
+  B1["분기 결과<br/>422 admin_reconfirmation_binding_invalid"]
+  N1 -->|"STANDARD·미등록 action 또는 body binding 미지원 acti<br/>on"| B1
+  B2["분기 결과<br/>401 admin_reauthentication_failed와 실패 감사"]
+  N4 -->|"잘못된 password·TOTP 또는 replay"| B2
+  B3["분기 결과<br/>report.original.grant, admin.report.delivery<br/>_package.create, report.delivery.correct"]
+  N1 -->|"body binding 미지원"| B3
+  N7 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

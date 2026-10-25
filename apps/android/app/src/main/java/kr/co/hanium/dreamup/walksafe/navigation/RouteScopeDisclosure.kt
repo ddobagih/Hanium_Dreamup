@@ -12,3 +12,16 @@ fun routeScopeDisclosureKo(priority: String): String? =
     } else {
         null
     }
+
+/** Installed-route voice is concise; scope disclosure remains available separately for presentation. */
+@Suppress("UNUSED_PARAMETER")
+fun routeStartAnnouncementKo(destinationName: String?, distanceM: Int, locationReady: Boolean, priority: String): String {
+    require(distanceM >= 0)
+    val name = destinationName?.trim()?.takeIf { it.isNotEmpty() } ?: "목적지"
+    val status = if (locationReady) {
+        "${name}까지 안내를 시작합니다. 경로 거리는 약 ${distanceM}미터입니다."
+    } else {
+        "${name}까지 약 ${distanceM}미터의 경로를 찾았습니다. 현재 위치를 확인하면 이동 방향을 안내하겠습니다."
+    }
+    return status
+}

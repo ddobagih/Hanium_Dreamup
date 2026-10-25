@@ -22,15 +22,13 @@ class MainActivityGatewayWalkLeaseOwnershipStaticTest {
         val stale = request.substringAfter(
             "if (!isGatewayWalkOperationCurrent(operation, token, gatewaySession)) {",
         ).substringBefore("return@runOnUiThread")
-        assertTrue(stale.contains("gatewayWalkAuthorityController.cancel(operation)"))
+        assertTrue(stale.contains("authority.cancel(operation)"))
         assertTrue(stale.contains("endAbandonedGatewayWalkStartLeaseBestEffort("))
         assertTrue(stale.contains("lease = abandonedGatewayWalkStartLeaseOrNull(outcome)"))
         val failure = request.substringAfter("onFailure = {").substringBefore("makeGatewayWalkStartRetryAvailable(")
         assertTrue(failure.contains("endAbandonedGatewayWalkStartLeaseBestEffort("))
 
-        val abandoned = source
-            .substringAfter("private fun abandonedGatewayWalkStartLeaseOrNull(")
-            .substringBefore("\n\n")
+        val abandoned = functionBlock("fun abandonedGatewayWalkStartLeaseOrNull(")
         assertTrue(abandoned.contains("GatewayWalkStartResult.Granted"))
         assertTrue(abandoned.contains("GatewayWalkHttpException)?.abandonedLease"))
     }
@@ -50,8 +48,8 @@ class MainActivityGatewayWalkLeaseOwnershipStaticTest {
     fun abandonedLeaseReleaseIsBoundToTheOperationWalkAndSession() {
         val release = functionBlock("private fun endAbandonedGatewayWalkStartLeaseBestEffort(")
         assertTrue(release.contains("if (lease == null || lease.walkId != operation.epoch.walkSessionId) return"))
-        assertTrue(release.contains("gatewaySessionExecutor.execute"))
-        assertTrue(release.contains("gatewayWalkSessionClient.end("))
+        assertTrue(release.contains("scheduler.execute"))
+        assertTrue(release.contains("requests.end("))
         assertTrue(release.contains("session = gatewaySession"))
         assertTrue(release.contains("lease = lease"))
         assertFalse(release.contains("completeStart("))
@@ -61,29 +59,14 @@ class MainActivityGatewayWalkLeaseOwnershipStaticTest {
     @Test
     fun renewalCallbackRequiresTheSameGatewaySessionBeforeApplyingTheLease() {
         val renewal = functionBlock("private fun requestGatewayWalkRenewal()")
-        val sessionCheck = renewal.indexOf("if (!isCurrentGatewaySession(gatewaySession)) {")
+        val sessionCheck = renewal.indexOf("if (!identity.isCurrent(gatewaySession)) {")
         assertTrue(sessionCheck > renewal.indexOf("runOnUiThread {"))
         assertTrue(sessionCheck < renewal.indexOf("currentOperationStatus(operation)"))
         assertTrue(sessionCheck < renewal.indexOf("completeRenew("))
         val rejected = renewal.substring(sessionCheck).substringBefore("return@runOnUiThread")
-        assertTrue(rejected.contains("gatewayWalkAuthorityController.cancel(operation)"))
+        assertTrue(rejected.contains("authority.cancel(operation)"))
         assertTrue(rejected.contains("handleGatewayWalkAuthorityLost(\"walk_lease_gateway_session_changed\")"))
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing $signature" }
-        val open = source.indexOf('{', source.indexOf(')', start))
-        var depth = 0
-        for (index in open until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        error("unterminated $signature")
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
 }

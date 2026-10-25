@@ -11,20 +11,21 @@ import org.junit.Test
  * destination and the walk are never touched.
  */
 class MainActivityVoiceDialogCancelStaticTest {
-    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/VoiceCommandInteractionController.kt").readText()
     private val cancel = source.substringAfter("private fun cancelVoiceDialogFromVoice() {")
         .substringBefore("\n    }\n")
 
     @Test
     fun onlyTheDialogAndTheSearchAreClosed() {
-        assertTrue(cancel.contains("if (searchCancelled) cancelDestinationSearch()"))
-        assertTrue(cancel.contains("destinationSearchVoiceState = null"))
-        assertTrue(cancel.contains("clearHomeDestinationVoiceDialog()"))
-        assertTrue(cancel.contains("walkingDestinationChange.clear()"))
+        assertTrue(cancel.contains("if (searchCancelled) search().cancel()"))
+        assertTrue(cancel.contains("search().clearVoiceSelection()"))
+        assertTrue(cancel.contains("dialog().clearHomeDestinationVoiceDialog()"))
+        assertTrue(cancel.contains("dialog().clearWalkingSelection()"))
         for (forbidden in listOf(
             "resetRouteState(", "cancelActiveRouteRequest(", "stopNavigationFromVoice(", "endNavigationAfterDeviation(",
             "currentDestination =", "pendingUiDestination =", "destinationQueryInput.setText(", "routeNavigator.",
-            "transitionWalkSession(", "requestRoute(",
+            "transitionWalkSession(", "requestRoute(", "routeRun().navigator.", "ui.clearPendingDestination()",
+            "routeRun().destination =", "walk.pauseWalk(", "walk.confirmWalkEnd(",
         )) {
             assertFalse(forbidden, cancel.contains(forbidden))
         }
@@ -34,20 +35,20 @@ class MainActivityVoiceDialogCancelStaticTest {
     fun theAnswerSaysWhatWasClosedAndThatGuidanceContinues() {
         assertTrue(cancel.contains("\"목적지 검색을 취소했습니다.\""))
         assertTrue(cancel.contains("\"후보 선택을 닫았습니다.\""))
-        assertTrue(cancel.contains("(if (isRouteActive) \" 진행 중인 길안내는 계속됩니다.\" else \"\")"))
+        assertTrue(cancel.contains("(if (routeRun().active) \" 진행 중인 길안내는 계속됩니다.\" else \"\")"))
         // With nothing open, the explicit phrases are named instead of acting.
-        assertTrue(cancel.contains("isRouteActive -> \"취소할 대화가 없습니다. 길안내를 끝내려면 길안내 종료라고 말해 주세요.\""))
+        assertTrue(cancel.contains("routeRun().active -> \"취소할 대화가 없습니다. 길안내를 끝내려면 길안내 종료라고 말해 주세요.\""))
         assertTrue(cancel.contains("\"취소할 대화가 없습니다. 목적지를 지우려면 목적지 취소라고 말해 주세요.\""))
     }
 
     @Test
     fun theCommandIsDispatchedOnHomeAndNotGatedAsARouteDecision() {
-        val execute = source.substringAfter("private fun executeVoiceAction(")
+        val execute = source.substringAfter("fun executeVoiceAction(")
             .substringBefore("private fun unrecognizedCommandHintKo()")
         assertTrue(execute.contains("AndroidVoiceAction.CancelDialog -> cancelVoiceDialogFromVoice()"))
-        val homeGate = execute.substringBefore("updateNavigationStatus(\"voice=walk_action_requires_active_walk\")")
+        val homeGate = execute.substringBefore("ui.navigationStatus(\"voice=walk_action_requires_active_walk\")")
         assertTrue(homeGate.contains("AndroidVoiceAction.CancelDialog,"))
-        val handler = source.substringAfter("private fun handleVoiceCommandPhrases(")
+        val handler = source.substringAfter("fun handleVoiceCommandPhrases(")
             .substringBefore("executeVoiceAction(action, expectedNavigationDecisionToken)")
         val decisionGate = handler.substringAfter("if (\n            action in setOf(").substringBefore(") && expectedNavigationDecisionToken")
         assertTrue(decisionGate.contains("AndroidVoiceAction.StopNavigation"))

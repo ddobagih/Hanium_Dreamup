@@ -1,0 +1,16 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-016-NONE" as NONE
+  state "S-D05-016-PENDING" as PENDING
+  state "S-D05-016-VERIFIED" as VERIFIED
+  state "S-D05-016-FAILED" as FAILED
+  [*] --> NONE
+  NONE --> PENDING: "begin exactinstance"
+  PENDING --> PENDING: "retry beforefailedlimit"
+  PENDING --> VERIFIED: "assets load sample verified"
+  PENDING --> FAILED: "attemptlimit expire orbackclock"
+  VERIFIED --> NONE: "invalidate"
+  FAILED --> PENDING: "new instance begin"
+  note right of NONE
+    F-D05-016 P-D05-016
+  end note

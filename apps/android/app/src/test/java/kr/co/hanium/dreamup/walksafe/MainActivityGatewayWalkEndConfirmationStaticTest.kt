@@ -18,23 +18,11 @@ class MainActivityGatewayWalkEndConfirmationStaticTest {
         assertTrue(end.contains("requestId = operation.requestId,"))
         assertFalse(end.contains("UUID.randomUUID()"))
         assertTrue(end.contains("GatewayWalkEndRetryPolicy.retryDelayMsOrNull("))
-        assertTrue(end.contains("leaseMayStillBeHeld = lease.isLocallyUsable(SystemClock.elapsedRealtime())"))
-        assertTrue(end.contains("sameGatewaySession = isCurrentGatewaySession(gatewaySession)"))
+        assertTrue(end.contains("leaseMayStillBeHeld = lease.isLocallyUsable(scheduler.nowMs())"))
+        assertTrue(end.contains("sameGatewaySession = identity.isCurrent(gatewaySession)"))
         assertTrue(end.contains("endGatewayWalkBestEffort(gatewaySession, operation, previousRetries + 1)"))
         assertTrue(end.contains("runOnUiThread"))
     }
 
-    private fun block(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing: $signature" }
-        var depth = 0
-        var opened = false
-        for (index in start until source.length) {
-            when (source[index]) {
-                '{' -> { depth += 1; opened = true }
-                '}' -> { depth -= 1; if (opened && depth == 0) return source.substring(start, index + 1) }
-            }
-        }
-        error("unterminated: $signature")
-    }
+    private fun block(signature: String): String = MainActivityRefactorSource.function(source, signature)
 }

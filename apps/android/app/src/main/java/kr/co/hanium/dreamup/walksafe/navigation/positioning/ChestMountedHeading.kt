@@ -229,10 +229,6 @@ class ChestMountedHeading(
                 rotation,
             )
         }
-        if (fieldAnomalyActive && !recordNormalRecoverySample(magneticField.observedAtMs)) {
-            return invalid(ChestMountedHeadingGateReason.FIELD_RECOVERING, rotation)
-        }
-
         // S09-32: the heading comes from the rotation vector, but the field checks above certify it
         // with a magnetometer sample taken up to MAX_SENSOR_SKEW_MS apart. While the phone turns,
         // the heading can move by |rate| x skew in between; that physical amount is added to the
@@ -246,6 +242,10 @@ class ChestMountedHeading(
             rotation.headingAccuracyDegrees + (angularRate ?: 0.0) * sensorSkewMs / MILLISECONDS_PER_SECOND
         if (!walkingHeadingAccuracyDegrees.isFinite() || walkingHeadingAccuracyDegrees > MAX_OUTPUT_ACCURACY_DEGREES) {
             return invalid(ChestMountedHeadingGateReason.HEADING_ACCURACY, rotation)
+        }
+        // Recovery evidence must pass the final heading gate before it can clear the anomaly.
+        if (fieldAnomalyActive && !recordNormalRecoverySample(magneticField.observedAtMs)) {
+            return invalid(ChestMountedHeadingGateReason.FIELD_RECOVERING, rotation)
         }
 
         val magneticHeadingDegrees = Math.toDegrees(atan2(forwardEast, forwardNorth))

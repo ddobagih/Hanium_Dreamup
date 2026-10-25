@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -74,6 +75,7 @@ class MotionObservationRateTest {
                 timestampMs = previous.timestampMs,
                 cameraPoseEvidence = previous.cameraPoseEvidence,
                 objectPositionInAnchor = previous.objectPositionInAnchor,
+                materialPointId = previous.materialPointId,
                 depthObservationTimestampNs = previous.depthObservationTimestampNs,
                 requireIndependentDepthObservation = true,
             )
@@ -403,6 +405,7 @@ class MotionObservationRateTest {
     }
 
     private class Fixture(private val scenario: Scenario) {
+        private val materialPointId = VisualMaterialPointId() // Same known point, independent of detection cadence.
         val tracker = ObjectTracker()
         lateinit var track: TrackState
             private set
@@ -438,6 +441,7 @@ class MotionObservationRateTest {
                     track.distanceHistory.lastOrNull()?.depthObservationTimestampNs
                 } else depthObservationTimestampNs,
                 requireIndependentDepthObservation = true,
+                materialPointId = materialPointId,
             )
             return estimate()
         }

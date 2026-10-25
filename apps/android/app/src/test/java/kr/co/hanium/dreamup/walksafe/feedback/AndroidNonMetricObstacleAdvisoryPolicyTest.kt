@@ -363,7 +363,7 @@ class AndroidNonMetricObstacleAdvisoryPolicyTest {
     }
 
     @Test
-    fun candidateLossDropsTheActiveDelivery() {
+    fun candidateLossRevokesStartButRetainsTheClaimedCompletionReceipt() {
         val policy = immediatePolicy()
         val candidate = detection(centerX = 0.5f)
         val first = policy.evaluate(listOf(candidate), gate, 1L, 1_000L)
@@ -373,7 +373,28 @@ class AndroidNonMetricObstacleAdvisoryPolicyTest {
 
         assertNull(policy.evaluate(emptyList(), gate, 2L, 1_001L))
         assertFalse(policy.isDeliveryCurrent(first))
-        assertFalse(policy.confirmDelivery(first, 1_002L))
+        assertTrue(policy.hasClaimedDelivery(first))
+        assertTrue(policy.confirmDelivery(first, 1_002L))
+        assertFalse(policy.hasClaimedDelivery(first))
+    }
+
+    @Test
+    fun equalValuedReplacementCannotBeClaimedConfirmedOrRejectedByTheOldReceipt() {
+        val policy = immediatePolicy()
+        val candidate = detection(centerX = 0.5f)
+        val first = requireNotNull(policy.evaluate(listOf(candidate), gate, 1L, 1_000L))
+        assertTrue(policy.claimDelivery(first))
+        policy.reset()
+        val replacement = requireNotNull(policy.evaluate(listOf(candidate), gate, 1L, 1_000L))
+        assertEquals(first, replacement)
+
+        assertFalse(policy.claimDelivery(first))
+        assertTrue(policy.claimDelivery(replacement))
+        assertFalse(policy.hasClaimedDelivery(first))
+        assertFalse(policy.confirmDelivery(first, 1_001L))
+        assertFalse(policy.rejectDelivery(first))
+        assertTrue(policy.hasClaimedDelivery(replacement))
+        assertTrue(policy.confirmDelivery(replacement, 1_001L))
     }
 
     @Test

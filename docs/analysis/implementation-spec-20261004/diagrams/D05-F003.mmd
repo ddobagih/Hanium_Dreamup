@@ -1,0 +1,10 @@
+flowchart TD
+  H["P-D05-003 · F-D05-003 카메라 YUV 소유 복사·회전·letterbox 전처리"]
+  H --> A["YUV420 plane crop stride 검사"]
+  A -->|"실패"| X["입력 거부 native 미호출"]
+  A -->|"성공"| B["owned bytes 복사 후 원 Image close"]
+  B --> C["선언 색공간 또는 BT601 full 변환"]
+  C --> D["quarter turn 0 에서 3"]
+  D --> E["RGB114 bilinear letterbox 768 FP32"]
+  E --> F["F-D05-002 native invoke"]
+  F --> G["박스 inverse letterbox 와 sensor 회전 복원"]

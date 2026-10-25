@@ -1,0 +1,11 @@
+stateDiagram-v2
+  state "F-D08-017 활성 보행 없음" as S0
+  state "F-D08-017 보행 lease 활성" as S1
+  state "F-D08-017 종료 기록" as S2
+  state "F-D08-017 충돌" as S3
+  [*] --> S0
+  S0 --> S1: start와stableclock
+  S1 --> S1: 동일holder renew 또는확인된takeover
+  S1 --> S2: end revoke expire
+  S1 --> S3: stale holder lease fence
+  S2 --> S3: 옛 start 재실행

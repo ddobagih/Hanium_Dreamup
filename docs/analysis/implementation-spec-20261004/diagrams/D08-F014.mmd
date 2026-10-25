@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D08-014 자기 세션 로그아웃·refresh 기반 폐기"]
+  B["진입: DELETE /api/field-session"]
+  A --> B
+  P0["1. 현재 세션을 찾고 해당 short slot 또는 long family 를 폐기한다."]
+  B --> P0
+  P1["2. self 쿠키를 만료 응답한다."]
+  P0 --> P1
+  P2["3. 장기/device holder 이면 일치하는 보행 lease 종료를 best effort 시도한다."]
+  P1 --> P2
+  P3["4. refresh 기반 logout은 current proof 또는 확인된 consumed proof로 해당 family만 폐기한다. 이것은 refresh 회전과 달리 계정 전체 reuse 폐기를 유발하지 않는다. 일치하는 family가 없어도 cookie clear 응답을 반환한다."]
+  P2 --> P3
+  OK["204 및 해당 쿠키 clear"]
+  P3 --> OK
+  C0{"보행 ledger 종료 실패"}
+  X0["인증 폐기는 유지; 보행 lease 는 만료로 회수 가능"]
+  B -. "해당 단계에서 검사" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"상태 commit 불명"}
+  X1["typed outcome unknown; 단순 성공으로 바꾸지 않음"]
+  B -. "해당 단계에서 검사" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"recovery 와 body/query"}
+  X2["범위 거부"]
+  B -. "해당 단계에서 검사" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["P-D08-007, P-D08-008, P-D08-012, P-D08-013"]
+  A -.-> POLICY

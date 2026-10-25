@@ -1,0 +1,10 @@
+flowchart TD
+  H["P-D05-005 · F-D05-005 legacy 두 모델 순차검출·부분 결과"]
+  H --> C{"명시 legacy 선택"}
+  C -->|"현재 아니오"| N["DISABLED fallback null"]
+  C -->|"예"| A["두 asset 와 계약 검증"]
+  A -->|"실패"| X["부분 생성도 해제"]
+  A --> B["COCO640 실행 partial"]
+  B --> D["custom960 실행"]
+  D -->|"성공"| F["합친 final"]
+  D -->|"실패"| X

@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.network
 
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import java.io.File
 import java.net.SocketTimeoutException
 import org.junit.Assert.assertEquals
@@ -108,19 +109,17 @@ class GatewayRenewalFailureNoticeTest {
     @Test
     fun mainRenewalFailureSpeaksTheNoticeForEveryReloginOutcome() {
         val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val start = source.indexOf("private fun renewRestoredGatewaySession(")
-        assertTrue("renewRestoredGatewaySession must exist", start >= 0)
-        val body = source.substring(start, source.indexOf("private fun commitLoggedInGatewaySession(", start))
+        val body = MainActivityRefactorSource.function(source, "fun renewRestoredGatewaySession(")
         assertTrue(body.contains("GatewayRenewalFailureNotice.of(error)?.let { notice ->"))
-        assertTrue(body.contains("updateNavigationStatus(notice.statusToken)"))
+        assertTrue(body.contains("ui.status(notice.statusToken)"))
         assertTrue(body.contains("speakInteraction(notice.speech)"))
         // Owner decision 1: the reason stays visible on the login screen (TalkBack-readable text).
-        assertTrue(body.contains("accountAccessNotice = notice.speech"))
-        assertTrue(body.contains("updateFirstRunOnboardingUi()"))
+        assertTrue(body.contains("ui.setAccountAccessNotice(notice.speech)"))
+        assertTrue(body.contains("ui.refreshFirstRun()"))
         assertTrue(
             "the notice must follow abandonRenewal, not the silent busy-retry branch",
             body.indexOf("GatewayRenewalFailureNotice.of(error)") >
-                body.indexOf("gatewaySessionStore.abandonRenewal("),
+                body.indexOf("store.abandonRenewal("),
         )
     }
 

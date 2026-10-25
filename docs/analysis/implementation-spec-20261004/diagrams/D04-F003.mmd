@@ -1,0 +1,21 @@
+flowchart TD
+  ID["F-D04-003 · 걸음 센서 등록·누적 수·PDR 이벤트<br/>P-D04-003"]
+  A["start 및 sensor callback"]
+  C0{"현재 listener 세대이며 값과 원래 시각이 유효한가"}
+  R0["무시하고 상태 보존"]
+  C1{"Counter baseline 또는 Detector/Counter 공통 걸음 기반이 확인됐는가"}
+  R1["기준선 수립; 과거 누적은 발행하지 않음"]
+  OK["UI total 갱신 → 정상 Detector HIGH 또는 stall uncovered Counter MEDIUM → Main 소유권 재검사"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  STOP["stop: 세대 retire·baseline 초기화·unregister; resetForNewWalk: total도 0"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

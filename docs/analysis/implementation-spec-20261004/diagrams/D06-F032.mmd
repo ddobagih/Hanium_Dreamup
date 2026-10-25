@@ -1,0 +1,49 @@
+flowchart TD
+  T["F-D06-032 위치 평가 NDJSON 내보내기와 선택창 복귀 재인가"]
+  P["전제: DEBUG; GENERAL VERIFIED usable gateway session, 동일 actor<br/>permission authentication, account deletion 차단 없음. 같은<br/>scope/walkEpoch COMPLETED 기록."]
+  T --> P
+  E1["E-D06-032-01 최근 기록 export→검증된 권한/binding<br/>캡처→ACTION_CREATE_DOCUMENT"]
+  E1 --> T
+  E2["E-D06-032-02 SAF 결과→generation·scope·actor·gateway·walk<br/>재확인→export 또는 목적지 정리"]
+  E2 --> T
+  A1["1. 현재 binding에서 최근 COMPLETED 하나를 고르고 pending export authority와<br/>generation을 저장한다."]
+  P --> A1
+  A2["2. SAF ACTION_CREATE_DOCUMENT로 NDJSON 목적지를 요청한다."]
+  A1 --> A2
+  A3["3. callback에서 pending 상태를 먼저 소비하고 현재 권한과 captured authority가<br/>정확히 같은지 확인한다."]
+  A2 --> A3
+  A4["4. Recorder는 전체 AEAD record chain을 검증한 후에만 출력에 쓰고 scope hash<br/>같은 내부 결합 값은 export에서 제외한다."]
+  A3 --> A4
+  A5["5. 실패·취소·stale 권한이면 부분 목적지를 delete 또는0바이트 truncate한다; 둘 다 실패하면<br/>정확 위치가 남을 수 있음을 화면으로 알린다."]
+  A4 --> A5
+  N["정상 종료: EXPORTED 후 사용자 안내."]
+  A5 --> N
+  FX["결과: 사용자 선택 저장소 평문 NDJSON, 성공/실패 음성. 외부 기관 서버 전송은 없음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"다른 actor/session/generation/walk 또는 계정삭제"}
+    R1["export 금지, 선택된 목적지 정리"]
+    B1 -->|조건 성립| R1
+    B2{"ACTIVE/INTERRUPTED 또는 scope mismatch"}
+    R2["NOT_COMPLETED/NOT_FOUND 등 반환"]
+    B2 -->|조건 성립| R2
+    B3{"원본 손상"}
+    R3["CORRUPT_SOURCE; 정상 export 미표시"]
+    B3 -->|조건 성립| R3
+    B4{"목적지 쓰기 실패"}
+    R4["DESTINATION_WRITE_FAILED·부분파일 제거 필요"]
+    B4 -->|조건 성립| R4
+    B5{"SAF 사용자 취소"}
+    R5["pending 소모 후 종료"]
+    B5 -->|조건 성립| R5
+  end
+  POL["정책: P-D06-028, P-D06-031"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 부분 출력물 제거/절단 시도, 실패도 명시."]
+    X2["취소: 취소 callback에서 pending 정리 및 대상 URI 있을 때 정리."]
+    X3["중단: 계정·보행 바뀐 늦은 callback는 거부."]
+    X4["재시도: 사용자가 다시 export 선택; 자동 재시도 없음."]
+    X5["복구: SAF 반환 뒤 원본과 authority를 새로 검사."]
+    X6["정리: delete 실패하면 wt truncate, 둘 다 실패시 잔존 가능 안내."]
+  end

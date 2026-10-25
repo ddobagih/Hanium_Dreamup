@@ -41,7 +41,10 @@ def summarize(directory: Path) -> list[dict[str, object]]:
                         skipped=sum(case.find("skipped") is not None for case in cases),
                     )
                     if exit_code is not None:
-                        row["status"] = "PASS" if exit_code == 0 and cases and not row["failures"] and not row["errors"] else "FAIL"
+                        if exit_code != 0 or not cases or row["failures"] or row["errors"]:
+                            row["status"] = "FAIL"
+                        else:
+                            row["status"] = "SKIPPED" if row["skipped"] == len(cases) else "PASS"
                 elif exit_code is not None and exit_code != 0:
                     row["status"] = "FAIL"
             except (OSError, ValueError, ET.ParseError) as exc:
@@ -64,7 +67,7 @@ def main() -> int:
     lines = ["## Test layers: " + args.report_dir.name, "", "| Group | Status | Tests | Failures | Errors | Skipped | Selected files |", "| --- | --- | ---: | ---: | ---: | ---: | ---: |"]
     for row in rows:
         lines.append(f"| {row['group']} | {row['status']} | {row['tests']} | {row['failures']} | {row['errors']} | {row['skipped']} | {len(row['selected_files'])} |")
-    lines.extend(["", "EXCLUDED is outside this selector. NOT_RUN is selected but not started; neither is PASS.", "Historical control tests stay excluded from product selectors. Web policy checks, Android build/lint/JVM and model-smoke results are not counted as Python/Node testcases here.", ""])
+    lines.extend(["", "EXCLUDED is outside this selector. NOT_RUN is selected but not started. SKIPPED means every reported testcase was skipped; none is PASS.", "Historical control tests stay excluded from product selectors. Web policy checks, Android build/lint/JVM and model-smoke results are not counted as Python/Node testcases here.", ""])
     markdown = "\n".join(lines)
     (args.report_dir / "summary.md").write_text(markdown)
     if os.environ.get("GITHUB_STEP_SUMMARY"):

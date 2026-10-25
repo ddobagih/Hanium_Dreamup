@@ -1,0 +1,29 @@
+flowchart TD
+  T["F-D09-001 환경 검증과 FastAPI 시작·종료 / P-D09-001"]
+  N0["설정과 저장 경계 검증"]
+  T --> N0
+  N1["issuer와 privacy/account key 결속"]
+  N0 --> N1
+  N2["report와 raw 복구 및 inventory"]
+  N1 --> N2
+  N3["monitor와 TMAP 및 health 시작"]
+  N2 --> N3
+  N4["yield serving"]
+  N3 --> N4
+  N5["finally 자원 순차 정리"]
+  N4 --> N5
+  Z["정상: 모든 startup 단계가 통과하면 API serving 가능"]
+  N5 --> Z
+  B0["Settings ValueError로 serving 이전 실패"]
+  N0 -->|"배포에서 fake 또는 불완전 모델/키/ACL/DB 계약"| B0
+  B1["yield 도달하지 않으며 finally 정리 시도"]
+  N1 -->|"startup binding/inventory 예외"| B1
+  B2["로그에는 purpose만 기록하고 가입은 요청별 차단; 로그인용 두 키는 계속 검증"]
+  N1 -->|"OTP용 HMAC만 불일치"| B2
+  R["종료와 복구: 서버 자동 재시도 없음 / 원인 해소 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  C["취소와 정리: lifespan 종료 시 stop event를 전달하고 소유 task를 기다림 / nested finally 순서로 resource owner.close 호출; 실패 시 정상 종료로 단정하지 않음"]
+  N5 -.-> C

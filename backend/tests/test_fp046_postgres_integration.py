@@ -835,8 +835,22 @@ def test_fp046_database_rejects_noncanonical_initial_request_status() -> None:
     engine.dispose()
 
 
+@pytest.fixture
+def postgres_actor_rate_limit_runtime(monkeypatch: pytest.MonkeyPatch):
+    # ASGITestClient intentionally omits app lifespan; this integration test
+    # still needs the real app-owned executor and PostgreSQL admission store.
+    monkeypatch.setattr(app_settings, "actor_rate_limit_store", "postgresql")
+    runtime = app.state.runtime.actor_rate_limits
+    runtime.start()
+    try:
+        yield runtime
+    finally:
+        runtime.close()
+
+
 def test_fp046_gateway_scoped_assertion_binds_body_path_and_tombstone(
     monkeypatch: pytest.MonkeyPatch,
+    postgres_actor_rate_limit_runtime,
 ) -> None:
     gateway_secret = "fp046-gateway-session-assertion-secret-v2"
     field_token = "fp046-field-token-for-scoped-assertion"
@@ -845,7 +859,6 @@ def test_fp046_gateway_scoped_assertion_binds_body_path_and_tombstone(
     monkeypatch.setattr(app_settings, "gateway_session_secret", gateway_secret)
     monkeypatch.setattr(app_settings, "walksafe_environment", "test")
     monkeypatch.setattr(app_settings, "allow_insecure_local_dev", False)
-    monkeypatch.setattr(app_settings, "actor_rate_limit_store", "postgresql")
 
     suffix = uuid.uuid4().hex[:12]
     actor_id = f"scoped.{suffix}"
@@ -906,6 +919,13 @@ def test_fp046_gateway_scoped_assertion_binds_body_path_and_tombstone(
         content=consent_body,
     )
     assert consent_response.status_code == 201, consent_response.text
+    with app.state.runtime.database.session_factory() as db:
+        recorded_admissions = db.scalar(
+            text("SELECT count(*) FROM actor_rate_limit_events "
+                 "WHERE actor_digest = :actor_digest AND rate_group = 'privacy'"),
+            {"actor_digest": hashlib.sha256(actor_id.encode("utf-8")).hexdigest()},
+        )
+    assert recorded_admissions == 1
     created = client.post(path, headers=headers, content=raw_body)
     assert created.status_code == 202, created.text
     assert created.headers["cache-control"] == "no-store"
@@ -2264,7 +2284,7 @@ def test_fresh_email_account_deletion_fences_auth_and_preserves_postcommit_reenr
         journal_path = next((journal_root / "journals").glob("*.json"))
         prepared_journal = json.loads(journal_path.read_text(encoding="utf-8"))
         assert prepared_journal["schema_version"] == (
-            "walksafe.account-deletion-worker-journal.v4"
+            "walksafe.account-deletion-worker-journal.v5"
         )
         assert prepared_journal["state"] == "PREPARED"
         assert prepared_journal["account_enrollment_count"] == 2
@@ -3020,7 +3040,8 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
                 )
             ).mappings()
         }
-        expected_update_tables = {
+        diagnostic_tables = {"guidance_diagnostic_preferences", "guidance_diagnostic_sessions", "guidance_diagnostic_batches"}
+        expected_update_tables = diagnostic_tables | {
             "reports",
             "account_deletion_requests",
             "account_deletion_items",
@@ -3116,7 +3137,7 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
             table_name
             for table_name, row in app_table_privileges.items()
             if row["runtime_delete"]
-        } == {"actor_rate_limit_events"}
+        } == {"actor_rate_limit_events"} | diagnostic_tables
         assert all(
             not row["runtime_truncate"] for row in app_table_privileges.values()
         )

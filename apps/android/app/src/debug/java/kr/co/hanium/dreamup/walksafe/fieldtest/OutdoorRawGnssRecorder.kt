@@ -41,13 +41,14 @@ class OutdoorRawGnssRecorder(
         val pendingEpochCount: Int,
         val pendingBytes: Int,
         val droppedMeasurementCount: Long,
+        val cleanupPending: Boolean,
+        val cleanupError: String?,
     )
 
     private val applicationContext = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private val locationManager = applicationContext.getSystemService(LocationManager::class.java)
-    private var callback: GnssMeasurementsEvent.Callback? = null
-    @Volatile private var registered = false
+    private val registration = OutdoorRawGnssRegistration()
     private var startCompletion: ((Boolean) -> Unit)? = null
     private val stopCompletions = mutableListOf<(Boolean) -> Unit>()
     private val statusPending = AtomicBoolean(false)
@@ -105,6 +106,9 @@ class OutdoorRawGnssRecorder(
             return
         }
         try {
+            if (ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                throw SecurityException("정확한 위치 권한이 필요합니다.")
+            }
             val listener = object : GnssMeasurementsEvent.Callback() {
                 override fun onGnssMeasurementsReceived(eventArgs: GnssMeasurementsEvent) {
                     record(eventArgs, activeGeneration)
@@ -119,8 +123,8 @@ class OutdoorRawGnssRecorder(
                     }
                 }
             }
-            callback = listener
             val manager = checkNotNull(locationManager)
+            registration.prepare { manager.unregisterGnssMeasurementsCallback(listener) }
             val accepted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 manager.registerGnssMeasurementsCallback(
                     GnssMeasurementRequest.Builder().setFullTracking(true).build(),
@@ -131,7 +135,7 @@ class OutdoorRawGnssRecorder(
                 manager.registerGnssMeasurementsCallback(listener, mainHandler)
             }
             if (!accepted) throw IllegalStateException("원시 GNSS 관측 등록이 거부되었습니다.")
-            registered = true
+            registration.confirmRegistration()
             publish()
             completeStart(true)
         } catch (failure: Exception) {
@@ -169,8 +173,8 @@ class OutdoorRawGnssRecorder(
     private fun record(event: GnssMeasurementsEvent, activeGeneration: Long) {
         val callbackElapsedNanos = SystemClock.elapsedRealtimeNanos()
         val callbackUtcMillis = System.currentTimeMillis()
-            if (!writer.accepts(activeGeneration)) return
-            try {
+        if (!writer.accepts(activeGeneration)) return
+        try {
                 val receiver = event.clock
                 val clock = OutdoorRawGnssClock(
                     receiver.timeNanos,
@@ -214,12 +218,10 @@ class OutdoorRawGnssRecorder(
             }
     }
 
-    private fun unregister() {
-        val listener = callback
-        callback = null
-        registered = false
-        if (listener != null) runCatching { locationManager?.unregisterGnssMeasurementsCallback(listener) }
-    }
+    private fun unregister(): Boolean = registration.release()
+
+    /** Retry the retained exact callback; this never reopens or changes the completed file. */
+    fun retryCleanup(): Boolean = unregister().also { publish() }
 
     private fun snapshot(): Status {
         val value = writer.snapshot
@@ -232,21 +234,21 @@ class OutdoorRawGnssRecorder(
             value.utcFallbacks > 0L -> "기기 UTC를 사용한 관측 ${value.utcFallbacks}개: GNSS 시간 정합성은 분석에서 확인합니다."
             else -> null
         }
-        val state = if (value.state == BoundedRawGnssWriter.State.RECORDING && !registered) State.STARTING
+        val state = if (value.state == BoundedRawGnssWriter.State.RECORDING && !registration.registered) State.STARTING
             else State.valueOf(value.state.name)
         return Status(state, value.measurements, value.epochs, value.adrValid, value.lastEpochNanos,
             value.error, if (state == State.STOPPED) sessionFile else stagingFile,
             value.missingFullBias, value.missingCodeType, value.utcFallbacks, warning,
-            value.closed, value.pendingBatches, value.pendingBytes, value.droppedMeasurements)
+            value.closed, value.pendingBatches, value.pendingBytes, value.droppedMeasurements,
+            registration.cleanupPending, registration.failure?.javaClass?.simpleName)
     }
 
     private fun publish() {
         if (!statusPending.compareAndSet(false, true)) return
         mainHandler.post {
             statusPending.set(false)
-            val value = status
-            if (value.state == State.STOPPING || value.closed) unregister()
-            onStatus(value)
+            if (writer.snapshot.state == BoundedRawGnssWriter.State.STOPPING || writer.snapshot.closed) unregister()
+            onStatus(status)
         }
     }
 

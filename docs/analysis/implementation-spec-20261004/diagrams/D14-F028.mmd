@@ -1,0 +1,27 @@
+flowchart TD
+  IN["F-D14-028<br/>내부 CRITICAL 사고 개시 기록"]
+  G["적용 정책<br/>P-D14-019"]
+  IN --> G
+  N1["1. 텍스트 trim/control char 금지와 시각 순서 검증"]
+  G --> N1
+  N2["2. 정규 opening payload의 intent SHA256 계산"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 같은 incident id 기존 행 잠금 및 digest 비교"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 신규이면 CRITICAL/OPEN/version1 projection과 u<br/>uid5 OPENED revision1 event 생성"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. commit race IntegrityError도 기존 same-inten<br/>t 재조회하여 idempotent 처리"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>기존 반환 created=false, 추가 event 없음"]
+  N3 -->|"같은 id와 정확 opening intent"| B1
+  B2["분기 결과<br/>409 incident_opening_conflict"]
+  N3 -->|"같은 id 다른 intent"| B2
+  B3["분기 결과<br/>rollback 및503"]
+  N5 -->|"DB 오류"| B3
+  B4["분기 결과<br/>health 저장소 inventory mismatch에서 USER_SAFETY_<br/>RISK로 호출; 같은 evidence 기반 안정 id"]
+  N1 -->|"실제 연결 producer"| B4
+  N5 --> END["정상 종료<br/>사고 기록만 commit. 프로세스 재시작·서비스 차단 제어·외부 알림은 이 함<br/>수가 수행하지 않음."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 개시/이력 행 삭제 API 없음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

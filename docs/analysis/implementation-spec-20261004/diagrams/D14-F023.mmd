@@ -1,0 +1,35 @@
+flowchart TD
+  IN["F-D14-023<br/>새 비밀번호·TOTP로 복구 완료"]
+  G["적용 정책<br/>P-D14-003 / P-D14-004 / P-D14-005 / P-D14-015 / P-D14-016"]
+  IN --> G
+  N1["1. 실패 제한→recovery fence→token/transaction/co<br/>de 검사"]
+  G --> N1
+  N2["2. 이미 완료 또는 code 사용됨 거절; 만료는 F-D14-024"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. control RECOVERY_IN_PROGRESS 및 bound devi<br/>ce, ACTIVE key 확인"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 새 runtime TOTP fingerprint가 transaction 이<br/>전값과 current control값 모두와 달라야 함"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 새 TOTP 검증 및 이전 password 재사용 거절, 새 passwor<br/>d hash 생성"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. PG 보호함수에서 password/factor/timecode/NORMAL<br/>/version 갱신 및 code.used/transaction.complete<br/>d 기록"]
+  N5 -->|"계속 가능한 경우"| N6
+  N7["7. RECOVERY_COMPLETE session 발급과 SUCCESS 감사/<br/>attempt를 같은 transaction으로 commit"]
+  N6 -->|"계속 가능한 경우"| N7
+  N8["8. opaque access token 및 NORMAL 반환"]
+  N7 -->|"계속 가능한 경우"| N8
+  B1["분기 결과<br/>409 admin_totp_secret_not_replaced"]
+  N4 -->|"runtime TOTP 미교체/잘못된 pending candidate"| B1
+  B2["분기 결과<br/>401 recovery_verification_failed"]
+  N5 -->|"새 TOTP 불일치"| B2
+  B3["분기 결과<br/>422 password_reuse_forbidden"]
+  N5 -->|"기존 password 재사용"| B3
+  B4["분기 결과<br/>401 recovery_invalid"]
+  N2 -->|"token 완료·소비·누락"| B4
+  B5["분기 결과<br/>403 recovery_invalid"]
+  N3 -->|"device/state 불일치"| B5
+  N8 --> END["정상 종료<br/>NORMAL session 발급. custody는 UNATTESTED 유지되어 <br/>고위험 작업 전에 F-D14-012 재확인 필요."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 완료 응답 유실 시 새 password/TOTP로 새 <br/>로그인 시도. 동일 TOTP timecode 재사용은 거절됨."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

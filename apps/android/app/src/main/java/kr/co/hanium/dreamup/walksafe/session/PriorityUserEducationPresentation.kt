@@ -38,6 +38,8 @@ object PriorityUserEducationPresentation {
                 "후보가 표시된 동안에만 번호로 선택할 수 있습니다. 목적지 취소라고 말하면 취소합니다. " +
                 "목적지 선택 후 안내 시작이라고 말하세요. 안내 시작 때 실제 위치와 카메라 품질을 점검하고 " +
                 "필요하면 현재 휴대전화 정면 고정 상태를 확인해야 합니다. " +
+                "진동은 주의나 입력 상태를 알리는 신호로, 같은 진동도 여러 이유로 울릴 수 있습니다. " +
+                "진동만으로 안전이나 방향, 행동을 판단하지 말고, 이유와 해야 할 행동은 함께 나오는 음성이나 화면 설명으로 확인하세요. " +
                 "지금 멈춰야 하면 발걸음을 멈추고 주변을 확인한 뒤 보행 일시정지라고 말하세요. " +
                 "보행을 아예 끝내려면 보행 종료라고 말하고 종료 확인 안내에 응답하세요. " +
                 "보행 일시정지로 보행 전체를 잠시 멈추고, 보행 재개로 이어갑니다. " +
@@ -51,6 +53,18 @@ object PriorityUserEducationPresentation {
                 "도움말은 사용 가능한 명령을, 다시 말해줘는 현재 안내만 읽습니다. " +
                 "음성 안내 중에는 입력이 잠시 멈춥니다. 듣기가 실패하거나 중지되면 다시 시도하세요. " +
                 "이 교육의 완료는 현재 장소가 안전하거나 실제 보행 연습을 마쳤다는 뜻이 아닙니다."
+    }
+
+    /** Keep each native utterance below the education watchdog without omitting any content. */
+    fun speechSegments(message: String): List<String> = buildList {
+        var start = 0
+        while (start < message.length) {
+            val limit = (start + 250).coerceAtMost(message.length)
+            val sentenceEnd = if (limit < message.length) message.lastIndexOf(". ", limit - 2) else -1
+            val end = if (sentenceEnd >= start) sentenceEnd + 2 else limit
+            add(message.substring(start, end))
+            start = end
+        }
     }
 
     fun screenText(snapshot: PriorityUserOnboardingSnapshot): String =

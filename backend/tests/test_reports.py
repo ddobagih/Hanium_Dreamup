@@ -7,6 +7,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 import sys
+import tempfile
 from typing import Optional
 import uuid
 
@@ -24,6 +25,7 @@ from backend.app.config import get_settings  # noqa: E402
 from backend.app.database import SessionLocal  # noqa: E402
 from backend.app.main import app, settings as app_settings  # noqa: E402
 from backend.app.services.privacy_lifecycle import bind_or_verify_privacy_hmac_key  # noqa: E402
+from backend.app.services import maintenance_lock  # noqa: E402
 from backend.app.models import (  # noqa: E402
     Report,
     ReportContentRevision,
@@ -530,21 +532,28 @@ def test_report_status_write_fails_closed_during_maintenance(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    created = create_report(client)
-    monkeypatch.setattr("backend.app.api.reports._trusted_maintenance_lock_parent", lambda *_args: True)
-    lock_path = tmp_path / "maintenance.lock"
-    lock_path.touch(mode=0o600)
-    descriptor = os.open(lock_path, os.O_RDONLY | os.O_NOFOLLOW)
-    monkeypatch.setattr(get_settings(), "maintenance_lock_path", lock_path)
-    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    lock_parent = Path("/run/user") / str(os.geteuid())
+    if os.geteuid() == 0 or not lock_parent.is_dir():
+        pytest.skip("requires a non-root Linux runtime with an owned /run/user directory")
+    parent_descriptor = os.open(lock_parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
-        response = client.patch(
-            f"/reports/{created['id']}/status",
-            json={"status": "reviewed", "expected_updated_at": created["updated_at"]},
-        )
+        if not maintenance_lock._trusted_maintenance_lock_parent(lock_parent, parent_descriptor):
+            pytest.skip("requires a maintenance lock directory under a trusted namespace")
     finally:
-        fcntl.flock(descriptor, fcntl.LOCK_UN)
-        os.close(descriptor)
+        os.close(parent_descriptor)
+
+    created = create_report(client)
+    with tempfile.NamedTemporaryFile(dir=lock_parent, prefix="walksafe-maintenance-test-") as lock_file:
+        lock_path = Path(lock_file.name)
+        monkeypatch.setattr(get_settings(), "maintenance_lock_path", lock_path)
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            response = client.patch(
+                f"/reports/{created['id']}/status",
+                json={"status": "reviewed", "expected_updated_at": created["updated_at"]},
+            )
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     assert response.status_code == 503
     assert response.json()["detail"]["code"] == "maintenance_in_progress"

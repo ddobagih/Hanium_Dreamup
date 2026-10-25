@@ -1,0 +1,21 @@
+flowchart TD
+ A["F-D03-031 새 위치 / P-D03-031"] --> C{"서로 다른 fresh raw와 filtered 근거인가"}
+ C -->|"아니오"| X["통과 증거 추가 안 함 / 필요시 기존 cue 무효"]
+ C -->|"예"| G{"긴 gap 10초 초과와 도달범위 80m 초과인가"}
+ G -->|"예"| H["첫 fix HOLD / 다음 연속 도달가능 fix에서 RESUME"]
+ G -->|"아니오"| J{"정지 step 변화 0.5 이하이며 큰 progress 점프인가"}
+ H -->|"다음 fresh fix"| C
+ J -->|"예"| K["anchor hold / 10초 미해소면 보호통과와 도착 차단 및 재확인"]
+ J -->|"아니오"| R{"후퇴 margin을 넘는 같은 rewind 후보인가"}
+ R -->|"예"| R2{"10초 내 두 fresh fix로 확인했는가"}
+ R2 -->|"예"| RW["이전 guide 복구 / 완료 speech 제거"]
+ R2 -->|"아니오"| X
+ R -->|"아니오"| P{"보호 guide를 통과하려는가"}
+ P -->|"아니오"| N["일반 passage margin으로 다음 guide 평가"]
+ P -->|"예"| E{"첫 보호통과 또는 다음 보호guide의 3단계 독립 증거가 완료인가"}
+ E -->|"아니오"| Q["통과 확인중 / 진행 보류"]
+ E -->|"예"| V{"다음 보호guide이면 두 시각 증가와 비감소 guide 거리<br/>거리차가 min raw와 filtered Δt 곱하기 80m/s 이하인가"}
+ V -->|"아니오"| Q
+ V -->|"예 또는 첫 보호통과"| Y["fix당 보호 guide 하나만 통과 / 새 anchor 기록"]
+ RW --> Q
+ A -->|"route reset 또는 위치 연속성 중단"| Z["pending 단계 증거 폐기"]

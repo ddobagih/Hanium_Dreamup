@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
+
 /** Independent depth captures and AR pose times have separate clocks; neither replaces the other. */
 internal enum class MotionObservationAdmission { NEW, DUPLICATE, UNAVAILABLE, DISCONTINUOUS }
 
@@ -11,6 +13,7 @@ internal class MotionObservationWindow {
     private var lastDepthTimestampNs: Long? = null
     private var source: DepthSource? = null
     private var referenceId: Long? = null
+    private var materialPointId: VisualMaterialPointId? = null
     var resetOnAdmission: Boolean = false
         private set
 
@@ -40,6 +43,8 @@ internal class MotionObservationWindow {
         }
         source = observation.source
         if (poseReference != null) referenceId = poseReference
+        // A different or unproven material point restarts only spatial motion, never proximity.
+        observeMaterialPointIdentity(observation.materialPointId)
         if (previousAt == at && depthAt != null && depthAt == lastDepthTimestampNs) {
             return MotionObservationAdmission.DUPLICATE
         }
@@ -71,15 +76,24 @@ internal class MotionObservationWindow {
             metric.lastOrNull()?.let { observation.timestampMs <= it.timestampMs } == true
         ) return
         metric += observation
+        if (observation.materialPointId == null || materialPointId !== observation.materialPointId) spatial.clear()
+        materialPointId = observation.materialPointId
         val pose = observation.cameraPoseEvidence
         val point = observation.objectPositionInAnchor
         if (observation.source.trustedForStepGuidance && observation.confidence >= 0.55f &&
             pose != null && pose.timestampMs == observation.timestampMs && pose.referenceId >= 0L &&
             pose.objectCenterInAnchor(Point2(0.5f, 0.5f), 1f) != null &&
+            observation.materialPointId != null && observation.materialPointId === materialPointId &&
             point != null && point.x.isFinite() && point.y.isFinite() && point.z.isFinite()
         ) spatial += observation
         prune(metric, observation.timestampMs)
         prune(spatial, observation.timestampMs)
+    }
+
+    /** Image ownership boundaries exist even when the current frame has no usable metric depth. */
+    fun observeMaterialPointIdentity(id: VisualMaterialPointId?) {
+        if (id == null || materialPointId !== id) spatial.clear()
+        materialPointId = id
     }
 
     fun metricSamples(atMs: Long): List<DistanceObservation> = sample(metric, atMs)
@@ -108,6 +122,7 @@ internal class MotionObservationWindow {
     fun clearSamples() {
         metric.clear()
         spatial.clear()
+        materialPointId = null
     }
 
     fun clear() {

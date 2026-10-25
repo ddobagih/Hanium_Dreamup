@@ -8,10 +8,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RouteNavigatorBearingCandidatesTest {
+    // These fixtures isolate route bearing geometry and confidence without delaying its spoken result.
+    // Production 1.5-second delay and immediate safety actions are covered by RouteDirectionRecheckGraceTest.
+
     @Test fun longStraightRouteSupportsFrontAndBehindAtTwentyThirtyAndFortyMeterAccuracy() {
         listOf(false, true).forEach { degraded ->
             listOf(20f, 30f, 40f).forEach { accuracy ->
-                listOf(90.0 to "앞쪽이 경로", 270.0 to "경로 진행 방향이 뒤쪽").forEach { (heading, expected) ->
+                listOf(90.0 to "약 12시 방향", 270.0 to "약 6시 방향").forEach { (heading, expected) ->
                     val navigator = navigator(straight(), degraded)
                     val result = navigator.update(fix(500.0, accuracy = accuracy), 1_000, false,
                         facingObservation = facing(heading))
@@ -59,16 +62,17 @@ class RouteNavigatorBearingCandidatesTest {
         val navigator = navigator(straight())
         val first = navigator.update(fix(500.0, accuracy = 40f), 1_000, false,
             facingObservation = facing(90.0))
-        assertTrue(first.instruction?.contains("앞쪽이 경로") == true)
+        assertTrue(first.instruction?.contains("약 12시 방향") == true)
         val match = navigator.currentRouteMatch()
         val turned = requireNotNull(navigator.retryGuidance(1_100, facing(270.0, 1_100)))
-        assertTrue(turned.instruction?.contains("경로 진행 방향이 뒤쪽") == true)
+        assertTrue(turned.instruction?.contains("방향이 확인되면 안내를 이어갑니다") == true)
+        assertFalse(turned.instruction?.contains("몸을 돌려주세요") == true)
         assertSame(match, navigator.currentRouteMatch())
         assertFalse(navigator.reserveInstruction(first))
         assertTrue(navigator.reserveInstruction(turned))
         navigator.acknowledgeInstruction(turned, 1_200)
         val manual = requireNotNull(navigator.currentGuidance(1_300, facing(90.0, 1_300)))
-        assertTrue(manual.instruction?.contains("앞쪽이 경로") == true)
+        assertTrue(manual.instruction?.contains("약 12시 방향") == true)
         assertSame(match, navigator.currentRouteMatch())
     }
 
@@ -83,7 +87,7 @@ class RouteNavigatorBearingCandidatesTest {
         assertEquals("guidance_in_flight", duringSpeech.reason)
         assertFalse(duringSpeech.cancelStaleNavigationSpeech)
         navigator.acknowledgeInstruction(first, 2_100)
-        assertTrue(navigator.currentGuidance(2_200, facing(0.0, 2_200))?.instruction?.contains("경로는 오른쪽") == true)
+        assertTrue(navigator.currentGuidance(2_200, facing(0.0, 2_200))?.instruction?.contains("약 3시 방향") == true)
     }
 
     /** S08-23: turning around reverses "ahead" during the same guide sentence, so it is revoked. */
@@ -96,7 +100,8 @@ class RouteNavigatorBearingCandidatesTest {
             facingObservation = facing(270.0, 2_000))
         assertEquals("route_guidance", turned.reason)
         assertTrue(turned.cancelStaleNavigationSpeech)
-        assertTrue(turned.instruction?.contains("경로 진행 방향이 뒤쪽") == true)
+        assertTrue(turned.instruction?.contains("방향이 확인되면 안내를 이어갑니다") == true)
+        assertFalse(turned.instruction?.contains("몸을 돌려주세요") == true)
         assertFalse(navigator.reserveInstruction(first))
         assertTrue(navigator.reserveInstruction(turned))
     }
@@ -104,7 +109,7 @@ class RouteNavigatorBearingCandidatesTest {
     @Test fun candidatesUseUnsnappedFilteredPointAndUncertaintyWithoutARawAccuracyCutoff() {
         val filteredPrecise = navigator(straight()).update(fix(500.0, accuracy = 40f), 1_000, false,
             FilteredRoutePosition(point(500.0), 3.0, 1_000), facingObservation = facing(90.0))
-        assertTrue(filteredPrecise.instruction?.contains("앞쪽이 경로") == true)
+        assertTrue(filteredPrecise.instruction?.contains("약 12시 방향") == true)
 
         val corner = route(listOf(point(0.0), point(500.0), point(500.0, -500.0)))
         val filteredUncertain = navigator(corner).update(fix(450.0, accuracy = 3f), 1_000, false,
@@ -117,7 +122,7 @@ class RouteNavigatorBearingCandidatesTest {
         val repeatedPoint = route(listOf(point(0.0), point(500.0), point(500.0), point(1_000.0)))
         val result = navigator(repeatedPoint).update(fix(500.0, accuracy = 40f), 1_000, false,
             facingObservation = facing(90.0))
-        assertTrue(result.instruction?.contains("앞쪽이 경로") == true)
+        assertTrue(result.instruction?.contains("약 12시 방향") == true)
     }
 
     @Test fun uncertaintyThatCoversTheWholeShortRouteDoesNotProveWhichSideOfTheDestinationWeAreOn() {
@@ -131,12 +136,12 @@ class RouteNavigatorBearingCandidatesTest {
             facingObservation = facing(90.0)))
         val beforeEndArea = navigator(straight()).update(fix(900.0, accuracy = 20f), 1_000, false,
             facingObservation = facing(90.0))
-        assertTrue(beforeEndArea.instruction?.contains("앞쪽이 경로") == true)
+        assertTrue(beforeEndArea.instruction?.contains("약 12시 방향") == true)
     }
 
     @Test fun denseCollinearSegmentsDoNotManufactureBranchAmbiguityFromSamplingDensity() {
         val dense = route(listOf(point(0.0), point(480.0), point(500.0), point(500.0), point(520.0), point(1_000.0)))
-        listOf(90.0 to "앞쪽이 경로", 270.0 to "경로 진행 방향이 뒤쪽").forEach { (heading, expected) ->
+        listOf(90.0 to "약 12시 방향", 270.0 to "약 6시 방향").forEach { (heading, expected) ->
             val navigator = navigator(dense)
             val result = navigator.update(fix(500.0, accuracy = 40f), 1_000, false,
                 facingObservation = facing(heading))
@@ -150,7 +155,7 @@ class RouteNavigatorBearingCandidatesTest {
         val strict = navigator(dense, degraded = false).update(fix(500.0, accuracy = 40f), 1_000, false,
             facingObservation = facing(90.0))
         assertEquals("route_guidance", strict.reason)
-        assertTrue(strict.instruction?.contains("앞쪽이 경로") == true)
+        assertTrue(strict.instruction?.contains("약 12시 방향") == true)
     }
 
     @Test fun retriesReevaluateCurrentLegFacingWithoutSwitchingToTheNearbyOutgoingSegment() {
@@ -161,12 +166,14 @@ class RouteNavigatorBearingCandidatesTest {
         assertTrue(first.instruction?.contains("약 12시 방향") == true)
         val match = navigator.currentRouteMatch()
         val turned = requireNotNull(navigator.retryGuidance(1_100, facing(0.0, 1_100)))
-        assertTrue(turned.instruction?.contains("오른쪽 경로 방향으로 몸을 돌리세요") == true)
+        assertTrue(turned.instruction?.contains("방향이 확인되면 안내를 이어갑니다") == true)
+        assertFalse(turned.instruction?.contains("몸을 돌려주세요") == true)
         assertSame(match, navigator.currentRouteMatch())
         assertFalse(navigator.reserveInstruction(first))
-        // S08-5: a clock number change needs a second fresh sample; the coarse direction does not wait.
+        // A clock number change needs a second fresh sample; the interim cue only asks for a recheck.
         val behind = navigator.currentGuidance(1_200, facing(270.0, 1_200))?.instruction
-        assertTrue(behind?.contains("경로 진행 방향이 뒤쪽입니다") == true)
+        assertTrue(behind?.contains("방향이 확인되면 안내를 이어갑니다") == true)
+        assertFalse(behind?.contains("몸을 돌려주세요") == true)
         assertFalse(behind?.contains("시 방향") == true)
         assertTrue(navigator.currentGuidance(1_300, facing(270.0, 1_300))?.instruction?.contains("약 6시 방향") == true)
     }
@@ -175,20 +182,20 @@ class RouteNavigatorBearingCandidatesTest {
         listOf<RouteFacingObservation?>(null, facing(90.0, 499)).forEach { observation ->
             val result = navigator(straight()).update(fix(500.0, accuracy = 40f), 1_000, false,
                 facingObservation = observation)
-            assertTrue(result.instruction?.contains("휴대전화 후면 카메라 방향을 확인할 수 없습니다") == true)
-            assertFalse(result.instruction?.contains("앞쪽이 경로") == true)
+            assertTrue(result.instruction?.contains("사용자 방향을 확인할 수 없어 다음 방향 안내를 보류합니다") == true)
+            assertFalse(result.instruction?.contains("약 12시 방향") == true)
         }
     }
 
     private fun assertRouteDirectionUncertain(result: RouteNavigatorUpdate) {
         assertTrue(result.instruction.toString(), result.instruction?.contains("현재 위치에서 경로의 진행 방향을 정확히 구분하기 어렵습니다") == true)
-        assertFalse(result.instruction?.contains("앞쪽이 경로") == true)
-        assertFalse(result.instruction?.contains("몸을 돌리세요") == true)
+        assertFalse(result.instruction?.contains("약 12시 방향") == true)
+        assertFalse(result.instruction?.contains("몸을 돌려주세요") == true)
         assertFalse(result.instruction?.contains("나침반 방향은 측정되지만") == true)
     }
 
     private fun navigator(route: WalkingRoute, degraded: Boolean = true) =
-        RouteNavigator(allowDegradedRouteGuidance = degraded).apply { setRoute(route) }
+        RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L), allowDegradedRouteGuidance = degraded).apply { setRoute(route) }
     private fun straight() = route(listOf(point(0.0), point(500.0), point(1_000.0)))
     private fun route(polyline: List<RoutePoint>): WalkingRoute {
         val distanceM = polyline.zipWithNext().sumOf { (a, b) -> haversineMeters(a.latitude, a.longitude, b.latitude, b.longitude) }.roundToInt()

@@ -1,0 +1,28 @@
+stateDiagram-v2
+ state "S-D02-001 READY 준비" as Ready
+ state "S-D02-001 ACTIVE 안내" as Active
+ state "S-D02-001 PAUSED 재검사 필요" as Recheck
+ state "S-D02-001 PAUSED 명시 재개 대기" as Await
+ state "S-D02-001 SAFE_STOP" as Stop
+ state "S-D02-001 ENDED" as Ended
+ [*] --> Ready
+ Ready --> Ready: "초기 검사 READY이면 token 발급; 아직 시작 아님"
+ Ready --> Active: "P-D02-001 exact token·foreground·30초 이하·원본 evidence fresh"
+ Ready --> Stop: "초기 준비 UNAVAILABLE"
+ Ready --> Ready: "PENDING 또는 만료이면 evidence 폐기·재검사"
+ Active --> Recheck: "background 또는 명시 recheck, recoveryGeneration 증가"
+ Recheck --> Await: "현재 epoch의 RESUME_WALK 전체 검사 READY"
+ Await --> Active: "정확한 시작 확인과 모든 freshness 재검사"
+ Await --> Await: "무응답·잘못 인식"
+ Await --> Recheck: "취소·background·만료"
+ Recheck --> Stop: "검사 UNAVAILABLE"
+ Active --> Stop: "runtime 불가·모드 변경·안전 stop"
+ Active --> Ended: "EndRequested"
+ Recheck --> Ended: "EndRequested"
+ Await --> Ended: "EndRequested"
+ Stop --> Ready: "새 보행 UUID; cleanup 완료 전 활성화 차단"
+ Ended --> Ready: "NewWalkRequested"
+ note right of Active
+  FULL 또는 DISTANCE_LIMITED는 별도 모드
+  ACTIVE 도중 조용한 모드 하향 없음
+ end note

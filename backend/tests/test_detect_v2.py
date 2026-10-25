@@ -325,7 +325,7 @@ def prepared_detect_health(monkeypatch):
 
         manager = health_snapshots.DetectV2HealthSnapshots(runner=compute)
         managers.append(manager)
-        monkeypatch.setattr(health_snapshots, "health_snapshots", manager)
+        monkeypatch.setattr(app.state.runtime, "detector_health", manager)
         manager.start(app_settings)
 
     yield prepare

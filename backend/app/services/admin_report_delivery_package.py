@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 import csv
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -341,7 +343,7 @@ def create_admin_report_delivery_package(
 
     try:
         secured_dml = _secured_delivery_package_dml_required(db)
-        report_query = select(Report).where(Report.id == report_id)
+        report_query = select(Report).where(account_subject_visible(Report)).where(Report.id == report_id)
         if not secured_dml:
             report_query = report_query.with_for_update()
         report = db.execute(report_query).scalar_one_or_none()
@@ -648,7 +650,7 @@ def get_admin_report_delivery_package_proof(
 ) -> AdminReportDeliveryPackageProof:
     try:
         report = db.execute(
-            select(Report).where(Report.id == report_id).with_for_update()
+            select(Report).where(account_subject_visible(Report)).where(Report.id == report_id).with_for_update()
         ).scalar_one_or_none()
         # S18-40: the proof follows the latest effective (uncorrected) event.
         latest_event = db.execute(

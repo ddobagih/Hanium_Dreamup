@@ -1,0 +1,16 @@
+stateDiagram-v2
+  state "S-D03-035-01 정상" as normal
+  state "S-D03-035-02 이탈확정" as confirmed
+  state "S-D03-035-03 선택대기" as choice
+  state "S-D03-035-04 재탐색중" as reroute
+  state "S-D03-035-05 새경로" as installed
+  state "S-D03-035-06 종료" as ended
+  [*] --> normal
+  normal --> confirmed: 2 distinct offroute fixes within 10s
+  confirmed --> choice: latch and REROUTE token
+  choice --> choice: recheck or later in route fix keeps latch
+  choice --> reroute: exact token NEW_ROUTE
+  reroute --> choice: failure retains route and suspension
+  reroute --> installed: validated current response installed
+  choice --> ended: exact token END
+  installed --> normal: new route revision

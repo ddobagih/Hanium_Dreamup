@@ -2,6 +2,9 @@ package kr.co.hanium.dreamup.walksafe.depth.unknown
 
 import java.util.BitSet
 import kr.co.hanium.dreamup.walksafe.depth.*
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualFrameKey
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPoint
+import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualMaterialPointId
 import kr.co.hanium.dreamup.walksafe.inference.unknown.FastSamFrameToken
 import kr.co.hanium.dreamup.walksafe.inference.unknown.segmentation.InstanceMask
 import org.junit.Assert.*
@@ -293,9 +296,18 @@ internal class UnknownProducerFixture(
     val height: Int = 32,
     val depthWidth: Int = width,
     val depthHeight: Int = height,
+    val knownPhysicalPoint: Boolean = false,
 ) {
     private var clock = 100_050L
     private val pipeline = UnknownObjectDepthPipeline(elapsedRealtimeMs = { clock })
+    private val pointId = VisualMaterialPointId()
+    /** Only fixtures explicitly declaring this fixed uniform-depth scene use this point. */
+    fun point(atMs: Long, cpuClockOffsetMs: Long = 0L): UnknownMaterialPointObservation {
+        val token = token(atMs, cpuClockOffsetMs)
+        val key = VisualFrameKey(token.sessionEpoch, token.frameId, token.cpuImageTimestampNs,
+            token.capturedElapsedNs / 1_000_000L, 1L)
+        return UnknownMaterialPointObservation(token, 0, VisualMaterialPoint(pointId, key, Point2(.5f, .5f)))
+    }
     fun sourceMs(atMs: Long) = 10_000L + atMs
     fun token(atMs: Long, cpuClockOffsetMs: Long = 0L) = FastSamFrameToken(
         FastSamFrameToken.Source.LIVE_CAMERA, 1L, sourceMs(atMs) * 1_000_000L,
@@ -326,7 +338,9 @@ internal class UnknownProducerFixture(
     fun process(atMs: Long, millimeters: Int? = 2_000, pose: CameraPoseEvidence = pose(atMs),
                 matrix: DoubleArray? = matrix(), mask: InstanceMask = rectangle(), values: IntArray? = null,
                 cpuClockOffsetMs: Long = 0L, deliveryDelayMs: Long = 50L, fullOnly: Boolean = false,
-                confidenceValues: ByteArray? = null): Frame {
+                confidenceValues: ByteArray? = null,
+                pointEvidence: UnknownMaterialPointObservation? =
+                    if (knownPhysicalPoint) point(atMs, cpuClockOffsetMs) else null): Frame {
         val token = token(atMs, cpuClockOffsetMs)
         var snapshot = snapshot(atMs, millimeters, pose, values, cpuClockOffsetMs)
         if (confidenceValues != null) snapshot = snapshot.copy(rawConfidence = ConfidenceImage8(depthWidth, depthHeight, confidenceValues))
@@ -336,6 +350,7 @@ internal class UnknownProducerFixture(
         val capture = requireNotNull(FrozenUnknownDepthCapture.freeze(token,
             snapshot, matrix, token.frameId))
         clock = token.capturedElapsedNs / 1_000_000L + deliveryDelayMs
-        return Frame(capture, pipeline.process(capture, token, listOf(mask), clock))
+        return Frame(capture, pipeline.process(capture, token, listOf(mask), clock,
+            materialPointsByMaskIndex = pointEvidence?.let { mapOf(0 to it) } ?: emptyMap()))
     }
 }

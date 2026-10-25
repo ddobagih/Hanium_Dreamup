@@ -1,0 +1,23 @@
+flowchart TB
+  E["F-D15-022 · 내 신고 삭제 상태<br/>P-D15-022"]
+  E --> OWNER["privacy shared lock·active subject 검증"]
+  OWNER --> TOMB{"소유 request tombstone이 있는가"}
+  TOMB -->|"예"| COPIES["외부사본 snapshot·최신 event 조회"]
+  COPIES --> COUNT{"tombstone count와 실제 copy 수 일치"}
+  COUNT -->|"아니오"| BAD["503 evidence inconsistent 반환"]
+  COUNT -->|"예"| DELETED["DELETED와 외부사본 개별상태 반환<br/>updated_at은 local/external 중 최신<br/>외부사본 완료와 local 삭제 구분"]
+  TOMB -->|"아니오"| REQ["소유 Report에 join된 DELETE request 조회"]
+  REQ --> FOUND{"request가 있는가"}
+  FOUND -->|"아니오"| NF["404 반환"]
+  FOUND -->|"예"| RES{"request status가 RESOLVED인가"}
+  RES -->|"예"| MISSING["503 report_deletion_effect_missing 반환"]
+  RES -->|"아니오"| HOLD["active legal hold 조회"]
+  HOLD --> REJ{"request status가 REJECTED인가"}
+  REJ -->|"예"| REJECTED["REJECTED 반환"]
+  REJ -->|"아니오"| HELD{"expires_at이 DB 현재보다 뒤인가"}
+  HELD -->|"예"| LEGAL["LEGAL_HOLD 반환"]
+  HELD -->|"아니오"| PENDING["PENDING 반환"]
+  NOTE["조회는 물리삭제·기관통신을 수행하지 않음<br/>active account deletion subject는404 은폐<br/>자동 retry 없음·세션 수명은 API 의존성"]
+  E -.-> NOTE
+  SRC["근거 · report_deletion.py:151 get_owned_report_deletion_status"]
+  E -.-> SRC

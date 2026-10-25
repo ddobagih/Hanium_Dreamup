@@ -33,6 +33,8 @@ from backend.app.services.accounts import (
     utc_now,
 )
 from asgi_client import ASGITestClient
+from test_account_smtp_integration import _smtp_server, smtp_tls_context
+from backend.app.services.accounts import SmtpOtpSender
 from scripts.purge_account_enrollments import _candidate_ids
 
 
@@ -781,6 +783,66 @@ def test_same_otp_request_concurrently_returns_delivery_lease_without_duplicate_
         engine.dispose()
 
 
+@pytest.mark.parametrize("security", ["implicit_tls", "starttls"])
+def test_smtp_accepted_but_activation_commit_failed_does_not_resend_same_request(monkeypatch, smtp_tls_context, security):
+    engine, SessionFactory = _session_factory()
+    service = AccountService(settings)
+    clock = utc_now()
+    monkeypatch.setattr(accounts_service, "utc_now", lambda: clock)
+    suffix = uuid.uuid4().hex
+    payload = _request(email=f"activation-loss-{suffix}@example.com", request_id=f"activation_loss_{suffix}")
+    original_mark_sent = service.mark_delivery_sent
+
+    def fail_activation(db, delivery):
+        def fail_commit():
+            raise SQLAlchemyError("synthetic activation commit failure")
+        with monkeypatch.context() as patch:
+            patch.setattr(db, "commit", fail_commit)
+            original_mark_sent(db, delivery)
+
+    monkeypatch.setattr(service, "mark_delivery_sent", fail_activation)
+    try:
+        with _smtp_server(smtp_tls_context, security) as (port, received):
+            sender = SmtpOtpSender(
+                host="127.0.0.1", port=port, security=security,
+                username="test", password="test", from_address="no-reply@example.com",
+                timeout_seconds=3,
+            )
+            app = FastAPI()
+            app.include_router(create_router(
+                settings, service=service, sender=sender,
+                rate_limiter=SimpleNamespace(check_source=lambda **_: None, check_email=lambda **_: None),
+            ))
+
+            def database():
+                with SessionFactory() as db:
+                    yield db
+            app.dependency_overrides[get_db] = database
+
+            def issue():
+                return ASGITestClient(app).post("/account-enrollments/email-otp", json=payload.model_dump(mode="json"))
+
+            result = issue()
+            assert result.status_code == 503
+            assert received["commands"].count(b"DATA") == 1
+            assert received["message"]
+            with SessionFactory() as db:
+                row = db.scalar(select(AccountEnrollment).where(AccountEnrollment.request_id == payload.request_id))
+                assert row.state == "PENDING_DELIVERY"
+                before = tuple(getattr(row, col.name) for col in AccountEnrollment.__table__.columns)
+            assert issue().json()["detail"]["code"] == "account_enrollment_in_progress"
+            clock += timedelta(seconds=settings.account_otp_delivery_lease_seconds + 1)
+            retry = issue()
+            assert retry.status_code == 409
+            assert retry.json()["detail"]["code"] == "account_enrollment_idempotency_conflict"
+            assert received["commands"].count(b"DATA") == 1
+            with SessionFactory() as db:
+                row = db.scalar(select(AccountEnrollment).where(AccountEnrollment.request_id == payload.request_id))
+                assert tuple(getattr(row, col.name) for col in AccountEnrollment.__table__.columns) == before
+    finally:
+        engine.dispose()
+
+
 def test_otp_flush_failure_rolls_back_encrypted_row_and_same_request_can_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -868,11 +930,15 @@ def test_otp_flush_failure_rolls_back_encrypted_row_and_same_request_can_retry(
         engine.dispose()
 
 
-def test_stale_pending_delivery_reissues_same_handle_with_new_code() -> None:
+def test_stale_pending_delivery_preserves_code_and_requires_new_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     engine, SessionFactory = _session_factory()
     service = AccountService(settings)
     suffix = uuid.uuid4().hex
-    started_at = utc_now()
+    started_at = utc_now().replace(microsecond=0)
+    codes = iter((123456, 654321))
+    monkeypatch.setattr(accounts_service.secrets, "randbelow", lambda _upper: next(codes))
     request = _request(
         email=f"delivery-lease-{suffix}@example.com",
         request_id=f"delivery_lease_{suffix}",
@@ -880,6 +946,17 @@ def test_stale_pending_delivery_reissues_same_handle_with_new_code() -> None:
     with SessionFactory() as db:
         original = service.issue_email_otp(db, request, now=started_at)
     assert original.delivery is not None
+    with SessionFactory() as db:
+        original_row = dict(db.execute(
+            select(AccountEnrollment.__table__).where(
+                AccountEnrollment.id == original.delivery.enrollment_id
+            )
+        ).mappings().one())
+    assert original_row["otp_hmac"] == service._crypto().otp_hmac(
+        handle=original.response.enrollment_handle,
+        email=request.email,
+        code=original.delivery.code,
+    )
 
     with SessionFactory() as db:
         with pytest.raises(AccountServiceError) as in_progress:
@@ -892,16 +969,49 @@ def test_stale_pending_delivery_reissues_same_handle_with_new_code() -> None:
                 ),
             )
         assert in_progress.value.code == "account_enrollment_in_progress"
-        assert in_progress.value.retry_after is not None
+        assert in_progress.value.status_code == 409
+        assert in_progress.value.retry_after == 1
 
     retry_at = started_at + timedelta(
         seconds=settings.account_otp_delivery_lease_seconds + 1
     )
+    send_checks: list[bool] = []
     with SessionFactory() as db:
-        retried = service.issue_email_otp(db, request, now=retry_at)
+        with pytest.raises(AccountServiceError) as ambiguous_retry:
+            service.issue_email_otp(
+                db, request, now=retry_at,
+                send_quota_check=lambda: send_checks.append(True),
+            )
+        assert ambiguous_retry.value.code == "account_enrollment_idempotency_conflict"
+        assert ambiguous_retry.value.status_code == 409
+        assert ambiguous_retry.value.retry_after is None
+        assert send_checks == []
+        # A possibly delivered OTP and every persisted enrollment field remain
+        # unchanged after the rejected retry, even if its transaction commits.
+        db.commit()
+    with SessionFactory() as db:
+        assert dict(db.execute(
+            select(AccountEnrollment.__table__).where(
+                AccountEnrollment.id == original.delivery.enrollment_id
+            )
+        ).mappings().one()) == original_row
+
+    retry_at = started_at + timedelta(seconds=max(
+        settings.account_otp_delivery_lease_seconds,
+        settings.account_otp_resend_cooldown_seconds,
+    ) + 1)
+    with SessionFactory() as db:
+        retried = service.issue_email_otp(
+            db,
+            _request(email=request.email, request_id=f"delivery_replacement_{suffix}"),
+            now=retry_at,
+            send_quota_check=lambda: send_checks.append(True),
+        )
+    assert send_checks == [True]
     assert retried.delivery is not None
-    assert retried.response.enrollment_handle == original.response.enrollment_handle
-    assert retried.delivery.issue_count == original.delivery.issue_count + 1
+    assert retried.response.enrollment_handle != original.response.enrollment_handle
+    assert retried.delivery.enrollment_id != original.delivery.enrollment_id
+    assert retried.delivery.issue_count == 1
     assert retried.delivery.code != original.delivery.code
 
     with SessionFactory() as db:
@@ -911,6 +1021,10 @@ def test_stale_pending_delivery_reissues_same_handle_with_new_code() -> None:
     with SessionFactory() as db:
         service.mark_delivery_failed(db, original.delivery, now=retry_at)
     with SessionFactory() as db:
+        expired_original = db.get(AccountEnrollment, original.delivery.enrollment_id)
+        assert expired_original is not None
+        assert expired_original.state == "EXPIRED"
+        assert expired_original.otp_hmac is None
         still_pending = db.get(AccountEnrollment, retried.delivery.enrollment_id)
         assert still_pending is not None
         assert still_pending.state == "PENDING_DELIVERY"

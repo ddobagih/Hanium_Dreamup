@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-001<br/>ARCore 카메라 receipt와 pose 소유권<br/>상태 ACTIVE"]
+    P0["TRACKING과 양수 camera 시각 검사"]
+    A --> D
+    P1["동일 provider epoch Frame receipt 발급"]
+    P0 --> P1
+    P2["RGB 복사 후 Image close"]
+    P1 --> P2
+    P3["pose와 제한된 plane metadata 복사"]
+    P2 --> P3
+    D{"P-D07-001<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["소유된 receipt와 RGB 반환"]
+    D -->|"TRACKING이며 Frame/CPU 시각 양수·동일 캡처"| B0
+    B1["depth CPU timestamp 자격 없음; 재획득 없음"]
+    D -->|"receipt가 외부·만료·없음"| B1
+    B2["RGB 전용/pose 초기화; 깊이 권한 없음"]
+    D -->|"비추적 또는 anchor 이탈"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

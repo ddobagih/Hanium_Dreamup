@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D02-024 TTS engine 준비·복구 예산·callback watchdog"]
+  E["진입: ensure actuator·speech request·close /<br/>onInit/onStart/onDone/onError/onStop"]
+  G{"P-D02-024 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["FAILED 및 Main readiness 차단/안전정지"]
+  G -->|"init/recovery 실패"| B0
+  B1["무시"]
+  G -->|"late 이전 engine callback"| B1
+  B2["이전 utterance DONE을 만들어내지 않고 실패 처리"]
+  G -->|"다음 utterance START 도착"| B2
+  B3["START 허용; expiry scheduling은 deadline+1"]
+  G -->|"source deadline=now"| B3
+  B4["나머지 cleanup 계속, 성공 청취라고 주장하지 않음"]
+  G -->|"native stop/shutdown 예외"| B4
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["engine init 후 Korean voice·listener·attributes 설정 성공해야 READY"]
+    S1["INITIALIZING 요청은 UNAVAILABLE; 후속 READY에 옛 문구 재생하지 않음"]
+    S2["dispatch 앞/후와 actual onStart에서 currentness·source deadline 재검사"]
+    S3["head utterance start watchdog 최대8000ms, 실제 START 뒤 message-family<br/>completion watchdog 시작"]
+    S4["exact engine+ID terminal callback 한 번만 소비"]
+    S5["service error는 engine failure; not-installed는 language unavailable;<br/>그 밖은 utterance failure"]
+    S6["close는 generation을 먼저 revoke하고 native stop/shutdown 및 callbacks 정리"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+    S4 --> S5
+    S5 --> S6
+  end
+  E -.-> S0
+  N["정상 종료: onDone만 실제 엔진 완료; REQUESTED/QUEUED와 구분."]
+  X["취소·중단: exact owner 취소 callbacks, reentrant close 도중 native lock 밖에 deferred<br/>전달. / 늦은 이전 소유자의 callback은 현 상태를 바꾸지 않는다."]
+  C["정리: generation revoke→watchdog/queue callbacks 해제→focus<br/>release→stop/shutdown, 예외 뒤에도 다음 단계 진행."]
+  R["재시도·복구: production automatic init retry0; 주입 테스트1회250ms만 별도. / 현재 조건과 소유권을<br/>다시 검사한다."]
+  S6 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

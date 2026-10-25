@@ -7,13 +7,15 @@
 가이드와 실제 기록이 다르면 다음 순서로 확인합니다.
 
 1. 승인 정책은 [정책 기준선 1.0.1](../control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json)을 따릅니다.
-2. 현재 기능 개선·분담·잔여는 [2026-09-30 인계](../handoff/2026-09-30/README.md), [최근 daylog](../../daylog/2026-09-30.md), [실행 계획](../planning/walksafe-feature-improvement-execution-20260926.md)을 확인합니다. [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)는 기존 통제·승인 경계를 확인하는 별도 자료입니다. hash로 봉인된 [과거 재개 안내서](../control/walksafe-project-resumption-runbook.md)의 상태·focus·활성화 문구와 v2.3·전환 준비 시점 v2.4 gate 명령은 현행 지시로 실행하지 않습니다.
+2. 현재 기능 개선·분담·잔여는 [2026-09-30 인계](../handoff/2026-09-30/README.md), [최근 daylog](../../daylog/2026-10-01.md), [A 완료 계획](../planning/walksafe-part-a-completion-plan-20260930.md)을 확인합니다. [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)는 기존 통제·승인 경계를 확인하는 별도 자료입니다. hash로 봉인된 [과거 재개 안내서](../control/walksafe-project-resumption-runbook.md)의 상태·focus·활성화 문구와 v2.3·전환 준비 시점 v2.4 gate 명령은 현행 지시로 실행하지 않습니다.
 3. 산출물 상태는 [current notice](../deliverables/00-control/artifact-register-current-notice-20260728-r001.md)에서 연결하는 [산출물 관리대장](../deliverables/00-control/artifact-register.json)과 [변경이력](../deliverables/00-control/artifact-change-log.json)을 따릅니다.
 4. 코드별 실행·설정은 실제 source, OpenAPI, lock, runtime config를 따릅니다. 날짜가 있거나 hash로 결속된 모듈 README가 이 계약과 충돌하면 역사 snapshot으로 봅니다.
 
 중앙 가이드가 위 자료의 값을 복제해 새 기준으로 사용되어서는 안 됩니다.
 
 ## 현재 두 사람 작업
+
+사용자 A의 현재 구현·검증·재개 위치는 [A 완료 계획](../planning/walksafe-part-a-completion-plan-20260930.md)에서 확인합니다. 원장 rev135 기준 A는 DONE48·PARTIAL101·미정합40, 잔여141개(총괄46·경로56·인식39)입니다. 최신 사용자 지시에 따라 기존 세 세션은 착수한 묶음을 마무리하고 Goal paused를 확인했습니다. 새 총괄1개·개발3개 세션의 실제 시작은 [전환 계약](../handoff/2026-10-01/four-session-transition/README.md)과 설정 담당의 작성 권한 이양을 따릅니다. 실제 종료·파일 소유권 이양은 [공통 인계](../handoff/2026-10-01/part-a-two-session.md)의 최신 기록을 따르며, 아래 인계 건수는 분담 시작 snapshot입니다.
 
 잔여 항목은 [A 사용자189개](../handoff/2026-09-30/part-a.md), [B 팀원188개](../handoff/2026-09-30/part-b.md)로 나눴습니다. 원문·최신 잔여·첫 작업은 [항목 상세](../handoff/2026-09-30/remaining-items.json), 실제 시험 수치와 미검증 범위는 [현황](../handoff/2026-09-30/status.md)을 확인합니다. 기능 변경은 `AGENTS.md`의 기능 우선 원칙과 파일 단독 담당을 따릅니다.
 

@@ -1,0 +1,11 @@
+flowchart TD
+  H["P-D05-009 · F-D05-009 검출 실패·출력 신선도·native stall 감독"]
+  H --> C{"현재 claim"}
+  C -->|"아니오"| X["stale 무시"]
+  C -->|"예"| R{"fresh SUCCESS age0 에서 800"}
+  R -->|"예"| S["성공 clock 갱신"]
+  R -->|"아니오"| F["실패창과 no-output clock 유지"]
+  F --> T{"3 회조건 또는 비재시도 또는 deadline"}
+  T -->|"아니오"| K["KEEP_CURRENT"]
+  T -->|"예 activewalk"| Z["SAFE_STOP generation 무효화"]
+  Z --> D["native drain 후 close"]

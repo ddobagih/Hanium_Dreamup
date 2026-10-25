@@ -1,0 +1,15 @@
+stateDiagram-v2
+  state "F-D04-023 UNMATCHED" as Unmatched
+  state "ACTIVE HIGH 또는 MEDIUM" as Active
+  state "BRANCH_SWITCH_PENDING LOW" as Pending
+  state "ACTIVE_BRANCH_RETAINED LOW" as Retained
+  [*] --> Unmatched
+  Unmatched --> Active: 유효 corridor와 충분 confidence
+  Active --> Pending: 비연결 branch cost 우세 1.5 이상 첫 관측
+  Pending --> Active: 5초 내 두 번째 독립 우세 / 새 branch 확정
+  Active --> Retained: 다른 branch 우세 미달
+  Retained --> Active: active branch 새 유효 근거
+  Pending --> Retained: 우세 미달
+  Pending --> Unmatched: invalid·expired·outside / pending clear
+  Active --> Unmatched: geometry 변경 / cache reset
+  Pending --> Pending: duplicate / 확인 횟수 증가 없음

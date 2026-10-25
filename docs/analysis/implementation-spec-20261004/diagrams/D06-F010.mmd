@@ -1,0 +1,41 @@
+flowchart TD
+  T["F-D06-010 신고 TTL 정리 Job과 구형 pending 저장소 폐기"]
+  P["전제: queue profile 불필요. 동일 Job ID가 있으면 등록 중복 생략. legacy purge 전<br/>durable marker."]
+  T --> P
+  E1["E-D06-010-01 앱 초기화→하루 주기 persisted Job 등록"]
+  E1 --> T
+  E2["E-D06-010-02 Job 실행→통신 없이 pruneExpired"]
+  E2 --> T
+  E3["E-D06-010-03 legacy queue 발견/앱 초기화→pending marker→암호문 미복호화 삭제"]
+  E3 --> T
+  A1["1. background single cleanup executor에서 store.pruneExpired를<br/>수행한다."]
+  P --> A1
+  A2["2. 현재 job identity가 같은 경우만 UI handler에서 jobFinished한다."]
+  A1 --> A2
+  A3["3. onStopJob은 future cancel 후 재스케줄 요청, destroy는 executor<br/>shutdown 한다."]
+  A2 --> A3
+  A4["4. legacy는 process/file lock 제한시간 아래 키 파괴·디렉터리 삭제·marker 해제<br/>순서로 정리한다."]
+  A3 --> A4
+  N["정상 종료: 만료 파일 수 반환/legacy clear."]
+  A4 --> N
+  FX["결과: 네트워크·업로드 없음. best-effort 물리 정리이므로 정확히 30일 시점 삭제 보장 아님."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"만료 전 유효 신고"}
+    R1["보존"]
+    B1 -->|조건 성립| R1
+    B2{"legacy lock/삭제/키 폐기 실패"}
+    R2["pending marker 유지, cleanup 재시도 경로"]
+    B2 -->|조건 성립| R2
+    B3{"Job 예외"}
+    R3["jobFinished needsReschedule=true"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-006, P-D06-010"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["시간: legacy shared lock budget 제한; Job 실제 실행시간은 OS 결정."]
+    X2["취소: onStopJob future interrupt."]
+    X3["복구: OS 재스케줄 및 다음 앱 cleanup."]
+    X4["정리: legacy ciphertext는 복호화하지 않음."]
+  end

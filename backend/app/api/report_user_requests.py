@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 import re
 import uuid
 
@@ -13,7 +15,7 @@ from sqlalchemy.orm import Session
 from backend.app.config import Settings
 from backend.app.database import get_db
 from backend.app.field_test_security import FieldTestAccess, VerifiedActorAssertion
-from backend.app.models import ReportUserRequest
+from backend.app.models import Report, ReportUserRequest
 from backend.app.schemas import (
     AdminReportDeletionExternalCopyEventCreateV1,
     AdminReportDeletionExternalCopyEventV1,
@@ -1161,7 +1163,11 @@ def create_router(settings: Settings) -> APIRouter:
                 detail={"code": "report_request_cursor_invalid"},
                 headers=_NO_STORE,
             ) from exc
-        statement = select(*admin_request_summary_columns())
+        statement = (
+            select(*admin_request_summary_columns())
+            .join(Report, Report.id == ReportUserRequest.report_id)
+            .where(account_subject_visible(Report))
+        )
         if report_id is not None:
             statement = statement.where(ReportUserRequest.report_id == report_id)
         if request_type is not None:
@@ -1248,9 +1254,9 @@ def create_router(settings: Settings) -> APIRouter:
             )
         try:
             row = db.execute(
-                select(*admin_request_columns()).where(
-                    ReportUserRequest.id == request_id
-                )
+                select(*admin_request_columns())
+                .join(Report, Report.id == ReportUserRequest.report_id)
+                .where(ReportUserRequest.id == request_id, account_subject_visible(Report))
             ).one_or_none()
             detail = project_admin_request_detail(coerce_admin_request(row)) if row else None
         except (SQLAlchemyError, AttributeError, TypeError, ValueError) as exc:

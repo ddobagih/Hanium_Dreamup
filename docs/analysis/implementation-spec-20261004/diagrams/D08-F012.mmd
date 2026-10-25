@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D08-012 현재 세션·권한 상태 조회"]
+  B["진입: GET /api/field-session"]
+  A --> B
+  P0["1. 쿠키 현재성을 확인한다."]
+  B --> P0
+  P1["2. Backend 계정 세션이면 session-current 확인한다."]
+  P0 --> P1
+  P2["3. privacy actor generation/fence 를 통과한다."]
+  P1 --> P2
+  P3["4. 일반 또는 recovery 상태 계약을 만들고 인증 200 인 기본 status 에만 capacity 를 선택 병합한다."]
+  P2 --> P3
+  OK["정상: 기본/long 세션 상태 및 선택 capacity"]
+  P3 --> OK
+  C0{"만료/폐기/변조"}
+  X0["비인증 또는 계약상 401"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"Backend binding unavailable"}
+  X1["503; 비인증으로 오인하지 않음"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"capacity fetch/cache 실패"}
+  X2["원래 session 응답 유지"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-007, P-D08-008, P-D08-011, P-D08-028"]
+  A -.-> POLICY

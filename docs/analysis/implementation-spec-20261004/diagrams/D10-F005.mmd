@@ -1,0 +1,28 @@
+flowchart TD
+  A["F-D10-005 Faster-Whisper lazy load·음향 근거 축약"]
+  N0["1. load lock을 이중 확인하고 verified local snapshot만 WhisperModel에 전달한다. loaded revision을 실제 인스턴스에 결속."]
+  A --> N0
+  N1["2. transcribe_file이 모든 segment generator를 순회하여 text·start/end·avg_logprob·no_speech_prob를 모아 공백으로 합친다."]
+  N0 --> N1
+  N2["3. 비어 있지 않은 segment의 finite logprob 평균과 유효 no_speech [0,1]의 최대를 사용한다."]
+  N1 --> N2
+  N3["4. 평균≥-1.0·no_speech≤0.6이면 acoustic execution 허용. 하나라도 근거가 없으면 confidence=0·False. confidence는 clamp((avg+1)*(1-no_speech),0,1)이다."]
+  N2 --> N3
+  N4["5. STTResult에 heuristic intent와 acoustic evidence를 별도로 반환한다."]
+  N3 --> N4
+  B0{"revision/manifest/hash 없음 또는 hash 불일치"}
+  R0["모델 load 차단"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"음성 segment나 유효 진단 부족"}
+  R1["acoustic 실행 불허"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"CPU 선택"}
+  R2["int8 기본; 실측 성능 또는 동일 품질 보장 아님"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N4 --> Z
+  P["적용 정책 · P-D10-007 · P-D10-009"]
+  P -. "코드 분기 기준" .-> A

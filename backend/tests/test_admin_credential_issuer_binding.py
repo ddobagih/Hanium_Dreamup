@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.app.api import health as health_api
+from backend.app.services import health_readiness as health_api
 from backend.app.services import admin_security
 from backend.app.services.admin_security import (
     AdminCredentialIssuerUnavailable,

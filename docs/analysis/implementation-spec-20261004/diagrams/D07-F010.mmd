@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-010<br/>근접 거리 표시와 별도 숫자 만료<br/>상태 ACTIVE"]
+    P0["MEASURED와 PREDICTED 표시 자격 분리"]
+    A --> D
+    P1["원본 elapsed에서 남은 display budget 계산"]
+    P0 --> P1
+    P2["현재 output의 숫자 표시"]
+    P1 --> P2
+    P3["남은 시간 더하기 1ms에 current 재검사"]
+    P2 --> P3
+    D{"P-D07-010<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["risk 금지지만 display 허용"]
+    D -->|"age900ms인 실측"| B0
+    B1["숫자 제거"]
+    D -->|"prediction 근거 없음/만료"| B1
+    B2["원본 deadline 유지"]
+    D -->|"동일 출력 재렌더"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

@@ -1,0 +1,20 @@
+stateDiagram-v2
+    state "S-D07-026-WAITING" as W
+    state "S-D07-026-ACCEPTED" as A
+    state "S-D07-026-QUALIFYING" as Q
+    state "S-D07-026-REJECTED" as R
+    state "S-D07-026-RETIRED" as X
+    [*] --> W
+    W --> A: 현재 route의 실제 결과 소비
+    A --> A: camera arrival만으로는 receipt 불변
+    A --> Q: exact same source의 첫 mask upgrade
+    Q --> A: 기존 depth 재처리 없이 새 receipt
+    A --> R: old 결과 또는 두번째 upgrade
+    R --> A: latest receipt는 그대로 유지
+    A --> X: owner route progress 변경
+    X --> W: 새 owner 현재 결과 대기
+    note right of A
+        P-D07-026
+        빈 결과와 거절 결과도 순서를 정함
+        dispatch 직전 exact receipt 검사
+    end note

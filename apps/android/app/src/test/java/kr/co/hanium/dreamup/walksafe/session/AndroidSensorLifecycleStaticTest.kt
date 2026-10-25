@@ -53,8 +53,14 @@ class AndroidSensorLifecycleStaticTest {
         // S08-31: re-registration stops after two attempts per start, so the notice states only
         // what is true (no input, direction guidance stopped).
         val activity = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-        val notice = activity.substringAfter("private fun routeCompassStatusMessage(): String {")
+        val caller = activity.substringAfter("private fun routeCompassStatusMessage(): String {")
             .substringBefore("private fun updateRouteOrientationReference(")
+        assertTrue(caller.contains("currentLocationCollectionOwnerOrNull() != locationCollectionOwner"))
+        assertTrue(caller.contains("earthOrientationTracker.latestRouteCompassHeading(SystemClock.elapsedRealtime())"))
+        assertTrue(caller.contains("positioningDiagnosticsPresenter.routeCompassStatusMessage(result)"))
+        val presenter = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/PositioningDiagnosticsPresenter.kt").readText()
+        assertTrue(presenter.contains("fun routeCompassStatusMessage(result: RouteCompassHeadingResult?): String {"))
+        val notice = presenter.substringAfter("fun routeCompassStatusMessage(result: RouteCompassHeadingResult?): String {")
             .substringAfter("RouteCompassHeadingReason.SENSOR_STALLED ->")
             .substringBefore("RouteCompassHeadingReason.QUALITY_LOW")
 

@@ -1,0 +1,29 @@
+flowchart TD
+  IN["F-D14-025<br/>복구 TOTP 후보 결속 및 DB 역할 경계"]
+  G["적용 정책<br/>P-D14-001 / P-D14-002 / P-D14-013 / P-D14-016"]
+  IN --> G
+  N1["1. runtime에는 control/session/reconfirmation/<br/>device key 직접 INSERT/UPDATE 및 recovery secre<br/>t 테이블 SELECT 등을 제한"]
+  G --> N1
+  N2["2. issuer·TOTP capability 확인을 잠금과 transition<br/>보다 앞에 적용하는 보호함수 사용"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. control/public-private fingerprint/custod<br/>y tuple 일관성을 잠금 하에서 재확인"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. startup supplied factor=current이면 CURRENT<br/>, 정확 활성 복구에서 새 factor면 RECOVERY_CANDIDATE로 최<br/>초 binding"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 새 candidate를 한 번 결속한 뒤 다른 factor 또는 잘못된 p<br/>ending binding은 INVALID"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. challenge consumed_at 단방향 trigger와 custod<br/>y same-transaction 감사 marker/deferred trigge<br/>r 적용"]
+  N5 -->|"계속 가능한 경우"| N6
+  B1["분기 결과<br/>권한 오류 또는 INVALID→startup/readiness 거절(D09)"]
+  N2 -->|"issuer가 다름·private/public fingerprint 불일치"| B1
+  B2["분기 결과<br/>새 후보 차단"]
+  N5 -->|"이미 다른 pending next factor 결속"| B2
+  B3["분기 결과<br/>DB trigger 거절"]
+  N6 -->|"runtime proof payload 수정/소비 reset"| B3
+  B4["분기 결과<br/>deferred commit trigger가 거절"]
+  N6 -->|"초기 UNATTESTED 복구 시작 감사 누락"| B4
+  N6 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

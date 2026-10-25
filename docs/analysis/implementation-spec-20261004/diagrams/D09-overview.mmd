@@ -1,0 +1,21 @@
+flowchart LR
+  A["D08 Gateway · Android 호출"] --> B["F-D09-002..007<br/>route 인가 · actor proof · rate · body와 오류 경계"]
+  M["F-D09-001<br/>Settings와 lifespan"] --> B
+  B --> D["F-D09-008..014<br/>v1/v2 탐지 · 전처리 · worker · health"]
+  B --> N["F-D09-015..019 · 031<br/>TMAP 경로 · POI · 예산 · health"]
+  B --> H["F-D09-020..021<br/>ready와 liveness"]
+  B --> G["F-D09-022..026<br/>개발 로그와 frame · quota · retention"]
+  B --> C["F-D09-027..028<br/>용량 측정과 유효 snapshot"]
+  B --> O["F-D09-030<br/>OpenAPI와 문서 endpoint"]
+  B --> X["D13 계정 · 동의 · raw · training"]
+  B --> Y["D14 admin session · proof · incident · audit"]
+  B --> Z["D15 report · 원본 · export · 삭제 · 복원"]
+  D --> MODEL["모델 artifact와 model.two_model_runtime<br/>실제 weights와 정확도 이번 미실행"]
+  N --> T["TMAP HTTPS<br/>실제 provider 호출 이번 미실행"]
+  X --> DB["F-D09-029<br/>runtime Session · migration role 경계"]
+  Y --> DB
+  Z --> DB
+  M --> H
+  M --> C
+  M --> G
+  DB --> R["F-D09-006 전역 rate event 보존<br/>D11 timer 및 CLI 운영 연결"]

@@ -1,0 +1,282 @@
+{
+  "setup_handoff_released": true,
+  "phase": "legacy_closed_new_team_running_nested_implementation_verified",
+  "project_id": "40567d89-464f-439d-952f-001772744034",
+  "repository": "/home/ddobagi/Hanium_Dreamup",
+  "legacy_threads": [
+    "01a0dc57-85bd-7aa1-b23e-e02463cd8c1b",
+    "01a0f4a8-576c-7442-8d4e-2e27f592302c",
+    "01a0f309-8e1c-7413-b647-0f4b469a4ffd"
+  ],
+  "new_threads": [
+    {
+      "role": "pm",
+      "title_requested": "한이음 A 전담 총괄 · 189개 DONE까지",
+      "threadId": "01a0f6c4-2491-7672-96b2-a8a31b2c9364",
+      "hostId": "local",
+      "goal_verification": {
+        "role": "pm",
+        "threadId": "01a0f6c4-2491-7672-96b2-a8a31b2c9364",
+        "status": "active",
+        "createdAt": 1790846500,
+        "verified_at": "2026-10-01T09:21:40.476Z",
+        "objective_exact_match": true,
+        "initial_null_return_verified": true,
+        "sequence": [
+          "get_goal",
+          "create_goal",
+          "get_goal"
+        ],
+        "evidence": "/home/ddobagi/.codex/sessions/2026/10/01/rollout-2026-10-01T18-20-44-01a0f6c4-2491-7672-96b2-a8a31b2c9364.jsonl"
+      },
+      "product_write_authorized": false,
+      "common_record_writer": true,
+      "development_goal_verification": {
+        "threadId": "01a0f6c4-2491-7672-96b2-a8a31b2c9364",
+        "role": "pm",
+        "before_status": null,
+        "creation_performed": true,
+        "after_status": "active",
+        "objective": "한이음 A 고정189개 전체의 개발 단계를 완료한다. 각 항목의 실제 제품 구현, 원본 사용자 앱 연결, 수행 가능한 직접 개발 검증과 필요한 독립 검토를 마무리하여, 모든 항목이 원문 DONE 또는 개발 완료 후 실기기·보행·물리 출력·외부 현장 검증만 남은 테스트 필요로 인수되게 한다. 개발 잔여·원문 미정합·운영 분류 미판정이 모두 0이고 테스트 필요 항목의 시나리오·환경·성공 조건 인계가 끝나면 이 개발 Goal을 완료한다. 개발3세션과 각 세션 내부 병렬 작업을 조정하며 실제 통합과 항목 종결을 책임진다. 현장 성공이나 전체 출시 완료로 확대하지 않고 B·기존WIP·원문과 과거 증거를 보존한다.",
+        "objective_exact_match": true,
+        "token_budget_specified": false,
+        "createdAt": 1790938314,
+        "verified_at": "2026-10-02T20:20:21.861054+09:00",
+        "sequence": [
+          "get_goal(null)",
+          "create_goal(exact prepared development objective)",
+          "get_goal(active, exact match)"
+        ],
+        "verification_source": "own actual response/status and setup relay 01a0de0d-81dc-7922-9eb1-afc555043a96",
+        "response_cursor": "27e397c3:152",
+        "limitation": "새 개발 Goal 등록 확인은 개발 전체완료·현장성공이 아니다. 담당 개발잔여/미정합/미판정0과 테스트필요 인계 전 active 유지.",
+        "first_pm_actual_verification": {
+          "threadId": "01a0f6c4-2491-7672-96b2-a8a31b2c9364",
+          "role": "pm",
+          "before_status": null,
+          "creation_performed": true,
+          "after_status": "active",
+          "objective": "한이음 A 고정189개 전체의 개발 단계를 완료한다. 각 항목의 실제 제품 구현, 원본 사용자 앱 연결, 수행 가능한 직접 개발 검증과 필요한 독립 검토를 마무리하여, 모든 항목이 원문 DONE 또는 개발 완료 후 실기기·보행·물리 출력·외부 현장 검증만 남은 테스트 필요로 인수되게 한다. 개발 잔여·원문 미정합·운영 분류 미판정이 모두 0이고 테스트 필요 항목의 시나리오·환경·성공 조건 인계가 끝나면 이 개발 Goal을 완료한다. 개발3세션과 각 세션 내부 병렬 작업을 조정하며 실제 통합과 항목 종결을 책임진다. 현장 성공이나 전체 출시 완료로 확대하지 않고 B·기존WIP·원문과 과거 증거를 보존한다.",
+          "objective_exact_match": true,
+          "token_budget_specified": false,
+          "createdAt": 1790938314,
+          "verified_at": "2026-10-02T19:55:05.567268+09:00",
+          "sequence": [
+            "get_goal(null)",
+            "create_goal(exact prepared development objective)",
+            "get_goal(active, exact match)"
+          ],
+          "limitation": "总괄1개 확인. 다른3담당의 실제 개발 Goal 조회/생성 결과는 아직 확인 전. 개발잔여0/미정합0/미판정0·테스트필요 인계까지 지속, 현장 성공/출시완료와 구분."
+        }
+      }
+    },
+    {
+      "role": "walk-output",
+      "title_requested": "한이음 A 보행·출력·준비 · 내부 병렬 DONE까지",
+      "threadId": "01a0f6c4-28ea-7220-85e4-c423a14e8535",
+      "hostId": "local",
+      "goal_verification": {
+        "role": "walk-output",
+        "threadId": "01a0f6c4-28ea-7220-85e4-c423a14e8535",
+        "status": "active",
+        "createdAt": 1790846487,
+        "verified_at": "2026-10-01T09:21:28.054Z",
+        "objective_exact_match": true,
+        "initial_null_return_verified": true,
+        "sequence": [
+          "get_goal",
+          "create_goal",
+          "get_goal"
+        ],
+        "evidence": "/home/ddobagi/.codex/sessions/2026/10/01/rollout-2026-10-01T18-20-45-01a0f6c4-28ea-7220-85e4-c423a14e8535.jsonl"
+      },
+      "product_write_authorized": true,
+      "common_record_writer": false,
+      "development_goal_verification": {
+        "threadId": "01a0f6c4-28ea-7220-85e4-c423a14e8535",
+        "role": "walk-output",
+        "before_status": null,
+        "creation_performed": true,
+        "after_status": "active",
+        "objective": "한이음 A scope.json walk-output 고정60개와 배정된 교차 Main 연결의 개발을 완료한다. 실제 수정·원본 앱 호출/소비/출력 연결·수행 가능한 직접 개발 검증·필요한 독립 검토를 마무리하여 담당 전부를 원문 DONE 또는 개발 완료 후 실기기·현장만 남은 테스트 필요로 인계한다. 담당 개발 잔여·미정합·분류 미판정 및 교차 Main 개발 잔여가 모두 0이면 이 개발 Goal을 완료한다. 각 독립 항목을 내부 병렬로 끝까지 종결하고 단일 파일 작성자·기존WIP·원문 증거를 보존한다. 물리 검증 성공을 주장하지 않는다.",
+        "objective_exact_match": true,
+        "token_budget_specified": false,
+        "createdAt": 1790938347,
+        "verified_at": "2026-10-02T20:20:21.861054+09:00",
+        "sequence": [
+          "get_goal(null)",
+          "create_goal(exact prepared development objective)",
+          "get_goal(active, exact match)"
+        ],
+        "verification_source": "own actual response/status and setup relay 01a0de0d-81dc-7922-9eb1-afc555043a96",
+        "response_cursor": "1965724b:190",
+        "limitation": "새 개발 Goal 등록 확인은 개발 전체완료·현장성공이 아니다. 담당 개발잔여/미정합/미판정0과 테스트필요 인계 전 active 유지."
+      }
+    },
+    {
+      "role": "route-motion",
+      "title_requested": "한이음 A 경로·위치·이동 · 내부 병렬 DONE까지",
+      "threadId": "01a0f6c4-1da0-7db2-a794-b7fcca3f1bc6",
+      "hostId": "local",
+      "goal_verification": {
+        "role": "route-motion",
+        "threadId": "01a0f6c4-1da0-7db2-a794-b7fcca3f1bc6",
+        "status": "active",
+        "createdAt": 1790846486,
+        "verified_at": "2026-10-01T09:21:26.543Z",
+        "objective_exact_match": true,
+        "initial_null_return_verified": true,
+        "sequence": [
+          "get_goal",
+          "create_goal",
+          "get_goal"
+        ],
+        "evidence": "/home/ddobagi/.codex/sessions/2026/10/01/rollout-2026-10-01T18-20-42-01a0f6c4-1da0-7db2-a794-b7fcca3f1bc6.jsonl"
+      },
+      "product_write_authorized": true,
+      "common_record_writer": false,
+      "development_goal_verification": {
+        "threadId": "01a0f6c4-1da0-7db2-a794-b7fcca3f1bc6",
+        "role": "route-motion",
+        "before_status": null,
+        "creation_performed": true,
+        "after_status": "active",
+        "objective": "한이음 A scope.json route-motion 고정60개의 경로·위치·방향·이동 기능 개발을 완료한다. 원문 미충족의 실제 수정·원본 앱 연결·수행 가능한 직접 개발 검증·필요한 독립 검토를 마무리하고, 타 담당 앱 연결은 실제 인수까지 확인한다. 담당 전부가 원문 DONE 또는 개발 완료 후 실기기·보행·현장만 남은 테스트 필요로 인수되고 개발 잔여·미정합·분류 미판정이 모두 0이면 이 개발 Goal을 완료한다. 내부 독립 구현을 병렬로 종결하고 B·단일 파일 소유·WIP·원문 증거를 보존한다. 실제 센서/현장 성공을 주장하지 않는다.",
+        "objective_exact_match": true,
+        "token_budget_specified": false,
+        "createdAt": 1790938620,
+        "verified_at": "2026-10-02T20:20:21.861054+09:00",
+        "sequence": [
+          "get_goal(null)",
+          "create_goal(exact prepared development objective)",
+          "get_goal(active, exact match)"
+        ],
+        "verification_source": "own actual response/status and setup relay 01a0de0d-81dc-7922-9eb1-afc555043a96",
+        "response_cursor": "589987d2:139",
+        "limitation": "새 개발 Goal 등록 확인은 개발 전체완료·현장성공이 아니다. 담당 개발잔여/미정합/미판정0과 테스트필요 인계 전 active 유지."
+      }
+    },
+    {
+      "role": "vision",
+      "title_requested": "한이음 A 카메라·인식·추적 · 내부 병렬 DONE까지",
+      "threadId": "01a0f6c4-2138-7122-b8c8-8e8b86a1423e",
+      "hostId": "local",
+      "goal_verification": {
+        "role": "vision",
+        "threadId": "01a0f6c4-2138-7122-b8c8-8e8b86a1423e",
+        "status": "active",
+        "createdAt": 1790846494,
+        "verified_at": "2026-10-01T09:25:11.972Z",
+        "objective_exact_match": true,
+        "initial_null_return_verified": true,
+        "sequence": [
+          "get_goal",
+          "create_goal",
+          "get_goal"
+        ],
+        "evidence": "/home/ddobagi/.codex/sessions/2026/10/01/rollout-2026-10-01T18-20-43-01a0f6c4-2138-7122-b8c8-8e8b86a1423e.jsonl"
+      },
+      "product_write_authorized": true,
+      "common_record_writer": false,
+      "development_goal_verification": {
+        "threadId": "01a0f6c4-2138-7122-b8c8-8e8b86a1423e",
+        "role": "vision",
+        "before_status": null,
+        "creation_performed": true,
+        "after_status": "active",
+        "objective": "한이음 A scope.json vision 고정50개의 카메라·인식·추적·깊이·점자블록·횡단보도 기능 개발을 완료한다. 실제 수정·원본 앱 생산/소비/출력 연결·수행 가능한 직접 개발 검증·필요한 독립 검토를 마무리하고 타 담당 소비 연결도 실제 인수까지 확인한다. 담당 전부가 원문 DONE 또는 개발 완료 후 실기기·영상/보행·성능/현장만 남은 테스트 필요로 인수되고 개발 잔여·미정합·분류 미판정이 모두 0이면 이 개발 Goal을 완료한다. 독립 구현을 내부 병렬로 종결하고 정책/임계값·파일 소유·WIP·원문 증거를 보존한다. 필수 실제 성능이나 현장 성공을 주장하지 않는다.",
+        "objective_exact_match": true,
+        "token_budget_specified": false,
+        "createdAt": 1790938497,
+        "verified_at": "2026-10-02T20:20:21.861054+09:00",
+        "sequence": [
+          "get_goal(null)",
+          "create_goal(exact prepared development objective)",
+          "get_goal(active, exact match)"
+        ],
+        "verification_source": "own actual response/status and setup relay 01a0de0d-81dc-7922-9eb1-afc555043a96",
+        "response_cursor": "a8b002d5:139",
+        "limitation": "새 개발 Goal 등록 확인은 개발 전체완료·현장성공이 아니다. 담당 개발잔여/미정합/미판정0과 테스트필요 인계 전 active 유지."
+      }
+    }
+  ],
+  "actual_goals_verified": 4,
+  "parallel_requirement": "세 개발 세션 간 병렬 + 각 개발 세션 내부 하위 disjoint 구현 병렬",
+  "note": "기존3 Goalpaused/종료 및공통소유해제실제확인. 설정담당의이파일추가쓰기종료. 새PM공통기록단독; 각개발책임은자기단독영역에서하위실제병렬구현착수와직접검증을진행. 내부병렬실적은새PM이실제agent/파일/실행으로확인.",
+  "setup_handoff_released_at": "2026-10-01 09:53:03 UTC",
+  "setup_file_owner": "pm",
+  "legacy_actual_goals": [
+    {
+      "threadId": "01a0dc57-85bd-7aa1-b23e-e02463cd8c1b",
+      "status": "paused",
+      "verified_at": "2026-10-01T09:46:31.257Z",
+      "evidence": "/home/ddobagi/.codex/sessions/2026/09/26/rollout-2026-09-26T15-11-58-01a0dc57-85bd-7aa1-b23e-e02463cd8c1b.jsonl"
+    },
+    {
+      "threadId": "01a0f4a8-576c-7442-8d4e-2e27f592302c",
+      "status": "paused",
+      "verified_at": "2026-10-01T09:40:33.305Z",
+      "evidence": "/home/ddobagi/.codex/sessions/2026/10/01/rollout-2026-10-01T08-31-08-01a0f4a8-576c-7442-8d4e-2e27f592302c.jsonl"
+    },
+    {
+      "threadId": "01a0f309-8e1c-7413-b647-0f4b469a4ffd",
+      "status": "paused",
+      "verified_at": "2026-10-01T09:38:11.909Z",
+      "evidence": "/home/ddobagi/.codex/sessions/2026/10/01/rollout-2026-10-01T00-58-04-01a0f309-8e1c-7413-b647-0f4b469a4ffd.jsonl"
+    }
+  ],
+  "legacy_current_batches_closed": true,
+  "legacy_writer_exceptions": 0,
+  "legacy_common_release_evidence": "/home/ddobagi/Hanium_Dreamup/docs/handoff/2026-10-01/part-a-two-session.md",
+  "canonical_revision_at_handoff": 135,
+  "counts_at_handoff": {
+    "walk-output": {
+      "PARTIAL": 38,
+      "DONE": 14,
+      "UNRECONCILED": 8
+    },
+    "route-motion": {
+      "UNRECONCILED": 18,
+      "PARTIAL": 38,
+      "DONE": 4
+    },
+    "vision": {
+      "PARTIAL": 25,
+      "DONE": 11,
+      "UNRECONCILED": 14
+    },
+    "A189": {
+      "PARTIAL": 101,
+      "DONE": 48,
+      "UNRECONCILED": 40
+    }
+  },
+  "verification_baseline": "/home/ddobagi/Hanium_Dreamup/work/part-a-completion-20260930/68-code",
+  "development_goal_reset_confirmation": {
+    "verified_at": "2026-10-02T20:20:21.861054+09:00",
+    "confirmed_roles": [
+      "pm",
+      "walk-output",
+      "route-motion",
+      "vision"
+    ],
+    "not_yet_verified_roles": [],
+    "all_four_confirmed": true,
+    "historical_initial_goal_verification_preserved": true,
+    "prior_pm_only_confirmation": {
+      "verified_at": "2026-10-02T19:55:05.567268+09:00",
+      "confirmed_roles": [
+        "pm"
+      ],
+      "not_yet_verified_roles": [
+        "walk-output",
+        "route-motion",
+        "vision"
+      ],
+      "all_four_confirmed": false,
+      "historical_initial_goal_verification_preserved": true
+    },
+    "field_success_claimed": false,
+    "token_budget_specified": false
+  }
+}

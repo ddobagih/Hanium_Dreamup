@@ -26,7 +26,9 @@ from sqlalchemy.exc import SQLAlchemyError
 import backend.app.services.report_original_access as report_original_access
 import backend.app.uploads as uploads
 from backend.app.database import SessionLocal
-from backend.app.main import report_image_key_manager
+from backend.app.config import get_settings
+from backend.app.services.report_image_keys import create_report_image_key_manager
+report_image_key_manager = create_report_image_key_manager(get_settings())
 from backend.app.models import (
     AdminOperationAudit,
     AdminSecurityControl,

@@ -1,0 +1,47 @@
+sequenceDiagram
+participant C as Camera F-D05-007
+participant V as 검출·LK F-D05-010/011
+participant D as Depth F-D07-003/007
+participant R as 위험후보 F-D07-008/012
+participant O as 출력 F-D02-023/025
+participant L as 생명주기 F-D02-018/034
+C->>V: owned frame·source lease·bounded 제출
+C->>D: capture/pose/depth receipt
+V-->>D: 검출 또는 LK 물질점·원본 시각
+alt 캡처/continuity/age 조건 통과
+D->>R: 실측 depth·유효 motion evidence
+R->>O: 후보·원본 lease·rank
+Note over O: 요청은 speak 반환 뒤 vibrate 순서, 비동기 재생은 겹칠 수 있음
+par 음성 경로
+O->>O: utterance reservation·REQUESTED 등록
+O->>O: 현재성 재검사·audio focus 요청
+alt current validator·기한·우선순위·focus 통과
+O->>O: dispatch·START 현재성 재검사
+O-->>R: 실제 DONE 또는 FAILED/CANCELLED
+else suppression·focus 실패·stale
+O-->>R: SUPPRESSED/UNAVAILABLE·음성 재생 없음
+end
+and 진동 경로 F-D02-026
+O->>O: 음성과 별도로 현재성·진동 허가 판정
+alt vibrationAccepted
+O-->>R: 진동 수락, 음성 실패/미수락이면 종료 해석 예약
+else 진동 허가 없음
+O-->>R: 진동 없음
+end
+end
+else 관측 불일치·만료·불충분
+D-->>R: 측정불가·UNKNOWN·위험 갱신 억제
+opt 제한된 짧은 공백 F-D07-009
+D->>D: 표시용 예측만 유지
+end
+end
+opt background·권한철회·known unsafe
+L->>V: generation 무효화·취소/drain
+L->>D: 측정 무효화·AR 자원 정리
+L->>O: 현재 owner 출력 retire
+alt 정리 성공
+L->>L: 완료 인정·새 시작은 별도 확인
+else 실패·재시도 소진
+L->>L: 정리 미확정·새 보행 차단
+end
+end

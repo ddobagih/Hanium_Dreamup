@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D11-021 현장 로그 요약의 AEAD 차단·역사 한정"]
+  B["P-D11-021 입력과 실행 경계 확인"]
+  A --> B
+  T0["1. 안전한 source snapshot과 envelope shape를 확인한다"]
+  B --> T0
+  T1["2. AEAD 자료는 summary_available=false로 취급해 평문 요약하지 않는다"]
+  T0 --> T1
+  T2["3. 과거 평문 자료만 camera/ARCore·provenance·sensitive key 조건 아래 제한 요약한다"]
+  T1 --> T2
+  T3["4. 결과를 LEGACY_HISTORY_ONLY_NOT_ELIGIBLE로 표시한다"]
+  T2 --> T3
+  T4["5. 정상 역사 요약도 return max(exit_code,1)로 종료한다"]
+  T3 --> T4
+  Z["역사 요약 성공도 exit＞=1"]
+  T4 --> Z
+  C0{"encrypted 또는 malformed current envelope"}
+  R0["요약 불가; legacy로 downgrade하지 않음"]
+  B -. "관련 조건 분기" .-> C0
+  C0 -->|"해당"| R0
+  C1{"strict option 조합 오류"}
+  R1["parser error"]
+  B -. "관련 조건 분기" .-> C1
+  C1 -->|"해당"| R1
+  C2{"과거 로그 strict 통과"}
+  R2["release_credit=0·field_evidence_credit=0"]
+  B -. "관련 조건 분기" .-> C2
+  C2 -->|"해당"| R2
+  X["종료 또는 중단: 별도 사용자 취소 명령 없음"]
+  Y["복구와 재시도: 자동 재시도 없음; 입력과 실패 근거 확인 후 별도 호출"]
+  Z -. "후속 실행 조건" .-> Y
+  B -. "취소 경계" .-> X

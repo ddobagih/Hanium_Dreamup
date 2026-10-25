@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D02-033 이전 보행 중단 안내와 개인정보 최소 기록"]
+  E["진입: ACTIVE/PAUSED/SAFE_STOP 저장·종료 clear / boolean marker+record 복원"]
+  G{"P-D02-033 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["각 다른 중단 설명"]
+  G -->|"정상 pause와 safe stop와 active crash"| B0
+  B1["구체 prior state 설명 대신 중립 안내"]
+  G -->|"다른 계정"| B1
+  B2["lowercase 허용 문자 외 underscore,160자 제한"]
+  G -->|"record의 이유 unsafe chars"| B2
+  B3["token 값 없이 WRONG_STATE/STALE_EPOCH/READINESS_EXPIRED 등 진단"]
+  G -->|"start/resume 거절"| B3
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["interrupting state만 record 생성; READY/ENDED는 null"]
+    S1["boolean marker false면 남은 record 무시"]
+    S2["marker true인데 record 없거나 damage/version wrong이면 LEGACY UNKNOWN 안내"]
+    S3["다른 actor hash이면 계정 중립 UNKNOWN 문구"]
+    S4["항상 자동 재개 없음과 새 기기 점검/보행 시작 안내"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: 안내 확인/새 세션 시작으로 marker 처리; lifecycle는 fresh READY 또는 configuration<br/>retention 별도."]
+  X["취소·중단: 소유권을 폐기하면 늦은 결과가 새 요청을 변경하지 못한다. / foreground/actor/epoch 변경 시 현재<br/>요청을 폐기한다."]
+  C["정리: marker clear와 record cleanup은 Main persistence stage, 실패는 상위 cleanup<br/>checkpoint에 남김."]
+  R["재시도·복구: 자동 재시도 없음; 새 적법한 이벤트 필요. / 현재 owner와 조건을 다시 확보해야 한다."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

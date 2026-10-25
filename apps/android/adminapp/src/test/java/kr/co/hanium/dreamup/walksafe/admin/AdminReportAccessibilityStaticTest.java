@@ -70,7 +70,7 @@ public final class AdminReportAccessibilityStaticTest {
         assertTrue(activity.contains("DocumentsContract.deleteDocument"));
         assertFalse(activity.contains("FileOutputStream"));
         assertTrue(activity.contains(
-            "parsedDeliveryRevision != connectedOperationsLatestDeliveryRevision"
+            "parsedDeliveryRevision != historyState.connectedOperationsLatestDeliveryRevision()"
         ));
         assertTrue(activity.contains("input(\"예상 최신 revision\""));
         assertTrue(activity.contains(

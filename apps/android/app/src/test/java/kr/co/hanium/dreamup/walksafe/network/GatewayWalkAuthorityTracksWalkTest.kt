@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe.network
 
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
 import java.io.File
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import org.junit.Assert.assertFalse
@@ -30,11 +31,10 @@ class GatewayWalkAuthorityTracksWalkTest {
         val source = sequenceOf(
             File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"),
             File("app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"),
-        ).first { it.isFile }.readText().replace(Regex("\\s+"), "")
-        val function = source.substringAfter("privatefunendAbandonedGatewayWalkStartLeaseBestEffort(")
-            .substringBefore("privatefun")
-        val guard = function.indexOf("if(gatewayWalkAuthorityController.tracksWalk(lease.walkId))return@execute")
-        val end = function.indexOf("gatewayWalkSessionClient.end(")
+        ).first { it.isFile }.readText()
+        val function = MainActivityRefactorSource.function(source, "fun endAbandonedGatewayWalkStartLeaseBestEffort(").replace(Regex("\\s+"), "")
+        val guard = function.indexOf("if(authority.tracksWalk(lease.walkId))return@execute")
+        val end = function.indexOf("requests.end(")
         assertTrue(guard >= 0 && end > guard)
     }
 }

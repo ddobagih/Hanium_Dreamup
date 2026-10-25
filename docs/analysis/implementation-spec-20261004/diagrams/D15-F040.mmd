@@ -1,0 +1,30 @@
+flowchart TB
+  E["F-D15-040 · 복원용 삭제 tombstone 서명 ledger 검증<br/>restore 검사/재적용 CLI에서 외부 ledger/head/key 로드"]
+  P["P-D15-040 · 전제조건<br/>복원 DB 밖의 신뢰 anchor와 Ed25519 공개키. code는 외부 서명자<br/>자체를 호출하지 않음."]
+  E --> P
+  S1["1. 중복 key·정확 schema/field·canonical<br/>bytes·UUID/time/hash 형식 검사"]
+  P --> S1
+  S2["2. domain-separated Ed25519 ledger/head<br/>signature 검증"]
+  S1 --> S2
+  S3["3. actual head SHA를 외부 required anchor와 비교하여<br/>rollback 거절"]
+  S2 --> S3
+  S4["4. ledger hash chain·sequence·scope/owner<br/>namespace/cutoff/head binding 검사"]
+  S3 --> S4
+  S5["5. content-free VerifiedReportTombstoneBundle<br/>반환"]
+  S4 --> S5
+  OK["정상 결과<br/>content-free VerifiedReportTombstoneBundle 반환"]
+  S5 --> OK
+  B1["조건 · 키/서명/ledger 누락·tamper<br/>결과 · fail-closed"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · 유효 서명이지만 과거 head<br/>결과 · restore_tombstone_head_rollback"]
+  S3 -. "해당 조건 발생" .-> B2
+  B3["조건 · chain gap·scope 다름<br/>결과 · 거절"]
+  S1 -. "해당 조건 발생" .-> B3
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>검증 함수는 입력 bytes를 소비하며 DB session을 만들지 않음."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_restore_tombstones.py:846<br/>verify_report_tombstone_bundle<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

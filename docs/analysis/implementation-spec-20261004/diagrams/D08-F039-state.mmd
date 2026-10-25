@@ -1,0 +1,12 @@
+stateDiagram-v2
+  state "F-D08-039 계정 generation 활성" as S0
+  state "F-D08-039 작업 진행" as S1
+  state "F-D08-039 삭제 fence" as S2
+  state "F-D08-039 작업 취소" as S3
+  state "F-D08-039 lease 해제" as S4
+  [*] --> S0
+  S0 --> S1: operation등록
+  S1 --> S2: 삭제내구수락
+  S2 --> S3: controllerabort
+  S1 --> S4: 정상전달끝
+  S3 --> S4: finally정리

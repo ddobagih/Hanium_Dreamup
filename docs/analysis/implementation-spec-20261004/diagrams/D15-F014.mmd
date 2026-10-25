@@ -1,0 +1,38 @@
+flowchart TB
+  E["F-D15-014 · 용량 제한 export·프로필·감사<br/>GET /reports/export"]
+  P["P-D15-014 · 전제조건<br/>admin high-risk report.export 재인가 및 named<br/>actor. agency는 reviewed<br/>damaged_tactile_block·exclude_fake·bundle 필수."]
+  E --> P
+  S1["1. format/profile 조합 검사"]
+  P --> S1
+  S2["2. process semaphore slot 즉시 획득"]
+  S1 --> S2
+  S3["3. DB payload byte 가드를 거친 bounded stream과<br/>row·scan 제한"]
+  S2 --> S3
+  S4["4. minimum 필드 축소/rounded 또는 redacted 좌표·image<br/>제거, agency 정확 좌표·named review 필터"]
+  S3 --> S4
+  S5["5. JSON/CSV/GeoJSON/ZIP 각 표현 및 총 byte cap을 검사"]
+  S4 --> S5
+  S6["6. response bytes 완성 후 durable export audit<br/>기록, 성공하면 no-store 다운로드"]
+  S5 --> S6
+  OK["정상 결과<br/>response bytes 완성 후 durable export audit 기록,<br/>성공하면 no-store 다운로드"]
+  S6 --> OK
+  B1["조건 · 동시 slot 2개 사용 중<br/>결과 · 503 report_export_capacity_exceeded"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · 10,000 row 또는10MiB 초과<br/>결과 · 413 report_export_too_large"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · agency scan&gt;20,000<br/>결과 · 413"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · bundle&amp;&amp;!csv 또는 !manifest;<br/>non-internal grid<br/>결과 · 400"]
+  S1 -. "해당 조건 발생" .-> B4
+  B5["조건 · 감사 저장 실패<br/>결과 · 완성된 bytes도 전송 보류"]
+  S6 -. "해당 조건 발생" .-> B5
+  B6["조건 · 요청 audit UUID 이미 존재<br/>결과 · 409 export_audit_id_conflict; 기존 파일 replay 아님"]
+  S1 -. "해당 조건 발생" .-> B6
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>export audit UUID를 다시 쓰면409. 다운로드 응답 유실만으로 동일<br/>감사 ID replay 성공을 보장하지 않음.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>closing(stream)·bounded buffer·slot finally.<br/>DB audit ID는 모든 표현 크기 검사 뒤 소비."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/api/reports.py:2797<br/>export_reports<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

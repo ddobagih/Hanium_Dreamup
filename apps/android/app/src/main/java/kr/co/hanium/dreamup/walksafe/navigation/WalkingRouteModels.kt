@@ -32,6 +32,7 @@ data class WalkingRouteStep(
     val roadName: String?,
     val turnType: Int?,
     val facilityType: Int?,
+    val roadType: Int? = null,
 )
 
 enum class WalkingRouteDistanceSource(val wireValue: String) {
@@ -66,6 +67,27 @@ data class DestinationSearchResult(
     val resultType: String = "poi",
     /** S06-30: what [distanceM] measures; null when unknown (older responses) or no distance. */
     val distanceSource: DestinationDistanceSource? = null,
+    /** Provider coordinate labels and alternatives; none is a verified walkable entrance. */
+    val coordinateEvidence: DestinationCoordinateEvidence? = null,
+)
+
+/** TMAP coordinate families, not entrance, building-side or floor classifications. */
+enum class DestinationCoordinateKind(val wireName: String) {
+    NOOR("noor"),
+    FRONT("front"),
+    LAT("lat"),
+    NEW("new"),
+}
+
+data class DestinationCoordinateCandidate(
+    val kind: DestinationCoordinateKind,
+    val point: RoutePoint,
+)
+
+/** The selected point remains the route target; alternatives retain only provider provenance. */
+data class DestinationCoordinateEvidence(
+    val selectedKind: DestinationCoordinateKind?,
+    val candidates: List<DestinationCoordinateCandidate>,
 )
 
 /**
@@ -83,6 +105,14 @@ enum class DestinationDistanceSource(val wireName: String) {
  */
 fun DestinationSearchResult.displayAddressOrNull(): String? =
     roadAddress?.takeIf(String::isNotBlank) ?: address?.takeIf(String::isNotBlank)
+
+/** Speech pronunciation only; provider/display address bytes are never changed. */
+fun DestinationSearchResult.speechAddressOrNull(): String? = displayAddressOrNull()?.let(::spokenDestinationAddressKo)
+
+fun spokenDestinationAddressKo(address: String): String =
+    Regex("(?<![0-9])([0-9]{1,6})-([0-9]{1,6})(?![0-9])").replace(address) {
+        "${it.groupValues[1]}의 ${it.groupValues[2]}"
+    }
 
 data class DestinationSearchResponse(
     val provider: String,

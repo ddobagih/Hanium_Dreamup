@@ -1,0 +1,21 @@
+flowchart TD
+  ID["F-D04-013 · GNSS status·raw measurement 관측과 구독 수명<br/>P-D04-013"]
+  A["GNSS observer start"]
+  C0{"closed가 아니고 이전 pending 정리를 끝냈는가"}
+  R0["observerClosed 또는 CLEANUP_PENDING"]
+  C1{"status/raw 중 하나 이상 등록되는가"}
+  R1["active false"]
+  OK["현재 generation callback → source별 시간 검증 → 품질 estimator 및 status 병합"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  STOP["stop: active false·generation 증가·cache clear → subscription cancel; 실패 handle 보존"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

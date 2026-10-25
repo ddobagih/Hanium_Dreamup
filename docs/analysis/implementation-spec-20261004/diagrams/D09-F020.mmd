@@ -1,0 +1,32 @@
+flowchart TD
+  T["F-D09-020 전체 readiness와 단일 실행 의존성 검사 / P-D09-020"]
+  N0["인가후6의존성probe 병렬"]
+  T --> N0
+  N1["single-flight와5초caller budget"]
+  N0 --> N1
+  N2["현재detector 및navigation검증"]
+  N1 --> N2
+  N3["reportmonitor와enrollment추가"]
+  N2 --> N3
+  N4["전체AND와degraded구분"]
+  N3 --> N4
+  N5["200또는503 JSON"]
+  N4 --> N5
+  Z["정상: 200 ready 또는503 not_ready에최소의존성상태반환"]
+  N5 --> Z
+  B0["503 status not_ready 및각check"]
+  N5 -->|"하나이상check.ready가True아님"| B0
+  B1["ready false check_timeout;같은작업다음조회공유"]
+  N1 -->|"local probe 5초넘김"| B1
+  B2["probe_stuck;새thread만들지않음"]
+  N2 -->|"unfinished probe threshold초과"| B2
+  B3["not_ready recent_success_unavailable"]
+  N4 -->|"최근TMAP없고live_probe=false"| B3
+  R["복구: 후속조회는동일inflight공유;완료후새검사. /ready 자체가전체서비스를중지/재시작하지않음 / 조건 복구 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  C["취소와 정리: 공유navigation probe shield; local worker는기존Future 유지 / probe engine dispose,session닫기,report임시fsync파일정리; background thread강제kill없음"]
+  N5 -.-> C

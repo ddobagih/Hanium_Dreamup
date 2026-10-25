@@ -1,0 +1,24 @@
+stateDiagram-v2
+  state "S-D09-026-CLOSED · 파일 미소유" as Closed
+  state "S-D09-026-LOCKED · private storage 잠금" as Locked
+  state "S-D09-026-PREPARED · schema와 legacy 확인" as Prepared
+  state "S-D09-026-COMMITTED · row transaction 완료" as Committed
+  state "S-D09-026-CLEANING · 무참조 소유 이미지 정리" as Cleaning
+  state "S-D09-026-FAILED · 호출 실패" as Failed
+  [*] --> Closed
+  Closed --> Locked: _open 또는 기존 저장소 sweep
+  Locked --> Prepared: 권한과 schema 및 signature 통과
+  Locked --> Failed: private 파일 또는 legacy 변경 거절
+  Prepared --> Committed: append 또는 만료 row 삭제 commit
+  Prepared --> Failed: quota 또는 transaction 오류
+  Committed --> Cleaning: 만료 삭제 뒤 image 후처리
+  Cleaning --> Closed: unlink와 fsync 및 lock 반환
+  Committed --> Closed: 쓰기 또는 조회 종료
+  Failed --> Closed: rollback과 lock 반환
+  Cleaning --> Closed: 프로세스 종료 뒤 재시작
+  Prepared --> Cleaning: prepare에서 orphan 확인
+  note right of Cleaning
+    F-D09-026 / P-D09-026
+    DB 참조가 없고 서비스 소유 UUID 이미지에 한정
+    수집 비활성 상태에서도 startup 및 매시간 sweep
+  end note

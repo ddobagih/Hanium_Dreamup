@@ -1,0 +1,157 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>분석 기준과 증거 해석</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="index.html">WalkSafe 기능과 처리 명세</a> · <a href="02-features.html">기능</a> · <a href="03-policies.html">정책</a> · <a href="05-scenarios.html">시나리오</a> · <a href="gallery.html">그림 모음</a> · <a href="08-review.html">검수</a></header><main><h1>분석 기준과 증거 해석</h1>
+<p><a href="index.html">전체 목차</a> · <a href="evidence/source-manifest.json">원본 파일 해시</a> · <a href="evidence/legacy-item-mapping.csv">기존 942개 항목 대응</a></p>
+<p>이 문서는 <strong>현재 작업트리를 고정한 정적 구현 명세</strong>다. 요청에 전제된 전체 DONE 진행표와 최종 통합 커밋은 확인되지 않았다. 발견한 코드·원장·문서 차이를 보존하며 상태를 승격하거나 제품 문제를 수정하지 않는다.</p>
+<h2>고정 기준</h2>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>확인값</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>실제 저장소</td>
+<td><code>/home/ddobagi/Hanium_Dreamup</code></td>
+</tr>
+<tr>
+<td>앱에 등록된 프로젝트 경로</td>
+<td><code>/home/ddobagi/ChatGPT/한이음 프로젝트</code> — 실행 환경에 해당 디렉터리 없음</td>
+</tr>
+<tr>
+<td>브랜치</td>
+<td><code>temp</code></td>
+</tr>
+<tr>
+<td>HEAD</td>
+<td><code>2e5744725a8c033a1817f3cc8a8ec679bc15ac9d</code></td>
+</tr>
+<tr>
+<td>HEAD 일시와 제목</td>
+<td>2026-09-30 13:32:45 KST · docs: record verified temp publication</td>
+</tr>
+<tr>
+<td>분석 복사본 생성 시각</td>
+<td>2026-10-04T10:33:40.003443+09:00</td>
+</tr>
+<tr>
+<td>미커밋 상태</td>
+<td>추적 파일 수정 199개, 미추적 상태 항목 342개</td>
+</tr>
+<tr>
+<td>분석 파일</td>
+<td>6,489개 해시·크기 목록, 그중 UTF-8 텍스트 6,196개 고정 복사</td>
+</tr>
+<tr>
+<td>읽기용 복사본</td>
+<td><code>/tmp/walksafe-spec-20261004-source</code></td>
+</tr>
+<tr>
+<td>명세의 줄 번호</td>
+<td>고정된 작업트리 파일의 줄 번호. HEAD 커밋의 줄 번호로 간주하지 않음</td>
+</tr>
+<tr>
+<td>바이너리</td>
+<td>해시·설정·로더 연결을 근거화. 모델 실행·기기 시험은 이번 작업에서 하지 않음</td>
+</tr>
+</tbody></table>
+<p>복사본은 분석 도중 다른 작업의 변경을 섞지 않기 위한 임시 읽기 기준이다. 장기 식별은 <code>source-manifest.json</code>의 파일별 SHA-256을 사용한다. 링크는 원본 저장소 파일로 연결되므로 이후 코드가 바뀌면 줄 번호와 해시를 대조해야 한다. 일부 ignored <code>work/</code>·비공개 과거 실행 기록은 고정본 바깥의 기존 증거이며 현재 코드 전체 검증으로 확대하지 않는다.</p>
+<h2>완료 기록과 실제 코드의 차이</h2>
+<table>
+<thead>
+<tr>
+<th>구분</th>
+<th align="right">전체</th>
+<th align="right">DONE</th>
+<th align="right">PARTIAL</th>
+<th align="right">미정합</th>
+<th align="right">해당 없음</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A 담당</td>
+<td align="right">189</td>
+<td align="right">57</td>
+<td align="right">132</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>B 담당</td>
+<td align="right">188</td>
+<td align="right">0</td>
+<td align="right">155</td>
+<td align="right">33</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>기존 종결분</td>
+<td align="right">565</td>
+<td align="right">553</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">12</td>
+</tr>
+<tr>
+<td>전체</td>
+<td align="right">942</td>
+<td align="right">610</td>
+<td align="right">287</td>
+<td align="right">33</td>
+<td align="right">12</td>
+</tr>
+</tbody></table>
+<p><code>current_status</code> 공란 33개는 미정합으로 표시했다. 원문 값을 변경하지 않았으며 빈값이 구현 부재·확정 결함이라는 의미는 아니다. A/B는 <a href="../../handoff/2026-09-30/remaining-items.json">기존 배정</a>의 <code>source_id</code>로 결합했다. 배정 377개 중 중복·누락·A/B 겹침은 없다. A189는 보행60+경로60+인식50+기존 DONE19이며, 기존 21개 분야와 추가 motion70개를 새 구현 분야의 탐색 색인에 연결한다.</p>
+<p>최신 rev241 인계는 <strong>개발 완료142, 개발 잔여47, 현장 테스트 필요85, 원문 DONE57/PARTIAL132</strong>를 기록한다. 개발142는 원문 DONE57과 현장 테스트 필요85의 합이며 전체 요구 완료와 같지 않다. B188의 상태가 그대로라는 사실도 B 코드에 변경이 없다는 뜻은 아니다.</p>
+<p>근거: <a href="../../planning/walksafe-part-a-completion-plan-20260930.md">A 완료 인계</a>, <a href="../../handoff/2026-10-01/four-session-transition/scope.json">4세션 범위</a>, <a href="evidence/implementation-plan-items-20260921.csv">복사한 현재 CSV</a>.</p>
+<h3>요약 JSON의 내부 불일치</h3>
+<p><code>implementation-plan-summary-20260921.json</code> 최상위 <code>current_status</code>에는 DONE605/PARTIAL264/미정합61/NA12가 남아 있고 최상위 <code>plan_revision</code>은 142다. 뒤쪽 <code>latest_part_a_user_stop_handoff</code>와 <code>latest_revision241_development_stage</code>가 최신 인계를 기록한다. 이번 집계는 고정 CSV를 직접 다시 계산했으며 JSON의 앞부분만 최신으로 취급하지 않았다. CSV 해시는 <code>73cef61183331641139f0f84ed4ede50dab085693f2090b001a01f242ba623fa</code>다.</p>
+<h2>증거 수준</h2>
+<table>
+<thead>
+<tr>
+<th>표기</th>
+<th>의미</th>
+<th>허용되는 결론</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CODE_STATIC</td>
+<td>고정 코드·설정과 호출 경로 직접 읽기</td>
+<td>구현된 조건과 상태변화 설명</td>
+</tr>
+<tr>
+<td>DOCUMENT_REQUIREMENT</td>
+<td>기존 정책·요구·인계 문서</td>
+<td>문서가 요구하거나 기록한 내용</td>
+</tr>
+<tr>
+<td>TEST_EXPECTATION</td>
+<td>테스트 코드의 단언·fixture</td>
+<td>해당 시험이 기대하는 행위; 이번 실행 통과 아님</td>
+</tr>
+<tr>
+<td>HISTORICAL_EXECUTION</td>
+<td>기존 실행 로그·빌드·설치 기록</td>
+<td>당시 대상/환경/범위에 한정한 결과</td>
+</tr>
+<tr>
+<td>CURRENT_DOC_CHECK</td>
+<td>이번 문서 연결·JSON·Mermaid 렌더링 검사</td>
+<td>문서 구조와 그림 생성 확인</td>
+</tr>
+<tr>
+<td>UNCONFIRMED</td>
+<td>근거 부재/부분판독/연결 또는 환경 미확인</td>
+<td>한계와 이유 표시</td>
+</tr>
+</tbody></table>
+<p>DONE은 기존 개선 작업의 기록이다. 이번 분석에서 모든 동작을 직접 실행했다는 뜻이 아니다. 정식 시험·출시 gate의 과거 <code>NOT_RUN</code>/<code>NOT_ELIGIBLE</code>도 문서 작성으로 닫지 않는다.</p>
+<h2>과거 실행의 현재 적용 한계</h2>
+<ul>
+<li>2026-10-03 APK build-result의 original source pin11개 중 현재 파일과 10개 일치, MainActivity 1개 상이였다는 조사 결과가 있다. 이 APK 성공은 현재 전체 소스 검증이 아니다.</li>
+<li>2026-10-04 최신 field-test-handoff의 상태는 <code>VOICE_FIRST_INSTALLED_MODEL_ACCURACY_UNRESOLVED</code>, <code>selected_original_source_pins_unchanged=false</code>다. 설치 해시 일치 기록과 모델 정확도 미해결 기록을 함께 보존한다.</li>
+<li>최신 daylog의 JVM210과 후속59는 중복 포함 별도 실행이다. 합산한 독립269건으로 쓰지 않는다. 실제 호출어 발화·실외 경로 시작 음성·보행·청취·모델 개선 완료는 미검증이다.</li>
+<li>이번 분석에서는 제품 테스트·빌드·설치·외부 API 변경·계정 조작·실기기 및 현장 시험을 수행하지 않는다. 문서 검사 결과는 별도 <a href="08-review.html">검수 보고</a>에 기록한다.</li>
+</ul>
+<p>근거: <code>/home/ddobagi/Hanium_Dreamup/work/part-a-four-sessions-20261001/apk-handoff/original-user-20261003T130105Z/build-result.json</code>, <code>/home/ddobagi/Hanium_Dreamup/work/outdoor-field-20261003/field-test-handoff.json</code>, <a href="../../../daylog/2026-10-04.md">2026-10-04 daylog</a>.</p>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

@@ -19,6 +19,45 @@ private const val OTP_FIXTURE_NOW_MS = 1_788_663_600_000L // 2026-09-06T03:00:00
 
 class GatewayAccountOtpRetryBehaviorTest {
     @Test
+    fun changingOnlyBirthDateFormatPreservesWireIdBackoffAndCallbacks() {
+        val compact = PAYLOAD.copy(dateOfBirth = "20000229")
+        val harness = Harness()
+        val transport = OtpTransport(pending("17"), success())
+        val client = GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS })
+        val first = requireNotNull(harness.policy.begin(compact))
+        assertEquals(PAYLOAD, first.payload)
+        assertNull(harness.policy.begin(PAYLOAD))
+        val error = assertThrows(GatewayAccountHttpException::class.java) { send(client, first) }
+        assertTrue(harness.policy.recordFailure(
+            first, PAYLOAD, error.statusCode, error.serverCode, error.retryAfterMs,
+        ))
+        assertEquals(17_000L, harness.policy.remainingWaitMs(compact))
+        assertEquals(17_000L, harness.policy.remainingWaitMs(PAYLOAD))
+        assertNull(harness.policy.begin(compact))
+        assertNull(harness.policy.begin(PAYLOAD))
+
+        harness.nowMs += 17_000L
+        val retry = requireNotNull(harness.policy.begin(PAYLOAD))
+        assertEquals(first.requestId, retry.requestId)
+        assertEquals(HANDLE, send(client, retry).enrollmentHandle)
+        assertTrue(harness.policy.recordSuccess(retry, compact, persistResult = { true }))
+        assertEquals(1, harness.generatedIds)
+        assertEquals(2, transport.bodies.size)
+        assertEquals(1, transport.bodies.distinct().size)
+        assertEquals("2000-02-29", JSONObject(transport.bodies.first()).getString("date_of_birth"))
+    }
+
+    @Test
+    fun invalidBirthDateEditStillRejectsTheOldCallback() {
+        val harness = Harness()
+        val attempt = requireNotNull(harness.policy.begin(PAYLOAD.copy(dateOfBirth = "20000229")))
+        assertFalse(harness.policy.recordSuccess(attempt, PAYLOAD.copy(dateOfBirth = "20000230"), persistResult = { true }))
+        val replacement = requireNotNull(harness.policy.begin(PAYLOAD))
+        assertNotEquals(attempt.requestId, replacement.requestId)
+        assertTrue(harness.policy.recordSuccess(replacement, PAYLOAD, persistResult = { true }))
+    }
+
+    @Test
     fun timeoutThenPendingWaitsForExplicitRetryWithTheSameWireIdUntil202() {
         val harness = Harness()
         val transport = OtpTransport(
@@ -52,7 +91,7 @@ class GatewayAccountOtpRetryBehaviorTest {
         assertEquals(first.requestId, third.requestId)
         val result = send(client, third)
         assertEquals(HANDLE, result.enrollmentHandle)
-        assertTrue(harness.policy.recordSuccess(third, PAYLOAD))
+        assertTrue(harness.policy.recordSuccess(third, PAYLOAD, persistResult = { true }))
         assertEquals(3, transport.bodies.size)
         assertEquals(1, harness.generatedIds)
         assertEquals(1, transport.bodies.distinct().size)
@@ -84,7 +123,7 @@ class GatewayAccountOtpRetryBehaviorTest {
             PAYLOAD.copy(email = "other@example.com"),
             PAYLOAD.copy(dateOfBirth = "2001-01-02"),
             PAYLOAD.copy(gatewayBaseUrl = "https://other-gateway.example"),
-            PAYLOAD.copy(ownerBindingSha256 = "other-owner-binding"),
+            PAYLOAD.copy(ownerBindingSha256 = "b".repeat(64)),
             PAYLOAD.copy(signupAttempt = "new-signup-epoch"),
         )
         variants.forEach { changed ->
@@ -92,10 +131,10 @@ class GatewayAccountOtpRetryBehaviorTest {
             val old = requireNotNull(harness.policy.begin(PAYLOAD))
             val current = requireNotNull(harness.policy.begin(changed))
             assertNotEquals(old.requestId, current.requestId)
-            assertFalse(harness.policy.recordSuccess(old, PAYLOAD))
+            assertFalse(harness.policy.recordSuccess(old, PAYLOAD, persistResult = { true }))
             assertFalse(harness.policy.recordFailure(old, changed, 409, PENDING_CODE, 300_000L))
             assertEquals(0L, harness.policy.remainingWaitMs(changed))
-            assertTrue(harness.policy.recordSuccess(current, changed))
+            assertTrue(harness.policy.recordSuccess(current, changed, persistResult = { true }))
         }
     }
 
@@ -108,7 +147,7 @@ class GatewayAccountOtpRetryBehaviorTest {
 
         val replacement = requireNotNull(harness.policy.begin(PAYLOAD))
         assertNotEquals(cancelled.requestId, replacement.requestId)
-        assertFalse(harness.policy.recordSuccess(cancelled, PAYLOAD))
+        assertFalse(harness.policy.recordSuccess(cancelled, PAYLOAD, persistResult = { true }))
         assertFalse(harness.policy.recordFailure(cancelled, PAYLOAD, 409, PENDING_CODE, 300_000L))
         assertTrue(harness.policy.recordFailure(replacement, PAYLOAD, 409, PENDING_CODE, 17_000L))
         assertEquals(17_000L, harness.policy.remainingWaitMs(PAYLOAD))
@@ -120,10 +159,10 @@ class GatewayAccountOtpRetryBehaviorTest {
         val old = requireNotNull(harness.policy.begin(PAYLOAD))
         val changed = PAYLOAD.copy(dateOfBirth = "2002-02-02")
 
-        assertFalse(harness.policy.recordSuccess(old, changed))
+        assertFalse(harness.policy.recordSuccess(old, changed, persistResult = { true }))
         val current = requireNotNull(harness.policy.begin(changed))
         assertNotEquals(old.requestId, current.requestId)
-        assertTrue(harness.policy.recordSuccess(current, changed))
+        assertTrue(harness.policy.recordSuccess(current, changed, persistResult = { true }))
     }
 
     @Test
@@ -170,7 +209,7 @@ class GatewayAccountOtpRetryBehaviorTest {
     }
 
     @Test
-    fun clientWireEmailAndBirthDateAreNotRewrittenByTheRetryPolicy() {
+    fun retryPayloadUsesTheSameCanonicalWireEmailAndPreservesBirthDate() {
         val payload = PAYLOAD.copy(email = "User@EXAMPLE.com")
         val harness = Harness()
         val attempt = requireNotNull(harness.policy.begin(payload))
@@ -179,7 +218,8 @@ class GatewayAccountOtpRetryBehaviorTest {
         assertNotNull(send(GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS }), attempt))
 
         val body = JSONObject(transport.bodies.single())
-        assertEquals(payload.email, body.getString("email"))
+        assertEquals("User@example.com", body.getString("email"))
+        assertEquals(payload.copy(email = "User@example.com"), attempt.payload)
         assertEquals(payload.dateOfBirth, body.getString("date_of_birth"))
         assertFalse(payload.toString().contains(payload.email))
         assertFalse(attempt.toString().contains(payload.email))
@@ -204,7 +244,7 @@ class GatewayAccountOtpRetryBehaviorTest {
         ))
         val currentAttempt = requireNotNull(harness.policy.begin(PAYLOAD))
         assertFalse(fence.completeIfCurrent(oldToken, "signup-binding"))
-        assertFalse(harness.policy.recordSuccess(oldAttempt, PAYLOAD))
+        assertFalse(harness.policy.recordSuccess(oldAttempt, PAYLOAD, persistResult = { true }))
         assertFalse(harness.policy.recordFailure(oldAttempt, PAYLOAD, 409, PENDING_CODE, 300_000L))
         assertNotEquals(oldAttempt, currentAttempt)
         assertEquals(oldAttempt.requestId, currentAttempt.requestId)
@@ -213,7 +253,7 @@ class GatewayAccountOtpRetryBehaviorTest {
 
         assertEquals(lateResponse.enrollmentHandle, currentResponse.enrollmentHandle)
         assertTrue(fence.completeIfCurrent(currentToken, "signup-binding"))
-        assertTrue(harness.policy.recordSuccess(currentAttempt, PAYLOAD))
+        assertTrue(harness.policy.recordSuccess(currentAttempt, PAYLOAD, persistResult = { true }))
         assertEquals(2, transport.bodies.size)
         assertEquals(1, transport.bodies.distinct().size)
         assertEquals(1, harness.generatedIds)
@@ -280,7 +320,7 @@ class GatewayAccountOtpRetryBehaviorTest {
         assertEquals(first.requestId, firstWireId)
         assertEquals(explicitNext.requestId, nextWireId)
         assertNotEquals(firstWireId, nextWireId)
-        assertTrue(harness.policy.recordSuccess(explicitNext, PAYLOAD))
+        assertTrue(harness.policy.recordSuccess(explicitNext, PAYLOAD, persistResult = { true }))
         assertEquals(2, harness.generatedIds)
         assertEquals(2, transport.bodies.size)
     }
@@ -319,7 +359,7 @@ class GatewayAccountOtpRetryBehaviorTest {
         assertEquals(2, harness.generatedIds)
         assertEquals(1, transport.bodies.size)
 
-        assertFalse(harness.policy.recordSuccess(old, PAYLOAD))
+        assertFalse(harness.policy.recordSuccess(old, PAYLOAD, persistResult = { true }))
         assertEquals(0L, harness.policy.remainingWaitMs(PAYLOAD))
         assertNull(harness.policy.begin(PAYLOAD))
         assertEquals(2, harness.generatedIds)
@@ -331,7 +371,7 @@ class GatewayAccountOtpRetryBehaviorTest {
         assertEquals(2, transport.bodies.size)
         assertEquals(old.requestId, JSONObject(transport.bodies[0]).getString("request_id"))
         assertEquals(current.requestId, JSONObject(transport.bodies[1]).getString("request_id"))
-        assertTrue(harness.policy.recordSuccess(current, PAYLOAD))
+        assertTrue(harness.policy.recordSuccess(current, PAYLOAD, persistResult = { true }))
         assertEquals(0L, harness.policy.remainingWaitMs(PAYLOAD))
         assertEquals(2, harness.generatedIds)
         assertEquals(2, transport.bodies.size)
@@ -340,9 +380,17 @@ class GatewayAccountOtpRetryBehaviorTest {
     private class Harness {
         var nowMs = 1_000L
         var generatedIds = 0
+        private val store = object : PendingEmailOtpRequestStore {
+            var value: PendingEmailOtpRequest? = null
+            override fun loadPendingOtpRequest() = value
+            override fun savePendingOtpRequest(request: PendingEmailOtpRequest): Boolean { value = request; return true }
+            override fun clearPendingOtpRequest(): Boolean { value = null; return true }
+        }
         val policy = EmailOtpRequestRetryPolicy(
             elapsedRealtimeMs = { nowMs },
             createRequestId = { "synthetic_request_" + (++generatedIds).toString() },
+            pendingStore = { store },
+            wallClockMs = { OTP_FIXTURE_NOW_MS },
         )
     }
 
@@ -397,7 +445,7 @@ class GatewayAccountOtpRetryBehaviorTest {
         val HANDLE = "A".repeat(43)
         val PAYLOAD = EmailOtpRequestRetryPolicy.Payload(
             gatewayBaseUrl = "https://gateway.example",
-            ownerBindingSha256 = "synthetic-owner-binding",
+            ownerBindingSha256 = "a".repeat(64),
             signupAttempt = "synthetic-signup-epoch",
             email = "person@example.com",
             dateOfBirth = "2000-02-29",

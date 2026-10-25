@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-003 기기 PIN·패턴·비밀번호 확인과 키 사용 1회 재시도"]
+  P["P-D12-003 일회용 자격증명 재전송 금지"]
+  A --> P
+  M0["1. 키 인증 실패 원인을 구분하고 영구 무효화면 즉시 STOP_KEY_INVALIDATED로 잠근다."]
+  P --> M0
+  M1["2. 인증 필요 오류는 기기 credential 화면을 한 번 요청한다."]
+  M0 --> M1
+  M2["3. 비밀값 없는 반복 가능 작업은 승인 후 같은 Runnable을 takeReady로 한 번만 실행한다."]
+  M1 --> M2
+  M3["4. 로그인·복구완료·재인증 등 credentialBound 작업은 재전송하지 않고 새 비밀번호와 새 TOTP 입력을 요청한다."]
+  M2 --> M3
+  M4["5. 로그인·복구완료·분실 신고는 비밀값 전송 전에 로컬 서명을 preflight한다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 인증 승인 뒤 허용된 Runnable 1회 실행 또는 새 자격증명 입력 안내."]
+  M0 -. "관련 조건 확인" .-> B0{"credential 승인 및 repeatable"}
+  B0 -->|"조건 해당"| R0["RETRY_ONCE"]
+  M1 -. "관련 조건 확인" .-> B1{"credential 승인 및 credentialBound"}
+  B1 -->|"조건 해당"| R1["REENTER_CREDENTIALS"]
+  M2 -. "관련 조건 확인" .-> B2{"취소 또는 반복 서명 실패"}
+  B2 -->|"조건 해당"| R2["STOP"]
+  M3 -. "관련 조건 확인" .-> B3{"화면 잠금 제거·초기화로 키 영구 무효"}
+  B3 -->|"조건 해당"| R3["STOP_KEY_INVALIDATED 및 교체 안내"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["repeatable만 최대1회; credentialBound는 새 password/TOTP 입력."]

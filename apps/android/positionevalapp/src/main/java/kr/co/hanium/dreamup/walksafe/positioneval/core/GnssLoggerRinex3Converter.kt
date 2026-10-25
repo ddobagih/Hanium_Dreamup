@@ -7,6 +7,7 @@
 package kr.co.hanium.dreamup.walksafe.positioneval.core
 
 import java.io.File
+import java.io.BufferedReader
 import java.io.FileOutputStream
 import java.io.Writer
 import java.time.LocalDateTime
@@ -68,10 +69,23 @@ object GnssLoggerRinex3Converter {
         input: File,
         output: File,
         generatedAtUtc: LocalDateTime = LocalDateTime.now(ZoneOffset.UTC),
+        cancellation: AnalysisCancellation = AnalysisCancellation(),
+    ): RinexConversionSummary = convert(input, output, generatedAtUtc, cancellation) {
+        it.bufferedReader(Charsets.UTF_8)
+    }
+
+    internal fun convert(
+        input: File,
+        output: File,
+        generatedAtUtc: LocalDateTime,
+        cancellation: AnalysisCancellation,
+        openInput: (File) -> BufferedReader,
     ): RinexConversionSummary {
+        cancellation.throwIfCancelled()
         if (!input.isFile) fail("INPUT_NOT_FOUND", "GnssLogger TXT 파일을 찾을 수 없습니다.")
         if (output.exists()) fail("OUTPUT_ALREADY_EXISTS", "기존 RINEX 출력 파일을 덮어쓰지 않습니다.")
-        val scan = scan(input)
+        val scan = scan(input, cancellation, openInput)
+        cancellation.throwIfCancelled()
         output.parentFile?.let { parent ->
             if (!parent.isDirectory && !parent.mkdirs()) fail("OUTPUT_DIRECTORY_UNAVAILABLE", "RINEX 출력 폴더를 만들 수 없습니다.")
         }
@@ -82,7 +96,8 @@ object GnssLoggerRinex3Converter {
             FileOutputStream(part).use { stream ->
                 val writer = stream.bufferedWriter(Charsets.US_ASCII)
                 writeHeader(writer, scan, generatedAtUtc)
-                body = writeBody(input, scan, writer)
+                body = writeBody(input, scan, writer, cancellation, openInput)
+                cancellation.throwIfCancelled()
                 writer.flush()
                 stream.fd.sync()
             }
@@ -92,6 +107,7 @@ object GnssLoggerRinex3Converter {
             if (body.acceptedCount != scan.acceptedCount || body.carrierPhaseCount != scan.carrierPhaseCount) {
                 fail("INTERNAL_CONVERSION_MISMATCH", "RINEX 사전 검사와 본문 변환 결과가 일치하지 않습니다.")
             }
+            cancellation.throwIfCancelled()
             if (!part.renameTo(output)) fail("OUTPUT_COMMIT_FAILED", "RINEX 출력 파일을 확정하지 못했습니다.")
             RinexConversionSummary(
                 scan.rawCount,
@@ -107,7 +123,7 @@ object GnssLoggerRinex3Converter {
         }
     }
 
-    private fun scan(input: File): ScanResult {
+    private fun scan(input: File, cancellation: AnalysisCancellation, openInput: (File) -> BufferedReader): ScanResult {
         var schema: RawSchema? = null
         var model = "unknown"
         var rawCount = 0
@@ -154,8 +170,9 @@ object GnssLoggerRinex3Converter {
             currentBatchSatellites.clear()
         }
 
-        input.bufferedReader(Charsets.UTF_8).useLines { lines ->
+        openInput(input).useLines { lines ->
             lines.forEachIndexed { zeroBasedLine, rawLine ->
+                cancellation.throwIfCancelled()
                 val lineNumber = zeroBasedLine + 1
                 val line = if (lineNumber == 1) rawLine.removePrefix("\uFEFF") else rawLine
                 when {
@@ -232,7 +249,13 @@ object GnssLoggerRinex3Converter {
         )
     }
 
-    private fun writeBody(input: File, scan: ScanResult, writer: Writer): BodySummary {
+    private fun writeBody(
+        input: File,
+        scan: ScanResult,
+        writer: Writer,
+        cancellation: AnalysisCancellation,
+        openInput: (File) -> BufferedReader,
+    ): BodySummary {
         var currentBatch: BatchKey? = null
         var currentEpoch: GpsEpoch? = null
         var suppressCarrierPhase = false
@@ -247,10 +270,12 @@ object GnssLoggerRinex3Converter {
         val clock = ClockTracker()
 
         fun flushBatch() {
+            cancellation.throwIfCancelled()
             if (batch.isEmpty()) return
             val observations = linkedMapOf<String, MutableMap<String, ObservationValue>>()
             val encounteredSignals = mutableSetOf<String>()
             batch.forEach { (measurement, clockContext) ->
+                cancellation.throwIfCancelled()
                 val selected = signalFor(measurement)
                 val signal = selected.signal ?: return@forEach
                 val phaseKey = "${signal.satellite}/${signal.observationCode}"
@@ -298,8 +323,9 @@ object GnssLoggerRinex3Converter {
             suppressCarrierPhase = false
         }
 
-        input.bufferedReader(Charsets.UTF_8).useLines { lines ->
+        openInput(input).useLines { lines ->
             lines.forEachIndexed { zeroBasedLine, line ->
+                cancellation.throwIfCancelled()
                 if (!line.startsWith("Raw,")) return@forEachIndexed
                 val measurement = scan.schema.measurement(line, zeroBasedLine + 1)
                 validateMeasurementContract(measurement)

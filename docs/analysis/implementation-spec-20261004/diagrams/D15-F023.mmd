@@ -1,0 +1,33 @@
+flowchart TB
+  E["F-D15-023 · 승인된 신고 물리삭제<br/>P-D15-023"]
+  E --> CLI["실행모드·DB role·limit1..100 검증<br/>deletion/storage DB session advisory locks"]
+  CLI --> MODE{"CLI action 선택"}
+  MODE -->|"--reconcile"| RECON["durable quarantine journal과 DB tombstone 대조<br/>committed면 finalize·아니면 restore"]
+  RECON --> RECONDONE["reconcile 결과 수 반환 후 종료<br/>새 후보 삭제 없음"]
+  MODE -->|"기본 preview 또는 --apply"| CAND["pending journal 없음 확인<br/>ACK DELETE 후보와 canonical digest 계산"]
+  CAND --> APPLY{"--apply인가"}
+  APPLY -->|"아니오"| PREVIEW["후보 수·digest 반환 후 종료<br/>물리삭제 service 호출 없음"]
+  APPLY -->|"예"| CONFIRM{"정확 confirm과 preview digest 일치"}
+  CONFIRM -->|"아니오"| CLIERR["CLI 실패 종료·삭제 안 함"]
+  CONFIRM -->|"예 · 각 후보"| EXIST{"request tombstone 이미 존재"}
+  EXIST -->|"예"| EQ{"report·owner·세대·request version 일치"}
+  EQ -->|"예"| REPLAY["DELETED 즉시 반환<br/>신규 삭제·stage 없음"]
+  EQ -->|"아니오"| CONFLICT["409 candidate conflict 반환"]
+  EXIST -->|"아니오"| LOCK["subject exclusive lock·전용 candidate DB 함수<br/>ACK DELETE owner/version 재검사"]
+  LOCK -->|"stale"| STALE["409 candidate stale 반환"]
+  LOCK --> HOLD{"active legal hold"}
+  HOLD -->|"예"| HELD["rollback·LEGAL_HOLD 즉시 반환<br/>파일·신고 삭제 안 함"]
+  HOLD -->|"아니오"| STAGE["외부사본 snapshot·tombstone flush<br/>private quarantine 파일 stage"]
+  STAGE -->|"실패"| RESTORE["rollback·stage restore<br/>restore 실패는 recovery required503"]
+  STAGE -->|"성공"| COMMIT["Report DELETE·tombstone DB commit"]
+  COMMIT -->|"성공"| FINAL["파일 finalize"]
+  COMMIT -->|"오류"| PROBE{"독립 확인으로 commit tombstone 존재"}
+  PROBE -->|"예"| FINAL
+  PROBE -->|"아니오"| RESTORE
+  PROBE -->|"확인 불가"| AMB["503 recovery required<br/>불명확한 stage를 임의 제거하지 않음"]
+  FINAL -->|"성공"| DELETED["DELETED 반환"]
+  FINAL -->|"실패"| CLEANUP["503 cleanup pending<br/>DB 삭제 효과 유지"]
+  REC["중단 후 --reconcile<br/>tombstone 있으면 finalize·없으면 restore<br/>pending journal 있으면 새 후보 처리 차단<br/>CLI finally advisory unlock·engine dispose"]
+  E -.-> REC
+  SRC["근거 · report_deletion.py:340 apply_report_deletion<br/>scripts/delete_reports.py:702 main"]
+  E -.-> SRC

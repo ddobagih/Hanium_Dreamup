@@ -84,6 +84,8 @@ class UnknownObjectFeedbackPolicy(stepLengthM: Float = 0.65f) {
                     output.sourceValidUntilElapsedRealtimeMs ?: Long.MAX_VALUE,
                     capturedAtMs + MAX_SOURCE_AGE_MS,
                 ),
+                sourceObservedAtElapsedRealtimeMs = minOf(output.sourceObservedAtElapsedRealtimeMs ?: capturedAtMs, capturedAtMs),
+                sourceMaxAgeMs = minOf(output.sourceMaxAgeMs ?: MAX_SOURCE_AGE_MS, MAX_SOURCE_AGE_MS),
                 userFacing = messages.buildUserFacing(
                     MetricDepthDecision(
                         className = CLASS_NAME,

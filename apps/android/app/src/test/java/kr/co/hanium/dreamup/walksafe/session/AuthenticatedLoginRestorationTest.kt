@@ -1,5 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.session
 
+import kr.co.hanium.dreamup.walksafe.MainActivityRefactorSource
+import kr.co.hanium.dreamup.walksafe.ReportStaticSourceInspector
+
 import java.io.File
 import kr.co.hanium.dreamup.walksafe.network.GatewayFieldSession
 import kr.co.hanium.dreamup.walksafe.network.GatewaySessionProcessCoordinator
@@ -118,23 +121,27 @@ class AuthenticatedLoginRestorationTest {
         val source = File(
             "src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
         ).readText()
-        val login = source.substringAfter("private fun loginEmailAccount(")
-            .substringBefore("private fun postAccountFailure(")
+        val login = MainActivityRefactorSource.function(source, "private fun loginEmailAccount(")
             .replace(Regex("\\s+"), " ")
-        val guardedCommit =
-            "if (!permissionSessionPolicy.isAuthenticatedFor(session.actorId)) { " +
-                "permissionSessionPolicy.rememberActor(session.actorId) }"
+        val composition = MainActivityRefactorSource.member(source, "createEmailAccountController")
+        val accountEffect = ReportStaticSourceInspector.functionBlock(composition, "override fun applyVerifiedAccount")
+            .replace(Regex("\\s+"), " ")
+        val guardedCommit = "if (!permissionSessionPolicy.isAuthenticatedFor(actorId)) {"
         val publish = login.indexOf("GatewaySessionProcessCoordinator.publishVerified(")
-        val commit = login.indexOf(guardedCommit)
-        val refresh = login.indexOf("refreshIntegratedConsentFromServer()")
-        assertTrue("The behavioral fixture must match MainActivity's login commit", commit >= 0)
+        val commit = login.indexOf("effects.applyVerifiedAccount(session.actorId, reauthenticatesExistingProgress)")
+        val refresh = login.indexOf("effects.refreshConfirmedConsent()")
+        val guard = accountEffect.indexOf(guardedCommit)
+        val remember = accountEffect.indexOf("permissionSessionPolicy.rememberActor(actorId)")
+        assertTrue("The behavioral fixture must match MainActivity's guarded login commit", guard >= 0 && remember > guard)
+        assertTrue(accountEffect.substring(guard, remember).contains("invalidateSpeechOutputStorageBinding()"))
+        assertTrue(composition.contains("override fun refreshConfirmedConsent() = refreshIntegratedConsentFromServer()"))
         assertTrue("Verified publication must still precede the local commit", publish >= 0 && publish < commit)
         assertTrue("Consent refresh must still follow the guarded commit", commit < refresh)
         assertEquals(
             "No additional unguarded rememberActor may undo the verified observer",
             1,
-            Regex("permissionSessionPolicy\\.rememberActor\\(session\\.actorId\\)")
-                .findAll(login).count(),
+            Regex("permissionSessionPolicy\\.rememberActor\\(actorId\\)")
+                .findAll(accountEffect).count(),
         )
     }
 

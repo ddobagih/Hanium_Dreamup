@@ -1,0 +1,13 @@
+flowchart TD
+ A["F-D11-006 계약과 repository catalog 및 active docs"] --> P["P-D11-006 선택한 독립 entrypoint"]
+ P --> C{"entrypoint"}
+ C -->|"OpenAPI 또는 catalog"| G["결정적 산출물 계산"]
+ G --> M{"check 모드"}
+ M -->|"예"| EQ{"저장 bytes 일치"}
+ EQ -->|"예"| Z["정합성 정상 종료"]
+ EQ -->|"아니오"| X["오류 종료"]
+ M -->|"아니오"| W["정해진 생성 파일 기록 후 종료"]
+ C -->|"active-doc checker"| V["현재 링크와 명령 및 경계 검사"]
+ V -->|"일치"| Z
+ V -->|"불일치"| X
+ Z -.-> R["자동 retry 없음. 제품 동작 검증과 구분"]

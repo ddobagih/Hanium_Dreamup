@@ -198,9 +198,19 @@ class RuntimeRiskMotionSeparationTest {
                 0f, 0f, -1f, CameraImageProjection(1_000, 1_000, 700f, 700f, 500f, 500f,
                     1f, 0f, 0f, 0f, 1f, 0f)) else null,
         )
-        return pipeline.processPrealignedForTest(snapshot, ns, at,
-            detections = listOf(DetectionCandidate("person", .95f, RectNorm(.25f, .25f, .5f, .5f)))).single()
-            // This synthetic fixture deliberately uses the same camera and elapsed clocks.
-            .copy(sourceValidUntilElapsedRealtimeMs = at + CurrentTrackedFrameObservation.MAX_SOURCE_AGE_MS)
+        val output = pipeline.processPrealignedForTest(snapshot, ns, at,
+            detections = listOf(DetectionCandidate("person", .95f, RectNorm(.25f, .25f, .5f, .5f))),
+            capturedAtElapsedRealtimeMs = at).single()
+        // This synthetic fixture deliberately uses the same camera and elapsed clocks.
+        val observedAt = minOf(at, if (output.source.metric) output.depthObservedAtMs ?: at else at,
+            output.sourceObservedAtElapsedRealtimeMs ?: at)
+        val maxAge = minOf(output.sourceMaxAgeMs ?: CurrentTrackedFrameObservation.MAX_SOURCE_AGE_MS,
+            CurrentTrackedFrameObservation.MAX_SOURCE_AGE_MS)
+        return output.copy(
+            sourceValidUntilElapsedRealtimeMs = minOf(output.sourceValidUntilElapsedRealtimeMs ?: Long.MAX_VALUE,
+                observedAt + maxAge),
+            sourceObservedAtElapsedRealtimeMs = observedAt,
+            sourceMaxAgeMs = maxAge,
+        )
     }
 }

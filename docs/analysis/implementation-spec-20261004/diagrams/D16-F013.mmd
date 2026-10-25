@@ -1,0 +1,18 @@
+flowchart TD
+  META["F-D16-013 · P-D16-013"]
+  META --> A
+  A["자동/수동 분석 버튼"] --> B{"busy=false·trace/GNSS·모드별 키/기준국 준비"}
+  B -->|"아니오"| X["시작 무시"]
+  B -->|"예"| C["새 generation·기존 결과 무효화·single worker"]
+  C --> D["변환 F005→기준국 F006/F008→PPK F010"]
+  D -->|"FailurePolicy가 참조 부족으로 분류"| I["truth_insufficient 진단 JSON"]
+  D -->|"엔진/기타실패"| J["allowlist reason 또는 ANALYSIS_FAILED JSON"]
+  D -->|"취소"| Q["실패 JSON 없이 취소 정리 F014"]
+  D -->|"정상"| E["FIX 평가 F012→결과 JSON F015"]
+  E --> G{"현재 generation이며 취소되지 않음"}
+  I --> G
+  J --> G
+  G -->|"아니오"| Z["늦은 결과 폐기"]
+  G -->|"예"| H["lastJson·hasResult=true·busy=false"]
+  H --> F["finally workRoot 삭제
+  정리경고 게시 fence 한계는 R-D16-002"]

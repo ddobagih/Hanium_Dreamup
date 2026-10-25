@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D03-018 검색 전용 현재위치 취득과 계정별 cache"]
+  P["정책 P-D03-018"]
+  A --> P
+  N0["1. 후보 거리·방향의 기준점만 구하고 보행 위치 증거와 분리한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. 현재 lease 의 유효 fix 면 동기 반환; 아니면 Fused HIGH_ACCURACY/FINE current location 을 최대 10s 요청한다."]
+  N0 --> N1
+  N2["3. 계정/세대 변경은 cache 와 이전 요청을 취소한다; acquire 중 재요청은 같은 물리 요청에 최신 completion 만 결합한다."]
+  N1 --> N2
+  N3["4. callback 마다 generation/lease/stillAllowed 재검사 후 유효 origin 또는 null 을 반환한다."]
+  N2 --> N3
+  Z["정상: origin 반환 후 acquire 종료."]
+  N3 --> Z
+  B0{"stale/mock/accuracy>100/미상"}
+  R0["origin 없음"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"permission SecurityException"}
+  R1["null 반환"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"callback 도착 전 context 변경"}
+  R2["폐기"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: source exception/null 은 위치부재 안내."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xtimeout["만료: provider 요청 10s; controller 별도 추가 타이머 없음."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xtimeout
+  Xcancel["취소: logical generation 먼저 폐기 후 cancellation."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xinterrupt["중단: actor/session/query 변경 결과 무효."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xinterrupt
+  Xretry["재시도: 다시 검색/위치 권한 복구 후 acquire."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry
+  Xcleanup["정리: cancel 은 cache 도 삭제."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

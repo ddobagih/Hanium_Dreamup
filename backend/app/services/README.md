@@ -21,6 +21,7 @@ Router에서 분리된 탐지, 관리자 보안, 개인정보 lifecycle, 신고 
 | `report_original_access.py` | 목적 제한·단일 사용 원본 access grant 발급과 소비 |
 | `report_storage.py` | 암호화 이미지와 DB commit 경계의 journal·startup reconciliation |
 | `privacy_lifecycle.py` | 가명화 동의, account generation fence와 계정 삭제 항목 상태 |
+| `privacy_visibility.py` | 복원된 삭제 subject·세대의 상품 조회·관리 mutation 거부, 삭제 worker의 잔존 조회 보존 |
 | `tmap_pedestrian.py` | TMAP POI/보행 경로 요청과 앱 schema 정규화 |
 | `walking_route_sanity.py` | provider 응답의 endpoint·거리·geometry fail-closed 검사 |
 

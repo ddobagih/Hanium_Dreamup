@@ -16,6 +16,7 @@ data class TwoModelRuntimeConfig(
     val unifiedWalksafe: ModelRuntimeConfig?,
     val customTactile: ModelRuntimeConfig?,
     val cocoGeneral: ModelRuntimeConfig?,
+    val personSupplement: ModelRuntimeConfig? = null,
 ) {
     init {
         if (primaryModelKey == UNIFIED_MODEL_KEY) {
@@ -24,6 +25,25 @@ data class TwoModelRuntimeConfig(
         if (primaryModelKey == LEGACY_TWO_MODEL_KEY || fallbackModelKey == LEGACY_TWO_MODEL_KEY) {
             // Legacy loading does not use the individual enabled flags to exclude either model.
             listOfNotNull(customTactile, cocoGeneral).forEach(::requireOutputThresholdCoverage)
+        }
+        personSupplement?.let { person ->
+            require(person.classes == PERSON_SUPPLEMENT_CLASSES && person.allowlist == setOf("person")) {
+                "person_supplement must retain the 13-class source order and output only person"
+            }
+            require(person.outputFormat == YoloOutputFormat.END_TO_END_XYXY) {
+                "person_supplement requires the end-to-end output contract"
+            }
+            requireArtifactHash(person)
+            require(person.sourceModelSha256?.matches(SHA256_PATTERN) == true && !person.sourceModel.isNullOrBlank()) {
+                "person_supplement source identity is required"
+            }
+            requireOutputThresholdCoverage(person)
+            if (person.enabled) {
+                require(primaryModelKey == UNIFIED_MODEL_KEY && unifiedWalksafe?.enabled == true &&
+                    person.inputSize == unifiedWalksafe.inputSize) {
+                    "person_supplement requires an enabled same-size unified primary"
+                }
+            }
         }
     }
 
@@ -38,7 +58,7 @@ data class TwoModelRuntimeConfig(
 
     // Legacy pair loading can create its models even when their enabled flags are false.
     internal val requiresGpuThreadOwner: Boolean
-        get() = listOfNotNull(unifiedWalksafe, customTactile, cocoGeneral)
+        get() = listOfNotNull(unifiedWalksafe, customTactile, cocoGeneral, personSupplement?.takeIf { it.enabled })
             .any { it.runtime.delegate == "gpu" }
 
     /** Report identity preserves raw WalkMate class IDs while runtime selection keeps its logical key. */
@@ -81,6 +101,10 @@ data class TwoModelRuntimeConfig(
         const val LEGACY_TWO_MODEL_KEY = "legacy_two_model"
         const val UNIFIED_MODEL_KEY = "unified_walksafe"
         const val WALKMATE_REPORT_MODEL_KEY = "walkmate_21cls"
+        const val PERSON_SUPPLEMENT_MODEL_KEY = "person_supplement"
+        internal val PERSON_SUPPLEMENT_CLASSES = listOf("person", "bicycle", "car", "motorcycle", "bus", "truck",
+            "traffic light", "normal_tactile_block", "damaged_tactile_block", "crosswalk", "curb_step",
+            "uneven_sidewalk", "e_scooter_obstruction")
 
         fun load(context: Context): TwoModelRuntimeConfig {
             val json = context.assets.open(CONFIG_ASSET).bufferedReader().use { it.readText() }
@@ -120,6 +144,8 @@ data class TwoModelRuntimeConfig(
                 ?.let { parseModel("custom_tactile", it, allowlistRequired = false) }
             val cocoGeneral = models.optJSONObject("coco_general")
                 ?.let { parseModel("coco_general", it, allowlistRequired = true) }
+            val personSupplement = models.optJSONObject(PERSON_SUPPLEMENT_MODEL_KEY)
+                ?.let { parseModel(PERSON_SUPPLEMENT_MODEL_KEY, it, allowlistRequired = true) }
             if (primaryModelKey == LEGACY_TWO_MODEL_KEY || fallbackModelKey == LEGACY_TWO_MODEL_KEY) {
                 require(customTactile != null) { "custom_tactile model config is required for legacy two-model runtime" }
                 require(cocoGeneral != null) { "coco_general model config is required for legacy two-model runtime" }
@@ -137,6 +163,7 @@ data class TwoModelRuntimeConfig(
                 unifiedWalksafe = unifiedWalksafe,
                 customTactile = customTactile,
                 cocoGeneral = cocoGeneral,
+                personSupplement = personSupplement,
             )
         }
 

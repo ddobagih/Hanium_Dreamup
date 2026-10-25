@@ -4,9 +4,12 @@ import java.nio.ByteBuffer
 
 data class CameraLumaMeasurement(
     val normalizedBrightness: Double,
-    /** Candidate proxy: fraction of sampled luma values that are near black. */
+    /** Historical name for sampled near-black pixels, not measured physical lens coverage. */
     val darkOrOccludedFraction: Double,
-)
+) {
+    val nearBlackFraction: Double
+        get() = darkOrOccludedFraction
+}
 
 object CameraLumaMeasurementPolicy {
     private const val SAMPLE_GRID_SIZE = 32
@@ -14,7 +17,7 @@ object CameraLumaMeasurementPolicy {
 
     /**
      * Samples a YUV_420_888 Y plane without assuming tightly packed rows or pixels.
-     * The occlusion value is deliberately only a near-black proxy until field validation.
+     * Near-black scene pixels do not identify whether a physical object covers the lens.
      */
     fun measure(
         buffer: ByteBuffer,

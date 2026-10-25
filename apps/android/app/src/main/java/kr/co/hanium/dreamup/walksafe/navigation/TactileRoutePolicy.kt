@@ -3,6 +3,12 @@ package kr.co.hanium.dreamup.walksafe.navigation
 import kr.co.hanium.dreamup.walksafe.inference.WalkMateClassPolicy
 import kotlin.math.abs
 
+/**
+ * Outer eligibility limits for an already-associated observation, not Android capture acceptance.
+ * [AndroidTactileRouteObservationSupplier] additionally validates same-frame projection evidence
+ * with GPS accuracy at most 5 m and detection age at most 400 ms. Its stricter limits remain separate
+ * from this policy's 25 m / 1,200 ms limits; passing either layer never proves a walking maneuver.
+ */
 data class TactileRoutePolicyConfig(
     val minimumConfidence: Float = 0.55f,
     val minimumStableFrames: Int = 3,
@@ -45,6 +51,8 @@ data class TactileRouteObservation(
     val routeSegmentIndex: Int? = null,
     /** Route install revision at capture ([ActiveRouteProjection.routeRevision]). */
     val routeVersion: Long? = null,
+    /** Same-capture own-mask geometry; it does not establish foot/body/walking authority. */
+    val surfaceEvidence: TactileSurfaceRouteEvidence? = null,
 )
 
 /**
@@ -75,6 +83,9 @@ data class TactileRouteDecision(
 /**
  * Keeps TMAP as the global route. Observation eligibility is not permission to follow a block:
  * these inputs do not prove its axis, user-relative motion, or measured contact depth.
+ * Every supplied observation must identify the same nonblank route as the live input, even when
+ * it comes from another supplier. The Android supplier enforces capture quality before this policy;
+ * this boundary independently enforces identity and eligibility after capture.
  */
 class TactileRoutePolicy(
     private val config: TactileRoutePolicyConfig = TactileRoutePolicyConfig(),
@@ -129,8 +140,8 @@ class TactileRoutePolicy(
         activeRouteProgress: TactileActiveRouteProgress?,
     ): String? {
         if (
-            (activeRouteId != null || tactile.routeId != null) &&
-            (activeRouteId == null || tactile.routeId != activeRouteId)
+            activeRouteId.isNullOrBlank() || tactile.routeId.isNullOrBlank() ||
+            tactile.routeId != activeRouteId
         ) {
             return "tactile_route_identity_mismatch"
         }

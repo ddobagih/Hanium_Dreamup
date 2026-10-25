@@ -24,7 +24,8 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend.app.api import health, reports
+from backend.app.api import health as health_api, reports
+from backend.app.services import health_readiness as health, report_commit
 from backend.app.config import get_settings
 from backend.app.models import Report, ReportImageObject
 from backend.app.services import report_storage
@@ -100,14 +101,14 @@ def runtime_app(tmp_path, monkeypatch, clean_test_storage):
 
     recovery_factory = sessionmaker(engine, class_=RecoverySession, autoflush=False)
     monkeypatch.setattr(health, "SessionLocal", recovery_factory)
-    real_complete = reports.complete_report_image_write
+    real_complete = report_commit.complete_report_image_write
 
     def complete(pending):
         if state.defer_cleanup:
             raise OSError(errno.EIO, "owned deferred journal cleanup")
         return real_complete(pending)
 
-    monkeypatch.setattr(reports, "complete_report_image_write", complete)
+    monkeypatch.setattr(report_commit, "complete_report_image_write", complete)
     real_inventory = monitor_module.read_report_storage_inventory_page
 
     def inventory(*args, **kwargs):
@@ -142,7 +143,7 @@ def runtime_app(tmp_path, monkeypatch, clean_test_storage):
     monkeypatch.setattr(health, "_navigation_readiness", navigation)
     app = FastAPI()
     app.include_router(reports.create_router(settings, manager, storage_readiness=storage_state))
-    app.include_router(health.create_router(
+    app.include_router(health_api.create_router(
         settings, detector_warmup=lambda: None, report_image_key_manager=manager,
         report_storage_monitor=monitor,
     ))

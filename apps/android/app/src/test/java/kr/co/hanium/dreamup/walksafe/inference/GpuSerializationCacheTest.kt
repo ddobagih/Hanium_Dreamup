@@ -69,7 +69,7 @@ class GpuSerializationCacheTest {
     }
 
     @Test
-    fun privateDirectoryIsStableAndConfinedToCodeCache() {
+    fun privateDirectoryIsStableAndConfinedToTheSuppliedNativeCacheRoot() {
         val root = temporaryFolder.newFolder()
         val first = GpuSerializationCache.privateDirectory(root)
         assertEquals(root.canonicalFile, requireNotNull(first.parentFile).canonicalFile)

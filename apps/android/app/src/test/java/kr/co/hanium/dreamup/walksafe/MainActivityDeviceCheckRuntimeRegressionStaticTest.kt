@@ -14,17 +14,24 @@ class MainActivityDeviceCheckRuntimeRegressionStaticTest {
     fun metricPreflightLatchIsSetOnlyAfterAllStartGuardsPass() {
         val continuation = functionBlock("private fun maybeContinuePostLoginDeviceCheck(")
         val pendingBranch = continuation.substringAfter(
-            "PostLoginMetricDepthState.PENDING ->",
-        ).substringBefore("PostLoginMetricDepthState.EXPLICITLY_UNSUPPORTED")
-        assertTrue(pendingBranch.contains("beginRuntimeMetricPreflight()"))
-        assertFalse(pendingBranch.contains("postLoginMetricPreflightStarted = true"))
+            "if (observation.metricDepth == PostLoginMetricDepthState.PENDING",
+        ).substringBefore("evaluate(binding)")
+        assertTrue(pendingBranch.contains("probes.startMetricPreflight(binding)"))
+        assertFalse(pendingBranch.contains("probes.metricPreflightStarted = true"))
 
+        assertTrue(MainActivityRefactorSource.property(source, "postLoginDeviceProbes").contains("get() = postLoginDeviceProbesHolder.value"))
+        val probeBinding = MainActivityRefactorSource.property(source, "postLoginDeviceProbesHolder")
+        assertTrue(probeBinding.contains("override fun startMetricPreflight(binding: PostLoginDeviceCheckBinding)"))
+        assertTrue(probeBinding.contains("beginRuntimeMetricPreflight()"))
+        val metricBinding = MainActivityRefactorSource.property(source, "runtimeMetricSession")
+        assertTrue(metricBinding.contains("bindingCurrent(binding: PostLoginDeviceCheckBinding) = isPostLoginDeviceCheckBindingCurrent(binding)"))
+        assertTrue(metricBinding.contains("postLoginDeviceProbes.setMetricPreflightStarted(started)"))
         val begin = functionBlock("private fun beginRuntimeMetricPreflight()")
         assertInOrder(
             begin,
             "if (!canBeginRuntimeMetricPreflight()) return",
-            "isPostLoginDeviceCheckBindingCurrent(binding)",
-            "postLoginMetricPreflightStarted = true",
+            "device.bindingCurrent(binding)",
+            "device.setPreflightStarted(true)",
         )
     }
 
@@ -33,33 +40,23 @@ class MainActivityDeviceCheckRuntimeRegressionStaticTest {
         val preflight = functionBlock("private fun startRuntimeMetricPreflightSession(")
         val resume = functionBlock("private fun resumeRendererAfterSessionClose(")
 
-        assertTrue(preflight.contains("arSessionPurpose = ArSessionPurpose.PREFLIGHT"))
-        assertTrue(preflight.contains("resumeRendererAfterSessionClose(resumeRenderer)"))
+        assertTrue(preflight.contains("native().publish(preflightSession, provider, preflightPurpose)"))
+        val binding = MainActivityRefactorSource.composition(source, "runtimeMetricPreflight")
+        assertTrue(binding.contains("{ arSessionOwner }"))
+        assertTrue(binding.contains("ArSessionPurpose.PREFLIGHT, ArSessionPurpose.RUNTIME, SystemClock::elapsedRealtime"))
+        assertTrue(preflight.contains("renderer.resumeAfterClose(resumeRenderer)"))
+        assertTrue(binding.contains("override fun resumeAfterClose(resume: Boolean) = resumeRendererAfterSessionClose(resume)"))
         assertTrue(resume.contains("session != null"))
-        assertTrue(resume.contains("arSessionPurpose != ArSessionPurpose.NONE"))
+        assertTrue(resume.contains("arSessionOwner.observe().purpose != ArSessionPurpose.NONE"))
         assertTrue(resume.contains("surfaceView.onResume()"))
         assertTrue(resume.contains("syncGlSurfaceRenderMode(forceFrame = true)"))
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing function: $signature" }
-        var depth = 0
-        var opened = false
-        for (index in start until source.length) {
-            when (source[index]) {
-                '{' -> {
-                    depth += 1
-                    opened = true
-                }
-                '}' -> {
-                    depth -= 1
-                    if (opened && depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        error("unterminated function: $signature")
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
+
+    private fun owner(path: String, name: String): String = MainActivityRefactorSource.member(
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/$path").readText(), name,
+    )
 
     private fun assertInOrder(text: String, vararg snippets: String) {
         var cursor = -1

@@ -1,0 +1,20 @@
+flowchart TD
+ A["F-D10-003 인증된 STT 또는 TTS POST"] --> B{"P-D10-002 선언 길이 유효하며 한도 이하"}
+ B -- "아니오" --> X["400 또는 413 · 본문 읽기 전 종료"]
+ B -- "예 또는 길이 헤더 없음" --> C{"actor와 IP 유효"}
+ C -- "아니오" --> Y["400 식별자 오류"]
+ C -- "예" --> D{"P-D10-003 global 및 IP 및 선택 actor 빈도 통과"}
+ D -- "아니오" --> R["429 · Retry-After · 이벤트 추가 없음"]
+ D -- "예" --> E["허용 이벤트를 모든 key deque에 기록"]
+ E --> F{"STT 요청"}
+ F -- "예" --> G{"P-D10-004 upload permit을 기본 2초 안에 획득"}
+ G -- "실패" --> H["503 stt_upload_busy · Retry-After 1"]
+ G -- "성공" --> I["본문 receive wrapper 연결"]
+ F -- "TTS" --> I
+ I --> J{"실제 누적 bytes가 한도 이하"}
+ J -- "초과" --> K["413 voice_request_too_large"]
+ J -- "통과" --> L["본문 파싱 및 endpoint 실행"]
+ L --> M["no-store · TTS nosniff"]
+ K --> N["finally upload permit 회수"]
+ M --> N
+ N --> O["종료 · 자동 재시도 없음"]

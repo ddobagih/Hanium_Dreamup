@@ -160,26 +160,15 @@ class WalkSafeEnvironmentProfilesTest {
     }
 
     @Test
-    fun runtimeMetricCandidatePreservesExistingMeasurementRequirements() {
+    fun runtimeMetricCandidateRequiresOneActualValidMetricFrameWithoutAStabilityWait() {
         val profile = WalkSafeEnvironmentProfiles.testCandidate.runtimeMetric
 
+        assertEquals("runtime-metric-test-candidate-r002", profile.profileId)
         assertEquals(RuntimeMetricPreflightPolicy.MAX_DURATION_MS, profile.maximumDurationMs)
-        assertEquals(
-            RuntimeMetricPreflightPolicy.MIN_DISTINCT_FRAMES,
-            profile.minimumDistinctFrames,
-        )
-        assertEquals(
-            RuntimeMetricPreflightPolicy.MIN_OBSERVATION_SPAN_MS,
-            profile.minimumObservationSpanMs,
-        )
-        assertEquals(
-            RuntimeMetricPreflightPolicy.MIN_VALID_SAMPLES_PER_PASSING_FRAME,
-            profile.minimumValidSamplesPerPassingFrame,
-        )
-        assertEquals(
-            RuntimeMetricPreflightPolicy.MIN_PASSING_PERCENT,
-            profile.minimumPassingPercent,
-        )
+        assertEquals(1, profile.minimumDistinctFrames)
+        assertEquals(0L, profile.minimumObservationSpanMs)
+        assertEquals(1, profile.minimumValidSamplesPerPassingFrame)
+        assertEquals(100, profile.minimumPassingPercent)
         assertEquals(
             RuntimeMetricPreflightPolicy.MIN_VALID_DISTANCE_METERS,
             profile.minimumValidDistanceMeters,
@@ -208,6 +197,7 @@ class WalkSafeEnvironmentProfilesTest {
             profile = candidate.copy(
                 profileId = "runtime-metric-stricter-test",
                 minimumDistinctFrames = candidate.minimumDistinctFrames + 1,
+                minimumObservationSpanMs = 1L,
             ),
         )
 

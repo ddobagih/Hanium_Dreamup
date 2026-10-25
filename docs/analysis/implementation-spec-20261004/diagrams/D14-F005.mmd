@@ -1,0 +1,25 @@
+flowchart TD
+  IN["F-D14-005<br/>TOTP 신선도와 replica 인자 결속"]
+  G["적용 정책<br/>P-D14-004"]
+  IN --> G
+  N1["1. 각 후보 시각에서 pyotp.verify valid_window=0 수행"]
+  G --> N1
+  N2["2. 일치 timecode 중 최대값 선택"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. last_accepted_timecode가 있고 timecode &lt;= la<br/>st이면 replay 판정"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. runtime canonical TOTP fingerprint와 DB co<br/>ntrol fingerprint 비교"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 로그인·재확인에서 성공 timecode 저장; 복구완료는 새 factor에<br/>서 첫 timecode 저장"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>None,false"]
+  N1 -->|"코드 형식 또는 검증 불일치"| B1
+  B2["분기 결과<br/>replayed=true; 로그인 401 admin_totp_replayed"]
+  N3 -->|"동일 또는 과거 timecode"| B2
+  B3["분기 결과<br/>503 admin_totp_configuration_mismatch"]
+  N4 -->|"잘못된 runtime secret 또는 fingerprint 불일치"| B3
+  N5 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

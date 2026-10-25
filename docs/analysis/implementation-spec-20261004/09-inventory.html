@@ -1,0 +1,273 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>화면·명령·설정·테스트 누락 대조</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="index.html">WalkSafe 기능과 처리 명세</a> · <a href="02-features.html">기능</a> · <a href="03-policies.html">정책</a> · <a href="05-scenarios.html">시나리오</a> · <a href="gallery.html">그림 모음</a> · <a href="08-review.html">검수</a></header><main><h1>화면·명령·설정·테스트 누락 대조</h1>
+<p><a href="index.html">전체 목차</a> · <a href="evidence/entrypoint-feature-map.csv">전체 진입점 대응표</a> · <a href="evidence/supplemental-inventory.csv">추가 선언 인벤토리</a> · <a href="08-review.html">검수 범위</a></p>
+<p>고정 소스의 선언·파일을 분야별 명세와 대조한 보조 색인이다. 패턴 추출에는 동적 등록·문자열 합성·반사·간접 호출 누락 가능성이 있다. <strong>같은 파일 연결은 후보 연결이며 해당 선언의 모든 분기를 설명했다는 보증이 아니다.</strong> 기능 상세의 근거 범위와 독립 검토 범위를 함께 확인한다. 설정은 식별자만 수집해 비밀값을 복제하지 않았다.</p>
+<h2>대조한 목록</h2>
+<table>
+<thead>
+<tr>
+<th>목록</th>
+<th align="right">선언/파일 수</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CONFIG_IDENTIFIER</td>
+<td align="right">316</td>
+</tr>
+<tr>
+<td>TEST_FILE</td>
+<td align="right">1438</td>
+</tr>
+<tr>
+<td>SCREEN_MENU_DECLARATION</td>
+<td align="right">6</td>
+</tr>
+<tr>
+<td>VOICE_COMMAND_OR_ACTION</td>
+<td align="right">38</td>
+</tr>
+<tr>
+<td>NATIVE_UI_PAGE</td>
+<td align="right">6</td>
+</tr>
+</tbody></table>
+<p>테스트 파일 중 기능에서 명시적으로 연결한 파일은 304개다. 나머지는 파일 인벤토리이며 기대 단언을 모두 검토하지 않았다. 이번 테스트 실행은 없다. 기능당 연결한 TEST_EXPECTATION과 과거 실행 기록은 상세 명세에서 구분한다.</p>
+<h2>사용자 앱 최상위 페이지</h2>
+<p><code>NativeUiPage</code> 6개 enum 값의 주요 연결이다. 가입/교육/삭제/관리자/디버그의 별도 화면·dialog는 이 enum의 완전 목록이라고 간주하지 않으며, 추가 선언·UI listener 인벤토리와 각 분야 상세를 함께 참조한다.</p>
+<table>
+<thead>
+<tr>
+<th>페이지</th>
+<th>주요 기능</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>HOME</td>
+<td><a href="domains/D02.html#F-D02-001">F-D02-001</a></td>
+</tr>
+<tr>
+<td>DESTINATION_SEARCH</td>
+<td><a href="domains/D03.html#F-D03-019">F-D03-019</a></td>
+</tr>
+<tr>
+<td>DESTINATION_CONFIRM</td>
+<td><a href="domains/D03.html#F-D03-023">F-D03-023</a></td>
+</tr>
+<tr>
+<td>GUIDANCE</td>
+<td><a href="domains/D03.html#F-D03-030">F-D03-030</a></td>
+</tr>
+<tr>
+<td>VOICE_COMMAND</td>
+<td><a href="domains/D03.html#F-D03-016">F-D03-016</a></td>
+</tr>
+<tr>
+<td>SETTINGS</td>
+<td><a href="domains/D01.html#F-D01-022">F-D01-022</a></td>
+</tr>
+</tbody></table>
+<h2>Android 로컬 음성 명령·action</h2>
+<p>아래는 <code>AndroidVoiceCommand</code>와 <code>AndroidVoiceAction</code>의 선언값이다. command와action이 같은 이름이어도 별도 타입이다. 인식 문구·confidence·단일 명령·상태 제약은 <a href="domains/D03.html#F-D03-013">F-D03-013</a>, 보행 제어 우선 처리는 <a href="domains/D03.html#F-D03-015">F-D03-015</a>로 연결한다. 서버 intent와 현재 앱의 로컬 dispatcher는 같은 실행 경로가 아니다.</p>
+<table>
+<thead>
+<tr>
+<th>식별자</th>
+<th align="right">선언 줄</th>
+<th>관련 기능</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CreateReport</td>
+<td align="right">6</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>OpenSettings</td>
+<td align="right">7</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>SetDestination</td>
+<td align="right">8</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>SelectDestinationCandidate</td>
+<td align="right">9</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>RepeatDestinationCandidates</td>
+<td align="right">10</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>HearMoreDestinationCandidates</td>
+<td align="right">11</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>PreviousDestinationCandidates</td>
+<td align="right">13</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>CancelDestination</td>
+<td align="right">14</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>CancelDialog</td>
+<td align="right">19</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>StartNavigation</td>
+<td align="right">20</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>RepeatGuidance</td>
+<td align="right">21</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>CurrentState</td>
+<td align="right">23</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>Help</td>
+<td align="right">24</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>NextNavigationInstruction</td>
+<td align="right">25</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>RequestReroute</td>
+<td align="right">26</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>RecheckLocation</td>
+<td align="right">27</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>ConfirmArrival</td>
+<td align="right">28</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>RejectArrival</td>
+<td align="right">29</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>StopNavigation</td>
+<td align="right">30</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>CreateReport</td>
+<td align="right">34</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>OpenSettings</td>
+<td align="right">35</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>SearchDestination</td>
+<td align="right">36</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>SelectDestinationCandidate</td>
+<td align="right">37</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>RepeatDestinationCandidates</td>
+<td align="right">38</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>HearMoreDestinationCandidates</td>
+<td align="right">39</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>PreviousDestinationCandidates</td>
+<td align="right">40</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>CancelDestination</td>
+<td align="right">41</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>CancelDialog</td>
+<td align="right">42</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>StartNavigation</td>
+<td align="right">43</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>SpeakCurrentGuidance</td>
+<td align="right">44</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>SpeakCurrentState</td>
+<td align="right">45</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>SpeakVoiceHelp</td>
+<td align="right">46</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>SpeakNextNavigationInstruction</td>
+<td align="right">47</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>RequestReroute</td>
+<td align="right">48</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>RecheckLocation</td>
+<td align="right">49</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>ConfirmArrival</td>
+<td align="right">50</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>RejectArrival</td>
+<td align="right">51</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+<tr>
+<td>StopNavigation</td>
+<td align="right">52</td>
+<td><a href="domains/D03.html#F-D03-013">F-D03-013</a></td>
+</tr>
+</tbody></table>
+<h2>API·센서·timer·lifecycle</h2>
+<p><a href="evidence/entrypoint-inventory.json">707개 선언 진입점 인벤토리</a>에 HTTP route·Gateway 경로·Android component/callback/UI listener·CLI main·systemd ExecStart/timer를 수록했다. Root는 미매핑된 debug 위치 시험 Activity/RAW GNSS 도구와 시험용 host를 담당 분야에 추가하도록 요청했다. 최종 잔여 판정은 <a href="evidence/coverage-summary.json">대조 결과</a>와 <a href="evidence/entrypoint-unmapped.csv">미매핑/인벤토리만 기록된 목록</a>을 따른다.</p>
+<h2>범위 제한</h2>
+<p>화면 이름·설정 식별자·테스트 파일 이름의 자동 추출은 본문 정독과 다르다. 대형 Main/helper, 역사 개발 스크립트, 제3자 vendor 수치 알고리즘, 테스트 fixture 전체 및 실운영 환경변수는 전수 의미 검토하지 않았다. 분야 <code>coverage.unreviewed</code>, D11의863파일 대응표, 독립 검토보고서에서 조사 수준과 남은 범위를 확인할 수 있다.</p>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

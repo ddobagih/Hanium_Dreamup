@@ -182,7 +182,7 @@ def test_migration_and_worker_are_manual_and_minimum_privilege() -> None:
     assert "DELETE-ACKNOWLEDGED-REPORTS" in worker
     assert "candidate inventory changed after preview" in worker
     assert "REPORT_DELETION_QUARANTINE_DIRECTORY_NAME" in report_storage
-    assert 'label="report deletion quarantine"' in report_storage
+    assert 'REPORT_DELETION_QUARANTINE_DIRECTORY_NAME: "report deletion quarantine"' in report_storage
     assert "requests." not in worker
     assert "httpx" not in worker
 

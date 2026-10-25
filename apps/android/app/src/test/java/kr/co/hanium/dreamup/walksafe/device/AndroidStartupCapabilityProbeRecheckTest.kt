@@ -44,6 +44,42 @@ class AndroidStartupCapabilityProbeRecheckTest {
     }
 
     @Test
+    fun secondRecheckPendingAndFailureMustReachTheCapabilityResolver() {
+        val state = OfflineKoreanTextToSpeechProbeState()
+        val firstGeneration = state.begin()
+        assertTrue(state.complete(firstGeneration, available = true))
+        assertFalse(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in resolve(state.available).pendingRequirements)
+
+        val secondGeneration = state.begin()
+        assertNull(state.available)
+        assertFalse(state.complete(firstGeneration, available = true))
+        assertTrue(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in resolve(state.available).pendingRequirements)
+        // An earlier true override would incorrectly erase this pending result. Main must revoke
+        // that override before begin(), including when it replaces the entire Android probe.
+        assertFalse(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in resolve(true).pendingRequirements)
+
+        assertTrue(state.complete(secondGeneration, available = false))
+        assertTrue(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in resolve(state.available).unavailableRequirements)
+        assertFalse(state.complete(firstGeneration, available = true))
+        assertTrue(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS in resolve(state.available).unavailableRequirements)
+    }
+
+    private fun resolve(ttsAvailable: Boolean?) = WalkSafeStartupCapabilityResolver.resolve(
+        WalkSafeStartupCapabilityInput(
+            androidVersionSupported = true,
+            cameraAvailable = true,
+            gpsAvailable = true,
+            microphoneAvailable = true,
+            vibrationAvailable = true,
+            onDeviceSpeechRecognitionAvailable = true,
+            offlineKoreanTextToSpeechAvailable = ttsAvailable,
+            metricDistanceAvailable = true,
+            approvedDesignatedDeviceProfile = true,
+            designatedDeviceProfileVersion = "test-device-profile-r001",
+        ),
+    )
+
+    @Test
     fun closeInvalidatesCallbacksAndRejectsAnotherProbe() {
         val state = OfflineKoreanTextToSpeechProbeState()
         val activeGeneration = state.begin()

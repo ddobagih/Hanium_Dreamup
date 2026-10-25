@@ -1,0 +1,38 @@
+flowchart TD
+  T["F-D06-012 신고 사용자 설명·분류의 직접 정정"]
+  P["전제: 현재 상세 및 content.reportId 일치, 현재 F-D06-011 authority."]
+  T --> P
+  E1["E-D06-012-01 내용 불러오기→현재 revision 확보"]
+  E1 --> T
+  E2["E-D06-012-02 설명/분류 수정 확인→정확 patch+UUID 보존→정정 호출"]
+  E2 --> T
+  A1["1. current content를 먼저 가져온다."]
+  P --> A1
+  A2["2. 사용자 확인 시 선택 patch와 expectedRevision을 고정한다."]
+  A1 --> A2
+  A3["3. 동일 pending intent일 때만 재사용하고 다른 patch 동시 제출을 거절한다."]
+  A2 --> A3
+  A4["4. 응답 reportId/expectedRevision/idempotencyKey 일치 후 새<br/>revision/hash/content로 교체한다."]
+  A3 --> A4
+  N["정상 종료: 새 content revision 게시."]
+  A4 --> N
+  FX["결과: 변경된 사용자 설명/분류 UI. 모델 탐지/원본 evidence의 직접 수정과 구분."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"임시 network/5xx/프로토콜 실패"}
+    R1["동일 UUID·revision·patch로 명시 retry"]
+    B1 -->|조건 성립| R1
+    B2{"404/409/413/415/422"}
+    R2["pending intent 종료, 자동 재전송 없음"]
+    B2 -->|조건 성립| R2
+    B3{"권한 변경/tombstone"}
+    R3["pending correction 및 선택 content 제거"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-011, P-D06-013"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["취소: authority/network/destroy의 공통 취소."]
+    X2["재시도: 동일 intent 사용자 retry."]
+    X3["복구: process 재시작 pending draft 자동 복원 없음."]
+  end

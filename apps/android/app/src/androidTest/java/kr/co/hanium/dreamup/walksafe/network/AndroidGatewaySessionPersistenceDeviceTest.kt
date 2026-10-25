@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kr.co.hanium.dreamup.walksafe.testing.syntheticBoundaryContext
 import java.io.File
 import java.security.KeyStore
 import java.util.Base64
@@ -40,7 +41,7 @@ class AndroidGatewaySessionPersistenceDeviceTest {
         require(phase == "roundtrip" || suppliedRunId != null)
         val runId = suppliedRunId ?: UUID.randomUUID().toString().replace("-", "")
         require(runId.matches(Regex("[A-Za-z0-9_-]{1,32}")))
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val context = syntheticBoundaryContext()
         val preferenceName = "walksafe_session_probe_$runId"
         val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
         fun policy(kind: String, version: Int) = AeadKeyPolicy(
@@ -131,6 +132,93 @@ class AndroidGatewaySessionPersistenceDeviceTest {
                         keyStore.deleteEntry(alias)
                         keyStore.deleteEntry("$alias.generation")
                     }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun changedBackendOriginRequiresFreshLoginWithoutBlockingInstallation() = withBackendProbe { store, preferences, deviceId ->
+        val newOrigin = "https://new-session-probe.example.test"
+        assertNull(store.restoreBackendDevice(newOrigin))
+        assertFalse("An endpoint change must allow a new credential login", store.isStorageBlocked())
+        assertFalse(preferences.contains("gateway_backend_device_encrypted_v1"))
+        assertEquals(deviceId, store.getOrCreateInstallDeviceId())
+        assertEquals("Existing user progress is preserved", "kept", preferences.getString("probe_progress", null))
+        assertNull("The old cookie must never be rebound to a new origin", store.restoreBackendDevice(GATEWAY_ORIGIN))
+        val now = System.currentTimeMillis()
+        val expiresAt = (now / 1_000L + 3_600L) * 1_000L
+        val freshlyVerified = GatewayFieldSession.backendAccountDeviceSession(
+            newOrigin,
+            BackendAccountDeviceCookieBinding(ACTOR_ID, 7L, 3L, deviceId, SESSION_ID, expiresAt),
+            fixtureCookie(deviceId, expiresAt), expiresAt,
+        )
+        val firstRun = FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
+            FirstRunOnboardingPolicy.initialEmailAccount(43L),
+            FirstRunOpaqueActorBinding.fromProvider(ACTOR_ID),
+            FirstRunReceiptHash.fromSha256Hex("b".repeat(64)),
+        ).current
+        assertEquals(GatewaySessionStoreResult.COMMITTED,
+            store.saveBackendDeviceIfAbsent(freshlyVerified, firstRun, newOrigin, now))
+        assertEquals(newOrigin, requireNotNull(store.restoreBackendDevice(newOrigin)).session.gatewayBaseUrl)
+    }
+
+    @Test
+    fun corruptedBackendCiphertextStillBlocksAfterOriginChange() = withBackendProbe { store, preferences, _ ->
+        assertTrue(preferences.edit().putString("gateway_backend_device_encrypted_v1", "corrupted").commit())
+        assertNull(store.restoreBackendDevice("https://new-session-probe.example.test"))
+        assertTrue(store.isStorageBlocked())
+        assertNull(store.getOrCreateInstallDeviceId())
+    }
+
+    @Test
+    fun missingInstallationBindingStillBlocksAfterOriginChange() = withBackendProbe { store, preferences, _ ->
+        assertTrue(preferences.edit().remove("gateway_install_id_encrypted_v1").commit())
+        assertNull(store.restoreBackendDevice("https://new-session-probe.example.test"))
+        assertTrue(store.isStorageBlocked())
+    }
+
+    private fun withBackendProbe(
+        check: (AndroidGatewaySessionStore, android.content.SharedPreferences, String) -> Unit,
+    ) {
+        val context = syntheticBoundaryContext()
+        val runId = UUID.randomUUID().toString().replace("-", "")
+        val preferenceName = "walksafe_origin_probe_$runId"
+        val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+        fun policy(kind: String, version: Int) = AeadKeyPolicy(
+            "walksafe.instrumentation.origin.$runId.$kind.v", version, setOf(version),
+        )
+        val policies = listOf(policy("session", 4), policy("install", 1), policy("legacy3", 3), policy("legacy1", 1))
+        val store = AndroidGatewaySessionStore(
+            preferences, AndroidKeyStoreAead(policies[0]), AndroidKeyStoreAead(policies[1]),
+            AndroidKeyStoreAead(policies[2]), AndroidKeyStoreAead(policies[3]),
+        )
+        try {
+            val deviceId = requireNotNull(store.getOrCreateInstallDeviceId())
+            val now = System.currentTimeMillis()
+            val expiresAt = (now / 1_000L + 3_600L) * 1_000L
+            val session = GatewayFieldSession.backendAccountDeviceSession(
+                GATEWAY_ORIGIN,
+                BackendAccountDeviceCookieBinding(ACTOR_ID, 7L, 3L, deviceId, SESSION_ID, expiresAt),
+                fixtureCookie(deviceId, expiresAt), expiresAt,
+            )
+            val firstRun = FirstRunOnboardingPolicy.recordVerifiedEmailLogin(
+                FirstRunOnboardingPolicy.initialEmailAccount(42L),
+                FirstRunOpaqueActorBinding.fromProvider(ACTOR_ID),
+                FirstRunReceiptHash.fromSha256Hex("a".repeat(64)),
+            ).current
+            assertEquals(GatewaySessionStoreResult.COMMITTED,
+                store.saveBackendDeviceIfAbsent(session, firstRun, GATEWAY_ORIGIN, now))
+            assertTrue(preferences.edit().putString("probe_progress", "kept").commit())
+            check(store, preferences, deviceId)
+        } finally {
+            assertTrue(context.deleteSharedPreferences(preferenceName))
+            val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            policies.forEach { policy ->
+                policy.knownVersions.forEach { version ->
+                    val alias = policy.alias(version)
+                    keyStore.deleteEntry(alias)
+                    keyStore.deleteEntry("$alias.generation")
                 }
             }
         }

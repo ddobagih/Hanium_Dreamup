@@ -81,10 +81,12 @@ class DepthAcquisitionFrameLocalFailureTest {
             File("src/main/java/kr/co/hanium/dreamup/walksafe/depth/ArCoreFrameProvider.kt"),
             File("app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/ArCoreFrameProvider.kt"),
         ).first { it.isFile }.readText()
-        val snapshot = source.substringAfter("fun acquireDepthSnapshot(").substringBefore("private fun captureCameraPose(")
+        // Both public overloads enter this helper before reading a camera clock or acquiring depth.
+        val snapshot = source.substringAfter("private inline fun acquireDepthSnapshotWithTimestamp(")
+            .substringBefore("private fun captureCameraPose(")
         val closed = snapshot.indexOf("if (closed) return DepthFrameSnapshot(0L, null, null, null)")
         val begin = snapshot.indexOf("runtimeAcquisitionFailures.beginDepthAcquisition()")
-        val bundle = snapshot.indexOf("acquireDepthBundle(")
+        val bundle = snapshot.indexOf("acquireDepthBundleWithTimestamp(")
         assertTrue(closed in 0 until begin)
         assertTrue(begin < bundle)
         assertEquals(1, Regex("""runtimeAcquisitionFailures\.beginDepthAcquisition\(\)""").findAll(source).count())

@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D01-018 계정별 교육 profile·완료 영수증 저장과 복원"]
+  G{"검증 actor binding; encrypted sensitivePrefs 정상; 현재 mutation owner"}
+  I["actor SHA256 preference key,storage_version2,FP004 version,ordered practice prefix,explicit reviewed/accepted/safeplace/hazard flags"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: persistent marker/corrupt storage로 fail-closed"]
+  G -->|"미충족"| X
+  N1["소유자 불명 평문 legacy profile을 제거하고 actor-specific encrypted JSON만 읽는다."]
+  I --> N1
+  N2["버전·bool·ordered practice prefix·필수 invariant를 확인하고 잘못된 profile은 지우고 해당 actor training을 차단한다."]
+  N1 --> N2
+  N3["변경 전에 invalid marker commit을 성공시켜 crash 중간 상태를 감지한다."]
+  N2 --> N3
+  N4["policy mutation 뒤 profile과 native completed receipt를 commit하고 marker를 제거한다."]
+  N3 --> N4
+  N5["복원 native completion은 actor/install/gateway/onboarding/probe version을 확인한 뒤 로그인 진행과 합친다."]
+  N4 --> N5
+  OK["저장 또는 유효 actor profile 복원"]
+  N5 --> OK
+  B0["복원 거부 및 profile clear"]
+  N2 -->|"storage_version·policy·prefix 오류"| B0
+  B1["mutation 시작하지 않음"]
+  N3 -->|"marker 저장 실패"| B1
+  B2["profile reset·training block; 완료 주장 안 함"]
+  N4 -->|"commit 실패"| B2
+  R["중단·취소: 사용자 새교육/reset은 교육 상태 초기화; 로그아웃은 actor-runtime 분리 / crash에서 marker가 남으면 불완전 교육 저장으로 차단"]
+  V["복구·재시도: 유효 actor/policy/storageversion에서 복원 / 필수교육 재수행 또는 정상 저장복구 경로"]
+  Q["정책 P-D01-008 · P-D01-011 · P-D01-018"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

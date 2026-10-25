@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-004<br/>객체 polygon ROI와 robust depth sampling<br/>상태 ACTIVE"]
+    P0["actual polygon 또는 bbox 내부 ROI 구성"]
+    A --> D
+    P1["원본 polygon 내부 grid 최대 500 sampling"]
+    P0 --> P1
+    P2["nearer 층과 MAD outlier 검사"]
+    P1 --> P2
+    P3["통계와 coverage 및 제외 사유 반환"]
+    P2 --> P3
+    D{"P-D07-004<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["bbox fallback 표시; mask 존재로 승격하지 않음"]
+    D -->|"실제 mask 없음"| B0
+    B1["foregroundAmbiguous; Full로 덮어 안전한 거리 생성 금지"]
+    D -->|"near 혼합층 존재"| B1
+    B2["metric 부족 또는 제한적 근접 증거로 후속 전달"]
+    D -->|"표본수/분포 부족"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

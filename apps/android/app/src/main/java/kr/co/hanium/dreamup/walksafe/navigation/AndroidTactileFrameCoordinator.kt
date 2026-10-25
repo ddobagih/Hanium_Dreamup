@@ -1,7 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionFrameEvidence
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionSnapshot
 import kr.co.hanium.dreamup.walksafe.AndroidRiskSelectionPolicy
-import kr.co.hanium.dreamup.walksafe.MainActivity
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
 import kr.co.hanium.dreamup.walksafe.depth.CurrentTrackedFrameObservation
 import kr.co.hanium.dreamup.walksafe.depth.TrackedObjectDepth
@@ -9,9 +10,11 @@ import kr.co.hanium.dreamup.walksafe.depth.UnknownObjectFeedbackBatch
 import kr.co.hanium.dreamup.walksafe.depth.UnknownObjectFeedbackPolicy
 import kr.co.hanium.dreamup.walksafe.feedback.FeedbackAction
 import kr.co.hanium.dreamup.walksafe.feedback.FeedbackCandidate
+import kr.co.hanium.dreamup.walksafe.feedback.FeedbackOutputEvaluationSnapshot
 import kr.co.hanium.dreamup.walksafe.feedback.WalkSafeFeedbackPolicy
 import kr.co.hanium.dreamup.walksafe.feedback.toFeedbackCandidate
 import kr.co.hanium.dreamup.walksafe.inference.tracking.VisualTrackingConfig
+import kr.co.hanium.dreamup.walksafe.inference.WalkMateClassPolicy
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import kotlin.math.abs
 
@@ -21,6 +24,8 @@ internal data class TactileFrameFeedbackDispatch(
     val deviceGateAllowsAlerts: Boolean,
     val action: FeedbackAction?,
     val policyEvaluatedAtMs: Long,
+    /** Null only for callers constructing a dispatch without a policy evaluation. */
+    val outputEvaluation: FeedbackOutputEvaluationSnapshot? = null,
 )
 
 internal fun interface TactileFrameFeedbackActuator {
@@ -60,9 +65,10 @@ internal class AndroidTactileFrameCoordinator(
     private val warningObservations = ArrayDeque<WarningObservation>()
     private var warningContext: WarningRegionContext? = null
     private val warningTrackingLimits = VisualTrackingConfig()
+    private val observationFrameStatistics = TactileObservationFrameStatistics()
 
     fun processSnapshot(
-        detectionSnapshot: MainActivity.DetectionSnapshot,
+        detectionSnapshot: DetectionSnapshot,
         nowMs: Long,
         currentFrameTimestampMs: Long,
         maxDetectionSourceAgeMs: Long,
@@ -72,8 +78,11 @@ internal class AndroidTactileFrameCoordinator(
         tmapOnRouteNow: Boolean,
         activeRouteId: String?,
         activeRouteProgress: TactileActiveRouteProgress? = null,
-        processDepth: (MainActivity.DetectionFrameEvidence, List<DetectionCandidate>) -> List<TrackedObjectDepth>,
-    ): MainActivity.TactileSnapshotFrameResult {
+        decisionElapsedRealtimeMs: Long? = null,
+        tactileSurfaces: List<kr.co.hanium.dreamup.walksafe.depth.TactileMaskSurfaceResult> = emptyList(),
+        decisionElapsedRealtimeNs: Long? = null,
+        processDepth: (DetectionFrameEvidence, List<DetectionCandidate>) -> List<TrackedObjectDepth>,
+    ): TactileSnapshotFrameResult {
         val candidateEvidence = detectionSnapshot.frameEvidence
         val matchedEvidence = matchingFrameEvidenceOrNull(
             evidence = candidateEvidence,
@@ -98,7 +107,7 @@ internal class AndroidTactileFrameCoordinator(
         } else {
             emptyList()
         }
-        val guidance = evaluate(
+        val evaluatedGuidance = evaluate(
             AndroidTactileFrameComposition.input(
                 outputs = outputs,
                 detectionIdentity = detectionSnapshot.identity,
@@ -111,9 +120,32 @@ internal class AndroidTactileFrameCoordinator(
                 tmapOnRouteNow = tmapOnRouteNow,
                 activeRouteId = activeRouteId,
                 activeRouteProgress = activeRouteProgress,
+                decisionElapsedRealtimeMs = decisionElapsedRealtimeMs,
+                tactileSurfaces = tactileSurfaces,
+                decisionElapsedRealtimeNs = decisionElapsedRealtimeNs,
             ),
         )
-        return MainActivity.TactileSnapshotFrameResult(
+        val hasTactileCandidates = detectionSnapshot.detections.any {
+            WalkMateClassPolicy.isTraversableTactileClass(it.className) ||
+                WalkMateClassPolicy.isTactileRouteBlockingClass(it.className)
+        }
+        val frameRejection = if (!hasTactileCandidates) null else when {
+            detectionSnapshot.partial -> TactileObservationRejection.DETECTION_INCOMPLETE
+            depthDetections.isEmpty() -> TactileObservationRejection.DETECTION_STALE
+            candidateEvidence == null -> TactileObservationRejection.CAPTURE_CONTEXT_UNAVAILABLE
+            matchedEvidence == null -> TactileObservationRejection.FRAME_MISMATCH
+            matchedEvidence.depthMapper == null -> TactileObservationRejection.DEPTH_INSUFFICIENT
+            else -> null
+        }
+        val captureKey = detectionSnapshot.captureFrameId?.let { frameId ->
+            detectionSnapshot.capturedAtElapsedRealtimeMs?.let { TactileObservationFrameKey(frameId, it) }
+        }
+        val guidance = withObservationStatistics(
+            evaluatedGuidance.copy(observationFrameRejection = frameRejection),
+            key = captureKey,
+            completedTactileFrame = hasTactileCandidates && !detectionSnapshot.partial,
+        )
+        return TactileSnapshotFrameResult(
             matchedEvidence = matchedEvidence,
             depthDetections = depthDetections,
             depthProcessingAttempted = depthProcessingAttempted,
@@ -128,11 +160,13 @@ internal class AndroidTactileFrameCoordinator(
             identity = input.identity,
             context = input.context,
             requireDepthMapper = true,
-        )?.copy(detectionAgeMs = input.detectionAgeMs),
+        )?.copy(detectionAgeMs = input.detectionAgeMs, decisionElapsedRealtimeMs = input.decisionElapsedRealtimeMs),
         navigationActive = input.navigationActiveAtCapture && input.navigationActiveNow,
         tmapOnRoute = input.tmapOnRouteAtCapture && input.tmapOnRouteNow,
         activeRouteId = input.activeRouteId,
         activeRouteProgress = input.activeRouteProgress,
+        tactileSurfaces = input.tactileSurfaces,
+        decisionElapsedRealtimeNs = input.decisionElapsedRealtimeNs,
     )
 
     /** Uses a verified current observation without publishing it as another detector snapshot. */
@@ -143,22 +177,39 @@ internal class AndroidTactileFrameCoordinator(
         tmapOnRouteNow: Boolean,
         activeRouteId: String?,
         activeRouteProgress: TactileActiveRouteProgress? = null,
-        processDepth: (CurrentTrackedFrameObservation, MainActivity.DetectionFrameEvidence) -> List<TrackedObjectDepth>,
-    ): MainActivity.TactileSnapshotFrameResult {
+        observationDiagnostics: TactileCurrentFrameDiagnostics? = null,
+        tactileSurfaces: List<kr.co.hanium.dreamup.walksafe.depth.TactileMaskSurfaceResult> = emptyList(),
+        decisionElapsedRealtimeNs: Long? = null,
+        processDepth: (CurrentTrackedFrameObservation, DetectionFrameEvidence) -> List<TrackedObjectDepth>,
+    ): TactileSnapshotFrameResult {
         val current = frame?.takeIf { it.observation.isFreshAt(nowElapsedRealtimeMs) }
         val evidence = current?.currentEvidence
         val detections = current?.observation?.trackedObservations.orEmpty().mapNotNull { it.geometry }
         // An all-LOST observation still reaches the visual pipeline to invalidate its track state.
         val outputs = if (current != null) processDepth(current.observation, current.currentEvidence) else emptyList()
-        val guidance = tactileRouteGuidance.apply(
+        val evaluatedGuidance = tactileRouteGuidance.apply(
             outputs = outputs,
-            context = current?.let { it.currentEvidence.tactileContext.copy(detectionAgeMs = it.sourceAgeMs(nowElapsedRealtimeMs)) },
+            context = current?.let { it.currentEvidence.tactileContext.copy(
+                detectionAgeMs = it.sourceAgeMs(nowElapsedRealtimeMs),
+                decisionElapsedRealtimeMs = nowElapsedRealtimeMs,
+            ) },
             navigationActive = evidence?.navigationActive == true && navigationActiveNow,
             tmapOnRoute = evidence?.tmapOnRoute == true && tmapOnRouteNow,
             activeRouteId = activeRouteId,
             activeRouteProgress = activeRouteProgress,
+            currentVisualObservation = current?.observation,
+            tactileSurfaces = tactileSurfaces,
+            decisionElapsedRealtimeNs = decisionElapsedRealtimeNs,
         )
-        return MainActivity.TactileSnapshotFrameResult(
+        val diagnostics = observationDiagnostics ?: frame?.let {
+            TactileCurrentFrameDiagnostics.fromAdmitted(it, nowElapsedRealtimeMs)
+        }
+        val guidance = withObservationStatistics(
+            evaluatedGuidance.copy(observationFrameRejection = diagnostics?.rejection),
+            key = diagnostics?.captureKey,
+            completedTactileFrame = diagnostics?.completedTactileSource == true,
+        )
+        return TactileSnapshotFrameResult(
             matchedEvidence = evidence,
             depthDetections = detections,
             depthProcessingAttempted = current != null && detections.isNotEmpty(),
@@ -166,8 +217,23 @@ internal class AndroidTactileFrameCoordinator(
         )
     }
 
+    private fun withObservationStatistics(
+        guidance: TactileRouteGuidanceResult,
+        key: TactileObservationFrameKey?,
+        completedTactileFrame: Boolean,
+    ): TactileRouteGuidanceResult {
+        val identified = key != null && key.frameId >= 0L && key.capturedAtElapsedRealtimeMs >= 0L
+        val reasons = guidance.observationRejections.values + listOfNotNull(guidance.observationFrameRejection)
+        val statistics = if (completedTactileFrame) observationFrameStatistics.record(key, reasons)
+            else observationFrameStatistics.snapshot()
+        return guidance.copy(
+            observationStatistics = statistics,
+            observationFrameIdentified = if (completedTactileFrame) identified else null,
+        )
+    }
+
     fun dispatchFeedback(
-        frame: MainActivity.TactileSnapshotFrameResult,
+        frame: TactileSnapshotFrameResult,
         stale: Boolean,
         deviceGateAllowsAlerts: Boolean,
         nowMs: Long,
@@ -182,17 +248,23 @@ internal class AndroidTactileFrameCoordinator(
         val currentOutputs = AndroidRiskSelectionPolicy.resolveConflictingStateFeedback(
             frame.guidance.outputs, nowElapsedRealtimeMs = nowMs,
         )
-        val currentCandidates = AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(currentOutputs).mapNotNull { output ->
+        val currentObservedCandidates = AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(currentOutputs).mapNotNull { output ->
             output.toFeedbackCandidate(stale = stale)
-                ?.takeIf { nowMs <= it.validUntilMs }
                 ?.let { SourcedFeedbackCandidate(output, it) }
         }
+        val currentCandidates = currentObservedCandidates.filter { nowMs <= it.feedback.validUntilMs }
         val independentCandidates = independentFreshOutputs.filter { it.isFreshAt(nowMs) }.flatMap { batch ->
             AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(batch.outputs).mapNotNull { output ->
                 output.toFeedbackCandidate()
                     ?.let { it.copy(validUntilMs = minOf(it.validUntilMs, batch.validUntilElapsedRealtimeMs)) }
                     ?.takeIf { nowMs <= it.validUntilMs }
                     ?.let { SourcedFeedbackCandidate(output, it, batch) }
+            }
+        }
+        val independentObservedCandidates = independentFreshOutputs.flatMap { batch ->
+            AndroidRiskSelectionPolicy.prioritizedFeedbackOutputs(batch.outputs).mapNotNull { output ->
+                output.toFeedbackCandidate(stale = !batch.isFreshAt(nowMs))
+                    ?.let { it.copy(validUntilMs = minOf(it.validUntilMs, batch.validUntilElapsedRealtimeMs)) }
             }
         }
         recordWarningObservation(currentCandidates, warningContext, stale || !deviceGateAllowsAlerts, nowMs)
@@ -212,7 +284,8 @@ internal class AndroidTactileFrameCoordinator(
             }
             val candidates = selected.map { it.feedback }
                 .sortedWith(compareByDescending<FeedbackCandidate> { it.level.ordinal }.thenByDescending { it.confidence })
-            val action = feedbackPolicy.evaluateCandidates(candidates, deviceGateAllowsAlerts, nowMs)
+            val action = feedbackPolicy.evaluateCandidates(candidates, deviceGateAllowsAlerts, nowMs,
+                observedCandidates = currentObservedCandidates.map { it.feedback } + independentObservedCandidates)
             TactileFrameFeedbackDispatch(
                 activeRiskTrackIds = feedbackPolicy.activeRiskTrackIds(
                     candidates = candidates,
@@ -227,6 +300,7 @@ internal class AndroidTactileFrameCoordinator(
                 deviceGateAllowsAlerts = deviceGateAllowsAlerts,
                 action = action,
                 policyEvaluatedAtMs = nowMs,
+                outputEvaluation = feedbackPolicy.lastOutputEvaluation(),
             )
         }
         (feedbackActuatorOverride ?: feedbackActuator).emit(dispatch)

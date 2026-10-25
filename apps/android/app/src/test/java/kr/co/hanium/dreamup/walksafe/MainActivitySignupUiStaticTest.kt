@@ -10,15 +10,36 @@ class MainActivitySignupUiStaticTest {
         "src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
     ).readText()
 
+    private val accountPresenterSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/AccountAccessPresenter.kt",
+    ).readText()
+
+    private val accountPanelSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/AccountAccessPanel.kt",
+    ).readText()
+
+    private val homePanelSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/HomePanel.kt",
+    ).readText()
+
+    private val styleSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/WalkSafeViewStyle.kt",
+    ).readText()
+
+    private val firstRunPresenterSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/FirstRunOnboardingPresenter.kt",
+    ).readText()
+
     @Test
     fun signupUsesTwoScreensAndSixInlineConsentCards() {
-        assertTrue(source.contains("private enum class AccountSignupStep { CONSENT, DETAILS }"))
+        assertTrue(accountPresenterSource.contains("enum class AccountSignupStep { CONSENT, DETAILS }"))
         assertTrue(source.contains("private val accountConsentCards"))
         assertTrue(source.contains("private val accountConsentClauseTexts"))
 
         val composition = sourceBlock(
             "val accountConsentDisclosure =",
-            "emailEnrollmentPartial?.selections?.let(::applyAccountConsentSelections)",
+            "private fun bindAccountInputValidation(",
+            accountPanelSource,
         )
         assertTrue(composition.contains("val consentClauseStops ="))
         assertTrue(composition.contains("documentClauseOrNull("))
@@ -32,8 +53,10 @@ class MainActivitySignupUiStaticTest {
             "automatic_reporting",
             "training_reuse",
         ).forEach { key -> assertTrue(composition.contains("\"$key\" to")) }
-        assertTrue(composition.contains("addView(accountConsentCards.getValue(key))"))
-        assertTrue(composition.contains("showMissingRequiredConsentError()"))
+        assertTrue(composition.contains("addView(consentCards.getValue(key))"))
+        assertTrue(sourceBlock("onConsentContinue = {", "onRequestOtp =").contains("showMissingRequiredConsentError()"))
+        assertTrue(accountPanelSource.contains("onClick = actions.onConsentContinue"))
+        assertTrue(source.contains("accountConsentCards.putAll(accountPanel.accountConsentCards)"))
         assertTrue(composition.contains("addView(listenButton)"))
         assertTrue(composition.contains("addView(accountConsentContinueButton)"))
         assertTrue(composition.contains("addView(accountConsentStepControls)"))
@@ -43,7 +66,7 @@ class MainActivitySignupUiStaticTest {
 
     @Test
     fun inlineClausesUseTheOuterScrollViewWithoutInterceptingTouches() {
-        val clauseBox = functionBlock("private fun applyWsClauseBox(")
+        val clauseBox = functionBlock("fun applyWsClauseBox(", styleSource)
         assertTrue(clauseBox.contains("view.maxHeight = Int.MAX_VALUE"))
         assertTrue(clauseBox.contains("view.isVerticalScrollBarEnabled = false"))
         assertTrue(clauseBox.contains("view.movementMethod = null"))
@@ -57,7 +80,8 @@ class MainActivitySignupUiStaticTest {
     fun releasedSignupCopyDoesNotExposeInternalLaunchPlaceholders() {
         val disclosure = sourceBlock(
             "val accountConsentDisclosure =",
-            "accountConsentDisclosureText = TextView(this).apply",
+            "accountConsentDisclosureText = TextView(context).apply",
+            accountPanelSource,
         )
         assertFalse(disclosure.contains("출시 전 확정"))
         assertFalse(disclosure.contains("확정 필요"))
@@ -65,13 +89,13 @@ class MainActivitySignupUiStaticTest {
 
     @Test
     fun requiredThreeGateSignupProgressAndOptionalThreeDoNot() {
-        val summary = functionBlock("private fun refreshAccountConsentSummary()")
+        val summary = functionBlock("fun refreshAccountConsentSummary(", accountPresenterSource)
         assertTrue(summary.contains("selections.requiredGranted"))
         assertTrue(summary.contains("selections.termsOfService"))
         assertTrue(summary.contains("selections.privacyNotice"))
         assertTrue(summary.contains("selections.locationTerms"))
 
-        val availability = functionBlock("private fun refreshAccountActionAvailability()")
+        val availability = functionBlock("fun refreshAccountActionAvailability(", accountPresenterSource)
         assertTrue(availability.contains("validity.canContinueFromConsent"))
         assertFalse(availability.contains("rawOriginal"))
         assertFalse(availability.contains("automaticReporting"))
@@ -80,44 +104,33 @@ class MainActivitySignupUiStaticTest {
 
     @Test
     fun validationErrorsTargetAndFocusTheExactInput() {
-        val inputError = functionBlock("private fun showAccountInputError(")
+        val inputError = functionBlock("fun showAccountInputError(", accountPresenterSource)
+        assertTrue(functionBlock("private fun showAccountInputError(").contains("accountAccessPresenter.showAccountInputError(target, message)"))
         assertTrue(inputError.contains("target.error = message"))
         assertTrue(inputError.contains("target.requestFocus()"))
         assertTrue(inputError.contains("target.requestRectangleOnScreen("))
 
-        val requestOtp = functionBlock("private fun requestEmailAccountOtp()")
-        assertTrue(requestOtp.contains("showAccountInputError(accountEmailInput"))
-        assertTrue(
-            Regex("showAccountInputError\\s*\\(\\s*accountDateOfBirthInput")
-                .containsMatchIn(requestOtp),
-        )
-
-        val create = functionBlock("private fun createEmailAccount()")
-        assertTrue(
-            Regex("showAccountInputError\\s*\\(\\s*accountEmailInput")
-                .containsMatchIn(create),
-        )
-        assertTrue(create.contains("showAccountInputError(accountOtpInput"))
-        assertTrue(
-            Regex("showAccountInputError\\s*\\(\\s*accountPasswordInput")
-                .containsMatchIn(create),
-        )
-        assertTrue(
-            Regex("showAccountInputError\\s*\\(\\s*accountPasswordConfirmationInput")
-                .containsMatchIn(create),
-        )
-
-        val login = functionBlock("private fun loginEmailAccount(")
-        assertTrue(login.contains("showAccountInputError(accountEmailInput"))
-        assertTrue(
-            Regex("showAccountInputError\\s*\\(\\s*accountPasswordInput")
-                .containsMatchIn(login),
-        )
+        val factory = MainActivityRefactorSource.member(source, "createEmailAccountController")
+        assertTrue(factory.contains("showAccountInputError(this@MainActivity.accountAccessPresenter.inputTarget(field), message)"))
+        val inputBridge = factory
+        assertTrue(inputBridge.contains("override fun text(field: EmailAccountController.InputField) = this@MainActivity.accountAccessPresenter.inputTarget(field).text?.toString().orEmpty()"))
+        val fields = functionBlock("fun inputTarget(", accountPresenterSource)
+        mapOf("EMAIL" to "accountEmailInput", "DATE_OF_BIRTH" to "accountDateOfBirthInput",
+            "PASSWORD" to "accountPasswordInput", "PASSWORD_CONFIRMATION" to "accountPasswordConfirmationInput",
+            "OTP" to "accountOtpInput").forEach { (field, control) ->
+            assertTrue(fields.contains("EmailAccountController.InputField.$field -> publishedInputs.$control"))
+        }
+        fun assertTargets(body: String, vararg expected: String) = expected.forEach { field ->
+            assertTrue(Regex("ui\\.showInputError\\s*\\(\\s*InputField\\.$field\\b").containsMatchIn(body))
+        }
+        assertTargets(functionBlock("private fun requestEmailAccountOtp()"), "EMAIL", "DATE_OF_BIRTH")
+        assertTargets(functionBlock("private fun createEmailAccount()"), "EMAIL", "OTP", "PASSWORD", "PASSWORD_CONFIRMATION")
+        assertTargets(functionBlock("private fun loginEmailAccount("), "EMAIL", "PASSWORD")
     }
 
     @Test
     fun invalidButNonBlankInputsKeepSubmitAttemptsReachableForExactErrors() {
-        val availability = functionBlock("private fun refreshAccountActionAvailability()")
+        val availability = functionBlock("fun refreshAccountActionAvailability(", accountPresenterSource)
         val requestOtp = assignmentBlock(
             availability,
             "accountRequestOtpButton.isEnabled =",
@@ -151,8 +164,9 @@ class MainActivitySignupUiStaticTest {
     @Test
     fun signupBackIsLastAndCommonToggleIsHiddenInsideSignup() {
         val signupControls = sourceBlock(
-            "accountSignupControls = LinearLayout(this).apply",
-            "accountAccessControls = LinearLayout(this).apply",
+            "accountSignupControls = LinearLayout(context).apply",
+            "accountAccessControls = LinearLayout(context).apply",
+            accountPanelSource,
         )
         assertInOrder(
             signupControls,
@@ -160,7 +174,10 @@ class MainActivitySignupUiStaticTest {
             "addView(accountSignupBackButton)",
         )
 
-        val update = functionBlock("private fun updateEmailAccountAccessUi(")
+        val update = functionBlock("fun updateEmailAccountAccessUi(", accountPresenterSource)
+        assertTrue(MainActivityRefactorSource.member(source, "updateEmailAccountAccessUi").contains("accountAccessInteractionOwner.updateEmailAccountAccessUi(snapshot)"))
+        assertTrue(functionBlock("private fun updateEmailAccountAccessUi(").contains("screen.renderAccess(AccountAccessPresenter.AccessFacts("))
+        assertTrue(MainActivityRefactorSource.member(source, "createAccountAccessInteractionOwner").contains("accountAccessPresenter.updateEmailAccountAccessUi(facts)"))
         assertTrue(update.contains("signupVisible -> View.GONE"))
         assertTrue(update.contains("accountSignupBackButton.visibility ="))
         assertTrue(update.contains("accountSignupStep == AccountSignupStep.CONSENT"))
@@ -169,55 +186,84 @@ class MainActivitySignupUiStaticTest {
 
     @Test
     fun selectedVisualPatternsKeepTheExistingTwoStepFlowAccessible() {
-        assertTrue(source.contains("private enum class AccountSignupStep { CONSENT, DETAILS }"))
-        val home = functionBlock("private fun buildHomeCardGrid()")
+        assertTrue(accountPresenterSource.contains("enum class AccountSignupStep { CONSENT, DETAILS }"))
+        val home = homePanelSource
+        val homeWiring = sourceBlock("val homePanel = HomePanel(", "nativeScreenPresenter.bindRuntimeViews(")
+        assertTrue(homeWiring.contains("style = viewStyle"))
+        assertTrue(homeWiring.contains("nativeHomeUiPresenter.publishGridTarget(homePanel)"))
+        assertTrue(homeWiring.contains("home = homePanel"))
         assertTrue(home.contains("orientation = LinearLayout.VERTICAL"))
         assertTrue(home.contains("title = \"길라잡이\""))
         assertTrue(home.contains("title = \"음성 명령\""))
         assertTrue(home.contains("title = \"설정\""))
         assertFalse(home.contains("title = \"손상 점자블록 신고\""))
         assertFalse(home.contains("설정 화면은 준비 중입니다"))
-        val settingsCard = home.substringAfter("title = \"설정\"")
-        assertTrue(settingsCard.contains("unlocked = { true }"))
-        assertTrue(settingsCard.contains("showNativeUiPage(NativeUiPage.SETTINGS)"))
-        assertTrue(home.contains("nativeFeatureAvailable(NativeUiPage.VOICE_COMMAND)"))
-        assertTrue(home.contains("nativeFeatureAvailable(NativeUiPage.DESTINATION_SEARCH)"))
-        assertTrue(home.contains("requestNativeFeature(NativeUiPage.VOICE_COMMAND)"))
-        assertTrue(home.contains("requestNativeFeature(NativeUiPage.DESTINATION_SEARCH)"))
+        val settingsCard = sourceBlock(
+            "renderCardAvailability(\n            settingsCard,",
+            "\n    }",
+            homePanelSource,
+        )
+        assertTrue(settingsCard.contains("available = true"))
+        assertTrue(homeWiring.contains("showNativeUiPage(NativeUiPage.SETTINGS)"))
+        assertTrue(homePanelSource.contains("homeCard(\"설정\", actions.onSettings)"))
+        assertTrue(homeWiring.contains("nativeFeatureAvailable(NativeUiPage.VOICE_COMMAND)"))
+        assertTrue(homeWiring.contains("nativeFeatureAvailable(NativeUiPage.DESTINATION_SEARCH)"))
+        assertTrue(homeWiring.contains("requestNativeFeature(NativeUiPage.VOICE_COMMAND)"))
+        assertTrue(homeWiring.contains("requestNativeFeature(NativeUiPage.DESTINATION_SEARCH)"))
 
-        val card = functionBlock("private fun wsHomeCard(")
-        assertTrue(card.contains("val card = Button(this).apply"))
+        val card = functionBlock("private fun homeCard(", homePanelSource)
+        val cardAvailability = functionBlock("private fun renderCardAvailability(", homePanelSource)
+        assertTrue(card.contains("Button(context).apply"))
         assertTrue(card.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
-        assertTrue(card.contains("잠김. \$lockTitle. \$lockDetail"))
+        assertTrue(cardAvailability.contains("잠김. \$lockTitle. \$lockDetail"))
         assertTrue(card.contains("setOnClickListener { onOpen() }"))
-        assertTrue(card.contains("card.isEnabled = !isWalkSessionRuntimeActive() || unlocked()"))
+        assertTrue(cardAvailability.contains("val cardEnabled = !runtimeActive || available"))
+        assertTrue(cardAvailability.contains("card.isEnabled = cardEnabled"))
+        assertTrue(cardAvailability.indexOf("val cardEnabled =") < cardAvailability.indexOf("card.isEnabled = cardEnabled"))
         val refresh = functionBlock("private fun refreshHomeCards()")
         assertTrue(refresh.contains("renderMainUi()"))
         assertFalse(refresh.contains("WalkSessionState.ACTIVE"))
 
-        val fields = functionBlock("private fun wsFieldGroup(")
+        val fields = functionBlock("fun wsFieldGroup(", styleSource)
         assertTrue(fields.contains("text = label"))
         assertTrue(fields.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
         val composition = sourceBlock(
-            "accountDetailsStepControls = LinearLayout(this).apply",
-            "emailEnrollmentPartial?.selections?.let(::applyAccountConsentSelections)",
+            "accountDetailsStepControls = LinearLayout(context).apply",
+            "private fun bindAccountInputValidation(",
+            accountPanelSource,
         )
         assertTrue(composition.contains("wsFieldGroup(accountDateOfBirthInput"))
         assertTrue(composition.contains("wsFieldGroup(accountEmailInput"))
         assertTrue(composition.contains("wsFieldGroup(accountPasswordInput"))
 
-        assertTrue(
-            source.contains(
-                "importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS",
-            ),
+        val voiceFirstPresentation = functionBlock(
+            "fun applyVoiceFirstPresentation(",
+            File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeScreenPresenter.kt").readText(),
         )
+        val compactPresentation = voiceFirstPresentation.filterNot { it.isWhitespace() }
+        assertTrue(compactPresentation.contains("valguidanceVisible=pageName==\"GUIDANCE\""))
+        assertTrue(compactPresentation.contains(
+            "valshown=guidanceVisible&&(it===destination.nativeGuidanceDestinationText||" +
+                "it===destination.nativeGuidanceStatusText)",
+        ))
+        assertTrue(compactPresentation.contains(
+            "valimportance=if(shown)View.IMPORTANT_FOR_ACCESSIBILITY_YES" +
+                "elseView.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS",
+        ))
+        assertTrue(compactPresentation.contains(
+            "if(it.importantForAccessibility!=importance)it.importantForAccessibility=importance",
+        ))
+        assertTrue(functionBlock("private fun applyNativeVoiceFirstPresentation(").contains("nativeScreenPresenter.applyVoiceFirstPresentation("))
         val safetyNotice = functionBlock("private fun refreshFirstRunNoticeUi(")
         assertTrue(safetyNotice.contains("FirstRunOnboardingStage.PURPOSE_AND_SAFETY"))
-        assertTrue(safetyNotice.contains("firstRunNoticeToggleButton.visibility = View.GONE"))
-        assertTrue(safetyNotice.contains("productPurposeText.visibility = if (visible) View.VISIBLE else View.GONE"))
+        assertTrue(safetyNotice.contains("firstRunOnboardingPresenter.refreshFirstRunNoticeUi(visible)"))
+        val noticeUi = functionBlock("fun refreshFirstRunNoticeUi(", firstRunPresenterSource)
+        assertTrue(noticeUi.contains("firstRunNoticeToggleButton.visibility = View.GONE"))
+        assertTrue(noticeUi.contains("productPurposeText.visibility = if (purposeStageVisible) View.VISIBLE else View.GONE"))
         val accountControls = sourceBlock(
-            "accountAccessControls = LinearLayout(this).apply",
-            "emailEnrollmentPartial?.selections?.let(::applyAccountConsentSelections)",
+            "accountAccessControls = LinearLayout(context).apply",
+            "private fun bindAccountInputValidation(",
+            accountPanelSource,
         )
         assertFalse(accountControls.contains("addView(accountLandingHeader)"))
 
@@ -281,29 +327,14 @@ class MainActivitySignupUiStaticTest {
         )
     }
 
-    private fun sourceBlock(startMarker: String, endMarker: String): String {
-        val start = source.indexOf(startMarker)
+    private fun sourceBlock(startMarker: String, endMarker: String, ownerSource: String = source): String {
+        val start = ownerSource.indexOf(startMarker)
         require(start >= 0) { "missing start marker: $startMarker" }
-        val end = source.indexOf(endMarker, start + startMarker.length)
+        val end = ownerSource.indexOf(endMarker, start + startMarker.length)
         require(end >= 0) { "missing end marker after $startMarker: $endMarker" }
-        return source.substring(start, end)
+        return ownerSource.substring(start, end)
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        require(start >= 0) { "missing function: $signature" }
-        val opening = source.indexOf('{', start)
-        require(opening >= 0)
-        var depth = 0
-        for (index in opening until source.length) {
-            when (source[index]) {
-                '{' -> depth += 1
-                '}' -> {
-                    depth -= 1
-                    if (depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        error("unterminated function: $signature")
-    }
+    private fun functionBlock(signature: String, ownerSource: String = source): String =
+        MainActivityRefactorSource.function(ownerSource, signature)
 }

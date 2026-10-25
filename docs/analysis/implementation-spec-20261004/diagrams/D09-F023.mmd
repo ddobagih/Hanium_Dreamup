@@ -1,0 +1,18 @@
+flowchart TD
+  title["F-D09-023 · 최근 깊이 디버그 로그 조회<br/>P-D09-023"]
+  N0["admin 인가와 enabled 검사"]
+  N1["저장소 열기 및 retention"]
+  N2["최근 seq N개 선택"]
+  N3["응답 순서 뒤집기"]
+  title --> N0
+  N0 --> N1
+  N1 --> N2
+  N2 --> N3
+  N3 --> OK["정상: 200 ok=true 및 items"]
+  N0 -->|"enabled=false"| B0["404 android_debug_log_disabled"]
+  B0 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N0 -->|"limit 범위 외"| B1["422 validation 오류"]
+  B1 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  title -.-> CANCEL["취소: 조회 worker 종료까지 기다림"]
+  CANCEL --> CLEAN["정리: SQLite 및 flock 반환"]
+  title -.-> RETRY["재시도: HTTP 실패의 서버 자동 재시도 없음"]

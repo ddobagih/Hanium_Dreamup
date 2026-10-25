@@ -1,0 +1,16 @@
+flowchart TD
+  META["F-D16-003 · P-D16-003"]
+  META --> A
+  A["SAF 문서 선택"] --> B{"RESULT_OK 및 URI 존재"}
+  B -->|"아니오"| X["입력 변경 없이 종료"]
+  B -->|"예"| C{"busy 또는 cancelling"}
+  C -->|"예"| X
+  C -->|"아니오"| D["이전 결과 무효화·UUID 사본 복사"]
+  D --> E{"0 초과·128MiB 이하·해시 계산·파싱 성공"}
+  E -->|"아니오"| F["새 사본/part 삭제·실패 안내"]
+  E -->|"예"| G["fsync·확정·이전 입력 삭제·새 입력 commit"]
+  G --> H{"trace 교체인가"}
+  H -->|"예"| I["수동 기준국 readiness·사본 초기화"]
+  H -->|"아니오"| J["입력 summary 갱신"]
+  I --> J
+  J --> K["외부 SAF 원본은 보존"]

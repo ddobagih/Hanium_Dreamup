@@ -1,0 +1,13 @@
+flowchart TD
+    A["F-D07-032 · P-D07-032<br/>unknown 같은 측정 표면의 warning 중복 축소"]
+    A --> I{"fragment ID가 frame 안에서 유일"}
+    I -->|아니오| E["require 실패"]
+    I -->|예| S["실제 warning 강도·TTC·거리·ID 순 정렬"]
+    S --> Q{"각 fragment 강한 실측 지원<br/>same capture·plane·실제 foreground 접촉"}
+    Q -->|부족 · hole · seam · partial · clock 불일치| K["해당 fragment를 독립 그룹으로 유지"]
+    Q -->|충족| P{"후보가 기존 모든 member와 직접 sameSurface인가"}
+    P -->|아니오| K
+    P -->|예| G["all-pair 그룹에 추가<br/>단순 transitive chain 확장 금지"]
+    G --> M["그룹의 strongest 실제 warning 유지<br/>다른 member 경고 문구만 mute"]
+    K --> R["각 그룹 결과 반환<br/>새 물체 identity 생성 없음"]
+    M --> R

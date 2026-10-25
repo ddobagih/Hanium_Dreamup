@@ -1,51 +1,68 @@
 package kr.co.hanium.dreamup.walksafe
 
 import java.io.File
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
 
-/** S14-37: runtime failures reach the supervisor with their kind and time. */
 class MainActivityDetectorFailureKindStaticTest {
-    private val activity = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private fun source(path: String) = File("src/main/java/kr/co/hanium/dreamup/walksafe/$path.kt").readText()
+    private val main = source("MainActivity")
+    private val lifecycle = source("runtime/vision/primary/PrimaryDetectorLifecycleController")
+    private val ar = source("runtime/vision/primary/PrimaryArDetectorWorker")
+    private val fallback = source("runtime/vision/primary/PrimaryCameraFallbackDetectorWorker")
 
-    @Test
-    fun runtimeFailureIsClassifiedAndTimedAndCompletedInferenceRecordsItsTime() {
-        val failure = activity.substringAfter("private fun handleDetectorRuntimeFailure(")
-            .substringBefore("private fun disableDetectorAfterRuntimeFailure(")
-        assertTrue(failure.contains("failureKind = detectorRuntimeFailureKind(error),"))
-        assertTrue(failure.contains("atElapsedRealtimeMs = SystemClock.elapsedRealtime(),"))
-        // S14-36: both completed-inference paths record their completion time through the checked entry point.
-        val outputs = activity.split("detectorRuntimeSupervisor.onDetectorOutput(").drop(1)
-        assertTrue(outputs.size == 2)
-        outputs.forEach { call ->
-            assertTrue(call.substringBefore(".action == DetectorRuntimeFailureAction.SAFE_STOP")
-                .contains("completedAtElapsedRealtimeMs = SystemClock.elapsedRealtime(),"))
+    @Test fun runtimeFailureIsClassifiedAndTimedAndCompletedInferenceRecordsItsTime() {
+        val failure = MainActivityRefactorSource.member(lifecycle, "runtimeFailure")
+        assertTrue(main.contains("primaryDetectorLifecycleController.runtimeFailure(error, expectedDetectorGeneration, expectedWalkEpoch)"))
+        assertTrue(failure.contains("detectorRuntimeFailureKind(error)"))
+        assertTrue(failure.contains("elapsedRealtimeMs(), run"))
+        val invocation = source("runtime/vision/primary/PrimaryDetectorInvocationWorker")
+        val returned = ReportStaticSourceInspector.blockAfter(
+            MainActivityRefactorSource.member(invocation, "invoke"), "result.also",
+        )
+        assertEquals(code("""
+            {
+                val returnedAt = elapsedRealtimeMs()
+                latestNativeTiming = PrimaryNativeTimingSnapshot(
+                    request.pacingTicket, request.epoch, request.frameGeneration,
+                    request.capturedAtElapsedRealtimeMs, invocation.detectorStartedAtElapsedRealtimeMs,
+                    returnedAt, it.status, it.timing.copy(
+                        completedModels = java.util.Collections.unmodifiableList(ArrayList(it.timing.completedModels)),
+                        skippedModels = java.util.Collections.unmodifiableList(ArrayList(it.timing.skippedModels)),
+                    ),
+                )
+                invocation.detectorOutputExpired = onNativeOutput(PrimaryNativeOutput(it, returnedAt))
+                if (it.inferenceCompleted) invocation.detectorSucceeded = true
+            }
+        """), code(returned))
+        val callbacks = listOf(
+            ar to """{ output ->
+                supervisor.onDetectorOutput(DetectorWorkClaim(work.generation, work.epoch, work.ticket),
+                    output.result, work.capturedAtElapsedRealtimeMs, output.completedAtElapsedRealtimeMs)
+                    .action == DetectorRuntimeFailureAction.SAFE_STOP
+            }""",
+            fallback to """{ output ->
+                supervisor.onDetectorOutput(DetectorWorkClaim(detectorGeneration, expectedEpoch, ticket),
+                    output.result, now, output.completedAtElapsedRealtimeMs)
+                    .action == DetectorRuntimeFailureAction.SAFE_STOP
+            }""",
+        )
+        for ((worker, expectedCallback) in callbacks) {
+            assertEquals(1, Regex("supervisor\\.onDetectorOutput\\(").findAll(code(worker)).count())
+            assertEquals(code(expectedCallback), code(ReportStaticSourceInspector.blockAfter(worker, "onNativeOutput =")))
         }
     }
 
-    @Test
-    fun failureInARunWithoutItsOwnSuccessDisarmsTheOldFreshnessClockBeforeTheSupervisorDecides() {
-        // S14-37-a: the success run is (detector generation, walk epoch); a failure of another run
-        // must not be timed from the previous run's last output. S14-36 moved the once-per-run re-arm
-        // into the supervisor (DetectorRuntimeSupervisorTest.aNewRunReArmsTheClockOnceAndLaterEventsOfTheRunKeepIt),
-        // so the failure and every output carry the same run key.
-        val failure = activity.substringAfter("private fun handleDetectorRuntimeFailure(")
-            .substringBefore("private fun disableDetectorAfterRuntimeFailure(")
-        assertTrue(
-            ReportStaticSourceInspector.appearsInOrder(
-                failure,
-                "if (!isCurrentFrameGeneration(expectedDetectorGeneration, expectedWalkEpoch)) return",
-                "val detectorRun = expectedDetectorGeneration to expectedWalkEpoch",
-                "detectorRuntimeSupervisor.onFailure(",
-                "run = detectorRun,",
-            ),
-        )
-        assertTrue(
-            Regex(
-                "DetectorWorkClaim\\(\\s*(detectorFrameGeneration|generation), expectedWalkEpoch, (detectorTicket|pacingTicket),",
-            ).findAll(activity).count() == 2,
-        )
-        // A reset is never a success: stale generations disarm instead of recording onSuccess().
-        assertTrue(!activity.contains("detectorRuntimeSupervisor.onSuccess("))
+    @Test fun failureInARunWithoutItsOwnSuccessDisarmsTheOldFreshnessClockBeforeTheSupervisorDecides() {
+        val failure = MainActivityRefactorSource.member(lifecycle, "runtimeFailure")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(failure,
+            "if (!currentness.frameIsCurrent(generation, epoch)) return", "val run = generation to epoch",
+            "supervisor.onFailure(", "elapsedRealtimeMs(), run"))
+        assertTrue(ar.contains("DetectorWorkClaim(work.generation, work.epoch, work.ticket)"))
+        assertTrue(fallback.contains("DetectorWorkClaim(detectorGeneration, expectedEpoch, ticket)"))
+        assertFalse(lifecycle.contains("supervisor.onSuccess("))
+        assertFalse(main.contains("detectorRuntimeSupervisor.onSuccess("))
     }
+
+    private fun code(value: String): String = ReportStaticSourceInspector.maskNonCode(value).filterNot(Char::isWhitespace)
 }

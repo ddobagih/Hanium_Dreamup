@@ -133,9 +133,10 @@ try:
     )
     from fastapi import HTTPException
     from fastapi.params import Param
-    from backend.app.api import reports
+    from backend.app.api import reports as reports_api
+    from backend.app.services import report_export as reports
     phase = "router"
-    router = reports.create_router(
+    router = reports_api.create_router(
         SimpleNamespace(admin_security_enabled=False, field_test_security_enabled=False),
         object(),
     )
@@ -153,14 +154,24 @@ try:
     class Database:
         def __init__(self):
             self.calls = 0
-        def scalars(self, statement):
+            self.closed = 0
+        def records(self):
+            return [record]
+        def close_result(self):
+            self.closed += 1
+        def execute(self, statement):
+            assert statement.get_execution_options()["yield_per"] == 1
+            assert "CASE WHEN" in str(statement)
             with lock:
                 self.calls += 1
                 if self.calls == 2:
                     entered.set()
             if not release.wait(4):
                 raise RuntimeError("owned export fixture gate timed out")
-            return SimpleNamespace(all=lambda: [record])
+            return SimpleNamespace(
+                mappings=lambda: (vars(item) for item in self.records()),
+                close=self.close_result,
+            )
     database = Database()
     record = SimpleNamespace(
         id=uuid.UUID("00000000-0000-4000-8000-000000000001"),
@@ -259,9 +270,8 @@ try:
                 self.committed = {}
                 self.rollbacks = 0
 
-            def scalars(self, statement):
-                selected_rows = super().scalars(statement)
-                return SimpleNamespace(all=lambda: [] if empty_rows else selected_rows.all())
+            def records(self):
+                return [] if empty_rows else super().records()
 
             def add(self, value):
                 events.append("audit_add")
@@ -453,10 +463,12 @@ try:
         )
 
         class AgencyDatabase(Database):
-            def scalars(self, statement):
-                self.calls += 1
+            def execute(self, statement):
                 assert statement._limit_clause.value == reports.MAX_REPORT_AGENCY_EXPORT_SCAN_ROWS + 1
-                return SimpleNamespace(all=lambda: [record] * count)
+                return super().execute(statement)
+
+            def records(self):
+                return (record for _ in range(count))
 
         database = AgencyDatabase()
         changes = {"db": database, "profile": "agency", "format": "csv", "manifest": True, "bundle": True}
@@ -514,6 +526,7 @@ try:
             assert row["review_note"] == "=2+2"
             if mode == "geojson":
                 assert body["features"][0]["geometry"]["coordinates"] == [127.125, 37.125]
+    assert database.closed == database.calls
     assert attempts == {"database": 0, "network": 0}
     print(json.dumps({"ok": True, "mode": mode, "attempts": attempts}))
 except BaseException as error:

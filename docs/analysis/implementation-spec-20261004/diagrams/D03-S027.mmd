@@ -1,0 +1,17 @@
+stateDiagram-v2
+  state "S-D03-027-01 대기" as idle
+  state "S-D03-027-02 요청중" as request
+  state "S-D03-027-03 archive검증" as archive
+  state "S-D03-027-04 설치" as installed
+  state "S-D03-027-05 거부" as refused
+  state "S-D03-027-06 취소" as cancelled
+  [*] --> idle
+  idle --> request: explicit start and all gates
+  request --> archive: valid response and current connected location
+  archive --> installed: save checked and current connected location again
+  request --> refused: transport or validation or location failure
+  archive --> refused: storage failure or disconnected current fix
+  request --> cancelled: generation or session invalidated
+  archive --> cancelled: response token invalidated
+  installed --> request: explicit replacement preserves installed route
+  refused --> request: explicit retry

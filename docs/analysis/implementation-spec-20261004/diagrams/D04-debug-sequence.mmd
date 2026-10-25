@@ -1,0 +1,28 @@
+sequenceDiagram
+  participant UI as Debug Outdoor Activity
+  participant Trace as D06 trace recorder
+  participant Raw as Raw recorder
+  participant Writer as Bounded writer thread
+  participant Native as Native GNSS
+  UI->>UI: preview gate 및 explicit start
+  UI->>Trace: start local binding / trace lease
+  UI->>Raw: start async
+  Raw->>Writer: private part open / header write flush
+  Writer-->>Raw: opened token
+  Raw->>Native: register measurements
+  Native-->>Raw: registration success
+  Raw-->>UI: start true and current identity
+  UI->>UI: same readiness generation / step reset / ready
+  Native-->>Raw: raw epoch
+  Raw->>Writer: copied batch if current token and budget
+  UI->>Trace: ready일 때만 위치·step·checkpoint
+  UI->>UI: onPause 또는 stop / ready false·generation 증가
+  UI->>Raw: stop
+  Raw->>Writer: invalidate admission then drain
+  Raw->>Native: unregister
+  Writer->>Writer: footer·flush·close·성공 시 final name
+  Writer-->>Raw: closed result
+  Raw-->>UI: stop complete
+  UI->>Trace: stop trace AFTER Raw close
+  Trace-->>UI: completed 또는 pending finalization
+  UI->>UI: 명시 SAF export 그리고 onResume 자동재시작 없음

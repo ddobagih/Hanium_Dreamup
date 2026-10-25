@@ -1,0 +1,19 @@
+flowchart TD
+ A["F-D10-027 결정 CSV 읽기"] --> B["P-D10-022 ID · decision · manual class2 boxes · remove yes 검사"]
+ B --> C["applied 및 blocked CSV 작성"]
+ C --> D{"pending 또는 blocked 존재"}
+ D -- "예" --> P["pending_decisions · build 안 함 · exit 0"]
+ D -- "아니오" --> E{"build 옵션"}
+ E -- "없음" --> Q["ready_to_build_not_run · exit 0"]
+ E -- "있음" --> F{"reset 옵션 및 기존 target"}
+ F -- "예" --> G["P-D10-020 target rmtree · broad guard 없음"]
+ F -- "아니오" --> H["data.yaml 생성"]
+ G --> H
+ H --> I["source split의 이미지 순회"]
+ I --> J{"image path에 exclude 결정"}
+ J -- "예" --> K["manifest excluded 기록 · 이미지 제외"]
+ J -- "아니오" --> L["accept 유지 · fix 교체 · remove 삭제 · add 추가"]
+ L --> M["이미지 symlink 또는 copy · 새 label"]
+ K --> N["manifest 및 built summary"]
+ M --> N
+ N --> Z["exit 0 · 학습은 실행하지 않음"]

@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D13-044<br/>출처 유형별 학습 동의 admission"]
+  P["P-D13-044<br/>별도 report-original 분기는동의규칙에존재하지만이도메인 datasetpromotion<br/>모든원본은 RAWcollection 이다."]
+  A --> P
+  N0["1. sourcekind 가허용집합인지검사한다."]
+  P --> N0
+  N1["2. subjectsharedfence 를잡고 tombstone 존재시 false 를반환한다."]
+  N0 --> N1
+  N2["3. 계정최신 consentevent 를조회한다."]
+  N1 --> N2
+  N3["4. currentconsent 와 training=true 를요구하고<br/>WALK_RAW_DIAGNOSTIC 일때만 raw=true 도요구한다."]
+  N2 --> N3
+  Z["일반서비스이용을막는동의가아니라학습진입만판정. 현재 dataset 원본은 RAWcollection 경로."]
+  N3 --> Z
+  B0{"REPORT_ORIGINAL 이고 raw=false,training=true,current"}
+  P -. "예외 조건 검사" .-> B0
+  B0 -- "조건 성립" --> X0["동의값만으로허용"]
+  B1{"WALK_RAW_DIAGNOSTIC 이고 raw=false"}
+  P -. "예외 조건 검사" .-> B1
+  B1 -- "조건 성립" --> X1["false"]
+  B2{"unknownkind"}
+  P -. "예외 조건 검사" .-> B2
+  B2 -- "조건 성립" --> X2["ValueError"]
+  B3{"tombstone/consent 없음/oldversion"}
+  P -. "예외 조건 검사" .-> B3
+  B3 -- "조건 성립" --> X3["false"]
+  R["재시도: 자동 반복 루프 없음. 호출자가 오류와 현재 상태를 확인 후 재호출.<br/>복구: 동일 요청의 재생 또는 전용 복구 기능이 있는 경우 steps/branches 에 명시."]
+  Z -. "호출자 또는 복구 경로" .-> R
+  C["취소 경계: 별도 취소 진입점 없음."]
+  A -. "취소 API 여부" .-> C

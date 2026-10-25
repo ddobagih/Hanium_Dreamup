@@ -1,0 +1,27 @@
+flowchart TD
+  A["F-D04-010 · P-D04-010<br/>RV unavailable·stale·허용 오류 또는 poor 근거 만료"]
+  P{"fresh explicit poor RV가 500ms 안인가"}
+  BLOCK["QUALITY_LOW 유지; 대체 차단"]
+  G{"gravity와 magnetic pair gate 통과"}
+  M{"paired raw accel가 없거나 residual 3 이하인가"}
+  GR["gravity magnetic 방위<br/>motion check 부재 여부를 품질로 표시"]
+  ALLOW{"gravity 실패가 accel 대체 허용 reason인가"}
+  C{"200ms 창 독립3개·tilt10도 및 field gate 통과"}
+  AC["steady accel magnetic 방위"]
+  NO["방위 없음과 gate reason"]
+  OUT["source·quality·원 시각·episode 출력<br/>숫자 heading error 없음; strict PDR와 분리"]
+  RV["정상 nonsuspect RV 복귀 → episode 해제"]
+  A --> P
+  P -->|"예"| BLOCK
+  P -->|"아니오"| G
+  G -->|"예"| M
+  G -->|"아니오"| ALLOW
+  M -->|"예"| GR
+  M -->|"아니오"| NO
+  ALLOW -->|"예"| C
+  ALLOW -->|"아니오"| NO
+  C -->|"예"| AC
+  C -->|"아니오"| NO
+  GR --> OUT
+  AC --> OUT
+  OUT -->|"후속 RV 입력"| RV

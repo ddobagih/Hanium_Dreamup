@@ -79,6 +79,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
     private data class PendingDelivery(
         val action: NonMetricObstacleAdvisoryAction,
         val state: DeliveryState,
+        val sourceCurrent: Boolean = true,
     )
 
     private val sightings = mutableMapOf<String, Sighting>()
@@ -158,7 +159,14 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
         val stableKeys = stable.mapTo(hashSetOf(), Observation::key)
         queuedAdvisories.removeAll { it.observation.key !in stableKeys }
         pendingDelivery?.let { pending ->
-            if (pending.action.key !in stableKeys) pendingDelivery = null
+            if (pending.action.key !in stableKeys) {
+                // Source loss blocks a new START, but does not erase an actual speech DONE.
+                // Keep claimed ownership until its terminal callback; a later sighting cannot
+                // revive the old start permission or reserve speech while it is still playing.
+                pendingDelivery = if (pending.state == DeliveryState.CLAIMED) {
+                    pending.copy(sourceCurrent = false)
+                } else null
+            }
         }
         stable.forEach { observation ->
             val queued = queuedAdvisories.firstOrNull { it.observation.key == observation.key }
@@ -192,14 +200,19 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
     @Synchronized
     fun claimDelivery(action: NonMetricObstacleAdvisoryAction): Boolean {
         val pending = pendingDelivery ?: return false
-        if (pending.action != action || pending.state != DeliveryState.RESERVED) return false
+        if (pending.action !== action || pending.state != DeliveryState.RESERVED) return false
         pendingDelivery = pending.copy(state = DeliveryState.CLAIMED)
         return true
     }
 
     @Synchronized
     fun isDeliveryCurrent(action: NonMetricObstacleAdvisoryAction): Boolean =
-        pendingDelivery?.action == action
+        pendingDelivery?.let { it.action === action && it.sourceCurrent } == true
+
+    /** Terminal ownership only. Actual DONE can follow start expiry or loss of the observation. */
+    @Synchronized
+    fun hasClaimedDelivery(action: NonMetricObstacleAdvisoryAction): Boolean =
+        pendingDelivery?.let { it.action === action && it.state == DeliveryState.CLAIMED } == true
 
     @Synchronized
     fun confirmDelivery(
@@ -207,7 +220,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
         deliveredAtMs: Long = action.observedAtMs,
     ): Boolean {
         val pending = pendingDelivery ?: return false
-        if (pending.action != action || pending.state != DeliveryState.CLAIMED) return false
+        if (pending.action !== action || pending.state != DeliveryState.CLAIMED) return false
         val confirmedAtMs = deliveredAtMs.coerceAtLeast(action.observedAtMs)
         pendingDelivery = null
         lastGlobalDeliveryAtMs = confirmedAtMs
@@ -218,7 +231,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
     @Synchronized
     fun rejectDelivery(action: NonMetricObstacleAdvisoryAction): Boolean {
         val pending = pendingDelivery ?: return false
-        if (pending.action != action) return false
+        if (pending.action !== action) return false
         pendingDelivery = null
         return true
     }

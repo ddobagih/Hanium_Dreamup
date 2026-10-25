@@ -10,6 +10,7 @@ import pytest
 from fastapi import HTTPException
 
 from backend.app.api import reports
+from backend.app.services import report_application, report_commit
 from backend.app.field_test_security import (
     FieldTestAccess,
     VerifiedActorAssertion,
@@ -28,10 +29,10 @@ IMAGE_BYTES = b"jpeg-bytes"
 NOW = datetime(2026, 8, 29, 1, 2, 3, tzinfo=UTC)
 
 
-def _contract() -> reports.ReportTransportContract:
-    return reports.ReportTransportContract(
+def _contract() -> report_application.ReportTransportContract:
+    return report_application.ReportTransportContract(
         report_id=REPORT_ID,
-        payload_sha256=reports.report_transport_payload_sha256(
+        payload_sha256=report_application.report_transport_payload_sha256(
             REPORT_ID,
             METADATA_BYTES,
             IMAGE_BYTES,
@@ -71,39 +72,39 @@ def _persist(
         SimpleNamespace(id=value) for value in (duplicate_ids or [])
     ]
     monkeypatch.setattr(
-        reports,
+        report_application,
         "_privacy_report_binding",
         lambda **_kwargs: (SUBJECT, 7),
     )
     monkeypatch.setattr(
-        reports,
+        report_application,
         "lock_report_ingest_transaction",
         lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
-        reports,
+        report_application,
         "_report_transport_replay",
         lambda *_args, **_kwargs: writes[0] if writes else None,
     )
     monkeypatch.setattr(
-        reports,
+        report_application,
         "lock_duplicate_candidate_window",
         lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
-        reports,
+        report_application,
         "find_duplicate_candidates_v2",
         lambda *_args, **_kwargs: duplicate_candidates,
     )
     monkeypatch.setattr(
-        reports,
+        report_application,
         "find_active_auto_report_cooldown",
         lambda *_args, **_kwargs: pytest.fail(
             "transport reports must not use cooldown as idempotency"
         ),
     )
     monkeypatch.setattr(
-        reports,
+        report_application,
         "_idempotent_report_replay",
         lambda *_args, **_kwargs: pytest.fail(
             "transport reports must not use inferred replay"
@@ -115,14 +116,14 @@ def _persist(
         report.updated_at = NOW
         writes.append(report)
 
-    monkeypatch.setattr(reports, "_commit_new_report_with_image", commit)
+    monkeypatch.setattr(report_application, "_commit_new_report_with_image", commit)
     settings = SimpleNamespace(
         field_test_security_enabled=False,
         upload_dir=Path("/tmp/walksafe-report-transport-tests"),
         maintenance_lock_path=None,
         maintenance_lock_group_gid=None,
     )
-    response = reports._persist_v2_report(
+    response = report_application._persist_v2_report(
         SimpleNamespace(rollback=lambda: None),  # type: ignore[arg-type]
         parsed=_metadata(),
         content=IMAGE_BYTES,
@@ -146,7 +147,7 @@ def test_payload_digest_uses_exact_framing_and_bytes() -> None:
         + IMAGE_BYTES
     ).hexdigest()
 
-    assert reports.report_transport_payload_sha256(
+    assert report_application.report_transport_payload_sha256(
         REPORT_ID,
         METADATA_BYTES,
         IMAGE_BYTES,
@@ -154,10 +155,10 @@ def test_payload_digest_uses_exact_framing_and_bytes() -> None:
 
 
 def test_zero_headers_is_legacy_and_partial_headers_fail() -> None:
-    assert reports._resolve_report_transport_contract(None, None, None) is None
+    assert report_application._resolve_report_transport_contract(None, None, None) is None
 
     with pytest.raises(HTTPException) as captured:
-        reports._resolve_report_transport_contract(str(REPORT_ID), None, None)
+        report_application._resolve_report_transport_contract(str(REPORT_ID), None, None)
     assert captured.value.status_code == 422
     assert captured.value.detail["code"] == "report_transport_headers_incomplete"
 
@@ -176,7 +177,7 @@ def test_transport_headers_require_canonical_values(
     payload_bytes: str,
 ) -> None:
     with pytest.raises(HTTPException) as captured:
-        reports._resolve_report_transport_contract(
+        report_application._resolve_report_transport_contract(
             report_id,
             payload_sha256,
             payload_bytes,
@@ -187,19 +188,19 @@ def test_transport_headers_require_canonical_values(
 def test_declared_hash_or_bytes_mismatch_is_rejected_before_persistence() -> None:
     contract = _contract()
     for invalid in (
-        reports.ReportTransportContract(
+        report_application.ReportTransportContract(
             REPORT_ID,
             "f" * 64,
             contract.payload_bytes,
         ),
-        reports.ReportTransportContract(
+        report_application.ReportTransportContract(
             REPORT_ID,
             contract.payload_sha256,
             contract.payload_bytes + 1,
         ),
     ):
         with pytest.raises(HTTPException) as captured:
-            reports._validate_report_transport_payload(
+            report_application._validate_report_transport_payload(
                 invalid,
                 metadata_bytes=METADATA_BYTES,
                 image_bytes=IMAGE_BYTES,
@@ -227,7 +228,7 @@ def test_fixed_id_persists_one_random_marker_and_replays_same_receipt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     first, writes = _persist(monkeypatch)
-    second = reports._persist_v2_report(
+    second = report_application._persist_v2_report(
         SimpleNamespace(rollback=lambda: None),  # type: ignore[arg-type]
         parsed=_metadata(),
         content=IMAGE_BYTES,
@@ -255,11 +256,21 @@ class _ReplaySession:
     def __init__(self, existing: Report | None) -> None:
         self.existing = existing
         self.executed: list[object] = []
+        self.selected: list[object] = []
         self.rollback_count = 0
 
     def execute(self, statement: object, *_args: object, **_kwargs: object) -> object:
         self.executed.append(statement)
         return object()
+
+    def scalar(self, statement):
+        description, = statement.column_descriptions
+        assert description["expr"] is Report
+        report_id = statement.compile().params["id_1"]
+        sql = str(statement)
+        assert "NOT (EXISTS (" in sql and "account_deletion_tombstones" in sql
+        self.selected.append(statement)
+        return self.existing if self.existing is not None and self.existing.id == report_id else None
 
     def get(self, _model: object, _key: object) -> Report | None:
         return self.existing
@@ -285,13 +296,14 @@ def test_id_lock_replay_requires_same_payload_and_privacy_binding() -> None:
     existing = _existing_transport_report()
     db = _ReplaySession(existing)
 
-    assert reports._report_transport_replay(
+    assert report_application._report_transport_replay(
         db,  # type: ignore[arg-type]
         contract=_contract(),
         privacy_subject=SUBJECT,
         account_generation=7,
     ) is existing
     assert len(db.executed) == 1
+    assert len(db.selected) == 1
 
     for conflict in (
         _existing_transport_report(client_payload_sha256="f" * 64),
@@ -300,7 +312,7 @@ def test_id_lock_replay_requires_same_payload_and_privacy_binding() -> None:
     ):
         conflict_db = _ReplaySession(conflict)
         with pytest.raises(HTTPException) as captured:
-            reports._report_transport_replay(
+            report_application._report_transport_replay(
                 conflict_db,  # type: ignore[arg-type]
                 contract=_contract(),
                 privacy_subject=SUBJECT,
@@ -321,10 +333,10 @@ def test_secured_auto_report_stale_replay_succeeds_but_new_id_is_rejected(
     )
     metadata_bytes = parsed.model_dump_json(exclude_none=True).encode("utf-8")
 
-    def contract_for(report_id: uuid.UUID) -> reports.ReportTransportContract:
-        return reports.ReportTransportContract(
+    def contract_for(report_id: uuid.UUID) -> report_application.ReportTransportContract:
+        return report_application.ReportTransportContract(
             report_id=report_id,
-            payload_sha256=reports.report_transport_payload_sha256(
+            payload_sha256=report_application.report_transport_payload_sha256(
                 report_id, metadata_bytes, IMAGE_BYTES,
             ),
             payload_bytes=len(metadata_bytes) + len(IMAGE_BYTES),
@@ -339,20 +351,20 @@ def test_secured_auto_report_stale_replay_succeeds_but_new_id_is_rejected(
     db = _ReplaySession(existing)
     settings = get_settings()
     monkeypatch.setattr(settings, "field_test_security_enabled", True)
-    monkeypatch.setattr(reports, "_privacy_report_binding", lambda **_kwargs: (SUBJECT, 7))
+    monkeypatch.setattr(report_application, "_privacy_report_binding", lambda **_kwargs: (SUBJECT, 7))
     ingest_locks: list[bool] = []
     monkeypatch.setattr(
-        reports,
+        report_application,
         "lock_report_ingest_transaction",
         lambda *_args, **kwargs: ingest_locks.append(kwargs["automatic_reporting"]),
     )
-    monkeypatch.setattr(reports, "_field_creation_response", lambda report, *, creation_outcome: report)
+    monkeypatch.setattr(report_application, "_field_creation_response", lambda report, *, creation_outcome: report)
 
-    def persist(contract: reports.ReportTransportContract) -> object:
-        reports._validate_report_transport_payload(
+    def persist(contract: report_application.ReportTransportContract) -> object:
+        report_application._validate_report_transport_payload(
             contract, metadata_bytes=metadata_bytes, image_bytes=IMAGE_BYTES,
         )
-        return reports._persist_v2_report(
+        return report_application._persist_v2_report(
             db,  # type: ignore[arg-type]
             parsed=parsed,
             content=IMAGE_BYTES,
@@ -397,7 +409,7 @@ def test_legacy_response_remains_valid_without_transport_headers(
     legacy.client_payload_bytes = None
     legacy.persistence_marker = None
 
-    response = reports._field_creation_response(legacy, creation_outcome="CREATED")
+    response = report_application._field_creation_response(legacy, creation_outcome="CREATED")
 
     assert response.id == str(REPORT_ID)
     assert response.transport_receipt is None
@@ -419,7 +431,7 @@ def test_status_is_field_scoped_and_missing_or_wrong_actor_is_hidden() -> None:
     request = SimpleNamespace(
         state=SimpleNamespace(verified_actor_assertion=verified),
     )
-    assert reports._report_transport_status_actor(
+    assert report_application._report_transport_status_actor(
         request,
         actor_header="field@example.com",
         account_generation_header="7",
@@ -428,7 +440,7 @@ def test_status_is_field_scoped_and_missing_or_wrong_actor_is_hidden() -> None:
 
     for actor in (None, "other@example.com"):
         with pytest.raises(HTTPException) as captured:
-            reports._report_transport_status_actor(
+            report_application._report_transport_status_actor(
                 request,
                 actor_header=actor,
                 account_generation_header="7",
@@ -446,7 +458,7 @@ def test_response_loss_status_projection_returns_only_the_same_receipt() -> None
         persistence_marker=MARKER_ID,
     )
 
-    status = reports._report_transport_status_response(row)
+    status = report_application._report_transport_status_response(row)
     body = status.model_dump(mode="json")
 
     assert body == {
@@ -467,7 +479,7 @@ def test_response_loss_status_projection_returns_only_the_same_receipt() -> None
         "duplicate_count",
     }.isdisjoint(body)
 
-    statement = reports._report_transport_status_statement(
+    statement = report_application._report_transport_status_statement(
         REPORT_ID,
         privacy_subject=SUBJECT,
         account_generation=7,
@@ -545,7 +557,8 @@ def test_postcommit_outcomes_preserve_confirmed_receipt_and_failure_boundaries(
         with pytest.raises(ValidationError) as invalid_response:
             reports.ReportResponse.model_validate({})
         fault = invalid_response.value
-    caplog.set_level(logging.WARNING, logger=reports.__name__)
+    for owner in (report_application, report_commit):
+        caplog.set_level(logging.WARNING, logger=owner.__name__)
 
     class FakeSession:
         def __init__(self):
@@ -559,6 +572,15 @@ def test_postcommit_outcomes_preserve_confirmed_receipt_and_failure_boundaries(
 
         def execute(self, *_args, **_kwargs):
             return object()
+
+        def scalar(self, statement):
+            description, = statement.column_descriptions
+            assert description["expr"] is Report
+            report_id = statement.compile().params["id_1"]
+            assert report_id == REPORT_ID
+            sql = str(statement)
+            assert "NOT (EXISTS (" in sql and "account_deletion_tombstones" in sql
+            return self.get(Report, report_id)
 
         def get(self, model, _key):
             value = self.committed.get(model)
@@ -614,16 +636,16 @@ def test_postcommit_outcomes_preserve_confirmed_receipt_and_failure_boundaries(
             material=bytes(range(32)),
         ),
     )
-    monkeypatch.setattr(reports, "_privacy_report_binding", lambda **_kwargs: (SUBJECT, 7))
-    monkeypatch.setattr(reports, "lock_report_ingest_transaction", lambda *_a, **_kw: None)
-    monkeypatch.setattr(reports, "_assert_report_precommit_active", lambda *_a, **_kw: None)
-    monkeypatch.setattr(reports, "lock_duplicate_candidate_window", lambda *_a, **_kw: None)
-    monkeypatch.setattr(reports, "find_duplicate_candidates_v2", lambda *_a, **_kw: [])
+    monkeypatch.setattr(report_application, "_privacy_report_binding", lambda **_kwargs: (SUBJECT, 7))
+    monkeypatch.setattr(report_application, "lock_report_ingest_transaction", lambda *_a, **_kw: None)
+    monkeypatch.setattr(report_application, "_assert_report_precommit_active", lambda *_a, **_kw: None)
+    monkeypatch.setattr(report_application, "lock_duplicate_candidate_window", lambda *_a, **_kw: None)
+    monkeypatch.setattr(report_application, "find_duplicate_candidates_v2", lambda *_a, **_kw: [])
 
     real_remove = report_storage.remove_image_file
     real_rmdir = Path.rmdir
-    real_complete = reports.complete_report_image_write
-    real_response = reports._field_creation_response
+    real_complete = report_commit.complete_report_image_write
+    real_response = report_application._field_creation_response
 
     def remove_with_fault(path):
         if path == journal_path and failure_point == "journal-unlink":
@@ -660,8 +682,8 @@ def test_postcommit_outcomes_preserve_confirmed_receipt_and_failure_boundaries(
 
     monkeypatch.setattr(report_storage, "remove_image_file", remove_with_fault)
     monkeypatch.setattr(Path, "rmdir", rmdir_with_fault)
-    monkeypatch.setattr(reports, "complete_report_image_write", complete_with_fault)
-    monkeypatch.setattr(reports, "_field_creation_response", response_with_ready_fields)
+    monkeypatch.setattr(report_commit, "complete_report_image_write", complete_with_fault)
+    monkeypatch.setattr(report_application, "_field_creation_response", response_with_ready_fields)
 
     settings = get_settings()
     for name, value in {
@@ -700,7 +722,7 @@ def test_postcommit_outcomes_preserve_confirmed_receipt_and_failure_boundaries(
         "x-walksafe-actor-id": "field@example.com",
         "x-walksafe-account-generation": "7",
         "x-walksafe-report-id": str(REPORT_ID),
-        "x-walksafe-report-payload-sha256": reports.report_transport_payload_sha256(
+        "x-walksafe-report-payload-sha256": report_application.report_transport_payload_sha256(
             REPORT_ID, metadata_bytes, image_bytes,
         ),
         "x-walksafe-report-payload-bytes": str(len(metadata_bytes) + len(image_bytes)),
@@ -727,7 +749,7 @@ def test_postcommit_outcomes_preserve_confirmed_receipt_and_failure_boundaries(
     committed = db.committed.get(Report)
     second = submit() if committed is not None else None
     projection = (
-        reports._report_transport_status_response(committed).model_dump(mode="json")
+        report_application._report_transport_status_response(committed).model_dump(mode="json")
         if committed is not None else None
     )
     print(json.dumps({
@@ -806,9 +828,9 @@ def test_postcommit_outcomes_preserve_confirmed_receipt_and_failure_boundaries(
     if second is not None:
         assert second.status_code == 201, second.text
         assert second.json()["transport_receipt"] == projection["transport_receipt"]
-        assert reports._report_transport_replay(
+        assert report_application._report_transport_replay(
             db,
-            contract=reports.ReportTransportContract(
+            contract=report_application.ReportTransportContract(
                 REPORT_ID,
                 headers["x-walksafe-report-payload-sha256"],
                 len(metadata_bytes) + len(image_bytes),
@@ -824,7 +846,7 @@ def test_postcommit_outcomes_preserve_confirmed_receipt_and_failure_boundaries(
         "cleanup-runtimeerror": ["report_postcommit_journal_cleanup_failed"],
         "response-validation": ["report_postcommit_response_failed"],
     }.get(failure_point, [])
-    records = [record for record in caplog.records if record.name == reports.__name__]
+    records = [record for record in caplog.records if record.name in {report_application.__name__, report_commit.__name__}]
     assert [record.getMessage() for record in records] == expected_warnings
     assert all(record.levelno == logging.WARNING for record in records)
     assert all(record.exc_info is None and not record.args for record in records)

@@ -1,0 +1,26 @@
+flowchart TD
+    A["F-D07-028<br/>실측 신체·예상 지면 등록과 한 점 간격 helper<br/>상태 UNCONNECTED"]
+    P0["명시 측정 body ground 오차 provenance 등록"]
+    A --> D
+    P1["exact owner reference capture를 bind"]
+    P0 --> P1
+    P2["actual own depthcell을 body로 역투영"]
+    P1 --> P2
+    P3["한 점 거리와 보수적 error interval 반환"]
+    P2 --> P3
+    D{"P-D07-028<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["등록/capture/clearance 거절"]
+    D -->|"측정값/오차/provenance 없음"| B0
+    B1["등록 또는 capture retire"]
+    D -->|"owner/reference 변경"| B1
+    B2["point-only bounds 반환; 실제 runtime 연결 없음"]
+    D -->|"동일 capture own cell 모든 증거 충족"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    N["Main 실행 연결 없음<br/>직접 API와 시험 기대만"]
+    A -.-> N
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

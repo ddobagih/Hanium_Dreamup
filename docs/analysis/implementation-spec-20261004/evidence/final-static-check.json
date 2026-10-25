@@ -1,0 +1,14 @@
+{
+  "checked_at": "2026-10-04T11:49:51.097423+09:00",
+  "domains": 16,
+  "features": 610,
+  "policies": 552,
+  "events": 992,
+  "threshold_entries": 1390,
+  "unique_referenced_source_files": 668,
+  "test_expectation_links": 489,
+  "diagrams": 766,
+  "svg_xml_valid": 766,
+  "errors": [],
+  "product_tests_executed": 0
+}

@@ -14,9 +14,13 @@ class InterFrameDetectionTracker(
     private val config: VisualTrackingConfig = VisualTrackingConfig(),
     private val clockNanos: () -> Long = System::nanoTime,
 ) {
+    private var estimatorOverride: VisualMotionEstimator? = null
+    internal constructor(config: VisualTrackingConfig, clockNanos: () -> Long, estimator: VisualMotionEstimator) :
+        this(config, clockNanos) { estimatorOverride = estimator }
+
     private val history = ArrayDeque<GrayTrackingFrame>()
     private val estimator: VisualMotionEstimator by lazy {
-        when (config.backend) {
+        estimatorOverride ?: when (config.backend) {
             VisualTrackingBackend.OPENCV_PYRAMIDAL_LK -> OpenCvPyramidalMotionEstimator(config.maxFeaturesPerObject, config.allowSimilarityTransform)
             VisualTrackingBackend.PATCH_DIAGNOSTIC -> PatchMotionEstimator(minOf(config.maxFeaturesPerObject, 16))
         }
@@ -26,6 +30,11 @@ class InterFrameDetectionTracker(
     private var acceptedGeometryVersion: Long? = null
     private var acceptedDimensions: FrameDimensions? = null
     private var coverageCursor = 0
+    /** Ownership is by token identity so a late worker cannot release a later reservation. */
+    class PendingSourceLease internal constructor(val sourceKey: VisualFrameKey)
+
+    private var pendingSourceLease: PendingSourceLease? = null
+    private var publishedSourceLease: PendingSourceLease? = null
 
     @Synchronized
     fun initialize(): Boolean = estimator.initialize()
@@ -34,7 +43,42 @@ class InterFrameDetectionTracker(
     fun clear() {
         history.clear()
         batch = null
+        pendingSourceLease = null
+        publishedSourceLease = null
         coverageCursor = 0
+    }
+
+    /** Reserves one in-flight source independently of the latest completed publication. */
+    @Synchronized
+    fun reservePendingSourceFrame(sourceKey: VisualFrameKey): PendingSourceLease? {
+        val current = history.lastOrNull()?.key ?: return null
+        expireSourceLeases(current)
+        if (pendingSourceLease != null || history.none { it.key == sourceKey } ||
+            !withinDetectionAge(sourceKey, current)) return null
+        return PendingSourceLease(sourceKey).also { pendingSourceLease = it }
+    }
+
+    /** Called only when the matching worker publishes its completed snapshot, never for partials. */
+    @Synchronized
+    fun publishPendingSourceFrame(lease: PendingSourceLease): Boolean {
+        val current = history.lastOrNull()?.key ?: return false
+        expireSourceLeases(current)
+        if (pendingSourceLease !== lease) return false
+        val sourceKey = lease.sourceKey
+        val published = publishedSourceLease?.sourceKey
+        if (history.none { it.key == sourceKey } || !withinDetectionAge(sourceKey, current) ||
+            (published != null && published.cameraTimestampNs > sourceKey.cameraTimestampNs)) return false
+        publishedSourceLease = lease
+        pendingSourceLease = null
+        return true
+    }
+
+    /** Cancellation affects only this worker's pending ownership, never a completed publication. */
+    @Synchronized
+    fun releasePendingSourceFrame(lease: PendingSourceLease): Boolean {
+        if (pendingSourceLease !== lease) return false
+        pendingSourceLease = null
+        return true
     }
 
     @Synchronized
@@ -77,9 +121,7 @@ class InterFrameDetectionTracker(
         acceptedEpoch = frame.key.epoch
         acceptedGeometryVersion = frame.key.geometryVersion
         acceptedDimensions = FrameDimensions(frame.width, frame.height, frame.sourceWidth, frame.sourceHeight)
-        while (history.size > config.maxHistoryFrames ||
-            frame.key.capturedAtElapsedRealtimeMs - history.first().key.capturedAtElapsedRealtimeMs > config.maxHistoryAgeMs
-        ) history.removeFirst()
+        trimHistory(frame.key)
         return TrackingFrameAdmission(true, reset)
     }
 
@@ -159,6 +201,36 @@ class InterFrameDetectionTracker(
             val frozen = detections.map { it.copy(polygonNorm = it.polygonNorm.toList()) }
             val selectedIndexes = selectTrackingIndexes(frozen, uprightQuarterTurns, prioritySourceIndices)
             val initialIndexes = selectedIndexes.take(config.maxTrackedObjects).toSet()
+            // Retain only bounded point descriptors, never the old batch's feature/image buffers.
+            val handoffs = if (completed && previous?.completed == true &&
+                previous.uprightQuarterTurns == uprightQuarterTurns && withinDetectionAge(previous.sourceKey, targetKey)
+            ) previous.states.mapIndexedNotNull { index, state ->
+                val point = state.materialPoint ?: return@mapIndexedNotNull null
+                if (!state.admitted || state.failure != null || state.quality < MATERIAL_POINT_MIN_QUALITY ||
+                    frames.indexOfFirst { it.key == state.lastKey } !in sourceIndex..targetIndex
+                ) return@mapIndexedNotNull null
+                val geometry = transform(previous.detections[index], state.transform)
+                if (!contains(geometry, Point2(point.x / frames[sourceIndex].width, point.y / frames[sourceIndex].height))) {
+                    return@mapIndexedNotNull null
+                }
+                val norm = Point2(point.x / frames[sourceIndex].width, point.y / frames[sourceIndex].height)
+                // A missing descriptor is not evidence that an old same-class owner disappeared.
+                // Freeze this proof while the entire previous batch is still available. Single-class
+                // handoffs retain their existing contract and do not require this additional proof.
+                val repeatedClassOwnershipProven = previous.states.indices.none { other ->
+                    if (other == index) false else {
+                        val peer = previous.states[other]
+                        val sameClass = previous.detections[other].className == geometry.className
+                        (sameClass && (!peer.admitted || peer.failure != null ||
+                            peer.quality < MATERIAL_POINT_MIN_QUALITY || peer.features == null ||
+                            peer.originalCount < 6 || peer.lastKey != state.lastKey)) ||
+                            (peer.failure == null && (peer.lastKey != state.lastKey ||
+                                contains(transform(previous.detections[other], peer.transform), norm)))
+                    }
+                }
+                PointHandoff(state.lastKey, geometry, point, repeatedClassOwnershipProven,
+                    previous.sourceKey, index, previous.detections[index], state.transform)
+            }.take(config.maxTrackedObjects).toMutableList() else mutableListOf()
             batch = Batch(sourceKey, detectionRevision, completed, uprightQuarterTurns, frozen, selectedIndexes, frozen.mapIndexed { index, detection ->
                 State(
                     lastKey = sourceKey,
@@ -168,83 +240,132 @@ class InterFrameDetectionTracker(
                         else -> null
                     },
                 )
-            }.toMutableList())
+            }.toMutableList(), handoffs)
         }
+        // An accepted completed batch takes over the published image. A partial result or
+        // another source cannot release a worker's pending/completed publication ownership.
+        if (completed && publishedSourceLease?.sourceKey == sourceKey) publishedSourceLease = null
         val current = requireNotNull(batch)
         val source = frames[sourceIndex]
         var budgetFailure: VisualTrackingFailure? = null
         var activeSlots = current.states.count { it.admitted && it.failure == null }
-        // Preserve priority in execution order as well as admission when the call budget is tight.
-        for (index in current.selectedIndexes) {
-            val state = current.states[index]
-            if (sourceKey == targetKey || state.failure != null) continue
-            if (!state.admitted && activeSlots >= config.maxTrackedObjects) continue
-            if (state.admitted && state.lastKey == targetKey) continue
-            if (budgetFailure != null) continue
-            val detection = current.detections[index]
-            if (!state.admitted) {
-                state.admitted = true
-                activeSlots++
-            }
-            try {
-                budget.charge()
-                if (state.features == null) {
-                    val features = estimator.seed(source, detection, budget)
-                    state.features = features
-                    state.originalCount = features.size
-                    if (features.size < 6) {
-                        state.failure = VisualTrackingFailure.TOO_FEW_FEATURES
+        // Complete each image edge across the admitted objects before continuing backfill.
+        // This checks physical point ownership at intermediate frames as well as the final target.
+        for (phaseIndex in sourceIndex + 1..targetIndex) {
+            val phaseKey = frames[phaseIndex].key
+            // Preserve admission priority inside each edge when the work budget is tight.
+            for (index in current.selectedIndexes) {
+                val state = current.states[index]
+                if (sourceKey == targetKey || state.failure != null) continue
+                if (!state.admitted && activeSlots >= config.maxTrackedObjects) continue
+                if (state.admitted && state.lastKey.cameraTimestampNs >= phaseKey.cameraTimestampNs) continue
+                if (budgetFailure != null) continue
+                val detection = current.detections[index]
+                if (!state.admitted) {
+                    state.admitted = true
+                    activeSlots++
+                }
+                try {
+                    budget.charge()
+                    if (state.features == null) {
+                        val features = estimator.seed(source, detection, budget)
+                        // One actual seed becomes the auxiliary material point. Geometry still needs
+                        // at least six points; six-point seeds keep geometry and provide no motion point.
+                        val representative = if (estimator.supportsMaterialPointTracking && features.size >= 7) {
+                            val center = detection.bboxNorm.center
+                            features.minByOrNull {
+                                val dx = it.currentX / source.width - center.x
+                                val dy = it.currentY / source.height - center.y
+                                dx * dx + dy * dy
+                            }
+                        } else null
+                        state.features = if (representative == null) features else features.filter { it !== representative }
+                        state.originalCount = requireNotNull(state.features).size
+                        if (representative != null && state.materialPoint == null) {
+                            state.materialPoint = VisualMotionPoint(VisualMaterialPointId(), representative.currentX, representative.currentY)
+                        }
+                        if (state.originalCount < 6) {
+                            state.failure = VisualTrackingFailure.TOO_FEW_FEATURES
+                            continue
+                        }
+                        budget.charge()
+                    }
+                    val lastIndex = frames.indexOfFirst { it.key == state.lastKey }
+                    if (lastIndex < 0) {
+                        state.failure = VisualTrackingFailure.SOURCE_NOT_IN_HISTORY
                         continue
                     }
-                    budget.charge()
-                }
-                val lastIndex = frames.indexOfFirst { it.key == state.lastKey }
-                if (lastIndex < 0) {
-                    state.failure = VisualTrackingFailure.SOURCE_NOT_IN_HISTORY
-                    continue
-                }
-                for (nextIndex in lastIndex + 1..targetIndex) {
-                    val before = frames[nextIndex - 1]
-                    val target = frames[nextIndex]
-                    if (target.key.capturedAtElapsedRealtimeMs - before.key.capturedAtElapsedRealtimeMs > config.maxFrameGapMs ||
-                        (target.key.cameraTimestampNs - before.key.cameraTimestampNs) / 1_000_000L > config.maxFrameGapMs
-                    ) {
-                        state.failure = VisualTrackingFailure.FRAME_GAP
-                        break
+                    adoptMaterialPointAtCurrentFrame(current, index, source)
+                    for (nextIndex in lastIndex + 1..phaseIndex) {
+                        val before = frames[nextIndex - 1]
+                        val target = frames[nextIndex]
+                        if (target.key.capturedAtElapsedRealtimeMs - before.key.capturedAtElapsedRealtimeMs > config.maxFrameGapMs ||
+                            (target.key.cameraTimestampNs - before.key.cameraTimestampNs) / 1_000_000L > config.maxFrameGapMs
+                        ) {
+                            state.failure = VisualTrackingFailure.FRAME_GAP
+                            break
+                        }
+                        val estimate = estimator.advance(source, before, target, detection, requireNotNull(state.features), state.originalCount, budget,
+                            materialPoint = state.materialPoint)
+                        edges++
+                        if (estimate.failure != null) {
+                            state.failure = estimate.failure
+                            break
+                        }
+                        if (!valid(transform(detection, estimate.transformNorm))) {
+                            state.failure = VisualTrackingFailure.OUT_OF_FRAME
+                            break
+                        }
+                        // Commit only an entirely validated edge, so interrupted work cannot leak.
+                        state.features = estimate.features
+                        state.transform = estimate.transformNorm
+                        state.residual = estimate.residual
+                        state.quality = minOf(state.quality, estimate.quality)
+                        state.lastKey = target.key
+                        state.materialPoint = estimate.materialPoint?.takeIf { point ->
+                            contains(transform(detection, estimate.transformNorm), Point2(point.x / source.width, point.y / source.height))
+                        }
+                        if (state.materialPoint == null) {
+                            // Every backfill edge has the same ownership boundary as a live frame.
+                            // A point that left the object cannot return later with its old identity.
+                            val retiredId = estimate.materialPoint?.id
+                            if (retiredId != null) current.handoffs.removeAll { it.point.id === retiredId }
+                        }
+                        adoptMaterialPointAtCurrentFrame(current, index, source)
+                        // Native calls cannot be preempted. Stop before starting another edge if
+                        // this completed edge crossed the work budget.
+                        budget.charge()
                     }
-                    val estimate = estimator.advance(source, before, target, detection, requireNotNull(state.features), state.originalCount, budget)
-                    edges++
-                    if (estimate.failure != null) {
-                        state.failure = estimate.failure
-                        break
-                    }
-                    if (!valid(transform(detection, estimate.transformNorm))) {
-                        state.failure = VisualTrackingFailure.OUT_OF_FRAME
-                        break
-                    }
-                    // Commit only an entirely validated edge, so interrupted work cannot leak.
-                    state.features = estimate.features
-                    state.transform = estimate.transformNorm
-                    state.residual = estimate.residual
-                    state.quality = minOf(state.quality, estimate.quality)
-                    state.lastKey = target.key
-                    // Native calls cannot be preempted. Stop before starting another edge if
-                    // this completed edge crossed the work budget.
-                    budget.charge()
+                } catch (exceeded: TrackingBudgetExceeded) {
+                    budgetFailure = exceeded.failure
+                } finally {
+                    // Terminal failures free a slot immediately; the next candidate uses this same
+                    // call's remaining time and pixel budget. Pending work retains its own slot.
+                    if (budgetFailure == null) rejectCompetingObjects(current, phaseKey)
+                    activeSlots = current.states.count { it.admitted && it.failure == null }
                 }
-            } catch (exceeded: TrackingBudgetExceeded) {
-                budgetFailure = exceeded.failure
-            } finally {
-                // Terminal failures free a slot immediately; the next candidate uses this same
-                // call's remaining time and pixel budget. Pending work retains its own slot.
-                if (budgetFailure == null) rejectCompetingObjects(current, targetKey)
-                activeSlots = current.states.count { it.admitted && it.failure == null }
             }
+            rejectCompetingObjects(current, phaseKey)
+            retireUnownedMaterialPoints(current, phaseKey, frames[phaseIndex])
+            if (budgetFailure != null) {
+                // An unfinished multi-object edge cannot establish intermediate ownership.
+                if (current.states.count { it.admitted && it.failure == null } > 1) {
+                    current.states.forEach { it.materialPoint = null }
+                    current.handoffs.clear()
+                }
+                break
+            }
+            // Per-object calls above cannot prove repeated-class ownership until every peer has
+            // completed this exact image edge. Recheck before moving any object to the next frame.
+            current.selectedIndexes.forEach { adoptMaterialPointAtCurrentFrame(current, it, source) }
         }
         val reachedTarget = current.states.all { !it.admitted || it.failure != null || it.lastKey == targetKey }
         val completedAfterDeadline = budgetFailure == VisualTrackingFailure.TIME_BUDGET_EXCEEDED && reachedTarget
         val incompleteBatch = budgetFailure != null && !completedAfterDeadline
-        if (!incompleteBatch) rejectCompetingObjects(current, targetKey)
+        if (!incompleteBatch) {
+            rejectCompetingObjects(current, targetKey)
+            current.selectedIndexes.forEach { adoptMaterialPointAtCurrentFrame(current, it, source) }
+        }
         val observations = current.states.mapIndexed { index, state ->
             // An exact detector capture already measures its own geometry; flow admission only
             // limits propagation to a later image. Never reuse these untracked boxes on later frames.
@@ -258,6 +379,23 @@ class InterFrameDetectionTracker(
                 lost(index, sourceKey, targetKey, failure, state.originalCount, state.features?.size ?: 0)
             } else {
                 val original = current.detections[index]
+                val materialPoint = if (!completed || incompleteBatch || state.quality < MATERIAL_POINT_MIN_QUALITY) null else {
+                    state.materialPoint?.let { point ->
+                        val norm = Point2(point.x / source.width, point.y / source.height)
+                        point.takeIf {
+                            contains(transform(original, state.transform), norm) &&
+                                current.states.indices.none { other ->
+                                    other != index && current.states[other].failure == null &&
+                                        (if (current.states[other].lastKey == targetKey) contains(
+                                            transform(current.detections[other], current.states[other].transform), norm
+                                        ) else true)
+                                }
+                        }?.let { VisualMaterialPoint(it.id, targetKey, norm) }
+                    }
+                }
+                // Uncertain ownership retires the physical identity even if this frame has no
+                // depth. It cannot resume the old spatial history when overlap later disappears.
+                if (!incompleteBatch && materialPoint == null) state.materialPoint = null
                 VisualTrackingObservation(
                     sourceIndex = index,
                     detectorSourceKey = sourceKey,
@@ -272,7 +410,11 @@ class InterFrameDetectionTracker(
                     residualPx = state.residual,
                     polygonConstrained = original.polygonNorm.isNotEmpty(),
                     transformNorm = state.transform,
-                )
+                    materialPoint = materialPoint,
+                ).also { observation ->
+                    state.materialPointHandoff?.takeIf { materialPoint?.id === it.pointId }
+                        ?.let(observation::bindMaterialPointHandoff)
+                }
             }
         }
         return result(sourceKey, targetKey, observations, started, edges, budget,
@@ -303,6 +445,93 @@ class InterFrameDetectionTracker(
             }
         }
         return reasons
+    }
+
+    private fun retireUnownedMaterialPoints(batch: Batch, key: VisualFrameKey, frame: GrayTrackingFrame) {
+        for (index in batch.states.indices) {
+            val state = batch.states[index]
+            val point = state.materialPoint ?: continue
+            if (state.lastKey != key) continue
+            val norm = Point2(point.x / frame.width, point.y / frame.height)
+            if (state.failure != null || !contains(transform(batch.detections[index], state.transform), norm) ||
+                batch.states.indices.any { other ->
+                    other != index && batch.states[other].failure == null &&
+                        (batch.states[other].lastKey != key ||
+                            contains(transform(batch.detections[other], batch.states[other].transform), norm))
+                }
+            ) {
+                state.materialPoint = null
+                batch.handoffs.removeAll { it.point.id === point.id }
+            }
+        }
+    }
+
+    /** A handoff copies a measured point only at its exact frame, never an affine extrapolation. */
+    private fun adoptMaterialPointAtCurrentFrame(batch: Batch, index: Int, frame: GrayTrackingFrame) {
+        if (!batch.completed || !estimator.supportsMaterialPointTracking) return
+        val state = batch.states[index]
+        if (!state.admitted || state.failure != null || state.quality < MATERIAL_POINT_MIN_QUALITY) return
+        val geometry = transform(batch.detections[index], state.transform)
+        val related = batch.states.indices.filter { batch.detections[it].className == geometry.className }
+        val repeatedClass = related.size > 1
+        if (repeatedClass && related.any { other ->
+                val peer = batch.states[other]
+                val point = peer.materialPoint
+                !peer.admitted || peer.failure != null || peer.quality < MATERIAL_POINT_MIN_QUALITY ||
+                    peer.lastKey != state.lastKey || peer.features == null || peer.originalCount < 6 ||
+                    point == null || !contains(transform(batch.detections[other], peer.transform),
+                        Point2(point.x / frame.width, point.y / frame.height))
+            }) return
+        fun eligible(handoff: PointHandoff, targetIndex: Int): Boolean {
+            val target = batch.states[targetIndex]
+            val targetGeometry = transform(batch.detections[targetIndex], target.transform)
+            val norm = Point2(handoff.point.x / frame.width, handoff.point.y / frame.height)
+            return handoff.key == target.lastKey && handoff.geometry.className == targetGeometry.className &&
+                iou(handoff.geometry.bboxNorm, targetGeometry.bboxNorm) >= 0.65f &&
+                contains(handoff.geometry, norm) && contains(targetGeometry, norm)
+        }
+        // Use the original descriptors for both directions and ownership vetoes. Consuming an
+        // earlier row must not turn an ambiguous later row into a unique association.
+        val candidates = batch.handoffOrigins.filter { handoff ->
+            handoff.key == state.lastKey && handoff.geometry.className == geometry.className &&
+                (!repeatedClass || (eligible(handoff, index) && handoff.repeatedClassOwnershipProven))
+        }
+        val handoff = candidates.singleOrNull() ?: return
+        if (!eligible(handoff, index)) return
+        val norm = Point2(handoff.point.x / frame.width, handoff.point.y / frame.height)
+        if (batch.handoffOrigins.any { it !== handoff && it.key == state.lastKey &&
+                (it.point.id === handoff.point.id || contains(it.geometry, norm))
+            } || (repeatedClass && (related.any { it != index && eligible(handoff, it) } ||
+                batch.states.indices.any { other ->
+                    other != index && batch.states[other].failure == null &&
+                        (batch.states[other].lastKey != state.lastKey ||
+                            contains(transform(batch.detections[other], batch.states[other].transform), norm))
+                }))
+        ) return
+        if (batch.handoffs.none { it === handoff }) return
+        state.materialPoint = handoff.point
+        state.materialPointHandoff = VisualMaterialPointHandoff(
+            handoff.sourceKey, batch.sourceKey, handoff.key, handoff.sourceIndex, index,
+            handoff.detection, batch.detections[index], handoff.geometry, handoff.transform, geometry, state.transform,
+            handoff.point.id, norm, batch.uprightQuarterTurns,
+        )
+        batch.handoffs.remove(handoff)
+    }
+
+    private fun contains(detection: DetectionCandidate, point: Point2): Boolean {
+        val box = detection.bboxNorm
+        if (!point.x.isFinite() || !point.y.isFinite() || point.x < box.x || point.y < box.y ||
+            point.x > box.x + box.width || point.y > box.y + box.height) return false
+        if (detection.polygonNorm.isEmpty()) return true
+        var inside = false
+        var before = detection.polygonNorm.last()
+        for (after in detection.polygonNorm) {
+            if ((after.y > point.y) != (before.y > point.y) &&
+                point.x < (before.x - after.x) * (point.y - after.y) / (before.y - after.y) + after.x
+            ) inside = !inside
+            before = after
+        }
+        return inside
     }
 
     private fun upright(rect: RectNorm, turns: Int): RectNorm = UprightCameraImage.toSensor(rect, (4 - turns) % 4)
@@ -427,6 +656,8 @@ class InterFrameDetectionTracker(
     }
 
     private companion object {
+        const val MATERIAL_POINT_MIN_QUALITY = 0.65f
+
         /** Budget/geometry outcomes are not evidence that an admitted object visually disappeared. */
         val NON_VISUAL_LOSS = setOf(
             VisualTrackingFailure.INVALID_GEOMETRY, VisualTrackingFailure.INPUT_BUDGET_EXCEEDED,
@@ -437,6 +668,69 @@ class InterFrameDetectionTracker(
 
     private data class FrameDimensions(val width: Int, val height: Int, val sourceWidth: Int, val sourceHeight: Int)
 
+    /** Protect only live origins/cursors; intermediate images may be sampled within the gap cap. */
+    private fun trimHistory(currentKey: VisualFrameKey) {
+        expireSourceLeases(currentKey)
+        val activeBatch = batch?.takeIf { withinDetectionAge(it.sourceKey, currentKey) }
+        val protectedKeys = buildSet {
+            pendingSourceLease?.sourceKey?.let(::add)
+            publishedSourceLease?.sourceKey?.let(::add)
+            activeBatch?.let { current ->
+                add(current.sourceKey)
+                current.states.asSequence()
+                    .filter { it.admitted && it.failure == null }
+                    .map { it.lastKey }
+                    .filter { withinDetectionAge(it, currentKey) }
+                    .forEach(::add)
+            }
+        }
+
+        while (history.isNotEmpty() &&
+            currentKey.capturedAtElapsedRealtimeMs - history.first().key.capturedAtElapsedRealtimeMs > config.maxHistoryAgeMs
+        ) {
+            removeHistoryFrame(history.first())
+        }
+
+        while (history.size > config.maxHistoryFrames) {
+            val frames = history.toList()
+            // Remove the oldest safe image first. A middle image is redundant only when its
+            // neighbors remain within the existing elapsed-time and camera-time gap contract.
+            val removableIndex = frames.indices.firstOrNull { index ->
+                index < frames.lastIndex && frames[index].key !in protectedKeys &&
+                    (index == 0 || frameGapWithinLimit(frames[index - 1], frames[index + 1]))
+            } ?: frames.indices.firstOrNull { index ->
+                // The 32-image hard bound takes precedence if malformed/sparse input leaves no
+                // safe sample to remove; tracking will report FRAME_GAP for the broken path.
+                index < frames.lastIndex && frames[index].key !in protectedKeys
+            } ?: 0 // Tiny configured histories may not fit all owners; never exceed the cap.
+            removeHistoryFrame(frames[removableIndex])
+        }
+    }
+
+    private fun expireSourceLeases(currentKey: VisualFrameKey) {
+        pendingSourceLease = pendingSourceLease?.takeIf { withinDetectionAge(it.sourceKey, currentKey) }
+        publishedSourceLease = publishedSourceLease?.takeIf { withinDetectionAge(it.sourceKey, currentKey) }
+    }
+
+    private fun removeHistoryFrame(frame: GrayTrackingFrame) {
+        history.remove(frame)
+        if (pendingSourceLease?.sourceKey == frame.key) pendingSourceLease = null
+        if (publishedSourceLease?.sourceKey == frame.key) publishedSourceLease = null
+        // A batch whose source/cursor had to be evicted fails closed at trackFrom's history check.
+    }
+
+    private fun withinDetectionAge(sourceKey: VisualFrameKey, currentKey: VisualFrameKey): Boolean {
+        val elapsedAgeMs = currentKey.capturedAtElapsedRealtimeMs - sourceKey.capturedAtElapsedRealtimeMs
+        val cameraAgeMs = (currentKey.cameraTimestampNs - sourceKey.cameraTimestampNs) / 1_000_000L
+        return elapsedAgeMs in 0L..config.maxDetectionAgeMs && cameraAgeMs in 0L..config.maxDetectionAgeMs
+    }
+
+    private fun frameGapWithinLimit(before: GrayTrackingFrame, after: GrayTrackingFrame): Boolean {
+        val elapsedGapMs = after.key.capturedAtElapsedRealtimeMs - before.key.capturedAtElapsedRealtimeMs
+        val cameraGapMs = (after.key.cameraTimestampNs - before.key.cameraTimestampNs) / 1_000_000L
+        return elapsedGapMs in 0L..config.maxFrameGapMs && cameraGapMs in 0L..config.maxFrameGapMs
+    }
+
     private data class Batch(
         val sourceKey: VisualFrameKey,
         val revision: Long,
@@ -445,6 +739,21 @@ class InterFrameDetectionTracker(
         val detections: List<DetectionCandidate>,
         val selectedIndexes: List<Int>,
         val states: MutableList<State>,
+        val handoffs: MutableList<PointHandoff>,
+    ) {
+        // Bounded by maxTrackedObjects, and independent of later consumption/retirement.
+        val handoffOrigins: List<PointHandoff> = handoffs.toList()
+    }
+
+    private data class PointHandoff(
+        val key: VisualFrameKey,
+        val geometry: DetectionCandidate,
+        val point: VisualMotionPoint,
+        val repeatedClassOwnershipProven: Boolean,
+        val sourceKey: VisualFrameKey,
+        val sourceIndex: Int,
+        val detection: DetectionCandidate,
+        val transform: VisualAffineTransform,
     )
 
     private data class State(
@@ -452,6 +761,8 @@ class InterFrameDetectionTracker(
         var admitted: Boolean = false,
         var features: List<VisualMotionFeature>? = null,
         var originalCount: Int = 0,
+        var materialPoint: VisualMotionPoint? = null,
+        var materialPointHandoff: VisualMaterialPointHandoff? = null,
         var transform: VisualAffineTransform = VisualAffineTransform(),
         var quality: Float = 1f,
         var residual: Float? = null,

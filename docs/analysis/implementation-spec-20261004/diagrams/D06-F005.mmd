@@ -1,0 +1,39 @@
+flowchart TD
+  T["F-D06-005 자동 신고 공간 중복·성공 cooldown·시도 lease"]
+  P["전제: named actor+공통 damage class+유효 촬영 GPS. 자동 후보만 cooldown 적용."]
+  T --> P
+  E1["E-D06-005-01 자동 후보 저장 전→scope acquire→허용/쿨다운/진행중/용량 거절"]
+  E1 --> T
+  E2["E-D06-005-02 exact 서버 접수→성공 cooldown 내구 저장→queue 삭제"]
+  E2 --> T
+  A1["1. tracker ID나 위치 cell 대신 실제 공간 거리로 중복 scope를 비교한다."]
+  P --> A1
+  A2["2. in-flight/retry-not-before/cooldown을 검사하고 고유 attempt lease를<br/>발급한다."]
+  A1 --> A2
+  A3["3. 현재 lease의 성공/실패만 반영한다."]
+  A2 --> A3
+  A4["4. 성공 receipt를 받은 자동 항목은 prefs cooldown commit 성공 후에만 원본 삭제한다."]
+  A3 --> A4
+  A5["5. 복원 시 동일 boot monotonic 잔여와 wall 시간 경계로 남은 cooldown을 계산한다."]
+  A4 --> A5
+  N["정상 종료: lease 해제 또는 cooldown 갱신."]
+  A5 --> N
+  FX["결과: 자동 후보의 조용한 억제, 성공 공간 상태 prefs 저장."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"직접 신고"}
+    R1["자동 cooldown 우회; 별도 건별 확인 유지"]
+    B1 -->|조건 성립| R1
+    B2{"cooldown commit 실패"}
+    R2["LOCAL_COMMIT_FAILED, 원본 보존"]
+    B2 -->|조건 성립| R2
+    B3{"다른 actor 또는 class"}
+    R3["공간이 같아도 별도 scope"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-005"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["재시도: retry delay helper는 일반 2초 지수 증가 최대30초, 429=30초,<br/>401/403/422=60초와 Retry-After 중 큰 값."]
+    X2["복구: 성공 cooldown만 prefs에서 복원; 셀/track 변경으로 우회하지 않음."]
+  end

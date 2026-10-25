@@ -99,7 +99,8 @@ class UserMotionStateEstimatorTest {
 
     @Test fun duplicateFixIdentityCannotRefreshSpeedUsingANewEnvelopeTime() {
         val estimator = UserMotionStateEstimator()
-        speed(estimator, 1_000L, 1.2)
+        estimator.observeSpeed(WalkingSpeedObservation(1.2, 0.1, 1_000L),
+            location(1_000L).copy(observationId = 1_000L), 1_000L)
         estimator.observeSpeed(WalkingSpeedObservation(1.2, 0.1, 2_500L),
             location(2_500L).copy(observationId = 1_000L), 2_500L)
         assertEquals(UserMovementState.UNKNOWN, estimator.snapshot(3_001L).movement)

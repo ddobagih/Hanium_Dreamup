@@ -22,6 +22,7 @@ import kr.co.hanium.dreamup.walksafe.network.cancellableHttpCall
 import kr.co.hanium.dreamup.walksafe.network.captureGatewayAuthenticationRequest
 import kr.co.hanium.dreamup.walksafe.network.consumeGatewayAuthenticationStaleResponse
 import kr.co.hanium.dreamup.walksafe.network.readBoundedResponse
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.LocalGeodesy
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -783,7 +784,8 @@ private fun routeTurnAngleDeg(
 private fun routeSegmentDirectionRadians(start: RoutePoint, end: RoutePoint): Double {
     val meanLatitudeRadians = Math.toRadians((start.latitude + end.latitude) / 2.0)
     val northM = (end.latitude - start.latitude) * METERS_PER_LATITUDE_DEGREE
-    val eastM = (end.longitude - start.longitude) * METERS_PER_LATITUDE_DEGREE * cos(meanLatitudeRadians)
+    val eastM = LocalGeodesy.wrapLongitudeDegrees(end.longitude - start.longitude) *
+        METERS_PER_LATITUDE_DEGREE * cos(meanLatitudeRadians)
     return atan2(eastM, northM)
 }
 
@@ -839,9 +841,10 @@ private fun projectPointToPolyline(
         if (segmentLengthM <= 0.0) continue
         val meanLatitudeRadians = Math.toRadians((start.latitude + end.latitude + point.latitude) / 3.0)
         val metersPerLongitudeDegree = METERS_PER_LATITUDE_DEGREE * max(0.01, cos(meanLatitudeRadians))
-        val segmentX = (end.longitude - start.longitude) * metersPerLongitudeDegree
+        val longitudeDelta = LocalGeodesy.wrapLongitudeDegrees(end.longitude - start.longitude)
+        val segmentX = longitudeDelta * metersPerLongitudeDegree
         val segmentY = (end.latitude - start.latitude) * METERS_PER_LATITUDE_DEGREE
-        val pointX = (point.longitude - start.longitude) * metersPerLongitudeDegree
+        val pointX = LocalGeodesy.wrapLongitudeDegrees(point.longitude - start.longitude) * metersPerLongitudeDegree
         val pointY = (point.latitude - start.latitude) * METERS_PER_LATITUDE_DEGREE
         val segmentNormSquared = segmentX * segmentX + segmentY * segmentY
         val fraction = if (segmentNormSquared > 0.0) {
@@ -851,7 +854,7 @@ private fun projectPointToPolyline(
         }
         val projectedPoint = RoutePoint(
             latitude = start.latitude + (end.latitude - start.latitude) * fraction,
-            longitude = start.longitude + (end.longitude - start.longitude) * fraction,
+            longitude = LocalGeodesy.wrapLongitudeDegrees(start.longitude + longitudeDelta * fraction),
         )
         val candidate = RoutePointProjection(
             distanceToRouteM = routePointDistanceM(point, projectedPoint),
@@ -907,7 +910,7 @@ private fun routePointDistanceM(start: RoutePoint, end: RoutePoint): Double {
     val startLat = Math.toRadians(start.latitude)
     val endLat = Math.toRadians(end.latitude)
     val deltaLat = endLat - startLat
-    val deltaLng = Math.toRadians(end.longitude - start.longitude)
+    val deltaLng = Math.toRadians(LocalGeodesy.wrapLongitudeDegrees(end.longitude - start.longitude))
     val value = sin(deltaLat / 2.0) * sin(deltaLat / 2.0) +
         cos(startLat) * cos(endLat) * sin(deltaLng / 2.0) * sin(deltaLng / 2.0)
     val bounded = min(1.0, max(0.0, value))
@@ -1003,6 +1006,8 @@ private fun JSONArray?.toRouteStepsOrNull(): List<WalkingRouteStep>? {
         if (item.hasNonNull("turn_type") && turnType == null) return null
         val facilityType = item.optNonNegativeIntOrNull("facility_type")
         if (item.hasNonNull("facility_type") && facilityType == null) return null
+        val roadType = item.optNonNegativeIntOrNull("road_type")
+        if (item.hasNonNull("road_type") && roadType == null) return null
         WalkingRouteStep(
             index = index,
             distanceM = distanceM,
@@ -1012,6 +1017,7 @@ private fun JSONArray?.toRouteStepsOrNull(): List<WalkingRouteStep>? {
             roadName = item.optString("road_name").takeIf { it.isNotBlank() },
             turnType = turnType,
             facilityType = facilityType,
+            roadType = roadType,
         )
     }
 }
@@ -1056,7 +1062,50 @@ private fun JSONObject.toDestinationSearchResultOrNull(): DestinationSearchResul
         distanceM = distanceM,
         resultType = resultType,
         distanceSource = distanceSource,
+        coordinateEvidence = parseDestinationCoordinateEvidence(this, point),
     )
+}
+
+/** Shared with the encrypted snapshot codec; absent provenance remains unknown for older data. */
+internal fun parseDestinationCoordinateEvidence(
+    json: JSONObject,
+    selectedPoint: RoutePoint,
+): DestinationCoordinateEvidence? {
+    val selectedKind = if (json.hasNonNull("coordinate_kind")) {
+        val literal = json.opt("coordinate_kind") as? String
+            ?: throw GatewayResponseProtocolException("destination_results_invalid")
+        DestinationCoordinateKind.entries.firstOrNull { it.wireName == literal }
+            ?: throw GatewayResponseProtocolException("destination_results_invalid")
+    } else null
+    val candidates = if (!json.hasNonNull("coordinate_candidates")) emptyList() else {
+        val array = json.optJSONArray("coordinate_candidates")
+            ?: throw GatewayResponseProtocolException("destination_results_invalid")
+        if (array.length() > MAX_DESTINATION_COORDINATE_CANDIDATES) {
+            throw GatewayResponseProtocolException("destination_results_invalid")
+        }
+        (0 until array.length()).map { index ->
+            val candidate = array.optJSONObject(index)
+                ?: throw GatewayResponseProtocolException("destination_results_invalid")
+            val literal = candidate.opt("kind") as? String
+                ?: throw GatewayResponseProtocolException("destination_results_invalid")
+            val kind = DestinationCoordinateKind.entries.firstOrNull { it.wireName == literal }
+                ?: throw GatewayResponseProtocolException("destination_results_invalid")
+            val point = candidate.optJSONObject("point")?.toRoutePointOrNull()
+                ?: throw GatewayResponseProtocolException("destination_results_invalid")
+            DestinationCoordinateCandidate(kind, point)
+        }
+    }
+    // The backend's first candidate is the family/coordinates that produced the selected point.
+    // Partial legacy facts remain usable; an explicit conflict drops only the selected claim.
+    // Point names are display labels, and a snapped route endpoint is not the requested POI.
+    val firstCandidate = candidates.firstOrNull()
+    val consistentKind = selectedKind?.takeUnless {
+        firstCandidate != null && (firstCandidate.kind != it ||
+            firstCandidate.point.latitude != selectedPoint.latitude ||
+            firstCandidate.point.longitude != selectedPoint.longitude)
+    }
+    return if (consistentKind == null && candidates.isEmpty()) null
+    else DestinationCoordinateEvidence(consistentKind, candidates)
 }
 
 private fun JSONObject.optFiniteDouble(name: String): Double? {
@@ -1093,6 +1142,7 @@ private const val TMAP_SUCCESS_RESULT_CODE = 0
 private const val STAIR_AVOID_PRIORITY = "STAIR_AVOID"
 private const val MAX_PROVIDER_ROUTE_ID_LENGTH = 256
 private const val MAX_DESTINATION_RESULT_LIMIT = 10
+private const val MAX_DESTINATION_COORDINATE_CANDIDATES = 4
 private const val MAX_DESTINATION_QUERY_CODE_POINTS = 80
 internal const val WALKING_ROUTE_MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 private const val MAX_ROUTE_POLYLINE_POINTS = 8_192
@@ -1110,9 +1160,9 @@ private const val TURN_GUIDE_MIN_STEP_DISTANCE_M = 10.0
 private const val TURN_GUIDE_MIN_EDGE_DISTANCE_M = 1.0
 private const val TURN_GUIDE_MIN_ANGLE_DEG = 60.0
 private const val TURN_GUIDE_MAX_GAP_M = 5.0
-private val DIRECTIONAL_GUIDE_TURN_TYPES = setOf(12, 13, 14, 16, 17, 18, 19)
-private const val METERS_PER_LATITUDE_DEGREE = 111_320.0
-private const val EARTH_RADIUS_M = 6_371_000.0
+private val DIRECTIONAL_GUIDE_TURN_TYPES = setOf(12, 13, 14, 16, 17, 18, 19, 212, 213, 214, 215, 216, 217)
+private const val METERS_PER_LATITUDE_DEGREE = LocalGeodesy.METERS_PER_DEGREE
+private const val EARTH_RADIUS_M = LocalGeodesy.EARTH_RADIUS_M
 private val BACKEND_ERROR_CODE = Regex("^[a-z][a-z0-9_]{0,63}$")
 private val KOREAN_DESTINATION_ACTION_RE = Regex(
     "\\s*(?:안내해줘|안내해|가자|목적지\\s*설정(?:해)?|설정(?:해)?|지정(?:해)?)\\s*$",

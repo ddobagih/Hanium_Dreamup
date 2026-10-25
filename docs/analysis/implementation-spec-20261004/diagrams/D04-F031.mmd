@@ -1,0 +1,21 @@
+flowchart TD
+  ID["F-D04-031 · 디버그 야외 시험 화면·권한·신호 미리보기<br/>P-D04-031"]
+  A["debug launcher onCreate"]
+  C0{"storage·권한·두 checkbox·중복/종료 gate를 통과하는가"}
+  R0["시작 비활성 및 상태 안내"]
+  C1{"GPS provider가 켜져 있는가"}
+  R1["설정 화면; 돌아와 자동시작 없음"]
+  OK["센서와 FLP preview 등록 → generation callback → 상태 표시; 아직 관측행 저장 안 함"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  STOP["onPause 또는 저장동의철회 → F034 stop"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

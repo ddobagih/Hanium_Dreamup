@@ -1,0 +1,22 @@
+flowchart TD
+  title["F-D09-030 · 실제 인가 규칙을 OpenAPI 계약에 반영<br/>P-D09-030"]
+  N0["OpenAPI cache 확인"]
+  N1["FastAPI 실제 route schema 생성"]
+  N2["설정별 보안 scheme 설치"]
+  N3["operation별 조건 및 오류 계약 보강"]
+  N4["app schema 캐시"]
+  title --> N0
+  N0 --> N1
+  N1 --> N2
+  N2 --> N3
+  N3 --> N4
+  N4 --> OK["정상: 권한 요구와 응답 변형이 포함된 OpenAPI schema"]
+  N0 -->|"schema cache 존재"| B0["동일 schema 객체 반환; 즉시 재생성하지 않음"]
+  B0 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N1 -->|"admin_security_enabled=false"| B1["개발/test legacy admin token scheme 사용"]
+  B1 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N2 -->|"admin_device_proof_enabled=true"| B2["해당 operation에 challenge/signature/correlation/read purpose 조건 기재"]
+  B2 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  title -.-> CANCEL["취소: 전용 취소 API 없음"]
+  CANCEL --> CLEAN["정리: 프로세스 종료 시 schema 메모리 해제"]
+  title -.-> RETRY["재시도: HTTP 실패의 서버 자동 재시도 없음"]

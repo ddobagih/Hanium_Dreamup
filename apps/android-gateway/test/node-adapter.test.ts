@@ -716,6 +716,7 @@ test("S19-54 real HTTP route matrix follows OpenAPI methods with concealed and q
   const sample = (template: string): string => template
     .replace("/privacy/account-deletions/{request_id}",
       "/privacy/account-deletions/probe_request_000001")
+    .replaceAll("{session_id}", id)
     .replaceAll("{report_id}", id)
     .replaceAll("{collection_id}", id)
     .replaceAll("{object_id}", id)
@@ -736,6 +737,12 @@ test("S19-54 real HTTP route matrix follows OpenAPI methods with concealed and q
     fetchImpl: async (input) => {
       const pathname = new URL(String(input)).pathname;
       upstreamPaths.push(pathname);
+      if (pathname === "/account-signup-policy") {
+        return Response.json({ schema_version: "walksafe.account-signup-policy.v1",
+          documents: Object.fromEntries(["terms_of_service", "privacy_notice", "location_terms", "raw_original", "automatic_reporting", "training_reuse"].map((key, index) => [key, {
+            version: "1.2.0", required: index < 3, equivalent_versions: ["1.1.1"], prior_versions: []
+          }])) });
+      }
       if (pathname === "/navigation/walking") {
         return Response.json({
           schema_version: "walksafe.walking_route.v1", provider: "tmap_pedestrian",
@@ -779,7 +786,7 @@ test("S19-54 real HTTP route matrix follows OpenAPI methods with concealed and q
     assert.equal((await rawBodyRequest(port, "POST", "/privacy/rights?control=account-deletion", {}, "")).status, 410);
     assert.equal((await rawBodyRequest(port, "PUT", "/privacy/rights", {}, "")).status, 405);
     assert.equal((await rawBodyRequest(port, "POST", "/privacy/rights?control=integrated-consent-bootstrap", {}, "")).status, 401);
-    assert.deepEqual(upstreamPaths, [], "anonymous matrix is stopped before Backend");
+    assert.deepEqual(upstreamPaths, ["/account-signup-policy"], "anonymous matrix reaches only public policy metadata");
 
     const origin = `http://127.0.0.1:${port}`;
     const login = await fetch(`${origin}/api/field-session`, {
@@ -821,7 +828,7 @@ test("S19-54 real HTTP route matrix follows OpenAPI methods with concealed and q
         "content-length": String(Buffer.byteLength(routeBody))
       }, routeBody);
     assert.equal(walkingWithIgnoredQuery.status, 200);
-    assert.deepEqual(upstreamPaths, ["/navigation/walking", "/navigation/walking"]);
+    assert.deepEqual(upstreamPaths, ["/account-signup-policy", "/navigation/walking", "/navigation/walking"]);
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }

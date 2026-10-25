@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from copy import copy
 from datetime import UTC, datetime
 import json
 import os
@@ -18,12 +19,14 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import select, text
 
-from backend.app.api import health as health_api
-import backend.app.main as main_app
+from backend.app.services import health_readiness as health_api
+from backend.app import application_runtime as runtime_module
+from backend.app.application_runtime import BackendRuntime
+from backend.app.config import get_settings
 import backend.app.services.report_storage as report_storage
 import backend.app.uploads as uploads
 from backend.app.database import SessionLocal
-from backend.app.api.reports import _commit_new_report_with_image
+from backend.app.services.report_commit import _commit_new_report_with_image
 from backend.app.models import (
     CriticalIncident,
     CriticalIncidentEvent,
@@ -554,25 +557,58 @@ def test_startup_inventory_rejects_report_without_encrypted_metadata(
         )
 
 
-def test_backend_lifespan_runs_storage_reconciliation_before_serving(monkeypatch) -> None:
+@pytest.fixture
+def storage_runtime(tmp_path):
+    settings = copy(get_settings())
+    settings.upload_dir = tmp_path
+    runtime = BackendRuntime(
+        settings,
+        database=SimpleNamespace(session_factory=None, close=lambda: None),
+    )
+    runtime.initialize_resources()
+    try:
+        yield runtime
+    finally:
+        runtime.report_storage_monitor.stop()
+        runtime.report_storage_monitor.close_cycle()
+        if runtime.inference_runner is not None:
+            runtime.inference_runner.close()
+
+
+def test_backend_lifespan_runs_storage_reconciliation_before_serving(monkeypatch, tmp_path) -> None:
+    from fastapi import FastAPI
+
+    @contextmanager
+    def empty_transaction():
+        yield SimpleNamespace(execute=lambda *_args, **_kwargs: SimpleNamespace(all=lambda: []))
+
+    settings = copy(get_settings())
+    settings.upload_dir = tmp_path
+    runtime = BackendRuntime(
+        settings,
+        database=SimpleNamespace(
+            session_factory=SimpleNamespace(begin=empty_transaction), close=lambda: None,
+        ),
+    )
+    app = FastAPI()
+
     calls = 0
 
     def reconcile() -> None:
         nonlocal calls
         calls += 1
 
-    monkeypatch.setattr(main_app, "reconcile_report_storage", reconcile)
+    monkeypatch.setattr(runtime, "reconcile_report_storage", reconcile)
     monkeypatch.setattr(
-        main_app,
+        runtime,
         "validate_admin_credential_issuer_binding",
         lambda: None,
     )
-    monkeypatch.setattr(main_app, "bind_privacy_hmac_key", lambda: None)
-    monkeypatch.setattr(main_app, "bind_account_crypto_keys", lambda: None)
-    monkeypatch.setattr(main_app, "inference_runner", None)
+    monkeypatch.setattr(runtime, "bind_privacy_hmac_key", lambda: None)
+    monkeypatch.setattr(runtime, "bind_account_crypto_keys", lambda: None)
 
     async def exercise() -> None:
-        async with main_app.lifespan(main_app.app):
+        async with runtime.lifespan(app):
             assert calls == 1
 
     import asyncio
@@ -580,13 +616,14 @@ def test_backend_lifespan_runs_storage_reconciliation_before_serving(monkeypatch
     asyncio.run(exercise())
 
 
-def test_backend_serializes_reconciliation_across_replicas(monkeypatch) -> None:
+def test_backend_serializes_reconciliation_across_replicas(monkeypatch, storage_runtime) -> None:
+    runtime = storage_runtime
     calls: list[str] = []
 
     @contextmanager
     def maintenance_lock(path, *, expected_group_gid):
-        assert path == main_app.settings.maintenance_lock_path
-        assert expected_group_gid == main_app.settings.maintenance_lock_group_gid
+        assert path == runtime.settings.maintenance_lock_path
+        assert expected_group_gid == runtime.settings.maintenance_lock_group_gid
         calls.append("maintenance-lock")
         try:
             yield
@@ -626,21 +663,21 @@ def test_backend_serializes_reconciliation_across_replicas(monkeypatch) -> None:
         calls.append("preflight")
         return {}
 
-    monkeypatch.setattr(main_app, "SessionLocal", FakeSessionFactory)
+    monkeypatch.setattr(runtime.database, "session_factory", FakeSessionFactory)
     monkeypatch.setattr(
-        main_app.reports,
-        "_shared_report_write_lock",
+        runtime_module,
+        "shared_maintenance_write_lock",
         maintenance_lock,
     )
-    monkeypatch.setattr(main_app.report_image_key_manager, "synchronize", lambda _db: None)
-    monkeypatch.setattr(main_app, "reconcile_pending_report_writes", reconcile)
+    monkeypatch.setattr(runtime.report_image_key_manager, "synchronize", lambda _db: None)
+    monkeypatch.setattr(runtime_module, "reconcile_pending_report_writes", reconcile)
     monkeypatch.setattr(
-        main_app,
+        runtime_module,
         "validate_report_storage_database_inventory",
         preflight,
     )
 
-    main_app.reconcile_report_storage()
+    runtime.reconcile_report_storage()
 
     assert calls == [
         "maintenance-lock",
@@ -654,7 +691,9 @@ def test_backend_serializes_reconciliation_across_replicas(monkeypatch) -> None:
 def test_reconciliation_waits_for_inflight_encrypted_report_commit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    storage_runtime,
 ) -> None:
+    runtime = storage_runtime
     transaction_lock = threading.Lock()
     commit_entered = threading.Event()
     allow_commit = threading.Event()
@@ -735,11 +774,11 @@ def test_reconciliation_waits_for_inflight_encrypted_report_commit(
         finally:
             transaction_lock.release()
 
-    monkeypatch.setattr(main_app, "SessionLocal", SimpleNamespace(begin=reconciliation_transaction))
-    monkeypatch.setattr(main_app.report_image_key_manager, "synchronize", lambda _db: None)
-    monkeypatch.setattr(main_app.settings, "upload_dir", tmp_path)
+    monkeypatch.setattr(runtime.database, "session_factory", SimpleNamespace(begin=reconciliation_transaction))
+    monkeypatch.setattr(runtime.report_image_key_manager, "synchronize", lambda _db: None)
+    monkeypatch.setattr(runtime.settings, "upload_dir", tmp_path)
     monkeypatch.setattr(
-        main_app,
+        runtime_module,
         "validate_report_storage_database_inventory",
         lambda _db, _upload_dir, **_kwargs: {},
     )
@@ -758,7 +797,7 @@ def test_reconciliation_waits_for_inflight_encrypted_report_commit(
             assert commit_entered.wait(timeout=2)
             assert destination.read_bytes().startswith(b"WSRI")
             assert b"inflight-image" not in destination.read_bytes()
-            reconciler = pool.submit(main_app.reconcile_report_storage)
+            reconciler = pool.submit(runtime.reconcile_report_storage)
             assert reconciliation_waiting.wait(timeout=2)
             assert not reconciler.done()
         finally:

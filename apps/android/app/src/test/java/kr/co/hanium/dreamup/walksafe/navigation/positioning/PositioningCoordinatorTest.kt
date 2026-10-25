@@ -132,14 +132,18 @@ class PositioningCoordinatorTest {
     }
 
     @Test
-    fun unavailableEstimatePausesGuidanceImmediately() {
+    fun firstUnavailableEstimateWaitsForThreeSecondsBeforeAnnouncingDegradation() {
         val coordinator = PositioningCoordinator()
         val snapshot = coordinator.observeGnss(fix(timeMs = 1_000L, accuracyM = 30.0))
 
         assertEquals(PositionQuality.UNAVAILABLE, snapshot.quality)
-        assertEquals(PositionConfidenceTransition.DEGRADED, snapshot.confidence.transition)
+        assertEquals(PositionConfidenceTransition.DEGRADATION_PENDING, snapshot.confidence.transition)
         assertTrue(snapshot.confidence.guidancePaused)
-        assertFalse(snapshot.confidence.announcementRequest?.repeated ?: true)
+        assertNull(snapshot.confidence.announcementRequest)
+        val confirmed = coordinator.evaluate(4_000L)
+        assertEquals(PositionConfidenceTransition.DEGRADED, confirmed.confidence.transition)
+        assertTrue(confirmed.confidence.guidancePaused)
+        assertFalse(confirmed.confidence.announcementRequest?.repeated ?: true)
     }
 
     @Test

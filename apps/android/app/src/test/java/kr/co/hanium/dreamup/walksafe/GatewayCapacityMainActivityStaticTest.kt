@@ -18,22 +18,27 @@ class GatewayCapacityMainActivityStaticTest {
 
     @Test
     fun verifiedStartupAndNetworkReconnectUseOneCoalescedRefreshWithoutPolling() {
-        val sessionChanged = functionBlock("private fun onGatewayProcessSessionChanged(")
+        val sessionChanged = delegatedOwner("onGatewayProcessSessionChanged", "actorSessionLifecycleCoordinator", "session/gateway/ActorSessionLifecycleCoordinator.kt", "onGatewayProcessSessionChanged", "{ actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged) refreshGuidanceDiagnosticAuthority() }")
         val register = functionBlock("private fun registerGatewayCapacityNetworkObserver()")
         val refresh = functionBlock("private fun requestGatewayCapacityRefresh(")
-        val callback = source.substringAfter("private val gatewayCapacityNetworkCallback =")
-            .substringBefore("private var currentDestination")
+        val callback = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/AndroidGatewayCapacityObserver.kt").readText()
+        val gatewayWiring = MainActivityRefactorSource.composition(source, "gatewaySessionController")
+        assertTrue(gatewayWiring.contains("networkObserver = AndroidGatewayCapacityObserver(this)"))
+        val actorWiring = MainActivityRefactorSource.composition(source, "actorSessionLifecycleCoordinator")
+        assertTrue(actorWiring.contains("GatewayCapacityProcessState.fenceSessionGeneration(generation)"))
+        assertTrue(actorWiring.contains("gatewaySessionController.requestGatewayCapacityRefresh(reason)"))
 
-        assertTrue(sessionChanged.contains("requestGatewayCapacityRefresh(\"verified_session_startup\")"))
-        assertTrue(sessionChanged.contains("fenceSessionGeneration(snapshot.generation)"))
-        assertTrue(register.contains("registerDefaultNetworkCallback(gatewayCapacityNetworkCallback)"))
-        assertTrue(callback.contains("override fun onAvailable(network: Network)"))
-        assertTrue(callback.contains("requestGatewayCapacityRefresh(\"network_reconnected\")"))
+        assertTrue(sessionChanged.contains("gateway.requestCapacity(\"verified_session_startup\")"))
+        assertTrue(sessionChanged.contains("gateway.fenceCapacityGeneration(snapshot.generation)"))
+        assertTrue(register.contains("networkObserver.register(object : NetworkEvents"))
+        assertTrue(callback.contains("override fun onAvailable(network: Network) = events.available()"))
+        assertTrue(callback.contains("manager.registerDefaultNetworkCallback(callback)"))
+        assertTrue(register.contains("requestGatewayCapacityRefresh(\"network_reconnected\")"))
         assertTrue(refresh.contains("GatewayCapacityProcessState.tryBeginRefresh()"))
         assertTrue(refresh.contains("capacitySessionGeneration = expectedSessionGeneration"))
         assertTrue(refresh.contains("if (GatewayCapacityProcessState.finishRefresh())"))
         assertTrue(refresh.contains("requestGatewayCapacityRefresh(\"coalesced_latest_session\")"))
-        assertTrue(refresh.contains("gatewaySessionClient.revalidate("))
+        assertTrue(refresh.contains("remote.revalidate("))
         assertTrue(refresh.contains("GatewayCapacityProcessState.finishRefresh()"))
         assertFalse(refresh.contains("postDelayed("))
         assertFalse(capacitySource.contains("Timer("))
@@ -45,12 +50,14 @@ class GatewayCapacityMainActivityStaticTest {
         val destroy = functionBlock("override fun onDestroy()")
         val unregister = destroy.indexOf("unregisterGatewayCapacityNetworkObserver()")
         val earlyBranch = destroy.indexOf("if (!privacyStartupInspectionComplete)")
+        val nativeObserver = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/AndroidGatewayCapacityObserver.kt").readText()
+        assertTrue(nativeObserver.contains("GatewaySessionController.Registration { manager.unregisterNetworkCallback(callback) }"))
 
         assertTrue(unregister >= 0)
         assertTrue(earlyBranch > unregister)
         assertTrue(
             functionBlock("private fun unregisterGatewayCapacityNetworkObserver()")
-                .contains("unregisterNetworkCallback("),
+                .contains("registration.unregister()"),
         )
     }
 
@@ -106,11 +113,11 @@ class GatewayCapacityMainActivityStaticTest {
         assertTrue(prepare.contains("reportCandidate=blocked:gateway_capacity"))
         assertTrue(explicitPreparation.contains("explicitRequest = true"))
         assertFalse(explicit.contains("GatewayCapacityProcessState"))
-        assertTrue(process.contains("reportQueueStore.enqueue("))
+        assertTrue(process.contains("queue.enqueue("))
         assertFalse(process.contains("uploadCall("))
         assertFalse(process.contains("gatewaySessionClient.revalidate("))
         val capture = functionBlock("private fun buildReportQueueDrainTrigger(")
-        assertTrue(capture.contains("GatewaySessionProcessCoordinator.snapshot()"))
+        assertTrue(capture.contains("sources.gatewaySnapshot()"))
         assertTrue(capture.contains("gatewaySession.isUsableFor(reporter)"))
         assertTrue(capture.contains("gatewaySessionGeneration = gatewaySnapshot.generation"))
         assertTrue(capture.contains("AndroidNetworkTransferPolicy.isAllowed("))
@@ -120,7 +127,7 @@ class GatewayCapacityMainActivityStaticTest {
         assertTrue(context.contains("trigger.gatewaySession.isUsableFor(reporter)"))
         val drain = functionBlock("private fun drainInitialExactReportQueue(")
         val contextGate = drain.indexOf("reportQueueDrainContext(trigger)")
-        val startNext = drain.indexOf("reportQueueDrainCoordinator.startNext(")
+        val startNext = drain.indexOf("reportQueueDrainCoordinator.startNextWithResult(")
         val execute = drain.indexOf("call.execute()")
         assertTrue(contextGate >= 0 && startNext > contextGate)
         assertTrue(execute > startNext)
@@ -135,6 +142,11 @@ class GatewayCapacityMainActivityStaticTest {
 
     @Test
     fun everyActivityRevalidationCarriesTheCapturedSessionGeneration() {
+        val search = MainActivityRefactorSource.function(source, "private fun performDestinationSearch(")
+        assertTrue(search.contains("backend.revalidate("))
+        assertTrue(search.contains("capacitySessionGeneration ="))
+        val composition = MainActivityRefactorSource.composition(source, "destinationSearchController")
+        assertTrue(composition.contains("gatewaySessionClient.revalidate(session, actorId, capacitySessionGeneration = capacitySessionGeneration)"))
         val callMarker = "gatewaySessionClient.revalidate("
         val calls = source.split(callMarker).drop(1)
 
@@ -147,11 +159,11 @@ class GatewayCapacityMainActivityStaticTest {
             )
         }
         assertTrue(
-            functionBlock("private fun performDestinationSearch(")
+            MainActivityRefactorSource.function(source, "private fun performDestinationSearch(")
                 .contains("expectedGatewaySessionGeneration"),
         )
         assertTrue(
-            functionBlock("private fun requestRoute(")
+            MainActivityRefactorSource.function(source, "fun requestRoute(")
                 .contains("expectedGatewaySessionGeneration"),
         )
     }
@@ -167,7 +179,7 @@ class GatewayCapacityMainActivityStaticTest {
         assertFalse(prepare.contains("participantAdmissionRestrictedSignal"))
     }
 
-    private fun functionBlock(marker: String): String = block(source, marker)
+    private fun functionBlock(marker: String): String = MainActivityRefactorSource.function(source, marker)
 
     private fun sessionFunctionBlock(marker: String): String = block(sessionSource, marker)
 
@@ -187,5 +199,20 @@ class GatewayCapacityMainActivityStaticTest {
             }
         }
         throw AssertionError("unterminated function body: $marker")
+    }
+
+    // Structural wiring and owner policy are checked separately; this does not execute Main.
+    private fun delegatedOwner(name: String, owner: String, path: String, target: String, expectedBody: String): String {
+        val caller = MainActivityRefactorSource.factory(source, name)
+        // Match the whole caller, including additional effects; a guarded call or lambda is different.
+        val declaration = caller.filterNot(Char::isWhitespace)
+        val body = Regex.escape(expectedBody.filterNot(Char::isWhitespace))
+        val expected = Regex("""^(?:private|internal|public|override)*fun$name\([^{}]*\)(?::[\w?<>]+)?$body$""")
+        assertTrue("Main caller changed for $owner.$target: $caller", expected.matches(declaration))
+        assertTrue(expectedBody.contains("$owner.$target("))
+        MainActivityRefactorSource.composition(source, owner)
+        return MainActivityRefactorSource.member(
+            File("src/main/java/kr/co/hanium/dreamup/walksafe/$path").readText(), target,
+        )
     }
 }

@@ -40,6 +40,21 @@ class GatewaySpeechClientTest {
         assertNull(parseGatewaySpeechTranscript(validResponse(), OTHER_REQUEST_ID))
     }
 
+    @Test fun rawJsonRejectsDuplicateEscapedKeysAndAmbiguousGrammar() {
+        val valid = validResponse()
+        val rejected = listOf(
+            valid.replace("\"transcript\":", "\"transcript\":\"안내 시작\",\"transcript\":"),
+            valid.replace("\"confidence\":0.81", "\"confidence\":0.81,\"confid\\u0065nce\":0.99"),
+            valid.replace("\"confidence\":0.81", "\"confidence\":true"),
+            valid.replace("\"confidence\":0.81", "\"confidence\":.81"),
+            valid.replace("\"confidence\":0.81", "\"confidence\":00.81"),
+            valid.replace("\"transcript\":", "'transcript':"),
+            valid + " {}", valid.replace("{", "{/*comment*/", false),
+        )
+        rejected.forEach { assertNull(it, parseGatewaySpeechTranscript(it, REQUEST_ID)) }
+        assertFalse(requireNotNull(parseGatewaySpeechTranscript(valid.replace("\"execution_allowed\":true", "\"execution_allowed\":false"), REQUEST_ID)).acoustic.executionAllowed)
+    }
+
     @Test
     fun ttsTextRejectsControlCharactersAndCodePointOverflow() {
         assertTrue(validGatewaySpeechText("명령을 다시 말씀해 주세요."))

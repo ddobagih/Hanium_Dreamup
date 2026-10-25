@@ -9,6 +9,9 @@ import org.junit.Test
 
 class ProductPurposeSurfacesStaticTest {
     private val activity = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val onboarding = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/OnboardingReadinessPanel.kt").readText()
+    private val runtimeViews = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRuntimeViewComposer.kt").readText()
+    private val reportPresentation = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/AndroidExplicitReportPresentation.kt").readText()
     private val disclosure = File(
         "src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt",
     ).readText()
@@ -31,7 +34,12 @@ class ProductPurposeSurfacesStaticTest {
 
     @Test
     fun firstScreenAndConsentUseTheSharedPurposeAndSafetyBoundary() {
-        assertTrue(activity.contains("text = \"\$WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO\\n앱 버전:"))
+        val composition = MainActivityRefactorSource.member(activity, "buildContentView")
+        assertTrue(composition.contains("val onboardingPanel = OnboardingReadinessPanel("))
+        assertTrue(composition.contains("purposeNotice = \"\$WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO\\n앱 버전:"))
+        assertTrue(composition.contains("nativeRegistrationComposition.bindRegistration(onboardingPanel)"))
+        assertTrue(onboarding.contains("productPurposeText = TextView(context).apply {\n            text = props.purposeNotice"))
+        assertTrue(onboarding.contains("addView(productPurposeText)"))
         assertTrue(disclosure.contains("WALKSAFE_PRODUCT_PURPOSE_STATEMENT_KO"))
         assertTrue(disclosure.contains("WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO"))
         assertTrue(userGuide.contains(WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO))
@@ -70,16 +78,30 @@ class ProductPurposeSurfacesStaticTest {
 
     @Test
     fun reportSurfacesNameOnlyDamagedTactileBlockReporting() {
-        assertFalse(activity.contains("위험 신고"))
-        assertFalse(activity.contains("\"신고 요청\""))
+        val surfaces = listOf(activity, onboarding, runtimeViews, reportPresentation)
+        surfaces.forEach { surface ->
+            assertFalse(surface.contains("위험 신고"))
+            assertFalse(surface.contains("\"신고 요청\""))
+            assertFalse(surface.contains("위험물 신고"))
+            assertFalse(surface.contains("보호자 추적"))
+            assertFalse(surface.contains("넘어짐 탐지"))
+            assertFalse(surface.contains("180일"))
+        }
         assertFalse(disclosure.contains("위험 신고"))
-        assertFalse(activity.contains("위험물 신고"))
-        assertFalse(activity.contains("보호자 추적"))
-        assertFalse(activity.contains("넘어짐 탐지"))
-
-        assertTrue(activity.contains("\"손상 점자블록 직접 신고\""))
-        assertTrue(activity.contains("REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO"))
-        assertTrue(activity.contains("방금 고정한 신고 보내기"))
+        val composition = MainActivityRefactorSource.member(activity, "buildContentView")
+        assertTrue(composition.contains("val runtimeComposer = NativeRuntimeViewComposer(this, viewStyle)"))
+        assertTrue(composition.contains("explicitReportButton = runtimeComposer.createReportAction("))
+        assertTrue(composition.contains("requestExplicitReport(ExplicitReportRequestSource.ON_SCREEN)"))
+        assertTrue(MainActivityRefactorSource.member(runtimeViews, "createReportAction")
+            .contains("\"손상 점자블록 직접 신고\""))
+        val reportBinding = MainActivityRefactorSource.composition(activity, "explicitReportPresentation")
+        assertTrue(reportBinding.contains("disclosureText = REPORT_EXPLICIT_CONFIRMATION_DISCLOSURE_KO"))
+        assertTrue(reportBinding.contains("AndroidExplicitReportPresentation.ViewTarget(explicitReportButton, explicitReportConfirmationText)"))
+        val render = MainActivityRefactorSource.function(activity, "private fun renderExplicitReportConfirmationDisclosure(")
+        assertTrue(render.contains("buttonText = if (armed) \"방금 고정한 신고 보내기\""))
+        assertTrue(render.contains("disclosure = \"\$disclosureText \$action\""))
+        val idle = MainActivityRefactorSource.function(activity, "private fun renderExplicitReportConfirmationIdle(")
+        assertTrue(idle.contains("buttonText = if (available) \"손상 점자블록 직접 신고\""))
         assertTrue(disclosure.contains("이번 손상 점자블록 직접 신고"))
         assertTrue(disclosure.contains("WalkSafe 테스트 서버"))
         assertTrue(disclosure.contains("기관으로 자동 전송하지 않습니다"))

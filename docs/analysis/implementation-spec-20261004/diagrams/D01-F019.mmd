@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D01-019 최초 필수 OS 권한 요청과 설정·종료 안내"]
+  G{"privacy startup inspection 준비 및 앱 화면 유효; initial request inflight 없음"}
+  I["CAMERA,FINE+COARSE,RECORD_AUDIO; API29+ACTIVITY_RECOGNITION; API33+POST_NOTIFICATIONS"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 권한 거부는 비취소 dialog; storagefailure는 정상 gate로 간주 안 함"]
+  G -->|"미충족"| X
+  N1["requiredPostLoginDeviceCheckPermissions에서 현재 빠진 OS 권한을 모은다."]
+  I --> N1
+  N2["request 전에 initial permissions started marker를 commit하고 한 번에 시스템 권한 요청을 보낸다."]
+  N1 --> N2
+  N3["결과 callback은 OS 상태를 재관측하고 complete marker를 저장한 뒤 다시 읽는다."]
+  N2 --> N3
+  N4["여전히 missing이면 준비취소·활성 보행 safety stop 및 비취소 앱 실행 불가 대화상자를 보여준다. 설정 열기 또는 종료를 제공한다."]
+  N3 --> N4
+  OK["필수 권한 모두 확인 후 다음 검사"]
+  N4 --> OK
+  B0["요청 시작 차단·저장문제 안내"]
+  N2 -->|"started marker 저장 실패"| B0
+  B1["초기 permission gate 통과"]
+  N3 -->|"모든 권한 부여"| B1
+  B2["features waiting만 기록하고 전체종료 제한 우회"]
+  N4 -->|"DEBUG＆＆bypass"| B2
+  B3["설정 Intent 또는 finishAndRemoveTask"]
+  N4 -->|"누락권한 있음"| B3
+  R["중단·취소: 시스템 거부 가능; 자체 dialog는 cancelable=false / started marker로 프로세스 중단 후 실제 OS grants를 재관측"]
+  V["복구·재시도: 마커만 믿지 않고 실제 granted 확인 / 설정에서 허용 후 관측; 초기 요청은 새앱 launch에서 필요한경우 가능"]
+  Q["정책 P-D01-012"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

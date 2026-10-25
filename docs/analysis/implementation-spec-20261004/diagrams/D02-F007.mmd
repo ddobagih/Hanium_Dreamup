@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D02-007 한국어 오프라인 TTS 실제 파일 합성 검사"]
+  E["진입: probe.start / init/onDone/onError/onStop"]
+  G{"P-D02-007 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["AVAILABLE"]
+  G -->|"정상 PCM duration＞=1000"| B0
+  B1["UNAVAILABLE"]
+  G -->|"언어/voice/init/listener/synthesis/file 오류"| B1
+  B2["무시"]
+  G -->|"잘못된 utterance 또는 terminal 이후 callback"| B2
+  B3["UNAVAILABLE; late success 불가"]
+  G -->|"10000ms 경과 또는 취소"| B3
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["engine 초기화·listener 등록·오프라인 한국어 voice 선택"]
+    S1["임시 WAV에 합성 요청"]
+    S2["현재 utterance onDone 뒤 WAV 구조와 길이 검사"]
+    S3["terminal을 단 한 번 획득하고 engine/timeout/temp file을 정리한 뒤 결과 callback"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+  end
+  E -.-> S0
+  N["정상 종료: 해당 이벤트 처리를 마치고 현재 스냅샷/결과를 반환한다."]
+  X["취소·중단: cancel/close는 terminal fail closed이며 멱등. / foreground·epoch·owner<br/>조건을 잃은 결과는 재사용하지 않는다."]
+  C["정리: timer cancel→engine stop/shutdown→임시 파일 삭제 후 callback."]
+  R["재시도·복구: 같은 probe 재시작 없음; 새 probe 생성. / 현재 증거와 소유권을 다시 확보해야 한다. 이전 성공을 소급<br/>복원하지 않는다."]
+  S3 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

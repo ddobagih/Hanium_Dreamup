@@ -58,6 +58,8 @@ public final class FastSamRuntimeServiceTest {
         FastSamRuntimeOptions o=options(false);CountDownLatch invoke=new CountDownLatch(1),release=new CountDownLatch(1);AtomicInteger result=new AtomicInteger();AtomicReference<Engine> e=new AtomicReference<>();
         FastSamRuntimeService<Void> s=new FastSamRuntimeService<>(12,o,r->result.incrementAndGet(),()->{Engine x=new Engine(o);x.invokeStarted=invoke;x.invokeRelease=release;e.set(x);return x;},System::nanoTime);
         s.start().get(3,TimeUnit.SECONDS);s.submitArgb(2,1,new int[2],token(1),null);await(invoke);CompletableFuture<Void> f=s.closeAsync();assertFalse(f.isDone());release.countDown();f.get(3,TimeUnit.SECONDS);assertEquals(0,result.get());assertEquals(1,s.stats().discardedAtClose);assertTrue(e.get().closed.get());
+        assertEquals("A closed flight must not finish an unnecessary full prototype decode",0,s.stats().completed);
+        assertTrue(s.stats().nativeReleaseConfirmed);assertFalse(s.stats().inflight);
     }
 
     @Test public void callbackFailureCannotReserveSuccessorAndReleaseIsIndependent()throws Exception {

@@ -1,0 +1,117 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D12 관리자 앱 명세 독립 표본 검토 — D01</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="../index.html">WalkSafe 기능과 처리 명세</a> · <a href="../02-features.html">기능</a> · <a href="../03-policies.html">정책</a> · <a href="../05-scenarios.html">시나리오</a> · <a href="../gallery.html">그림 모음</a> · <a href="../08-review.html">검수</a></header><main><h1>D12 관리자 앱 명세 독립 표본 검토 — D01</h1>
+<p>[판정]</p>
+<ul>
+<li>7개 핵심 기능과 대응 정책·8개 Mermaid 원본을 코드와 대조했다. 문서 보완 4건 및 후속 도표 노드 충돌 1건을 작성자가 수정했고 영향 부분을 재확인했다. 이번 표본에서 미해결 필수 문서 수정 사항은 없다.</li>
+<li>제품 실행·테스트·빌드·APK·기기·실제 서버 검증은 수행하지 않았다. Mermaid는 원본 흐름과 조건만 읽었으며 렌더 결과 검증은 Root 범위다.</li>
+<li>45개 기능 전체의 정확성·누락 없음 또는 관리자 운영 기능의 배포 활성화를 보증하지 않는다.</li>
+</ul>
+<p>[기준 버전]</p>
+<ul>
+<li>작성자 <code>/root/admin_app</code>의 쓰기 종료 확인 후 검토를 시작했다. 검토자는 D01 작성자 <code>/root/account_onboarding</code>이며 D12 JSON·Mermaid·제품 소스를 직접 수정하지 않았다.</li>
+<li>코드 기준: <code>/tmp/walksafe-spec-20261004-source</code>, <code>2026-10-04T10:33:40+09:00</code>, base <code>2e5744725a8c033a1817f3cc8a8ec679bc15ac9d</code> + 당시 WIP.</li>
+<li>첫 읽기 JSON SHA256: <code>2664360f9c4db72d53c899e890d30975827131179f73844d93d9ad92f6074ba7</code>.</li>
+<li>3건 수정 중간 SHA256: <code>5ec017ace96dd9ef6069ace7a7850ae573bdadb381b6bd5579306ae784c1d9fc</code>.</li>
+<li>최종 검토 JSON SHA256: <code>baf8864332f587da496eeacea90fab6357a77360ce977ea84e0093a2290eab67</code>.</li>
+<li>검토 도중 SHA가 바뀐 이유는 아래 요청을 작성자가 반영했기 때문이다. F004·F015·F019·F038의 JSON, 대응 정책 및 영향 도표를 최종 버전으로 다시 읽었다. F038의 마지막 노드 ID 정정은 JSON SHA를 바꾸지 않았다.</li>
+</ul>
+<p>[표본과 확인 결과]</p>
+<table>
+<thead>
+<tr>
+<th>기능·정책</th>
+<th>대조한 주요 코드</th>
+<th>확인한 주장·판정</th>
+<th>도표</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>F-D12-001 / P-D12-001</td>
+<td><code>apps/android/adminapp/build.gradle.kts:12-144</code>; <code>AdminBoundaryActivity.java:424-443,522-622</code>; main manifest·debug network config·data extraction rules</td>
+<td>debug 명시 opt-in만 운영 기능 구성, release 항상 false, property 우선순위, HTTPS root·source commit 형식 검사 일치. manifest 선언은 기기 효과 시험과 구분됨.</td>
+<td>D12-F001.mmd</td>
+</tr>
+<tr>
+<td>F-D12-004 / P-D12-004</td>
+<td><code>security/AdminSecurityController.java:533-603,1844-1965</code>; <code>AdminBoundaryActivity.java:3149-3160</code>; <code>security/AdminSecurityHttpClient.java:1160-1203</code></td>
+<td>토큰 발급과 state/inventory 검증을 구분. token32..512·공백금지, 현재 session/device 각1개, 발급 후 조회실패 FAIL_CLOSED·retained token 경계 일치. 공유 ID <code>-shared</code> 금지 누락 수정 확인.</td>
+<td>D12-F004.mmd</td>
+</tr>
+<tr>
+<td>F-D12-006 / P-D12-006</td>
+<td><code>security/AdminSecurityController.java:255-380,431-493</code>; <code>AdminBoundaryActivity.java:913-965,3328-3349</code></td>
+<td>일반 background generation 증가·local lock, snapshot identity 숨김, 의도적 SAF/기기인증 이탈 예외, access session은 기기확인+서버검증, recovery token은 별도 분기 일치.</td>
+<td>D12-F006.mmd</td>
+</tr>
+<tr>
+<td>F-D12-015 / P-D12-015</td>
+<td><code>security/AdminSecurityController.java:644-741,1693-1711</code>; <code>security/AdminHighRiskActionGate.java:245-291</code></td>
+<td>action 없는 overload 거부, expiry 엄격 <code>&gt; now</code>, exact action/method/path, consume 전 pending 제거, custody/운영 gate 확인. background 즉시 삭제 표현을 사용차단·resume clear로 정정 확인.</td>
+<td>D12-F015.mmd</td>
+</tr>
+<tr>
+<td>F-D12-019 / P-D12-019</td>
+<td><code>security/AdminOriginalEvidence.java:1-160,252-270</code>; <code>security/AdminOperationsHttpClient.java:409-517</code>; <code>AdminBoundaryActivity.java:1991-2241</code></td>
+<td>현재 draft APPROVED 진입조건, 이유8..500, token단회소모, grant 만료 상한330000ms, 이미지8MiB/축8192/20M픽셀/표시1600, 현재scope 검사 후 표시, 만료·변경·onStop cleanup 확인. audit와 실제열람 증거 구분 일치.</td>
+<td>D12-F019.mmd</td>
+</tr>
+<tr>
+<td>F-D12-031 / P-D12-031</td>
+<td><code>security/AdminReportRequestController.java:273-381,396-462</code>; <code>security/AdminReportRequestModels.java:1-108,273-291</code>; <code>AdminBoundaryActivity.java:3754-3784</code></td>
+<td>DELETE는 ACKNOWLEDGED→REJECTED만 일반 PATCH 가능. CORRECTION은 RESOLVED 허용. PATCH 성공 이후 상세 GET 실패는 재전송하지 않고 detail 재조회 상태로 구분.</td>
+<td>D12-F031.mmd 및 D12-F031-state.mmd</td>
+</tr>
+<tr>
+<td>F-D12-038 / P-D12-038</td>
+<td><code>security/AdminRawCollectionModels.java:120-206,343-401</code>; <code>security/AdminRawCollectionHttpClient.java:144-186</code>; <code>AdminBoundaryActivity.java:4896-4953</code></td>
+<td>TRAINING APPROVED의 3digest·dataset·3제외확인, 다른 결정의 승인전용증거 거부, source/actor/revision+1/요청의도 응답결속 확인. reason/revision/idempotency 입력 누락 수정 확인.</td>
+<td>D12-F038.mmd</td>
+</tr>
+</tbody></table>
+<ul>
+<li>위 표의 짧은 Java 경로는 <code>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/</code> 기준이다.</li>
+<li>타 기능의 공통 gate를 무조건 우선순위로 단정하지 않고 실제 표본의 호출 순서·scope guard와 대조했다. HTTP deadline 전체 구현, 서버 관리자 권한의 최종 판정은 이 표본에서 전수검토하지 않았다.</li>
+</ul>
+<p>[수정 요청과 재확인]</p>
+<ul>
+<li>RV-D12-D01-01 · 문서 진입조건/도표 오류 · 해결: F019에 <code>현재 검수 draft가 APPROVED</code>일 때만 grant 요청이 가능함을 추가했다. 서버 기존 판정이 APPROVED라는 뜻과 구분했다. 기존 정상표시→무조건 cleanup→승인 사용으로 오해할 수 있던 도표를 정상 확인 경로와 별도 lifecycle cleanup으로 나눴다. 근거 <code>AdminBoundaryActivity.java:1995-2000,2131-2241</code>.</li>
+<li>RV-D12-D01-02 · 문서 시점 정확화 · 해결: F015의 background에서 pending 허가 제거 표현을 수정했다. <code>suspendForBackground:289-295</code>는 generation·lock을 바꾸며 <code>resumeLocalSession:308-327</code>가 clear한다. 실행 중 작업이 stale로 끝날 때 <code>LocalOperation.close:450-453</code>도 clear할 수 있지만 단순 background 즉시 메모리 소거와는 다르다.</li>
+<li>RV-D12-D01-03 · 필수 입력정책 누락 · 해결: F038/P038에 reason1..500, expectedRevision≥0, canonical UUID idempotencyKey, 선택 TRAINING revision과 정확 일치 조건을 추가했다. 근거 <code>AdminRawCollectionModels.java:145-155</code>, <code>AdminBoundaryActivity.java:4907-4911</code>.</li>
+<li>RV-D12-D01-04 · 허용 ID 범위 누락 · 해결: F004/P004에 대소문자 무관 <code>-shared</code> 접미사 거부를 추가했다. regex를 통과해도 추가 거부가 존재한다. 근거 <code>AdminSecurityHttpClient.java:1175-1183</code>.</li>
+<li>RV-D12-D01-05 · 후속 도표 노드 충돌 · 해결: F038에 보강한 입력검증 노드 <code>C</code>가 기존 중단 경계 <code>C</code>를 재정의하던 것을 <code>INPUT</code>으로 분리했다. 수정 원문에서 서로 다른 라벨·edge를 확인했다. 제품 코드 문제는 아니다.</li>
+</ul>
+<p>[기존 관찰과 실행 한계]</p>
+<ul>
+<li>기존 R-D12-007/D14 R8의 재인증 이후 <code>step_up_verified_at</code> 전달 단절 가능성은 F015 notes에 이미 명시되어 있다. 이 검토는 클라이언트 호출 순서를 확인했으며 서버 D14/D09 경로를 재검토하거나 403을 동적으로 재현하지 않았다. 해결된 제품 결함이라고 처리하지 않는다.</li>
+<li>release 운영 기능 false는 정적 설정 사실이다. 앱 KeyStore/PIN, 토큰 실제 발급, 보호 API, FLAG_SECURE, 파일 저장·삭제, 원본 이미지 표시, 학습 증거의 실물 적합성은 이번에 실행·관찰하지 않았다.</li>
+<li>테스트 파일의 존재나 기존 기록을 이 검토의 실행 결과로 세지 않았다.</li>
+</ul>
+<p>[미검토]</p>
+<ul>
+<li>나머지 F002-003, F005, F007-014, F016-018, F020-030, F032-037, F039-045는 기능 단위 독립검토를 수행하지 않았다. 일부는 위 표본의 공유 helper로 읽었지만 검토 완료 범위로 확대하지 않는다.</li>
+<li>보안·복구·기기키 회전·proof parser·전체 HTTP client·SAF·검수/전달 미확정 journal·삭제후속·사고·감사·접근성·텔레메트리의 모든 분기, 전체 테스트, 서버 권위 구현, 모든 추가 state/sequence 도표는 미검토다.</li>
+<li>Mermaid 렌더/시각 회귀 및 최종 Markdown 연결 검증, 전체 분야 통합·완료 판단은 Root가 담당한다.</li>
+</ul>
+<p>[인계]</p>
+<ul>
+<li><p>변경 파일: <code>reviews/D12-by-D01.md</code> 한 개. 검토 대상 JSON/Mermaid와 제품 코드 직접 변경 없음.</p>
+</li>
+<li><p>최종 JSON SHA는 위 최종 검토 SHA와 같다. 최종 표본 도표 SHA256은 아래와 같다.</p>
+</li>
+<li><p><code>D12-F001.mmd</code>: <code>e07dd65c8cb44a3d6f1706308f3639ac4589a33c46f35dd4d18a22c2f8455ffa</code>.</p>
+</li>
+<li><p><code>D12-F004.mmd</code>: <code>902d3c6f75de1e9e953a35bc86766ee27065702b8d8a54539ee2b91878331e6e</code>.</p>
+</li>
+<li><p><code>D12-F006.mmd</code>: <code>102706c4a29d310444500d3510b91aefeac9007fa8432baef70f735e68a9077d</code>.</p>
+</li>
+<li><p><code>D12-F015.mmd</code>: <code>36b83d5e380e61021af6e4b66df56a210abbbbed6e6c66891e07d7d4bb28a44d</code>.</p>
+</li>
+<li><p><code>D12-F019.mmd</code>: <code>f5167b5baea8873eea7c6333b7a4116f0d89144c3d7d371d9229cbfa200956e1</code>.</p>
+</li>
+<li><p><code>D12-F031.mmd</code>: <code>b89084e5e761887122b5c84dbb205bf440e8e81f9c3c03b04fa16e4eb26cef62</code>.</p>
+</li>
+<li><p><code>D12-F031-state.mmd</code>: <code>83f1a28039aafad447754c6ada002cff2117103c08c26fdb0ed5912ed1293ed0</code>.</p>
+</li>
+<li><p><code>D12-F038.mmd</code>: <code>1ba8d6d2ede6e8d3d14fd51d5f2c1b4c0e08c68b5262cb29d6be4d4373c73295</code>.</p>
+</li>
+</ul>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

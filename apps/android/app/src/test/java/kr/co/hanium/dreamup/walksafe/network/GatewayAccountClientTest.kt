@@ -4,6 +4,8 @@ import java.util.Base64
 import java.io.IOException
 import kr.co.hanium.dreamup.walksafe.account.SignupConsentSelections
 import org.json.JSONObject
+import org.json.JSONArray
+import kr.co.hanium.dreamup.walksafe.account.SIGNUP_DOCUMENT_VERSIONS
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -531,6 +533,42 @@ class GatewayAccountClientTest {
             "http://127.0.0.1:8081", "person@example.com", "2000-01-01", "request_1234567890",
         )
         assertEquals("http://127.0.0.1:8081/api/account-enrollments/email-otp", transport.url)
+        assertEquals(70_000L, transport.totalTimeoutMs)
+    }
+
+    @Test
+    fun signupPolicyMetadataUsesTheApprovedOriginAndExactPublicContract() {
+        val documents = JSONObject()
+        SIGNUP_DOCUMENT_VERSIONS.entries.forEachIndexed { index, (key, version) ->
+            documents.put(key, JSONObject().put("version", version).put("required", index < 3)
+                .put("equivalent_versions", JSONArray()).put("prior_versions", JSONArray()))
+        }
+        val body = JSONObject().put("schema_version", "walksafe.account-signup-policy.v1")
+            .put("documents", documents).toString()
+        val transport = AccountTransport(GatewayHttpResponse(500, "{}"), GatewayHttpResponse(200, body))
+        val client = GatewayAccountClient(transport, "https://approved.example", false)
+        assertTrue(client.signupUnavailableOptionalDocuments("https://approved.example").isEmpty())
+        assertEquals("https://approved.example/api/account-signup-policy", transport.getUrl)
+        assertThrows(GatewayAccountHttpException::class.java) {
+            client.signupUnavailableOptionalDocuments("https://other.example")
+        }
+        assertEquals(1, transport.getCount)
+        transport.getResponse = GatewayHttpResponse(503, "{}")
+        assertThrows(GatewayAccountHttpException::class.java) {
+            client.signupUnavailableOptionalDocuments("https://approved.example")
+        }
+    }
+
+    @Test
+    fun serverCurrentVersionCannotReplaceTheDocumentsActuallyDisplayedByTheApp() {
+        val transport = AccountTransport(GatewayHttpResponse(500, "{}"))
+        val client = GatewayAccountClient(transport)
+        val changed = SIGNUP_DOCUMENT_VERSIONS + ("terms_of_service" to "walksafe.terms-of-service.v2")
+        assertThrows(GatewayAccountHttpException::class.java) {
+            client.createAccount("https://gateway.example", HANDLE, "012345", "a-long-safe-password",
+                SignupConsentSelections(true, true, true), changed)
+        }
+        assertEquals("", transport.url)
     }
 
     private class AccountTransport(
@@ -540,6 +578,8 @@ class GatewayAccountClientTest {
         var url: String = ""
         var body: String = ""
         var getCount: Int = 0
+        var getUrl: String = ""
+        var totalTimeoutMs: Long? = null
         var getFailure: Exception? = null
 
         override fun postJson(url: String, body: String): GatewayHttpResponse {
@@ -548,8 +588,14 @@ class GatewayAccountClientTest {
             return postResponse
         }
 
+        override fun postJson(url: String, body: String, totalTimeoutMs: Long): GatewayHttpResponse {
+            this.totalTimeoutMs = totalTimeoutMs
+            return postJson(url, body)
+        }
+
         override fun get(url: String, headers: Map<String, String>): GatewayHttpResponse {
             getCount += 1
+            getUrl = url
             getFailure?.let { throw it }
             return getResponse
         }

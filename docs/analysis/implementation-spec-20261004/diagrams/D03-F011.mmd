@@ -1,0 +1,20 @@
+flowchart TD
+ A["F-D03-011 명령 dispatch / P-D03-011"] --> B["Main이 commandId에 새 search 또는 route generation 결합"]
+ B --> C{"현재 state와 commandId인가"}
+ C -->|"아니오"| X["오래된 poll 종료"]
+ C -->|"예"| W{"명령 작업이 pending인가"}
+ W -->|"예"| T{"작업 대기가 30초에 도달했는가"}
+ T -->|"예"| F["CommandResultTimeout / Main 재시작 경로"]
+ T -->|"아니오"| O{"출력이 활성인가"}
+ O -->|"예"| S["Speaking 입력 억제 / 새 출력 진행은 watchdog 갱신"]
+ O -->|"아니오이며 1.2초 경과"| Q["WaitingForCommandResult / 새 wake 수신 가능"]
+ Q -->|"100ms 후 현재 command 작업 재검사"| C
+ W -->|"아니오"| E{"출력 활성인가"}
+ E -->|"예"| S
+ E -->|"아니오"| R{"quiet 500ms 또는 무출력 1.2초인가"}
+ R -->|"예"| K["wake 대기로 복귀"]
+ R -->|"아니오"| C
+ S --> U{"출력 진행 없이 130초인가"}
+ U -->|"예"| V["OutputTimeout / Main 재시작 경로"]
+ U -->|"아니오"| C
+ B -->|"stop 또는 eligibility 상실"| X

@@ -1,0 +1,23 @@
+flowchart TD
+A["SAF 반입 F-D16-003"] --> B{"Trace v2·UTC·hash 유효? F-D16-004"}
+B -->|"아니오"| X["반입 거절·새 사본 정리"]
+B -->|"예"| C["GnssLogger→RINEX F-D16-005"]
+C --> D{"기준국 모드"}
+D -->|"수동"| E["O/N·시간·거리·hash 검증 F-D16-006"]
+D -->|"자동"| F["키·NGII catalog·후보 다운로드 F-D16-007/008"]
+E --> G["고정 JNI·입력중복병합/충돌검사·PPK F-D16-010"]
+F --> G
+G -->|"성공"| H["UTC LLH 계약·FIX 격자 평가 F-D16-011/012"]
+C -->|"실패"| Y["FailurePolicy 실패 JSON F-D16-013"]
+E -->|"실패"| Y
+F -->|"실패"| Y
+G -->|"일반 실패"| Y
+G -->|"취소"| Z["JSON 없이 정리·옛callback 차단 F-D16-014"]
+H --> I{"현재 generation·취소 아님?"}
+Y --> I
+I -->|"아니오"| Z
+I -->|"예"| J["NOT_INDEPENDENT 결과 F-D16-015"]
+J -->|"명시 저장"| K["SAF JSON write·실패시 사용자 재시도"]
+J -->|"자료 삭제·busy/cancelling 없음"| L["비공개 사본·키 삭제 F-D16-016"]
+L -->|"부분 실패"| M["잔존 상태 재정합·재시도"]
+L -->|"성공"| N["로컬 입력/결과 초기화·외부원본/공개cache 보존"]

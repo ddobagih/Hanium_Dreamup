@@ -71,6 +71,7 @@ _PRIVACY_CLEANUP_TABLES = (
     "account_deletion_requests",
     "account_deletion_receipts",
     "account_deletion_tombstones",
+    "privacy_installation_evidence_keys",
     "privacy_consent_events",
     "privacy_hmac_key_bindings",
     "signup_consent_receipts",
@@ -334,3 +335,13 @@ def clean_test_storage_before_module(
     if clean_test_storage is not None:
         clean_test_storage()
     yield
+
+
+@pytest.fixture(autouse=True)
+def initialize_default_app_resources():
+    # Existing transport tests deliberately do not enter the production lifespan.
+    # Their key file/upload root above are exclusively owned by this pytest run.
+    import sys
+    module = sys.modules.get("backend.app.main")
+    if module is not None and module.app.state.runtime.report_image_key_manager is None:
+        module.app.state.runtime.initialize_resources()

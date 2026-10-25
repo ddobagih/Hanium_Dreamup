@@ -1,0 +1,17 @@
+stateDiagram-v2
+  state "F037 IDLE" as Idle
+  state "STARTING" as Starting
+  state "RECORDING" as Recording
+  state "STOPPING: generation 무효" as Stopping
+  state "STOPPED: closed·publish 성공" as Stopped
+  state "ERROR: closed·part 보존" as Error
+  [*] --> Idle
+  Idle --> Starting: start 단1회
+  Starting --> Recording: open·header flush 성공
+  Starting --> Stopping: 준비중 stop
+  Starting --> Error: open·worker 시작 실패
+  Recording --> Recording: budget내 batch copy / flush 뒤 count
+  Recording --> Stopping: stop·queue/file overflow·fail
+  Stopping --> Stopped: 승인queue drain·footer·flush·close·publish 성공
+  Stopping --> Error: error 또는 flush·close·publish 실패
+  Recording --> Error: IO실패 후 pending drop 및 close

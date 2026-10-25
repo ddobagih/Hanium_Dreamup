@@ -61,8 +61,19 @@ class BuildProvenanceStaticTest {
         assertTrue(buildScript.contains("WALKSAFE_GATEWAY_ORIGIN"))
         assertTrue(buildScript.contains("normalizedHttpsOriginOrNull"))
         assertTrue(buildScript.contains("walksafe-release-v1"))
-        assertTrue(mainSource.contains("GatewayEndpointPolicy.approvedReleaseOriginOrNull"))
-        assertTrue(mainSource.contains("isEnabled = BuildConfig.DEBUG"))
+        val origin = MainActivityRefactorSource.member(mainSource, "configuredGatewayOriginOrNull")
+        assertTrue(origin.contains("return if (BuildConfig.DEBUG)"))
+        assertTrue(origin.contains("GatewayEndpointPolicy.approvedReleaseOriginOrNull("))
+        assertTrue(origin.contains("approvedOrigin = BuildConfig.WALKSAFE_GATEWAY_ORIGIN"))
+        val composition = MainActivityRefactorSource.member(mainSource, "buildContentView")
+        assertTrue(composition.contains("val settingsPanel = SettingsPrivacyPanel("))
+        assertTrue(composition.contains("backendUrlInput = requireNotNull(settingsPanel.backendUrlInput)"))
+        val panel = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/SettingsPrivacyPanel.kt").readText()
+        val input = MainActivityRefactorSource.property(panel, "backendUrlInput")
+        assertTrue(input.contains("if (BuildConfig.DEBUG)"))
+        assertTrue(input.contains("isEnabled = BuildConfig.DEBUG"))
+        assertTrue(input.contains("isFocusable = BuildConfig.DEBUG"))
+        assertTrue(input.contains("} else {\n        null\n    }"))
     }
 
     @Test

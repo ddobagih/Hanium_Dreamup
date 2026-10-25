@@ -16,6 +16,7 @@ import java.util.Locale
 import java.util.UUID
 import kr.co.hanium.dreamup.walksafe.MetadataCaptureLogEntry
 import kr.co.hanium.dreamup.walksafe.debuglog.MetadataLogJsonEncoder
+import kr.co.hanium.dreamup.walksafe.feedback.FieldSpeechOutputStorageProvider
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
 import kr.co.hanium.dreamup.walksafe.security.AeadLimits
 import kr.co.hanium.dreamup.walksafe.security.AeadOpenResult
@@ -126,6 +127,7 @@ internal class PersistentFieldSessionLog(
     private val initiallyBlockedForRawSourceCollection: Boolean = false,
     private val aead: LocalAead = AndroidKeyStoreAead(FIELD_KEY_POLICY),
     private val directorySync: (File) -> Boolean = ::syncDirectory,
+    private val initializeArchive: Boolean = true,
 ) : FieldSessionLog {
     private var active: SessionState? = null
     private var lastTelemetryAtMs = Long.MIN_VALUE
@@ -151,8 +153,10 @@ internal class PersistentFieldSessionLog(
             if (initiallyBlockedForAccountDeletion) persistFence(accountDeletionBlockFile())
             if (initiallyBlockedForRawSourceCollection) persistFence(rawSourceCollectionBlockFile())
             refreshPersistentFencesAndDropStaleActive()
-            pruneCompletedSessions()
-            if (accountDeletionBlocked || rawSourceCollectionBlocked) {
+            if (initializeArchive) pruneCompletedSessions()
+            if (!initializeArchive) {
+                // A privacy-only accessor never restores/starts the DEBUG archive stream.
+            } else if (accountDeletionBlocked || rawSourceCollectionBlocked) {
                 finalizePersistedActiveSessionForRestoreBlock(
                     terminationReason = if (accountDeletionBlocked) {
                         "account_deletion_blocked"
@@ -165,6 +169,84 @@ internal class PersistentFieldSessionLog(
             } else {
                 restoreActiveSession()
             }
+        }
+    }
+
+    /** Narrow release storage boundary; the private companion/key policy stays private. */
+    internal class SpeechStorageAccess private constructor(
+        private val owner: PersistentFieldSessionLog,
+    ) {
+        internal data class Profile(
+            val maxSegmentBytes: Long,
+            val maxWindowBytes: Long,
+            val maxRetainedWindows: Int,
+            val maxWindowAgeMs: Long,
+            val maxActiveWindowAgeMs: Long,
+        )
+
+        val rootDirectory: File get() = owner.rootDirectory
+        val aead: LocalAead get() = owner.aead
+        val recordLimits: AeadLimits get() = RECORD_LIMITS
+        val profile: Profile get() = Profile(owner.maxSegmentBytes, owner.maxSessionBytes,
+            owner.maxRetainedSessions, owner.maxSessionAgeMs, owner.maxActiveSessionAgeMs)
+        fun nowMillis(): Long = owner.nowMillis()
+
+        fun <T> withWritableStorage(action: () -> T): T? = synchronized(owner) {
+            synchronized(PROCESS_LOCK) storage@{
+                owner.refreshPersistentFencesAndDropStaleActive()
+                if (owner.accountDeletionBlocked || owner.rawSourceCollectionBlocked ||
+                    owner.cryptoBlocked
+                ) return@storage null
+                action()
+            }
+        }
+
+        /** Reentrant withWritableStorage use keeps the original owner -> PROCESS_LOCK order. */
+        fun prepareExistingArchives(): Boolean = synchronized(owner) {
+            synchronized(PROCESS_LOCK) {
+                owner.pruneCompletedSessions()
+                !owner.cryptoBlocked
+            }
+        }
+
+        fun blockCrypto() = synchronized(owner) {
+            synchronized(PROCESS_LOCK) { owner.blockCryptoLocked() }
+        }
+        fun syncDirectory(directory: File): Boolean = owner.directorySync(directory)
+
+        fun purgeAll(): Boolean = owner.purgeAll()
+        fun purgeForRawSourceWithdrawal(accountDeletionIntent: () -> Boolean): Boolean =
+            owner.purgeForRawSourceWithdrawal(accountDeletionIntent)
+        fun resetAfterConfirmedRawConsent(accountDeletionActive: () -> Boolean): Boolean =
+            owner.resetAfterConfirmedRawConsent(accountDeletionActive)
+        fun blockForAccountDeletion(): Boolean = owner.blockForAccountDeletion()
+        fun blockForRawSourceWithdrawal(): Boolean = owner.blockForRawSourceWithdrawal()
+        fun resetRawSourceAfterConfirmedConsent(): Boolean = owner.resetRawSourceAfterConfirmedConsent()
+        fun resetForNewEnrollment(): Boolean = owner.resetForNewEnrollment()
+
+        companion object {
+            fun recordAad(window: Long, ordinal: Long): ByteArray =
+                ("$AAD_PREFIX|field-log|speech-output|window=$window|ordinal=$ordinal|record|storage=1")
+                    .toByteArray(StandardCharsets.UTF_8)
+            /** Production defaults reuse the actual field key/profile, including purge/reset. */
+            fun create(
+                appFilesDirectory: File,
+                initiallyBlockedForAccountDeletion: Boolean = false,
+                initiallyBlockedForRawSourceCollection: Boolean = false,
+                aead: LocalAead = AndroidKeyStoreAead(FIELD_KEY_POLICY),
+                nowMillis: () -> Long = System::currentTimeMillis,
+                directorySync: (File) -> Boolean = ::syncDirectory,
+            ): SpeechStorageAccess = SpeechStorageAccess(PersistentFieldSessionLog(
+                rootDirectory = File(appFilesDirectory, "field_sessions"),
+                // This information is never persisted: no archive init/start/metadata API is exposed.
+                deviceInfo = FieldSessionDeviceInfo("", "", "", ""),
+                initiallyBlockedForAccountDeletion = initiallyBlockedForAccountDeletion,
+                initiallyBlockedForRawSourceCollection = initiallyBlockedForRawSourceCollection,
+                aead = aead,
+                nowMillis = nowMillis,
+                directorySync = directorySync,
+                initializeArchive = false,
+            ))
         }
     }
 
@@ -184,6 +266,7 @@ internal class PersistentFieldSessionLog(
         active?.let { return it.id }
         if (hasActivePointerArtifact()) return null
         pruneCompletedSessions()
+        if (cryptoBlocked) return null
         val now = nowMillis()
         val id = idFactory().takeIf { SAFE_SESSION_ID.matches(it) }
             ?: throw IllegalArgumentException("field session id must contain only safe filename characters")
@@ -273,7 +356,23 @@ internal class PersistentFieldSessionLog(
     @Synchronized
     override fun purgeAll(): Boolean = synchronized(PROCESS_LOCK) {
         refreshPersistentFencesAndDropStaleActive()
-        accountDeletionBlocked = true
+        purgeStorageLocked(forAccountDeletion = true)
+    }
+
+    @Synchronized
+    private fun purgeForRawSourceWithdrawal(accountDeletionIntent: () -> Boolean): Boolean =
+        synchronized(PROCESS_LOCK) {
+            refreshPersistentFencesAndDropStaleActive()
+            purgeStorageLocked(forAccountDeletion = false, accountDeletionIntent)
+        }
+
+    /** Both reasons share the verified root/key/sync algorithm; RAW cannot lower account intent. */
+    private fun purgeStorageLocked(
+        forAccountDeletion: Boolean,
+        accountDeletionIntent: () -> Boolean = { false },
+    ): Boolean {
+        accountDeletionBlocked = accountDeletionBlocked || forAccountDeletion || accountDeletionIntent()
+        rawSourceCollectionBlocked = rawSourceCollectionBlocked || !forAccountDeletion
         val preserveRawSourceBlock = rawSourceCollectionBlocked
         active = null
         stats = null
@@ -290,25 +389,34 @@ internal class PersistentFieldSessionLog(
         )
         val recreated = rootDirectory.mkdirs() || rootDirectory.isDirectory
         val recreationDurable = recreated && rootDirectory.parentFile?.let(directorySync) == true
-        val accountFencePersisted = recreated && persistFence(accountDeletionBlockFile())
+        // Admission intent is memory-only and can arrive while key/root I/O holds PROCESS_LOCK.
+        accountDeletionBlocked = accountDeletionBlocked || accountDeletionIntent()
+        val accountFenceNeeded = accountDeletionBlocked
+        val accountFencePersisted = !accountFenceNeeded ||
+            (recreated && persistFence(accountDeletionBlockFile()))
         val rawFencePersisted =
             !preserveRawSourceBlock || (
                 recreated && persistFence(rawSourceCollectionBlockFile())
             )
+        // The existing crypto fence binds a RAW reset to proof even if its verified marker is lost.
+        val rawProofFencePersisted = forAccountDeletion || (recreated && persistFence(cryptoBlockFile()))
         val purgePrerequisites = keyDeleted && deleted && deletionDurable &&
-            recreationDurable && accountFencePersisted && rawFencePersisted
+            recreationDurable && accountFencePersisted && rawFencePersisted && rawProofFencePersisted
         val purgeVerified = purgePrerequisites && atomicWrite(
             fieldKeyPurgeVerifiedFile(),
             FIELD_KEY_PURGE_VERIFIED_VALUE,
         )
-        val succeeded = purgePrerequisites && purgeVerified
-        cryptoBlocked = !succeeded
+        accountDeletionBlocked = accountDeletionBlocked || accountDeletionIntent()
+        val lateAccountFencePersisted = !accountDeletionBlocked || accountFenceNeeded ||
+            (recreated && persistFence(accountDeletionBlockFile()))
+        val succeeded = purgePrerequisites && purgeVerified && lateAccountFencePersisted
+        cryptoBlocked = !succeeded || !forAccountDeletion
         if (!succeeded) {
             fieldKeyPurgeVerifiedFile().delete()
             atomicTemporaryFile(fieldKeyPurgeVerifiedFile()).delete()
             persistFence(cryptoBlockFile())
         }
-        succeeded
+        return succeeded
     }
 
     @Synchronized
@@ -355,31 +463,73 @@ internal class PersistentFieldSessionLog(
     @Synchronized
     override fun resetForNewEnrollment(): Boolean = synchronized(PROCESS_LOCK) {
         refreshPersistentFencesAndDropStaleActive()
-        if (!hasVerifiedFieldKeyPurge() || !hasOnlyVerifiedPurgeArtifacts()) {
-            blockCryptoLocked()
-            return@synchronized false
+        resetAfterVerifiedPurgeLocked(clearAccountFence = true)
+    }
+
+    @Synchronized
+    private fun resetAfterConfirmedRawConsent(accountDeletionActive: () -> Boolean): Boolean =
+        synchronized(PROCESS_LOCK) {
+            refreshPersistentFencesAndDropStaleActive()
+            if (!rawResetMayProceed(accountDeletionActive)) return@synchronized false
+            if (cryptoBlocked || hasFence(fieldKeyPurgeVerifiedFile())) {
+                return@synchronized resetAfterVerifiedPurgeLocked(
+                    clearAccountFence = false, accountDeletionActive)
+            }
+            // Keep the old raw-only fence path and its public changed Boolean unchanged.
+            if (!clearFence(rawSourceCollectionBlockFile())) return@synchronized false
+            rawSourceCollectionBlocked = false
+            pruneCompletedSessions()
+            if (cryptoBlocked || !rawResetMayProceed(accountDeletionActive)) return@synchronized false
+            true // Already healthy first grant is actually writable, even when nothing changed.
         }
-        val accountCleared = clearFence(accountDeletionBlockFile())
+
+    private fun rawResetMayProceed(accountDeletionActive: () -> Boolean): Boolean {
+        refreshPersistentFencesAndDropStaleActive()
+        val deleting = try { accountDeletionActive() } catch (_: Exception) {
+            blockCryptoLocked()
+            return false
+        }
+        if (deleting) {
+            accountDeletionBlocked = true
+            persistFence(accountDeletionBlockFile())
+        }
+        return !accountDeletionBlocked
+    }
+
+    private fun resetAfterVerifiedPurgeLocked(
+        clearAccountFence: Boolean,
+        accountDeletionActive: () -> Boolean = { false },
+    ): Boolean {
+        fun admitted(): Boolean = clearAccountFence || rawResetMayProceed(accountDeletionActive)
+        fun failed(): Boolean {
+            if (!clearAccountFence) {
+                rawSourceCollectionBlocked = true
+                persistFence(rawSourceCollectionBlockFile())
+            }
+            blockCryptoLocked()
+            return false
+        }
+        if (!admitted() || !hasVerifiedFieldKeyPurge() || !hasOnlyVerifiedPurgeArtifacts()) {
+            return failed()
+        }
+        val accountCleared = !clearAccountFence || clearFence(accountDeletionBlockFile())
         val rawCleared = clearFence(rawSourceCollectionBlockFile())
         val cryptoCleared = clearFence(cryptoBlockFile())
         if (!accountCleared || !rawCleared || !cryptoCleared || !hasOnlyExactPurgeMarker()) {
-            blockCryptoLocked()
-            return@synchronized false
+            return failed()
         }
-        if (!aead.createFreshAfterVerifiedPurge()) {
-            blockCryptoLocked()
-            return@synchronized false
+        if (!admitted() || !aead.createFreshAfterVerifiedPurge() || !admitted()) {
+            return failed()
         }
         val marker = fieldKeyPurgeVerifiedFile()
-        if (!marker.delete() || marker.exists() || !directorySync(rootDirectory)) {
-            blockCryptoLocked()
-            return@synchronized false
+        if (!marker.delete() || marker.exists() || !directorySync(rootDirectory) || !admitted()) {
+            return failed()
         }
-        accountDeletionBlocked = false
+        if (clearAccountFence) accountDeletionBlocked = false
         rawSourceCollectionBlocked = false
         cryptoBlocked = false
         rootDirectory.mkdirs()
-        true
+        return true
     }
 
     @Synchronized
@@ -1107,9 +1257,22 @@ internal class PersistentFieldSessionLog(
         val protectedActiveId = readActivePointerId()
         if (cryptoBlocked) return
         val now = nowMillis()
+        val speechArtifact = File(rootDirectory, FieldSpeechOutputStorageProvider.ARTIFACT_DIRECTORY)
+        val speechWindows = if (Files.exists(speechArtifact.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            FieldSpeechOutputStorageProvider.readValidWindows(speechArtifact, aead, RECORD_LIMITS,
+                SpeechStorageAccess.Profile(maxSegmentBytes, maxSessionBytes,
+                    maxRetainedSessions, maxSessionAgeMs, maxActiveSessionAgeMs)) ?: run {
+                blockCryptoLocked()
+                return
+            }
+        } else emptyList()
         val completed = rootDirectory.listFiles(File::isDirectory)
             .orEmpty()
             .mapNotNull { directory ->
+                if (directory.name == FieldSpeechOutputStorageProvider.ARTIFACT_DIRECTORY) {
+                    // Only the exact artifact was authenticated above; unknown dirs still fail closed.
+                    return@mapNotNull null
+                }
                 if (directory.name == protectedActiveId) return@mapNotNull null
                 val manifest = readManifest(directory.name) ?: run {
                     blockCryptoLocked()
@@ -1122,10 +1285,14 @@ internal class PersistentFieldSessionLog(
                 val endedAt = manifest.optLong("ended_at_epoch_ms", directory.lastModified())
                 RetainedSession(directory, endedAt)
             }
+            .plus(speechWindows.map { RetainedSession(it.directory, it.createdAtMs) })
             .sortedByDescending(RetainedSession::endedAtMs)
         completed.forEachIndexed { index, session ->
             val expired = now >= session.endedAtMs && now - session.endedAtMs > maxSessionAgeMs
             if (expired || index >= maxRetainedSessions) session.directory.deleteRecursively()
+        }
+        if (speechWindows.isNotEmpty() && speechArtifact.listFiles()?.isEmpty() == true) {
+            speechArtifact.delete()
         }
     }
 
@@ -1265,6 +1432,7 @@ internal class PersistentFieldSessionLog(
             "compass_source",
             "cue_id",
             "expression_level",
+            "clock_reference_kind",
             "heading_accuracy_deg",
             "position_uncertainty_m",
             "rear_heading_deg",
@@ -1272,6 +1440,19 @@ internal class PersistentFieldSessionLog(
             "reported_heading_accuracy_deg",
             "route_bearing_deg",
             "segment_index",
+            "compass_input_age_ms",
+            "compass_rejected_check",
+            "rear_horizontal_permille",
+            "magnetic_field_ut",
+            "expected_magnetic_field_ut",
+            "magnetic_field_deviation_ut",
+            "magnetic_field_allowance_ut",
+            "magnetic_horizontal_permille",
+            "magnetic_inclination_deg",
+            "expected_magnetic_inclination_deg",
+            "magnetic_inclination_residual_deg",
+            "magnetic_inclination_allowance_deg",
+            "compass_reason",
             // S09-9 late step/ZUPT handling: whole milliseconds and an event count only.
             "measurement_lag_ms",
             "replayed_event_count",

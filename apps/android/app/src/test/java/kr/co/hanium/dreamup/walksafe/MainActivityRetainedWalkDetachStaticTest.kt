@@ -29,7 +29,7 @@ class MainActivityRetainedWalkDetachStaticTest {
         assertTrue(detach < destroy.indexOf("super.onDestroy()\n    }"))
         // The authority-lost path only stops walks of the lifecycle the Activity references now.
         val lost = functionBlock("private fun handleGatewayWalkAuthorityLost(")
-        assertTrue(lost.contains("val snapshot = walkSessionLifecycle.snapshot()"))
+        assertTrue(lost.contains("val snapshot = runtime.snapshot()"))
         assertTrue(lost.contains("if (snapshot.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)) {"))
     }
 
@@ -44,11 +44,5 @@ class MainActivityRetainedWalkDetachStaticTest {
         assertEquals(before, retained.snapshot())
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "Missing function: $signature" }
-        val next = Regex("""\n    (private |internal |override |@VisibleForTesting|/\*\*|fun )""")
-            .find(source, start + signature.length)?.range?.first ?: source.length
-        return source.substring(start, next)
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
 }

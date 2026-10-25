@@ -1,0 +1,28 @@
+flowchart TD
+  A["F-D04-029 · P-D04-029<br/>DEBUG field lease의 GNSS·motion·checkpoint"]
+  G{"현재 lease와 measurement <= record 시각 계약"}
+  NO["기록 없음 또는 실패 처리"]
+  K{"checkpoint 이벤트인가"}
+  S{"통합 stationary가 1.5초 이상인가"}
+  DENY["mark 거부와 안내; ordinal 유지"]
+  UTC{"최초 GNSS UTC anchor가 있는가"}
+  ANCHOR["anchor와 monotonic delta로 UTC 계산"]
+  MONO["MONOTONIC_ONLY; UTC 생략"]
+  ROW["측정시각 position 행과 replay live sensor 행 분리<br/>checkpoint는 방문 사건; 참좌표 아님"]
+  WRITE{"recorder append 또는 mark 성공"}
+  STOP["field session stop 및 저장실패 UI"]
+  EXPORT["완료 세션 export: 내부 prefix 제거<br/>seq와 canonical JSON → D16 parser"]
+  A --> G
+  G -->|"아니오"| NO
+  G -->|"예"| K
+  K -->|"예"| S
+  K -->|"아니오"| UTC
+  S -->|"아니오"| DENY
+  S -->|"예"| UTC
+  UTC -->|"예"| ANCHOR
+  UTC -->|"아니오"| MONO
+  ANCHOR --> ROW
+  MONO --> ROW
+  ROW --> WRITE
+  WRITE -->|"아니오"| STOP
+  WRITE -->|"예"| EXPORT

@@ -36,9 +36,9 @@ class RuntimeMeasuredQualityGateTest {
     }
 
     @Test
-    fun unavailableFrameMissingSensorsAndUntrustedLocationRevokePassImmediately() {
+    fun unknownFrameStateMissingSensorsAndUntrustedLocationRevokePassImmediately() {
         val reasons = listOf(
-            "FRAME_UNAVAILABLE", "FRAME_STATE_UNKNOWN", "INVALID_MEASUREMENT",
+            "FRAME_STATE_UNKNOWN", "INVALID_MEASUREMENT",
             "STALE_OR_INVALID_TIMESTAMP", "TRUSTED_FIX_UNAVAILABLE", "INVALID_ACCURACY",
         )
         reasons.forEach { reason ->
@@ -109,12 +109,11 @@ class RuntimeMeasuredQualityGateTest {
     }
 
     @Test
-    fun allMeasuredCameraQualityFactorsShareTheBoundedWindow() {
+    fun cameraImageQualityFactorsShareTheBoundedWindow() {
         listOf(
             CameraFrameQualityReason.BRIGHTNESS_OUTSIDE_APPROVED_RANGE,
             CameraFrameQualityReason.OCCLUSION_OUTSIDE_APPROVED_RANGE,
             CameraFrameQualityReason.SHAKE_OUTSIDE_APPROVED_RANGE,
-            CameraFrameQualityReason.MOUNT_ANGLE_OUTSIDE_APPROVED_RANGE,
         ).forEach { reason ->
             val gate = RuntimeMeasuredQualityGate()
             val pass = evidence()

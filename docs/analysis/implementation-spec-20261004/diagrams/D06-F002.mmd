@@ -1,0 +1,37 @@
+flowchart TD
+  T["F-D06-002 신고 프레임·깊이·JPEG 증거 고정"]
+  P["전제: 현재 frameGeneration/runtimeMetricGeneration/walk epoch;<br/>partial 아닌 DetectionSnapshot; metric-depth 출력과 이미지 동일 객체."]
+  T --> P
+  E1["E-D06-002-01 현재 추론 프레임 완료→publishCurrentFrameReportState→자동<br/>후보와 직접 신고 snapshot 게시"]
+  E1 --> T
+  E2["E-D06-002-02 명시 신고 첫 동작→고정 snapshot 검증→JPEG/metadata 복사"]
+  E2 --> T
+  A1["1. YUV→ARGB→축소 JPEG 재인코딩한다."]
+  P --> A1
+  A2["2. frameStateLock 이후 runtimeMetricStateLock 순서로 현재 프레임을 재검사한다."]
+  A1 --> A2
+  A3["3. snapshot.frameEvidence 동일성·geometry·mapper·출력<br/>참조·reportImage 참조를 대조해 coordinate_gate_status pass를 부여한다."]
+  A2 --> A3
+  A4["4. 구조 JPEG 검증은 마커 길이와 프레임/스캔 구성만 검사하며 픽셀 디코딩 보장은 하지 않는다."]
+  A3 --> A4
+  N["정상 종료: 검증된 snapshot을 후보 처리로 전달."]
+  A4 --> N
+  FX["결과: 탐지 메타데이터·GPS·사진의 고정 자료. 사진 모자이크 없음. GPS는 촬영 기기의 위치<br/>CAPTURE_DEVICE."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"세대·geometry·프레임 증거 불일치"}
+    R1["게시 거부 또는 coordinate gate 미통과"]
+    B1 -->|조건 성립| R1
+    B2{"SOI/EOI만 있고 유효 scan 없음"}
+    R2["동결/queue 거부"]
+    B2 -->|조건 성립| R2
+    B3{"ARGB/JPEG 변환 RuntimeException"}
+    R3["이미지 null, 신고 후보 저장 차단"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-002"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["취소: 프레임 상태 reset이 보관 참조와 캡처 시간을 무효화."]
+    X2["정리: 명시 동결 payload는 소비/만료/취소 후 zeroize."]
+  end

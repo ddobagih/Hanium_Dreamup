@@ -16,6 +16,14 @@ internal fun rawRuntimeLatencyBucket(valueMs: Long): Int {
     return if (index < 0) RAW_RUNTIME_LATENCY_BUCKET_COUNT - 1 else index
 }
 
+/** Local producer identity; reference equality is required and it is never serialized. */
+class RawRuntimeWindowIdentity internal constructor()
+
+internal data class RawRuntimeWindowSnapshot(
+    val detection: RawDetectionMetadataSample,
+    val performance: RawPerformanceMetadataSample,
+)
+
 /**
  * One capture window of runtime counters for the raw PERFORMANCE/DETECTION pair.
  *
@@ -111,6 +119,22 @@ internal class RawRuntimeWindowAccumulator {
 
     fun windowElapsedMs(nowElapsedMs: Long): Long =
         if (windowOpen) nowElapsedMs - windowStartedAtElapsedMs else 0L
+
+    /** Frozen together on the serial RAW executor before another inference can update the window. */
+    fun snapshot(
+        windowStartedAtEpochMs: Long,
+        capturedAtEpochMs: Long,
+        detectorAvailable: Boolean,
+        thermalThrottled: Boolean?,
+    ): RawRuntimeWindowSnapshot {
+        val identity = RawRuntimeWindowIdentity()
+        return RawRuntimeWindowSnapshot(
+            detectionSample(windowStartedAtEpochMs, capturedAtEpochMs, detectorAvailable)
+                .copy(windowIdentity = identity),
+            performanceSample(windowStartedAtEpochMs, capturedAtEpochMs, thermalThrottled)
+                .copy(windowIdentity = identity),
+        )
+    }
 
     fun detectionSample(
         windowStartedAtEpochMs: Long,

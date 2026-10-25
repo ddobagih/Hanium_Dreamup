@@ -1,0 +1,27 @@
+flowchart TD
+  A["F-D12-004 관리자 비밀번호·TOTP 로그인"]
+  P["P-D12-004 서버 상태까지 확인해야 로그인 접근 공개"]
+  A --> P
+  M0["1. 화면 입력을 mutable char[]로 가져오고 EditText를 비운 뒤 preflight 기기 서명을 수행한다."]
+  P --> M0
+  M1["2. AUTHENTICATING에서 POST /admin/security/sessions 로그인 본문의 SHA-256과 LOGIN device proof를 결속한다."]
+  M0 --> M1
+  M2["3. 토큰 32~512자·공백 없음, NORMAL/RECOVERY_REQUIRED, canonical current session UUID를 검증한다."]
+  M1 --> M2
+  M3["4. access token과 admin/device/session을 메모리에 보관하고 서버 state 및 전체 session inventory를 읽는다."]
+  M2 --> M3
+  M4["5. 현재 유효 session과 현재 device가 각각 정확히 하나인지 대조한 뒤 snapshot을 공개하고 인증 telemetry를 남긴다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 서버 state/inventory 검증 뒤 NORMAL 또는 RECOVERY_REQUIRED snapshot 공개."]
+  M0 -. "관련 조건 확인" .-> B0{"로그인 응답 발급 전 실패"}
+  B0 -->|"조건 해당"| R0["토큰·identity 제거 및 FAIL_CLOSED"]
+  M1 -. "관련 조건 확인" .-> B1{"토큰 발급 후 상태 조회 실패"}
+  B1 -->|"조건 해당"| R1["업무 잠금; 발급 토큰의 존재와 성공 공개 구분"]
+  M2 -. "관련 조건 확인" .-> B2{"late 결과의 local generation 불일치"}
+  B2 -->|"조건 해당"| R2["새 접근을 열지 않고 인증 binding 정리"]
+  M3 -. "관련 조건 확인" .-> B3{"TOTP_REPLAYED 또는 REAUTHENTICATION_FAILED"}
+  B3 -->|"조건 해당"| R3["새 코드 안내"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["사용자 명시 동작으로 다시 시도한다. 비밀번호/TOTP를 자동 재전송하지 않는다. 상세 분기는 해당 입력·분기와 F-D12-003을 따른다."]
+  P -. "ID 추가 검증" .-> ID{"소문자화한 ID가 -shared로 끝남"}
+  ID -->|"예"| DENY["공유 관리자 ID 거절 · 요청 구성 중단"]

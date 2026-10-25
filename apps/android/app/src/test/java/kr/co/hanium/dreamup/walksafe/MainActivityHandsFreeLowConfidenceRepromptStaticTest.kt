@@ -10,29 +10,31 @@ import org.junit.Test
  * is reported back on the UI thread exactly once so the command window can reopen.
  */
 class MainActivityHandsFreeLowConfidenceRepromptStaticTest {
-    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/VoiceInputSessionController.kt").readText()
+    private val runtime = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/HandsFreeRuntimeSession.kt").readText()
     private val controller =
         File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/HandsFreeVoiceController.kt").readText()
 
     @Test
     fun theControllerIsGivenTheSpokenReask() {
-        val attach = source.substringAfter("private fun attachHandsFreeVoiceController(")
-            .substringBefore("handsFreeVoiceController = controller")
-        assertTrue(attach.contains("speakLowConfidenceReprompt = ::speakHandsFreeLowConfidenceReprompt,"))
+        val attach = MainActivityRefactorSource.member(runtime, "attachHandsFreeVoiceController")
+        assertTrue(attach.contains("lowConfidenceReprompt = input::lowConfidenceReprompt,"))
+        assertTrue(MainActivityRefactorSource.member(source.replace("\n            override fun ", "\n    override fun "), "lowConfidenceReprompt").contains("speakHandsFreeLowConfidenceReprompt(onFinished)"))
+        val platform = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/AndroidVoiceInputPlatform.kt").readText()
+        assertTrue(platform.contains("speakLowConfidenceReprompt = callbacks.lowConfidenceReprompt"))
         assertTrue(controller.contains("playLowConfidenceReprompt = speakLowConfidenceReprompt,"))
         assertTrue(controller.contains("internal const val HANDS_FREE_LOW_CONFIDENCE_REPROMPT_KO = \"다시 말씀해 주세요.\""))
     }
 
     @Test
     fun theReaskIsSpokenAndItsEndIsReportedOnce() {
-        val reprompt = source.substringAfter("private fun speakHandsFreeLowConfidenceReprompt(")
-            .substringBefore("\n    }\n")
-        assertTrue(reprompt.contains("ensureFeedbackActuator().speakInteraction("))
+        val reprompt = MainActivityRefactorSource.member(source, "speakHandsFreeLowConfidenceReprompt")
+        assertTrue(reprompt.contains("output.speakLowConfidenceReprompt("))
         assertTrue(reprompt.contains("message = kr.co.hanium.dreamup.walksafe.voice.HANDS_FREE_LOW_CONFIDENCE_REPROMPT_KO,"))
         assertTrue(reprompt.contains("onCompleted = { finish(kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.COMPLETED) }"))
         assertTrue(reprompt.contains("onFailed = { finish(kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.FAILED) }"))
         assertTrue(reprompt.contains("if (!accepted) finish(kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.FAILED)"))
-        assertTrue(reprompt.contains("runOnUiThread { if (delivered.compareAndSet(false, true)) onFinished(result) }"))
-        assertTrue(reprompt.contains("showWalkLastResult("))
+        assertTrue(reprompt.contains("scheduler.runOnMain { if (delivered.compareAndSet(false, true)) onFinished(result) }"))
+        assertTrue(reprompt.contains("presentation.lastResult("))
     }
 }

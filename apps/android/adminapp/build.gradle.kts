@@ -1,3 +1,5 @@
+import java.net.URLClassLoader
+import org.gradle.api.tasks.compile.JavaCompile
 import java.net.URI
 
 plugins {
@@ -74,6 +76,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.2.0-security"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "WALKSAFE_PRODUCT_ROLE", "\"ADMIN\"")
         buildConfigField("String", "ADMIN_AUTHENTICATION_MODE", "\"PASSWORD_TOTP\"")
@@ -135,4 +138,33 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.squareup.okhttp3:mockwebserver3:5.4.0")
     testImplementation("org.json:json:20240303")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("com.squareup.okhttp3:mockwebserver3:5.4.0")
+}
+
+// Assert generated variant constants against the requested debug matrix.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty("walksafe.test.expectedAdminOperations", operationalDebugEnabled)
+}
+
+// Release host-test tasks are not created by this Android plugin. Verify the actual compiled
+// release constants independently, including when the caller requests every development switch.
+tasks.register("verifyReleaseBuildConfigIsolation") {
+    group = "verification"
+    dependsOn("compileReleaseJavaWithJavac")
+    doLast {
+        val classes = tasks.named<JavaCompile>("compileReleaseJavaWithJavac").get().destinationDirectory.get().asFile
+        URLClassLoader(arrayOf(classes.toURI().toURL()), null).use { loader ->
+            val generated = loader.loadClass("kr.co.hanium.dreamup.walksafe.admin.BuildConfig")
+            val fields = generated.fields.associateBy { it.name }
+            listOf("DEBUG", "ADMIN_OPERATIONAL_WORKFLOWS_ENABLED").forEach { name ->
+                check(!fields.getValue(name).getBoolean(null)) { "Release unexpectedly enables $name" }
+            }
+            check(fields.getValue("ADMIN_SECURITY_WORKFLOWS_ENABLED").getBoolean(null))
+            check(fields.getValue("WALKSAFE_PRODUCT_ROLE").get(null) == "ADMIN")
+            check(fields.getValue("ADMIN_WORKFLOW_STATE").get(null) == "SECURITY_CONTROL_ENABLED_OPERATIONS_LOCKED")
+            println("Verified compiled release BuildConfig isolation: kr.co.hanium.dreamup.walksafe.admin")
+        }
+    }
 }

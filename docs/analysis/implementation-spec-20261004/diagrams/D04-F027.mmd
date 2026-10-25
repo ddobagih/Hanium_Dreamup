@@ -1,0 +1,21 @@
+flowchart TD
+  ID["F-D04-027 · 사용자 동작의 RAW 구간 집계<br/>P-D04-027"]
+  A["RAW 추론 완료 후 현재 state peek"]
+  C0{"ACTIVE와 RAW 동의가 허용되는가"}
+  R0["reset"]
+  C1{"현재 snapshot 시각·generation이 연결 가능한가"}
+  R1["연속 interval 생략"]
+  OK["state 시간·unknown·transition·reason·latency bucket만 집계 → RAW window summary"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  STOP["resetWindow는 경계 previous 유지; reset은 전부 clear"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C1 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  R1 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

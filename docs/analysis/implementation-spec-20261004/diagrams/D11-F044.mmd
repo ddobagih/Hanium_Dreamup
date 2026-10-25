@@ -1,0 +1,16 @@
+flowchart TD
+ A["F-D11-044 신고 tombstone 복원"] --> P["P-D11-044 source fence와 target isolation"]
+ P --> S["signal handler 설치와 source lock. evidence 부재 확인"]
+ S --> E["fence request 출력 후 안정된 서명6파일을 bounded wait"]
+ E --> T["target allow_connections=false와 other_session_count0 확인"]
+ T --> I["inventory와 서명 원장으로 plan 계산"]
+ I --> M{"apply 지정"}
+ M -->|"아니오"| V["plan 반환. 작업 필요면 exit2 아니면0. 원래 signal handler 복원"]
+ M -->|"예"| D["evidence와 target 재확인 후 재적용. post inventory 재계산"]
+ D --> Q{"publishable 검증 통과"}
+ Q -->|"예"| G["publish gate bytes 반환. 외부 게시 없음"]
+ Q -->|"아니오"| X["mutation status를 보존한 오류 exit2"]
+ E -->|"timeout 또는 서명 실패"| X
+ T -->|"격리 실패"| X
+ X --> H["원래 signal handler와 lock 정리"]
+ G --> H

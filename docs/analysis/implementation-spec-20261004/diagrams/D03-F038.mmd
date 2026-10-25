@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D03-038 경로 끝과 실제 목적지 사이의 접근 경고"]
+  P["정책 P-D03-038"]
+  A --> P
+  N0["1. provider 경로 끝을검증된출입구나목적지실제 접근 완료로오해하지않게한다."]
+  P -->|"현재 입력이 정상 처리 경로에 해당"| N0
+  N1["2. route 끝과선택 destination 이떨어져있으면상대방향이아닌직선차이와최종접근미확인문구를낸다."]
+  N0 --> N1
+  N2["3. 그차이를가로질러이동하라는새 connector 경로를만들지않는다."]
+  N1 --> N2
+  N3["4. FRONT/NOOR/LAT/NEW 와대안좌표는 provider 출처이며 입구·건물면·층·안전 통행의증명이아니다."]
+  N2 --> N3
+  N4["5. turn/facility numericcode 에따른 maneuver 만만들고알수없는 code 는일반다음안내점거리로표현한다."]
+  N3 --> N4
+  Z["정상: 현재 근거에맞는설명."]
+  N4 --> Z
+  B0{"samecoords 라도 name 등 full RoutePoint 다름"}
+  R0["provenance 조회불허"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B0
+  B0 -->|"참"| R0
+  B1{"endpointgap 조건 충족"}
+  R1["gap-aware 설명;자동 도착 없음"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B1
+  B1 -->|"참"| R1
+  B2{"unknown turn code"}
+  R2["rawinstruction 실행문대체안함"]
+  P -. "해당 조건일 때 이 대체 경로" .-> B2
+  B2 -->|"참"| R2
+  Xfailure["실패: 접근증거없음을표시."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xfailure
+  Xcancel["취소: route 교체 provenance 무효."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcancel
+  Xretry["재시도: 별도 자동입구 탐색 없음."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xretry
+  Xcleanup["정리: setRoute/clear 에서기존목적지 evidence 제거."]
+  P -. "취소 실패 만료 등 별도 사건" .-> Xcleanup

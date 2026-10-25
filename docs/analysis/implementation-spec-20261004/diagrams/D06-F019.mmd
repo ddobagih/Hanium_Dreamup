@@ -1,0 +1,43 @@
+flowchart TD
+  T["F-D06-019 raw 암호화 저장소·용량·만료·불독립 자료 격리"]
+  P["전제: 유효 collection UUID/owner/AAD, account fence 없음; OS<br/>allocatable space와 usage를 확인할 수 있어야 함."]
+  T --> P
+  E1["E-D06-019-01 새 segment admission→cleanup/usage/profile 판정"]
+  E1 --> T
+  E2["E-D06-019-02 expire/prune→만료 자료 제거"]
+  E2 --> T
+  E3["E-D06-019-03 manifest 읽기 불가→quarantine 이동"]
+  E3 --> T
+  A1["1. ACKNOWLEDGED/rejected/revoked/expired 등 제거 가능한 자료를 먼저 정리한다."]
+  P --> A1
+  A2["2. 재시작 이전 walk partial을 seal 또는 discard하고 실제 live/quarantine<br/>footprint를 센다."]
+  A1 --> A2
+  A3["3. 유효 미전송/미만료 자료는 공간을 위해 제거하지 않는다."]
+  A2 --> A3
+  A4["4. manifest와 chunks를 AEAD로 봉인하고 temp fsync→atomic rename→dir<br/>fsync 한다."]
+  A3 --> A4
+  A5["5. 읽기 불가 collection은 bytes를 해석하지 않고 별도 quarantine으로 이동한다."]
+  A4 --> A5
+  N["정상 종료: admission과 manifest 보존."]
+  A5 --> N
+  FX["결과: 암호화 local raw store, 삭제/격리/hold counters. enum<br/>VIDEO/AUDIO/EXACT_LOCATION 등이 있어도 runtime chunk allowlist는<br/>DETECTION/PERFORMANCE뿐."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"측정불가/symlink/알 수 없는 저장 상태"}
+    R1["HOLD_USAGE_UNKNOWN"]
+    B1 -->|조건 성립| R1
+    B2{"no-profile uploadable2개 또는 unreadable quarantine2개"}
+    R2["새 raw collection만 보류"]
+    B2 -->|조건 성립| R2
+    B3{"profile count/byte 상한 또는 OS 공간 부족"}
+    R3["CAPACITY_HOLD; 보행 상태/사용자 경고 변경 없음"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-017"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: RawCollectionStorageReadException을 empty queue와 구별."]
+    X2["재시도: 다음 admission/전송/정리 기회에 재검사."]
+    X3["복구: active pointer reconcile·완전 partial seal."]
+    X4["정리: unreadable quarantine은 소유/만료를 추정하지 않으며 account purge 때 제거."]
+  end

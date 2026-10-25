@@ -1,0 +1,25 @@
+flowchart TD
+  IN["F-D14-012<br/>복구 자료 별도 보관 확인과 교체"]
+  G["적용 정책<br/>P-D14-007"]
+  IN --> G
+  N1["1. 입력 tuple 검사 후 control lock 및 populate_exi<br/>sting"]
+  G --> N1
+  N2["2. NORMAL 및 caller session 재확인"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 기존 attested reference digest/종류/위치/backup<br/>이 정확히 같으면 idempotent로 우선 처리"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 변경이면 expected version 일치 요구; 이미 ATTESTED인<br/>데 expected 누락도 conflict"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. reference SHA256만 저장하고 timestamp 및 state_<br/>version 증가; SUCCESS 감사 후 commit"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>idempotent 우선으로 성공, version 증가 없음"]
+  N3 -->|"동일 자료 재전송이고 expected version은 오래됨"| B1
+  B2["분기 결과<br/>409 admin_recovery_custody_state_version_con<br/>flict"]
+  N4 -->|"다른 자료로 교체인데 version 불일치 또는 누락"| B2
+  B3["분기 결과<br/>허용"]
+  N4 -->|"UNATTESTED 최초 등록이며 expected 누락"| B3
+  N5 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 세션·자격의 무효화와 물리 삭제는 별개. 본 함수는 명시한 <br/>행 변경 외 자동 보존기한 삭제를 하지 않음."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

@@ -1,0 +1,42 @@
+flowchart TD
+  T["F-D06-021 raw manifest·status·chunk·commit 전송 프로토콜"]
+  P["전제: GENERAL backend session·original walk·current/continued<br/>consent·Wi-Fi bound network. 2chunk와 backend object mapping이<br/>exact."]
+  T --> P
+  E1["E-D06-021-01 uploadCall→PUT manifest→GET status→모든 chunk<br/>PUT→status→POST commit"]
+  E1 --> T
+  A1["1. local ordinal 0,1과 object mapping/hash/size를 사전 검증한다."]
+  P --> A1
+  A2["2. manifest PUT 뒤 status를 읽어 이미 committed receipt면 곧바로 반환한다."]
+  A1 --> A2
+  A3["3. 미완료이면 status missing subset을 따르지 않고 매 시도 첫 chunk부터 두 chunk를<br/>재전송한다."]
+  A2 --> A3
+  A4["4. 마지막 ack READY_TO_COMMIT 및 status를 확인한 뒤 commit한다."]
+  A3 --> A4
+  A5["5. JSON content type/no-store·엄격 상태/schema·receipt digest를<br/>확인한다."]
+  A4 --> A5
+  N["정상 종료: 정확 v2 receipt 반환."]
+  A5 --> N
+  FX["결과: D08 Gateway→D09 raw backend; 목적 GENERAL_RAW. raw v2 수신은<br/>RAW_QUARANTINE_14D."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"이미 COMMITTED v2 receipt"}
+    R1["chunk 재전송 없이 완료"]
+    B1 -->|조건 성립| R1
+    B2{"기존 동일 chunk"}
+    R2["서버 재ack 기대; client 자동 누락-chunk 재개 아님"]
+    B2 -->|조건 성립| R2
+    B3{"lease stale/body write 중 취소"}
+    R3["CancellationException, 연결/stream 해제"]
+    B3 -->|조건 성립| R3
+    B4{"응답 type/no-store/schema 오류"}
+    R4["protocol failure"]
+    B4 -->|조건 성립| R4
+  end
+  POL["정책: P-D06-019"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["시간: 연결8000ms/read20000ms; 이 client에는 전체 upload deadline 인자가<br/>없음."]
+    X2["취소: 16KiB write chunk마다 currentOrCancel."]
+    X3["재시도: client 내부 loop retry 없음; 다음 시도는 두 chunk 처음부터."]
+    X4["정리: coordinator finally plaintext zeroize."]
+  end

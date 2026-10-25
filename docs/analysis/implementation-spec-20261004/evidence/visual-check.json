@@ -1,0 +1,49 @@
+{
+  "captured_at": "2026-10-04T02:44:34.857Z",
+  "scope": "대표 구조·시퀀스·위험·취소·관리자분야·경로 그림과 문서 화면. 전체766그림 인간전수 판독 아님. 전체SVG는 별도browser decode검사.",
+  "samples": [
+    {
+      "file": "architecture.svg",
+      "screenshot": "evidence/previews/architecture-visual.png",
+      "kind": "representative diagram visual sample"
+    },
+    {
+      "file": "sc-03.svg",
+      "screenshot": "evidence/previews/sc-03-visual.png",
+      "kind": "representative diagram visual sample"
+    },
+    {
+      "file": "D07-F009.svg",
+      "screenshot": "evidence/previews/D07-F009-visual.png",
+      "kind": "representative diagram visual sample"
+    },
+    {
+      "file": "D16-F014.svg",
+      "screenshot": "evidence/previews/D16-F014-visual.png",
+      "kind": "representative diagram visual sample"
+    },
+    {
+      "file": "D12-overview.svg",
+      "screenshot": "evidence/previews/D12-overview-visual.png",
+      "kind": "representative diagram visual sample"
+    },
+    {
+      "file": "D03-F027.svg",
+      "screenshot": "evidence/previews/D03-F027-visual.png",
+      "kind": "representative diagram visual sample"
+    }
+  ],
+  "manual_inspection": {
+    "inspected": [
+      "index-final.png",
+      "domains-D07-final.png",
+      "architecture-visual.png",
+      "sc-03-visual.png",
+      "D07-F009-visual.png",
+      "D16-F014-visual.png",
+      "D12-overview-visual.png",
+      "D03-F027-visual.png"
+    ],
+    "result": "대표 화면 한국어·표·노드·분기선 표시 확인. 긴 세로 그림은 축소 preview에서 작아지므로 상세문서와 원본SVG의 크기/스크롤로 확인. 전체그림 의미·시각 전수검토 주장은 없음."
+  }
+}

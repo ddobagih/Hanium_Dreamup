@@ -47,11 +47,11 @@ class RouteCompassHeadingTest {
         assertHeading(90.0, evaluate(rotation))
     }
 
-    @Test fun sixtyDegreeTiltIsIncludedButMoreVerticalRearAxesAreUnavailable() {
-        listOf(-60.0, 60.0).forEach { tilt ->
+    @Test fun supportedRearProjectionIncludesSeventyDegreesButRejectsEightyDegrees() {
+        listOf(-60.0, 60.0, -70.0, 70.0).forEach { tilt ->
             assertHeading(0.0, evaluate(matrix(tilt = tilt)))
         }
-        listOf(-60.1, 60.1, -90.0, 90.0).forEach { tilt ->
+        listOf(-80.0, 80.0, -90.0, 90.0).forEach { tilt ->
             assertInvalid(RouteCompassHeadingReason.REAR_AXIS_VERTICAL, evaluate(matrix(tilt = tilt)))
         }
     }

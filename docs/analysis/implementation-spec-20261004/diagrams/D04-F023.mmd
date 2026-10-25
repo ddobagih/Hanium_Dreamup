@@ -1,0 +1,23 @@
+flowchart TD
+  ID["F-D04-023 · 불확실도 기반 경로 좌표 매칭<br/>P-D04-023"]
+  A["filtered position + route"]
+  C0{"좌표·time·freshness·route가 유효하고 새 측정인가"}
+  R0["UNMATCHED reason"]
+  C1{"uncertainty corridor 내 후보가 있는가"}
+  R1["CORRIDOR_OUTSIDE"]
+  C2{"connected branch 또는 우세 1.5·연속2회가 있는가"}
+  R2["기존 branch 유지 또는 pending LOW"]
+  OK["cost/경쟁 separation → HIGH/MEDIUM만 active progress commit; raw와 snapped 분리"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END

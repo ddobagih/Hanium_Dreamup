@@ -1,0 +1,20 @@
+stateDiagram-v2
+    state "S-D07-009-UNAVAILABLE" as U
+    state "S-D07-009-MEASURED" as M
+    state "S-D07-009-PREDICTED" as P
+    state "S-D07-009-TEMPORARILY_UNAVAILABLE" as T
+    [*] --> U
+    U --> M: 독립 실측 자격 충족
+    M --> M: 새 독립 depth만 seed 갱신
+    M --> P: 3회 200ms seed 및 gap 오차 조건
+    M --> T: 공백이지만 예측 지지 부족
+    P --> P: 원본 고정 horizon 안 display만
+    P --> U: horizon 최대 600ms 만료 또는 연속성 손실
+    T --> U: 관측 소유권과 source 퇴역
+    P --> M: 새 독립 실측
+    T --> M: 새 독립 실측
+    note right of P
+        P-D07-009
+        metric distance TTC 보수 없음
+        예측을 history에 넣지 않음
+    end note

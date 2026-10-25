@@ -1,0 +1,52 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D16 및 기준 문서 독립 표본 검토</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="../index.html">WalkSafe 기능과 처리 명세</a> · <a href="../02-features.html">기능</a> · <a href="../03-policies.html">정책</a> · <a href="../05-scenarios.html">시나리오</a> · <a href="../gallery.html">그림 모음</a> · <a href="../08-review.html">검수</a></header><main><h1>D16 및 기준 문서 독립 표본 검토</h1>
+<p>검토자 baseline_audit. 작성자 Root/entry_inventory와 분리. 제품 시험·빌드·기기·외부서비스 실행 없음. 정적 소스·문서 대조만 수행.</p>
+<h2>검토 범위</h2>
+<ul>
+<li>00-baseline.md의 freeze 199/342,6489/6196,CSV942 상태 집계와SHA 재확인. 추가 지적 없음.</li>
+<li>01-repository-map.md의 manifest/Application/Main,관리자 조건과직접origin,Gateway/Backend router,modelconfig,Web410. 추가 지적 없음.</li>
+<li>F/P-D16-002 키 저장: PrivateStorage.kt79–191,AnalysisCoordinator.kt240–253/616–627,MainActivity.kt89–98.</li>
+<li>F/P-D16-010 PPK: PpkEngines.kt83–215,walksafe_ppk_engine.c15/170–280,walksafe_ppk_jni.c108–155.</li>
+<li>F/P-D16-012 평가: PpkEvaluation.kt134–258.</li>
+<li>F/P-D16-014 취소: AnalysisCancellation.kt7–55,AnalysisCoordinator.kt367–426/641–693.</li>
+<li>F/P-D16-016 삭제: AnalysisCoordinator.kt215–225/443–484/747–767.</li>
+<li>위5기능 그림 및 overview/cancellation-state/pipeline-sequence. 주요8소스 hash는 freeze manifest와 일치.</li>
+</ul>
+<h2>발견과 조치</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>심각도</th>
+<th>발견</th>
+<th>조치</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DOC-D16-01</td>
+<td>P2</td>
+<td>그룹 내부 canonical 중복을 먼저 병합하고 이후 그룹 간 중복을 거절하는데 모두 금지로 단순화</td>
+<td>Root JSON F010/P010 및 흐름도 수정; 독립 재검토 해결 확인</td>
+</tr>
+<tr>
+<td>DOC-D16-02</td>
+<td>P2</td>
+<td>F014 기존 취소 문구 억제 분기가 새 분석 시작으로 연결됨</td>
+<td>Root H→J 삭제; 독립 재검토 해결 확인</td>
+</tr>
+<tr>
+<td>DOC-D16-03</td>
+<td>P2</td>
+<td>JNI 취소/오류가 FIX 평가로 이어지는 시퀀스</td>
+<td>Root 성공/취소/일반오류 분리 및 FailurePolicy 분류 명시; 독립 재검토 해결 확인</td>
+</tr>
+</tbody></table>
+<p>R-D16-002 완료 뒤 cleanup 경고 차단 가능성은 정적 경로와 일치; 제품 결함 확정/실행 재현으로 해석하지 않는다.</p>
+<h2>검토 버전</h2>
+<p>00 SHA d3a4478f005f94a30a927f18026883925e7de56184af6e60f8a527f5491930d2</p>
+<p>01 SHA 3b168fdebc8e3312d32d40ca8f46ba61f15d5415b1741ba222c2a9942b1438c8</p>
+<p>D16 시작32c7effe473fcd9edff907f567161d4008297003ea387fd36e540c139fd7ab3e → 검토 종료4f74d9ec668c8aa5fee8e4a4858a46fff86d1db7f8fbdab58e709bbd6c982a73. 중간 변경은 Root의 문서 상태별칭 설명 추가. 위 수정은 검토 종료 이후 수행.</p>
+<h2>미검토</h2>
+<p>나머지11기능 전체, vendor 수치 알고리즘, 모든시험/fixture, 실제NGII/Keystore/JNI/SAF, 저장소 전체 호출 그래프/architecture 그림, Mermaid 렌더·시각QA 미검토. Root가 renderer 및 별도 표시 점검을 담당한다.</p>
+<h2>수정 후 독립 재검토</h2>
+<p>DOC-D16-01/02/03 모두 해결, 변경된 세 부분 추가 지적 없음. JSON SHA 읽기 전후 f0edb4ca3e8e06c05251b1761017dc83378f6683a6db7a86b9a461a27f084b4d 동일. F014 SHA11362f8f1a4cd0a3ae328a4fbe93198daa7809f84355d84c7d8d2c3e46155df9, sequence SHA9fc3b5769fcdb2e361bfb53edbaaf58852493c0b9b4c6bdb2161b5079099ea09. 기존 미검토 범위 유지.</p>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

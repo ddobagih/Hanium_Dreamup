@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-005<br/>객체 거리·confidence·Full fallback 및 pseudo trend<br/>상태 ACTIVE"]
+    P0["Raw 후보와 hard gate 평가"]
+    A --> D
+    P1["허용된 Full fallback 검토"]
+    P0 --> P1
+    P2["위험 거리 종류와 confidence 산출"]
+    P1 --> P2
+    P3["metric 또는 제한된 근접 또는 pseudo 분리"]
+    P2 --> P3
+    D{"P-D07-005<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["Full 사용 불가; metric 없음"]
+    D -->|"Raw foreground ambiguity"| B0
+    B1["WARNING 상한; TTC/report 없음"]
+    D -->|"부분 coverage이며 가까운 일반 장애물"| B1
+    B2["숫자·보수 없는 CAUTION"]
+    D -->|"metric 실패하지만 visual approach 조건 만족"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

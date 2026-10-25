@@ -1,0 +1,44 @@
+flowchart TD
+  T["F-D06-022 raw 영수증 확인·ACK 보존·격리·거절 처분"]
+  P["전제: same owner/collection/manifest binding; current lease 계속<br/>허용."]
+  T --> P
+  E1["E-D06-022-01 upload receipt→exact 검증→ACKNOWLEDGED marker→local<br/>purge"]
+  E1 --> T
+  E2["E-D06-022-02 HTTP 거절→quarantine/reject/delete/hold 분기"]
+  E2 --> T
+  A1["1. store는 v2 receipt만 현재 완료로 허용한다."]
+  P --> A1
+  A2["2. ACKNOWLEDGED를 내구 기록한 후 원본을 삭제한다."]
+  A1 --> A2
+  A3["3. 삭제 실패는 ACKNOWLEDGED_PURGE_PENDING, 다음 작업은 네트워크 없이 삭제를<br/>재시도한다."]
+  A2 --> A3
+  A4["4. 400/413/415/422는 QUARANTINED, 401/403은 authority hold로<br/>분리한다."]
+  A3 --> A4
+  A5["5. 409 consent rejected/walk never uploadable은 각 marker 후 삭제,<br/>active walk는 보존; 503 raw_ingest_disabled는 process 내 재시도 중지한다."]
+  A4 --> A5
+  N["정상 종료: DELETED_AFTER_EXACT_RECEIPT."]
+  A5 --> N
+  FX["결과: 컬렉션 삭제/암호 격리, 내부 counter만. receipt는 학습 재사용 승인 또는 제품 현장<br/>PASS 아님."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"receipt mismatch/legacy v1"}
+    R1["원본 보존, RECEIPT_REJECTED"]
+    B1 -->|조건 성립| R1
+    B2{"일시 network/기타 서버 실패"}
+    R2["RETRYABLE_FAILURE, 원본 유지"]
+    B2 -->|조건 성립| R2
+    B3{"서버 ingest disabled"}
+    R3["process 내 SERVER_DISABLED; 새 프로세스까지 upload start 거절"]
+    B3 -->|조건 성립| R3
+    B4{"거절 marker 또는 삭제 실패"}
+    R4["반환 outcome과 실제 물리 삭제 성공은 동일하지 않음; 다음 cleanup 대상"]
+    B4 -->|조건 성립| R4
+  end
+  POL["정책: P-D06-019, P-D06-020"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 원본 보존·격리·거절 cleanup 분리."]
+    X2["재시도: 일시 실패 후 다음 trigger."]
+    X3["복구: ACK/rejected marker cleanup."]
+    X4["정리: 평문 chunks finally zeroize."]
+  end

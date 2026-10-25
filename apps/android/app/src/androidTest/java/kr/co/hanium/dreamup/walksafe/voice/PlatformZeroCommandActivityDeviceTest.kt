@@ -1,5 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.voice
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
 import android.Manifest
 import android.app.Instrumentation
 import android.content.Intent
@@ -234,7 +236,7 @@ class PlatformZeroCommandActivityDeviceTest {
     }
 
     private fun mainField(activity: MainActivity, name: String): Any? =
-        MainActivity::class.java.getDeclaredField(name).apply {
+        MainActivityControllerTestFixture.field(name).apply {
             isAccessible = true
         }.get(activity)
 

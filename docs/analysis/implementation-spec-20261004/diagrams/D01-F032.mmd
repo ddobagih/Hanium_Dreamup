@@ -1,0 +1,36 @@
+flowchart TD
+  A["F-D01-032 삭제 worker·Activity lease·네트워크 단일 실행·marker 재개"]
+  G{"process AccountDeletionProcessCoordinator.shared; journal network-allowed; current Activity lease; reset reservation 없음"}
+  I["worker generation,Activity lease identity,origin/install/request identity,network lease; fallback marker phase"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: storage·executor rejection→fence 유지·failure 기록"]
+  G -->|"미충족"| X
+  N1["attach/detach는 Activity generation과 worker generation을 바꾸고 등록된 network call을 취소한다. process executor와 journal 자체는 Activity가 소유하지 않는다."]
+  I --> N1
+  N2["preparation worker는 확인대기·journal없음·reservation없음을, journal worker는 current request identity와 failClosed/reset fence를 검사한다."]
+  N1 --> N2
+  N3["prepared commit은 workerStageSerialLock으로 직렬화하고 fsync prepare를 state lock 밖에서 수행한 뒤 exact reservation/generation/journal일 때만 bounded atomic publish한다."]
+  N2 --> N3
+  N4["network register는 active call이 없을 때 하나만 허용; beginNetworkCall은 동일 lease를 한번만 execute 가능하게 한다. completion은 같은 begun lease만 consume하여 status apply한다."]
+  N3 --> N4
+  N5["Main marker 재개는 identity 일치를 확인하고 PREPARED→요청replay,ACCEPTED→localpurge,LOCAL_PURGED→증거누락차단,EVIDENCE_PENDING→증거제출,EVIDENCE_ACKED→status조회,TERMINAL_RECEIPT→binding정리를 분기한다."]
+  N4 --> N5
+  OK["현재 lease의 단계 진행 및 journal/UI반영"]
+  N5 --> OK
+  B0["current lease 불일치로 무시; network cancel"]
+  N1 -->|"옛Activity callback"| B0
+  B1["임시삭제 대신 durable recovery fence를 새Activity에 보존"]
+  N3 -->|"prepare 중 rotation, 이미 durable confirmation"| B1
+  B2["추가 network 실행 거부"]
+  N4 -->|"duplicate register/begin"| B2
+  B3["remote 재개 안 하고 privacy fence 유지"]
+  N5 -->|"identity mismatch·FAIL_CLOSED"| B3
+  B4["재개 중복 시작 안 함"]
+  N5 -->|"localpurge 또는 request 이미inflight"| B4
+  R["중단·취소: Activity detach는 진행 call을 취소하지만 durable 삭제 의사/저널 취소 아님 / late prepare가 durable authority를 만들었으면 recovery로 인계"]
+  V["복구·재시도: startup journal+fallback marker phase로 정확 후속작업 선택 / markRetry 저장 뒤 사용자/status 재개; timer 재송신으로 문서화하지 않음"]
+  Q["정책 P-D01-020 · P-D01-021 · P-D01-022 · P-D01-023"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

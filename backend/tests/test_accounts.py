@@ -4,6 +4,8 @@ from copy import deepcopy
 from datetime import UTC, date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 import importlib
+import json
+from pathlib import Path
 from types import SimpleNamespace
 import uuid
 
@@ -156,6 +158,25 @@ def test_email_idna_golden_vectors_use_exact_canonical_ascii(
                     "password": "long enough password",
                 }
             )
+
+
+def test_shared_android_gateway_email_wire_values_are_accepted_unchanged() -> None:
+    fixture = Path(__file__).resolve().parents[2] / "contracts/test-vectors/account-email.json"
+    for vector in json.loads(fixture.read_text())["vectors"]:
+        canonical = vector["canonical"]
+        if canonical is None:
+            continue  # Raw Unicode validation belongs to Android/Gateway, not the ASCII wire schema.
+        assert canonical_email(canonical) == canonical
+        assert normalize_email(canonical) == canonical
+        assert AccountAuthenticateRequestV1.model_validate({
+            "schema_version": "walksafe.account-authenticate.v1",
+            "email": canonical, "password": "long enough password",
+        }).email == canonical
+        assert EmailOtpEnrollmentRequestV1.model_validate({
+            "schema_version": "walksafe.account-enrollment-email-otp.v1",
+            "email": canonical, "date_of_birth": "2000-01-01",
+            "request_id": "request_identifier_0001",
+        }).email == canonical
 
 
 def test_email_contract_rejects_noncanonical_or_invalid_values() -> None:
@@ -1081,13 +1102,18 @@ def test_smtp_sender_requires_verified_tls_without_plaintext_fallback(
     context = object()
 
     class FakeSmtp:
-        def __init__(self, host, port, **kwargs):
-            events.append(("connect", host, port, kwargs))
+        def __init__(self, **kwargs):
+            self.options = kwargs
+            self.sock = None
+
+        def connect(self, host, port):
+            events.append(("connect", host, port, self.options))
+            return 220, b"ready"
 
         def __enter__(self):
             return self
 
-        def __exit__(self, *_args):
+        def close(self):
             events.append("close")
 
         def ehlo(self):
@@ -1104,8 +1130,7 @@ def test_smtp_sender_requires_verified_tls_without_plaintext_fallback(
             messages.append(message)
 
     monkeypatch.setattr(accounts_service.ssl, "create_default_context", lambda: context)
-    monkeypatch.setattr(accounts_service.smtplib, "SMTP", FakeSmtp)
-    monkeypatch.setattr(accounts_service.smtplib, "SMTP_SSL", FakeSmtp)
+    monkeypatch.setattr(accounts_service, "_DeadlineSmtp", FakeSmtp)
     sender = SmtpOtpSender(
         host="smtp.example.com",
         port=465 if security == "implicit_tls" else 587,
@@ -1122,13 +1147,13 @@ def test_smtp_sender_requires_verified_tls_without_plaintext_fallback(
     )
     connect = events[0]
     assert connect[0] == "connect"
+    assert connect[3]["context"] is context
+    assert connect[3]["implicit_tls"] == (security == "implicit_tls")
     if security == "implicit_tls":
-        assert connect[3]["context"] is context
         assert not any(
             isinstance(event, tuple) and event[0] == "starttls" for event in events
         )
     else:
-        assert "context" not in connect[3]
         assert ("starttls", context) in events
     assert ("send", "recipient@example.com") in events
     assert parsedate_to_datetime(messages[0]["Date"]).tzinfo is UTC

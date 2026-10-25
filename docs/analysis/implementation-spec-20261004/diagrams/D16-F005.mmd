@@ -1,0 +1,19 @@
+flowchart TD
+  META["F-D16-005 · P-D16-005"]
+  META --> A
+  A["GnssLogger 반입·변환 시작"] --> B{"Raw schema·clock·숫자·중복 observable 유효"}
+  B -->|"아니오"| X["전체 변환 실패·part 삭제"]
+  B -->|"예"| C{"지원신호·CN0≥20·uncertainty 기준 등 통과"}
+  C -->|"아니오"| D["해당 행 제외·제외 사유 집계"]
+  C -->|"예"| E{"ADR valid·reset/slip 없음·uncertainty 0.1m 미만"}
+  E -->|"아니오"| F["유효 code만 유지·phase null"]
+  E -->|"예"| G["code·phase·Doppler·신호강도 기록"]
+  D --> H{"최소 epoch2·satellite4·code8·phase4"}
+  F --> H
+  G --> H
+  H -->|"미달"| X
+  H -->|"충족"| I["2차 순회 RINEX3.03 출력·scan count 대조"]
+  I -->|"count 일치"| J["fsync·rename·rover.obs 반환"]
+  I -->|"불일치"| X
+  J --> K["다음 coordinator 취소 checkpoint
+  변환 loop 내부 즉시 취소는 없음"]

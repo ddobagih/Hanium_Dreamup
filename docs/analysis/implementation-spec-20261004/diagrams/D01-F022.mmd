@@ -1,0 +1,32 @@
+flowchart TD
+  A["F-D01-022 목적별 통합 동의 bootstrap·현재 서버 확인·버전 재동의"]
+  G{"verified GENERAL session·origin/install ID·민감저장소 정상·삭제 HTTP block 없음"}
+  I["FP-013-1.2.0, 네 itemversions,clientRevision floor,expectedPreviousReceipt; bootstrap READY 또는 RECONSENT_REQUIRED"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 서버 미확인 시 새로운 허용은 닫힌 채 표시"]
+  G -->|"미충족"| X
+  N1["서버 조회 전 holdIntegratedConsentAuthorityForRefresh로 기존 backend authority를 내려 새 응답 전 grants를 재사용하지 않는다."]
+  I --> N1
+  N2["GET privacy/rights의 integrated-consent 또는 integrated-consent-bootstrap control을 요청한다."]
+  N1 --> N2
+  N3["current call generation·session generation·actor가 같은 완료만 받아 floor/previousReceipt를 반영한다."]
+  N2 --> N3
+  N4["READY CURRENT_CONSENT/SIGNUP이면 서버 선택으로 draft를 만들고 현재버전 저장 PUT을 연결한다. RECONSENT_REQUIRED는 선택 UI를 유지하고 새 명시 동의를 기다린다."]
+  N3 --> N4
+  OK["현재 authority confirmation으로 이어지거나 재동의 대기"]
+  N4 --> OK
+  B0["bootstrap 호출"]
+  N2 -->|"현재confirmation404 또는 reconsent409+같은requiredversion"| B0
+  B1["pending 있으면 retry, 없으면 bootstrap; 옛grant로 열지 않음"]
+  N3 -->|"응답 revision이 local보다 낮음"| B1
+  B2["부정 응답으로 거부"]
+  N4 -->|"READY와 source/receipt 불일치"| B2
+  B3["권위 적용 안 함"]
+  N4 -->|"삭제·스토리지·session 변경"| B3
+  R["중단·취소: 새 요청은 이전 consent call/bootstrap call cancel / Activity destroyed 또는 session교체이면 callback 무시"]
+  V["복구·재시도: 암호화 cache는 UNCONFIRMED로 복원 후 서버 재확인 / 연결후 다시 확인 또는 pending mutation retry; 무한bootstrap 없음"]
+  Q["정책 P-D01-006 · P-D01-014 · P-D01-015 · P-D01-024"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

@@ -1,0 +1,13 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-021-NOT_CONFIGURED" as NOT_CONFIGURED
+  state "S-D05-021-CURRENT" as CURRENT
+  state "S-D05-021-PREVIOUS_KNOWN_GOOD" as PREVIOUS_KNOWN_GOOD
+  [*] --> NOT_CONFIGURED
+  NOT_CONFIGURED --> CURRENT: "explicit nonproduction profile injection"
+  CURRENT --> CURRENT: "activate next walk after all gates"
+  CURRENT --> PREVIOUS_KNOWN_GOOD: "rollback exactprevious afteradditionalgates"
+  PREVIOUS_KNOWN_GOOD --> CURRENT: "snapshot role swap"
+  note right of NOT_CONFIGURED
+    F-D05-021 P-D05-021
+  end note

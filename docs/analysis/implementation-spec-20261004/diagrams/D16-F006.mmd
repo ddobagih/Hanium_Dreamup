@@ -1,0 +1,15 @@
+flowchart TD
+  META["F-D16-006 · P-D16-006"]
+  META --> A
+  A["수동 기준국 URI 목록 선택"] --> B{"trace 존재·busy/cancelling 아님"}
+  B -->|"아니오"| X["반입 거부"]
+  B -->|"예"| C["이전 선택 무효화·1..32 파일 복사·해시"]
+  C --> D{"총256MiB 이하·파일명/압축·동일 station/hour/type"}
+  D -->|"위반·중복"| F["실패·staging/새 사본 삭제"]
+  D -->|"통과"| E["RINEX2·O와N·실제epoch/항법·위치/연속성 검사"]
+  E --> G{"기준국 30km 이하·시간 및 ECEF 조건 충족"}
+  G -->|"아니오"| F
+  G -->|"예"| H["manualBaseReady·검증해제물 삭제·원본 사본 유지"]
+  H --> I["분석 때 사본 hash와 전체 prepare 재검증"]
+  C -->|"취소"| F
+  I -->|"취소·변조"| F

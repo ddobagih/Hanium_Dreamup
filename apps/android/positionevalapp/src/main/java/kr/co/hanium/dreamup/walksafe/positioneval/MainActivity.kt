@@ -17,6 +17,7 @@ class MainActivity : Activity() {
         private const val REQUEST_BASE_RINEX = 13
     }
 
+    private lateinit var coordinator: AnalysisCoordinator
     private lateinit var keyInput: EditText
     private lateinit var keyState: TextView
     private lateinit var traceState: TextView
@@ -56,32 +57,33 @@ class MainActivity : Activity() {
         exportButton = findViewById(R.id.exportButton)
         clearButton = findViewById(R.id.clearButton)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        AnalysisCoordinator.initialize(applicationContext)
+        coordinator = AnalysisCoordinator.get(applicationContext)
+        coordinator.initialize()
 
         saveKeyButton.setOnClickListener { saveKey() }
         selectTraceButton.setOnClickListener { openDocument(REQUEST_TRACE) }
         selectGnssButton.setOnClickListener { openDocument(REQUEST_GNSS) }
         selectBaseButton.setOnClickListener { openDocument(REQUEST_BASE_RINEX) }
-        analyzeManualButton.setOnClickListener { AnalysisCoordinator.startAnalysis(useManualBase = true) }
-        analyzeButton.setOnClickListener { AnalysisCoordinator.startAnalysis() }
-        cancelButton.setOnClickListener { AnalysisCoordinator.cancelAnalysis() }
+        analyzeManualButton.setOnClickListener { coordinator.startAnalysis(useManualBase = true) }
+        analyzeButton.setOnClickListener { coordinator.startAnalysis() }
+        cancelButton.setOnClickListener { coordinator.cancelAnalysis() }
         exportButton.setOnClickListener { createResultDocument() }
-        clearButton.setOnClickListener { AnalysisCoordinator.clearPrivateData() }
+        clearButton.setOnClickListener { coordinator.clearPrivateData() }
     }
 
     override fun onStart() {
         super.onStart()
-        AnalysisCoordinator.attach(observer)
+        coordinator.attach(observer)
     }
 
     override fun onStop() {
-        AnalysisCoordinator.detach(observer)
+        coordinator.detach(observer)
         super.onStop()
     }
 
     override fun onDestroy() {
         if (isFinishing && !isChangingConfigurations) {
-            AnalysisCoordinator.cancelAnalysis()
+            coordinator.cancelAnalysis()
         }
         super.onDestroy()
     }
@@ -95,7 +97,7 @@ class MainActivity : Activity() {
             renderStatus("입력 확인 필요\n국토지리정보원 다운로드 키를 입력해 주세요.")
             return
         }
-        AnalysisCoordinator.saveKey(value)
+        coordinator.saveKey(value)
     }
 
     private fun openDocument(requestCode: Int) {
@@ -121,14 +123,14 @@ class MainActivity : Activity() {
                 data.data?.let(::add)
                 data.clipData?.let { clip -> for (index in 0 until clip.itemCount) add(clip.getItemAt(index).uri) }
             }.distinct()
-            if (uris.isNotEmpty()) AnalysisCoordinator.importBaseDocuments(uris)
+            if (uris.isNotEmpty()) coordinator.importBaseDocuments(uris)
             return
         }
         if (data.data == null) return
         when (requestCode) {
-            REQUEST_TRACE -> AnalysisCoordinator.importDocument(data.data!!, ArtifactKind.TRACE)
-            REQUEST_GNSS -> AnalysisCoordinator.importDocument(data.data!!, ArtifactKind.GNSS)
-            REQUEST_EXPORT -> AnalysisCoordinator.exportResult(data.data!!)
+            REQUEST_TRACE -> coordinator.importDocument(data.data!!, ArtifactKind.TRACE)
+            REQUEST_GNSS -> coordinator.importDocument(data.data!!, ArtifactKind.GNSS)
+            REQUEST_EXPORT -> coordinator.exportResult(data.data!!)
         }
     }
 
@@ -136,7 +138,7 @@ class MainActivity : Activity() {
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "application/json"
-            putExtra(Intent.EXTRA_TITLE, AnalysisCoordinator.resultFileName())
+            putExtra(Intent.EXTRA_TITLE, coordinator.resultFileName())
         }
         startActivityForResult(intent, REQUEST_EXPORT)
     }

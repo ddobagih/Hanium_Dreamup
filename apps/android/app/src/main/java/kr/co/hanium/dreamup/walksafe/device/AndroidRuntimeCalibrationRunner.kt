@@ -101,8 +101,21 @@ class AndroidRuntimeCalibrationRunner(
     private val gpuSupported: Boolean = true,
     private val restoredQueue: RuntimeCandidateQueueSnapshot? = null,
     private val budgetMs: Long = MAXIMUM_BUDGET_MS,
+    private val fixtureSource: FixtureSource = BundledFixtures(context),
 ) : RuntimeCalibrationWorkController {
     init { require(budgetMs in 1L..MAXIMUM_BUDGET_MS) }
+
+    /** Fixed-input boundary; production keeps the existing hash-pinned asset loader. */
+    interface FixtureSource {
+        fun loadManifest(): RuntimeCalibrationFixtureManifest
+        fun loadArgb(fixture: RuntimeCalibrationFixture): ArgbImage
+    }
+
+    private class BundledFixtures(context: Context) : FixtureSource {
+        private val delegate = RuntimeCalibrationFixtures(context)
+        override fun loadManifest() = delegate.loadManifest()
+        override fun loadArgb(fixture: RuntimeCalibrationFixture) = delegate.loadArgb(fixture)
+    }
 
     private val appContext = context.applicationContext
     private val monitor = Object()
@@ -200,11 +213,32 @@ class AndroidRuntimeCalibrationRunner(
             require(config.primaryModelKey == TwoModelRuntimeConfig.UNIFIED_MODEL_KEY && unified.enabled)
             require(bindingHash.isNotBlank())
             progress(RuntimeCalibrationStage.PREPARING)
-            val fixtures = RuntimeCalibrationFixtures(appContext)
+            val fixtures = fixtureSource
             val manifest = fixtures.loadManifest()
             val required = manifest.fixtures.filter { it.required }
             require(required.isNotEmpty() && manifest.coverage.positiveFixtureIds.isNotEmpty() &&
                 manifest.coverage.emptyFixtureIds.isNotEmpty() && manifest.coverage.nearThresholdFixtureIds.isNotEmpty())
+            // An invalid A cannot establish B's correctness. Borrow A through its owner before
+            // probing processors, creating the candidate queue or querying the live environment.
+            currentCandidate = baselineCandidate
+            progress(RuntimeCalibrationStage.OUTPUT_CHECK)
+            var baselineNearThresholdObserved = false
+            for (fixture in required) {
+                checkActive()
+                val input = fixturePreprocessor.preprocessBilinear(fixtures.loadArgb(fixture), unified.inputSize)
+                val reference = correctnessOutput(input, baselineDetector, baselineCandidate, true)
+                if (!RuntimeCalibrationOutputGate.matchesFixtureRoles(
+                        reference.result.detections, reference.result.detections,
+                        RuntimeCalibrationFixtureRole.POSITIVE in fixture.roles,
+                        RuntimeCalibrationFixtureRole.EMPTY in fixture.roles,
+                        fixture.groundTruth.filter { !it.isCrowd }.map { it.className to it.bboxNorm },
+                    )) throw CandidateInconclusive("baseline_fixture_role_mismatch")
+                if (RuntimeCalibrationFixtureRole.NEAR_THRESHOLD in fixture.roles &&
+                    RuntimeCalibrationOutputGate.hasNearThresholdCandidate(reference.rawOutput, unified)) {
+                    baselineNearThresholdObserved = true
+                }
+            }
+            if (!baselineNearThresholdObserved) throw CandidateInconclusive("near_threshold_not_observed")
             queue = RuntimeSelectionPolicy.createCandidateQueue(
                 availableProcessors(), baselineCandidate, gpuSupported, restored = restoredQueue,
             )
@@ -372,7 +406,7 @@ class AndroidRuntimeCalibrationRunner(
     }
 
     private fun measureFixedCandidate(
-        fixtures: RuntimeCalibrationFixtures,
+        fixtures: FixtureSource,
         manifest: RuntimeCalibrationFixtureManifest,
         required: List<RuntimeCalibrationFixture>,
         detector: TfliteAndroidFrameDetector,
@@ -475,7 +509,7 @@ class AndroidRuntimeCalibrationRunner(
     private fun comparisonBlock(
         order: RuntimeComparisonOrder,
         required: List<RuntimeCalibrationFixture>,
-        fixtures: RuntimeCalibrationFixtures,
+        fixtures: FixtureSource,
         detector: TfliteAndroidFrameDetector,
         candidate: RuntimeCandidate,
         challengerBorrowed: Boolean,

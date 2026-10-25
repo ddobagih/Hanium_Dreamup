@@ -1,0 +1,21 @@
+stateDiagram-v2
+    state "TRAINING 판단 대기" as Review
+    state "APPROVED decision" as Decision
+    state "등록 artifact" as Artifact
+    state "APPROVED dataset revision" as Dataset
+    state "RETIRED previous revision" as Retired
+    state "실행 시 권한 거부" as Denied
+    state "삭제 영수증과 파일 정리" as Removed
+    [*] --> Review
+    Review --> Decision: F-D13-033 현재 동의와 비식별 근거
+    Decision --> Artifact: F-D13-038 저장 파일 SHA와크기 확인
+    Artifact --> Dataset: F-D13-039 member 집합 승인
+    Dataset --> Retired: 후속 revision 승인 시 parent event
+    Dataset --> Denied: 동의 철회 또는 삭제 또는 만료
+    Artifact --> Removed: F-D13-042 retention 실행
+    Dataset --> Dataset: F-D13-040 단기 gate 수출
+    note right of Denied
+      F-D13-043 모델 계보 검사는 구현됨
+      실제 배포 caller 연결 미확인
+      모델 자동 삭제나 재훈련은 없음
+    end note

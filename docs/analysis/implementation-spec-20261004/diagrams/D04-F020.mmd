@@ -1,0 +1,23 @@
+flowchart TD
+  ID["F-D04-020 · 신뢰할 수 있는 직선 구간에서 보정 샘플 생성<br/>P-D04-020"]
+  A["정렬 완료 raw fix"]
+  C0{"raw age·accuracy·speed·course가 적합한가"}
+  R0["reset + RAW_FIX 거부"]
+  C1{"연속성·직선·corridor·jump 검사를 통과하는가"}
+  R1["구간 폐기 또는 새 anchor"]
+  C2{"20걸음·10초·최소거리와 speed 적분 일치를 만족하는가"}
+  R2["WAITING 또는 불일치 reset"]
+  OK["SAMPLE_READY + 원 endpoint evidence → 프로필 학습"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END

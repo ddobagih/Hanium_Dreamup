@@ -32,11 +32,12 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from sqlalchemy import func, select
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
     AccountDeletionTombstone,
+    Report, RawCollection, PrivacyConsentEvent,
     PrivacyHmacKeyBinding,
     PrivacyHmacKeyringEntry,
 )
@@ -87,6 +88,7 @@ class AccountTombstoneReapplyPlan:
     ledger_sha256: str
     missing: tuple[AccountTombstoneEntry, ...]
     present: int
+    retained_data_categories: tuple[str, ...] = ()
 
 
 def _timestamp_text(value: datetime) -> str:
@@ -456,10 +458,23 @@ def _plan(
                 "A restored tombstone conflicts with the signed ledger.",
             )
         present += 1
+    # A restored tombstone is an access fence, not evidence of physical deletion.
+    subjects = [(entry.privacy_subject_hmac, entry.account_generation) for entry in ledger.entries]
+    retained = []
+    for category, model in (("reports", Report), ("raw_collections", RawCollection),
+                            ("consent_events", PrivacyConsentEvent)):
+        for offset in range(0, len(subjects), 256):
+            found = db.scalar(select(model.privacy_subject_hmac).where(
+                tuple_(model.privacy_subject_hmac, model.account_generation).in_(subjects[offset:offset + 256])
+            ).limit(1))
+            if found is not None:
+                retained.append(category)
+                break
     return AccountTombstoneReapplyPlan(
         ledger_sha256=ledger.ledger_sha256,
         missing=tuple(missing),
         present=present,
+        retained_data_categories=tuple(retained),
     )
 
 

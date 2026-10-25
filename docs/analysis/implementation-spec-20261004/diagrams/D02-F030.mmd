@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D02-030 횡단보도 참고 안내의 경로 일치 영수증"]
+  E["진입: route-bound reference observation / reserve/start/DONE/fail"]
+  G{"P-D02-030 입력·소유권·상태 검사"}
+  A --> E
+  E --> G
+  B0["old start 불가; owner 완료/실패 처리 대기"]
+  G -->|"route ID/version/segment 하나라도 달라짐"| B0
+  B1["예약 불가"]
+  G -->|"invalid/future/expired/malformed"| B1
+  B2["거절"]
+  G -->|"same capture로 source loss 복원 시도"| B2
+  B3["다음 token/cooldown을 소비하지 않음"]
+  G -->|"실패/거절/old receipt"| B3
+  subgraph PROCESS["처리 단계: 분기는 해당 단계에서 적용"]
+    S0["GL observation의 latest/current route tuple 검증"]
+    S1["one pending identity reservation"]
+    S2["actual start에서 최신 route/track 및 원본 deadline 검증"]
+    S3["source loss 또는 route component 변경은 old start 차단"]
+    S4["실제 시작한 exact receipt DONE은 후속 source loss/TTL 만료와 별개로 completion<br/>interval 반영"]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+  end
+  E -.-> S0
+  N["정상 종료: DONE 기반8초 interval; route 진행 완료는 별도 navigation 계약."]
+  X["취소·중단: owner 교체/reset은 old receipt exact cancellation. /<br/>foreground/actor/epoch 변경 시 현재 요청을 폐기한다."]
+  C["정리: 순수 판단 로직은 외부 자원을 소유하지 않는다."]
+  R["재시도·복구: 자동 재시도 없음; 새 적법한 이벤트 필요. / 현재 owner와 조건을 다시 확보해야 한다."]
+  S4 --> N
+  E -.-> X
+  X --> C
+  C -.-> R

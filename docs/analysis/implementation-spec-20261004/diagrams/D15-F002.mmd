@@ -1,0 +1,36 @@
+flowchart TB
+  E["F-D15-002 · v2 점자블록 파손 신고 접수<br/>POST /reports/v2"]
+  P["P-D15-002 · 전제조건<br/>FIELD 인증·actor generation·수집 동의 및 보안 Android<br/>승인 release bundle 검사."]
+  E --> P
+  S1["1. 전송 header 3종 유무·형식과 actor 세대 확인"]
+  P --> S1
+  S2["2. metadata 크기와 v2 schema·허용 class/model 검사"]
+  S1 --> S2
+  S3["3. 보안 Android APK/source/model config 승인 결합<br/>검사"]
+  S2 --> S3
+  S4["4. 원본 전송 digest 검증 후 이미지 sanitize; bbox가 제공되면<br/>EXIF 회전 반전 2..8 거절"]
+  S3 --> S4
+  S5["5. privacy subject 및 동의 lock→전송/내용<br/>replay→auto gate→쿨다운→중복 조회"]
+  S4 --> S5
+  S6["6. Report new + 암호화 image object 및 receipt<br/>marker 저장"]
+  S5 --> S6
+  OK["정상 결과<br/>201 CREATED/REPLAYED/SUPPRESSED_BY_COOLDOWN.<br/>receipt가 있으면 DB+암호화 이미지 저장에 결속."]
+  S6 --> OK
+  B1["조건 · model/class/ID 불일치 또는 GPS 없음<br/>결과 · 422"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · trigger auto와 auto_reported 값 불일치<br/>결과 · schema 422"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · transport 계약 존재·쿨다운 활성<br/>결과 · 429 + Retry-After 600"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · 전송 계약 없는 쿨다운<br/>결과 · 기존 신고로 201 SUPPRESSED_BY_COOLDOWN"]
+  S1 -. "해당 조건 발생" .-> B4
+  B5["조건 · 원본 hash/크기 불일치<br/>결과 · 422 report_transport_payload_mismatch"]
+  S1 -. "해당 조건 발생" .-> B5
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/api/reports.py:2590<br/>create_report_v2<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

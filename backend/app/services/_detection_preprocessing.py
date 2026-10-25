@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 import asyncio
 from concurrent.futures import Executor, Future, InvalidStateError
 import multiprocessing
@@ -610,6 +613,19 @@ class _DetectionPreprocessingRuntime:
             raise RuntimeError("preprocessing runtime cleanup failed") from errors[0]
 
 
+DetectionPreprocessingRuntime = _DetectionPreprocessingRuntime
+_APP_RUNTIME: ContextVar[_DetectionPreprocessingRuntime | None] = ContextVar("walksafe_preprocessing", default=None)
+
+
+@contextmanager
+def use_detection_preprocessing(runtime):
+    token = _APP_RUNTIME.set(runtime)
+    try:
+        yield
+    finally:
+        _APP_RUNTIME.reset(token)
+
+
 _RUNTIME_LOCK = threading.Lock()
 _RUNTIME = _DetectionPreprocessingRuntime()
 
@@ -645,7 +661,7 @@ async def read_detection_image_upload(
     deadline_or_cancelled = False
     try:
         with _RUNTIME_LOCK:
-            job = _RUNTIME.open(deadline, capacity.release)
+            job = (_APP_RUNTIME.get() or _RUNTIME).open(deadline, capacity.release)
     except BaseException as exc:
         capacity.release()
         if isinstance(exc, Exception):
@@ -684,6 +700,10 @@ async def read_detection_image_upload(
 
 
 def close_detection_preprocessing() -> None:
+    scoped = _APP_RUNTIME.get()
+    if scoped is not None:
+        scoped.close()
+        return
     global _RUNTIME
     with _RUNTIME_LOCK:
         _RUNTIME.close()

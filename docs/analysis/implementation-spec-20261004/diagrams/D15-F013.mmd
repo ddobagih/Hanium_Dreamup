@@ -1,0 +1,28 @@
+flowchart TB
+  E["F-D15-013 · 신고 통계·위치 grid 집계<br/>GET /reports/summary"]
+  P["P-D15-013 · 전제조건<br/>읽기 권한·purpose. PostgreSQL/PostGIS 질의 경계."]
+  E --> P
+  S1["1. DB 단일 statement로<br/>total/fake/non_fake/located/missing_location/bounds/status_counts/source_counts와<br/>top_clusters를 집계"]
+  P --> S1
+  S2["2. 위치 없는 신고와 위치 있는 신고를 구분"]
+  S1 --> S2
+  S3["3. 좌표 x/size floor half-open cell을 float64로<br/>산출; 경계 모호성은 exact rational fallback"]
+  S2 --> S3
+  S4["4. grid 결과·상위 항목을 조합하고 보안 read 감사"]
+  S3 --> S4
+  OK["정상 결과<br/>grid 결과·상위 항목을 조합하고 보안 read 감사"]
+  S4 --> OK
+  B1["조건 · latitude 또는 longitude IS NULL<br/>결과 · located 집계에서 제외; 그 밖의 좌표 유효성은 저장 제약에 의존"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · half-open float 경계 표현 불가<br/>결과 · 정확 rational 계산으로 cell 결정"]
+  S2 -. "해당 조건 발생" .-> B2
+  B3["조건 · top_limit=0<br/>결과 · 상위 목록 생략"]
+  S1 -. "해당 조건 발생" .-> B3
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/report_summary_aggregation.py:333<br/>aggregate_report_summary<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

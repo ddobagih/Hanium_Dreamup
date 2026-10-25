@@ -1,0 +1,41 @@
+sequenceDiagram
+  actor Admin as 관리자
+  participant UI as AdminBoundaryActivity
+  participant Gate as AdminSecurityController
+  participant Key as AndroidKeyStore
+  participant API as Backend 직접 API
+  participant Life as Android lifecycle
+  Admin->>UI: F-D12-024 내부 신고 상태 변경 + fresh password/TOTP
+  UI->>UI: 현재 선택 · revision · operation generation 고정
+  UI->>Gate: worker에서 고위험 요청 시작
+  Gate->>Gate: workLock + NORMAL + ATTESTED + debug 운영 gate
+  Gate->>API: 재인증 challenge 요청
+  API-->>Gate: exact bound challenge
+  Gate->>Key: canonical payload 서명
+  Key-->>Gate: DER signature
+  Gate->>API: password/TOTP 재인증 + device proof
+  API-->>Gate: exact action/method/path nonce + expires
+  Gate->>Gate: pending 허가를 먼저 지운 뒤 조건 평가
+  Gate->>API: 실제 PATCH에 대한 device-proof challenge
+  API-->>Gate: bound challenge
+  Gate->>Key: 실제 요청 hash와 intent 서명
+  Key-->>Gate: signed proof
+  alt dispatch 직전 local generation 유효
+    Gate->>API: PATCH status + nonce + proof
+    alt 응답 report/status/version 일치
+      API-->>Gate: 확인된 mutation 응답
+      Gate->>Gate: PATCH_CONFIRMED 증거 보관
+      Gate->>API: 최신 report detail GET
+      API-->>Gate: 상세 또는 조회 오류
+      Gate-->>UI: SUCCEEDED / UPDATED_DETAIL_STALE / CONFLICT
+    else API 오류 또는 결과 미확정
+      API-->>Gate: 403/409/timeout/검증 오류
+      Note over Gate,API: D14 R8 정적 교차관찰의 admin_step_up_required 가능성 포함<br/>현재 통합 성공을 검증한 시퀀스가 아님
+      Gate-->>UI: 성공 단정 없이 오류 또는 재조회 복구
+    end
+  else dispatch 전에 이탈
+    Life->>Gate: onStop localGeneration 증가 + 잠금
+    Gate-->>UI: 전송 취소 / 늦은 callback 폐기
+  end
+  Note over Life,API: 이미 전송된 쓰기는 로컬 취소로 되돌아가지 않음<br/>자동 mutation 재전송 없음
+  Gate->>Gate: char[] 정리 · 최종 generation 검증 · workLock 해제

@@ -52,6 +52,8 @@ class WalkSafeFeedbackPersistentRiskNavigationTest {
                 trackStableMs = 1_000L,
                 stale = false,
                 validUntilMs = now + 400L,
+                observedAtElapsedRealtimeMs = now,
+                observationMaxAgeMs = 400L,
                 riskDistanceM = distanceAt(now),
             )
             if (pending == null) {

@@ -112,3 +112,14 @@ def test_gap_fields_are_optional_and_non_negative() -> None:
     assert legacy.start_gap_m is None and legacy.end_gap_m is None
     with pytest.raises(ValidationError):
         WalkingRouteResponse.model_validate({**base, "end_gap_m": -1})
+
+
+@pytest.mark.parametrize("gap_m", [36.0, 60.0, 99.0])
+def test_allowed_provider_gap_preserves_the_original_polyline(gap_m):
+    request = _request()
+    start, end = _shifted(ORIGIN, gap_m), _shifted(DESTINATION, -gap_m)
+    response = _normalize_tmap_response(_payload(start, end), request)
+    assert response.polyline == [start, end]
+    assert response.start_gap_m == round(route_point_distance_m(request.origin, start))
+    assert response.end_gap_m == round(route_point_distance_m(request.destination, end))
+    assert response.summary.distance_m == round(route_point_distance_m(start, end))

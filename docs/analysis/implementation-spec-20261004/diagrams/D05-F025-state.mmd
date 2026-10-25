@@ -1,0 +1,19 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-025-IDLE" as IDLE
+  state "S-D05-025-ELIGIBLE" as ELIGIBLE
+  state "S-D05-025-RESERVED" as RESERVED
+  state "S-D05-025-CLAIMED" as CLAIMED
+  state "S-D05-025-COMPLETED" as COMPLETED
+  state "S-D05-025-CANCELLED" as CANCELLED
+  [*] --> IDLE
+  IDLE --> ELIGIBLE: "current metric candidate"
+  ELIGIBLE --> RESERVED: "next policy reservation"
+  RESERVED --> CLAIMED: "current TTL andclaim"
+  CLAIMED --> COMPLETED: "TTS DONE or vibration terminaltimer"
+  CLAIMED --> CANCELLED: "owner stale expired stop"
+  RESERVED --> CANCELLED: "claim rejection"
+  COMPLETED --> IDLE: "history cooldown retained"
+  note right of IDLE
+    F-D05-025 P-D05-025
+  end note

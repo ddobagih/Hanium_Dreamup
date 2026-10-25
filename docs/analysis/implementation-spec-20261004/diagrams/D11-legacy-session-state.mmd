@@ -1,0 +1,13 @@
+stateDiagram-v2
+  [*] --> active
+  active --> paused: "background"
+  paused --> paused: "foreground 단독"
+  stopped --> stopped: "foreground 단독"
+  active --> stopped: "user_stop"
+  paused --> stopped: "user_stop"
+  stopped --> active: "user_resume"
+  paused --> active: "user_resume"
+  note right of active
+    "F-D11-032 과거 pure 상태함수"
+    "현재 Next HTTP는 먼저 410으로 종료"
+  end note

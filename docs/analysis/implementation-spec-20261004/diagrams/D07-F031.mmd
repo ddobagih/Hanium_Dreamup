@@ -1,0 +1,26 @@
+flowchart TD
+    A["F-D07-031<br/>미연결 TTC·risk helper와 폐기 tactile 호환 정책<br/>상태 LEGACY_REFERENCE"]
+    P0["직접 TTC risk helper 호출만 적용"]
+    A --> D
+    P1["별도 helper 수치로 반환"]
+    P0 --> P1
+    P2["deprecated tactile은 NONE null"]
+    P1 --> P2
+    P3["Main 활성 경로와 구분"]
+    P2 --> P3
+    D{"P-D07-031<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["해당 독립 수치로 결과"]
+    D -->|"직접 TTC/risk helper 호출"| B0
+    B1["호출 연결 없음"]
+    D -->|"production Main/object pipeline"| B1
+    B2["NONE/null"]
+    D -->|"depth-only tactile 호환 호출"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    N["Main 실행 연결 없음<br/>직접 API와 시험 기대만"]
+    A -.-> N
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

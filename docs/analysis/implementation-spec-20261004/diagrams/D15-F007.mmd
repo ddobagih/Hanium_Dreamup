@@ -1,0 +1,30 @@
+flowchart TB
+  E["F-D15-007 · 신고 출처·성능 제외·검토 신호 산출<br/>신고 payload 저장 및 응답 직렬화"]
+  P["P-D15-007 · 전제조건<br/>신고 schema 검증과 정제 image bytes가 준비됨."]
+  E --> P
+  S1["1. 클라이언트가 서버 검토 승인 필드를 주입하지 못하게 allowlist 적용"]
+  P --> S1
+  S2["2. fake/demo 판정과 coordinate gate 누락/실패 이유를 산출"]
+  S1 --> S2
+  S3["3. v2는 client_asserted_detection을 항상 성능 제외<br/>이유로 포함"]
+  S2 --> S3
+  S4["4. location_quality: finite 위치 없음 missing;<br/>accuracy invalid/&gt;50 low; &gt;15 medium; 그<br/>외 high"]
+  S3 --> S4
+  S5["5. fake·confidence&lt;0.7·location/heading<br/>결손·중복 flag를 검토 신호로 반환"]
+  S4 --> S5
+  OK["정상 결과<br/>fake·confidence&lt;0.7·location/heading 결손·중복<br/>flag를 검토 신호로 반환"]
+  S5 --> OK
+  B1["조건 · coordinate gate 미통과<br/>결과 · 성능 제외; 이것만으로 demo로 바꾸지 않음"]
+  S1 -. "해당 조건 발생" .-> B1
+  B2["조건 · v1<br/>결과 · legacy_v1_unverified_provenance로 제외"]
+  S1 -. "해당 조건 발생" .-> B2
+  B3["조건 · 좌표 high + named human review<br/>결과 · 기관 export 자격 판단에 별도 사용"]
+  S1 -. "해당 조건 발생" .-> B3
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>조회는 상태 추가 없음. 쓰기 중복 허용 여부는 아래 분기와 공유 버전 계약<br/>참조.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/api/reports.py:850<br/>_enrich_v2_payload<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

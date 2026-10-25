@@ -10,18 +10,55 @@ import org.junit.Test
 class WalkSafeDesignTokenConformanceTest {
     private val source =
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val styleSource =
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/WalkSafeViewStyle.kt").readText()
+
+    private val accountSource =
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/AccountAccessPanel.kt").readText()
+    private val onboardingSource =
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/OnboardingReadinessPanel.kt").readText()
+
+    private val firstRunPresenterSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/FirstRunOnboardingPresenter.kt",
+    ).readText()
+    private val userReportPresenterSource = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/UserReportPresenter.kt",
+    ).readText()
 
     private fun argb(name: String): String {
         val match = Regex("""const val $name = 0x([0-9a-fA-F]{8})\.toInt\(\)""")
-            .find(source)
+            .find(styleSource)
         requireNotNull(match) { "missing constant: $name" }
         return "#" + match.groupValues[1].uppercase()
     }
 
     private fun dimension(name: String): String {
-        val match = Regex("""const val $name = ([0-9.]+)f""").find(source)
+        val match = Regex("""const val $name = ([0-9.]+)f""").find(styleSource)
         requireNotNull(match) { "missing constant: $name" }
         return match.groupValues[1].removeSuffix(".0") + "dp"
+    }
+
+    @Test
+    fun mainDelegatesToTheExactSharedStyleImplementation() {
+        assertTrue(source.contains("WalkSafeViewStyle(this)"))
+        listOf(
+            "= viewStyle.applyAccessibleControlDefaults(root)",
+            "= viewStyle.applyWsSecondaryButtonStyle(button)",
+            "= viewStyle.applyWsButtonStyle(button, minHeightDp, primary)",
+            "= viewStyle.wsButtonFace(fill, density, outlined, focused)",
+            "= viewStyle.wsTypeface(style, medium)",
+            "= viewStyle.accessiblePriorityUserButton(label, emphasis, spokenLabel, onClick)",
+        ).forEach { delegate ->
+            assertTrue("missing Main style connection: $delegate", source.contains(delegate))
+        }
+        val defaults = functionBlock("fun applyAccessibleControlDefaults(", styleSource)
+        assertTrue(defaults.contains("applyWsStackSpacing(root)"))
+        val content = functionBlock("private fun buildContentView(")
+            .replace(Regex("\\s+"), "")
+        assertTrue(content.contains("AccountAccessPanel(context=this,style=viewStyle,"))
+        assertTrue(content.contains("OnboardingReadinessPanel(context=this,style=viewStyle,"))
+        assertTrue(accountSource.contains("style.applyWsClauseBox(this)"))
+        assertTrue(onboardingSource.contains("style.applyWsClauseBox(this)"))
     }
 
     @Test
@@ -69,8 +106,9 @@ class WalkSafeDesignTokenConformanceTest {
         val manifest = File("src/main/AndroidManifest.xml").readText()
         val fontFamily = File("src/main/res/font/pretendard.xml").readText()
         val typeface = sourceBlock(
-            "private fun wsTypeface(",
-            "private fun wsButtonFace(",
+            "fun wsTypeface(",
+            "fun wsButtonFace(",
+            styleSource,
         )
 
         assertTrue(
@@ -117,25 +155,44 @@ class WalkSafeDesignTokenConformanceTest {
     @Test
     fun componentStylesAreAppliedToTheCurrentVisibleControls() {
         val build = functionBlock("private fun buildContentView()")
-        assertTrue(build.contains("setBackgroundColor(WS_COLOR_OVERLAY_FILL)"))
-        assertTrue(build.contains("setBackgroundColor(WS_COLOR_WALK_OVERLAY_FILL)"))
+        val contentComposer = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeContentViewComposer.kt").readText()
+        val runtimeComposer = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRuntimeViewComposer.kt").readText()
+        assertTrue(build.contains("NativeContentViewComposer(this, viewStyle)"))
+        assertTrue(build.contains("contentComposer.createOverlayContainer("))
+        assertTrue(functionBlock("fun createOverlayContainer(", contentComposer).contains("setBackgroundColor(WS_COLOR_OVERLAY_FILL)"))
+        assertTrue(build.contains("NativeRuntimeViewComposer(this, viewStyle)"))
+        assertTrue(build.contains("runtimeComposer.createWalkSafetyOverlay("))
+        assertTrue(runtimeComposer.contains("setBackgroundColor(WS_COLOR_WALK_OVERLAY_FILL)"))
         assertTrue(build.contains("applyAccessibleControlDefaults(overlay)"))
         assertTrue(build.contains("applyAccessibleControlDefaults(walkSafetyOverlay)"))
-        assertTrue(Regex("""applyWsButtonStyle\(\s*startupCapabilityConfirmButton,\s*WS_TOUCH_WALK_PRIMARY_DP,\s*primary = true,\s*\)""").containsMatchIn(build))
-        assertTrue(Regex("""listOf\(\s*firstRunPhonePostureText,\s*startupCapabilityText,\s*postLoginDeviceCheckLiveStatusText,\s*nativeDestinationConfirmationText,\s*\)\.forEach\(::applyWsStatusCard\)""").containsMatchIn(build))
-        assertTrue(build.contains("wsEmphasisButtons.forEach"))
-        assertTrue(build.contains("applyWsButtonStyle(it, WS_TOUCH_PRIMARY_DP, primary = true)"))
-        assertTrue(functionBlock("private fun renderUserReportList(").contains("applyWsButtonStyle(detailButton, WS_TOUCH_WALK_ACTION_DP)"))
-        assertTrue(functionBlock("private fun updateDestinationSearchUi()").contains("applyWsButtonStyle(this, WS_TOUCH_WALK_ACTION_DP)"))
+        assertTrue(Regex("""applyWsButtonStyle\(\s*firstRunOnboardingPresenter\.readinessBinding\(\)\.startupCapabilityConfirmButton,\s*WS_TOUCH_WALK_PRIMARY_DP,\s*primary = true,\s*\)""").containsMatchIn(build))
+        assertTrue(Regex("""contentComposer\.styleStatusCards\(\s*onboardingPanel\.firstRunPhonePostureText,\s*firstRunOnboardingPresenter\.readinessBinding\(\)\.startupCapabilityText,\s*firstRunOnboardingPresenter\.readinessBinding\(\)\.postLoginDeviceCheckLiveStatusText,\s*nativeScreenPresenter\.guidanceBinding\(\)\.nativeDestinationConfirmationText,\s*\)""").containsMatchIn(build))
+        assertTrue(functionBlock("fun styleStatusCards(", contentComposer).contains("listOf(phonePosture, startup, deviceCheck, destination).forEach(style::applyWsStatusCard)"))
+        assertTrue(build.contains("viewStyle.clearEmphasisButtons()"))
+        assertTrue(build.contains("viewStyle.applyEmphasisButtonStyles()"))
+        val emphasis = functionBlock("fun applyEmphasisButtonStyles(", styleSource)
+        assertTrue(emphasis.contains("wsEmphasisButtons.forEach"))
+        assertTrue(emphasis.contains("applyWsButtonStyle(it, WS_TOUCH_PRIMARY_DP, primary = true)"))
+        assertTrue(functionBlock("private fun renderUserReportList(", userReportPresenterSource).contains("applyWsButtonStyle(detailButton, WS_TOUCH_WALK_ACTION_DP)"))
+        val reports = File("src/main/java/kr/co/hanium/dreamup/walksafe/report/interaction/UserReportInteractionOwner.kt").readText()
+        assertTrue(functionBlock("private fun renderUserReportState(").contains("userReportInteractionOwner.renderUserReportState(state)"))
+        assertTrue(MainActivityRefactorSource.member(source, "createUserReportInteractionOwner").contains("UserReportInteractionOwner("))
+        assertTrue(MainActivityRefactorSource.member(reports, "renderUserReportState").contains("presentation.render(state, currentUserReportAuthorityOrNull())"))
+        assertTrue(MainActivityRefactorSource.member(source, "createUserReportInteractionOwner").contains("userReportPresenter.render(state, authority)"))
+        val destinationPanel = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/DestinationGuidancePanel.kt").readText()
+        assertTrue(build.contains("DestinationGuidancePanel("))
+        assertTrue(build.contains("destinationSearchPresenter.bindPanel(destinationPanel)"))
+        assertTrue(functionBlock("private fun updateDestinationSearchUi()").contains("destinationSearchPresenter.renderSearch("))
+        assertTrue(functionBlock("override fun renderSearchResults(", destinationPanel).contains("style.applyWsButtonStyle(this, WS_TOUCH_WALK_ACTION_DP)"))
     }
 
     @Test
     fun sharedControlStylesKeepVisibleFocusDisabledStateAndStackSpacing() {
-        val defaults = functionBlock("private fun applyAccessibleControlDefaults(")
-        val spacing = functionBlock("private fun applyWsStackSpacing(")
-        val secondary = functionBlock("private fun applyWsSecondaryButtonStyle(")
-        val button = functionBlock("private fun applyWsButtonStyle(")
-        val face = functionBlock("private fun wsButtonFace(")
+        val defaults = functionBlock("fun applyAccessibleControlDefaults(", styleSource)
+        val spacing = functionBlock("fun applyWsStackSpacing(", styleSource)
+        val secondary = functionBlock("fun applyWsSecondaryButtonStyle(", styleSource)
+        val button = functionBlock("fun applyWsButtonStyle(", styleSource)
+        val face = functionBlock("fun wsButtonFace(", styleSource)
         assertTrue(defaults.contains("applyWsButtonStyle(root, WS_TOUCH_WALK_ACTION_DP)"))
         assertTrue(defaults.contains("if (root is EditText) applyWsFieldStyle(root)"))
         assertTrue(defaults.contains("intArrayOf(WS_COLOR_PRIMARY_ACTION_FILL, WS_COLOR_BUTTON_BORDER)"))
@@ -145,7 +202,9 @@ class WalkSafeDesignTokenConformanceTest {
         assertTrue(secondary.contains("applyWsButtonStyle(button, 144f)"))
         assertTrue(button.contains("button.background = StateListDrawable().apply"))
         assertTrue(button.contains("intArrayOf(-android.R.attr.state_enabled)"))
-        assertTrue(button.contains("face(restingFill, faded = true)"))
+        assertTrue(source.contains("= viewStyle.applyWsButtonStyle(button, minHeightDp, primary)"))
+        assertTrue(button.contains("addState(intArrayOf(-android.R.attr.state_enabled), face(WS_COLOR_BUTTON_DISABLED_FILL))"))
+        assertTrue(button.contains("WS_COLOR_BUTTON_DISABLED_TEXT"))
         assertTrue(button.contains("intArrayOf(android.R.attr.state_pressed)"))
         assertTrue(button.contains("intArrayOf(android.R.attr.state_focused)"))
         assertTrue(button.contains("face(restingFill, focused = true)"))
@@ -156,7 +215,7 @@ class WalkSafeDesignTokenConformanceTest {
 
     @Test
     fun consentBodiesUseTheFullScrollablePageWithIndependentListeningControls() {
-        val clause = functionBlock("private fun applyWsClauseBox(")
+        val clause = functionBlock("fun applyWsClauseBox(", styleSource)
         val build = functionBlock("private fun buildContentView()")
         assertTrue(clause.contains("view.background = null"))
         assertTrue(clause.contains("view.textSize = 18f"))
@@ -164,13 +223,19 @@ class WalkSafeDesignTokenConformanceTest {
         assertTrue(clause.contains("view.maxHeight = Int.MAX_VALUE"))
         assertTrue(clause.contains("view.movementMethod = null"))
         assertTrue(clause.contains("view.isClickable = false"))
-        assertTrue(build.contains("accountConsentClauseTexts[key] = clauseText"))
-        assertTrue(build.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
-        assertTrue(build.contains("addView(clauseText)"))
-        assertTrue(build.contains("addView(listenButton)"))
+        assertTrue(accountSource.contains("consentClauseTexts[key] = clauseText"))
+        assertTrue(accountSource.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES"))
+        assertTrue(accountSource.contains("addView(clauseText)"))
+        assertTrue(accountSource.contains("addView(listenButton)"))
+        assertTrue(build.contains("accountConsentClauseTexts.putAll(accountPanel.accountConsentClauseTexts)"))
+        assertTrue(build.contains("onListenConsent = {\n                    this@MainActivity.accountConsentSpeechOwner.playAccountConsentClause(it)"))
         assertFalse(build.contains("addView(firstRunConsentAllButton)"))
-        assertTrue(source.contains("controlsScroll = ScrollView(this).apply {\n            isFillViewport = true"))
-        val listening = functionBlock("private fun playAccountConsentClause(")
+        assertFalse(onboardingSource.contains("addView(firstRunConsentAllButton)"))
+        val runtimeComposer = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRuntimeViewComposer.kt").readText()
+        assertTrue(build.contains("NativeRuntimeViewComposer(this, viewStyle)"))
+        assertTrue(build.contains("controlsScroll = runtimeComposer.createControlsScroll(overlay,"))
+        assertTrue(functionBlock("fun createControlsScroll(", runtimeComposer).contains("isFillViewport = true"))
+        val listening = MainActivityRefactorSource.function(source, "private fun playAccountConsentClause(")
         assertFalse(listening.contains("isChecked ="))
         assertFalse(listening.contains("acceptEducationConsent"))
         assertTrue(listening.contains("onCompleted = {"))
@@ -180,25 +245,40 @@ class WalkSafeDesignTokenConformanceTest {
     @Test
     fun emailWaitingStateDoesNotReattachTheRemovedProgressCard() {
         val build = functionBlock("private fun buildContentView()")
-        val waiting = functionBlock("private fun firstRunWaitingTextOrNull(")
+        val waiting = MainActivityRefactorSource.function(source, "private fun firstRunWaitingTextOrNull(")
         val emailWaiting = waiting.substringBefore("return when (snapshot.stage)")
-        val dots = functionBlock("private fun updateFirstRunWaitingDots(")
-        val update = functionBlock("private fun updateFirstRunOnboardingUi(")
+        val dots = functionBlock("fun updateFirstRunWaitingDots(", firstRunPresenterSource)
+        val dotSettings = functionBlock("private fun updateFirstRunWaitingDots(")
+        val update = MainActivityRefactorSource.function(source, "private fun updateFirstRunOnboardingUi(")
+        val waitingComposition = MainActivityRefactorSource.composition(source, "firstRunPresentationCoordinator")
         val onResume = functionBlock("override fun onResume()")
         val onPause = functionBlock("override fun onPause()")
 
-        assertTrue(build.contains("firstRunWaitingCard = LinearLayout(this).apply"))
-        assertTrue(build.contains("repeat(FIRST_RUN_WAITING_DOT_COUNT)"))
-        assertTrue(build.contains("GradientDrawable.OVAL"))
-        assertTrue(build.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
-        assertTrue(build.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"))
+        val waitingCard = sourceBlock("firstRunWaitingText = TextView(context).apply", "priorityUserOnboardingStatusText = TextView(context).apply", onboardingSource)
+        assertTrue(waitingCard.contains("repeat(FIRST_RUN_WAITING_DOT_COUNT)"))
+        assertTrue(waitingCard.contains("GradientDrawable.OVAL"))
+        assertTrue(waitingCard.contains("importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
+        assertTrue(waitingCard.contains("accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE"))
+        assertTrue(build.contains("nativeRegistrationComposition.bindRegistration(onboardingPanel)"))
+        val registration = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRegistrationScreenComposition.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(registration, "bindRegistration").contains("firstRun.bindOnboardingPanel(panel)"))
+        assertTrue(MainActivityRefactorSource.composition(source, "nativeRegistrationComposition").contains("NativeRegistrationScreenComposition(this, viewStyle, nativeUiPublication)"))
+        assertTrue(build.contains("nativeRegistrationComposition.publishRegistrationConsentTail()"))
+        assertTrue(MainActivityRefactorSource.member(registration, "publishRegistrationConsentTail").contains("publication.publish(NativeUiPublication.Target.FIRST_RUN_WAITING_CARD)"))
+        assertTrue(functionBlock("fun bindOnboardingPanel(", firstRunPresenterSource).contains("onboarding = panel"))
+        assertTrue(functionBlock("fun publishRegistrationTargets(", firstRunPresenterSource).contains("publishedRegistration = onboarding"))
+        assertTrue(firstRunPresenterSource.contains("fun registrationBinding(): OnboardingReadinessPanel = publishedRegistration"))
+        assertTrue(dots.contains("with(onboarding)"))
+        assertTrue(dots.contains("firstRunWaitingDots.forEachIndexed { index, dot ->"))
+        assertTrue(MainActivityRefactorSource.member(registration, "bindRegistration").contains("FirstRunOnboardingPresenter(context, style, panel)"))
         assertFalse(build.contains("addView(firstRunWaitingCard)"))
+        assertFalse(onboardingSource.contains("addView(firstRunWaitingCard)"))
         assertTrue(waiting.contains("FirstRunOnboardingStage.VERIFIED_SMS"))
         assertTrue(waiting.contains("FirstRunOnboardingStage.GUARDIAN_APPROVAL"))
         assertTrue(waiting.contains("FirstRunOnboardingStage.ACCOUNT_ACTIVATION"))
         assertTrue(waiting.contains("FirstRunOnboardingStage.VERIFIED_LOGIN"))
         assertTrue(emailWaiting.contains("snapshot.flow == FirstRunOnboardingFlow.EMAIL_ACCOUNT_V4"))
-        assertTrue(emailWaiting.contains("return if (accountRequestFence.isInFlight())"))
+        assertTrue(emailWaiting.contains("return if (facts.accountRequestInFlight())"))
         assertTrue(
             emailWaiting.contains(
                 "인증번호 요청, 계정 생성 또는 로그인을 처리하고 있습니다. 잠시 기다려 주세요.",
@@ -210,19 +290,26 @@ class WalkSafeDesignTokenConformanceTest {
         assertFalse(waiting.contains("Button("))
         assertFalse(waiting.contains("재전송"))
         assertFalse(waiting.contains("타이머"))
-        assertTrue(dots.contains("Settings.Global.ANIMATOR_DURATION_SCALE"))
+        assertTrue(dotSettings.contains("Settings.Global.ANIMATOR_DURATION_SCALE"))
+        assertTrue(dotSettings.contains("firstRunOnboardingPresenter.updateFirstRunWaitingDots(active, animationsEnabled)"))
         assertTrue(dots.contains("AlphaAnimation(FIRST_RUN_WAITING_DOT_MIN_ALPHA, 1f)"))
         assertTrue(dots.contains("repeatMode = Animation.REVERSE"))
         assertTrue(dots.contains("repeatCount = Animation.INFINITE"))
         assertTrue(dots.contains("dot.clearAnimation()"))
-        assertTrue(update.contains("firstRunWaitingCard.visibility ="))
-        assertTrue(update.contains("active = waitingText != null && isActivityForeground"))
+        assertTrue(functionBlock("fun renderWaiting(", firstRunPresenterSource).contains("firstRunWaitingCard.visibility ="))
+        assertTrue(update.contains("effects.renderWaiting {"))
+        assertTrue(waitingComposition.contains("firstRunOnboardingPresenter.renderWaiting(facts())"))
+        assertTrue(waitingComposition.contains("override fun accountRequestInFlight() = emailAccountController.isRequestInFlight()"))
+        assertTrue(functionBlock("fun renderWaiting(", firstRunPresenterSource).contains("active = waitingText != null && facts.activityForeground"))
+        assertTrue(update.contains("text = firstRunWaitingTextOrNull(snapshot)"))
+        assertTrue(update.contains("activityForeground = facts.foreground"))
+        assertTrue(waitingComposition.contains("override val foreground get() = isActivityForeground"))
         assertTrue(onResume.contains("updateFirstRunWaitingDots("))
         assertTrue(onPause.contains("updateFirstRunWaitingDots(active = false)"))
-        assertTrue(source.contains("const val FIRST_RUN_WAITING_DOT_COUNT = 3"))
-        assertTrue(source.contains("const val FIRST_RUN_WAITING_DOT_MIN_ALPHA = 0.2f"))
-        assertTrue(source.contains("const val FIRST_RUN_WAITING_DOT_PERIOD_MS = 750L"))
-        assertTrue(source.contains("const val FIRST_RUN_WAITING_DOT_STAGGER_MS = 300L"))
+        assertTrue(onboardingSource.contains("const val FIRST_RUN_WAITING_DOT_COUNT = 3"))
+        assertTrue(firstRunPresenterSource.contains("const val FIRST_RUN_WAITING_DOT_MIN_ALPHA = 0.2f"))
+        assertTrue(firstRunPresenterSource.contains("const val FIRST_RUN_WAITING_DOT_PERIOD_MS = 750L"))
+        assertTrue(firstRunPresenterSource.contains("const val FIRST_RUN_WAITING_DOT_STAGGER_MS = 300L"))
     }
 
     private fun assertFontWeight(xml: String, weight: String, resource: String) {
@@ -235,29 +322,29 @@ class WalkSafeDesignTokenConformanceTest {
         )
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
+    private fun functionBlock(signature: String, text: String = source): String {
+        val start = text.indexOf(signature)
         require(start >= 0) { "missing function: $signature" }
-        val opening = source.indexOf('{', start)
+        val opening = text.indexOf('{', start)
         require(opening >= 0) { "missing function body: $signature" }
         var depth = 0
-        for (index in opening until source.length) {
-            when (source[index]) {
+        for (index in opening until text.length) {
+            when (text[index]) {
                 '{' -> depth += 1
                 '}' -> {
                     depth -= 1
-                    if (depth == 0) return source.substring(start, index + 1)
+                    if (depth == 0) return text.substring(start, index + 1)
                 }
             }
         }
         error("unterminated function: $signature")
     }
 
-    private fun sourceBlock(startMarker: String, endMarker: String): String {
-        val start = source.indexOf(startMarker)
+    private fun sourceBlock(startMarker: String, endMarker: String, text: String = source): String {
+        val start = text.indexOf(startMarker)
         require(start >= 0) { "missing start marker: $startMarker" }
-        val end = source.indexOf(endMarker, start + startMarker.length)
+        val end = text.indexOf(endMarker, start + startMarker.length)
         require(end >= 0) { "missing end marker after $startMarker: $endMarker" }
-        return source.substring(start, end)
+        return text.substring(start, end)
     }
 }

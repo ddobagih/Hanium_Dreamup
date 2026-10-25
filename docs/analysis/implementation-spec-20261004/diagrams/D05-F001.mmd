@@ -1,0 +1,9 @@
+flowchart TD
+  H["F-D05-001 모델 번들·라벨·임계값의 로컬 신뢰 계약"]
+  H --> J["JSON 과 선택 모델 읽기"]
+  J --> V{"키 라벨 threshold 형식 유효"}
+  V -->|"아니오"| X["설정 거부"]
+  V -->|"예"| K{"APK asset SHA 일치"}
+  K -->|"아니오"| E["integrity failure 사용 불가"]
+  K -->|"예"| C["P-D05-001 유효 config"]
+  C --> L["F-D05-002 로드 요청"]

@@ -1,0 +1,44 @@
+flowchart TD
+  T["F-D06-034 디버그 원본 전송 admission과 보행 재시작 취소"]
+  P["전제: DEBUG factory, RAW_SOURCE_COLLECTION 허용, walk<br/>allowsPostWalkTransfer(READY/ENDED), charging=true, Wi-Fi.<br/>unknown 상태는 ACTIVE로 fail closed."]
+  T --> P
+  E1["E-D06-034-01 로그 toggle/프레임 버튼→민감전송 gate→enabled 또는 요청 flag"]
+  E1 --> T
+  E2["E-D06-034-02 actual upload→lock 안 admission 재평가→전송 dispatch"]
+  E2 --> T
+  E3["E-D06-034-03 보행 ACTIVE/PAUSED 등 재진입→generation 증가→두 transport<br/>취소"]
+  E3 --> T
+  A1["1. UI 동작 시 gate 불충족이면 toggle/요청 flag를 false로 하고 동의·네트워크 안내를<br/>한다."]
+  P --> A1
+  A2["2. actual action은 같은 admission lock 아래 상태를 재확인한 뒤 실행한다."]
+  A1 --> A2
+  A3["3. 보행 재진입은 admissionClosed와 generation을 바꾼 다음 metadata/frame<br/>active 연결을 취소한다."]
+  A2 --> A3
+  A4["4. 원래 motion기반 helper decide가 있어도 이 Main 경로는 decideAfterWalk를<br/>사용하고 종료 후 stillness 근거를 요구하지 않는다."]
+  A3 --> A4
+  N["정상 종료: 조건 통과 dispatch 결과 Boolean."]
+  A4 --> N
+  FX["결과: 네트워크 시작/취소와 debug UI 상태. Debug factory의 실제 endpoint는<br/>loopback."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"ACTIVE/PAUSED/SAFE_STOP 또는 미초기화"}
+    R1["보행중 차단"]
+    B1 -->|조건 성립| R1
+    B2{"charging unknown/false"}
+    R2["충전 대기"]
+    B2 -->|조건 성립| R2
+    B3{"cellular"}
+    R3["Wi-Fi 대기"]
+    B3 -->|조건 성립| R3
+    B4{"OTHER/OFFLINE/raw 미동의"}
+    R4["fail closed"]
+    B4 -->|조건 성립| R4
+  end
+  POL["정책: P-D06-018, P-D06-033"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: probe exception은 charging=false로 처리."]
+    X2["취소: 상태변경시 cancelActiveUpload 호출."]
+    X3["중단: generation이 달라지면 이미 허용됐어도 admitted 결과 false."]
+    X4["재시도: 조건 회복 후 이후 사용자/producer 이벤트에서 재평가."]
+  end

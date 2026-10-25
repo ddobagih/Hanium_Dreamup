@@ -650,54 +650,65 @@ def test_raw_inventory_rejects_collection_aggregate_mismatch(
 def test_backend_lifespan_reconciles_raw_storage_before_serving(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    owned_app = main_app.create_app(main_app.settings)
+    owner = owned_app.state.runtime
+    owner.initialize_resources()
+    monkeypatch.setattr(owner, "initialize_resources", lambda: None)
+    from backend.app import application_runtime as runtime_module
     calls: list[str] = []
     monkeypatch.setattr(
-        main_app,
+        owner,
         "validate_admin_credential_issuer_binding",
         lambda: calls.append("admin"),
     )
     monkeypatch.setattr(
-        main_app,
+        owner,
         "bind_privacy_hmac_key",
         lambda: calls.append("privacy"),
     )
     monkeypatch.setattr(
-        main_app,
+        owner,
         "bind_account_crypto_keys",
         lambda: calls.append("account-crypto"),
     )
     monkeypatch.setattr(
-        main_app,
+        owner,
         "reconcile_report_storage",
         lambda: calls.append("report"),
     )
     monkeypatch.setattr(
-        main_app,
+        owner,
         "reconcile_raw_collection_storage",
         lambda: calls.append("raw"),
     )
-    monkeypatch.setattr(main_app, "capacity_monitor", None)
-    monkeypatch.setattr(main_app, "inference_runner", None)
+    monkeypatch.setattr(owner, "capacity_monitor", None)
+    monkeypatch.setattr(owner, "inference_runner", None)
 
     async def exercise() -> None:
-        async with main_app.lifespan(main_app.app):
+        async with owner.lifespan(owned_app):
             assert calls == ["admin", "privacy", "account-crypto", "report", "raw"]
 
     asyncio.run(exercise())
+
 
 
 def test_backend_raw_reconciliation_holds_shared_maintenance_lock(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    owned_app = main_app.create_app(main_app.settings)
+    owner = owned_app.state.runtime
+    owner.initialize_resources()
+    monkeypatch.setattr(owner, "initialize_resources", lambda: None)
+    from backend.app import application_runtime as runtime_module
     calls: list[str] = []
     root = tmp_path / "raw-objects"
     root.mkdir(mode=0o700)
 
     @contextmanager
     def maintenance_lock(path, *, expected_group_gid):
-        assert path == main_app.settings.maintenance_lock_path
-        assert expected_group_gid == main_app.settings.maintenance_lock_group_gid
+        assert path == owner.settings.maintenance_lock_path
+        assert expected_group_gid == owner.settings.maintenance_lock_group_gid
         calls.append("maintenance-lock")
         try:
             yield
@@ -730,30 +741,30 @@ def test_backend_raw_reconciliation_holds_shared_maintenance_lock(
         calls.append("reconcile")
 
     def validate(_db, _root, *, key_manager, storage) -> None:
-        assert key_manager is main_app.report_image_key_manager
-        assert storage is main_app.raw_collection_storage
+        assert key_manager is owner.report_image_key_manager
+        assert storage is owner.raw_collection_storage
         calls.append("validate")
 
-    monkeypatch.setattr(main_app.settings, "raw_object_dir", root)
-    monkeypatch.setattr(main_app, "SessionLocal", FakeSessionFactory)
+    monkeypatch.setattr(owner.settings, "raw_object_dir", root)
+    monkeypatch.setattr(owner.database, "_session_factory", FakeSessionFactory)
     monkeypatch.setattr(
-        main_app.reports,
+        runtime_module,
         "shared_maintenance_write_lock",
         maintenance_lock,
     )
     monkeypatch.setattr(
-        main_app.report_image_key_manager,
+        owner.report_image_key_manager,
         "synchronize",
         lambda _db: calls.append("keys"),
     )
-    monkeypatch.setattr(main_app, "reconcile_pending_raw_chunk_writes", reconcile)
+    monkeypatch.setattr(runtime_module, "reconcile_pending_raw_chunk_writes", reconcile)
     monkeypatch.setattr(
-        main_app,
+        runtime_module,
         "validate_raw_storage_database_inventory",
         validate,
     )
 
-    main_app.reconcile_raw_collection_storage()
+    owner.reconcile_raw_collection_storage()
 
     assert calls == [
         "maintenance-lock",

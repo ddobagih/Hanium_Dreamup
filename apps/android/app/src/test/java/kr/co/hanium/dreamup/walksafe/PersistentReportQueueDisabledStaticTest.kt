@@ -57,13 +57,16 @@ class PersistentReportQueueDisabledStaticTest {
             )
         }
 
-        val process = ReportStaticSourceInspector.functionBlock(
-            source,
-            "private fun processReportCandidate",
-        )
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/ReportCandidateController.kt").readText()
+        val wiring = MainActivityRefactorSource.composition(source, "reportCandidateController")
+        assertTrue(wiring.contains("reportQueueStore.enqueue("))
+        assertTrue(MainActivityRefactorSource.member(source, "publishCurrentFrameReportState")
+            .contains("reportCandidateController.publishCurrentFrameReportState("))
+        assertTrue(MainActivityRefactorSource.member(owner, "prepareReportCandidate").contains("processReportCandidate("))
+        val process = MainActivityRefactorSource.member(owner, "processReportCandidate")
         assertTrue(
             "ACTIVE report creation must only offer the frozen payload to the U5 queue.",
-            process.contains("reportQueueStore.enqueue("),
+            process.contains("queue.enqueue("),
         )
         assertFalse(process.contains("uploadCall("))
         val queueContract = ReportStaticSourceInspector.read(REPORT_QUEUE_CONTRACT_PATH)
@@ -79,29 +82,47 @@ class PersistentReportQueueDisabledStaticTest {
             buildScript.contains("automatic capacity plus one max stored explicit entry reserve"),
         )
 
-        val explicitButton = source.substringAfter("explicitReportButton = Button(this).apply")
-            .substringBefore("voiceReportButton = Button(this).apply")
-        assertTrue(explicitButton.contains("PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE != null"))
+        val content = MainActivityRefactorSource.member(source, "buildContentView")
+        val composer = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRuntimeViewComposer.kt").readText()
+        assertTrue(content.contains("NativeRuntimeViewComposer(this, viewStyle)"))
+        assertTrue(content.contains("explicitReportButton = runtimeComposer.createReportAction("))
+        assertTrue(content.contains("queueAvailable = { PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE != null }"))
+        val explicitButton = MainActivityRefactorSource.member(composer, "createReportAction")
+        assertTrue(explicitButton.contains("val queueAvailable = queueAvailable()"))
         assertTrue(explicitButton.contains("isEnabled = queueAvailable"))
         assertTrue(explicitButton.contains("신고 저장 기능 준비 중"))
         assertTrue(explicitButton.contains("contentDescription = if (queueAvailable)"))
 
-        val explicitRequest = ReportStaticSourceInspector.functionBlock(
-            source,
-            "private fun ensureExplicitReportAuthorityPreconditions",
-        )
-        assertTrue(explicitRequest.contains("PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE == null"))
+        val explicitRequest = MainActivityRefactorSource.member(owner, "ensureExplicitReportAuthorityPreconditions")
+        assertTrue(explicitRequest.contains("!queueEnabled"))
+        assertTrue(wiring.contains("queueEnabled = PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE != null"))
+        assertTrue(wiring.contains("override fun speakInteraction(message: String) { this@MainActivity.speakInteraction(message) }"))
+        assertTrue(MainActivityRefactorSource.member(source, "requestExplicitReport").contains("reportCandidateController.requestExplicitReport(source)"))
+        assertTrue(MainActivityRefactorSource.member(owner, "requestExplicitReport").contains("ensureExplicitReportAuthorityPreconditions("))
         assertTrue(explicitRequest.contains("reportCandidate=blocked:queue_disabled"))
-        assertTrue(explicitRequest.contains("speakInteraction(message)"))
+        assertTrue(explicitRequest.contains("ui.speakInteraction(message)"))
     }
 
     @Test
     fun cleanupUsesDedicatedBoundedCoalescingExecutorAtEveryPrivacyBoundary() {
         val source = ReportStaticSourceInspector.read(MAIN_ACTIVITY_PATH)
+        val drainOwner = File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/ReportQueueDrainController.kt").readText()
+        val drainWiring = MainActivityRefactorSource.composition(source, "reportQueueDrainController")
+        assertTrue(drainWiring.contains("ReportQueueDrainController("))
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/deletion/runtime/LegacyPendingReportQueuePurgeController.kt").readText()
+        val wiring = MainActivityRefactorSource.composition(source, "legacyPendingReportQueuePurgeController")
+        assertTrue(wiring.contains("executor = executor"))
+        assertTrue(wiring.contains("callbacks = LegacyQueuePurgeCallbacks { callback -> callbacks.post { callback() } }"))
+        val ports = MainActivityRefactorSource.factory(source, "createPrivacyLegacyPurge")
+        assertTrue(ports.contains("executor = { reportCleanupExecutor }"))
+        assertTrue(ports.contains("AndroidPendingReportStore.purgeAllWithoutLoading(applicationContext)"))
+        val authority = MainActivityRefactorSource.factory(source, "createPrivacyAuthorityComposition")
+        assertTrue(authority.contains("callbacks = object : AccountDeletionProgressCallbacks"))
+        assertTrue(authority.contains("override fun post(callback: () -> Unit) = reportCleanupCallbackHandler.post { callback() }"))
         assertTrue(
             Regex(
-                """private\s+val\s+reportQueueDrainExecutor\s*=\s*Executors\.newSingleThreadExecutor""",
-            ).containsMatchIn(source),
+                """private\s+val\s+reportQueueDrainExecutor(?:\s*:\s*ExecutorService)?\s*=\s*Executors\.newSingleThreadExecutor""",
+            ).containsMatchIn(drainOwner),
         )
         assertTrue(
             Regex(
@@ -110,69 +131,60 @@ class PersistentReportQueueDisabledStaticTest {
         )
 
         val helper =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun scheduleLegacyPendingReportQueuePurge",
-            )
-        assertTrue(helper.contains("reportCleanupExecutor.execute"))
+            MainActivityRefactorSource.member(owner, "schedule")
+        assertTrue(helper.contains("executor().execute"))
         assertFalse(
             "Keystore/filesystem cleanup must not share the report drain executor.",
             helper.contains("reportQueueDrainExecutor"),
         )
         assertTrue(
             "Cleanup executor must delegate to the bounded cleanup worker.",
-            helper.contains("purgeLegacyPendingReportQueueOnCleanupThread()"),
+            helper.contains("purgeOnWorker()"),
         )
 
         val maxAttempts =
             Regex(
-                """const\s+val\s+LEGACY_REPORT_CLEANUP_MAX_ATTEMPTS\s*=\s*(\d+)""",
-            ).find(source)?.groupValues?.get(1)?.toInt()
+                """const\s+val\s+MAX_ATTEMPTS\s*=\s*(\d+)""",
+            ).find(owner)?.groupValues?.get(1)?.toInt()
                 ?: error("Missing cleanup retry limit")
         assertTrue("Cleanup retries must be bounded to at most three attempts.", maxAttempts in 1..3)
         val cleanupWorker =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun purgeLegacyPendingReportQueueOnCleanupThread",
-            )
-        assertTrue(cleanupWorker.contains("0 until LEGACY_REPORT_CLEANUP_MAX_ATTEMPTS"))
+            MainActivityRefactorSource.member(owner, "purgeOnWorker")
+        assertTrue(cleanupWorker.contains("0 until MAX_ATTEMPTS"))
         assertTrue(
             "Cleanup worker must perform the only opaque store purge.",
-            cleanupWorker.contains("AndroidPendingReportStore.purgeAllWithoutLoading"),
+            cleanupWorker.contains("purgeLegacyStore()"),
         )
 
-        assertTrue(helper.contains("if (reportCleanupDestroyed) return false"))
+        assertTrue(helper.contains("if (destroyed) return false"))
         val coalescedWaiter =
             ReportStaticSourceInspector.blockAfter(
                 helper,
-                "if (legacyPendingReportQueuePurgeInFlight)",
+                "if (inFlight)",
             )
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 coalescedWaiter,
-                "legacyPendingReportQueuePurgeWaiters +=",
-                "activityToken = reportCleanupActivityToken",
-                "generation = reportCleanupGeneration",
+                "this.waiters +=",
+                "activityToken = activityToken",
+                "generation = this.generation",
                 "callback = onComplete",
                 "return false",
             ),
         )
         val completion =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun completeLegacyPendingReportQueuePurge",
-            )
+            MainActivityRefactorSource.member(owner, "complete")
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 completion,
-                "reportCleanupDestroyed",
-                "generation != reportCleanupGeneration",
-                "legacyPendingReportQueuePurgeWaiters.toList()",
-                "legacyPendingReportQueuePurgeWaiters.clear()",
-                "reportCleanupCallbackHandler.post",
-                "!reportCleanupDestroyed",
-                "waiter.activityToken == reportCleanupActivityToken",
-                "waiter.generation == reportCleanupGeneration",
+                "destroyed",
+                "generation != this.generation",
+                "this.waiters.toList()",
+                "this.waiters.clear()",
+                "callbacks.post",
+                "!destroyed",
+                "waiter.activityToken == activityToken",
+                "waiter.generation == this.generation",
                 "waiter.callback(succeeded)",
             ),
         )
@@ -185,9 +197,9 @@ class PersistentReportQueueDisabledStaticTest {
         )
 
         val consentWithdrawals =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun applyImmediateConsentWithdrawals",
+            MainActivityRefactorSource.member(
+                File("src/main/java/kr/co/hanium/dreamup/walksafe/session/consent/IntegratedConsentController.kt").readText(),
+                "applyImmediateConsentWithdrawals",
             )
         val rawWithdrawal = consentWithdrawals
             .substringAfter("IntegratedConsentItem.RAW_SOURCE_COLLECTION ->")
@@ -195,81 +207,89 @@ class PersistentReportQueueDisabledStaticTest {
         val automaticWithdrawal = consentWithdrawals
             .substringAfter("IntegratedConsentItem.AUTOMATIC_REPORTING ->")
             .substringBefore("IntegratedConsentItem.MOBILE_NETWORK_TRANSFER ->")
-        assertFalse(rawWithdrawal.contains("scheduleLegacyPendingReportQueuePurge()"))
-        assertTrue(automaticWithdrawal.contains("scheduleLegacyPendingReportQueuePurge()"))
+        assertFalse(rawWithdrawal.contains("reports.scheduleLegacyPurge()"))
+        assertTrue(automaticWithdrawal.contains("reports.scheduleLegacyPurge()"))
 
+        val consent = MainActivityRefactorSource.composition(source, "integratedConsentController")
+        assertTrue(consent.contains("portsFactory({ reportPrivacyConsentSession }, { legacyPendingReportQueuePurgeController }, { speechOutputStorageCoordinator })"))
+        assertTrue(MainActivityRefactorSource.factory(source, "createPrivacyConsent")
+            .contains("override fun scheduleLegacyPurge() { legacyPurge().schedule() }"))
         val accountDeletion =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun scheduleAcceptedAccountDeletionLocalPurge",
-            )
+            MainActivityRefactorSource.function(source, "private fun scheduleAcceptedAccountDeletionLocalPurge")
         assertTrue(
-            accountDeletion.contains("purgeAccountDeletionLocalDataOnCleanupThread()"),
+            accountDeletion.contains("purge.purgeLocalDataOnWorker()"),
         )
         val accountDeletionLocalPurge =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun purgeAccountDeletionLocalDataOnCleanupThread",
-            )
+            MainActivityRefactorSource.function(source, "private fun purgeAccountDeletionLocalDataOnCleanupThread")
         assertTrue(
             accountDeletionLocalPurge.contains(
-                "purgeLegacyPendingReportQueueOnCleanupThread()",
+                "legacyQueue.purgeOnWorker()",
             ),
         )
 
+        assertTrue(MainActivityRefactorSource.composition(source, "accountDeletionProgressController")
+            .contains("purge = AccountDeletionLocalDataPurge { accountDeletionLocalDataPurger.value.purgeLocalDataOnWorker() }"))
+        assertTrue(MainActivityRefactorSource.composition(source, "accountDeletionLocalDataPurger")
+            .contains("legacyQueue = legacyPendingReportQueuePurgeController"))
+        assertTrue(MainActivityRefactorSource.member(source, "scheduleLegacyPendingReportQueuePurge")
+            .contains("legacyPendingReportQueuePurgeController.schedule(onComplete)"))
         val onDestroy =
             ReportStaticSourceInspector.functionBlock(source, "override fun onDestroy")
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 onDestroy,
                 "cancelReportQueueDrain()",
-                "reportQueueDrainExecutor.shutdownNow()",
+                "reportQueueDrainController.shutdownExecutor()",
             ),
         )
-        assertTrue(
-            ReportStaticSourceInspector.appearsInOrder(
-                onDestroy,
-                "reportCleanupDestroyed = true",
-                "reportCleanupGeneration += 1L",
-                "legacyPendingReportQueuePurgeInFlight = false",
-                "legacyPendingReportQueuePurgeWaiters.clear()",
-                "reportCleanupExecutor.shutdownNow()",
-            ),
-        )
+        val destruction = MainActivityRefactorSource.member(owner, "destroy")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            destruction, "destroyed = true", "generation += 1L", "inFlight = false", "waiters.clear()",
+        ))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            onDestroy, "legacyPendingReportQueuePurgeController.destroy()", "reportCleanupExecutor.shutdownNow()",
+        ))
+        assertTrue(MainActivityRefactorSource.member(drainOwner, "shutdownExecutor").contains("reportQueueDrainExecutor.shutdownNow()"))
         assertFalse(onDestroy.contains("reportUploaderExecutor"))
     }
 
     @Test
     fun deviceUnsentEvidenceUsesRequestBoundActualPurgeResult() {
         val source = ReportStaticSourceInspector.read(MAIN_ACTIVITY_PATH)
+        val wiring = MainActivityRefactorSource.composition(source, "accountDeletionProgressController")
+        assertTrue(wiring.contains("store = accountDeletionRecoveryStore"))
+        assertTrue(wiring.contains("stages = accountDeletionWorkerStages"))
+        assertTrue(wiring.contains("cleanupExecutor = { cleanupExecutor() }"))
+        assertTrue(MainActivityRefactorSource.factory(source, "createPrivacyAuthorityComposition").contains("cleanupExecutor = { accountDeletionCleanupExecutor }"))
+        assertTrue(wiring.contains("purge = AccountDeletionLocalDataPurge { accountDeletionLocalDataPurger.value.purgeLocalDataOnWorker() }"))
+        MainActivityRefactorSource.composition(source, "accountDeletionLocalDataPurger")
+        assertTrue(MainActivityRefactorSource.member(source, "purgeAccountDeletionLocalDataOnCleanupThread")
+            .contains("accountDeletionLocalDataPurger.purgeLocalDataOnWorker()"))
         val recovery =
-            ReportStaticSourceInspector.functionBlock(
-                source,
-                "private fun scheduleAcceptedAccountDeletionLocalPurge",
-            )
+            MainActivityRefactorSource.function(source, "private fun scheduleAcceptedAccountDeletionLocalPurge")
         assertTrue(
             "DEVICE_UNSENT purge result must be durably bound into evidence before upload.",
             ReportStaticSourceInspector.appearsInOrder(
                 recovery,
-                "accountDeletionLocalPurgeInFlightRequestId = journal.requestId",
-                "accountDeletionCleanupExecutor.execute",
-                "runAccountDeletionWorkerDurableStage(workerAttempt)",
-                "purgeAccountDeletionLocalDataOnCleanupThread()",
+                "localPurgeInFlightRequestId = journal.requestId",
+                "cleanupExecutor().execute",
+                "stages.durable(workerAttempt)",
+                "purge.purgeLocalDataOnWorker()",
                 "result = if (purgeSucceeded) \"DELETED\" else \"FAILED\"",
                 "deviceDeletionEvidenceSha256(evidenceWithoutHash)",
-                "accountDeletionFallbackMarker.update(next)",
-                "accountDeletionStateMachine.recordDeviceEvidence(",
-                "runAccountDeletionWorkerDurableStage(workerAttempt)",
-                "persistAccountDeletionJournal(current)",
-                "submitPendingDeviceDeletionEvidenceAllowed(next, current)",
+                "store.fallbackMarker.update(next)",
+                "stateMachine().recordDeviceEvidence(",
+                "stages.durable(workerAttempt)",
+                "store.persistJournal(current)",
+                "evidenceController.submitPendingAllowed(next, current)",
             ),
         )
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 recovery,
-                "if (!accountDeletionWorkerStageAllowed(workerAttempt)) return@execute",
+                "if (!stages.allowed(workerAttempt)) return@execute",
                 "markerUpdated",
-                "!accountDeletionWorkerStageAllowed(workerAttempt)",
+                "!stages.allowed(workerAttempt)",
                 "recordDeviceEvidence(",
             ),
         )
@@ -447,7 +467,7 @@ internal object ReportStaticSourceInspector {
         error("Unclosed block after offset $openingBrace")
     }
 
-    private fun maskNonCode(source: String): String {
+    fun maskNonCode(source: String): String {
         val masked = source.toCharArray()
         var state = LexicalState.CODE
         var blockCommentDepth = 0

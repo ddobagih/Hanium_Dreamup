@@ -1,0 +1,16 @@
+stateDiagram-v2
+  state "등록 전" as New
+  state "PENDING" as P
+  state "ACTIVE" as A
+  state "REVOKED" as R
+  [*] --> New
+  New --> A: "F-D14-014 최초 등록 또는 trusted recovery 교체"
+  New --> P: "NORMAL 기존 ACTIVE 존재 - 높은 version 등록"
+  P --> A: "F-D14-015 구키 proof와 새키 signature 성공"
+  P --> R: "더 새 PENDING 등록 또는 분실 또는 복구 시작"
+  A --> R: "교체 확정 또는 분실 또는 타기기 복구 또는 긴급 교체"
+  note right of R
+    "원문 공개키와 version 수정 불가"
+    "REVOKED에서 복귀 금지"
+    "정상 교체 성공 후 구키 HTTP 재시도 불가"
+  end note

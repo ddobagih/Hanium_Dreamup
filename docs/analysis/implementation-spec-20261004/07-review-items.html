@@ -1,0 +1,1032 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>불일치와 추가 검토 목록</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#182c43;font:16px/1.75 system-ui,'Noto Sans CJK KR',sans-serif}header{background:#102941;color:white;padding:20px max(24px,calc((100vw - 1440px)/2));border-bottom:5px solid #43a6a0}header a{color:white}main{max-width:1480px;margin:28px auto;padding:36px 48px;background:white;box-shadow:0 5px 30px #1830470c;border-radius:12px}h1{font-size:2.1rem;line-height:1.35;margin-top:0}h2{font-size:1.55rem;border-bottom:2px solid #dce7ef;padding-bottom:10px;margin-top:48px}h3{font-size:1.14rem;margin-top:30px}a{color:#075b9b;text-decoration:none}a:hover{text-decoration:underline}p{max-width:1120px}table{border-collapse:collapse;width:100%;font-size:.94rem;margin:18px 0 30px;table-layout:auto}td,th{border:1px solid #d9e3ec;padding:11px 13px;text-align:left;vertical-align:top;overflow-wrap:anywhere;min-width:80px}th{background:#eaf2f8;font-weight:650}tr:nth-child(even){background:#f8fafc}code{background:#edf2f6;border-radius:4px;padding:2px 5px;font-size:.87em;overflow-wrap:anywhere}pre{overflow:auto;background:#102941;color:#eef5ff;padding:20px;border-radius:8px}pre code{background:none;color:inherit;padding:0}img{display:block;max-width:100%;height:auto;margin:16px 0;border:1px solid #dbe6ed;border-radius:8px;background:#fff}blockquote{border-left:4px solid #4c93bb;background:#eff7fc;margin:16px 0;padding:4px 20px}li{margin:7px 0}.notice{background:#fff4dc;border:1px solid #e7c782;border-radius:7px;padding:14px 18px;margin-bottom:24px}input,select{font:inherit;padding:10px;border:1px solid #a8becd;border-radius:6px;margin:5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}.card{padding:18px;border:1px solid #d9e3ec;border-radius:8px;background:#f8fafc}.muted{color:#607589}details{border:1px solid #dbe6ed;border-radius:8px;padding:12px 16px;margin:12px 0}summary{cursor:pointer;font-weight:650}footer{margin-top:35px;padding-top:15px;border-top:1px solid #dbe6ed;font-size:14px;color:#607589}@media(max-width:850px){main{padding:22px 16px;margin:12px}h1{font-size:1.65rem}table{display:block;overflow:auto}header{padding:16px}td,th{min-width:150px}}@media print{header{display:none}main{box-shadow:none;padding:0;margin:0}img{break-inside:avoid}h2{break-before:auto}a{color:inherit}}</style></head><body><header><a href="index.html">WalkSafe 기능과 처리 명세</a> · <a href="02-features.html">기능</a> · <a href="03-policies.html">정책</a> · <a href="05-scenarios.html">시나리오</a> · <a href="gallery.html">그림 모음</a> · <a href="08-review.html">검수</a></header><main><h1>불일치와 추가 검토 목록</h1>
+<p><a href="index.html">전체 목차</a> · <a href="08-review.html">검수 결과</a></p>
+<p>아래 항목은 현재 구현 설명과 분리한 검토 목록이다. 제품 수정은 수행하지 않았다. 정적 의심·실행 미확인·역사 문서 불일치를 실제 재현된 결함과 구분한다.</p>
+<table>
+<thead>
+<tr>
+<th>검토 ID</th>
+<th>분야</th>
+<th>관찰</th>
+<th>영향</th>
+<th>판정 수준</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>R-D01-001</td>
+<td>D01</td>
+<td>암호 로그인 HTTP 예외 처리9293-9295가 postAccountFailure에 retryAfterMs를 넘기지 않는다. postAccountFailure9325 부근의429 남은초 안내 분기가 있어도 이 호출에서는 기본null이다.</td>
+<td>서버가 유효 Retry-After를 주어도 비밀번호로그인 UI는 구체적초 대신 잠시 후 안내를 사용할 수 있음. 이번 문서화에서 코드는 수정하지 않음.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:9293<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:9309</td>
+</tr>
+<tr>
+<td>R-D01-002</td>
+<td>D01</td>
+<td>PriorityUserOnboardingPolicy.evaluate(environment, walkIsActive)는 environment 값을 사용하지 않는다. Main current device/channel capability가 교육출력의 실제 gate이다.</td>
+<td>policy enum의 offline Korean/vibration block reason만으로 실제판정을 설명하면 오류. D02와 실제Main gate를 연결해야 함.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PriorityUserOnboardingPolicy.kt:564<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:24814</td>
+</tr>
+<tr>
+<td>R-D01-003</td>
+<td>D01</td>
+<td>초기 required permission 집합에는 카메라·정밀위치·마이크와 OS별activity/notification이 포함되고 거부시 비취소 앱 실행불가 대화상자로 연결된다.</td>
+<td>실행 중 feature별 부분권한 제한 모델과 초기경로는 결과가 다름. 일률적 권한선택허용 또는부분사용 가능이라고 문서화할 수 없음.</td>
+<td>정적관찰; 제품정책 차이 여부 Root 판단</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:22909<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:17208</td>
+</tr>
+<tr>
+<td>R-D01-004</td>
+<td>D01</td>
+<td>EMAIL_ACCOUNT_V4의 ACCOUNT_CREATED stage는 OTP enrollment가 발급된 다음 계정 생성 버튼을 기다리는 상태명으로도 사용된다.</td>
+<td>상태 이름만 보고 서버계정이 이미 만들어졌다고 판단하면 안 됨. 실제 생성 성공은201 응답·actor/receipt로 구분.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:8983<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/FirstRunOnboardingPolicy.kt:496</td>
+</tr>
+<tr>
+<td>R-D01-005</td>
+<td>D01</td>
+<td>비밀번호 찾기/초기화/재설정 UI·API는 관련 앱 소스 검색에서 발견하지 못했다. 문서의 복구는 OTP partial·저장session재검증·삭제전용재인증을 뜻한다.</td>
+<td>일반적인 forgot-password 기능이 있다고 추정해서는 안 됨. 서버 또는 다른domain 제공 여부는 Root 확인대상.</td>
+<td>미발견 범위 명시; 서버미확인</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:18650<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayAccountClient.kt:36</td>
+</tr>
+<tr>
+<td>R-D01-006</td>
+<td>D01</td>
+<td>backendDevice logout은 저장bundle을 먼저 제거하고 원격DELETE를 시도한다. 장기 token처럼 durable PendingRevocation을 남기는 분기가 아니다.</td>
+<td>offline/DELETE 실패에서 앱은로그아웃되어도 서버 해당session 폐기완료는 입증되지 않음. 원격확정callback 실패와 로컬SIGNED_OUT을 분리.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:12506<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:12539<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:12663</td>
+</tr>
+<tr>
+<td>R-D01-007</td>
+<td>D01</td>
+<td>통합 동의 disclosure는 RAW30일·quarantine14일·training3년 등의 보관 설명을 포함하지만 이 D01은 실제 서버/RAW 삭제·전송 구현과 운영을 검증하지 않았다.</td>
+<td>표시문구는 문서요구/고지로 보고 D06 및 D13의 실제 보존·삭제 근거와 대조해야 함.</td>
+<td>타분야 근거연결 필요</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt:1</td>
+</tr>
+<tr>
+<td>R-D01-008</td>
+<td>D01</td>
+<td>일부 큰 codec/private helper와 Main 일부범위는 coverage.unreviewed에 명시한대로 미정독이다.</td>
+<td>핵심33개 기능 caller→guard→상태/cleanup을 기록했으나 전체D01 모든분기 전수확인 또는 전체프로젝트DONE 판정은 하지 않음.</td>
+<td>명시적 검토한계</td>
+<td>domains/D01.json coverage.unreviewed</td>
+</tr>
+<tr>
+<td>R-D02-001</td>
+<td>D02</td>
+<td>production 환경 bundle·camera/official 환경 승인 profile 및 runtime safety threshold profile가 null이다. Main 환경 candidate는 DEBUG 조건, 안전 profile 기본 constructor는 null이다. 기기 승인 registry도 미지정이나 Main approvedDeviceProfileRequired=false로 호출한다.</td>
+<td>testCandidate 임계와 개발 실행을 production 승인 또는 현장 검증 완료로 설명하면 안 됨.</td>
+<td>정적 관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeEnvironmentProfiles.kt:75<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkRuntimeSafetyCoordinator.kt:555<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:908<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:27729</td>
+</tr>
+<tr>
+<td>R-D02-002</td>
+<td>D02</td>
+<td>scheduleDeviceRuntimeCalibration은 manual→fixed fixture 검사, automatic→loadDetector로만 연결하며 prepareDeviceRuntimeCalibration은 정의만 검색됨. live runner/session 및 후속 UnknownRuntimeCalibration은 현재 활성 UI 경로로 확인되지 않음.</td>
+<td>live CONFIRMED profile 실측이 기본 기기 검사에서 실행된다는 설명을 배제. D05와 연결 상태 통합 필요.</td>
+<td>정적 관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:36103<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:36125</td>
+</tr>
+<tr>
+<td>R-D02-003</td>
+<td>D02</td>
+<td>현재 기기점검 Depth 경로는 isDepthModeSupported API 지원 검사이며 종료 시 runtimeMetricOutputAllowed=false다.</td>
+<td>Depth 지원과 실제 거리 프레임·거리 정확도 검증을 분리해야 함.</td>
+<td>정적 관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:30953<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:31021</td>
+</tr>
+<tr>
+<td>R-D02-004</td>
+<td>D02</td>
+<td>PendingSpeechQueue helper/test는 존재하지만 AndroidFeedbackActuator 현재 초기화 중 speak 경로는 UNAVAILABLE이고 기존 요청 자동 replay를 하지 않는다.</td>
+<td>보조 queue 클래스 존재를 실제 초기화 대기 발화 기능으로 표시하지 않음.</td>
+<td>정적 관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/PendingSpeechQueue.kt:1<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt:1</td>
+</tr>
+<tr>
+<td>R-D02-005</td>
+<td>D02</td>
+<td>Main TalkBack fallback은 event dispatch 뒤 caller failOnce로 reservation을 해제하며 route progress 완료를 확정하지 않는다.</td>
+<td>TalkBack 표시 요청·발화 완료·route 완료 증거는 서로 다름.</td>
+<td>정적 관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:37253<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:38128</td>
+</tr>
+<tr>
+<td>R-D02-006</td>
+<td>D02</td>
+<td>저장 기기검사 binding struct의 mutable 권한/서비스 fields는 sha digest에서 제외되어 runtime prerequisite 변경에도 측정 결과를 보존한다.</td>
+<td>별도 Main runtime permission/feature/readiness gate를 함께 읽어야 하며 저장 결과만으로 현재 start 가능 판단 금지.</td>
+<td>정적 관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidDeviceCheckResultStore.kt:1</td>
+</tr>
+<tr>
+<td>R-D02-007</td>
+<td>D02</td>
+<td>TemporaryGatewayWavPlayer의 delete는 결과를 확인하지 않고 audio attributes/listener 설정은 datasource/prepare/start runCatching 밖이다.</td>
+<td>모든 setup 오류와 파일 삭제 성공이 helper 자체에서 보장된다고 기록할 수 없음; 코드 변경은 이번 범위 밖.</td>
+<td>검토 필요: 정적 cleanup 보호 범위</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/GatewayVoiceAudio.kt:94</td>
+</tr>
+<tr>
+<td>R-D02-008</td>
+<td>D02</td>
+<td>정적 테스트 선언/기존 주석만 읽었고 JVM/Android/실기기 테스트를 실행하지 않았다.</td>
+<td>문서 TEST_EXPECTATION을 이번 PASS로 통합하지 말 것.</td>
+<td>정적 관찰</td>
+<td>apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleTest.kt:1<br>apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuatorRuntimeRegressionTest.kt:1</td>
+</tr>
+<tr>
+<td>R-D02-009</td>
+<td>D02</td>
+<td>MainActivityAccessibilityAnnouncementStaticTest.onlyTheCentralTalkBackChannelCallsAnnounceForAccessibility는 직접 announceForAccessibility 호출1개와 statusText.announceForAccessibility(message)를 요구한다. 현재 Main의 해당 호출 검색은0건이며 announceForTalkBack은 accessibilityStatusText live-region/text를 갱신한다.</td>
+<td>현 구현과 해당 정적 테스트 기대 불일치. 이번 테스트 실행 실패로 기록하지 않으며 사용자 접근성 동작도 실행으로 확인하지 않음.</td>
+<td>정적 불일치; 별도 코드/테스트 판단 필요</td>
+<td>apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityAnnouncementStaticTest.kt:18<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:38058<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:38125</td>
+</tr>
+<tr>
+<td>R-D03-001</td>
+<td>D03</td>
+<td>서버 AAC/STT 입력 구현의 private toggleGatewayVoiceCapture 는 src/main 전체 검색에서 외부 호출이 확인되지 않는다.</td>
+<td>활성 음성 입력은 Vosk/설치형 on-device 경로. 서버 STT 기능 존재만으로 앱 UI 와 서버 음성 intent 의 end-to-end 연결을 주장할 수 없다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:40768<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:40903<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewaySpeechClient.kt:57</td>
+</tr>
+<tr>
+<td>R-D03-002</td>
+<td>D03</td>
+<td>WakeWordController 기본 production profile 은 null 이며 Main 호출이 없다. 실제 호출어는 별도의 Vosk probe/hands-free 경로다.</td>
+<td>이전 default-off gate 만 보고 현재 호출어 전체를 disabled 로 분류하면 오기다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/WakeWordController.kt:53<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:15840<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:38884</td>
+</tr>
+<tr>
+<td>R-D03-003</td>
+<td>D03</td>
+<td>archive load 는 first route 저장 확인 및 만료 관리이며 runtime 경로복원 진입이 아니다.</td>
+<td>자동 복원/재부팅 후 안내 재개가 구현되었다고 설명할 수 없다.</td>
+<td>정적관찰;의도와일치하는테스트기대</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:1609<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:46585<br>apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityRouteSnapshotArchiveOnlyStaticTest.kt:19</td>
+</tr>
+<tr>
+<td>R-D03-004</td>
+<td>D03</td>
+<td>DestinationSearchVoiceState 의 moreResultsAvailable 및 Main 의 과거 append/recovery 분기가 남아 있지만 현재 검색은 resetSearch=false 에서 반환하고 더듣기는 보유목록만 이동한다.</td>
+<td>provider pagination 메타데이터와 실제 사용자 더듣기 동작을 구분해야 한다. 추가 fetch 기능으로 문서화하지 않는다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:42388<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:45762<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/WalkingRouteModels.kt:113</td>
+</tr>
+<tr>
+<td>R-D03-005</td>
+<td>D03</td>
+<td>provider 좌표종류 FRONT 및 대안좌표를 보존하나 입구·건물면·층·최종접근 통행검증은 없다.</td>
+<td>STAIR_AVOID 경로 및 목적지접근 설명은 현장 안전이나 접근가능 입구를 보증하지 않는다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/WalkingRouteModels.kt:73<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigator.kt:2525</td>
+</tr>
+<tr>
+<td>R-D03-006</td>
+<td>D03</td>
+<td>AudioRecord.stop 은 500ms join 두 개를 사용하지만 native stop/release 와 releaseComplete 대기는 전체 1 초 상한이 아니다.</td>
+<td>마이크 반환시간의 최악 지연을 정적 상수만으로 보장할 수 없다. 기기측정 미수행.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/voice/AndroidPcmAudioSource.kt:162</td>
+</tr>
+<tr>
+<td>R-D03-007</td>
+<td>D03</td>
+<td>현재 위치를 말로 설명하는 명령은 명시적으로 미지원이며 위치 다시확인은 별도행동이다.</td>
+<td>현재상태/위치재확인을 역지오코딩 위치설명으로 확대해석하지 않는다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommand.kt:462<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:41623</td>
+</tr>
+<tr>
+<td>R-D03-008</td>
+<td>D03</td>
+<td>음성 단계 diagnostics 는 DEBUG 전용이며 운영 voice-stage 수집은 활성화되지 않았다.</td>
+<td>진단 코드를 운영 전송·실사용 통계 수집으로 설명하지 않는다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/voice/VoiceRequestStageDiagnostics.kt:7<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/voice/VoiceRequestStageDiagnostics.kt:165</td>
+</tr>
+<tr>
+<td>R-D04-001</td>
+<td>D04</td>
+<td>TransferStationaryEvidencePolicy.confirmed는 제품 src/main/java에서 선언 외 호출이 발견되지 않는다. helper/단위시험 존재와 runtime 적용을 분리해야 한다.</td>
+<td>전송 전 연속5초 정지 조건이 이 helper를 통해 제품에 적용된다고 주장할 수 없다. 실제 전송 gate는 별도 담당 교차검토 대상이다.</td>
+<td>정적관찰: UNCONNECTED; 전체 제품 src/main/java symbol 검색</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/TransferStationaryEvidencePolicy.kt:12<br>apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/TransferStationaryEvidencePolicyTest.kt:1</td>
+</tr>
+<tr>
+<td>R-D04-002</td>
+<td>D04</td>
+<td>Main appendPositionFieldGnssTrace에서 meanCn0DbHz 인자에 GnssQualitySnapshot.medianCn0DbHz를 전달한다. trace의 mean_cn0_db_hz 키 이름과 실제 통계가 다르다. Outdoor debug trace도 동일하게 median을 meanCn0DbHz에 전달한다.</td>
+<td>D16 또는 외부 분석에서 mean으로 해석하면 실제 중앙값 통계와 혼동할 수 있다. 문서에서는 현재 연결을 중앙값으로 명시하고 코드 수정은 수행하지 않았다.</td>
+<td>정적관찰: wire 필드 이름과 Main 전달 의미 불일치</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:48449<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/evaluation/PositioningTraceContract.kt:289<br>apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/fieldtest/OutdoorPositionTestActivity.kt:485</td>
+</tr>
+<tr>
+<td>R-D04-003</td>
+<td>D04</td>
+<td>현재 estimator는 제한된 늦은 GNSS replay 및 late step/ZUPT rollback을 구현한다. OUT_OF_ORDER는 모든 지연 입력을 일괄 거부한다는 뜻이 아니다.</td>
+<td>현재 규칙은 GNSS replay 최대5초/128 events 및 motion 지연최대2초이다. 이 조건 밖의 거부와 replay 성공을 분리해야 한다. 과거 검증 결과를 현재 기능 검증으로 승격하지 않았다.</td>
+<td>현재 코드 기준 문서화; 과거 기록의 변경/재판정 없음</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/PedestrianPositionEstimator.kt:587<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/PedestrianPositionEstimator.kt:774</td>
+</tr>
+<tr>
+<td>R-D04-004</td>
+<td>D04</td>
+<td>정밀 GNSS/PDR·장착·자기장 gate 통과 및 명명된 테스트 기대는 물리적 전진방향·실제 지면 정지·현장 절대오차의 검증이 아니다.</td>
+<td>제품 ACTIVE는 호출 연결과 구현 상태를 뜻하며 사용 안전성·센서 실측 성능이나 이번 테스트 통과를 뜻하지 않는다.</td>
+<td>검증 범위 제한 명시</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/ChestMountedHeading.kt:86<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/UserMotionStateEstimator.kt:1<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/PedestrianPositionEstimator.kt:1</td>
+</tr>
+<tr>
+<td>R-D04-005</td>
+<td>D04</td>
+<td>늦은 STEP replay는 이후 이력을 재적용한 현재 estimate를 반환하지만, Main의 step trace 호출은 measurementElapsedRealtimeMs=event.timestampMs로 기록한다. appendPositionFieldMotionTrace는 snapshot.filtered 좌표를 그대로 사용한다.</td>
+<td>late step이 실제 replay되는 경우 sensor 행의 측정 시각은 과거 step이고 filtered 좌표는 replay 후 현재일 수 있다. GNSS 행의 별도 measurement-time 처리와 구분해야 한다. D16 분석 시 시간 정렬 의미 확인 필요. 제품 코드는 수정하지 않았다.</td>
+<td>제품 정적 의심: 연결 코드로 관찰; 재현·기기·trace 실행 미수행</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:44004<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:48492<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/PositioningCoordinator.kt:539<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/PedestrianPositionEstimator.kt:716</td>
+</tr>
+<tr>
+<td>R-D04-006</td>
+<td>D04</td>
+<td>OutdoorPositionTestActivity motion callback은 device stationary 변수만 갱신하고 coordinator.observeUserMotion/observeUserSpeed를 호출하지 않는다. heartbeat가 호출한 ZUPT는 claimZeroVelocityUpdate의 lastMotion=null gate에서 거부된다.</td>
+<td>debug 화면 STATIONARY와 checkpoint는 product unified ground stillness와 다르며, heartbeat ZUPT 시도를 실제 ZUPT_APPLIED로 설명하면 잘못이다. device quiet만으로 checkpoint를 허용하는 동작도 제품과 별도이다.</td>
+<td>정적 연결 불일치; 실행/수정 미수행</td>
+<td>apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/fieldtest/OutdoorPositionTestActivity.kt:150<br>apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/fieldtest/OutdoorPositionTestActivity.kt:285<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/PositioningCoordinator.kt:396<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/positioning/UserMotionStateEstimator.kt:642</td>
+</tr>
+<tr>
+<td>R-D05-001</td>
+<td>D05</td>
+<td>inference/README.md 의 활성 13class E2E 설명이 현재 APK config 의 21class raw normalized output 과 불일치한다.</td>
+<td>모델 출력형상·활성 class 와후보상태를과거설명으로해석할위험. 명세는현재코드를우선한다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/README.md:1<br>apps/android/app/src/main/assets/model-config/two_model_runtime.json:1</td>
+</tr>
+<tr>
+<td>R-D05-002</td>
+<td>D05</td>
+<td>RuntimeBundleLifecycle 는 productionApprovalProfile null 및 Main 호출 없음. overlap 은 internal forTest 전용. Main live calibration 진입 prepareDeviceRuntimeCalibration 은정의만확인되어후속 UnknownRuntimeCalibration 도미연결이다.</td>
+<td>지원코드존재를현재자동모델배포·실시간최적화·겹침실행제품 기능으로계산하면과대평가된다.</td>
+<td>정적관찰; D02와교차확인</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/RuntimeBundleLifecycle.kt:324<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TfliteAndroidFrameDetector.kt:376<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:36125<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:36414</td>
+</tr>
+<tr>
+<td>R-D05-003</td>
+<td>D05</td>
+<td>주 YUV 전처리는지원 DataSpace BT601/709 full/limited 를반영하지만 FastSamYuvCopy 는 BT601 full 변환식을사용한다.</td>
+<td>같은 source 영상이라도명시 limited/709 일때양 모델 RGB 가다를수있다. 실제검출품질영향은미측정이며결함/정확도저하로단정하지않는다.</td>
+<td>정적관찰; 품질영향미검증</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/YuvImagePreprocessor.kt:1<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/unknown/FastSamYuvCopy.java:1</td>
+</tr>
+<tr>
+<td>R-D05-004</td>
+<td>D05</td>
+<td>RunningDetectorIdentity.of 의 unified 선택은 unifiedmodel 을 identity 에포함하지만 personSupplement 구성은별도추가하지않는다. 현재 config 에는 supplement 가없다.</td>
+<td>향후보완 모델활성시전체실행모델 binding 이요구와일치하는지검토필요. 현재활성누락이라고단정하지않는다.</td>
+<td>조건부검토필요</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/RunningDetectorVerification.kt:1<br>apps/android/app/src/main/assets/model-config/two_model_runtime.json:1</td>
+</tr>
+<tr>
+<td>R-D05-005</td>
+<td>D05</td>
+<td>AndroidUnknownRuntimeProfileStore.createBinding 의 primaryPreprocessing 명칭은 fused-yuv-rgb-letterbox-float32-768-v1 이며현재 unified 실제경로는 uprightRGBbilinear 다.</td>
+<td>조합 profile 의전처리설명과실구현명칭차이. bundle/decoderidentity 도같이묶이므로현재잘못된 profile 재사용을입증한것은아니다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/unknown/tuning/AndroidUnknownRuntimeProfileStore.kt:115<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TfliteAndroidFrameDetector.kt:189</td>
+</tr>
+<tr>
+<td>R-D05-006</td>
+<td>D05</td>
+<td>RunningDetectorVerificationGate.recordAttempt 는성공검증을 pendingdeadline 실패분기보다먼저검사한다.</td>
+<td>gate 메서드만읽고늦은모든성공이거부된다고명세하면틀린다. Main expire/currentcallback 의실제순서(D02)와함께해석해야한다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/RunningDetectorVerification.kt:1</td>
+</tr>
+<tr>
+<td>R-D06-001</td>
+<td>D06</td>
+<td>RawCollectionRuntimeCoordinator의 upload-after-walk 설명 주석은 SAFE_STOP을 언급하지만 실행 uploadAdmission/allowsPostWalkTransfer는 READY/ENDED만 허용한다.</td>
+<td>SAFE_STOP에서 봉인은 가능하지만 송신 가능으로 명세화하면 실제 동작과 어긋남. F-D06-018/020은 실행조건을 기준으로 기록.</td>
+<td>정적관찰: 주석 불일치, 코드 변경하지 않음</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/rawcollection/RawCollectionRuntimeCoordinator.kt:184<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/rawcollection/RawCollectionRuntimeCoordinator.kt:1023</td>
+</tr>
+<tr>
+<td>R-D06-002</td>
+<td>D06</td>
+<td>fieldlog README의 heartbeat gap 매 주기 기록 설명과 실제 동일 gap 10000ms 간격 기록 사이 차이가 있다.</td>
+<td>수집 간격·로그누락 해석은 코드와 FieldSessionHeartbeatTest 기대를 기준으로 해야 함.</td>
+<td>정적관찰: 문서 불일치, 기존 문서 변경하지 않음</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/README.md<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionHeartbeat.kt:1</td>
+</tr>
+<tr>
+<td>R-D06-003</td>
+<td>D06</td>
+<td>AndroidReportDeletionTrackerStore의 deletion UUID only 설명보다 schema v2 실제 저장 범위가 넓으며 reportId/requestId/requestType으로 correction도 추적한다.</td>
+<td>삭제요청만 추적하는 저장소로 축약하지 않음; F-D06-015에 v1/v2 구별.</td>
+<td>정적관찰: 설명/구현 범위차이</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportDeletionTrackerStore.kt:22<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportDeletionTrackerStore.kt:84</td>
+</tr>
+<tr>
+<td>R-D06-004</td>
+<td>D06</td>
+<td>DEBUG frame/metadata 전송은 post-walk admission과 실제 frame producer가 동시에 유효해야 하며 그 조합의 실기기 전달은 이번에 실행하지 않았다.</td>
+<td>debug uploader 구현 존재만으로 실제 보행후 캡처 버튼·서버 송신 성공을 주장할 수 없음.</td>
+<td>미확인: runtime/UI 검증 필요</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:34600<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt:169</td>
+</tr>
+<tr>
+<td>R-D06-005</td>
+<td>D06</td>
+<td>위치 평가 export에는 정확 좌표가 포함된다. 일반 field event·runtime diagnostic의 좌표 미수집 설명을 이 경로에 일반화할 수 없다.</td>
+<td>F-D06-032의 사용자 고지·재인가·평문 목적지 정리 경계를 분리해야 함.</td>
+<td>정적관찰: 개인정보 경계 구분</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:47907<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/PositionFieldSessionRecorder.kt:263</td>
+</tr>
+<tr>
+<td>R-D06-006</td>
+<td>D06</td>
+<td>report README는 단위시험 JPEG를 SOI/EOI marker만 가진 fixture라 설명하지만 현재 ReportTestJpeg는 SOF0·SOS·entropy가 있는 구조 JPEG를 생성한다.</td>
+<td>기존 문서의 fixture 한계는 현행 테스트와 차이가 있다. 구조검사 기대가 있다는 사실도 실제 Android decode/Gateway/Backend 통합 실행 성공을 의미하지 않음.</td>
+<td>정적관찰: 문서/fixture 불일치; 기존파일 수정 없음</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/README.md:98<br>apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportTestJpeg.kt:3<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/JpegStructureValidator.kt:13</td>
+</tr>
+<tr>
+<td>R-D07-001</td>
+<td>D07</td>
+<td>현재 TactileRoutePolicy.evaluate는 자격충족 후에도 TMAP tactile_motion_evidence_unavailable로 반환한다. depth/README.md의 조건 충족 시 local guidance 설명은 현재 구현과 다르다.</td>
+<td>표면/축/corridor 관측을 점자블록 이동·steering 허가로 소개하면 실제 기능을 과장한다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicy.kt:123<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/README.md:15<br>apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicyTest.kt:69</td>
+</tr>
+<tr>
+<td>R-D07-002</td>
+<td>D07</td>
+<td>ARCore semantic 복사 helper와 semantic config refresh가 있으나 Main의 ENABLED/refresh 호출은 검색상 없다.</td>
+<td>semantic label/ground 판단을 현재 보행 기능으로 주장할 수 없다. FastSAM tactile semantic mask와 별도 계층이다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/ArCoreFrameProvider.kt:54<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/ArCoreFrameProvider.kt:271<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt</td>
+</tr>
+<tr>
+<td>R-D07-003</td>
+<td>D07</td>
+<td>MeasuredBodySpace 및 tracked/tactile body wrapper는 정의/시험만 연결되어 있으며 Main production call이 없다.</td>
+<td>신체·발밑 간격, whole object 충돌, 안전한 통행 공간을 현재 활성 기능으로 주장할 수 없다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/MeasuredBodySpace.kt:71<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/TrackedMeasuredBodyDepth.kt:1<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/TactileMeasuredBodySurface.kt:1<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:44962</td>
+</tr>
+<tr>
+<td>R-D07-004</td>
+<td>D07</td>
+<td>timeToCollisionMs는 approachTimeMs 호환값이며 collisionAssessment는 UNKNOWN만 있다. point CPA 역시 한 점과 원본 lease의 nominal 상대운동이다.</td>
+<td>접근 urgency/점 CPA를 충돌 확률·안전 해제·보행 통과시간으로 해석하지 않아야 한다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/DepthContracts.kt:186<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/MotionContext.kt:114<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/ObjectTracker.kt:796</td>
+</tr>
+<tr>
+<td>R-D07-005</td>
+<td>D07</td>
+<td>TrackerRiskPolicy.kt의 TTC/TrackingRisk/IdSwitch/ApproachSpeed helper는 활성 ObjectTracker·MessagePolicy 경로와 별도 미연결 계층이다.</td>
+<td>helper 60초 TTC cap·2.2m close를 production threshold로 복사하면 현재 구현과 다르다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/TrackerRiskPolicy.kt:178<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/ObjectTracker.kt:796<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/MessagePolicy.kt:244</td>
+</tr>
+<tr>
+<td>R-D07-006</td>
+<td>D07</td>
+<td>ObservedMaskExtent의 small rejection 관련 진단값이 있지만 UnknownWalkingObstaclePolicy.select는 metricExtent 인자로 장애물을 숨기지 않는다.</td>
+<td>작거나 얇은 표면을 무해하다고 제외하는 기능이 활성이라고 해석하지 않아야 한다.</td>
+<td>정적관찰</td>
+<td>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/unknown/ObservedMaskExtent.kt:1<br>apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/unknown/UnknownWalkingObstaclePolicy.kt:15</td>
+</tr>
+<tr>
+<td>R-D07-007</td>
+<td>D07</td>
+<td>기존 S10/S11 실행 기록은 다른 작업 버전과 범위의 증거이며 이번 snapshot의 전체 depth/Native/현장 통합 완료는 확인하지 않았다.</td>
+<td>본 명세의 ACTIVE와 TEST_EXPECTATION은 실기기 PASS 또는 안전성 판정이 아니다.</td>
+<td>검토필요</td>
+<td>고정 snapshot: /tmp/walksafe-spec-20261004-source<br>apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/PointClosestApproachPipelineRegressionTest.kt:8</td>
+</tr>
+<tr>
+<td>R-D08-001</td>
+<td>D08</td>
+<td>Gateway 에서 별도 Host/Origin/Referer allowlist 또는 CSRF token 검사는 확인되지 않는다. SameSite=Strict 쿠키와 Nginx Host 덮어쓰기, JSON/메서드 계약이 존재하지만 이를 명시 Origin 검증으로 서술할 수 없다.</td>
+<td>신뢰 proxy 와브라우저요청경계를검토할때명시적검증부재를별도로평가해야한다. 취약점악용가능성을정적검색만으로확정하지않음.</td>
+<td>정적관찰</td>
+<td>apps/android-gateway/src/node-adapter.ts:325<br>apps/android-gateway/src/auth.ts:1268<br>deploy/nginx/walksafe-android-gateway.conf.example</td>
+</tr>
+<tr>
+<td>R-D08-002</td>
+<td>D08</td>
+<td>Nginx 예시 field-walk 와 privacy/rights client_max_body_size1KiB, Gateway 명령/동의 JSON4KiB 로한계가다르다.</td>
+<td>예시그대로배포하면 Gateway 가허용하는일부 body 를 proxy 가먼저 413 거부할수있다. 운영설정미확인.</td>
+<td>검토필요</td>
+<td>deploy/nginx/walksafe-android-gateway.conf.example<br>apps/android-gateway/src/routes.ts:1199<br>apps/android-gateway/src/integrated-consent.ts:1831</td>
+</tr>
+<tr>
+<td>R-D08-003</td>
+<td>D08</td>
+<td>보행 sealed 감사 segment 는보존기간이정해질때까지유지한다. live ledger 의 boundedsize 와전체 archive 디스크상한은다르다.</td>
+<td>오래운영하면 archive 증가가능. 정해지지않은기간/자동삭제를명세에추정하지않음.</td>
+<td>정적관찰</td>
+<td>apps/android-gateway/src/state-encryption-maintenance.ts:609<br>apps/android-gateway/src/state-encryption-maintenance.ts:670<br>apps/android-gateway/src/field-walk-ledger.ts:1054</td>
+</tr>
+<tr>
+<td>R-D08-004</td>
+<td>D08</td>
+<td>RAW relay 는 preflightHEAD20 초와 write20 초를순차수행할수있다. RAW_COLLECTION_OWN_LIMITS_MS 는 body15 초+Backend20 초만합산하고 Node 가 10 초 margin 을더해 45 초를준다.</td>
+<td>최악순차합 55 초이상과 45 초전체기한이달라정상적으로느린 HEAD 후 write 가취소될수있다. 실제재현미수행.</td>
+<td>검토필요</td>
+<td>apps/android-gateway/src/raw-collection-relay.ts:44<br>apps/android-gateway/src/raw-collection-relay.ts:1051<br>apps/android-gateway/src/raw-collection-relay.ts:1085<br>apps/android-gateway/src/node-adapter.ts:49</td>
+</tr>
+<tr>
+<td>R-D08-005</td>
+<td>D08</td>
+<td>원자 rewrite 는파일단위이며 maintenance 전체 storetransaction 은아니다. 전부 prepare 한후 apply 하지만 apply 도중후속실패시앞서쓴파일 rollback 코드는없다.</td>
+<td>운영자는일부키회전후실패를예상하여 report/재 inspect 해야한다. 이번실행없음.</td>
+<td>정적관찰</td>
+<td>apps/android-gateway/src/state-encryption-maintenance.ts:885<br>apps/android-gateway/src/state-encryption-maintenance.ts:977</td>
+</tr>
+<tr>
+<td>R-D08-006</td>
+<td>D08</td>
+<td>Gateway runtime 자체에 backup 생성/restore 명령은없다. 삭제상태의 backup35 일은 Backend itemcontract projection 이며실제 backup tombstone 재적용은 D13 개인정보 복원정책 및 D11 백업·복원 운영 검토범위다.</td>
+<td>키회전/상태암호화와백업복구완료를혼동하지않아야한다.</td>
+<td>정적관찰</td>
+<td>apps/android-gateway/src/state-encryption-maintenance.ts:1066<br>apps/android-gateway/src/privacy-deletion-v2.ts:165</td>
+</tr>
+<tr>
+<td>R-D08-007</td>
+<td>D08</td>
+<td>STT/TTS 는삭제 fence 를 relay 전후검사하지만 privacyoperationlease/controller 에등록하지않는다. 따라서삭제수락즉시진행 Voicefetch 를 operationabort 로취소한다고볼수없고,완료후늦은응답노출을차단한다.</td>
+<td>전송중삭제시점과 upstream 중단여부를제품/보안설명에서구분해야한다.실제 race 실행검증없음.</td>
+<td>정적관찰</td>
+<td>apps/android-gateway/src/routes.ts:3194<br>apps/android-gateway/src/speech-relay.ts:420</td>
+</tr>
+<tr>
+<td>R-D09-001</td>
+<td>D09</td>
+<td>README의 포괄적인 field/admin 역할 설명은 method/path별 실제 allowlist를 모두 표현하지 않는다. GET /health와 /detect/health는 field이고 GET /detect/v2/health 및 debug POST는 admin이다.</td>
+<td>역할을 API 이름이나 README 요약만으로 추정하면 호출 권한을 오기할 수 있어 본 명세는 실제 allowlist를 우선함.</td>
+<td>정적 관찰; 문서 요약과 상세 계약 구분</td>
+<td>backend/app/README.md:34<br>backend/app/field_test_security.py:246<br>contracts/walksafe.openapi.json</td>
+</tr>
+<tr>
+<td>R-D09-002</td>
+<td>D09</td>
+<td>actor v4 replay jti cache는 process-local 메모리이며 restart나 다른 replica와 공유되지 않는다.</td>
+<td>한 프로세스 안의 단발성 검증 범위를 전역 재사용 차단으로 확대해 해석할 수 없음.</td>
+<td>정적 확인된 경계; 실제 배포 replica 수 미확인</td>
+<td>backend/app/field_test_security.py:1497<br>backend/app/field_test_security.py:1533</td>
+</tr>
+<tr>
+<td>R-D09-003</td>
+<td>D09</td>
+<td>TMAP minute/day call budget과 provider cooldown은 runtime의 process-local 상태이다.</td>
+<td>여러 API worker 또는 replica 사이 전역 provider quota가 자동 공유되지 않음.</td>
+<td>정적 확인된 제한; 운영 구성 미확인</td>
+<td>backend/app/services/tmap_runtime.py:28<br>backend/app/services/tmap_runtime.py:533<br>backend/app/services/tmap_runtime.py:591</td>
+</tr>
+<tr>
+<td>R-D09-004</td>
+<td>D09</td>
+<td>경로 안전코드 미확인 오류 route_safety_code_unknown은 normalizer의 502 domain 오류지만 worker error allowlist에 없어 외부에서는 503 tmap_processing_unavailable로 변환되고 runtime admission도 중지된다.</td>
+<td>같은 runtime의 이후 route/POI 접수가 불가할 수 있다. 현재 회귀 테스트도 이 변환을 기대하므로 오류를 임의로 고쳐 기술하지 않음.</td>
+<td>정적 관찰 및 테스트 기대; 실제 실행 미수행</td>
+<td>backend/app/services/tmap_pedestrian.py:1308<br>backend/app/services/tmap_runtime.py:454<br>backend/app/services/tmap_runtime.py:837<br>backend/tests/test_navigation_road_type_worker_error_regression.py</td>
+</tr>
+<tr>
+<td>R-D09-005</td>
+<td>D09</td>
+<td>WalkingRouteRequest.radius_m은 5000 기본 및 12000 상한을 검증하지만 fetch_tmap_pedestrian_route가 provider body 또는 후처리에 사용하지 않는다.</td>
+<td>요청의 radius_m이 실제 경로 검색 범위를 바꾼다고 설명할 수 없음.</td>
+<td>정적 호출/참조 검색 관찰</td>
+<td>backend/app/schemas.py:346<br>backend/app/services/tmap_pedestrian.py:1389</td>
+</tr>
+<tr>
+<td>R-D09-006</td>
+<td>D09</td>
+<td>경로 최근 성공 cache는 후속 실패로 삭제되지 않아 walking health가 ready이면서 dependency_state=recent_failure일 수 있다.</td>
+<td>최근 성공 근거와 마지막 시도 상태를 분리해서 읽어야 함; 현재 provider 가용성 실시간 보장 아님.</td>
+<td>정적 관찰 및 명시 테스트 기대</td>
+<td>backend/app/services/tmap_pedestrian.py:332<br>backend/app/services/tmap_pedestrian.py:367<br>backend/app/api/navigation.py:77<br>backend/tests/test_navigation_route_health_state.py</td>
+</tr>
+<tr>
+<td>R-D09-007</td>
+<td>D09</td>
+<td>전체 readiness navigation check는 최근 route+POI 성공 cache가 ready이면 runtime budget 확인 전에 반환한다.</td>
+<td>cache 기한 중 사용자 call budget 소진으로 요청503이어도 navigation check는 ready일 수 있음.</td>
+<td>정적 분기 관찰; 운영 시나리오 미실행</td>
+<td>backend/app/api/health.py:845<br>backend/app/services/tmap_pedestrian.py:2034</td>
+</tr>
+<tr>
+<td>R-D09-008</td>
+<td>D09</td>
+<td>체크인 OpenAPI의 /ready, detect/navigation/debug operation responses는 일부 실제 오류 status를 열거하지 않는다. 예를 들어 /ready는 200만 선언되지만 handler는503을 반환한다.</td>
+<td>OpenAPI status 목록만으로 모든 오류 상태를 판단할 수 없어 본 명세는 실제 handler/middleware 분기를 추가 기재함.</td>
+<td>JSON 계약과 코드 정적 대조</td>
+<td>contracts/walksafe.openapi.json<br>backend/app/api/health.py:963<br>backend/app/api/detect.py:224<br>backend/app/api/android_debug.py:52</td>
+</tr>
+<tr>
+<td>R-D09-009</td>
+<td>D09</td>
+<td>GET /detect/health는 async handler에서 동기 legacy adapter lazy load를 직접 호출하지만 v2 health는 background memory snapshot을 읽는다.</td>
+<td>legacy cold health 호출의 event-loop 지연 가능성을 v2 snapshot의 저비용 조회 특성으로 설명하면 안 됨. 실제 지연 측정 없음.</td>
+<td>정적 실행 맥락 관찰</td>
+<td>backend/app/api/detect.py:216<br>backend/app/detector.py:98<br>backend/app/detector.py:212<br>backend/app/services/detect_v2_health.py:691</td>
+</tr>
+<tr>
+<td>R-D09-010</td>
+<td>D09</td>
+<td>account session-current는 account route이지만 request_limits의 16KiB _ACCOUNT_PATHS 집합에 포함되지 않는다.</td>
+<td>session-current에 일반 body limit가 적용되는 예외를 계정 전용 16KiB 제한으로 잘못 확대하면 안 됨.</td>
+<td>정적 관찰; D13 전달</td>
+<td>backend/app/request_limits.py:33<br>backend/app/request_limits.py:63<br>backend/app/field_test_security.py:217</td>
+</tr>
+<tr>
+<td>R-D10-001</td>
+<td>D10</td>
+<td>13cls deployment/registry 기록과 현재 Android21cls runtime의 모델·hash·class·tensor·fallback이 다름</td>
+<td>기록의 모델 활성 선언·옛 test 기대를 실제21cls Android의 current 상태 또는 공통 Backend/Android 모델이라고 해석할 수 없음. D05 runtime 명세와 연결.</td>
+<td>정적 불일치</td>
+<td>model/registry/walksafe-model-registry.json:6<br>model/deployments/local-deployment.json:7<br>model/README.md:9<br>apps/android/app/src/main/assets/model-config/two_model_runtime.json:2<br>tests/test_runtime_model_integration.py:39<br>model/test_android_tflite_contract.py:29</td>
+</tr>
+<tr>
+<td>R-D10-002</td>
+<td>D10</td>
+<td>과거 Android exporter가 nms=True로 현행 raw asset 이름에 복사할 수 있음</td>
+<td>current raw21cls tensor contract/hash를 exporter가 갱신·검증하지 않음. 기존 helper 실행은 단순 안전한 재변환으로 볼 수 없음. 이번 미실행.</td>
+<td>정적 관찰</td>
+<td>scripts/export_android_tflite_models_20260531.py:58<br>scripts/export_android_tflite_models_20260531.py:99<br>apps/android/app/src/main/assets/model-config/two_model_runtime.json:14</td>
+</tr>
+<tr>
+<td>R-D10-003</td>
+<td>D10</td>
+<td>train_yolo의 검증 manifest와 실제 --data YAML 내용 결속 없음</td>
+<td>승인 manifest 검사 통과를 실제 model.train이 읽은 image/label 전체와 동일함의 증거로 확대할 수 없음.</td>
+<td>정적 관찰</td>
+<td>model/train_yolo.py:58<br>model/train_yolo.py:72<br>model/train_yolo.py:115<br>scripts/walksafe_dataset_integrity.py:190</td>
+</tr>
+<tr>
+<td>R-D10-004</td>
+<td>D10</td>
+<td>일부 날짜형 direct YOLO 학습 runner는 승인 gate wrapper를 거치지 않음</td>
+<td>학습진입마다 동일한 manifest/HMAC/DB gate가 적용된다는 전역 주장은 불가.</td>
+<td>정적 관찰</td>
+<td>scripts/run_walksafe_unified_aihub183_png_yolo26n_768_20260627.sh:33<br>scripts/run_walksafe_tactile3_reviewed_yolo26s_20260522.sh:47<br>scripts/run_walksafe_unified_yolo26n_20260601.sh:29</td>
+</tr>
+<tr>
+<td>R-D10-005</td>
+<td>D10</td>
+<td>과거 숫자 validator 일부가 NaN finite 여부를 검사하지 않음</td>
+<td>범위 비교만으로 NaN을 차단할 수 없고 manual boxes는 w/h=0도 차단하지 않음. 실제 악성입력 시험은 미실행.</td>
+<td>정적 관찰</td>
+<td>model/two_model_runtime.py:158<br>model/two_model_runtime.py:503<br>model/validate_yolo_dataset.py:77<br>data_sources/scripts/apply_tactile_damage_area_review_decisions.py:115</td>
+</tr>
+<tr>
+<td>R-D10-006</td>
+<td>D10</td>
+<td>review apply의 --reset 경로 보호·빈 결정·결정 image 매칭 보장 없음</td>
+<td>source==target 또는 잘못된 target rmtree 가능, 빈 decision도 build 가능, 경로 문자열 불일치 결정은 적용되지 않을 수 있음. 이번 실행·수정 없음.</td>
+<td>정적 관찰</td>
+<td>data_sources/scripts/apply_tactile_damage_area_review_decisions.py:217<br>data_sources/scripts/apply_tactile_damage_area_review_decisions.py:224<br>data_sources/scripts/apply_tactile_damage_area_review_decisions.py:318</td>
+</tr>
+<tr>
+<td>R-D10-007</td>
+<td>D10</td>
+<td>hard worker kill 시 transient TTS 파일 finally 정리 보장 없음</td>
+<td>SIGTERM/kill 사이 생성된 transient/tmp 파일은 Python finally가 실행되지 않을 수 있고 prune은 qwen3_tts_*.wav만 대상으로 한다. 잔여 실제 발생은 미실행.</td>
+<td>정적 추론·검토필요</td>
+<td>voice/inference_process.py:85<br>voice/tts.py:315<br>voice/tts.py:345<br>voice/tts.py:145</td>
+</tr>
+<tr>
+<td>R-D10-008</td>
+<td>D10</td>
+<td>ready probe가 infer semaphore와 별개로 동일 pool을 공유</td>
+<td>probe queue 포함 timeout으로 같은 pool을 abort할 수 있어 다른 작업 영향 가능. 최대추론1 선언과 readiness 동시성 경계 구분 필요.</td>
+<td>정적 관찰·동시실행 미시험</td>
+<td>voice/server.py:664<br>voice/server.py:758<br>voice/server.py:907<br>voice/inference_process.py:66</td>
+</tr>
+<tr>
+<td>R-D10-009</td>
+<td>D10</td>
+<td>기본 STT model &#39;medium&#39;과 immutable explicit owner/repo 로드 계약 차이</td>
+<td>기본환경만으로 모델 ready를 보장하지 않음. 유효 owner/repo·revision·manifest/hash 사전 설정 필요.</td>
+<td>정적 관찰</td>
+<td>voice/server.py:292<br>voice/stt.py:111<br>voice/model_integrity.py:35</td>
+</tr>
+<tr>
+<td>R-D10-010</td>
+<td>D10</td>
+<td>Voice 구현 API와 Android 실제 사용자 진입/intent 소비는 별개</td>
+<td>D03 정적 교차보고에서 Main toggleGatewayVoiceCapture 실제진입 미연결 및 서버 intent 미소비. 서버구현 존재를 앱 E2E 연결완료로 판정하지 않음.</td>
+<td>D03 교차근거·Root 통합확인</td>
+<td>voice/server.py:1<br>voice/server.py:683<br>voice/server.py:707<br>voice/server.py:898</td>
+</tr>
+<tr>
+<td>R-D10-011</td>
+<td>D10</td>
+<td>retention PREVIEW도 기존 recovery 상태를 변경함</td>
+<td>preview라는 명칭만으로 읽기전용이라고 안내하면 안 됨. 영수증에 따른 staged 삭제/복원 수행.</td>
+<td>정적 관찰</td>
+<td>scripts/manage_training_artifact_retention.py:165<br>scripts/manage_training_artifact_retention.py:268</td>
+</tr>
+<tr>
+<td>R-D10-012</td>
+<td>D10</td>
+<td>legacy materialize 출력과 현재 strict 학습 manifest 계약이 미호환</td>
+<td>기본 이미지 symlink와 hash/image_ref 없는 manifest를 현재 train wrapper가 그대로 사용할 수 없음.</td>
+<td>정적 관찰</td>
+<td>data_sources/scripts/apply_tactile_damage_area_review_decisions.py:183<br>data_sources/scripts/apply_tactile_damage_area_review_decisions.py:265<br>scripts/walksafe_dataset_integrity.py:19<br>scripts/walksafe_dataset_integrity.py:163</td>
+</tr>
+<tr>
+<td>R-D10-013</td>
+<td>D10</td>
+<td>21cls export_manifest의 pixel-unit 기술은 corrected README/runtime와 다름</td>
+<td>README는 2026-09-13 normalized 보정과 동일 artifact hash를 기록한다. export_manifest의 오래된 coordinate_contract만 runtime decoder 기준으로 쓰면 안 됨. 수치동등성 이번 미재시험.</td>
+<td>정적 기록 불일치</td>
+<td>model/artifacts/candidates/walkmate_21cls_yolo11n_img768_20260912/export_manifest.json:325<br>model/artifacts/candidates/walkmate_21cls_yolo11n_img768_20260912/README.md:8<br>apps/android/app/src/main/assets/model-config/two_model_runtime.json:14</td>
+</tr>
+<tr>
+<td>R-D10-014</td>
+<td>D10</td>
+<td>telemetry payload helper에 운영 수집 연결과 acoustic 인자 없음</td>
+<td>schema 반환은 연결돼 있으나 payload 저장/전송은 확인되지 않음. helper 정책을 실제 음향 gate의 telemetry로 단정할 수 없음.</td>
+<td>정적 관찰</td>
+<td>voice/telemetry.py:11<br>voice/server.py:697</td>
+</tr>
+<tr>
+<td>R-D10-015</td>
+<td>D10</td>
+<td>Voice README 임시 WAV 삭제 시점·서빙 제한 표현의 범위</td>
+<td>코드는 transient를 response 반환 전에 bytes로 읽고 삭제한다. loopback-only는 ASGI 앱 자체 bind 강제가 아니라 실행 구성에 의존하며 어떤 host 호출도 전용 토큰 필요.</td>
+<td>문서와 코드 표현 경계</td>
+<td>voice/README.md:3<br>voice/README.md:39<br>voice/server.py:1000</td>
+</tr>
+<tr>
+<td>R-D11-001</td>
+<td>D11</td>
+<td>scripts README의 field 요약/strict gate 설명과 현재 pull/summary의 항상 비인정 종료 경계가 다르다.</td>
+<td>로그 회수나 옛 summary 통과를 현재 physical/field PASS로 잘못 해석할 수 있음.</td>
+<td>정적 관찰</td>
+<td>scripts/README.md:30<br>scripts/pull_android_field_sessions_20260710.py:677<br>scripts/summarize_android_field_sessions_20260710.py:1910</td>
+</tr>
+<tr>
+<td>R-D11-002</td>
+<td>D11</td>
+<td>apps/web 소스·build·test는 존재하지만 Next 전경로410이다. 독립 Gateway로 제거된 route와 남은 health/proxy 코드가 섞여 있다.</td>
+<td>잔존 API/UI를 현행 제품기능으로 계수하지 않아야 함.</td>
+<td>정적 관찰</td>
+<td>apps/web/proxy.ts:3<br>apps/web/legacy-runtime-boundary.ts:1<br>apps/web/README.md:5</td>
+</tr>
+<tr>
+<td>R-D11-003</td>
+<td>D11</td>
+<td>deploy는 NOT_APPLIED 초안으로 설명하지만 Backend/Gateway/Voice/retention unit에 실제 실행 지시문이 남아 있고 Web3파일만 주석 stub이다.</td>
+<td>초안이라고 모두 inert라고 쓰거나 실제 운영 중이라고 쓰면 모두 부정확함. host 상태 미확인.</td>
+<td>정적 관찰</td>
+<td>deploy/README.md:17<br>deploy/README.md:29<br>deploy/systemd/walksafe-report-retention.timer:5<br>deploy/systemd/walksafe-web.service:1</td>
+</tr>
+<tr>
+<td>R-D11-004</td>
+<td>D11</td>
+<td>날짜형 역사 control 도구의 일부 unit 회귀와 continuation은 현행 CI에 연결되지만 historical-control은 all에서 제외된다.</td>
+<td>date만으로 inactive 분류하거나 과거 gate 실행을 현재 의무로 승격하지 않아야 함.</td>
+<td>정적 관찰</td>
+<td>.github/workflows/quality.yml:254<br>scripts/run_walksafe_test_layers_current.sh:1</td>
+</tr>
+<tr>
+<td>R-D11-005</td>
+<td>D11</td>
+<td>visualTest overlay는 Git HEAD 복사본이며 original WIP·로컬 모델 다운로드·키·SDK를 자동 포함하지 않는다.</td>
+<td>원본 현재 작업트리와 동일한 APK 또는 원본 통합 완료라고 주장할 수 없음.</td>
+<td>정적 관찰</td>
+<td>scripts/prepare_visual_test_workspace.sh:18<br>tools/visual-test/README.md:12</td>
+</tr>
+<tr>
+<td>R-D11-006</td>
+<td>D11</td>
+<td>D11의 큰 역사·레거시 범위는 전수 inventory를 만들었지만 모든 내부 helper를 줄 단위로 검토하지 못했다.</td>
+<td>전체 상세 명세 완료 여부는 Root가 미검토 목록과 다른 담당의 coverage를 대조해야 함.</td>
+<td>검토 필요</td>
+<td>coverage.file_map<br>coverage.unreviewed</td>
+</tr>
+<tr>
+<td>R-D11-007</td>
+<td>D11</td>
+<td>진단 tunnel proxy는 cf-connecting-ip 검증과 loopback caller 전제를 사용하지만 /api/의 열거는 nginx 예제보다 넓다.</td>
+<td>진단 proxy를 승인 운영 nginx와 동일 ingress 정책으로 설명하면 안 됨. 이번 취약성 실행 검증은 하지 않음.</td>
+<td>정적 관찰</td>
+<td>scripts/visual-test-tunnel-proxy.mjs:30<br>deploy/nginx/walksafe-android-gateway.conf.example:239</td>
+</tr>
+<tr>
+<td>R-D12-001</td>
+<td>D12</td>
+<td>release 운영 플래그가 항상 false. 운영 신고·raw·사고 UI 구현 존재를 배포 활성화로 해석할 수 없다.</td>
+<td>운영 기능 ACTIVE 대신 CONDITIONAL 표기, release 보안 기능과 구분.</td>
+<td>정적관찰</td>
+<td>apps/android/adminapp/build.gradle.kts:81 ADMIN_OPERATIONAL_WORKFLOWS_ENABLED</td>
+</tr>
+<tr>
+<td>R-D12-002</td>
+<td>D12</td>
+<td>AdminSecurityController.close는 security/operations/raw 취소를 호출하지만 report/incident repository에는 명시 cancel 연결이 없다.</td>
+<td>해당 요청은 call timeout/interrupt 및 generation fence 경계로 설명한다. 전체 요청 즉시 취소나 서버 미처리를 주장할 수 없다.</td>
+<td>정적관찰; 동적 경쟁 미재현</td>
+<td>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java:1724 close<br>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOkHttpTransport.java:20 AdminOkHttpTransport</td>
+</tr>
+<tr>
+<td>R-D12-003</td>
+<td>D12</td>
+<td>W13 기록의 deadline 미구현, custody 프로세스 비보존, 검수 attempt 메모리 한정 문구는 현 코드의 deadline/Preferences 저장/lookup과 다르다.</td>
+<td>과거 주석을 현재 구현 상태로 채택하지 않음. 원본 역사문서 수정하지 않음.</td>
+<td>정적 불일치</td>
+<td>apps/android/adminapp/W13-SECURITY-NOTES.md:5<br>apps/android/adminapp/W13-SECURITY-NOTES.md:8<br>apps/android/adminapp/W13-SECURITY-NOTES.md:75<br>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java:5532 PreferencesReviewAttemptStore<br>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java:5486 PreferencesCustodyAttemptStore</td>
+</tr>
+<tr>
+<td>R-D12-004</td>
+<td>D12</td>
+<td>DELETE 권리 요청은 일반 PATCH로 RESOLVED 전이 불가. 앱에는 실제 삭제 처리 전용 UI가 없다.</td>
+<td>삭제 완료와 관리자 답변/반려·외부 사본 후속 사실 기록을 분리.</td>
+<td>정적관찰</td>
+<td>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminReportRequestModels.java:74 allowedNextStatuses</td>
+</tr>
+<tr>
+<td>R-D12-005</td>
+<td>D12</td>
+<td>감사 actor 응답은 1..64자, actor 필터는 3..64자를 허용한다.</td>
+<td>짧은 actor ID의 직접 필터 가능성은 별도 계약 대조 필요.</td>
+<td>정적 입력 경계 차이</td>
+<td>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminAuditModels.java:22 Filters<br>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminAuditModels.java:43 Event</td>
+</tr>
+<tr>
+<td>R-D12-006</td>
+<td>D12</td>
+<td>원본 grant는 토큰을 꺼낸 뒤 수신/디코딩 실패해도 새 grant가 필요하다. 원본 접근 감사만으로 화면 열람 확인을 대신하지 않는다.</td>
+<td>원본 미수신 안내와 fresh 재인증 흐름 필요.</td>
+<td>정적관찰</td>
+<td>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationsHttpClient.java:409 loadOriginalEvidence<br>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java:2132 applyLoadedOriginalEvidence</td>
+</tr>
+<tr>
+<td>R-D12-007</td>
+<td>D12</td>
+<td>Root의 D14/D09 교차검토에서 reauth nonce 발급 후 step_up_verified_at identity 전달이 끊겨 downstream admin_step_up_required 403에 이를 가능성을 보고했다.</td>
+<td>F-D12-015 및 고위험 클라이언트 절차는 구현으로만 기술한다. 실제 서버 통합 성공·배포 가능성을 주장하지 않음.</td>
+<td>부모 전달 정적 교차관찰; D12 직접 동적 재현 없음</td>
+<td>D14 R8: reauth nonce/session.step_up_verified_at 및 authorize_high_risk_bearer<br>D09/D15: middleware와 admin_reports/incident action context</td>
+</tr>
+<tr>
+<td>R-D12-008</td>
+<td>D12</td>
+<td>기기 KeyStore/PIN·생체/FLAG_SECURE/SAF 저장·삭제/실제 서버 세션과 운영 API를 이번 실행하지 않았다.</td>
+<td>시험 소스·구현 문서화와 실기기/외부 시스템 성공 증거를 분리한다.</td>
+<td>범위 한계</td>
+<td>apps/android/adminapp/src/main/AndroidManifest.xml<br>apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java</td>
+</tr>
+<tr>
+<td>R-D13-001</td>
+<td>D13</td>
+<td>설치 증명 공개키 등록 함수는 존재하지만 HTTP/runtime 호출 연결이 검색되지 않는다. 등록키 없는 설치의 삭제 evidence는 digest-only legacy 계약을 허용한다.</td>
+<td>기기 서명 소유 증명을 모든 실제 설치에 적용 완료했다고 판단할 수 없음.</td>
+<td>정적관찰; 등록 rollout 연결 검토필요</td>
+<td>backend/app/services/privacy_lifecycle.py:2226<br>backend/app/services/privacy_lifecycle.py:2294<br>backend/app/api/privacy.py:129</td>
+</tr>
+<tr>
+<td>R-D13-002</td>
+<td>D13</td>
+<td>require_model_deployable와 assess_training_model_lineage는 tests 외 실제 배포/등록 caller가 확인되지 않는다. 코드 주석도 승인 정책이 아닌 root choice라고 명시한다.</td>
+<td>자동 배포 차단·훈련 중지·기배포 모델 외부사본 삭제 보장 없음.</td>
+<td>정적관찰</td>
+<td>backend/app/services/training_model_lineage.py:1<br>backend/app/services/training_model_lineage.py:116<br>backend/app/services/training_model_lineage.py:181</td>
+</tr>
+<tr>
+<td>R-D13-003</td>
+<td>D13</td>
+<td>계정 삭제 worker의 external_copy_count &gt; 0은 server_copies를 EXTERNAL_PENDING으로 남긴다. 일반 transition은 서버소유 terminal을 막고 manifest 경로도 external count &gt; 0을 완료하지 않는다. 별도 기관 확인을 account item terminal로 잇는 경로는 확인되지 않는다.</td>
+<td>기관 사본이 있으면 내부 삭제 완료만으로 전체 계정 삭제 COMPLETED에 도달하지 않는다. D15 신고 삭제 외부사본 원장과 통합을 가정하지 말 것.</td>
+<td>정적관찰; 연결 검토필요</td>
+<td>backend/app/services/privacy_lifecycle.py:2590<br>backend/app/services/privacy_lifecycle.py:2692<br>scripts/account_deletion_worker.py:1446</td>
+</tr>
+<tr>
+<td>R-D13-004</td>
+<td>D13</td>
+<td>RAW retention 후보는 terminal COMMITTED/QUARANTINED expiry만 선택한다. 미완료 upload와 digest-rejected 비terminal 수집의 별도 만료 정리는 해당 worker에 없다.</td>
+<td>미완료·거부된 파일/예약의 장기 정리 경로는 별도 검토 필요. 계정 삭제 worker 경로와 구분.</td>
+<td>정적관찰</td>
+<td>scripts/manage_raw_collection_retention.py:212<br>backend/app/services/raw_collection_storage.py:2269</td>
+</tr>
+<tr>
+<td>R-D13-005</td>
+<td>D13</td>
+<td>RAW legal hold는 retention 후보에서 제외되지만 account_deletion_worker.process_request는 같은 hold를 직접 검사하지 않는다.</td>
+<td>계정삭제와 legal hold 동시 적용 우선순위가 이 서비스 경계에서는 확정되지 않음. 법률 판단을 뜻하지 않음.</td>
+<td>정적관찰; 정책/연결 검토필요</td>
+<td>scripts/manage_raw_collection_retention.py:212<br>scripts/account_deletion_worker.py:2315<br>backend/app/services/raw_collection_lifecycle.py:251</td>
+</tr>
+<tr>
+<td>R-D13-006</td>
+<td>D13</td>
+<td>register_sanitized_artifact는 envelope file hash/size와 승인·metadata를 검사하나 AEAD 복호화·평문 hash·실제 비식별 품질을 검증하지 않는다.</td>
+<td>등록 성공을 암호화 형식이나 얼굴/위치/음성 제거의 실증으로 사용할 수 없음.</td>
+<td>정적관찰</td>
+<td>backend/app/services/training_dataset_lifecycle.py:94</td>
+</tr>
+<tr>
+<td>R-D13-007</td>
+<td>D13</td>
+<td>훈련 승인/수출의 _require_current_consent는 현재 row 조회만 하며 privacy subject advisory fence를 획득하지 않는다.</td>
+<td>동의 확인과 등록/승인/학습 시작 사이 철회 경쟁의 원자성은 정적 보장으로 주장할 수 없음. 실제 동시성 테스트 미실행.</td>
+<td>정적관찰; 경쟁 검토필요</td>
+<td>backend/app/services/training_dataset_lifecycle.py:55<br>backend/app/services/training_dataset_lifecycle.py:204<br>backend/app/services/training_dataset_lifecycle.py:341</td>
+</tr>
+<tr>
+<td>R-D13-008</td>
+<td>D13</td>
+<td>account_password_policy는 작은 offline common-password 목록과 단순패턴 필터를 사용하며 검토된 전체 유출 corpus 연동은 주석상 후속 검토이다.</td>
+<td>모든 유출 비밀번호를 검사한다고 설명할 수 없음.</td>
+<td>정적관찰</td>
+<td>backend/app/services/account_password_policy.py:1</td>
+</tr>
+<tr>
+<td>R-D13-009</td>
+<td>D13</td>
+<td>RAW ingress와 schema의 B1a 초기 주석은 successful storage가 없다고 기술하지만 main은 RawCollectionStorage를 연결하고 현행 put/commit 저장 구현이 존재한다.</td>
+<td>역사 단계 주석을 현재 미구현 판정으로 사용하지 않음.</td>
+<td>문서주석과현행구현 불일치</td>
+<td>backend/app/services/raw_collection_ingest.py:1<br>backend/app/schemas.py:2360<br>backend/app/main.py:559<br>backend/app/services/raw_collection_storage.py:2378</td>
+</tr>
+<tr>
+<td>R-D13-010</td>
+<td>D13</td>
+<td>training artifact retention은 latest consent receipt와 두 boolean을 검사하지만 consent_event_is_current를 직접 확인하지 않는다. gate/approval은 currentness를 검사한다.</td>
+<td>policy version 변경만 있고 receipt가 그대로일 때 실행 차단과 물리정리 시점은 다를 수 있음.</td>
+<td>정적관찰</td>
+<td>scripts/manage_training_artifact_retention.py:82<br>backend/app/services/training_dataset_lifecycle.py:55</td>
+</tr>
+<tr>
+<td>R-D14-001</td>
+<td>D14</td>
+<td>관리자 감사 목록의 READ source는 AdminOperationAudit 중 admin.report.list/detail/admin.audit.list만 선택한다.</td>
+<td>incident/raw collection/report request 등 기록된 모든 operation audit가 이 목록에 나타난다고 설명할 수 없다.</td>
+<td>정적관찰</td>
+<td>backend/app/services/admin_audit_projection.py:224 query_admin_audit_events</td>
+</tr>
+<tr>
+<td>R-D14-002</td>
+<td>D14</td>
+<td>step-up 발급 TTL은 설정1..900초이나 중앙 consume_admin_high_risk_reconfirmation은 max-age를 넘기지 않아 기본300초를 사용한다.</td>
+<td>TTL을300초보다 크게 설정해도 중앙 HTTP 승인 소비 유효기간이 늘어난다고 보장할 수 없다. offline helper는 설정값을 전달한다.</td>
+<td>정적관찰</td>
+<td>backend/app/services/admin_security.py:3160 reauthenticate<br>backend/app/services/admin_security.py:1590 consume_admin_high_risk_reconfirmation</td>
+</tr>
+<tr>
+<td>R-D14-003</td>
+<td>D14</td>
+<td>기기키 교체 service의 already_confirmed idempotency 분기는 HTTP에서는 구키 ACTIVE proof 요건 때문에 최초 성공 뒤 도달 불가하다.</td>
+<td>응답유실 회복은 session devices 조회 조정(D12)과 연결해야 한다.</td>
+<td>정적관찰</td>
+<td>backend/app/services/admin_security.py:2906 confirm_device_key_rotation</td>
+</tr>
+<tr>
+<td>R-D14-004</td>
+<td>D14</td>
+<td>관리자 인증 attempt/challenge/session/reconfirmation/recovery 기록의 자동 retention purge는 조사한 runtime/service에서 찾지 못했다. 만료는 논리적 사용불가·quota 제외다.</td>
+<td>120초 challenge TTL이나15분 recovery TTL을 물리 데이터 보존기간으로 쓰면 안 된다. migration downgrade의 challenge attempt 삭제와 테스트 fixture cleanup은 운영 purge가 아니다.</td>
+<td>정적관찰; 다른 운영 도구 전체검색 범위 한계</td>
+<td>backend/app/services/admin_device_proof.py:870 AdminDeviceProofService.issue_challenge<br>backend/app/services/admin_security.py:1875 AdminSecurityService._rate_limit_retry_after<br>backend/app/services/admin_security.py:3859 complete_recovery</td>
+</tr>
+<tr>
+<td>R-D14-005</td>
+<td>D14</td>
+<td>Python password rehash는 향후 cost 변경을 고려하지만 현재 PG rehash wrapper는 legacy16384/8/1에서16384/8/5로의 encoding regex만 허용한다.</td>
+<td>현재 cost에서는 일치한다. 향후 cost 상승 시 Python 단위 기대만으로 PostgreSQL 호환성을 주장할 수 없다.</td>
+<td>정적관찰; 현재 동작 장애 주장 아님</td>
+<td>backend/app/services/admin_security.py:2057 login<br>backend/alembic/versions/202609240002_admin_password_login_rehash.py:25 upgrade</td>
+</tr>
+<tr>
+<td>R-D14-006</td>
+<td>D14</td>
+<td>incident 상세는 projection와 events 별도 SELECT 후 일치를 요구하고 history endpoint는 단일 statement snapshot을 사용한다.</td>
+<td>동시 append 상황에서 상세 조회가 일시503을 반환할 가능성은 남아 있으며 이번에는 재현하지 않았다.</td>
+<td>코드에 근거한 가능성; 재현 미실행</td>
+<td>backend/app/api/admin_incidents.py:430 get_admin_incident_detail<br>backend/app/api/admin_incidents.py:555 get_admin_incident_history</td>
+</tr>
+<tr>
+<td>R-D14-007</td>
+<td>D14</td>
+<td>custody는 확인 진술/digest, hardware security level은 trusted provisioning 인자다.</td>
+<td>서버가 물리 OFF_PHONE/암호화백업/Android hardware attestation을 직접 검증했다는 주장과 구분해야 한다.</td>
+<td>정적관찰</td>
+<td>backend/app/services/admin_security.py:2558 attest_recovery_custody<br>backend/app/services/admin_device_proof.py:1266 provision_admin_device_key</td>
+</tr>
+<tr>
+<td>R-D14-008</td>
+<td>D14</td>
+<td>정적 연결 불일치 R-D14-008: reauthenticate는 Python 및 PG 양쪽에서 session.step_up_verified_at를 NULL로 설정한다. _authorize_high_risk_bearer는 reconfirmation.verified_at 검증·소비 후 기존 identity를 그대로 반환하며 D09 middleware도 같은 객체를 전달한다. incident status PATCH, admin report status PATCH, admin delivery-packages POST, admin report-request status PATCH route는 identity.step_up_verified_at=None이면403 admin_step_up_required로 거절한다. /reports workflow 및 external-copy 경로에는 같은 timestamp 검사가 없어 이 관찰을 모든 writes로 확대하지 않는다. 따라서 정상 재확인 경로에서 해당 업무 도달이 차단되는 정적 경로를 확인했다. 서비스 단위 성공 기대와 구분하며 실제 HTTP/PG 실행 재현은 하지 않았다.</td>
+<td>유효한 일회 reconfirmation과 ACTION proof를 모두 소비한 뒤 앞서 특정한 incident/report/request API가403이 될 수 있다. report-request 상세 근거는 D15 R-D15-006에 연결한다. business 서비스 성공이나 mock identity 시험은 실제 middleware 경로 성공을 입증하지 않는다.</td>
+<td>고정 snapshot의 정적 연결 불일치; 실행 재현 미수행</td>
+<td>backend/app/services/admin_security.py:3303 reauthenticate clears timestamp<br>backend/alembic/versions/202608120001_admin_recovery_custody.py:1597 walksafe_issue_admin_reconfirmation clears timestamp<br>backend/app/services/admin_security.py:1521 _authorize_high_risk_bearer returns original identity<br>backend/app/field_test_security.py:2166 FieldTest middleware preserves identity<br>backend/app/api/admin_incidents.py:121 _require_action_context<br>backend/app/api/admin_reports.py:147 _require_admin_report_action_context</td>
+</tr>
+<tr>
+<td>R-D15-001</td>
+<td>D15</td>
+<td>기간만료 retention 경로는 사용자 DELETE 요청 처리와 다른 lifecycle이며 직접 ReportDeletionTombstone 생성/외부 삭제 ledger 연결을 확인하지 못했다. active legal hold는 DB reports DELETE trigger가 공통 차단하므로 hold 우회라고 단정하지 않는다.</td>
+<td>기간만료로 지워진 신고가 어떤 ledger에 기록되고 과거 백업에서 재등장하지 않게 되는지 별도 검토가 필요하다. 사용자 요청 삭제와 동일 복구 계약이라고 설명할 수 없다.</td>
+<td>정적관찰 및 운영연계 검토필요</td>
+<td>scripts/check_report_retention_dry_run.py:3320<br>backend/app/services/report_deletion.py:340<br>backend/alembic/versions/202608300003_report_restore_reapply.py:176</td>
+</tr>
+<tr>
+<td>R-D15-002</td>
+<td>D15</td>
+<td>D15 report deletion external copy state/event와 D13 account deletion server_copies EXTERNAL_PENDING의 완료 연결 호출을 확인하지 못했다.</td>
+<td>기관 사본 삭제 회신을 기록했다고 계정삭제 전체 완료가 자동 성립한다고 주장할 수 없다.</td>
+<td>연결 미확인; D13 교차검토</td>
+<td>backend/app/services/report_external_copy_deletions.py:369<br>backend/app/services/report_deletion.py:234</td>
+</tr>
+<tr>
+<td>R-D15-003</td>
+<td>D15</td>
+<td>read-only scripts/check_report_restore_tombstones.py는 plan/gate를 source_fence 없이 호출하지만 현재 서비스는 필수 source fence를 요구한다.</td>
+<td>유효 evidence를 읽어도 현재 helper 계약에서 restore_source_fence_required로 차단된다. 정상 복원 계획/게이트용으로 안내하려면 fence 지원 CLI와 구분해야 한다.</td>
+<td>정적 호출 계약 불일치; 이번 실행/수정 없음</td>
+<td>scripts/check_report_restore_tombstones.py:108<br>scripts/check_report_restore_tombstones.py:118<br>backend/app/services/report_restore_tombstones.py:1743</td>
+</tr>
+<tr>
+<td>R-D15-004</td>
+<td>D15</td>
+<td>호환 status agency-reviewed flag·legacy agency export와 typed review APPROVED·v2 package는 검토 증거 계약이 다르다.</td>
+<td>legacy reviewed 상태를 typed 원본 grant 증거 검토·기관 전달 완료와 혼동하면 실제 보장보다 큰 주장이 된다.</td>
+<td>활성 병행 경로의 정책 차이</td>
+<td>backend/app/api/reports.py:3897<br>backend/app/services/admin_report_workflow.py:518<br>backend/app/services/admin_report_delivery_package.py:560</td>
+</tr>
+<tr>
+<td>R-D15-005</td>
+<td>D15</td>
+<td>대규모 DB/파일 보상 경로의 부분검토와 실제 PostgreSQL/외부 시스템 미검증이 남아 있다.</td>
+<td>이 명세는 static 구현 계약이며 전체 보안감사/운영 검증/전체 기능 완료 판정 근거가 아니다. coverage.unreviewed의 구체 범위를 유지해야 한다.</td>
+<td>검증 한계</td>
+<td>backend/app/services/admin_report_integrity.py:1631<br>backend/app/services/report_restore_postgres.py:1077</td>
+</tr>
+<tr>
+<td>R-D15-006</td>
+<td>D15</td>
+<td>D14-R8/D09 교차관찰: 재확인 발급이 session.step_up_verified_at를 NULL로 두고 고위험 authorizer가 기존 identity를 반환하는 경로에서, D15 action context는 timestamp None을403으로 차단한다. report status·delivery package 생성·권리요청 status HTTP 경계에 적용된다.</td>
+<td>service 단독 코드/테스트가 동작해도 정상 HTTP 재확인→mutation 성공을 입증하지 못한다. reports.py workflow context 및 외부사본 record context에는 같은 timestamp 검사가 없어 동일 문제를 모든 관리자 API로 확대하지 않는다.</td>
+<td>정적 caller 결합 불일치; D14 근거 연결; 실행재현/제품수정 없음</td>
+<td>backend/app/api/admin_reports.py:147<br>backend/app/api/admin_reports.py:776<br>backend/app/api/admin_reports.py:826<br>backend/app/api/report_user_requests.py:245<br>backend/app/api/report_user_requests.py:1301</td>
+</tr>
+<tr>
+<td>R-D16-001</td>
+<td>D16</td>
+<td>README는 변환기가 시험 통과해야 available=true가 된다고 설명하지만 PinnedAndroidRinexConverter.status는 true 상수이며 런타임 시험 receipt를 확인하지 않는다.</td>
+<td>변환기 availability를 매 실행 검증 통과로 기술하면 과장. JNI 엔진은 별도로 실제 version pin 검사.</td>
+<td>정적 불일치 확인</td>
+<td>apps/android/positionevalapp/README.md:59<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/core/PpkEngines.kt:25</td>
+</tr>
+<tr>
+<td>R-D16-002</td>
+<td>D16</td>
+<td>analyze 정상/실패 결과 complete는 activeRun=null로 만든 뒤 finally의 cleanup 실패에서 changeIfCurrent(run)을 호출한다. 이 fence는 active generation 불일치로 경고 갱신을 거부할 수 있다.</td>
+<td>완료 후 임시파일 삭제 실패 주의 문구가 사용자에게 전달되지 않을 가능성. 실제 실패 재현 시험 없음.</td>
+<td>정적 경로 확인, 동적 재현 미수행</td>
+<td>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/AnalysisCoordinator.kt:594<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/AnalysisCoordinator.kt:647<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/AnalysisCoordinator.kt:667</td>
+</tr>
+<tr>
+<td>R-D16-003</td>
+<td>D16</td>
+<td>GNSS 변환기의 scan/write loop는 cancellation/interrupt를 검사하지 않는다. 자동 다운로드의 해제·헤더 호출도 optional cancellation을 전달하지 않는 구간이 있다.</td>
+<td>취소된 결과의 commit은 차단하지만 해당 구간 처리와 새 분석 시작이 지연될 수 있음. 즉시 중단 또는 고정 취소 latency로 기술 불가.</td>
+<td>정적 제한 확인</td>
+<td>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/core/GnssLoggerRinex3Converter.kt:157<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/core/GnssLoggerRinex3Converter.kt:301<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/core/NgiiClient.kt:499<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/core/NgiiClient.kt:530</td>
+</tr>
+<tr>
+<td>R-D16-004</td>
+<td>D16</td>
+<td>NGII_KEY_REJECTED, STATION_CATALOG_UNAVAILABLE 및 다수 구체적 파싱 오류가 AnalysisFailurePolicy allowlist에 없어 ANALYSIS_FAILED로 축약된다.</td>
+<td>하위 reason code와 사용자가 받는 진단 code가 다르다. 특히 키 거부는 KEY_NOT_AVAILABLE 분기가 아니므로 keyStored 표시를 자동 해제하지 않는다.</td>
+<td>정적 구현 행동 확인</td>
+<td>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/AnalysisCoordinator.kt:133<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/AnalysisCoordinator.kt:170<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/core/NgiiClient.kt:299</td>
+</tr>
+<tr>
+<td>R-D16-005</td>
+<td>D16</td>
+<td>PpkOutputContract는 quality 1..7을 허용하지만 PpkPosParser는 1..6만 허용한다.</td>
+<td>Q7 결과가 선행 검증 뒤 후행 parser에서 거부됨. 최종 명세는 후행의 더 엄격한 경계를 적용해야 함.</td>
+<td>정적 경계 차이 확인</td>
+<td>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/core/PpkOutputContract.kt:87<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/core/PpkEvaluation.kt:68</td>
+</tr>
+<tr>
+<td>R-D16-006</td>
+<td>D16</td>
+<td>분석 시작 문구는 입력 무결성 확인 완료를 표시하지만 trace/GNSS 사본의 반입 후 hash를 시작마다 재검증하는 호출은 없다. 수동 기준국만 prepare에서 hash를 재검증한다.</td>
+<td>모든 입력의 해시를 매 분석마다 재검증한다고 기술하면 부정확. trace는 반입 시 파싱한 메모리 TraceSession을 재사용한다.</td>
+<td>정적 동작 한계 확인</td>
+<td>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/AnalysisCoordinator.kt:378<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/AnalysisCoordinator.kt:496<br>apps/android/positionevalapp/src/main/java/kr/co/hanium/dreamup/walksafe/positioneval/core/ManualBaseRinexImporter.kt:166</td>
+</tr>
+</tbody></table>
+<footer>기준: 2026-10-04 10:33:40 KST 작업트리. 최종 통합·전체 DONE 미확인. 제품 실행 검증과 문서 검수를 구분합니다.</footer></main></body></html>

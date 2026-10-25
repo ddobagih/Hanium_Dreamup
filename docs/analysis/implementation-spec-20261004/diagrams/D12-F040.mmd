@@ -1,0 +1,25 @@
+flowchart TD
+  A["F-D12-040 통합 감사 목록·유형·행위자 필터"]
+  P["P-D12-040 감사 최소정보와 dispatch 전 세션 검증"]
+  A --> P
+  M0["1. READ proof로 GET /admin/reports/audits를 조회한다."]
+  P --> M0
+  M1["2. 최소 event ID/type/action/outcome/actor/resource/time/correlation projection을 검증한다."]
+  M0 --> M1
+  M2["3. 페이지 중복은 type+ID로 검사하고 cursor 진행을 확인한다."]
+  M1 --> M2
+  M3["4. queued 요청은 generation 확인과 1회 실행권 claim 후 loader를 호출한다."]
+  M2 --> M3
+  M4["5. 세션 종료 시 목록·필터·선택을 지운다."]
+  M3 --> M4
+  M4 --> N["정상 종료: 검증된 감사 목록 페이지 표시."]
+  M0 -. "관련 조건 확인" .-> B0{"큐 대기 중 로그아웃"}
+  B0 -->|"조건 해당"| R0["loader 호출 없이 폐기"]
+  M1 -. "관련 조건 확인" .-> B1{"중복 또는 진행없는 페이지"}
+  B1 -->|"조건 해당"| R1["ERROR"]
+  M2 -. "관련 조건 확인" .-> B2{"늦은 callback"}
+  B2 -->|"조건 해당"| R2["반영 차단"]
+  M3 -. "관련 조건 확인" .-> B3{"실패"}
+  B3 -->|"조건 해당"| R3["명시적 동일 READ 재시도"]
+  A -. "중단 경계" .-> C["별도 취소 버튼은 없는 경우가 많다. Activity 중단/세션 변경은 로컬 generation과 결과 반영을 무효화하며 이미 전송된 서버 변경의 취소를 뜻하지 않는다."]
+  A -. "복구 경계" .-> Q["실패한 읽기를 명시적 실행."]

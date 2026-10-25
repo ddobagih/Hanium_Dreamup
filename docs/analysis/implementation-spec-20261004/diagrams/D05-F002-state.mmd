@@ -1,0 +1,22 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-002-NEW" as NEW
+  state "S-D05-002-LOADING" as LOADING
+  state "S-D05-002-READY" as READY
+  state "S-D05-002-CPU_FALLBACK" as CPU_FALLBACK
+  state "S-D05-002-CLOSING" as CLOSING
+  state "S-D05-002-CLOSED" as CLOSED
+  state "S-D05-002-FAILED" as FAILED
+  [*] --> NEW
+  NEW --> LOADING: "create SHA tensor"
+  LOADING --> READY: "success"
+  LOADING --> FAILED: "contract cleanup failure"
+  READY --> CPU_FALLBACK: "recoverable delegate error and release success"
+  CPU_FALLBACK --> READY: "CPU invoke success"
+  CPU_FALLBACK --> FAILED: "CPU failure"
+  READY --> CLOSING: "close stops admission"
+  CLOSING --> CLOSED: "accepted work drains and native closes"
+  CLOSING --> FAILED: "native release failure"
+  note right of NEW
+    F-D05-002 P-D05-002
+  end note

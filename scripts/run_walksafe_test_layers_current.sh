@@ -131,6 +131,8 @@ UNIT_PYTHON_TESTS=(
   backend/tests/test_actor_auth_epoch.py
   backend/tests/test_actor_assertion_v4.py
   tests/test_voice_intents.py
+  tests/test_voice_inference_generation.py
+  tests/test_whisper_hint_benchmark.py
   tests/test_voice_model_integrity.py
   tests/test_voice_stt_policy.py
   tests/test_voice_stt_server.py
@@ -241,6 +243,11 @@ UNIT_PYTHON_TESTS=(
   backend/tests/test_readiness_snapshot.py
   backend/tests/test_admin_credential_issuer_key.py
   backend/tests/test_accounts.py
+  backend/tests/test_installation_evidence_key_api.py
+  backend/tests/test_signup_policy_preflight.py
+  backend/tests/test_tmap_nearby_search.py
+  backend/tests/test_tmap_station_search.py
+  backend/tests/test_account_deletion_storage_roots.py
   backend/tests/test_account_key_purpose_binding.py
   backend/tests/test_account_deletion_worker.py
   backend/tests/test_capacity_state.py
@@ -311,6 +318,23 @@ UNIT_PYTHON_TESTS=(
   backend/tests/test_tmap_readiness_worker_isolation.py
   backend/tests/test_tmap_route_distance_consistency.py
   backend/tests/test_destination_query_android_parity.py
+  backend/tests/test_actor_rate_limit_runtime.py
+  backend/tests/test_field_test_body_capture.py
+  backend/tests/test_guidance_diagnostics.py
+  backend/tests/test_navigation_road_type_preservation.py
+  backend/tests/test_navigation_road_type_worker_error_regression.py
+  backend/tests/test_navigation_route_health_state.py
+  backend/tests/test_navigation_route_health_transport_boundaries.py
+  backend/tests/test_raw_training_transaction_fences.py
+  backend/tests/test_report_status_transition.py
+  backend/tests/test_tmap_blank_facility.py
+  backend/tests/test_tmap_directional_crosswalk_guidance.py
+  backend/tests/test_tmap_disconnect_cancellation.py
+  backend/tests/test_tmap_guidance_incomplete.py
+  backend/tests/test_tmap_normalization_boundaries.py
+  backend/tests/test_tmap_numeric_code_validation.py
+  backend/tests/test_tmap_route_health_state_owner.py
+  backend/tests/test_walking_route_consistency.py
 )
 
 FUNCTIONAL_PYTHON_TESTS=(
@@ -361,6 +385,20 @@ FUNCTIONAL_PYTHON_TESTS=(
   backend/tests/test_fp008_postgres_integration.py
   backend/tests/test_fp046_postgres_integration.py
   backend/tests/test_raw_collection_postgres_integration.py
+  backend/tests/test_owner_routes_postgres.py
+  backend/tests/test_account_deletion_prior_report_copies.py
+  backend/tests/test_account_deletion_copy_race_postgres.py
+  backend/tests/test_admin_delivery_package_historical_proof_postgres.py
+  backend/tests/test_admin_report_history_tail_postgres.py
+  backend/tests/test_admin_security_custody_cas_postgres.py
+  backend/tests/test_application_factory.py
+  backend/tests/test_diagnostic_storage_postgres.py
+  backend/tests/test_refactor_lifecycle_transactions_postgres.py
+  backend/tests/test_s19_31_consent_authority_gateway_postgres.py
+  backend/tests/test_s19_33_report_consent_commit_postgres.py
+  backend/tests/test_installation_evidence_security_postgres.py
+  backend/tests/test_admin_body_bound_reconfirmation_postgres.py
+  backend/tests/test_gateway_privacy_candidates_postgres.py
   backend/tests/test_raw_collection_retention_postgres_integration.py
   backend/tests/test_report_user_requests_postgres_integration.py
   tests/test_agency_submission_receipt.py
@@ -661,7 +699,9 @@ run_unit() (
   run_locked_gateway_npm test || gateway_status=$?
   printf '%s\n' "${gateway_status}" > "${REPORT_DIR}/node-gateway.exit"
   if (( gateway_status != 0 )); then exit "${gateway_status}"; fi
-  (cd "${REPO_ROOT}/apps/android" && ./gradlew testDebugUnitTest --no-daemon --rerun-tasks)
+  (cd "${REPO_ROOT}/apps/android" && ./gradlew :app:testDebugUnitTest :adminapp:testDebugUnitTest --no-daemon --rerun-tasks)
+  # Keep default-returning Android stubs out of the strict host-policy invocation above.
+  (cd "${REPO_ROOT}/apps/android" && ./gradlew :app:testDebugSdkAdapterUnitTest --no-daemon --rerun-tasks)
 )
 
 run_active_session_control() (
@@ -694,11 +734,14 @@ require_test_database() {
 run_functional() {
   require_test_database
   activate_locked_node_path
-  run_python_tests python-functional "${PYTHON_BIN}" "${FUNCTIONAL_PYTHON_TESTS[@]}"
+  # The HTTP/PG chain consumes this invocation's current Gateway, even for standalone functional.
+  run_locked_gateway_npm run build
+  WALKSAFE_GATEWAY_BUILD_DIR="${REPO_ROOT}/apps/android-gateway/dist" \
+    run_python_tests python-functional "${PYTHON_BIN}" "${FUNCTIONAL_PYTHON_TESTS[@]}"
   run_locked_npm run lint
   run_locked_npm run typecheck
   run_locked_gateway_npm run typecheck
-  (cd "${REPO_ROOT}/apps/android" && ./gradlew lintDebug --no-daemon)
+  (cd "${REPO_ROOT}/apps/android" && ./gradlew :app:lintDebug :adminapp:lintDebug --no-daemon)
 }
 
 run_integration() {
@@ -741,20 +784,45 @@ run_integration() {
       --web-root "${REPO_ROOT}/apps/web" \
       --build-dir "${web_dist_dir}"
   )
-  (cd "${REPO_ROOT}/apps/android" && ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon)
-  "${PYTHON_BIN}" "${REPO_ROOT}/scripts/check_android_apk_model_asset_20260713.py"
+  # Generated BuildConfig combinations: each debug switch on/off, with explicit expectations.
+  local enabled
+  for enabled in false true; do
+    (
+      cd "${REPO_ROOT}/apps/android"
+      ./gradlew \
+        :app:testDebugUnitTest --tests '*BuildVariantIsolationTest' \
+        :adminapp:testDebugUnitTest --tests '*AdminBuildVariantIsolationTest' \
+        -PdevelopmentReportQueue="${enabled}" -PdevelopmentQuickStart="${enabled}" \
+        -Pwalksafe.guidanceStartBypass="${enabled}" -PWALKSAFE_REPORT_QUEUE_ENABLED=false \
+        -PWALKSAFE_ADMIN_OPERATIONAL_DEBUG="${enabled}" \
+        -Pwalksafe.expectedDevelopmentQuickStart="${enabled}" \
+        -Pwalksafe.expectedReportQueue="${enabled}" \
+        -Pwalksafe.expectedGuidanceStartBypass="${enabled}" --no-daemon
+    )
+  done
+  (cd "${REPO_ROOT}/apps/android" && ./gradlew \
+    :app:assembleDebug :app:assembleDebugAndroidTest \
+    :adminapp:assembleDebug :adminapp:assembleDebugAndroidTest --no-daemon)
+  "${PYTHON_BIN}" "${REPO_ROOT}/scripts/check_android_apk_model_asset_20260713.py" --profile debug
   local source_commit="${WALKSAFE_SOURCE_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse HEAD)}"
   (
     cd "${REPO_ROOT}/apps/android"
       WALKSAFE_SOURCE_COMMIT="${source_commit}" \
       WALKSAFE_GATEWAY_ORIGIN="${WALKSAFE_RELEASE_TEST_GATEWAY_ORIGIN:-https://walksafe.invalid}" \
       WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-https://admin.walksafe.invalid}" \
-      ./gradlew testReleaseUnitTest lintRelease assembleRelease --no-daemon
+      ./gradlew \
+        :app:verifyReleaseBuildConfigIsolation :app:lintRelease :app:assembleRelease \
+        :adminapp:verifyReleaseBuildConfigIsolation :adminapp:lintRelease :adminapp:assembleRelease \
+        -PdevelopmentQuickStart=true -PdevelopmentReportQueue=true \
+        -Pwalksafe.guidanceStartBypass=true -PWALKSAFE_ADMIN_OPERATIONAL_DEBUG=true \
+        -Pwalksafe.expectedDevelopmentQuickStart=false -Pwalksafe.expectedReportQueue=false \
+        -Pwalksafe.expectedGuidanceStartBypass=false --no-daemon
   )
   "${PYTHON_BIN}" "${REPO_ROOT}/scripts/check_android_apk_model_asset_20260713.py" \
+    --profile release \
     --apk "${REPO_ROOT}/apps/android/app/build/outputs/apk/release/app-release-unsigned.apk"
   if [[ "${WALKSAFE_RUN_ANDROID_DEVICE_TESTS:-false}" == "true" ]]; then
-    (cd "${REPO_ROOT}/apps/android" && ./gradlew connectedDebugAndroidTest --no-daemon)
+    (cd "${REPO_ROOT}/apps/android" && ./gradlew :app:connectedDebugAndroidTest :adminapp:connectedDebugAndroidTest --no-daemon)
   fi
 }
 

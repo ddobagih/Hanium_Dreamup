@@ -447,7 +447,10 @@ class AndroidPrivacyDeletionAccountDeletionTest {
     }
 
     private fun gatewayTerminalConflictCodes(): Set<String> {
-        val source = File("../../android-gateway/src/privacy-deletion-v2.ts").readText()
+        val entry = File("../../android-gateway/src/privacy-deletion-v2.ts").readText()
+        assertTrue(entry.contains("ACCOUNT_DELETION_TERMINAL_CONFLICT_CODES_V2,"))
+        assertTrue(entry.contains("from \"./privacy-deletion-codec.js\""))
+        val source = File("../../android-gateway/src/privacy-deletion-codec.ts").readText()
         val block = source
             .substringAfter(
                 "export const ACCOUNT_DELETION_TERMINAL_CONFLICT_CODES_V2 = Object.freeze([",
@@ -457,6 +460,53 @@ class AndroidPrivacyDeletionAccountDeletionTest {
             .findAll(block)
             .map { it.groupValues[1] }
             .toSet()
+    }
+
+    @Test fun deviceVerificationProjectionIsParsedSeparatelyAndCannotCloseAnUnverifiedRequest() {
+        val canonical = validStatusJson()
+        val root = org.json.JSONObject(canonical)
+        val view = org.json.JSONObject().put("schema_version", "walksafe.account-deletion-device-verification.v1")
+            .put("completion_view", "IN_PROGRESS").put("target_count", 2).put("deleted_count", 1)
+            .put("not_found_count", 0).put("failed_count", 0).put("pending_count", 1)
+            .put("unverifiable_count", 0).put("unverifiable_reason", org.json.JSONObject.NULL)
+            .put("follow_up", org.json.JSONObject.NULL).put("device_clock_anomaly_count", 0)
+            .put("device_due_at", "2026-07-26T12:00:00Z").put("evaluated_at", "2026-07-25T12:00:10Z")
+        val wire = root.put("device_verification", view).toString()
+        assertNull(validatedAccountDeletionStatusOrNull(wire, INSTALLATION_ID, REQUEST_ID))
+        val parsed = requireNotNull(validatedAccountDeletionStatusViewOrNull(wire, INSTALLATION_ID, REQUEST_ID))
+        assertEquals(validatedAccountDeletionStatusOrNull(canonical, INSTALLATION_ID, REQUEST_ID), parsed.canonicalStatus)
+        assertEquals(1L, parsed.deviceVerification?.pendingCount)
+        assertEquals(AccountDeletionPhase.IN_PROGRESS, parsed.canonicalStatus.derivedPhase())
+        for ((key, value) in listOf("target_count" to 3, "pending_count" to "1", "completion_view" to "COMPLETED",
+            "follow_up" to "DELETE_ON_NEXT_CONTACT_OR_REMOVE_APP", "device_due_at" to "2026-02-31T00:00:00Z")) {
+            val altered = org.json.JSONObject(wire)
+            altered.getJSONObject("device_verification").put(key, value)
+            assertNull(key, validatedAccountDeletionStatusViewOrNull(altered.toString(), INSTALLATION_ID, REQUEST_ID))
+        }
+        assertNull(validatedAccountDeletionStatusViewOrNull(wire, INSTALLATION_ID, "other_account_delete_request"))
+    }
+
+    @Test fun signatureIsOutsideCanonicalHashAndMalformedSignatureNeverSerializes() {
+        val generator = java.security.KeyPairGenerator.getInstance("EC").apply {
+            initialize(java.security.spec.ECGenParameterSpec("secp256r1"))
+        }
+        val key = generator.generateKeyPair()
+        val unsigned = DeviceDeletionEvidence(REQUEST_ID, "tombstone-00000001", "1".repeat(64), INSTALLATION_ID,
+            "device-evidence-0001", 1L, 3L, "FAILED", "2026-07-25T12:05:00Z", "0".repeat(64))
+        val hash = deviceDeletionEvidenceSha256(unsigned)
+        val signature = java.security.Signature.getInstance("SHA256withECDSA").run {
+            initSign(key.private); update(installationEvidenceSignatureMessage(hash))
+            java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(sign())
+        }
+        val signed = unsigned.copy(evidenceSha256 = hash, installationSignature = signature)
+        assertEquals(hash, deviceDeletionEvidenceSha256(signed))
+        val body = org.json.JSONObject(deviceDeletionEvidenceBody(signed))
+        assertEquals("FAILED", body.getString("result"))
+        assertEquals(signature, body.getString("installation_signature"))
+        assertTrue(verifyInstallationEvidenceSignature(key.public, hash, signature))
+        assertThrows(IllegalArgumentException::class.java) {
+            deviceDeletionEvidenceBody(signed.copy(installationSignature = "invalid"))
+        }
     }
 
     private fun validStatusJson(): String {

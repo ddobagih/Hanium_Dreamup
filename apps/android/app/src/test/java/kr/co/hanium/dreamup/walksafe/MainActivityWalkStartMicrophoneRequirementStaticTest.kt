@@ -35,32 +35,16 @@ class MainActivityWalkStartMicrophoneRequirementStaticTest {
     @Test
     fun microphoneRevocationDuringAWalkStillStopsOnlyVoiceFeatures() {
         val observed = functionBlock("private fun applyObservedPermissionStateChange(")
-        val microphone = observed.substringAfter("if (!hasRecordAudioPermission()) {")
+        val microphone = observed.substringAfter("if (!platform.microphoneGranted()) {")
             .substringBefore("}")
 
-        assertTrue(microphone.contains("stopHandsFreeVoiceService()"))
-        assertTrue(microphone.contains("cancelVoiceCommandRecognition()"))
-        assertFalse(microphone.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
+        assertTrue(microphone.contains("runtime.stopHandsFree()"))
+        assertTrue(microphone.contains("runtime.cancelVoiceRecognition()"))
+        assertFalse(microphone.contains("runtime.enterSafetyStop("))
+        val binding = MainActivityRefactorSource.composition(source, "permissionFlowController")
+        assertTrue(binding.contains("override fun stopHandsFree() { stopHandsFreeVoiceService() }"))
+        assertTrue(binding.contains("override fun cancelVoiceRecognition() { cancelVoiceCommandRecognition() }"))
     }
 
-    private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing function: $signature" }
-        var depth = 0
-        var opened = false
-        for (index in start until source.length) {
-            when (source[index]) {
-                '{' -> {
-                    depth += 1
-                    opened = true
-                }
-                '}' -> {
-                    depth -= 1
-                    if (opened && depth == 0) return source.substring(start, index + 1)
-                }
-            }
-        }
-        // Expression-bodied functions end at the next declaration.
-        return source.substring(start).substringBefore("\n    private fun ", source.substring(start))
-    }
+    private fun functionBlock(signature: String): String = MainActivityRefactorSource.function(source, signature)
 }

@@ -14,7 +14,7 @@ import {
   type IntegratedConsentConfirmation
 } from "../src/integrated-consent.js";
 import { createGatewayServer } from "../src/node-adapter.js";
-import { REPORT_PURPOSE_HEADER } from "../src/routes.js";
+import { REPORT_PURPOSE_HEADER, REPORT_ID_HEADER, REPORT_PAYLOAD_SHA256_HEADER, REPORT_PAYLOAD_BYTES_HEADER } from "../src/routes.js";
 import { configureTestStateEncryption } from "./state-encryption-fixture.js";
 
 const backendOrigin = new URL(process.env.EPOCH_TEST_BACKEND_ORIGIN!);
@@ -107,17 +107,19 @@ async function consent(cookie: string): Promise<HeadersInit> {
 async function exercise(cookie: string, consentHeaders: HeadersInit): Promise<number[]> {
   const walking = await gatewayFetch("/api/navigation/walking", {
     method: "POST", headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({
-      origin: { latitude: 37.5665, longitude: 126.978 },
-      destination: { latitude: 37.567, longitude: 126.979 }
-    })
+    body: process.env.EPOCH_TEST_WALKING_REQUEST!
   });
   await walking.text();
   const form = new FormData();
   form.set("metadata", JSON.stringify({ source: "android", auto_reported: false }));
   form.set("image", new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" }), "report.jpg");
   const report = await gatewayFetch("/api/reports/v2", {
-    method: "POST", headers: { cookie, ...Object.fromEntries(new Headers(consentHeaders)) }, body: form
+    method: "POST", headers: {
+      cookie, ...Object.fromEntries(new Headers(consentHeaders)),
+      [REPORT_ID_HEADER]: "11111111-1111-4111-8111-111111111111",
+      [REPORT_PAYLOAD_SHA256_HEADER]: "a".repeat(64),
+      [REPORT_PAYLOAD_BYTES_HEADER]: "123"
+    }, body: form
   });
   await report.text();
   for (const response of [walking, report]) assert.equal(response.headers.get("cache-control"), "no-store");

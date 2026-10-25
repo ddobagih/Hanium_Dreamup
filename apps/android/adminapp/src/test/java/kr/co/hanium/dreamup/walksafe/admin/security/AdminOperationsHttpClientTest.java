@@ -23,6 +23,21 @@ import org.junit.Test;
 
 public final class AdminOperationsHttpClientTest {
     @Test
+    public void deliveryInstitutionMismatchIsDistinguishedWithoutExposingServerDetails() {
+        FakeTransport failed = new FakeTransport();
+        failed.businessStatus = 409;
+        failed.businessError = "{\"detail\":{\"code\":\"delivery_institution_mismatch\","
+            + "\"message\":\"private server detail\"}}";
+        AdminOperationsApi.MutationConflictException error = assertThrows(
+            AdminOperationsApi.MutationConflictException.class,
+            () -> client(failed, new CapturingSigner()).recordDelivery(SESSION, REPORT_ID, delivery())
+        );
+        assertTrue(error.institutionMismatch());
+        assertFalse(error.getMessage().contains("private server detail"));
+        assertEquals(2, failed.requests.size());
+    }
+
+    @Test
     public void reviewAndDeliveryUseOnlyFrozenRoutesProofAndCorrelationHeaders() throws Exception {
         FakeTransport transport = new FakeTransport();
         CapturingSigner signer = new CapturingSigner();
@@ -931,6 +946,7 @@ public final class AdminOperationsHttpClientTest {
         boolean addUnexpectedChallengeField;
         int challengeStatus = 200;
         int businessStatus = 201;
+        String businessError = "private server detail";
         int readStatus = 200;
         String reviewHistoryOverride;
         String deliveryHistoryOverride;
@@ -990,7 +1006,7 @@ public final class AdminOperationsHttpClientTest {
                 }
             }
             if (businessStatus < 200 || businessStatus > 299) {
-                return new AdminOperationsHttpClient.Response(businessStatus, "private server detail");
+                return new AdminOperationsHttpClient.Response(businessStatus, businessError);
             }
             if (url.endsWith("/original-access-grants")) {
                 return new AdminOperationsHttpClient.Response(

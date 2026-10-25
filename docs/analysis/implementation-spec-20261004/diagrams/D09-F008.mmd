@@ -1,0 +1,30 @@
+flowchart TD
+  T["F-D09-008 legacy 서버 이미지 탐지 / P-D09-008"]
+  N0["context schema 검증"]
+  T --> N0
+  N1["이미지 전처리"]
+  N0 --> N1
+  N2["isolated 또는 serial thread 실행"]
+  N1 --> N2
+  N3["모델 결과 schema 검증"]
+  N2 --> N3
+  N4["응답 반환"]
+  N3 --> N4
+  Z["정상: 검증된 detection 응답 반환; 별도 신고 저장은 발생하지 않음"]
+  N4 --> Z
+  B0["422 detect_context_invalid"]
+  N0 -->|"context JSON/schema 불일치"| B0
+  B1["503 detect_queue_timeout; Retry-After1"]
+  N2 -->|"queue deadline"| B1
+  B2["503 detect_inference_deadline_exceeded; worker retirement"]
+  N2 -->|"실행 hard deadline"| B2
+  B3["503 model_unavailable; 공개reason allowlist 밖은 detector_runtime_error"]
+  N4 -->|"runtime 실패"| B3
+  R["종료와 복구: 서버 자동 재시도 없음 / 원인 해소 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  C["취소와 정리: ASGI task 취소를 전파; 이미 제출된 runner Future는 owner가 끝까지 정리 / 요청 지역 상태 반환; 공유 자원은 소유자의 lifecycle에서 정리"]
+  N4 -.-> C

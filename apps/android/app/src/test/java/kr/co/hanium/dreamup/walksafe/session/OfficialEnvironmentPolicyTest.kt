@@ -123,7 +123,7 @@ class OfficialEnvironmentPolicyTest {
     }
 
     @Test
-    fun runtimeDegradationSuppressesImmediatelyThenSafeStopsAfterBoundedRetries() {
+    fun runtimeMeasuredDegradationRemainsSuppressedAndRecoverableAfterBoundedRetries() {
         val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
         val degraded = assess(
             gpsQuality = gpsEvidence().copy(status = EnvironmentEvidenceStatus.FAIL),
@@ -140,11 +140,12 @@ class OfficialEnvironmentPolicyTest {
 
         assertEquals(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY, first.action)
         assertEquals(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY, second.action)
-        assertEquals(OfficialEnvironmentRuntimeAction.SAFE_STOP, third.action)
+        assertEquals(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY, third.action)
         assertTrue(first.suppressAllWalkOutputs)
         assertTrue(second.suppressAllWalkOutputs)
         assertTrue(third.suppressAllWalkOutputs)
-        assertTrue(third.isTerminal)
+        assertFalse(third.isTerminal)
+        assertEquals(0, third.retryAttemptsRemaining)
     }
 
     @Test
@@ -154,7 +155,7 @@ class OfficialEnvironmentPolicyTest {
             PROFILE.copy(maximumRuntimeRetryAttempts = 0),
         )
         val stopped = guard.onAssessment(
-            assess(gpsQuality = null, cameraQuality = null),
+            assess(userConfirmation = confirmation().copy(dryWeather = EnvironmentEvidenceStatus.FAIL)),
             NOW_MS,
         )
 
@@ -568,7 +569,7 @@ class OfficialEnvironmentPolicyTest {
     }
 
     @Test
-    fun conditionalRuntimeStopsAfterRealDegradationAndDoesNotAutoResume() {
+    fun conditionalRuntimeMeasuredRestrictionRecoversFromFreshSensorsAfterTheRetryBudget() {
         val guard = OfficialEnvironmentRuntimeGuard(EPOCH, PROFILE)
         assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, guard.onAssessment(educatedAssessment(), NOW_MS).action)
         val failed = educatedAssessment(gpsQuality = null, cameraQuality = null)
@@ -576,14 +577,33 @@ class OfficialEnvironmentPolicyTest {
             val now = NOW_MS + index * PROFILE.runtimeRetryIntervalMs + 1L
             guard.onAssessment(failed.copy(assessedAtElapsedRealtimeMs = now), now)
         }
-        assertEquals(OfficialEnvironmentRuntimeAction.SAFE_STOP, guard.decision().action)
+        assertEquals(OfficialEnvironmentRuntimeAction.SUPPRESS_OUTPUTS_AND_RETRY, guard.decision().action)
+        assertFalse(guard.decision().isTerminal)
         assertTrue(guard.decision().suppressAllWalkOutputs)
+        val recoveredAt = NOW_MS + 10_000L
         val recovered = guard.onAssessment(
-            educatedAssessment().copy(assessedAtElapsedRealtimeMs = NOW_MS + 10_000L),
-            NOW_MS + 10_000L,
+            OfficialEnvironmentPolicy.assess(
+                currentEpoch = EPOCH,
+                nowElapsedRealtimeMs = recoveredAt,
+                gpsQuality = OfficialEnvironmentPolicy.assessGpsQuality(
+                    currentEpoch = EPOCH,
+                    nowElapsedRealtimeMs = recoveredAt,
+                    observation = GpsQualityObservation(EPOCH, recoveredAt, true, 5.0),
+                    approvedProfile = PROFILE,
+                ),
+                cameraQuality = MeasuredEnvironmentEvidence(
+                    OfficialEnvironmentFactor.CAMERA_QUALITY, EPOCH, recoveredAt,
+                    EnvironmentEvidenceStatus.PASS, CAMERA_PROFILE_ID, MAX_AGE_MS, "PASSED",
+                ),
+                userConfirmation = null,
+                approvedProfile = PROFILE,
+                usageLimitsAcknowledged = true,
+            ), recoveredAt,
         )
-        assertEquals(OfficialEnvironmentRuntimeAction.SAFE_STOP, recovered.action)
-        assertTrue(recovered.suppressAllWalkOutputs)
+        assertEquals(OfficialEnvironmentRuntimeAction.CONTINUE, recovered.action)
+        assertFalse(recovered.suppressAllWalkOutputs)
+        assertTrue(recovered.navigationOutputsAllowed)
+        assertTrue(recovered.cameraOutputsAllowed)
     }
 
     private fun educatedAssessment(

@@ -1,0 +1,23 @@
+flowchart TD
+ A["F-D10-010 Qwen3 TTS"] --> B["P-D10-009/012 private cache dir 및 output 경로 확인"]
+ B --> C{"use_cache이고 nonempty output 존재"}
+ C -->|"예"| H["cache hit: 필요시 prune, load 없이 cached=True 반환"]
+ C -->|"아니오"| L["출력별 bucket flock 획득"]
+ L --> C2{"lock 안에서 cache 재확인"}
+ C2 -->|"hit"| H2["cache 결과 준비. 모델 load 없음"]
+ H2 --> U["finally flock 해제 및 FD close"]
+ C2 -->|"miss 또는 use_cache=False"| M["pinned local model load 후 custom/design/clone 분기 합성"]
+ M --> W["임시 WAV에 저장, fsync, os.replace, directory fsync"]
+ W --> P{"서비스 cache 출력인가"}
+ P -->|"예"| P2["보호 파일 유지, mtime순 개수/bytes 초과 cache 삭제"]
+ P -->|"아니오"| O["합성 결과 준비"]
+ P2 --> O
+ O --> U
+ M -->|"예외"| F["finally 남은 임시파일 및 실패 transient output 삭제 시도"]
+ W -->|"예외"| F
+ P2 -->|"예외"| F
+ F --> U
+ U --> Z["준비한 결과 반환 또는 예외 전파"]
+ H --> E["종료"]
+ Z --> E
+ F -.-> N["worker hard kill에서는 finally 실행 보장 없음"]

@@ -1,0 +1,48 @@
+flowchart TD
+  E["F-D06-029 현장 저장 관리 이벤트<br/>P-D06-024·027"]
+  KIND{"요청 종류"}
+  RET["일반 retention<br/>공유 field archive와 speech window 최신순"]
+  ACTIVE{"활성 세션 age 14일 이상?"}
+  ADEL["활성 pointer와 해당 세션 삭제"]
+  KEEP["활성 세션 보호<br/>일반 archive count eviction 제외"]
+  ARCH["완료 age 14일 초과 또는 index20 이상 삭제<br/>측정/manifest 무결성 실패는 crypto block"]
+  RDONE["보존 정리 종료<br/>정상 archive 전체 purge를 수행하지 않음"]
+  REVOKE["raw 철회 또는 계정삭제<br/>해당 영속 fence·active/stat 차단"]
+  PURGE["공유키 알려진 버전 파괴<br/>field root 삭제·부모 fsync<br/>root 재생성·fsync"]
+  CHECK{"필요 account/raw/crypto fence<br/>검증 marker까지 모두 내구화 성공?"}
+  VERIFIED["PURGE_VERIFIED<br/>수집 차단은 목적별 reset 전 유지"]
+  BLOCK["실패 false·허용 차단 유지<br/>purge 실패는 marker 제거·crypto fence<br/>reset 실패는 경로별 fence 유지"]
+  RESET["재동의 또는 새 enrollment 요청"]
+  ENROLL{"새 enrollment reset인가?"}
+  AUTH{"account intent와 현재 동의 허용?"}
+  MODE{"cryptoBlocked 또는 verified purge marker 존재?"}
+  PROOF{"정확한 purge marker와 예상 잔여파일만 존재?"}
+  HEALTHY["건강한 첫 grant 또는 기존 raw-only fence<br/>raw fence clear·archive prune 뒤 account/crypto 재검사"]
+  FRESH["허용된 fence만 clear<br/>fresh key 생성·marker 삭제·directory sync"]
+  OPEN{"단계 전체 성공 및 authority 현재?"}
+  READY["새 lifetime 수집 가능<br/>기존 raw window는 부활하지 않음"]
+  DEBUG["outdoor_position_test 지정 root 삭제<br/>symlink 따라가지 않음"]
+  DDONE["해당 debug root 삭제 결과 반환<br/>D04 도구의 측정 동작과 별개"]
+  E --> KIND
+  KIND -->|일반 보존 정리| RET --> ACTIVE
+  ACTIVE -->|예| ADEL --> ARCH
+  ACTIVE -->|아니오| KEEP --> ARCH
+  ARCH --> RDONE
+  KIND -->|raw 철회·계정삭제| REVOKE --> PURGE --> CHECK
+  CHECK -->|예| VERIFIED
+  CHECK -->|아니오| BLOCK
+  KIND -->|재동의·재가입 reset| RESET --> ENROLL
+  ENROLL -->|예·계정 fence 해제 권한은 이 경로만| PROOF
+  ENROLL -->|아니오·raw 재동의| AUTH
+  AUTH -->|예| MODE
+  MODE -->|예| PROOF
+  PROOF -->|예| FRESH --> OPEN
+  PROOF -->|아니오| BLOCK
+  MODE -->|아니오| HEALTHY --> OPEN
+  AUTH -->|아니오| BLOCK
+  OPEN -->|예| READY
+  OPEN -->|아니오| BLOCK
+  KIND -->|별도 debug 자료 purge| DEBUG --> DDONE
+  ACCOUNT["늦은 account deletion intent도 재조회<br/>raw 재동의가 account fence를 낮추지 못함"]
+  ACCOUNT -. "purge/reset 중 우선" .-> CHECK
+  ACCOUNT -. "재가입 외 account fence 해제 금지" .-> AUTH

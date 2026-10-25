@@ -1,0 +1,15 @@
+flowchart TD
+  H["P-D05-023 · F-D05-023 카메라 진단 화면의 lifecycle·RGB 검출·거리 표시"]
+  H --> P{"CAMERA 권한 ARCore 준비"}
+  P -->|"미충족"| U["권한 설치 대기 UI"]
+  P -->|"충족"| L["worker 모델과 session 준비"]
+  L --> G{"generation current"}
+  G -->|"아니오"| C["prepared 자원 close"]
+  G -->|"예"| R["GL preview busyCAS1"]
+  R --> T{"TRACKING"}
+  T -->|"예"| D["exactCPU image optionaldepth"]
+  T -->|"아니오"| B["RGB 만 metric 없음"]
+  D --> I["worker 검출 current 결과 UI"]
+  B --> I
+  I --> F["finally Image close busy 해제"]
+  R -->|"pause destroy"| X["generation 무효화 GLpause ownerclose"]

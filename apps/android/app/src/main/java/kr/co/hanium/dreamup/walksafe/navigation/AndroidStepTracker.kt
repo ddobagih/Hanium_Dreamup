@@ -5,6 +5,11 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.SystemClock
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.SensorTrackerHealthRecorder
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.SensorTrackerHealthSnapshot
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.SensorTrackerStoppedReason
+import kr.co.hanium.dreamup.walksafe.navigation.positioning.TrackedSensorSource
 import kotlin.math.sqrt
 
 enum class StepEventSource {
@@ -30,12 +35,78 @@ enum class StepCounterBaselineState {
     ESTABLISHED,
 }
 
+/** An accepted raw Counter sample, including its actual receipt when supplied. */
+data class StepCounterSample(
+    val cumulativeSteps: Float,
+    val measurementElapsedRealtimeNanos: Long,
+    val receivedAtElapsedRealtimeNanos: Long? = null,
+) {
+    internal fun isValid(receivedAtMs: Long): Boolean = cumulativeSteps.isFinite() && cumulativeSteps >= 0f &&
+        measurementElapsedRealtimeNanos >= 0L &&
+        (receivedAtElapsedRealtimeNanos == null || (receivedAtElapsedRealtimeNanos >= measurementElapsedRealtimeNanos &&
+            receivedAtElapsedRealtimeNanos / 1_000_000L <= receivedAtMs))
+}
+
+/** Sample intervals are observation spans, not the physical interval of each emitted step. */
+data class StepCounterObservation(
+    val producerRegistrationGeneration: Int,
+    val baseline: StepCounterSample,
+    val previous: StepCounterSample?,
+    val current: StepCounterSample,
+) {
+    internal fun isConsistentWith(event: StepEvent, receivedAtMs: Long): Boolean {
+        val baselineReceiptNs = baseline.receivedAtElapsedRealtimeNanos
+        val previousReceiptNs = previous?.receivedAtElapsedRealtimeNanos
+        val currentReceiptNs = current.receivedAtElapsedRealtimeNanos
+        return producerRegistrationGeneration >= 0 && baseline.isValid(receivedAtMs) && current.isValid(receivedAtMs) &&
+            baseline.measurementElapsedRealtimeNanos <= current.measurementElapsedRealtimeNanos &&
+            (previous == null || (previous.isValid(receivedAtMs) &&
+                previous.measurementElapsedRealtimeNanos >= baseline.measurementElapsedRealtimeNanos &&
+                previous.measurementElapsedRealtimeNanos < current.measurementElapsedRealtimeNanos &&
+                (previous.measurementElapsedRealtimeNanos != baseline.measurementElapsedRealtimeNanos ||
+                    (previous.cumulativeSteps == baseline.cumulativeSteps &&
+                        (baselineReceiptNs == null || previousReceiptNs == null ||
+                            baselineReceiptNs == previousReceiptNs))))) &&
+            (baselineReceiptNs == null || previousReceiptNs == null || baselineReceiptNs <= previousReceiptNs) &&
+            (baselineReceiptNs == null || currentReceiptNs == null || baselineReceiptNs <= currentReceiptNs) &&
+            (previousReceiptNs == null || currentReceiptNs == null || previousReceiptNs <= currentReceiptNs) &&
+            event.source == StepEventSource.STEP_COUNTER &&
+            event.producerRegistrationGeneration == producerRegistrationGeneration &&
+            event.measurementElapsedRealtimeNanos == current.measurementElapsedRealtimeNanos &&
+            event.receivedAtElapsedRealtimeNanos == current.receivedAtElapsedRealtimeNanos
+    }
+}
+
 data class StepEvent(
     val deltaSteps: Int,
     val timestampMs: Long,
     val source: StepEventSource,
     val confidence: StepEventConfidence,
-)
+    /** Original sensor time; [timestampMs] is its display/legacy precision only. */
+    val measurementElapsedRealtimeNanos: Long? = null,
+    /** Captured at sensor callback entry, not at a later UI dispatch. Missing legacy facts stay null. */
+    val receivedAtElapsedRealtimeNanos: Long? = null,
+    /** Producer lifecycle boundary, distinct from the positioning owner and any source observation ID. */
+    val producerRegistrationGeneration: Int? = null,
+    val counterObservation: StepCounterObservation? = null,
+) {
+    internal fun isConsistentWith(
+        stepCount: Int,
+        measuredAtMs: Long,
+        receivedAtMs: Long,
+        expectedSource: StepEventSource?,
+        expectedConfidence: StepEventConfidence?,
+    ): Boolean = deltaSteps == stepCount && timestampMs == measuredAtMs &&
+        (expectedSource == null || source == expectedSource) &&
+        (expectedConfidence == null || confidence == expectedConfidence) &&
+        (measurementElapsedRealtimeNanos == null ||
+            (measurementElapsedRealtimeNanos >= 0L && measurementElapsedRealtimeNanos / 1_000_000L == measuredAtMs)) &&
+        (receivedAtElapsedRealtimeNanos == null ||
+            (receivedAtElapsedRealtimeNanos >= 0L && receivedAtElapsedRealtimeNanos / 1_000_000L in measuredAtMs..receivedAtMs &&
+                (measurementElapsedRealtimeNanos == null || receivedAtElapsedRealtimeNanos >= measurementElapsedRealtimeNanos))) &&
+        (producerRegistrationGeneration == null || producerRegistrationGeneration >= 0) &&
+        (counterObservation == null || counterObservation.isConsistentWith(this, receivedAtMs))
+}
 
 class AndroidStepTracker internal constructor(
     private val registration: StepSensorRegistration,
@@ -83,6 +154,14 @@ class AndroidStepTracker internal constructor(
     private var recountedPreBaselineSteps = 0
     private var latestCounterWindowSteps = 0
     private var latestCounterSampleNs = Long.MIN_VALUE
+    // Missing legacy receipts do not erase an earlier accepted receipt in this registration.
+    private var latestKnownStepReceiptNs: Long? = null
+    @Volatile
+    private var latestCounterEvidence: StepCounterObservation? = null
+
+    /** Includes baseline, unchanged and absorbed accepted samples, even when no PDR step is emitted. */
+    val latestCounterObservation: StepCounterObservation?
+        get() = latestCounterEvidence
 
     @Volatile
     private var stepCounterRegistered = false
@@ -91,6 +170,14 @@ class AndroidStepTracker internal constructor(
     private var started = false
     private var registrationGeneration = 0
     private var currentListener: SensorEventListener? = null
+
+    private val health = SensorTrackerHealthRecorder(listOf(
+        TrackedSensorSource.STEP_COUNTER, TrackedSensorSource.STEP_DETECTOR, TrackedSensorSource.ACCELEROMETER,
+    ))
+
+    /** Registration, accepted input and cleanup facts; current permission is checked by the caller. */
+    val operationalHealth: SensorTrackerHealthSnapshot
+        get() = health.snapshot
 
     val usesStepCounter: Boolean
         get() = registration.hasSensor(Sensor.TYPE_STEP_COUNTER)
@@ -104,16 +191,34 @@ class AndroidStepTracker internal constructor(
 
     fun start(): Boolean {
         if (started) return true
-        if (
-            !registration.hasSensor(Sensor.TYPE_STEP_COUNTER) &&
-            !registration.hasSensor(Sensor.TYPE_STEP_DETECTOR) &&
-            !registration.hasSensor(Sensor.TYPE_ACCELEROMETER)
-        ) return false
+        if (currentListener != null) {
+            try {
+                stop(SensorTrackerStoppedReason.FAILED_START)
+            } catch (_: RuntimeException) {
+                // The old registration still needs cleanup; do not add another listener.
+                health.retire(registrationGeneration, SensorTrackerStoppedReason.FAILED_START, currentListener != null)
+                return false
+            }
+        }
+        health.beginAttempt(registrationGeneration)
+        val anySensorAvailable = try {
+            probeSensorAvailability(Sensor.TYPE_STEP_COUNTER, TrackedSensorSource.STEP_COUNTER) ||
+                probeSensorAvailability(Sensor.TYPE_STEP_DETECTOR, TrackedSensorSource.STEP_DETECTOR) ||
+                probeSensorAvailability(Sensor.TYPE_ACCELEROMETER, TrackedSensorSource.ACCELEROMETER)
+        } catch (failure: RuntimeException) {
+            health.retire(registrationGeneration, SensorTrackerStoppedReason.FAILED_START, currentListener != null)
+            throw failure
+        }
+        if (!anySensorAvailable) {
+            health.retire(registrationGeneration, SensorTrackerStoppedReason.FAILED_START, false)
+            return false
+        }
         activeWindowHardwareBaseline = null
         activeWindowStepOffset = totalActiveSteps
         fallbackStepDetector.reset()
         resetDetectorHandOver()
         val generation = ++registrationGeneration
+        health.generationStarted(generation)
         lateinit var listener: SensorEventListener
         listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
@@ -129,50 +234,55 @@ class AndroidStepTracker internal constructor(
         }
         currentListener = listener
         try {
-            stepCounterRegistered = registration.hasSensor(Sensor.TYPE_STEP_COUNTER) &&
-                registration.register(listener, Sensor.TYPE_STEP_COUNTER)
-            stepDetectorRegistered = registration.hasSensor(Sensor.TYPE_STEP_DETECTOR) &&
-                registration.register(listener, Sensor.TYPE_STEP_DETECTOR)
+            val counterAvailable = registration.hasSensor(Sensor.TYPE_STEP_COUNTER)
+            health.availability(TrackedSensorSource.STEP_COUNTER, counterAvailable)
+            stepCounterRegistered = counterAvailable &&
+                health.register(TrackedSensorSource.STEP_COUNTER) {
+                    registration.register(listener, Sensor.TYPE_STEP_COUNTER)
+                }
+            val detectorAvailable = registration.hasSensor(Sensor.TYPE_STEP_DETECTOR)
+            health.availability(TrackedSensorSource.STEP_DETECTOR, detectorAvailable)
+            stepDetectorRegistered = detectorAvailable &&
+                health.register(TrackedSensorSource.STEP_DETECTOR) {
+                    registration.register(listener, Sensor.TYPE_STEP_DETECTOR)
+                }
             accelerometerRegistered =
                 if (!stepCounterRegistered && !stepDetectorRegistered) {
-                    registration.hasSensor(Sensor.TYPE_ACCELEROMETER) &&
+                    val accelerometerAvailable = registration.hasSensor(Sensor.TYPE_ACCELEROMETER)
+                    health.availability(TrackedSensorSource.ACCELEROMETER, accelerometerAvailable)
+                    accelerometerAvailable && health.register(TrackedSensorSource.ACCELEROMETER) {
                         registration.register(listener, Sensor.TYPE_ACCELEROMETER)
+                    }
                 } else {
                     false
                 }
         } catch (_: SecurityException) {
             abandonRegistration(listener)
             return false
+        } catch (failure: RuntimeException) {
+            try {
+                stop(SensorTrackerStoppedReason.FAILED_START)
+            } catch (cleanupFailure: RuntimeException) {
+                if (cleanupFailure !== failure) failure.addSuppressed(cleanupFailure)
+            }
+            throw failure
         }
         started = stepCounterRegistered || stepDetectorRegistered || accelerometerRegistered
         if (!started) {
             abandonRegistration(listener)
         } else if (started) {
+            health.activate()
             onTrackingStarted()
         }
         return started
     }
 
+    private fun probeSensorAvailability(type: Int, source: TrackedSensorSource): Boolean =
+        registration.hasSensor(type).also { health.availability(source, it) }
+
     private fun abandonRegistration(listener: SensorEventListener) {
         registrationGeneration += 1
-        currentListener = null
         started = false
-        stepCounterRegistered = false
-        stepDetectorRegistered = false
-        accelerometerRegistered = false
-        try {
-            registration.unregister(listener)
-        } catch (_: RuntimeException) {
-            // A cleanup failure must not turn a failed start into an exception.
-        }
-    }
-
-    fun stop() {
-        registrationGeneration += 1
-        val listener = currentListener
-        currentListener = null
-        started = false
-        registration.unregister(listener)
         stepCounterRegistered = false
         stepDetectorRegistered = false
         accelerometerRegistered = false
@@ -180,6 +290,37 @@ class AndroidStepTracker internal constructor(
         activeWindowStepOffset = totalActiveSteps
         fallbackStepDetector.reset()
         resetDetectorHandOver()
+        health.retire(registrationGeneration, SensorTrackerStoppedReason.FAILED_START, currentListener != null)
+        try {
+            registration.unregister(listener)
+            if (currentListener === listener) currentListener = null
+        } catch (_: RuntimeException) {
+            // Failed start remains false; keep the cleanup target for the next retry.
+        } finally {
+            health.retire(registrationGeneration, SensorTrackerStoppedReason.FAILED_START, currentListener != null)
+        }
+    }
+
+    fun stop() = stop(SensorTrackerStoppedReason.EXPLICIT_STOP)
+
+    private fun stop(reason: SensorTrackerStoppedReason) {
+        registrationGeneration += 1
+        val listener = currentListener
+        started = false
+        health.retire(registrationGeneration, reason, listener != null)
+        try {
+            registration.unregister(listener)
+            if (currentListener === listener) currentListener = null
+        } finally {
+            stepCounterRegistered = false
+            stepDetectorRegistered = false
+            accelerometerRegistered = false
+            activeWindowHardwareBaseline = null
+            activeWindowStepOffset = totalActiveSteps
+            fallbackStepDetector.reset()
+            resetDetectorHandOver()
+            health.retire(registrationGeneration, reason, currentListener != null)
+        }
     }
 
     private fun resetDetectorHandOver() {
@@ -193,6 +334,8 @@ class AndroidStepTracker internal constructor(
         recountedPreBaselineSteps = 0
         latestCounterWindowSteps = 0
         latestCounterSampleNs = Long.MIN_VALUE
+        latestKnownStepReceiptNs = null
+        latestCounterEvidence = null
     }
 
     fun resetForNewWalk() {
@@ -205,38 +348,51 @@ class AndroidStepTracker internal constructor(
     }
 
     private fun handleSensorChanged(event: SensorEvent) {
+        val generation = registrationGeneration
+        val receivedAtNs = SystemClock.elapsedRealtimeNanos()
         when (event.sensor.type) {
             Sensor.TYPE_STEP_COUNTER -> {
                 val total = event.values.firstOrNull() ?: return
-                if (!onStepCounterTotal(total, event.timestamp)) return
+                if (!onStepCounterTotal(total, event.timestamp, receivedAtNs)) return
             }
             Sensor.TYPE_STEP_DETECTOR -> {
-                event.values.firstOrNull()?.takeIf { it > 0f } ?: return
-                if (!onStepDetected(event.timestamp)) return
+                val detectorValue = event.values.firstOrNull() ?: return
+                if (!onStepDetected(event.timestamp, receivedAtNs, detectorValue)) return
             }
             Sensor.TYPE_ACCELEROMETER -> {
                 val x = event.values.getOrNull(0) ?: return
                 val y = event.values.getOrNull(1) ?: return
                 val z = event.values.getOrNull(2) ?: return
-                onAccelerometerSample(x, y, z, event.timestamp)
+                if (!onAccelerometerSample(x, y, z, event.timestamp, receivedAtNs)) return
             }
         }
+        if (generation != registrationGeneration) return
         onMotionSensorSample(totalActiveSteps)
     }
 
     /** Accelerometer branch of [handleSensorChanged]; internal because JVM tests cannot build a SensorEvent. */
-    internal fun onAccelerometerSample(x: Float, y: Float, z: Float, timestampNs: Long) {
+    internal fun onAccelerometerSample(x: Float, y: Float, z: Float, timestampNs: Long, receivedAtNs: Long? = null): Boolean {
+        if (receivedAtNs != null && receivedAtNs < timestampNs) return false
+        val generation = registrationGeneration
         val magnitude = sqrt((x * x + y * y + z * z).toDouble())
-        fallbackStepDetector.observe(timestampNs, magnitude).forEach { stepAtNs ->
+        val previousAcceptedNs = fallbackStepDetector.lastAcceptedSampleTimestampNs
+        val steps = fallbackStepDetector.observe(timestampNs, magnitude, Int.MAX_VALUE - totalActiveSteps)
+        if (fallbackStepDetector.lastAcceptedSampleTimestampNs == previousAcceptedNs) return false
+        health.acceptedSample(TrackedSensorSource.ACCELEROMETER, generation, timestampNs, receivedAtNs)
+        steps.forEach { stepAtNs ->
             totalActiveSteps += 1
             onStepCountChanged(totalActiveSteps)
+            if (generation != registrationGeneration) return true
             emitStepEvent(
                 deltaSteps = 1,
                 timestampNs = stepAtNs,
                 source = StepEventSource.ACCELEROMETER_FALLBACK,
                 confidence = StepEventConfidence.LOW,
+                receivedAtNs = receivedAtNs,
             )
+            if (generation != registrationGeneration) return true
         }
+        return true
     }
 
     /**
@@ -244,11 +400,23 @@ class AndroidStepTracker internal constructor(
      * Impossible input (non-finite, negative, untimed, or beyond the integer walk total) is
      * rejected before the baseline, total, or any count/motion callback changes.
      */
-    internal fun onStepCounterTotal(total: Float, timestampNs: Long): Boolean {
-        if (!total.isFinite() || total < 0f || timestampNs < 0L) return false
+    internal fun onStepCounterTotal(total: Float, timestampNs: Long, receivedAtNs: Long? = null): Boolean {
+        if (!total.isFinite() || total < 0f || timestampNs < 0L || timestampNs <= latestCounterSampleNs) return false
+        if (receivedAtNs != null && receivedAtNs < timestampNs) return false
+        if (receivedAtNs != null && latestKnownStepReceiptNs?.let { receivedAtNs < it } == true) return false
+        val generation = registrationGeneration
         val baseline = activeWindowHardwareBaseline ?: total
         val windowSteps = (total.toDouble() - baseline.toDouble()).coerceAtLeast(0.0)
         if (activeWindowStepOffset + windowSteps > Int.MAX_VALUE.toDouble()) return false
+        val currentSample = StepCounterSample(total, timestampNs, receivedAtNs)
+        val counterObservation = StepCounterObservation(
+            generation, latestCounterEvidence?.baseline ?: currentSample,
+            latestCounterEvidence?.current, currentSample,
+        )
+        latestCounterEvidence = counterObservation
+        latestCounterSampleNs = timestampNs
+        if (receivedAtNs != null) latestKnownStepReceiptNs = receivedAtNs
+        health.acceptedSample(TrackedSensorSource.STEP_COUNTER, generation, timestampNs, receivedAtNs)
         if (activeWindowHardwareBaseline == null && stepDetectorRegistered) {
             // Detector steps up to the Counter's first sample are inside its baseline, not its window.
             windowPdrSteps = 0
@@ -257,13 +425,13 @@ class AndroidStepTracker internal constructor(
         activeWindowHardwareBaseline = baseline
         if (stepDetectorRegistered) {
             latestCounterWindowSteps = windowSteps.toInt()
-            latestCounterSampleNs = timestampNs
             reconcileRecountedPreBaselineSteps()
         }
         val previousTotal = totalActiveSteps
         val updatedTotal = activeWindowStepOffset + windowSteps.toInt()
         totalActiveSteps = maxOf(previousTotal, updatedTotal)
         onStepCountChanged(totalActiveSteps)
+        if (generation != registrationGeneration) return true
         val deltaSteps = totalActiveSteps - previousTotal
         if (!stepDetectorRegistered && deltaSteps > 0) {
             emitStepEvent(
@@ -271,11 +439,33 @@ class AndroidStepTracker internal constructor(
                 timestampNs = timestampNs,
                 source = StepEventSource.STEP_COUNTER,
                 confidence = StepEventConfidence.MEDIUM,
+                receivedAtNs = receivedAtNs,
+                counterObservation = counterObservation,
             )
         } else if (stepDetectorRegistered) {
-            handOverCounterSteps(windowSteps.toInt(), timestampNs)
+            handOverCounterSteps(windowSteps.toInt(), timestampNs, receivedAtNs, counterObservation)
         }
         return true
+    }
+
+    private fun detectorIncrementFitsIntegerCapacity(timestampNs: Long): Boolean {
+        if (timestampNs > counterCoveredUntilNs && timestampNs > counterBaselineNs && windowPdrSteps == Int.MAX_VALUE) {
+            return false
+        }
+        if (!stepCounterRegistered) return totalActiveSteps < Int.MAX_VALUE
+        if (activeWindowHardwareBaseline == null || timestampNs <= counterBaselineNs) {
+            return totalActiveSteps < Int.MAX_VALUE && activeWindowStepOffset < Int.MAX_VALUE &&
+                preBaselineDetectorSteps < Int.MAX_VALUE
+        }
+        if (detectorStepsAfterBaseline == Int.MAX_VALUE) return false
+        if (latestCounterSampleNs == Long.MIN_VALUE) return true
+        val recounted = if (latestCounterSampleNs - counterBaselineNs <= COUNTER_RECOUNT_WINDOW_NS) {
+            (latestCounterWindowSteps - (detectorStepsAfterBaseline + 1)).coerceIn(0, preBaselineDetectorSteps)
+        } else {
+            recountedPreBaselineSteps
+        }
+        val offset = activeWindowStepOffset.toLong() + recountedPreBaselineSteps - recounted
+        return offset in 0..Int.MAX_VALUE.toLong() && offset + latestCounterWindowSteps <= Int.MAX_VALUE.toLong()
     }
 
     /**
@@ -283,9 +473,16 @@ class AndroidStepTracker internal constructor(
      * [onStepCounterTotal]. A step at or before the newest counter batch that covered a detector
      * stall is already counted and is not emitted again.
      */
-    internal fun onStepDetected(timestampNs: Long): Boolean {
-        if (timestampNs < 0L) return false
-        lastDetectorEventNs = maxOf(lastDetectorEventNs ?: timestampNs, timestampNs)
+    internal fun onStepDetected(timestampNs: Long, receivedAtNs: Long? = null, detectorValue: Float = 1f): Boolean {
+        if (!detectorValue.isFinite() || !(detectorValue > 0f)) return false
+        if (timestampNs < 0L || lastDetectorEventNs?.let { timestampNs <= it } == true) return false
+        if (receivedAtNs != null && receivedAtNs < timestampNs) return false
+        if (receivedAtNs != null && latestKnownStepReceiptNs?.let { receivedAtNs < it } == true) return false
+        if (!detectorIncrementFitsIntegerCapacity(timestampNs)) return false
+        val generation = registrationGeneration
+        lastDetectorEventNs = timestampNs
+        if (receivedAtNs != null) latestKnownStepReceiptNs = receivedAtNs
+        health.acceptedSample(TrackedSensorSource.STEP_DETECTOR, generation, timestampNs, receivedAtNs)
         if (!stepCounterRegistered) {
             totalActiveSteps += 1
             onStepCountChanged(totalActiveSteps)
@@ -308,6 +505,7 @@ class AndroidStepTracker internal constructor(
                 }
             }
         }
+        if (generation != registrationGeneration) return true
         if (timestampNs <= counterCoveredUntilNs) return true
         if (timestampNs > counterBaselineNs) windowPdrSteps += 1
         emitStepEvent(
@@ -315,6 +513,7 @@ class AndroidStepTracker internal constructor(
             timestampNs = timestampNs,
             source = StepEventSource.STEP_DETECTOR,
             confidence = StepEventConfidence.HIGH,
+            receivedAtNs = receivedAtNs,
         )
         return true
     }
@@ -339,23 +538,29 @@ class AndroidStepTracker internal constructor(
      * treated as stalled and only the Counter steps not yet emitted are sent, as one batch at the
      * Counter timestamp. While alive, Counter-only surplus is absorbed so it is never dumped later.
      */
-    private fun handOverCounterSteps(counterWindowSteps: Int, timestampNs: Long) {
+    private fun handOverCounterSteps(counterWindowSteps: Int, timestampNs: Long, receivedAtNs: Long?,
+        counterObservation: StepCounterObservation) {
+        // Late baseline recounts belong to Detector steps already emitted before this window.
+        // Count reconciliation and PDR handover must use the same post-baseline step basis.
+        val counterPdrWindowSteps = (counterWindowSteps - recountedPreBaselineSteps).coerceAtLeast(0)
         val silentSince = lastDetectorEventNs ?: detectorSilentSinceNs
         if (detectorSilentSinceNs == null) detectorSilentSinceNs = timestampNs
         val stalled = silentSince != null && timestampNs - silentSince > DETECTOR_STALL_NS
         if (!stalled) {
-            windowPdrSteps = maxOf(windowPdrSteps, counterWindowSteps)
+            windowPdrSteps = maxOf(windowPdrSteps, counterPdrWindowSteps)
             return
         }
-        val uncovered = counterWindowSteps - windowPdrSteps
+        val uncovered = counterPdrWindowSteps - windowPdrSteps
         if (uncovered <= 0) return
-        windowPdrSteps = counterWindowSteps
+        windowPdrSteps = counterPdrWindowSteps
         counterCoveredUntilNs = maxOf(counterCoveredUntilNs, timestampNs)
         emitStepEvent(
             deltaSteps = uncovered,
             timestampNs = timestampNs,
             source = StepEventSource.STEP_COUNTER,
             confidence = StepEventConfidence.MEDIUM,
+            receivedAtNs = receivedAtNs,
+            counterObservation = counterObservation,
         )
     }
 
@@ -364,6 +569,8 @@ class AndroidStepTracker internal constructor(
         timestampNs: Long,
         source: StepEventSource,
         confidence: StepEventConfidence,
+        receivedAtNs: Long?,
+        counterObservation: StepCounterObservation? = null,
     ) {
         if (deltaSteps <= 0 || timestampNs < 0L) return
         onStepEvent(
@@ -372,6 +579,10 @@ class AndroidStepTracker internal constructor(
                 timestampMs = timestampNs / NANOS_PER_MILLISECOND,
                 source = source,
                 confidence = confidence,
+                measurementElapsedRealtimeNanos = timestampNs,
+                receivedAtElapsedRealtimeNanos = receivedAtNs,
+                producerRegistrationGeneration = registrationGeneration,
+                counterObservation = counterObservation,
             ),
         )
     }

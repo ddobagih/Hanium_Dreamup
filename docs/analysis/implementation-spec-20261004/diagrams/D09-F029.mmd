@@ -1,0 +1,22 @@
+flowchart TD
+  title["F-D09-029 · DB 세션·전송 보안·migration 실행 경계<br/>P-D09-029"]
+  N0["환경과 DB transport 검증"]
+  N1["runtime 또는 migration role 분리"]
+  N2["engine 및 Session 생성"]
+  N3["소유 서비스 transaction 실행"]
+  N4["finally Session 종료"]
+  title --> N0
+  N0 --> N1
+  N1 --> N2
+  N2 --> N3
+  N3 --> N4
+  N4 --> OK["정상: runtime Session 제공 또는 별도 실행한 migration transaction 종료"]
+  N0 -->|"remote TLS/GSS 설정 부적합 또는 ambient libpq host/service override"| B0["Settings validation 실패"]
+  B0 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N3 -->|"배포 migration URL 없음 또는 runtime role과 동일"| B1["migration 설정 실패"]
+  B1 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N1 -->|"요청 오류/취소"| B2["get_db finally의 session.close 실행; business commit 여부는 해당 기능 transaction 경계 참조"]
+  B2 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  title -.-> CANCEL["취소: 전용 취소 API 없음"]
+  CANCEL --> CLEAN["정리: Session.close와 migration context 연결 반환"]
+  title -.-> RETRY["재시도: HTTP 실패의 서버 자동 재시도 없음"]

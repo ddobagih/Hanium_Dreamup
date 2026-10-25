@@ -1,0 +1,47 @@
+flowchart TD
+  T["F-D06-030 정밀 위치 평가 기록의 명시 시작과 lease 결합"]
+  P["전제: DEBUG, 위치 저장 차단 없음, foreground ACTIVE·fine location 권한.<br/>사용자 checkbox 확인. RecorderBinding은 UUID scope와 epoch 이상 0."]
+  T --> P
+  E1["E-D06-030-01 위치 평가 시작 버튼→정확 좌표/평문 export 및 가슴부착·8자보정 확인→lease<br/>생성"]
+  E1 --> T
+  E2["E-D06-030-02 GNSS/motion trace→scope·generation·epoch·시간<br/>확인→암호화 append"]
+  E2 --> T
+  E3["E-D06-030-03 종료 버튼→COMPLETED manifest→lease 해제"]
+  E3 --> T
+  A1["1. UI 경고와 사용자 확인 후 현재 로컬 scope 및 보행 recoveryGeneration으로<br/>binding을 만든다."]
+  P --> A1
+  A2["2. 보존 정리 후 빈 용량을 확보하고 ACTIVE AEAD manifest를 쓴다."]
+  A1 --> A2
+  A3["3. 각 trace는 일치하는 lease와 증가한 단조시각을 검증하고 AAD에<br/>scope/session/generation/epoch/sequence를 넣어 봉인한다."]
+  A2 --> A3
+  A4["4. 기록 fsync 후 manifest를 원자 갱신한다. manifest 실패시 append 전 길이로<br/>되돌리기를 시도한다."]
+  A3 --> A4
+  A5["5. 정상 stop은 COMPLETED manifest를 쓰며 성공 후 Main이 메모리 lease와 관련<br/>anchor 상태를 해제한다."]
+  A4 --> A5
+  N["정상 종료: COMPLETED가 된 경우에만 정상 종료."]
+  A5 --> N
+  FX["결과: noBackup/position_field_sessions_v1의 AEAD<br/>manifest/records; 화면유지·센서 구독 연결. 정확 좌표 포함."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"stale scope/generation/epoch 또는 timestamp 역행"}
+    R1["append 거부; rollback/age 조건이면 INTERRUPTED"]
+    B1 -->|조건 성립| R1
+    B2{"중복 start 또는 metadata/binding 무효"}
+    R2["새 세션 생성 거부"]
+    B2 -->|조건 성립| R2
+    B3{"stop I/O 실패"}
+    R3["종료 실패 안내, 재종료/전체삭제 가능"]
+    B3 -->|조건 성립| R3
+    B4{"화면잠금/백그라운드/보행 epoch 변경"}
+    R4["Main 환경 검증으로 현재 lease 사용 중단"]
+    B4 -->|조건 성립| R4
+  end
+  POL["정책: P-D06-028, P-D06-029"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: 유효하지 않은 lease/입력은 false, manifest 실패시 파일 truncate 복구 시도."]
+    X2["시간: 활성14일 이상이면 INTERRUPTED."]
+    X3["중단: 프로세스 재시작 active는 INTERRUPTED; 자동 재개 안 함."]
+    X4["복구: 새 사용자 시작은 새로운 lease."]
+    X5["정리: Main 종료 성공 후 lease/anchor/checkpoint 메모리 초기화."]
+  end

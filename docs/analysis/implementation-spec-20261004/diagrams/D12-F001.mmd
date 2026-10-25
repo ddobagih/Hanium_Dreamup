@@ -1,0 +1,24 @@
+flowchart TD
+  A["F-D12-001 빌드 역할·보안 활성화·운영 기능 잠금"]
+  P["P-D12-001 운영 활성화는 debug 명시적 옵트인"]
+  A --> P
+  M0["1. 기본 ADMIN_SECURITY_WORKFLOWS_ENABLED=true와 ADMIN_OPERATIONAL_WORKFLOWS_ENABLED=false를 생성한다."]
+  P --> M0
+  M1["2. debug는 operationalDebugEnabled를 운영 플래그로 사용하고 release는 설정값과 무관하게 false로 덮어쓴다."]
+  M0 --> M1
+  M2["3. Activity는 보안 플래그일 때 키를 준비하고 운영 플래그일 때만 Operations/Report/Incident/Raw 클라이언트를 생성한다."]
+  M1 --> M2
+  M3["4. release preReleaseBuild는 정확한 root HTTPS origin 및 40자리 16진 source commit을 검사한다."]
+  M2 --> M3
+  M3 --> N["정상 종료: 선택한 빌드 variant의 보안/운영 상수를 생성한다."]
+  M0 -. "관련 조건 확인" .-> B0{"debug 옵션 true"}
+  B0 -->|"조건 해당"| R0["운영 클라이언트와 패널 연결 가능"]
+  M1 -. "관련 조건 확인" .-> B1{"release 또는 debug 옵션 false"}
+  B1 -->|"조건 해당"| R1["운영 업무 잠금 안내"]
+  M2 -. "관련 조건 확인" .-> B2{"옵션이 허용된 문자열 이외"}
+  B2 -->|"조건 해당"| R2["Gradle 설정 실패"]
+  M3 -. "관련 조건 확인" .-> B3{"release origin 또는 source commit 부적합"}
+  B3 -->|"조건 해당"| R3["release 빌드 전 검사 실패"]
+  A -. "중단 경계" .-> C["해당 없음: 별도 취소 이벤트 없음."]
+  A -. "복구 경계" .-> Q["잘못된 설정을 고친 뒤 별도 빌드가 필요하며 앱 실행 중 토글은 없다."]
+  P -. "manifest 경계" .-> CFG["INTERNET만 요청 · launcher exported<br/>backup 및 기기전송 제외<br/>debug cleartext는 loopback만"]

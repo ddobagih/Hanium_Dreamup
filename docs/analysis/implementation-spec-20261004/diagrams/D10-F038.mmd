@@ -1,0 +1,26 @@
+flowchart TD
+  A["F-D10-038 별도 디렉터리 unified TFLite export·sidecar"]
+  N0["1. data.yaml class names를 PyYAML 또는 간이 parser로 읽는다. 파일 없으면 빈 이름 집합 허용."]
+  A --> N0
+  N1["2. plan과 Android drop-in target를 출력. dry-run은 실행 명령만 출력하고0."]
+  N0 --> N1
+  N2["3. 실실행은 model존재와 ultralytics/tensorflow interpreter 확인 후 export(nms=!no_nms,int8=False)."]
+  N1 --> N2
+  N3["4. 최신 mtime의 원하는 precision TFLite를 별도 output에 복사하고 source/data/input_size/nms/classes/output_contract sidecar JSON 작성."]
+  N2 --> N3
+  B0{"--no-nms"}
+  R0["nms=false 가능하지만 sidecar output_contract 문자열은 여전히 nms=True일 때 [1,300,6] 설명"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"원하는 파일이 아닌 과거 동일접두 export가 최신"}
+  R1["mtime 선택; artifact provenance 자체를 hash로 결속하지 않음"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  B2{"Android target 안내"}
+  R2["자동 Android copy 아님; output-dir를 직접 Android로 지정한 경우 제외"]
+  A -. "관련 분기" .-> B2
+  B2 --> R2
+  Z["종료 · 자동 재시도 없음"]
+  N3 --> Z
+  P["적용 정책 · P-D10-029"]
+  P -. "코드 분기 기준" .-> A

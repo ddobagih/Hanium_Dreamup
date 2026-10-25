@@ -1,0 +1,33 @@
+stateDiagram-v2
+  state "F-D06-006 저장 가능" as READY
+  state "AEAD queued" as QUEUED
+  state "F-D06-007 STATUS_CHECK" as STATUS
+  state "POSTING" as POSTING
+  state "COMMITTING" as COMMITTING
+  state "원본 삭제" as DELETED
+  state "retry defer" as HELD
+  state "격리" as QUARANTINED
+  state "privacy/account fence" as BLOCKED
+  [*] --> READY
+  READY --> QUEUED: capacity·동의·atomic publish
+  QUEUED --> STATUS: READY 또는 ENDED·현재 authority
+  STATUS --> COMMITTING: exact 기존 receipt
+  STATUS --> POSTING: 미접수·현재 목적 허용
+  POSTING --> COMMITTING: exact receipt
+  STATUS --> HELD: not-before
+  STATUS --> QUARANTINED: 400 또는 413 또는 415 또는 422
+  POSTING --> HELD: Retry-After
+  POSTING --> QUARANTINED: 400 또는 413 또는 415 또는 422
+  STATUS --> QUEUED: 취소·일시실패
+  POSTING --> QUEUED: 취소·일시실패
+  COMMITTING --> DELETED: cooldown commit·delete 성공
+  COMMITTING --> QUEUED: local commit/delete 실패
+  HELD --> STATUS: 허용된 후속 trigger·not-before 경과
+  QUEUED --> BLOCKED: privacy fence
+  BLOCKED --> DELETED: 검증된 purge
+  QUARANTINED --> DELETED: TTL 또는 개인정보 정리 성공
+  note right of QUARANTINED
+    격리 항목은 일반 재전송 대상 아님
+    TTL 또는 개인정보 정리 대상
+    P-D06-006..010
+  end note

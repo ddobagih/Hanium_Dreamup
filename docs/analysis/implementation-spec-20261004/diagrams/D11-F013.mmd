@@ -1,0 +1,12 @@
+flowchart TD
+ A["F-D11-013 백업 prune"] --> P["P-D11-013 서명과 age 및 보호 사본 검증"]
+ P --> C["각 backup inventory. strict35일 초과와 최소3세트 보호로 후보 산정"]
+ C --> H{"키 침해 또는 불완전 inventory"}
+ H -->|"예"| X["삭제 동결과 오류 또는 보류 결과"]
+ H -->|"아니오"| M{"apply 지정"}
+ M -->|"아니오"| V["계획 JSON만 출력 후 종료"]
+ M -->|"예"| G["정확 확인문구와 DATA_DELETE 권위 gate 및 lock"]
+ G --> D["선택된 오래된 검증 세트만 삭제"]
+ D --> Z["결과 JSON 후 종료"]
+ G -->|"검증 실패"| X
+ Z -.-> R["자동 retry 없음. 새 inventory로 재검토"]

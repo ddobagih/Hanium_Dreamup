@@ -21,8 +21,8 @@ public final class AdminRawCollectionBoundaryStaticTest {
         assertTrue(gate >= 0 && client > gate && controller > client);
         assertTrue(source.contains("AdminRawCollectionRepository.ConflictException"));
         assertTrue(source.contains("재제출하지 말고 새 재인증으로 최신 목록"));
-        assertTrue(source.contains("controller.decideAdminRawCollectionPurpose"));
-        assertTrue(source.contains("controller.recordAdminRawCollectionLegalHold"));
+        assertTrue(source.contains("controller.rawCollections().decideAdminRawCollectionPurpose"));
+        assertTrue(source.contains("controller.rawCollections().recordAdminRawCollectionLegalHold"));
         assertTrue(source.contains("Arrays.fill(ownedPassword, '\\0')"));
         assertTrue(source.contains("Arrays.fill(ownedTotp, '\\0')"));
     }

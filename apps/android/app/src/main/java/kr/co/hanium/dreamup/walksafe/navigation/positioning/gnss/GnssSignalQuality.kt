@@ -86,6 +86,8 @@ internal data class GnssQualitySnapshot(
     val cn0FromSatelliteStatus: Boolean = false,
     /** S09-6: unsupported vs. observed-then-lost state derived from the same window (values unchanged). */
     val signalAvailability: GnssSignalAvailability = GnssSignalAvailability.UNSUPPORTED,
+    /** Original supplied receipt of the selected epoch; null when absent, never its evaluation time. */
+    val latestEpochReceivedAtNanos: Long? = null,
 )
 
 internal object GnssFrequencyClassifier {

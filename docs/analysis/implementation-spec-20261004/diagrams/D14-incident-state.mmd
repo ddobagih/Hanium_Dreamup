@@ -1,0 +1,15 @@
+stateDiagram-v2
+  state "OPEN revision1" as O
+  state "ACKNOWLEDGED" as A
+  state "RESOLVED" as S
+  state "REOPENED" as R
+  [*] --> O: "F-D14-028 trusted opening"
+  O --> A: "F-D14-032 exact proof HIGH 승인 CAS"
+  A --> S: "다음 상태 관측 저장"
+  S --> R: "재개 관측 저장"
+  R --> A: "재확인 관측 저장"
+  note right of S
+    "관측 기록이며 자동복구 수행 아님"
+    "version256이면 추가 전이 차단"
+    "동일 intent 재시도는 기존 snapshot 반환"
+  end note

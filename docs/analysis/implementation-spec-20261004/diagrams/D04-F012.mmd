@@ -1,0 +1,23 @@
+flowchart TD
+  ID["F-D04-012 · 속도 기반 heading 선택·회전 전달·평활<br/>P-D04-012"]
+  A["step 시각의 speed/course/chest 입력"]
+  C0{"속도 및 source 품질·나이가 유효한가"}
+  R0["heading null"]
+  C1{"source 유지 또는 1500ms·새 관측 2개 전환 조건인가"}
+  R1["현재 source 유지 또는 허용된 상실 대체"]
+  C2{"GPS 회전 보정 근거가 충분하거나 raw course가 아직 안전한가"}
+  R2["과거 course 보류"]
+  OK["시간 비례 circular blend → error 확대 → 원 observation timestamp 반환"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END

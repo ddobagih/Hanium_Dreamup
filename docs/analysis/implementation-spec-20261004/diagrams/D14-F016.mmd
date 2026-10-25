@@ -1,0 +1,31 @@
+flowchart TD
+  IN["F-D14-016<br/>요청에 결속된 기기 서명 challenge 발급"]
+  G["적용 정책<br/>P-D14-001 / P-D14-008 / P-D14-012"]
+  IN --> G
+  N1["1. enabled/header/correlation header=payload<br/> 검사; ACTION은 bearer identity 확인, sessionless<br/>는 설정 admin_id 일치"]
+  G --> N1
+  N2["2. purpose LOGIN은 POST sessions/session=null<br/>/action=null/read=null; RECOVERY_COMPLETE는 P<br/>OST recovery/complete; ACTION은 등록 workflow와 <br/>identity exact 결속"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. 서버 시각을 밀리초 정밀도로 잘라 issued_at 생성, expires=<br/>issued+120000ms"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. PG issuer/TOTP/control/ACTIVE key 검증 및 잠금<br/>, marker 재계산"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. sessionless source별120초 4회 admission, key<br/>별 미소비·미만료 quota 8개 검사"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. 32 random bytes nonce 및 UUID challenge로 c<br/>anonical exact18 signed JSON 생성"]
+  N5 -->|"계속 가능한 경우"| N6
+  N7["7. challenge와 admission 기록 commit, exact18와 <br/>signing_payload 반환"]
+  N6 -->|"계속 가능한 경우"| N7
+  B1["분기 결과<br/>action null, read_purpose 지정. DB context pur<br/>pose는 READ로 변환"]
+  N2 -->|"GET ACTION"| B1
+  B2["분기 결과<br/>422"]
+  N2 -->|"session.revoke ACTION인데 body/query digest가 빈<br/> 요청과 다름"| B2
+  B3["분기 결과<br/>둘이 pool8 공유; ACTION pool8과 분리"]
+  N5 -->|"LOGIN/RECOVERY_COMPLETE quota"| B3
+  B4["분기 결과<br/>429와 최소1초 Retry-After, 신규 challenge 없음"]
+  N5 -->|"source별 sessionless 최근120초 4회 이상 또는 pool8 이상"| B4
+  N7 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. 발급 실패 rollback. 만료/소비 이력 자동 삭제 없음<br/>."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

@@ -24,6 +24,12 @@ enum class SpeechOutputOutcome {
     FOCUS_LOST,
     CANCELLED_BY_PRIORITY,
     CANCELLED_STALE_NAVIGATION,
+    /** Registered READY request, before focus/native dispatch; rejected attempts are not queued. */
+    REQUESTED,
+    /** Exact risk owner detached with native stop attempted; never a platform playback ACK. */
+    CANCELLED_RISK,
+    /** Exact advisory receipt detached with native stop attempted; never a playback ACK. */
+    CANCELLED_ADVISORY,
 }
 
 /**

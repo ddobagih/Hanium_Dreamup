@@ -50,6 +50,14 @@ download.zip
 - 결과 JSON은 원래 파일명과 내부 오류 경로를 제외하고 입력 SHA-256과 공개 reason code만 남긴다. 선택한 원본 SAF 파일은 변경하거나 삭제하지 않는다.
 - 화면 회전과 중복 탭에도 프로세스 전역 단일 worker에서 분석 한 건만 실행한다.
 
+## 분석 구현과 검증 경계
+
+- `AnalysisCoordinator.get(applicationContext)`가 프로세스의 coordinator 한 개와 단일 worker를 유지한다. 화면은 같은 인스턴스에 observer를 붙이고 떼며, coordinator가 입력·진행 상태·활성 generation·결과 공개를 소유한다.
+- `AnalysisPipeline`은 변환기, `PpkEngine`, 기준국 공급자, 작업 폴더, 결과 시계를 주입받는다. 수동 공급자는 기존 RINEX 재검증을 사용하고, 자동 공급자는 `AndroidAnalysisStorage`에서 KeyStore·NGII adapter와 연결한다. 키 버퍼는 다운로드가 끝나거나 실패하면 지운다.
+- `PpkEngine.run(request, PpkRunContext)`가 generation과 취소 토큰을 명시한다. HTTP·압축 해제·JNI·완료 검사에서 같은 토큰을 사용하며, JNI의 process lock·native token·정리 수명주기는 유지한다.
+- pipeline은 임시 폴더 정리를 마친 뒤 결과와 정리 실패 여부를 반환한다. coordinator는 현재 generation인지 다시 확인한 뒤 결과를 공개하므로 취소된 이전 작업의 늦은 결과가 새 분석을 덮지 않는다. 정리 실패 경고는 완료 상태에 함께 표시한다.
+- `AnalysisPipelineTest`는 가짜 변환기·엔진·저장소·다운로드 공급자와 합성 trace/RINEX를 실제 pipeline 및 coordinator에 연결한다. 수치·reason code·원본 보존·취소·정리·즉시 재분석·observer 재연결을 검증한다. JVM 시험은 Android SAF·KeyStore, 실제 NGII 다운로드, native JNI 기기 실행 또는 현장 위치 정확도를 입증하지 않는다.
+
 ## 고정 구성요소
 
 - GnssLogger 변환기: `rtklibexplorer/android_rinex` commit `b27fcd07bc085e5213ba29655ad6168b61d60b9e` 기반 Kotlin 포트, 앱에 포함되어 실행됨

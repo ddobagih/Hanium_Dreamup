@@ -1,0 +1,20 @@
+flowchart TD
+  title["F-D09-031 · 목적지 검색 의존성 상태 조회<br/>P-D09-031"]
+  N0["field 인가"]
+  N1["mock 또는 live 분기"]
+  N2["live app key와 최근 성공 검사"]
+  N3["고정 status와 reason 응답"]
+  title --> N0
+  N0 --> N1
+  N1 --> N2
+  N2 --> N3
+  N3 --> OK["정상: 200 mode와 ready/unavailable; 잘못된 provider는503"]
+  N0 -->|"provider=mock"| B0["200 ready; 외부 TMAP 성공을 뜻하지 않음"]
+  B0 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N1 -->|"provider가 live/mock 이외"| B1["503 tmap_poi_provider_invalid"]
+  B1 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  N2 -->|"key 없음 또는 recent success 없음"| B2["200 unavailable 및 해당 reason"]
+  B2 --> END["실패 종료 또는 조건 복구 후 새 요청"]
+  title -.-> CANCEL["취소: 전용 취소 API 없음"]
+  CANCEL --> CLEAN["정리: 지역 응답 메모리 반환"]
+  title -.-> RETRY["재시도: HTTP 실패의 서버 자동 재시도 없음"]

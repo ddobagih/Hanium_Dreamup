@@ -1,0 +1,23 @@
+flowchart TD
+  B["F-D12-001 보안 기본 활성<br/>운영은 debug 명시 true만"] --> K["F-D12-002 003 012 013<br/>하드웨어 기기키와 PIN 확인"]
+  K --> A["F-D12-004 005 007<br/>로그인 · 서버 상태 · 세션 폐기"]
+  A --> R["F-D12-008..011<br/>분실 신고 · 복구 · 외부 보관 확인"]
+  A --> G{"NORMAL · ATTESTED<br/>현재 세션과 운영 flag 유효"}
+  G -->|"운영 잠김"| LOCK["보안 관리 기능만 표시"]
+  G -->|"운영 허용"| P["F-D12-014 015 016<br/>요청 proof · 필요시 fresh 재인증 · Backend 직접"]
+  P --> REPORT["F-D12-017..024<br/>신고 조회 · 원본 확인 · 검수 · 내부 상태"]
+  REPORT --> PACKAGE["F-D12-025..029<br/>제출본 생성/검증 · 수동 전달 사실 · 정정"]
+  P --> RIGHTS["F-D12-030..033<br/>권리 요청 · 외부 사본 회신 사실"]
+  P --> INCIDENT["F-D12-034 035<br/>CRITICAL 사고 이력과 상태"]
+  P --> RAW["F-D12-036..039<br/>격리 metadata · REPORT/TRAINING · 법적 보존"]
+  P --> AUDIT["F-D12-040<br/>최소 감사 projection"]
+  A -.-> LIFE["F-D12-006 041 042 043 045<br/>로컬 잠금 · 수명주기 · 접근성 · 로그 · 오프라인"]
+  A -. "보안 API" .-> D14["D14 관리자 보안 서버<br/>R8 재인증 identity 전달 단절 교차관찰"]
+  REPORT -. "신고 API" .-> D15["D15 신고 및 권리요청 서버"]
+  PACKAGE -. "기록 API" .-> D15
+  RIGHTS -. "처리 API" .-> D15
+  RAW -. "원시수집 API" .-> D13["D13 원시자료 서버"]
+  INCIDENT -. "사고 API" .-> IS["D14/D09 사고 경계"]
+  PACKAGE -.-> MANUAL["외부 기관 전송은 앱 밖에서 수행<br/>앱은 이미 한 전달 사실만 기록"]
+  RIGHTS -.-> COPY["기관 외부 사본 실제 삭제는 앱 밖<br/>회신 근거와 상태만 기록"]
+  U["F-D12-044 enum 선언만 존재<br/>RELEASE_APPROVAL PRIVILEGE_CHANGE DATA_DELETE"] -.-> NONE["미연결 생산 기능"]

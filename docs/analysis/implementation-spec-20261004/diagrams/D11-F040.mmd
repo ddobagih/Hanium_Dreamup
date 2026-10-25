@@ -1,0 +1,11 @@
+flowchart TD
+ A["F-D11-040 RAW retention CLI"] --> P["P-D11-040 전용 DB와 root 및 as-of와 limit최대500"]
+ P --> C{"preview 또는 apply 또는 reconcile"}
+ C -->|"preview"| V["보존 후보와 candidate digest 조회 후 종료"]
+ C -->|"apply"| G["정확 DELETE-EXPIRED-RAW-COLLECTIONS와 operationID 및 digest 검증"]
+ G --> D["관리자 gate 아래 후보 재검증과 quarantine 및 DB 삭제"]
+ C -->|"reconcile"| R["정확 확인문구와 관리자 gate 아래 기존 operation 복구"]
+ D --> Z["결과 manifest 또는 복구 필요 상태"]
+ R --> Z
+ G -->|"권위 또는 입력 실패"| X["거부"]
+ Z -.-> N["세부 helper 전체 미검토. 실제 운영 실행 없음"]

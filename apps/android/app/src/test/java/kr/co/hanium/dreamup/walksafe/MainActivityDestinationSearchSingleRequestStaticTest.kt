@@ -18,25 +18,23 @@ import org.junit.Test
  */
 class MainActivityDestinationSearchSingleRequestStaticTest {
     private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-    private val search = source.substringAfter("private fun performDestinationSearch(reset: Boolean)")
-        .substringBefore("private fun isDestinationSearchLeaseCurrent(")
-    private val hearMore = source.substringAfter("private fun hearMoreVoiceDestinationCandidates() {")
-        .substringBefore("private fun cancelDestinationFromVoice() {")
+    private val search = MainActivityRefactorSource.function(source, "private fun performDestinationSearch(reset: Boolean)")
+    private val hearMore = MainActivityRefactorSource.function(source, "fun hearMoreVoiceDestinationCandidates()")
 
     @Test fun oneSearchRequestsTheWholeCandidateCap() {
-        assertTrue(source.contains("const val DESTINATION_SEARCH_MAX_RESULTS = 10"))
+        assertTrue(MainActivityRefactorSource.destination.contains("const val DESTINATION_SEARCH_MAX_RESULTS = 10"))
         assertTrue(search.contains("val queryLimit = DESTINATION_SEARCH_MAX_RESULTS"))
         assertTrue(search.contains("limit = queryLimit,"))
     }
 
     @Test fun hearMoreNeverStartsASearchOrALocationRequest() {
-        assertFalse(hearMore.contains("performDestinationSearch("))
-        assertFalse(hearMore.contains("requestDestinationSearchLocation("))
-        assertFalse(hearMore.contains("destinationSearchLocationLeaseOrNull("))
-        assertFalse(hearMore.contains("pendingVoiceDestinationPageIndex = state.pageIndex + 1"))
+        assertFalse(hearMore.contains("search().search("))
+        assertFalse(hearMore.contains("search().requestLocation("))
+        assertFalse(hearMore.contains("startVoiceDestinationSearch("))
+        assertFalse(hearMore.contains("search().requestVoiceResults("))
         assertTrue(hearMore.contains("state.onCommand(DestinationSearchVoiceCommand.HearMore)"))
         // The provider may still have more than the cap: say how to find others instead of fetching.
-        assertTrue(hearMore.contains("if (destinationSearchProviderHasMore == true) {"))
+        assertTrue(hearMore.contains("if (search().state.providerHasMore == true) {"))
         assertTrue(hearMore.contains("더 자세한 장소명으로"))
     }
 
@@ -44,7 +42,7 @@ class MainActivityDestinationSearchSingleRequestStaticTest {
         val guard = search.indexOf("if (!resetSearch) return false")
         assertTrue(guard >= 0)
         assertTrue(guard < search.indexOf("destinationSearchLocationLeaseOrNull()"))
-        assertTrue(guard < search.indexOf("walkingRouteClient.searchDestinationsCall("))
+        assertTrue(guard < search.indexOf("backend.searchCall("))
         // A new search (voice or keyboard) replaces the list and its voice state as a new version.
         val reset = search.substringAfter("if (resetSearch) {").substringBefore("}")
         assertTrue(reset.contains("destinationSearchResults.clear()"))
@@ -52,8 +50,7 @@ class MainActivityDestinationSearchSingleRequestStaticTest {
     }
 
     @Test fun theMoreRuleKnowsTheCapWasAlreadyRequested() {
-        val rule = source.substringAfter("private fun destinationSearchCanLoadMore(")
-            .substringBefore("private fun isDestinationSearchLeaseCurrent(")
+        val rule = MainActivityRefactorSource.function(source, "private fun destinationSearchCanLoadMore(")
         assertTrue(rule.contains("requestedCount = DESTINATION_SEARCH_MAX_RESULTS,"))
         assertFalse(rule.contains("destinationSearchPage * DESTINATION_SEARCH_PAGE_SIZE"))
         // Whatever the provider says, a cap-sized request leaves nothing larger to ask for.

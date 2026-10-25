@@ -1,0 +1,23 @@
+flowchart TD
+  ID["F-D04-015 · GNSS 위치 필터와 지연 fix 재생<br/>P-D04-015"]
+  A["FLP fix → owner 검증"]
+  C0{"mock·좌표·age·noise·accuracy를 통과하는가"}
+  R0["HARD_REJECTED"]
+  C1{"새 GNSS이며 현재 state보다 늦거나 5초 replay 근거가 있는가"}
+  R1["OUT_OF_ORDER 또는 REPLAY_WINDOW_EXCEEDED"]
+  C2{"extreme jump·수치 실패가 없는가"}
+  R2["HARD_REJECTED; replay 중이면 rollback"]
+  OK["초기화 또는 soft-weight position update → 필요시 motion 재생 → quality/raw/filtered 반환"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END

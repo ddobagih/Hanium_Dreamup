@@ -157,7 +157,8 @@ object AndroidRiskSelectionPolicy {
     private val feedbackPriorityComparator = compareBy<TrackedObjectDepth> {
         it.userFacing.messageLevel.priorityScore()
     }.thenByDescending {
-        it.timeToCollisionMs.validNonnegativeOrInfinity()
+        // Approach urgency orders the original output, retaining its UNKNOWN collision evidence.
+        it.approachTimeMs.validNonnegativeOrInfinity()
     }.thenByDescending {
         if (it.source.metric) it.riskDistanceM.validNonnegativeOrInfinity() else Double.POSITIVE_INFINITY
     }.thenBy { it.confidence.finalScore }

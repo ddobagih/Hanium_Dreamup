@@ -1,0 +1,14 @@
+flowchart TD
+  H["P-D05-012 · F-D05-012 이름 없는 mask 의 luma 수신·capture lease·물질점 추적"]
+  H --> L{"LIVE token 실제 luma 일치 age800"}
+  L -->|"아니오"| X["거부 reset 또는 point 없음"]
+  L -->|"예"| R["ring32 원 capture lease"]
+  R --> C["FastSAM mask callback"]
+  C --> V{"lease owner current 남은예산"}
+  V -->|"아니오"| X
+  V -->|"예"| T["원 capture 까지만 edge tracking"]
+  T --> M{"actualpoint mask 내부 유일소유"}
+  M -->|"아니오"| U["mask 별 point 없음"]
+  M -->|"예"| P["D07 물질점 전달"]
+  U --> F["finally lease close"]
+  P --> F

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 import base64
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -343,7 +345,7 @@ def user_report_statement(
     limit: int,
 ):
     status_expression = _user_status_expression()
-    statement = select(*user_report_columns()).where(
+    statement = select(*user_report_columns()).where(account_subject_visible(Report)).where(
         Report.privacy_subject_hmac == privacy_subject,
         Report.account_generation == account_generation,
     )
@@ -451,8 +453,9 @@ def get_owned_user_report(
         account_generation=account_generation,
     )
     row = db.execute(
-        select(*user_report_columns()).where(
+        select(*user_report_columns()).where(account_subject_visible(Report)).where(
             Report.id == report_id,
+            account_subject_visible(Report),
             Report.privacy_subject_hmac == privacy_subject,
             Report.account_generation == account_generation,
         )
@@ -497,6 +500,7 @@ def get_owned_report_user_request(
             ReportUserRequest.id == request_id,
             ReportUserRequest.report_id == report_id,
             Report.id == report_id,
+            account_subject_visible(Report),
             Report.privacy_subject_hmac == privacy_subject,
             Report.account_generation == account_generation,
         )
@@ -548,8 +552,9 @@ def create_report_user_request(
         account_generation=account_generation,
     )
     report = db.execute(
-        select(Report).where(
+        select(Report).where(account_subject_visible(Report)).where(
             Report.id == report_id,
+            account_subject_visible(Report),
             Report.privacy_subject_hmac == privacy_subject,
             Report.account_generation == account_generation,
         ).with_for_update()
@@ -755,8 +760,9 @@ def update_admin_request_status(
     try:
         item = db.execute(
             select(ReportUserRequest)
-            .where(ReportUserRequest.id == request_id)
-            .with_for_update()
+            .join(Report, Report.id == ReportUserRequest.report_id)
+            .where(ReportUserRequest.id == request_id, account_subject_visible(Report))
+            .with_for_update(of=ReportUserRequest)
         ).scalar_one_or_none()
     except SQLAlchemyError as exc:
         db.rollback()
@@ -889,7 +895,8 @@ def _latest_request_status(
                 ReportUserRequest.status_version,
                 ReportUserRequest.public_response,
                 ReportUserRequest.updated_at,
-            ).where(ReportUserRequest.id == request_id)
+            ).join(Report, Report.id == ReportUserRequest.report_id)
+            .where(ReportUserRequest.id == request_id, account_subject_visible(Report))
         ).one_or_none()
     except SQLAlchemyError as exc:
         db.rollback()

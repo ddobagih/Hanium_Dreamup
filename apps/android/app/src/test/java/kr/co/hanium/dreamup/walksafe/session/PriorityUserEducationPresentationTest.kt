@@ -8,6 +8,22 @@ import org.junit.Test
 
 class PriorityUserEducationPresentationTest {
     @Test
+    fun longUsageEducationIsSplitWithoutLosingTextAndShortEducationStaysIntact() {
+        PriorityUserEducationPlayback.entries.forEach { playback ->
+            val message = PriorityUserEducationPresentation.speechText(playback)
+            val segments = PriorityUserEducationPresentation.speechSegments(message)
+            assertEquals(message, segments.joinToString(""))
+            assertTrue(segments.all { it.isNotBlank() && it.length <= 250 })
+            if (playback == PriorityUserEducationPlayback.APP_USAGE) assertTrue(segments.size > 1)
+        }
+        assertEquals(listOf("짧은 안내입니다."), PriorityUserEducationPresentation.speechSegments("짧은 안내입니다."))
+        val unbroken = "안".repeat(600)
+        val segments = PriorityUserEducationPresentation.speechSegments(unbroken)
+        assertEquals(listOf(250, 250, 100), segments.map { it.length })
+        assertEquals(unbroken, segments.joinToString(""))
+    }
+
+    @Test
     fun screenIncludesTheFullSpokenContentForEachEducationStage() {
         val policy = adultPolicy()
         val safetyText = PriorityUserEducationPresentation.screenText(policy.snapshot())

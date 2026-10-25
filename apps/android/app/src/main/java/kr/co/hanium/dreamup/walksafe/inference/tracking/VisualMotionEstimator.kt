@@ -26,16 +26,24 @@ internal data class VisualMotionFeature(
     val currentY: Float = sourceY.toFloat(),
 )
 
+/** Auxiliary LK correspondence, excluded from the object geometry fit and feature counts. */
+internal data class VisualMotionPoint(val id: VisualMaterialPointId, val x: Float, val y: Float)
+
 internal data class VisualMotionEstimate(
     val features: List<VisualMotionFeature>,
     val transformNorm: VisualAffineTransform,
     val quality: Float,
     val residual: Float,
     val failure: VisualTrackingFailure? = null,
+    val materialPoint: VisualMotionPoint? = null,
+    // Actual native inlier medians; unavailable stages and other estimators keep null.
+    val diagnosticMedianForwardBackwardErrorPx: Float? = null,
+    val diagnosticMedianLkError: Float? = null,
 )
 
 /** The pure patch implementation remains an explicitly selected diagnostic backend. */
 internal interface VisualMotionEstimator {
+    val supportsMaterialPointTracking: Boolean get() = false
     fun initialize(): Boolean = true
     fun seed(frame: GrayTrackingFrame, detection: DetectionCandidate, budget: TrackingWorkBudget): List<VisualMotionFeature>
     fun advance(
@@ -46,5 +54,6 @@ internal interface VisualMotionEstimator {
         features: List<VisualMotionFeature>,
         originalFeatureCount: Int,
         budget: TrackingWorkBudget,
+        materialPoint: VisualMotionPoint? = null,
     ): VisualMotionEstimate
 }

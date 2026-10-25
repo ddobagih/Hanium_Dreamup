@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D08-013 기기 세션 목록"]
+  B["진입: GET /api/field-session?devices=true"]
+  A --> B
+  P0["1. query 중복/조합을 검사한다."]
+  B --> P0
+  P1["2. v7 쿠키이면 같은 generation/auth epoch의 단기 device slot만 반환한다. 그 외 유효 long 쿠키이면 해당 legacy 또는 Backend long family 목록을 반환한다."]
+  P0 --> P1
+  P2["3. 현재 device 식별을 포함한 제한된 목록을 반환한다."]
+  P1 --> P2
+  OK["활성 기기 목록"]
+  P2 --> OK
+  C0{"복구 scope 또는 현재 인증 없음"}
+  X0["접근 거부"]
+  B -. "해당 단계에서 검사" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"상태 저장소 오류"}
+  X1["503 등 typed error"]
+  B -. "해당 단계에서 검사" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"capacity"}
+  X2["이 변형에서는 조회하지 않음"]
+  B -. "해당 단계에서 검사" .-> C2
+  C2 -->|"조건 충족"| X2
+  T["클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 외부 요청은 Node 전체 deadline 적용; 본 기능의 추가 제한은 입력·단계·연결 정책 참조."]
+  B -. "중단 조건" .-> T
+  R["자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["P-D08-007, P-D08-008, P-D08-011"]
+  A -.-> POLICY

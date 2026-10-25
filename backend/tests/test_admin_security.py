@@ -40,6 +40,7 @@ from backend.app import database as database_api
 from backend.app import field_test_security as field_test_security_api
 from backend.app.api import admin_security as admin_security_api
 from backend.app.api import reports as reports_api
+from backend.app.services import report_application
 import backend.app.config as config_module
 import backend.app.services.admin_security as admin_security_service
 from backend.app.config import Settings
@@ -295,7 +296,7 @@ def test_report_high_risk_endpoint_only_rechecks_protected_work(
         )
         return _identity()
 
-    monkeypatch.setattr(reports_api, "authorize_admin_protected_work", authorize)
+    monkeypatch.setattr(report_application, "authorize_admin_protected_work", authorize)
     request = Request(
         {
             "type": "http",
@@ -317,7 +318,7 @@ def test_report_high_risk_endpoint_only_rechecks_protected_work(
         admin_step_up_ttl_seconds=60,
     )
 
-    identity = reports_api._reauthorize_admin_high_risk_in_transaction(
+    identity = report_application._reauthorize_admin_high_risk_in_transaction(
         request,
         database_session,
         settings,
@@ -463,12 +464,12 @@ def test_recovery_state_recheck_blocks_protected_report_work(
         )
 
     monkeypatch.setattr(
-        reports_api,
+        report_application,
         "authorize_admin_protected_work",
         reject_recovered_session,
     )
     monkeypatch.setattr(
-        reports_api,
+        report_application,
         "record_admin_security_denial",
         lambda **_kwargs: None,
     )
@@ -489,7 +490,7 @@ def test_recovery_state_recheck_blocks_protected_report_work(
     )
 
     with pytest.raises(HTTPException) as recovered:
-        reports_api._reauthorize_admin_high_risk_in_transaction(
+        report_application._reauthorize_admin_high_risk_in_transaction(
             request,
             object(),
             SimpleNamespace(
@@ -1683,12 +1684,12 @@ def test_report_high_risk_denial_is_recorded_outside_the_endpoint_transaction(
         )
 
     monkeypatch.setattr(
-        reports_api,
+        report_application,
         "authorize_admin_protected_work",
         deny,
     )
     monkeypatch.setattr(
-        reports_api,
+        report_application,
         "record_admin_security_denial",
         lambda **kwargs: denials.append(kwargs),
     )
@@ -1705,7 +1706,7 @@ def test_report_high_risk_denial_is_recorded_outside_the_endpoint_transaction(
     )
 
     with pytest.raises(Exception) as denied:
-        reports_api._reauthorize_admin_high_risk_in_transaction(
+        report_application._reauthorize_admin_high_risk_in_transaction(
             request,
             object(),
             SimpleNamespace(
@@ -2697,7 +2698,7 @@ def test_enabled_openapi_documents_bearer_and_exact_admin_context() -> None:
             "type": "string",
             "minLength": 22,
             "maxLength": 22,
-            "pattern": "^[A-Za-z0-9_-]{22}$",
+            "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$",
         }
     public_login = schema["paths"]["/admin/security/sessions"]["post"]
     assert set(public_login["security"][0]) == set(protected) - {

@@ -8,6 +8,12 @@ import org.junit.Test
 
 class MainActivityStartupCapabilityStaticTest {
     private val activity = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val panel = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/OnboardingReadinessPanel.kt",
+    ).readText()
+    private val presenter = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/ui/DeviceCheckPresenter.kt",
+    ).readText()
     private val probe = File(
         "src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidStartupCapabilityProbe.kt",
     ).readText()
@@ -18,6 +24,40 @@ class MainActivityStartupCapabilityStaticTest {
     ).readText()
 
     @Test
+    fun presentationReceivesCapturedFactsAfterTheMainCapabilityAndReadinessEffects() {
+        val refresh = method("refreshStartupCapabilityUi")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(
+            refresh,
+            "evidence().record(decision)",
+            "ui.persist(decision)",
+            "applyRuntimeReadinessIfActive(decision)",
+            "ui.priority(decision)",
+            "ui.updateOfficialEnvironment()",
+            "ui.render(",
+            "ui.updatePrewalk(",
+            "ui.updatePriority(decision)",
+            "ui.updateFirstRun()",
+        ))
+        assertTrue(MainActivityRefactorSource.composition(activity, "startupCapabilityFactsRenderer").contains("renderAwaitingExplicitResumeControl()"))
+        val registrationSource = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRegistrationScreenComposition.kt").readText()
+        val bindRegistration = MainActivityRefactorSource.member(registrationSource, "bindRegistration")
+        assertTrue(bindRegistration.contains("deviceCheck = DeviceCheckPresenter(panel, style)"))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(bindRegistration,
+            "deviceCheck = DeviceCheckPresenter(panel, style)", "firstRun.publishRegistrationTargets()"))
+        assertTrue(activity.contains("nativeRegistrationComposition.bindRegistration(onboardingPanel)"))
+        val registrationWire = MainActivityRefactorSource.property(activity, "nativeRegistrationComposition")
+        assertTrue(registrationWire.contains("by lazy(LazyThreadSafetyMode.NONE)"))
+        assertTrue(registrationWire.contains("NativeRegistrationScreenComposition(this, viewStyle, nativeUiPublication)"))
+        assertTrue(MainActivityRefactorSource.property(activity, "deviceCheckPresenter").contains("nativeRegistrationComposition.devicePresenter()"))
+        assertTrue(MainActivityRefactorSource.member(registrationSource, "devicePresenter").contains("= deviceCheck"))
+        assertTrue(MainActivityRefactorSource.composition(activity, "startupCapabilityFactsRenderer").contains("deviceCheckPresenter.renderStartupCapability(facts)"))
+        assertTrue(presenter.contains("data class StartupFacts("))
+        assertTrue(presenter.contains("fun renderStartupCapability(facts: StartupFacts): Boolean"))
+        listOf("startupCapabilityProbe", "walkSessionLifecycle", "transitionWalkSession(", "persistStartupCapabilityDecision(")
+            .forEach { authority -> assertFalse("UI must not own $authority", presenter.contains(authority)) }
+    }
+
+    @Test
     fun launcherKeepsProductIdentityAndOnboardingPrecedesReadinessAndRuntime() {
         assertTrue(manifest.contains("android:label=\"@string/app_name\""))
         assertTrue(strings.contains("WalkSafe(워크세이프)"))
@@ -26,12 +66,12 @@ class MainActivityStartupCapabilityStaticTest {
 
         val overlay = activity.substringAfter("val overlay = LinearLayout(this).apply")
             .substringBefore("val controlsScroll = ScrollView(this).apply")
-        val readiness = activity
-            .substringAfter("walkReadinessControls = LinearLayout(this).apply")
-            .substringBefore("walkLastResultText = TextView(this).apply")
-        val onboarding = overlay.indexOf("addView(firstRunOnboardingControls)")
-        val readinessGroup = overlay.indexOf("addView(walkReadinessControls)")
-        val runtime = overlay.indexOf("addView(runtimeControls)")
+        val readiness = panel
+            .substringAfter("walkReadinessControls = LinearLayout(context).apply")
+            .substringBefore("fun setAccountContent(")
+        val onboarding = overlay.indexOf("addView(onboardingPanel.firstRunOnboardingControls)")
+        val readinessGroup = overlay.indexOf("addView(firstRunOnboardingPresenter.readinessBinding().walkReadinessControls)")
+        val runtime = overlay.indexOf("addView(nativeScreenPresenter.searchBinding().runtimeControls)")
         val capability = readiness.indexOf("addView(startupCapabilityText)")
         val confirmation = readiness.indexOf("addView(startupCapabilityConfirmButton)")
         assertTrue(onboarding >= 0)
@@ -39,6 +79,12 @@ class MainActivityStartupCapabilityStaticTest {
         assertTrue(readinessGroup < runtime)
         assertTrue(capability >= 0)
         assertTrue(capability < confirmation)
+        assertTrue(activity.contains("addView(onboardingPanel.firstRunOnboardingControls)"))
+        assertTrue(activity.contains("firstRunOnboardingPresenter.readinessBinding().walkReadinessControls"))
+        assertTrue(activity.contains("firstRunOnboardingPresenter.readinessBinding().startupCapabilityText"))
+        assertTrue(activity.contains("firstRunOnboardingPresenter.readinessBinding().startupCapabilityConfirmButton"))
+        assertTrue(panel.contains("setOnClickListener { actions.readiness.onStartupConfirmed() }"))
+        assertTrue(activity.contains("onStartupConfirmed = { handleStartupCapabilityConfirmAction() }"))
     }
 
     @Test
@@ -65,35 +111,29 @@ class MainActivityStartupCapabilityStaticTest {
 
     @Test
     fun noRuntimeStartIsEnabledBeforeTheExactCapabilityDecisionIsConfirmed() {
-        val permissionStart = activity.substringAfter("private fun ensurePermissionsThenStart()")
-            .substringBefore("private fun currentReporterUserId()")
-        val depthStart = activity.substringAfter("private fun startDepthSession()")
-            .substringBefore("private fun requestArCoreAvailabilityRecheck(")
-        val actionGate = activity.substringAfter("private fun applyActionButtonState()")
-            .substringBefore("private fun openAppSettings()")
+        val permissionStart = method("ensurePermissionsThenStart")
+        val depthStart = method("startDepthSession")
+        val actionGate = method("applyActionButtonState")
         val automaticStart =
-            activity.substringAfter("private fun maybeAdvanceWalkSessionAfterCapabilityCheck()")
-                .substringBefore("private fun requestGatewayWalkStart(")
+            method("maybeAdvanceWalkSessionAfterCapabilityCheck")
 
         assertTrue(permissionStart.contains("if (!requireStartupCapabilityConfirmation()) return"))
-        assertTrue(depthStart.contains("if (!requireStartupCapabilityConfirmation()) return"))
+        assertTrue(depthStart.contains("if (!admission.requireStartupConfirmation()) return"))
         assertTrue(actionGate.contains("isStartupCapabilityConfirmed()"))
-        assertTrue(automaticStart.contains("if (!isStartupCapabilityConfirmed())"))
+        assertTrue(automaticStart.contains("if (!readiness.isConfirmed())"))
         assertFalse(activity.contains("confirmedStartupCapabilityDecision = decision\n        startDepthSession()"))
     }
 
     @Test
     fun runtimeDistanceDowngradeRequiresLimitedDecisionBeforeExistingFallbackStarts() {
-        val fallbackRequest = activity.substringAfter("private fun requestCameraFallbackStart(")
-            .substringBefore("private fun startCameraFallbackSession(")
-        val arCoreStart = activity.substringAfter("private fun continueDepthSessionStart(")
-            .substringBefore("private fun stopDepthSession(")
+        val fallbackRequest = method("requestCameraFallbackStart")
+        val arCoreStart = method("continueDepthSessionStart")
 
-        assertTrue(fallbackRequest.contains("metricDistanceCapabilityOverride = false"))
-        assertTrue(fallbackRequest.contains("refreshStartupCapabilityUi()"))
+        assertTrue(fallbackRequest.contains("metric.restoreCapability(false)"))
+        assertTrue(fallbackRequest.contains("readiness.refreshUi()"))
         assertTrue(
             fallbackRequest.contains(
-                "if (automaticTransitionReady || isStartupCapabilityConfirmed())",
+                "if (automaticTransitionReady || admission.startupConfirmed())",
             ),
         )
         assertTrue(fallbackRequest.contains("WALKSAFE_LIMITED_DISTANCE_NOTICE_KO"))
@@ -103,9 +143,7 @@ class MainActivityStartupCapabilityStaticTest {
 
     @Test
     fun postLoginFeatureRestrictionsCannotReopenACapabilityBlockedStart() {
-        val restrictions = activity
-            .substringAfter("private fun applyPostLoginDeviceFeatureRestrictions(")
-            .substringBefore("/** Active route/risk work")
+        val restrictions = method("applyPostLoginDeviceFeatureRestrictions")
         val tierCondition = restrictions.substringAfter("val tier = if (")
             .substringBefore("WalkSafeStartupCapabilityTier.BLOCKED")
         assertTrue(
@@ -113,9 +151,10 @@ class MainActivityStartupCapabilityStaticTest {
                 "WalkSafeStartupCapabilityResolver.blocksWalkStart(decision.unavailableRequirements)",
             ),
         )
-        val transcriberFailure = activity
-            .substringAfter("is HandsFreeVoiceTerminalFailure.Transcriber ->")
-            .substringBefore("HandsFreeVoiceTerminalFailure.CommandDispatchFailed,")
+        val transcriberFailure = ReportStaticSourceInspector.functionBlock(
+            MainActivityRefactorSource.composition(activity, "voiceInputController"), "override fun limitPersistentHandsFreeRecognition",
+        )
+        assertTrue(method("handleHandsFreeVoiceTerminalFailure").contains("applicationEffects.limitPersistentHandsFreeRecognition()"))
         assertTrue(
             transcriberFailure.contains(
                 "val walkStartStillAllowed = startupCapabilityDecision?.mayConfirmAndStart == true",
@@ -126,10 +165,10 @@ class MainActivityStartupCapabilityStaticTest {
 
     @Test
     fun homeCommandsPreferInstalledKoreanPlatformAndWalkFlowsRequireVosk() {
-        val voiceStart = ReportStaticSourceInspector.functionBlock(
-            activity,
-            "private fun startVoiceCommandRecognition",
-        )
+        val voiceStart = method("startVoiceCommandRecognition")
+        val platform = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/input/AndroidVoiceInputPlatform.kt").readText()
+        assertTrue(MainActivityRefactorSource.composition(activity, "voiceInputController").contains("AndroidVoiceInputPlatform(this)"))
+        assertTrue(MainActivityRefactorSource.member(platform, "createRecognizer").contains("PreferredOfflineSpeechRecognizer(context, modelDirectory)"))
         val preferred = File(
             "src/main/java/kr/co/hanium/dreamup/walksafe/voice/PreferredOfflineSpeechRecognizer.kt",
         ).readText()
@@ -139,15 +178,15 @@ class MainActivityStartupCapabilityStaticTest {
                 "val preferPlatform = purpose == VoiceRecognitionPurpose.COMMAND &&",
             ),
         )
-        assertTrue(voiceStart.contains("nativeHomeFeatureContextAvailable()"))
+        assertTrue(voiceStart.contains("environment.homeFeatureContextAvailable()"))
         assertTrue(
             voiceStart.contains(
-                "if (handsFreeVoiceModelDirectory == null && !preferPlatform)",
+                "if (handsFreeRuntime.modelDirectory == null && !preferPlatform)",
             ),
         )
         assertTrue(
             voiceStart.contains(
-                "PreferredOfflineSpeechRecognizer(this) { handsFreeVoiceModelDirectory }",
+                "platform.createRecognizer { handsFreeRuntime.modelDirectory }",
             ),
         )
         assertFalse(activity.contains("SpeechRecognizer.isOnDeviceRecognitionAvailable"))
@@ -155,14 +194,14 @@ class MainActivityStartupCapabilityStaticTest {
         assertFalse(activity.contains("SpeechRecognizer.createSpeechRecognizer"))
         assertFalse(voiceStart.contains("postLoginDeviceFeatureEnabled"))
         assertFalse(voiceStart.contains("WalkSafeStartupRequirement.ON_DEVICE_STT"))
-        assertTrue(voiceStart.contains("if (!hasRecordAudioPermission())"))
+        assertTrue(voiceStart.contains("if (!environment.microphoneGranted())"))
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 voiceStart,
-                "if (handsFreeVoiceModelDirectory == null) prepareHandsFreeVoiceModel()",
-                "if (handsFreeVoiceModelDirectory == null && !preferPlatform)",
+                "if (handsFreeRuntime.modelDirectory == null) prepareHandsFreeVoiceModel()",
+                "if (handsFreeRuntime.modelDirectory == null && !preferPlatform)",
                 "stopHandsFreeVoiceService()",
-                "PreferredOfflineSpeechRecognizer(this) { handsFreeVoiceModelDirectory }",
+                "platform.createRecognizer { handsFreeRuntime.modelDirectory }",
                 "recognizer.setRecognitionListener",
                 "recognizer.startListening(",
                 "preferPlatform = preferPlatform",
@@ -191,19 +230,28 @@ class MainActivityStartupCapabilityStaticTest {
 
     @Test
     fun limitationMustBeDeliveredBeforeConfirmationAndResultIsPersistedWithProvenance() {
-        val confirmation = activity.substringAfter("private fun confirmStartupCapabilityDecision()")
-            .substringBefore("private fun persistStartupCapabilityDecision(")
-        val completion = activity.substringAfter("private fun completeStartupCapabilityConfirmation(")
-            .substringBefore("private fun failStartupCapabilityConfirmation(")
-        val persistence = activity.substringAfter("private fun persistStartupCapabilityDecision(")
-            .substringBefore("private fun isStartupCapabilityConfirmed()")
+        val confirmation = method("confirmStartupCapabilityDecision")
+        val completion = method("completeStartupCapabilityConfirmation")
+        val persistenceOwner = method("persistStartupCapabilityDecision")
+        assertTrue(persistenceOwner.contains("storage.write(decision, profileMatch)"))
+        assertTrue(MainActivityRefactorSource.composition(activity, "startupConfirmationInteraction").contains("storage = AndroidStartupDecisionStorage { stepLengthPrefs }"))
+        val persistenceSource = File("src/main/java/kr/co/hanium/dreamup/walksafe/startup/interaction/AndroidStartupDecisionStorage.kt").readText()
+        val persistence = MainActivityRefactorSource.member(persistenceSource, "write")
+        assertTrue(persistenceOwner.contains("lastPersisted == decision"))
+        assertTrue(persistenceOwner.indexOf("lastPersisted == decision") < persistenceOwner.indexOf("storage.write(decision, profileMatch)"))
+        assertTrue(persistence.contains("preferences().edit()"))
 
         assertTrue(confirmation.contains("deliverStartupCapabilityNotice("))
         assertTrue(confirmation.contains("onDelivered = { completeStartupCapabilityConfirmation(decision) }"))
         assertFalse(confirmation.contains("confirmedStartupCapabilityDecision = decision"))
-        assertTrue(completion.contains("confirmedStartupCapabilityDecision = expected"))
+        assertFalse("same decision must not be confirmed before the notice is delivered",
+            Regex("\\bconfirmed\\s*=\\s*decision\\b").containsMatchIn(confirmation))
+        assertTrue(completion.contains("confirmed = expected"))
         assertTrue(activity.contains("startupCapabilityConfirmationPending"))
-        assertTrue(activity.contains("onCompleted = deliveredOnMain"))
+        val notice = method("deliverStartupCapabilityNotice")
+        assertTrue(notice.contains("onCompleted = deliveredOnMain"))
+        val confirmationWire = MainActivityRefactorSource.composition(activity, "startupConfirmationInteraction")
+        assertTrue(confirmationWire.contains("statusExplanation = true, additionalCurrent = additionalCurrent"))
         assertTrue(persistence.contains("startup_capability_tier"))
         assertTrue(persistence.contains("startup_capability_device_model"))
         assertTrue(persistence.contains("startup_capability_android_version"))
@@ -216,12 +264,8 @@ class MainActivityStartupCapabilityStaticTest {
 
     @Test
     fun runtimeTtsFailureBlocksWalkAndSafetyStopsOnlyTheActiveSession() {
-        val failure = activity.substringAfter("private fun handleRuntimeSpeechCapabilityFailure(")
-            .substringBefore("private fun feedbackActuatorStatusText()")
-        val oneShotFailure = ReportStaticSourceInspector.functionBlock(
-            activity,
-            "private fun handleOneShotSpeechRecognitionFailure",
-        )
+        val failure = method("handleRuntimeSpeechCapabilityFailure")
+        val oneShotFailure = method("handleOneShotSpeechRecognitionFailure")
 
         assertTrue(failure.contains("offlineKoreanTextToSpeechCapabilityOverride = false"))
         assertFalse(failure.contains("onDeviceSpeechRecognitionCapabilityOverride = false"))
@@ -235,20 +279,15 @@ class MainActivityStartupCapabilityStaticTest {
         assertFalse(failure.contains("stopLocationUpdates()"))
         assertTrue(failure.contains("refreshStartupCapabilityUi()"))
         assertTrue(oneShotFailure.contains("oneShotSpeechRecognitionLimited = true"))
-        assertFalse(oneShotFailure.contains("onDeviceSpeechRecognitionCapabilityOverride"))
+        assertFalse(oneShotFailure.contains("applicationEffects.limitPersistentHandsFreeRecognition()"))
         assertFalse(oneShotFailure.contains("stopHandsFreeVoiceService()"))
         assertFalse(oneShotFailure.contains("enterWalkSessionSafetyStopAndCancelOutputs("))
         assertTrue(oneShotFailure.contains("scheduleHandsFreeVoiceRestart()"))
 
-        val navigationStart = activity.substringAfter("private fun startNavigationServicesIfNeeded()")
-            .substringBefore("private fun missingCameraPermissions()")
-        val navigationGate = activity.substringAfter("private fun currentNavigationCollectionAllowsWork()")
-            .substringBefore("private fun missingCameraPermissions()")
-        val stepTrackingGate = activity.substringAfter(
-            "private fun currentStepTrackingCollectionAllowsWork()",
-        ).substringBefore("private fun currentNavigationCollectionAllowsWork()")
-        val locationUpdate = activity.substringAfter("private fun handleLocationUpdate(")
-            .substringBefore("private fun updateHeadingFromLocation(")
+        val navigationStart = method("startNavigationServicesIfNeeded")
+        val navigationGate = method("currentNavigationCollectionAllowsWork")
+        val stepTrackingGate = method("currentStepTrackingCollectionAllowsWork")
+        val locationUpdate = locationObservationPolicy(activity)
         assertTrue(navigationStart.contains("if (!currentStepTrackingCollectionAllowsWork())"))
         assertTrue(stepTrackingGate.contains("if (!isStartupCapabilityConfirmed()) return false"))
         assertTrue(
@@ -257,23 +296,22 @@ class MainActivityStartupCapabilityStaticTest {
             ),
         )
         assertFalse(navigationGate.contains("currentRuntimeMetricOutputAllowsWork()"))
-        assertTrue(locationUpdate.contains("!currentNavigationCollectionAllowsWork()"))
+        assertTrue(locationUpdate.contains("!scope.navigationAllowed"))
     }
 
     @Test
     fun structuralSpeechRecognitionErrorsFailClosedButNoMatchCanRetry() {
-        val listener = activity.substringAfter("private fun buildVoiceCommandRecognitionListener(")
-            .substringBefore("private fun handleVoiceCommandPhrases(")
+        val listener = method("buildVoiceCommandRecognitionListener")
 
         assertTrue(listener.contains("SpeechRecognizer.ERROR_NO_MATCH"))
         assertTrue(listener.contains("SpeechRecognizer.ERROR_SPEECH_TIMEOUT"))
         assertTrue(listener.contains("speechRecognizer?.destroy()"))
         assertTrue(listener.contains("handleOneShotSpeechRecognitionFailure("))
-        assertFalse(listener.contains("onDeviceSpeechRecognitionCapabilityOverride"))
+        assertFalse(listener.contains("applicationEffects.limitPersistentHandsFreeRecognition()"))
         assertTrue(
             listener.contains(
                 "VoiceRecognitionPurpose.WALK_SESSION_RESUME ->\n" +
-                    "                        handleWalkSessionResumeRecognizerNotStarted()",
+                    "                        commands.resumeRecognizerNotStarted()",
             ),
         )
         assertTrue(listener.contains("permanentlyLimit = false"))
@@ -301,20 +339,125 @@ class MainActivityStartupCapabilityStaticTest {
             assertFalse(shouldPermanentlyLimitOneShotSpeechRecognition(error))
         }
 
-        val voiceStart = ReportStaticSourceInspector.functionBlock(
-            activity,
-            "private fun startVoiceCommandRecognition",
-        )
+        val voiceStart = method("startVoiceCommandRecognition")
         assertFalse(voiceStart.contains("permanentlyLimit = true"))
         assertTrue(voiceStart.contains("permanentlyLimit = false"))
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 voiceStart,
-                "if (handsFreeVoiceModelDirectory == null) prepareHandsFreeVoiceModel()",
-                "if (handsFreeVoiceModelDirectory == null && !preferPlatform)",
+                "if (handsFreeRuntime.modelDirectory == null) prepareHandsFreeVoiceModel()",
+                "if (handsFreeRuntime.modelDirectory == null && !preferPlatform)",
                 "oneShotSpeechRecognitionLimited = false",
-                "PreferredOfflineSpeechRecognizer(this) { handsFreeVoiceModelDirectory }",
+                "platform.createRecognizer { handsFreeRuntime.modelDirectory }",
             ),
         )
     }
+    private fun method(name: String): String = MainActivityRefactorSource.function(activity, "private fun $name(")
+
+
+    private fun locationObservationPolicy(
+        mainSource: String,
+        ownerSource: String = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/PositioningSessionController.kt").readText(),
+    ): String {
+        MainActivityRefactorSource.composition(mainSource, "positioningSessionController")
+        val main = MainActivityRefactorSource.factory(mainSource, "handleLocationUpdate")
+        // Whole declaration comparison preserves guards, argument forwarding and effect order.
+        val expectedMain = """
+private fun handleLocationUpdate(
+        location: Location,
+        owner: LocationCollectionOwner,
+        locationGeneration: Int,
+        binding: PositioningCollectionBinding,
+        receivedAtElapsedRealtimeMs: Long,
+    ) {
+        positioningSessionController.handleLocationUpdate(location, owner, locationGeneration, binding, receivedAtElapsedRealtimeMs)
+    }
+        """.trimIndent()
+        org.junit.Assert.assertEquals("Main location callback must directly invoke its actual owner", expectedMain.filterNot(Char::isWhitespace),
+            main.filterNot(Char::isWhitespace))
+        val owner = ownerSource
+        val update = MainActivityRefactorSource.factory(owner, "handleLocationUpdate")
+        // Whole declaration comparison preserves guards, argument forwarding and effect order.
+        val expectedUpdate = """
+fun handleLocationUpdate(
+        location: Location,
+        owner: LocationCollectionOwner,
+        locationGeneration: Int,
+        binding: PositioningCollectionBinding,
+        receivedAtElapsedRealtimeMs: Long,
+    ) {
+        // Reject a retired callback before reading any SDK values.
+        if (!isLocationObservationCurrent(owner, locationGeneration, binding)) return
+        val observation = location.toPositioningObservation(receivedAtElapsedRealtimeMs, sources.mock(location)) { atNanos ->
+            runCatching { gnssQualityObserver?.snapshot(atNanos) }.getOrNull()
+        }
+        handleLocationObservation(
+            observation, owner, locationGeneration, binding,
+            updateOrientationReference = { updateRouteOrientationReference(location) },
+            appendGnssTrace = { snapshot, matchedEvidenceCurrent ->
+                effects.appendGnssTrace(snapshot, location, matchedEvidenceCurrent)
+            },
+        )
+    }
+        """.trimIndent()
+        // Keep line boundaries: joining a // comment with the next line can disable its guard.
+        org.junit.Assert.assertEquals("SDK callback must reject retired observations before mapping and invoking the observation policy",
+            expectedUpdate.lines().map(String::trim), update.lines().map(String::trim))
+        assertTrue(update.contains("if (!isLocationObservationCurrent(owner, locationGeneration, binding)) return"))
+        assertTrue(update.indexOf("if (!isLocationObservationCurrent") < update.indexOf("location.toPositioningObservation"))
+        assertTrue(update.contains("handleLocationObservation("))
+        return MainActivityRefactorSource.member(owner, "handleLocationObservation")
+    }
+
+
+    @Test
+    fun locationObservationPolicyRejectsNonExecutingMainCallers() {
+        val mainSource = activity
+        locationObservationPolicy(mainSource)
+        val caller = MainActivityRefactorSource.factory(mainSource, "handleLocationUpdate")
+        val call = "positioningSessionController.handleLocationUpdate(location, owner, locationGeneration, binding, receivedAtElapsedRealtimeMs)"
+        org.junit.Assert.assertTrue(caller.contains(call))
+        val variants = linkedMapOf(
+            "conditional" to caller.replace(call, "if (false) { $call }"),
+            "uninvoked lambda" to caller.replace(call, "{ $call }"),
+            "comment" to caller.replace(call, "/* $call */"),
+            "additional effect" to caller.replace(call, "$call\nunexpectedEffect()"),
+            "omitted" to caller.replace(call, ""),
+            "early return" to caller.replace(call, "return\n$call"),
+        )
+
+        val accepted = variants.filter { (_, changed) ->
+            val mainSource = mainSource.replace(caller, changed)
+            runCatching { locationObservationPolicy(mainSource) }.isSuccess
+        }.keys
+        org.junit.Assert.assertTrue("Non-equivalent Main callers accepted: $accepted", accepted.isEmpty())
+    }
+
+
+    @Test
+    fun locationObservationPolicyRejectsNonExecutingSdkObservationCalls() {
+        val mainSource = activity
+        val owner = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/PositioningSessionController.kt").readText()
+        locationObservationPolicy(mainSource, owner)
+        val caller = MainActivityRefactorSource.factory(owner, "handleLocationUpdate")
+        val start = caller.indexOf("        handleLocationObservation(")
+        org.junit.Assert.assertTrue(start >= 0)
+        val call = caller.substring(start, caller.lastIndexOf("\n    }")).trim()
+        val commentBoundary = "// Reject a retired callback before reading any SDK values.\n"
+        org.junit.Assert.assertTrue(caller.contains(commentBoundary))
+        val variants = mapOf(
+            "line comment swallows guard" to caller.replace(commentBoundary, commentBoundary.trimEnd() + " "),
+            "conditional" to caller.replace(call, "if (false) { $call }"),
+            "uninvoked lambda" to caller.replace(call, "{ $call }"),
+            "comment" to caller.replace(call, "/* $call */"),
+            "additional effect" to caller.replace(call, "$call\nunexpectedEffect()"),
+            "omitted" to caller.replace(call, ""),
+            "early return" to caller.replace(call, "return\n$call"),
+        )
+        val accepted = variants.filter { (_, changed) ->
+            runCatching { locationObservationPolicy(mainSource, owner.replace(caller, changed)) }.isSuccess
+        }.keys
+        org.junit.Assert.assertTrue("Non-equivalent SDK callers accepted: $accepted", accepted.isEmpty())
+    }
+
 }

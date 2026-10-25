@@ -1,0 +1,38 @@
+flowchart TD
+  A["F-D08-022 보행 경로 검색 중계"]
+  B["진입: POST /api/navigation/walking"]
+  A --> B
+  P0["1. 일반 인증·Backend current·privacy lease 및 walkOwnershipGate 를 검사한다."]
+  B --> P0
+  P1["2. 다른기기 보행이면 차단; 자기 holder 또는 active 없음은 허용한다."]
+  P0 --> P1
+  P2["3. 좌표·옵션 payload 를 검사하고 signed Backend /navigation/walking 으로 보낸다."]
+  P1 --> P2
+  P3["4. 응답 2MiB, polyline8192·steps/guides1024 및 finite 좌표를 검증한다."]
+  P2 --> P3
+  P4["5. 늦은 body 를 cancel 하고 actor lease 를 종료한다."]
+  P3 --> P4
+  OK["정상: 검증된 경로 JSON 또는 명시 실패"]
+  P4 --> OK
+  C0{"다른기기 보행 active"}
+  X0["409"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"handler7.5 초 또는 upstream5 초 초과"}
+  X1["504"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"client abort"}
+  X2["499"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"과대/부정확 geometry"}
+  X3["502"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. handler 전체 7.5 초; Node8 초; upstream body 포함 5 초; Android10 초보다 짧게 설계."]
+  B -. "중단 조건" .-> T
+  R["재시도: 자동 재시도 없음. 응답의 Retry-After 와 다음 행동 계약이 있는 경우에만 그 의미를 전달한다."]
+  T -.-> R
+  POLICY["정책: P-D08-004, P-D08-011, P-D08-013, P-D08-015, P-D08-029"]
+  A -.-> POLICY

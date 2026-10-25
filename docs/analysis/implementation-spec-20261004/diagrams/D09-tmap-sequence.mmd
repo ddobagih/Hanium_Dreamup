@@ -1,0 +1,30 @@
+sequenceDiagram
+  autonumber
+  participant C as HTTP caller
+  participant A as F-D09-015 또는 017
+  participant R as F-D09-018 runtime
+  participant T as TMAP provider
+  participant W as 응답 정규화 child
+  Note over A,W: P-D09-015..018 · route와 POI가 슬롯 및 호출 예산 공유
+  C->>A: 경로 JSON 또는 검색 query
+  A->>A: provider 작업과 ASGI disconnect 대기 생성
+  A->>R: absolute deadline으로 2개 중 lease 예약
+  R->>R: budget과 429 cooldown 확인 및 호출량 소비
+  R->>T: 공식 HTTPS 요청 · identity encoding
+  T-->>R: bounded response stream
+  R->>W: CPU 정규화 job
+  W->>W: geometry 또는 POI provenance 검증
+  alt 완료가 disconnect보다 먼저 관측
+    W-->>R: 제한된 response DTO
+    R->>R: stream close와 child exit 및 reader 완료 확인
+    R-->>A: result
+    A-->>C: HTTP200
+  else disconnect 또는 deadline
+    C-->>A: http.disconnect 또는 caller 취소
+    A->>R: owner task 취소 요청
+    R->>T: owned stream close
+    R->>W: terminate 및 종료 확인
+    R->>R: 모든 자원 종료 후 lease 반환
+  end
+  Note over R,W: cleanup 실패 또는 허용되지 않은 worker envelope는 admission 중지
+  Note over R,T: 자동 provider 재시도 없음 · budget은 process-local

@@ -16,7 +16,7 @@ class RouteSpeechEvidenceRegressionTest {
         assertFalse(turned.cancelStaleNavigationSpeech)
         nav.acknowledgeInstruction(first, 1_200)
         val manual = requireNotNull(nav.currentGuidance(1_201, facing(1_201, 0.0)))
-        assertTrue(manual.instruction?.contains("오른쪽 경로 방향으로 몸을 돌리세요") == true)
+        assertTrue(manual.instruction?.contains("안내한 방향으로 몸을 돌려주세요") == true)
         assertFalse(manual.instruction?.contains("꺾으세요") == true)
     }
 
@@ -24,12 +24,12 @@ class RouteSpeechEvidenceRegressionTest {
     @Test fun aReversingTurnRevokesTheInFlightSentenceAndRegeneratesItFromTheFreshFacing() {
         val nav = navigator()
         val first = nav.update(fix(), 1_000, false, facingObservation = facing(1_000))
-        assertTrue(first.instruction?.contains("앞쪽이 경로 진행 방향입니다") == true)
+        assertTrue(first.instruction?.contains("약 12시 방향") == true)
         assertTrue(nav.reserveInstruction(first))
         val reversed = requireNotNull(nav.retryGuidance(1_100, facing(1_100, 270.0)))
         assertEquals("route_guidance", reversed.reason)
         assertTrue(reversed.cancelStaleNavigationSpeech)
-        assertTrue(reversed.instruction?.contains("경로 진행 방향이 뒤쪽입니다") == true)
+        assertTrue(reversed.instruction?.contains("방향이 확인되면 안내를 이어갑니다") == true)
         assertFalse(reversed.instruction?.contains("꺾으세요") == true)
         assertFalse(nav.isInstructionCurrent(first, 1_100, facing(1_100, 270.0)))
         assertFalse(nav.reserveInstruction(first))
@@ -39,14 +39,15 @@ class RouteSpeechEvidenceRegressionTest {
     @Test fun adjacentTurnsFinishSpeakingButALeftRightReversalDoesNot() {
         val nav = navigator()
         val left = nav.update(fix(), 1_000, false, facingObservation = facing(1_000, 180.0))
-        assertTrue(left.instruction?.contains("경로는 왼쪽입니다") == true)
+        assertTrue(left.instruction?.contains("약 9시 방향") == true)
         assertTrue(nav.reserveInstruction(left))
         val adjacent = requireNotNull(nav.retryGuidance(1_100, facing(1_100, 90.0)))
         assertEquals("guidance_in_flight", adjacent.reason)
         assertFalse(adjacent.cancelStaleNavigationSpeech)
         val reversed = requireNotNull(nav.retryGuidance(1_200, facing(1_200, 0.0)))
         assertTrue(reversed.cancelStaleNavigationSpeech)
-        assertTrue(reversed.instruction?.contains("경로는 오른쪽입니다") == true)
+        assertTrue(reversed.instruction?.contains("방향이 확인되면 안내를 이어갑니다") == true)
+        assertFalse(reversed.instruction?.contains("몸을 돌려주세요") == true)
         assertFalse(nav.reserveInstruction(left))
         assertTrue(nav.reserveInstruction(reversed))
     }
@@ -80,15 +81,48 @@ class RouteSpeechEvidenceRegressionTest {
         assertEquals("guidance_in_flight", nav.retryGuidance(1_202, null)?.reason)
     }
 
-    @Test fun clockPrecisionLossRevokesTheNumericCueWithoutRelaxingAngularLimits() {
-        val nav = navigator()
+    @Test fun supportedNominalClockPreservesPlayingThenManualClockKeepsTheOriginalStartDeadline() {
+        // Cold nominal confirmation uses the production fixed GRACE; the other tests isolate immediate revocation.
+        val nav = RouteNavigator().apply { setRoute(WalkingRoute("TEST", WalkingRouteSummary(400, 400),
+            listOf(point(0.0), point(400.0)),
+            listOf(WalkingRouteGuidePoint(0, point(200.0), null, 200, 200, turnType = 13)))) }
         val first = nav.update(fix(), 1_000, false, facingObservation = facing(1_000))
         assertTrue(first.instruction?.contains("12시 방향") == true)
         assertTrue(nav.reserveInstruction(first))
-        val coarse = requireNotNull(nav.retryGuidance(1_100, facing(1_100).copy(headingAccuracyDegrees = 20.0)))
-        assertTrue(coarse.cancelStaleNavigationSpeech)
-        assertFalse(coarse.instruction?.contains("시 방향") == true)
+        assertTrue(nav.isInstructionCurrent(first, 1_000, facing(1_000)))
+        val continuing = requireNotNull(nav.retryGuidance(1_100, facing(1_100).copy(headingAccuracyDegrees = 20.0)))
+        assertEquals("guidance_in_flight", continuing.reason)
+        assertFalse(continuing.cancelStaleNavigationSpeech)
         assertFalse(nav.reserveInstruction(first))
+        assertNull(continuing.instruction)
+        assertNull(continuing.speechCueToken)
+        val confirmed = facing(1_101).copy(headingAccuracyDegrees = 20.0)
+        val samePacket = requireNotNull(nav.retryGuidance(1_101, confirmed))
+        assertEquals("guidance_in_flight", samePacket.reason)
+        assertFalse(samePacket.cancelStaleNavigationSpeech)
+        assertNull(samePacket.instruction)
+        assertNull(samePacket.speechCueToken)
+        assertTrue(nav.isInstructionCurrent(first, 1_101, confirmed))
+        assertTrue(nav.isInstructionCompletionCurrent(first, 1_101))
+        assertEquals(1_000L, first.speechCueToken?.facingObservedAtElapsedRealtimeMs)
+        assertEquals(1_500L, first.speechCueToken?.facingValidUntilElapsedRealtimeMs)
+        nav.acknowledgeInstruction(first, 1_101)
+        assertFalse(nav.isInstructionCompletionCurrent(first, 1_101))
+        val coarse = requireNotNull(nav.currentGuidance(1_102, facing(1_102).copy(headingAccuracyDegrees = 20.0)))
+        assertFalse(coarse.cancelStaleNavigationSpeech)
+        assertTrue(coarse.instruction?.contains("바라보고 있는 방향 기준 약 12시 방향") == true)
+        assertFalse(coarse.instruction.orEmpty().contains("시에서") || coarse.instruction.orEmpty().contains("사이 방향"))
+        assertEquals(RouteFacingExpression.CLOCK, coarse.facingDiagnostic?.expression)
+        assertEquals(RouteClockReferenceKind.NOMINAL_TREND_CLOCK, coarse.facingDiagnostic?.clockReferenceKind)
+        assertTrue(requireNotNull(coarse.speechCueToken).requiresFacingEvidence)
+        assertFalse(nav.isInstructionCurrent(first, 1_102, facing(1_102).copy(headingAccuracyDegrees = 20.0)))
+        assertFalse(nav.reserveInstruction(first))
+        assertTrue(nav.reserveInstruction(coarse))
+        assertEquals(1_102L, coarse.speechCueToken?.facingObservedAtElapsedRealtimeMs)
+        assertEquals(1_602L, coarse.speechCueToken?.facingValidUntilElapsedRealtimeMs)
+        assertTrue(nav.isInstructionCurrent(coarse, 1_602, facing(1_102).copy(headingAccuracyDegrees = 20.0)))
+        assertFalse(nav.isInstructionCurrent(coarse, 1_603, facing(1_102).copy(headingAccuracyDegrees = 20.0)))
+        assertFalse(nav.isInstructionCurrent(coarse, 1_603, facing(1_603).copy(headingAccuracyDegrees = 20.0)))
     }
 
     @Test fun failedManualDeliveryRetriesOnceAndLateFailureCannotConsumeItsReplacement() {
@@ -127,7 +161,7 @@ class RouteSpeechEvidenceRegressionTest {
             assertNotNull(nav.currentAcceptedRouteMatchFor(1_000))
             assertFalse(update.instruction?.contains("꺾으세요") == true)
             assertFalse(update.instruction?.contains("이동하세요") == true)
-            assertTrue(update.instruction?.contains("방향과 위치를 확인") == true)
+            assertTrue(update.instruction?.contains("방향이 확인되면 안내를 이어갑니다") == true)
         }
     }
 
@@ -135,13 +169,14 @@ class RouteSpeechEvidenceRegressionTest {
         val nav = navigator()
         val raw = fix()
         val update = nav.update(raw, 1_200, false, facingObservation = facing(1_200))
-        assertTrue(update.instruction?.contains("150m 앞, 오른쪽으로 꺾으세요") == true)
+        assertTrue(update.instruction?.contains("다음 안내 지점에서 경로 기준으로 3시 방향으로 꺾으세요") == true)
         assertNotNull(nav.currentAcceptedRouteMatchFor(raw.elapsedRealtimeMs))
         assertNull(nav.currentAcceptedRouteMatchFor(1_200))
         assertEquals(1_000L, raw.elapsedRealtimeMs)
     }
 
-    private fun navigator() = RouteNavigator().apply {
+    // Isolate offered-cue validation and sensor provenance; default cancellation/grace is tested separately.
+    private fun navigator() = RouteNavigator(RouteNavigatorConfig(directionRecheckGraceMs = 0L)).apply {
         setRoute(WalkingRoute("TEST", WalkingRouteSummary(400, 400),
             listOf(point(0.0), point(400.0)),
             listOf(WalkingRouteGuidePoint(0, point(200.0), null, 200, 200, turnType = 13))))

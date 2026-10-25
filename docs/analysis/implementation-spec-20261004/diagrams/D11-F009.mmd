@@ -1,0 +1,13 @@
+flowchart TD
+ A["F-D11-009 DB와 관리자 키 준비"] --> P["P-D11-009 선택된 전용 권위"]
+ P --> C{"명시적으로 호출된 entrypoint"}
+ C -->|"migrate service"| M["maintenance migration credential로 Alembic head 적용"]
+ C -->|"issuer-bind"| I["migration 의존과 Backend conflict. source 권위 및 descriptor 확인"]
+ I --> IB["issuer DB binding commit"]
+ C -->|"device-key provision"| D["admin과 device 및 key version. canonical P-256 SPKI와 marker 확인"]
+ D --> DB["DB 연결 뒤 등록 또는 회전 helper 호출"]
+ M --> Z["선택 entrypoint 종료. 설치와 실제 운영 여부 미확인"]
+ IB --> Z
+ DB --> Z
+ P -->|"credential 또는 descriptor 불일치"| X["거부"]
+ Z -.-> R["자동 재시도 없음. 키 원문을 보고서에 남기지 않음"]

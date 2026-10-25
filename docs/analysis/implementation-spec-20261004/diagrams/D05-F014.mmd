@@ -1,0 +1,12 @@
+flowchart TD
+  H["P-D05-014 · F-D05-014 FastSAM raw tensor·인스턴스 mask 복원"]
+  H --> V{"shape exact 그리고 모든 값 finite"}
+  V -->|"아니오"| X["decode failure service stop"]
+  V -->|"예"| C["confidence 초과 0.25"]
+  C --> N["IoU 초과 0.7 NMS 최대 100"]
+  N --> P["32 prototype dot product"]
+  P --> L["letterbox 제거 bilinear logitresize"]
+  L --> B["logit 초과 0 실제 mask bits"]
+  B --> E{"area 양수"}
+  E -->|"아니오"| D["empty mask 버림"]
+  E -->|"예"| R["원 센서 mask holes 보존"]

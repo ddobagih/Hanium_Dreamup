@@ -1,0 +1,29 @@
+flowchart TB
+  C["D06·D12 Android 신고·관리자 클라이언트"]
+  RUNTIME["D09 runtime·권한 미들웨어·readiness"]
+  PRIV["D13 계정 세대·동의·privacy locks"]
+  AUTH["D14 admin session·proof·재확인"]
+  INGEST["F-D15-001~008·047<br/>접수·검증·멱등·중복·암호화 저장"]
+  STORE["F-D15-009~011<br/>키 회전·journal 복구·inventory monitor"]
+  READ["F-D15-012~020·046<br/>읽기·통계·export·사용자 요청·정정·감사"]
+  ADMIN["F-D15-025~037<br/>상태·원본 증거·검토 결정·패키지·수동 전달"]
+  DELETE["F-D15-021~024<br/>ACK 요청 물리삭제·외부 사본 기록"]
+  RET["F-D15-038~039<br/>기간 만료 보존·삭제"]
+  REST["F-D15-040~045·048<br/>외부 tombstone·격리 복원·게시 gate"]
+  OPS["D11 백업·복원 운영<br/>서명 manifest·restore receipt·예약 서비스"]
+  C --> RUNTIME --> INGEST
+  PRIV --> INGEST
+  INGEST --> STORE
+  INGEST --> READ
+  AUTH --> ADMIN
+  READ --> ADMIN
+  READ --> DELETE
+  ADMIN --> DELETE
+  DELETE --> REST
+  OPS --> RET
+  OPS --> REST
+  RET -. "R-D15-001 tombstone 연결 미확인" .-> REST
+  AUTH -. "R-D15-006 일부 HTTP action stepup 결합" .-> DELETE
+  AUTH -. "R-D15-006 status·package HTTP 조건" .-> ADMIN
+  PRIV -. "R-D15-002 계정 외부사본 완료 연결 미확인" .-> DELETE
+  STORE --> RUNTIME

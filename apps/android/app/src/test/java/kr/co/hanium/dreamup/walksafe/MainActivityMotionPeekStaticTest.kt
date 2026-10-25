@@ -16,19 +16,20 @@ class MainActivityMotionPeekStaticTest {
 
     @Test
     fun rawMetadataPeeksOnlyAfterAdmissionAndConsent() {
-        val record = source.substringAfter("private fun recordRawCollectionDetectionMetadata(")
-            .substringBefore("private fun revalidateRawCollectionRuntime(")
+        val record = MainActivityRefactorSource.function(source, "private fun recordRawCollectionDetectionMetadata(")
+        val wiring = MainActivityRefactorSource.factory(source, "createRawCollectionTransferController")
+        assertTrue(wiring.contains("override fun peekMotion(nowElapsedRealtimeMs: Long) = runCatching { positioningCoordinator.peekUserMotion(nowElapsedRealtimeMs) }.getOrNull()"))
         assertFalse(record.contains("currentUserMotion("))
-        val task = record.indexOf("executeRawCollectionTask {")
+        val task = record.indexOf("executeRawMetadataTask {")
         val activeCheck = record.indexOf("context.walk.state != WalkSessionState.ACTIVE")
         val epochCheck = record.indexOf("context.walk.epoch != expectedWalkEpoch")
         val consent = record.indexOf("val motionCollectionAllowed = context.consentSession.currentConfirmationOrNull(")
-        val peek = record.indexOf("positioningCoordinator.peekUserMotion(SystemClock.elapsedRealtime())")
+        val peek = record.indexOf("capture.peekMotion(elapsedRealtimeMs())")
         assertTrue(task in 0 until activeCheck)
         assertTrue(epochCheck > activeCheck)
         assertTrue(consent > epochCheck)
         assertTrue(peek > consent)
-        assertEquals(1, Regex("""peekUserMotion\(""").findAll(record).count())
+        assertEquals(1, Regex("""capture\.peekMotion\(""").findAll(record).count())
         val guarded = record.substring(consent, peek)
         assertTrue(guarded.contains("if (motionCollectionAllowed) {"))
     }
@@ -38,8 +39,12 @@ class MainActivityMotionPeekStaticTest {
         // Owner decision 3(b) / ADD-MOTION-043: transfers start only after the walk, so no transfer
         // admission consults the motion estimator any more.
         assertFalse(source.contains("transferStationaryEvidenceConfirmedAt"))
-        val status = functionBlock("private fun currentUserMotionStatusText()")
-        assertTrue(status.contains("positioningCoordinator.peekUserMotion(nowMs)"))
+        val caller = MainActivityRefactorSource.member(source, "currentUserMotionStatusText")
+        assertTrue(caller.contains("frameMotionEvidence.currentUserMotionStatusText()"))
+        MainActivityRefactorSource.composition(source, "frameMotionEvidence")
+        val composer = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/capture/FrameMotionEvidenceComposer.kt").readText()
+        val status = MainActivityRefactorSource.member(composer, "currentUserMotionStatusText")
+        assertTrue(status.contains("positioning().coordinator.peekUserMotion(nowMs)"))
         assertFalse(status.contains(".currentUserMotion("))
     }
 

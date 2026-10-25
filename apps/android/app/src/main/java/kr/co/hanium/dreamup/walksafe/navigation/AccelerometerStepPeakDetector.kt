@@ -30,6 +30,10 @@ internal class AccelerometerStepPeakDetector(
 ) {
     private var lastSampleNs: Long? = null
 
+    /** Accepted input time, independently of whether this input closes an accepted step peak. */
+    val lastAcceptedSampleTimestampNs: Long?
+        get() = lastSampleNs
+
     /** Maximum of the most recently closed excursion; the trough level after it scales with its excess. */
     private var lastExcursionPeakMps2: Double? = null
     private var excursionPeakNs: Long? = null
@@ -51,9 +55,12 @@ internal class AccelerometerStepPeakDetector(
     }
 
     /** Returns the sensor timestamps (ns) of steps accepted with this sample, oldest first. */
-    fun observe(timestampNs: Long, magnitudeMps2: Double): List<Long> {
-        if (timestampNs < 0L || !magnitudeMps2.isFinite() || magnitudeMps2 < 0.0 ||
+    fun observe(timestampNs: Long, magnitudeMps2: Double, maximumEmittedSteps: Int = Int.MAX_VALUE): List<Long> {
+        if (maximumEmittedSteps < 0 || timestampNs < 0L || !magnitudeMps2.isFinite() || magnitudeMps2 < 0.0 ||
             lastSampleNs?.let { timestampNs <= it } == true
+        ) return emptyList()
+        if (magnitudeMps2 < peakMagnitudeMps2 &&
+            excursionPeakNs?.let { peakEmissionCount(it) > maximumEmittedSteps } == true
         ) return emptyList()
         lastSampleNs = timestampNs
         if (magnitudeMps2 >= peakMagnitudeMps2) {
@@ -77,22 +84,31 @@ internal class AccelerometerStepPeakDetector(
     private fun acceptPeak(peakNs: Long): List<Long> {
         // A second hump without a trough in between is part of the same step.
         if (!troughSincePeak) return emptyList()
+        val emissionCount = peakEmissionCount(peakNs)
         troughSincePeak = false
-        val previous = lastPeakNs ?: return startSequence(peakNs)
+        if (emissionCount == 0) return startSequence(peakNs)
+        val previous = requireNotNull(lastPeakNs)
+        val steps = if (emissionCount == 1) listOf(peakNs) else listOf(previous, peakNs)
+        lastPeakNs = peakNs
+        lastPeakEmitted = true
+        lastIntervalNs = peakNs - previous
+        return steps
+    }
+
+    /** Shared by the capacity check and commit; a rejected closing sample changes no peak state. */
+    private fun peakEmissionCount(peakNs: Long): Int {
+        if (!troughSincePeak) return 0
+        val previous = lastPeakNs ?: return 0
         val intervalNs = peakNs - previous
-        if (intervalNs < minimumStepIntervalNs) return startSequence(peakNs)
+        if (intervalNs < minimumStepIntervalNs) return 0
         val previousInterval = lastIntervalNs
         val continuous = if (previousInterval == null) {
             intervalNs <= maximumStartIntervalNs
         } else {
             intervalNs * 2 >= previousInterval && intervalNs <= previousInterval * 2
         }
-        if (!continuous) return startSequence(peakNs)
-        val steps = if (lastPeakEmitted) listOf(peakNs) else listOf(previous, peakNs)
-        lastPeakNs = peakNs
-        lastPeakEmitted = true
-        lastIntervalNs = intervalNs
-        return steps
+        if (!continuous) return 0
+        return if (lastPeakEmitted) 1 else 2
     }
 
     private fun startSequence(peakNs: Long): List<Long> {

@@ -1,0 +1,33 @@
+{
+  "basis": "WORKING_TREE_SNAPSHOT_FINAL_INTEGRATION_UNCONFIRMED",
+  "captured_at": "2026-10-04T10:33:40.003443+09:00",
+  "commit": "2e5744725a8c033a1817f3cc8a8ec679bc15ac9d",
+  "branch": "temp",
+  "tracked_modified": 199,
+  "untracked_status_entries": 342,
+  "status_counts": {
+    "PARTIAL": 287,
+    "DONE": 610,
+    "UNRECONCILED": 33,
+    "NOT_APPLICABLE": 12
+  },
+  "part_counts": {
+    "A": {
+      "PARTIAL": 132,
+      "DONE": 57
+    },
+    "B": {
+      "PARTIAL": 155,
+      "UNRECONCILED": 33
+    },
+    "기존 종결분": {
+      "DONE": 553,
+      "NOT_APPLICABLE": 12
+    }
+  },
+  "csv_sha256": "73cef61183331641139f0f84ed4ede50dab085693f2090b001a01f242ba623fa",
+  "all_done_confirmed": false,
+  "final_integration_commit_confirmed": false,
+  "direct_product_tests_in_this_analysis": 0,
+  "scope": "기존 사실 기록을 보존하는 현재 작업트리 정적 역설계"
+}

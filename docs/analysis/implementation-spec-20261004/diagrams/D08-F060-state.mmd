@@ -1,0 +1,12 @@
+stateDiagram-v2
+  state "F-D08-060 Active 요청 및 fence" as ACTIVE
+  state "F-D08-060 Archive 내구 저장" as SEALED
+  state "F-D08-060 Indexed archive" as INDEXED
+  state "F-D08-060 Active와 archive 중복 사본" as BOTH
+  state "F-D08-060 분실 또는 무결성 실패" as FAIL
+  [*] --> ACTIVE
+  ACTIVE --> SEALED: 완료 조건 및2MiB초과에서archive먼저저장
+  SEALED --> INDEXED: 재읽기검증후mainpointer와index저장
+  SEALED --> BOTH: main저장전crash
+  BOTH --> INDEXED: 동일identity검증후다음mutation
+  INDEXED --> FAIL: 등록fence파일분실

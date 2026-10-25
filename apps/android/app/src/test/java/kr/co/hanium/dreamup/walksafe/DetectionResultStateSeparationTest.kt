@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe
 
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionSnapshot
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectionResult
 import kr.co.hanium.dreamup.walksafe.inference.AndroidDetectionStatus
 import kr.co.hanium.dreamup.walksafe.inference.DetectorAssetIntegrityFailure
@@ -21,7 +22,7 @@ class DetectionResultStateSeparationTest {
         // 1. Normal empty scene: a completed inference with no boxes, fresh by its capture age.
         val emptyScene = AndroidDetectionResult.empty()
         assertEquals(AndroidDetectionStatus.SUCCESS, emptyScene.status)
-        val published = MainActivity.DetectionSnapshot(
+        val published = DetectionSnapshot(
             detections = emptyScene.detections,
             identity = AndroidDetectionSnapshotFrameIdentity(captureFrameId = 7L, frameTimestampMs = 1_000L),
             capturedAtMs = 1_000L,
@@ -50,9 +51,9 @@ class DetectionResultStateSeparationTest {
         assertEquals(AndroidDetectionStatus.UNAVAILABLE, AndroidDetectionResult.unavailable().status)
 
         // 3. No camera frame (or only unavailable/failed calls): no completed result exists.
-        val noFrame = MainActivity.DetectionSnapshot.empty()
+        val noFrame = DetectionSnapshot.empty()
         assertEquals(
-            MainActivity.DetectionSnapshot.DETECTION_NOT_COMPLETED_STALE_REASON,
+            DetectionSnapshot.DETECTION_NOT_COMPLETED_STALE_REASON,
             noFrame.staleReason(1_100L, 1_050L, MAX_AGE_MS, MAX_DELTA_MS),
         )
         assertTrue(noFrame.debugStatusText(1_100L, 1_050L, MAX_AGE_MS, MAX_DELTA_MS).contains("아직 완료된 TFLite 결과 없음"))
@@ -60,7 +61,7 @@ class DetectionResultStateSeparationTest {
 
     @Test
     fun anOldCompletedResultIsStaleForADifferentReasonThanNoResult() {
-        val old = MainActivity.DetectionSnapshot.empty().copy(
+        val old = DetectionSnapshot.empty().copy(
             identity = AndroidDetectionSnapshotFrameIdentity(captureFrameId = 1L, frameTimestampMs = 1_000L),
             capturedAtMs = 1_000L,
             startedAtMs = 1_000L,

@@ -1,0 +1,36 @@
+flowchart TB
+  E["F-D15-031 · 현재 승인 내용의 기관 전달 패키지 생성<br/>POST<br/>/admin/reports/{report_id}/delivery-packages"]
+  P["P-D15-031 · 전제조건<br/>현재 내용의 최신 typed APPROVED, all review<br/>checks·증거결속 조건. request.state<br/>identity.step_up_verified_at가 None이면 service<br/>호출 전403; D14 재확인 계약 결합 미해결."]
+  E --> P
+  S1["1. current content와 latest approved review를<br/>읽어 기대 revisions 비교"]
+  P --> S1
+  S2["2. previous package 기준 revision+1과<br/>supersedes_package_id 결정"]
+  S1 --> S2
+  S3["3. v2 reports.csv+manifest.json을<br/>deterministic ZIP bytes로 생성"]
+  S2 --> S3
+  S4["4. CSV/manifest/package digest·byte count 및<br/>exact single-report export audit 준비"]
+  S3 --> S4
+  S5["5. secured DB function 또는 row lock 아래<br/>package·export·operation audit commit"]
+  S4 --> S5
+  S6["6. ZIP과 package/review/content revision 및<br/>hash headers 반환"]
+  S5 --> S6
+  OK["정상 결과<br/>ZIP과 package/review/content revision 및 hash<br/>headers 반환"]
+  S6 --> OK
+  B1["조건 · HTTP action identity.step_up_verified_at is<br/>None<br/>결과 · 403 admin_step_up_required; service mutation에<br/>도달하지 않음"]
+  P -. "해당 조건 발생" .-> B1
+  B2["조건 · content/review revision 변경<br/>결과 · 별도409"]
+  S3 -. "해당 조건 발생" .-> B2
+  B3["조건 · current approval 없음<br/>결과 · 409 latest_review_approval_required"]
+  S1 -. "해당 조건 발생" .-> B3
+  B4["조건 · DB/audit 실패<br/>결과 · 503; bytes 미반환"]
+  S1 -. "해당 조건 발생" .-> B4
+  B5["조건 · package revision 경합<br/>결과 · 409"]
+  S3 -. "해당 조건 발생" .-> B5
+  LIFE["중단·취소<br/>별도 취소 API 없음.<br/>요청 중단이 이미 commit된 DB 효과를 되돌린다는 계약은 없음."]
+  E -. "수명주기" .-> LIFE
+  RETRY["재시도·복구<br/>생성 요청에 idempotency key 없음; 성공 재호출은 새 package<br/>revision 가능.<br/>서버 내부 자동 재시도 없음. 호출자가 최신 상태를 확인해 재호출.<br/>오류코드와 현재 저장 상태 확인 후 해당 진입점으로 재요청."]
+  LIFE -. "상태 확인" .-> RETRY
+  CLEAN["정리<br/>DB session 수명은 get_db 의존성에 위임. 기능 내부<br/>rollback/commit 여부는 처리 단계에 명시."]
+  OK -. "종료 처리" .-> CLEAN
+  SRC["근거 · backend/app/services/admin_report_delivery_package.py:325<br/>create_admin_report_delivery_package<br/>분기 점선은 처리 중 적용되는 조건 주석이며 분기 검사 순서를 새로 정의하지 않음"]
+  P -.-> SRC

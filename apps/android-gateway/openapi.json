@@ -6,10 +6,391 @@
     "description": "Single-process Android gateway contract, including bounded email signup relays, Backend-bound password sessions, bounded authenticated STT/TTS relays, fixed report transport receipts, v7 actor/generation-bound report content rights, authenticated integrated-consent bootstrap with Backend CAS, and durable account-deletion v2 fencing with capability recovery. Every response is Cache-Control: no-store. Any public route may also answer 503 gateway_trusted_client_ip_unavailable in production when the reverse proxy did not set the trusted client IP header to exactly one valid address (S19-53), and 504 gateway_request_deadline_exceeded when its Node handler passed the outer whole-request deadline. Outside navigation, S19-59 sets the deadline to limits a request can meet in sequence plus 5 seconds (35 seconds for an ordinary route); navigation uses separate 8-second walking and 7-second search outer deadlines and shorter inner deadlines. The outcome of an outer deadline answer is unknown, so a client repeats only an idempotent request with the same request ID."
   },
   "paths": {
+    "/api/field-diagnostics/preference": {
+      "get": {
+        "operationId": "getFieldDiagnosticPreference",
+        "description": "Independent opt-in field diagnostics for the current general Backend account session. No query parameters. Gateway replaces inbound identity headers, signs the exact Backend request, and revalidates the privacy generation after a bounded response. Backend owns preference, event-schema, ownership and retention validation. RAW/report consent does not authorize diagnostics.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "x-max-response-bytes": 262144,
+        "responses": {
+          "200": {
+            "description": "Current account diagnostic result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldDiagnosticPreference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "405": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "authorizeFieldDiagnosticPreference",
+        "description": "Independent opt-in field diagnostics for the current general Backend account session. No query parameters. Gateway replaces inbound identity headers, signs the exact Backend request, and revalidates the privacy generation after a bounded response. Backend owns preference, event-schema, ownership and retention validation. RAW/report consent does not authorize diagnostics.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "x-max-response-bytes": 262144,
+        "responses": {
+          "200": {
+            "description": "Current account diagnostic result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldDiagnosticPreference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "405": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        },
+        "x-max-body-bytes": 262144,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldDiagnosticPreferenceAuthorize"
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateFieldDiagnosticPreference",
+        "description": "Independent opt-in field diagnostics for the current general Backend account session. No query parameters. Gateway replaces inbound identity headers, signs the exact Backend request, and revalidates the privacy generation after a bounded response. Backend owns preference, event-schema, ownership and retention validation. RAW/report consent does not authorize diagnostics.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "x-max-response-bytes": 262144,
+        "responses": {
+          "200": {
+            "description": "Current account diagnostic result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldDiagnosticPreference"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "405": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        },
+        "x-max-body-bytes": 262144,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldDiagnosticPreferenceUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/field-diagnostics/sessions/{session_id}/batches": {
+      "post": {
+        "operationId": "uploadFieldDiagnosticBatch",
+        "description": "Independent opt-in field diagnostics for the current general Backend account session. No query parameters. Gateway replaces inbound identity headers, signs the exact Backend request, and revalidates the privacy generation after a bounded response. Backend owns preference, event-schema, ownership and retention validation. RAW/report consent does not authorize diagnostics.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "x-max-response-bytes": 262144,
+        "responses": {
+          "200": {
+            "description": "Current account diagnostic result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldDiagnosticBatchAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "405": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        },
+        "x-max-body-bytes": 262144,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldDiagnosticBatchCreate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/field-diagnostics/sessions/{session_id}": {
+      "get": {
+        "operationId": "getFieldDiagnosticSession",
+        "description": "Independent opt-in field diagnostics for the current general Backend account session. No query parameters. Gateway replaces inbound identity headers, signs the exact Backend request, and revalidates the privacy generation after a bounded response. Backend owns preference, event-schema, ownership and retention validation. RAW/report consent does not authorize diagnostics.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "x-max-response-bytes": 262144,
+        "responses": {
+          "200": {
+            "description": "Current account diagnostic result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldDiagnosticSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "405": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+            }
+          }
+        ]
+      }
+    },
     "/api/account-enrollments/email-otp": {
       "post": {
         "operationId": "requestAccountEnrollmentEmailOtp",
-        "description": "Public bounded relay. The JSON body is limited to 4096 bytes and exact-key validated before Backend service authentication. Backend responses are limited to 16384 bytes and projected through strict success and error allowlists.",
+        "description": "Public bounded relay. The JSON body is limited to 4096 bytes and exact-key validated before Backend service authentication. Backend responses are limited to 16384 bytes and projected through strict success and error allowlists. OTP only: SMTP shared budget 30 seconds, Gateway upstream 40 seconds and Node whole-handler deadline 60 seconds; other requests retain their existing budgets.",
         "x-max-body-bytes": 4096,
         "requestBody": {
           "required": true,
@@ -185,7 +566,7 @@
       },
       "post": {
         "operationId": "createFieldSession",
-        "description": "Body limit 4096 bytes; body-read timeout 10 seconds. Login purpose defaults to general for legacy request compatibility. Short login returns its exact session_scope; account_deletion_recovery is always short-lived and cannot include device_id. An enabled general device login or one-time refresh returns split access-cookie and refresh-token credentials. A consumed refresh-token reuse revokes every long-lived family of the account (owner decision 1). S19-10: before any session state is read, a refresh is limited per trusted client address (60 per minute) and per claimed actor and refresh family (30 refused refresh verdicts, 400/401/403/409, per minute; client cancellation and deadline answers do not count) with 429 field_session_refresh_rate_limited (retryable, Retry-After), and to 16 in progress with 503 field_session_storage_busy (retryable). S19-11: 503 field_session_storage_unavailable (retryable) means nothing was committed and the presented refresh proof is still valid; a failure after the commit is 500 field_session_storage_outcome_unknown.",
+        "description": "Body limit 4096 bytes; body-read timeout 10 seconds. Login purpose defaults to general for legacy request compatibility. Short login returns its exact session_scope; account_deletion_recovery is always short-lived and cannot include device_id. Backend password grants also accept purpose=account_deletion_recovery only with remember_me=false and neither device_id nor session_mode; they issue a signed v6 recovery cookie without Max-Age or Expires and retain its existing fixed 12-hour server expiry. An enabled general device login or one-time refresh returns split access-cookie and refresh-token credentials. A consumed refresh-token reuse revokes every long-lived family of the account (owner decision 1). S19-10: before any session state is read, a refresh is limited per trusted client address (60 per minute) and per claimed actor and refresh family (30 refused refresh verdicts, 400/401/403/409, per minute; client cancellation and deadline answers do not count) with 429 field_session_refresh_rate_limited (retryable, Retry-After), and to 16 in progress with 503 field_session_storage_busy (retryable). S19-11: 503 field_session_storage_unavailable (retryable) means nothing was committed and the presented refresh proof is still valid; a failure after the commit is 500 field_session_storage_outcome_unknown.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1534,8 +1915,13 @@
           }
         ],
         "x-walksafe-conditional-security": {
-          "integrated-consent": ["fieldSession", "consentControlSecret"],
-          "integrated-consent-bootstrap": ["fieldSession"]
+          "integrated-consent": [
+            "fieldSession",
+            "consentControlSecret"
+          ],
+          "integrated-consent-bootstrap": [
+            "fieldSession"
+          ]
         },
         "parameters": [
           {
@@ -1600,7 +1986,7 @@
       },
       "put": {
         "operationId": "putIntegratedConsent",
-        "description": "Records four independent consent selections only after a live field session and exact backend consent receipt confirm the mutation. The query contains exactly control=integrated-consent. S19-27: 503 integrated_consent_outcome_unknown (detail.retry: same_request_id, Retry-After: 1) means the local write may already be durable; resend the same request_id, which replays the stored confirmation or adopts the Backend idempotent receipt.",
+        "description": "Records four independent consent selections only after a live field session and exact backend consent receipt confirm the mutation. The query contains exactly control=integrated-consent. S19-27: 503 integrated_consent_outcome_unknown (detail.retry: same_request_id, Retry-After: 1) means the local write may already be durable; resend the same request_id, which replays the stored confirmation or adopts the Backend idempotent receipt. For control=installation-evidence-key, the body is InstallationEvidenceKey and the success status is 204. Registration requires confirmed current installation consent, its control secret and the current account generation; the first registered key wins.",
         "security": [
           {
             "fieldSession": [],
@@ -1614,7 +2000,10 @@
             "required": true,
             "schema": {
               "type": "string",
-              "const": "integrated-consent"
+              "enum": [
+                "integrated-consent",
+                "installation-evidence-key"
+              ]
             }
           }
         ],
@@ -1623,7 +2012,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/IntegratedConsentRequest"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/IntegratedConsentRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/InstallationEvidenceKey"
+                  }
+                ]
               }
             }
           }
@@ -1661,6 +2057,22 @@
           },
           "502": {
             "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "204": {
+            "description": "The installation key is registered. Cache-Control: no-store."
+          }
+        }
+      },
+      "head": {
+        "operationId": "headPrivacyRightsPage",
+        "description": "Public HTML privacy channel metadata with an empty body; no control query.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Public privacy page headers; empty body."
           },
           "503": {
             "$ref": "#/components/responses/GatewayError"
@@ -1727,7 +2139,7 @@
     "/privacy/account-deletions/{request_id}/status": {
       "get": {
         "operationId": "getAccountDeletionStatusV2",
-        "description": "Refreshes canonical backend deletion status using only the request-bound recovery capability.",
+        "description": "Refreshes canonical backend deletion status using only the request-bound recovery capability. The device-verification.v1 header requests a dynamic device_verification view. This view is never stored in the canonical ledger or deletion receipt.",
         "security": [
           {
             "deletionAccessSecret": []
@@ -1736,11 +2148,29 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/AccountDeletionRequestId"
+          },
+          {
+            "name": "x-walksafe-deletion-status-view",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "device-verification.v1"
+              ]
+            }
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/components/responses/AccountDeletionStatus"
+            "description": "Canonical deletion status, optionally accompanied by the current device verification projection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeletionStatusViewV2"
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/GatewayError"
@@ -1793,6 +2223,48 @@
           },
           "503": {
             "$ref": "#/components/responses/AccountDeletionPending"
+          }
+        }
+      }
+    },
+    "/api/account-signup-policy": {
+      "get": {
+        "operationId": "getAccountSignupPolicy",
+        "description": "Public signup document metadata. Exact six document keys; current, equivalent and prior versions are validated; current is excluded from both arrays, and the arrays are disjoint. No query or entity body. No-store; no service credentials or upstream extras are exposed.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Current signup document policy.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountSignupPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "405": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
           }
         }
       }
@@ -1954,6 +2426,363 @@
       }
     },
     "schemas": {
+      "FieldDiagnosticPreference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "present",
+          "enabled",
+          "revision"
+        ],
+        "properties": {
+          "present": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "FieldDiagnosticPreferenceAuthorize": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "authorize_if_absent"
+        ],
+        "properties": {
+          "authorize_if_absent": {
+            "type": "boolean",
+            "const": true
+          }
+        }
+      },
+      "FieldDiagnosticPreferenceUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "expected_revision"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9223372036854775806
+          }
+        }
+      },
+      "FieldDiagnosticEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "session_id",
+          "build_id",
+          "recorded_at_ms",
+          "elapsed_realtime_ms",
+          "name",
+          "fields"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+          },
+          "session_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+          },
+          "build_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{7,64}$"
+          },
+          "recorded_at_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "elapsed_realtime_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string",
+            "enum": [
+              "app_created",
+              "diagnostic_scope",
+              "direction_grace",
+              "navigation_start",
+              "position_quality",
+              "route_request",
+              "route_terminal",
+              "tts"
+            ]
+          },
+          "fields": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {
+              "accuracy_m": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "age_ms": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "clock_hour": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "cue_revision": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "distance_m": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "elapsed_ms": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "episode_id": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "grace_deadline_ms": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "grace_onset_ms": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "grace_remaining_ms": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "heading_accuracy_deg": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "http_status": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "observed_ms": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "range_end_hour": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "range_start_hour": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "rate_hz": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "request_generation": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "retained_age_ms": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "authorization_kind": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+              },
+              "expression_level": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+              },
+              "gate_reason": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+              },
+              "mode": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+              },
+              "reason": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+              },
+              "source": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+              },
+              "stage": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+              },
+              "tts_state": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+              },
+              "current": {
+                "type": "boolean"
+              },
+              "foreground": {
+                "type": "boolean"
+              },
+              "navigation_allowed": {
+                "type": "boolean"
+              },
+              "position_paused": {
+                "type": "boolean"
+              },
+              "request_pending": {
+                "type": "boolean"
+              },
+              "request_id": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+              },
+              "cue_id": {
+                "type": "string",
+                "pattern": "^[0-9]{1,10}:[0-9]{1,10}$"
+              }
+            }
+          }
+        }
+      },
+      "FieldDiagnosticBatchCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "batch_id",
+          "preference_revision",
+          "events"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+          },
+          "preference_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          },
+          "events": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/FieldDiagnosticEvent"
+            },
+            "description": "Unique event IDs; every event has the same session_id and build_id, and session_id equals the path parameter."
+          }
+        }
+      },
+      "FieldDiagnosticBatchAccepted": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "batch_id",
+          "accepted"
+        ],
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+          },
+          "accepted": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "FieldDiagnosticSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "session_id",
+          "build_id",
+          "retained_event_count",
+          "truncated",
+          "batches"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+          },
+          "build_id": {
+            "type": "string"
+          },
+          "retained_event_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "batches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "batch_id",
+                "received_at",
+                "events"
+              ],
+              "properties": {
+                "batch_id": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+                },
+                "received_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "events": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FieldDiagnosticEvent"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "FieldSessionError": {
         "type": "object",
         "description": "S01-20 public /api/field-session error contract. The code is at `code` or `detail.code`; clients map the listed code, HTTP status and flags to x-walksafe-error-contract.next_action and treat any other code as REAUTHENTICATE. gateway_method_not_allowed (405, Allow header) answers methods the path does not declare.",
@@ -2763,12 +3592,37 @@
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
             "description": "Optional canonical per-install identifier. When present, the fixed 12-hour Backend account session is issued as device-bound v7 and may authorize field-walk; it is not a refresh-token session. The value is an installation identifier, not a per-request proof that the caller holds a registered device key; the cookie remains a bearer credential."
           },
+          "purpose": {
+            "type": "string",
+            "const": "account_deletion_recovery",
+            "description": "Optional password-verified account deletion recovery; omitting this field preserves the general password login."
+          },
           "session_mode": {
             "type": "string",
             "const": "long_lived",
             "description": "Owner decision 2 (2026-09-29) / S19-1: opt-in Backend email long-lived login. Requires device_id and remember_me=true and an enabled long-lived Gateway (otherwise 503 field_long_lived_sessions_unavailable). The 200 body is FieldLongSession: a short access cookie plus a rotating refresh token for a family bound to the account generation, auth epoch and device; Backend account currency is still checked on every request and refresh. Without this field the v7 short session is unchanged."
           }
         },
+        "allOf": [
+          {
+            "not": {
+              "required": ["purpose", "device_id"]
+            }
+          },
+          {
+            "not": {
+              "required": ["purpose", "session_mode"]
+            }
+          },
+          {
+            "not": {
+              "required": ["purpose", "remember_me"],
+              "properties": {
+                "remember_me": { "const": true }
+              }
+            }
+          }
+        ],
         "additionalProperties": false
       },
       "FieldSessionLogin": {
@@ -2938,6 +3792,11 @@
           },
           "absolute_expires_at_epoch_ms": {
             "$ref": "#/components/schemas/EpochMillisecondsOrUnlimited"
+          },
+          "account_generation": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Present for a Backend account session; derived from the stored authenticated binding."
           }
         },
         "additionalProperties": false
@@ -3088,6 +3947,11 @@
           },
           "capacity": {
             "$ref": "#/components/schemas/CapacitySnapshot"
+          },
+          "account_generation": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Present for a Backend account session; derived from the stored authenticated binding."
           }
         },
         "additionalProperties": false
@@ -5187,7 +6051,11 @@
           },
           "result": {
             "type": "string",
-            "enum": ["DELETED", "NOT_FOUND", "FAILED"]
+            "enum": [
+              "DELETED",
+              "NOT_FOUND",
+              "FAILED"
+            ]
           },
           "completed_at": {
             "type": "string",
@@ -5197,6 +6065,11 @@
           "evidence_sha256": {
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
+          },
+          "installation_signature": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{86,100}$",
+            "description": "P-256 SHA256withECDSA DER, unpadded base64url. Signs ASCII walksafe/device-deletion-evidence-signature/v1 followed by NUL and evidence_sha256. Excluded from the canonical evidence hash."
           }
         },
         "additionalProperties": false
@@ -5361,6 +6234,283 @@
           "completion_receipt_sha256": {
             "type": ["string", "null"],
             "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountSignupPolicyDocument": {
+        "type": "object",
+        "required": [
+          "version",
+          "required",
+          "equivalent_versions",
+          "prior_versions"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "equivalent_versions": {
+            "type": "array",
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+            }
+          },
+          "prior_versions": {
+            "type": "array",
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountSignupPolicy": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "documents"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "walksafe.account-signup-policy.v1",
+            "type": "string"
+          },
+          "documents": {
+            "type": "object",
+            "required": [
+              "terms_of_service",
+              "privacy_notice",
+              "location_terms",
+              "raw_original",
+              "automatic_reporting",
+              "training_reuse"
+            ],
+            "properties": {
+              "terms_of_service": {
+                "$ref": "#/components/schemas/AccountSignupPolicyDocument"
+              },
+              "privacy_notice": {
+                "$ref": "#/components/schemas/AccountSignupPolicyDocument"
+              },
+              "location_terms": {
+                "$ref": "#/components/schemas/AccountSignupPolicyDocument"
+              },
+              "raw_original": {
+                "$ref": "#/components/schemas/AccountSignupPolicyDocument"
+              },
+              "automatic_reporting": {
+                "$ref": "#/components/schemas/AccountSignupPolicyDocument"
+              },
+              "training_reuse": {
+                "$ref": "#/components/schemas/AccountSignupPolicyDocument"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "InstallationEvidenceKey": {
+        "type": "object",
+        "required": [
+          "installation_id",
+          "public_key"
+        ],
+        "properties": {
+          "installation_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "public_key": {
+            "type": "string",
+            "minLength": 79,
+            "maxLength": 122,
+            "pattern": "^[A-Za-z0-9_-]{79,122}$",
+            "description": "Canonical unpadded base64url P-256 SPKI DER."
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountDeletionDeviceVerificationV1": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "completion_view",
+          "target_count",
+          "deleted_count",
+          "not_found_count",
+          "failed_count",
+          "pending_count",
+          "unverifiable_count",
+          "device_clock_anomaly_count",
+          "unverifiable_reason",
+          "follow_up",
+          "device_due_at",
+          "evaluated_at"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.account-deletion-device-verification.v1"
+          },
+          "completion_view": {
+            "type": "string",
+            "enum": [
+              "COMPLETED",
+              "IN_PROGRESS",
+              "SERVER_COMPLETED_DEVICE_UNVERIFIED"
+            ]
+          },
+          "target_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "deleted_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "not_found_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pending_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unverifiable_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "device_clock_anomaly_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unverifiable_reason": {
+            "enum": [
+              "SLA_ELAPSED_NO_CONTACT",
+              null
+            ]
+          },
+          "follow_up": {
+            "enum": [
+              "DELETE_ON_NEXT_CONTACT_OR_REMOVE_APP",
+              null
+            ]
+          },
+          "device_due_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evaluated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountDeletionStatusViewV2": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "client_revision",
+          "revision",
+          "accepted_at",
+          "updated_at",
+          "account_generation",
+          "tombstone_id",
+          "request_receipt_sha256",
+          "overall_status",
+          "items",
+          "completion_receipt_sha256"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.account-deletion-status.v2"
+          },
+          "request_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{16,128}$"
+          },
+          "client_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accepted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "account_generation": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "tombstone_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "request_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "overall_status": {
+            "type": "string",
+            "enum": [
+              "PROCESSING",
+              "PARTIAL",
+              "RETRY_WAIT",
+              "RESTRICTED",
+              "FAILED",
+              "COMPLETED"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "minItems": 9,
+            "maxItems": 9,
+            "items": {
+              "$ref": "#/components/schemas/AccountDeletionItemV2"
+            },
+            "description": "Canonical order: device_untransmitted_data, server_originals, server_quarantine, server_copies, report_records, training_datasets, training_labels, derived_artifacts, backups."
+          },
+          "completion_receipt_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "device_verification": {
+            "$ref": "#/components/schemas/AccountDeletionDeviceVerificationV1"
           }
         },
         "additionalProperties": false

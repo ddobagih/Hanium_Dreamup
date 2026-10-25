@@ -1,0 +1,165 @@
+{
+  "schema_version": "walksafe.walking_route.v1",
+  "provider": "tmap_pedestrian",
+  "provider_route_id": null,
+  "distance_source": "provider_total_geometry_scaled",
+  "priority": "STAIR_AVOID",
+  "summary": {
+    "distance_m": 75,
+    "duration_s": 82
+  },
+  "polyline": [
+    {
+      "latitude": 37.0,
+      "longitude": 127.0,
+      "name": null
+    },
+    {
+      "latitude": 37.000144427452625,
+      "longitude": 127.00000826649934,
+      "name": null
+    },
+    {
+      "latitude": 37.000411063718275,
+      "longitude": 127.00001377186852,
+      "name": null
+    },
+    {
+      "latitude": 37.000455502796115,
+      "longitude": 127.00001377074244,
+      "name": null
+    },
+    {
+      "latitude": 37.00047494433059,
+      "longitude": 126.99999998648713,
+      "name": null
+    },
+    {
+      "latitude": 37.00053049542618,
+      "longitude": 127.00010198276964,
+      "name": null
+    },
+    {
+      "latitude": 37.00059160163134,
+      "longitude": 127.00020122242628,
+      "name": null
+    }
+  ],
+  "steps": [
+    {
+      "index": 0,
+      "distance_m": 53,
+      "duration_s": 67,
+      "points": [
+        {
+          "latitude": 37.0,
+          "longitude": 127.0,
+          "name": null
+        },
+        {
+          "latitude": 37.000144427452625,
+          "longitude": 127.00000826649934,
+          "name": null
+        },
+        {
+          "latitude": 37.000411063718275,
+          "longitude": 127.00001377186852,
+          "name": null
+        },
+        {
+          "latitude": 37.000455502796115,
+          "longitude": 127.00001377074244,
+          "name": null
+        },
+        {
+          "latitude": 37.00047494433059,
+          "longitude": 126.99999998648713,
+          "name": null
+        }
+      ],
+      "instruction": null,
+      "road_name": null,
+      "turn_type": null,
+      "facility_type": 11,
+      "road_type": 23
+    },
+    {
+      "index": 1,
+      "distance_m": 22,
+      "duration_s": 15,
+      "points": [
+        {
+          "latitude": 37.00047494433059,
+          "longitude": 126.99999998648713,
+          "name": null
+        },
+        {
+          "latitude": 37.00053049542618,
+          "longitude": 127.00010198276964,
+          "name": null
+        },
+        {
+          "latitude": 37.00059160163134,
+          "longitude": 127.00020122242628,
+          "name": null
+        }
+      ],
+      "instruction": null,
+      "road_name": null,
+      "turn_type": null,
+      "facility_type": 15,
+      "road_type": 21
+    }
+  ],
+  "guide_points": [
+    {
+      "index": 0,
+      "point": {
+        "latitude": 37.0,
+        "longitude": 127.0,
+        "name": null
+      },
+      "instruction": null,
+      "turn_type": 200,
+      "point_type": "SP",
+      "facility_type": 11,
+      "distance_from_start_m": 0,
+      "remaining_distance_m": 75,
+      "bearing_deg": 2.617219193046651
+    },
+    {
+      "index": 1,
+      "point": {
+        "latitude": 37.00047494433059,
+        "longitude": 126.99999998648713,
+        "name": null
+      },
+      "instruction": null,
+      "turn_type": 213,
+      "point_type": "GP",
+      "facility_type": 15,
+      "distance_from_start_m": 53,
+      "remaining_distance_m": 22,
+      "bearing_deg": 55.707322321514425
+    },
+    {
+      "index": 2,
+      "point": {
+        "latitude": 37.00059160163134,
+        "longitude": 127.00020122242628,
+        "name": null
+      },
+      "instruction": null,
+      "turn_type": 201,
+      "point_type": "EP",
+      "facility_type": null,
+      "distance_from_start_m": 75,
+      "remaining_distance_m": 0,
+      "bearing_deg": null
+    }
+  ],
+  "start_gap_m": 0,
+  "end_gap_m": 0,
+  "provider_result_code": 0,
+  "provider_result_message": "OK"
+}

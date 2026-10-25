@@ -52,6 +52,9 @@ class TactileRoutePolicyTest {
                         TmapCorridorProjectionEvidence.OUTSIDE
                     },
                     centerXNormalized = item.getDouble("center_x_normalized").toFloat(),
+                    // v1 has no route-context fields; the Android adapter supplies the required
+                    // identity without changing the shared fixture or its other consumers.
+                    routeId = ACTIVE_ROUTE_ID,
                 )
             }
             val decision = policy.evaluate(
@@ -60,6 +63,7 @@ class TactileRoutePolicyTest {
                     tmapOnRoute = case.getBoolean("tmap_on_route"),
                     gpsAccuracyM = case.getDouble("gps_accuracy_m").toFloat(),
                     tactile = tactile,
+                    activeRouteId = ACTIVE_ROUTE_ID,
                 ),
             )
             val expected = case.getJSONObject("expected")
@@ -73,7 +77,7 @@ class TactileRoutePolicyTest {
                 assertTrue(caseId, case.getBoolean("navigation_active"))
                 assertTrue(caseId, case.getBoolean("tmap_on_route"))
                 assertEquals(TmapCorridorProjectionEvidence.OVERLAPS, observation.tmapCorridorProjection)
-                assertSame(caseId, observation, policy.selectCandidate(listOf(observation)))
+                assertSame(caseId, observation, policy.selectCandidate(listOf(observation), ACTIVE_ROUTE_ID))
                 // v1 records camera heading, image side and corridor association, not block
                 // axis, user axis or contact-pixel depth. Independent production counterexamples:
                 // AndroidTactileRouteSafetyRegressionTest.cameraAlignedWithTheRouteStillCannotAuthorizeFollowingTheBlock,
@@ -138,7 +142,7 @@ class TactileRoutePolicyTest {
 
     @Test
     fun noObservationStillReportsNotVisibleRatherThanARejection() {
-        val selected = policy.selectCandidate(emptyList())
+        val selected = policy.selectCandidate(emptyList(), ACTIVE_ROUTE_ID)
         val decision = policy.evaluate(baseInput(selected))
         assertNull(selected)
         assertEquals("tactile_not_visible", decision.reason)
@@ -157,7 +161,7 @@ class TactileRoutePolicyTest {
     fun damagedBlockInTheLocalCorridorPreventsNormalTactileOverride() {
         val normal = stableObservation("normal", "normal_tactile_block", centerX = 0.5f, inCorridor = true)
         val damaged = stableObservation("damaged", "damaged_tactile_block", centerX = 0.55f, inCorridor = true)
-        val selected = policy.selectCandidate(listOf(normal, damaged))
+        val selected = policy.selectCandidate(listOf(normal, damaged), ACTIVE_ROUTE_ID)
 
         val decision = policy.evaluate(baseInput(tactile = selected))
 
@@ -171,7 +175,7 @@ class TactileRoutePolicyTest {
     fun damageOutsideVisualCorridorDoesNotHideStableNormalCorridor() {
         val normal = stableObservation("normal", "normal_tactile_block", centerX = 0.5f, inCorridor = true)
         val damaged = stableObservation("damaged", "damaged_tactile_block", centerX = 0.05f, inCorridor = false)
-        val selected = policy.selectCandidate(listOf(damaged, normal))
+        val selected = policy.selectCandidate(listOf(damaged, normal), ACTIVE_ROUTE_ID)
 
         val decision = policy.evaluate(baseInput(tactile = selected))
 
@@ -231,13 +235,17 @@ class TactileRoutePolicyTest {
             .substringBefore("private fun hasActivityRecognitionPermission")
         assertTrue(locationPermission.contains("Manifest.permission.ACCESS_FINE_LOCATION"))
         assertFalse(locationPermission.contains("Manifest.permission.ACCESS_COARSE_LOCATION"))
-        assertTrue(source.contains("routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE"))
-        assertTrue(source.contains("routeNavigator.rerouteRequestFailed()"))
-        assertTrue(source.contains("existing_route_retained"))
-        assertTrue(source.contains("!routeRequestInFlight.get() &&"))
-        assertTrue(source.contains("update.reason != \"route_missing\""))
-        assertTrue(source.contains("!routeNavigator.hasRoute()"))
-        assertTrue(source.contains("navigation=route_waiting trusted_gps_missing"))
+        val acquisition = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/RouteAcquisitionController.kt").readText()
+        val guidance = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/RouteGuidanceController.kt").readText()
+        assertTrue(source.contains("routeAcquisitionController."))
+        assertTrue(source.contains("routeGuidanceController."))
+        assertTrue(acquisition.contains("routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE"))
+        assertTrue(acquisition.contains("routeNavigator.rerouteRequestFailed()"))
+        assertTrue(acquisition.contains("existing_route_retained"))
+        assertTrue(guidance.contains("!scope.requestPending &&"))
+        assertTrue(guidance.contains("update.reason != \"route_missing\""))
+        assertTrue(acquisition.contains("!routeNavigator.hasRoute()"))
+        assertTrue(acquisition.contains("navigation=route_waiting trusted_gps_missing"))
     }
 
     @Test
@@ -284,6 +292,7 @@ class TactileRoutePolicyTest {
             routeHeadingDeltaDeg = 5f,
             tmapCorridorProjection = projection,
             centerXNormalized = centerX,
+            routeId = ACTIVE_ROUTE_ID,
         )
     }
 
@@ -293,6 +302,7 @@ class TactileRoutePolicyTest {
             tmapOnRoute = true,
             gpsAccuracyM = 5f,
             tactile = tactile,
+            activeRouteId = ACTIVE_ROUTE_ID,
         )
     }
 
@@ -305,5 +315,9 @@ class TactileRoutePolicyTest {
             directory = directory.parentFile ?: return@repeat
         }
         error("shared tactile route policy fixture not found from $userDirectory")
+    }
+
+    private companion object {
+        const val ACTIVE_ROUTE_ID = "active-route"
     }
 }

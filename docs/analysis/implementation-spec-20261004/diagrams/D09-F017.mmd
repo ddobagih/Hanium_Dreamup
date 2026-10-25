@@ -1,0 +1,32 @@
+flowchart TD
+  T["F-D09-017 목적지 POI 검색·좌표 의미 보존 / P-D09-017"]
+  N0["query와 origin쌍 검증"]
+  T --> N0
+  N1["live 또는 mock 선택"]
+  N0 --> N1
+  N2["budget 후 provider page1 조회"]
+  N1 --> N2
+  N3["count와 유효 POI 정규화"]
+  N2 --> N3
+  N4["좌표family와 stable candidate ID"]
+  N3 --> N4
+  N5["distance source와 more 계산"]
+  N4 --> N5
+  Z["정상: destination_search.v1에 query·후보·좌표family·거리출처·paging정보 반환"]
+  N5 --> Z
+  B0["422 empty_query/origin_coordinates_incomplete"]
+  N0 -->|"빈 normalized query 또는 origin 한쪽만"| B0
+  B1["정해진3개 후보를 matching; live success evidence 기록안함"]
+  N1 -->|"mock provider"| B1
+  B2["502 invalid_tmap_response"]
+  N2 -->|"totalCount/items 형태·개수 불일치"| B2
+  B3["504/502/503 고정오류"]
+  N1 -->|"API timeout/network/429"| B3
+  R["복구: 자동 페이지추가/자동 provider retry 없음 / 조건 복구 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  B3 -.-> R
+  C["취소와 정리: http.disconnect 시 query task.cancel; 소유 runtime에서 resource정리 / 요청 지역 메모리 반환; 공유 자원은 runtime 소유자가 정리"]
+  N5 -.-> C

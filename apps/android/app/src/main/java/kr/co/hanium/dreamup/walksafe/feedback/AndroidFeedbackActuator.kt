@@ -1,28 +1,14 @@
 package kr.co.hanium.dreamup.walksafe.feedback
 
 import android.content.Context
-import android.media.AudioFocusRequest
-import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.ToneGenerator
-import android.os.Build
-import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.os.SystemClock
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
-import android.util.Log
 import java.io.Closeable
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-import kr.co.hanium.dreamup.walksafe.BuildConfig
 import kr.co.hanium.dreamup.walksafe.depth.MessageLevel
-import kr.co.hanium.dreamup.walksafe.voice.selectInstalledOfflineKoreanVoice
 import kr.co.hanium.dreamup.walksafe.voice.KoreanOfflineVoiceSelection
 
 const val PRIORITY_USER_TRAINING_VIBRATION_DURATION_MS = 370L
@@ -41,14 +27,20 @@ data class RiskFeedbackDispatchResult(
 /**
  * Owns Android TTS, audio focus and vibration resources. Risk speech flushes queued navigation;
  * utterance callbacks release focus only after all tracked speech finishes. Call [close] at teardown.
+ *
+ * Public output requests may arrive on any thread. Speech admission (priority, cancellation and
+ * registration) and native speak/stop/close share speechEngineOperationLock, in that order before
+ * pendingUtterances. Native callbacks are posted to the main scheduler; caller validators, focus
+ * effects and terminal callbacks run outside both locks so they may reenter or wait for another
+ * request. Haptic effects use outputGate's separate lifetime/rank order; no speech operation lock
+ * acquires that gate.
  */
 class AndroidFeedbackActuator private constructor(
-    context: Context?,
     private val onOfflineKoreanSpeechUnavailable: () -> Unit = {},
     private val speechAllowed: () -> Boolean = { true },
     private val hapticAllowed: () -> Boolean = { true },
     private val onOfflineKoreanSpeechReady: () -> Unit = {},
-    private val speechRuntime: FeedbackSpeechRuntime?,
+    private val speechRuntime: FeedbackSpeechRuntime,
     private val ttsRecoveryBudget: TtsEngineRecoveryBudget = TtsEngineRecoveryBudget(),
 ) : TextToSpeech.OnInitListener, Closeable {
     constructor(
@@ -58,8 +50,8 @@ class AndroidFeedbackActuator private constructor(
         hapticAllowed: () -> Boolean = { true },
         onOfflineKoreanSpeechReady: () -> Unit = {},
     ) : this(
-        context, onOfflineKoreanSpeechUnavailable, speechAllowed, hapticAllowed,
-        onOfflineKoreanSpeechReady, null,
+        onOfflineKoreanSpeechUnavailable, speechAllowed, hapticAllowed,
+        onOfflineKoreanSpeechReady, AndroidFeedbackSpeechRuntime(context),
     )
 
     /** Injects only platform effects; tests execute this actuator's real ownership state machine. */
@@ -71,12 +63,10 @@ class AndroidFeedbackActuator private constructor(
         onOfflineKoreanSpeechReady: () -> Unit = {},
         recoveryBudget: TtsEngineRecoveryBudget = TtsEngineRecoveryBudget(),
     ) : this(
-        null, onOfflineKoreanSpeechUnavailable, speechAllowed, hapticAllowed,
+        onOfflineKoreanSpeechUnavailable, speechAllowed, hapticAllowed,
         onOfflineKoreanSpeechReady, runtime, recoveryBudget,
     )
 
-    private val appContext = context?.applicationContext
-    private val audioManager = appContext?.getSystemService(AudioManager::class.java)
     private val ready = AtomicBoolean(false)
     private val pendingSpeechQueue = PendingSpeechQueue()
     private val speechUnavailableNotified = AtomicBoolean(false)
@@ -84,40 +74,25 @@ class AndroidFeedbackActuator private constructor(
     private var speechUnavailableVibrationRetained = false
     @Volatile
     private var ttsState = TtsState.INITIALIZING
-    private val mainHandler = speechRuntime?.scheduler ?: AndroidFeedbackSpeechScheduler()
+    private val mainHandler = speechRuntime.scheduler
     private val outputGate = FeedbackOutputGate(::elapsedRealtime)
-    private lateinit var textToSpeech: TextToSpeech
+    @Volatile
     private var ttsEngineGeneration = 0L
+    private var preparedSpeechEngineGeneration: Long? = null
     private var ttsInitializationWatchdog: Runnable? = null
-    private val vibrator: Vibrator? = if (appContext == null) {
-        null
-    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        appContext.getSystemService(VibratorManager::class.java)?.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        appContext.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-    }
     private val audioFocusLock = Any()
     private var hasAudioFocus = false
     private var activeAudioFocus = AudioManager.AUDIOFOCUS_LOSS
-    private var activeAudioFocusRequest: AudioFocusRequest? = null
     private var activeAudioFocusListener: AudioManager.OnAudioFocusChangeListener? = null
     private var audioFocusGeneration = 0L
-    private val pendingUtterances = mutableSetOf<String>()
+    private val pendingUtterances = UtteranceLedger()
     private val speechEngineOperationLock = Any()
     @Volatile
-    private var priorityTrainingStopInProgress = false
+    private var speechEngineStopInProgress = false
     private var speechRecognitionBlockedUntilMs = 0L
     private var speechRecognitionWaitLogged = false
-    private val pendingUtteranceOrder = mutableListOf<String>()
-    private val startedUtterances = mutableSetOf<String>()
     private val utteranceCallbacks = UtteranceCallbackRegistry()
-    private val utteranceWatchdogs = mutableMapOf<String, Runnable>()
-    private val utteranceMessageLengths = mutableMapOf<String, Int>()
-    private val utteranceRiskRanks = mutableMapOf<String, Int>()
-    private val utteranceStartDeadlines = mutableMapOf<String, Long>()
-    private val utteranceStartValidators = mutableMapOf<String, () -> Boolean>()
-    private val explicitTerminalRequiredUtterances = mutableSetOf<String>()
+    private data class RiskStartCheck(val id: String, val deadlineMs: Long, val validator: () -> Boolean)
     private val utteranceSequence = AtomicLong(0L)
     private val priorityUserTrainingVibrationLock = Any()
     private var priorityUserTrainingVibrationCompletion: Runnable? = null
@@ -142,6 +117,9 @@ class AndroidFeedbackActuator private constructor(
      */
     @Volatile
     var speechOutputListener: ((SpeechOutputEvent) -> Unit)? = null
+    /** Separate test diagnostics; never replaces the consented speech-storage listener. */
+    @Volatile
+    internal var guidanceDiagnosticListener: ((SpeechOutputEvent) -> Unit)? = null
     /**
      * S08-34 (nav-F5): true only while a start validator runs for an utterance the engine has
      * actually started (main thread). Submission and start-watchdog checks leave it false.
@@ -190,11 +168,7 @@ class AndroidFeedbackActuator private constructor(
                     if (engineGeneration == ttsEngineGeneration) onInit(status)
                 }
             }
-            if (speechRuntime != null) {
-                speechRuntime.initialize(initialized)
-            } else {
-                textToSpeech = TextToSpeech(requireNotNull(appContext)) { status -> initialized(status) }
-            }
+            speechRuntime.initialize(initialized)
         } catch (_: RuntimeException) {
             mainHandler.post {
                 if (engineGeneration == ttsEngineGeneration) recoverTextToSpeechOrFail()
@@ -220,7 +194,7 @@ class AndroidFeedbackActuator private constructor(
             return
         }
         val languageStatus = runCatching {
-            speechRuntime?.setLanguage(Locale.KOREAN) ?: textToSpeech.setLanguage(Locale.KOREAN)
+            speechRuntime.setLanguage(Locale.KOREAN)
         }.getOrElse {
             recoverTextToSpeechOrFail()
             return
@@ -230,7 +204,7 @@ class AndroidFeedbackActuator private constructor(
             return
         }
         val voiceSelection = runCatching {
-            speechRuntime?.selectOfflineKoreanVoice() ?: selectInstalledOfflineKoreanVoice(textToSpeech)
+            speechRuntime.selectOfflineKoreanVoice()
         }.getOrElse {
             recoverTextToSpeechOrFail()
             return
@@ -303,9 +277,13 @@ class AndroidFeedbackActuator private constructor(
             recoverTextToSpeechOrFail()
             return
         }
-        ready.set(true)
-        ttsState = TtsState.READY
-        speechUnavailableNotified.set(false)
+        synchronized(speechEngineOperationLock) {
+            if (ttsState != TtsState.INITIALIZING || engineGeneration != ttsEngineGeneration) return
+            preparedSpeechEngineGeneration = engineGeneration
+            ready.set(true)
+            ttsState = TtsState.READY
+            speechUnavailableNotified.set(false)
+        }
         runCatching(onOfflineKoreanSpeechReady)
         flushPendingSpeech()
     }
@@ -351,60 +329,107 @@ class AndroidFeedbackActuator private constructor(
         outcome: SpeechOutputOutcome = SpeechOutputOutcome.ENGINE_ERROR,
     ) {
         logSpeechEvent("runtime_error code=$errorCode", utteranceId)
+        val failureEffects = synchronized(speechEngineOperationLock) {
+            val pending = utteranceId != null && synchronized(pendingUtterances) {
+                utteranceId in pendingUtterances
+            }
+            when (ttsRuntimeFailureDisposition(errorCode, pending, ttsState == TtsState.READY)) {
+                TtsRuntimeFailureDisposition.IGNORE -> ({})
+                TtsRuntimeFailureDisposition.UTTERANCE -> ({
+                    markUtteranceFinished(utteranceId, completed = false, notifyFailure = notifyFailure)
+                })
+                TtsRuntimeFailureDisposition.ENGINE -> {
+                    val recoveryEffects = takeTextToSpeechRecoveryEffects()
+                    ({
+                        if (!notifyFailure) markUtteranceFinished(
+                            utteranceId, completed = false, notifyFailure = false,
+                        )
+                        recoveryEffects()
+                    })
+                }
+                TtsRuntimeFailureDisposition.LANGUAGE -> takeOfflineKoreanLanguageFailureEffects()
+            }
+        }
+        // A valid engine failure retires readiness before any observer can replace its owner.
+        // Consumers and native effects run after both ownership locks have been released.
         emitSpeechOutcome(
             outcome,
             utteranceId,
             errorCode.takeIf { outcome == SpeechOutputOutcome.ENGINE_ERROR },
         )
-        val pending = utteranceId != null && synchronized(pendingUtterances) { utteranceId in pendingUtterances }
-        when (ttsRuntimeFailureDisposition(errorCode, pending, ttsState == TtsState.READY)) {
-            TtsRuntimeFailureDisposition.IGNORE -> Unit
-            TtsRuntimeFailureDisposition.UTTERANCE ->
-                markUtteranceFinished(utteranceId, completed = false, notifyFailure = notifyFailure)
-            TtsRuntimeFailureDisposition.ENGINE -> {
-                if (!notifyFailure) markUtteranceFinished(utteranceId, completed = false, notifyFailure = false)
-                recoverTextToSpeechOrFail()
-            }
-            TtsRuntimeFailureDisposition.LANGUAGE -> failOfflineKoreanLanguage()
-        }
+        failureEffects()
     }
 
     private fun recoverTextToSpeechOrFail() {
-        if (ttsState == TtsState.CLOSED) return
-        val recover = ttsRecoveryBudget.claimRetry()
-        val engineGeneration = ++ttsEngineGeneration
-        ready.set(false)
-        if (recover) ttsState = TtsState.INITIALIZING else ttsState = TtsState.FAILED
-        ttsInitializationWatchdog?.let(mainHandler::removeCallbacks)
-        ttsInitializationWatchdog = null
-        pendingSpeechQueue.clear()
-        val interrupted = synchronized(pendingUtterances) { pendingUtterances.toList() }
-        if (isSpeechEngineInitialized()) runCatching { stopSpeechEngine() }
-        failPendingSpeech(interrupted, stopTts = false)
-        if (recover) {
-            mainHandler.postDelayed(
-                {
-                    if (engineGeneration == ttsEngineGeneration && ttsState == TtsState.INITIALIZING) {
-                        initializeTextToSpeech()
-                    }
-                },
-                TTS_RECOVERY_DELAY_MS,
-            )
-        } else {
-            notifyOfflineKoreanSpeechUnavailable()
+        takeTextToSpeechRecoveryEffects()()
+    }
+
+    private fun takeTextToSpeechRecoveryEffects(): () -> Unit {
+        val recover: Boolean
+        val engineGeneration: Long
+        val interrupted: List<String>
+        synchronized(speechEngineOperationLock) {
+            if (ttsState == TtsState.CLOSED) return {}
+            recover = ttsRecoveryBudget.claimRetry()
+            engineGeneration = ++ttsEngineGeneration
+            ready.set(false)
+            if (recover) ttsState = TtsState.INITIALIZING else ttsState = TtsState.FAILED
+            ttsInitializationWatchdog?.let(mainHandler::removeCallbacks)
+            ttsInitializationWatchdog = null
+            pendingSpeechQueue.clear()
+            interrupted = synchronized(pendingUtterances) { pendingUtterances.toList() }
+        }
+        return {
+            synchronized(speechEngineOperationLock) {
+                if (engineGeneration == ttsEngineGeneration && ttsState != TtsState.CLOSED &&
+                    isSpeechEngineInitialized()
+                ) stopSpeechEngine()
+            }
+            failPendingSpeech(interrupted, stopTts = false)
+            // Observer, native stop and terminal consumers may have closed or replaced the engine.
+            if (engineGeneration == ttsEngineGeneration && ttsState != TtsState.CLOSED) {
+                if (recover) {
+                    mainHandler.postDelayed(
+                        {
+                            if (engineGeneration == ttsEngineGeneration && ttsState == TtsState.INITIALIZING) {
+                                initializeTextToSpeech()
+                            }
+                        },
+                        TTS_RECOVERY_DELAY_MS,
+                    )
+                } else {
+                    notifyOfflineKoreanSpeechUnavailable()
+                }
+            }
         }
     }
 
     private fun failOfflineKoreanLanguage() {
-        if (ttsState == TtsState.CLOSED) return
-        ttsEngineGeneration += 1L
-        ready.set(false)
-        ttsState = TtsState.LANGUAGE_UNSUPPORTED
-        pendingSpeechQueue.clear()
-        val interrupted = synchronized(pendingUtterances) { pendingUtterances.toList() }
-        if (isSpeechEngineInitialized()) runCatching { stopSpeechEngine() }
-        failPendingSpeech(interrupted, stopTts = false)
-        notifyOfflineKoreanSpeechUnavailable()
+        takeOfflineKoreanLanguageFailureEffects()()
+    }
+
+    private fun takeOfflineKoreanLanguageFailureEffects(): () -> Unit {
+        val engineGeneration: Long
+        val interrupted: List<String>
+        synchronized(speechEngineOperationLock) {
+            if (ttsState == TtsState.CLOSED) return {}
+            engineGeneration = ++ttsEngineGeneration
+            ready.set(false)
+            ttsState = TtsState.LANGUAGE_UNSUPPORTED
+            pendingSpeechQueue.clear()
+            interrupted = synchronized(pendingUtterances) { pendingUtterances.toList() }
+        }
+        return {
+            synchronized(speechEngineOperationLock) {
+                if (engineGeneration == ttsEngineGeneration && ttsState == TtsState.LANGUAGE_UNSUPPORTED &&
+                    isSpeechEngineInitialized()
+                ) stopSpeechEngine()
+            }
+            failPendingSpeech(interrupted, stopTts = false)
+            if (engineGeneration == ttsEngineGeneration && ttsState == TtsState.LANGUAGE_UNSUPPORTED) {
+                notifyOfflineKoreanSpeechUnavailable()
+            }
+        }
     }
 
     fun emit(
@@ -414,8 +439,16 @@ class AndroidFeedbackActuator private constructor(
         isStillValidAtStart: () -> Boolean,
         onSpeechCancelled: (() -> Unit)? = null,
     ): RiskFeedbackDispatchResult {
+        val policyOwner = action.deliveryOwner
+        if (policyOwner != null && (!policyOwner.matches(action) || !policyOwner.isClaimed())) {
+            return RiskFeedbackDispatchResult(NavigationSpeechDispatchResult.SUPPRESSED, false)
+        }
         val generation = outputGate.generation()
-        val current = { outputGate.isCurrent(generation, action.validUntilMs, isStillValidAtStart) }
+        val current = {
+            outputGate.isCurrent(generation, action.validUntilMs) &&
+                runCatching(isStillValidAtStart).getOrDefault(false) &&
+                outputGate.isCurrent(generation, action.validUntilMs)
+        }
         if (!current()) return RiskFeedbackDispatchResult(NavigationSpeechDispatchResult.SUPPRESSED, false)
         val speech = speak(
             message = action.message,
@@ -428,15 +461,59 @@ class AndroidFeedbackActuator private constructor(
             requiresExplicitTerminalCallback = true,
             protectsFromFollowingSpeech = false,
             onCancelled = onSpeechCancelled,
+            riskDeliveryOwner = policyOwner,
+            onCloseCancelled = onSpeechCancelled,
+            messageFamily = SpeechMessageFamily.RISK,
         )
+        val vibrationCurrent = {
+            (policyOwner == null || policyOwner.isClaimed()) && current() &&
+                (policyOwner == null || policyOwner.isClaimed())
+        }
         val vibrationAccepted = vibrate(action.vibrationPatternMs, rank = action.level.ordinal,
-            validUntilMs = action.validUntilMs, isStillValid = current, generation = generation)
+            validUntilMs = action.validUntilMs, isStillValid = vibrationCurrent, generation = generation,
+            eventId = action.deliveryKey.takeIf { action.level == MessageLevel.STOP })
         return RiskFeedbackDispatchResult(speech, vibrationAccepted)
+    }
+
+    /**
+     * Cancels only this issued risk's speech; the caller decides when its guidance is invalid.
+     * True means the registered delivery was detached and native stop was attempted, not an
+     * acknowledgement that the platform stopped playing. Stop errors use the existing log path.
+     * The single CANCELLED_RISK observation has this same logical meaning.
+     */
+    fun cancelRiskSpeech(action: FeedbackAction): Boolean {
+        val owner = action.deliveryOwner ?: return false
+        if (!owner.matches(action)) return false
+        val outputGeneration = outputGate.generation()
+        if (!outputGate.isCurrent(outputGeneration)) return false
+        val cancellation = synchronized(speechEngineOperationLock) {
+            if (ttsState != TtsState.READY || speechEngineStopInProgress) return false
+            val utteranceId = synchronized(pendingUtterances) {
+                // Native TTS has no per-utterance stop. Never stop an unrelated queued owner.
+                pendingUtterances.singleOrNull()?.takeIf { id ->
+                    val registration = pendingUtterances[id]?.riskDelivery
+                    registration != null && registration.owner === owner &&
+                        registration.engineGeneration == ttsEngineGeneration &&
+                        registration.outputGeneration == outputGeneration
+                }
+            } ?: return false
+            // Revoke native callback ownership before stop, including synchronous onDone/onStop.
+            // The policy may already have retired the owner, so isClaimed is not a cancel gate.
+            val effects = takeUtteranceFinishEffects(utteranceId, completed = false, cancelled = true)
+            stopSpeechEngine()
+            utteranceId to effects
+        }
+        cancellation.second()
+        // Native callbacks lost the detached registration; report this accepted cancellation once.
+        // Both callbacks run outside admission/registry locks; observer exceptions are isolated.
+        emitSpeechOutcome(SpeechOutputOutcome.CANCELLED_RISK, cancellation.first)
+        return true
     }
 
     fun vibrateRiskOnly(action: FeedbackAction, isStillValidAtStart: () -> Boolean): Boolean =
         vibrate(action.vibrationPatternMs, rank = action.level.ordinal,
-            validUntilMs = action.validUntilMs, isStillValid = isStillValidAtStart)
+            validUntilMs = action.validUntilMs, isStillValid = isStillValidAtStart,
+            eventId = action.deliveryKey.takeIf { action.level == MessageLevel.STOP })
 
     /** Short, distinct haptics announce when voice recognition starts and stops listening. */
     fun playVoiceListeningStartVibration(): Boolean = vibrate(longArrayOf(0L, 35L))
@@ -446,14 +523,16 @@ class AndroidFeedbackActuator private constructor(
     fun playRouteGuidancePausedVibration(): Boolean = vibrate(longArrayOf(0L, 120L))
 
     fun playRouteDeviationConfirmedVibration(): Boolean =
-        vibrate(checkNotNull(VibrationPatterns.forLevel(MessageLevel.STOP)), rank = MessageLevel.STOP.ordinal)
+        vibrate(checkNotNull(VibrationPatterns.forLevel(MessageLevel.STOP)), rank = MessageLevel.STOP.ordinal,
+            eventId = "route_deviation_confirmed")
 
     /** Adds a short haptic cue to the separate spoken and on-screen mounting correction. */
     fun playPhoneMountingCorrectionVibration(): Boolean =
         vibrate(longArrayOf(0L, 120L))
 
     fun playPhoneMountingSafetyStopVibration(): Boolean =
-        vibrate(checkNotNull(VibrationPatterns.forLevel(MessageLevel.STOP)), rank = MessageLevel.STOP.ordinal)
+        vibrate(checkNotNull(VibrationPatterns.forLevel(MessageLevel.STOP)), rank = MessageLevel.STOP.ordinal,
+            eventId = "phone_mounting_safety_stop")
 
     fun playPriorityUserTrainingVibration(
         onWindowElapsed: () -> Unit,
@@ -488,17 +567,20 @@ class AndroidFeedbackActuator private constructor(
     }
 
     fun cancelCommandInteraction() {
-        val commandUtterances = synchronized(pendingUtterances) {
-            if (pendingUtterances.any { !it.startsWith("$ANNOUNCE_INTERACTION_PREFIX-") }) return
-            val owned = utteranceCallbacks.exclusiveCommandUtteranceIds(
-                pendingUtteranceIds = pendingUtterances,
-                explicitTerminalRequiredIds = explicitTerminalRequiredUtterances,
-            )
+        val commandUtterances = synchronized(speechEngineOperationLock) {
+            val owned = synchronized(pendingUtterances) {
+                if (pendingUtterances.any { !it.startsWith("$ANNOUNCE_INTERACTION_PREFIX-") }) return
+                utteranceCallbacks.exclusiveCommandUtteranceIds(
+                    pendingUtteranceIds = pendingUtterances,
+                    explicitTerminalRequiredIds = pendingUtterances.explicitTerminalIds(),
+                )
+            }
             if (owned.isEmpty()) return
-            // Keep the ownership check and engine stop atomic with utterance registration.
             if (ttsState == TtsState.READY) stopSpeechEngine()
-            lastInteractionMessage = ""
-            lastInteractionMessageAtMs = 0L
+            synchronized(pendingUtterances) {
+                lastInteractionMessage = ""
+                lastInteractionMessageAtMs = 0L
+            }
             owned
         }
         commandUtterances.forEach { markUtteranceFinished(it, completed = false) }
@@ -518,11 +600,11 @@ class AndroidFeedbackActuator private constructor(
                         pendingUtterances.all { it in strictUtterances }
                 }
                 if (stillOwnsStop) {
-                    priorityTrainingStopInProgress = true
+                    speechEngineStopInProgress = true
                     try {
                         stopSpeechEngine()
                     } finally {
-                        priorityTrainingStopInProgress = false
+                        speechEngineStopInProgress = false
                     }
                 }
             }
@@ -535,34 +617,38 @@ class AndroidFeedbackActuator private constructor(
 
     /** Gives a spoken accessibility service sole ownership before it announces a risk. */
     fun prepareForExternalRiskAnnouncement() {
-        synchronized(pendingUtterances) { progressToneGeneration += 1 }
-        pendingSpeechQueue.clear()
         val watchdogs: List<Runnable>
         val advisoryFailures: List<() -> Unit>
         val strictTrainingFailures: List<() -> Unit>
-        synchronized(pendingUtterances) {
-            advisoryFailures = pendingUtterances
-                .filter { it.startsWith("$ANNOUNCE_ADVISORY_PREFIX-") }
-                .mapNotNull { utteranceCallbacks.takeTerminalCallback(it, completed = false, notifyFailure = true, cancelled = true) }
-            strictTrainingFailures = explicitTerminalRequiredUtterances
-                .mapNotNull { utteranceCallbacks.takeTerminalCallback(it, completed = false, notifyFailure = true, cancelled = true) }
-            if (pendingUtterances.isNotEmpty()) {
-                speechRecognitionBlockedUntilMs = elapsedRealtime() + SPEECH_RECOGNITION_QUIET_MS
+        val focusRegistration: AudioManager.OnAudioFocusChangeListener?
+        val tone: ProgressToneEffects?
+        synchronized(speechEngineOperationLock) {
+            pendingSpeechQueue.clear()
+            synchronized(pendingUtterances) {
+                progressToneGeneration += 1
+                tone = detachProgressToneLocked()?.first
+                advisoryFailures = pendingUtterances
+                    .filter { it.startsWith("$ANNOUNCE_ADVISORY_PREFIX-") }
+                    .mapNotNull { utteranceCallbacks.takeTerminalCallback(it, completed = false, notifyFailure = true, cancelled = true) }
+                strictTrainingFailures = pendingUtterances.explicitTerminalIds()
+                    .mapNotNull { utteranceCallbacks.takeTerminalCallback(it, completed = false, notifyFailure = true, cancelled = true) }
+                if (pendingUtterances.isNotEmpty()) {
+                    speechRecognitionBlockedUntilMs = elapsedRealtime() + SPEECH_RECOGNITION_QUIET_MS
+                }
+                watchdogs = pendingUtterances.drain().mapNotNull { it.watchdog }
+                utteranceCallbacks.clear()
+                lastRiskMessage = ""
+                lastRiskMessageAtMs = 0L
+                lastNavMessage = ""
+                lastNavMessageAtMs = 0L
+                lastInteractionMessage = ""
+                lastInteractionMessageAtMs = 0L
+                focusRegistration = retireAudioFocusRegistration()
             }
-            pendingUtterances.clear()
-            pendingUtteranceOrder.clear()
-            startedUtterances.clear()
-            utteranceCallbacks.clear()
-            watchdogs = utteranceWatchdogs.values.toList()
-            utteranceWatchdogs.clear()
-            utteranceMessageLengths.clear()
-            utteranceRiskRanks.clear()
-            utteranceStartDeadlines.clear()
-            utteranceStartValidators.clear()
-            explicitTerminalRequiredUtterances.clear()
+            // Admission cannot publish a replacement between retiring the old owners and stop.
+            if (ttsState == TtsState.READY) stopSpeechEngine()
         }
         watchdogs.forEach(mainHandler::removeCallbacks)
-        if (ttsState == TtsState.READY) stopSpeechEngine()
         advisoryFailures.forEach { callback ->
             runCatching { callback() }
                 .onFailure { logSpeechEvent("terminal_callback_error") }
@@ -571,14 +657,9 @@ class AndroidFeedbackActuator private constructor(
             runCatching { callback() }
                 .onFailure { logSpeechEvent("terminal_callback_error") }
         }
-        stopProgressToneSafely { progressTone?.stopTone() }
-        lastRiskMessage = ""
-        lastRiskMessageAtMs = 0L
-        lastNavMessage = ""
-        lastNavMessageAtMs = 0L
-        lastInteractionMessage = ""
-        lastInteractionMessageAtMs = 0L
-        abandonAudioFocus()
+        stopProgressToneSafely { tone?.stopTone() }
+        releaseProgressTone(tone)
+        focusRegistration?.let { releaseAudioFocusRegistration(it) }
     }
 
     fun speakNavigation(
@@ -603,6 +684,8 @@ class AndroidFeedbackActuator private constructor(
             requiresExplicitTerminalCallback = requiresExplicitTerminalCallback,
             protectsFromFollowingSpeech = false,
             onCancelled = onCancelled,
+            onCloseCancelled = onCancelled,
+            messageFamily = SpeechMessageFamily.NAVIGATION,
         )
     }
 
@@ -626,7 +709,7 @@ class AndroidFeedbackActuator private constructor(
         }
         navigation.forEach {
             val notifyFailure = synchronized(pendingUtterances) {
-                it in explicitTerminalRequiredUtterances
+                pendingUtterances[it]?.requiresExplicitTerminalCallback == true
             }
             markUtteranceFinished(it, completed = false, notifyFailure = notifyFailure, cancelled = true)
         }
@@ -638,6 +721,7 @@ class AndroidFeedbackActuator private constructor(
         message: String,
         onFailed: () -> Unit,
         onCompleted: (() -> Unit)? = null,
+        onCancelled: (() -> Unit)? = null,
     ): NavigationSpeechDispatchResult {
         if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
         if (ttsState != TtsState.READY) return NavigationSpeechDispatchResult.UNAVAILABLE
@@ -648,16 +732,73 @@ class AndroidFeedbackActuator private constructor(
             onFailed = onFailed,
             requiresExplicitTerminalCallback = true,
             protectsFromFollowingSpeech = false,
+            onCancelled = onCancelled ?: onFailed,
+            onCloseCancelled = onCancelled,
+            messageFamily = SpeechMessageFamily.INTERACTION,
         )
     }
 
     fun speakInteraction(message: String): Boolean =
-        speak(message, SpeechPriority.INTERACTION) == NavigationSpeechDispatchResult.ACCEPTED
+        speak(message, SpeechPriority.INTERACTION, messageFamily = SpeechMessageFamily.INTERACTION) ==
+            NavigationSpeechDispatchResult.ACCEPTED
+
+    /** Home response currentness is checked at admission, after focus and at native START. */
+    @JvmOverloads
+    fun speakGuardedHomeCommandInteraction(
+        message: String,
+        isStillValidAtStart: () -> Boolean,
+        onFailed: () -> Unit,
+        onCompleted: (() -> Unit)? = null,
+        onCancelled: (() -> Unit)? = null,
+        deferToCurrentSpeech: Boolean = false,
+    ): NavigationSpeechDispatchResult {
+        if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
+        if (ttsState != TtsState.READY) return NavigationSpeechDispatchResult.UNAVAILABLE
+        return speakReady(
+            message = message,
+            priority = SpeechPriority.INTERACTION,
+            onCompleted = onCompleted,
+            onFailed = onFailed,
+            advisoryStartDeadlineMs = Long.MAX_VALUE,
+            advisoryStartValidator = isStillValidAtStart,
+            requiresExplicitTerminalCallback = true,
+            protectsFromFollowingSpeech = false,
+            onCancelled = onCancelled ?: onFailed,
+            onCloseCancelled = onCancelled,
+            messageFamily = SpeechMessageFamily.INTERACTION,
+            deferToCurrentSpeech = deferToCurrentSpeech,
+        )
+    }
+
+    /** The caller owns the immutable response source; callbacks retain interaction semantics. */
+    @JvmOverloads
+    fun speakGuardedInteraction(
+        message: String,
+        isStillValidAtStart: () -> Boolean,
+        onCompleted: (() -> Unit)?,
+        onFailed: (() -> Unit)?,
+        onCancelled: (() -> Unit)? = null,
+        deferToCurrentSpeech: Boolean = false,
+    ): NavigationSpeechDispatchResult = speak(
+        message = message,
+        priority = SpeechPriority.INTERACTION,
+        onCompleted = onCompleted,
+        onFailed = onFailed,
+        advisoryStartDeadlineMs = Long.MAX_VALUE,
+        advisoryStartValidator = isStillValidAtStart,
+        requiresExplicitTerminalCallback = true,
+        protectsFromFollowingSpeech = false,
+        onCancelled = onCancelled ?: onFailed,
+        onCloseCancelled = onCancelled,
+        messageFamily = SpeechMessageFamily.INTERACTION,
+        deferToCurrentSpeech = deferToCurrentSpeech,
+    )
 
     fun speakInteraction(
         message: String,
         onCompleted: (() -> Unit)?,
         onFailed: (() -> Unit)?,
+        onCancelled: (() -> Unit)? = null,
     ): NavigationSpeechDispatchResult = speak(
         message = message,
         priority = SpeechPriority.INTERACTION,
@@ -665,18 +806,25 @@ class AndroidFeedbackActuator private constructor(
         onFailed = onFailed,
         requiresExplicitTerminalCallback = true,
         protectsFromFollowingSpeech = false,
+        onCancelled = onCancelled ?: onFailed,
+        onCloseCancelled = onCancelled,
+        messageFamily = SpeechMessageFamily.INTERACTION,
     )
 
     fun speakExplicitConfirmation(
         message: String,
         onCompleted: () -> Unit,
         onFailed: () -> Unit,
+        onCancelled: (() -> Unit)? = null,
     ): NavigationSpeechDispatchResult = speak(
         message = message,
         priority = SpeechPriority.INTERACTION,
         onCompleted = onCompleted,
         onFailed = onFailed,
         requiresExplicitTerminalCallback = true,
+        onCancelled = onCancelled ?: onFailed,
+        onCloseCancelled = onCancelled,
+        messageFamily = SpeechMessageFamily.EDUCATION_OR_CONSENT,
     )
 
     /** Explicit consent reading can precede startup checks, but still requires a ready offline voice. */
@@ -684,6 +832,7 @@ class AndroidFeedbackActuator private constructor(
         message: String,
         onCompleted: () -> Unit,
         onFailed: () -> Unit,
+        onCancelled: (() -> Unit)? = null,
     ): NavigationSpeechDispatchResult {
         if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
         if (ttsState != TtsState.READY) return NavigationSpeechDispatchResult.UNAVAILABLE
@@ -693,6 +842,9 @@ class AndroidFeedbackActuator private constructor(
             onCompleted = onCompleted,
             onFailed = onFailed,
             requiresExplicitTerminalCallback = true,
+            onCancelled = onCancelled ?: onFailed,
+            onCloseCancelled = onCancelled,
+            messageFamily = SpeechMessageFamily.EDUCATION_OR_CONSENT,
         )
     }
 
@@ -700,12 +852,16 @@ class AndroidFeedbackActuator private constructor(
         message: String,
         onCompleted: () -> Unit,
         onFailed: () -> Unit,
+        onCancelled: (() -> Unit)? = null,
     ): NavigationSpeechDispatchResult = speak(
         message = message,
         priority = SpeechPriority.INTERACTION,
         onCompleted = onCompleted,
         onFailed = onFailed,
         requiresExplicitTerminalCallback = true,
+        onCancelled = onCancelled ?: onFailed,
+        onCloseCancelled = onCancelled,
+        messageFamily = SpeechMessageFamily.EDUCATION_OR_CONSENT,
     )
 
     /** Queues a low-priority camera advisory without interrupting navigation or risk speech. */
@@ -723,6 +879,66 @@ class AndroidFeedbackActuator private constructor(
         advisoryStartDeadlineMs = validUntilMs,
         advisoryStartValidator = isStillValid,
     ) == NavigationSpeechDispatchResult.ACCEPTED
+
+    /**
+     * Uses the same advisory admission as [speakAdvisory]. A registered request delivers its receipt
+     * once, outside both speech locks, after REQUESTED and before focus or native speech.
+     * An observer or concurrent replacement may retire it before delivery; callers must also fence
+     * their source ownership and terminal state when receiving the receipt.
+     * Terminal callbacks may run before this method returns; callers must keep ownership from
+     * [onRegistered], rather than restoring it from the returned dispatch result. The callback is
+     * exception-isolated. A receipt can already be retired when dispatch returns false.
+     */
+    fun speakAdvisoryWithReceipt(
+        message: String,
+        validUntilMs: Long,
+        isStillValid: () -> Boolean,
+        onRegistered: (AdvisorySpeechReceipt) -> Unit,
+        onCompleted: (() -> Unit)? = null,
+        onFailed: (() -> Unit)? = null,
+        onCancelled: (() -> Unit)? = onFailed,
+    ): Boolean {
+        val receipt = AdvisorySpeechReceipt()
+        return speak(
+            message = message,
+            priority = SpeechPriority.ADVISORY,
+            onCompleted = onCompleted,
+            onFailed = onFailed,
+            advisoryStartDeadlineMs = validUntilMs,
+            advisoryStartValidator = isStillValid,
+            onCancelled = onCancelled,
+            advisoryReceipt = receipt,
+            onAdvisoryRegistered = { onRegistered(receipt) },
+        ) == NavigationSpeechDispatchResult.ACCEPTED
+    }
+
+    /**
+     * Detaches only this actuator's exact, still registered advisory, even if its source was
+     * invalidated after playback began. True means logical cancellation and a native stop attempt,
+     * not a platform playback acknowledgement. It preserves haptics and engine readiness.
+     */
+    fun cancelAdvisorySpeech(receipt: AdvisorySpeechReceipt): Boolean {
+        val outputGeneration = outputGate.generation()
+        if (!outputGate.isCurrent(outputGeneration)) return false
+        val cancellation = synchronized(speechEngineOperationLock) {
+            if (ttsState != TtsState.READY || speechEngineStopInProgress) return false
+            val utteranceId = synchronized(pendingUtterances) {
+                // Native stop cannot target an individual utterance in an unrelated queue.
+                pendingUtterances.singleOrNull()?.takeIf { id ->
+                    val registration = pendingUtterances[id]?.advisoryDelivery
+                    registration != null && registration.receipt === receipt &&
+                        registration.engineGeneration == ttsEngineGeneration &&
+                        registration.outputGeneration == outputGeneration
+                }
+            } ?: return false
+            val effects = takeUtteranceFinishEffects(utteranceId, completed = false, cancelled = true)
+            stopSpeechEngine()
+            utteranceId to effects
+        }
+        cancellation.second()
+        emitSpeechOutcome(SpeechOutputOutcome.CANCELLED_ADVISORY, cancellation.first)
+        return true
+    }
 
     fun isAppSpeechIdleForExternalAdvisory(): Boolean =
         synchronized(pendingUtterances) { pendingUtterances.isEmpty() }
@@ -787,7 +1003,7 @@ class AndroidFeedbackActuator private constructor(
         }
         if (tone == null) {
             tone = try {
-                speechRuntime?.createProgressTone(volume) ?: AndroidProgressToneEffects(volume)
+                speechRuntime.createProgressTone(volume)
             } catch (_: Exception) {
                 logSpeechEvent("progress_tone_create_error")
                 abandonProgressFocusIfOwned(attempt, focusGeneration)
@@ -885,10 +1101,22 @@ class AndroidFeedbackActuator private constructor(
             )
         } ?: return
         // Native release stays outside both locks and targets the detached registration only.
-        releaseAudioFocusRegistration(registration.first, registration.second)
+        releaseAudioFocusRegistration(registration)
     }
 
     fun isSpeechInitializing(): Boolean = ttsState == TtsState.INITIALIZING
+
+    /** A failed engine needs an explicit new owner; normal readiness never spends another retry. */
+    internal fun hasTerminalSpeechFailure(): Boolean = synchronized(speechEngineOperationLock) {
+        ttsState == TtsState.FAILED || ttsState == TtsState.LANGUAGE_UNSUPPORTED
+    }
+
+    /** The prepared engine identity, read without queuing or starting any output. */
+    internal fun readySpeechEngineGenerationOrNull(): Long? = synchronized(speechEngineOperationLock) {
+        preparedSpeechEngineGeneration?.takeIf {
+            ttsState == TtsState.READY && ready.get() && it == ttsEngineGeneration
+        }
+    }
 
     fun statusText(): String {
         return when (ttsState) {
@@ -911,6 +1139,12 @@ class AndroidFeedbackActuator private constructor(
         requiresExplicitTerminalCallback: Boolean = false,
         protectsFromFollowingSpeech: Boolean = requiresExplicitTerminalCallback,
         onCancelled: (() -> Unit)? = onFailed,
+        riskDeliveryOwner: FeedbackDeliveryOwner? = null,
+        onCloseCancelled: (() -> Unit)? = null,
+        advisoryReceipt: AdvisorySpeechReceipt? = null,
+        onAdvisoryRegistered: (() -> Unit)? = null,
+        messageFamily: SpeechMessageFamily? = null,
+        deferToCurrentSpeech: Boolean = false,
     ): NavigationSpeechDispatchResult {
         if (message.isBlank()) return NavigationSpeechDispatchResult.SUPPRESSED
         if (!speechAllowed()) return NavigationSpeechDispatchResult.UNAVAILABLE
@@ -937,6 +1171,12 @@ class AndroidFeedbackActuator private constructor(
             requiresExplicitTerminalCallback,
             protectsFromFollowingSpeech,
             onCancelled,
+            riskDeliveryOwner,
+            onCloseCancelled,
+            advisoryReceipt,
+            onAdvisoryRegistered,
+            messageFamily,
+            deferToCurrentSpeech,
         )
     }
 
@@ -956,25 +1196,28 @@ class AndroidFeedbackActuator private constructor(
         requiresExplicitTerminalCallback: Boolean = false,
         protectsFromFollowingSpeech: Boolean = requiresExplicitTerminalCallback,
         onCancelled: (() -> Unit)? = onFailed,
+        riskDeliveryOwner: FeedbackDeliveryOwner? = null,
+        onCloseCancelled: (() -> Unit)? = null,
+        advisoryReceipt: AdvisorySpeechReceipt? = null,
+        onAdvisoryRegistered: (() -> Unit)? = null,
+        messageFamily: SpeechMessageFamily? = null,
+        deferToCurrentSpeech: Boolean = false,
     ): NavigationSpeechDispatchResult {
         if (!outputGate.isCurrent()) return NavigationSpeechDispatchResult.SUPPRESSED
         // A synchronous native stop callback must not reenter TTS speak before stop returns.
-        if (priorityTrainingStopInProgress) return NavigationSpeechDispatchResult.UNAVAILABLE
+        if (speechEngineStopInProgress && Thread.holdsLock(speechEngineOperationLock)) {
+            return NavigationSpeechDispatchResult.UNAVAILABLE
+        }
         val dispatchEngineGeneration = ttsEngineGeneration
         val dispatchOutputGeneration = outputGate.generation()
         fun submissionOwnerIsCurrent(): Boolean =
             ttsState == TtsState.READY &&
                 ttsEngineGeneration == dispatchEngineGeneration &&
-                outputGate.isCurrent(dispatchOutputGeneration)
+                outputGate.isCurrent(dispatchOutputGeneration) &&
+                (riskDeliveryOwner == null || riskDeliveryOwner.isClaimed())
         val isRisk = priority == SpeechPriority.RISK
         val isInteraction = priority == SpeechPriority.INTERACTION
         val isAdvisory = priority == SpeechPriority.ADVISORY
-        val strictTrainingUtterance = synchronized(pendingUtterances) {
-            utteranceCallbacks.protectedUtteranceIds().firstOrNull()
-        }
-        if (strictTrainingUtterance != null) {
-            if (!isRisk) return NavigationSpeechDispatchResult.SUPPRESSED
-        }
         val nowMs = elapsedRealtime()
         if (
             (isAdvisory || advisoryStartDeadlineMs != null || advisoryStartValidator != null) &&
@@ -985,52 +1228,43 @@ class AndroidFeedbackActuator private constructor(
                     !runCatching(advisoryStartValidator).getOrDefault(false)
             )
         ) return NavigationSpeechDispatchResult.SUPPRESSED
-        if (isRisk) {
-            val activeRiskRank = synchronized(pendingUtterances) {
-                pendingUtterances.mapNotNull(utteranceRiskRanks::get).maxOrNull()
-            }
-            if (activeRiskRank != null && (riskRank ?: activeRiskRank) <= activeRiskRank) {
-                return NavigationSpeechDispatchResult.SUPPRESSED
-            }
-        }
-        val messagePriorityMs = when (priority) {
-            SpeechPriority.RISK -> RISK_DUP_WINDOW_MS
-            SpeechPriority.INTERACTION -> INTERACTION_DUP_WINDOW_MS
-            SpeechPriority.NAVIGATION -> NAV_DUP_WINDOW_MS
-            SpeechPriority.ADVISORY -> 0L
-        }
-        if (!isAdvisory && isDuplicateMessage(message, priority, messagePriorityMs)) {
-            return NavigationSpeechDispatchResult.SUPPRESSED
-        }
-        if (isAdvisory && synchronized(pendingUtterances) { pendingUtterances.isNotEmpty() }) {
-            return NavigationSpeechDispatchResult.SUPPRESSED
-        }
-        val riskPending = synchronized(pendingUtterances) {
-            pendingUtterances.any { it.startsWith("$ANNOUNCE_ASSERTIVE_PREFIX-") }
-        }
-        val isCommandInteraction = isInteraction && requiresExplicitTerminalCallback &&
-            !protectsFromFollowingSpeech
-        // Do not queue cancellable commands behind risk speech: stopping that queue would stop risk.
-        if (isCommandInteraction && riskPending) return NavigationSpeechDispatchResult.SUPPRESSED
-        // TextToSpeech.stop() cannot cancel a training utterance without stopping the preceding
-        // risk. Keep all interactions outside that engine queue, including protected training.
-        if (isInteraction && riskPending) return NavigationSpeechDispatchResult.SUPPRESSED
-        if (priority == SpeechPriority.NAVIGATION) {
-            val pendingIds = synchronized(pendingUtterances) { pendingUtterances.toList() }
-            if (pendingIds.isNotEmpty()) {
-                if (pendingIds.any { !it.startsWith("$ANNOUNCE_ADVISORY_PREFIX-") }) {
-                    return NavigationSpeechDispatchResult.SUPPRESSED
+        // Only an unstarted, same-rank owner with an actual false start check may yield.
+        // Caller checks can reenter or wait for another request, so take and evaluate separately.
+        val invalidatedRiskStarts = if (isRisk && riskRank != null) {
+            val checks = synchronized(pendingUtterances) {
+                pendingUtterances.mapNotNull { id ->
+                    if (pendingUtterances[id]?.started == true || pendingUtterances[id]?.riskRank != riskRank) return@mapNotNull null
+                    val deadline = pendingUtterances[id]?.startDeadlineMs ?: return@mapNotNull null
+                    val validator = pendingUtterances[id]?.startValidator ?: return@mapNotNull null
+                    RiskStartCheck(id, deadline, validator)
                 }
-                cancelQueuedCompletionCallbacks(keepRisk = false)
-                if (!submissionOwnerIsCurrent()) return NavigationSpeechDispatchResult.UNAVAILABLE
-                stopSpeechEngine()
+            }
+            checks.filter { runCatching(it.validator).getOrNull() == false }.associateBy(RiskStartCheck::id)
+        } else emptyMap()
+        if (!submissionOwnerIsCurrent()) return NavigationSpeechDispatchResult.UNAVAILABLE
+        val replacedPolicyOwner = riskDeliveryOwner?.replacesDeliveryOwner
+        fun authorizedReplacementIdLocked(): String? {
+            if (!isRisk || riskDeliveryOwner == null || replacedPolicyOwner == null ||
+                !riskDeliveryOwner.isClaimed() || !replacedPolicyOwner.isClaimed() ||
+                riskDeliveryOwner.trackId != replacedPolicyOwner.trackId
+            ) return null
+            return pendingUtterances.singleOrNull { id ->
+                val registration = pendingUtterances[id]?.riskDelivery
+                pendingUtterances[id]?.riskRank == riskRank && registration != null &&
+                    registration.owner === replacedPolicyOwner &&
+                    registration.engineGeneration == dispatchEngineGeneration &&
+                    registration.outputGeneration == dispatchOutputGeneration
             }
         }
-        val queueMode = when (priority) {
-            SpeechPriority.RISK -> TextToSpeech.QUEUE_FLUSH
-            SpeechPriority.INTERACTION -> if (riskPending) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH
-            SpeechPriority.NAVIGATION -> TextToSpeech.QUEUE_ADD
-            SpeechPriority.ADVISORY -> TextToSpeech.QUEUE_ADD
+        fun activeRiskRankLocked(): Int? {
+            val replacementId = authorizedReplacementIdLocked()
+            return pendingUtterances.filterNot { id ->
+                val checked = invalidatedRiskStarts[id]
+                id == replacementId ||
+                    (checked != null && pendingUtterances[id]?.started == false &&
+                        pendingUtterances[id]?.startDeadlineMs == checked.deadlineMs &&
+                        pendingUtterances[id]?.startValidator === checked.validator)
+            }.mapNotNull { pendingUtterances[it]?.riskRank }.maxOrNull()
         }
         val utterancePrefix = when (priority) {
             SpeechPriority.RISK -> ANNOUNCE_ASSERTIVE_PREFIX
@@ -1039,10 +1273,13 @@ class AndroidFeedbackActuator private constructor(
             SpeechPriority.ADVISORY -> ANNOUNCE_ADVISORY_PREFIX
         }
         val utteranceId = "$utterancePrefix-$nowMs-${utteranceSequence.incrementAndGet()}"
+        // Select once from the actual caller meaning and keep this budget with its registration.
+        val terminalBudgetMs = messageFamily?.let { utteranceTerminalTimeoutMs(message.length, it) }
+            ?: utteranceTerminalTimeoutMs(message.length)
         val registerUtterance = {
             markUtteranceStarted(
                 utteranceId,
-                message.length,
+                terminalBudgetMs,
                 riskRank,
                 onCompleted,
                 onFailed,
@@ -1051,34 +1288,131 @@ class AndroidFeedbackActuator private constructor(
                 requiresExplicitTerminalCallback,
                 protectsFromFollowingSpeech,
                 onCancelled,
+                riskDeliveryOwner?.let {
+                    RiskDeliveryRegistration(it, dispatchEngineGeneration, dispatchOutputGeneration)
+                },
+                onCloseCancelled,
+                advisoryReceipt?.let {
+                    AdvisoryDeliveryRegistration(it, dispatchEngineGeneration, dispatchOutputGeneration)
+                },
             )
         }
-        if (queueMode == TextToSpeech.QUEUE_FLUSH) {
-            logSpeechEvent("queue_flush priority=$priority")
-            cancelQueuedCompletionCallbacks(
-                keepRisk = priority != SpeechPriority.RISK && riskPending,
-                // Publish a risk replacement before old owners' cancellation callbacks can
-                // reenter dispatch; otherwise a same-rank risk may speak and then be flushed.
-                replacement = if (isRisk) registerUtterance else null,
-            )
-        }
-        // Consumer cancellation callbacks may close this actuator or replace its engine.
-        // Do not acquire new ownership/focus after returning from such a callback.
-        if (!submissionOwnerIsCurrent()) return NavigationSpeechDispatchResult.UNAVAILABLE
-        if (isRisk) {
-            if (synchronized(pendingUtterances) { utteranceId !in pendingUtterances }) {
+        var queueMode = TextToSpeech.QUEUE_ADD
+        val cancellationEffects = synchronized(speechEngineOperationLock) {
+            // Only admission/native effects take this lock. Never call outputGate, a caller
+            // validator, focus effects or terminal callbacks while holding it.
+            if (!speechEngineOwnerIsCurrent(dispatchEngineGeneration)) {
+                return NavigationSpeechDispatchResult.UNAVAILABLE
+            }
+            if (speechEngineStopInProgress) return NavigationSpeechDispatchResult.UNAVAILABLE
+            // Automatic status and nonurgent caution must never flush a sentence already owned
+            // by navigation, a command or a risk. Their producer retains the current retry.
+            if ((deferToCurrentSpeech || (isRisk && riskRank == MessageLevel.CAUTION.ordinal)) &&
+                synchronized(pendingUtterances) { pendingUtterances.isNotEmpty() }
+            ) return NavigationSpeechDispatchResult.SUPPRESSED
+            val strictTrainingUtterance = synchronized(pendingUtterances) {
+                utteranceCallbacks.protectedUtteranceIds().firstOrNull()
+            }
+            if (strictTrainingUtterance != null) {
+                if (!isRisk) return NavigationSpeechDispatchResult.SUPPRESSED
+            }
+            if (isRisk) {
+                val activeRiskRank = synchronized(pendingUtterances) {
+                    if (replacedPolicyOwner != null && authorizedReplacementIdLocked() == null) {
+                        return NavigationSpeechDispatchResult.SUPPRESSED
+                    }
+                    activeRiskRankLocked()
+                }
+                if (activeRiskRank != null && (riskRank ?: activeRiskRank) <= activeRiskRank) {
+                    return NavigationSpeechDispatchResult.SUPPRESSED
+                }
+            }
+            val messagePriorityMs = when (priority) {
+                SpeechPriority.RISK -> RISK_DUP_WINDOW_MS
+                SpeechPriority.INTERACTION -> INTERACTION_DUP_WINDOW_MS
+                SpeechPriority.NAVIGATION -> NAV_DUP_WINDOW_MS
+                SpeechPriority.ADVISORY -> 0L
+            }
+            if (!isAdvisory && isDuplicateMessage(message, priority, messagePriorityMs)) {
                 return NavigationSpeechDispatchResult.SUPPRESSED
             }
-        } else {
-            registerUtterance()
+            if (isAdvisory && synchronized(pendingUtterances) { pendingUtterances.isNotEmpty() }) {
+                return NavigationSpeechDispatchResult.SUPPRESSED
+            }
+            val riskPending = synchronized(pendingUtterances) {
+                pendingUtterances.any { it.startsWith("$ANNOUNCE_ASSERTIVE_PREFIX-") }
+            }
+            if (isInteraction && riskPending) return NavigationSpeechDispatchResult.SUPPRESSED
+            var navigationReplacesAdvisory = false
+            if (priority == SpeechPriority.NAVIGATION) {
+                val pendingIds = synchronized(pendingUtterances) { pendingUtterances.toList() }
+                if (pendingIds.any { !it.startsWith("$ANNOUNCE_ADVISORY_PREFIX-") }) {
+                    return NavigationSpeechDispatchResult.SUPPRESSED
+                }
+                navigationReplacesAdvisory = pendingIds.isNotEmpty()
+            }
+            queueMode = when (priority) {
+                SpeechPriority.RISK -> TextToSpeech.QUEUE_FLUSH
+                SpeechPriority.INTERACTION -> if (riskPending) TextToSpeech.QUEUE_ADD else TextToSpeech.QUEUE_FLUSH
+                SpeechPriority.NAVIGATION -> TextToSpeech.QUEUE_ADD
+                SpeechPriority.ADVISORY -> TextToSpeech.QUEUE_ADD
+            }
+            val effects = if (queueMode == TextToSpeech.QUEUE_FLUSH) {
+                logSpeechEvent("queue_flush priority=$priority")
+                // Publish every replacement before old owners can reenter from cancellation.
+                synchronized(pendingUtterances) {
+                    // onStart publishes under this lock, independently of the engine lock.
+                    // Recheck and retire atomically so a newly started owner cannot yield.
+                    if (isRisk) {
+                        if (replacedPolicyOwner != null && authorizedReplacementIdLocked() == null) {
+                            return NavigationSpeechDispatchResult.SUPPRESSED
+                        }
+                        val activeRiskRank = activeRiskRankLocked()
+                        if (activeRiskRank != null && (riskRank ?: activeRiskRank) <= activeRiskRank) {
+                            return NavigationSpeechDispatchResult.SUPPRESSED
+                        }
+                        // An issued relationship is consumed with exact owner/rank/generation
+                        // checks and registration. This receipt calls no policy/caller code.
+                        if (replacedPolicyOwner != null && riskDeliveryOwner?.markReplacementAdmitted() != true) {
+                            return NavigationSpeechDispatchResult.SUPPRESSED
+                        }
+                    }
+                    cancelQueuedCompletionCallbacks(keepRisk = false, replacement = registerUtterance)
+                }
+            } else if (navigationReplacesAdvisory) {
+                val cancelled = cancelQueuedCompletionCallbacks(keepRisk = false)
+                registerUtterance()
+                cancelled
+            } else {
+                registerUtterance()
+                null
+            }
+            if (navigationReplacesAdvisory) stopSpeechEngine()
+            effects
+        }
+        // Reuse the request timestamp already bound to registration; notify outside both locks.
+        // Its reentry may retire this owner; the existing submission fences below must still win.
+        emitSpeechOutcome(SpeechOutputOutcome.REQUESTED, utteranceId, atElapsedRealtimeMs = nowMs)
+        // Receipt publication follows REQUESTED, including when its observer retired the request.
+        if (onAdvisoryRegistered != null) {
+            runCatching(onAdvisoryRegistered)
+                .onFailure { logSpeechEvent("advisory_registration_callback_error", utteranceId) }
+        }
+        cancellationEffects?.invoke()
+        // A callback may close, replace the engine, or publish a higher-priority owner.
+        if (!submissionOwnerIsCurrent()) {
+            finishUnsubmittedUtterance(utteranceId, queueMode, dispatchEngineGeneration,
+                dispatchOutputGeneration, riskDeliveryOwner)
+            return NavigationSpeechDispatchResult.UNAVAILABLE
+        }
+        if (synchronized(pendingUtterances) { utteranceId !in pendingUtterances }) {
+            return NavigationSpeechDispatchResult.SUPPRESSED
         }
         if (!requestAudioFocus(isRisk)) {
             emitSpeechOutcome(SpeechOutputOutcome.FOCUS_DENIED, utteranceId)
-            val stillOwnsFailedRequest = submissionOwnerIsCurrent() && synchronized(pendingUtterances) {
-                pendingUtterances.size == 1 && utteranceId in pendingUtterances
-            }
-            if (queueMode == TextToSpeech.QUEUE_FLUSH && stillOwnsFailedRequest) stopSpeechEngine()
-            markUtteranceFinished(utteranceId, completed = false, notifyFailure = false)
+            finishUnsubmittedUtterance(utteranceId, queueMode, dispatchEngineGeneration,
+                dispatchOutputGeneration, riskDeliveryOwner,
+                stopCurrentRequest = submissionOwnerIsCurrent())
             return NavigationSpeechDispatchResult.UNAVAILABLE
         }
         // Focus acquisition/cancellation can invalidate a request after it was registered.
@@ -1086,17 +1420,15 @@ class AndroidFeedbackActuator private constructor(
         if (!isUtteranceStillValidAtStart(utteranceId)) return NavigationSpeechDispatchResult.SUPPRESSED
         val speakResult: Int? = try {
             synchronized(speechEngineOperationLock) {
-                if (priorityTrainingStopInProgress ||
-                    synchronized(pendingUtterances) { utteranceId !in pendingUtterances }
+                if (speechEngineStopInProgress || !speechEngineOwnerIsCurrent(dispatchEngineGeneration) ||
+                    synchronized(pendingUtterances) {
+                        utteranceId !in pendingUtterances ||
+                            (riskDeliveryOwner != null && !riskDeliveryOwner.isClaimed())
+                    }
                 ) {
                     null
-                } else if (speechRuntime != null) {
-                    speechRuntime.speak(message, queueMode, utteranceId)
                 } else {
-                    val params = Bundle().apply {
-                        putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
-                    }
-                    textToSpeech.speak(message, queueMode, params, utteranceId)
+                    speechRuntime.speak(message, queueMode, utteranceId)
                 }
             }
         } catch (_: RuntimeException) {
@@ -1105,11 +1437,18 @@ class AndroidFeedbackActuator private constructor(
             return NavigationSpeechDispatchResult.UNAVAILABLE
         }
         if (speakResult == null) {
-            markUtteranceFinished(utteranceId, completed = false, notifyFailure = false)
+            finishUnsubmittedUtterance(utteranceId, queueMode, dispatchEngineGeneration,
+                dispatchOutputGeneration, riskDeliveryOwner)
             return NavigationSpeechDispatchResult.UNAVAILABLE
         }
         if (speakResult == TextToSpeech.ERROR) {
-            if (queueMode == TextToSpeech.QUEUE_FLUSH) stopSpeechEngine()
+            synchronized(speechEngineOperationLock) {
+                val stillOwned = speechEngineOwnerIsCurrent(dispatchEngineGeneration) &&
+                    synchronized(pendingUtterances) { utteranceId in pendingUtterances }
+                if (stillOwned) {
+                    if (queueMode == TextToSpeech.QUEUE_FLUSH) stopSpeechEngine()
+                }
+            }
             failRequiredSpeechRuntime(utteranceId, notifyFailure = false)
             return NavigationSpeechDispatchResult.UNAVAILABLE
         }
@@ -1135,6 +1474,38 @@ class AndroidFeedbackActuator private constructor(
         else NavigationSpeechDispatchResult.SUPPRESSED
     }
 
+    private fun finishUnsubmittedUtterance(
+        utteranceId: String,
+        queueMode: Int,
+        engineGeneration: Long,
+        outputGeneration: Long,
+        riskDeliveryOwner: FeedbackDeliveryOwner?,
+        stopCurrentRequest: Boolean = false,
+    ) {
+        // Admission already cancelled the old owner, but QUEUE_FLUSH has not yet run.
+        // A retired replacement must stop that old native output, never a reentrant winner.
+        val outputCurrent = outputGate.isCurrent(outputGeneration)
+        val retiredReplacement = synchronized(speechEngineOperationLock) {
+            val retired = riskDeliveryOwner != null && !riskDeliveryOwner.isClaimed()
+            val stillOwnsStop = outputCurrent && !speechEngineStopInProgress &&
+                speechEngineOwnerIsCurrent(engineGeneration) && synchronized(pendingUtterances) {
+                    val registration = pendingUtterances[utteranceId]?.riskDelivery
+                    pendingUtterances.size == 1 && utteranceId in pendingUtterances &&
+                        (riskDeliveryOwner == null ||
+                            (registration != null && registration.owner === riskDeliveryOwner &&
+                                registration.engineGeneration == engineGeneration &&
+                                registration.outputGeneration == outputGeneration))
+                }
+            if (queueMode == TextToSpeech.QUEUE_FLUSH && stillOwnsStop && (stopCurrentRequest || retired)) {
+                stopSpeechEngine()
+            }
+            retired
+        }
+        // Watchdog/focus effects and the one terminal consumer can reenter or join another request.
+        markUtteranceFinished(utteranceId, completed = false, notifyFailure = false,
+            cancelled = retiredReplacement)
+    }
+
     private fun vibrate(
         patternMs: LongArray?,
         cancelPriorityUserTraining: Boolean = true,
@@ -1143,39 +1514,42 @@ class AndroidFeedbackActuator private constructor(
         isStillValid: () -> Boolean = { true },
         generation: Long = outputGate.generation(),
         dedupe: Boolean = true,
+        eventId: String? = null,
     ): Boolean {
         if (!hapticAllowed()) return false
-        return outputGate.vibrate(patternMs, rank, generation, validUntilMs, isStillValid) { pattern ->
-            val currentVibrator = vibrator
-            if (speechRuntime == null) {
-                if (currentVibrator == null || !currentVibrator.hasVibrator()) return@vibrate false
-            }
+        var interruptedTraining: Pair<Runnable?, (() -> Unit)?>? = null
+        val accepted = outputGate.vibrate(patternMs, rank, generation, validUntilMs, isStillValid,
+            eventId = eventId) { pattern ->
             val nowMs = elapsedRealtime()
             if (dedupe && pattern.contentEquals(lastVibrationPattern ?: longArrayOf()) &&
                 nowMs - lastVibrationAtMs < VIBRATION_DUP_WINDOW_MS
             ) return@vibrate false
-            if (speechRuntime != null) {
-                if (!speechRuntime.vibrate(pattern.copyOf())) return@vibrate false
-            } else {
-                checkNotNull(currentVibrator).vibrate(VibrationEffect.createWaveform(pattern, -1))
-            }
+            if (!speechRuntime.vibrate(pattern.copyOf())) return@vibrate false
             if (cancelPriorityUserTraining) {
-                cancelPriorityUserTrainingVibration(notifyFailure = true)
+                interruptedTraining = takePriorityUserTrainingVibration()
             }
             lastVibrationPattern = pattern.copyOf()
             lastVibrationAtMs = nowMs
             true
         }
+        // A training failure may submit speech on another thread and wait for its result.
+        // Retire its ownership with the haptic effect, then notify outside the output gate.
+        interruptedTraining?.first?.let(mainHandler::removeCallbacks)
+        interruptedTraining?.second?.invoke()
+        return accepted
     }
 
-    private fun cancelPriorityUserTrainingVibration(notifyFailure: Boolean) {
-        val pending = synchronized(priorityUserTrainingVibrationLock) {
+    private fun takePriorityUserTrainingVibration(): Pair<Runnable?, (() -> Unit)?> =
+        synchronized(priorityUserTrainingVibrationLock) {
             val completion = priorityUserTrainingVibrationCompletion
             val failure = priorityUserTrainingVibrationFailure
             priorityUserTrainingVibrationCompletion = null
             priorityUserTrainingVibrationFailure = null
             completion to failure
         }
+
+    private fun cancelPriorityUserTrainingVibration(notifyFailure: Boolean) {
+        val pending = takePriorityUserTrainingVibration()
         pending.first?.let(mainHandler::removeCallbacks)
         if (notifyFailure) pending.second?.invoke()
     }
@@ -1220,8 +1594,6 @@ class AndroidFeedbackActuator private constructor(
     private fun requestAudioFocus(isRisk: Boolean): Boolean = requestSpeechAudioFocus(isRisk)
 
     private fun requestSpeechAudioFocus(isRisk: Boolean): Boolean {
-        val manager = audioManager
-        if (manager == null && speechRuntime == null) return false
         val outputGeneration = outputGate.generation()
         if (!outputGate.isCurrent(outputGeneration)) return false
         val requestedGain = if (isRisk) {
@@ -1238,42 +1610,16 @@ class AndroidFeedbackActuator private constructor(
             val reservedGeneration = ++audioFocusGeneration
             reservedGeneration to previous
         }
-        previousRegistration?.let { releaseAudioFocusRegistration(it.first, it.second) }
+        previousRegistration?.let { releaseAudioFocusRegistration(it) }
         if (!isAudioFocusRequestCurrent(generation, outputGeneration)) return false
         val listener = AudioManager.OnAudioFocusChangeListener { focusChange ->
             handleAudioFocusChange(focusChange, generation)
         }
-        var request: AudioFocusRequest? = null
         val requested = try {
-            if (speechRuntime != null) {
-                speechRuntime.requestAudioFocus(isRisk, listener)
-            } else {
-                val nativeManager = checkNotNull(manager)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    request = AudioFocusRequest.Builder(requestedGain)
-                        .setAudioAttributes(
-                            AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                                .build(),
-                        )
-                        .setAcceptsDelayedFocusGain(false)
-                        .setOnAudioFocusChangeListener(listener)
-                        .build()
-                    nativeManager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-                } else {
-                    @Suppress("DEPRECATION")
-                    val requestedFocus = nativeManager.requestAudioFocus(
-                        listener,
-                        AudioManager.STREAM_MUSIC,
-                        requestedGain,
-                    )
-                    requestedFocus == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-                }
-            }
+            speechRuntime.requestAudioFocus(isRisk, listener)
         } catch (_: RuntimeException) {
             // The effect may have submitted B before throwing. Never abandon B's registration.
-            releaseAudioFocusRegistration(request, listener)
+            releaseAudioFocusRegistration(listener)
             return false
         }
         if (!requested) return false
@@ -1284,12 +1630,11 @@ class AndroidFeedbackActuator private constructor(
             } else {
                 hasAudioFocus = true
                 activeAudioFocus = requestedGain
-                activeAudioFocusRequest = request
                 activeAudioFocusListener = listener
                 true
             }
         }
-        if (!accepted) releaseAudioFocusRegistration(request, listener)
+        if (!accepted) releaseAudioFocusRegistration(listener)
         return accepted
     }
 
@@ -1304,25 +1649,26 @@ class AndroidFeedbackActuator private constructor(
             focusChange != AudioManager.AUDIOFOCUS_LOSS_TRANSIENT &&
             focusChange != AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK
         ) return
-        val releasedRegistration = synchronized(audioFocusLock) {
-            if (!hasAudioFocus || audioFocusGeneration != generation) {
-                null
-            } else {
-                val registration = activeAudioFocusRequest to activeAudioFocusListener
-                hasAudioFocus = false
-                activeAudioFocus = AudioManager.AUDIOFOCUS_LOSS
-                activeAudioFocusRequest = null
-                activeAudioFocusListener = null
-                audioFocusGeneration += 1L
-                registration
+        val releasedRegistration: AudioManager.OnAudioFocusChangeListener
+        val interrupted: List<String>
+        val toneGeneration: Int
+        synchronized(speechEngineOperationLock) {
+            val registration = synchronized(audioFocusLock) {
+                if (!hasAudioFocus || audioFocusGeneration != generation) {
+                    null
+                } else {
+                    takeAudioFocusRegistration()
+                }
+            } ?: return
+            releasedRegistration = registration
+            synchronized(pendingUtterances) {
+                interrupted = pendingUtterances.toList()
+                toneGeneration = ++progressToneGeneration
             }
         }
-        if (releasedRegistration == null) return
         logSpeechEvent("audio_focus_lost change=$focusChange")
         emitSpeechOutcome(SpeechOutputOutcome.FOCUS_LOST, utteranceId = null)
-        releaseAudioFocusRegistration(releasedRegistration.first, releasedRegistration.second)
-        val interrupted = synchronized(pendingUtterances) { pendingUtterances.toList() }
-        val toneGeneration = synchronized(pendingUtterances) { ++progressToneGeneration }
+        releaseAudioFocusRegistration(releasedRegistration)
         mainHandler.post {
             val tone = synchronized(pendingUtterances) {
                 if (toneGeneration == progressToneGeneration) progressTone else null
@@ -1334,7 +1680,13 @@ class AndroidFeedbackActuator private constructor(
     }
 
     private fun abandonAudioFocus() {
-        val registration = synchronized(audioFocusLock) {
+        val registration = retireAudioFocusRegistration() ?: return
+        releaseAudioFocusRegistration(registration)
+    }
+
+    /** Detach ownership now; release only this registration after dropping state locks. */
+    private fun retireAudioFocusRegistration(): AudioManager.OnAudioFocusChangeListener? =
+        synchronized(audioFocusLock) {
             if (hasAudioFocus) {
                 takeAudioFocusRegistration()
             } else {
@@ -1342,46 +1694,28 @@ class AndroidFeedbackActuator private constructor(
                 audioFocusGeneration += 1L
                 null
             }
-        } ?: return
-        releaseAudioFocusRegistration(registration.first, registration.second)
-    }
+        }
 
     private fun takeAudioFocusRegistration(
         expectedGeneration: Long? = null,
         expectedGain: Int? = null,
-    ): Pair<AudioFocusRequest?, AudioManager.OnAudioFocusChangeListener?>? =
+    ): AudioManager.OnAudioFocusChangeListener? =
         synchronized(audioFocusLock) {
             if (!hasAudioFocus ||
                 (expectedGeneration != null && audioFocusGeneration != expectedGeneration) ||
                 (expectedGain != null && activeAudioFocus != expectedGain)
             ) return@synchronized null
-            val current = activeAudioFocusRequest to activeAudioFocusListener
+            val current = activeAudioFocusListener
             hasAudioFocus = false
             activeAudioFocus = AudioManager.AUDIOFOCUS_LOSS
-            activeAudioFocusRequest = null
             activeAudioFocusListener = null
             audioFocusGeneration += 1L
             current
         }
 
-    private fun releaseAudioFocusRegistration(
-        request: AudioFocusRequest?,
-        listener: AudioManager.OnAudioFocusChangeListener?,
-    ) {
+    private fun releaseAudioFocusRegistration(listener: AudioManager.OnAudioFocusChangeListener) {
         try {
-            if (speechRuntime != null) {
-                listener?.let { speechRuntime.abandonAudioFocus(it) }
-                return
-            }
-            val manager = audioManager ?: return
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                request?.let { manager.abandonAudioFocusRequest(it) }
-                return
-            }
-            listener?.let {
-                @Suppress("DEPRECATION")
-                manager.abandonAudioFocus(it)
-            }
+            speechRuntime.abandonAudioFocus(listener)
         } catch (_: RuntimeException) {
             // Ownership is already retired; failure must not skip terminal callbacks or close.
             logSpeechEvent("audio_focus_release_error")
@@ -1390,7 +1724,7 @@ class AndroidFeedbackActuator private constructor(
 
     private fun markUtteranceStarted(
         utteranceId: String,
-        messageLength: Int,
+        terminalBudgetMs: Long,
         riskRank: Int?,
         onCompleted: (() -> Unit)?,
         onFailed: (() -> Unit)?,
@@ -1399,18 +1733,23 @@ class AndroidFeedbackActuator private constructor(
         requiresExplicitTerminalCallback: Boolean,
         protectsFromFollowingSpeech: Boolean,
         onCancelled: (() -> Unit)?,
+        riskDelivery: RiskDeliveryRegistration?,
+        onCloseCancelled: (() -> Unit)?,
+        advisoryDelivery: AdvisoryDeliveryRegistration?,
     ) {
         synchronized(pendingUtterances) {
-            pendingUtterances.add(utteranceId)
-            pendingUtteranceOrder.add(utteranceId)
-            utteranceCallbacks.register(utteranceId, onCompleted, onFailed, protectsFromFollowingSpeech, onCancelled)
-            utteranceMessageLengths[utteranceId] = messageLength
-            riskRank?.let { utteranceRiskRanks[utteranceId] = it }
-            startDeadlineMs?.let { utteranceStartDeadlines[utteranceId] = it }
-            startValidator?.let { utteranceStartValidators[utteranceId] = it }
-            if (requiresExplicitTerminalCallback) {
-                explicitTerminalRequiredUtterances.add(utteranceId)
-            }
+            pendingUtterances.reserve(UtteranceRecord(
+                id = utteranceId,
+                terminalBudgetMs = terminalBudgetMs,
+                riskRank = riskRank,
+                riskDelivery = riskDelivery,
+                advisoryDelivery = advisoryDelivery,
+                startDeadlineMs = startDeadlineMs,
+                startValidator = startValidator,
+                requiresExplicitTerminalCallback = requiresExplicitTerminalCallback,
+            ))
+            utteranceCallbacks.register(utteranceId, onCompleted, onFailed, protectsFromFollowingSpeech,
+                onCancelled, onCloseCancelled)
             armNextUtteranceStartWatchdogLocked()
         }
     }
@@ -1419,24 +1758,21 @@ class AndroidFeedbackActuator private constructor(
         if (utteranceId == null) return false
         val deadlineAndValidator = synchronized(pendingUtterances) {
             if (utteranceId !in pendingUtterances) return false
-            val deadline = utteranceStartDeadlines[utteranceId] ?: return@synchronized null
-            val validator = utteranceStartValidators[utteranceId] ?: return@synchronized null
+            val deadline = pendingUtterances[utteranceId]?.startDeadlineMs ?: return@synchronized null
+            val validator = pendingUtterances[utteranceId]?.startValidator ?: return@synchronized null
             deadline to validator
         } ?: return true
         val isValid = speechStartIsCurrent(
             elapsedRealtime(), deadlineAndValidator.first, deadlineAndValidator.second,
         )
         if (isValid) return true
-        val shouldStop = synchronized(pendingUtterances) {
-            if (
-                utteranceId !in pendingUtterances ||
-                utteranceStartValidators[utteranceId] !== deadlineAndValidator.second
-            ) {
-                false
-            } else {
-                if (ttsState == TtsState.READY) stopSpeechEngine()
-                true
+        val shouldStop = synchronized(speechEngineOperationLock) {
+            val stillOwned = synchronized(pendingUtterances) {
+                utteranceId in pendingUtterances &&
+                    pendingUtterances[utteranceId]?.startValidator === deadlineAndValidator.second
             }
+            if (stillOwned && ttsState == TtsState.READY) stopSpeechEngine()
+            stillOwned
         }
         if (shouldStop) {
             emitSpeechOutcome(SpeechOutputOutcome.EXPIRED_BEFORE_START, utteranceId)
@@ -1451,28 +1787,21 @@ class AndroidFeedbackActuator private constructor(
         val inferredTerminalCallbacks = mutableListOf<() -> Unit>()
         synchronized(pendingUtterances) {
             if (utteranceId !in pendingUtterances) return
-            val predecessors = pendingUtteranceOrder.takeWhile { it != utteranceId }
-            predecessors.forEach { predecessor ->
+            val predecessors = pendingUtterances.detachPredecessors(utteranceId)
+            predecessors.forEach { record ->
+                val predecessor = record.id
                 clearDuplicateSuppressionOwnedBy(predecessor)
-                pendingUtterances.remove(predecessor)
-                pendingUtteranceOrder.remove(predecessor)
-                startedUtterances.remove(predecessor)
-                utteranceWatchdogs.remove(predecessor)?.let(inferredWatchdogs::add)
-                utteranceMessageLengths.remove(predecessor)
-                utteranceRiskRanks.remove(predecessor)
-                utteranceStartDeadlines.remove(predecessor)
-                utteranceStartValidators.remove(predecessor)
-                explicitTerminalRequiredUtterances.remove(predecessor)
+                record.watchdog?.let(inferredWatchdogs::add)
                 utteranceCallbacks.takeTerminalCallback(
                     utteranceId = predecessor,
                     completed = false,
                     notifyFailure = true,
                 )?.let(inferredTerminalCallbacks::add)
             }
-            startedUtterances.add(utteranceId)
+            val started = pendingUtterances.markStarted(utteranceId) ?: return
             scheduleUtteranceWatchdogLocked(
                 utteranceId,
-                utteranceTerminalTimeoutMs(utteranceMessageLengths[utteranceId] ?: 0),
+                started.terminalBudgetMs,
             )
         }
         inferredWatchdogs.forEach(mainHandler::removeCallbacks)
@@ -1480,16 +1809,16 @@ class AndroidFeedbackActuator private constructor(
     }
 
     private fun scheduleUtteranceWatchdogLocked(utteranceId: String, delayMs: Long) {
-        utteranceWatchdogs.remove(utteranceId)?.let(mainHandler::removeCallbacks)
+        pendingUtterances.replaceWatchdog(utteranceId, null)?.let(mainHandler::removeCallbacks)
         val engineGeneration = ttsEngineGeneration
         lateinit var watchdog: Runnable
         watchdog = Runnable {
             val started = synchronized(pendingUtterances) {
-                if (utteranceWatchdogs[utteranceId] !== watchdog ||
+                if (pendingUtterances[utteranceId]?.watchdog !== watchdog ||
                     utteranceId !in pendingUtterances ||
                     engineGeneration != ttsEngineGeneration || ttsState != TtsState.READY
                 ) return@Runnable
-                utteranceId in startedUtterances
+                pendingUtterances[utteranceId]?.started == true
             }
             // Expiry/revocation before start is cancellation, not evidence of engine failure.
             // After onStart, this is the terminal watchdog: start TTL no longer revokes completion.
@@ -1498,15 +1827,16 @@ class AndroidFeedbackActuator private constructor(
             // Keep pending ownership until the existing error classifier has classified it.
             failRequiredSpeechRuntime(utteranceId, outcome = SpeechOutputOutcome.TERMINAL_TIMEOUT)
         }
-        utteranceWatchdogs[utteranceId] = watchdog
+        pendingUtterances.replaceWatchdog(utteranceId, watchdog)
         mainHandler.postDelayed(watchdog, delayMs)
     }
 
     private fun armNextUtteranceStartWatchdogLocked() {
-        val next = pendingUtteranceOrder.firstOrNull() ?: return
-        if (next in startedUtterances || next in utteranceWatchdogs) return
+        val record = pendingUtterances.firstRecord() ?: return
+        if (record.started || record.watchdog != null) return
+        val next = record.id
         val nowMs = elapsedRealtime()
-        val deadlineDelayMs = utteranceStartDeadlines[next]?.let { deadline ->
+        val deadlineDelayMs = pendingUtterances[next]?.startDeadlineMs?.let { deadline ->
             // Source validity is inclusive. At the deadline itself a request is still valid.
             if (deadline < nowMs) 0L else
                 (deadline - nowMs).coerceAtMost(UTTERANCE_START_TIMEOUT_MS) + 1L
@@ -1523,40 +1853,45 @@ class AndroidFeedbackActuator private constructor(
         notifyFailure: Boolean = true,
         cancelled: Boolean = false,
     ) {
+        takeUtteranceFinishEffects(utteranceId, completed, notifyFailure, cancelled)()
+    }
+
+    /** Detaches once under the registry lock; platform effects and consumers run after admission. */
+    private fun takeUtteranceFinishEffects(
+        utteranceId: String?,
+        completed: Boolean,
+        notifyFailure: Boolean = true,
+        cancelled: Boolean = false,
+    ): () -> Unit {
         var terminalCallback: (() -> Unit)? = null
         var watchdog: Runnable? = null
-        var shouldAbandonFocus = false
+        var focusRegistration: AudioManager.OnAudioFocusChangeListener? = null
         synchronized(pendingUtterances) {
             if (utteranceId != null) {
-                val removed = pendingUtterances.remove(utteranceId)
-                if (removed) {
+                val removed = pendingUtterances.detach(utteranceId)
+                if (removed != null) {
                     if (!completed) clearDuplicateSuppressionOwnedBy(utteranceId)
-                    pendingUtteranceOrder.remove(utteranceId)
-                    startedUtterances.remove(utteranceId)
-                    watchdog = utteranceWatchdogs.remove(utteranceId)
-                    utteranceMessageLengths.remove(utteranceId)
-                    utteranceRiskRanks.remove(utteranceId)
-                    utteranceStartDeadlines.remove(utteranceId)
-                    utteranceStartValidators.remove(utteranceId)
-                    explicitTerminalRequiredUtterances.remove(utteranceId)
+                    watchdog = removed.watchdog
                     terminalCallback = utteranceCallbacks.takeTerminalCallback(
                         utteranceId = utteranceId,
                         completed = completed,
                         notifyFailure = notifyFailure,
                         cancelled = cancelled,
                     )
-                    shouldAbandonFocus = pendingUtterances.isEmpty()
-                    if (shouldAbandonFocus) {
+                    if (pendingUtterances.isEmpty()) {
                         speechRecognitionBlockedUntilMs = elapsedRealtime() + SPEECH_RECOGNITION_QUIET_MS
+                        focusRegistration = retireAudioFocusRegistration()
                     }
                     armNextUtteranceStartWatchdogLocked()
                 }
             }
         }
-        watchdog?.let(mainHandler::removeCallbacks)
-        if (shouldAbandonFocus) abandonAudioFocus()
-        runCatching { terminalCallback?.invoke() }
-            .onFailure { logSpeechEvent("terminal_callback_error", utteranceId) }
+        return {
+            watchdog?.let(mainHandler::removeCallbacks)
+            focusRegistration?.let { releaseAudioFocusRegistration(it) }
+            runCatching { terminalCallback?.invoke() }
+                .onFailure { logSpeechEvent("terminal_callback_error", utteranceId) }
+        }
     }
 
     private fun failPendingSpeech(
@@ -1565,7 +1900,16 @@ class AndroidFeedbackActuator private constructor(
         cancelled: Boolean = false,
     ) {
         if (interrupted.isEmpty()) return
-        if (stopTts && ttsState == TtsState.READY) stopSpeechEngine()
+        if (stopTts) {
+            synchronized(speechEngineOperationLock) {
+                val stillOwnsStop = synchronized(pendingUtterances) {
+                    ttsState == TtsState.READY &&
+                        interrupted.any { it in pendingUtterances } &&
+                        pendingUtterances.all { it in interrupted }
+                }
+                if (stillOwnsStop) stopSpeechEngine()
+            }
+        }
         interrupted.forEach { markUtteranceFinished(it, completed = false, cancelled = cancelled) }
     }
 
@@ -1573,23 +1917,23 @@ class AndroidFeedbackActuator private constructor(
         outcome: SpeechOutputOutcome,
         utteranceId: String?,
         errorCode: Int? = null,
+        atElapsedRealtimeMs: Long? = null,
     ) {
-        val listener = speechOutputListener ?: return
-        runCatching {
-            listener(SpeechOutputEvent(speechOutputKindOf(utteranceId), outcome, elapsedRealtime(), errorCode))
-        }
+        if (speechOutputListener == null && guidanceDiagnosticListener == null) return
+        val event = SpeechOutputEvent(speechOutputKindOf(utteranceId), outcome,
+            atElapsedRealtimeMs ?: elapsedRealtime(), errorCode)
+        runCatching { speechOutputListener?.invoke(event) }
+        runCatching { guidanceDiagnosticListener?.invoke(event) }
     }
 
     private fun logSpeechEvent(event: String, utteranceId: String? = null) {
-        if (speechRuntime != null || !BuildConfig.DEBUG) return
-        // IDs contain only priority, monotonic time and sequence; never record spoken text.
-        Log.d("WalkSafeVoiceOutput", "event=$event utterance=${utteranceId ?: "none"}")
+        speechRuntime.logSpeechEvent(event, utteranceId)
     }
 
     private fun cancelQueuedCompletionCallbacks(
         keepRisk: Boolean,
         replacement: (() -> Unit)? = null,
-    ) {
+    ): () -> Unit {
         var watchdogs: List<Runnable> = emptyList()
         var advisoryFailures: List<() -> Unit> = emptyList()
         var strictTrainingFailures: List<() -> Unit> = emptyList()
@@ -1606,93 +1950,96 @@ class AndroidFeedbackActuator private constructor(
                 .filter { it.startsWith("$ANNOUNCE_ADVISORY_PREFIX-") }
                 .mapNotNull { utteranceCallbacks.takeTerminalCallback(it, completed = false, notifyFailure = true, cancelled = true) }
             strictTrainingFailures = cancelled
-                .filter(explicitTerminalRequiredUtterances::contains)
+                .filter { pendingUtterances[it]?.requiresExplicitTerminalCallback == true }
                 .mapNotNull { utteranceCallbacks.takeTerminalCallback(it, completed = false, notifyFailure = true, cancelled = true) }
             cancelled.forEach(::clearDuplicateSuppressionOwnedBy)
-            pendingUtterances.removeAll(cancelled.toSet())
-            pendingUtteranceOrder.removeAll(cancelled.toSet())
-            startedUtterances.removeAll(cancelled.toSet())
+            watchdogs = cancelled.mapNotNull { pendingUtterances.detach(it)?.watchdog }
             utteranceCallbacks.cancel(cancelled)
-            watchdogs = cancelled.mapNotNull(utteranceWatchdogs::remove)
-            cancelled.forEach(utteranceMessageLengths::remove)
-            cancelled.forEach(utteranceRiskRanks::remove)
-            cancelled.forEach(utteranceStartDeadlines::remove)
-            cancelled.forEach(utteranceStartValidators::remove)
-            cancelled.forEach(explicitTerminalRequiredUtterances::remove)
             replacement?.invoke()
             armNextUtteranceStartWatchdogLocked()
         }
-        // Both callers preempt queued speech for a higher-priority or replacing output.
-        cancelledIds.forEach { emitSpeechOutcome(SpeechOutputOutcome.CANCELLED_BY_PRIORITY, it) }
-        watchdogs.forEach(mainHandler::removeCallbacks)
-        advisoryFailures.forEach { callback ->
-            runCatching { callback() }
-                .onFailure { logSpeechEvent("terminal_callback_error") }
-        }
-        strictTrainingFailures.forEach { callback ->
-            runCatching { callback() }
-                .onFailure { logSpeechEvent("terminal_callback_error") }
+        return {
+            // Both callers preempt queued speech for a higher-priority or replacing output.
+            cancelledIds.forEach { emitSpeechOutcome(SpeechOutputOutcome.CANCELLED_BY_PRIORITY, it) }
+            watchdogs.forEach(mainHandler::removeCallbacks)
+            advisoryFailures.forEach { callback ->
+                runCatching { callback() }
+                    .onFailure { logSpeechEvent("terminal_callback_error") }
+            }
+            strictTrainingFailures.forEach { callback ->
+                runCatching { callback() }
+                    .onFailure { logSpeechEvent("terminal_callback_error") }
+            }
         }
     }
 
     override fun close() {
         outputGate.close()
-        synchronized(audioFocusLock) { audioFocusGeneration += 1L }
-        logSpeechEvent("engine_closed", null)
-        ready.set(false)
-        ttsState = TtsState.CLOSED
-        ttsEngineGeneration += 1L
-        pendingSpeechQueue.clear()
-        cancelPriorityUserTrainingVibration(notifyFailure = false)
         val watchdogs: List<Runnable>
-        synchronized(pendingUtterances) {
-            pendingUtterances.clear()
-            pendingUtteranceOrder.clear()
-            startedUtterances.clear()
-            utteranceCallbacks.clear()
-            watchdogs = utteranceWatchdogs.values.toList()
-            utteranceWatchdogs.clear()
-            utteranceMessageLengths.clear()
-            utteranceRiskRanks.clear()
-            utteranceStartDeadlines.clear()
-            utteranceStartValidators.clear()
-            explicitTerminalRequiredUtterances.clear()
+        val tone: ProgressToneEffects?
+        val closeCancellations: List<() -> Unit>
+        synchronized(speechEngineOperationLock) {
+            if (ttsState == TtsState.CLOSED) return
+            synchronized(audioFocusLock) { audioFocusGeneration += 1L }
+            logSpeechEvent("engine_closed", null)
+            ready.set(false)
+            ttsState = TtsState.CLOSED
+            ttsEngineGeneration += 1L
+            pendingSpeechQueue.clear()
+            synchronized(pendingUtterances) {
+                closeCancellations = utteranceCallbacks.takeCloseCancellationCallbacks(pendingUtterances)
+                watchdogs = pendingUtterances.drain().mapNotNull { it.watchdog }
+                utteranceCallbacks.clear()
+                progressToneGeneration += 1
+                tone = detachProgressToneLocked()?.first
+            }
+            // Native speak either finishes before this retirement or observes CLOSED afterward.
+            if (isSpeechEngineInitialized()) {
+                stopSpeechEngine()
+                shutdownSpeechEngine()
+            }
         }
+        cancelPriorityUserTrainingVibration(notifyFailure = false)
         watchdogs.forEach(mainHandler::removeCallbacks)
-        val tone = synchronized(pendingUtterances) {
-            progressToneGeneration += 1
-            detachProgressToneLocked()?.first
-        }
         mainHandler.removeCallbacksAndMessages(null)
         abandonAudioFocus()
         releaseProgressTone(tone)
         if (!speechUnavailableVibrationRetained) {
-            runCatching { if (speechRuntime != null) speechRuntime.cancelVibration() else vibrator?.cancel() }
+            runCatching { speechRuntime.cancelVibration() }
         }
-        if (isSpeechEngineInitialized()) {
-            stopSpeechEngine()
-            shutdownSpeechEngine()
+        if (closeCancellations.isNotEmpty()) mainHandler.post {
+            // Defer even native-effect reentry: its outer engine operation has not returned yet.
+            closeCancellations.forEach { callback ->
+                runCatching(callback).onFailure { logSpeechEvent("terminal_callback_error") }
+            }
         }
     }
 
     private fun elapsedRealtime(): Long =
-        speechRuntime?.elapsedRealtime() ?: SystemClock.elapsedRealtime()
+        speechRuntime.elapsedRealtime()
 
     private fun isSpeechEngineInitialized(): Boolean =
-        speechRuntime?.engineInitialized ?: ::textToSpeech.isInitialized
+        speechRuntime.engineInitialized
 
-    private fun stopSpeechEngine() {
+    private fun speechEngineOwnerIsCurrent(engineGeneration: Long): Boolean =
+        ttsState == TtsState.READY && ttsEngineGeneration == engineGeneration
+
+    private fun stopSpeechEngine() = synchronized(speechEngineOperationLock) {
+        val previousStopInProgress = speechEngineStopInProgress
+        speechEngineStopInProgress = true
         try {
-            if (speechRuntime != null) speechRuntime.stop() else textToSpeech.stop()
+            speechRuntime.stop()
         } catch (_: RuntimeException) {
             // Cancellation remains cancellation; a stop exception cannot trigger fallback speech.
             logSpeechEvent("engine_stop_error")
+        } finally {
+            speechEngineStopInProgress = previousStopInProgress
         }
     }
 
     private fun shutdownSpeechEngine() {
         try {
-            if (speechRuntime != null) speechRuntime.shutdown() else textToSpeech.shutdown()
+            speechRuntime.shutdown()
         } catch (_: RuntimeException) {
             logSpeechEvent("engine_shutdown_error")
         }
@@ -1700,16 +2047,7 @@ class AndroidFeedbackActuator private constructor(
 
     private fun configureSpeechAttributes(): Boolean {
         try {
-            if (speechRuntime != null) {
-                speechRuntime.configureAudioAttributes()
-            } else {
-                textToSpeech.setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build(),
-                )
-            }
+            speechRuntime.configureAudioAttributes()
             return true
         } catch (_: RuntimeException) {
             recoverTextToSpeechOrFail()
@@ -1718,18 +2056,7 @@ class AndroidFeedbackActuator private constructor(
     }
 
     private fun installSpeechListener(listener: FeedbackSpeechRuntime.Listener): Int = try {
-        speechRuntime?.setListener(listener) ?: textToSpeech.setOnUtteranceProgressListener(
-            object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) = listener.onStart(utteranceId)
-                override fun onDone(utteranceId: String?) = listener.onDone(utteranceId)
-                @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) = listener.onError(utteranceId)
-                override fun onError(utteranceId: String?, errorCode: Int) =
-                    listener.onError(utteranceId, errorCode)
-                override fun onStop(utteranceId: String?, interrupted: Boolean) =
-                    listener.onStop(utteranceId, interrupted)
-            },
-        )
+        speechRuntime.setListener(listener)
     } catch (_: RuntimeException) {
         TextToSpeech.ERROR
     }
@@ -1768,6 +2095,7 @@ internal interface FeedbackSpeechRuntime {
     /** Haptic effect only; lease, rank and duplicate policy stay in the actuator and output gate. */
     fun vibrate(patternMs: LongArray): Boolean = false
     fun cancelVibration() = Unit
+    fun logSpeechEvent(event: String, utteranceId: String?) = Unit
 
     interface Listener {
         fun onStart(utteranceId: String?)
@@ -1784,27 +2112,11 @@ internal interface ProgressToneEffects {
     fun release()
 }
 
-private class AndroidProgressToneEffects(volumePercent: Int) : ProgressToneEffects {
-    private val tone = ToneGenerator(AudioManager.STREAM_MUSIC, volumePercent)
-    override fun startTone(toneType: Int, durationMs: Int): Boolean =
-        tone.startTone(toneType, durationMs)
-    override fun stopTone() = tone.stopTone()
-    override fun release() = tone.release()
-}
-
 internal interface FeedbackSpeechScheduler {
     fun post(task: Runnable): Boolean
     fun postDelayed(task: Runnable, delayMs: Long): Boolean
     fun removeCallbacks(task: Runnable)
     fun removeCallbacksAndMessages(token: Any?)
-}
-
-private class AndroidFeedbackSpeechScheduler : FeedbackSpeechScheduler {
-    private val handler = Handler(Looper.getMainLooper())
-    override fun post(task: Runnable): Boolean = handler.post(task)
-    override fun postDelayed(task: Runnable, delayMs: Long): Boolean = handler.postDelayed(task, delayMs)
-    override fun removeCallbacks(task: Runnable) = handler.removeCallbacks(task)
-    override fun removeCallbacksAndMessages(token: Any?) = handler.removeCallbacksAndMessages(token)
 }
 
 internal enum class TtsRuntimeFailureDisposition {

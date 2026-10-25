@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D01-012 안전·앱 필요성 설명 청취와 명시적 교육 동의"]
+  G{"현재 교육 페이지·현재 actor·training policy·현재 기기 출력 조건; 안전교육 선행 순서"}
+  I["SAFETY 및 NECESSITY 교육 문구, segmented speech, TTS terminal; TalkBack 화면검토 이벤트"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 출력/저장 오류는 다음 단계 제한"]
+  G -->|"미충족"| X
+  N1["교육 버튼은 현재 페이지·actor·generation을 확인하고 기존 출력 attempt를 정리한다."]
+  I --> N1
+  N2["speechSegments로 설명을 최대250자 단위로 나누어 순차 재생한다."]
+  N1 --> N2
+  N3["각 구간의 actual DONE 후 다음 구간, 마지막 DONE 후 reviewed 기록을 durable training mutation으로 저장한다."]
+  N2 --> N3
+  N4["필요성 reviewed 등 선행 조건 뒤 명시적 교육 동의를 받는다. TalkBack 화면 검토 확인은 별도 경로다."]
+  N3 --> N4
+  OK["마지막 실제 DONE 또는 명시 화면검토 후 reviewed; 사용자 동의 후 교육 통과"]
+  N4 --> OK
+  B0["reviewed 새완료 처리 안 함"]
+  N2 -->|"TTS 미준비·오류·중단"| B0
+  B1["늦은 완료 폐기"]
+  N3 -->|"actor/page/generation/foreground 변경"| B1
+  B2["진행중 청취 취소; 이미 완료된 과거 reviewed를 무조건 지우지 않음"]
+  N1 -->|"같은 교육 다시 누름"| B2
+  R["중단·취소: 사용자 재탭·페이지이탈·배경이면 attempt cancel / 전경·actor·페이지 변경 때 current completion만 허용"]
+  V["복구·재시도: 이미 저장된 유효 actor profile reviewed는 복원 / 사용자 다시 듣기 가능; 실패 완료 자동 생성 없음"]
+  Q["정책 P-D01-009 · P-D01-011"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

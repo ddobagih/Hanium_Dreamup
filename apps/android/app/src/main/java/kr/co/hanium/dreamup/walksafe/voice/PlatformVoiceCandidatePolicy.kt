@@ -65,6 +65,7 @@ internal fun assessPlatformVoiceCandidate(
     }
     val preview = when (candidate) {
         AndroidVoiceCommand.Help -> AndroidVoiceAction.SpeakVoiceHelp
+        AndroidVoiceCommand.OpenHelp -> AndroidVoiceAction.OpenHelp
         is AndroidVoiceCommand.SetDestination -> AndroidVoiceAction.SearchDestination(candidate.placeName)
         is AndroidVoiceCommand.SelectDestinationCandidate -> destinationDialogState
             ?.onCommand(DestinationSearchVoiceCommand.SelectCandidate(candidate.oneBasedIndex))

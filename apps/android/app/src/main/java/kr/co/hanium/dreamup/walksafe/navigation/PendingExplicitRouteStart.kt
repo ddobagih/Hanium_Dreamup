@@ -9,9 +9,13 @@ internal class PendingExplicitRouteStart<C>(
 
     private var pending: Request<C>? = null
 
-    fun replace(context: C, nowElapsedRealtimeMs: Long): Request<C> {
+    fun replace(
+        context: C,
+        nowElapsedRealtimeMs: Long,
+        keepUntilCancelled: Boolean = false,
+    ): Request<C> {
         require(nowElapsedRealtimeMs >= 0L)
-        return Request(context, nowElapsedRealtimeMs).also { pending = it }
+        return Request(context, nowElapsedRealtimeMs, keepUntilCancelled).also { pending = it }
     }
 
     fun currentOrNull(): Request<C>? = pending
@@ -57,9 +61,11 @@ internal class PendingExplicitRouteStart<C>(
     data class Request<C>(
         val context: C,
         val requestedAtElapsedRealtimeMs: Long,
+        val keepUntilCancelled: Boolean = false,
     ) {
         internal fun isExpired(nowElapsedRealtimeMs: Long, timeoutMs: Long): Boolean {
             if (nowElapsedRealtimeMs < requestedAtElapsedRealtimeMs) return true
+            if (keepUntilCancelled) return false
             return nowElapsedRealtimeMs - requestedAtElapsedRealtimeMs >= timeoutMs
         }
     }

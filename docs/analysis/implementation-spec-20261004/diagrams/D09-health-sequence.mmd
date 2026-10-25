@@ -1,0 +1,36 @@
+sequenceDiagram
+  autonumber
+  participant C as GET ready 호출자
+  participant A as F-D09-020 집계
+  participant S as check별 single-flight 상태
+  participant W as 동기 probe thread
+  participant N as navigation probe
+  participant M as report monitor snapshot
+  Note over A,M: P-D09-020 · 한 check라도 ready가 아니면 전체503
+  C->>A: field 인가된 GET /ready
+  par 동기 check들
+    A->>S: 기존 Future 또는 새 probe 요청
+    alt 이미 실행 중
+      S-->>A: 같은 Future
+    else 시작 가능
+      S->>W: 하나의 daemon thread 실행
+      W-->>S: 결과 또는 exception
+    end
+    S-->>A: 5초 내 결과 또는 unavailable
+  and navigation
+    A->>N: 최근 route와 POI 성공 cache 확인
+    alt 최근 성공 유효
+      N-->>A: cache ready
+    else live probe 허용
+      N->>N: user budget와 probe allowance 확인
+      N-->>A: bounded shared probe 결과
+    else live probe 비활성
+      N-->>A: unavailable
+    end
+  and monitor snapshot
+    A->>M: upload와 encryption 및 inventory checks
+    M-->>A: 현재 snapshot
+  end
+  A->>A: account enrollment와 모든 ready 필드 AND
+  A-->>C: 200 ready 또는 503 not_ready
+  Note over S,W: caller 종료 후 thread는 계속 소유 · stuck이면 대체 thread 생성 금지

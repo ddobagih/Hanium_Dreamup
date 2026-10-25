@@ -1,0 +1,9 @@
+flowchart TD
+  H["P-D05-006 · F-D05-006 사람 보완 모델 선택·비파괴 병합"]
+  H --> A{"person_supplement enabled"}
+  A -->|"현재 없음"| Z["주 21 종 모델만"]
+  A -->|"예"| C["13class person-only 계약 확인"]
+  C --> B["유효 person score 순"]
+  B --> D{"기존 person IoU 초과 0.7"}
+  D -->|"예"| X["보완후보 버림"]
+  D -->|"아니오"| P["person append vehicle 유지"]

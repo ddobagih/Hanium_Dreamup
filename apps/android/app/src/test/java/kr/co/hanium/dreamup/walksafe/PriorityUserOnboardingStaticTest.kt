@@ -8,6 +8,16 @@ import org.junit.Test
 class PriorityUserOnboardingStaticTest {
     private val source =
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    private val panelSource =
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/OnboardingReadinessPanel.kt").readText()
+    private val styleSource =
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/WalkSafeViewStyle.kt").readText()
+    private val presenterSource =
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/FirstRunOnboardingPresenter.kt").readText()
+    private val profileSource = ownerSource("session/onboarding/PriorityUserProfileController.kt")
+    private val onboardingSource = ownerSource("session/onboarding/FirstRunOnboardingController.kt")
+    private val readinessSource = ownerSource("session/readiness/WalkReadinessCoordinator.kt")
+    private val producerSource = ownerSource("session/readiness/WalkReadinessProducers.kt")
     private val feedback =
         File(
             "src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
@@ -21,6 +31,10 @@ class PriorityUserOnboardingStaticTest {
     fun onboardingIsRequiredAtBothStartAndRuntimeReadinessBoundaries() {
         val blockReason = functionBlock("private fun walkSessionReadinessBlockReason(")
         val capture = functionBlock("private fun captureWalkSessionReadiness(")
+        val producer = MainActivityRefactorSource.member(
+            producerSource.substringAfter("internal class PriorityWalkReadinessProducer("), "evaluate",
+        )
+        val composition = MainActivityRefactorSource.property(source, "walkReadinessCoordinator")
 
         assertTrue(
             readiness.contains(
@@ -32,15 +46,18 @@ class PriorityUserOnboardingStaticTest {
                 "WalkSessionReadinessRequirement.PRIORITY_USER_ONBOARDING",
             ),
         )
-        assertTrue(capture.contains("priorityUserOnboardingPolicy.evaluate("))
+        assertTrue(capture.contains("producers.evaluate(requirement, effectiveDecision"))
+        assertTrue(producer.contains("policy().evaluate(currentEnvironment(decision), walkIsActive = walkRuntimeActive())"))
+        assertTrue(composition.contains("PriorityWalkReadinessProducer({ priorityUserOnboardingPolicy }, ::currentPriorityUserSupportEnvironment"))
+        assertTrue(composition.contains("::isWalkSessionRuntimeActive, { developmentQuickStartEnabled }, ::currentReporterUserId"))
         assertTrue(source.contains("get() = BuildConfig.DEBUG && BuildConfig.DEVELOPMENT_QUICK_START"))
-        assertTrue(blockReason.contains("if (!firstRunOnboardingComplete())"))
-        assertTrue(capture.contains("currentReporterUserId() != null"))
-        assertTrue(capture.contains("account_profile_unbound"))
-        assertTrue(blockReason.contains("if (!developmentQuickStartEnabled && !onboarding.mayStartWalk) return onboarding.noticeKo"))
+        assertTrue(blockReason.contains("if (!sources.onboardingComplete())"))
+        assertTrue(producer.contains("currentActorId() != null"))
+        assertTrue(producer.contains("account_profile_unbound"))
+        assertTrue(blockReason.contains("if (!sources.quickStartEnabled() && !onboarding.mayStartWalk) return onboarding.noticeKo"))
         assertTrue(
-            blockReason.indexOf("priorityUserOnboardingPolicy.evaluate(") <
-                blockReason.indexOf("currentReporterUserId()"),
+            blockReason.indexOf("sources.priorityOnboarding(decision)") <
+                blockReason.indexOf("sources.reporterUserId()"),
         )
     }
 
@@ -52,29 +69,32 @@ class PriorityUserOnboardingStaticTest {
             create,
             "restorePermissionSessionStateFromPrefs()",
             "restorePriorityUserOnboardingFromPrefs()",
-            "GatewaySessionProcessCoordinator.attach(",
+            "{ gatewaySessionController }, { try { it.detach() } finally { it.unregisterGatewayCapacityNetworkObserver() } },",
+            ").attach(::dispatchGatewayProcessSessionChanged)",
             "enforcePriorityUserAccountEligibility()",
             "scheduleGatewaySessionRestoreAfterPrivacyStartupInspection()",
         )
         val restore = functionBlock("private fun restoreGatewaySessionFromPrefs()")
         assertInOrder(
             restore,
-            "val actorId = restored.firstRunSnapshot.reporterActorBinding?.value",
+            "val actorId = restored.firstRunSnapshot.verifiedActorBinding?.value",
             "actorId == null || actorId != restored.session.actorId",
-            "restorePriorityUserOnboardingFromPrefs()",
-            "priorityUserOnboardingActorId != actorId",
+            "profile.restorePriorityProfile()",
+            "profile.priorityActorId() != actorId",
             "GatewaySessionProcessCoordinator.publishRestoredUnverified(",
         )
         assertTrue(source.contains("PREF_PRIORITY_USER_PROFILE_PREFIX"))
-        assertTrue(source.contains("priorityUserActorSha256(actorId)"))
-        assertTrue(source.contains("\"actor_id_sha256\""))
+        assertTrue(profileSource.contains("priorityUserActorSha256(actorId)"))
+        assertTrue(profileSource.contains("\"actor_id_sha256\""))
         assertTrue(source.contains("PRIORITY_USER_PROFILE_STORAGE_VERSION"))
         assertTrue(
-            source.contains(
+            profileSource.contains(
                 "PriorityUserPractice.entries.take(completedPractices.size)",
             ),
         )
-        assertTrue(source.contains("sensitivePrefs.edit().remove(profileKey).commit()"))
+        assertTrue(functionBlock("private fun restorePriorityUserOnboardingFromPrefs()").contains("storage.remove(profileKey)"))
+        assertTrue(MainActivityRefactorSource.composition(source, "priorityUserProfileController")
+            .contains("sensitivePrefs.edit().remove(key).commit()"))
     }
 
     @Test
@@ -93,12 +113,12 @@ class PriorityUserOnboardingStaticTest {
             "expectedSession = session",
             "expectedProcessGeneration = process.generation",
         )
-        val observer = functionBlock("private fun onGatewayProcessSessionChanged(")
+        val observer = actorSessionChange(source)
         assertInOrder(observer,
-            "reporterUserId = actorId",
+            "permissions.reporterActorId = actorId",
             "restorePriorityUserOnboardingFromPrefs()",
             "if (verifiedActorSession != null)",
-            "enforcePriorityUserAccountEligibility()",
+            "permissions.enforceAccountEligibility()",
         )
     }
 
@@ -122,35 +142,40 @@ class PriorityUserOnboardingStaticTest {
         )
         assertInOrder(
             education,
-            "beginPriorityUserProfileMutationOrFailClosed()",
+            "profiles.beginMutation()",
             "policy.reviewSafetyEducation(",
         )
         assertInOrder(
             safePlace,
-            "beginPriorityUserProfileMutationOrFailClosed()",
-            "priorityUserOnboardingPolicy.confirmSafePracticePlace()",
+            "profiles.beginMutation()",
+            "profiles.policy().confirmSafePracticePlace()",
         )
         assertInOrder(
             delivery,
-            "beginPriorityUserProfileMutationOrFailClosed()",
+            "profiles.beginMutation()",
             "policy.recordPracticeDelivery(token, signal)",
         )
         assertInOrder(
             reset,
             "beginPriorityUserProfileMutationOrFailClosed()",
-            "priorityUserOnboardingPolicy.resetTraining()",
+            "profiles.policy.resetTraining()",
         )
         assertInOrder(
             persist,
-            ".putString(priorityUserProfileKey(actorId), profile.toString())",
-            ".remove(invalidKey)",
-            ".commit()",
+            "storage.writeAndClearMarker(",
+            "{ priorityUserProfileKey(actorId) }, { profile.toString() }, invalidKey",
+            "if (committed)",
         )
         assertTrue(restore.contains("priorityUserProfileInvalidKey(actorId)"))
         assertTrue(restore.contains("if (profileInvalid)"))
         assertTrue(source.contains("PREF_PRIORITY_USER_PROFILE_INVALID_PREFIX"))
-        assertTrue(source.contains("priorityUserStorageBlockedActorHashes"))
-        assertInOrder(begin, ".putBoolean(invalidKey, true)", ".commit()")
+        assertTrue(profileSource.contains("private val blockedActorHashes"))
+        assertTrue(begin.contains("storage.markInvalid(invalidKey)"))
+        val storage = MainActivityRefactorSource.composition(source, "priorityUserProfileController")
+        assertInOrder(storage.substringAfter("override fun markInvalid(key: String) ="),
+            ".putBoolean(key, true)", ".commit()")
+        assertInOrder(storage.substringAfter("override fun writeAndClearMarker("),
+            ".putString(key(), json())", ".remove(invalidKey)", ".commit()")
         assertFalse(begin.contains("alreadyInvalid"))
         assertFalse(reset.contains(".remove(priorityUserProfileKey(actorId))"))
     }
@@ -164,25 +189,33 @@ class PriorityUserOnboardingStaticTest {
         val delivery = functionBlock("private fun recordPriorityUserPracticeDelivery(")
         val failure = functionBlock("private fun failPriorityUserTrainingDelivery(")
         val cleanup = functionBlock("private fun clearPriorityUserTrainingDeliveryIfOwned(")
+        val cleanupState = functionBlock("internal fun clearPriorityUserTrainingStateIfOwned(")
         val current = functionBlock("private fun isPriorityUserTrainingDeliveryCurrent(")
 
         assertTrue(update.contains("val deviceGateOpen = postLoginDeviceCheckPassesFeatureGate()"))
-        assertTrue(update.contains("accountBound && deviceGateOpen && decision.mayActivateAccount"))
-        assertTrue(education.contains("if (!requireDeviceCheckForPriorityUserTraining()) return"))
-        assertTrue(safePlace.contains("if (!requireDeviceCheckForPriorityUserTraining()) return"))
-        assertTrue(practice.contains("if (!requireDeviceCheckForPriorityUserTraining()) return"))
+        assertTrue(update.contains("deviceGateOpen = deviceGateOpen"))
+        assertTrue(update.contains("mayActivateAccount = decision.mayActivateAccount"))
+        assertTrue(presenterBlock("fun updatePriorityUserOnboardingUi(").contains(
+            "accountBound && deviceGateOpen && facts.mayActivateAccount",
+        ))
+        assertTrue(education.contains("if (!admission.requireDeviceCheck()) return"))
+        assertTrue(safePlace.contains("if (!admission.requireDeviceCheck()) return"))
+        assertTrue(practice.contains("if (!admission.requireDeviceCheck()) return"))
         assertTrue(delivery.contains("clearPriorityUserTrainingDeliveryIfOwned("))
         assertTrue(failure.contains("clearPriorityUserTrainingDeliveryIfOwned("))
-        assertTrue(cleanup.contains("priorityUserEducationInFlight = false"))
-        assertTrue(cleanup.contains("priorityUserPracticeInFlight = null"))
-        assertTrue(cleanup.contains("policy.cancelPractice(token)"))
-        assertTrue(cleanup.contains("cancelPriorityUserTrainingFeedback()"))
-        assertTrue(current.contains("postLoginDeviceCheckPassesFeatureGate()"))
+        assertInOrder(cleanup, "clearPriorityUserTrainingStateIfOwned(generation, actorId, policy, token)", "runtime.cancelExistingFeedback()")
+        assertTrue(cleanupState.contains("priorityUserEducationInFlight = false"))
+        assertTrue(cleanupState.contains("priorityUserPracticeInFlight = null"))
+        assertTrue(cleanupState.contains("policy.cancelPractice(token)"))
+        assertTrue(cleanup.contains("runtime.cancelExistingFeedback()"))
+        assertTrue(current.contains("profiles.deliveryCurrent(generation, priorityUserTrainingGeneration, actorId, policy)"))
+        assertTrue(MainActivityRefactorSource.member(onboardingSource, "isTrainingDeliveryCurrent").contains("effects.deviceGatePassed()"))
+        assertEducationPorts()
     }
 
     @Test
     fun educationRequiresPlaybackWhilePracticeKeepsItsAvailableChannels() {
-        val update = functionBlock("private fun updatePriorityUserOnboardingUi(")
+        val update = presenterBlock("fun updatePriorityUserOnboardingUi(")
         val practiceButtons = update.substringAfter(
             "priorityUserPracticeButtons.forEach",
         ).substringBefore("priorityUserResetButton")
@@ -205,12 +238,12 @@ class PriorityUserOnboardingStaticTest {
         assertTrue(native.contains("voicePlaybackCompleted = true"))
         assertTrue(
             practice.contains(
-                "postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)",
+                "admission.featureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)",
             ),
         )
         assertTrue(
             practice.contains(
-                "postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.HAPTIC_FEEDBACK)",
+                "admission.featureEnabled(PostLoginDeviceCheckFeature.HAPTIC_FEEDBACK)",
             ),
         )
         assertTrue(hapticDelivery.contains("playPriorityUserTrainingVibration("))
@@ -228,13 +261,24 @@ class PriorityUserOnboardingStaticTest {
         val restrictions = functionBlock("private fun applyPostLoginDeviceFeatureRestrictions(")
         val resolver = functionBlock("private fun resolveCurrentStartupCapabilityDecision(")
         val refresh = functionBlock("private fun refreshStartupCapabilityUi()")
-        val actuator = functionBlock("private fun ensureFeedbackActuator()")
-        val speechAllowed = actuator.substringAfter("speechAllowed = {")
-            .substringBefore("hapticAllowed = {")
-        val hapticAllowed = actuator.substringAfter("hapticAllowed = {")
-        val unavailableSpeech = actuator.substringAfter(
-            "onOfflineKoreanSpeechUnavailable = {",
-        ).substringBefore("speechAllowed = {")
+        val actuator = MainActivityRefactorSource.function(source, "private fun ensureFeedbackActuator()")
+        val actuatorFactory = MainActivityRefactorSource.member(source, "createSpeechOutputController")
+        assertTrue(actuator.contains("actuatorFactory.create("))
+        assertTrue(actuatorFactory.contains("speechAllowed = ::authorizeActuatorSpeechForHomeWakeInput"))
+        assertTrue(functionBlock("private fun authorizeActuatorSpeechForHomeWakeInput()").contains("authorizeNativeFeedbackSpeech("))
+        assertTrue(functionBlock("internal fun authorizeNativeFeedbackSpeech(").contains("navigationSpeechCapabilityAllowed()"))
+        val speechAllowed = functionBlock("private fun navigationSpeechCapabilityAllowed()")
+        val trainingOutput = MainActivityRefactorSource.member(source, "trainingOutputCapabilityAllowed")
+        assertTrue(trainingOutput.contains("educationInteractionController.presentationState().educationInFlight || educationInteractionController.presentationState().practiceInFlight != null"))
+        assertTrue(trainingOutput.contains("!isWalkSessionRuntimeActive() && postLoginDeviceCheckPassesFeatureGate()"))
+        assertTrue(trainingOutput.contains("startupCapabilityDecision?.allowsTrainingOutput("))
+        assertTrue(trainingOutput.contains("startupCapabilityProbe.snapshot().vibrationAvailable else null"))
+        assertTrue(speechAllowed.contains("trainingOutputCapabilityAllowed(WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS)"))
+        val hapticAllowed = actuatorFactory.substringAfter("hapticAllowed = {")
+        assertTrue(actuator.contains("readyEffects.offlineSpeechUnavailable(generation, actor)"))
+        assertTrue(actuatorFactory.contains("override fun offlineSpeechUnavailable(lifecycleGeneration: Int, actuator: AndroidFeedbackActuator)"))
+        assertTrue(actuatorFactory.contains("handleOfflineKoreanSpeechUnavailable(lifecycleGeneration, actuator)"))
+        val unavailableSpeech = functionBlock("private fun handleOfflineKoreanSpeechUnavailable(")
 
         assertTrue(
             restrictions.contains(
@@ -251,12 +295,12 @@ class PriorityUserOnboardingStaticTest {
         assertInOrder(
             resolver,
             "applyPostLoginDeviceFeatureRestrictions(",
-            "startupCapabilityProbe.decision(",
+            "evaluation.probeDecision(",
         )
         assertInOrder(
             refresh,
             "resolveCurrentStartupCapabilityDecision()",
-            "startupCapabilityDecision = decision",
+            "evidence().record(decision)",
         )
         assertTrue(speechAllowed.contains("WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS"))
         assertFalse(speechAllowed.contains("WalkSafeStartupRequirement.VIBRATION"))
@@ -276,19 +320,21 @@ class PriorityUserOnboardingStaticTest {
 
         assertInOrder(
             bindActor,
-            "reporterUserId = actorId",
-            "if (!permissionSessionPolicy.isAuthenticatedFor(actorId))",
-            "permissionSessionPolicy.rememberActor(actorId)",
+            "effects.setReporterActor(actorId)",
+            "if (!effects.authenticatedFor(actorId))",
+            "effects.rememberActor(actorId)",
             "restorePriorityUserOnboardingFromPrefs()",
         )
-        assertTrue(bindActor.contains("firstRunOnboardingSnapshot.verifiedActorBinding?.value"))
-        assertTrue(bindActor.contains("clearGatewaySession(logoutRemote = true)"))
+        assertTrue(bindActor.contains("snapshot.verifiedActorBinding?.value"))
+        assertTrue(bindActor.contains("gateway.clearSession()"))
+        assertTrue(MainActivityRefactorSource.composition(source, "firstRunOnboardingController")
+            .contains("clearGatewaySession(logoutRemote = true)"))
         assertTrue(reporter.contains("priorityUserOnboardingPolicy.accountBlockReason() == null"))
-        assertTrue(source.contains("priorityUserOnboardingActorId == session.actorId"))
+        assertTrue(ownerSource("session/gateway/GatewaySessionController.kt").contains("profile.priorityActorId() == session.actorId"))
         val gatewayLogin = functionBlock("private fun onGatewaySessionButtonClicked()")
         assertInOrder(
             gatewayLogin,
-            "priorityUserOnboardingActorId == session.actorId",
+            "profile.priorityActorId() == session.actorId",
             "commitLoggedInGatewaySession(",
         )
         val gatewayCommit = functionBlock(
@@ -296,8 +342,8 @@ class PriorityUserOnboardingStaticTest {
         )
         assertInOrder(
             gatewayCommit,
-            "priorityUserOnboardingActorId != session.actorId",
-            "gatewaySessionStore.saveInitialIfAbsent(",
+            "profile.priorityActorId() != session.actorId",
+            "store.saveInitialIfAbsent(",
         )
     }
 
@@ -305,10 +351,13 @@ class PriorityUserOnboardingStaticTest {
     fun logoutDetachesMemoryButKeepsTheAccountScopedProfile() {
         val logout = functionBlock("private fun onAccountLogoutClicked()")
 
-        assertTrue(logout.contains("priorityUserOnboardingActorId = null"))
-        assertTrue(logout.contains("priorityUserOnboardingPolicy = PriorityUserOnboardingPolicy()"))
+        assertTrue(logout.contains("onboarding.resetPriorityProfile(clearCompletedRecord = true)"))
+        val binding = MainActivityRefactorSource.composition(source, "accountAccessInteractionOwner")
+        assertTrue(binding.contains("priorityUserProfileController.actorId = null"))
+        assertTrue(binding.contains("priorityUserProfileController.policy = PriorityUserOnboardingPolicy()"))
         assertTrue(logout.contains("priority_user_account_logged_out"))
-        assertTrue(logout.contains("refreshStartupCapabilityUi()"))
+        assertTrue(logout.contains("ui.refreshStartupIfInitialized()"))
+        assertTrue(binding.contains("refreshStartupCapabilityUi()"))
         assertFalse(logout.contains("priorityUserProfileKey("))
     }
 
@@ -345,9 +394,11 @@ class PriorityUserOnboardingStaticTest {
             ),
         )
         assertFalse(practice.contains("speakInteraction(practice.instructionKo)"))
-        assertFalse(practice.contains("persistPriorityUserOnboardingOrFailClosed()"))
+        assertFalse("Practice dispatch must not persist before tracked terminal callbacks",
+            Regex("\\bprofiles\\s*\\.\\s*persistOrFailClosed\\s*\\(").containsMatchIn(practice))
         assertTrue(terminal.contains("policy.recordPracticeDelivery(token, signal)"))
-        assertTrue(terminal.contains("persistPriorityUserOnboardingOrFailClosed()"))
+        assertTrue(terminal.contains("profiles.persistOrFailClosed()"))
+        assertEducationPorts()
     }
 
     @Test
@@ -356,14 +407,17 @@ class PriorityUserOnboardingStaticTest {
             .substringBefore("/** Queues a low-priority camera advisory")
         val listener = feedback.substringAfter("object : FeedbackSpeechRuntime.Listener")
             .substringBefore("if (listenerResult")
-        val platformListener = feedback.substringAfter("private fun installSpeechListener(")
-            .substringBefore("private enum class TtsState")
+        val nativeSpeech = File("src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackSpeechRuntime.kt").readText()
+        val platformListener = nativeSpeech.substringAfter("internal class AndroidFeedbackUtteranceListener(")
+            .substringBefore("private class AndroidProgressToneEffects")
+        assertTrue(MainActivityRefactorSource.member(feedback, "installSpeechListener").contains("speechRuntime.setListener(listener)"))
+        assertTrue(nativeSpeech.contains("textToSpeech.setOnUtteranceProgressListener(AndroidFeedbackUtteranceListener(listener))"))
         val inference = feedback.substringAfter("private fun armUtteranceTerminalWatchdog(")
             .substringBefore("private fun scheduleUtteranceWatchdogLocked")
 
         assertTrue(strictSpeech.contains("requiresExplicitTerminalCallback = true"))
         assertTrue(listener.contains("postUtteranceCallback(engineGeneration, utteranceId)"))
-        assertTrue(platformListener.contains("object : UtteranceProgressListener()"))
+        assertTrue(platformListener.contains(") : UtteranceProgressListener()"))
         assertTrue(platformListener.contains("override fun onStart(utteranceId: String?) = listener.onStart(utteranceId)"))
         assertTrue(platformListener.contains("override fun onDone(utteranceId: String?) = listener.onDone(utteranceId)"))
         assertFalse(platformListener.contains("markUtteranceFinished(utteranceId, completed = true)"))
@@ -371,7 +425,16 @@ class PriorityUserOnboardingStaticTest {
         assertTrue(listener.contains("markUtteranceFinished(utteranceId, completed = true)"))
         assertTrue(listener.contains("onError"))
         assertTrue(listener.contains("onStop"))
-        assertTrue(inference.contains("explicitTerminalRequiredUtterances.remove(predecessor)"))
+        val ledger = File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/feedback/UtteranceLedger.kt",
+        ).readText()
+        val detachPredecessors = ledger.substringAfter("fun detachPredecessors(id: String)")
+            .substringBefore("fun detach(id: String)")
+        assertTrue(feedback.contains("private val pendingUtterances = UtteranceLedger()"))
+        assertTrue(inference.contains("val predecessors = pendingUtterances.detachPredecessors(utteranceId)"))
+        assertTrue(inference.contains("val predecessor = record.id"))
+        assertTrue(detachPredecessors.contains("records.keys.takeWhile { it != id }.mapNotNull(::detach)"))
+        assertTrue(ledger.contains("fun detach(id: String): UtteranceRecord? = records.remove(id)"))
         assertTrue(inference.contains("completed = false"))
         assertFalse(inference.contains("completed = true"))
         assertFalse(inference.contains("completed = !explicitTerminalRequired"))
@@ -395,15 +458,41 @@ class PriorityUserOnboardingStaticTest {
 
     @Test
     fun ageBoundaryBlocksLocalAccountActivationWithoutFakeGuardianApproval() {
+        val registration = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRegistrationScreenComposition.kt").readText()
+        val bindRegistration = MainActivityRefactorSource.member(registration, "bindRegistration")
+        val registrationConstruction = MainActivityRefactorSource.property(source, "nativeRegistrationComposition")
+        assertTrue(registrationConstruction.contains("NativeRegistrationScreenComposition(this, viewStyle, nativeUiPublication) { accountAccessPresenter }"))
+        assertTrue(MainActivityRefactorSource.property(source, "firstRunOnboardingPresenter").contains("nativeRegistrationComposition.firstRunPresenter()"))
+        assertTrue(MainActivityRefactorSource.member(source, "buildContentView").contains("nativeRegistrationComposition.bindRegistration(onboardingPanel)"))
+        assertTrue(bindRegistration.contains("if (!::firstRun.isInitialized)"))
+        assertTrue(bindRegistration.contains("FirstRunOnboardingPresenter(context, style, panel)"))
+        assertTrue(bindRegistration.contains("firstRun.bindOnboardingPanel(panel)"))
+        assertTrue(bindRegistration.contains("deviceCheck = DeviceCheckPresenter(panel, style)"))
+        assertTrue(bindRegistration.contains("firstRun.publishRegistrationTargets()"))
+
         val persistAccount = functionBlock("private fun persistReporterUserFromInput()")
         val reporter = functionBlock("private fun currentReporterUserId()")
 
         assertTrue(persistAccount.contains("manual_reporter_id_disallowed"))
         assertFalse(persistAccount.contains("reporterUserId ="))
         assertTrue(reporter.contains("priorityUserOnboardingPolicy.accountBlockReason() == null"))
-        assertTrue(source.contains("PriorityUserAgeBand.UNDER_14"))
-        assertTrue(source.contains("PriorityUserAgeBand.AGE_14_TO_17"))
-        assertTrue(source.contains("PriorityUserAgeBand.ADULT_18_PLUS"))
+        val ages = panelSource.substringAfter("priorityUserOnboardingStatusText = TextView(context).apply {")
+            .substringBefore("priorityUserEducationButton =")
+        assertTrue(ages.contains("PriorityUserAgeBand.UNDER_14"))
+        assertTrue(ages.contains("PriorityUserAgeBand.AGE_14_TO_17"))
+        assertTrue(ages.contains("PriorityUserAgeBand.ADULT_18_PLUS"))
+        assertTrue(ages.contains("onClick = { actions.education.onPriorityAgeSelected(ageBand) }"))
+        val composition = functionBlock("private fun buildContentView(): FrameLayout")
+        assertTrue(composition.contains("onPriorityAgeSelected = {\n                        selectPriorityUserAgeBand(it)"))
+        assertTrue(panelSource.contains("val priorityUserAgeButtons: Map<PriorityUserAgeBand, Button> get() = priorityAgeButtons"))
+        assertTrue(MainActivityRefactorSource.member(registration, "publishEducationAndReadiness").contains("firstRun.publishEducationTargets()"))
+        assertTrue(composition.contains("nativeRegistrationComposition.publishEducationAndReadiness()"))
+        val selection = functionBlock("private fun selectPriorityUserAgeBand(")
+        assertTrue(selection.contains("priorityUserOnboardingPolicy.selectAgeBand(ageBand)"))
+        val traversal = presenterBlock("fun linkPriorityUserAccessibilityTraversal(")
+        assertTrue(traversal.contains("PriorityUserAgeBand.UNDER_14"))
+        assertTrue(traversal.contains("PriorityUserAgeBand.AGE_14_TO_17"))
+        assertTrue(traversal.contains("PriorityUserAgeBand.ADULT_18_PLUS"))
         assertFalse(source.contains("recordGuardianVerification("))
     }
 
@@ -426,18 +515,41 @@ class PriorityUserOnboardingStaticTest {
 
     @Test
     fun onboardingUsesFlexibleTextHighContrastAndExplicitFocusOrder() {
+        val registration = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRegistrationScreenComposition.kt").readText()
+        val bindRegistration = MainActivityRefactorSource.member(registration, "bindRegistration")
+        val registrationConstruction = MainActivityRefactorSource.property(source, "nativeRegistrationComposition")
+        assertTrue(registrationConstruction.contains("NativeRegistrationScreenComposition(this, viewStyle, nativeUiPublication) { accountAccessPresenter }"))
+        assertTrue(MainActivityRefactorSource.property(source, "firstRunOnboardingPresenter").contains("nativeRegistrationComposition.firstRunPresenter()"))
+        assertTrue(MainActivityRefactorSource.member(source, "buildContentView").contains("nativeRegistrationComposition.bindRegistration(onboardingPanel)"))
+        assertTrue(bindRegistration.contains("if (!::firstRun.isInitialized)"))
+        assertTrue(bindRegistration.contains("FirstRunOnboardingPresenter(context, style, panel)"))
+        assertTrue(bindRegistration.contains("firstRun.bindOnboardingPanel(panel)"))
+        assertTrue(bindRegistration.contains("deviceCheck = DeviceCheckPresenter(panel, style)"))
+        assertTrue(bindRegistration.contains("firstRun.publishRegistrationTargets()"))
+
         val content = functionBlock("private fun buildContentView()")
-        val factory = content.substringAfter("fun accessiblePriorityUserButton(")
-            .substringBefore("productPurposeText =")
-        val traversal = functionBlock("private fun linkPriorityUserAccessibilityTraversal()")
-        val update = functionBlock("private fun updatePriorityUserOnboardingUi(")
+        val factory = blockStartingAt(styleSource, "fun accessiblePriorityUserButton(")
+        val traversal = presenterBlock("fun linkPriorityUserAccessibilityTraversal()")
+        val update = presenterBlock("fun updatePriorityUserOnboardingUi(")
+        val updateBinding = functionBlock("private fun updatePriorityUserOnboardingUi(")
 
         assertTrue(factory.contains("setSingleLine(false)"))
         assertTrue(factory.contains("ellipsize = null"))
         assertFalse(factory.contains("maxLines ="))
         assertTrue(factory.contains("minimumHeight = (WS_TOUCH_MIN_DP * resources.displayMetrics.density).roundToInt()"))
         assertTrue(factory.contains("ViewGroup.LayoutParams.WRAP_CONTENT"))
-        assertTrue(content.contains("ViewCompat.setAccessibilityHeading("))
+        assertTrue(panelSource.contains("ViewCompat.setAccessibilityHeading("))
+        assertTrue(panelSource.contains("priorityUserEducationButton = style.accessiblePriorityUserButton("))
+        assertTrue(content.contains("style = viewStyle"))
+        assertInOrder(content.substringAfter("onboardingPanel.setAccountContent("),
+            "nativeRegistrationComposition.publishEducationAndReadiness()",
+            "linkPriorityUserAccessibilityTraversal()", "updatePriorityUserOnboardingUi()")
+        assertTrue(content.contains("nativeRegistrationComposition.bindRegistration(onboardingPanel)"))
+        assertTrue(bindRegistration.contains("FirstRunOnboardingPresenter(context, style, panel)"))
+        val educationPublication = MainActivityRefactorSource.member(registration, "publishEducationAndReadiness")
+        assertTrue(educationPublication.contains("firstRun.publishEducationTargets()"))
+        assertTrue(MainActivityRefactorSource.member(presenterSource, "publishEducationTargets").contains("publishedEducation = onboarding"))
+        assertTrue(MainActivityRefactorSource.member(presenterSource, "educationBinding").contains("= publishedEducation"))
         assertTrue(traversal.contains("accessibilityTraversalAfter = previous.id"))
         assertTrue(traversal.contains("nextFocusForwardId = current.id"))
         assertTrue(traversal.contains("nextFocusDownId = current.id"))
@@ -450,17 +562,54 @@ class PriorityUserOnboardingStaticTest {
         )
         assertTrue(update.contains("priorityUserOnboardingStatusText.contentDescription = message"))
         assertTrue(update.contains("button.contentDescription = button.text"))
+        assertTrue(functionBlock("private fun linkPriorityUserAccessibilityTraversal()").contains(
+            "firstRunOnboardingPresenter.linkPriorityUserAccessibilityTraversal()",
+        ))
+        assertTrue(updateBinding.contains("firstRunOnboardingPresenter.updatePriorityUserOnboardingUi("))
+        assertTrue(updateBinding.contains("highContrastEnabled = environment.highContrastEnabled"))
         assertFalse(content.contains("setOnTouchListener"))
         assertFalse(content.contains("GestureDetector"))
+        assertFalse(panelSource.contains("setOnTouchListener"))
+        assertFalse(panelSource.contains("GestureDetector"))
     }
 
     @Test
     fun nativeEducationKeepsPostureListeningAndConsentInAccessibleOrder() {
+        val registration = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/NativeRegistrationScreenComposition.kt").readText()
+        val bindRegistration = MainActivityRefactorSource.member(registration, "bindRegistration")
+        val registrationConstruction = MainActivityRefactorSource.property(source, "nativeRegistrationComposition")
+        assertTrue(registrationConstruction.contains("NativeRegistrationScreenComposition(this, viewStyle, nativeUiPublication) { accountAccessPresenter }"))
+        assertTrue(MainActivityRefactorSource.property(source, "firstRunOnboardingPresenter").contains("nativeRegistrationComposition.firstRunPresenter()"))
+        assertTrue(MainActivityRefactorSource.member(source, "buildContentView").contains("nativeRegistrationComposition.bindRegistration(onboardingPanel)"))
+        assertTrue(bindRegistration.contains("if (!::firstRun.isInitialized)"))
+        assertTrue(bindRegistration.contains("FirstRunOnboardingPresenter(context, style, panel)"))
+        assertTrue(bindRegistration.contains("firstRun.bindOnboardingPanel(panel)"))
+        assertTrue(bindRegistration.contains("deviceCheck = DeviceCheckPresenter(panel, style)"))
+        assertTrue(bindRegistration.contains("firstRun.publishRegistrationTargets()"))
+
         val content = functionBlock("private fun buildContentView()")
-        val controls = content.substringAfter("priorityUserOnboardingControls =").substringBefore("linkPriorityUserAccessibilityTraversal()")
-        assertInOrder(controls, "addView(priorityUserOnboardingStatusText)", "addView(priorityUserEducationProgressText)", "addView(priorityUserEducationBodyText)", "addView(firstRunPhonePostureControls)", "addView(priorityUserEducationButton)", "addView(priorityUserPracticeNecessityButton)", "addView(priorityUserSafePlaceButton)", "PriorityUserPractice.entries.forEach { addView(priorityUserPracticeButtons.getValue(it)) }", "addView(priorityUserEducationAgreeButton)")
+        val controls = blockStartingAt(panelSource, "priorityUserOnboardingControls = LinearLayout(context).apply")
+        assertInOrder(controls, "addView(priorityUserOnboardingStatusText)", "addView(priorityUserEducationProgressText)", "addView(priorityUserEducationBodyText)", "addView(firstRunPhonePostureControls)", "addView(priorityUserEducationButton)", "addView(priorityUserPracticeNecessityButton)", "addView(priorityUserSafePlaceButton)", "PriorityUserPractice.entries.forEach { addView(practiceButtons.getValue(it)) }", "addView(priorityUserEducationAgreeButton)")
         assertFalse(controls.contains("addView(loginUserIdInput)"))
-        val update = functionBlock("private fun updateNativeSafetyEducationUi()")
+        assertTrue(panelSource.contains("onClick = actions.education.onSafetyEducation"))
+        assertTrue(panelSource.contains("onClick = actions.education.onPracticeNecessity"))
+        assertTrue(panelSource.contains("onClick = { actions.education.onPractice(practice) }"))
+        assertTrue(content.contains("onSafetyEducation = ::reviewPriorityUserSafetyEducation"))
+        assertTrue(content.contains("playNativeSafetyEducation(practiceNecessity = true)"))
+        assertTrue(content.contains("performPriorityUserPractice(it)"))
+        assertTrue(panelSource.contains("val priorityUserPracticeButtons: Map<PriorityUserPractice, Button> get() = practiceButtons"))
+        assertTrue(MainActivityRefactorSource.member(presenterSource, "linkPriorityUserAccessibilityTraversal").contains("priorityUserPracticeButtons.getValue(practice)"))
+        assertTrue(content.contains("nativeRegistrationComposition.bindRegistration(onboardingPanel)"))
+        assertTrue(bindRegistration.contains("FirstRunOnboardingPresenter(context, style, panel)"))
+        val educationPublication = MainActivityRefactorSource.member(registration, "publishEducationAndReadiness")
+        assertTrue(educationPublication.contains("firstRun.publishEducationTargets()"))
+        assertTrue(MainActivityRefactorSource.member(presenterSource, "publishEducationTargets").contains("publishedEducation = onboarding"))
+        assertTrue(MainActivityRefactorSource.member(presenterSource, "educationBinding").contains("= publishedEducation"))
+        assertTrue(panelSource.contains("val priorityUserEducationBodyText: TextView"))
+        assertTrue(panelSource.contains("val priorityUserEducationProgressText: TextView"))
+        assertTrue(content.contains("nativeRegistrationComposition.publishEducationAndReadiness()"))
+        assertTrue(educationPublication.contains("publication.publish(NativeUiPublication.Target.FIRST_RUN_PHONE_POSTURE_CONTROLS)"))
+        val update = presenterBlock("fun updateNativeSafetyEducationUi(")
         assertTrue(update.contains("val heading = if (showPosture) \"사전 연습\" else \"안전 교육\""))
         assertTrue(update.contains("priorityUserEducationBodyText.accessibilityTraversalAfter = priorityUserEducationProgressText.id"))
         assertTrue(update.contains("firstRunPhonePostureButton.accessibilityTraversalAfter = priorityUserEducationBodyText.id"))
@@ -489,22 +638,40 @@ class PriorityUserOnboardingStaticTest {
         assertTrue(playback.contains("이미 완료한 청취 기록은 유지됩니다."))
         val completion = playback.substringAfter("onCompleted = {").substringBefore("onFailed = failed")
         assertInOrder(completion, "isPriorityUserTrainingDeliveryCurrent",
-            "beginPriorityUserProfileMutationOrFailClosed",
+            "profiles.beginMutation",
             "policy.finishAppUsageEducationPlayback(usageToken, completed = true)",
-            "persistPriorityUserOnboardingOrFailClosed")
+            "profiles.persistOrFailClosed")
         assertTrue(update.contains("state.educationReviewed && state.practiceNecessityReviewed"))
-        assertTrue(content.contains("onClick = ::acceptNativeSafetyEducation"))
+        assertTrue(panelSource.contains("onClick = actions.education.onEducationAgree"))
+        assertTrue(content.contains("onEducationAgree = ::acceptNativeSafetyEducation"))
+        assertTrue(educationPublication.contains("publication.publish(NativeUiPublication.Target.PRIORITY_USER_EDUCATION_AGREE_BUTTON)"))
+        assertEducationPorts()
     }
 
     @Test
     fun nativeEducationDisplaysSharedSpeechAndProgressWithoutTruncatingLargeText() {
         val update = functionBlock("private fun updateNativeSafetyEducationUi()")
         val playback = functionBlock("private fun playNativeSafetyEducation(")
-        val body = source.substringAfter("priorityUserEducationBodyText = TextView(this).apply {")
-            .substringBefore("priorityUserAgeButtons.clear()")
+        val body = blockStartingAt(panelSource, "priorityUserEducationBodyText = TextView(context).apply {")
         assertTrue(update.contains("PriorityUserEducationPresentation.screenText(state)"))
         assertTrue(update.contains("PriorityUserEducationPresentation.progressNotice("))
+        assertTrue(update.contains("firstRunOnboardingPresenter.updateNativeSafetyEducationUi("))
+        assertTrue(update.contains("body = body"))
+        assertTrue(update.contains("progress = progress"))
+        val rendered = presenterBlock("fun updateNativeSafetyEducationUi(")
+        assertTrue(rendered.contains("val body = facts.body"))
+        assertTrue(rendered.contains("val progress = facts.progress"))
+        assertTrue(rendered.contains("priorityUserEducationBodyText.text.toString() != body"))
+        assertTrue(rendered.contains("priorityUserEducationProgressText.text.toString() != progress"))
+        assertFalse(presenterSource.contains("ensureFeedbackActuator()"))
+        assertTrue(update.contains("if (prepareFeedback) ensureFeedbackActuator()"))
         assertTrue(playback.contains("PriorityUserEducationPresentation.speechText(playback)"))
+        assertTrue(playback.contains("PriorityUserEducationPresentation.speechSegments(message)"))
+        assertTrue(playback.contains("message = segments[dispatchedSegment]"))
+        val completion = playback.substringAfter("onCompleted = {").substringBefore("onFailed = failed")
+        assertInOrder(completion, "isPriorityUserTrainingDeliveryCurrent", "segmentIndex != dispatchedSegment",
+            "segmentIndex += 1", "segmentIndex < segments.size", "playbackHandler.post { dispatchWhenReady() }",
+            "profiles.beginMutation", "policy.finishAppUsageEducationPlayback(usageToken, completed = true)")
         assertTrue(playback.contains("AndroidFeedbackActuator.INITIALIZATION_READINESS_TIMEOUT_MS"))
         assertFalse(playback.contains("+ 8_000L"))
         assertTrue(body.contains("ViewGroup.LayoutParams.WRAP_CONTENT"))
@@ -519,17 +686,23 @@ class PriorityUserOnboardingStaticTest {
         val practice = functionBlock("private fun performPriorityUserPractice(")
         val delivery = functionBlock("private fun recordPriorityUserPracticeDelivery(")
         val confirmation = functionBlock("private fun confirmPriorityUserHazardResponse()")
-        val update = functionBlock("private fun updateNativeSafetyEducationUi()")
+        val update = presenterBlock("fun updateNativeSafetyEducationUi(")
+        val updateBinding = functionBlock("private fun updateNativeSafetyEducationUi()")
         val current = functionBlock("private fun isPriorityUserTrainingDeliveryCurrent(")
         assertTrue(practice.contains("confirmPriorityUserHazardResponse()"))
         assertFalse(delivery.contains("policy.confirmHazardResponse"))
-        assertTrue(delivery.contains("if (policy.isHazardResponseReady(token)) updatePriorityUserOnboardingUi()"))
+        assertTrue(delivery.contains("if (policy.isHazardResponseReady(token)) effects.refresh(Presentation.PRIORITY)"))
         assertTrue(confirmation.contains("!policy.isHazardResponseReady(token)"))
-        assertInOrder(confirmation, "isPriorityUserTrainingDeliveryCurrent", "beginPriorityUserProfileMutationOrFailClosed", "policy.confirmHazardResponse(token)", "persistPriorityUserOnboardingOrFailClosed")
-        assertTrue(current.contains("isActivityForeground &&"))
+        assertInOrder(confirmation, "isPriorityUserTrainingDeliveryCurrent", "profiles.beginMutation", "policy.confirmHazardResponse(token)", "profiles.persistOrFailClosed")
+        assertTrue(current.contains("profiles.deliveryCurrent(generation, priorityUserTrainingGeneration, actorId, policy)"))
+        assertTrue(MainActivityRefactorSource.member(onboardingSource, "isTrainingDeliveryCurrent").contains("effects.foreground() &&"))
         assertTrue(update.contains("PriorityUserEducationPresentation.hazardResponseActionKo"))
         assertTrue(update.contains("state.requiresPracticeRestart"))
         assertTrue(update.contains("priorityUserPracticeInFlight != null -> \"이번 연습 중지\""))
+        assertTrue(updateBinding.contains("educationInteractionController.hazardResponseReady(priorityUserOnboardingPolicy)"))
+        assertTrue(MainActivityRefactorSource.member(ownerSource("ui/workflow/EducationInteractionController.kt"), "hazardResponseReady")
+            .contains("priorityUserPracticeAttemptToken?.let(policy::isHazardResponseReady)"))
+        assertTrue(updateBinding.contains("hazardResponseReady = hazardResponseReady"))
         val stop = functionBlock("private fun reviewPriorityUserSafetyEducation()")
             .substringBefore("if (priorityUserEducationInFlight)")
         assertInOrder(stop, "priorityUserPracticeInFlight != null", "cancelPendingPriorityUserTrainingFeedback()")
@@ -537,7 +710,9 @@ class PriorityUserOnboardingStaticTest {
         assertFalse(practice.contains("startLocationUpdates"))
         assertFalse(practice.contains("beginNativeWalkFromHome"))
         assertFalse(practice.contains("startCamera"))
-        listOf("private fun failPriorityUserTrainingDelivery(", "private fun clearPriorityUserTrainingDeliveryIfOwned(", "private fun cancelPendingPriorityUserTrainingFeedback()").forEach {
+        val ownedCleanup = functionBlock("private fun clearPriorityUserTrainingDeliveryIfOwned(")
+        assertTrue(ownedCleanup.contains("clearPriorityUserTrainingStateIfOwned(generation, actorId, policy, token)"))
+        listOf("private fun failPriorityUserTrainingDelivery(", "internal fun clearPriorityUserTrainingStateIfOwned(", "private fun cancelPendingPriorityUserTrainingFeedback()").forEach {
             assertTrue(functionBlock(it).contains("priorityUserPracticeAttemptToken = null"))
         }
     }
@@ -547,22 +722,75 @@ class PriorityUserOnboardingStaticTest {
         val restore = functionBlock("private fun restorePriorityUserOnboardingFromPrefs()")
         val persist = functionBlock("private fun persistPriorityUserOnboarding()")
         val bind = functionBlock("private fun bindFirstRunVerifiedActorForTraining()")
-        assertTrue(restore.contains("profile.optBoolean(\"hazard_response_confirmed\", false)"))
+        assertTrue(restore.contains("decodeProfile(profile, actorSha256)"))
+        val decode = MainActivityRefactorSource.member(profileSource, "decodeProfile")
+        assertTrue(decode.contains("profile.optBoolean(\"hazard_response_confirmed\", false)"))
         assertTrue(persist.contains(".put(\"hazard_response_confirmed\", snapshot.hazardResponseConfirmed)"))
         assertTrue(bind.contains("hazardResponseConfirmed = compatible && restored.hazardResponseConfirmed"))
         assertTrue(bind.contains("educationReviewed = compatible && restored.educationReviewed"))
         assertTrue(bind.contains("appUsageAccepted = compatible && restored.appUsageAccepted"))
-        assertTrue(bind.contains("FirstRunOnboardingPolicy.restartFp004Training(firstRunOnboardingSnapshot)"))
+        assertTrue(bind.contains("FirstRunOnboardingPolicy.restartFp004Training(snapshot)"))
         assertFalse(bind.substringAfter("val restart =").contains("clearGatewaySession"))
         val accept = functionBlock("private fun acceptNativeSafetyEducation()")
         assertTrue(accept.contains("!state.interactivePracticeComplete"))
     }
 
+    private fun presenterBlock(signature: String): String =
+        ReportStaticSourceInspector.functionBlock(presenterSource, signature.substringBefore('('))
+
+    private fun ownerSource(path: String): String =
+        File("src/main/java/kr/co/hanium/dreamup/walksafe/$path").readText()
+
+    private fun assertEducationPublication(content: String) {
+        assertTrue(content.contains("FirstRunOnboardingPresenter(this, viewStyle, onboardingPanel)"))
+        assertTrue(content.contains("firstRunOnboardingPresenter.bindOnboardingPanel(onboardingPanel)"))
+        assertTrue(content.contains("firstRunOnboardingPresenter.publishEducationTargets()"))
+        assertTrue(MainActivityRefactorSource.member(presenterSource, "publishEducationTargets")
+            .contains("publishedEducation = onboarding"))
+        assertTrue(MainActivityRefactorSource.member(presenterSource, "educationBinding")
+            .contains("= publishedEducation"))
+    }
+
+    private fun assertEducationPorts() {
+        val binding = MainActivityRefactorSource.composition(source, "educationInteractionController")
+        assertTrue(binding.contains("beginPriorityUserProfileMutationOrFailClosed()"))
+        assertTrue(binding.contains("persistPriorityUserOnboardingOrFailClosed()"))
+        assertTrue(binding.contains("requireDeviceCheckForPriorityUserTraining()"))
+        assertTrue(binding.contains("firstRunOnboardingController.isTrainingDeliveryCurrent(generation, currentGeneration, actorId, policy)"))
+        assertTrue(binding.contains("cancelPriorityUserTrainingFeedback()"))
+        assertTrue(binding.contains("actuator.speakPriorityUserTraining(message, onCompleted, onFailed, onCancelled)"))
+        assertTrue(binding.contains("actuator.playPriorityUserTrainingVibration(onWindowElapsed, onFailed)"))
+        assertTrue(binding.contains("Presentation.PRIORITY -> this@MainActivity.updatePriorityUserOnboardingUi()"))
+    }
+
     private fun functionBlock(signature: String): String {
-        val start = source.indexOf(signature)
-        check(start >= 0) { "missing function: $signature" }
-        val next = source.indexOf("\n    private fun ", start + signature.length)
-        return if (next < 0) source.substring(start) else source.substring(start, next)
+        if (signature.contains("captureWalkSessionReadiness(")) {
+            assertTrue(MainActivityRefactorSource.member(source, "captureWalkSessionReadiness")
+                .contains("walkReadinessCoordinator.capture(decision, action, recordResourceDiagnostics, checkEntryPermissions)"))
+            assertTrue(MainActivityRefactorSource.property(source, "walkReadinessCoordinator").contains("WalkReadinessCoordinator("))
+            return MainActivityRefactorSource.member(readinessSource, "capture")
+        }
+        return MainActivityRefactorSource.function(source, signature)
+    }
+
+    private fun blockStartingAt(text: String, marker: String): String {
+        val start = text.indexOf(marker)
+        check(start >= 0) { "missing block: $marker" }
+        var braceDepth = 0
+        var sawOpeningBrace = false
+        for (index in start until text.length) {
+            when (text[index]) {
+                '{' -> {
+                    braceDepth += 1
+                    sawOpeningBrace = true
+                }
+                '}' -> if (sawOpeningBrace) {
+                    braceDepth -= 1
+                    if (braceDepth == 0) return text.substring(start, index + 1)
+                }
+            }
+        }
+        error("unterminated block: $marker")
     }
 
     private fun assertInOrder(text: String, vararg snippets: String) {
@@ -573,4 +801,56 @@ class PriorityUserOnboardingStaticTest {
             previous = current
         }
     }
+
+    private fun actorSessionChange(mainSource: String): String {
+        MainActivityRefactorSource.composition(mainSource, "actorSessionLifecycleCoordinator")
+        val main = MainActivityRefactorSource.factory(mainSource, "onGatewayProcessSessionChanged")
+        // Whole declaration comparison preserves guards, argument forwarding and effect order.
+        val expectedMain = """
+private fun onGatewayProcessSessionChanged(
+        snapshot: GatewaySessionProcessSnapshot,
+        consentAuthorityChanged: Boolean,
+    ) {
+        actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)
+        refreshGuidanceDiagnosticAuthority()
+    }
+        """.trimIndent()
+        org.junit.Assert.assertEquals("Main gateway callback must invoke the owner before diagnostic refresh", expectedMain.filterNot(Char::isWhitespace),
+            main.filterNot(Char::isWhitespace))
+        val call = main.indexOf("actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)")
+        org.junit.Assert.assertTrue(call >= 0)
+        org.junit.Assert.assertTrue(main.indexOf("refreshGuidanceDiagnosticAuthority()") > call)
+        return MainActivityRefactorSource.member(java.io.File(
+            "src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/ActorSessionLifecycleCoordinator.kt",
+        ).readText(), "onGatewayProcessSessionChanged")
+    }
+
+
+    @Test
+    fun actorSessionChangeRejectsNonExecutingOrReorderedCallers() {
+        val mainSource = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        actorSessionChange(mainSource)
+        val caller = MainActivityRefactorSource.factory(mainSource, "onGatewayProcessSessionChanged")
+        val call = "actorSessionLifecycleCoordinator.onGatewayProcessSessionChanged(snapshot, consentAuthorityChanged)"
+        org.junit.Assert.assertTrue(caller.contains(call))
+        val variants = linkedMapOf(
+            "conditional" to caller.replace(call, "if (false) { $call }"),
+            "uninvoked lambda" to caller.replace(call, "{ $call }"),
+            "comment" to caller.replace(call, "/* $call */"),
+            "additional effect" to caller.replace(call, "$call\nunexpectedEffect()"),
+            "omitted" to caller.replace(call, ""),
+            "early return" to caller.replace(call, "return\n$call"),
+        )
+
+        variants["reordered effects"] = caller.replace(call, "").replace(
+            "refreshGuidanceDiagnosticAuthority()", "refreshGuidanceDiagnosticAuthority()\n" + call,
+        )
+
+        val accepted = variants.filter { (_, changed) ->
+            val mainSource = mainSource.replace(caller, changed)
+            runCatching { actorSessionChange(mainSource) }.isSuccess
+        }.keys
+        org.junit.Assert.assertTrue("Non-equivalent Main callers accepted: $accepted", accepted.isEmpty())
+    }
+
 }

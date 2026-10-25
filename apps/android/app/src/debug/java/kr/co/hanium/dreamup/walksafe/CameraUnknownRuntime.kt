@@ -22,10 +22,12 @@ internal class CameraUnknownRuntime<T>(
     private var retrySerial = 0L
 
     fun resume() {
-        if (destroyed) return
+        if (destroyed || active) return
         active = true
         if (service == null && status == Status.IDLE) startNew() else {
-            if (service?.stats()?.stopping == true && status != Status.RELEASE_FAILED) status = Status.FAILED
+            if (service?.stats()?.stopping == true &&
+                status != Status.WAITING_RELEASE && status != Status.RELEASE_FAILED
+            ) status = Status.FAILED
             changed()
         }
     }
@@ -35,6 +37,27 @@ internal class CameraUnknownRuntime<T>(
         retrySerial++ // A release callback cannot carry a retry into another foreground session.
         if (status == Status.WAITING_RELEASE) status = Status.FAILED
         service?.discardPending("camera_test_paused")
+    }
+
+    /** Stop native admission on leaving CameraTest; a resumed owner waits for confirmed release. */
+    fun pauseAndRelease() {
+        pause()
+        val old = service ?: return
+        val request = ++retrySerial
+        status = Status.WAITING_RELEASE
+        old.closeAsync()
+        old.releasedFuture().whenComplete { _, error -> dispatch {
+            if (destroyed || request != retrySerial || service !== old) return@dispatch
+            if (error != null || !old.stats().nativeReleaseConfirmed) {
+                status = Status.RELEASE_FAILED
+                if (active) changed()
+            } else {
+                service = null
+                backendName = null
+                status = Status.IDLE
+                if (active) startNew()
+            }
+        } }
     }
 
     fun retry() {
@@ -60,7 +83,10 @@ internal class CameraUnknownRuntime<T>(
         if (active) changed()
     }
 
-    fun accepts(epoch: Long): Boolean = active && owns(epoch) && service?.stats()?.stopping == false
+    fun accepts(epoch: Long): Boolean {
+        val current = service ?: return false
+        return active && !destroyed && current.sessionEpoch == epoch && current.isReady
+    }
 
     fun destroy() {
         active = false

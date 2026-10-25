@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D01-013 앱 사용법 청취·사용 조건·안전 장소 확인"]
+  G{"안전/필요성 교육 선행, current actor/device gate 및 APP_USAGE 페이지"}
+  I["APP_USAGE 문구; 자세·공식환경 조건 acknowledgement; 안전 장소 explicit button"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: 저장실패/조건미달→연습 미개방"]
+  G -->|"미충족"| X
+  N1["앱 사용법 안내를 segmented speech로 읽고 최종 DONE 또는 허용된 TalkBack 화면검토로 appUsageReviewed를 기록한다."]
+  I --> N1
+  N2["postureReviewed 및 safety/necessity/educationAccepted와 usage conditions를 만족해야 app usage accept를 반영한다."]
+  N1 --> N2
+  N3["confirmPriorityUserSafePracticePlace는 현재 device gate와 app usage prerequisite를 재검사한다."]
+  N2 --> N3
+  N4["durable mutation marker 뒤 safe place를 기록; 과거 prefix가 있으나 hazardResponse가 없으면 연습 재시작한다."]
+  N3 --> N4
+  OK["safePracticePlaceConfirmed 및 첫 HAZARD 버튼"]
+  N4 --> OK
+  B0["appUsageAccepted 거부"]
+  N2 -->|"설명·자세·사용조건 미충족"| B0
+  B1["safe place 저장 거부"]
+  N3 -->|"기기준비 또는사용법미완료"| B1
+  B2["prefix 초기화·HAZARD부터"]
+  N4 -->|"과거연습있지만 hazardResponse 없음"| B2
+  R["중단·취소: 설명 재탭/화면이탈 출력 취소; 안전장소 확인 취소 별도 API 없음 / actor/generation 바뀌면 오래된 확인값 적용 금지"]
+  V["복구·재시도: actor-bound profile 복원; missing hazard-response 재시작 규칙 / 조건 충족 후 다시 명시확인"]
+  Q["정책 P-D01-009 · P-D01-010 · P-D01-011"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G

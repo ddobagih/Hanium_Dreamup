@@ -1,0 +1,40 @@
+flowchart TD
+  A["F-D08-060 완료 삭제 원장 archive·fence 보존·index 복구"]
+  B["진입: mutateLedger → archiveCompletedRequests"]
+  A --> B
+  P0["1. request 와 actor fence 를 각각암호화 temp/fsync/rename/dirfsync 로 먼저 저장한다."]
+  B --> P0
+  P1["2. 두 archive 를 재읽어 immutableidentity 및 fence 일치를검증한다."]
+  P0 --> P1
+  P2["3. active 에서 record/fence 를제거하고 actor16hexprefixindex 를동일 ledger 쓰기에서등록한다."]
+  P1 --> P2
+  P3["4. crash 로양쪽사본이남으면 immutableidentity/fence 를대조한후 active 를우선하고다음 mutation 에서재 archive 한다."]
+  P2 --> P3
+  P4["5. archive 의 outbox 변경은 overlay 로처리하며 outboxrequest_refs 를먼저 superset 으로저장한후 archive 쓰기·비우기 index 정리를한다."]
+  P3 --> P4
+  P5["6. 구 index 없음은 lock 하에서한번전수스캔하여 fence 와남은 outbox 를등록한다."]
+  P4 --> P5
+  OK["정상: 완료 record archive 와 actor fence/index 를 유지하면서 조회·outbox 전달 계속"]
+  P5 --> OK
+  C0{"2MiB 이하지만 fullarchive 없음"}
+  X0["현재 active 유지"]
+  B -. "해당 단계 분기" .-> C0
+  C0 -->|"조건 충족"| X0
+  C1{"등록 prefix 있는데 actorfile 없음"}
+  X1["integrity 실패;삭제안된 actor 로되살리지않음"]
+  B -. "해당 단계 분기" .-> C1
+  C1 -->|"조건 충족"| X1
+  C2{"active 와 archive 의 identity/fence 불일치"}
+  X2["integrity 실패"]
+  B -. "해당 단계 분기" .-> C2
+  C2 -->|"조건 충족"| X2
+  C3{"완료아닌 request"}
+  X3["archive 대상아님"]
+  B -. "해당 단계 분기" .-> C3
+  C3 -->|"조건 충족"| X3
+  T["종료·기한: 클라이언트 종료 시 request.signal 이 abort 된다. 이미 내구 저장된 변경은 롤백하지 않는다. 동기 ledger 검사·파일 처리 자체에 독립 timeout 은 없다. 호출 HTTP/maintenance lock 의 기한과 실행 맥락을 따른다."]
+  B -. "중단 조건" .-> T
+  R["재시도: 다음 상태 mutation 이 동일 archive identity 를 검사하여 미완료 이동을 이어간다. 손상 파일을 자동 덮어쓰지 않는다."]
+  T -.-> R
+  POLICY["정책: P-D08-019, P-D08-020, P-D08-021, P-D08-023, P-D08-031"]
+  A -.-> POLICY

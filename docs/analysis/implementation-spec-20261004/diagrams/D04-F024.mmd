@@ -1,0 +1,23 @@
+flowchart TD
+  ID["F-D04-024 · 경로 진행·출발·회전 통과에 맞춘 정렬 방위<br/>P-D04-024"]
+  A["위치+match+pending guide"]
+  C0{"위치·route·최대거리 검사를 통과하는가"}
+  R0["POSITION/ROUTE reason"]
+  C1{"local branch가 합의되고 branch 변경 대기가 아닌가"}
+  R1["BRANCH_AMBIGUOUS 또는 PENDING"]
+  C2{"출발 또는 현재 구간의 1m 이상 bearing 근거와 turn passage가 있는가"}
+  R2["NO_ROUTE_BEARING 또는 TURN_PASSAGE_PENDING"]
+  OK["15m lookahead target·진북 bearing·uncertainty·lateral 진단 반환"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END

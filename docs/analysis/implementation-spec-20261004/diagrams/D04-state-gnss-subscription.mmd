@@ -1,0 +1,20 @@
+stateDiagram-v2
+  state "F-D04-013 INACTIVE" as Inactive
+  state "raw 등록 ACTIVE" as Raw
+  state "status C/N0 fallback ACTIVE" as Status
+  state "CLEANUP_PENDING" as Pending
+  state "CLOSED" as Closed
+  [*] --> Inactive
+  Inactive --> Raw: raw 등록 성공
+  Inactive --> Status: raw 미등록이고 status 성공
+  Inactive --> Inactive: 두 등록 모두 실패
+  Raw --> Raw: raw silence / status CN0로 덮지 않음
+  Raw --> Inactive: stop 취소 성공
+  Status --> Inactive: stop 취소 성공
+  Raw --> Pending: stop 취소 실패
+  Status --> Pending: stop 취소 실패
+  Pending --> Inactive: 보존 handle 취소 재시도 성공
+  Pending --> Pending: 정리 실패 / start 차단
+  Inactive --> Closed: close
+  Pending --> Closed: close / 실패 handle 정리 재시도 대상 보존
+  Closed --> Closed: start 거부

@@ -1,0 +1,27 @@
+flowchart TD
+  IN["F-D14-030<br/>관리자 사고 상세 및 전체 이력 무결성 조회"]
+  G["적용 정책<br/>P-D14-018 / P-D14-019"]
+  IN --> G
+  N1["1. identity/read proof/UUID/query 검사"]
+  G --> N1
+  N2["2. 사고 projection과 event revision 오름차순 조회"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. event 개수1..256 및 revision1부터 연속성 확인"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. OPENED 최초 event의 null actor/previous 및 이후<br/> 허용 transition·actor 존재 확인"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 마지막 revision/state/recorded_at가 projectio<br/>n version/status/updated_at와 정확 일치 검사"]
+  N4 -->|"계속 가능한 경우"| N5
+  N6["6. 상세+allowed_next_states+전체 events 반환 전 ope<br/>ration audit commit"]
+  N5 -->|"계속 가능한 경우"| N6
+  B1["분기 결과<br/>404 admin_incident_not_found"]
+  N2 -->|"사고 없음"| B1
+  B2["분기 결과<br/>503 admin_incident_projection_invalid"]
+  N5 -->|"projection/history 불일치"| B2
+  B3["분기 결과<br/>422"]
+  N1 -->|"query 존재"| B3
+  N6 --> END["정상 종료<br/>검사와 명시적 트랜잭션 처리 후 반환."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 별도 SELECT 사이 동시 append로 불일치가 관<br/>측될 수 있어 history page의 단일 statement snapshot과<br/> 구분. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. event 삭제 없이 조회."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

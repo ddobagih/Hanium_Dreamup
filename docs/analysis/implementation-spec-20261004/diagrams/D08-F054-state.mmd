@@ -1,0 +1,9 @@
+stateDiagram-v2
+  state "F-D08-054 상태 조회" as REQUEST
+  state "F-D08-054 상태 집계 receipt 교차검증" as VALIDATE
+  state "F-D08-054 허용 상태 응답" as RETURN
+  state "F-D08-054 502 projection 거부" as REJECT
+  [*] --> REQUEST
+  REQUEST --> VALIDATE: Backend상태수신
+  VALIDATE --> RETURN: 집계와receipt일치
+  VALIDATE --> REJECT: 모순이나과대응답

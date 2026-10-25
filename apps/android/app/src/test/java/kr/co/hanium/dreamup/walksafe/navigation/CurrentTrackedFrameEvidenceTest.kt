@@ -1,7 +1,8 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
-import kr.co.hanium.dreamup.walksafe.FrozenImageToTextureCoordinateMapper
-import kr.co.hanium.dreamup.walksafe.MainActivity
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionFrameEvidence
+import kr.co.hanium.dreamup.walksafe.runtime.DetectionSnapshot
+import kr.co.hanium.dreamup.walksafe.depth.FrozenImageToTextureCoordinateMapper
 import kr.co.hanium.dreamup.walksafe.depth.DepthFrameSnapshot
 import kr.co.hanium.dreamup.walksafe.depth.DetectionCandidate
 import kr.co.hanium.dreamup.walksafe.depth.ImageSize
@@ -133,12 +134,12 @@ class CurrentTrackedFrameEvidenceTest {
     }
 
     private fun create(
-        snapshot: MainActivity.DetectionSnapshot = sourceSnapshot(),
-        current: MainActivity.DetectionFrameEvidence = evidence(target),
+        snapshot: DetectionSnapshot = sourceSnapshot(),
+        current: DetectionFrameEvidence = evidence(target),
         result: VisualTrackingResult = trackingResult(),
     ): CurrentTrackedFrameEvidence? = CurrentTrackedFrameEvidence.fromTrackingResult(snapshot, result, current, 1_400L)
 
-    private fun sourceSnapshot(): MainActivity.DetectionSnapshot = MainActivity.DetectionSnapshot(
+    private fun sourceSnapshot(): DetectionSnapshot = DetectionSnapshot(
         detections = listOf(detection),
         identity = AndroidDetectionSnapshotFrameIdentity(source.frameId, source.frameId / 1_000_000L),
         capturedAtMs = 20_000L, startedAtMs = 20_001L, completedAtMs = 20_200L,
@@ -147,13 +148,13 @@ class CurrentTrackedFrameEvidenceTest {
         capturedAtElapsedRealtimeMs = source.capturedAtElapsedRealtimeMs,
     )
 
-    private fun evidence(key: VisualFrameKey): MainActivity.DetectionFrameEvidence {
+    private fun evidence(key: VisualFrameKey): DetectionFrameEvidence {
         val transform = requireNotNull(FrozenImageToDepthTransform.create(
             frameId = key.frameId,
             mappedCorners = listOf(Point2(0f, 0f), Point2(1f, 0f), Point2(0f, 1f), Point2(1f, 1f)),
             mappedCenter = Point2(0.5f, 0.5f),
         ))
-        return MainActivity.DetectionFrameEvidence(
+        return DetectionFrameEvidence(
             frameId = key.frameId, frameTimestampMs = key.frameId / 1_000_000L,
             depthSnapshot = DepthFrameSnapshot(key.frameId, null, null, null, cameraImageTimestampNs = key.cameraTimestampNs),
             depthMapper = FrozenImageToTextureCoordinateMapper(key.frameId, transform, ImageSize(2, 2)),

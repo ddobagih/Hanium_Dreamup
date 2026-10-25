@@ -1,0 +1,14 @@
+stateDiagram-v2
+  state "F-D08-061 Current 동의 tail" as LIVE
+  state "F-D08-061 Segment 내구 저장" as SEALED
+  state "F-D08-061 Schema7 current pointer" as COMPACT
+  state "F-D08-061 미참조 segment" as ORPHAN
+  state "F-D08-061 무결성 실패" as FAIL
+  state "F-D08-061 철회 reserve" as RESERVE
+  [*] --> LIVE
+  LIVE --> SEALED: normal한계접근시prefixseal
+  SEALED --> COMPACT: pointer와currenttail저장
+  SEALED --> ORPHAN: pointer쓰기전crash
+  ORPHAN --> COMPACT: 동일prefix검증과재fsync
+  ORPHAN --> FAIL: prefix불일치
+  LIVE --> RESERVE: seal실패와단조철회또는allfalse

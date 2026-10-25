@@ -96,6 +96,9 @@ data class OfficialEnvironmentAssessment(
     ),
     // Runtime gates such as mounting correction can block outputs despite good raw quality.
     val runtimeUnavailableMeasuredFactors: Set<OfficialEnvironmentFactor> = emptySet(),
+    val readinessEvidence: Map<OfficialEnvironmentFactor, WalkSessionReadinessEvidence> = emptyMap(),
+    // A runtime restriction is hard unless its current source explicitly identifies camera-only recovery.
+    val recoverableRuntimeUnavailableMeasuredFactors: Set<OfficialEnvironmentFactor> = emptySet(),
 ) {
     init {
         require(factorStatuses.keys == OfficialEnvironmentFactor.entries.toSet()) {
@@ -107,6 +110,9 @@ data class OfficialEnvironmentAssessment(
         require(runtimeUnavailableMeasuredFactors.all {
             it == OfficialEnvironmentFactor.GPS_QUALITY || it == OfficialEnvironmentFactor.CAMERA_QUALITY
         }) { "Runtime output restrictions must identify measured factors" }
+        require(runtimeUnavailableMeasuredFactors.containsAll(recoverableRuntimeUnavailableMeasuredFactors)) {
+            "Recoverable runtime restrictions must be a subset of current runtime restrictions"
+        }
     }
 
     private val applicableStatuses: Map<OfficialEnvironmentFactor, EnvironmentEvidenceStatus>
@@ -265,6 +271,30 @@ object OfficialEnvironmentPolicy {
             profileId = approvedProfile?.profileId,
             factorStatuses = statuses,
             usageLimitsAcknowledged = usageLimitsAcknowledged,
+            readinessEvidence = listOfNotNull(
+                readinessEvidence(gpsQuality, approvedProfile?.profileId, approvedProfile),
+                readinessEvidence(cameraQuality, approvedProfile?.cameraQualityProfileId, approvedProfile),
+            ).associateBy { it.first }.mapValues { it.value.second },
+        )
+    }
+
+    private fun readinessEvidence(
+        evidence: MeasuredEnvironmentEvidence?,
+        requiredVersion: String?,
+        profile: ApprovedOfficialEnvironmentProfile?,
+    ): Pair<OfficialEnvironmentFactor, WalkSessionReadinessEvidence>? {
+        val measured = evidence ?: return null
+        val observedAt = measured.observedAtElapsedRealtimeMs?.takeIf { it >= 0L } ?: return null
+        val maximumAge = measured.maximumEvidenceAgeMs?.takeIf { it >= 0L } ?: return null
+        val version = measured.measurementProfileId?.takeIf(String::isNotBlank) ?: return null
+        val expectedVersion = requiredVersion?.takeIf(String::isNotBlank) ?: return null
+        val approved = profile ?: return null
+        return measured.factor to WalkSessionReadinessEvidence(
+            source = "official_environment:${measured.factor.name.lowercase()}",
+            observedAtElapsedRealtimeMs = observedAt,
+            maxAgeMs = minOf(maximumAge, approved.maximumMeasuredEvidenceAgeMs),
+            sourceVersion = version,
+            requiredVersion = expectedVersion,
         )
     }
 
@@ -431,8 +461,18 @@ class OfficialEnvironmentRuntimeGuard(
         }
 
         lastDegradationCountedAtMs = nowElapsedRealtimeMs
-        consecutiveDegradations += 1
-        if (consecutiveDegradations > profile.maximumRuntimeRetryAttempts) {
+        if (consecutiveDegradations <= profile.maximumRuntimeRetryAttempts &&
+            consecutiveDegradations < Int.MAX_VALUE
+        ) consecutiveDegradations += 1
+        // Measured quality can recover in this same walk. Exhausting the recheck budget
+        // keeps its outputs closed, but must not latch a terminal stop for those sensors.
+        val recoverableMeasuredFailure = commonConditionsAllowed && enabledMeasuredFactors.isNotEmpty() &&
+            assessment.runtimeUnavailableMeasuredFactors.intersect(enabledMeasuredFactors).all {
+                it in assessment.recoverableRuntimeUnavailableMeasuredFactors
+            }
+        if (consecutiveDegradations > profile.maximumRuntimeRetryAttempts &&
+            !recoverableMeasuredFailure
+        ) {
             terminal = true
             lastDecision = decision(OfficialEnvironmentRuntimeAction.SAFE_STOP)
         } else {

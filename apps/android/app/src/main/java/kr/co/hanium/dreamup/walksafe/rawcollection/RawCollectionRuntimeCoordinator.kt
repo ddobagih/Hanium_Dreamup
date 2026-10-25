@@ -1,8 +1,13 @@
 package kr.co.hanium.dreamup.walksafe.rawcollection
 
 import java.io.File
+import java.lang.ref.WeakReference
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.UUID
 import java.util.concurrent.CancellationException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
@@ -15,6 +20,7 @@ import kr.co.hanium.dreamup.walksafe.navigation.positioning.MOTION_LATENCY_BUCKE
 import kr.co.hanium.dreamup.walksafe.navigation.positioning.MotionStateSummary
 import kr.co.hanium.dreamup.walksafe.network.ActiveNetworkTransport
 import kr.co.hanium.dreamup.walksafe.network.CancellableNetworkCall
+import kr.co.hanium.dreamup.walksafe.network.parseHttpRetryAfterMs
 import kr.co.hanium.dreamup.walksafe.network.GatewayFieldSession
 import kr.co.hanium.dreamup.walksafe.network.GatewaySessionScope
 import kr.co.hanium.dreamup.walksafe.network.GatewayWalkLease
@@ -75,6 +81,8 @@ data class RawDetectionMetadataSample(
      * the opening runtime. Only a segment without an approved queue profile can have them.
      */
     val boundaryWindowCount: Int = 0,
+    /** In-memory producer identity, never serialized. */
+    val windowIdentity: RawRuntimeWindowIdentity? = null,
 ) : RawRuntimeMetadataSample {
     init {
         require(windowStartedAtEpochMs >= 0L)
@@ -114,6 +122,8 @@ data class RawPerformanceMetadataSample(
     val windowCount: Int = 1,
     /** ADD-MOTION-045: motion-state aggregate of the window (no coordinate or sensor value). */
     val motion: MotionStateSummary? = null,
+    /** Must name the same producer snapshot as the detection sample. */
+    val windowIdentity: RawRuntimeWindowIdentity? = null,
 ) : RawRuntimeMetadataSample {
     init {
         require(windowStartedAtEpochMs >= 0L)
@@ -202,6 +212,8 @@ class RawCollectionRuntimeCoordinator private constructor(
     private val elapsedRealtimeMs: () -> Long,
     private val minimumCaptureIntervalMs: Long,
     private val allocatableBytes: () -> Long?,
+    private val processScope: Any,
+    private val cancellationExecutor: Executor,
 ) {
     /**
      * [elapsedRealtimeMs] must be the same clock that produced the Gateway lease's local
@@ -220,6 +232,8 @@ class RawCollectionRuntimeCoordinator private constructor(
         elapsedRealtimeMs = elapsedRealtimeMs,
         minimumCaptureIntervalMs = minimumCaptureIntervalMs,
         allocatableBytes = allocatableBytes,
+        processScope = rootDirectory.canonicalPath,
+        cancellationExecutor = processCancellationExecutor,
     )
 
     internal constructor(
@@ -230,7 +244,10 @@ class RawCollectionRuntimeCoordinator private constructor(
         minimumCaptureIntervalMs: Long,
         testOnly: Unit = Unit,
         allocatableBytes: () -> Long? = { Long.MAX_VALUE },
-    ) : this(store, client, idFactory, elapsedRealtimeMs, minimumCaptureIntervalMs, allocatableBytes)
+        processScope: Any = store,
+        cancellationExecutor: Executor = processCancellationExecutor,
+    ) : this(store, client, idFactory, elapsedRealtimeMs, minimumCaptureIntervalMs, allocatableBytes,
+        processScope, cancellationExecutor)
 
     private data class UploadLease(
         val owner: RawCollectionOwner,
@@ -248,6 +265,7 @@ class RawCollectionRuntimeCoordinator private constructor(
     private data class ActiveUpload(
         val lease: UploadLease,
         val call: CancellableNetworkCall<RawCollectionUploadOutcome>,
+        val terminated: CountDownLatch,
     )
 
     private data class Admission(
@@ -280,7 +298,9 @@ class RawCollectionRuntimeCoordinator private constructor(
         val elapsedRealtimeMs: Long,
     )
 
+    @Volatile
     private var activeUpload: ActiveUpload? = null
+    private val retryDeadlines = mutableMapOf<RawCollectionOwner, Long>()
     private var aggregate: RuntimeAggregate? = null
     private var lastCapture: LastCapture? = null
 
@@ -294,6 +314,18 @@ class RawCollectionRuntimeCoordinator private constructor(
 
     init {
         require(minimumCaptureIntervalMs >= RAW_MIN_CAPTURE_INTERVAL_MS)
+        synchronized(processUploadsLock) {
+            // Strong canonical-path keys survive collection of the first equal String owner.
+            // Weak coordinator values are pruned when another owner registers.
+            processCoordinators.entries.removeAll { (_, coordinators) ->
+                coordinators.removeAll { it.get() == null }
+                coordinators.isEmpty()
+            }
+            processCoordinators.getOrPut(processScope) { mutableSetOf() }.let { coordinators ->
+                coordinators.removeAll { it.get() == null }
+                coordinators += WeakReference(this)
+            }
+        }
     }
 
     /**
@@ -378,6 +410,8 @@ class RawCollectionRuntimeCoordinator private constructor(
             is AdmissionResult.Admitted -> gate.admission
         }
         if (
+            detectionSample.windowIdentity == null ||
+            detectionSample.windowIdentity !== performanceSample.windowIdentity ||
             detectionSample.windowStartedAtEpochMs != performanceSample.windowStartedAtEpochMs ||
             detectionSample.capturedAtEpochMs != performanceSample.capturedAtEpochMs ||
             detectionSample.windowCount != 1 ||
@@ -688,7 +722,9 @@ class RawCollectionRuntimeCoordinator private constructor(
         }
         return when (val gate = uploadAdmission(context)) {
             is AdmissionResult.Blocked -> RawReadyStatus.GateBlocked(gate.reason)
-            is AdmissionResult.Admitted -> readyStatus(context)
+            is AdmissionResult.Admitted -> if (retryDelayMs(gate.admission.owner) != null) {
+                RawReadyStatus.GateBlocked(RawCollectionGateReason.RETRY_DELAY)
+            } else readyStatus(context)
         }
     }
 
@@ -714,6 +750,15 @@ class RawCollectionRuntimeCoordinator private constructor(
     @Synchronized
     fun startNextUpload(
         contextProvider: () -> RawCollectionRuntimeContext,
+    ): CancellableNetworkCall<RawCollectionUploadOutcome>? = try {
+        startNextUploadFromStorage(contextProvider)
+    } catch (_: RuntimeException) {
+        outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
+        CancellableNetworkCall.blocking { RawCollectionUploadOutcome.LOCAL_READ_FAILED }
+    }
+
+    private fun startNextUploadFromStorage(
+        contextProvider: () -> RawCollectionRuntimeContext,
     ): CancellableNetworkCall<RawCollectionUploadOutcome>? {
         if (activeUpload != null) return null
         if (serverIngestDisabled) {
@@ -727,6 +772,10 @@ class RawCollectionRuntimeCoordinator private constructor(
                 return null
             }
             is AdmissionResult.Admitted -> gate.admission
+        }
+        if (retryDelayMs(admission.owner) != null) {
+            outcomeCounters.recordUploadGate(RawCollectionGateReason.RETRY_DELAY)
+            return null
         }
         val ready = try {
             store.readyManifests(admission.owner)
@@ -766,6 +815,7 @@ class RawCollectionRuntimeCoordinator private constructor(
         )
         val nested = AtomicReference<CancellableNetworkCall<*>?>()
         val executionStarted = AtomicBoolean(false)
+        val terminated = CountDownLatch(1)
         lateinit var outer: CancellableNetworkCall<RawCollectionUploadOutcome>
         outer = CancellableNetworkCall(
             executeBlock = execute@{
@@ -774,6 +824,7 @@ class RawCollectionRuntimeCoordinator private constructor(
                     executionStarted.set(true)
                 }
                 val plaintextChunks = mutableListOf<RawPlaintextChunk>()
+                var localWork = true
                 try {
                     if (!isLeaseCurrent(lease, contextProvider())) {
                         return@execute RawCollectionUploadOutcome.CANCELLED
@@ -802,6 +853,7 @@ class RawCollectionRuntimeCoordinator private constructor(
                         }
                         plaintextChunks += chunk
                     }
+                    localWork = false
                     val uploadCall = client.uploadCall(
                         session = lease.session,
                         // The segment's own (earlier, continued) receipt is sent unchanged; the
@@ -829,6 +881,7 @@ class RawCollectionRuntimeCoordinator private constructor(
                     if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
                         return@execute RawCollectionUploadOutcome.CANCELLED
                     }
+                    localWork = true
                     synchronized(this) {
                         if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
                             RawCollectionUploadOutcome.CANCELLED
@@ -844,39 +897,55 @@ class RawCollectionRuntimeCoordinator private constructor(
                 } catch (_: CancellationException) {
                     RawCollectionUploadOutcome.CANCELLED
                 } catch (error: RawCollectionHttpException) {
-                    if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
-                        RawCollectionUploadOutcome.CANCELLED
-                    } else when (error.statusCode) {
-                        400, 413, 415, 422 -> if (store.quarantine(lease.owner, localManifest.collectionId)) {
-                            RawCollectionUploadOutcome.QUARANTINED
-                        } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
-                        401, 403 -> RawCollectionUploadOutcome.AUTHORITY_BLOCKED
-                        409 -> when (rawErrorCode(error.errorBody)) {
-                            in RAW_CONSENT_REJECTION_CODES -> {
-                                // S1617-18-F1: the server will not accept this consent binding; the
-                                // segment is deleted instead of holding the queue until it expires.
-                                store.discardConsentRejected(lease.owner, localManifest.collectionId)
-                                RawCollectionUploadOutcome.CONSENT_REJECTED
+                    try {
+                        if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
+                            RawCollectionUploadOutcome.CANCELLED
+                        } else when (error.statusCode) {
+                            400, 413, 415, 422 -> if (store.quarantine(lease.owner, localManifest.collectionId)) {
+                                RawCollectionUploadOutcome.QUARANTINED
+                            } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                            401, 403 -> RawCollectionUploadOutcome.AUTHORITY_BLOCKED
+                            409 -> when (rawErrorCode(error.errorBody)) {
+                                in RAW_CONSENT_REJECTION_CODES -> {
+                                    // S1617-18-F1: the server will not accept this consent binding; the
+                                    // segment is deleted instead of holding the queue until it expires.
+                                    if (store.discardConsentRejected(lease.owner, localManifest.collectionId)) {
+                                        RawCollectionUploadOutcome.CONSENT_REJECTED
+                                    } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                                }
+                                RAW_WALK_NOT_UPLOADABLE_CODE -> {
+                                    // Owner decision 3(b): the Gateway will never accept this walk, so it
+                                    // must not hold the queue either (transfer-F8: its own marker).
+                                    if (store.discardWalkRejected(lease.owner, localManifest.collectionId)) {
+                                        RawCollectionUploadOutcome.WALK_REJECTED
+                                    } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                                }
+                                // transfer-F7: kept; the caller retries once after the Gateway lease TTL.
+                                RAW_WALK_IN_PROGRESS_CODE -> RawCollectionUploadOutcome.WALK_IN_PROGRESS
+                                // The rest: kept for a later try.
+                                else -> RawCollectionUploadOutcome.RETRYABLE_FAILURE
                             }
-                            RAW_WALK_NOT_UPLOADABLE_CODE -> {
-                                // Owner decision 3(b): the Gateway will never accept this walk, so it
-                                // must not hold the queue either (transfer-F8: its own marker).
-                                store.discardWalkRejected(lease.owner, localManifest.collectionId)
-                                RawCollectionUploadOutcome.WALK_REJECTED
-                            }
-                            // transfer-F7: kept; the caller retries once after the Gateway lease TTL.
-                            RAW_WALK_IN_PROGRESS_CODE -> RawCollectionUploadOutcome.WALK_IN_PROGRESS
-                            // The rest: kept for a later try.
+                            503 -> if (rawErrorCode(error.errorBody) == RAW_INGEST_DISABLED_CODE) {
+                                // A server setting, not a transient failure: stop until the next
+                                // process start instead of retrying on every recheck (16-17 #60).
+                                serverIngestDisabled = true
+                                RawCollectionUploadOutcome.SERVER_DISABLED
+                            } else RawCollectionUploadOutcome.RETRYABLE_FAILURE
                             else -> RawCollectionUploadOutcome.RETRYABLE_FAILURE
                         }
-                        503 -> if (rawErrorCode(error.errorBody) == RAW_INGEST_DISABLED_CODE) {
-                            // A server setting, not a transient failure: stop until the next
-                            // process start instead of retrying on every recheck (16-17 #60).
-                            serverIngestDisabled = true
-                            RawCollectionUploadOutcome.SERVER_DISABLED
-                        } else RawCollectionUploadOutcome.RETRYABLE_FAILURE
-                        else -> RawCollectionUploadOutcome.RETRYABLE_FAILURE
+                    } catch (_: RuntimeException) {
+                        if (outer.isCancelled()) RawCollectionUploadOutcome.CANCELLED
+                        else RawCollectionUploadOutcome.LOCAL_READ_FAILED
                     }.also { outcome ->
+                        if (outcome == RawCollectionUploadOutcome.RETRYABLE_FAILURE ||
+                            outcome == RawCollectionUploadOutcome.WALK_IN_PROGRESS) {
+                            parseHttpRetryAfterMs(error.retryAfterHeader)?.takeIf { it > 0L }?.let { delay ->
+                                synchronized(this) {
+                                    val now = elapsedRealtimeMs().coerceAtLeast(0L)
+                                    retryDeadlines[lease.owner] = now + delay.coerceAtMost(Long.MAX_VALUE - now)
+                                }
+                            }
+                        }
                         when (outcome) {
                             RawCollectionUploadOutcome.CANCELLED -> Unit
                             RawCollectionUploadOutcome.SERVER_DISABLED -> outcomeCounters.record(
@@ -893,24 +962,53 @@ class RawCollectionRuntimeCoordinator private constructor(
                     RawCollectionUploadOutcome.RECEIPT_REJECTED
                 } catch (_: java.io.IOException) {
                     if (outer.isCancelled()) RawCollectionUploadOutcome.CANCELLED
-                    else RawCollectionUploadOutcome.RETRYABLE_FAILURE.also {
+                    else (if (localWork) RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                        else RawCollectionUploadOutcome.RETRYABLE_FAILURE).also {
                         outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
+                    }
+                } catch (_: RuntimeException) {
+                    if (outer.isCancelled()) RawCollectionUploadOutcome.CANCELLED else {
+                        outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
+                        if (localWork) RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                        else RawCollectionUploadOutcome.RETRYABLE_FAILURE
                     }
                 } finally {
                     plaintextChunks.forEach { it.plaintext.fill(0) }
                     synchronized(this) {
                         if (activeUpload?.call === outer) activeUpload = null
                     }
+                    untrackProcessUpload(outer)
+                    terminated.countDown()
                 }
             },
             cancelBlock = {
-                synchronized(this) {
-                    if (!executionStarted.get() && activeUpload?.call === outer) activeUpload = null
+                // call.cancel() has already set its flag. Transport cancellation and monitor
+                // cleanup can block, so neither runs on the Activity or deletion caller.
+                cancellationExecutor.execute {
+                    try {
+                        // Close the socket before waiting for a producer/receipt monitor.
+                        nested.getAndSet(null)?.cancel()
+                    } finally {
+                        synchronized(this) {
+                            if (!executionStarted.get() && activeUpload?.call === outer) {
+                                activeUpload = null
+                                untrackProcessUpload(outer)
+                                terminated.countDown()
+                            }
+                        }
+                    }
                 }
-                nested.getAndSet(null)?.cancel()
             },
         )
-        activeUpload = ActiveUpload(lease, outer)
+        val active = ActiveUpload(lease, outer, terminated)
+        synchronized(processUploadsLock) {
+            if (processScope in deletionFencedScopes) {
+                outer.cancel()
+                return null
+            }
+            processUploads.getOrPut(processScope) { mutableSetOf() } += active
+            activeUpload = active
+        }
         return outer
     }
 
@@ -936,7 +1034,10 @@ class RawCollectionRuntimeCoordinator private constructor(
             sealActiveSegment(context)
         }
 
-    /** Deletes this ended walk's remaining PARTIAL copies (never a sealed segment). */
+    /**
+     * Deletes this ended walk's remaining PARTIAL copies (never a sealed segment).
+     * Returns -1 when storage cannot be read, distinct from a successful empty result.
+     */
     @Synchronized
     fun discardEndedPartials(context: RawCollectionRuntimeContext): Int {
         if (!context.walk.state.isWalkEnd()) return 0
@@ -945,7 +1046,11 @@ class RawCollectionRuntimeCoordinator private constructor(
             context.sessionGeneration,
             context.deviceCheck,
         ) ?: return 0
-        return store.discardPartials(owner, context.walk.epoch.walkSessionId)
+        return try {
+            store.discardPartials(owner, context.walk.epoch.walkSessionId)
+        } catch (_: RawCollectionStorageReadException) {
+            -1
+        }
     }
 
     @Synchronized
@@ -977,10 +1082,108 @@ class RawCollectionRuntimeCoordinator private constructor(
     private fun keepsReceiptAcrossChange(receiptSha256: String): Boolean =
         receiptSha256 in undecidedReceipts || receiptSha256 in store.continuedReceipts()
 
+    /** Fast process admission/cancellation only; actual purge/termination ACK stays on cleanup. */
+    fun fenceAccountDeletionAdmission() {
+        val active = synchronized(processUploadsLock) {
+            markDeletionAdmissionLocked()
+            processUploads[processScope].orEmpty().toList()
+        }
+        active.forEach { it.call.cancel() }
+    }
+
+    private fun markDeletionAdmissionLocked() {
+        deletionFencedScopes += processScope
+        deletionEpochs[processScope] = Any()
+    }
+
+    /**
+     * [timeoutMs] bounds cancellation/producer/zero-fill ACK from entry, including a stalled
+     * cancel callback or coordinator monitor. Physical store purge starts only after those ACKs;
+     * its filesystem I/O is separate from this termination deadline. A timeout never purges.
+     */
+    fun onAccountDeleted(timeoutMs: Long = 5_000L): Boolean {
+        val started = System.nanoTime()
+        require(timeoutMs >= 0L)
+        val timeoutNanos = TimeUnit.MILLISECONDS.toNanos(timeoutMs)
+        val (active, barriers) = synchronized(processUploadsLock) {
+            markDeletionAdmissionLocked()
+            deletionCalls[processScope] = (deletionCalls[processScope] ?: 0) + 1
+            val coordinators = (processCoordinators[processScope].orEmpty().mapNotNull { it.get() } + this).distinct()
+            val pending = pendingDeletionBarriers.getOrPut(processScope) { mutableMapOf() }
+            processUploads[processScope].orEmpty().toList() to coordinators.map { coordinator ->
+                coordinator to pending.getOrPut(coordinator) { CountDownLatch(1) }
+            }
+        }
+        try {
+            // Outer flags are immediate; only their potentially blocking cancel callbacks queue.
+            active.forEach { it.call.cancel() }
+            for ((coordinator, barrier) in barriers) coordinator.submitDeletionBarrier(barrier)
+            for (upload in active) {
+                if (!awaitTermination(upload.terminated, started, timeoutNanos)) return false
+            }
+            for ((_, barrier) in barriers) {
+                if (!awaitTermination(barrier, started, timeoutNanos)) return false
+            }
+            // No coordinator monitor is reacquired here. The process fence prevents new capture,
+            // and each old producer/old Activity upload has actually finished before storage I/O.
+            return store.onAccountDeleted()
+        } finally {
+            synchronized(processUploadsLock) {
+                val remaining = requireNotNull(deletionCalls[processScope]) - 1
+                if (remaining == 0) deletionCalls.remove(processScope)
+                else deletionCalls[processScope] = remaining
+            }
+        }
+    }
+
+    fun cancelAndAwaitUploadTermination(timeoutMs: Long = 5_000L): Boolean {
+        val started = System.nanoTime()
+        require(timeoutMs >= 0L)
+        val active = activeUpload // volatile: never wait on a producer's monitor to request cancel.
+        active?.call?.cancel()
+        return active == null || awaitTermination(active.terminated, started, TimeUnit.MILLISECONDS.toNanos(timeoutMs))
+    }
+
+    private fun submitDeletionBarrier(barrier: CountDownLatch) {
+        synchronized(processUploadsLock) {
+            // Repeated timed-out deletion attempts join the existing producer barrier.
+            if (barrier.count == 0L || pendingDeletionBarriers[processScope]?.get(this) !== barrier ||
+                !submittedDeletionBarriers.add(barrier)) return
+        }
+        cancellationExecutor.execute {
+            try {
+                synchronized(this) { aggregate = null; lastCapture = null }
+            } finally {
+                synchronized(processUploadsLock) {
+                    pendingDeletionBarriers[processScope]?.let { pending ->
+                        if (pending[this] === barrier) pending.remove(this)
+                        if (pending.isEmpty()) pendingDeletionBarriers.remove(processScope)
+                    }
+                    submittedDeletionBarriers.remove(barrier)
+                    barrier.countDown()
+                }
+            }
+        }
+    }
+
+    private fun awaitTermination(terminated: CountDownLatch, started: Long, timeoutNanos: Long): Boolean = try {
+        val remaining = (timeoutNanos - (System.nanoTime() - started)).coerceAtLeast(0L)
+        terminated.await(remaining, TimeUnit.NANOSECONDS)
+    } catch (_: InterruptedException) {
+        Thread.currentThread().interrupt()
+        false
+    }
+
     @Synchronized
-    fun onAccountDeleted(): Boolean {
-        cancelActiveLocked()
-        return store.onAccountDeleted()
+    fun nextUploadRetryDelayMs(context: RawCollectionRuntimeContext): Long? {
+        val owner = ownerOrNull(context.session, context.sessionGeneration, context.deviceCheck) ?: return null
+        return retryDelayMs(owner)
+    }
+
+    private fun retryDelayMs(owner: RawCollectionOwner): Long? {
+        val now = elapsedRealtimeMs().coerceAtLeast(0L)
+        retryDeadlines.entries.removeAll { it.value <= now }
+        return retryDeadlines[owner]?.let { it - now }
     }
 
     private fun selectableReceipts(current: IntegratedConsentConfirmation): Set<String> =
@@ -1001,12 +1204,41 @@ class RawCollectionRuntimeCoordinator private constructor(
     ): Boolean {
         cancelActiveLocked()
         val owner = ownerOrNull(session, sessionGeneration, deviceCheck) ?: return false
-        return store.resetForNewEnrollment(owner)
+        val reservation = Any()
+        val deletionEpoch = synchronized(processUploadsLock) {
+            if (resetReservations.containsKey(processScope) || deletionWorkPendingLocked()) return false
+            resetReservations[processScope] = reservation
+            deletionEpochs[processScope]
+        }
+        try {
+            if (!store.resetForNewEnrollment(owner)) return false
+            // A different Activity can fence deletion while storage ACK is pending. Only the
+            // exact reset reservation/epoch may reopen admission; a changed epoch fails closed.
+            return synchronized(processUploadsLock) {
+                if (resetReservations[processScope] !== reservation ||
+                    deletionEpochs[processScope] !== deletionEpoch || deletionWorkPendingLocked()) {
+                    false
+                } else {
+                    deletionFencedScopes -= processScope
+                    deletionEpochs.remove(processScope)
+                    retryDeadlines.clear()
+                    true
+                }
+            }
+        } finally {
+            synchronized(processUploadsLock) {
+                if (resetReservations[processScope] === reservation) resetReservations.remove(processScope)
+            }
+        }
     }
 
-    @Synchronized
+    private fun deletionWorkPendingLocked(): Boolean =
+        processUploads[processScope].orEmpty().isNotEmpty() ||
+            pendingDeletionBarriers[processScope].orEmpty().isNotEmpty() ||
+            (deletionCalls[processScope] ?: 0) != 0
+
     fun cancelActiveUpload() {
-        cancelActiveLocked()
+        activeUpload?.call?.cancel()
     }
 
     /**
@@ -1059,6 +1291,9 @@ class RawCollectionRuntimeCoordinator private constructor(
     /** Session, owner and current RAW consent; no walk condition. */
     private fun ownerAdmission(context: RawCollectionRuntimeContext): AdmissionResult {
         fun blocked(reason: RawCollectionGateReason) = AdmissionResult.Blocked(reason)
+        if (synchronized(processUploadsLock) { processScope in deletionFencedScopes }) {
+            return blocked(RawCollectionGateReason.OWNER)
+        }
         val session = context.session ?: return blocked(RawCollectionGateReason.SESSION)
         val owner = ownerOrNull(session, context.sessionGeneration, context.deviceCheck)
             ?: return blocked(RawCollectionGateReason.OWNER)
@@ -1145,6 +1380,32 @@ class RawCollectionRuntimeCoordinator private constructor(
 
     private fun WalkSessionState.isWalkEnd(): Boolean =
         this == WalkSessionState.ENDED || this == WalkSessionState.SAFE_STOP
+
+    private fun untrackProcessUpload(call: CancellableNetworkCall<RawCollectionUploadOutcome>) {
+        synchronized(processUploadsLock) {
+            processUploads[processScope]?.let { uploads ->
+                uploads.removeAll { it.call === call }
+                if (uploads.isEmpty()) processUploads.remove(processScope)
+            }
+        }
+    }
+
+    private companion object {
+        val processUploadsLock = Any()
+        val processUploads = mutableMapOf<Any, MutableSet<ActiveUpload>>()
+        val deletionFencedScopes = mutableSetOf<Any>()
+        val processCoordinators = mutableMapOf<Any, MutableSet<WeakReference<RawCollectionRuntimeCoordinator>>>()
+        val pendingDeletionBarriers = mutableMapOf<Any, MutableMap<RawCollectionRuntimeCoordinator, CountDownLatch>>()
+        val submittedDeletionBarriers = mutableSetOf<CountDownLatch>()
+        val deletionCalls = mutableMapOf<Any, Int>()
+        val deletionEpochs = mutableMapOf<Any, Any>()
+        val resetReservations = mutableMapOf<Any, Any>()
+        // RAW owns this process executor; a blocked report cancellation cannot delay RAW sockets.
+        // Pending barriers/call cancel are deduplicated, and idle daemon threads expire.
+        val processCancellationExecutor: Executor = Executors.newCachedThreadPool { runnable ->
+            Thread(runnable, "walksafe-raw-cancellation").apply { isDaemon = true }
+        }
+    }
 
     private fun cancelActiveLocked() {
         val active = activeUpload ?: return

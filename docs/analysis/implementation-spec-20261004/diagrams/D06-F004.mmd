@@ -1,0 +1,48 @@
+flowchart TD
+  T["F-D06-004 직접 신고 건별 안내·단회 확인·취소"]
+  P["전제: debug queue 활성; verified actor/general session/build<br/>origin/동의/보행 runtime/신고 권한. capture 성공."]
+  T --> P
+  E1["E-D06-004-01 버튼/음성 첫 신고→payload stage→안내 완료 대기"]
+  E1 --> T
+  E2["E-D06-004-02 음성 TTS onCompleted 또는 화면 OnDraw→arm→30초 확인 창"]
+  E2 --> T
+  E3["E-D06-004-03 두 번째 신고 동작→consumeIfConfirmed→동일 frozen bytes<br/>queue"]
+  E3 --> T
+  E4["E-D06-004-04 취소·문맥변경·timer→invalidate→zeroize"]
+  E4 --> T
+  A1["1. 첫 동작 시 이미지·metadata 사본을 고정하고 기존 pending을 지운다."]
+  P --> A1
+  A2["2. 화면 요청은 실제 draw callback, 음성 요청은 TTS 완료 callback 이후에만 arm한다."]
+  A1 --> A2
+  A3["3. 안내 도중 재요청은 전송 확인으로 소비하지 않는다."]
+  A2 --> A3
+  A4["4. 두 번째 동작은 일치 문맥·시간에서 단회 consume한다."]
+  A3 --> A4
+  A5["5. 저장 직전 권한/환경/actor generation을 재검사하고 exact bytes enqueue 뒤<br/>close로 zeroize한다."]
+  A4 --> A5
+  N["정상 종료: 해당 1건 local queue 저장."]
+  A5 --> N
+  FX["결과: ‘방금 고정한 신고 보내기’ 버튼/설명 변경, 음성·live-region 안내. raw/학습 동의로<br/>전용하지 않음."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"TTS 실패/취소 또는 안내 120초 초과"}
+    R1["안내 실패/만료 표시; 저장하지 않음"]
+    B1 -->|조건 성립| R1
+    B2{"확인 30초 초과·문맥 불일치"}
+    R2["동결 자료 zeroize, 재신고 필요"]
+    B2 -->|조건 성립| R2
+    B3{"queue 저장 성공"}
+    R3["휴대전화 저장·아직 미접수·보행 종료 뒤 전송 안내"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-004"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: freeze/authority/queue 실패, 접수 성공 안내 없음."]
+    X2["시간: 안내 120초, 확인 30초; timer는 한도+1ms 예약."]
+    X3["취소: invalidate와 TTS onCancelled에서 pending 삭제."]
+    X4["복구: process-local pending은 재시작 복원 안 됨."]
+    X5["정리: metadata/image 배열 0으로 덮음."]
+  end
+  DRAW["ON_SCREEN: view attached·observer alive 검사<br/>첫 OnDraw 뒤 post한 delivered callback<br/>generation/context 재검사 후 arm"]
+  P -. "화면 건별 안내 완료 경로" .-> DRAW

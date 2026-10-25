@@ -15,13 +15,19 @@ class MainActivityRouteSnapshotArchiveOnlyStaticTest {
 
     @Test
     fun loadedSnapshotsOnlyScheduleExpiryAndCheckTheWalkNeverInstallAGuidanceRoute() {
-        assertFalse(Regex("""[Ss]napshot\??\.route\b""").containsMatchIn(source))
-        assertFalse(Regex("""[Ss]napshot\??\.destination\b""").containsMatchIn(source))
-        assertEquals(1, Regex("""routeNavigator\.setRoute\(""").findAll(source).count())
-        assertTrue(Regex("""routeNavigator\.setRoute\(\s*route,\s*destination = destination,""").containsMatchIn(source))
-
-        val startup = source.substringAfter("routeSnapshotStore.expiryMetadata(routeSnapshotNowEpochMs)")
-            .substringBefore("accountDeletionIntentFence =")
+        val acquisition = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/RouteAcquisitionController.kt").readText()
+        val archive = File("src/main/java/kr/co/hanium/dreamup/walksafe/navigation/session/RouteArchiveController.kt").readText()
+        MainActivityRefactorSource.composition(source, "routeAcquisitionController")
+        MainActivityRefactorSource.composition(source, "routeArchiveController")
+        listOf(source, acquisition, archive).forEach { owner ->
+            assertFalse(Regex("""[Ss]napshot\??\.route\b""").containsMatchIn(owner))
+            assertFalse(Regex("""[Ss]napshot\??\.destination\b""").containsMatchIn(owner))
+        }
+        assertEquals(1, Regex("""routeNavigator\.setRoute\(""").findAll(acquisition).count())
+        assertTrue(Regex("""routeNavigator\.setRoute\(\s*route,\s*destination = destination,""").containsMatchIn(acquisition))
+        val startup = MainActivityRefactorSource.member(archive, "initialize")
+        assertTrue(startup.contains("lane.attach { factory().also { routeSnapshotStore = it } }"))
+        assertTrue(startup.contains("result?.metadata?.let"))
         assertTrue(startup.contains("scheduleEncryptedRouteSnapshotExpiry("))
         assertFalse(startup.contains("setRoute("))
         assertFalse(startup.contains("requestRoute("))

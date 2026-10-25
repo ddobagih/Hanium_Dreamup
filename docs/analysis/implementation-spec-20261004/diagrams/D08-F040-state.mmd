@@ -1,0 +1,12 @@
+stateDiagram-v2
+  state "F-D08-040 요청 없음" as S0
+  state "F-D08-040 fence와 outbox 저장" as S1
+  state "F-D08-040 Backend 전달 대기" as S2
+  state "F-D08-040 Backend 접수 확인" as S3
+  state "F-D08-040 영구 충돌" as S4
+  [*] --> S0
+  S0 --> S1: 최근로그인과capability로수락
+  S1 --> S2: 세션폐기 또는Backend전달실패
+  S2 --> S3: worker전달확인
+  S1 --> S3: 직접전달성공
+  S2 --> S4: 영구conflict

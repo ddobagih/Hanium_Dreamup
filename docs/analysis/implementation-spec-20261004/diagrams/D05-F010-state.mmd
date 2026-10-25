@@ -1,0 +1,19 @@
+stateDiagram-v2
+  direction LR
+  state "S-D05-010-EMPTY" as EMPTY
+  state "S-D05-010-RETAINING" as RETAINING
+  state "S-D05-010-SOURCE_RESERVED" as SOURCE_RESERVED
+  state "S-D05-010-PARTIAL_PROGRESS" as PARTIAL_PROGRESS
+  state "S-D05-010-CURRENT" as CURRENT
+  state "S-D05-010-LOST" as LOST
+  [*] --> EMPTY
+  EMPTY --> RETAINING: "valid gray offer"
+  RETAINING --> SOURCE_RESERVED: "reserve exact source"
+  SOURCE_RESERVED --> PARTIAL_PROGRESS: "valid batch budget partial"
+  PARTIAL_PROGRESS --> CURRENT: "all measured edges reach target"
+  PARTIAL_PROGRESS --> LOST: "age gap support failure"
+  CURRENT --> LOST: "continuity broken"
+  LOST --> RETAINING: "new actual detection source"
+  note right of EMPTY
+    F-D05-010 P-D05-010
+  end note

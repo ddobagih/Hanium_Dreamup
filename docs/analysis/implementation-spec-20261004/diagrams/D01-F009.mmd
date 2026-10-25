@@ -1,0 +1,34 @@
+flowchart TD
+  A["F-D01-009 조건부 토큰 로그인·장기 refresh 회전"]
+  G{"token login 또는 stored long-lived 복원 분기; flag/환경·provider 계약 유효"}
+  I["actor/token·선택 deviceId·GENERAL 또는 삭제 recovery purpose; refresh proof fingerprint/family/rotation"]
+  A --> G
+  G -->|"조건 충족"| I
+  X["조건 미충족: unknown/invalid refresh는 재로그인; UI 오류계약 unknown code 기본REAUTHENTICATE"]
+  G -->|"미충족"| X
+  N1["token 로그인은200 GENERAL 또는 legacy204 응답과 GET 상태를 확인한다. 삭제 recovery는 short scope만 허용한다."]
+  I --> N1
+  N2["long-lived 복원은 flag와 binding을 확인하고 갱신 예약 후 refresh를 한 번 보낸다."]
+  N1 --> N2
+  N3["새 응답은 same family·rotation+1·same absolute expiry·다른 refresh를 검증한 뒤 old session invalidate한다."]
+  N2 --> N3
+  N4["확인된 미적용 busy만 retry proof를 복원하고, 결과불명은 재로그인 안내로 종료한다."]
+  N3 --> N4
+  OK["새 장기 세션 교체 또는 short verified session"]
+  N4 --> OK
+  B0["long-lived token 복원 대신 revoke 경로; backendDevice 복원과 별개"]
+  N2 -->|"debug property 기본 false"| B0
+  B1["세션 무효화·재인증"]
+  N3 -->|"rotation Long.MAX_VALUE·잘못된새proof"| B1
+  B2["이전 refresh 재사용 금지"]
+  N4 -->|"IO/결과불명"| B2
+  B3["rollback 가능한 안전 재시도"]
+  N4 -->|"429/503 미적용 확인+Retry-After1..300초"| B3
+  R["중단·취소: 명시 logout은 pending revoke로 연결 / crash renewing 상태의 보존/복원 정책은 저장 reducer가 담당"]
+  V["복구·재시도: persisted renewing→pending revocation 코드 경계, 상세 reducer 검토 한계 명시 / 확정 미적용에서만 boundedRetry; unknown은 새 로그인"]
+  Q["정책 P-D01-006 · P-D01-007 · P-D01-024"]
+  A -.-> R
+  R -.-> V
+  Q -.-> G
+  TTL["restore: now가 idle 또는 absolute expiry 이상이면 PendingRevocation. 일반 복원 없음"]
+  N2 -->|"TTL 경계 도달"| TTL

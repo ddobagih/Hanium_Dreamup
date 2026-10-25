@@ -49,13 +49,13 @@ class GuideDistanceToleranceRegressionTest {
             TrustedLocation(37.0 + 50 * north, 127.0, 3f, 1_000L), 1_000L, false, null, facingNorth,
         )
         val instruction = requireNotNull(update.instruction)
-        assertTrue(instruction, instruction.contains("50m 앞"))
+        assertTrue(instruction, instruction.contains("다음 안내 지점까지 경로를 따라 약 50미터"))
 
         // A declared distance inside the turn bound is kept as the provider rounding value.
         val close = route.copy(guidePoints = listOf(route.guidePoints.single().copy(distanceFromStartM = 106, remainingDistanceM = 94)))
         val closeUpdate = RouteNavigator().apply { setRoute(close) }
             .update(TrustedLocation(37.0 + 50 * north, 127.0, 3f, 1_000L), 1_000L, false, null, facingNorth)
-        assertTrue(closeUpdate.instruction, requireNotNull(closeUpdate.instruction).contains("56m 앞"))
+        assertTrue(closeUpdate.instruction, requireNotNull(closeUpdate.instruction).contains("다음 안내 지점까지 경로를 따라 약 56미터"))
     }
 
     private fun longRoute(declaredFromStartM: Int, normalized: Boolean): JSONObject = JSONObject().apply {

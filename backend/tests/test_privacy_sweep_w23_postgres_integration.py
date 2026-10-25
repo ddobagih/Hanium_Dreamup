@@ -1356,10 +1356,10 @@ def test_s1617_52_completed_deletion_purges_installation_keys_and_keeps_fingerpr
                 command.downgrade(config, "202609300003")
             with engine.connect() as connection:
                 # The whole downgrade is one transaction, so a refusal keeps
-                # the repository head (202609300009 after the duplicate representative guard).
+                # the repository head (202610110001 including opt-in diagnostic tables).
                 assert connection.execute(
                     text("SELECT version_num FROM alembic_version")
-                ).scalar_one() == "202609300009"
+                ).scalar_one() == "202610110001"
 
         assert_downgrade_refused("installation evidence keys are registered")
         bystander_accepted = _accept(

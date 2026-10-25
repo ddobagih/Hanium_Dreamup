@@ -5,81 +5,64 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * S06-34 (06.txt:241): the screen list also says which numbers the voice dialog reads now ("음성 안내 중:
- * 4번~6번"). Only the header text changes on a page change: no button rebuild, no live region, no focus move.
- */
+/** S06-34: only the spoken page owns the existing range header; refreshing it cannot rebuild/focus candidates. */
 class MainActivityDestinationVoiceRangeHeaderStaticTest {
-    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-    private val ui = source.substringAfter("private fun updateDestinationSearchUi()")
-        .substringBefore("private fun updateRouteButtonText()")
+    private fun source(relative: String) = File("src/main/java/kr/co/hanium/dreamup/walksafe/$relative").readText()
+    private val main = source("MainActivity.kt")
+    private val panel = source("ui/DestinationGuidancePanel.kt")
+    private val presenter = source("ui/DestinationSearchPresenter.kt")
+    private val dialog = source("voice/interaction/DestinationVoiceDialogController.kt")
+    private fun member(source: String, name: String, occurrence: Int = 0) = MainActivityRefactorSource.member(source, name, occurrence)
 
-    @Test
-    fun theHeaderIsBuiltWithTheListAndBeforeTheNumberedButtons() {
-        val header = ui.indexOf("destinationVoiceRangeText = TextView(this).apply {")
-        assertTrue(header >= 0 && header < ui.indexOf("destinationSearchResults.forEachIndexed { index, result ->"))
-        val refresh = ui.substringAfter("private fun refreshDestinationVoiceRangeText(")
+    @Test fun theHeaderIsBuiltWithTheListAndBeforeTheNumberedButtons() {
+        val render = member(panel, "renderSearchResults")
+        val header = render.indexOf("voiceRangeHeader = TextView(context).apply {")
+        assertTrue(header >= 0 && header < render.indexOf("candidates.forEach { candidate ->"))
+        val refresh = member(presenter, "refreshVoiceRange") + member(presenter, "voiceRangeLabel") + member(panel, "renderVoiceRange") + member(panel, "applyVoiceRange")
         assertTrue(refresh.contains("?.voicePageRangeLabelKo()"))
-        assertTrue(refresh.contains("it.query == destinationSearchQuery && it.results == destinationSearchResults"))
+        assertTrue(refresh.contains("it.query == search.query && it.results == search.results"))
         assertTrue(refresh.contains("header.text = label.orEmpty()"))
         for (forbidden in listOf("accessibilityLiveRegion", "requestFocus", "ACTION_ACCESSIBILITY_FOCUS", "removeAllViews", "addView(")) {
             assertFalse(forbidden, refresh.contains(forbidden))
         }
-        // The buttons still carry the global voice numbers and stay touchable (S06-34 earlier fix).
-        assertTrue(ui.contains("android.text.SpannableStringBuilder(\"\${index + 1}번 \${result.name}\")"))
-        assertTrue(ui.contains("openNativeDestinationConfirmation(result)"))
+        assertTrue(render.contains("android.text.SpannableStringBuilder(\"\${candidate.number}번 \${candidate.result.name}\")"))
+        assertTrue(member(presenter, "renderSearch").contains("Candidate(result, index + 1, details)"))
+        assertTrue(render.contains("setOnClickListener { onSelected(candidate.result) }"))
+        assertTrue(member(main, "updateDestinationSearchUi").contains("onSelected = ::openNativeDestinationConfirmation"))
     }
 
-    @Test
-    fun aPagePromptUpdatesTheHeaderAndAClosedDialogHidesIt() {
-        val prompt = source.substringAfter("private fun speakHomeDestinationVoicePrompt(")
-            .substringBefore("val attempt = state.beginVoicePrompt()")
-        assertTrue(prompt.contains("refreshDestinationVoiceRangeText(state)"))
-        assertFalse(prompt.contains("updateDestinationSearchUi()"))
-        val clear = source.substringAfter("private fun clearHomeDestinationVoiceDialog(reason:")
-            .substringBefore("private fun currentVoiceDestinationDialogState")
-        // voice-F9 (test moved): every close hides it, also one that keeps the list (BACKGROUNDED,
-        // PAGE_CHANGED); the default would have re-shown the kept list's page.
-        assertTrue(clear.contains("refreshDestinationVoiceRangeText(null)"))
+    @Test fun aPagePromptUpdatesTheHeaderAndAClosedDialogHidesIt() {
+        val prompt = member(dialog, "speakHomeDestinationVoicePrompt").substringBefore("val attempt = state.beginVoicePrompt()")
+        assertTrue(prompt.contains("ui.refreshDestinationRange(state)"))
+        assertFalse(prompt.contains("ui.renderSearch()"))
+        val clear = member(dialog, "clearHomeDestinationVoiceDialog", occurrence = 1)
+        assertTrue(clear.contains("ui.refreshDestinationRange(null)"))
     }
 
-    @Test
-    fun onlyASpokenPageShowsItsRangeAndListRebuildsKeepTheDialogsPage() {
-        val prompt = source.substringAfter("private fun speakHomeDestinationVoicePrompt(")
-            .substringBefore("val attempt = state.beginVoicePrompt()")
-        assertTrue(
-            ReportStaticSourceInspector.appearsInOrder(
-                prompt,
-                "clearHomeDestinationVoiceDialog()",
-                "if (state.results.isEmpty()) return speakInteraction(message)",
-                "val actorId = reporterUserId ?: return false",
-                "refreshDestinationVoiceRangeText(state)",
-            ),
-        )
-        assertTrue(
-            source.contains(
-                "private fun refreshDestinationVoiceRangeText(state: DestinationSearchVoiceState? = destinationVoiceRangeState) {\n" +
-                    "        destinationVoiceRangeState = state\n",
-            ),
-        )
-        assertFalse(source.contains("refreshDestinationVoiceRangeText(state: DestinationSearchVoiceState? = destinationSearchVoiceState)"))
-        // The list rebuild uses the tracked page, so a closed dialog's range does not come back.
-        assertTrue(ui.contains("destinationSearchResultsContainer.addView(header)\n            refreshDestinationVoiceRangeText()"))
+    @Test fun onlyASpokenPageShowsItsRangeAndListRebuildsKeepTheDialogsPage() {
+        val prompt = member(dialog, "speakHomeDestinationVoicePrompt").substringBefore("val attempt = state.beginVoicePrompt()")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(prompt,
+            "clearHomeDestinationVoiceDialog()", "if (state.results.isEmpty()) return output.speakInteraction(message)",
+            "val actorId = identity.actorId() ?: return false", "ui.refreshDestinationRange(state)"))
+        val mainRefresh = member(main, "refreshDestinationVoiceRangeText")
+        assertTrue(mainRefresh.contains("state: DestinationSearchVoiceState? = destinationSearchPresenter.voiceRangeState"))
+        assertTrue(member(presenter, "refreshVoiceRange").contains("voiceRangeState = state"))
+        assertFalse(mainRefresh.contains("state: DestinationSearchVoiceState? = destinationSearchVoiceState"))
+        assertTrue(member(presenter, "renderSearch").contains("voiceRangeLabel(state), onSelected"))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(member(panel, "renderSearchResults"),
+            "destinationSearchResultsContainer.addView(header)", "renderVoiceRange(voiceRange)"))
     }
 
-    @Test
-    fun failedSpeechAndExpiredLeaseHideTheUnspokenOrOldRange() {
-        val prompt = source.substringAfter("private fun speakHomeDestinationVoicePrompt(")
-            .substringBefore("private fun previousVoiceDestinationCandidates()")
+    @Test fun failedSpeechAndExpiredLeaseHideTheUnspokenOrOldRange() {
+        val prompt = member(dialog, "speakHomeDestinationVoicePrompt")
         val failure = prompt.substringAfter("onFailed = {")
-        assertTrue(failure.contains("commandSpeechResponseGeneration == responseGeneration"))
-        assertTrue(failure.contains("destinationVoiceRangeState === state"))
-        assertTrue(failure.contains("refreshDestinationVoiceRangeText(null)"))
-        assertTrue(prompt.contains("reportCleanupCallbackHandler.postDelayed({"))
+        assertTrue(failure.contains("output.responseGeneration() == responseGeneration"))
+        assertTrue(failure.contains("ui.destinationRangeState() === state"))
+        assertTrue(failure.contains("ui.refreshDestinationRange(null)"))
+        assertTrue(prompt.contains("scheduler.postDialogExpiry({"))
         assertTrue(prompt.contains("if (homeDestinationVoiceDialogLease === lease) currentVoiceDestinationDialogState()"))
-        val leaseLookup = source.substringAfter("private fun currentVoiceDestinationDialogState(): DestinationSearchVoiceState? {")
-            .substringBefore("private fun retryHomeDestinationVoiceDialog(")
+        val leaseLookup = member(dialog, "currentVoiceDestinationDialogState")
         assertTrue(leaseLookup.contains("if (state == null && homeDestinationVoiceDialogLease === lease)"))
-        assertTrue(leaseLookup.contains("refreshDestinationVoiceRangeText(null)"))
+        assertTrue(leaseLookup.contains("ui.refreshDestinationRange(null)"))
     }
 }

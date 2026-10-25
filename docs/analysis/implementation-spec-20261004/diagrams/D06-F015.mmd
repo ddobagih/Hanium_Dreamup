@@ -1,0 +1,40 @@
+flowchart TD
+  T["F-D06-015 신고 요청 참조 암호화 추적 저장소"]
+  P["전제: GENERAL VERIFIED backend-bound session, canonical actor와<br/>account generation."]
+  T --> P
+  E1["E-D06-015-01 요청 접수→trackRequest→암호화 AtomicFile"]
+  E1 --> T
+  E2["E-D06-015-02 같은 계정 조회→AEAD 검증/구형 v1 upgrade"]
+  E2 --> T
+  A1["1. 기존 snapshot을 엄격 decode한다."]
+  P --> A1
+  A2["2. 동일 request ID의 다른 report/type 충돌을 거절한다."]
+  A1 --> A2
+  A3["3. 중복 요청은 성공으로 처리하되 총 distinct256을 넘기지 않는다."]
+  A2 --> A3
+  A4["4. schema2 암호화 저장하고 평문 byte를 zeroize한다."]
+  A3 --> A4
+  A5["5. v1은 삭제 ID를 보존하여 best-effort schema upgrade; AEAD key rewrap<br/>실패는 차단한다."]
+  A4 --> A5
+  N["정상 종료: track true."]
+  A5 --> N
+  FX["결과: 요청 참조 ciphertext만 보관. 화면 재접근 권한을 제공하는 인증 자료가 아님."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"tamper/invalid JSON"}
+    R1["파일 삭제 시도 후 Blocked; 값 반환 안 함"]
+    B1 -->|조건 성립| R1
+    B2{"v1 schema-upgrade write 실패"}
+    R2["유효 v1 읽기는 유지"]
+    B2 -->|조건 성립| R2
+    B3{"상한/교차 type 충돌"}
+    R3["track false"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-014"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["실패: Blocked/false/empty."]
+    X2["복구: 유효 v1→v2 읽기 호환."]
+    X3["정리: 손상 ciphertext 삭제 시도."]
+  end

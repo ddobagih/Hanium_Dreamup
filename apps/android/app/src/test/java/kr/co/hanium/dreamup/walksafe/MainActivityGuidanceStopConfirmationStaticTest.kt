@@ -12,17 +12,18 @@ import org.junit.Test
  */
 class MainActivityGuidanceStopConfirmationStaticTest {
     private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
-    private val handler = source.substringAfter("private fun handleVoiceCommandPhrases(")
-        .substringBefore("private fun executeWalkSessionVoiceAction(")
+    private val handler = MainActivityRefactorSource.function(source, "private fun handleVoiceCommandPhrases(")
+    private fun body(name: String) = MainActivityRefactorSource.function(source, "private fun $name(")
+
 
     @Test
     fun everyUtteranceEndsTheQuestionBeforeAnythingElseRuns() {
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 handler,
-                "val confirmationWasOpen = guidanceStopConfirmation.consumeOpenConfirmation(SystemClock.elapsedRealtime())",
-                "guidanceStopConfirmationRouteGeneration == routeRequestGeneration",
-                "guidanceStopConfirmationWalkEpoch == snapshot.epoch && isRouteActive",
+                "val confirmationWasOpen = guidanceStopConfirmation.consumeOpenConfirmation(scheduler.nowMs())",
+                "guidanceStopConfirmationRouteGeneration == route.requestGeneration()",
+                "guidanceStopConfirmationWalkEpoch == snapshot.epoch && routeRun().active",
                 "walkSessionVoiceControlPolicy.evaluate(",
                 "if (voiceEndConfirmationPromptPending) {",
             ),
@@ -34,47 +35,44 @@ class MainActivityGuidanceStopConfirmationStaticTest {
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 handler,
-                "updateNavigationStatus(\"voice=navigation_decision_stale\")",
+                "ui.navigationStatus(\"voice=navigation_decision_stale\")",
                 "if (action == AndroidVoiceAction.StopNavigation &&",
                 "confirmGuidanceStopFirst(recognized, guidanceStopConfirmationOpen)",
                 ") return",
-                "executeVoiceAction(action, expectedNavigationDecisionToken)",
+                "executeVoiceAction(action, expectedNavigationDecisionToken, confidenceScores?.getOrNull(0)?.toDouble())",
             ),
         )
     }
 
     @Test
     fun theQuestionReopensInputAfterSpeechAndNeverTouchesTheRoute() {
-        val confirm = source.substringAfter("private fun confirmGuidanceStopFirst(")
-            .substringBefore("\n    }\n")
+        val confirm = body("confirmGuidanceStopFirst")
         assertTrue(confirm.contains("guidanceStopPhraseOrNull(recognized) ?: return false"))
         assertTrue(confirm.contains("dialogOpen = voiceDestinationDialogOpen(),"))
-        assertTrue(confirm.contains("guidanceRunning = isRouteActive,"))
+        assertTrue(confirm.contains("guidanceRunning = routeRun().active,"))
         assertTrue(confirm.contains("message = kr.co.hanium.dreamup.walksafe.navigation.GUIDANCE_STOP_CONFIRMATION_PROMPT_KO"))
         assertTrue(
             ReportStaticSourceInspector.appearsInOrder(
                 confirm,
                 "preparingInput = true,",
                 "onCompleted = {",
-                "guidanceStopConfirmation.promptDelivered(SystemClock.elapsedRealtime())",
-                "voiceCommandPromptPending = false",
-                "voiceCommandPromptReadyGeneration = preparationGeneration",
-                "if (!startVoiceCommandRecognition()) {",
+                "guidanceStopConfirmation.promptDelivered(scheduler.nowMs())",
+                "input.completePreparedPrompt(preparationGeneration)",
+                "if (!input.startVoiceCommandRecognition()) {",
             ),
         )
         assertTrue(confirm.contains("onFailed = {"))
-        assertTrue(confirm.contains("routeRequestGeneration == expectedRouteGeneration && isRouteActive"))
-        assertTrue(confirm.contains("walkSessionLifecycle.snapshot().epoch == expectedWalkEpoch"))
+        assertTrue(confirm.contains("route.requestGeneration() == expectedRouteGeneration && routeRun().active"))
+        assertTrue(confirm.contains("walk.snapshot().epoch == expectedWalkEpoch"))
         assertTrue(confirm.contains("invalidateGuidanceStopConfirmation()"))
         for (forbidden in listOf("resetRouteState(", "cancelActiveRouteRequest(", "stopNavigationFromVoice(", "routeNavigator.")) {
             assertFalse(forbidden, confirm.contains(forbidden))
         }
-        val open = source.substringAfter("private fun voiceDestinationDialogOpen(): Boolean =")
-            .substringBefore("private var homeDestinationVoiceDialogLease")
+        val open = body("voiceDestinationDialogOpen")
         for (part in listOf(
-            "destinationSearchInFlight", "destinationSearchVoiceState != null", "homeDestinationVoiceDialogLease != null",
-            "walkingDestinationChange.hasPending()", "pendingVoiceDestinationQuery != null",
-            "destinationSearchLocationController?.isAcquiring == true",
+            "search().state.inFlight", "search().state.voicePage != null", "dialog().hasHomeLease()",
+            "dialog().hasWalkingSelection()", "search().state.pendingVoiceQuery != null",
+            "search().isAcquiring",
         )) {
             assertTrue(part, open.contains(part))
         }
@@ -82,8 +80,8 @@ class MainActivityGuidanceStopConfirmationStaticTest {
 
     @Test
     fun theStopItselfIsUnchanged() {
-        val stop = source.substringAfter("private fun stopNavigationFromVoice(expectedToken: RouteNavigatorDecisionToken?) {")
-            .substringBefore("\n    }\n")
+        val commandOwner = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/VoiceCommandInteractionController.kt").readText()
+        val stop = MainActivityRefactorSource.member(commandOwner, "stopNavigationFromVoice", 1)
         assertTrue(stop.contains("cancelActiveRouteRequest(preserveExistingRoute = false)"))
         assertTrue(stop.contains("resetRouteState()"))
         assertFalse(stop.contains("guidanceStopConfirmation"))
@@ -91,14 +89,10 @@ class MainActivityGuidanceStopConfirmationStaticTest {
 
     @Test
     fun routeTouchAndWalkTransitionsInvalidatePendingConfirmation() {
-        val invalidation = source.substringAfter("private fun invalidateGuidanceStopConfirmation() {")
-            .substringBefore("\n    }\n")
+        val invalidation = body("invalidateGuidanceStopConfirmation")
         assertTrue(invalidation.contains("guidanceStopConfirmation.invalidate()"))
-        assertTrue(source.substringAfter("private fun resetRouteState(").substringBefore("\n    }\n")
-            .contains("invalidateGuidanceStopConfirmation()"))
-        assertTrue(source.substringAfter("private fun showNativeUiPage(page: NativeUiPage, preserveVoiceInteraction: Boolean) {")
-            .substringBefore("\n    }\n").contains("if (nativeUiPage != page && !preserveVoiceInteraction) invalidateGuidanceStopConfirmation()"))
-        assertTrue(source.substringAfter("private fun transitionWalkSession(").substringBefore("\n    }\n")
-            .contains("if (transition.changed) invalidateGuidanceStopConfirmation()"))
+        assertTrue(body("resetRouteState").contains("effects.invalidateStopConfirmation()"))
+        assertTrue(MainActivityRefactorSource.function(source, "private fun showNativeUiPage(page: NativeUiPage, preserveVoiceInteraction: Boolean)").contains("if (nativeUiPage != page && !preserveVoiceInteraction) pages.invalidateGuidanceStopConfirmation()"))
+        assertTrue(body("transitionWalkSession").contains("if (transition.changed) effects.invalidateGuidanceStopConfirmation()"))
     }
 }

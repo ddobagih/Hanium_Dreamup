@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-007<br/>현재 LK 프레임과 detector source의 깊이 합성<br/>상태 ACTIVE"]
+    P0["완료 detector source와 현재 LK target 검증"]
+    A --> D
+    P1["TRACKED LOST budget row를 source index로 연결"]
+    P0 --> P1
+    P2["현재 depth capture와 mapper 검증"]
+    P1 --> P2
+    P3["원본 source의 800ms lease로 게시"]
+    P2 --> P3
+    D{"P-D07-007<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["빈 결과"]
+    D -->|"target/depth/camera/mapper/pose 불일치"| B0
+    B1["cached output; 관측 count 증가 없음"]
+    D -->|"동일 capture replay"| B1
+    B2["해당 metric/motion/gap 폐기; source count 구분"]
+    D -->|"object budget defer 또는 LOST"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

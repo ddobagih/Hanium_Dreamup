@@ -1,0 +1,41 @@
+flowchart TD
+  T["F-D06-008 신고 multipart HTTP·목적별 permit·응답 계약"]
+  P["전제: permit generation·purpose live, actor=session.actorId, 승인<br/>origin exact, current consent/network binding."]
+  T --> P
+  E1["E-D06-008-01 drain transport 생성→permit 발급→socket<br/>열기→status/POST"]
+  E1 --> T
+  E2["E-D06-008-02 HTTP 응답→bounded body→strict receipt 판정"]
+  E2 --> T
+  A1["1. socket open 안에서 live permit/purpose를 확인한다."]
+  P --> A1
+  A2["2. networkBinding.openConnection에 연결하고 redirect를 막는다."]
+  A1 --> A2
+  A3["3. 정확 multipart length를 지정하고 metadata/image를 스트림으로 쓴 뒤 임시 복사본을<br/>zeroize한다."]
+  A2 --> A3
+  A4["4. status 404만 미접수로 해석; 2xx는 strict 필드·PERSISTED·receipt<br/>marker/UUID/hash/bytes를 검증한다."]
+  A3 --> A4
+  A5["5. POST creation_outcome CREATED/REPLAYED를 보존하며 SUPPRESSED 성공<br/>payload는 거부한다."]
+  A4 --> A5
+  N["정상 종료: exact transport receipt 반환."]
+  A5 --> N
+  FX["결과: Gateway를 거쳐 WalkSafe 서버에 업로드. 공공기관 자동 제출 아님."]
+  N --> FX
+  subgraph B["실행 단계별 조건과 실제 분기 결과"]
+    B1{"목적 permit 오래됨/다른 목적"}
+    R1["연결 생성 거부"]
+    B1 -->|조건 성립| R1
+    B2{"2xx malformed/mismatched receipt"}
+    R2["ReportUploadProtocolException; 성공 처리 없음"]
+    B2 -->|조건 성립| R2
+    B3{"POST auth stale 응답"}
+    R3["Gateway 인증 무효화 소비 후 HTTP 오류 전달"]
+    B3 -->|조건 성립| R3
+  end
+  POL["정책: P-D06-008, P-D06-009"]
+  POL -. "각 단계에 적용" .-> P
+  subgraph X["종료와 이후 처리 경계"]
+    X1["시간: connect 8000ms/read12000ms; status whole deadline20000ms,<br/>POST35000ms."]
+    X2["취소: 연결·stream attach cancellation으로 닫기."]
+    X3["재시도: 이 client 내부 자동 재시도 없음; 호출자 결정."]
+    X4["정리: finally disconnect, payload 사본 zeroize."]
+  end

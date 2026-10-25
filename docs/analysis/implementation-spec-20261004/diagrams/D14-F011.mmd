@@ -1,0 +1,25 @@
+flowchart TD
+  IN["F-D14-011<br/>현재 또는 다른 세션 해지"]
+  G["적용 정책<br/>P-D14-006 / P-D14-010"]
+  IN --> G
+  N1["1. 2바이트까지 stream 확인하여 허용 raw body만 통과"]
+  G --> N1
+  N2["2. 타 session 대상이면 identity/correlation/chall<br/>enge/body/query/경로가 정확히 결속된 proof 검사"]
+  N1 -->|"계속 가능한 경우"| N2
+  N3["3. control NORMAL 및 현재 caller 세션 유효성 재검사"]
+  N2 -->|"계속 가능한 경우"| N3
+  N4["4. 대상 session 존재 확인 후 revoked_at와 administra<br/>tor_revoked 이유 기록"]
+  N3 -->|"계속 가능한 경우"| N4
+  N5["5. 새 폐기일 때 SUCCESS 감사, commit 뒤 state 반환"]
+  N4 -->|"계속 가능한 경우"| N5
+  B1["분기 결과<br/>404 admin_session_not_found"]
+  N4 -->|"대상 없음"| B1
+  B2["분기 결과<br/>변경/성공 감사 추가 없이 state 반환"]
+  N4 -->|"이미 폐기된 대상과 다른 유효 caller"| B2
+  B3["분기 결과<br/>bearer 자체 무효로 차단"]
+  N3 -->|"자기 session 해지 후 동일 bearer 재시도"| B3
+  N5 --> END["정상 종료<br/>현재 세션을 해지해도 그 요청은 state를 반환한다. 다음 인증부터 해당 be<br/>arer 무효."]
+  RET["재시도와 복구 계약<br/>서버 자동 재시도 없음. 실패 원인을 해소한 새 요청 또는 명시된 복구 기능 사<br/>용."]
+  CAN["취소와 정리 계약<br/>취소 API 없음. session 행을 삭제하지 않고 revoke 표시."]
+  IN -. "종료 관련 계약" .-> RET
+  IN -. "종료 관련 계약" .-> CAN

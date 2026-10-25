@@ -1,0 +1,27 @@
+flowchart TD
+    A["F-D07-027<br/>점자 관측 거절 사유와 프레임 통계<br/>상태 ACTIVE"]
+    P0["frame level 관측 거절 사유 수집"]
+    A --> D
+    P1["같은 frame reason을 한 번만 집계"]
+    P0 --> P1
+    P2["64개 key와 retired watermark 유지"]
+    P1 --> P2
+    P3["진단 count 비율 출력 권한 없음"]
+    P2 --> P3
+    D{"P-D07-027<br/>상위 정책 자격 및 특수 분기"}
+    D -->|"별도 분기 없는 qualified 입력"| P0
+    P3 --> Z
+    B0["depth_insufficient 기록; depth 처리 없음"]
+    D -->|"completed tactile frame지만 mapper 없음"| B0
+    B1["집계 증가 없음"]
+    D -->|"동일frame 재평가"| B1
+    B2["watermark로 재집계 차단"]
+    D -->|"history에서 퇴역한 oldframe 재전달"| B2
+    Z["해당 결과 반환<br/>자동 재시도 없음"]
+    B0 --> Z
+    B1 --> Z
+    B2 --> Z
+    C["owner 또는 capture 퇴역<br/>늦은 결과는 current 검사에서 폐기"]
+    A -.-> C
+    C --> Z
+    NOTE["정책 수준의 분기 요약<br/>일반 처리 단계는 자격 충족 시에만 적용"]

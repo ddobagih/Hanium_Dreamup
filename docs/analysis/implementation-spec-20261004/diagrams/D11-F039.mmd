@@ -1,0 +1,17 @@
+flowchart TD
+ A["F-D11-039 물리 신고 삭제"] --> P["P-D11-039 전용 role과 모드. limit1..100"]
+ P --> L["worker와 storage advisory lock 모두 획득"]
+ L --> M{"명령 모드"}
+ M -->|"reconcile"| R["이전 quarantine과 DB 상태 재조정. confirm과 digest 혼용 거부"]
+ M -->|"preview 또는 apply"| Q{"pending quarantine 있음"}
+ Q -->|"예"| X["새 후보 작업 거부"]
+ Q -->|"아니오"| C["현재 후보와 digest 산출"]
+ C --> AP{"apply 지정"}
+ AP -->|"아니오"| V["preview 후보 결과 후 종료"]
+ AP -->|"예"| G["정확 확인문구와64hex preview digest 대조 및 관리자 gate"]
+ G --> D["후보별 삭제 또는 LEGAL_HOLD 결과"]
+ D --> Z["결과 반환. finally 두 lock 해제"]
+ R --> Z
+ V --> Z
+ G -->|"불일치"| X
+ X --> Z

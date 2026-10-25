@@ -1,3 +1,5 @@
+import java.net.URLClassLoader
+import org.gradle.api.tasks.compile.JavaCompile
 import com.android.build.api.artifact.SingleArtifact
 import groovy.json.JsonSlurper
 import java.net.URI
@@ -40,17 +42,6 @@ val configuredGatewayOrigin = providers.gradleProperty("WALKSAFE_GATEWAY_ORIGIN"
 val verifiedReleaseGatewayOrigin = normalizedHttpsOriginOrNull(configuredGatewayOrigin)
 val developmentReportQueue = providers.gradleProperty("developmentReportQueue").orNull == "true"
 val developmentQuickStart = providers.gradleProperty("developmentQuickStart").orNull == "true"
-val developmentQuickStartEmail = if (developmentQuickStart) {
-    providers.gradleProperty("developmentQuickStartEmail").orNull ?: "test0905@example.com"
-} else ""
-val developmentQuickStartPassword = if (developmentQuickStart) {
-    providers.environmentVariable("WALKSAFE_DEVELOPMENT_TEST_PASSWORD").orNull.orEmpty()
-} else ""
-if (developmentQuickStart) {
-    check(developmentQuickStartPassword.isNotBlank()) {
-        "Development quick start requires WALKSAFE_DEVELOPMENT_TEST_PASSWORD for a local test account"
-    }
-}
 fun buildConfigString(value: String): String = "\"" + value
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
@@ -176,6 +167,9 @@ val debugGuidanceStartBypass =
 val debugGuidanceBuildMarker =
     if (debugGuidanceStartBypass) "walksafe-debug-v1-bypass-on" else "walksafe-debug-v1"
 val debugGuidanceArtifactLabel = if (debugGuidanceStartBypass) "on" else "off"
+// Present only in an explicitly prepared field-test APK; ordinary debug builds do not upload diagnostics.
+val guidanceDiagnosticBuildId = providers.gradleProperty("walksafe.guidanceDiagnosticBuildId")
+    .orNull?.takeIf { it.matches(Regex("[a-f0-9]{64}")) } ?: "disabled"
 val validateWalkSafeSourceCommit by tasks.registering {
     doLast {
         check(verifiedSourceCommit != null) {
@@ -414,7 +408,44 @@ tasks.configureEach {
     }
 }
 
+// These host regressions use inert Android SDK views/logging, not a real Android runtime.
+// Keep default-returning SDK stubs confined to an explicit, separate Gradle invocation.
+val sdkAdapterTestTask = "testDebugSdkAdapterUnitTest"
+val sdkAdapterTestClasses = listOf(
+    "kr.co.hanium.dreamup.walksafe.navigation.session.RouteGuidanceCompassClockRaceRegressionTest",
+    "kr.co.hanium.dreamup.walksafe.navigation.AndroidEarthOrientationQueryReceiptRaceRegressionTest",
+    "kr.co.hanium.dreamup.walksafe.ui.UserReportPresenterAuthorityFenceTest",
+    "kr.co.hanium.dreamup.walksafe.ui.SettingsKoreanSpeechRecoveryPresentationTest",
+)
+val sdkAdapterTestMode = gradle.startParameter.taskNames.any {
+    it.substringAfterLast(':') == sdkAdapterTestTask
+}
+if (sdkAdapterTestMode) {
+    check(gradle.startParameter.taskNames == listOf(":app:$sdkAdapterTestTask")) {
+        "Run :app:$sdkAdapterTestTask alone, in a separate Gradle invocation from strict host tests."
+    }
+}
+tasks.register(sdkAdapterTestTask) {
+    group = "verification"
+    description = "Runs only the allowlisted host policies with inert SDK defaults; no device behavior claim."
+    doFirst { check(sdkAdapterTestMode) { "Invoke the exact :app:$sdkAdapterTestTask task alone." } }
+    dependsOn("testDebugUnitTest")
+}
+
 android {
+    testOptions.unitTests {
+        isReturnDefaultValues = sdkAdapterTestMode
+        // AGP applies its report defaults before this callback, after generic task configuration.
+        all { test ->
+            if (sdkAdapterTestMode && test.name == "testDebugUnitTest") {
+                test.reports.junitXml.required.set(true)
+                test.reports.html.required.set(true)
+                test.reports.junitXml.outputLocation.set(layout.buildDirectory.dir("test-results/$sdkAdapterTestTask"))
+                test.reports.html.outputLocation.set(layout.buildDirectory.dir("reports/tests/$sdkAdapterTestTask"))
+                test.binaryResultsDirectory.set(layout.buildDirectory.dir("test-results/$sdkAdapterTestTask/binary"))
+            }
+        }
+    }
     namespace = "kr.co.hanium.dreamup.walksafe"
     compileSdk = 36
 
@@ -489,6 +520,7 @@ android {
                 )
             }
             buildConfigField("String", "WALKSAFE_SOURCE_COMMIT", "\"${verifiedSourceCommit ?: "unverified"}\"")
+            buildConfigField("String", "WALKSAFE_GUIDANCE_DIAGNOSTIC_BUILD_ID", buildConfigString(guidanceDiagnosticBuildId))
             buildConfigField("String", "WALKSAFE_GATEWAY_ORIGIN", "\"$debugGatewayOrigin\"")
             buildConfigField(
                 "String",
@@ -503,8 +535,6 @@ android {
             )
             buildConfigField("boolean", "WALKSAFE_DEBUG_GUIDANCE_START_BYPASS", "$debugGuidanceStartBypass")
             buildConfigField("boolean", "DEVELOPMENT_QUICK_START", "$developmentQuickStart")
-            buildConfigField("String", "DEVELOPMENT_QUICK_START_EMAIL", buildConfigString(developmentQuickStartEmail))
-            buildConfigField("String", "DEVELOPMENT_QUICK_START_PASSWORD", buildConfigString(developmentQuickStartPassword))
         }
         release {
             // The development report queue is DEBUG-gated at runtime; keep its build-time
@@ -523,13 +553,12 @@ android {
             buildConfigField("String", "WALKSAFE_SOURCE_COMMIT", "\"${verifiedSourceCommit ?: "unverified"}\"")
             buildConfigField("String", "WALKSAFE_GATEWAY_ORIGIN", "\"${verifiedReleaseGatewayOrigin ?: "invalid-release-origin"}\"")
             buildConfigField("String", "WALKSAFE_BUILD_MARKER", "\"walksafe-release-v1\"")
+            buildConfigField("String", "WALKSAFE_GUIDANCE_DIAGNOSTIC_BUILD_ID", "\"disabled\"")
             // Owner decision 2 (2026-09-29): release keeps the login until an explicit end.
             buildConfigField("boolean", "WALKSAFE_LONG_LIVED_LOGIN_ENABLED", "true")
             buildConfigField("boolean", "WALKSAFE_POST_LOGIN_DEVICE_CHECK_REQUIRED", "true")
             buildConfigField("boolean", "WALKSAFE_DEBUG_GUIDANCE_START_BYPASS", "false")
             buildConfigField("boolean", "DEVELOPMENT_QUICK_START", "false")
-            buildConfigField("String", "DEVELOPMENT_QUICK_START_EMAIL", "\"\"")
-            buildConfigField("String", "DEVELOPMENT_QUICK_START_PASSWORD", "\"\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -704,6 +733,27 @@ androidComponents {
 }
 
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    inputs.property("walksafe.sdkAdapterTestMode", sdkAdapterTestMode)
+    if (sdkAdapterTestMode && name == "testDebugUnitTest") {
+        // File selection is an allowlist even when a caller adds a broad --tests filter.
+        setIncludes(sdkAdapterTestClasses.flatMap { type ->
+            val path = type.replace('.', '/')
+            listOf("$path.class", "$path\$*.class")
+        })
+        filter.setIncludePatterns(*sdkAdapterTestClasses.toTypedArray())
+    } else {
+        doFirst { check(!sdkAdapterTestMode) { "SDK-default mode is limited to debug adapter regressions." } }
+        sdkAdapterTestClasses.forEach { filter.excludeTestsMatching(it) }
+    }
+    val releaseTest = name.contains("Release")
+    mapOf(
+        "walksafe.expectedDevelopmentQuickStart" to (!releaseTest && developmentQuickStart),
+        "walksafe.expectedReportQueue" to (!releaseTest && (developmentReportQueue || reportQueueEnabled)),
+        "walksafe.expectedGuidanceStartBypass" to (!releaseTest && debugGuidanceStartBypass),
+    ).forEach { (property, actual) ->
+        inputs.property(property, providers.gradleProperty(property).orNull ?: actual.toString())
+        systemProperty(property, providers.gradleProperty(property).orNull ?: actual.toString())
+    }
     systemProperty(
         "walksafe.guidanceStartBypass",
         providers.gradleProperty("walksafe.guidanceStartBypass").orNull.orEmpty(),
@@ -726,9 +776,33 @@ dependencies {
     implementation("org.opencv:opencv:4.13.0")
 
     testImplementation("junit:junit:4.13.2")
+    // JVM email contract tests use real ICU; this dependency is never packaged in the APK.
+    testImplementation("com.ibm.icu:icu4j:76.1")
     testImplementation("org.json:json:20240303")
     testImplementation("org.tensorflow:tensorflow-lite-metadata:0.2.0")
+    // Main's renderer signatures need these Android interfaces on the JVM test classpath.
+    testRuntimeOnly("org.khronos:opengl-api:gl1.1-android-2.1_r1")
 
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
+}
+
+// Release host-test tasks are not created by this Android plugin. Verify the actual compiled
+// release constants independently, including when the caller requests every development switch.
+tasks.register("verifyReleaseBuildConfigIsolation") {
+    group = "verification"
+    dependsOn("compileReleaseJavaWithJavac")
+    doLast {
+        val classes = tasks.named<JavaCompile>("compileReleaseJavaWithJavac").get().destinationDirectory.get().asFile
+        URLClassLoader(arrayOf(classes.toURI().toURL()), null).use { loader ->
+            val generated = loader.loadClass("kr.co.hanium.dreamup.walksafe.BuildConfig")
+            val fields = generated.fields.associateBy { it.name }
+            listOf("DEBUG", "DEVELOPMENT_QUICK_START", "WALKSAFE_REPORT_QUEUE_ENABLED", "WALKSAFE_DEBUG_GUIDANCE_START_BYPASS").forEach { name ->
+                check(!fields.getValue(name).getBoolean(null)) { "Release unexpectedly enables $name" }
+            }
+            check("DEVELOPMENT_QUICK_START_EMAIL" !in fields && "DEVELOPMENT_QUICK_START_PASSWORD" !in fields)
+            check(fields.getValue("WALKSAFE_BUILD_MARKER").get(null) == "walksafe-release-v1")
+            println("Verified compiled release BuildConfig isolation: kr.co.hanium.dreamup.walksafe")
+        }
+    }
 }

@@ -13,6 +13,37 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class ReportQueueContractTest {
+    @Test fun sharedCopiesCloseTheSameOwnerAndPreserveCallerBytes() {
+        val metadata = "{\"kind\":\"hazard\"}".toByteArray()
+        val image = reportTestJpeg()
+        val originalImage = image.copyOf()
+        val payload = requireNotNull(FrozenReportPayload.freeze(REPORT_ID, metadata, image))
+        val report = QueuedReport(payload, ReportQueuePriority.EXPLICIT, "walker", REPORT_ID,
+            "a".repeat(64), 1L, 2L)
+        report.copy(quarantined = true).close()
+        report.close()
+        assertThrows(IllegalStateException::class.java) { payload.metadataUtf8() }
+        for (name in listOf("frozenMetadata", "frozenImage")) {
+            val field = FrozenReportPayload::class.java.getDeclaredField(name).apply { isAccessible = true }
+            assertTrue((field.get(payload) as ByteArray).all { it == 0.toByte() })
+        }
+        assertArrayEquals(originalImage, image)
+        assertEquals("{\"kind\":\"hazard\"}", String(metadata))
+    }
+
+    @Test fun exactByteScopeZerosItsCopiesWhenTheConsumerThrows() {
+        val payload = requireNotNull(FrozenReportPayload.freeze(REPORT_ID, "{}".toByteArray(), reportTestJpeg()))
+        var metadataCopy: ByteArray? = null
+        var imageCopy: ByteArray? = null
+        assertThrows(IllegalStateException::class.java) {
+            payload.useExactBytes { metadata, image -> metadataCopy = metadata; imageCopy = image; error("consumer failure") }
+        }
+        assertTrue(requireNotNull(metadataCopy).all { it == 0.toByte() })
+        assertTrue(requireNotNull(imageCopy).all { it == 0.toByte() })
+        assertEquals("{}", String(payload.metadataUtf8()))
+        payload.close()
+    }
+
     @Test
     fun productionProfileMatchesTheValidatedBuildConfigExactly() {
         val profile = PRODUCTION_REPORT_QUEUE_CAPACITY_PROFILE

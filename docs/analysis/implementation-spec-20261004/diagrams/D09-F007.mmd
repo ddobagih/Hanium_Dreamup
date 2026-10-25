@@ -1,0 +1,28 @@
+flowchart TD
+  T["F-D09-007 본문 크기·민감응답 캐시·오류 공개 경계 / P-D09-007"]
+  N0["경로와 method별 body limit 선택"]
+  T --> N0
+  N1["Content-Length 사전검사"]
+  N0 --> N1
+  N2["실제 stream 누적bytes 검사"]
+  N1 --> N2
+  N3["router validation과 고정오류 투영"]
+  N2 --> N3
+  N4["민감 response cache 헤더 치환"]
+  N3 --> N4
+  Z["정상: 한계 내 body만 handler에 도달하고 민감 응답은 지정 캐시 정책 적용"]
+  N4 --> Z
+  B0["413; 원문 body echo 없음"]
+  N1 -->|"Content-Length > 해당 limit"| B0
+  N2 -->|"received bytes > 해당 limit"| B0
+  B1["새 오류응답을 만들지 않고 예외 전파"]
+  N3 -->|"이미 response.start 뒤 예외"| B1
+  B2["고정422 + 해당 no-store 및 admin audit"]
+  N3 -->|"민감경로 Pydantic 거부"| B2
+  R["종료와 복구: 서버 자동 재시도 없음 / 원인 해소 후 새 요청에서 다시 검증"]
+  Z -.-> R
+  B0 -.-> R
+  B1 -.-> R
+  B2 -.-> R
+  C["취소와 정리: 전용 취소 API 없음 / 요청 지역 상태 반환; 공유 자원은 소유자의 lifecycle에서 정리"]
+  N4 -.-> C

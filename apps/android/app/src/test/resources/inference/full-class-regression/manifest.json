@@ -1,0 +1,1038 @@
+{
+  "schema_version": 1,
+  "model_sha256": "d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57",
+  "source_model_sha256": "6f8ae9d2bb82f91e4391e42957a1b374bd4b14efa4702a86f7283454bc38cee0",
+  "config_sha256": "2d75fe233d7a321347575673172495635045dcad88b54f3c3f6e2d6ce166489e",
+  "classes": [
+    "linear_tactile_paving",
+    "damaged_linear_tactile_paving",
+    "dot_tactile_paving",
+    "damaged_dot_tactile_paving",
+    "passenger_car",
+    "bus",
+    "truck",
+    "motorcycle",
+    "bicycle",
+    "abandoned_e_scooter",
+    "moving_e_scooter",
+    "traffic_light",
+    "crosswalk",
+    "construction_fence",
+    "barricade",
+    "traffic_cone",
+    "bollard",
+    "utility_or_streetlight_pole",
+    "trash_bin",
+    "portable_sign",
+    "person"
+  ],
+  "thresholds": {
+    "default": 0.15,
+    "linear_tactile_paving": 0.25,
+    "damaged_linear_tactile_paving": 0.3,
+    "dot_tactile_paving": 0.25,
+    "damaged_dot_tactile_paving": 0.3,
+    "passenger_car": 0.15,
+    "bus": 0.15,
+    "truck": 0.15,
+    "motorcycle": 0.15,
+    "bicycle": 0.15,
+    "abandoned_e_scooter": 0.25,
+    "moving_e_scooter": 0.15,
+    "traffic_light": 0.3,
+    "crosswalk": 0.25,
+    "construction_fence": 0.15,
+    "barricade": 0.15,
+    "traffic_cone": 0.15,
+    "bollard": 0.15,
+    "utility_or_streetlight_pole": 0.15,
+    "trash_bin": 0.15,
+    "portable_sign": 0.15,
+    "person": 0.15
+  },
+  "input_shape": [
+    1,
+    768,
+    768,
+    3
+  ],
+  "output_shape": [
+    1,
+    25,
+    12096
+  ],
+  "tensor_encoding": "FLOAT32_LITTLE_ENDIAN",
+  "runtime": {
+    "tensorflow": "2.19.1",
+    "opencv": "4.13.0",
+    "delegate": "host_cpu_default_XNNPACK",
+    "threads": 2
+  },
+  "preprocessing": "OpenCV JPEG/PNG decode to RGB uint8, INTER_LINEAR, round-to-even resize and integer pad114, float32 /255",
+  "excluded": [
+    {
+      "image": "wm_273939_b708636847387629.jpg",
+      "reason": "Supplied class11 box covers crosswalk; not accepted as traffic light truth."
+    },
+    {
+      "image": "wm_252243_9d0a16e278e881d1.jpeg",
+      "reason": "Dot morphology not visible in target; use a clearly dot-pattern damaged case instead."
+    },
+    {
+      "image": "wm_260524_145cb4dad3a349f4.jpg",
+      "reason": "Mounted shop sign ambiguity; replace with a visible freestanding board."
+    }
+  ],
+  "scope": "Bounded 21-class regression set with real-photograph background crops, distinct from runtime-equivalence fixtures and formal accuracy/field evaluation.",
+  "android_runtime_verified": false,
+  "rows": [
+    {
+      "id": "positive_00",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 0,
+      "target_class_name": "linear_tactile_paving",
+      "photo": "photos/positive_00.jpg",
+      "photo_sha256": "5ade96b0f02612ea1cf8dcd7168775f08b779aff9436d8ca4807351049b4d05b",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_273454_2cd4006bcf537560.jpg",
+      "original_source_sha256": "5ade96b0f02612ea1cf8dcd7168775f08b779aff9436d8ca4807351049b4d05b",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_273454_2cd4006bcf537560.txt",
+      "label_sha256": "3c40288f8b7e77ac9af46df812c961a3161bed4927ec335304116314f027d114",
+      "target_boxes_xywh_normalized": [
+        [
+          0.592963,
+          0.788456,
+          0.307655,
+          0.324596
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "e0ea68b1a9a5f4c06e8bfa854972244e875b6cf5d0c3493477b6fe817655f0df",
+      "input_sha256": "d4f38adda067d3135a5849831cd519ee446a961e97e64fd4b277d986097f27c1",
+      "raw_file": "raw/positive_00.f32le.gz",
+      "raw_sha256": "c889a4ee64c02cdb1d918c8779c2382191b09ce87e8231e39c808402b58b6fe9"
+    },
+    {
+      "id": "positive_01",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 1,
+      "target_class_name": "damaged_linear_tactile_paving",
+      "photo": "photos/positive_01.jpeg",
+      "photo_sha256": "a5b67b2a214c92e6a73f87276a5da1d44f2411865aec9890fb2dbb99007e7a1d",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_252709_1491ee84d82c9046.jpeg",
+      "original_source_sha256": "a5b67b2a214c92e6a73f87276a5da1d44f2411865aec9890fb2dbb99007e7a1d",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_252709_1491ee84d82c9046.txt",
+      "label_sha256": "028471ffbe42d222df46e1d47f7cc7646ac401bd424d0b9d339dc4609f3f4500",
+      "target_boxes_xywh_normalized": [
+        [
+          0.4986,
+          0.351882,
+          0.19711,
+          0.508994
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; Visible worn/cracked linear tactile tiles; supplied damaged-linear label.",
+      "width": 4640,
+      "height": 3480,
+      "preprocessing": {
+        "scale": 0.16551724137931034,
+        "pad_x": 0,
+        "pad_y": 96,
+        "resized_width": 768,
+        "resized_height": 576
+      },
+      "decoded_rgb_sha256": "f02d9b4aed4e96f60388e88cfb8b087ec5fa42462f3dfcc4d88c153194b11289",
+      "input_sha256": "3d0a937d71a2eb6fc81a5de657b2fd5e2d36bd9feed7f23ff504bdd1a38a96d3",
+      "raw_file": "raw/positive_01.f32le.gz",
+      "raw_sha256": "81d63e574d85930fe281e4b6e1a873b789035fa1a4938e6da85098633c360d28"
+    },
+    {
+      "id": "positive_02",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 2,
+      "target_class_name": "dot_tactile_paving",
+      "photo": "photos/positive_02.jpg",
+      "photo_sha256": "3e9b2b34425377892748c309ec7ee2758df086e7b48931ff599eae9835afd0ce",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_274526_55f9e289c9a9c396.jpg",
+      "original_source_sha256": "3e9b2b34425377892748c309ec7ee2758df086e7b48931ff599eae9835afd0ce",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_274526_55f9e289c9a9c396.txt",
+      "label_sha256": "2386042b85e7f39951900a2fb2e4586992a9ef170bf47f0749865c390528320c",
+      "target_boxes_xywh_normalized": [
+        [
+          0.49974,
+          0.949074,
+          0.999479,
+          0.1
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "333239afd97b6c6a1558968b4ac4876e0f55003eeb7c406d04f5081378d5d907",
+      "input_sha256": "583b8c0aee343a1690d94d873d6b4bcc3ac98eb99d9991b092ae91facd53bf16",
+      "raw_file": "raw/positive_02.f32le.gz",
+      "raw_sha256": "a8ff026b56ea823a8b8f3449327d70f53b29e9aaf679ac87bd303115522671be"
+    },
+    {
+      "id": "positive_03",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 3,
+      "target_class_name": "damaged_dot_tactile_paving",
+      "photo": "photos/positive_03.jpeg",
+      "photo_sha256": "6093586418ef08cd0d1681fcf21cff949e4b11ba5120c70402b36857454b9dca",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_252541_e3ec7c8ee5e2cb39.jpeg",
+      "original_source_sha256": "6093586418ef08cd0d1681fcf21cff949e4b11ba5120c70402b36857454b9dca",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_252541_e3ec7c8ee5e2cb39.txt",
+      "label_sha256": "03b1e98a23c6c63cf165483bd00d5ecb3d42ace0b38243f128b4f16f9f4bbded",
+      "target_boxes_xywh_normalized": [
+        [
+          0.568461,
+          0.492072,
+          0.432556,
+          0.191039
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; Visible dot relief and worn/broken tile surface; supplied damaged-dot label.",
+      "width": 3024,
+      "height": 4032,
+      "preprocessing": {
+        "scale": 0.19047619047619047,
+        "pad_x": 96,
+        "pad_y": 0,
+        "resized_width": 576,
+        "resized_height": 768
+      },
+      "decoded_rgb_sha256": "4e9e504d2fc63f0292e9a1bdde667c58c06f4c0de5d86264e46af9e9b3dd4bf0",
+      "input_sha256": "4fe5f1abfd88b4947999dc8c0280a7b22fd2a0ea13f573c7c564ae57bf9489ae",
+      "raw_file": "raw/positive_03.f32le.gz",
+      "raw_sha256": "92e3372968be47066180eee3b8b92dcedf0bfe8c95497786a643c6a649b35b79"
+    },
+    {
+      "id": "positive_04",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 4,
+      "target_class_name": "passenger_car",
+      "photo": "photos/positive_04.jpg",
+      "photo_sha256": "dc6202e60eca5b13946df37d051f9ea44f1914fe9ef4a1f2f0047617ce5fc4ec",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/person/WalkMate_YOLO/images/test/fusion178_ts13_person_13_088_193.jpg",
+      "original_source_sha256": "dc6202e60eca5b13946df37d051f9ea44f1914fe9ef4a1f2f0047617ce5fc4ec",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/person/WalkMate_YOLO/labels/test/fusion178_ts13_person_13_088_193.txt",
+      "label_sha256": "7abb2854cd8fe7a604efc2d2361573d4f75c2eb50380f83b23b2d7b6f0cb61da",
+      "target_boxes_xywh_normalized": [
+        [
+          0.92005208,
+          0.67395833,
+          0.15989583,
+          0.60208333
+        ],
+        [
+          0.7359375,
+          0.50138889,
+          0.0875,
+          0.04583333
+        ],
+        [
+          0.70911458,
+          0.490625,
+          0.05572917,
+          0.03402778
+        ],
+        [
+          0.54869792,
+          0.48993056,
+          0.04114583,
+          0.04513889
+        ],
+        [
+          0.53151042,
+          0.471875,
+          0.03385417,
+          0.03125
+        ],
+        [
+          0.21484375,
+          0.60833333,
+          0.31302083,
+          0.31944444
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1440,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 96,
+        "resized_width": 768,
+        "resized_height": 576
+      },
+      "decoded_rgb_sha256": "e02813100c71dfa5d07d9c5be4616087562e7d88383c9efefc616fd55a4f95ea",
+      "input_sha256": "00187458639013bf00077193abf6eaa73ca02e3646fb0518265e918a7b7fd944",
+      "raw_file": "raw/positive_04.f32le.gz",
+      "raw_sha256": "ed0e166ae8eeeb77777f4e51409844d7eb39f7583d5b0bfd534c64a84c888cee"
+    },
+    {
+      "id": "positive_05",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 5,
+      "target_class_name": "bus",
+      "photo": "photos/positive_05.jpg",
+      "photo_sha256": "6f188a5217ecf24a6d91ba781e8630f62348078f8da44307418c72986a852151",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_257546_236ce797d8e6aade.jpg",
+      "original_source_sha256": "6f188a5217ecf24a6d91ba781e8630f62348078f8da44307418c72986a852151",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_257546_236ce797d8e6aade.txt",
+      "label_sha256": "d578b82ea532e29a4706d840d70c30835550e1735a742791d41aeb74e749ada9",
+      "target_boxes_xywh_normalized": [
+        [
+          0.190078,
+          0.499639,
+          0.380156,
+          0.262759
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "6c9c8eb0609a2b0c9dd06c524fb2ecf342905a81c3970f5ad6101d6c4a65176b",
+      "input_sha256": "ebb35bd212e3f8199c09175a42038995f0a06387648c343b5879c26e450252ab",
+      "raw_file": "raw/positive_05.f32le.gz",
+      "raw_sha256": "760e280ddd748637c947b3b47f7667744260614e7e5463cc925647af2cab156b"
+    },
+    {
+      "id": "positive_06",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 6,
+      "target_class_name": "truck",
+      "photo": "photos/positive_06.jpg",
+      "photo_sha256": "b7dd5923af843385a4367739512a11ba97dc4f6099fa7b36570aa55d497b1b93",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_256198_67e1da596b4f97a7.jpg",
+      "original_source_sha256": "b7dd5923af843385a4367739512a11ba97dc4f6099fa7b36570aa55d497b1b93",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_256198_67e1da596b4f97a7.txt",
+      "label_sha256": "5730ba614770ccbcd4c34f2da5087d3843f2f756496fb12c5db17eb7fc1429a1",
+      "target_boxes_xywh_normalized": [
+        [
+          0.249487,
+          0.595792,
+          0.278391,
+          0.359398
+        ],
+        [
+          0.42974,
+          0.477505,
+          0.032813,
+          0.068713
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "0533a0ae7f7f7fa2f737cfd304dc3e421d962faca36ba2151cf5fd00930ebe8a",
+      "input_sha256": "618a882fd02d81cb084a0d13324a03bb071ad663004ace6d7b567ff6ea69033a",
+      "raw_file": "raw/positive_06.f32le.gz",
+      "raw_sha256": "52d780eb3589b765c884045f6183bda5b07f98f52e478e588e6dd00d3852e11e"
+    },
+    {
+      "id": "positive_07",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 7,
+      "target_class_name": "motorcycle",
+      "photo": "photos/positive_07.jpg",
+      "photo_sha256": "e61f854b39d5c64684c9d51d065935d06fbe66ca8e47c4b0135390b9ae34cedf",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_253888_786af3defb17f9b1.jpg",
+      "original_source_sha256": "e61f854b39d5c64684c9d51d065935d06fbe66ca8e47c4b0135390b9ae34cedf",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_253888_786af3defb17f9b1.txt",
+      "label_sha256": "b7bde276fdc4a220863ba00972cdc331a596dcef1ce2aab3fff97dae21088738",
+      "target_boxes_xywh_normalized": [
+        [
+          0.246003,
+          0.527593,
+          0.281536,
+          0.356111
+        ],
+        [
+          0.426641,
+          0.444917,
+          0.153802,
+          0.176093
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "5fce009f8a1872316ba71ea50cd75f52983aa302ef5fc2e6426fd8f9c8e282ef",
+      "input_sha256": "bd916d927592bdacf4be2032bb3fcb58273d74a893db7b370faa132fc51882ac",
+      "raw_file": "raw/positive_07.f32le.gz",
+      "raw_sha256": "3c88d771ef8f56af3f28ebb0bb0ac288baea0216a7dee131670553cba0b711cf"
+    },
+    {
+      "id": "positive_08",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 8,
+      "target_class_name": "bicycle",
+      "photo": "photos/positive_08.jpg",
+      "photo_sha256": "fa4d81080e30ec0266e091e4977be9e3b595b68c3d66a419d7d6b68fa81e3479",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254265_7a457340181fac1a.jpg",
+      "original_source_sha256": "fa4d81080e30ec0266e091e4977be9e3b595b68c3d66a419d7d6b68fa81e3479",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_254265_7a457340181fac1a.txt",
+      "label_sha256": "b8c27f80c4723d72a0b0816e3d0928f59af9133ef1a755b16269322ca16230fb",
+      "target_boxes_xywh_normalized": [
+        [
+          0.872052,
+          0.800722,
+          0.252604,
+          0.396296
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "eca6cb6374acd29d448b6755dd666522e0e813e15275759b026e31ce5611b493",
+      "input_sha256": "4cd5568e72b2b9aec2c21c73504b23dc57a545be224de89cdec43a01830a84ce",
+      "raw_file": "raw/positive_08.f32le.gz",
+      "raw_sha256": "d79d6a2073e6430ee51d140c013e68c9689826bc4ec058e16f775588744754bc"
+    },
+    {
+      "id": "positive_09",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 9,
+      "target_class_name": "abandoned_e_scooter",
+      "photo": "photos/positive_09.png",
+      "photo_sha256": "6b09902eee203d5f51fdfe0f0006496fdb39604999a6507db2b50f54a47a0ebb",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_263376_5b6b18dd9e0f81e7.png",
+      "original_source_sha256": "6b09902eee203d5f51fdfe0f0006496fdb39604999a6507db2b50f54a47a0ebb",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_263376_5b6b18dd9e0f81e7.txt",
+      "label_sha256": "1ec2c95c23ae6ae3f0e275535bf08e723be65c75601eebe1153ef35d33fbf78b",
+      "target_boxes_xywh_normalized": [
+        [
+          0.3116783,
+          0.57627153,
+          0.20499611,
+          0.48702187
+        ],
+        [
+          0.48350289,
+          0.5110581,
+          0.05330969,
+          0.20824627
+        ],
+        [
+          0.4873566,
+          0.50107146,
+          0.05909026,
+          0.17687116
+        ],
+        [
+          0.50192987,
+          0.50029707,
+          0.04281903,
+          0.15594698
+        ],
+        [
+          0.5066132,
+          0.50196114,
+          0.03291713,
+          0.14976615
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; Supplied abandoned-scooter category; single frame does not verify abandonment or motion.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "651cea339c20b4c4bebdac8d5481073629b489db4b9da8c3f3da223db28e4d76",
+      "input_sha256": "d0b262c2455e1e9e4eece765ba0c079bb5ba175ce21e25623758980fb7402390",
+      "raw_file": "raw/positive_09.f32le.gz",
+      "raw_sha256": "a23c39f40dfe53ab28686c89fca636c932df17bec684799ac7c1a008a8f74e8c"
+    },
+    {
+      "id": "positive_10",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 10,
+      "target_class_name": "moving_e_scooter",
+      "photo": "photos/positive_10.jpg",
+      "photo_sha256": "6cb766833625f07b8f83232b5dbc937a76179e257e95928ccb20c634d7a87831",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_270431_fba9275fc38daede.jpg",
+      "original_source_sha256": "6cb766833625f07b8f83232b5dbc937a76179e257e95928ccb20c634d7a87831",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_270431_fba9275fc38daede.txt",
+      "label_sha256": "5e28e5368861821f4dede9b37a9b1ba9ada9b5092774ee91d9ec3d8b2fb5eb57",
+      "target_boxes_xywh_normalized": [
+        [
+          0.1078,
+          0.768289,
+          0.2156,
+          0.463422
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; Supplied moving-scooter category; single frame does not verify actual motion.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "551edc036c926d7ba434f6db5965611bdd725b1c4b8f1b90ff1a4d457884e208",
+      "input_sha256": "27e4c08d7120ec3b569f54c3c3ae8f26e40388b46d3add15cf7886cd8ef9b70a",
+      "raw_file": "raw/positive_10.f32le.gz",
+      "raw_sha256": "586c840b9391c0849f10dc1c5d30b3cca8fd078b2f08b76c5d95382f4c1cfc6c"
+    },
+    {
+      "id": "positive_11",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 11,
+      "target_class_name": "traffic_light",
+      "photo": "photos/positive_11.jpg",
+      "photo_sha256": "8083d67f2fbe44d52422c7aa58a32abb790ac31b10c3464c7f71e45f2f038293",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/ts19/WalkMate_YOLO/images/test/fusion178_ts19_person_19_029_160.jpg",
+      "original_source_sha256": "8083d67f2fbe44d52422c7aa58a32abb790ac31b10c3464c7f71e45f2f038293",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/ts19/WalkMate_YOLO/labels/test/fusion178_ts19_person_19_029_160.txt",
+      "label_sha256": "41ff54245b97b3aad898fd3512b152018a6187dbfbb54f9ed2ad0e0ac0c8ce84",
+      "target_boxes_xywh_normalized": [
+        [
+          0.06961806,
+          0.04139785,
+          0.10034722,
+          0.06666667
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 2880,
+      "height": 1860,
+      "preprocessing": {
+        "scale": 0.26666666666666666,
+        "pad_x": 0,
+        "pad_y": 136,
+        "resized_width": 768,
+        "resized_height": 496
+      },
+      "decoded_rgb_sha256": "41b9efca86cfbf76f6ca924911962f579a007e5c62798d87ca88e462a0adc828",
+      "input_sha256": "dd2971212d187a96e5592c3106f6d2454b145854cf4569d84a7207fe307e8f80",
+      "raw_file": "raw/positive_11.f32le.gz",
+      "raw_sha256": "92051e0be201abaf6c04aa26fe993be994de973becea4b4f3a3c10a4c762ebe1"
+    },
+    {
+      "id": "positive_12",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 12,
+      "target_class_name": "crosswalk",
+      "photo": "photos/positive_12.jpg",
+      "photo_sha256": "bb9397ef57fb9d8cea640fec9960dca7b588637c28ead7da8cc31dd421e86e16",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_273732_bac1927ce241507b.jpg",
+      "original_source_sha256": "bb9397ef57fb9d8cea640fec9960dca7b588637c28ead7da8cc31dd421e86e16",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_273732_bac1927ce241507b.txt",
+      "label_sha256": "9550e3e593776cb3d09778ec3e8f08decbd408777058f032090b4c955a101435",
+      "target_boxes_xywh_normalized": [
+        [
+          0.290045,
+          0.387281,
+          0.542665,
+          0.183522
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "1991af7f4441e0eaf3aff9aa1da0814fa932b5fd048968a05ac67c0f2f828af9",
+      "input_sha256": "ca1d43ee76cb3450c849cc129f7fa08aa1bcc0815dbc16e0974a4d3c45179688",
+      "raw_file": "raw/positive_12.f32le.gz",
+      "raw_sha256": "0aa2bf5b4ecdcf267dff3780bba70d55de35fd3af5ddbc8e635d475f4a188e47"
+    },
+    {
+      "id": "positive_13",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 13,
+      "target_class_name": "construction_fence",
+      "photo": "photos/positive_13.png",
+      "photo_sha256": "28f88856384b45467c22bcd5cc44f24a34389043380dbe79044b57ebeabf9df3",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_264686_cbef0147a0cbf88d.png",
+      "original_source_sha256": "28f88856384b45467c22bcd5cc44f24a34389043380dbe79044b57ebeabf9df3",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_264686_cbef0147a0cbf88d.txt",
+      "label_sha256": "4d3bb5a31532f859b8dfe5711c5bbe6678ebdc7447066ffba21a57a2a3c8f548",
+      "target_boxes_xywh_normalized": [
+        [
+          0.88430785,
+          0.2457375,
+          0.23138429,
+          0.43220731
+        ],
+        [
+          0.63706641,
+          0.18090783,
+          0.1044285,
+          0.30156941
+        ],
+        [
+          0.24353262,
+          0.21322926,
+          0.13941632,
+          0.10802558
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "bbaa07c8cc84f9afa2fc5e7bec9e18376a761a8263403a0cf25f0f8dff08b840",
+      "input_sha256": "0b01de3df5a99ded5ac77496367c423ef843f577fd8f19d03f0f7936a89bb219",
+      "raw_file": "raw/positive_13.f32le.gz",
+      "raw_sha256": "e3e2d703d2c53594503097c62b0dd329a68e4d2c5b08e78007c895cc9769b0d8"
+    },
+    {
+      "id": "positive_14",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 14,
+      "target_class_name": "barricade",
+      "photo": "photos/positive_14.jpg",
+      "photo_sha256": "f8ceb78919da7a116ceec501056b95fcc11509c687d9ce56af4328165e458436",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255637_c3fd50bded02246b.jpg",
+      "original_source_sha256": "f8ceb78919da7a116ceec501056b95fcc11509c687d9ce56af4328165e458436",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_255637_c3fd50bded02246b.txt",
+      "label_sha256": "5caca37fda52fabb7880db95d89699b66957661fe2fe420620609fb0ede806b8",
+      "target_boxes_xywh_normalized": [
+        [
+          0.815953,
+          0.697963,
+          0.27901,
+          0.358944
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "3865a32a177ae9beb507c462d9ebb431fa341aedd0ec4c0723f0078993e8303b",
+      "input_sha256": "b6cdff1172d02693cba78694f270c3c40e566c7ef8a6159d7647a4cddd29cd27",
+      "raw_file": "raw/positive_14.f32le.gz",
+      "raw_sha256": "100361b4bc2f1b2b1bbd22d328d4a46fac3ee231b76dd5807c7df5f54838d752"
+    },
+    {
+      "id": "positive_15",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 15,
+      "target_class_name": "traffic_cone",
+      "photo": "photos/positive_15.jpg",
+      "photo_sha256": "025b970d9c9d326b0c5e32cdd9678a8ded6a39b3f05fb1a9d9a30fa2ea76574e",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_265905_085b08198cb7681a.jpg",
+      "original_source_sha256": "025b970d9c9d326b0c5e32cdd9678a8ded6a39b3f05fb1a9d9a30fa2ea76574e",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_265905_085b08198cb7681a.txt",
+      "label_sha256": "ea9c2ec1302944ebd7384c31e391f56ce9f8af7c67381c751ba291e590939638",
+      "target_boxes_xywh_normalized": [
+        [
+          0.70069271,
+          0.50666204,
+          0.26654167,
+          0.35389815
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "b3b708839a5938969b712c619a467aa4435100a42ac8b9fb11e6e81027eca87b",
+      "input_sha256": "70c32642d85f9eed84e06d9af8c34332987b58e09d4013873cfe35519a69b28d",
+      "raw_file": "raw/positive_15.f32le.gz",
+      "raw_sha256": "d763dfd27d7e0a06c97b4f57fcc8464e23dd938d1556215ccec6dba0720147e5"
+    },
+    {
+      "id": "positive_16",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 16,
+      "target_class_name": "bollard",
+      "photo": "photos/positive_16.jpg",
+      "photo_sha256": "68dfd49ab07f3e69b73606ddb3c81a8a6d37109cbd5e9eb89572fc11e71fae7c",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_259487_cc733f524ab12781.jpg",
+      "original_source_sha256": "68dfd49ab07f3e69b73606ddb3c81a8a6d37109cbd5e9eb89572fc11e71fae7c",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_259487_cc733f524ab12781.txt",
+      "label_sha256": "653e0c7bf20e3ceabf23bc58e530a898c1f59b7fdff65fdca7ea339e9aa2b683",
+      "target_boxes_xywh_normalized": [
+        [
+          0.082776,
+          0.655394,
+          0.063469,
+          0.340139
+        ],
+        [
+          0.273099,
+          0.722134,
+          0.080365,
+          0.490546
+        ],
+        [
+          0.915958,
+          0.707407,
+          0.119833,
+          0.585185
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "e972aa93f2ccf47a25b0e7b1b4352b01d9712adbff6cf09a64441f2800732068",
+      "input_sha256": "086691ea538401ae4ac25b02419a5f1c2ef5fcb2a675ffa436ec1c6ae7926ee5",
+      "raw_file": "raw/positive_16.f32le.gz",
+      "raw_sha256": "01581e7c829347a7ca79d14a0afa40be74b1e87fbb8e1992a30eb095d078b488"
+    },
+    {
+      "id": "positive_17",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 17,
+      "target_class_name": "utility_or_streetlight_pole",
+      "photo": "photos/positive_17.jpg",
+      "photo_sha256": "5dea809794794042b16036ebdbc4fc64017621f0047a3c73a2a54cbe6fd09693",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_270749_acc2d8a73f1dcd1c.jpg",
+      "original_source_sha256": "5dea809794794042b16036ebdbc4fc64017621f0047a3c73a2a54cbe6fd09693",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_270749_acc2d8a73f1dcd1c.txt",
+      "label_sha256": "691fc9eb71897cd9a2a7555e0ed7a7b55cbda480cbcb89be04ba96b0ab05d607",
+      "target_boxes_xywh_normalized": [
+        [
+          0.407831,
+          0.43937,
+          0.091484,
+          0.878741
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "1b4741f487ea40e409c08f7cc2ea4de16491a9935e55a667249fe1cf51a8a447",
+      "input_sha256": "bd9ab493c2e1940c341016c47439bb0b245bcf579827923ff1cd324152ff19a6",
+      "raw_file": "raw/positive_17.f32le.gz",
+      "raw_sha256": "046c1896836d69c81d8f09d8708d56b08c4cdffde6ae5a319f624ae15553c5d3"
+    },
+    {
+      "id": "positive_18",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 18,
+      "target_class_name": "trash_bin",
+      "photo": "photos/positive_18.jpg",
+      "photo_sha256": "2897c3e5e0cff0b46b48ce8da6a7b32bd8284ab6487e174fa89bb4547a19e004",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_276005_d99eb6a419c1c85e.jpg",
+      "original_source_sha256": "2897c3e5e0cff0b46b48ce8da6a7b32bd8284ab6487e174fa89bb4547a19e004",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_276005_d99eb6a419c1c85e.txt",
+      "label_sha256": "f4a4aa4b7aea9881f5044524c046a745fb3f8d7c9a9111c7056d148ba4c53fb8",
+      "target_boxes_xywh_normalized": [
+        [
+          0.45353,
+          0.427012,
+          0.217335,
+          0.459534
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "a78f8eaba8547f179a489bbd997d98538739ba00d5b57892c492c05385d09ac4",
+      "input_sha256": "9be4528ed198bd2e5ec037399ad34e66815f3cc6d6d814247c23562b27cfa835",
+      "raw_file": "raw/positive_18.f32le.gz",
+      "raw_sha256": "419a353d02ca432e270c8cb9d2e5840aa163624c5ffa93807f1850ab36210fb9"
+    },
+    {
+      "id": "positive_19",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 19,
+      "target_class_name": "portable_sign",
+      "photo": "photos/positive_19.jpg",
+      "photo_sha256": "1df7c0d91794df7db160bc27e36a5304990572993ef4def2b078197c83a227b8",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_255058_dc73938e0032688f.jpg",
+      "original_source_sha256": "1df7c0d91794df7db160bc27e36a5304990572993ef4def2b078197c83a227b8",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/labels/test/wm_255058_dc73938e0032688f.txt",
+      "label_sha256": "41f571313ec0c61df717ec7bc33ecbcf982ead868fc83e1aaa0428cf17242431",
+      "target_boxes_xywh_normalized": [
+        [
+          0.49987,
+          0.440509,
+          0.028594,
+          0.085648
+        ],
+        [
+          0.552057,
+          0.396852,
+          0.030573,
+          0.156481
+        ],
+        [
+          0.808385,
+          0.508981,
+          0.141979,
+          0.566667
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1080,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 168,
+        "resized_width": 768,
+        "resized_height": 432
+      },
+      "decoded_rgb_sha256": "e0dc7d1e61c5f4a2513b76c9d89587392bab37e033b0fcaa1bbc99f2ea089ec2",
+      "input_sha256": "712171743061de2ba5ac168e029da601db717e1730b258efcc002abcdcd5bf81",
+      "raw_file": "raw/positive_19.f32le.gz",
+      "raw_sha256": "84cb42e5c8efc858a9c204fadb0b356da0db5f515ecd1398bbfd6c46685e3a65"
+    },
+    {
+      "id": "positive_20",
+      "kind": "CLASS_POSITIVE",
+      "target_class_id": 20,
+      "target_class_name": "person",
+      "photo": "photos/positive_20.jpg",
+      "photo_sha256": "b44f2f4f8fbe00e6a5acc897692eb1d2d8dbc234369dcb30d8ad5cb47688c456",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/person/WalkMate_YOLO/images/test/fusion178_ts13_person_13_038_104.jpg",
+      "original_source_sha256": "b44f2f4f8fbe00e6a5acc897692eb1d2d8dbc234369dcb30d8ad5cb47688c456",
+      "label_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/person/WalkMate_YOLO/labels/test/fusion178_ts13_person_13_038_104.txt",
+      "label_sha256": "596b070e0b65756d9cac7b9682235811fa2d08a94c9920c1a24882adc799bfad",
+      "target_boxes_xywh_normalized": [
+        [
+          0.87890625,
+          0.66180556,
+          0.19635417,
+          0.42638889
+        ],
+        [
+          0.45598958,
+          0.590625,
+          0.08072917,
+          0.27013889
+        ],
+        [
+          0.36354167,
+          0.60659722,
+          0.08958333,
+          0.27986111
+        ],
+        [
+          0.73776042,
+          0.49409722,
+          0.02239583,
+          0.03958333
+        ]
+      ],
+      "annotation_scope": "Only selected target-class supplied boxes; other classes may be incompletely annotated. Do not calculate overall precision/mAP from this subset.",
+      "manual_review": "Source photo and target boxes visually reviewed in this session; visible object matches selected category.",
+      "width": 1920,
+      "height": 1440,
+      "preprocessing": {
+        "scale": 0.4,
+        "pad_x": 0,
+        "pad_y": 96,
+        "resized_width": 768,
+        "resized_height": 576
+      },
+      "decoded_rgb_sha256": "7de9baa435ec1af1ca89efb08fdd43b47b23d9cc7af78a9783bfa7edd3dd7c82",
+      "input_sha256": "eab1f39e47ee5e450ed327c1339cce47f5fc9c817299f62f5d4b1c1e32c7116d",
+      "raw_file": "raw/positive_20.f32le.gz",
+      "raw_sha256": "4790b6eeb7e7a8b3b745240533940f099746d24aa3d476ce84a71932d31d87b7"
+    },
+    {
+      "id": "negative_wall_pattern",
+      "kind": "REAL_BACKGROUND_NEGATIVE",
+      "negative_kind": "wall_pattern",
+      "photo": "photos/negative_wall_pattern.png",
+      "photo_sha256": "d5c3a0b4f705b7dd3b6ab80cd51661c89a2ac2dcb9973f8d388b83a0fd04959d",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_254265_7a457340181fac1a.jpg",
+      "original_source_sha256": "fa4d81080e30ec0266e091e4977be9e3b595b68c3d66a419d7d6b68fa81e3479",
+      "parent_positive_id": "positive_08",
+      "crop_xyxy_pixels": [
+        35,
+        302,
+        413,
+        659
+      ],
+      "target_boxes_xywh_normalized": [],
+      "manual_review": "Visually reviewed derived crop with no visible member of the 21 classes. Original scene contains positives outside this crop; not a full negative scene or zero-label inference.",
+      "width": 378,
+      "height": 357,
+      "preprocessing": {
+        "scale": 2.0317460317460316,
+        "pad_x": 0,
+        "pad_y": 21,
+        "resized_width": 768,
+        "resized_height": 725
+      },
+      "decoded_rgb_sha256": "5aab7ad69799aaf9d7a1473ae84bca708429eeceac3ead614bce92ccf270d09a",
+      "input_sha256": "f68608639c4f0e8c6d70796070bab161aa6812f1d8f992abb49792bba5f8fec4",
+      "raw_file": "raw/negative_wall_pattern.f32le.gz",
+      "raw_sha256": "730269e69ef55daa82f95ae074821a80e4fbe5d42e30f42329846f5cb28231e9"
+    },
+    {
+      "id": "negative_pavement_shadow",
+      "kind": "REAL_BACKGROUND_NEGATIVE",
+      "negative_kind": "pavement_shadow",
+      "photo": "photos/negative_pavement_shadow.png",
+      "photo_sha256": "2aaef2e4574f0d15fceaa2915825bc4829e395612c128d955d23cfa5aa9045ce",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_273454_2cd4006bcf537560.jpg",
+      "original_source_sha256": "5ade96b0f02612ea1cf8dcd7168775f08b779aff9436d8ca4807351049b4d05b",
+      "parent_positive_id": "positive_00",
+      "crop_xyxy_pixels": [
+        19,
+        562,
+        768,
+        1026
+      ],
+      "target_boxes_xywh_normalized": [],
+      "manual_review": "Visually reviewed derived crop with no visible member of the 21 classes. Original scene contains positives outside this crop; not a full negative scene or zero-label inference.",
+      "width": 749,
+      "height": 464,
+      "preprocessing": {
+        "scale": 1.0253671562082778,
+        "pad_x": 0,
+        "pad_y": 146,
+        "resized_width": 768,
+        "resized_height": 476
+      },
+      "decoded_rgb_sha256": "6e1654ea692ec4aa33b9cbbf2ee81218c7f91f5583e4abb72c1101aeee347e55",
+      "input_sha256": "47d198b212ab084aa2c1391e37239f4cdaaf35188cebbe180c736095d37f3005",
+      "raw_file": "raw/negative_pavement_shadow.f32le.gz",
+      "raw_sha256": "d5fb1f0b9929a0321dbcf6d4411228e48256232b84667299aeb70b2a6e40a177"
+    },
+    {
+      "id": "negative_lane_marking",
+      "kind": "REAL_BACKGROUND_NEGATIVE",
+      "negative_kind": "lane_marking",
+      "photo": "photos/negative_lane_marking.png",
+      "photo_sha256": "1038f87bb6ba2f5f7e4dd2b91a2a6f6df1e552436e0163b4ce7636bdca6efea5",
+      "original_source": "/home/ddobagi/Documents/Codex/2026-09-13/d/work/base/WalkMate_YOLO/images/test/wm_265905_085b08198cb7681a.jpg",
+      "original_source_sha256": "025b970d9c9d326b0c5e32cdd9678a8ded6a39b3f05fb1a9d9a30fa2ea76574e",
+      "parent_positive_id": "positive_15",
+      "crop_xyxy_pixels": [
+        19,
+        540,
+        614,
+        788
+      ],
+      "target_boxes_xywh_normalized": [],
+      "manual_review": "Visually reviewed derived crop with no visible member of the 21 classes. Original scene contains positives outside this crop; not a full negative scene or zero-label inference.",
+      "width": 595,
+      "height": 248,
+      "preprocessing": {
+        "scale": 1.2907563025210085,
+        "pad_x": 0,
+        "pad_y": 224,
+        "resized_width": 768,
+        "resized_height": 320
+      },
+      "decoded_rgb_sha256": "53ec34c7d340b09c4c3bbf5246cf9e3559ea4ec02265edf6f64b67f5dd548fc5",
+      "input_sha256": "339afdf603b87816719a71caaee902041694ac85d73fe157f080d408561f6652",
+      "raw_file": "raw/negative_lane_marking.f32le.gz",
+      "raw_sha256": "6591889cd95c709c5343c64dbc4292fa68dfff2e25e09c531b48795de0dfb724"
+    }
+  ]
+}

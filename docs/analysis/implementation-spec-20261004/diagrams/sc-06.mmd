@@ -1,0 +1,19 @@
+flowchart TD
+A["현재 RAW 동의·보행 F-D06-017/018"] --> B["30초 집계·암호화 봉인 F-D06-019"]
+B --> C{"READY/ENDED·foreground·WiFi·충전·lease없음? F-D06-020"}
+C -->|"아니오·SAFE_STOP 포함"| X["전송 보류·보존/TTL 정책"]
+C -->|"예"| D["manifest→chunk→commit F-D06-021 / F-D08-051..054"]
+D --> E{"각 단계 최신 동의·subject·quota·hash? F-D13-025/026/028"}
+E -->|"실패·철회·삭제"| Y["중단·거부/격리·정리 F-D06-023"]
+E -->|"유효"| F["14일 격리 영수증 F-D13-028"]
+F --> G["TRAINING 검토 F-D13-033"]
+G -->|"반려·증거불충분"| Z["학습 승인 없음"]
+G -->|"목적 승인"| H["비식별 artifact 등록·revision 승인 F-D13-038/039"]
+H --> I["짧은 HMAC gate F-D13-040"]
+I --> J{"실행 시 manifest/DB 재검증 F-D10-019/020"}
+J -->|"만료·철회·상태불일치"| K["학습 wrapper 차단"]
+J -->|"통과·dry-run=true"| DR["학습 호출 없이 계획 종료"]
+J -->|"통과·dry-run=false"| L["wrapper 학습 호출
+별도 data YAML 결속 한계 R-D10 관련항목"]
+H -.->|"철회/삭제/만료 상태에서 명시 운영 호출"| M["artifact 보존 CLI·복구 F-D13-042
+계보 helper F-D13-043은 runtime caller 미확인"]

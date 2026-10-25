@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.config import Settings
 from backend.app.database import get_db
-from backend.app.api.reports import shared_maintenance_write_lock
+from backend.app.services.maintenance_lock import shared_maintenance_write_lock
 from backend.app.field_test_security import (
     FieldTestAccess,
     RawCollectionOperation,
@@ -292,9 +292,13 @@ def create_router(
     *,
     admission_gate: AdmissionGate | None = None,
     storage_handler: RawCollectionStorageHandler | None = None,
+    storage_handler_provider=None,
 ) -> APIRouter:
     router = APIRouter(prefix="/raw-collections", tags=["raw-collections"])
     gate = admission_gate or authorize_raw_collection_write
+
+    def current_storage():
+        return storage_handler_provider() if storage_handler_provider else storage_handler
 
     async def run_head_preflight(
         request: Request,
@@ -329,7 +333,7 @@ def create_router(
                     _run_guarded_preflight,
                     gate,
                     db,
-                    storage_handler,
+                    current_storage(),
                     actor_id=actor_id,
                     account_generation=account_generation,
                     purpose=purpose,
@@ -567,7 +571,7 @@ def create_router(
                     _run_guarded_write,
                     gate,
                     db,
-                    storage_handler,
+                    current_storage(),
                     lambda handler, admission: handler.put_manifest(
                         db,
                         admission,
@@ -657,7 +661,7 @@ def create_router(
                     _run_guarded_write,
                     gate,
                     db,
-                    storage_handler,
+                    current_storage(),
                     lambda handler, admission: handler.put_chunk(
                         db,
                         admission,
@@ -721,12 +725,12 @@ def create_router(
             chunk_sha256=None,
             commit_sha256=None,
         )
-        if storage_handler is None:
+        if current_storage() is None:
             _raise_storage_unavailable(db)
         try:
             return await to_thread.run_sync(
                 partial(
-                    storage_handler.get_status,
+                    current_storage().get_status,
                     db,
                     actor_id=actor_id,
                     account_generation=account_generation,
@@ -809,7 +813,7 @@ def create_router(
                     _run_guarded_write,
                     gate,
                     db,
-                    storage_handler,
+                    current_storage(),
                     lambda handler, admission: handler.commit(
                         db,
                         admission,

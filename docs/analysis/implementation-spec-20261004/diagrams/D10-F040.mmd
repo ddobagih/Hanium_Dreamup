@@ -1,0 +1,20 @@
+flowchart TD
+  A["F-D10-040 데이터 후보·권리·검수 manifest 보존 기록"]
+  N0["1. policy 문서는 hard negative33·bbox review 후12·min-box hold9·small object augmentation3·우선threshold/augmentation4로 후보를 분류한 기록을 제공."]
+  A --> N0
+  N1["2. hold9행은 min-box 검토 전 train 배제, 모든 후보는 source-level privacy audit 전 공유 안 함, sequence/location leakage 피할 것을 문서 요구로 서술."]
+  N0 --> N1
+  N2["3. README는 현재 후보 CANDIDATE_REVALIDATION_REQUIRED와 권리·hash·독립test 한계를 연결한다. source/license/취득시점/hash 기록·사람 승인 전 자동 라벨 학습 금지를 요구한다."]
+  N1 --> N2
+  B0{"보존 CSV/summary 숫자"}
+  R0["이번 데이터 재계산/학습 포함/사람 시각검수 완료 근거 아님"]
+  A -. "관련 분기" .-> B0
+  B0 --> R0
+  B1{"policy 문서 요구"}
+  R1["초기 builder가 모든 요구를 자동 enforcement하는 것은 아님"]
+  A -. "관련 분기" .-> B1
+  B1 --> R1
+  Z["종료 · 자동 재시도 없음"]
+  N2 --> Z
+  P["적용 정책 · P-D10-031"]
+  P -. "코드 분기 기준" .-> A

@@ -1,0 +1,17 @@
+flowchart TD
+  META["F-D16-014 · P-D16-014"]
+  META --> A
+  A["취소 버튼 또는 실제 Activity 종료"] --> B{"activeRun 존재·아직 취소 아님"}
+  B -->|"아니오"| X["no-op"]
+  B -->|"예"| C["결과 폐기·busy=false·cancelling=true"]
+  C --> D["token cancel·Future interrupt
+  HTTPS disconnect·native atomic cancel"]
+  D --> E["single worker에서 종료·정리
+  일부 변환/파싱은 즉시 취소 확인 없음"]
+  C --> N["새 분석 요청: 입력준비/busy=false이면 새 generation 큐잉"]
+  E --> F["cancellingRuns에서 이전 세대 1회 제거"]
+  F --> G{"새 activeRun·busy·result 존재"}
+  G -->|"예"| H["이전 취소 문구·결과 게시 금지"]
+  G -->|"아니오"| I["취소 완료/정리 실패 안내"]
+  N -->|"이전 작업 정리 뒤"| J["새 분석 시작"]
+  

@@ -1,0 +1,15 @@
+stateDiagram-v2
+[*] --> Ready
+Ready --> Running: F-D16-013 입력 준비·busy=false
+Running --> CancelRequested: F-D16-014 취소
+CancelRequested --> Cleaning: token cancel·worker 종료
+CancelRequested --> NewQueued: 새 generation 요청
+NewQueued --> Running: 이전 정리 뒤 single worker 시작
+Cleaning --> Ready: 새 run 없음
+Running --> Result: 현재 generation·취소 아님
+Running --> Result: 허용 실패 진단 JSON
+Result --> Ready: 새 입력·삭제
+note right of CancelRequested
+P-D16-014: 이전 callback 폐기
+변환/일부 파싱은 즉시 중단 미보장
+end note

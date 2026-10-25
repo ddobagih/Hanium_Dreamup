@@ -1,11 +1,12 @@
 package kr.co.hanium.dreamup.walksafe.feedback
 
+import kr.co.hanium.dreamup.walksafe.MainActivityControllerTestFixture
+
 import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -47,6 +48,7 @@ class MainCommandSpeechColdStartDeviceTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val deadlineMs = SystemClock.elapsedRealtime() + 55_000L
         var activity: MainActivity? = null
+        val cancelledResponse = TerminalEvents()
         try {
             activity = instrumentation.startActivitySync(
                 Intent(instrumentation.targetContext, MainActivity::class.java)
@@ -77,7 +79,7 @@ class MainCommandSpeechColdStartDeviceTest {
                     invokeBoolean(foregroundActivity, "firstRunOnboardingComplete") &&
                         invokeBoolean(foregroundActivity, "nativeHomeFeatureContextAvailable"),
                 )
-                val recording = MainActivity::class.java.getDeclaredField("voiceRecognitionActive").apply {
+                val recording = MainActivityControllerTestFixture.field("voiceRecognitionActive").apply {
                     isAccessible = true
                 }.getBoolean(foregroundActivity)
                 assertFalse("Do not interfere with a real recording", recording)
@@ -108,7 +110,6 @@ class MainCommandSpeechColdStartDeviceTest {
             assertEquals("Cold-start response failed", 0, completedResponse.failed.get())
             Log.i(TAG, "main_cold_start_actual_onDone=true")
 
-            val cancelledResponse = TerminalEvents()
             val cancelledActuator = onMain(deadlineMs) {
                 requestColdResponse(
                     foregroundActivity,
@@ -119,6 +120,7 @@ class MainCommandSpeechColdStartDeviceTest {
             }
             waitUntil(deadlineMs, 8_000L, "Cancelled request never reached real late engine readiness") {
                 onMain(deadlineMs) {
+                    cancelledResponse.assertOutputObserverCurrent(cancelledActuator)
                     checkNotNull(
                         AndroidFeedbackActuator::class.java.getDeclaredField("ttsState").apply {
                             isAccessible = true
@@ -127,34 +129,49 @@ class MainCommandSpeechColdStartDeviceTest {
                 }
             }
             val engine = onMain(deadlineMs) {
-                AndroidFeedbackActuator::class.java.getDeclaredField("textToSpeech").apply {
+                AndroidFeedbackActuator::class.java.getDeclaredField("speechRuntime").apply {
                     isAccessible = true
-                }.get(cancelledActuator) as TextToSpeech
+                }.get(cancelledActuator) as AndroidFeedbackSpeechRuntime
             }
             val observationEndMs = SystemClock.elapsedRealtime() + 3_000L
+            var globalEngineBusyObserved = false
             while (SystemClock.elapsedRealtime() < observationEndMs) {
                 remainingMs(deadlineMs)
                 assertEquals("Page exit allowed a late success callback", 0, cancelledResponse.completed.get())
                 assertTrue("Cancellation delivered duplicate terminal failures", cancelledResponse.failed.get() <= 1)
-                assertFalse("Page exit allowed queued app speech", onMain(deadlineMs) {
-                    cancelledActuator.isAppSpeechActive() || engine.isSpeaking
-                })
+                val globalEngineBusy: Boolean = onMain(deadlineMs) {
+                    cancelledResponse.assertNoOwnedSpeechOutput(cancelledActuator)
+                    assertFalse("Page exit allowed queued app speech", cancelledActuator.isAppSpeechActive())
+                    engine.isSpeaking()
+                }
+                globalEngineBusyObserved = globalEngineBusyObserved || globalEngineBusy
                 Thread.sleep(100L)
             }
-            Log.i(TAG, "main_page_exit_before_readiness_no_speech=true observation_ms=3000")
+            onMain(deadlineMs) {
+                cancelledResponse.assertNoOwnedSpeechOutput(cancelledActuator)
+                assertFalse("Page exit allowed queued app speech", cancelledActuator.isAppSpeechActive())
+            }
+            assertEquals("Page exit allowed a late success callback", 0, cancelledResponse.completed.get())
+            assertTrue("Cancellation delivered duplicate terminal failures", cancelledResponse.failed.get() <= 1)
+            Log.i(TAG, "main_page_exit_before_readiness_no_speech=true observation_ms=3000 " +
+                "owned_requested=0 owned_started=0 owned_done=0 global_engine_busy_observed=$globalEngineBusyObserved")
         } finally {
             val activityToFinish = activity
             if (activityToFinish != null) onMain(SystemClock.elapsedRealtime() + 3_000L) {
                 try {
-                    invokeNoArgs(activityToFinish, "cancelCommandSpeechResponse")
-                    val field = actuatorField()
-                    try {
-                        (field.get(activityToFinish) as? AndroidFeedbackActuator)?.close()
-                    } finally {
-                        field.set(activityToFinish, null)
-                    }
+                    cancelledResponse.restoreSpeechOutputObserver()
                 } finally {
-                    activityToFinish.finish()
+                    try {
+                        invokeNoArgs(activityToFinish, "cancelCommandSpeechResponse")
+                        val field = actuatorField()
+                        try {
+                            (field.get(activityToFinish) as? AndroidFeedbackActuator)?.close()
+                        } finally {
+                            field.set(activityToFinish, null)
+                        }
+                    } finally {
+                        activityToFinish.finish()
+                    }
                 }
             }
         }
@@ -186,20 +203,28 @@ class MainCommandSpeechColdStartDeviceTest {
             kotlin.jvm.functions.Function0::class.java,
             kotlin.jvm.functions.Function0::class.java,
             java.lang.Boolean.TYPE,
+            kotlin.jvm.functions.Function0::class.java,
+            kr.co.hanium.dreamup.walksafe.voice.CurrentStateSpeechLease::class.java,
+            kotlin.jvm.functions.Function0::class.java,
+            kotlin.jvm.functions.Function0::class.java,
         ).apply { isAccessible = true }
         assertTrue(
             "Main rejected the pending cold-start response before readiness",
-            response.invoke(activity, message, false, onCompleted, onFailed, false) as Boolean,
+            response.invoke(activity, message, false, onCompleted, onFailed, false,
+                null, null, { true }, null) as Boolean,
         )
         val actuator = checkNotNull(field.get(activity) as? AndroidFeedbackActuator)
         assertTrue("The test must request speech before the real onInit callback", actuator.isSpeechInitializing())
         assertEquals("Dispatch is not completion", 0, events.completed.get())
-        if (leavePage) showPage(activity, "HOME")
+        if (leavePage) {
+            events.observeSpeechOutput(actuator)
+            showPage(activity, "HOME")
+        }
         return actuator
     }
 
     private fun showPage(activity: MainActivity, pageName: String) {
-        val page = MainActivity::class.java.getDeclaredField("nativeUiPage").apply {
+        val page = MainActivityControllerTestFixture.field("nativeUiPage").apply {
             isAccessible = true
         }.get(activity) as Enum<*>
         val constants = checkNotNull(page.javaClass.enumConstants) { "Native page type is not an enum" }
@@ -209,7 +234,7 @@ class MainCommandSpeechColdStartDeviceTest {
         }.invoke(activity, target)
     }
 
-    private fun actuatorField() = MainActivity::class.java.getDeclaredField("feedbackActuator").apply {
+    private fun actuatorField() = MainActivityControllerTestFixture.field("feedbackActuator").apply {
         isAccessible = true
     }
 
@@ -254,6 +279,54 @@ class MainCommandSpeechColdStartDeviceTest {
         val terminal = CountDownLatch(1)
         val completed = AtomicInteger(0)
         val failed = AtomicInteger(0)
+        private val requested = AtomicInteger(0)
+        private val started = AtomicInteger(0)
+        private val done = AtomicInteger(0)
+        private var observedActuator: AndroidFeedbackActuator? = null
+        private var previousListener: ((SpeechOutputEvent) -> Unit)? = null
+        private var observingListener: ((SpeechOutputEvent) -> Unit)? = null
+
+        fun observeSpeechOutput(actuator: AndroidFeedbackActuator) {
+            check(observedActuator == null)
+            val previous = actuator.speechOutputListener
+            val observer: (SpeechOutputEvent) -> Unit = { event ->
+                when (event.outcome) {
+                    SpeechOutputOutcome.REQUESTED -> requested.incrementAndGet()
+                    SpeechOutputOutcome.STARTED -> started.incrementAndGet()
+                    SpeechOutputOutcome.DONE -> done.incrementAndGet()
+                    else -> Unit
+                }
+                previous?.invoke(event)
+            }
+            observedActuator = actuator
+            previousListener = previous
+            observingListener = observer
+            actuator.speechOutputListener = observer
+        }
+
+        fun assertOutputObserverCurrent(actuator: AndroidFeedbackActuator) {
+            assertTrue("Speech observation must belong to the exact cancelled actuator", observedActuator === actuator)
+            assertTrue("Cancelled actuator output observation was replaced",
+                actuator.speechOutputListener === checkNotNull(observingListener))
+        }
+
+        fun assertNoOwnedSpeechOutput(actuator: AndroidFeedbackActuator) {
+            assertOutputObserverCurrent(actuator)
+            assertEquals("Page exit allowed an owned native speech request", 0, requested.get())
+            assertEquals("Page exit allowed an owned native speech start", 0, started.get())
+            assertEquals("Page exit allowed an owned native speech completion", 0, done.get())
+        }
+
+        fun restoreSpeechOutputObserver() {
+            observedActuator?.let { actuator ->
+                if (actuator.speechOutputListener === observingListener) {
+                    actuator.speechOutputListener = previousListener
+                }
+            }
+            observedActuator = null
+            previousListener = null
+            observingListener = null
+        }
     }
 
     private companion object {

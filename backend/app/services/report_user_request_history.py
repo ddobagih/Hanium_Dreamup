@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from backend.app.services.privacy_visibility import account_subject_visible
+
 import base64
 import binascii
 from dataclasses import dataclass
@@ -257,6 +259,7 @@ def _owned_source_statement(
         )
         .join(Report, Report.id == ReportUserRequest.report_id)
         .where(
+            account_subject_visible(Report),
             Report.privacy_subject_hmac == privacy_subject,
             Report.account_generation == account_generation,
         )
@@ -273,6 +276,7 @@ def _owned_source_statement(
         literal(None, type_=DateTime(timezone=True)).label("created_at"),
         ReportDeletionTombstone.deleted_at.label("updated_at"),
     ).where(
+        account_subject_visible(ReportDeletionTombstone),
         ReportDeletionTombstone.privacy_subject_hmac == privacy_subject,
         ReportDeletionTombstone.account_generation == account_generation,
     )
@@ -293,11 +297,13 @@ def _owned_report_exists(
 ) -> bool:
     current = select(Report.id.label("report_id")).where(
         Report.id == report_id,
+        account_subject_visible(Report),
         Report.privacy_subject_hmac == privacy_subject,
         Report.account_generation == account_generation,
     )
     deleted = select(ReportDeletionTombstone.report_id).where(
         ReportDeletionTombstone.report_id == report_id,
+        account_subject_visible(ReportDeletionTombstone),
         ReportDeletionTombstone.privacy_subject_hmac == privacy_subject,
         ReportDeletionTombstone.account_generation == account_generation,
     )

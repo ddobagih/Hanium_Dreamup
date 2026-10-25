@@ -1,0 +1,30 @@
+flowchart TD
+  A["F-D04-037 · P-D04-037<br/>writer.start"] --> IDLE{"IDLE인가"}
+  IDLE -->|아니오| DUP["onOpened false 반환<br/>기존 상태 유지"]
+  IDLE -->|예| THREAD{"STARTING generation 증가 후<br/>worker 시작 성공"}
+  THREAD -->|아니오| STARTERR["ERROR closed<br/>onOpened false · onClosed"]
+  THREAD -->|예| OPEN{"sink open/header write/flush 성공"}
+  OPEN -->|아니오| IOERR["I/O 오류 기록 · pending drop<br/>queue 비움 · STOPPING"]
+  OPEN -->|예| STOPREQ{"이미 stop 요청됐는가"}
+  STOPREQ -->|예| OF["onOpened false"]
+  STOPREQ -->|아니오| REC["RECORDING · onOpened true<br/>입력과 stop 대기"]
+  REC --> APP["append token과 batch"]
+  APP --> TOKEN{"같은 generation이며 RECORDING"}
+  TOKEN -->|아니오| STALE["false 반환 · 상태 유지"]
+  TOKEN -->|예| BUDGET{"pending 16개/1MiB 및<br/>파일 64MiB와 footer 예약 내인가"}
+  BUDGET -->|아니오| LIMIT["새 batch dropped 기록 · STOPPING<br/>generation 무효화 · append false"]
+  BUDGET -->|예| QUEUE["bytes copy enqueue · append true<br/>worker write/flush 성공 후만 통계 반영"]
+  QUEUE --> REC
+  QUEUE -. I/O 실패 .-> IOERR
+  REC -->|명시 stop 또는 fail| STOP["STOPPING · generation 무효화"]
+  OF --> DRAIN
+  LIMIT --> DRAIN
+  STOP --> DRAIN
+  DRAIN["이미 승인된 queue drain<br/>COMPLETE 또는 INCOMPLETE footer"] --> CLOSE
+  DRAIN -. I/O 실패 .-> IOERR
+  IOERR --> CLOSE["finally flush/close 시도<br/>실패도 error에 반영"]
+  CLOSE --> NOERR{"error가 없고 sink가 있는가"}
+  NOERR -->|아니오| ERROR["ERROR closed · .part 보존<br/>onClosed · 새 instance 필요"]
+  NOERR -->|예| MOVE{"Files.move 최종 이름 공개 성공<br/>ATOMIC_MOVE 보장 없음"}
+  MOVE -->|아니오| ERROR
+  MOVE -->|예| DONE["STOPPED closed · onClosed"]

@@ -1,0 +1,12 @@
+flowchart TD
+  H["F-D05-004 YOLO raw 파싱·억제·모호한 상태 보존"]
+  H --> S{"exact output length"}
+  S -->|"아니오"| E["tensor contract failure"]
+  S -->|"예"| A["anchor 모든 score 와 box 검사"]
+  A --> T["전체 class top1"]
+  T --> Q{"allowlist 와 score 이상 threshold"}
+  Q -->|"아니오"| D["anchor 버림"]
+  Q -->|"예"| C["crop 교집합 없는 후보 제거"]
+  C --> N["P-D05-004 same class IoU 초과 0.7 NMS"]
+  N --> B["최대 300 후 image 중복 제거"]
+  B --> U["상반상태 양쪽 uncertain 보존"]

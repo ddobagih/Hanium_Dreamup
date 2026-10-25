@@ -1,0 +1,16 @@
+flowchart TD
+  META["F-D16-007 · P-D16-007"]
+  META --> A
+  A["자동 기준국 조회"] --> B["live catalog strict parsing"]
+  B -->|"성공"| C["캐시 저장"]
+  B -->|"실패"| D{"캐시 schema/hash·30일 이하·미래5분 이하"}
+  D -->|"실패"| X["STATION_CATALOG_UNAVAILABLE"]
+  D -->|"유효"| E["캐시 catalog 사용"]
+  C --> F{"30km 이내 후보 존재"}
+  E --> F
+  F -->|"아니오"| Y["BASE_STATION_TOO_FAR"]
+  F -->|"예"| G["hourly health·coverage 조회
+  조회 실패는 빈 상태"]
+  G --> H["calendarComplete→현재 운영/health→거리 정렬"]
+  H --> I["상태가 부정적이어도 historical 다운로드 시도 가능"]
+  B -->|"취소"| Z["fallback 없이 취소 전달"]

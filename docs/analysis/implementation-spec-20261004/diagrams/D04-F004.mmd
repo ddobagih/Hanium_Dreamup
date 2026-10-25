@@ -1,0 +1,26 @@
+flowchart TD
+  ID["F-D04-004 · 가속도만 가능한 기기의 보조 걸음 검출<br/>P-D04-004"]
+  A["하드웨어 센서 없는 경우의 가속도 sample"]
+  C0{"finite magnitude와 새 timestamp인가"}
+  R0["0걸음·상태 보존"]
+  C1{"peak excursion이 종료되고 trough가 있었는가"}
+  R1["peak 또는 trough 후보 보존"]
+  C2{"300ms 이상이며 시작 3초 이내 또는 이전 간격 0.5..2배인가"}
+  R2["새 첫 peak로 재시작"]
+  OK["첫 일관 쌍 2걸음; 이후 1걸음 LOW"]
+  END["호출자 반환 또는 다음 입력 대기"]
+  STOP["fallback reset"]
+  ID --> A
+  A --> C0
+  C0 -->|"아니오"| R0
+  C1 -->|"아니오"| R1
+  C2 -->|"아니오"| R2
+  C2 -->|"예"| OK
+  OK --> END
+  C0 -->|"예"| C1
+  R0 --> END
+  C1 -->|"예"| C2
+  R1 --> END
+  R2 --> END
+  A -->|"stop 또는 reset"| STOP
+  STOP --> END

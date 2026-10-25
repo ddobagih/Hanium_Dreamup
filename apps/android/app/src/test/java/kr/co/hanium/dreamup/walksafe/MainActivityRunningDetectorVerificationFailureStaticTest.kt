@@ -15,75 +15,97 @@ class MainActivityRunningDetectorVerificationFailureStaticTest {
 
     @Test
     fun everyScheduledVerificationIsBoundedRetriedAndEndsInAnExplicitState() {
-        val schedule = functionBlock("private fun scheduleRunningDetectorVerification(")
-        val begin = schedule.indexOf("runningDetectorVerification.begin(detector, SystemClock.elapsedRealtime())")
-        val deadline = schedule.indexOf("{ expireRunningDetectorVerification(detector) }")
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/primary/PrimaryDetectorLifecycleController.kt").readText()
+        MainActivityRefactorSource.composition(source, "primaryDetectorLifecycleController")
+        val schedule = MainActivityRefactorSource.member(owner, "scheduleVerification")
+        val begin = schedule.indexOf("beginVerification(instance, elapsedRealtimeMs())")
+        val deadline = schedule.indexOf("{ expireVerification(instance) }")
         assertTrue(begin >= 0 && deadline > begin)
-        assertTrue(schedule.contains("runningDetectorVerification.pendingDeadlineMs,"))
+        assertTrue(schedule.contains("verification.pendingDeadlineMs)"))
         assertTrue(schedule.indexOf("if (!retryAttempt) {") in 0 until begin)
-        assertTrue(schedule.contains("runningDetectorVerification.recordAttempt("))
+        val beginBody = MainActivityRefactorSource.member(owner, "beginVerification")
+        assertTrue(beginBody.contains("verification.begin(instance, nowMs)"))
+        assertTrue(schedule.contains("val step = recordVerification("))
+        val record = MainActivityRefactorSource.member(owner, "recordVerification")
+        val owned = record.indexOf("if (detector.projection().detector !== instance || detector.projection().loadGeneration != expectedGeneration || detector.projection().closing)")
+        val observed = record.indexOf("verification.recordAttempt(instance, identity, evidence, nowMs())")
+        assertTrue(owned >= 0 && observed > owned)
+        assertTrue(MainActivityRefactorSource.member(source, "recordRunningDetectorVerification").contains("nowElapsedRealtimeMs: () -> Long = SystemClock::elapsedRealtime"))
+        assertTrue(record.contains("RunningDetectorVerificationStep.STALE"))
         val retry = schedule.substringAfter("RunningDetectorVerificationStep.RETRY ->")
             .substringBefore("RunningDetectorVerificationStep.FAILED ->")
-        assertTrue(retry.contains("scheduleRunningDetectorVerification(detector, modelKey, fallbackUsed, retryAttempt = true)"))
-        assertTrue(retry.contains("runningDetectorVerification.retryDelayMs,"))
+        assertTrue(retry.contains("scheduleVerification(instance, modelKey, fallbackUsed, retryAttempt = true)"))
+        assertTrue(retry.contains("verification.retryDelayMs)"))
         val failed = schedule.substringAfter("RunningDetectorVerificationStep.FAILED ->")
             .substringBefore("RunningDetectorVerificationStep.VERIFIED ->")
-        assertTrue(failed.contains("runOnUiThread { disableDetectorAfterVerificationFailure(detector) }"))
+        assertTrue(failed.contains("presentation.onUi { disableUnverified(instance) }"))
         val verified = schedule.substringAfter("RunningDetectorVerificationStep.VERIFIED ->")
             .substringBefore("RunningDetectorVerificationStep.STALE ->")
-        assertTrue(verified.contains("maybeContinuePostLoginDeviceCheck()"))
+        assertTrue(verified.contains("preparation.modelVerified()"))
         val rejected = schedule.substringAfter("catch (_: RejectedExecutionException) {")
-        assertTrue(rejected.contains("if (runningDetectorVerification.fail(detector)) {"))
-        assertTrue(rejected.contains("disableDetectorAfterVerificationFailure(detector)"))
-        val expire = functionBlock("private fun expireRunningDetectorVerification(")
-        assertTrue(expire.contains("if (runningDetectorVerification.expire(detector, SystemClock.elapsedRealtime())) {"))
-        assertTrue(expire.contains("disableDetectorAfterVerificationFailure(detector)"))
+        assertTrue(rejected.contains("if (verification.fail(instance)) presentation.onUi {"))
+        assertTrue(rejected.contains("disableUnverified(instance)"))
+        val expire = MainActivityRefactorSource.member(owner, "expireVerification")
+        assertTrue(expire.contains("if (verification.expire(instance, elapsedRealtimeMs())) disableUnverified(instance)"))
+        assertTrue(expire.contains("disableUnverified(instance)"))
     }
 
     @Test
     fun aFailedVerificationDisablesTheInstanceAndStopsARunningWalk() {
-        val disable = functionBlock("private fun disableDetectorAfterVerificationFailure(")
-        val guard = disable.indexOf("if (frameDetector !== detector || detectorClosing) return@synchronized false")
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/primary/PrimaryDetectorLifecycleController.kt").readText()
+        val execution = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/primary/PrimaryDetectorExecutionOwner.kt").readText()
+        val disable = MainActivityRefactorSource.member(owner, "disableUnverified")
+        val nativeDisable = MainActivityRefactorSource.member(execution, "disableUnverified")
+        val binding = MainActivityRefactorSource.composition(source, "primaryDetectorLifecycleController")
+        val guard = nativeDisable.indexOf("if (detector !== expectedDetector || closing) return@synchronized false")
         assertTrue(guard >= 0)
-        listOf(
-            "frameDetector = NoopAndroidFrameDetector()",
-            "detectorLoadGeneration += 1L",
-            "detectorAvailable = false",
-            "detectorLoadReason = kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness.SAMPLE_INFERENCE_UNVERIFIED_REASON",
-            "latestDetectionSnapshot = DetectionSnapshot.empty()",
-        ).forEach { assertTrue(it, disable.indexOf(it) > guard) }
-        assertTrue(disable.contains("detectorExecutor.execute { detector.close() }"))
-        assertTrue(disable.contains("runtimeObstacleDetectionCapabilityOverride = false"))
-        assertTrue(disable.contains("metricDistanceCapabilityOverride = false"))
-        assertTrue(disable.contains(
+        listOf("detector = NoopAndroidFrameDetector()", "loadGeneration += 1L", "available = false")
+            .forEach { assertTrue(it, nativeDisable.indexOf(it) > guard) }
+        assertTrue(nativeDisable.indexOf("commit()") > nativeDisable.indexOf("available = false"))
+        assertTrue(disable.contains("detector.disableUnverified(instance) {"))
+        assertTrue(disable.contains("loadReason = RunningDetectorReadiness.SAMPLE_INFERENCE_UNVERIFIED_REASON"))
+        assertTrue(disable.contains("frame().clearDetectionSnapshot()"))
+        val frameOwner = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/frame/FrameSynthesisController.kt").readText()
+        assertTrue(MainActivityRefactorSource.member(frameOwner, "clearDetectionSnapshot").contains("latestDetectionSnapshot = DetectionSnapshot.empty()"))
+        assertTrue(disable.contains("detector.nativeLane.execute { platform.close(instance) }"))
+        assertTrue(binding.contains("runtimeObstacleDetectionCapabilityOverride = false"))
+        assertTrue(binding.contains("runtimeMetricSession.restoreCapability(false)"))
+        assertTrue(binding.contains(
             "walkSessionLifecycle.snapshot().state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)",
         ))
-        assertTrue(disable.contains("if (walking) enterWalkSessionSafetyStopAndCancelOutputs(\"detector_runtime_failed\")"))
-        assertTrue(disable.contains("RunningDetectorReadiness.WALK_BLOCK_NOTICE_KO"))
-        assertTrue(disable.contains("maybeContinuePostLoginDeviceCheck()"))
+        assertTrue(disable.contains("if (walking) failureEffects.enterSafetyStop()"))
+        assertTrue(binding.contains("RunningDetectorReadiness.WALK_BLOCK_NOTICE_KO"))
+        assertTrue(disable.contains("preparation.modelVerified()"))
         // The existing device re-check reloads a detector that is unavailable and not closing.
-        val primary = functionBlock("private fun handlePostLoginDeviceCheckPrimaryAction()")
-        assertTrue(primary.contains("if (!detectorAvailable && !detectorClosing) detectorLoadAttempted = false"))
+        val primary = MainActivityRefactorSource.function(source, "private fun handlePostLoginDeviceCheckPrimaryAction()")
+        val retry = MainActivityRefactorSource.member(owner, "allowLoadRetryIfUnavailable")
+        assertTrue(primary.contains("effects.prepareDetectorRetry()"))
+        assertTrue(MainActivityRefactorSource.member(source, "createPostLoginDeviceCheckController").contains("primaryDetectorLifecycleController.allowLoadRetryIfUnavailable()"))
+        assertTrue(retry.contains("!detector.projection().available && !detector.projection().closing && !loadInFlight"))
+        assertTrue(retry.contains("loadAttempted = false"))
     }
 
     @Test
     fun deviceCheckWalkEntryAndCameraReasonUseTheVerificationState() {
-        val observation = functionBlock("private fun currentPostLoginDeviceCheckObservation()")
+        val observation = MainActivityRefactorSource.function(source, "private fun currentPostLoginDeviceCheckObservation()")
+        val deviceBinding = MainActivityRefactorSource.member(source, "createPostLoginDeviceCheckController")
+        val lifecycle = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/primary/PrimaryDetectorLifecycleController.kt").readText()
         val row = observation.substringAfter("detector = when {").substringBefore("cameraPipeline = cameraPipeline,")
-        assertTrue(row.contains("!detectorLoadAttempted -> PostLoginDeviceCheckSignal.PENDING"))
-        assertTrue(row.contains(
-            "kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness.deviceCheckSignal(\n" +
-                "                        runningDetectorVerification.state(frameDetector),",
-        ))
-        assertTrue(!row.contains("detectorConfigLoaded && detectorAvailable -> PostLoginDeviceCheckSignal.READY"))
+        assertTrue(row.contains("!detector.loadAttempted || detector.loadInFlight -> PostLoginDeviceCheckSignal.PENDING"))
+        assertTrue(row.contains("detector.configLoaded && detector.available -> detector.readiness"))
+        assertTrue(deviceBinding.contains("RunningDetectorReadiness.deviceCheckSignal(primaryDetectorLifecycleController.verificationState(primaryDetectorOwner.projection().detector))"))
+        assertTrue(MainActivityRefactorSource.member(lifecycle, "verificationState").contains("verification.state(instance)"))
+        assertTrue(!row.contains("detector.configLoaded && detector.available -> PostLoginDeviceCheckSignal.READY"))
 
-        val block = functionBlock("private fun walkSessionReadinessBlockReason(")
-        val entry = block.indexOf("if (runningDetectorBlocksWalkEntry()) {")
-        assertTrue(entry >= 0 && entry < block.indexOf("if (!cameraAnalysisFeaturesEnabled()) {"))
+        val block = MainActivityRefactorSource.function(source, "private fun walkSessionReadinessBlockReason(")
+        val readinessBinding = MainActivityRefactorSource.composition(source, "walkReadinessBlockController")
+        val entry = block.indexOf("if (sources.runningDetectorBlocksEntry()) {")
+        assertTrue(entry >= 0 && entry < block.indexOf("if (!sources.cameraEnabled()) {"))
         assertTrue(block.contains("return kr.co.hanium.dreamup.walksafe.device.RunningDetectorReadiness.WALK_BLOCK_NOTICE_KO"))
-        val helper = functionBlock("private fun runningDetectorBlocksWalkEntry()")
-        assertTrue(helper.contains("runningDetectorVerification.state(frameDetector), detectorAvailable, detectorLoadReason,"))
+        val helper = MainActivityRefactorSource.member(lifecycle, "blocksWalkEntry")
+        assertTrue(helper.contains("verification.state(detector.projection().detector),\n        detector.projection().available, loadReason"))
 
+        assertTrue(readinessBinding.contains("override fun runningDetectorBlocksEntry() = runningDetectorBlocksWalkEntry()"))
         val reasons = source.substringAfter("val cameraReason = when {").substringBefore("else -> null")
         assertTrue(reasons.indexOf("runningDetectorBlocksWalkEntry() ->") in
             0 until reasons.indexOf("!cameraAnalysisFeaturesEnabled() ->"))
@@ -93,7 +115,16 @@ class MainActivityRunningDetectorVerificationFailureStaticTest {
 
     @Test
     fun theOutputGateGenerationIsVolatile() {
-        assertEquals(1, Regex("""@Volatile\n    private var detectorLoadGeneration = 0L""").findAll(source).count())
+        val owner = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/primary/PrimaryDetectorExecutionOwner.kt").readText()
+        val compositionSource = File("src/main/java/kr/co/hanium/dreamup/walksafe/runtime/vision/composition/VisionPrimaryComposition.kt").readText()
+        assertTrue(MainActivityRefactorSource.property(source, "primaryDetectorOwner").contains("by visionPrimaryComposition.detector"))
+        assertTrue(MainActivityRefactorSource.property(source, "visionPrimaryComposition").contains("createVisionPrimaryComposition()"))
+        assertTrue(MainActivityRefactorSource.member(source, "createVisionPrimaryComposition").contains("VisionPrimaryComposition("))
+        assertTrue(MainActivityRefactorSource.member(source, "createVisionPrimaryComposition").contains("{ frameStateLock }, SystemClock::elapsedRealtime"))
+        val actualDetector = MainActivityRefactorSource.property(compositionSource, "detector")
+        assertTrue(actualDetector.contains("Lazy<PrimaryDetectorExecutionOwner> = lazy"))
+        assertTrue(actualDetector.contains("PrimaryDetectorExecutionOwner(stateLock = frameLock()"))
+        assertEquals(1, Regex("""@Volatile\s+private var loadGeneration = 0L""").findAll(owner).count())
     }
 
     private fun functionBlock(signature: String): String {
