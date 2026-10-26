@@ -75,6 +75,24 @@ test("401 is denied, while all other Backend responses are unavailable", async (
   }
 });
 
+for (const cancellation of ["rejected", "pending"] as const) {
+  test(`status-only account check discards bodies even when cancellation is ${cancellation}`, { timeout: 1_000 }, async () => {
+    for (const status of [401, 503, 200]) {
+      let cancelled = 0;
+      const body = new ReadableStream<Uint8Array>({
+        cancel() {
+          cancelled++;
+          return cancellation === "rejected" ? Promise.reject(new Error("private cleanup failure"))
+            : new Promise<void>(() => undefined);
+        }
+      });
+      const result = await checkBackendAccountSessionCurrent(BINDING, async () => new Response(body, { status }));
+      assert.equal(result, status === 401 ? "denied" : "unavailable");
+      assert.equal(cancelled, 1);
+    }
+  });
+}
+
 test("network failure and timeout are unavailable", async () => {
   const networkFailure: GatewayFetch = async () => {
     throw new Error("network unavailable");

@@ -117,6 +117,118 @@ class SpeechPriorityDeviceTest {
     @Test(timeout=90_000) fun nativeDuckingFocusLossFailsOnceAndExplicitReplayCompletes() =
         verifyNativeFocusLoss(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
 
+    /** Synthetic, explicitly labelled distance: tests native sequencing, never sensor accuracy. */
+    @Test(timeout=90_000) fun nativeStopFinishesBeforeFreshDistanceAndCompletesWarningOnlyOnce() {
+        val a=ready();val warning=Terminal();val reads=AtomicInteger()
+        val events=mutableListOf<SpeechOutputEvent>();var latest="old fixture"
+        var delivered:String?=null
+        try {
+            main {
+                a.speechOutputListener={events+=it}
+                assertEquals(NavigationSpeechDispatchResult.ACCEPTED,a.emit(
+                    distanceTestWarning(),warning::complete,warning::fail,{true},warning::cancel,
+                    distanceAfterWarning={
+                        assertEquals(1,warning.done.get());reads.incrementAndGet();delivered=latest
+                        ObstacleDistanceSpeech(latest,SystemClock.elapsedRealtime()+15_000){true}
+                    }).speech)
+            }
+            await("Native STOP must start before distance is read"){main{engine(a).isSpeaking&&started(a,"risk")}}
+            main {
+                assertEquals(0,reads.get());warning.assertCounts(0,0,0)
+                latest="거리 안내 순서 시험입니다. 이 숫자는 측정값이 아닙니다. 약 일 점 이 미터입니다."
+            }
+            await("Native warning and distance must both finish",45_000){main{events.count{it.kind==SpeechOutputKind.RISK&&it.outcome==SpeechOutputOutcome.DONE}==2}}
+            main {
+                warning.assertCounts(1,0,0);assertEquals(1,reads.get());assertEquals(latest,delivered)
+                val sequence=events.filter{it.kind==SpeechOutputKind.RISK&&it.outcome in setOf(SpeechOutputOutcome.STARTED,SpeechOutputOutcome.DONE)}
+                assertEquals(listOf(SpeechOutputOutcome.STARTED,SpeechOutputOutcome.DONE,SpeechOutputOutcome.STARTED,SpeechOutputOutcome.DONE),sequence.map{it.outcome})
+                assertTrue(sequence.zipWithNext().all{(x,y)->x.atElapsedRealtimeMs<=y.atElapsedRealtimeMs})
+                assertFalse(a.isAppSpeechActive())
+            }
+            report("native_stop_then_distance=true fresh_provider_after_warning_done=true warning_done_once=true synthetic_range=true distance_accuracy_and_human_audibility=NOT_TESTED")
+        } finally {main{a.close()}}
+    }
+
+    @Test(timeout=90_000) fun nativeDistanceYieldsToNewStop() = verifyDistancePreemption(MessageLevel.STOP)
+    @Test(timeout=90_000) fun nativeDistanceYieldsToNewWarning() = verifyDistancePreemption(MessageLevel.WARNING)
+
+    private fun verifyDistancePreemption(level:MessageLevel) {
+        val a=ready();val warning=Terminal();val replacement=Terminal();val suppressed=Terminal()
+        val events=mutableListOf<SpeechOutputEvent>()
+        try {
+            main {
+                a.speechOutputListener={events+=it}
+                assertEquals(NavigationSpeechDispatchResult.ACCEPTED,a.emit(
+                    distanceTestWarning(),warning::complete,warning::fail,{true},warning::cancel,
+                    distanceAfterWarning={ObstacleDistanceSpeech(
+                        "거리 후속 설명 중단 시험입니다. 실제 측정값이 아닙니다. ".repeat(8),
+                        SystemClock.elapsedRealtime()+15_000){true}}).speech)
+            }
+            await("Native distance must be speaking",25_000){main{
+                warning.done.get()==1&&engine(a).isSpeaking&&events.count{it.kind==SpeechOutputKind.RISK&&it.outcome==SpeechOutputOutcome.STARTED}==2
+            }}
+            main {
+                assertEquals(NavigationSpeechDispatchResult.SUPPRESSED,interaction(a,"사용자 응답 시험",suppressed))
+                assertEquals(NavigationSpeechDispatchResult.SUPPRESSED,navigation(a,"경로 안내 시험",suppressed))
+                assertEquals(NavigationSpeechDispatchResult.ACCEPTED,a.emit(
+                    FeedbackAction("replacement","새 경고 우선순위 시험입니다. 실제 이동 지시가 아닙니다.",level,null,"replacement-fixture"),
+                    replacement::complete,replacement::fail,{true},replacement::cancel).speech)
+                a.cancelCommandInteraction();assertFalse(a.cancelNavigationSpeech())
+            }
+            await("New risk must complete despite stale lower-priority cancellation",25_000){replacement.done.get()==1}
+            main {
+                warning.assertCounts(1,0,0);replacement.assertCounts(1,0,0);suppressed.assertCounts(0,0,0)
+                assertEquals(3,events.count{it.kind==SpeechOutputKind.RISK&&it.outcome==SpeechOutputOutcome.STARTED})
+                assertEquals(2,events.count{it.kind==SpeechOutputKind.RISK&&it.outcome==SpeechOutputOutcome.DONE})
+                assertTrue(events.any{it.outcome==SpeechOutputOutcome.CANCELLED_BY_PRIORITY})
+                assertFalse(a.isAppSpeechActive())
+            }
+            report("native_distance_preempted_by=$level lower_priority_suppressed=true stale_cancel_safe=true warning_done_once=true synthetic_evidence=true")
+        } finally {main{a.close()}}
+    }
+
+    @Test(timeout=90_000) fun nativeExpiredDistanceDoesNotStartAfterStop() = verifyInvalidDistance(true)
+    @Test(timeout=90_000) fun nativeRetiredTargetDistanceDoesNotStartAfterStop() = verifyInvalidDistance(false)
+
+    private fun verifyInvalidDistance(expired:Boolean) {
+        val a=ready();val warning=Terminal();val events=mutableListOf<SpeechOutputEvent>();val reads=AtomicInteger()
+        try {
+            main {
+                a.speechOutputListener={events+=it}
+                assertEquals(NavigationSpeechDispatchResult.ACCEPTED,a.emit(
+                    distanceTestWarning(),warning::complete,warning::fail,{true},warning::cancel,
+                    distanceAfterWarning={reads.incrementAndGet();ObstacleDistanceSpeech("재생되면 안 되는 시험 거리입니다.",
+                        SystemClock.elapsedRealtime()+(if(expired)-1 else 15_000)){expired}}).speech)
+            }
+            await("Actual warning must finish",25_000){warning.done.get()==1}
+            Thread.sleep(2_000)
+            main {
+                warning.assertCounts(1,0,0);assertEquals(1,reads.get())
+                assertEquals(1,events.count{it.kind==SpeechOutputKind.RISK&&it.outcome==SpeechOutputOutcome.STARTED})
+                assertEquals(1,events.count{it.kind==SpeechOutputKind.RISK&&it.outcome==SpeechOutputOutcome.DONE})
+                assertFalse(a.isAppSpeechActive())
+            }
+            report("native_invalid_distance_expired=$expired retired_target=${!expired} only_warning_started=true observation_after_done_ms=2000 synthetic_validity=true")
+        } finally {main{a.close()}}
+    }
+
+    @Test(timeout=90_000) fun closingNativeWarningNeverRunsItsDistanceProvider() {
+        val a=ready();val warning=Terminal();val reads=AtomicInteger()
+        try {
+            main { assertEquals(NavigationSpeechDispatchResult.ACCEPTED,a.emit(
+                distanceTestWarning(),warning::complete,warning::fail,{true},warning::cancel,
+                distanceAfterWarning={reads.incrementAndGet();ObstacleDistanceSpeech("금지된 후속 시험",Long.MAX_VALUE){true}}).speech) }
+            await("Warning must actually start before owner closes"){main{engine(a).isSpeaking&&started(a,"risk")}}
+            main{a.close()};Thread.sleep(2_000)
+            main{warning.assertCounts(0,0,0);assertEquals(0,reads.get());assertFalse(a.isAppSpeechActive())}
+            report("native_warning_owner_closed=true distance_provider_calls=0 old_completion=0 observation_ms=2000")
+        } finally {main{a.close()}}
+    }
+
+    private fun distanceTestWarning()=FeedbackAction("distance-test-stop",
+        "멈추세요. 음성 순서를 확인하는 시험입니다. 실제 장애물 감지가 아닙니다.",
+        MessageLevel.STOP,null,"distance-test-fixture")
+
     private fun verifyNativeFocusLoss(gain:Int) {
         val a=ready();val interrupted=Terminal();val replay=Terminal()
         val focusLost=AtomicInteger()

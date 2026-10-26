@@ -800,145 +800,157 @@ class RawCollectionRuntimeCoordinator private constructor(
                 val plaintextChunks = mutableListOf<RawPlaintextChunk>()
                 var localWork = true
                 try {
-                    if (!isLeaseCurrent(lease, contextProvider())) {
-                        return@execute RawCollectionUploadOutcome.CANCELLED
-                    }
-                    if (localManifest.uploadDisposition == RawUploadDisposition.ACKNOWLEDGED) {
-                        return@execute synchronized(this) {
+                    // Applying an HTTP rejection can fail in local storage too. Keep that
+                    // work inside the same failure boundary as receipt persistence.
+                    try {
+                        if (!isLeaseCurrent(lease, contextProvider())) {
+                            return@execute RawCollectionUploadOutcome.CANCELLED
+                        }
+                        if (localManifest.uploadDisposition == RawUploadDisposition.ACKNOWLEDGED) {
+                            return@execute synchronized(this) {
+                                if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
+                                    RawCollectionUploadOutcome.CANCELLED
+                                } else if (store.deleteAcknowledged(lease.owner, localManifest.collectionId)) {
+                                    RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT
+                                } else RawCollectionUploadOutcome.ACKNOWLEDGED_PURGE_PENDING
+                            }
+                        }
+                        uploadBindings.forEach { binding ->
+                            val chunk = store.readUploadChunk(
+                                collectionId = localManifest.collectionId,
+                                owner = lease.owner,
+                                ordinal = binding.localOrdinal,
+                            ) ?: return@execute RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                            if (
+                                chunk.metadata.sizeBytes != binding.sizeBytes ||
+                                chunk.metadata.sha256 != binding.sha256
+                            ) {
+                                chunk.plaintext.fill(0)
+                                return@execute RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                            }
+                            plaintextChunks += chunk
+                        }
+                        localWork = false
+                        val uploadCall = client.uploadCall(
+                            session = lease.session,
+                            // The segment's own (earlier, continued) receipt is sent unchanged; the
+                            // server verifies RAW continuity from it (16-17 #14).
+                            consent = boundConsentView(lease.confirmation, localManifest.consentReceiptSha256),
+                            networkBinding = lease.networkBinding,
+                            localManifest = localManifest,
+                            backendManifest = backendManifest,
+                            chunks = plaintextChunks,
+                            isCurrent = {
+                                !outer.isCancelled() && isLeaseCurrent(lease, contextProvider())
+                            },
+                        )
+                        nested.set(uploadCall)
+                        if (
+                            outer.isCancelled() ||
+                            !isLeaseCurrent(lease, contextProvider())
+                        ) {
+                            nested.compareAndSet(uploadCall, null)
+                            uploadCall.cancel()
+                            return@execute RawCollectionUploadOutcome.CANCELLED
+                        }
+                        val receipt = uploadCall.execute()
+                        localWork = true
+                        nested.compareAndSet(uploadCall, null)
+                        if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
+                            return@execute RawCollectionUploadOutcome.CANCELLED
+                        }
+                        synchronized(this) {
                             if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
                                 RawCollectionUploadOutcome.CANCELLED
-                            } else if (store.deleteAcknowledged(lease.owner, localManifest.collectionId)) {
-                                RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT
-                            } else RawCollectionUploadOutcome.ACKNOWLEDGED_PURGE_PENDING
+                            } else when (store.completeAfterReceipt(lease.owner, receipt)) {
+                                RawReceiptCompletion.DELETED ->
+                                    RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT
+                                RawReceiptCompletion.INVALID_RECEIPT ->
+                                    RawCollectionUploadOutcome.RECEIPT_REJECTED
+                                RawReceiptCompletion.ACKNOWLEDGED_PURGE_PENDING ->
+                                    RawCollectionUploadOutcome.ACKNOWLEDGED_PURGE_PENDING
+                            }
                         }
-                    }
-                    uploadBindings.forEach { binding ->
-                        val chunk = store.readUploadChunk(
-                            collectionId = localManifest.collectionId,
-                            owner = lease.owner,
-                            ordinal = binding.localOrdinal,
-                        ) ?: return@execute RawCollectionUploadOutcome.LOCAL_READ_FAILED
-                        if (
-                            chunk.metadata.sizeBytes != binding.sizeBytes ||
-                            chunk.metadata.sha256 != binding.sha256
-                        ) {
-                            chunk.plaintext.fill(0)
-                            return@execute RawCollectionUploadOutcome.LOCAL_READ_FAILED
-                        }
-                        plaintextChunks += chunk
-                    }
-                    localWork = false
-                    val uploadCall = client.uploadCall(
-                        session = lease.session,
-                        // The segment's own (earlier, continued) receipt is sent unchanged; the
-                        // server verifies RAW continuity from it (16-17 #14).
-                        consent = boundConsentView(lease.confirmation, localManifest.consentReceiptSha256),
-                        networkBinding = lease.networkBinding,
-                        localManifest = localManifest,
-                        backendManifest = backendManifest,
-                        chunks = plaintextChunks,
-                        isCurrent = {
-                            !outer.isCancelled() && isLeaseCurrent(lease, contextProvider())
-                        },
-                    )
-                    nested.set(uploadCall)
-                    if (
-                        outer.isCancelled() ||
-                        !isLeaseCurrent(lease, contextProvider())
-                    ) {
-                        nested.compareAndSet(uploadCall, null)
-                        uploadCall.cancel()
-                        return@execute RawCollectionUploadOutcome.CANCELLED
-                    }
-                    val receipt = uploadCall.execute()
-                    localWork = true
-                    nested.compareAndSet(uploadCall, null)
-                    if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
-                        return@execute RawCollectionUploadOutcome.CANCELLED
-                    }
-                    synchronized(this) {
+                    } catch (error: RawCollectionHttpException) {
+                        localWork = true
                         if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
                             RawCollectionUploadOutcome.CANCELLED
-                        } else when (store.completeAfterReceipt(lease.owner, receipt)) {
-                            RawReceiptCompletion.DELETED ->
-                                RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT
-                            RawReceiptCompletion.INVALID_RECEIPT ->
-                                RawCollectionUploadOutcome.RECEIPT_REJECTED
-                            RawReceiptCompletion.ACKNOWLEDGED_PURGE_PENDING ->
-                                RawCollectionUploadOutcome.ACKNOWLEDGED_PURGE_PENDING
+                        } else when (error.statusCode) {
+                            400, 413, 415, 422 -> if (store.quarantine(lease.owner, localManifest.collectionId)) {
+                                RawCollectionUploadOutcome.QUARANTINED
+                            } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                            401, 403 -> RawCollectionUploadOutcome.AUTHORITY_BLOCKED
+                            409 -> when (rawErrorCode(error.errorBody)) {
+                                in RAW_CONSENT_REJECTION_CODES -> {
+                                    // S1617-18-F1: the server will not accept this consent binding; the
+                                    // segment is deleted instead of holding the queue until it expires.
+                                    if (store.discardConsentRejected(lease.owner, localManifest.collectionId)) {
+                                        RawCollectionUploadOutcome.CONSENT_REJECTED
+                                    } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                                }
+                                RAW_WALK_NOT_UPLOADABLE_CODE -> {
+                                    // Owner decision 3(b): the Gateway will never accept this walk, so it
+                                    // must not hold the queue either (transfer-F8: its own marker).
+                                    if (store.discardWalkRejected(lease.owner, localManifest.collectionId)) {
+                                        RawCollectionUploadOutcome.WALK_REJECTED
+                                    } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
+                                }
+                                // transfer-F7: kept; the caller retries once after the Gateway lease TTL.
+                                RAW_WALK_IN_PROGRESS_CODE -> RawCollectionUploadOutcome.WALK_IN_PROGRESS
+                                // The rest: kept for a later try.
+                                else -> RawCollectionUploadOutcome.RETRYABLE_FAILURE
+                            }
+                            503 -> if (rawErrorCode(error.errorBody) == RAW_INGEST_DISABLED_CODE) {
+                                // A server setting, not a transient failure: stop until the next
+                                // process start instead of retrying on every recheck (16-17 #60).
+                                serverIngestDisabled = true
+                                RawCollectionUploadOutcome.SERVER_DISABLED
+                            } else RawCollectionUploadOutcome.RETRYABLE_FAILURE
+                            else -> RawCollectionUploadOutcome.RETRYABLE_FAILURE
+                        }.also { outcome ->
+                            if (outcome == RawCollectionUploadOutcome.RETRYABLE_FAILURE ||
+                                outcome == RawCollectionUploadOutcome.WALK_IN_PROGRESS) {
+                                kr.co.hanium.dreamup.walksafe.network.parseHttpRetryAfterMs(error.retryAfterHeader)
+                                    ?.takeIf { it > 0L }?.let { delay ->
+                                        synchronized(this) {
+                                            retryOwner = lease.owner
+                                            val now = elapsedRealtimeMs().coerceAtLeast(0L)
+                                            retryNotBeforeElapsedMs = now + delay.coerceAtMost(Long.MAX_VALUE - now)
+                                        }
+                                    }
+                            }
+                            when (outcome) {
+                                RawCollectionUploadOutcome.CANCELLED -> Unit
+                                RawCollectionUploadOutcome.SERVER_DISABLED -> outcomeCounters.record(
+                                    RawCollectionOutcomeCounter.UPLOAD_SERVER_DISABLED,
+                                )
+                                RawCollectionUploadOutcome.WALK_REJECTED -> outcomeCounters.record(
+                                    RawCollectionOutcomeCounter.UPLOAD_WALK_REJECTED,
+                                )
+                                else -> outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
+                            }
                         }
                     }
                 } catch (_: CancellationException) {
                     RawCollectionUploadOutcome.CANCELLED
-                } catch (error: RawCollectionHttpException) {
-                    if (outer.isCancelled() || !isLeaseCurrent(lease, contextProvider())) {
-                        RawCollectionUploadOutcome.CANCELLED
-                    } else when (error.statusCode) {
-                        400, 413, 415, 422 -> if (store.quarantine(lease.owner, localManifest.collectionId)) {
-                            RawCollectionUploadOutcome.QUARANTINED
-                        } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
-                        401, 403 -> RawCollectionUploadOutcome.AUTHORITY_BLOCKED
-                        409 -> when (rawErrorCode(error.errorBody)) {
-                            in RAW_CONSENT_REJECTION_CODES -> {
-                                // S1617-18-F1: the server will not accept this consent binding; the
-                                // segment is deleted instead of holding the queue until it expires.
-                                if (store.discardConsentRejected(lease.owner, localManifest.collectionId)) {
-                                    RawCollectionUploadOutcome.CONSENT_REJECTED
-                                } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
-                            }
-                            RAW_WALK_NOT_UPLOADABLE_CODE -> {
-                                // Owner decision 3(b): the Gateway will never accept this walk, so it
-                                // must not hold the queue either (transfer-F8: its own marker).
-                                if (store.discardWalkRejected(lease.owner, localManifest.collectionId)) {
-                                    RawCollectionUploadOutcome.WALK_REJECTED
-                                } else RawCollectionUploadOutcome.LOCAL_READ_FAILED
-                            }
-                            // transfer-F7: kept; the caller retries once after the Gateway lease TTL.
-                            RAW_WALK_IN_PROGRESS_CODE -> RawCollectionUploadOutcome.WALK_IN_PROGRESS
-                            // The rest: kept for a later try.
-                            else -> RawCollectionUploadOutcome.RETRYABLE_FAILURE
-                        }
-                        503 -> if (rawErrorCode(error.errorBody) == RAW_INGEST_DISABLED_CODE) {
-                            // A server setting, not a transient failure: stop until the next
-                            // process start instead of retrying on every recheck (16-17 #60).
-                            serverIngestDisabled = true
-                            RawCollectionUploadOutcome.SERVER_DISABLED
-                        } else RawCollectionUploadOutcome.RETRYABLE_FAILURE
-                        else -> RawCollectionUploadOutcome.RETRYABLE_FAILURE
-                    }.also { outcome ->
-                        if (outcome == RawCollectionUploadOutcome.RETRYABLE_FAILURE ||
-                            outcome == RawCollectionUploadOutcome.WALK_IN_PROGRESS) {
-                            kr.co.hanium.dreamup.walksafe.network.parseHttpRetryAfterMs(error.retryAfterHeader)
-                                ?.takeIf { it > 0L }?.let { delay ->
-                                    synchronized(this) {
-                                        retryOwner = lease.owner
-                                        val now = elapsedRealtimeMs().coerceAtLeast(0L)
-                                        retryNotBeforeElapsedMs = now + delay.coerceAtMost(Long.MAX_VALUE - now)
-                                    }
-                                }
-                        }
-                        when (outcome) {
-                            RawCollectionUploadOutcome.CANCELLED -> Unit
-                            RawCollectionUploadOutcome.SERVER_DISABLED -> outcomeCounters.record(
-                                RawCollectionOutcomeCounter.UPLOAD_SERVER_DISABLED,
-                            )
-                            RawCollectionUploadOutcome.WALK_REJECTED -> outcomeCounters.record(
-                                RawCollectionOutcomeCounter.UPLOAD_WALK_REJECTED,
-                            )
-                            else -> outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
-                        }
-                    }
                 } catch (_: RawCollectionProtocolException) {
-                    outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
-                    RawCollectionUploadOutcome.RECEIPT_REJECTED
-                } catch (_: java.io.IOException) {
-                    if (outer.isCancelled()) RawCollectionUploadOutcome.CANCELLED
-                    else RawCollectionUploadOutcome.RETRYABLE_FAILURE.also {
+                    if (outer.isCancelled() || !isLeaseContextCurrent(lease, contextProvider())) {
+                        RawCollectionUploadOutcome.CANCELLED
+                    } else {
                         outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
+                        RawCollectionUploadOutcome.RECEIPT_REJECTED
+                    }
+                } catch (_: java.io.IOException) {
+                    if (outer.isCancelled() || !isLeaseContextCurrent(lease, contextProvider())) {
+                        RawCollectionUploadOutcome.CANCELLED
+                    } else {
+                        outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
+                        RawCollectionUploadOutcome.RETRYABLE_FAILURE
                     }
                 } catch (_: RuntimeException) {
-                    if (outer.isCancelled()) RawCollectionUploadOutcome.CANCELLED
-                    else {
+                    if (outer.isCancelled() || !isLeaseContextCurrent(lease, contextProvider())) {
+                        RawCollectionUploadOutcome.CANCELLED
+                    } else {
                         outcomeCounters.record(RawCollectionOutcomeCounter.UPLOAD_FAILED)
                         if (localWork) RawCollectionUploadOutcome.LOCAL_READ_FAILED
                         else RawCollectionUploadOutcome.RETRYABLE_FAILURE

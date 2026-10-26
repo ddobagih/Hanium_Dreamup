@@ -1,5 +1,6 @@
 /** Driven by the opt-in Postgres test; authentication responses use real HTTP. */
 import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -14,7 +15,10 @@ import {
   type IntegratedConsentConfirmation
 } from "../src/integrated-consent.js";
 import { createGatewayServer } from "../src/node-adapter.js";
-import { REPORT_PURPOSE_HEADER } from "../src/routes.js";
+import {
+  REPORT_ID_HEADER, REPORT_PAYLOAD_BYTES_HEADER,
+  REPORT_PAYLOAD_SHA256_HEADER, REPORT_PURPOSE_HEADER
+} from "../src/routes.js";
 import { configureTestStateEncryption } from "./state-encryption-fixture.js";
 
 const backendOrigin = new URL(process.env.EPOCH_TEST_BACKEND_ORIGIN!);
@@ -112,15 +116,31 @@ async function exercise(cookie: string, consentHeaders: HeadersInit): Promise<nu
       destination: { latitude: 37.567, longitude: 126.979 }
     })
   });
-  await walking.text();
+  const walkingBody = await walking.text();
   const form = new FormData();
-  form.set("metadata", JSON.stringify({ source: "android", auto_reported: false }));
-  form.set("image", new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: "image/jpeg" }), "report.jpg");
+  const metadata = JSON.stringify({ source: "android", auto_reported: false });
+  const image = new Uint8Array([0xff, 0xd8, 0xff]);
+  const reportId = randomUUID();
+  const metadataLength = Buffer.alloc(8);
+  metadataLength.writeBigUInt64BE(BigInt(Buffer.byteLength(metadata)));
+  const imageLength = Buffer.alloc(8);
+  imageLength.writeBigUInt64BE(BigInt(image.byteLength));
+  const payloadSha256 = createHash("sha256").update("walksafe-report-payload-v1\0")
+    .update(reportId).update(metadataLength).update(metadata).update(imageLength).update(image).digest("hex");
+  form.set("metadata", metadata);
+  form.set("image", new Blob([image], { type: "image/jpeg" }), "report.jpg");
   const report = await gatewayFetch("/api/reports/v2", {
-    method: "POST", headers: { cookie, ...Object.fromEntries(new Headers(consentHeaders)) }, body: form
+    method: "POST", headers: {
+      cookie, ...Object.fromEntries(new Headers(consentHeaders)),
+      [REPORT_ID_HEADER]: reportId,
+      [REPORT_PAYLOAD_SHA256_HEADER]: payloadSha256,
+      [REPORT_PAYLOAD_BYTES_HEADER]: String(Buffer.byteLength(metadata) + image.byteLength)
+    }, body: form
   });
-  await report.text();
+  const reportBody = await report.text();
   for (const response of [walking, report]) assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.ok([200, 401].includes(walking.status), `walking ${walking.status}: ${walkingBody}`);
+  assert.ok([201, 401].includes(report.status), `report ${report.status}: ${reportBody}`);
   return [walking.status, report.status];
 }
 function localEpoch(cookie: string): number | null {

@@ -2,8 +2,6 @@ package kr.co.hanium.dreamup.walksafe.network
 
 // Exchanges named field credentials for the release gateway's scoped session cookie.
 
-import java.io.ByteArrayOutputStream
-import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
@@ -748,7 +746,7 @@ class GatewayFieldSessionClient(
             )
         }
         if (login.statusCode == 200) {
-            val scopeResponse = runCatching { JSONObject(login.responseBody) }.getOrNull()
+            val scopeResponse = login.strictSessionJsonOrNull()
             if (
                 scopeResponse?.optString("session_mode") == "long_lived" ||
                 scopeResponse?.has("refresh_token") == true
@@ -780,7 +778,7 @@ class GatewayFieldSessionClient(
         val cookieHeaders = mapOf(GatewayFieldSession.COOKIE_HEADER to parsedCookie.cookiePair)
         val status = transport.get(endpoint, cookieHeaders)
         if (status.statusCode !in 200..299) throw status.toSessionException("gateway_status_failed")
-        val statusJson = runCatching { JSONObject(status.responseBody) }.getOrNull()
+        val statusJson = status.strictSessionJsonOrNull()
             ?: throw GatewaySessionHttpException(statusCode = 0, reason = "invalid_gateway_status")
         if (
             !statusJson.optBoolean("required", false) ||
@@ -855,8 +853,8 @@ class GatewayFieldSessionClient(
             throw login.toSessionException("account_password_login_failed")
         }
         if (enableLongLivedSession) {
-            val actor = runCatching { JSONObject(login.responseBody).strictStringOrNull("actor_id") }
-                .getOrNull()?.takeIf { BACKEND_ACCOUNT_ACTOR_ID.matches(it) }
+            val actor = login.strictSessionJsonOrNull()?.strictStringOrNull("actor_id")
+                ?.takeIf { BACKEND_ACCOUNT_ACTOR_ID.matches(it) }
                 ?: throw GatewaySessionHttpException(0, "gateway_actor_binding_failed")
             val session = parseLongLivedSession(
                 response = login, gatewayBaseUrl = approvedOrigin,
@@ -869,7 +867,7 @@ class GatewayFieldSessionClient(
             )
             try {
                 val status = transport.get(endpoint, session.requestHeaders(responseNowEpochMs))
-                val json = runCatching { JSONObject(status.responseBody) }.getOrNull()
+                val json = status.strictSessionJsonOrNull()
                 if (status.statusCode != 200 || json == null ||
                     json.strictStringOrNull("actor_id") != actor || !statusMatchesLease(json, session)
                 ) throw GatewaySessionHttpException(0, "gateway_actor_binding_failed")
@@ -880,7 +878,7 @@ class GatewayFieldSessionClient(
             }
             return session
         }
-        val loginJson = runCatching { JSONObject(login.responseBody) }.getOrNull()
+        val loginJson = login.strictSessionJsonOrNull()
         if (
             loginJson == null ||
             loginJson.jsonKeySet() != setOf("session_scope") ||
@@ -904,7 +902,7 @@ class GatewayFieldSessionClient(
             runCatching { transport.delete(endpoint, cookieHeaders) }
             throw status.toSessionException("gateway_status_failed")
         }
-        val statusJson = runCatching { JSONObject(status.responseBody) }.getOrNull()
+        val statusJson = status.strictSessionJsonOrNull()
         val actor = statusJson?.optString("actor_id")
         if (
             statusJson == null ||
@@ -952,7 +950,7 @@ class GatewayFieldSessionClient(
                 "gateway_backend_device_restore_unavailable",
             )
         }
-        val status = runCatching { JSONObject(response.responseBody) }.getOrNull()
+        val status = response.strictSessionJsonOrNull()
         if (response.statusCode in 200..299 && status == null) {
             throw GatewaySessionHttpException(
                 response.statusCode,
@@ -1127,7 +1125,7 @@ class GatewayFieldSessionClient(
                 "gateway_status_http_${response.statusCode}",
             )
         }
-        val statusJson = runCatching { JSONObject(response.responseBody) }.getOrNull()
+        val statusJson = response.strictSessionJsonOrNull()
             ?: return result(
                 GatewaySessionRevalidationStatus.PENDING,
                 "gateway_status_malformed",
@@ -1208,7 +1206,7 @@ class GatewayFieldSessionClient(
             ?.coerceIn(1L, MAX_RETRY_AFTER_MS / 1_000L)
             ?.times(1_000L)
         val serverCode = runCatching {
-            val response = JSONObject(responseBody)
+            val response = strictSessionJsonOrNull() ?: return@runCatching null
             val code = response.optJSONObject("detail")?.optString("code")
                 ?: response.optString("code")
             code
@@ -1233,7 +1231,7 @@ class GatewayFieldSessionClient(
         val unappliedCodes = CONFIRMED_UNAPPLIED_REFRESH_CODES[statusCode] ?: return null
         val retrySeconds = header("Retry-After")?.trim()?.toLongOrNull()
             ?.takeIf { it in 1L..MAX_RETRY_AFTER_MS / 1_000L } ?: return null
-        val body = runCatching { JSONObject(responseBody) }.getOrNull() ?: return null
+        val body = strictSessionJsonOrNull() ?: return null
         if (body.opt("code") !in unappliedCodes || body.opt("retryable") != true ||
             body.opt("reauthentication_required") == true || body.has("detail")
         ) return null
@@ -1270,7 +1268,7 @@ class GatewayFieldSessionClient(
         }
         val cookie = parseGatewayCookie(response.header("Set-Cookie"), requireSecure)
             ?: throw GatewaySessionHttpException(statusCode = 0, reason = "invalid_gateway_cookie")
-        val json = runCatching { JSONObject(response.responseBody) }.getOrNull()
+        val json = response.strictSessionJsonOrNull()
             ?: throw GatewaySessionHttpException(statusCode = 0, reason = "invalid_gateway_login_response")
         val responseFields = LONG_LIVED_SESSION_RESPONSE_FIELDS +
             if (requireBackendAccountGeneration) setOf("account_generation") else emptySet()
@@ -1571,6 +1569,11 @@ private fun parseGatewayCookie(
     return ParsedGatewayCookie("${GatewayFieldSession.COOKIE_NAME}=$value", maxAge)
 }
 
+private fun GatewayHttpResponse.strictSessionJsonOrNull(): JSONObject? = runCatching {
+    if (!strictJsonObjectDocument(responseBody)) return@runCatching null
+    JSONObject(responseBody)
+}.getOrNull()
+
 class HttpUrlConnectionGatewaySessionTransport(
     private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
 ) : GatewaySessionTransport {
@@ -1621,25 +1624,32 @@ class HttpUrlConnectionGatewaySessionTransport(
         body: ByteArray? = null,
     ): GatewayHttpResponse {
         val endpoint = URL(url)
-        val connection = openConnection(endpoint).apply {
-            requestMethod = method
-            connectTimeout = 8_000
-            // OTP: Gateway body + SMTP/DB + response + whole-handler margin is 65 s.
-            readTimeout = if (method == "POST" && endpoint.path == "/api/account-enrollments/email-otp") {
-                75_000
-            } else 12_000
-            instanceFollowRedirects = false
-            doInput = true
-            doOutput = body != null
-            headers.forEach(::setRequestProperty)
-        }
+        val connection = openConnection(endpoint)
         try {
+            connection.apply {
+                requestMethod = method
+                connectTimeout = 8_000
+                // OTP: Gateway body + SMTP/DB + response + whole-handler margin is 65 s.
+                readTimeout = if (method == "POST" && endpoint.path == "/api/account-enrollments/email-otp") {
+                    75_000
+                } else 12_000
+                instanceFollowRedirects = false
+                doInput = true
+                doOutput = body != null
+                headers.forEach(::setRequestProperty)
+                setRequestProperty("Accept-Encoding", "identity")
+            }
             if (body != null) connection.outputStream.use { it.write(body) }
-            val status = connection.responseCode
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val response = connection.readBoundedResponse(
+                MAX_RESPONSE_BYTES,
+                HttpConnectionCancellation(),
+                strictSuccessFraming = true,
+                // Error bodies also decide whether the one-use refresh proof may be retried.
+                strictErrorFraming = true,
+            )
             return GatewayHttpResponse(
-                statusCode = status,
-                responseBody = stream?.use { it.readBoundedText(MAX_RESPONSE_BYTES) }.orEmpty(),
+                statusCode = response.statusCode,
+                responseBody = response.body,
                 headers = connection.headerFields
                     .filterKeys { it != null }
                     .mapValues { (name, values) ->
@@ -1653,21 +1663,10 @@ class HttpUrlConnectionGatewaySessionTransport(
                     },
             )
         } finally {
-            connection.disconnect()
+            // Cleanup must not replace the received reply or the original transport failure.
+            runCatching { connection.disconnect() }
         }
     }
-}
-
-private fun InputStream.readBoundedText(maxBytes: Int): String {
-    val output = ByteArrayOutputStream()
-    val buffer = ByteArray(4_096)
-    while (true) {
-        val read = read(buffer)
-        if (read <= 0) break
-        if (output.size() + read > maxBytes) throw IllegalStateException("gateway response too large")
-        output.write(buffer, 0, read)
-    }
-    return output.toString(Charsets.UTF_8.name())
 }
 
 private fun sha256Hex(value: String): String {

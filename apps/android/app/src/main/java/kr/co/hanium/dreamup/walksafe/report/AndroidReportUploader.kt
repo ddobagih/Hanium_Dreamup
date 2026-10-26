@@ -19,6 +19,7 @@ import kr.co.hanium.dreamup.walksafe.network.cancellableHttpCall
 import kr.co.hanium.dreamup.walksafe.network.captureGatewayAuthenticationRequest
 import kr.co.hanium.dreamup.walksafe.network.consumeGatewayAuthenticationStaleResponse
 import kr.co.hanium.dreamup.walksafe.network.readBoundedResponse
+import kr.co.hanium.dreamup.walksafe.network.strictJsonObjectDocument
 import kr.co.hanium.dreamup.walksafe.session.IntegratedConsentConfirmation
 import org.json.JSONArray
 import org.json.JSONObject
@@ -60,6 +61,7 @@ internal fun parseQueuedUploadResultOrNull(
     body: String,
     report: QueuedReport,
 ): ReportQueueUploadResult? = runCatching {
+    require(strictJsonObjectDocument(body))
     val root = JSONObject(body)
     val outcome = root.creationOutcomeOrNull()
     require(outcome != ReportCreationOutcome.SUPPRESSED_BY_COOLDOWN)
@@ -80,6 +82,7 @@ internal fun parseQueuedStatusReceiptOrNull(
     body: String,
     report: QueuedReport,
 ): ReportQueueReceipt? = runCatching {
+    require(strictJsonObjectDocument(body))
     val root = JSONObject(body)
     require(root.keysAsSet() == REPORT_STATUS_FIELDS)
     require(root.getString("persistence_state") == "PERSISTED")
@@ -232,7 +235,10 @@ internal class AndroidReportUploader internal constructor() {
                 metadataSnapshot.fill(0)
                 imageSnapshot.fill(0)
             }
-            val response = connection.readBoundedResponse(REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation)
+            val response = connection.readBoundedResponse(
+                REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation,
+                strictSuccessFraming = true, strictErrorFraming = true,
+            )
             if (response.statusCode !in 200..299) {
                 val error = response.toUploadException(connection)
                 cancellation.throwIfCancelled()
@@ -273,7 +279,10 @@ internal class AndroidReportUploader internal constructor() {
                 "/api/reports/v2/${report.payload.reportId}/status",
             deadlineMs = REPORT_STATUS_DEADLINE_MS,
         ) { connection, cancellation ->
-            val response = connection.readBoundedResponse(REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation)
+            val response = connection.readBoundedResponse(
+                REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation,
+                strictSuccessFraming = true, strictErrorFraming = true,
+            )
             when (response.statusCode) {
                 404 -> null
                 in 200..299 -> parseQueuedStatusReceiptOrNull(response.body, report)
@@ -310,6 +319,7 @@ internal class AndroidReportUploader internal constructor() {
                 doInput = true
                 instanceFollowRedirects = false
                 setRequestProperty("Accept", "application/json")
+                setRequestProperty("Accept-Encoding", "identity")
                 setRequestProperty("Connection", "close")
                 setRequestProperty(REPORT_PURPOSE_HEADER, purpose.wireValue)
                 setRequestProperty(REPORT_ID_HEADER, report.payload.reportId)
@@ -329,7 +339,7 @@ internal class AndroidReportUploader internal constructor() {
             execute(connection, cancellation)
         } finally {
             cancellation.detach(connection)
-            connection.disconnect()
+            runCatching { connection.disconnect() }
         }
     }
 
@@ -388,6 +398,7 @@ internal class AndroidReportUploader internal constructor() {
                     doInput = true
                     instanceFollowRedirects = false
                     setRequestProperty("Accept", "application/json")
+                    setRequestProperty("Accept-Encoding", "identity")
                     setRequestProperty("Connection", "close")
                     setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
                     setRequestProperty(
@@ -430,7 +441,10 @@ internal class AndroidReportUploader internal constructor() {
                 } finally {
                     metadataUtf8.fill(0)
                 }
-                val response = connection.readBoundedResponse(REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation)
+                val response = connection.readBoundedResponse(
+                    REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation,
+                    strictSuccessFraming = true, strictErrorFraming = true,
+                )
                 if (response.statusCode !in 200..299) {
                     val error = ReportUploadHttpException(
                         ReportUploadError(
@@ -451,7 +465,7 @@ internal class AndroidReportUploader internal constructor() {
                     ?: throw ReportUploadProtocolException()
             } finally {
                 cancellation.detach(connection)
-                connection.disconnect()
+                runCatching { connection.disconnect() }
             }
         }.clearingOwnedReportImage(imageSnapshot)
     }
@@ -573,7 +587,7 @@ internal fun validatedReportUploadResponseOrNull(
     body: String,
     receiptExpectation: ReportUploadReceiptExpectation,
 ): ReportUploadResponse? {
-    if (statusCode !in 200..299 || body.isBlank()) return null
+    if (statusCode !in 200..299 || !strictJsonObjectDocument(body)) return null
     return try {
         val root = JSONObject(body)
         val creationOutcome = root.creationOutcomeOrNull()

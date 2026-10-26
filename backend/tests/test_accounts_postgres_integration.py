@@ -5,6 +5,7 @@ from datetime import timedelta
 import importlib
 import os
 from threading import Event
+from time import monotonic
 from types import SimpleNamespace
 import uuid
 
@@ -12,7 +13,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from fastapi import FastAPI
 import pytest
-from sqlalchemy import create_engine, func, inspect, select, text
+from sqlalchemy import create_engine, event, func, inspect, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
@@ -1222,6 +1223,104 @@ def test_concurrent_account_creation_has_one_result_or_one_different_payload_win
                 payloads[winner].password, snapshot[1]["password_hash"],
             )
             assert snapshot[2]["selections"] == payloads[winner].consent.selections.model_dump()
+    finally:
+        release.set()
+        engine.dispose()
+
+
+@pytest.mark.parametrize("case", ("same", "password", "consent", "rollback"))
+def test_creation_replay_waits_for_observed_postgres_lock_then_uses_committed_result(case: str) -> None:
+    engine, SessionFactory = _session_factory()
+    service = AccountService(settings)
+    suffix = uuid.uuid4().hex
+    email = f"creation-lock-{suffix}@example.com"
+    first_flushed, second_connected, release = Event(), Event(), Event()
+    pids = {}
+    try:
+        issued = _active_enrollment(service, SessionFactory, email=email, suffix=suffix)
+        assert issued.delivery is not None
+        first = _create_payload(issued.response.enrollment_handle, issued.delivery.code)
+        body = first.model_dump()
+        if case == "password":
+            body["password"] = "another correct horse battery"
+        elif case == "consent":
+            body["consent"]["selections"]["raw_original"] = True
+        second = AccountCreateRequestV1.model_validate(body)
+
+        def create_first():
+            try:
+                with SessionFactory() as db:
+                    pids["first"] = db.scalar(text("SELECT pg_backend_pid()"))
+
+                    def hold_commit(session):
+                        session.flush()
+                        first_flushed.set()
+                        assert release.wait(timeout=10), "first creation was not released"
+                        if case == "rollback":
+                            raise SQLAlchemyError("synthetic pre-commit failure")
+
+                    event.listen(db, "before_commit", hold_commit)
+                    return service.create_account(db, first)
+            except SQLAlchemyError as exc:
+                return exc
+
+        def create_second():
+            try:
+                with SessionFactory() as db:
+                    pids["second"] = db.scalar(text("SELECT pg_backend_pid()"))
+                    second_connected.set()
+                    return service.create_account(db, second)
+            except AccountServiceError as exc:
+                return exc
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first_future = pool.submit(create_first)
+            try:
+                assert first_flushed.wait(timeout=5), "first creation did not reach commit"
+                second_future = pool.submit(create_second)
+                assert second_connected.wait(timeout=5)
+                # Observe a real PostgreSQL lock wait, rather than infer one from thread timing.
+                with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as observer:
+                    deadline = monotonic() + 5
+                    while True:
+                        blockers = observer.scalar(text("SELECT pg_blocking_pids(:pid)"), {"pid": pids["second"]})
+                        if pids["first"] in blockers:
+                            break
+                        assert monotonic() < deadline, "second creation never waited on the first transaction"
+                        assert not second_future.done(), "second creation escaped the row lock"
+                        release.wait(0.01)
+                assert not second_future.done()
+            finally:
+                release.set()
+            original, replayed = first_future.result(timeout=5), second_future.result(timeout=5)
+
+        if case == "rollback":
+            assert isinstance(original, SQLAlchemyError)
+            assert not isinstance(replayed, Exception)
+            accepted = replayed
+        else:
+            assert not isinstance(original, Exception)
+            accepted = original
+            if case == "same":
+                assert replayed == original
+            else:
+                assert isinstance(replayed, AccountServiceError)
+                assert (replayed.code, replayed.status_code) == ("account_enrollment_conflict", 409)
+        with SessionFactory() as db:
+            snapshot = _creation_replay_pg_snapshot(db, first.enrollment_handle)
+            _assert_creation_replay_pg_counts(
+                db, email_hmac=service.normalized_email_lookup(email)[1], account_id=snapshot[1]["id"],
+            )
+            assert snapshot[0]["state"] == "CONSUMED"
+            assert snapshot[0]["attempt_count"] == 0
+            assert snapshot[0]["otp_hmac"] is None
+            assert snapshot[1]["actor_id"] == accepted.actor_id
+            assert snapshot[2]["selections"] == first.consent.selections.model_dump()
+            assert accounts_service.verify_account_password(first.password, snapshot[1]["password_hash"])
+        with SessionFactory() as db:
+            assert service.create_account(db, first) == accepted
+        with SessionFactory() as db:
+            assert _creation_replay_pg_snapshot(db, first.enrollment_handle) == snapshot
     finally:
         release.set()
         engine.dispose()

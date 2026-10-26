@@ -8,6 +8,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -762,6 +763,41 @@ public final class AdminOperationsHttpClientTest {
         }
         assertTrue(image.closed);
         assertBufferZeroed(image.lastBuffer);
+    }
+
+    @Test
+    public void originalReaderRejectsCancellationDuringStreamClose() {
+        InputStream input = new ByteArrayInputStream(PNG) {
+            @Override public void close() { Thread.currentThread().interrupt(); }
+        };
+        try {
+            assertThrows(IOException.class,
+                () -> AdminOperationsHttpClient.readOriginalEvidenceBody(input, PNG.length));
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    public void originalReaderRejectsIoAndRuntimeCloseFailuresAndClearsReadBuffer() {
+        for (boolean runtimeFailure : new boolean[] {false, true}) {
+            byte[][] observedBuffer = new byte[1][];
+            InputStream input = new ByteArrayInputStream(PNG) {
+                @Override public int read(byte[] bytes, int offset, int length) {
+                    observedBuffer[0] = bytes;
+                    return super.read(bytes, offset, length);
+                }
+                @Override public void close() throws IOException {
+                    if (runtimeFailure) throw new IllegalStateException("synthetic close failure");
+                    throw new IOException("synthetic close failure");
+                }
+            };
+            Class<? extends Exception> expected = runtimeFailure ? IllegalStateException.class : IOException.class;
+            assertThrows(expected,
+                () -> AdminOperationsHttpClient.readOriginalEvidenceBody(input, PNG.length));
+            assertBufferZeroed(observedBuffer[0]);
+        }
     }
 
     private static void assertBufferZeroed(byte[] buffer) {

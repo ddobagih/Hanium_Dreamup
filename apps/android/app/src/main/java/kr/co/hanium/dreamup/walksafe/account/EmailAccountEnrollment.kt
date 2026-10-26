@@ -3,6 +3,7 @@ package kr.co.hanium.dreamup.walksafe.account
 import android.content.SharedPreferences
 import java.time.Instant
 import java.util.Base64
+import kr.co.hanium.dreamup.walksafe.network.strictJsonObjectDocument
 import kr.co.hanium.dreamup.walksafe.security.AeadKeyPolicy
 import kr.co.hanium.dreamup.walksafe.security.AndroidKeyStoreAead
 import kr.co.hanium.dreamup.walksafe.security.AndroidSensitivePreferenceStore
@@ -107,6 +108,7 @@ internal object EmailEnrollmentPartialCodec {
 
     fun decode(encoded: String): EmailEnrollmentPartial? = runCatching {
         if (encoded.length !in 2..4_096) return@runCatching null
+        if (!strictJsonObjectDocument(encoded)) return@runCatching null
         val value = JSONObject(encoded)
         if (
             value.jsonKeys() != FIELDS ||

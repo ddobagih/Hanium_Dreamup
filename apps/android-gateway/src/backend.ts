@@ -663,6 +663,7 @@ export async function checkBackendAccountSessionCurrent(
   const headers = backendServiceRequestHeaders();
   if (!headers || !bindBackendActor(headers, binding)) return "unavailable";
   const url = backendUrl("/accounts/session-current");
+  let response: Response | undefined;
   try {
     const signed = await signBackendActorRequest(url, { method: "POST", headers });
     if (!signed) return "unavailable";
@@ -671,7 +672,7 @@ export async function checkBackendAccountSessionCurrent(
       ? AbortSignal.any([requestSignal, timeoutSignal])
       : timeoutSignal;
     signal.throwIfAborted();
-    const response = await fetchImpl(url, {
+    response = await fetchImpl(url, {
       ...signed,
       redirect: "error",
       signal
@@ -681,6 +682,9 @@ export async function checkBackendAccountSessionCurrent(
     if (response.status === 401) return "denied";
   } catch {
     // A transport failure must not be mistaken for a revoked account.
+  } finally {
+    // Only the status is used; discard an error body without waiting for its tail.
+    void response?.body?.cancel("account currentness check finished").catch(() => undefined);
   }
   return "unavailable";
 }

@@ -386,6 +386,39 @@ class AndroidSensitivePreferenceStoreTest {
         assertFalse(current.edit().commit())
     }
 
+    @Test
+    fun entryLimitCanBeSavedAndRestoredWithoutChangingTheLimit() {
+        val storage = FakeStorage()
+        val provider = FakeKeyProvider()
+        val store = newStore(storage, provider)
+        val editor = store.edit()
+        repeat(256) { editor.putString("profile_$it", "value-$it") }
+        assertTrue(editor.commit())
+        val restored = newStore(storage, provider)
+        assertFalse(restored.isBlocked())
+        assertEquals(256, restored.keys().size)
+        assertEquals("value-255", restored.getString("profile_255", null))
+    }
+
+    @Test
+    fun overLimitSnapshotIsRejectedBeforePublishingUnrestorableData() {
+        val storage = FakeStorage()
+        val provider = FakeKeyProvider()
+        val store = newStore(storage, provider)
+        assertTrue(store.edit().putString("control_secret", "original").commit())
+        val original = storage.strings.getValue(spec.storageKey)
+        val encryptions = provider.createCalls
+        val editor = store.edit()
+        repeat(256) { editor.putString("profile_$it", "value-$it") }
+        assertFalse(editor.commit())
+        assertTrue(store.isBlocked())
+        assertEquals(original, storage.strings.getValue(spec.storageKey))
+        assertEquals(encryptions, provider.createCalls)
+        val restored = newStore(storage, provider)
+        assertTrue(restored.isBlocked())
+        assertNull(restored.getString("control_secret", null))
+    }
+
     private fun newStore(
         storage: FakeStorage,
         provider: FakeKeyProvider,

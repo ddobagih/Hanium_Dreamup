@@ -25,6 +25,8 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -148,6 +150,18 @@ class AndroidIntegratedConsentCasLiveHandoffTest {
                     }
                     true
                 })
+            val saved = requireNotNull(client.saveCall(
+                origin, sessionA, installationA, secretA, successor.requestId,
+                successor.clientRevision, successor.desiredSelections,
+                successor.expectedPreviousBackendReceiptSha256,
+            ).execute())
+            assertEquals(successor.desiredSelections, saved.selections)
+            assertFalse(saved.selections.rawSourceCollection)
+            assertFalse(saved.selections.automaticReporting)
+
+            // Model losing Android's in-memory state after Backend commit but before
+            // saving its receipt. Reopen the pre-response journal into a new session.
+            // This is a JVM state reconstruction, not an Android process/KeyStore test.
             val reopened = JSONObject(
                 Files.readAllBytes(durable).toString(Charsets.UTF_8),
             )
@@ -160,26 +174,27 @@ class AndroidIntegratedConsentCasLiveHandoffTest {
             assertTrue(RejectedConsentCasJournalCodec.restoredPendingPreservesConfirmation(
                 successor, initialA, rejected.actorSha256, successor.clientRevision, history))
             val journalPreserved = history?.firstRejected == rejected
-
-            val saved = requireNotNull(client.saveCall(
-                origin, sessionA, installationA, secretA, successor.requestId,
-                successor.clientRevision, successor.desiredSelections,
-                successor.expectedPreviousBackendReceiptSha256,
-            ).execute())
-            assertEquals(successor.desiredSelections, saved.selections)
-            assertFalse(saved.selections.rawSourceCollection)
-            assertFalse(saved.selections.automaticReporting)
-            // Simulate a crash after Backend commit and before Android's local receipt commit.
+            val restored = IntegratedConsentSession()
+            assertNotSame(local, restored)
+            assertTrue(restored.restoreCurrentConfirmation(initialA))
+            assertTrue(restored.restorePendingMutation(requireNotNull(reopenedPending), retry = true))
+            assertFalse(restored.isAllowed(IntegratedConsentItem.RAW_SOURCE_COLLECTION))
+            assertFalse(restored.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
+            assertFalse(restored.applyExactPendingConfirmation(initialA))
+            assertEquals(reopenedPending, restored.pendingMutationOrNull())
             val replay = httpConsent(
                 origin, sessionA, installationA, secretA, "PUT",
-                requestJson(successor),
+                requestJson(reopenedPending),
             )
             assertEquals(200, replay.first)
             val replayConfirmation = validatedIntegratedConsentConfirmationOrNull(
                 replay.second, installationA, secretA,
             )
             assertEquals(saved, replayConfirmation)
-            assertTrue(local.applyExactPendingConfirmation(requireNotNull(replayConfirmation)))
+            assertTrue(restored.applyExactPendingConfirmation(requireNotNull(replayConfirmation)))
+            assertNull(restored.pendingMutationOrNull())
+            assertFalse(restored.isAllowed(IntegratedConsentItem.RAW_SOURCE_COLLECTION))
+            assertFalse(restored.isAllowed(IntegratedConsentItem.AUTOMATIC_REPORTING))
             val finalGet = httpConsent(
                 origin, sessionA, installationA, secretA, "GET", null,
             )
@@ -208,6 +223,7 @@ class AndroidIntegratedConsentCasLiveHandoffTest {
                 .put("cas_code", error.serverCode)
                 .put("replay_status", replay.first)
                 .put("final_get_status", finalGet.first)
+                .put("fresh_session_restored", true)
                 .put("original_journal_preserved", journalPreserved))
         } finally {
             Files.deleteIfExists(durable)

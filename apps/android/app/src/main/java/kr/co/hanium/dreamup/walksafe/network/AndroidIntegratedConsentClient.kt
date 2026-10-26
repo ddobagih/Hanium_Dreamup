@@ -117,12 +117,15 @@ class AndroidIntegratedConsentClient(private val installationPublicKey: ((String
                     doInput = true
                     instanceFollowRedirects = false
                     setRequestProperty("Accept", "application/json")
+                    setRequestProperty("Accept-Encoding", "identity")
                     setRequestProperty("Connection", "close")
                     session.requestHeaders().forEach(::setRequestProperty)
                 }
                 val response = connection.readBoundedResponse(
                     INTEGRATED_CONSENT_MAX_RESPONSE_BYTES,
                     cancellation,
+                    strictSuccessFraming = true,
+                    strictErrorFraming = true,
                 )
                 if (response.statusCode !in 200..299) {
                     cancellation.throwIfCancelled()
@@ -248,6 +251,7 @@ class AndroidIntegratedConsentClient(private val installationPublicKey: ((String
                     doInput = true
                     instanceFollowRedirects = false
                     setRequestProperty("Accept", "application/json")
+                    setRequestProperty("Accept-Encoding", "identity")
                     setRequestProperty("Connection", "close")
                     setRequestProperty(
                         CONSENT_CONTROL_SECRET_HEADER,
@@ -273,6 +277,8 @@ class AndroidIntegratedConsentClient(private val installationPublicKey: ((String
                 val response = connection.readBoundedResponse(
                     INTEGRATED_CONSENT_MAX_RESPONSE_BYTES,
                     cancellation,
+                    strictSuccessFraming = true,
+                    strictErrorFraming = true,
                 )
                 if (method == "GET" && response.statusCode == 404) return@cancellableHttpCall null
                 if (response.statusCode !in 200..299) {
@@ -298,13 +304,15 @@ class AndroidIntegratedConsentClient(private val installationPublicKey: ((String
                             requestMethod = "PUT"; connectTimeout = 8_000; readTimeout = 12_000
                             instanceFollowRedirects = false; doOutput = true
                             setRequestProperty("Content-Type", "application/json")
+                            setRequestProperty("Accept-Encoding", "identity")
                             setRequestProperty(CONSENT_CONTROL_SECRET_HEADER, controlSecret)
                             session.requestHeaders().forEach(::setRequestProperty)
                         }
                         registration.outputStream.use { it.write(JSONObject()
                             .put("installation_id", installationId).put("public_key", key)
                             .toString().toByteArray(Charsets.UTF_8)) }
-                        val registered = registration.readBoundedResponse(4096, cancellation)
+                        val registered = registration.readBoundedResponse(4096, cancellation,
+                            strictSuccessFraming = true, strictErrorFraming = true)
                         if (registered.statusCode != 204) throw IntegratedConsentHttpException(registered.statusCode, registered.body)
                     } finally { cancellation.detach(registration); registration.disconnect() }
                 }
@@ -320,7 +328,7 @@ internal fun validatedIntegratedConsentBootstrapOrNull(
     body: String,
     expectedInstallationId: String,
 ): IntegratedConsentBootstrap? {
-    if (body.isBlank()) return null
+    if (!strictJsonObjectDocument(body)) return null
     return runCatching {
         val root = JSONObject(body)
         if (
@@ -423,7 +431,7 @@ internal fun validatedIntegratedConsentConfirmationOrNull(
     expectedInstallationId: String,
     expectedControlSecret: String,
 ): IntegratedConsentConfirmation? {
-    if (body.isBlank()) return null
+    if (!strictJsonObjectDocument(body)) return null
     return runCatching {
         val root = JSONObject(body)
         if (
@@ -542,10 +550,12 @@ class IntegratedConsentHttpException(
     val errorBody: String,
 ) : IllegalStateException("integrated consent request failed: $statusCode") {
     val serverCode: String? = runCatching {
+        if (!strictJsonObjectDocument(errorBody)) return@runCatching null
         JSONObject(errorBody).optJSONObject("detail")?.optString("code")
             ?.takeIf { it.matches(Regex("^[a-z][a-z0-9_]{0,63}$")) }
     }.getOrNull()
     val requiredPolicyVersion: String? = runCatching {
+        if (!strictJsonObjectDocument(errorBody)) return@runCatching null
         JSONObject(errorBody).optJSONObject("detail")
             ?.optString("required_policy_version")
             ?.takeIf { it.isNotBlank() }

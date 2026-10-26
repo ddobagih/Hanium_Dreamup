@@ -170,11 +170,15 @@ internal class EncryptedRouteSnapshotStore private constructor(
 
     fun endWalk(): Boolean = synchronized(process.lock) {
         val lease = walkLease ?: return@synchronized true
-        val cleared = clearWalk(lease.scope)
-        process.release(lease)
-        endedScope = lease.scope
-        // Keep the scope for an idempotent purge retry, but it no longer authorizes saves/loads.
-        cleared
+        try {
+            clearWalk(lease.scope)
+        } catch (_: Exception) {
+            false
+        } finally {
+            process.release(lease)
+            endedScope = lease.scope
+            // Keep the scope for a purge retry, but even a failed purge ends save/load authority.
+        }
     }
 
     /** Destroy detaches runtime ownership; it does not claim that an archive was deleted. */

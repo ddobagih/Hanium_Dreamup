@@ -208,6 +208,7 @@ class AndroidPrivacyDeletionClient(private val signEvidence: ((String, String) -
                     doInput = true
                     instanceFollowRedirects = false
                     setRequestProperty("Accept", "application/json")
+                    setRequestProperty("Accept-Encoding", "identity")
                     if (method == "GET") {
                         setRequestProperty("X-WalkSafe-Deletion-Status-View", "device-verification.v1")
                     }
@@ -233,6 +234,8 @@ class AndroidPrivacyDeletionClient(private val signEvidence: ((String, String) -
                 val response = connection.readBoundedResponse(
                     ACCOUNT_DELETION_MAX_RESPONSE_BYTES,
                     cancellation,
+                    strictSuccessFraming = true,
+                    strictErrorFraming = true,
                 )
                 if (response.statusCode == 404 && reauthenticationRequiredOnNotFound) {
                     throw AccountDeletionReauthenticationRequiredException(response.body)
@@ -321,7 +324,7 @@ internal fun validatedAccountDeletionStatusOrNull(
     expectedInstallationId: String,
     expectedRequestId: String,
 ): AccountDeletionStatus? {
-    if (body.isBlank()) return null
+    if (!strictJsonObjectDocument(body)) return null
     return runCatching {
         val root = JSONObject(body)
         if (
@@ -465,6 +468,7 @@ internal fun validDeletionAccessSecret(value: String): Boolean =
 
 internal fun accountDeletionTerminalConflictCodeOrNull(body: String): String? =
     runCatching {
+        if (!strictJsonObjectDocument(body)) return@runCatching null
         val root = JSONObject(body)
         if (root.deletionJsonKeys() == setOf("code")) {
             root.getString("code").takeIf(
@@ -507,6 +511,7 @@ internal fun accountDeletionHttpFailureDisposition(
 internal const val ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE = "reauthentication_required"
 
 private fun accountDeletionReauthenticationRequired(body: String): Boolean = runCatching {
+    if (!strictJsonObjectDocument(body)) return@runCatching false
     val root = JSONObject(body)
     root.opt("code") == "account_deletion_reauthentication_required" &&
         root.opt("reauthentication_required") == true

@@ -24,6 +24,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
+from backend.app import uploads
 from backend.app.api import health, reports
 from backend.app.config import get_settings
 from backend.app.models import Report, ReportImageObject
@@ -79,7 +80,7 @@ def runtime_app(tmp_path, monkeypatch, clean_test_storage):
     state = SimpleNamespace(
         engine=engine, upload=upload, defer_cleanup=False, commit_gate=None,
         commit_entered=threading.Event(), fail_commit=False, recovery_attempted=threading.Event(),
-        recovery_pid=None, inventory_entered=threading.Event(),
+        recovery_pid=None, inventory_entered=threading.Event(), settings=settings, manager=manager,
     )
 
     class WriterSession(Session):
@@ -116,6 +117,7 @@ def runtime_app(tmp_path, monkeypatch, clean_test_storage):
 
     monkeypatch.setattr(monitor_module, "read_report_storage_inventory_page", inventory)
     storage_state = StorageReadinessState()
+    state.storage_state = storage_state
     monitor = ReportStorageMonitor(
         upload_root=upload, state=storage_state,
         session=lambda: locked_report_storage_session(recovery_factory, reports._shared_report_write_lock, None, None),
@@ -141,6 +143,7 @@ def runtime_app(tmp_path, monkeypatch, clean_test_storage):
 
     monkeypatch.setattr(health, "_navigation_readiness", navigation)
     app = FastAPI()
+    state.app = app
     app.include_router(reports.create_router(settings, manager, storage_readiness=storage_state))
     app.include_router(health.create_router(
         settings, detector_warmup=lambda: None, report_image_key_manager=manager,
@@ -404,3 +407,75 @@ def test_ready_upload_probe_cannot_be_mistaken_for_unknown_storage(runtime_app, 
         assert peer.result(3)["ready"] is True
     assert response.status_code == 200, response.text
     assert not list(state.upload.glob(".readiness-*"))
+
+
+@pytest.mark.parametrize("environment", ("field", "staging", "production"))
+def test_deployment_storage_http_write_recovers_on_lifespan_reentry(
+    runtime_app, monkeypatch, environment,
+):
+    """Storage permission policies with real JPEG/SQL and the actual lifespan.
+
+    Auth, camera and RAW startup hooks are outside this storage test. The
+    backup-group lookup and encryption declarations are synthetic; this is
+    neither a full deployment configuration nor a real backup-reader test.
+    """
+    from backend.app import main
+
+    state = runtime_app
+    state.upload.chmod(0o2750)
+    assert state.upload.stat().st_gid > 0, "run with a non-root test group"
+    monkeypatch.setenv("WALKSAFE_ENVIRONMENT", environment)
+    monkeypatch.setattr(
+        uploads.grp, "getgrnam",
+        lambda _name: SimpleNamespace(gr_gid=state.upload.stat().st_gid),
+    )
+    state.settings.walksafe_environment = environment
+    monkeypatch.setattr(main, "settings", state.settings)
+    monkeypatch.setattr(main, "SessionLocal", sessionmaker(state.engine, autoflush=False))
+    monkeypatch.setattr(main, "report_image_key_manager", state.manager)
+    monkeypatch.setattr(main, "report_storage_state", state.storage_state)
+    monkeypatch.setattr(main, "report_storage_monitor", state.monitor)
+    monkeypatch.setattr(main, "capacity_monitor", None)
+    monkeypatch.setattr(main, "inference_runner", None)
+    for name in (
+        "validate_admin_credential_issuer_binding", "bind_privacy_hmac_key",
+        "bind_account_crypto_keys", "reconcile_raw_collection_storage",
+        "start_detect_v2_health", "stop_detect_v2_health",
+    ):
+        monkeypatch.setattr(main, name, lambda *_args: None)
+    complete = report_storage.complete_report_image_write
+
+    def cleanup(pending):
+        if state.defer_cleanup:
+            raise OSError(errno.EIO, "owned journal cleanup fault")
+        return complete(pending)
+
+    monkeypatch.setattr(report_storage, "complete_report_image_write", cleanup)
+
+    async def exercise():
+        async with main.lifespan(state.app):
+            state.defer_cleanup = True
+            report_id, response = await asyncio.to_thread(state.write)
+            assert response.status_code == 201, response.text
+            journal = state.journal(report_id)
+            assert journal.parent.stat().st_mode & 0o7777 == 0o700
+            assert journal.stat().st_mode & 0o7777 == 0o600
+            destination = state.upload / f"{report_id}.wse"
+            ciphertext = destination.read_bytes()
+            assert destination.stat().st_mode & 0o7777 == 0o640
+        assert journal.exists()
+        state.defer_cleanup = False
+        async with main.lifespan(state.app):
+            # Startup reconciliation must finish before requests are served.
+            assert not journal.exists()
+            assert destination.read_bytes() == ciphertext
+            assert destination.stat().st_mode & 0o7777 == 0o640
+            with Session(state.engine) as db:
+                assert db.get(Report, report_id) is not None
+                assert db.get(ReportImageObject, report_id) is not None
+            assert (await asyncio.to_thread(state.ready)).status_code == 200
+            _, next_response = await asyncio.to_thread(state.write)
+            assert next_response.status_code == 201, next_response.text
+        assert not list(state.upload.glob(".readiness-*"))
+
+    asyncio.run(exercise())

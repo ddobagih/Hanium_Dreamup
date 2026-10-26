@@ -77,7 +77,7 @@ class SpeechHttpFailureDeviceTest {
             assertThrows(GatewaySpeechProtocolException::class.java) { call(server, file).execute() }
             server.finished()
         }
-        Server(200, "x".repeat(SPEECH_STT_MAX_RESPONSE_BYTES + 1)).use { server ->
+        Server(200, "x".repeat(SPEECH_STT_MAX_RESPONSE_BYTES + 1), allowEarlyDisconnect = true).use { server ->
             assertThrows(NetworkResponseTooLargeException::class.java) { call(server, file).execute() }
             server.finished()
         }
@@ -150,14 +150,101 @@ class SpeechHttpFailureDeviceTest {
         }
     }
 
+    @Test fun nativeMalformedFramingAndUtf8CannotAuthorizeTranscript() = fixture { file ->
+        val bytes=body().toString().toByteArray()
+        val brokenUtf8=body().put("transcript","UTF8_MARKER").toString()
+            .split("UTF8_MARKER").let { it[0].toByteArray()+byteArrayOf(0xc3.toByte(),0x28)+it[1].toByteArray() }
+        val cases=linkedMapOf(
+            "invalid_utf8" to rawReply(brokenUtf8,"Content-Length: ${brokenUtf8.size}\r\n"),
+            "negative_length" to rawReply(bytes,"Content-Length: -1\r\n"),
+            "signed_length" to rawReply(bytes,"Content-Length: +${bytes.size}\r\n"),
+            "duplicate_length" to rawReply(bytes,"Content-Length: ${bytes.size}\r\nContent-Length: ${bytes.size}\r\n"),
+            "conflicting_length" to rawReply(bytes,"Content-Length: ${bytes.size+10}\r\nContent-Length: ${bytes.size}\r\n"),
+            "chunked_and_length" to rawReply(chunked(bytes),"Transfer-Encoding: chunked\r\nContent-Length: ${bytes.size}\r\n"),
+            "truncated_body" to rawReply(bytes.copyOf(bytes.size/2),"Content-Length: ${bytes.size}\r\n"),
+        )
+        val accepted=mutableListOf<String>()
+        for((name,reply) in cases) Server(200,"",rawResponse=reply).use { server ->
+            val failure=runCatching{call(server,file).execute()}.exceptionOrNull()
+            if(failure==null) accepted+=name
+            else assertTrue("Unexpected failure type in $name",failure is IOException || failure is GatewaySpeechProtocolException)
+            server.finished();assertEquals(1,server.hits.get());assertEquals(128L,file.length())
+            report("native_framing_case=$name rejected=${failure!=null} exception=${failure?.javaClass?.simpleName} command_executed=false")
+        }
+        assertEquals("Invalid wire response accepted as transcript",emptyList<String>(),accepted)
+    }
+
+    @Test fun nativeValidLengthChunkedAndCloseDelimitedRepliesRemainUsable() = fixture { file ->
+        val bytes=body().toString().toByteArray()
+        val cases=linkedMapOf(
+            "length" to rawReply(bytes,"Content-Length: ${bytes.size}\r\n"),
+            "chunked" to rawReply(chunked(bytes),"Transfer-Encoding: chunked\r\n"),
+            "close_delimited" to rawReply(bytes,""),
+        )
+        for((name,reply) in cases) Server(200,"",rawResponse=reply).use { server ->
+            val result=call(server,file).execute()
+            assertEquals("도움말",result.transcript);assertEquals(id,result.requestId);assertTrue(result.acoustic.executionAllowed)
+            server.finished();assertEquals(1,server.hits.get())
+            report("native_valid_framing=$name accepted=true command_executed=false")
+        }
+    }
+
+    private fun rawReply(bytes:ByteArray,framing:String)=
+        ("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n"+
+            "X-Content-Type-Options: nosniff\r\n"+framing+"Connection: close\r\n\r\n").toByteArray()+bytes
+    private fun chunked(bytes:ByteArray)=(bytes.size.toString(16)+"\r\n").toByteArray()+bytes+"\r\n0\r\n\r\n".toByteArray()
+
+    @Test fun nativeStreamingByteLimitIsEnforcedWithoutDependingOnLengthHeader() = fixture { file ->
+        val valid=body().toString().toByteArray()
+        val atLimit=valid+ByteArray(SPEECH_STT_MAX_RESPONSE_BYTES-valid.size){0x20}
+        for (chunked in listOf(false,true)) {
+            val framing=if(chunked) "Transfer-Encoding: chunked\r\n" else ""
+            val encoded=if(chunked) chunked(atLimit) else atLimit
+            Server(200,"",rawResponse=rawReply(encoded,framing)).use { server ->
+                assertEquals("도움말",call(server,file).execute().transcript);server.finished()
+            }
+            val overLimit=atLimit+byteArrayOf(0x20)
+            Server(200,"",rawResponse=rawReply(if(chunked) chunked(overLimit) else overLimit,framing), allowEarlyDisconnect = true).use { server ->
+                assertThrows(NetworkResponseTooLargeException::class.java){call(server,file).execute()}
+                server.finished();assertEquals(128L,file.length())
+            }
+            report("native_streaming_limit chunked=$chunked accepted_bytes=${atLimit.size} rejected_bytes=${overLimit.size} unchanged_limit=true")
+        }
+    }
+
+    @Test fun cancellingDuringPartialBodyCannotReturnTranscriptAndFreshRequestCanSucceed() = fixture { file ->
+        Server(200,body().toString(),pauseAfterBodyBytes=16).use { server ->
+            val request=call(server,file);val executor=Executors.newSingleThreadExecutor()
+            try {
+                val result=executor.submit<Throwable?> {runCatching{request.execute()}.exceptionOrNull()}
+                assertTrue("Actual partial response must be delivered before cancellation",server.partialResponse.await(5,TimeUnit.SECONDS))
+                val start=SystemClock.elapsedRealtime();request.cancel()
+                val failure=result.get(5,TimeUnit.SECONDS)
+                val elapsed=SystemClock.elapsedRealtime()-start
+                assertTrue(failure is CancellationException)
+                server.continueResponse.countDown();server.finished()
+                assertEquals(1,server.hits.get());assertEquals(128L,file.length())
+                report("native_partial_body_cancel=true complete_transcript_returned=false observed_cancel_ms=$elapsed caller_audio_preserved=true")
+            } finally {server.continueResponse.countDown();executor.shutdownNow()}
+        }
+        Server(200,body().toString()).use { server ->
+            assertEquals("도움말",call(server,file).execute().transcript);server.finished();assertEquals(1,server.hits.get())
+        }
+        report("native_partial_body_cancel_fresh_explicit_request_succeeded=true automatic_retry=false")
+    }
+
     private class Server(status: Int, body: String,
         headers: String = "Content-Type: application/json\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n",
-        private val gate: CountDownLatch? = null) : AutoCloseable {
+        private val gate: CountDownLatch? = null,
+        private val rawResponse: ByteArray? = null,
+        private val pauseAfterBodyBytes: Int? = null,
+        private val allowEarlyDisconnect: Boolean = false) : AutoCloseable {
         private val socket = ServerSocket().apply {
             bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0)); soTimeout = 10_000
         }
         val base = "http://127.0.0.1:${socket.localPort}"
         val hits = AtomicInteger(); val received = CountDownLatch(1)
+        val partialResponse=CountDownLatch(1);val continueResponse=CountDownLatch(1)
         var requestBytes = 0; var requestHeader = ""
         private val worker = Executors.newSingleThreadExecutor()
         private val task = worker.submit {
@@ -175,13 +262,25 @@ class SpeechHttpFailureDeviceTest {
                 val bytes = body.toByteArray()
                 try {
                     peer.getOutputStream().apply {
-                        write("HTTP/1.1 $status Test\r\n${headers}Content-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
-                        write(bytes); flush()
+                        if(rawResponse!=null) write(rawResponse) else {
+                            write("HTTP/1.1 $status Test\r\n${headers}Content-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                            if(pauseAfterBodyBytes==null) write(bytes) else {
+                                write(bytes,0,pauseAfterBodyBytes);flush();partialResponse.countDown()
+                                check(continueResponse.await(10,TimeUnit.SECONDS))
+                                write(bytes,pauseAfterBodyBytes,bytes.size-pauseAfterBodyBytes)
+                            }
+                        }
+                        flush()
                     }
-                } catch (failure: IOException) { if (gate == null) throw failure }
+                } catch (failure: IOException) {
+                    // Only oversized-response cases expect the client to close before the server finishes.
+                    // Their caller must still assert NetworkResponseTooLargeException, not any I/O failure.
+                    if (gate == null && pauseAfterBodyBytes == null &&
+                        !(allowEarlyDisconnect && failure is java.net.SocketException)) throw failure
+                }
             }
         }
         fun finished() { task.get(15, TimeUnit.SECONDS) }
-        override fun close() { gate?.countDown(); socket.close(); task.cancel(true); worker.shutdownNow() }
+        override fun close() { gate?.countDown();continueResponse.countDown(); socket.close(); task.cancel(true); worker.shutdownNow() }
     }
 }

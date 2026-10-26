@@ -123,6 +123,59 @@ class IntegratedUiDeviceTest {
         report("CANDIDATE_SEQUENCE real_tts=true cancelled_page_blocked=true retry_completed=true detail_read_only=true candidates=synthetic")
     }
 
+    /** Real page handlers and TTS; synthetic candidates isolate replacement from search/ASR. */
+    @Test fun replacingPartlySpokenCandidatePageCannotAuthorizeRetiredNumbers() = withHome {
+        val mode=requireNotNull(InstrumentationRegistry.getArguments().getString("candidatePageReplacement"))
+        require(mode in setOf("next","previous","repeat"))
+        val initialPage=if(mode=="previous") 1 else 0
+        val expectedPage=if(mode=="next") 1 else 0
+        val state=kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState(
+            "목록 전환 시험",(1..6).map {
+                kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchResult(
+                    "replacement-$it","시험역 $it",kr.co.hanium.dreamup.walksafe.navigation.RoutePoint(37.5,127.0),
+                    null,"시험로 $it",null,100)
+            },pageIndex=initialPage)
+        fun current()=field("destinationSearchVoiceState") as? kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState
+        fun selected(s:kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState,number:Int)=
+            s.onCommand(kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceCommand.SelectCandidate(number)).selectedResult
+        main {
+            activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            call("cancelVoiceCommandRecognition")
+            val page=field("nativeUiPage") as Enum<*>
+            call("showNativeUiPage",page.javaClass.enumConstants!!.single{(it as Enum<*>).name=="DESTINATION_SEARCH"})
+            MainActivity::class.java.getDeclaredField("destinationSearchQuery").apply{isAccessible=true}.set(activity,state.query)
+            MainActivity::class.java.getDeclaredField("destinationSearchVoiceState").apply{isAccessible=true}.set(activity,state)
+            assertTrue(call("speakHomeDestinationVoicePrompt",state,state.voicePrompt(),true) as Boolean)
+        }
+        waitUntil("Native first candidate must finish while next candidate still speaks",45_000) {
+            val a=field("feedbackActuator") ?: return@waitUntil false
+            val tts=a.javaClass.getDeclaredField("textToSpeech").apply{isAccessible=true}.get(a) as android.speech.tts.TextToSpeech
+            state.completedCandidateNumbers()==setOf(initialPage*3+1)&&tts.isSpeaking
+        }
+        lateinit var replacement:kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState
+        main {
+            assertNull(selected(state,initialPage*3+1));assertNull(field("gatewayVoiceRecorder"))
+            call(when(mode){"next"->"hearMoreVoiceDestinationCandidates";"previous"->"previousVoiceDestinationCandidates";else->"repeatVoiceDestinationCandidates"})
+            replacement=requireNotNull(current());assertEquals(expectedPage,replacement.pageIndex)
+            if(mode!="repeat")assertNotSame(state,replacement)
+            assertTrue(replacement.completedCandidateNumbers().isEmpty())
+            assertNull(selected(replacement,expectedPage*3+1));assertNull(field("gatewayVoiceRecorder"))
+        }
+        waitUntil("Replacement page must complete before opening microphone",90_000) {
+            current()===replacement&&replacement.completedCandidateNumbers()==(expectedPage*3+1..expectedPage*3+3).toSet()&&field("gatewayVoiceRecorder")!=null
+        }
+        main {
+            assertNotNull(selected(replacement,expectedPage*3+1))
+            assertNull(selected(replacement,if(expectedPage==0)4 else 1))
+            if(mode!="repeat")assertNull(selected(state,initialPage*3+1))
+            assertFalse(field("isRouteActive") as Boolean);assertNull(field("pendingUiDestination"))
+            assertEquals(false,field("destinationSearchInFlight"))
+            call("cancelNativeDestinationSearchAndReturnHome")
+            assertNull(field("gatewayVoiceRecorder"));assertNull(current())
+        }
+        report("CANDIDATE_PAGE_REPLACEMENT mode=$mode actual_native_speech=true incomplete_page_blocked=true current_page_only_authorized=true old_page_not_revived=true actual_followup_mic=true destination_not_selected=true synthetic_candidates=true ASR_and_human_audibility=NOT_TESTED")
+    }
+
     @Test fun logoutFixtureAccountThroughRealHandler() {
         val expected = InstrumentationRegistry.getArguments().getString("logoutExpectedActorSha256")
         assumeTrue(expected != null)
@@ -385,6 +438,83 @@ class IntegratedUiDeviceTest {
         report("UPLOAD_EXIT mode=$mode explicit_retry_recording=true")
     }
 
+    @Test fun listeningCuePrecedesCaptureAndCancelledCueCannotReopenMicrophone() = withHome {
+        assumeTrue(BuildConfig.WALKSAFE_SERVER_STT_ENABLED)
+        for (mode in listOf("capture", "cancel", "back", "help")) {
+            waitUntil("Real home voice readiness unavailable") { call("homeVoiceCommandAvailable") == true }
+            main {
+                activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                if (mode == "help") call("openVoiceHelp")
+                else assertTrue(views(activity.window.decorView).filterIsInstance<Button>()
+                    .single { it.isShown && it.text == "음성 명령" }.performClick())
+            }
+            var observed = false
+            val deadline = SystemClock.elapsedRealtime() + 60_000L
+            while (!observed && SystemClock.elapsedRealtime() < deadline) {
+                main {
+                    val cue = field("voiceListeningStartCue") as? kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer
+                    if (cue?.isPlaying() == true) {
+                        observed = true
+                        assertNull("The cue must not be recorded", field("gatewayVoiceRecorder"))
+                        assertEquals(false, field("voiceRecognitionActive"))
+                        assertEquals(false, call("isHandsFreeVoiceSpeechOutputActive"))
+                        // A duplicate request must leave the original bounded cue running.
+                        val generation = cue.javaClass.getDeclaredField("generation").apply { isAccessible = true }
+                        val before = generation.get(cue)
+                        assertEquals(true, call("startVoiceCommandRecognition", field("voiceRecognitionPurpose"), null))
+                        assertEquals(before, generation.get(cue))
+                        when (mode) {
+                            "cancel" -> call("cancelVoiceCommandRecognition")
+                            "back" -> activity.onBackPressed()
+                        }
+                    }
+                }
+                if (!observed) SystemClock.sleep(5)
+            }
+            assertTrue("No actual listening cue observed: $mode", observed)
+            if (mode == "capture" || mode == "help") {
+                waitUntil("Cue did not hand over to the real microphone: $mode") { field("gatewayVoiceRecorder") != null }
+                main { assertFalse((field("voiceListeningStartCue") as kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer).isPlaying()) }
+            } else {
+                SystemClock.sleep(800)
+                main { assertNull("Cancelled cue reopened microphone: $mode", field("gatewayVoiceRecorder")); assertEquals(false, field("voiceRecognitionActive")) }
+            }
+            main { call("cancelVoiceCommandRecognition"); call("closeVoiceHelp", false); call("returnToCurrentInteractionArea") }
+            report("LISTENING_CUE mode=$mode real_tts=true cue_observed=true capture_after_cue_only=true duplicate_preserved=true human_audibility=NOT_TESTED")
+        }
+    }
+
+    /** Fault injection into the audio owner only; account, microphone and session gates stay real. */
+    @Test fun failedListeningCueKeepsMicrophoneClosedAndOffersExplicitRetry() = withHome {
+        assumeTrue(BuildConfig.WALKSAFE_SERVER_STT_ENABLED)
+        val cueField = MainActivity::class.java.getDeclaredField("voiceListeningStartCue").apply { isAccessible = true }
+        main {
+            activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            call("cancelVoiceCommandRecognition")
+            (cueField.get(activity) as? kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer)?.close()
+            cueField.set(activity, kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer(activity, { false }).also { it.close() })
+        }
+        try {
+            waitUntil("Real home voice readiness unavailable") { call("homeVoiceCommandAvailable") == true }
+            main { views(activity.window.decorView).filterIsInstance<Button>().single { it.isShown && it.text == "음성 명령" }.performClick() }
+            waitUntil("Cue failure did not expose recovery") {
+                (field("voiceCommandErrorPanel") as View).isShown &&
+                    (field("voiceCommandErrorText") as android.widget.TextView).text.contains("알림음")
+            }
+            SystemClock.sleep(800)
+            main {
+                assertNull(field("gatewayVoiceRecorder"))
+                assertEquals(false, field("voiceRecognitionActive"))
+                cueField.set(activity, null) // Restore a usable audio owner before explicit retry.
+                assertTrue((field("voiceCommandErrorAction") as Button).performClick())
+            }
+            waitUntil("Explicit retry did not open the real microphone") { field("gatewayVoiceRecorder") != null }
+            report("LISTENING_CUE injected_closed_owner=true failure_no_capture=true explicit_retry_real_capture=true")
+        } finally {
+            main { (cueField.get(activity) as? kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer)?.close(); cueField.set(activity, null) }
+        }
+    }
+
     @Test fun serverRecordingCanCancelAndReenterTwice() = withHome {
         assumeTrue(BuildConfig.WALKSAFE_SERVER_STT_ENABLED)
         for (ordinal in 1..2) {
@@ -439,6 +569,44 @@ class IntegratedUiDeviceTest {
             assertEquals("Partial long speech must not be complete", 0, completed)
             assertNotEquals(kr.co.hanium.dreamup.walksafe.voice.CommandSpeechState.COMPLETED, tracker.progress(commandId).state)
             assertNull("Speech must not open capture early", field("gatewayVoiceRecorder"))
+        }
+        val engineStop = InstrumentationRegistry.getArguments().getString("longEngineStop")
+        if (engineStop != null) {
+            require(singleUtterance && engineStop in setOf("timeout", "cancel"))
+            fun actualTts(): android.speech.tts.TextToSpeech {
+                val actuator = field("feedbackActuator")!!
+                return actuator.javaClass.getDeclaredField("textToSpeech").apply { isAccessible = true }
+                    .get(actuator) as android.speech.tts.TextToSpeech
+            }
+            main { assertTrue("Host must interrupt a still-playing long utterance", actualTts().isSpeaking) }
+            report("LONG_ENGINE_STOP_READY mode=$engineStop elapsed_ms=${SystemClock.elapsedRealtime() - began} actual_single_utterance_speaking=true")
+            waitUntil("Host did not interrupt the actual speech service", 15_000) { !actualTts().isSpeaking }
+            if (engineStop == "cancel") {
+                instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+                waitUntil("Back during dead-engine response did not return HOME") { field("nativeUiPage").toString() == "HOME" }
+            } else {
+                waitUntil("Dead long utterance never reached failure", 130_000) { failed > 0 }
+                main {
+                    assertEquals(1, failed)
+                    assertEquals(kr.co.hanium.dreamup.walksafe.voice.CommandSpeechState.FAILED, tracker.progress(commandId).state)
+                }
+            }
+            repeat(30) {
+                main {
+                    assertEquals(0, completed); assertEquals(0, delivered)
+                    assertNotEquals(kr.co.hanium.dreamup.walksafe.voice.CommandSpeechState.COMPLETED, tracker.progress(commandId).state)
+                    assertNull(field("gatewayVoiceRecorder"))
+                }
+                SystemClock.sleep(100)
+            }
+            main {
+                call("returnToCurrentInteractionArea")
+                views(activity.window.decorView).filterIsInstance<Button>().single { it.isShown && it.text == "도움말" }.performClick()
+            }
+            waitUntil("Explicit new help action did not recover speech and microphone", 65_000) { field("gatewayVoiceRecorder") != null }
+            main { assertEquals(0, completed); assertEquals(0, delivered); call("closeVoiceHelp", false) }
+            report("LONG_ENGINE_FAILURE mode=$engineStop elapsed_ms=${SystemClock.elapsedRealtime() - began} old_complete=0 old_parts=0 no_auto_mic=true explicit_new_help_recovered=true human_audibility=NOT_TESTED")
+            return@withHome
         }
         waitUntil("Long actual speech did not finish", 120_000) { completed > 0 || failed > 0 }
         main {
@@ -784,6 +952,7 @@ class IntegratedUiDeviceTest {
 
     @Test fun candidateAudioFocusLossRequiresVisibleReplayBeforeNumberSelection() = withHome {
         assertTrue(BuildConfig.WALKSAFE_SERVER_STT_ENABLED)
+        val externalTtsStop = InstrumentationRegistry.getArguments().getString("externalTtsStop") == "true"
         val state = kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState(
             "음성 중단 시험", (1..3).map {
                 kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchResult(
@@ -811,8 +980,9 @@ class IntegratedUiDeviceTest {
                 val tts = actuator.javaClass.getDeclaredField("textToSpeech").apply { isAccessible = true }.get(actuator) as android.speech.tts.TextToSpeech
                 state.completedCandidateNumbers() == setOf(1) && tts.isSpeaking
             }
-            main { assertEquals(android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED, manager.requestAudioFocus(competing)) }
-            waitUntil("Focus loss did not terminate the unfinished candidate prompt") { field("voiceCommandPromptPending") == false }
+            if (externalTtsStop) report("TTS_ENGINE_STOP_READY actual_second_candidate_speaking=true")
+            else main { assertEquals(android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED, manager.requestAudioFocus(competing)) }
+            waitUntil("Interrupted engine did not terminate the unfinished candidate prompt", if (externalTtsStop) 90_000 else 25_000) { field("voiceCommandPromptPending") == false }
             main {
                 assertTrue(state.completedCandidateNumbers().isEmpty())
                 assertNull(state.onCommand(kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceCommand.SelectCandidate(1)).selectedResult)
@@ -839,8 +1009,57 @@ class IntegratedUiDeviceTest {
                 assertEquals(state.results.first(), state.onCommand(kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceCommand.SelectCandidate(1)).selectedResult)
                 call("cancelNativeDestinationSearchAndReturnHome")
             }
-            report("CANDIDATE_FOCUS_RECOVERY actual_native_focus_loss=true incomplete_number_rejected=true visible_replay=true no_auto_capture_3s=true same_candidates_replayed=true completed_number_authorized=true actual_mic=true route_not_started=true other_app_or_call=NOT_TESTED")
+            report("CANDIDATE_FOCUS_RECOVERY actual_native_focus_loss=${!externalTtsStop} external_tts_stop_requested=$externalTtsStop incomplete_number_rejected=true visible_replay=true no_auto_capture_3s=true same_candidates_replayed=true completed_number_authorized=true actual_mic=true route_not_started=true other_app_or_call=NOT_TESTED")
         } finally { main { manager.abandonAudioFocusRequest(competing) } }
+    }
+
+    @Test fun helpEngineDeathRequiresExplicitActionAndReconnectsBeforeListening() = withHome {
+        val action = InstrumentationRegistry.getArguments().getString("helpEngineRecovery") ?: "retry"
+        require(action in setOf("retry", "topic", "menu", "reenter"))
+        main {
+            activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            views(activity.window.decorView).filterIsInstance<Button>()
+                .single { it.isShown && it.text == "도움말" }.performClick()
+        }
+        waitUntil("Actual help TTS did not start", 30_000) {
+            val actuator = field("feedbackActuator") ?: return@waitUntil false
+            val tts = actuator.javaClass.getDeclaredField("textToSpeech").apply { isAccessible = true }.get(actuator) as? android.speech.tts.TextToSpeech
+            field("voiceHelpScreen") != null && field("voiceCommandPromptPending") == true && tts?.isSpeaking == true
+        }
+        report("HELP_ENGINE_STOP_READY action=$action actual_help_speaking=true")
+        waitUntil("Actual engine interruption did not expose help recovery", 100_000) {
+            (field("voiceHelpRecovery") as? Button)?.isShown == true && field("voiceCommandPromptPending") == false
+        }
+        repeat(30) {
+            main { assertNull(field("gatewayVoiceRecorder")); assertFalse(field("voiceRecognitionActive") as Boolean) }
+            SystemClock.sleep(100)
+        }
+        main {
+            assertTrue((field("voiceHelpSummary") as android.widget.TextView).text.contains("중단"))
+            when(action) {
+                "retry" -> assertTrue((field("voiceHelpRecovery") as Button).performClick())
+                "topic", "menu" -> views(activity.window.decorView).filterIsInstance<Button>()
+                    .single { it.isShown && it.text.startsWith(if(action == "topic") "1번" else "4번") }.performClick()
+                else -> {
+                    views(activity.window.decorView).filterIsInstance<Button>().single { it.isShown && it.text == "도움말 닫기" }.performClick()
+                    views(activity.window.decorView).filterIsInstance<Button>().single { it.isShown && it.text == "도움말" }.performClick()
+                }
+            }
+            assertNull("An explicit retry must finish TTS before capture", field("gatewayVoiceRecorder"))
+        }
+        waitUntil("Explicit help action did not reconnect TTS and open actual microphone", 65_000) {
+            field("voiceHelpScreen") != null && field("gatewayVoiceRecorder") != null
+        }
+        main {
+            assertEquals(false, field("voiceCommandPromptPending"))
+            assertFalse((field("voiceHelpRecovery") as Button).isShown)
+            val summary = (field("voiceHelpSummary") as android.widget.TextView).text.toString()
+            report("HELP_RECOVERED_SUMMARY action=$action text=$summary")
+            assertFalse("Recovered help must not still display the interruption error", summary.contains("중단"))
+            assertFalse(field("isRouteActive") as Boolean)
+            call("closeVoiceHelp", false)
+        }
+        report("HELP_ENGINE_RECOVERY action=$action no_auto_capture_3s=true explicit_action_reconnected=true actual_TTS_completion_before_mic=true route_not_started=true human_audibility=NOT_TESTED")
     }
 
     @Test fun largeFontHelpControlsRemainReachableAndUnclipped() = withHome {
@@ -1372,6 +1591,155 @@ class IntegratedUiDeviceTest {
             assertEquals("SETTINGS", field("nativeUiPage").toString())
         }
         report("UNTRUSTED_COMMAND unchanged_threshold=0.55 denied_low_score=true supported_threshold_executes=true real_Main=true ASR_result=synthetic")
+    }
+
+    /** Real UI/TTS, rapid topic replacements before completion; no transcript or readiness injection. */
+    @Test fun rapidHelpTopicExitCannotReopenInput() = withHome {
+        val mode = requireNotNull(InstrumentationRegistry.getArguments().getString("helpTopicExit"))
+        require(mode in setOf("close", "back", "home", "recreate"))
+        main {
+            activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            views(activity.window.decorView).filterIsInstance<Button>().single { it.isShown && it.text == "도움말" }.performClick()
+        }
+        waitUntil("Help UI absent") { (field("voiceHelpScreen") as? View)?.isShown == true }
+        main {
+            for (number in listOf(1, 2, 3, 4)) {
+                views(field("voiceHelpScreen") as View).filterIsInstance<Button>()
+                    .single { it.text.startsWith("${number}번") }.performClick()
+                assertNull("Replacement prompt opened microphone before completion", field("gatewayVoiceRecorder"))
+            }
+            assertEquals("도움말 목록", (field("voiceHelpSummary") as android.widget.TextView).text.toString())
+            assertTrue("Must interrupt a pending real prompt", field("voiceCommandPromptPending") as Boolean)
+            if (mode == "close") views(field("voiceHelpScreen") as View).filterIsInstance<Button>()
+                .single { it.text == "도움말 닫기" }.performClick()
+        }
+        if (mode == "back") instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        if (mode == "home") {
+            instrumentation.targetContext.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            waitUntil("Help did not leave foreground") { field("isActivityForeground") == false }
+        }
+        if (mode == "recreate") recreateRealMainForExitTest()
+        waitUntil("Retired help prompt still owns capture") {
+            field("voiceCommandPromptPending") == false && field("gatewayVoiceRecorder") == null &&
+                field("voiceRecognitionActive") == false
+        }
+        if (mode == "home") {
+            instrumentation.targetContext.startActivity(Intent(instrumentation.targetContext, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+            waitUntil("Help did not return to foreground") { field("isActivityForeground") == true }
+        }
+        repeat(50) {
+            main {
+                assertNull(field("gatewayVoiceRecorder")); assertNull(field("gatewaySpeechCall"))
+                assertNull(field("activeGatewaySpeechInteraction")); assertFalse(field("voiceRecognitionActive") as Boolean)
+                assertFalse(field("isRouteActive") as Boolean)
+            }
+            SystemClock.sleep(100)
+        }
+        main { call("closeVoiceHelp", false); call("returnToCurrentInteractionArea") }
+        waitUntil("Main explicit voice did not recover") { call("homeVoiceCommandAvailable") == true }
+        main { views(activity.window.decorView).filterIsInstance<Button>().single { it.isShown && it.text == "음성 명령" }.performClick() }
+        waitUntil("Explicit action could not start a new microphone") { field("gatewayVoiceRecorder") != null }
+        main { call("cancelNativeVoiceCommandAndReturnHome") }
+        report("RAPID_HELP_EXIT mode=$mode topic_replacements=4 early_microphone=false no_late_capture_5s=true explicit_fresh_capture=true human_audibility=NOT_TESTED")
+    }
+
+    private fun recreateRealMainForExitTest() {
+        val old = activity
+        main { old.recreate() }
+        waitUntil("Real MainActivity did not recreate", 30_000) {
+            val next = androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED)
+                .filterIsInstance<MainActivity>().singleOrNull { it !== old }
+            if (next != null) activity = next
+            next != null && old.isDestroyed
+        }
+        waitUntil("Account/onboarding not restored after recreation", 30_000) { call("nativeHomeFeatureContextAvailable") == true }
+        main { activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
+    /** Cancel the genuine UI search at its initial location/request phase; don't fabricate a reply. */
+    @Test fun destinationSearchExitCannotApplyRetiredWork() = withHome {
+        val mode = requireNotNull(InstrumentationRegistry.getArguments().getString("destinationExit"))
+        val awaitSearchRequest = InstrumentationRegistry.getArguments().getString("awaitDestinationRequest") == "true"
+        require(mode in setOf("back", "home", "recreate"))
+        var httpStarted = false
+        main {
+            activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            views(activity.window.decorView).filterIsInstance<Button>().single { it.isShown && it.text == "길라잡이" }.performClick()
+            (field("destinationQueryInput") as EditText).setText("서울역")
+            assertTrue((field("destinationSearchButton") as Button).performClick())
+            assertEquals("서울역", field("destinationSearchQuery"))
+            httpStarted = field("destinationSearchInFlight") == true
+        }
+        if (awaitSearchRequest) {
+            val deadline = SystemClock.elapsedRealtime() + 45_000L
+            var observed = false
+            while (!observed && SystemClock.elapsedRealtime() < deadline) {
+                main { observed = field("destinationSearchInFlight") == true }
+                if (!observed) SystemClock.sleep(5)
+            }
+            assertTrue("No live search request observed; cannot claim request cancellation", observed)
+        }
+        if (mode == "back") instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        if (mode == "home") {
+            instrumentation.targetContext.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            waitUntil("Search did not pause") { field("isActivityForeground") == false }
+        }
+        if (mode == "recreate") recreateRealMainForExitTest()
+        waitUntil("Search work survived exit") { field("destinationSearchInFlight") == false }
+        if (mode == "home") {
+            instrumentation.targetContext.startActivity(Intent(instrumentation.targetContext, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+            waitUntil("Search did not return") { field("isActivityForeground") == true }
+        }
+        repeat(50) {
+            main {
+                assertFalse(field("destinationSearchInFlight") as Boolean)
+                assertTrue((field("destinationSearchResults") as List<*>).isEmpty())
+                assertNull(field("pendingUiDestination")); assertNull(field("gatewayVoiceRecorder"))
+                assertFalse(field("isRouteActive") as Boolean)
+            }
+            SystemClock.sleep(100)
+        }
+        main { call("cancelNativeDestinationSearchAndReturnHome") }
+        waitUntil("Search exit did not release HOME") { field("nativeUiPage").toString() == "HOME" && call("homeVoiceCommandAvailable") == true }
+        report("SEARCH_INITIAL_EXIT mode=$mode search_in_flight_at_click=$httpStarted search_request_phase_observed=$awaitSearchRequest no_late_results_5s=true no_route_or_capture=true; server_request_execution=NOT_MEASURED delayed_server_reply=NOT_INJECTED location_gate_preserved=true")
+    }
+
+    @Test fun preparationRecreationCannotRestoreStartAuthorization() = withHome {
+        main {
+            activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            views(activity.window.decorView).filterIsInstance<Button>().single { it.isShown && it.text == "길라잡이" }.performClick()
+            (field("destinationQueryInput") as EditText).setText("서울역")
+            (field("destinationSearchButton") as Button).performClick()
+        }
+        waitUntil("Real search did not provide candidates", 45_000) {
+            field("destinationSearchInFlight") == false && views(field("destinationSearchResultsContainer") as View)
+                .filterIsInstance<Button>().any { it.isShown && it.isEnabled }
+        }
+        main {
+            views(field("destinationSearchResultsContainer") as View).filterIsInstance<Button>()
+                .first { it.isShown && it.isEnabled }.performClick()
+            assertTrue(call("isInWalkInteractionArea") == true)
+            assertFalse(field("isRouteActive") as Boolean)
+        }
+        recreateRealMainForExitTest()
+        repeat(50) {
+            main {
+                assertFalse(field("isRouteActive") as Boolean)
+                assertNull(field("nativeGuidanceConfirmationAction")); assertNull(field("nativeGuidanceConfirmationScreen"))
+                assertNull(field("gatewayVoiceRecorder"))
+            }
+            SystemClock.sleep(100)
+        }
+        main {
+            report("PREPARATION_RECREATE restored_page=${field("nativeUiPage")} destination_retained=${field("pendingUiDestination") != null} walk_area=${call("isInWalkInteractionArea")} no_auto_start_5s=true no_old_confirmation=true sensor_pass_injected=false")
+            call("cancelNativeGuidanceAndReturnHome")
+        }
+        waitUntil("Recreated preparation cannot be cancelled") { field("nativeUiPage").toString() == "HOME" && field("pendingUiDestination") == null && call("isInWalkInteractionArea") == false }
     }
 
     @Test fun realDestinationPreparationRetryAndCancellation() = withHome {

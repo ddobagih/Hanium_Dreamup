@@ -1080,7 +1080,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var voiceHelpRecovery: Button? = null
     private var voiceHelpGeneration = 0L
     private var voiceHelpLastText = kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.MENU
-    private var voiceHelpCue: kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer? = null
+    private var voiceListeningStartCue: kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer? = null
     private lateinit var gatewayVoiceStatusText: TextView
     private lateinit var voiceCommandErrorPanel: LinearLayout
     private lateinit var voiceCommandErrorText: TextView
@@ -1174,6 +1174,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     }
     private var voiceCommandPromptPending = false
     private var voiceCommandPromptReadyGeneration: Int? = null
+    private var voiceListeningCueReadyGeneration: Int? = null
     private var deferredVoiceRecognitionStart: Runnable? = null
     private var deferredVoiceRecognitionFailure: (() -> Unit)? = null
     private var voiceRecognitionPurpose = VoiceRecognitionPurpose.COMMAND
@@ -14912,6 +14913,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 // A completed cue is sufficient only when the wake phrase had no inline command.
                 if (command == null && result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.COMPLETED) {
                     voiceCommandPromptReadyGeneration = voiceRecognitionGeneration
+                    voiceListeningCueReadyGeneration = voiceRecognitionGeneration
                 }
                 startVoiceCommandRecognition()
             } else {
@@ -36143,6 +36145,8 @@ generation != cameraFallbackGeneration
         // New output owns the visible response; cancellation of an older TTS cannot overwrite it.
         invalidateForegroundHomeWakeInput()
         val responseGeneration = ++commandSpeechResponseGeneration
+        voiceListeningCueReadyGeneration = null
+        voiceListeningStartCue?.cancel()
         commandSpeechTracker.finish(commandSpeechAttempt, CommandSpeechState.CANCELLED)
         commandSpeechAttempt = speechAttempt
         // registerLatest retires old callbacks silently. Preserve retry for an interrupted
@@ -36738,7 +36742,9 @@ generation != cameraFallbackGeneration
             } == true
 
     private fun isHandsFreeVoiceOutputActive(): Boolean {
-        if (foregroundHomeWakeAcknowledgement?.isPlaying() == true) return true
+        if (foregroundHomeWakeAcknowledgement?.isPlaying() == true ||
+            voiceListeningStartCue?.isPlaying() == true
+        ) return true
         return isHandsFreeVoiceSpeechOutputActive()
     }
 
@@ -37139,6 +37145,8 @@ generation != cameraFallbackGeneration
         if (handsFreeVoiceDestroyed) return
         handsFreeVoiceOwnsCommandPage = false
         handsFreeVoiceDestroyed = true
+        voiceListeningStartCue?.close()
+        voiceListeningStartCue = null
         cancelForegroundHomeWakeAcknowledgement()
         foregroundHomeWakeAcknowledgement?.close()
         foregroundHomeWakeAcknowledgement = null
@@ -38878,6 +38886,7 @@ generation != cameraFallbackGeneration
         expectedGatewayWalkOperationId: String? = null,
     ): Boolean {
         if (isGuidancePreview()) return false
+        if (voiceListeningStartCue?.isPlaying() == true) return true
         handsFreeVoiceOwnsCommandPage = false
         cancelForegroundHomeWakeAcknowledgement()
         cancelForegroundHomeWakeListening()
@@ -38953,12 +38962,18 @@ generation != cameraFallbackGeneration
             !feedbackPolicy.canSpeakNavigation(SystemClock.elapsedRealtime()) ||
             feedbackActuator?.prepareForSpeechRecognition() == false
         ) {
+            // Intervening speech/warnings retire a previous cue; signal again immediately before input.
+            voiceListeningCueReadyGeneration = null
             return deferVoiceRecognitionUntilOutputIdle(purpose, expectedGatewayWalkOperationId)
         }
         clearDeferredVoiceRecognitionStart(notifyFailure = false)
-        voiceCommandPromptReadyGeneration = null
         if (BuildConfig.WALKSAFE_SERVER_STT_ENABLED && purpose == VoiceRecognitionPurpose.COMMAND) {
             if (!promptCompletedForThisRequest) return prepareOneShotVoiceCommandPrompt()
+            if (voiceListeningCueReadyGeneration != voiceRecognitionGeneration) {
+                return playVoiceListeningStartCue(purpose, expectedGatewayWalkOperationId)
+            }
+            voiceCommandPromptReadyGeneration = null
+            voiceListeningCueReadyGeneration = null
             val started = startGatewayVoiceCapture()
             if (!started) speakInteraction("서버 음성 입력을 시작할 수 없습니다. 로그인과 데이터 사용 설정을 확인해 주세요.")
             return started
@@ -38987,6 +39002,11 @@ generation != cameraFallbackGeneration
         if (purpose == VoiceRecognitionPurpose.COMMAND && !promptCompletedForThisRequest) {
             return prepareOneShotVoiceCommandPrompt()
         }
+        if (voiceListeningCueReadyGeneration != voiceRecognitionGeneration) {
+            return playVoiceListeningStartCue(purpose, expectedGatewayWalkOperationId)
+        }
+        voiceCommandPromptReadyGeneration = null
+        voiceListeningCueReadyGeneration = null
         stopHandsFreeVoiceService()
         val generation = ++voiceRecognitionGeneration
         val recognizer = speechRecognizer ?: runCatching {
@@ -39050,6 +39070,62 @@ generation != cameraFallbackGeneration
                 permanentlyLimit = false,
             )
         }
+    }
+
+    /** The same bounded cue precedes every one-shot recorder, after speech releases audio. */
+    private fun playVoiceListeningStartCue(
+        purpose: VoiceRecognitionPurpose,
+        expectedGatewayWalkOperationId: String?,
+    ): Boolean {
+        stopHandsFreeVoiceService()
+        val generation = voiceRecognitionGeneration
+        val responseGeneration = commandSpeechResponseGeneration
+        val lifecycle = feedbackLifecycleGeneration
+        val epoch = walkSessionLifecycle.snapshot().epoch
+        val page = nativeUiPage
+        val actor = reporterUserId
+        val sessionGeneration = GatewaySessionProcessCoordinator.snapshot().generation
+        val resumeToken = walkSessionResumeConfirmationToken
+        val decisionToken = routeNavigator.pendingDecisionToken()
+        val cue = voiceListeningStartCue ?: kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer(
+            this, ::isHandsFreeVoiceSpeechOutputActive,
+        ).also { voiceListeningStartCue = it }
+        if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeVoiceInput", "event=LISTENING_CUE_STARTED")
+        cue.play { result ->
+            if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeVoiceInput", "event=LISTENING_CUE_TERMINAL result=$result")
+            if (result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.CANCELLED ||
+                generation != voiceRecognitionGeneration || responseGeneration != commandSpeechResponseGeneration ||
+                !isActivityForeground || !isFeedbackLifecycleCurrent(lifecycle) || nativeUiPage != page ||
+                epoch != walkSessionLifecycle.snapshot().epoch || reporterUserId != actor ||
+                GatewaySessionProcessCoordinator.snapshot().generation != sessionGeneration ||
+                resumeToken != walkSessionResumeConfirmationToken || decisionToken != routeNavigator.pendingDecisionToken()
+            ) return@play
+            if (result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.COMPLETED) {
+                voiceListeningCueReadyGeneration = generation
+                // Recheck permission, session and safety gates after this asynchronous interval.
+                if (startVoiceCommandRecognition(purpose, expectedGatewayWalkOperationId)) return@play
+            }
+            voiceListeningCueReadyGeneration = null
+            voiceCommandPromptReadyGeneration = null
+            updateVoiceCommandButton(active = false)
+            when (purpose) {
+                VoiceRecognitionPurpose.WALK_SESSION_RESUME -> handleWalkSessionResumeRecognizerNotStarted()
+                VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER ->
+                    cancelGatewayWalkTakeoverConfirmation(epoch, "takeover_voice_not_started")
+                VoiceRecognitionPurpose.COMMAND -> Unit
+            }
+            val message = if (result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.FAILED)
+                "입력 시작 알림음을 재생하지 못했습니다. 음성 명령이나 다시 듣기를 눌러 재시도해 주세요."
+            else "듣기를 시작하지 못했습니다. 음성 명령이나 다시 듣기를 눌러 재시도해 주세요."
+            if (result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.FAILED &&
+                purpose == VoiceRecognitionPurpose.COMMAND
+            ) showVoiceCommandError(message, "다시 시도") { startVoiceCommandRecognition() }
+            updateGatewayVoiceStatus(message)
+            showVoiceHelpRecovery(message)
+            reportPanelStatus?.append("\n\n$message")
+            speakInteraction(message)
+        }
+        return true
     }
 
     private fun cancelDeferredVoiceRecognitionStart() {
@@ -39164,6 +39240,8 @@ generation != cameraFallbackGeneration
     private fun cancelCommandSpeechResponse() {
         cancelDeferredVoiceRecognitionStart()
         commandSpeechResponseGeneration += 1L
+        voiceListeningCueReadyGeneration = null
+        voiceListeningStartCue?.cancel()
         failInterruptedRouteDecisionSpeech(commandSpeechResponseGeneration - 1L)
         commandSpeechTracker.finish(commandSpeechAttempt, CommandSpeechState.CANCELLED)
         commandSpeechAttempt = null
@@ -39889,7 +39967,7 @@ generation != cameraFallbackGeneration
         quarantineAuthority = null
         quarantineContent = null
         quarantineBusy = false
-        voiceHelpCue?.cancel()
+        voiceListeningStartCue?.cancel()
         reportPanelStatus = null
         dialog.dismiss()
         cancelVoiceCommandRecognition()
@@ -40247,7 +40325,7 @@ generation != cameraFallbackGeneration
 
     private fun speakReportPanel(message: String) {
         if (reportPanelDialog == null) return
-        voiceHelpCue?.cancel()
+        voiceListeningStartCue?.cancel()
         cancelVoiceCommandRecognition()
         stopHandsFreeVoiceService()
         reportPanelLastText = message
@@ -40259,16 +40337,9 @@ generation != cameraFallbackGeneration
         speakCommandResponse(message, preparingInput = true, statusExplanation = true, onCompleted = {
             if (current()) {
                 voiceCommandPromptPending = false
-                val cue = voiceHelpCue ?: kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer(
-                    this, ::isHandsFreeVoiceSpeechOutputActive,
-                ).also { voiceHelpCue = it }
-                cue.play { result ->
-                    if (current() && result != kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.CANCELLED) {
-                        voiceCommandPromptReadyGeneration = voiceRecognitionGeneration
-                        if (!startVoiceCommandRecognition()) reportPanelStatus?.append(
-                            "\n\n듣기를 시작하지 못했습니다. 마이크 권한을 확인하거나 버튼으로 선택해 주세요.")
-                    }
-                }
+                voiceCommandPromptReadyGeneration = voiceRecognitionGeneration
+                if (!startVoiceCommandRecognition()) reportPanelStatus?.append(
+                    "\n\n듣기를 시작하지 못했습니다. 마이크 권한을 확인하거나 버튼으로 선택해 주세요.")
             }
         }, onFailed = {
             if (current()) reportPanelStatus?.append("\n\n음성을 재생하지 못했습니다. 다시 듣기로 재시도해 주세요.")
@@ -40322,6 +40393,8 @@ generation != cameraFallbackGeneration
             accessibilityTraversalAfter = previousId
         }.also { items.addView(it); previousId = it.id }
         voiceHelpRecovery = voiceHelpButton("다시 시도") {
+            voiceHelpSummary?.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
+            voiceHelpSummary?.text = "안내 후 번호를 말씀하거나 버튼을 눌러 주세요."
             speakVoiceHelp(voiceHelpLastText)
         }.apply {
             visibility = View.GONE
@@ -40362,8 +40435,8 @@ generation != cameraFallbackGeneration
         val screen = voiceHelpScreen ?: return
         voiceHelpScreen = null
         voiceHelpGeneration += 1L
-        voiceHelpCue?.close()
-        voiceHelpCue = null
+        voiceListeningStartCue?.close()
+        voiceListeningStartCue = null
         voiceHelpSummary = null
         voiceHelpRecovery = null
         (screen.parent as? ViewGroup)?.removeView(screen)
@@ -40417,9 +40490,12 @@ generation != cameraFallbackGeneration
         if (voiceHelpScreen == null) return
         // Invalidate old playback and input before a touch selection or repeat starts another turn.
         val generation = ++voiceHelpGeneration
-        voiceHelpCue?.cancel()
+        voiceListeningStartCue?.cancel()
         cancelVoiceCommandRecognition()
         stopHandsFreeVoiceService()
+        // Help open/choice/repeat/retry are explicit user turns. Reconnect a failed engine
+        // before the existing completion gate decides whether microphone capture may start.
+        ensureFeedbackActuator().retryFailedSpeechInitialization()
         if (remember) voiceHelpLastText = text
         voiceHelpRecovery?.visibility = View.GONE
         val epoch = walkSessionLifecycle.snapshot().epoch
@@ -40431,15 +40507,8 @@ generation != cameraFallbackGeneration
         val started = speakCommandResponse(text, preparingInput = true, statusExplanation = true, onCompleted = {
             if (current()) {
                 voiceCommandPromptPending = false
-                val cue = voiceHelpCue ?: kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementPlayer(
-                    this, ::isHandsFreeVoiceSpeechOutputActive,
-                ).also { voiceHelpCue = it }
-                cue.play { result ->
-                    if (current() && result != kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.CANCELLED) {
-                        voiceCommandPromptReadyGeneration = voiceRecognitionGeneration
-                        if (!startVoiceCommandRecognition()) showVoiceHelpRecovery("듣기를 시작하지 못했습니다. 다시 시도해 주세요.")
-                    }
-                }
+                voiceCommandPromptReadyGeneration = voiceRecognitionGeneration
+                if (!startVoiceCommandRecognition()) showVoiceHelpRecovery("듣기를 시작하지 못했습니다. 다시 시도해 주세요.")
             }
         }, onFailed = {
             if (current()) showVoiceHelpRecovery("음성 안내가 중단되었습니다. 다시 시도해 주세요. 음성이 계속 나오지 않으면 도움말을 닫고 한국어 음성 설정을 확인하세요.")
@@ -41057,6 +41126,9 @@ generation != cameraFallbackGeneration
             }
             return
         }
+        // This is an explicit user replay. A dead TTS service needs a new connection;
+        // the existing prompt readiness/completion gates still own selection and capture.
+        ensureFeedbackActuator().retryFailedSpeechInitialization()
         speakHomeDestinationVoicePrompt(transition.state)
     }
 

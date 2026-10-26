@@ -146,7 +146,251 @@ class DeletionEvidenceRecoveryDeviceTest {
         }
     }
 
-    private class NativeServer(responses:List<Pair<Int,String>>,requestedPort:Int=0):AutoCloseable {
+    @Test fun nativeDeletionStatusRejectsAmbiguousJsonWithoutChangingTheJournal() {
+        val valid = validStatusJson()
+        val malformed = listOf(valid + " {}", valid + "junk", valid.replaceFirst("{", "{\"revision\":2,"),
+            valid.replaceFirst("{", "{\"\\u0072evision\":2,"), valid.replace("\"revision\":1", "revision:1"),
+            valid.replaceFirst("\"schema_version\"", "'schema_version'"), valid.dropLast(1) + ",}")
+        val accepted = mutableListOf<Int>()
+        for ((index, body) in malformed.withIndex()) NativeServer(listOf(200 to body)).use { server ->
+            val machine = AccountDeletionStateMachine()
+            assertTrue(machine.requestConfirmation()); assertTrue(machine.begin(journal(server.base)))
+            val before = machine.snapshotOrNull()
+            val result = runCatching { AndroidPrivacyDeletionClient()
+                .fetchDeletionStatusCall(checkNotNull(before), server.base, SECRET).execute() }
+            if (result.isSuccess) accepted += index
+            else assertTrue(result.exceptionOrNull() is AccountDeletionProtocolException)
+            assertEquals(before, machine.snapshotOrNull()); assertTrue(machine.processingBlocked())
+            server.finished()
+        }
+        report("status_document_cases=${malformed.size} unexpectedly_accepted=$accepted no_real_deletion=true")
+        assertEquals(emptyList<Int>(), accepted)
+    }
+
+    @Test fun nativeDeletionErrorsCannotUseAmbiguousJsonForTerminalOrReauthenticationActions() {
+        val accepted = mutableListOf<String>()
+        for ((status, valid) in listOf(
+            409 to "{\"code\":\"account_deletion_already_completed\"}",
+            401 to "{\"code\":\"account_deletion_reauthentication_required\",\"reauthentication_required\":true}")) {
+            val malformed = listOf(valid + " {}", valid + "junk", valid.replaceFirst("{", "{\"code\":\"other\","),
+                valid.replaceFirst("{", "{\"\\u0063ode\":\"other\","), valid.replace("\"code\"", "code"),
+                valid.replace("\"code\"", "'code'"), valid.dropLast(1) + ",}")
+            for ((index, body) in malformed.withIndex()) NativeServer(listOf(status to body)).use { server ->
+                val error = assertThrows(AccountDeletionHttpException::class.java) {
+                    AndroidPrivacyDeletionClient().fetchDeletionStatusCall(journal(server.base), server.base, SECRET).execute()
+                }
+                if (accountDeletionHttpFailureDisposition(error.statusCode, error.errorBody) !=
+                    AccountDeletionHttpFailureDisposition.Retry("http_$status")) accepted += "$status:$index"
+                server.finished()
+            }
+        }
+        report("error_document_cases=14 unexpectedly_actionable=$accepted")
+        assertEquals(emptyList<String>(), accepted)
+    }
+
+    @Test fun nativeDeletionResponseFramingAndUtf8AreStrictOnSuccessAndFailure() {
+        val accepted = mutableListOf<String>()
+        for (status in listOf(200, 409)) {
+            val body = if (status == 200) validStatusJson() else "{\"code\":\"account_deletion_already_completed\"}"
+            val bytes = body.toByteArray()
+            val cases = listOf(
+                "short" to ("Content-Length: ${bytes.size + 20}\r\n" to bytes),
+                "duplicate_length" to ("Content-Length: ${bytes.size}\r\nContent-Length: ${bytes.size}\r\n" to bytes),
+                "conflicting_framing" to ("Content-Length: ${bytes.size}\r\nTransfer-Encoding: chunked\r\n" to chunk(bytes)),
+                "encoding" to ("Content-Length: ${bytes.size}\r\nContent-Encoding: gzip\r\n" to bytes),
+                "invalid_utf8" to ("" to (bytes.copyOfRange(0, bytes.size - 1) +
+                    ",\"ignored\":\"".toByteArray() + byteArrayOf(0xc3.toByte(), 0x28) + "\"}".toByteArray()))
+            )
+            for ((name, wire) in cases) NativeServer(listOf(status to body), wireResponse = { _, _ ->
+                response(status, wire.first, wire.second)
+            }).use { server ->
+                val result = runCatching { AndroidPrivacyDeletionClient()
+                    .fetchDeletionStatusCall(journal(server.base), server.base, SECRET).execute() }
+                if (result.exceptionOrNull() !is NetworkResponseProtocolException) accepted += "$status:$name"
+                server.finished()
+            }
+        }
+        report("strict_wire_cases=10 missing_transport_rejection=$accepted")
+        assertEquals(emptyList<String>(), accepted)
+    }
+
+    @Test fun nativeDeletionValidFramingAndErrorCodesRemainUsable() {
+        val bytes = validStatusJson().toByteArray()
+        for ((name, wire) in listOf(
+            "length" to ("Content-Length: ${bytes.size}\r\n" to bytes),
+            "chunked" to ("Transfer-Encoding: chunked\r\n" to chunk(bytes)),
+            "close" to ("" to bytes))) NativeServer(listOf(200 to ""), wireResponse = { _, _ ->
+                response(200, wire.first, wire.second)
+            }).use { server ->
+                val value = AndroidPrivacyDeletionClient().fetchDeletionStatusCall(journal(server.base), server.base, SECRET).execute()
+                assertEquals(REQUEST, value.requestId); server.finished()
+                assertTrue("identity requested for $name", server.headers.single().contains("Accept-Encoding: identity", true))
+            }
+        for ((status, body) in listOf(409 to "{\"code\":\"account_deletion_already_completed\"}",
+            401 to "{\"code\":\"account_deletion_reauthentication_required\",\"reauthentication_required\":true}")) {
+            NativeServer(listOf(status to body)).use { server ->
+                val error = assertThrows(AccountDeletionHttpException::class.java) { AndroidPrivacyDeletionClient()
+                    .fetchDeletionStatusCall(journal(server.base), server.base, SECRET).execute() }
+                assertEquals(body, error.errorBody); assertEquals(status, error.statusCode); server.finished()
+                assertEquals(if (status == 409) AccountDeletionHttpFailureDisposition.TerminalConflict("account_deletion_already_completed")
+                    else AccountDeletionHttpFailureDisposition.Retry(ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE),
+                    accountDeletionHttpFailureDisposition(status, body))
+            }
+        }
+        report("valid_wire_formats=3 original_error_actions=2")
+    }
+
+    @Test fun allFiveDeletionEntryPointsShareTheStrictResponseBoundary() {
+        for (entry in listOf("initial", "recovery", "replay", "status", "evidence")) {
+            val code = if (entry == "initial") 202 else 200
+            val valid = validStatusJson()
+            for (kind in listOf("valid", "extra_json", "short_body")) {
+                val body = if (kind == "extra_json") "$valid {}" else valid
+                NativeServer(listOf(code to body), wireResponse = { _, text ->
+                    val bytes = text.toByteArray()
+                    response(code, "Content-Length: ${bytes.size + if (kind == "short_body") 8 else 0}\r\n", bytes)
+                }).use { server ->
+                    val client = AndroidPrivacyDeletionClient()
+                    val machine = AccountDeletionStateMachine()
+                    assertTrue(machine.requestConfirmation()); assertTrue(machine.begin(journal(server.base)))
+                    assertEquals(AccountDeletionApplyResult.APPLIED, machine.apply(checkNotNull(
+                        validatedAccountDeletionStatusOrNull(valid, INSTALLATION, REQUEST))))
+                    val saved = checkNotNull(machine.snapshotOrNull())
+                    val call = when (entry) {
+                        "initial" -> client.requestDeletionCall(server.base, server.base, GatewayFieldSession.verified(
+                            server.base, "synthetic-deletion-actor", "walksafe_field_session=" + "a".repeat(64),
+                            System.currentTimeMillis() + 60_000), INSTALLATION, SECRET, REQUEST)
+                        "recovery" -> client.recoverDeletionRequestAcceptOrReplayCall(server.base, server.base,
+                            GatewayFieldSession.legacyVerified(gatewayBaseUrl = server.base, actorId = "synthetic-deletion-actor",
+                                deviceId = "synthetic-deletion-device", cookiePair = "walksafe_field_session=" + "b".repeat(64),
+                                expiresAtEpochMs = System.currentTimeMillis() + 60_000,
+                                sessionScope = GatewaySessionScope.ACCOUNT_DELETION_RECOVERY), INSTALLATION, SECRET, REQUEST)
+                        "replay" -> client.replayDeletionRequestCall(saved, server.base, SECRET)
+                        "status" -> client.fetchDeletionStatusCall(saved, server.base, SECRET)
+                        else -> { val proof = evidence(saved); client.submitDeviceDeletionEvidenceCall(saved, server.base, SECRET, proof) }
+                    }
+                    when (kind) {
+                        "valid" -> assertEquals(REQUEST, call.execute().requestId)
+                        "extra_json" -> assertThrows(AccountDeletionProtocolException::class.java) { call.execute() }
+                        else -> assertThrows(NetworkResponseProtocolException::class.java) { call.execute() }
+                    }
+                    server.finished()
+                    assertTrue(server.headers.single().contains("Accept-Encoding: identity", true))
+                    assertEquals(saved, machine.snapshotOrNull()); assertTrue(machine.processingBlocked())
+                }
+            }
+        }
+        report("entry_points=5 valid_and_extra_json_and_short_body_cases=15 actual_accounts_untouched=true")
+    }
+
+    private fun chunk(bytes: ByteArray) = "${bytes.size.toString(16)}\r\n".toByteArray() + bytes + "\r\n0\r\n\r\n".toByteArray()
+
+    @Test fun nativeRegisteredKeySignsFailedEvidenceAndKeepsIdenticalRetryBytes() {
+        withIsolatedEvidenceKey { installation, key, alias, cacheDigests ->
+            NativeServer(listOf(200 to consentBody(installation), 204 to "",
+                200 to validStatusJson(), 200 to validStatusJson())).use { server ->
+                val session = GatewayFieldSession.verified(server.base, "synthetic-native-evidence-actor",
+                    "walksafe_field_session=v2.synthetic.evidence", Long.MAX_VALUE)
+                val consent = AndroidIntegratedConsentClient(key::publicKey)
+                    .fetchCurrentCall(server.base, session, installation, "b".repeat(64)).execute()
+                assertNotNull(consent)
+                val machine = AccountDeletionStateMachine()
+                assertTrue(machine.requestConfirmation())
+                assertTrue(machine.begin(AccountDeletionJournal.pending(server.base, installation, REQUEST, "2026-07-25T12:00:00Z")))
+                assertEquals(AccountDeletionApplyResult.APPLIED, machine.apply(checkNotNull(
+                    validatedAccountDeletionStatusOrNull(validStatusJson(), installation, REQUEST))))
+                val saved = checkNotNull(machine.snapshotOrNull())
+                // These are failed, synthetic deletion results. No application data is erased.
+                val unsigned = evidence(saved).copy(result = "FAILED", completedAt = "2026-07-25T12:00:05Z", evidenceSha256 = "0".repeat(64))
+                val proof = unsigned.copy(evidenceSha256 = deviceDeletionEvidenceSha256(unsigned))
+                cacheDigests.add(proof.evidenceSha256)
+                val client = AndroidPrivacyDeletionClient(key::signIfPresent)
+                repeat(2) { assertEquals("PROCESSING", client.submitDeviceDeletionEvidenceCall(saved, server.base, SECRET, proof).execute().overallStatus.name) }
+                server.finished()
+                val registration = JSONObject(server.bodies[1])
+                assertEquals(installation, registration.getString("installation_id"))
+                assertTrue(server.headers[1].startsWith("PUT /privacy/rights?control=installation-evidence-key "))
+                assertTrue(server.headers[1].contains("Cookie: walksafe_field_session=v2.synthetic.evidence", true))
+                val publicKey = java.security.KeyFactory.getInstance("EC").generatePublic(java.security.spec.X509EncodedKeySpec(
+                    java.util.Base64.getUrlDecoder().decode(registration.getString("public_key"))))
+                assertNull(KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.getKey(alias, null).encoded)
+                assertEquals(server.bodies[2], server.bodies[3])
+                val sent = JSONObject(server.bodies[2])
+                assertEquals(installation, sent.getString("installation_id")); assertEquals("FAILED", sent.getString("result"))
+                assertEquals(proof.evidenceSha256, sent.getString("evidence_sha256"))
+                val signature = java.util.Base64.getUrlDecoder().decode(sent.getString("installation_signature"))
+                fun verifies(digest: String) = java.security.Signature.getInstance("SHA256withECDSA").run {
+                    initVerify(publicKey); update(("walksafe/device-deletion-evidence-signature/v1\u0000" + digest).toByteArray(Charsets.US_ASCII)); verify(signature)
+                }
+                assertTrue(verifies(proof.evidenceSha256))
+                val other = proof.copy(installationId = installation + "-other")
+                assertFalse(verifies(deviceDeletionEvidenceSha256(other)))
+                assertEquals(saved, machine.snapshotOrNull()); assertTrue(machine.processingBlocked())
+                report("native_keystore_registration=true private_key_exportable=false signed_failed_evidence_http=true exact_retry=true other_installation_digest_rejected=true")
+            }
+        }
+    }
+
+    @Test fun nativeEvidenceKeyRegistrationConflictRequiresExplicitRetryWithoutKeyReplacement() {
+        withIsolatedEvidenceKey { installation, key, _, _ ->
+            NativeServer(listOf(200 to consentBody(installation), 409 to "{\"detail\":{\"code\":\"installation_evidence_key_conflict\"}}",
+                200 to consentBody(installation), 204 to "")).use { server ->
+                val session = GatewayFieldSession.verified(server.base, "synthetic-native-evidence-actor",
+                    "walksafe_field_session=v2.synthetic.evidence", Long.MAX_VALUE)
+                val client = AndroidIntegratedConsentClient(key::publicKey)
+                val failure = assertThrows(IntegratedConsentHttpException::class.java) {
+                    client.fetchCurrentCall(server.base, session, installation, "b".repeat(64)).execute()
+                }
+                assertEquals(409, failure.statusCode)
+                assertEquals(2, server.headers.size)
+                val before = key.publicKey(installation)
+                assertNotNull(client.fetchCurrentCall(server.base, session, installation, "b".repeat(64)).execute())
+                server.finished()
+                assertEquals(4, server.headers.size)
+                assertEquals(before, key.publicKey(installation))
+                assertEquals(server.bodies[1], server.bodies[3])
+                report("registration_conflict_not_success=true no_implicit_retry=true same_native_public_key_on_explicit_retry=true")
+            }
+        }
+    }
+
+    private fun withIsolatedEvidenceKey(test: (String, AndroidInstallationEvidenceKey, String, MutableSet<String>) -> Unit) {
+        val installation = "instrumentation-wire-evidence-" + java.util.UUID.randomUUID()
+        val alias = "walkmate.deletion-evidence." + hash(installation)
+        val keys = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        val cacheDigests = mutableSetOf<String>()
+        assertFalse(keys.containsAlias(alias))
+        try { test(installation, AndroidInstallationEvidenceKey(app), alias, cacheDigests) }
+        finally {
+            keys.deleteEntry(alias); assertFalse(keys.containsAlias(alias))
+            // Only this test's digest-specific cache is removed; never call the app-wide reset.
+            for (digest in cacheDigests) for (suffix in listOf("", ".bak", ".new")) {
+                val name = "deletion-signature-" + hash("$installation:$digest")
+                val file = File(app.noBackupFilesDir, name + suffix)
+                if (file.exists()) assertTrue(file.delete())
+            }
+        }
+    }
+
+    private fun consentBody(installation: String): String = JSONObject()
+        .put("schema_version", INTEGRATED_CONSENT_CONFIRMATION_SCHEMA_VERSION).put("current", true)
+        .put("installation_id", installation).put("request_id", "native_evidence_consent_0001")
+        .put("policy_version", INTEGRATED_CONSENT_POLICY_VERSION)
+        .put("item_versions", JSONObject().put("raw_source_collection", INTEGRATED_CONSENT_RAW_ITEM_VERSION)
+            .put("automatic_reporting", INTEGRATED_CONSENT_AUTOMATIC_ITEM_VERSION)
+            .put("mobile_network_transfer", INTEGRATED_CONSENT_MOBILE_ITEM_VERSION)
+            .put("training_reuse", INTEGRATED_CONSENT_TRAINING_ITEM_VERSION))
+        .put("client_revision", 1).put("revision", 1)
+        .put("selections", JSONObject().put("raw_source_collection", false).put("automatic_reporting", false)
+            .put("mobile_network_transfer", false).put("training_reuse", false))
+        .put("confirmed_at", "2026-10-25T00:00:00.000Z").put("gateway_audit_record_sha256", "a".repeat(64))
+        .put("backend_consent_receipt_sha256", "b".repeat(64)).toString()
+
+    private fun response(status: Int, headers: String, bytes: ByteArray) =
+        "HTTP/1.1 $status Test\r\nContent-Type: application/json\r\n${headers}Connection: close\r\n\r\n".toByteArray() + bytes
+
+    private class NativeServer(responses:List<Pair<Int,String>>,requestedPort:Int=0,
+        wireResponse: ((Int, String) -> ByteArray)? = null):AutoCloseable {
         private val server=ServerSocket().apply {reuseAddress=true;bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"),requestedPort));soTimeout=15_000}
         val port=server.localPort;val base="http://127.0.0.1:$port"
         val bodies=mutableListOf<String>();val headers=mutableListOf<String>()
@@ -159,7 +403,11 @@ class DeletionEvidenceRecoveryDeviceTest {
                 val length=header.lineSequence().firstOrNull{it.startsWith("Content-Length:",true)}?.substringAfter(':')?.trim()?.toInt()?:0
                 check(length in 0..1_000_000)
                 val data=ByteArray(length);for(i in data.indices){val b=input.read();check(b>=0);data[i]=b.toByte()};bodies+=data.toString(Charsets.UTF_8)
-                val bytes=body.toByteArray();c.getOutputStream().apply{write("HTTP/1.1 $status Test\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray());write(bytes);flush()}
+                val bytes=body.toByteArray();c.getOutputStream().apply {
+                    if (wireResponse != null) write(wireResponse(status, body))
+                    else { write("HTTP/1.1 $status Test\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray());write(bytes) }
+                    flush()
+                }
             }
         }
         fun finished(){task.get(20,TimeUnit.SECONDS)}

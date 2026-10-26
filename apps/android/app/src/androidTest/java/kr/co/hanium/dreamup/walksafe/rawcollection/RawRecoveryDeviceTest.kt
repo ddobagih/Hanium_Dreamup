@@ -198,7 +198,12 @@ class RawRecoveryDeviceTest {
             when(mode) {
                 "manifest" -> { assertFalse(storage.writeManifestAtomically(VALID,"REPLACEMENT"));assertEquals(manifest,storage.readManifest(VALID)) }
                 "chunk" -> { assertFalse(storage.writeChunkAtomically(VALID,0,"REPLACEMENT"));assertEquals(chunk,storage.readChunk(VALID,0)) }
-                "fence" -> { assertFalse(storage.writeFenceAtomically(fenceName,"REPLACEMENT"));assertEquals("BEFORE",storage.readFence(fenceName)) }
+                "fence" -> {
+                    assertTrue("Independent durable fallback must preserve the block", storage.writeFenceAtomically(fenceName,"REPLACEMENT"))
+                    assertEquals("BEFORE", target.resolve("$fenceName.fence").readText().trim())
+                    assertEquals("REPLACEMENT", FileRawCollectionStorage(root).readFence(fenceName))
+                    assertTrue(root.resolve("raw_collections_v2/recovery_fences/$fenceName.fence").isFile)
+                }
                 "purge" -> { assertFalse(store.onAccountDeleted());assertFalse(storage.verifiedEmptyAfterAccountPurge());assertEquals(manifest,storage.readManifest(VALID)) }
             }
         } finally { android.system.Os.chmod(target.absolutePath,0b111000000) }
@@ -209,7 +214,7 @@ class RawRecoveryDeviceTest {
             "purge" -> {assertTrue(store.onAccountDeleted());assertTrue(storage.verifiedEmptyAfterAccountPurge())}
         }
         InstrumentationRegistry.getInstrumentation().sendStatus(0,android.os.Bundle().apply {
-            putString("stream","RAW_NATIVE_DENIAL case=$mode actual_chmod=true denial_reported=true evidence_preserved=true restored_permission_retry=true synthetic_owner=true actual_account_deletion=false\n")
+            putString("stream","RAW_NATIVE_DENIAL case=$mode actual_chmod=true primary_permission_denied=true evidence_preserved=true fence_fallback_when_available=true restored_permission_retry=true synthetic_owner=true actual_account_deletion=false\n")
         })
     }
 

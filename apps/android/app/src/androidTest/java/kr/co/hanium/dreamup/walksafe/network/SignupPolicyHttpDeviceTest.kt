@@ -20,6 +20,44 @@ import org.junit.Test
 /** Actual Android HTTP/JSON, synthetic loopback policy and account responses.
  * No real account/OTP/consent, Main UI, stored enrollment or external service is touched. */
 class SignupPolicyHttpDeviceTest {
+    @Test fun strictNativeJsonAcrossPolicyOtpAndAccountCreation() {
+        val forms = listOf("valid", "whitespace", "extra-document", "extra-text", "unquoted", "single-quotes", "trailing-comma", "duplicate")
+        for (kind in listOf("policy", "otp", "create")) for (form in forms) {
+            val canonical = when (kind) { "policy" -> policy().toString(); "otp" -> otpReply().toString(); else -> CREATED }
+            val response = when (form) {
+                "whitespace" -> " \r\n$canonical\t "
+                "extra-document" -> canonical + "{}"
+                "extra-text" -> canonical + "private-trailing-fixture"
+                "unquoted" -> canonical.replace("\"schema_version\":", "schema_version:")
+                "single-quotes" -> canonical.replace('"', '\'')
+                "trailing-comma" -> canonical.dropLast(1) + ",}"
+                "duplicate" -> canonical.dropLast(1) + ",\"schem\\u0061_version\":" + JSONObject.quote(JSONObject(canonical).getString("schema_version")) + "}"
+                else -> canonical
+            }
+            val status = when (kind) { "policy" -> 200; "otp" -> 202; else -> 201 }
+            NativeServer(listOf(status to response)).use { server ->
+                val result = runCatching {
+                    val client = GatewayAccountClient()
+                    when (kind) {
+                        "policy" -> assertTrue(client.signupUnavailableOptionalDocuments(server.base).isEmpty())
+                        "otp" -> assertEquals(HANDLE, requestOtp(server.base).enrollmentHandle)
+                        else -> create(client, server.base, "Synthetic-R7!password")
+                    }
+                }
+                if (form in listOf("valid", "whitespace")) result.getOrThrow()
+                else {
+                    val failure = result.exceptionOrNull()
+                    assertTrue("$kind/$form accepted or wrong error: $failure", failure is GatewayAccountHttpException)
+                    assertEquals(0, (failure as GatewayAccountHttpException).statusCode)
+                    assertEquals(when (kind) { "policy" -> "invalid_signup_policy"; "otp" -> "invalid_email_otp_response"; else -> "invalid_account_create_response" }, failure.reason)
+                    assertFalse(failure.message.orEmpty().contains("private-trailing-fixture"))
+                }
+                server.finished(); assertEquals(1, server.headers.size)
+                report("strict_native_json=$kind/$form accepted=${result.isSuccess} synthetic_response_only=true")
+            }
+        }
+    }
+
     private fun report(value:String)=InstrumentationRegistry.getInstrumentation().sendStatus(0,
         Bundle().apply{putString("stream","SIGNUP_POLICY $value\n")})
     private fun policy()=JSONObject().put("schema_version","walksafe.account-signup-policy.v1")

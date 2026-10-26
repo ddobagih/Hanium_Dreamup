@@ -40,6 +40,7 @@ from backend.app.api import accounts
 from backend.app.config import get_settings, migration_database_url
 from backend.app.field_test_security import FieldTestSecurityMiddleware
 from backend.app.models import UserAccount
+from backend.app.schemas import WalkingRouteResponse
 from backend.app.services.accounts import (
     account_email_crypto_for_settings, bind_or_verify_account_crypto_keys,
     hash_account_password,
@@ -209,7 +210,20 @@ def test_backend_only_epoch_update_blocks_existing_gateway_cookie_over_http(epoc
     async def controlled_walking(request: Request):
         await request.body()
         business_calls.append("/navigation/walking")
-        return JSONResponse({"ok": True})
+        points = [
+            {"latitude": 37.5665, "longitude": 126.9780},
+            {"latitude": 37.5670, "longitude": 126.9790},
+        ]
+        route = WalkingRouteResponse.model_validate({
+            "schema_version": "walksafe.walking_route.v1",
+            "provider": "tmap_pedestrian", "priority": "STAIR_AVOID",
+            "summary": {"distance_m": 104, "duration_s": 90},
+            "polyline": points,
+            "steps": [{"index": 0, "distance_m": 104, "duration_s": 90, "points": points}],
+            "guide_points": [{"index": 0, "point": points[-1], "instruction": "도착"}],
+            "provider_result_code": 0, "provider_result_message": "OK",
+        })
+        return JSONResponse(route.model_dump(mode="json"))
 
     @app.post("/reports/v2")
     async def controlled_report(request: Request):

@@ -166,6 +166,8 @@ def _run_reopen_race(root: Path, replacement: str) -> dict[str, object]:
 
 _CHILD = r"""
 import json, os, socket, sys
+if sys.flags.optimize:
+    raise RuntimeError("readiness I/O checks require assertions enabled")
 os.environ["WALKSAFE_ENVIRONMENT"] = "development"
 os.environ["DATABASE_URL"] = "postgresql+psycopg://walksafe_test:disabled@127.0.0.1:1/walksafe_pytest_unconfigured"
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -197,7 +199,7 @@ def test_nonregular_swap_at_committed_reopen_finishes_worker_and_allows_fresh_ch
     tmp_path: Path, replacement: str,
 ) -> None:
     environment = dict(os.environ)
-    for name in ("WALKSAFE_TEST_DATABASE_URL", "WALKSAFE_MIGRATION_DATABASE_URL", "PYTEST_ADDOPTS"):
+    for name in ("WALKSAFE_TEST_DATABASE_URL", "WALKSAFE_MIGRATION_DATABASE_URL", "PYTEST_ADDOPTS", "PYTHONOPTIMIZE"):
         environment.pop(name, None)
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     # run(timeout=...) kills and waits for its owned child on a regression.
@@ -260,3 +262,132 @@ def test_nonblocking_regular_files_keep_digest_size_and_key_state_validation(
     report_storage.validate_report_storage_inventory(
         tmp_path, [entry], known_key_states={"test-key": "active"},
     )
+
+
+_JOURNAL_CHILD = r"""
+import io, json, os, sys
+if sys.flags.optimize:
+    raise RuntimeError("journal I/O checks require assertions enabled")
+from pathlib import Path
+from backend.tests.test_report_storage_readiness_io import _inventory
+from backend.app.services import report_storage
+root, replacement = Path(sys.argv[1]), sys.argv[2]
+encrypted, destination, entry = _inventory(root)
+pending = report_storage.stage_report_image(destination, encrypted)
+journal = pending.journal_path
+backup = root.parent / (root.name + '-saved-journal')
+real_open, real_io_open = os.open, io.open
+swapped, lookups = False, []
+def swap(path):
+    global swapped
+    if swapped or not isinstance(path, (str, bytes, os.PathLike)) or Path(path) != journal:
+        return
+    swapped = True
+    journal.rename(backup)
+    if replacement == 'fifo':
+        os.mkfifo(journal, 0o600)
+    elif replacement == 'symlink':
+        journal.symlink_to(backup)
+    else:
+        journal.mkdir(mode=0o700)
+    print('JOURNAL_OPEN_SWAP_REACHED', flush=True)
+def open_race(path, *args, **kwargs):
+    swap(path)
+    return real_open(path, *args, **kwargs)
+def io_open_race(path, *args, **kwargs):
+    swap(path)
+    return real_io_open(path, *args, **kwargs)
+def lookup(report_id):
+    lookups.append(str(report_id))
+    return report_storage.ReportStorageCommitState(True, entry.image_object)
+os.open, io.open = open_race, io_open_race
+rejected = False
+try:
+    try:
+        report_storage.reconcile_pending_report_writes(root, lookup)
+    except report_storage.ReportStorageJournalUnresolved:
+        rejected = True
+finally:
+    os.open, io.open = real_open, real_io_open
+assert swapped
+assert rejected, 'changed journal was accepted'
+assert not lookups, 'database lookup occurred before rejecting the changed journal'
+assert destination.read_bytes() == encrypted.envelope
+assert journal.is_symlink() or journal.exists()
+if replacement == 'directory':
+    journal.rmdir()
+else:
+    journal.unlink()
+backup.rename(journal)
+result = report_storage.reconcile_pending_report_writes(root, lookup)
+assert result.retained_committed == 1 and result.removed_orphans == 0
+assert destination.read_bytes() == encrypted.envelope
+assert not journal.exists()
+print('JOURNAL_REJECTED_EVIDENCE_PRESERVED_RECOVERY_PASSED', flush=True)
+"""
+
+
+@pytest.mark.parametrize("replacement", ("fifo", "symlink", "directory"))
+def test_journal_open_swap_is_rejected_without_blocking_or_losing_evidence(
+    tmp_path: Path, replacement: str,
+) -> None:
+    environment = dict(os.environ)
+    for name in ("WALKSAFE_TEST_DATABASE_URL", "WALKSAFE_MIGRATION_DATABASE_URL", "PYTEST_ADDOPTS", "PYTHONOPTIMIZE"):
+        environment.pop(name, None)
+    environment["WALKSAFE_ENVIRONMENT"] = "development"
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    try:
+        result = subprocess.run(
+            [sys.executable, "-B", "-c", _JOURNAL_CHILD, str(tmp_path), replacement],
+            cwd=Path(__file__).resolve().parents[2], env=environment,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=5,
+        )
+    except subprocess.TimeoutExpired as error:
+        pytest.fail(f"journal reopen blocked in the owned child: {error.stdout!r}")
+    assert result.returncode == 0, result.stdout
+    assert "JOURNAL_OPEN_SWAP_REACHED" in result.stdout
+    assert "JOURNAL_REJECTED_EVIDENCE_PRESERVED_RECOVERY_PASSED" in result.stdout
+
+
+@pytest.mark.parametrize("mutation", ("replace", "append"))
+def test_journal_changed_during_read_is_rejected_before_commit_lookup(
+    tmp_path: Path, monkeypatch, mutation: str,
+) -> None:
+    monkeypatch.setenv("WALKSAFE_ENVIRONMENT", "development")
+    encrypted, destination, entry = _inventory(tmp_path)
+    journal = report_storage.stage_report_image(destination, encrypted).journal_path
+    original = journal.read_bytes()
+    load = json.load
+    descriptors = []
+
+    def changed_during_read(stream):
+        descriptors.append(stream.fileno())
+        payload = load(stream)
+        if mutation == "replace":
+            journal.unlink()
+            journal.write_bytes(original)
+            journal.chmod(0o600)
+        else:
+            with journal.open("ab") as output:
+                output.write(b"\n")
+        return payload
+
+    def unexpected_lookup(_report_id):
+        pytest.fail("changed journal reached the database lookup")
+
+    monkeypatch.setattr(json, "load", changed_during_read)
+    with pytest.raises(report_storage.ReportStorageJournalUnresolved):
+        report_storage.reconcile_pending_report_writes(tmp_path, unexpected_lookup)
+    assert destination.read_bytes() == encrypted.envelope
+    assert journal.read_bytes() == original + (b"\n" if mutation == "append" else b"")
+    assert len(descriptors) == 1
+    with pytest.raises(OSError) as closed:
+        os.fstat(descriptors[0])
+    assert closed.value.errno == errno.EBADF
+
+    monkeypatch.setattr(json, "load", load)
+    result = report_storage.reconcile_pending_report_writes(
+        tmp_path, lambda _id: report_storage.ReportStorageCommitState(True, entry.image_object),
+    )
+    assert result.retained_committed == 1 and result.removed_orphans == 0
+    assert destination.read_bytes() == encrypted.envelope

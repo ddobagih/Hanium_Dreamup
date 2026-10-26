@@ -27,6 +27,91 @@ class ReportNativeHttpStreamingDeviceTest {
         ReportPrivacyConsentSession.resetForNewEnrollment()
     }
 
+    @Test fun malformedNativeRepliesCannotConfirmReportAcceptance() {
+        for (variant in listOf("short", "ambiguous", "duplicate_length", "encoding", "utf8", "extra_json", "unfinished_chunks")) {
+            nativeReceiptBoundary(variant, accepted = false)
+        }
+    }
+
+    @Test fun nativeValidFixedChunkedAndCloseDelimitedReceiptsRemainAccepted() {
+        for (variant in listOf("fixed", "chunked", "close")) nativeReceiptBoundary(variant, accepted = true)
+    }
+
+    private fun nativeReceiptBoundary(variant: String, accepted: Boolean) {
+        val image = byteArrayOf(1, 2, 3)
+        val valid = successBody(image)
+        val bytes = when (variant) {
+            "extra_json" -> (valid + "{}").toByteArray()
+            "utf8" -> (valid.dropLast(1) + ",\"unused\":\"").toByteArray() +
+                byteArrayOf(0xc3.toByte(), 0x28) + "\"}".toByteArray()
+            else -> valid.toByteArray()
+        }
+        ServerSocket(0).use { server ->
+            server.soTimeout = 10_000
+            val executor = Executors.newSingleThreadExecutor()
+            try {
+                val sent = executor.submit {
+                    server.accept().use { socket ->
+                        socket.soTimeout = 10_000
+                        val input = socket.getInputStream()
+                        val head = ByteArrayOutputStream()
+                        while (!head.toString("US-ASCII").endsWith("\r\n\r\n")) {
+                            val value = input.read()
+                            check(value >= 0 && head.size() < 16_384)
+                            head.write(value)
+                        }
+                        val length = head.toString("US-ASCII").lineSequence()
+                            .first { it.startsWith("Content-Length:", true) }.substringAfter(':').trim().toInt()
+                        check(length in 0..16_384)
+                        repeat(length) { check(input.read() >= 0) }
+                        val framing = when (variant) {
+                            "short" -> "Content-Length: ${bytes.size + 5}\r\n"
+                            "ambiguous" -> "Content-Length: ${bytes.size}\r\nTransfer-Encoding: chunked\r\n"
+                            "duplicate_length" -> "Content-Length: ${bytes.size}\r\nContent-Length: ${bytes.size}\r\n"
+                            "encoding" -> "Content-Length: ${bytes.size}\r\nContent-Encoding: gzip\r\n"
+                            "chunked", "unfinished_chunks" -> "Transfer-Encoding: chunked\r\n"
+                            "close" -> ""
+                            else -> "Content-Length: ${bytes.size}\r\n"
+                        }
+                        // Send one complete fixture buffer; a native early rejection may close its peer.
+                        val response = ByteArrayOutputStream().apply {
+                            write(("HTTP/1.1 201 Created\r\nContent-Type: application/json\r\n" + framing +
+                                "Connection: close\r\n\r\n").toByteArray())
+                            if (variant in listOf("ambiguous", "chunked", "unfinished_chunks")) {
+                                write("${bytes.size.toString(16)}\r\n".toByteArray()); write(bytes); write("\r\n".toByteArray())
+                                if (variant != "unfinished_chunks") write("0\r\n\r\n".toByteArray())
+                            } else write(bytes)
+                        }.toByteArray()
+                        socket.getOutputStream().apply { write(response); flush() }
+                    }
+                }
+                ReportPrivacyConsentSession.resetForNewEnrollment()
+                check(ReportPrivacyConsentSession.grantFromServerConfirmedIntegratedConsent())
+                val result = runCatching {
+                    AndroidReportUploader().uploadCall(
+                        requireNotNull(ReportPrivacyConsentSession.issueUploadPermit(ReportTransferPurpose.EXPLICIT)),
+                        GatewayFieldSession.verified("http://127.0.0.1:${server.localPort}", ACTOR_ID,
+                            "walksafe_field_session=v2.test.session.cookie", Long.MAX_VALUE),
+                        consentConfirmation(), IntegratedConsentNetworkBinding.forTest(IntegratedConsentNetworkTransport.WIFI) { it.openConnection() },
+                        ReportTransferPurpose.EXPLICIT, """{"auto_reported":false,"trace_id":"$TRACE_ID"}""",
+                        image, TRACE_ID, ACTOR_ID,
+                    ).execute()
+                }
+                sent.get(10, TimeUnit.SECONDS)
+                if (accepted) assertEquals(ReportUploadReceiptOutcome.BOUND, result.getOrThrow().receiptOutcome)
+                else assertTrue("$variant must reject receipt, got $result",
+                    result.exceptionOrNull() is java.io.IOException || result.exceptionOrNull() is ReportUploadProtocolException)
+                androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().sendStatus(0,
+                    android.os.Bundle().apply { putString("stream", "NATIVE_REPORT_BOUNDARY variant=$variant accepted=$accepted external_upload=false\n") })
+            } finally {
+                server.close()
+                executor.shutdownNow()
+                check(executor.awaitTermination(15, TimeUnit.SECONDS))
+                ReportPrivacyConsentSession.resetForNewEnrollment()
+            }
+        }
+    }
+
     @Test fun httpErrorsKeepStatusBodyAndRetryAfter() {
         for (status in listOf(401, 403, 422, 429, 503)) {
             val errorBody = """{"detail":{"code":"device_test_failure"}}"""

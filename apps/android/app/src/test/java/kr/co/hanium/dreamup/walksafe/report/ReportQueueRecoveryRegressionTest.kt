@@ -25,6 +25,58 @@ class ReportQueueRecoveryRegressionTest {
     @get:Rule val temporary = TemporaryFolder()
 
     @Test
+    fun invalidStatusDocumentKeepsExactStoredReportUntilCleanStatusRecovery() = invalidReceiptRecovery(status = true)
+
+    @Test
+    fun invalidUploadDocumentKeepsExactStoredReportUntilCleanStatusRecovery() = invalidReceiptRecovery(status = false)
+
+    private fun invalidReceiptRecovery(status: Boolean) {
+        val f = fixture()
+        val original = f.enqueue()
+        var commits = 0
+        var posts = 0
+        var held: QueuedReport? = null
+        fun body(report: QueuedReport): String = org.json.JSONObject()
+            .put("persistence_state", "PERSISTED").put("user_status", "RECEIVED")
+            .put("transport_receipt", org.json.JSONObject()
+                .put("marker", REPORT_RECEIPT_MARKER).put("report_id", report.payload.reportId)
+                .put("persistence_marker", "123e4567-e89b-42d3-a456-426614174002")
+                .put("payload_sha256", report.payload.payloadSha256).put("payload_bytes", report.payload.payloadBytes))
+            .toString() + "{}"
+        val transport = object : ReportQueueTransport {
+            override fun statusCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt?> {
+                held = report
+                if (status) parseQueuedStatusReceiptOrNull(body(report), report) ?: throw ReportUploadProtocolException()
+                else null
+            }
+            override fun uploadCall(report: QueuedReport) = CancellableNetworkCall.blocking<ReportQueueReceipt> {
+                posts++
+                parseQueuedUploadReceiptOrNull(body(report), report) ?: throw ReportUploadProtocolException()
+            }
+        }
+        try {
+            assertEquals(ReportQueueDrainOutcome.RECEIPT_REJECTED,
+                requireNotNull(f.coordinator.startNext({ context() }, transport) { commits++; true }).execute())
+            assertEquals(0, commits)
+            assertEquals(if (status) 0 else 1, posts)
+            assertThrows(IllegalStateException::class.java) { requireNotNull(held).payload.imageJpeg() }
+            val restored = f.reopen()
+            val stored = restored.queuedReports()
+            try {
+                assertEquals(1, stored.size)
+                assertTrue(original.payload.contentEquals(stored.single().payload))
+                assertFalse(stored.single().quarantined)
+            } finally { stored.forEach { it.close() } }
+            assertEquals(ReportQueueDrainOutcome.DELETED_AFTER_STATUS,
+                requireNotNull(ReportQueueDrainCoordinator(restored).startNext({ context() }, successfulTransport()) {
+                    commits++; true
+                }).execute())
+            assertEquals(1, commits)
+            assertTrue(restored.queuedReports().isEmpty())
+        } finally { original.close() }
+    }
+
+    @Test
     fun typedCooldownPreservesExactPayloadAndTenMinuteDelayAfterReopen() {
         val f = fixture()
         val delayed = f.enqueue(priority = ReportQueuePriority.AUTOMATIC)

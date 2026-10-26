@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
+import { type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, beforeEach, test } from "node:test";
 
 import { establishBackendGatewaySession } from "../src/auth.js";
+import { createGatewayServer } from "../src/node-adapter.js";
 import { handleGatewayRequest as routeRequest, type GatewayDependencies } from "../src/routes.js";
 import {
   resetSpeechAdmissionForTests,
@@ -494,3 +497,203 @@ test("revoked or unavailable Backend account session never reaches Voice", async
     assert.equal(voiceRequests, 0);
   }
 });
+
+for (const duplicate of [
+  '"transcript":"종료",',
+  '"acoustic_execution_allowed":false,',
+  '"acoustic_\\u0065xecution_allowed":false,'
+]) {
+  test(`STT rejects conflicting duplicate response fields: ${duplicate}`, async () => {
+    const cookie = backendSessionCookie();
+    const request = () => new Request("http://127.0.0.1:8081/api/speech/stt", {
+      method: "POST", headers: speechHeaders(cookie, "audio/wav"), body: ownedBuffer(wavBytes())
+    });
+    const response = await handleGatewayRequest(request(), {
+      fetchImpl: async () => new Response("{" + duplicate + JSON.stringify(voiceSttPayload()).slice(1), {
+        headers: { "content-type": "application/json" }
+      })
+    });
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { code: "speech_upstream_invalid" });
+    assert.equal((await handleGatewayRequest(request(), { fetchImpl: async () => jsonVoiceStt() })).status, 200);
+  });
+}
+
+test("valid acoustic refusal is forwarded unchanged rather than enabled by the relay", async () => {
+  const response = await handleGatewayRequest(new Request("http://127.0.0.1:8081/api/speech/stt", {
+    method: "POST", headers: speechHeaders(backendSessionCookie(), "audio/wav"), body: ownedBuffer(wavBytes())
+  }), { fetchImpl: async () => jsonVoiceStt({
+    acoustic_confidence: 0, acoustic_execution_allowed: false,
+    no_speech_probability: 1, avg_logprob: -20
+  }) });
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json() as { acoustic: unknown }).acoustic, {
+    confidence: 0, execution_allowed: false, no_speech_probability: 1, avg_logprob: -20
+  });
+});
+
+for (const kind of ["stt", "tts"] as const) {
+  test(`${kind} malformed client stream stays an input error and never reaches Voice`, async () => {
+    let voiceCalls = 0;
+    const response = await handleGatewayRequest(new Request(`http://127.0.0.1:8081/api/speech/${kind}`, {
+      method: "POST", headers: speechHeaders(backendSessionCookie(), kind === "stt" ? "audio/wav" : "application/json"),
+      body: new ReadableStream<Uint8Array>({ start(controller) { controller.error(new Error("private-input-error")); } }),
+      duplex: "half"
+    } as RequestInit & { duplex: "half" }), {
+      fetchImpl: async () => { voiceCalls++; throw new Error("Voice must not be reached"); }
+    });
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { code: kind === "stt" ? "speech_body_read_failed" : "request_body_read_failed" });
+    assert.equal(voiceCalls, 0);
+  });
+
+  test(`${kind} cancels a late upstream body after client cancellation and frees admission`, { timeout: 5_000 }, async () => {
+    const cookie = backendSessionCookie();
+    const controller = new AbortController();
+    let started!: () => void;
+    const entered = new Promise<void>(resolve => { started = resolve; });
+    let release!: (response: Response) => void;
+    const pending = new Promise<Response>(resolve => { release = resolve; });
+    const request = (signal?: AbortSignal) => new Request(`http://127.0.0.1:8081/api/speech/${kind}`, {
+      method: "POST", headers: speechHeaders(cookie, kind === "stt" ? "audio/wav" : "application/json"),
+      body: kind === "stt" ? ownedBuffer(wavBytes()) : JSON.stringify({
+        schema_version: SPEECH_TTS_REQUEST_SCHEMA, text: "시험 안내", request_id: REQUEST_ID
+      }), ...(signal ? { signal } : {})
+    });
+    const response = handleGatewayRequest(request(controller.signal), {
+      fetchImpl: async () => { started(); return pending; }
+    });
+    await entered;
+    controller.abort();
+    assert.equal((await response).status, 499);
+    let cancelled = 0;
+    const late = new Response(new ReadableStream<Uint8Array>({ cancel() { cancelled++; } }));
+    try {
+      release(late);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      assert.equal(cancelled, 1, "abandoned response body must be cancelled");
+      const retry = await handleGatewayRequest(request(), { fetchImpl: async () => kind === "stt"
+        ? jsonVoiceStt() : new Response(ownedBuffer(wavBytes()), {
+          headers: { "content-type": "audio/wav", "x-voice-model-revision": MODEL_REVISION }
+        }) });
+      assert.equal(retry.status, 200);
+    } finally {
+      await late.body?.cancel().catch(() => undefined);
+    }
+  });
+}
+
+// Real HTTP on both sides of the Gateway, with owned test services instead of
+// Python authentication/inference. This is transport evidence, not model/device accuracy.
+for (const kind of ["stt", "tts"] as const) {
+  for (const fault of ["truncated", "stalled", "disconnect", "wrong-type", "oversized", "session-revoked", "session-unavailable",
+    "session-revoked-stream", "session-unavailable-stream"] as const) {
+    test(`${kind} real HTTP ${fault} fails without leaking data and permits retry`, { timeout: 8_000 }, async () => {
+      const sessionFailure = fault.startsWith("session-");
+      const sessionRevoked = fault.startsWith("session-revoked");
+      const timeoutName = `WALKSAFE_VOICE_${kind.toUpperCase()}_TIMEOUT_MS`;
+      const limitName = `WALKSAFE_VOICE_${kind.toUpperCase()}_RESPONSE_MAX_BYTES`;
+      const previousTimeout = process.env[timeoutName];
+      const previousLimit = process.env[limitName];
+      process.env[timeoutName] = "1000";
+      process.env[limitName] = "1024";
+      let healthy = false;
+      let gateCalls = 0;
+      let voiceCalls = 0;
+      let unfinishedClosed!: () => void;
+      const closed = new Promise<void>(resolve => { unfinishedClosed = resolve; });
+      const upstream = createServer((request, response) => {
+        request.resume();
+        if (request.url === "/accounts/session-current") {
+          gateCalls++;
+          const denied = !healthy && sessionFailure;
+          if (denied) response.once("close", unfinishedClosed);
+          response.writeHead(denied ? (sessionRevoked ? 401 : 503) : 204);
+          if (denied && fault.endsWith("-stream")) response.write("private-session-service-detail");
+          else response.end();
+          return;
+        }
+        assert.equal(request.url, `/speech/${kind}`);
+        voiceCalls++;
+        assert.equal(request.headers["x-walksafe-voice-service-token"], VOICE_TOKEN);
+        assert.equal(request.headers["cookie"], undefined);
+        const payload = kind === "stt" ? Buffer.from(JSON.stringify(voiceSttPayload())) : Buffer.from(wavBytes(0.01));
+        const headers = { "content-type": kind === "stt" ? "application/json" : "audio/wav",
+          "x-voice-model-revision": MODEL_REVISION };
+        if (healthy) { response.writeHead(200, headers).end(payload); return; }
+        response.once("close", unfinishedClosed);
+        if (fault === "disconnect") { request.socket.destroy(); return; }
+        if (fault === "wrong-type") {
+          response.writeHead(200, { "content-type": "text/html" }).end("private-upstream-detail");
+          return;
+        }
+        response.writeHead(200, fault === "truncated" ? {
+          ...headers, "content-length": String(payload.length + 100)
+        } : headers);
+        response.flushHeaders();
+        if (fault === "truncated") { response.write(payload, () => response.destroy()); return; }
+        if (fault === "oversized") { response.end(Buffer.alloc(1025, 65)); return; }
+        response.write("private-upstream-detail"); // leave the tail unfinished until aborted
+      });
+      let upstreamOrigin = "";
+      // Preserve the product's fixed-origin policy. Only translate the approved
+      // loopback ports to this owned ephemeral listener; use real fetch throughout.
+      const gateway = createGatewayServer({ fetchImpl: (input, init) => {
+        const url = new URL(String(input));
+        assert.ok(["http://127.0.0.1:8000", "http://127.0.0.1:9001"].includes(url.origin));
+        return fetch(new URL(url.pathname + url.search, upstreamOrigin), init);
+      } });
+      const listen = (server: Server) => new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+      try {
+        await listen(upstream);
+        upstreamOrigin = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
+        await listen(gateway);
+        const origin = `http://127.0.0.1:${(gateway.address() as AddressInfo).port}`;
+        const cookie = backendSessionCookie();
+        const send = () => fetch(`${origin}/api/speech/${kind}`, {
+          method: "POST", headers: speechHeaders(cookie, kind === "stt" ? "audio/wav" : "application/json"),
+          body: kind === "stt" ? ownedBuffer(wavBytes()) : JSON.stringify({
+            schema_version: SPEECH_TTS_REQUEST_SCHEMA, text: "시험 안내", request_id: REQUEST_ID
+          }), signal: AbortSignal.timeout(6_000)
+        });
+        const failed = await send();
+        const expectedStatus = sessionFailure ? (sessionRevoked ? 401 : 503)
+          : fault === "stalled" ? 504 : 502;
+        const expectedCode = sessionFailure ? (sessionRevoked ? "gateway_auth_required" : "gateway_security_not_configured")
+          : fault === "stalled" ? "speech_upstream_timeout" : fault === "disconnect"
+          ? "speech_upstream_unavailable" : "speech_upstream_invalid";
+        const failureBody = await failed.json();
+        assert.equal(failed.status, expectedStatus, JSON.stringify(failureBody));
+        assert.equal(failed.headers.get("cache-control"), "no-store");
+        assert.deepEqual(failureBody, sessionFailure ? {
+          code: expectedCode, message: sessionRevoked ? "인증이 필요합니다." : "현장 테스트 보안 설정을 확인해 주세요."
+        } : { code: expectedCode });
+        let closeTimeout: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([closed, new Promise<never>((_resolve, reject) => {
+            closeTimeout = setTimeout(() => reject(new Error("discarded upstream body remained open")), 1_000);
+          })]);
+        } finally {
+          if (closeTimeout !== undefined) clearTimeout(closeTimeout);
+        }
+        if (sessionFailure) assert.equal(voiceCalls, 0, "failed account gate must not send audio/text to Voice");
+        healthy = true;
+        const retry = await send();
+        assert.equal(retry.status, 200);
+        if (kind === "stt") assert.equal((await retry.json() as { transcript: string }).transcript, "주변을 설명해줘");
+        else assert.deepEqual(Buffer.from(await retry.arrayBuffer()), Buffer.from(wavBytes(0.01)));
+        assert.equal(gateCalls, 2);
+        assert.equal(voiceCalls, sessionFailure ? 1 : 2);
+        assert.equal((await fetch(`${origin}/internal/health`)).status, 200);
+      } finally {
+        for (const server of [gateway, upstream]) {
+          server.closeAllConnections();
+          await new Promise<void>(resolve => server.close(() => resolve()));
+        }
+        for (const [name, value] of [[timeoutName, previousTimeout], [limitName, previousLimit]] as const) {
+          if (value === undefined) delete process.env[name]; else process.env[name] = value;
+        }
+      }
+    });
+  }
+}

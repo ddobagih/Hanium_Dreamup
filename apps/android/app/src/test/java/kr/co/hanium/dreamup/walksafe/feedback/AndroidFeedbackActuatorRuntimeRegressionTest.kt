@@ -670,6 +670,34 @@ class AndroidFeedbackActuatorRuntimeRegressionTest {
     }
 
     @Test
+    fun disconnectedCommandCancellationRetiresEngineUntilExplicitRetry() {
+        val (runtime, actuator) = readyActuator()
+        var completed = 0
+        var failed = 0
+        assertEquals(NavigationSpeechDispatchResult.ACCEPTED,
+            actuator.speakInteraction("old command", { completed++ }, { failed++ }))
+        val old = runtime.spoken.last().id
+        runtime.start(old)
+        runtime.stopThrows = true
+        actuator.cancelCommandInteraction()
+        assertEquals(1, failed)
+        assertEquals("tts=init_failed", actuator.statusText())
+        assertFalse(actuator.isAppSpeechActive())
+        runtime.done(old)
+        runtime.advanceBy(150_000)
+        assertEquals(0, completed)
+        assertEquals(1, runtime.engines.size)
+        runtime.stopThrows = false
+        actuator.retryFailedSpeechInitialization()
+        assertEquals(2, runtime.engines.size)
+        runtime.ready()
+        assertTrue(actuator.speakInteraction("explicit new command"))
+        assertEquals(2, runtime.spoken.size)
+        runtime.done(old)
+        assertEquals(0, completed)
+    }
+
+    @Test
     fun stopExceptionCannotSkipCancellationOrLaterShutdown() {
         val (runtime, actuator) = readyActuator()
         val events = Events()

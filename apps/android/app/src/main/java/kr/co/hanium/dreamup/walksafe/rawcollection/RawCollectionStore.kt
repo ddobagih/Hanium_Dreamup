@@ -578,7 +578,11 @@ internal class RawCollectionStore private constructor(
         val local = readManifest(collectionId)?.takeIf { it.owner == owner } ?: return false
         if (local.uploadDisposition == RawUploadDisposition.ACKNOWLEDGED) return false
         if (local.uploadDisposition != marker) {
-            writeManifest(local.copy(uploadDisposition = marker))
+            if (!writeManifest(local.copy(uploadDisposition = marker))) {
+                // The rejected collection itself may be read-only. Keep the decision outside it
+                // so a failed delete cannot make the old manifest uploadable after a restart.
+                storage.writeFenceAtomically(rejectionFence(collectionId), marker.name)
+            }
         }
         return discardCollectionAndPointer(collectionId)
     }
@@ -843,6 +847,11 @@ internal class RawCollectionStore private constructor(
                     (
                         !name.startsWith(RAW_CONSENT_POLICY_FENCE_PREFIX) ||
                             storage.readFence(name) != RawCollectionFence.CONSENT_POLICY_ALIGNED.name
+                        ) &&
+                    (
+                        !name.startsWith(COLLECTION_REJECTION_FENCE_PREFIX) ||
+                            !isCanonicalUuid(name.removePrefix(COLLECTION_REJECTION_FENCE_PREFIX)) ||
+                            storage.readFence(name) !in REJECTION_DISPOSITIONS.map { it.name }
                         )
             }
         ) return false
@@ -939,7 +948,11 @@ internal class RawCollectionStore private constructor(
             ?: return null
         val manifest = decodeRawManifest(opened.plaintext)
         opened.plaintext.fill(0)
-        return manifest?.takeIf { it.collectionId == collectionId }
+        val local = manifest?.takeIf { it.collectionId == collectionId } ?: return null
+        val rejection = storage.readFence(rejectionFence(collectionId)) ?: return local
+        val disposition = REJECTION_DISPOSITIONS.firstOrNull { it.name == rejection }
+            ?: throw RawCollectionStorageReadException("collection rejection fence")
+        return local.copy(uploadDisposition = disposition)
     }
 
     private fun writeManifest(manifest: RawCollectionManifest): Boolean {
@@ -951,6 +964,9 @@ internal class RawCollectionStore private constructor(
     }
 
     private companion object {
+        const val COLLECTION_REJECTION_FENCE_PREFIX = "collection-rejected-"
+        val REJECTION_DISPOSITIONS = setOf(RawUploadDisposition.CONSENT_REJECTED, RawUploadDisposition.WALK_REJECTED)
+        fun rejectionFence(collectionId: String) = "$COLLECTION_REJECTION_FENCE_PREFIX$collectionId"
         fun manifestAad(collectionId: String): ByteArray =
             "$AAD_PREFIX|raw-collection|manifest|schema=2|collection=$collectionId"
                 .toByteArray(Charsets.UTF_8)

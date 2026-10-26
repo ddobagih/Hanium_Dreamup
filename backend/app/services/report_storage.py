@@ -269,9 +269,27 @@ def _validate_journal_directory(journal_dir: Path) -> None:
 
 def _read_pending_write(upload_root: Path, journal_path: Path) -> PendingReportWrite:
     try:
-        if journal_path.is_symlink() or not stat.S_ISREG(journal_path.stat(follow_symlinks=False).st_mode):
-            raise ValueError("journal is not a regular file")
-        payload = json.loads(journal_path.read_text(encoding="utf-8"))
+        # A path check before read_text leaves a FIFO/symlink swap window.
+        # As with committed envelopes, NONBLOCK does not bound regular-file I/O.
+        descriptor = os.open(
+            journal_path,
+            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+        )
+        try:
+            metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(metadata.st_mode):
+                raise ValueError("journal is not a regular file")
+            with os.fdopen(descriptor, "r", encoding="utf-8", closefd=False) as stream:
+                payload = json.load(stream)
+            if (
+                _object_fingerprint(os.fstat(descriptor)) != _object_fingerprint(metadata)
+                or _object_fingerprint(journal_path.stat(follow_symlinks=False))
+                != _object_fingerprint(metadata)
+            ):
+                raise ValueError("journal changed while reading")
+        finally:
+            os.close(descriptor)
         if not isinstance(payload, dict):
             raise ValueError("journal is not an object")
         report_id = uuid.UUID(str(payload.get("report_id")))

@@ -52,7 +52,16 @@ def main(argv: list[str] | None = None) -> int:
     if not url:
         print(json.dumps({"error": f"{DATABASE_URL_ENV} is required"}), file=sys.stderr)
         return 2
-    engine = create_engine(url, pool_pre_ping=True)
+    try:
+        engine = create_engine(url, pool_pre_ping=True)
+    except (SQLAlchemyError, ValueError, ImportError) as exc:
+        # URL parsing and driver loading fail before a connection is opened.
+        # Keep credentials and driver details out of this error path too.
+        print(
+            json.dumps({"error": "database setup failed", "type": type(exc).__name__}),
+            file=sys.stderr,
+        )
+        return 1
     try:
         with sessionmaker(bind=engine, expire_on_commit=False)() as db:
             result = purge_expired_account_deletion_receipts(

@@ -18,8 +18,10 @@ import org.junit.runner.RunWith;
 public final class AdminBoundaryLifecycleDeviceTest {
     @Test public void backgroundClearsCredentialsAndWindowBlocksCapture() {
         try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            awaitWindowFocus(scenario);
             List<EditText> sensitive = new ArrayList<>();
             scenario.onActivity(activity -> {
+                assertTrue("credential entry requires the visible, started screen", activityStarted(activity));
                 assertTrue((activity.getWindow().getAttributes().flags & WindowManager.LayoutParams.FLAG_SECURE) != 0);
                 collect(activity.getWindow().getDecorView(), sensitive);
                 assertTrue("password/TOTP fields must actually be present", sensitive.size() >= 2);
@@ -27,6 +29,7 @@ public final class AdminBoundaryLifecycleDeviceTest {
             });
             scenario.moveToState(Lifecycle.State.CREATED);
             scenario.onActivity(activity -> {
+                assertFalse("onStop must complete before inspecting credentials", activityStarted(activity));
                 for (EditText field : sensitive) assertEquals("background must wipe: " + field.getHint(), "", field.getText().toString());
             });
             scenario.moveToState(Lifecycle.State.RESUMED);
@@ -37,13 +40,7 @@ public final class AdminBoundaryLifecycleDeviceTest {
     }
     @Test public void recreationDoesNotRestoreSecretInputsAndKeepsCaptureProtection() {
         try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
-            long until = android.os.SystemClock.elapsedRealtime() + 5000L;
-            boolean[] focused = {false};
-            while (!focused[0] && android.os.SystemClock.elapsedRealtime() < until) {
-                scenario.onActivity(activity -> focused[0] = activity.hasWindowFocus());
-                if (!focused[0]) android.os.SystemClock.sleep(50L);
-            }
-            assertTrue("actual window focus is required", focused[0]);
+            awaitWindowFocus(scenario);
             List<EditText> oldFields = new ArrayList<>();
             final AdminBoundaryActivity[] oldActivity = new AdminBoundaryActivity[1];
             scenario.onActivity(activity -> {
@@ -71,6 +68,26 @@ public final class AdminBoundaryLifecycleDeviceTest {
                     assertFalse(field.isSaveEnabled());
                 }
             });
+        }
+    }
+
+    private static void awaitWindowFocus(ActivityScenario<AdminBoundaryActivity> scenario) {
+        long until = android.os.SystemClock.elapsedRealtime() + 5000L;
+        boolean[] focused = {false};
+        while (!focused[0] && android.os.SystemClock.elapsedRealtime() < until) {
+            scenario.onActivity(activity -> focused[0] = activity.hasWindowFocus());
+            if (!focused[0]) android.os.SystemClock.sleep(50L);
+        }
+        assertTrue("actual window focus is required", focused[0]);
+    }
+
+    private static boolean activityStarted(AdminBoundaryActivity activity) {
+        try {
+            java.lang.reflect.Field field = AdminBoundaryActivity.class.getDeclaredField("activityStarted");
+            field.setAccessible(true);
+            return field.getBoolean(activity);
+        } catch (ReflectiveOperationException error) {
+            throw new AssertionError(error);
         }
     }
 

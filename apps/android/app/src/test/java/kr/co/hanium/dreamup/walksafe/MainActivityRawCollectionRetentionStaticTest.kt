@@ -14,7 +14,9 @@ class MainActivityRawCollectionRetentionStaticTest {
     private val main = sequenceOf(
         File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"),
         File("app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt"),
-    ).first { it.isFile }.readText().replace(Regex("\\s+"), "")
+    ).first { it.isFile }.readText()
+        .replace(Regex("(?m)^\\s*//.*$"), "")
+        .replace(Regex("\\s+"), "")
     private val coordinator = sequenceOf(
         File("src/main/java/kr/co/hanium/dreamup/walksafe/rawcollection/RawCollectionRuntimeCoordinator.kt"),
         File("app/src/main/java/kr/co/hanium/dreamup/walksafe/rawcollection/RawCollectionRuntimeCoordinator.kt"),
@@ -24,7 +26,7 @@ class MainActivityRawCollectionRetentionStaticTest {
     fun productionCoordinatorUsesTheLeaseDeadlineClock() {
         assertTrue(
             main.contains(
-                "RawCollectionRuntimeCoordinator(File(noBackupRoot,\"raw_collections\")," +
+                "RawCollectionRuntimeCoordinator(File(noBackupRoot.canonicalFile,\"raw_collections\")," +
                     "elapsedRealtimeMs=SystemClock::elapsedRealtime," +
                     // S14-39: the OS allocatable bytes of the same volume gate new RAW writes.
                     "allocatableBytes=AndroidAllocatableBytes(applicationContext,noBackupRoot),)",

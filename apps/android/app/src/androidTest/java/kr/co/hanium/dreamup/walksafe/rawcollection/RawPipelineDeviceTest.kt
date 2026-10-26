@@ -21,9 +21,9 @@ import org.junit.Test
 /** Real encrypted files and native HTTP; synthetic authority/state/clock only in an isolated fixture.
  * Never starts the actual app walk or changes actual account consent. No camera is used. */
 class RawPipelineDeviceTest {
-    private class Fixture(base: String) : AutoCloseable {
-        val id = UUID.randomUUID().toString()
-        val root = File(InstrumentationRegistry.getInstrumentation().targetContext.noBackupFilesDir.canonicalFile, "raw-pipeline-$id").apply { check(mkdir()) }
+    private class Fixture(base: String, val id: String = UUID.randomUUID().toString()) : AutoCloseable {
+        var retainForRestart = false
+        val root = File(InstrumentationRegistry.getInstrumentation().targetContext.noBackupFilesDir.canonicalFile, "raw-pipeline-$id").apply { check(isDirectory || mkdir()) }
         val policy = AeadKeyPolicy("walksafe.instrumentation.pipeline.$id.v",1,setOf(1))
         val cipher = AndroidKeyStoreAead(policy)
         var wall = 1_800_000_000_000L
@@ -69,6 +69,7 @@ class RawPipelineDeviceTest {
         fun files()=root.walkTopDown().filter{it.isFile}.associate {it.relativeTo(root).path to MessageDigest.getInstance("SHA-256").digest(it.readBytes()).toList()}
         override fun close() {
             coordinator.cancelActiveUpload()
+            if (retainForRestart) return
             assertTrue(cipher.destroyKnownVersions())
             val ks=KeyStore.getInstance("AndroidKeyStore").apply{load(null)}
             ks.deleteEntry("${policy.alias(1)}.generation");assertFalse(ks.containsAlias(policy.alias(1)))
@@ -125,6 +126,88 @@ class RawPipelineDeviceTest {
                 assertEquals(RawReadyStatus.GateBlocked(RawCollectionGateReason.SERVER_DISABLED),f.coordinator.uploadStatus(f.context()))
                 repeat(10){assertNull(f.coordinator.startNextUpload{f.context()})}
                 report("RAW_PIPELINE native_503_disabled=PASS plaintext_zeroed=true encrypted_queue_preserved=true repeated_calls=10 blocked=true")
+            }
+        }
+    }
+
+    @Test fun nativeDisabledResponseIsRecheckedOnlyAfterActualProcessRestart() {
+        val args = InstrumentationRegistry.getArguments()
+        val phase = args.getString("rawDisabledPhase")
+        org.junit.Assume.assumeTrue(phase in setOf("write", "read"))
+        val run = requireNotNull(args.getString("rawDisabledRun"))
+        require(run.matches(Regex("[a-z0-9]{16}")))
+        NativeServer(503,"{\"detail\":{\"code\":\"raw_ingest_disabled\"}}").use { server ->
+            Fixture(server.base, run).use { f ->
+                val marker = File(f.root, "restart-pid")
+                if (phase == "write") {
+                    assertFalse(marker.exists()); f.seed()
+                } else {
+                    assertNotEquals(marker.readText().toInt(), android.os.Process.myPid())
+                    assertEquals(1, f.store.readyManifests(f.owner).size)
+                    assertNotEquals(RawReadyStatus.GateBlocked(RawCollectionGateReason.SERVER_DISABLED), f.coordinator.uploadStatus(f.context()))
+                }
+                val before = f.files()
+                assertEquals(RawCollectionUploadOutcome.SERVER_DISABLED, f.execute())
+                server.finished(); f.assertSubmittedPlaintextCleared()
+                assertEquals(before, f.files())
+                repeat(10) { assertNull(f.coordinator.startNextUpload { f.context() }) }
+                report("RAW_DISABLED_RESTART phase=$phase actual_native_http503=true subsequent_requests_blocked=10 encrypted_files_unchanged=true pid=${android.os.Process.myPid()} synthetic_authority=true")
+                if (phase == "write") {
+                    marker.writeText(android.os.Process.myPid().toString())
+                    f.retainForRestart = true
+                }
+            }
+        }
+    }
+
+    @Test fun nativeRejectedUploadMustStayBlockedAfterFailedCleanupAndProcessRestart() {
+        val args = InstrumentationRegistry.getArguments()
+        val phase = args.getString("rawRejectedPhase")
+        org.junit.Assume.assumeTrue(phase in setOf("write", "read"))
+        val run = requireNotNull(args.getString("rawRejectedRun"))
+        val reason = requireNotNull(args.getString("rawRejectedReason"))
+        require(run.matches(Regex("[a-z0-9]{16}")))
+        require(reason in setOf("consent", "walk"))
+        val code = if (reason == "consent") "raw_source_collection_consent_required" else "raw_collection_walk_not_uploadable"
+        NativeServer(409, JSONObject().put("detail", JSONObject().put("code", code)).toString()).use { server ->
+            Fixture(server.base, run).use { f ->
+                val marker = File(f.root, "restart-marker.json")
+                if (phase == "write") {
+                    assertFalse(marker.exists()); f.seed()
+                    val collection = f.store.readyManifests(f.owner).single().collectionId
+                    val dir = File(f.root, "raw_collections_v2/collections/$collection")
+                    try {
+                        android.system.Os.chmod(dir.absolutePath, 0b101000000)
+                        assertFalse(dir.canWrite())
+                        assertEquals(RawCollectionUploadOutcome.LOCAL_READ_FAILED, f.execute())
+                        server.finished(); f.assertSubmittedPlaintextCleared()
+                        marker.writeText(JSONObject().put("pid", android.os.Process.myPid()).put("collection", collection).toString())
+                        f.retainForRestart = true
+                        report("RAW_REJECTED_RESTART phase=write reason=$reason actual_http409=true actual_marker_and_delete_denial=true local_failure_reported=true pid=${android.os.Process.myPid()}")
+                    } finally {
+                        if (!f.retainForRestart) android.system.Os.chmod(dir.absolutePath, 0b111000000)
+                    }
+                } else {
+                    val saved = JSONObject(marker.readText())
+                    assertNotEquals(saved.getInt("pid"), android.os.Process.myPid())
+                    val collection = saved.getString("collection")
+                    android.system.Os.chmod(File(f.root, "raw_collections_v2/collections/$collection").absolutePath, 0b111000000)
+                    val selectable = f.store.readyManifests(f.owner).any { it.collectionId == collection }
+                    // Exercise the normal coordinator only if the rejected item was selected again.
+                    if (selectable) {
+                        val outcome = f.execute()
+                        server.finished(); f.assertSubmittedPlaintextCleared()
+                        assertEquals(if (reason == "consent") RawCollectionUploadOutcome.CONSENT_REJECTED else RawCollectionUploadOutcome.WALK_REJECTED, outcome)
+                        assertTrue(f.store.readyManifests(f.owner).isEmpty())
+                        report("RAW_REJECTED_RESTART phase=read reason=$reason second_actual_http_request=true same_collection=$collection cleanup_after_second_rejection=true pid=${android.os.Process.myPid()} loopback_only=true synthetic_authority=true")
+                    }
+                    assertFalse("Permanently rejected data was uploaded again after restart", selectable)
+                    repeat(10) { assertNull(f.coordinator.startNextUpload { f.context() }) }
+                    assertFalse("No connection may reach the loopback server", server.received.await(500, TimeUnit.MILLISECONDS))
+                    assertEquals(RawCapacityAdmission.ALLOWED, f.store.admitNewSegment(WALK, confirmation().backendConsentReceiptSha256))
+                    assertFalse(File(f.root, "raw_collections_v2/collections/$collection").exists())
+                    report("RAW_REJECTED_RESTART phase=read reason=$reason second_actual_http_request=false blocked_attempts=10 local_admission_cleanup=true pid=${android.os.Process.myPid()} loopback_only=true synthetic_authority=true")
+                }
             }
         }
     }
@@ -187,7 +270,8 @@ class RawPipelineDeviceTest {
                 try {
                     assertTrue(dir.setWritable(false,true));assertFalse("Fault injection must really deny writing",dir.canWrite())
                     val outcome=f.execute();server.finished();f.assertSubmittedPlaintextCleared()
-                    assertEquals("Failed deletion must leave evidence available",before,f.files())
+                    assertEquals("Failed deletion must preserve existing ciphertext", before, f.files().filterKeys { it in before })
+                    assertTrue("Durable rejection must block immediate reselection", f.store.readyManifests(f.owner).isEmpty())
                     report("RAW_PIPELINE rejected_code=$code actual_unwritable_directory=true outcome=$outcome ciphertext_still_present=true")
                     assertEquals("Rejected segment could not be marked or deleted",RawCollectionUploadOutcome.LOCAL_READ_FAILED,outcome)
                 } finally {assertTrue(dir.setWritable(true,true))}

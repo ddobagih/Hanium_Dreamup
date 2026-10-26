@@ -39,6 +39,51 @@ public final class AdminAuthenticatedTransportDeviceTest {
     private String originalToken;
     private String originalMode = "valid";
     private int originalReads;
+    private AdminInstitutionDelivery delivery;
+    private int deliveryResponseCode;
+
+    @Test public void deliveryInstitutionConflictIsDistinctAndNeverAutomaticallyResent() throws Exception {
+        deliveryConflict("{\"detail\":{\"code\":\"delivery_institution_mismatch\",\"message\":\"private-detail\"}}", true);
+    }
+
+    @Test public void ordinaryDeliveryConflictDoesNotClaimAnInstitutionMismatch() throws Exception {
+        deliveryConflict("{\"detail\":{\"code\":\"delivery_revision_conflict\"}}", false);
+    }
+
+    @Test public void ambiguousDeliveryErrorsCannotSelectInstitutionRecovery() throws Exception {
+        String valid = "{\"detail\":{\"code\":\"delivery_institution_mismatch\"}}";
+        for (String invalid : List.of(valid + "{}", valid + "trailing",
+            valid.replaceFirst("\\{", "{\"detail\":{},"), valid.replace("\"code\"", "'code'"))) {
+            deliveryConflict(invalid, false);
+        }
+    }
+
+    @Test public void validManualDeliveryIsRecordedOnceOverSignedAndroidHttp() throws Exception {
+        prepareDelivery(); deliveryResponseCode = 201; response = "{}";
+        var result = new AdminOperationsHttpClient(origin(), true, descriptor, AdminAuthenticatedTransportDeviceTest::sign)
+            .recordDelivery(SESSION, REPORT_ID, delivery);
+        assertEquals(201, result.statusCode());
+        assertEquals(1, businessCount); assertEquals(1, signatureCount);
+        assertEquals(2, server.getRequestCount()); assertTrue(challenges.isEmpty());
+    }
+
+    private void prepareDelivery() {
+        delivery = new AdminInstitutionDelivery("시험 기관", "phone", "시험 담당자",
+            AdminInstitutionDelivery.Status.SUBMITTED, null, "앱 밖에서 수행한 전달 사실 시험", null,
+            "2026-10-25T00:00:00Z", 1L, 0L, IDEMPOTENCY);
+    }
+
+    private void deliveryConflict(String body, boolean institutionMismatch) throws Exception {
+        prepareDelivery(); deliveryResponseCode = 409; response = body;
+        int before = server.getRequestCount(), beforeBusiness = businessCount;
+        var failure = assertThrows(AdminOperationsApi.MutationConflictException.class, () ->
+            new AdminOperationsHttpClient(origin(), true, descriptor, AdminAuthenticatedTransportDeviceTest::sign)
+                .recordDelivery(SESSION, REPORT_ID, delivery));
+        assertEquals(institutionMismatch, failure.institutionMismatch());
+        assertFalse(failure.getMessage().contains("private-detail"));
+        assertEquals(beforeBusiness + 1, businessCount);
+        assertEquals(before + 2, server.getRequestCount()); assertTrue(challenges.isEmpty());
+    }
 
     @Test public void lostOriginalBodyRequiresNewGrantOverActualAndroidHttp() throws Exception {
         originalMode = "truncated";
@@ -242,6 +287,15 @@ public final class AdminAuthenticatedTransportDeviceTest {
         assertTrue("synthetic key signature over actual request challenge", verifier.verify(Base64.getUrlDecoder().decode(
             request.getHeaders().get(AdminDeviceProof.SIGNATURE_HEADER))));
         signatureCount++;
+        if (delivery != null) {
+            assertEquals("/reports/" + REPORT_ID + "/deliveries", target);
+            assertEquals("POST", request.getMethod());
+            assertEquals("Bearer " + TOKEN, request.getHeaders().get("Authorization"));
+            assertEquals("report.delivery.create", challenge.get("action"));
+            assertArrayEquals(delivery.requestBody(), body);
+            businessCount++;
+            return json(deliveryResponseCode, response);
+        }
         if (target.equals("/admin/security/sessions")) {
             return json(200, "{\"access_token\":\"" + TOKEN + "\",\"security_state\":\"NORMAL\",\"current_session_id\":\"" + SESSION_ID + "\"}");
         }

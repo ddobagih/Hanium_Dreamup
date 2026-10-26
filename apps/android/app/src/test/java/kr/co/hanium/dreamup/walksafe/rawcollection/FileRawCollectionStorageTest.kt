@@ -61,6 +61,40 @@ class FileRawCollectionStorageTest {
         assertTrue(storage.verifiedEmptyAfterAccountPurge())
     }
 
+    @Test
+    fun recoveryFenceRemainsAuthoritativeAndIsIncludedInPurge() {
+        val root = temporaryFolder.newFolder("fence-recovery")
+        val storage = FileRawCollectionStorage(root)
+        val primary = root.resolve("raw_collections_v2/fences/account-deleted.fence")
+        assertTrue(primary.mkdirs()) // Deterministic primary write failure, without host chmod assumptions.
+        assertTrue(storage.writeFenceAtomically("account-deleted", "ACCOUNT_DELETED"))
+        assertTrue(primary.delete())
+        primary.writeText("STALE")
+        val restored = FileRawCollectionStorage(root)
+        assertEquals("ACCOUNT_DELETED", restored.readFence("account-deleted"))
+        assertTrue(restored.hasFence("account-deleted"))
+        assertEquals(setOf("account-deleted"), restored.listFenceNames())
+        assertTrue(restored.writeFenceAtomically("account-deleted", "UPDATED"))
+        assertEquals("UPDATED", FileRawCollectionStorage(root).readFence("account-deleted"))
+        assertTrue(restored.verifiedEmptyAfterAccountPurge())
+        assertTrue(restored.clearAllFences())
+        assertFalse(restored.hasFence("account-deleted"))
+        assertTrue(restored.listFenceNames().isEmpty())
+    }
+
+    @Test
+    fun malformedRecoveryFenceCannotSilentlyRestoreOlderPrimaryAuthority() {
+        val root = temporaryFolder.newFolder("bad-fence")
+        val storage = FileRawCollectionStorage(root)
+        assertTrue(storage.writeFenceAtomically("account-deleted", "ACCOUNT_DELETED"))
+        val recovery = root.resolve("raw_collections_v2/recovery_fences/account-deleted.fence")
+        assertTrue(requireNotNull(recovery.parentFile).mkdirs()); recovery.writeText("")
+        org.junit.Assert.assertThrows(RawCollectionStorageReadException::class.java) {
+            storage.readFence("account-deleted")
+        }
+        assertTrue(storage.hasFence("account-deleted"))
+    }
+
     private companion object {
         const val COLLECTION_ID = "123e4567-e89b-42d3-a456-426614174000"
     }

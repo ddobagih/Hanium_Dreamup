@@ -24,6 +24,40 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AndroidPrivacyDeletionAccountDeletionTest {
+    @Test fun statusRequiresExactlyOneStandardJsonDocument() {
+        val valid = validStatusJson()
+        assertNotNull(validatedAccountDeletionStatusOrNull(" \r\n$valid\t", INSTALLATION_ID, REQUEST_ID))
+        val malformed = listOf(valid + " {}", valid + "junk", valid.replaceFirst("{", "{\"revision\":2,"),
+            valid.replaceFirst("{", "{\"\\u0072evision\":2,"), valid.replace("\"revision\":1", "revision:1"),
+            valid.replaceFirst("\"schema_version\"", "'schema_version'"), valid.dropLast(1) + ",}")
+        assertEquals(emptyList<Int>(), malformed.indices.filter {
+            validatedAccountDeletionStatusOrNull(malformed[it], INSTALLATION_ID, REQUEST_ID) != null
+        })
+    }
+
+    @Test fun malformedConflictCannotBecomeATerminalDeletionDecision() {
+        val valid = "{\"code\":\"account_deletion_already_completed\"}"
+        assertEquals("account_deletion_already_completed", accountDeletionTerminalConflictCodeOrNull(valid))
+        val malformed = listOf(valid + " {}", valid + "junk", valid.replaceFirst("{", "{\"code\":\"other\","),
+            valid.replaceFirst("{", "{\"\\u0063ode\":\"other\","), valid.replace("\"code\"", "code"),
+            valid.replace("\"code\"", "'code'"), valid.dropLast(1) + ",}")
+        assertEquals(emptyList<Int>(), malformed.indices.filter {
+            accountDeletionHttpFailureDisposition(409, malformed[it]) is AccountDeletionHttpFailureDisposition.TerminalConflict
+        })
+    }
+
+    @Test fun malformedReauthenticationBodyCannotSelectAnAuthenticationAction() {
+        val valid = "{\"code\":\"account_deletion_reauthentication_required\",\"reauthentication_required\":true}"
+        assertEquals(AccountDeletionHttpFailureDisposition.Retry(ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE),
+            accountDeletionHttpFailureDisposition(401, valid))
+        val malformed = listOf(valid + " {}", valid + "junk", valid.replaceFirst("{", "{\"reauthentication_required\":false,"),
+            valid.replaceFirst("{", "{\"\\u0063ode\":\"other\","), valid.replace("\"code\"", "code"),
+            valid.replace("\"code\"", "'code'"), valid.dropLast(1) + ",}")
+        assertEquals(emptyList<Int>(), malformed.indices.filter {
+            accountDeletionHttpFailureDisposition(401, malformed[it]) != AccountDeletionHttpFailureDisposition.Retry("http_401")
+        })
+    }
+
     @Test
     fun exactV2NineItemStatusParsesAndUnknownOrReorderedShapeFailsClosed() {
         val valid = validStatusJson()

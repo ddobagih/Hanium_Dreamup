@@ -109,7 +109,15 @@ class DestinationSearchLocationController(
             callback?.invoke(null)
             return false
         }
-        if (isAcquiring && generation == requestGeneration) cancelRequest = cancellation else cancellation()
+        if (isAcquiring && generation == requestGeneration) {
+            cancelRequest = cancellation
+        } else {
+            try {
+                cancellation()
+            } catch (_: Exception) {
+                // An immediate result may already have completed or started a newer request.
+            }
+        }
         return true
     }
 

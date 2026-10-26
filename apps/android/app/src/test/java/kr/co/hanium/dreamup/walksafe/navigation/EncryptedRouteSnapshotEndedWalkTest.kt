@@ -63,6 +63,37 @@ class EncryptedRouteSnapshotEndedWalkTest {
         assertEquals("second", store.load(scope("walk-2"), 4_000L)?.route?.providerRouteId)
     }
 
+    @Test fun endWalkReadExceptionStillRetiresTheOldWalk() = checkUnexpectedEndFailure("read")
+
+    @Test fun endWalkClearExceptionStillRetiresTheOldWalk() = checkUnexpectedEndFailure("clear")
+
+    @Test fun endWalkReadbackExceptionStillRetiresTheOldWalk() = checkUnexpectedEndFailure("readback")
+
+    private fun checkUnexpectedEndFailure(stage: String) {
+        val storage = EndedWalkSnapshotStorage()
+        val store = newStore(storage, EndedWalkKeyProvider(), RouteSnapshotProcessCoordinator())
+        assertTrue(store.beginWalk(scope("walk-1")))
+        assertTrue(store.saveFirstRoute(scope("walk-1"), route("first"), destination, 1_000L))
+        when (stage) {
+            "read" -> storage.readFailure = IllegalStateException("read unavailable")
+            "clear" -> storage.clearFailure = IllegalStateException("clear unavailable")
+            "readback" -> storage.failReadAfterClear = true
+        }
+        assertFalse(store.endWalk())
+        storage.readFailure = null
+        storage.clearFailure = null
+        storage.failReadAfterClear = false
+        // A late result from the ended walk must not recreate or read its archive.
+        assertFalse(store.saveFirstRoute(scope("walk-1"), route("late"), destination, 2_000L))
+        assertTrue(store.load(scope("walk-1"), 2_000L) == null)
+        assertFalse(store.beginWalk(scope("walk-1")))
+        assertTrue(store.endWalk())
+        assertTrue(storage.envelope == null)
+        assertTrue(store.beginWalk(scope("walk-2")))
+        assertTrue(store.saveFirstRoute(scope("walk-2"), route("second"), destination, 3_000L))
+        assertEquals("second", store.load(scope("walk-2"), 4_000L)?.route?.providerRouteId)
+    }
+
     private fun newStore(storage: EndedWalkSnapshotStorage, keys: EndedWalkKeyProvider,
         process: RouteSnapshotProcessCoordinator) = EncryptedRouteSnapshotStore(
         storage = storage,
@@ -87,8 +118,11 @@ class EncryptedRouteSnapshotEndedWalkTest {
 private class EndedWalkSnapshotStorage : RouteSnapshotStorage {
     var envelope: String? = null
     var clearSucceeds = true
+    var readFailure: Exception? = null
+    var clearFailure: Exception? = null
+    var failReadAfterClear = false
 
-    override fun read(): String? = envelope
+    override fun read(): String? { readFailure?.let { throw it }; return envelope }
 
     override fun write(envelope: String): Boolean {
         this.envelope = envelope
@@ -96,7 +130,9 @@ private class EndedWalkSnapshotStorage : RouteSnapshotStorage {
     }
 
     override fun clear(): Boolean {
+        clearFailure?.let { throw it }
         if (clearSucceeds) envelope = null
+        if (failReadAfterClear) readFailure = IllegalStateException("readback unavailable")
         return clearSucceeds
     }
 }

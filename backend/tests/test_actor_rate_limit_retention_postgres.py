@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor
+import json
+import time
 
 import pytest
 from sqlalchemy import create_engine, event, text
@@ -171,3 +174,62 @@ def test_s20_45_cli_apply_does_not_wait_for_a_concurrent_writer(database, capsys
     printed = capsys.readouterr().out
     assert '"deleted_count":5' in printed and '"status":"completed"' in printed
     assert _remaining(owner) == set(_PRESERVED) | {"concurrent_writer"}
+
+
+def test_locked_expired_row_times_out_without_partial_deletion_and_retry_recovers(
+    database, capsys,
+) -> None:
+    owner, runtime_sessions = database
+    settings = _settings()
+    settings.database_statement_timeout_ms = 100
+    before = _remaining(owner)
+    with owner.connect() as blocker:
+        transaction = blocker.begin()
+        try:
+            blocker.execute(text(
+                "SELECT id FROM public.actor_rate_limit_events "
+                "WHERE actor_digest = 'eligible_account' FOR UPDATE"
+            )).scalar_one()
+            started = time.monotonic()
+            assert main(
+                ["--apply", "--batch-size", "3"], settings=settings,
+                session_factory=runtime_sessions,
+            ) == 1
+            assert time.monotonic() - started < 3
+            captured = capsys.readouterr()
+            assert captured.out == ""
+            assert json.loads(captured.err)["deletion_outcome"] == "unknown"
+            assert _remaining(owner) == before
+        finally:
+            transaction.rollback()
+    retried = run_retention(
+        settings, session_factory=runtime_sessions, apply=True, batch_size=3,
+    )
+    assert retried["deleted_count"] == 3
+    assert _remaining(owner) == set(_ELIGIBLE_OLDEST_FIRST[3:]) | set(_PRESERVED)
+
+
+def test_concurrent_cleaners_preserve_live_and_unknown_groups(database) -> None:
+    owner, runtime_sessions = database
+    start = threading.Barrier(2)
+
+    def clean():
+        start.wait(timeout=5)
+        return run_retention(
+            _settings(), session_factory=runtime_sessions, apply=True, batch_size=3,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        calls = [pool.submit(clean) for _ in range(2)]
+        results = [call.result(timeout=10) for call in calls]
+    remaining = _remaining(owner)
+    assert set(_PRESERVED) <= remaining
+    assert all(0 <= result["deleted_count"] <= 3 for result in results)
+    assert sum(result["deleted_count"] for result in results) == len(_ROWS) - len(remaining)
+    # Overlapping batches may select the same rows. A later explicit batch
+    # must still drain the eligible remainder without touching live windows.
+    final = run_retention(
+        _settings(), session_factory=runtime_sessions, apply=True, batch_size=10,
+    )
+    assert final["deleted_count"] == len(remaining) - len(_PRESERVED)
+    assert _remaining(owner) == set(_PRESERVED)

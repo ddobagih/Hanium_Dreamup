@@ -516,7 +516,13 @@ class AndroidFeedbackActuator private constructor(
             )
             if (owned.isEmpty()) return
             // Keep the ownership check and engine stop atomic with utterance registration.
-            if (ttsState == TtsState.READY) stopSpeechEngine()
+            if (ttsState == TtsState.READY && !stopSpeechEngine()) {
+                // A disconnected engine must not remain cached as READY after cancellation.
+                // Retire its callbacks, but leave reconnection to the next explicit user action.
+                ttsEngineGeneration += 1L
+                ready.set(false)
+                ttsState = TtsState.FAILED
+            }
             lastInteractionMessage = ""
             lastInteractionMessageAtMs = 0L
             owned
@@ -1734,12 +1740,18 @@ class AndroidFeedbackActuator private constructor(
     private fun isSpeechEngineInitialized(): Boolean =
         speechRuntime?.engineInitialized ?: ::textToSpeech.isInitialized
 
-    private fun stopSpeechEngine() {
-        try {
-            if (speechRuntime != null) speechRuntime.stop() else textToSpeech.stop()
+    private fun stopSpeechEngine(): Boolean {
+        return try {
+            val stopped = if (speechRuntime != null) {
+                speechRuntime.stop()
+                true
+            } else textToSpeech.stop() == TextToSpeech.SUCCESS
+            if (!stopped) logSpeechEvent("engine_stop_error")
+            stopped
         } catch (_: RuntimeException) {
             // Cancellation remains cancellation; a stop exception cannot trigger fallback speech.
             logSpeechEvent("engine_stop_error")
+            false
         }
     }
 

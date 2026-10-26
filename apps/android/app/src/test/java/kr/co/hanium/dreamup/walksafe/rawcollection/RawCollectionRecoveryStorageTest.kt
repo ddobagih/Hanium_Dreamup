@@ -117,6 +117,34 @@ class RawCollectionRecoveryStorageTest {
         assertEquals("external-ciphertext", external.resolve("keep.aead").readText())
     }
 
+    @Test
+    fun rejectionFallbackSurvivesReconstructionThenAdmissionDeletesOnlyRejectedData() {
+        for (consent in listOf(true, false)) {
+            val root = temporary.newFolder()
+            val files = FileRawCollectionStorage(root)
+            var deny = false
+            val failing = object : RawCollectionStorage by files {
+                override fun writeManifestAtomically(collectionId: String, envelope: String) =
+                    !deny && files.writeManifestAtomically(collectionId, envelope)
+                override fun deleteCollection(collectionId: String) = !deny && files.deleteCollection(collectionId)
+            }
+            val cipher = RecoveryStorageAead()
+            val store = RawCollectionStore(failing, cipher, { NOW })
+            seedComplete(store)
+            deny = true
+            assertFalse(if (consent) store.discardConsentRejected(OWNER, VALID) else store.discardWalkRejected(OWNER, VALID))
+            val restored = RawCollectionStore(root, cipher, { NOW })
+            assertTrue(restored.readyManifests(OWNER).isEmpty())
+            assertNull(restored.readUploadChunk(VALID, OWNER, 0))
+            assertNotNull(files.readManifest(VALID))
+            assertEquals(RawCapacityAdmission.ALLOWED, restored.admitNewSegment(WALK, CONSENT))
+            assertNull(files.readManifest(VALID))
+            assertTrue(restored.onAccountDeleted())
+            assertTrue(restored.resetForNewEnrollment(OWNER.copy(accountGeneration = 2)))
+            assertTrue(files.listFenceNames().isEmpty())
+        }
+    }
+
     private fun isolated(root: File, name: String) =
         root.resolve("raw_collections_v2/quarantine/$ORPHAN/$name")
 

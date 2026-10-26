@@ -16,6 +16,7 @@ import uuid
 
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 import pytest
 from pydantic import ValidationError
 from sqlalchemy import create_engine, text
@@ -428,6 +429,8 @@ def test_v12_migration_round_trip_on_postgres(monkeypatch: pytest.MonkeyPatch) -
         monkeypatch.setenv("DATABASE_URL", migration_url)
         monkeypatch.setenv("WALKSAFE_MIGRATION_DATABASE_URL", migration_url)
         config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+        expected_head = ScriptDirectory.from_config(config).get_current_head()
+        assert expected_head is not None
         SessionFactory = sessionmaker(bind=disposable_engine)
 
         command.upgrade(config, "202609300005")
@@ -440,7 +443,7 @@ def test_v12_migration_round_trip_on_postgres(monkeypatch: pytest.MonkeyPatch) -
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM public.alembic_version")
-            ).scalar_one() == "202609300009"
+            ).scalar_one() == expected_head
             assert _ingest_hash(connection) == NEW_INGEST_HASH
             assert integrity.admin_report_integrity_boundary_state(connection) is True
             # The latest consent is 1.1.0: reports wait for the 1.2.0 reconsent.
@@ -498,7 +501,7 @@ def test_v12_migration_round_trip_on_postgres(monkeypatch: pytest.MonkeyPatch) -
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM public.alembic_version")
-            ).scalar_one() == "202609300009"
+            ).scalar_one() == expected_head
             assert _ingest_hash(connection) == NEW_INGEST_HASH
             assert integrity.admin_report_integrity_boundary_state(connection) is True
             assert _runtime_report_insert(connection, login_role) is None

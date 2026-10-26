@@ -33,6 +33,22 @@ class AndroidReportUploaderAuthenticationStaleTest {
     }
 
     @Test
+    fun directDisconnectFailurePreservesAuthenticationFailure() {
+        exercise(false, StaleAuthenticationResponseTiming.CURRENT, disconnectFails = true)
+    }
+
+    @Test
+    fun queuedUploadDisconnectFailurePreservesAuthenticationFailure() {
+        exercise(true, StaleAuthenticationResponseTiming.CURRENT, disconnectFails = true)
+    }
+
+    @Test
+    fun queuedStatusDisconnectFailurePreservesAuthenticationFailure() {
+        exercise(true, StaleAuthenticationResponseTiming.CURRENT, statusLookup = true,
+            clearExpected = false, disconnectFails = true)
+    }
+
+    @Test
     fun directCurrentStaleResponseClearsOnce() {
         exercise(false, StaleAuthenticationResponseTiming.CURRENT)
     }
@@ -130,6 +146,7 @@ class AndroidReportUploaderAuthenticationStaleTest {
         body: String = STALE_AUTHENTICATION_BODY,
         statusLookup: Boolean = false,
         clearExpected: Boolean = timing == StaleAuthenticationResponseTiming.CURRENT,
+        disconnectFails: Boolean = false,
     ): Throwable {
         val origin = if (queued) {
             assumeTrue(
@@ -153,6 +170,7 @@ class AndroidReportUploaderAuthenticationStaleTest {
                         expected = state.publish(state.session(origin))
                     }
                 },
+                disconnectFails = disconnectFails,
                 onBodyClosed = {
                     if (timing == StaleAuthenticationResponseTiming.CANCELLED) call.cancel()
                 },
@@ -243,6 +261,7 @@ class AndroidReportUploaderAuthenticationStaleTest {
         body: String,
         private val onResponse: () -> Unit,
         private val onBodyClosed: () -> Unit,
+        private val disconnectFails: Boolean,
     ) : HttpURLConnection(url) {
         private val bytes = body.toByteArray(Charsets.UTF_8)
         private val closedBody = AtomicBoolean(false)
@@ -251,7 +270,9 @@ class AndroidReportUploaderAuthenticationStaleTest {
             private set
 
         override fun connect() = Unit
-        override fun disconnect() = Unit
+        override fun disconnect() {
+            if (disconnectFails) throw IllegalStateException("synthetic disconnect failure")
+        }
         override fun usingProxy(): Boolean = false
         override fun getOutputStream(): OutputStream = output
         override fun getResponseCode(): Int {

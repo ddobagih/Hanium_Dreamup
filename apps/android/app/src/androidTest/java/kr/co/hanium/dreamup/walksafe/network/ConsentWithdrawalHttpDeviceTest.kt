@@ -151,7 +151,162 @@ class ConsentWithdrawalHttpDeviceTest {
         }
     }
 
-    private class NativeServer(responses:List<Pair<Int,String>>,requestedPort:Int=0, private val responseGate:CountDownLatch?=null):AutoCloseable {
+    private fun bootstrapBody() = JSONObject().put("schema_version", "walksafe.integrated-consent-bootstrap.v1")
+        .put("status", "READY").put("source", "CURRENT_CONSENT").put("installation_id", INSTALLATION)
+        .put("policy_version", INTEGRATED_CONSENT_POLICY_VERSION).put("item_versions", JSONObject(VERSIONS))
+        .put("client_revision_floor", 1).put("selections", choices(confirmation().selections))
+        .put("source_receipt_sha256", "b".repeat(64)).put("expected_previous_backend_receipt_sha256", "b".repeat(64)).toString()
+
+    @Test fun allConsentEntryPointsRejectAmbiguousDocumentsAndRetainLocalWithdrawal() {
+        val accepted = mutableListOf<String>()
+        for (entry in listOf("bootstrap", "current", "save")) {
+            val valid = if (entry == "bootstrap") bootstrapBody() else body(confirmation(2))
+            val malformed = listOf(valid + " {}", valid + "junk",
+                valid.replaceFirst("{", "{\"installation_id\":\"other\","),
+                valid.replaceFirst("{", "{\"\\u0069nstallation_id\":\"other\","),
+                valid.replace("\"installation_id\"", "installation_id"),
+                valid.replace("\"installation_id\"", "'installation_id'"), valid.dropLast(1) + ",}")
+            for ((index, text) in malformed.withIndex()) NativeServer(listOf(200 to text)).use { server ->
+                val state = IntegratedConsentSession(); assertTrue(state.accept(confirmation())); assertTrue(state.withdrawImmediately(raw))
+                val before = state.cachedConfirmationOrNull()
+                val client = AndroidIntegratedConsentClient()
+                val result = runCatching { when (entry) {
+                    "bootstrap" -> client.fetchBootstrapCall(server.base, session(server.base), INSTALLATION).execute()
+                    "current" -> read(client, server)
+                    else -> save(client, server, mutation(confirmation(), confirmation().selections.copy(rawSourceCollection=false)))
+                } }
+                if (result.isSuccess) accepted += "$entry:$index"
+                else assertTrue(result.exceptionOrNull() is IntegratedConsentProtocolException)
+                server.finished(); assertEquals(before, state.cachedConfirmationOrNull()); assertFalse(state.isAllowed(raw))
+            }
+        }
+        report("ambiguous_document_cases=21 unexpectedly_accepted=$accepted local_withdrawal_retained=true")
+        assertEquals(emptyList<String>(), accepted)
+    }
+
+    @Test fun consentErrorMetadataRejectsAmbiguousDocuments() {
+        val valid = "{\"detail\":{\"code\":\"integrated_consent_policy_version_mismatch\",\"required_policy_version\":\"next-policy\"}}"
+        val malformed = listOf(valid + " {}", valid + "junk", valid.replaceFirst("{", "{\"detail\":{},"),
+            valid.replaceFirst("{", "{\"\\u0064etail\":{},"), valid.replace("\"detail\"", "detail"),
+            valid.replace("\"detail\"", "'detail'"), valid.dropLast(1) + ",}")
+        val actionable = mutableListOf<Int>()
+        for ((index, text) in malformed.withIndex()) NativeServer(listOf(409 to text)).use { server ->
+            val error = assertThrows(IntegratedConsentHttpException::class.java) { read(AndroidIntegratedConsentClient(), server) }
+            if (error.serverCode != null || error.requiredPolicyVersion != null) actionable += index
+            assertEquals(409, error.statusCode); server.finished()
+        }
+        report("error_document_cases=7 unexpectedly_actionable=$actionable")
+        assertEquals(emptyList<Int>(), actionable)
+    }
+
+    @Test fun consentHttpFramingIsStrictForBootstrapCurrentAndErrorResponses() {
+        val accepted = mutableListOf<String>()
+        for (entry in listOf("bootstrap", "current")) for (status in listOf(200, 409)) {
+            val text = if (status == 409) "{\"detail\":{\"code\":\"integrated_consent_previous_receipt_conflict\"}}"
+                else if (entry == "bootstrap") bootstrapBody() else body(confirmation())
+            val bytes = text.toByteArray()
+            val malformed = listOf(
+                "short" to ("Content-Length: ${bytes.size + 8}\r\n" to bytes),
+                "duplicate" to ("Content-Length: ${bytes.size}\r\nContent-Length: ${bytes.size}\r\n" to bytes),
+                "conflicting" to ("Content-Length: ${bytes.size}\r\nTransfer-Encoding: chunked\r\n" to chunk(bytes)),
+                "utf8" to ("" to (bytes.copyOfRange(0, bytes.size-1) + ",\"ignored\":\"".toByteArray() + byteArrayOf(0xc3.toByte(),0x28) + "\"}".toByteArray()))
+            )
+            for ((name, wire) in malformed) NativeServer(listOf(status to text), wireResponse = { _, _ -> response(status, wire.first, wire.second) }).use { server ->
+                val client = AndroidIntegratedConsentClient()
+                val result = runCatching { if (entry == "bootstrap") client.fetchBootstrapCall(server.base,session(server.base),INSTALLATION).execute() else read(client,server) }
+                if (result.exceptionOrNull() !is NetworkResponseProtocolException) accepted += "$entry:$status:$name"
+                server.finished()
+            }
+        }
+        report("strict_wire_cases=16 missing_transport_rejection=$accepted")
+        assertEquals(emptyList<String>(), accepted)
+    }
+
+    @Test fun evidenceKeyRegistrationCannotAcceptAnIncomplete204Response() {
+        NativeServer(listOf(200 to body(confirmation()), 204 to ""), wireResponse = { code, text ->
+            response(code, "Content-Length: ${if (code == 204) 1 else text.toByteArray().size}\r\n", text.toByteArray())
+        }).use { server ->
+            val client = AndroidIntegratedConsentClient { "synthetic-public-key-transport-only" }
+            assertThrows(NetworkResponseProtocolException::class.java) { read(client, server) }
+            server.finished(); assertEquals(2,server.headers.size)
+        }
+    }
+
+    @Test fun validConsentFramingAndEvidenceKeyRegistrationRemainUsable() {
+        for (entry in listOf("bootstrap", "current", "save")) for (framing in listOf("length", "chunked", "close")) {
+            val pending = mutation(confirmation(), confirmation().selections.copy(rawSourceCollection = false))
+            val expected = if (entry == "save") confirmation(2, request = pending.requestId, selections = pending.desiredSelections) else confirmation()
+            val text = if (entry == "bootstrap") bootstrapBody() else body(expected)
+            NativeServer(listOf(200 to text), wireResponse = { code, body ->
+                val bytes = body.toByteArray()
+                when (framing) {
+                    "length" -> response(code, "Content-Length: ${bytes.size}\r\n", bytes)
+                    "chunked" -> response(code, "Transfer-Encoding: chunked\r\n", chunk(bytes))
+                    else -> response(code, "", bytes)
+                }
+            }).use { server ->
+                val client = AndroidIntegratedConsentClient()
+                when (entry) {
+                    "bootstrap" -> assertNotNull(client.fetchBootstrapCall(server.base, session(server.base), INSTALLATION).execute())
+                    "current" -> assertEquals(confirmation(), read(client, server))
+                    else -> assertEquals(expected, save(client, server, pending))
+                }
+                server.finished()
+                assertTrue(server.headers.single().contains("Accept-Encoding: identity", true))
+            }
+        }
+        NativeServer(listOf(200 to body(confirmation()), 204 to "")).use { server ->
+            assertEquals(confirmation(), read(AndroidIntegratedConsentClient { "synthetic-public-key-transport-only" }, server))
+            server.finished()
+            assertEquals(2, server.headers.size)
+            assertTrue(server.headers.last().startsWith("PUT /privacy/rights?control=installation-evidence-key "))
+            assertTrue(server.headers.all { it.contains("Accept-Encoding: identity", true) })
+        }
+        report("valid_document_and_framing_cases=9 valid_registration_204=true")
+    }
+
+    @Test fun cancellationDuringEvidenceKeyRegistrationCannotPublishConsent() {
+        val registrationReceived = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        NativeServer(listOf(200 to body(confirmation()), 204 to ""), wireResponse = { code, text ->
+            if (code == 204) {
+                registrationReceived.countDown()
+                check(release.await(5, TimeUnit.SECONDS))
+            }
+            response(code, "Content-Length: ${text.toByteArray().size}\r\n", text.toByteArray())
+        }).use { server ->
+            val state = IntegratedConsentSession()
+            assertTrue(state.accept(confirmation())); assertTrue(state.withdrawImmediately(raw))
+            val call = AndroidIntegratedConsentClient { "synthetic-public-key-transport-only" }
+                .fetchCurrentCall(server.base, session(server.base), INSTALLATION, SECRET)
+            val worker = Executors.newSingleThreadExecutor()
+            val published = java.util.concurrent.atomic.AtomicInteger()
+            try {
+                val result = worker.submit<Throwable?> {
+                    try {
+                        val reply = checkNotNull(call.execute())
+                        published.incrementAndGet(); state.applyConfirmation(reply); null
+                    } catch (error: Exception) { error }
+                }
+                assertTrue(registrationReceived.await(5, TimeUnit.SECONDS))
+                call.cancel(); release.countDown()
+                assertTrue(result.get(5, TimeUnit.SECONDS) is java.util.concurrent.CancellationException)
+                assertEquals(0, published.get()); assertFalse(state.isAllowed(raw))
+                try { server.finished() } catch (error: java.util.concurrent.ExecutionException) {
+                    assertTrue(error.cause is java.io.IOException)
+                }
+                assertEquals(2, server.headers.size)
+                report("registration_received=true delayed_204_not_published=true withdrawal_retained=true")
+            } finally { release.countDown(); call.cancel(); worker.shutdownNow() }
+        }
+    }
+
+    private fun chunk(bytes: ByteArray) = "${bytes.size.toString(16)}\r\n".toByteArray() + bytes + "\r\n0\r\n\r\n".toByteArray()
+    private fun response(status: Int, headers: String, bytes: ByteArray) =
+        "HTTP/1.1 $status Test\r\nContent-Type: application/json\r\n${headers}Connection: close\r\n\r\n".toByteArray() + bytes
+
+    private class NativeServer(responses:List<Pair<Int,String>>,requestedPort:Int=0, private val responseGate:CountDownLatch?=null,
+        wireResponse: ((Int, String) -> ByteArray)? = null):AutoCloseable {
         private val server=ServerSocket().apply {reuseAddress=true;bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"),requestedPort));soTimeout=15_000}
         val port=server.localPort;val base="http://127.0.0.1:$port"
         val received=CountDownLatch(1)
@@ -166,7 +321,11 @@ class ConsentWithdrawalHttpDeviceTest {
                 check(length in 0..1_000_000)
                 val data=ByteArray(length);for(i in data.indices){val b=input.read();check(b>=0);data[i]=b.toByte()};bodies+=data.toString(Charsets.UTF_8)
                 received.countDown();check(responseGate?.await(5,TimeUnit.SECONDS) != false)
-                val bytes=body.toByteArray();c.getOutputStream().apply{write("HTTP/1.1 $status Test\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray());write(bytes);flush()}
+                val bytes=body.toByteArray();c.getOutputStream().apply {
+                    if (wireResponse != null) write(wireResponse(status, body))
+                    else { write("HTTP/1.1 $status Test\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray());write(bytes) }
+                    flush()
+                }
             }
         }
         fun finished(){task.get(20,TimeUnit.SECONDS)}

@@ -395,6 +395,7 @@ def test_android_cas_recovery_against_real_backend_and_gateway(tmp_path):
         assert android["final_get_status"] == 200
         assert android["final_get_receipt_sha256"] == android["successor_receipt_sha256"]
         assert android["original_journal_preserved"] is True
+        assert android["fresh_session_restored"] is True
         assert android["bootstrap_receipt_sha256"] != android["successor_receipt_sha256"]
         with Session(runtime_engine) as db:
             events = db.scalars(select(PrivacyConsentEvent).where(

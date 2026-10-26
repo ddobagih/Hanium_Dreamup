@@ -90,6 +90,9 @@ _READ_FLAGS = (
     os.O_RDONLY
     | getattr(os, "O_CLOEXEC", 0)
     | getattr(os, "O_NOFOLLOW", 0)
+    # Reach the regular-file check even if the entry was replaced by a FIFO.
+    # This does not impose a deadline on regular-file I/O.
+    | getattr(os, "O_NONBLOCK", 0)
 )
 _WRITE_FLAGS = (
     os.O_WRONLY

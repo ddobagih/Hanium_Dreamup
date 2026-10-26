@@ -104,7 +104,9 @@ class ActiveNetworkCalls {
     }
 
     fun cancelAll() {
-        calls.toList().forEach(CancellableNetworkCall<*>::cancel)
+        // One broken cleanup must not skip cancellation of other requests. Keep each call
+        // registered until complete(): requesting cancellation does not prove the worker exited.
+        calls.toList().forEach { runCatching { it.cancel() } }
     }
 }
 
@@ -178,7 +180,7 @@ internal class HttpConnectionCancellation {
     fun attach(value: HttpURLConnection) {
         check(connection.compareAndSet(null, value)) { "HTTP connection already attached" }
         if (cancelled.get() && connection.compareAndSet(value, null)) {
-            value.disconnect()
+            runCatching { value.disconnect() }
             throw CancellationException("network call cancelled")
         }
     }
@@ -203,7 +205,7 @@ internal class HttpConnectionCancellation {
         cancelled.set(true)
         // Disconnect first: closing a request stream whose write is blocked waits for that write's
         // lock (JDK StreamingOutputStream.close -> flush), so the socket must be closed before it.
-        connection.getAndSet(null)?.disconnect()
+        runCatching { connection.getAndSet(null)?.disconnect() }
         runCatching { stream.getAndSet(null)?.close() }
     }
 
@@ -298,13 +300,14 @@ internal fun HttpURLConnection.readBoundedResponse(
     maximumBytes: Int,
     cancellation: HttpConnectionCancellation,
     strictSuccessFraming: Boolean = false,
+    strictErrorFraming: Boolean = false,
 ): BoundedHttpResponse {
     require(maximumBytes > 0)
     // A cancelled or expired call must not reach responseCode: some HttpURLConnection
     // implementations silently reconnect and resend after disconnect().
     cancellation.throwIfCancelled()
     val status = responseCode
-    val strict = strictSuccessFraming && status in 200..299
+    val strict = if (status in 200..299) strictSuccessFraming else strictErrorFraming
     val contentLength = if (strict) strictBodyLength() else getHeaderFieldLong("Content-Length", -1L)
     if (contentLength > maximumBytes.toLong()) {
         throw NetworkResponseTooLargeException(maximumBytes)
@@ -368,6 +371,7 @@ private fun InputStream.readBoundedText(
     val output = ByteArrayOutputStream(initialSize)
     val buffer = ByteArray(8 * 1024)
     var totalBytes = 0
+    var zeroReads = 0
     while (true) {
         cancellation.throwIfCancelled()
         val read = try {
@@ -378,6 +382,12 @@ private fun InputStream.readBoundedText(
         }
         cancellation.throwIfCancelled()
         if (read < 0) break
+        if (read == 0) {
+            // Match the existing administrator response readers' no-progress limit.
+            if (++zeroReads > 3) throw NetworkResponseProtocolException("response_body_no_progress")
+            continue
+        }
+        zeroReads = 0
         totalBytes += read
         if (totalBytes > maximumBytes) throw NetworkResponseTooLargeException(maximumBytes)
         output.write(buffer, 0, read)

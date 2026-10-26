@@ -566,6 +566,97 @@ class RawCollectionRuntimeCoordinatorTest {
         assertEquals(1, f.store.readyManifests(OWNER).size)
     }
 
+    @Test
+    fun lateProtocolFailureAfterSessionChangeIsCancelled() = assertStaleFailureIsCancelled(
+        RawCollectionProtocolException(),
+    )
+
+    @Test
+    fun lateIoFailureAfterSessionChangeIsCancelled() = assertStaleFailureIsCancelled(
+        java.io.IOException("synthetic disconnected response"),
+    )
+
+    @Test
+    fun lateRuntimeFailureAfterSessionChangeIsCancelled() = assertStaleFailureIsCancelled(
+        IllegalStateException("synthetic response failure"),
+    )
+
+    @Test
+    fun lateProtocolFailureAfterExplicitCancellationIsCancelled() = assertStaleFailureIsCancelled(
+        RawCollectionProtocolException(), explicitCancellation = true,
+    )
+
+    private fun assertStaleFailureIsCancelled(error: Exception, explicitCancellation: Boolean = false) {
+        val f = fixture()
+        prepareUpload(f)
+        var current = f.context(WalkSessionState.ENDED)
+        val call = requireNotNull(f.coordinator.startNextUpload { current })
+        val beforeCounters = f.coordinator.outcomeCountersSnapshot()
+        f.client.beforeReturn = {
+            if (explicitCancellation) call.cancel()
+            else current = current.copy(sessionGeneration = current.sessionGeneration + 1L)
+            throw error
+        }
+        assertEquals(RawCollectionUploadOutcome.CANCELLED, call.execute())
+        assertEquals(beforeCounters, f.coordinator.outcomeCountersSnapshot())
+        assertEquals(1, f.store.readyManifests(OWNER).size)
+        assertTrue(f.client.lastPlaintexts.all { bytes -> bytes.all { it == 0.toByte() } })
+        f.client.beforeReturn = null
+        // The old operation released its slot and cannot poison the next valid operation.
+        assertEquals(RawCollectionUploadOutcome.DELETED_AFTER_EXACT_RECEIPT,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+    }
+
+    @Test
+    fun quarantineWriteExceptionReturnsLocalFailureAndReleasesUploadSlot() =
+        assertHttpFailureLocalWriteIsContained(422)
+
+    @Test
+    fun consentRejectionWriteExceptionReturnsLocalFailureAndReleasesUploadSlot() =
+        assertHttpFailureLocalWriteIsContained(409, "raw_source_collection_consent_interrupted")
+
+    @Test
+    fun walkRejectionWriteExceptionReturnsLocalFailureAndReleasesUploadSlot() =
+        assertHttpFailureLocalWriteIsContained(409, "raw_collection_walk_not_uploadable")
+
+    @Test
+    fun quarantineReadExceptionReturnsLocalFailureAndReleasesUploadSlot() =
+        assertHttpFailureLocalWriteIsContained(422, failRead = true)
+
+    @Test
+    fun consentRejectionReadExceptionReturnsLocalFailureAndReleasesUploadSlot() =
+        assertHttpFailureLocalWriteIsContained(409, "raw_source_collection_consent_interrupted", failRead = true)
+
+    @Test
+    fun walkRejectionReadExceptionReturnsLocalFailureAndReleasesUploadSlot() =
+        assertHttpFailureLocalWriteIsContained(409, "raw_collection_walk_not_uploadable", failRead = true)
+
+    private fun assertHttpFailureLocalWriteIsContained(status: Int, code: String? = null, failRead: Boolean = false) {
+        val f = fixture()
+        prepareUpload(f)
+        f.client.httpFailure = status
+        f.client.errorBody = code?.let { "{\"detail\":{\"code\":\"$it\"}}" }.orEmpty()
+        f.client.beforeReturn = {
+            f.storage.failManifestRead = failRead
+            f.storage.throwOnManifestWrite = !failRead
+        }
+        assertEquals(RawCollectionUploadOutcome.LOCAL_READ_FAILED,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertEquals(1, f.storage.collectionCount)
+        assertTrue(f.client.lastPlaintexts.all { bytes -> bytes.all { it == 0.toByte() } })
+        assertEquals(1L, f.coordinator.outcomeCountersSnapshot()["upload_failed"])
+        f.storage.throwOnManifestWrite = false
+        f.storage.failManifestRead = false
+        f.client.beforeReturn = null
+        // Retry the same rejection: only the repaired local store may now apply it.
+        val expected = if (status == 422) RawCollectionUploadOutcome.QUARANTINED
+            else if (code == "raw_source_collection_consent_interrupted") RawCollectionUploadOutcome.CONSENT_REJECTED
+            else RawCollectionUploadOutcome.WALK_REJECTED
+        assertEquals(expected,
+            requireNotNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) }).execute())
+        assertNull(f.coordinator.startNextUpload { f.context(WalkSessionState.ENDED) })
+    }
+
     private fun prepareUpload(f: RuntimeFixture) {
         assertEquals(RawMetadataCaptureResult.CAPTURED,
             f.coordinator.captureMetadataBatch(f.context(WalkSessionState.ACTIVE), detectionSample(), performanceSample()))
@@ -888,6 +979,7 @@ private class RuntimeFakeClient : RawCollectionNetworkClient {
     var calls = 0
     var beforeReturn: (() -> Unit)? = null
     var httpFailure: Int? = null
+    var errorBody = ""
     var retryAfterHeader: String? = null
     var factoryFails = false
     var lastPlaintexts: List<ByteArray> = emptyList()
@@ -911,7 +1003,7 @@ private class RuntimeFakeClient : RawCollectionNetworkClient {
         return CancellableNetworkCall.blocking {
             check(isCurrent())
             beforeReturn?.invoke()
-            httpFailure?.let { throw RawCollectionHttpException(it, retryAfterHeader = retryAfterHeader) }
+            httpFailure?.let { throw RawCollectionHttpException(it, errorBody, retryAfterHeader) }
             exactRuntimeReceipt(backendManifest)
         }
     }
@@ -942,6 +1034,7 @@ private fun exactRuntimeReceipt(manifest: BackendRawManifest): RawCollectionRece
 
 private class RuntimeFakeStorage : RawCollectionStorage {
     var throwOnManifestWrite = false
+    var failManifestRead = false
     private var activeId: String? = null
     private val manifests = mutableMapOf<String, String>()
     private val chunks = mutableMapOf<Pair<String, Int>, String>()
@@ -963,7 +1056,10 @@ private class RuntimeFakeStorage : RawCollectionStorage {
         activeId = null
         return true
     }
-    override fun readManifest(collectionId: String): String? = manifests[collectionId]
+    override fun readManifest(collectionId: String): String? {
+        if (failManifestRead) throw RawCollectionStorageReadException("synthetic manifest read failure")
+        return manifests[collectionId]
+    }
     override fun writeManifestAtomically(collectionId: String, envelope: String): Boolean {
         if (throwOnManifestWrite) throw IllegalStateException("synthetic local write failure")
         manifests[collectionId] = envelope

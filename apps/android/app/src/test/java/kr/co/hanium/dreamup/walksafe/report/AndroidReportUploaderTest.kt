@@ -37,6 +37,89 @@ import org.junit.Test
 
 class AndroidReportUploaderTest {
     @Test
+    fun directReceiptRejectsAmbiguousJsonDocument() {
+        for (body in ambiguousDocuments(structuredSuccessBody())) {
+            assertNull(body, validatedReportUploadResponseOrNull(201, body, receiptExpectation()))
+        }
+        assertNotNull(validatedReportUploadResponseOrNull(201, " \r\n" + structuredSuccessBody() + "\t", receiptExpectation()))
+    }
+
+    @Test
+    fun queuedUploadReceiptRejectsAmbiguousJsonDocument() {
+        queuedReport().use { report ->
+            val valid = JSONObject().put("transport_receipt", transportReceipt(report)).toString()
+            for (body in ambiguousDocuments(valid)) assertNull(body, parseQueuedUploadResultOrNull(body, report))
+            assertNotNull(parseQueuedUploadResultOrNull(" \n" + valid + "\t", report))
+        }
+    }
+
+    @Test
+    fun queuedStatusReceiptRejectsAmbiguousJsonDocument() {
+        queuedReport().use { report ->
+            val valid = JSONObject().put("persistence_state", "PERSISTED")
+                .put("user_status", "RECEIVED").put("transport_receipt", transportReceipt(report)).toString()
+            for (body in ambiguousDocuments(valid)) assertNull(body, parseQueuedStatusReceiptOrNull(body, report))
+            assertNotNull(parseQueuedStatusReceiptOrNull(" \n" + valid + "\t", report))
+        }
+    }
+
+    private fun ambiguousDocuments(valid: String) = listOf(
+        valid + "{}", valid + "garbage", valid + "\u0000",
+        valid.replace('"', '\''), "/*comment*/" + valid,
+        valid.replaceFirst(":", "="), valid.dropLast(1) + ",}",
+        valid.replaceFirst(Regex("\"([^\"]+)\":"), "$1:"),
+    )
+
+    @Test fun rejectsCompleteJsonInShortHttpBody() = invalidWireReceipt("short")
+    @Test fun rejectsConflictingHttpFraming() = invalidWireReceipt("ambiguous")
+    @Test fun rejectsUnsupportedHttpEncoding() = invalidWireReceipt("encoding")
+    @Test fun rejectsInvalidUtf8EvenInUnusedField() = invalidWireReceipt("utf8")
+    @Test fun rejectsTrailingSecondJsonOverHttp() = invalidWireReceipt("extra_json")
+    @Test fun rejectsDuplicateContentLengthOverHttp() = invalidWireReceipt("duplicate_length")
+    @Test fun rejectsTruncatedChunkedResponse() = invalidWireReceipt("unfinished_chunks")
+
+    private fun invalidWireReceipt(fault: String) {
+        val json = structuredSuccessBody()
+        val bytes = when (fault) {
+            "extra_json" -> (json + "{}").toByteArray()
+            "utf8" -> (json.dropLast(1) + ",\"unused\":\"").toByteArray() +
+                byteArrayOf(0xc3.toByte(), 0x28) + "\"}".toByteArray()
+            else -> json.toByteArray()
+        }
+        LocalHttpTestServer { _, socket ->
+            val framing = when (fault) {
+                "short" -> "Content-Length: ${bytes.size + 5}\r\n"
+                "ambiguous" -> "Content-Length: ${bytes.size}\r\nTransfer-Encoding: chunked\r\n"
+                "duplicate_length" -> "Content-Length: ${bytes.size}\r\nContent-Length: ${bytes.size}\r\n"
+                "unfinished_chunks" -> "Transfer-Encoding: chunked\r\n"
+                "encoding" -> "Content-Length: ${bytes.size}\r\nContent-Encoding: gzip\r\n"
+                else -> "Content-Length: ${bytes.size}\r\n"
+            }
+            socket.getOutputStream().apply {
+                write(("HTTP/1.1 201 Created\r\nContent-Type: application/json\r\n" + framing + "Connection: close\r\n\r\n").toByteArray())
+                if (fault in listOf("ambiguous", "unfinished_chunks")) {
+                    write("${bytes.size.toString(16)}\r\n".toByteArray())
+                    write(bytes); write("\r\n".toByteArray())
+                    if (fault == "ambiguous") write("0\r\n\r\n".toByteArray())
+                } else write(bytes)
+                flush()
+            }
+        }.use { server ->
+            try {
+                val error = assertThrows(Exception::class.java) {
+                    AndroidReportUploader().uploadCall(
+                        uploadPermit(), session(server.baseUrl), consentConfirmation(), testNetworkBinding(),
+                        ReportTransferPurpose.EXPLICIT,
+                        """{"auto_reported":false,"trace_id":"$TEST_TRACE_ID"}""",
+                        TEST_IMAGE, TEST_TRACE_ID, TEST_ACTOR_ID,
+                    ).execute()
+                }
+                assertTrue("unexpected error: $error", error is java.io.IOException || error is ReportUploadProtocolException)
+            } finally { ReportPrivacyConsentSession.resetForNewEnrollment() }
+        }
+    }
+
+    @Test
     fun realBackendRequestBytesBindCreatedAndReplayReceiptsAndCooldownError() {
         val fixtures = requireNotNull(javaClass.getResourceAsStream("/report/s20-6-transport-outcomes.json"))
             .bufferedReader().use { JSONObject(it.readText()) }

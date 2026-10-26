@@ -2,7 +2,10 @@ package kr.co.hanium.dreamup.walksafe.admin.security;
 
 import static org.junit.Assert.*;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.TextView;
 import androidx.lifecycle.Lifecycle;
 import androidx.test.core.app.ActivityScenario;
@@ -30,6 +33,262 @@ public final class AdminSecurityRaceDeviceTest {
     @Test public void lateRecoveryAfterReturnCannotPublishAuthority() throws Exception { lateAuthentication(true, true); }
     @Test public void logoutDropsLocalAuthorityBeforeDelayedServerSuccess() throws Exception { logout(false); }
     @Test public void logoutDropsLocalAuthorityBeforeDelayedServerFailure() throws Exception { logout(true); }
+
+    /** Real buttons and executor; only the server's custody statement is synthetic. No backup is made. */
+    @Test public void custodyConfirmationCannotClaimBackupVerificationOrSubmitWithoutUserConfirmation() throws Exception {
+        Fixture fixture = new Fixture("unused", false);
+        fixture.custody = AdminRecoveryCustodyState.UNATTESTED;
+        fixture.login();
+        try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            awaitInitialized(scenario);
+            scenario.onActivity(activity -> {
+                install(activity, fixture.controller); invoke(activity, "render");
+                assertEquals(View.VISIBLE, ((View) get(activity, "custodyGroup")).getVisibility());
+                assertTrue(button(activity.getWindow().getDecorView(), "복구자료 외부 보관 확인 기록").performClick());
+                assertEquals(0, fixture.custodyRequests.size());
+                assertTrue(((TextView) get(activity, "resultText")).getText().toString().contains("확인란"));
+                ((CheckBox) get(activity, "custodyConfirmationInput")).setChecked(true);
+                assertTrue(button(activity.getWindow().getDecorView(), "복구자료 외부 보관 확인 기록").performClick());
+                assertFalse(((CheckBox) get(activity, "custodyConfirmationInput")).isChecked());
+            });
+            awaitSecurityWork(scenario);
+            scenario.onActivity(activity -> {
+                assertEquals(1, fixture.custodyRequests.size());
+                assertEquals(AdminRecoveryCustodyState.ATTESTED, fixture.controller.snapshot().recoveryCustodyState());
+                String result = ((TextView) get(activity, "resultText")).getText().toString();
+                assertTrue(result, result.contains("실제 백업 복원 여부는 별도 확인"));
+                assertTrue(button(activity.getWindow().getDecorView(), "서버·기기 보안 정보 펼치기").performClick());
+                TextView label = get(activity, "custodyText");
+                assertTrue(label.isShown());
+                assertTrue(label.getText().toString(), label.getText().toString().contains("백업·복원 미검증"));
+                assertEquals(View.GONE, ((View) get(activity, "custodyGroup")).getVisibility());
+            });
+        } finally { fixture.controller.close(); }
+    }
+
+    @Test public void lostCustodyResponseRequiresExplicitRetryWithTheSameAttempt() throws Exception {
+        Fixture fixture = new Fixture("unused", false);
+        fixture.custody = AdminRecoveryCustodyState.UNATTESTED;
+        fixture.failCustodyOnce = true;
+        fixture.login();
+        try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            awaitInitialized(scenario);
+            scenario.onActivity(activity -> {
+                install(activity, fixture.controller); invoke(activity, "render");
+                ((CheckBox) get(activity, "custodyConfirmationInput")).setChecked(true);
+                assertTrue(button(activity.getWindow().getDecorView(), "복구자료 외부 보관 확인 기록").performClick());
+            });
+            awaitSecurityWork(scenario);
+            assertEquals(1, fixture.custodyRequests.size());
+            // Transport failure retains the token for explicit state refresh, but locks work.
+            assertEquals(AdminSecurityState.FAIL_CLOSED, fixture.controller.snapshot().securityState());
+            assertNotNull(fixture.controller.pendingRecoveryCustodyMaterialKind());
+            scenario.onActivity(activity -> {
+                assertEquals(View.GONE, ((View) get(activity, "operationsGroup")).getVisibility());
+                assertEquals(View.GONE, ((View) get(activity, "custodyGroup")).getVisibility());
+                assertTrue(button(activity.getWindow().getDecorView(), "서버 보안상태와 기기 세션 새로고침").performClick());
+            });
+            awaitSecurityWork(scenario);
+            assertEquals(AdminSecurityState.NORMAL, fixture.controller.snapshot().securityState());
+            scenario.onActivity(activity -> {
+                invoke(activity, "render");
+                assertEquals(1, fixture.custodyRequests.size());
+                assertTrue(((TextView) get(activity, "custodyText")).getText().toString().contains("확정되지 않았습니다"));
+                assertFalse(((View) get(activity, "custodyMaterialKindInput")).isEnabled());
+                ((CheckBox) get(activity, "custodyConfirmationInput")).setChecked(true);
+                assertTrue(button(activity.getWindow().getDecorView(), "복구자료 외부 보관 확인 기록").performClick());
+            });
+            awaitSecurityWork(scenario);
+            assertEquals(2, fixture.custodyRequests.size());
+            assertEquals(fixture.custodyRequests.get(0).custodyReference(), fixture.custodyRequests.get(1).custodyReference());
+            assertEquals(fixture.custodyRequests.get(0).materialKind(), fixture.custodyRequests.get(1).materialKind());
+            assertNull(fixture.controller.pendingRecoveryCustodyMaterialKind());
+            assertEquals(AdminRecoveryCustodyState.ATTESTED, fixture.controller.snapshot().recoveryCustodyState());
+        } finally { fixture.controller.close(); }
+    }
+
+    @Test public void refreshedUnattestedCustodyReopensConfirmationAndRemovesAttestedLabel() throws Exception {
+        Fixture fixture = new Fixture("unused", false); fixture.login();
+        try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            awaitInitialized(scenario);
+            scenario.onActivity(activity -> {
+                install(activity, fixture.controller); invoke(activity, "render");
+                assertEquals(View.GONE, ((View) get(activity, "custodyGroup")).getVisibility());
+                fixture.custody = AdminRecoveryCustodyState.UNATTESTED; fixture.stateRevision++;
+                assertTrue(button(activity.getWindow().getDecorView(), "서버 보안상태와 기기 세션 새로고침").performClick());
+            });
+            awaitSecurityWork(scenario);
+            scenario.onActivity(activity -> {
+                assertEquals(AdminRecoveryCustodyState.UNATTESTED, fixture.controller.snapshot().recoveryCustodyState());
+                assertEquals(View.VISIBLE, ((View) get(activity, "custodyGroup")).getVisibility());
+                String label = ((TextView) get(activity, "custodyText")).getText().toString();
+                assertTrue(label, label.contains("미확인") && label.contains("고위험 작업 잠금"));
+                assertEquals(View.GONE, ((View) get(activity, "operationsGroup")).getVisibility());
+            });
+        } finally { fixture.controller.close(); }
+    }
+
+    private static void awaitSecurityWork(ActivityScenario<AdminBoundaryActivity> scenario) throws Exception {
+        ExecutorService[] executor = new ExecutorService[1];
+        scenario.onActivity(activity -> executor[0] = get(activity, "networkExecutor"));
+        executor[0].submit(() -> {}).get(5, TimeUnit.SECONDS);
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+    }
+
+    @Test public void recoveryStartDisplaysServerTotpPrerequisiteAndKeepsOperationsLocked() throws Exception {
+        recoveryStartForm(false);
+    }
+
+    @Test public void failedRecoveryStartDoesNotExposeCompletionForm() throws Exception {
+        recoveryStartForm(true);
+    }
+
+    /** Native form handlers with synthetic history; does not enable the operational build gate. */
+    @Test public void deliveryPrefillRequiresCompleteMatchingHistoryAndPreservesUserInput() throws Exception {
+        Fixture fixture = new Fixture("unused", false); fixture.login();
+        AdminReportModels.Detail detail = deliveryDetail();
+        try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            awaitInitialized(scenario);
+            scenario.onActivity(activity -> {
+                install(activity, fixture.controller); invoke(activity, "render");
+                ((AdminReportController) get(activity, "reportController")).replaceDetail(detail);
+                invokeWith(activity, "connectReportToOperations", new Class<?>[]{AdminReportModels.Detail.class}, detail);
+                EditText input = get(activity, "institutionInput");
+                for (String condition : List.of("valid", "typed", "partial", "count", "stale", "reload", "terminal")) {
+                    List<AdminOperationsApi.DeliveryHistoryItem> history = get(activity, "deliveryHistoryItems");
+                    history.clear(); history.add(deliveryItem(condition.equals("terminal")));
+                    set(activity, "deliveryHistorySnapshotRevision", condition.equals("stale") ? 2L : 1L);
+                    set(activity, "deliveryHistoryTotalCount", condition.equals("count") ? 2L : 1L);
+                    set(activity, "deliveryHistoryNextCursor", condition.equals("partial") ? "next" : null);
+                    set(activity, "deliveryHistoryNeedsFirstPage", condition.equals("reload"));
+                    input.setText(condition.equals("typed") ? "사용자 입력 기관" : "");
+                    invoke(activity, "prefillDeliveryInstitution");
+                    assertEquals(condition, condition.equals("valid") ? "기존 시험 기관" :
+                        condition.equals("typed") ? "사용자 입력 기관" : "", input.getText().toString());
+                }
+            });
+        } finally { fixture.controller.close(); }
+    }
+
+    @Test public void institutionConflictUsesFreshHistoryAndRequestsManualResubmission() throws Exception {
+        deliveryConflictForm(true, true);
+    }
+
+    @Test public void institutionConflictWithStaleHistoryDoesNotOverwriteTheInstitution() throws Exception {
+        deliveryConflictForm(true, false);
+    }
+
+    @Test public void ordinaryConflictKeepsTheInstitutionAndDoesNotClaimMismatch() throws Exception {
+        deliveryConflictForm(false, true);
+    }
+
+    private void deliveryConflictForm(boolean mismatch, boolean fresh) throws Exception {
+        Fixture fixture = new Fixture("unused", false); fixture.login();
+        AdminReportModels.Detail detail = deliveryDetail();
+        var history = AdminOperationsApi.Result.deliveryHistory("synthetic-correlation", 200,
+            detail.summary().id(), fresh ? 1L : 2L, 1L, null, List.of(deliveryItem(false)));
+        Class<?> refreshType = Class.forName(AdminBoundaryActivity.class.getName() + "$OperationalConflictRefresh");
+        var ctor = refreshType.getDeclaredConstructor(AdminReportModels.Detail.class, AdminOperationsApi.Result.class);
+        ctor.setAccessible(true); Object refresh = ctor.newInstance(detail, history);
+        try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            awaitInitialized(scenario);
+            scenario.onActivity(activity -> {
+                install(activity, fixture.controller); invoke(activity, "render");
+                ((AdminReportController) get(activity, "reportController")).replaceDetail(detail);
+                invokeWith(activity, "connectReportToOperations", new Class<?>[]{AdminReportModels.Detail.class}, detail);
+                EditText input = get(activity, "institutionInput"); input.setText("사용자 입력 기관");
+                set(activity, "operationInFlight", true); set(activity, "recordingDelivery", true);
+                invokeWith(activity, "applyOperationalConflict",
+                    new Class<?>[]{String.class, boolean.class, refreshType, boolean.class},
+                    detail.summary().id(), true, refresh, mismatch);
+                assertEquals(mismatch && fresh ? "기존 시험 기관" : "사용자 입력 기관", input.getText().toString());
+                String result = ((TextView) get(activity, "resultText")).getText().toString();
+                assertTrue(result, result.contains(mismatch ? "기관명이 다릅니다" : "다른 관리자의 변경"));
+                assertTrue(result, result.contains(mismatch ? "자동으로 다시 제출하지 않았습니다" : "자동 재제출하지 않고"));
+                if (mismatch) assertTrue(result, result.contains(fresh ? "직접 다시 제출" : "다시 조회"));
+                assertFalse((Boolean) get(activity, "operationInFlight"));
+                assertFalse((Boolean) get(activity, "recordingDelivery"));
+            });
+        } finally { fixture.controller.close(); }
+    }
+
+    private static AdminReportModels.Detail deliveryDetail() throws Exception {
+        try (var input = InstrumentationRegistry.getInstrumentation().getContext().getAssets()
+            .open("admin-report-detail-v2.json")) {
+            var json = new org.json.JSONObject(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            json.put("latest_delivery_revision", 1);
+            json.getJSONObject("current_delivery").put("revision", 1).put("status", "SUBMITTED");
+            return AdminReportModels.parseDetail(json.toString(), AdminDeviceFixtures.REPORT_ID);
+        }
+    }
+
+    private static AdminOperationsApi.DeliveryHistoryItem deliveryItem(boolean terminal) {
+        return new AdminOperationsApi.DeliveryHistoryItem("99999999-9999-4999-8999-999999999999", 1L,
+            "88888888-8888-4888-8888-888888888888", 1L,
+            terminal ? AdminInstitutionDelivery.Status.RESOLVED : AdminInstitutionDelivery.Status.SUBMITTED,
+            terminal ? "synthetic-receipt" : null, "기존 시험 기관",
+            "2026-10-25T00:00:00Z", "2026-10-25T00:00:01Z", null);
+    }
+
+    private static void set(Object target, String name, Object value) {
+        try { Field f = target.getClass().getDeclaredField(name); f.setAccessible(true); f.set(target, value); }
+        catch (ReflectiveOperationException error) { throw new AssertionError(error); }
+    }
+
+    private static void invokeWith(Object target, String name, Class<?>[] types, Object... args) {
+        try { Method m = target.getClass().getDeclaredMethod(name, types); m.setAccessible(true); m.invoke(target, args); }
+        catch (ReflectiveOperationException error) { throw new AssertionError(error); }
+    }
+
+    private void recoveryStartForm(boolean fail) throws Exception {
+        Fixture fixture = new Fixture("startRecovery", fail);
+        fixture.release.countDown();
+        try (ActivityScenario<AdminBoundaryActivity> scenario = ActivityScenario.launch(AdminBoundaryActivity.class)) {
+            awaitInitialized(scenario);
+            scenario.onActivity(activity -> {
+                install(activity, fixture.controller); invoke(activity, "render");
+                ((EditText) get(activity, "adminIdInput")).setText("admin-001");
+                ((EditText) get(activity, "recoveryCodeInput")).setText("synthetic-recovery-code-only");
+                assertTrue(button(activity.getWindow().getDecorView(), "분실 복구 시작 및 기존 세션 폐기").performClick());
+                assertEquals(0, ((EditText) get(activity, "recoveryCodeInput")).length());
+            });
+            assertTrue("recovery request reached the synthetic API", fixture.entered.await(5, TimeUnit.SECONDS));
+            awaitSecurityWork(scenario);
+            scenario.onActivity(activity -> {
+                assertFalse(fixture.controller.snapshot().isAccessSessionActive());
+                assertEquals(View.GONE, ((View) get(activity, "operationsGroup")).getVisibility());
+                ViewGroup form = get(activity, "recoveryCompleteGroup");
+                String result = ((TextView) get(activity, "resultText")).getText().toString();
+                if (fail) {
+                    assertEquals(AdminSecurityState.FAIL_CLOSED, fixture.controller.snapshot().securityState());
+                    assertFalse(fixture.controller.snapshot().isRecoveryActive());
+                    assertEquals(View.GONE, form.getVisibility());
+                    assertFalse(result, result.contains("복구가 시작되었습니다"));
+                } else {
+                    assertTrue(fixture.controller.snapshot().isRecoveryActive());
+                    assertEquals(View.VISIBLE, form.getVisibility());
+                    assertTrue(result, result.contains(AdminRecoveryMessagePolicy.RECOVERY_PREPARATION_KO));
+                    assertTrue(((TextView) form.getChildAt(0)).isShown());
+                    assertEquals(AdminRecoveryMessagePolicy.RECOVERY_PREPARATION_KO,
+                        ((TextView) form.getChildAt(0)).getText().toString());
+                    assertEquals("새 비밀번호", ((EditText) get(activity, "newPasswordInput")).getHint().toString());
+                    assertTrue(((EditText) get(activity, "newTotpInput")).getHint().toString().contains("새 TOTP"));
+                }
+            });
+        } finally { fixture.controller.close(); }
+    }
+
+    private static Button button(View root, String text) {
+        if (root instanceof Button && text.contentEquals(((Button) root).getText())) return (Button) root;
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                Button found = button(group.getChildAt(i), text);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
 
     /** Actual Activity and executor; harmless callbacks only, no synthetic login or remote mutation. */
     @Test public void queuedSecurityWorkCannotRunAfterScreenExitAndReturn() throws Exception {
@@ -195,6 +454,13 @@ public final class AdminSecurityRaceDeviceTest {
             if (!ready[0]) Thread.sleep(25);
         }
         assertTrue("native key initialization must finish before injecting test API", ready[0]);
+        until = android.os.SystemClock.elapsedRealtime() + 5000;
+        boolean[] focused = {false};
+        while (!focused[0] && android.os.SystemClock.elapsedRealtime() < until) {
+            scenario.onActivity(activity -> focused[0] = activity.hasWindowFocus() && (Boolean) get(activity, "activityStarted"));
+            if (!focused[0]) Thread.sleep(25);
+        }
+        assertTrue("the real administrator window must be visible and started", focused[0]);
     }
     private static void install(AdminBoundaryActivity activity, AdminSecurityController replacement) {
         AdminSecurityController original = get(activity, "controller");
@@ -225,6 +491,10 @@ public final class AdminSecurityRaceDeviceTest {
     private static final class Fixture {
         final CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
         final AdminSecurityController controller;
+        volatile AdminRecoveryCustodyState custody = AdminRecoveryCustodyState.ATTESTED;
+        volatile int stateRevision = 1;
+        volatile boolean failCustodyOnce;
+        final java.util.List<AdminSecurityApi.RecoveryCustodyAttestation> custodyRequests = new java.util.concurrent.CopyOnWriteArrayList<>();
         Fixture(String delayedMethod, boolean fail) {
             AdminSecurityApi api = (AdminSecurityApi) Proxy.newProxyInstance(AdminSecurityApi.class.getClassLoader(),
                 new Class<?>[]{AdminSecurityApi.class}, (proxy, method, args) -> {
@@ -237,8 +507,11 @@ public final class AdminSecurityRaceDeviceTest {
                     switch (name) {
                         case "login": return new AdminSecurityApi.LoginResult(TOKEN, AdminSecurityState.NORMAL, SESSION);
                         case "startRecovery": return new AdminSecurityApi.RecoveryStartResult(TOKEN, AdminSecurityState.RECOVERY_IN_PROGRESS);
-                        case "getState": case "revokeSession": return new AdminSecurityApi.StateSnapshot(AdminSecurityState.NORMAL,
-                            "v1", "2026-10-07T00:00:00Z", AdminRecoveryCustodyState.ATTESTED, "2026-10-06T00:00:00Z");
+                        case "getState": case "revokeSession": return state();
+                        case "attestRecoveryCustody":
+                            custodyRequests.add((AdminSecurityApi.RecoveryCustodyAttestation) args[1]);
+                            if (failCustodyOnce) { failCustodyOnce = false; throw new IOException("synthetic response loss"); }
+                            custody = AdminRecoveryCustodyState.ATTESTED; stateRevision++; return state();
                         case "getCompleteDeviceInventory":
                             ((Runnable) args[1]).run();
                             return new AdminSecurityApi.DeviceInventory(List.of(new AdminSecurityApi.SessionInfo(SESSION,
@@ -250,6 +523,9 @@ public final class AdminSecurityRaceDeviceTest {
                 });
             controller = new AdminSecurityController(api);
         }
+        AdminSecurityApi.StateSnapshot state() { return new AdminSecurityApi.StateSnapshot(AdminSecurityState.NORMAL,
+            Integer.toString(stateRevision), "2026-10-07T00:00:00Z", custody,
+            custody == AdminRecoveryCustodyState.ATTESTED ? "2026-10-06T00:00:00Z" : null); }
         void login() throws IOException { controller.login("admin-001", "synthetic-password", "123456", DEVICE, "fixture"); }
     }
 }
