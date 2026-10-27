@@ -138,7 +138,7 @@ final class AdminHttpRequestDeadline {
             throw new IllegalArgumentException("HTTP request budget is invalid");
         }
         // adm-F2: a closed transport opens nothing.
-        if (closed) throw new IOException(CANCELLED_MESSAGE);
+        if (closed || Thread.currentThread().isInterrupted()) throw new IOException(CANCELLED_MESSAGE);
         long startedAtNanos = clock.nanoTime();
         HttpURLConnection connection = connections.open(url);
         Owner owner = new Owner(connection, startedAtNanos, budgetNanos);
@@ -204,6 +204,7 @@ final class AdminHttpRequestDeadline {
         /** Throws once the deadline passed or the request was cancelled. */
         void check() throws IOException {
             if (remainingNanos() <= 0L) state.compareAndSet(ACTIVE, TIMED_OUT);
+            if (Thread.currentThread().isInterrupted()) state.compareAndSet(ACTIVE, CANCELLED);
             int current = state.get();
             if (current == TIMED_OUT) throw new SocketTimeoutException(DEADLINE_MESSAGE);
             if (current == CANCELLED) throw new IOException(CANCELLED_MESSAGE);
@@ -231,7 +232,14 @@ final class AdminHttpRequestDeadline {
         }
 
         private void disconnect() {
-            if (disconnectClaimed.compareAndSet(false, true)) connection.disconnect();
+            if (disconnectClaimed.compareAndSet(false, true)) {
+                try {
+                    connection.disconnect();
+                } catch (RuntimeException ignored) {
+                    // Best-effort cleanup must not replace the response/original failure or
+                    // escape the cancellation worker. The owner still checks cancellation/deadline.
+                }
+            }
         }
 
         /**

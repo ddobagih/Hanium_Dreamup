@@ -108,7 +108,7 @@ internal object BoundedRuntimeDiagnosticLog {
     }
 }
 
-/** All filesystem work runs on this single bounded worker, never the recognition/UI caller. */
+/** Appends use one bounded worker; account cleanup purges under the same lock on its own worker. */
 private class RuntimeDiagnosticFileWriter(private val directory: File) {
     private val current = File(directory, "events.log")
     private val previous = File(directory, "events.previous.log")

@@ -126,7 +126,11 @@ data class DepthStats(
      * that hold kept depth. A thin object is judged along its length only. Null = not judged.
      */
     val spatialCoverage: Float? = null,
+    /** Kept measured pixels only; additional speech geometry, never a replacement risk statistic. */
+    val surfaceSamples: List<DepthSurfaceSample> = emptyList(),
 )
+
+data class DepthSurfaceSample(val depthUv: Point2, val zM: Float, val confidence: Float?)
 
 /**
  * Per-reason counts of in-region depth candidates removed before statistics. A zero pixel is a
@@ -263,6 +267,8 @@ data class TrackedObjectDepth(
     val sourceObservedAtElapsedRealtimeMs: Long? = null,
     /** The producer's actual age budget for [sourceObservedAtElapsedRealtimeMs]. */
     val sourceMaxAgeMs: Long? = null,
+    /** Camera to nearest coherent observed surface, never Z, ground range or a prediction. */
+    val measuredSurfaceRangeM: Float? = null,
 ) {
     /** Original numeric approach time, with the original capture/lease and retirement behavior. */
     val approachTimeMs: Long? get() = timeToCollisionMs

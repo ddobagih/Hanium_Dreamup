@@ -273,7 +273,12 @@ class UnknownObjectDepthPipeline(
             region.regionId to spatialSupport.evaluate(observation.depth, true, region.sample.mask, supportedRegion = true)
         }
         val regionOutputs = regions.associate { region -> region.regionId to proximityOutput(capture, region, completedMs)
-            .let { output -> output.copy(rayDistanceM = regionSpatial[region.regionId]?.nearestReliableRangeM ?: output.rayDistanceM) } }
+            .let { output -> output.copy(
+                rayDistanceM = regionSpatial[region.regionId]?.nearestReliableRangeM ?: output.rayDistanceM,
+                measuredSurfaceRangeM = regionSpatial[region.regionId]?.nearestReliableRangeM?.takeIf {
+                    observations.first { it.sourceDetectionIndex in region.sourceIndices }.depth.newDepthInformation
+                },
+            ) } }
         val regionSelections = regions.associate { region -> region.regionId to UnknownWalkingObstaclePolicy.select(
             region.sample.mask, regionOutputs[region.regionId], capture.imageQuarterTurns,
             spatialEvidence = regionSpatial[region.regionId])
@@ -313,6 +318,8 @@ class UnknownObjectDepthPipeline(
         val result = UnknownDepthFrameResult(token, objects.map { obj ->
             val eligible = obj.trackId in candidateTrackIds
             obj.copy(walkingObstacleCandidate = eligible,
+                measuredSurfaceRangeM = observations.firstOrNull { it.trackId == obj.trackId && it.depth.newDepthInformation }
+                    ?.spatialEvidence?.nearestReliableRangeM,
                 rayDistanceM = observations.firstOrNull { it.trackId == obj.trackId }?.spatialEvidence?.nearestReliableRangeM ?: obj.rayDistanceM,
                 userFacing = if (eligible) obj.userFacing else UserFacingDepth(null, MessageLevel.NONE, null))
         }, observations.map { observation ->

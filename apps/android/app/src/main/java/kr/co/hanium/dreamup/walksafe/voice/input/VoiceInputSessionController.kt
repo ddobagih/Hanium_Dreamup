@@ -295,6 +295,12 @@ internal class VoiceInputSessionController(
                 decisionToken = environment.pendingNavigationDecisionToken(),
             )
         } else null
+        if (environment.serverCommandRecognitionEnabled()) {
+            handsFreeVoiceOwnsCommandPage = false
+            stopHandsFreeVoiceService()
+            startVoiceCommandRecognition()
+            return
+        }
         if (environment.runtimeActive()) {
             handsFreeVoiceOwnsCommandPage = true
             // S05-33: waking the assistant does not move the walking guidance page either; only a
@@ -400,7 +406,7 @@ internal class VoiceInputSessionController(
         if (
             !snapshot.isForeground ||
             (snapshot.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
-                !(environment.page().voiceInteraction && homeVoiceCommandAvailable()))
+                !(environment.page().voiceInteraction && homeVoiceCommandAvailable()) && !environment.walkAreaCommandAvailable())
         ) {
             presentation.voiceStatus("화면 음성 명령은 초기 설정과 기기 점검을 완료한 뒤 앱 화면에서 사용할 수 있습니다.")
             return
@@ -457,7 +463,8 @@ internal class VoiceInputSessionController(
                         WalkSessionState.ACTIVE -> applicationEffects.requireStartupCapabilityConfirmation()
                         WalkSessionState.PAUSED -> voiceResumeConfirmationAvailable()
                         WalkSessionState.READY, WalkSessionState.SAFE_STOP, WalkSessionState.ENDED ->
-                            environment.page().voiceInteraction && homeVoiceCommandAvailable()
+                            (environment.page().voiceInteraction && homeVoiceCommandAvailable()) ||
+                                environment.walkAreaCommandAvailable()
                         else -> false
                     }
             }
@@ -493,6 +500,12 @@ internal class VoiceInputSessionController(
         }
         clearDeferredVoiceRecognitionStart(notifyFailure = false)
         voiceCommandPromptReadyGeneration = null
+        if (environment.serverCommandRecognitionEnabled() && purpose == VoiceRecognitionPurpose.COMMAND) {
+            if (!promptCompletedForThisRequest) return prepareOneShotVoiceCommandPrompt()
+            val started = gateway.startGatewayVoiceCapture()
+            if (!started) output.speakInteraction("서버 음성 입력을 시작할 수 없습니다. 로그인과 데이터 사용 설정을 확인해 주세요.")
+            return started
+        }
         fun unavailable(detail: String, permanentlyLimit: Boolean): Boolean {
             presentation.navigationStatus("voice=recognizer_unavailable")
             handleOneShotSpeechRecognitionFailure(detail, permanentlyLimit)

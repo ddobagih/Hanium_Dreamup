@@ -114,6 +114,12 @@ fun spokenDestinationAddressKo(address: String): String =
         "${it.groupValues[1]}의 ${it.groupValues[2]}"
     }
 
+/** Speak the main/sub-number separator explicitly; keep the displayed/provider address intact. */
+fun String.toSpokenDestinationAddressKo(): String =
+    replace(DESTINATION_ADDRESS_SUB_NUMBER, "$1의 $2")
+
+private val DESTINATION_ADDRESS_SUB_NUMBER = Regex("(?<![0-9-])([0-9]+)-([0-9]+)(?![0-9-])")
+
 data class DestinationSearchResponse(
     val provider: String,
     val query: String,

@@ -141,10 +141,10 @@ class AndroidReportFrozenFrameAdmissionTest {
         assertNull(f.gate(capture = f.capture.first to f.capture.second.copy(depthDetections = emptyList())))
     }
 
-    @Test fun originalNullSourceIndexCompatibilityIsPreserved() {
+    @Test fun missingSourceIndexCannotProveTheReportCoordinates() {
         val f = Fixture(); val output = f.output.copy(sourceDetectionIndex = null)
         val changed = f.capture.second.copy(depthDetections = emptyList(), guidance = f.capture.second.guidance.copy(outputs = listOf(output)))
-        assertEquals("pass", f.gate(output = output, capture = f.capture.first to changed))
+        assertNull(f.gate(output = output, capture = f.capture.first to changed))
     }
 
     @Test fun copiedOrReplacedImageAndWallCaptureClockCannotCreatePass() {

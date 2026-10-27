@@ -356,6 +356,7 @@ internal fun validatedIntegratedConsentBootstrapOrNull(
 ): IntegratedConsentBootstrap? {
     if (body.isBlank()) return null
     return runCatching {
+        require(strictJsonObjectDocument(body)) { "invalid JSON response document" }
         val root = JSONObject(body)
         if (
             root.jsonKeys() != setOf(
@@ -459,6 +460,7 @@ internal fun validatedIntegratedConsentConfirmationOrNull(
 ): IntegratedConsentConfirmation? {
     if (body.isBlank()) return null
     return runCatching {
+        require(strictJsonObjectDocument(body)) { "invalid JSON response document" }
         val root = JSONObject(body)
         if (
             root.jsonKeys() != setOf(

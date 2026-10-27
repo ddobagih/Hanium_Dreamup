@@ -80,7 +80,7 @@ class MainActivityAccessibilityStaticTest {
         val sharedDispatch = MainActivityRefactorSource.function(source, "internal fun dispatchCommandSpeechResponse(")
         assertTrue(
             sharedDispatch.contains(
-                "actuator.speakGuardedHomeCommandInteraction(message, isCurrent,\n            onFailed = failed, onCompleted = completed, onCancelled = cancelled)",
+                "actuator.speakGuardedHomeCommandInteraction(message, isCurrent,\n            onFailed = failed, onCompleted = completed, onCancelled = cancelled,\n            deferToCurrentSpeech = deferToCurrentSpeech)",
             ),
         )
         val dispatchCaller = code(MainActivityRefactorSource.factory(source, "dispatchCommandSpeechResponse"))
@@ -94,7 +94,7 @@ class MainActivityAccessibilityStaticTest {
         )
         assertEquals(
             "{actuator.speakGuardedInteraction(message,isCurrent," +
-                "onCompleted=completed,onFailed=failed,onCancelled=cancelled)}",
+                "onCompleted=completed,onFailed=failed,onCancelled=cancelled,deferToCurrentSpeech=deferToCurrentSpeech)}",
             ordinaryDispatch,
         )
         val actuatorSource = File("src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt").readText()
@@ -104,7 +104,7 @@ class MainActivityAccessibilityStaticTest {
                 "advisoryStartDeadlineMs=Long.MAX_VALUE,advisoryStartValidator=isStillValidAtStart," +
                 "requiresExplicitTerminalCallback=true,protectsFromFollowingSpeech=false," +
                 "onCancelled=onCancelled?:onFailed,onCloseCancelled=onCancelled," +
-                "messageFamily=SpeechMessageFamily.INTERACTION,)",
+                "messageFamily=SpeechMessageFamily.INTERACTION,deferToCurrentSpeech=deferToCurrentSpeech,)",
             guardedInteraction.substringAfter("):NavigationSpeechDispatchResult=", ""),
         )
         assertTrue(sharedDispatch.contains("actuator.speakGuardedHomeCommandInteraction(message, startCurrent"))

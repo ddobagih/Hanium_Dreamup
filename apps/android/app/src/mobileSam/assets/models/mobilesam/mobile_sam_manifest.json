@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "model": "MobileSAM vit_t",
+  "source_sha256": "6dbb90523a35330fedd7f1d3dfc66f995213d81b29a5ca8108dbcdd4e37d6c2f",
+  "input_size": 1024,
+  "preprocess": "Ultralytics RGB resize longest side, top-left padding114, CHW (RGB-mean)/std",
+  "mean": [
+    123.675,
+    116.28,
+    103.53
+  ],
+  "std": [
+    58.395,
+    57.12,
+    57.375
+  ],
+  "box": "single xyxy in 1024 image coordinates",
+  "mask_output": "float32[1,1,1024,1024], crop padding then bilinear resize to original, threshold0",
+  "files": {
+    "mobile_sam_decoder.onnx": {
+      "sha256": "92072a75294f81b782ef04201a772f8319fa74f9e7af2f8ccb0fa10d06fd9177",
+      "bytes": 16408575
+    },
+    "mobile_sam_encoder.onnx": {
+      "sha256": "0d72a4ffc33bf50a172d40740cab8fcb82c7da34e5a1d22020a25bdc15ae5bb9",
+      "bytes": 27969729
+    }
+  },
+  "versions": {
+    "torch": "2.10.0",
+    "onnx": "1.23.0",
+    "onnxruntime": "1.30.0"
+  },
+  "validation": [
+    {
+      "source": "/Users/luminggi/Desktop/WalkMate/sam-test-20260927/comparison/inputs/japan_crosswalk.jpg",
+      "box_fraction": [
+        0.1,
+        0.15,
+        0.8,
+        0.9
+      ],
+      "mask_iou_vs_pytorch": 1.0,
+      "quality_abs_error": 2.6226043701171875e-06
+    },
+    {
+      "source": "/Users/luminggi/Desktop/WalkMate/sam-test-20260927/comparison/inputs/japan_crosswalk.jpg",
+      "box_fraction": [
+        0.4,
+        0.5,
+        0.7,
+        0.95
+      ],
+      "mask_iou_vs_pytorch": 1.0,
+      "quality_abs_error": 7.152557373046875e-07
+    },
+    {
+      "source": "/Users/luminggi/Desktop/WalkMate/sam-test-20260927/comparison/inputs/driveway.jpg",
+      "box_fraction": [
+        0.1,
+        0.15,
+        0.8,
+        0.9
+      ],
+      "mask_iou_vs_pytorch": 1.0,
+      "quality_abs_error": 5.960464477539063e-08
+    },
+    {
+      "source": "/Users/luminggi/Desktop/WalkMate/sam-test-20260927/comparison/inputs/driveway.jpg",
+      "box_fraction": [
+        0.4,
+        0.5,
+        0.7,
+        0.95
+      ],
+      "mask_iou_vs_pytorch": 1.0,
+      "quality_abs_error": 1.7881393432617188e-06
+    }
+  ]
+}

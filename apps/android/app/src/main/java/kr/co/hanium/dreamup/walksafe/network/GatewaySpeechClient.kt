@@ -100,6 +100,7 @@ internal class AndroidGatewaySpeechClient {
                 val response = connection.readBoundedResponse(
                     SPEECH_STT_MAX_RESPONSE_BYTES,
                     cancellation,
+                    strictSuccessFraming = true,
                 )
                 if (response.statusCode != HttpURLConnection.HTTP_OK) {
                     throw GatewaySpeechHttpException(response.statusCode)

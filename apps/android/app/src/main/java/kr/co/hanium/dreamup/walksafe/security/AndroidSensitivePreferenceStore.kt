@@ -2,6 +2,7 @@ package kr.co.hanium.dreamup.walksafe.security
 
 import android.content.SharedPreferences
 import java.util.IdentityHashMap
+import kr.co.hanium.dreamup.walksafe.network.strictJsonObjectDocument
 import org.json.JSONObject
 
 internal data class SensitivePreferenceSpec(
@@ -261,6 +262,10 @@ internal class AndroidSensitivePreferenceStore private constructor(
     }
 
     private fun persist(next: MutableMap<String, StoredValue>): Boolean {
+        if (next.size > MAX_ENTRY_COUNT) {
+            markBlocked()
+            return false
+        }
         val payload = encodeSnapshot(next).toByteArray(Charsets.UTF_8)
         val sealed = aead.seal(payload, spec.domainAad, SNAPSHOT_LIMITS)
         payload.fill(0)
@@ -408,9 +413,11 @@ internal class AndroidSensitivePreferenceStore private constructor(
     private fun decodeSnapshot(payload: ByteArray): MutableMap<String, StoredValue>? =
         runCatching {
             require(payload.size <= SNAPSHOT_LIMITS.maxPlaintextBytes)
-            val root = JSONObject(String(payload, Charsets.UTF_8))
+            val document = payload.decodeToString(throwOnInvalidSequence = true)
+            require(strictJsonObjectDocument(document))
+            val root = JSONObject(document)
             require(root.keysAsSet() == ROOT_FIELDS)
-            require(root.getInt("snapshot_version") == SNAPSHOT_VERSION)
+            require(root.opt("snapshot_version") == SNAPSHOT_VERSION)
             val encodedValues = root.getJSONObject("values")
             require(encodedValues.length() <= MAX_ENTRY_COUNT)
             buildMap {
@@ -418,10 +425,15 @@ internal class AndroidSensitivePreferenceStore private constructor(
                     requireAllowed(key)
                     val encoded = encodedValues.getJSONObject(key)
                     require(encoded.keysAsSet() == VALUE_FIELDS)
-                    val value = when (encoded.getString("type")) {
-                        TYPE_STRING -> StoredValue.StringValue(encoded.getString("value"))
-                        TYPE_LONG -> StoredValue.LongValue(encoded.getLong("value"))
-                        TYPE_BOOLEAN -> StoredValue.BooleanValue(encoded.getBoolean("value"))
+                    val raw = encoded.opt("value")
+                    val value = when (encoded.opt("type")) {
+                        TYPE_STRING -> StoredValue.StringValue(raw as? String ?: error("invalid string"))
+                        TYPE_LONG -> StoredValue.LongValue(when (raw) {
+                            is Int -> raw.toLong()
+                            is Long -> raw
+                            else -> error("invalid integer")
+                        })
+                        TYPE_BOOLEAN -> StoredValue.BooleanValue(raw as? Boolean ?: error("invalid boolean"))
                         else -> error("unsupported sensitive preference type")
                     }
                     put(key, value)

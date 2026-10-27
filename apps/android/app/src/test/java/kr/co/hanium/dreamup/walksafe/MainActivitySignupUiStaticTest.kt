@@ -243,8 +243,7 @@ class MainActivitySignupUiStaticTest {
         val compactPresentation = voiceFirstPresentation.filterNot { it.isWhitespace() }
         assertTrue(compactPresentation.contains("valguidanceVisible=pageName==\"GUIDANCE\""))
         assertTrue(compactPresentation.contains(
-            "valshown=guidanceVisible&&(it===destination.nativeGuidanceDestinationText||" +
-                "it===destination.nativeGuidanceStatusText)",
+            "valshown=(it===destination.nativeGuidanceStatusText&&guidanceVisible&&speechFailure!=null)",
         ))
         assertTrue(compactPresentation.contains(
             "valimportance=if(shown)View.IMPORTANT_FOR_ACCESSIBILITY_YES" +
@@ -270,7 +269,7 @@ class MainActivitySignupUiStaticTest {
         val reportDisclosure = functionBlock(
             "private fun renderExplicitReportConfirmationDisclosure(",
         )
-        val reportIdle = functionBlock("private fun renderExplicitReportConfirmationIdle(")
+        val reportIdle = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/AndroidExplicitReportPresentation.kt").readText(), "renderIdle")
         val voiceButton = functionBlock("private fun updateVoiceCommandButton(")
         assertTrue(reportDisclosure.contains("refreshHomeCards()"))
         assertTrue(reportIdle.contains("refreshHomeCards()"))

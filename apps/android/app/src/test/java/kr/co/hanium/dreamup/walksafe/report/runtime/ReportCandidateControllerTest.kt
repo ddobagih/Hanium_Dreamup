@@ -24,6 +24,18 @@ class ReportCandidateControllerTest {
         ReportPrivacyConsentSession.withdraw()
         GatewaySessionProcessCoordinator.clear(GatewaySessionProcessCoordinator.snapshot().generation)
     }
+    @Test fun sensitiveStorageFailureBlocksCachedConsentBeforeAndAfterDisclosure() {
+        for (afterDisclosure in listOf(false, true)) {
+            val f = Fixture().ready()
+            if (afterDisclosure) { f.stage(); f.beginDisclosure(); f.delivered!!.invoke(); f.runMain() }
+            f.sensitiveBlocked = true
+            f.controller.requestExplicitReport(ReportCandidateController.ExplicitReportRequestSource.ON_SCREEN)
+            assertEquals("reportCandidate=blocked:sensitive_storage", f.controller.status())
+            assertNull(f.queuedImage)
+            assertFalse(f.events.contains("queue"))
+        }
+    }
+
     @Test fun successfulExplicitQueueResultReleasesItsSharedPlaintextOwner() {
         val f = Fixture().ready()
         f.returnQueued = true
@@ -187,6 +199,8 @@ class ReportCandidateControllerTest {
         val consent = IntegratedConsentSession()
         val policy = PermissionSessionPolicy()
         var elapsed = 1_000L
+        var sensitiveBlocked = false
+        override fun sensitiveStorageBlocked() = sensitiveBlocked
         var permission = true
         var safety = true
         var frameCurrent = true

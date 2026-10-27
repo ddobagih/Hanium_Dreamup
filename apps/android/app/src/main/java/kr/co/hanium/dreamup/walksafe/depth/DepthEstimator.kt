@@ -290,6 +290,7 @@ class ObjectDepthEstimator(
             userFacing = userFacing,
             contactDepth = contactDepth,
         ).copy(
+            measuredSurfaceRangeM = cameraPose?.let { measuredSurfaceRange(stats, input.mapper, it) },
             riskDistanceKind = userRisk?.kind,
             horizontalDistanceM = userRisk?.horizontalM,
             spatialCoverageLimited = spatiallyLimited,

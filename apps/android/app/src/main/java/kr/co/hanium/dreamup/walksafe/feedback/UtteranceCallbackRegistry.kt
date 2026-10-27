@@ -17,6 +17,19 @@ fun utteranceTerminalTimeoutMs(characterCount: Int, family: SpeechMessageFamily)
     (5_000L + characterCount.coerceAtLeast(0) * 300L)
         .coerceIn(family.minimumMs, family.maximumMs)
 
+/** Keep long education below the per-utterance watchdog without removing any instructions. */
+internal fun trainingSpeechChunks(message: String): List<String> {
+    val chunks = mutableListOf<String>()
+    for (sentence in message.trim().split(Regex("(?<=[.!?])\\s+"))) {
+        for (part in sentence.chunked(240)) {
+            if (chunks.isNotEmpty() && chunks.last().length + 1 + part.length <= 240) {
+                chunks[chunks.lastIndex] += " $part"
+            } else chunks.add(part)
+        }
+    }
+    return chunks
+}
+
 internal enum class CommandSpeechReadiness {
     WAITING,
     DISPATCH,

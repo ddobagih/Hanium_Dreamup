@@ -275,6 +275,7 @@ class NativeWorkflowControllerTest {
         init { controller = NativeWorkflowController(
             proxy(NativeWorkflowController.EntryQueries::class.java) { name, args -> when (name) {
                 "shouldShowNativeHome" -> { queries += "homeAvailable"; homeAvailable }
+                "walkingArea" -> false
                 "nativeHomeFeatureContextAvailable" -> false
                 "isWalkSessionRuntimeActive" -> { queries += "runtime"; active }
                 "nativeFeatureAvailable" -> { queries += "feature:${args[0]}"; featureAvailable }

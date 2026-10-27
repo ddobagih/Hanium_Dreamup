@@ -24,7 +24,9 @@ class MainActivityCommandFeedbackLeaseStaticTest {
         assertTrue(owner.contains("current.gatewayGeneration == captured.gatewayGeneration"))
         assertTrue(owner.contains("current.walkEpoch == captured.walkEpoch"))
         assertTrue(response.contains("commandSpeechResponseCallbacks.takeTerminalCallback("))
-        assertTrue(response.contains("if (dispatch != NavigationSpeechDispatchResult.ACCEPTED) failed()"))
+        assertTrue(response.contains("commandSpeechTracker.submit(responseId, nativeParts.size)"))
+        assertTrue(response.contains("dispatch == NavigationSpeechDispatchResult.ACCEPTED"))
+        assertTrue(response.contains("failed = { if (partTerminal.compareAndSet(false, true)) failed() }"))
         assertFalse(response.contains("announceForAccessibility("))
         assertFalse(response.contains("startVoiceCommandRecognition("))
     }
@@ -96,9 +98,9 @@ class MainActivityCommandFeedbackLeaseStaticTest {
     fun pageExitCancelsCommandSpeechAndBackgroundStillClosesTheActualEngine() {
         val page = functionBlock("private fun showNativeUiPage(page: NativeUiPage, preserveVoiceInteraction: Boolean)")
         val pageChange = page.substringBefore("nativeUiPage = page")
-        assertTrue(pageChange.contains("if (nativeUiPage != page)"))
-        assertTrue(pageChange.contains("if (!preserveVoiceInteraction)"))
-        assertTrue(pageChange.contains("pages.retireOutgoingVoiceInteraction(nativeUiPage.isVoiceInteractionPage())"))
+        assertTrue(page.contains("if (nativeUiPage != page)"))
+        assertTrue(page.contains("if (!preserveVoiceInteraction)"))
+        assertTrue(page.contains("pages.retireOutgoingVoiceInteraction(nativeUiPage.isVoiceInteractionPage())"))
         val pagePort = MainActivityRefactorSource.property(source, "nativeWorkflowController")
         val retire = ReportStaticSourceInspector.functionBlock(pagePort, "override fun retireOutgoingVoiceInteraction")
         assertTrue(retire.contains("if (wasVoicePage)"))

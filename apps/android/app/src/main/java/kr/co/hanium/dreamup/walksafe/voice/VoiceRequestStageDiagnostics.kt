@@ -20,6 +20,7 @@ internal enum class VoiceRequestOutcome {
     MODEL_LOAD_FAILED,
     DECODER_FAILED,
     INPUT_SILENCED,
+    INPUT_ROUTE_CHANGED,
     AUDIO_FAILED,
     NO_SPEECH,
     RESULT_DELAYED,
@@ -135,6 +136,7 @@ internal fun classifyVoiceRequestOutcome(
         else -> VoiceRequestOutcome.FINAL_RECEIVED
     }
     streamingError == VoskStreamingError.AUDIO_SILENCED -> VoiceRequestOutcome.INPUT_SILENCED
+    streamingError == VoskStreamingError.AUDIO_ROUTE_CHANGED -> VoiceRequestOutcome.INPUT_ROUTE_CHANGED
     streamingError == VoskStreamingError.MODEL_UNAVAILABLE ||
         streamingError == VoskStreamingError.MODEL_LOAD_FAILED -> VoiceRequestOutcome.MODEL_LOAD_FAILED
     streamingError == VoskStreamingError.INFERENCE_FAILED -> VoiceRequestOutcome.DECODER_FAILED

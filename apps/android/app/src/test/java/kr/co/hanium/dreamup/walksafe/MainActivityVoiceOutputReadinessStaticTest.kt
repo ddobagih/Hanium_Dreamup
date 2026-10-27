@@ -149,7 +149,7 @@ class MainActivityVoiceOutputReadinessStaticTest {
             assertTrue(binding.contains("official, mounting, producers,"))
             val coordinator = File("src/main/java/kr/co/hanium/dreamup/walksafe/session/readiness/WalkReadinessCoordinator.kt").readText()
             assertTrue(MainActivityRefactorSource.member(coordinator, "capture")
-                .contains("producers.evaluate(requirement, effectiveDecision, epoch, officialAssessment, mountingAssessment, deviceResources)"))
+                .contains("producers.evaluate(requirement, effectiveDecision, epoch, officialAssessment, mountingAssessment,\n                deviceResources, allowModelPreparationPending)"))
             MainActivityRefactorSource.member(
                 File("src/main/java/kr/co/hanium/dreamup/walksafe/session/readiness/WalkReadinessProducers.kt").readText()
                     .substringAfter("internal class WalkReadinessProducers("), "evaluate")

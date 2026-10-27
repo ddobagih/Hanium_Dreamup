@@ -344,7 +344,8 @@ internal class AccountDeletionNetworkController(
                                     )
                                 is AccountDeletionHttpFailureDisposition.Retry ->
                                     markRetry(
-                                        disposition.code,
+                                        if (purpose != AccountDeletionCallPurpose.INITIAL &&
+                                            disposition.code == ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE) "http_401" else disposition.code,
                                         workerAttempt,
                                         activateRev0Reauthentication =
                                             purpose == AccountDeletionCallPurpose.INITIAL &&

@@ -21,6 +21,7 @@ internal class ForegroundAacRecorder(
     private val onLimitReached: () -> Unit,
     private val onInputFailure: (VoiceInputFailure) -> Unit = {},
     private val microphoneLease: VoiceMicrophoneLease = VoiceMicrophoneLease.process,
+    private val onSpeechEnded: (() -> Unit)? = null,
 ) {
     private class ActiveRecording(
         val recorder: MediaRecorder,
@@ -74,9 +75,23 @@ internal class ForegroundAacRecorder(
             recording.recorder.registerAudioRecordingCallback(Executor { handler.post(it) }, callback)
             unwatchSilencing = { runCatching { recording.recorder.unregisterAudioRecordingCallback(callback) }; Unit }
         }
+        val endpoint = SpeechEndpointPolicy(recording.startedAtElapsedRealtimeMs)
         val poll = object : Runnable {
             override fun run() {
-                if (!rejectInvalidInput(recording)) handler.postDelayed(this, 100L)
+                if (rejectInvalidInput(recording)) return
+                val now = SystemClock.elapsedRealtime()
+                if (now - recording.startedAtElapsedRealtimeMs >= MAX_RECORDING_DURATION_MS ||
+                    endpoint.captureLimitExceeded(now)) {
+                    cancel()
+                    onLimitReached()
+                    return
+                }
+                if (onSpeechEnded != null && endpoint.shouldStop(now,
+                        runCatching { recording.recorder.maxAmplitude }.getOrDefault(0))) {
+                    onSpeechEnded.invoke()
+                    return
+                }
+                handler.postDelayed(this, 100L)
             }
         }
         recording.poll = poll
@@ -108,7 +123,10 @@ internal class ForegroundAacRecorder(
                 val recording = active
                 if (recording?.recorder === source && !rejectInvalidInput(recording) &&
                     (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED ||
-                        what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED)) onLimitReached()
+                        what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED)) {
+                    cancel()
+                    onLimitReached()
+                }
             }
             createdRecorder.prepare()
             createdRecorder.start()
@@ -136,6 +154,11 @@ internal class ForegroundAacRecorder(
     fun stop(): File? {
         val recording = active ?: return null
         if (rejectInvalidInput(recording)) return null
+        if (SystemClock.elapsedRealtime() - recording.startedAtElapsedRealtimeMs >= MAX_RECORDING_DURATION_MS) {
+            cancel()
+            onLimitReached()
+            return null
+        }
         retire(recording)
         val stopped = runCatching { recording.recorder.stop() }.isSuccess
         try { runCatching { recording.recorder.release() } }

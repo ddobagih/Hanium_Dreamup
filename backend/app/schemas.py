@@ -2161,6 +2161,12 @@ class PrivacyErrorResponseV2(BaseModel):
     detail: PrivacyErrorDetailV2
 
 
+class InstallationEvidenceKeyV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    installation_id: PrivacyEvidenceId
+    public_key: str = Field(min_length=79, max_length=122, pattern=r"^[A-Za-z0-9_-]+$")
+
+
 class DeviceDeletionEvidenceV2(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

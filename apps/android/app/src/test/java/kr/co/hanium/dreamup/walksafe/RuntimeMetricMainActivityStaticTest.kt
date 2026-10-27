@@ -403,7 +403,7 @@ class RuntimeMetricMainActivityStaticTest {
         assertTrue(binding.contains("{ speechOutputController }"))
         assertTrue(MainActivityRefactorSource.member(MainActivityRefactorSource.speech, "closeActuator").contains("feedbackActuator?.close()"))
 
-        val explicitReport = functionBlock("private fun ensureExplicitReportCapturePreconditions()")
+        val explicitReport = MainActivityRefactorSource.member(File("src/main/java/kr/co/hanium/dreamup/walksafe/report/runtime/ReportCandidateController.kt").readText(), "explicitReportCaptureRejectionOrNull")
         val metricGate = explicitReport.indexOf("frames.runtimeMetricAllowsWork()")
         assertTrue(metricGate >= 0)
         assertTrue(MainActivityRefactorSource.composition(source, "reportCandidateController")

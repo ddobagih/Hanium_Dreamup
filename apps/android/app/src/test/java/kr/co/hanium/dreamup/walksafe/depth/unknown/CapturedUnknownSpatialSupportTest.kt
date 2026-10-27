@@ -38,6 +38,22 @@ class CapturedUnknownSpatialSupportTest {
         assertTrue(points.all { observation.mask.contains(it.imageX, it.imageY) })
     }
 
+    @Test fun briefingRangeUsesSpatialSurfaceWithoutMedianFallbackForRawAndFull() {
+        for (full in listOf(false, true)) {
+            val fixture = UnknownProducerFixture()
+            val frame = (0..5).map { fixture.process(it * 200L, 1_000, fullOnly = full) }.last()
+            val observation = frame.result.observations.single()
+            val output = frame.result.objects.single()
+            assertNotNull(output.measuredSurfaceRangeM)
+            assertEquals(observation.spatialEvidence!!.nearestReliableRangeM!!, output.measuredSurfaceRangeM!!, .00001f)
+            assertEquals(if (full) DepthSource.ARCORE_FULL_DEPTH else DepthSource.ARCORE_RAW_DEPTH, output.source)
+        }
+        val fixture = UnknownProducerFixture()
+        val pose = fixture.pose(0L).copy(imageProjection = null)
+        val unsupported = fixture.process(0L, pose = pose).result.objects.single()
+        assertNull(unsupported.measuredSurfaceRangeM)
+    }
+
     @Test fun offAxisAxialDepthBelowThreeMetersCannotAdmitRadiallyDistantSurface() {
         val fixture = UnknownProducerFixture(80, 60)
         val mask = fixture.rectangle(53, 15, 64, 45)

@@ -18,6 +18,19 @@ import org.junit.Test
 class ReportQueueDrainControllerTest {
     @After fun resetPrivacyAuthority() { ReportPrivacyConsentSession.resetForNewEnrollment() }
 
+    @Test fun sensitiveStorageFailureRetiresDrainEvenWithCachedValidConsent() {
+        val f = Fixture()
+        val trigger = f.start()
+        assertTrue(f.controller.reportQueueDrainContext(trigger).consentAllowed)
+        f.sensitiveBlocked = true
+        assertFalse(f.controller.reportQueueRecoveryBaseGatesAvailable())
+        assertFalse(f.controller.reportQueueDrainContext(trigger).consentAllowed)
+        assertFalse(f.controller.reportQueueDrainContext(trigger).automaticReportingAllowed)
+        f.executor.takeNext().run()
+        assertEquals(0, f.statusCalls)
+        assertEquals(0, f.uploadCalls)
+    }
+
     @Test fun accountPurgeDeadlineIncludesCancellationBlockedByReceiptDeletionMonitor() {
         val control = Executors.newSingleThreadExecutor()
         val f = Fixture(liveCancellationExecutor = control)
@@ -694,6 +707,7 @@ class ReportQueueDrainControllerTest {
         var walk = WalkSessionSnapshot(WalkRuntimeEpoch(WALK, 0L), WalkSessionState.ENDED,
             WalkSessionMode.UNAVAILABLE, null, true, null)
         var networkReady = true
+        var sensitiveBlocked = false
         var transport = ActiveNetworkTransport.WIFI
         var binding: IntegratedConsentNetworkBinding? = wifiBinding()
         var mainThread = true
@@ -728,7 +742,8 @@ class ReportQueueDrainControllerTest {
                 permissionPolicy = { events += "preference"; policy },
                 gatewaySnapshot = { events += "gateway"; GatewaySessionProcessSnapshot(session, null,
                     gatewayGeneration, storageBlocked, null, deletionOnly) },
-                walkSnapshot = { events += "walk"; walk }, reporterActorId = { events += "actor"; actor }),
+                walkSnapshot = { events += "walk"; walk }, reporterActorId = { events += "actor"; actor },
+                sensitiveStorageBlocked = { sensitiveBlocked }),
             runtime = object : ReportQueueDrainController.Runtime {
                 override fun isForeground() = foreground
                 override fun isWalkInitialized() = walkInitialized

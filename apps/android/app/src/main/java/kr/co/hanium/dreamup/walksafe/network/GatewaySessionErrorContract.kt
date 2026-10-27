@@ -151,6 +151,7 @@ internal object GatewaySessionErrorContract {
     }
 
     private fun parsed(body: String): Pair<String, JSONObject>? = runCatching {
+        if (!strictJsonObjectDocument(body)) return@runCatching null
         val root = JSONObject(body)
         val detail = root.optJSONObject("detail")
         val source = detail ?: root

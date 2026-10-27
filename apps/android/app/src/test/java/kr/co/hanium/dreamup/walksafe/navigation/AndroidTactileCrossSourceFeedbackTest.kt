@@ -273,6 +273,25 @@ class AndroidTactileCrossSourceFeedbackTest {
         assertTrue(expired.activeFeedbackDeliveryKeys.isEmpty())
     }
 
+    @Test
+    fun distanceUpdatesWithoutChangingPendingWarningAndHonorsSourceLeaseAndDeduplication() {
+        val first = dispatch(primary = listOf(output(PRIMARY).copy(measuredSurfaceRangeM = 2.5f)), unknown = emptyList())
+        val action = requireNotNull(first.action)
+        assertTrue(policy.claimFeedbackDelivery(action.trackId, START, START))
+        val next = dispatch(START + 100, listOf(output(PRIMARY, START + 100).copy(measuredSurfaceRangeM = 1.8f)), emptyList())
+        assertNull(next.action)
+        assertEquals(first.activeFeedbackDeliveryKeys, next.activeFeedbackDeliveryKeys)
+        val latest = requireNotNull(next.distanceOutputsByDeliveryKey[action.deliveryKey])
+        assertEquals(1.8f, requireNotNull(latest.measuredSurfaceRangeM), .00001f)
+        assertEquals(START + 900, latest.sourceValidUntilElapsedRealtimeMs)
+        val duplicate = dispatch(START + 200)
+        assertEquals(1, duplicate.distanceOutputsByDeliveryKey.size)
+        val expired = dispatch(START + 801, emptyList(), listOf(output(UNKNOWN)))
+        assertTrue(expired.distanceOutputsByDeliveryKey.isEmpty())
+        val stale = dispatch(START + 300, listOf(output(PRIMARY)), emptyList(), stale = true)
+        assertTrue(stale.distanceOutputsByDeliveryKey.isEmpty())
+    }
+
     private fun dispatch(
         now: Long = START,
         primary: List<TrackedObjectDepth> = listOf(output(PRIMARY)),

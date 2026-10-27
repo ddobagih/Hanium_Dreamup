@@ -5,7 +5,7 @@ import {
 } from "./auth.js";
 import { authorizeProxyRequest, type GatewayFetch } from "./backend.js";
 import { resolveVoiceServiceConfig, type VoiceServiceConfig } from "./config.js";
-import { readBoundedJsonBody } from "./request-body.js";
+import { duplicateJsonObjectKeysError, readBoundedJsonBody } from "./request-body.js";
 
 export const SPEECH_STT_RESPONSE_SCHEMA = "walksafe.speech-stt-response.v1";
 export const SPEECH_TTS_REQUEST_SCHEMA = "walksafe.speech-tts-request.v1";
@@ -421,13 +421,15 @@ export async function relaySpeechStt(
       request.signal
     );
     if (bytes.error) {
-      return bytes.error.status === 413
+      return [400, 413].includes(bytes.error.status)
         ? responseError(502, "speech_upstream_invalid")
         : bytes.error;
     }
     let value: unknown;
     try {
-      value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes.bytes));
+      const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes.bytes);
+      value = JSON.parse(text);
+      if (duplicateJsonObjectKeysError(text)) return responseError(502, "speech_upstream_invalid");
     } catch {
       return responseError(502, "speech_upstream_invalid");
     }
@@ -557,7 +559,7 @@ export async function relaySpeechTts(
       request.signal
     );
     if (bytes.error) {
-      return bytes.error.status === 413
+      return [400, 413].includes(bytes.error.status)
         ? responseError(502, "speech_upstream_invalid")
         : bytes.error;
     }

@@ -130,6 +130,9 @@ class AndroidSensitivePreferenceStoreTest {
         val tampered = newStore(storage, provider)
         assertTrue(tampered.isBlocked())
         assertNull(tampered.getString("control_secret", null))
+        // A fallback value is not evidence of consent: entry points must consult isBlocked().
+        assertEquals("fallback", tampered.getString("control_secret", "fallback"))
+        assertFalse(tampered.edit().putString("control_secret", "new-consent").commit())
 
         storage.booleans.remove(spec.blockedKey)
         storage.strings[spec.storageKey] = envelope
@@ -137,6 +140,8 @@ class AndroidSensitivePreferenceStoreTest {
         val createsBeforeRestore = provider.createCalls
         val missingKey = newStore(storage, provider)
         assertTrue(missingKey.isBlocked())
+        assertEquals("fallback", missingKey.getString("control_secret", "fallback"))
+        assertFalse(missingKey.edit().putString("control_secret", "new-consent").commit())
         assertEquals(createsBeforeRestore, provider.createCalls)
     }
 
@@ -404,6 +409,68 @@ class AndroidSensitivePreferenceStoreTest {
         assertFalse(old.edit().putLong("revision", 8L).commit())
     }
 
+    @Test
+    fun unchangedEditsSkipEncryptionAndStorageButClearAndBlockedOwnersDoNot() {
+        val storage = FakeStorage()
+        val provider = FakeKeyProvider()
+        val store = newStore(storage, provider)
+        assertTrue(store.edit().putString("control_secret", "secret")
+            .putBoolean("consent", false).putLong("revision", 1).commit())
+        val ciphertext = storage.strings.getValue(spec.storageKey)
+        val encryptions = provider.createCalls
+        val writes = storage.commitCalls
+        repeat(3) {
+            assertTrue(store.edit().putString("control_secret", "secret")
+                .putBoolean("consent", false).putLong("revision", 1)
+                .remove("profile_absent").commit())
+        }
+        assertEquals(encryptions, provider.createCalls)
+        assertEquals(writes, storage.commitCalls)
+        assertEquals(ciphertext, storage.strings.getValue(spec.storageKey))
+
+        assertTrue(store.edit().clear().putString("control_secret", "secret")
+            .putBoolean("consent", false).putLong("revision", 1).commit())
+        assertEquals(encryptions + 1, provider.createCalls)
+        assertEquals(writes + 1, storage.commitCalls)
+        val current = newStore(storage, provider)
+        assertFalse(store.edit().putLong("revision", 1).commit())
+        current.failClosed()
+        assertFalse(current.edit().commit())
+    }
+
+    @Test
+    fun entryLimitCanBeSavedAndRestoredWithoutChangingTheLimit() {
+        val storage = FakeStorage()
+        val provider = FakeKeyProvider()
+        val store = newStore(storage, provider)
+        val editor = store.edit()
+        repeat(256) { editor.putString("profile_$it", "value-$it") }
+        assertTrue(editor.commit())
+        val restored = newStore(storage, provider)
+        assertFalse(restored.isBlocked())
+        assertEquals(256, restored.keys().size)
+        assertEquals("value-255", restored.getString("profile_255", null))
+    }
+
+    @Test
+    fun overLimitSnapshotIsRejectedBeforePublishingUnrestorableData() {
+        val storage = FakeStorage()
+        val provider = FakeKeyProvider()
+        val store = newStore(storage, provider)
+        assertTrue(store.edit().putString("control_secret", "original").commit())
+        val original = storage.strings.getValue(spec.storageKey)
+        val encryptions = provider.createCalls
+        val editor = store.edit()
+        repeat(256) { editor.putString("profile_$it", "value-$it") }
+        assertFalse(editor.commit())
+        assertTrue(store.isBlocked())
+        assertEquals(original, storage.strings.getValue(spec.storageKey))
+        assertEquals(encryptions, provider.createCalls)
+        val restored = newStore(storage, provider)
+        assertTrue(restored.isBlocked())
+        assertNull(restored.getString("control_secret", null))
+    }
+
     private fun newStore(
         storage: FakeStorage,
         provider: FakeKeyProvider,
@@ -417,8 +484,8 @@ class AndroidSensitivePreferenceStoreTest {
         override val processIdentity: Any = this
         val strings = mutableMapOf<String, String>()
         val booleans = mutableMapOf<String, Boolean>()
-        var commitsSucceed = true
         var commitCalls = 0
+        var commitsSucceed = true
         var keyEnumerationSucceeds = true
         var failResetMarkerClearOnce = false
         var failResetMarkerStageOnce = false

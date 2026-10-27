@@ -24,10 +24,9 @@ class MessagePolicyUrgencyRegressionTest {
 
     private fun assertActionBeforeMotion(message: String, action: String) {
         val actionAt = message.indexOf(action)
-        val motionAt = message.indexOf("사용자 쪽으로 다가오는")
-        assertTrue("The current measured motion remains qualified: $message", motionAt >= 0)
-        assertTrue("The selected action must be heard before motion commentary: $message",
-            actionAt >= 0 && actionAt < motionAt)
+        assertTrue("The selected action remains audible: $message", actionAt >= 0)
+        assertTrue("Unverified movement commentary must be omitted: $message", !message.contains("사용자 쪽으로"))
+        if (action == "멈추세요") assertTrue("Stop must be first: $message", message.startsWith("멈추세요."))
     }
 
     private fun decision(distanceM: Float, confidence: Float) = MessagePolicy().evaluate(

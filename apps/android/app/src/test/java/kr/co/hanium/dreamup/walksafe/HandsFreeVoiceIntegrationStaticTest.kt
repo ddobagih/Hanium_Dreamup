@@ -247,7 +247,7 @@ class HandsFreeVoiceIntegrationStaticTest {
             .substringBefore("// A passive render")
         val acknowledgement = MainActivityRefactorSource.function(mainActivity, "private fun acknowledgeForegroundHomeWake")
         val command = acknowledgement.substringAfter("} else {")
-        assertTrue(acknowledgement.contains("if (command == null)"))
+        assertTrue(acknowledgement.contains("if (command == null || environment.serverCommandRecognitionEnabled())"))
         assertTrue(acknowledgement.contains("session.startCommandRecognition()"))
         assertTrue(command.contains("session.recognized(RecognizedVoiceInput("))
         assertTrue(command.contains("listOf(command.text)"))
@@ -281,7 +281,7 @@ class HandsFreeVoiceIntegrationStaticTest {
             "player.play",
             "if (!isCurrent()) {",
             "return@play",
-            "if (command == null)",
+            "if (command == null || environment.serverCommandRecognitionEnabled())",
         ))
     }
 

@@ -80,12 +80,19 @@ class HomeDestinationVoiceDialogAnswerWindowRegressionTest {
         val creation = prompt.substringAfter("HomeDestinationVoiceDialogLease(").substringBefore(") else null")
         assertTrue(creation.contains("answerWindowStartsAfterPrompt = true"))
         assertEquals(2, Regex("""lease\?\.openAnswerWindow\(\)""").findAll(prompt).count())
-        val completed = prompt.substringAfter("onCompleted = {").substringBefore("onFailed = {")
+        val completed = prompt.substringAfter("state.completeVoicePrompt(attempt)").substringBefore("onFailed = {")
         val failed = prompt.substringAfter("onFailed = {")
-        assertTrue(completed.indexOf("state.completeVoicePrompt(attempt)") < completed.indexOf("lease?.openAnswerWindow()"))
+        assertTrue(completed.contains("if (current) lease?.openAnswerWindow()"))
         assertTrue(failed.indexOf("state.failVoicePrompt(attempt)") < failed.indexOf("lease?.openAnswerWindow()"))
-        assertEquals("no other caller may start the answer time", 2,
+        val detail = MainActivityRefactorSource.member(source, "speakVoiceDestinationCandidateDetail")
+        assertTrue(detail.contains("answerWindowStartsAfterPrompt = true"))
+        assertTrue(detail.indexOf("if (!current()) return") < detail.indexOf("detailLease?.openAnswerWindow()"))
+        assertTrue(detail.contains("onCompleted = { finish(true) }"))
+        assertTrue(detail.contains("onFailed = { finish(false) }"))
+        assertTrue(detail.contains("onCancelled = { finish(false) }"))
+        assertEquals("page terminal callbacks and the shared detail terminal callback", 3,
             Regex("""openAnswerWindow\(\)""").findAll(source).count())
+
     }
 
     private fun lease(state: DestinationSearchVoiceState) =

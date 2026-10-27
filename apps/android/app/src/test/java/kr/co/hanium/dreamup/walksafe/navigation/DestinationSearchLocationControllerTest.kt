@@ -192,6 +192,59 @@ class DestinationSearchLocationControllerTest {
         assertEquals(listOf(RoutePoint(35.872, 128.602)), results)
     }
 
+    @Test
+    fun replacingSearchDuringGpsWaitTransfersLogicalOwnershipWithoutRestartingGps() {
+        val source = FakeSource()
+        val controller = DestinationSearchLocationController(source) { 10_000L }
+        var oldResults = 0
+        var newResults = 0
+        controller.acquire(lease, { true }) { oldResults++ }
+        val oldConsumer = controller.completionGeneration
+        controller.acquire(lease, { true }) { newResults++ }
+        assertTrue(controller.completionGeneration > oldConsumer)
+        assertEquals("one GPS operation may serve the latest command", 1, source.callbacks.size)
+        source.complete(0, publicDaeguFixture)
+        assertEquals(0, oldResults)
+        assertEquals(1, newResults)
+        assertFalse(controller.isAcquiring)
+    }
+
+    @Test
+    fun cancellationAndRetryCannotLetOldLocationCompleteTheNewCommand() {
+        val source = FakeSource()
+        val controller = DestinationSearchLocationController(source) { 10_000L }
+        var completions = 0
+        controller.acquire(lease, { true }) { completions++ }
+        val cancelledConsumer = controller.completionGeneration
+        controller.cancel()
+        assertTrue(controller.completionGeneration > cancelledConsumer)
+        assertFalse(controller.isAcquiring)
+        controller.acquire(lease, { true }) { completions++ }
+        val retryConsumer = controller.completionGeneration
+        source.complete(0, publicDaeguFixture)
+        assertTrue(controller.isAcquiring)
+        assertEquals(retryConsumer, controller.completionGeneration)
+        assertEquals(0, completions)
+        source.complete(1, null)
+        assertFalse(controller.isAcquiring)
+        assertEquals(1, completions)
+    }
+
+    @Test
+    fun cachedFixDoesNotCreateAFalseAsynchronousConsumer() {
+        val source = FakeSource()
+        val controller = DestinationSearchLocationController(source) { 10_000L }
+        controller.acquire(lease, { true }) {}
+        source.complete(0, publicDaeguFixture)
+        val completedConsumer = controller.completionGeneration
+        var completedSynchronously = false
+        controller.acquire(lease, { true }) { completedSynchronously = it != null }
+        assertTrue(completedSynchronously)
+        assertFalse(controller.isAcquiring)
+        assertEquals(completedConsumer, controller.completionGeneration)
+        assertEquals(1, source.callbacks.size)
+    }
+
     private class FakeSource : DestinationSearchLocationSource {
         val callbacks = mutableListOf<(DestinationSearchLocationFix?) -> Unit>()
         var cancelled = 0

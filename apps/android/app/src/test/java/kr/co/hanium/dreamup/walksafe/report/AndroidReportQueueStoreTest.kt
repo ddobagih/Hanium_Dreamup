@@ -19,6 +19,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -26,6 +27,224 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class AndroidReportQueueStoreTest {
+    @Test
+    fun maintenanceReadAndInventoryErrorsRequestRetryEvenWhenUploadsAreDisabled() {
+        for (failure in listOf("read", "inventory")) {
+            val storage = FakeReportQueueStorage()
+            val aead = FakeQueueAead()
+            val queue = store(storage, aead, { 1_000L }, { UUID.fromString(REPORT_1) })
+            requireNotNull(queue.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT)).close()
+            val broken = object : ReportQueueStorage by storage {
+                override fun <T> withLockedAccess(action: (LockedReportQueueStorage) -> T): T? =
+                    storage.withLockedAccess { access ->
+                        action(object : LockedReportQueueStorage by access {
+                            override fun read(reportId: String): String? = if (failure == "read") null else access.read(reportId)
+                            override fun measureUsage(): ReportQueueStorageUsage? =
+                                if (failure == "inventory") null else access.measureUsage()
+                        })
+                    }
+            }
+            val cleanup = AndroidReportQueueStore(capacityProfile = null, storageFactory = { broken },
+                aead = aead, idFactory = { error("maintenance") }, nowMillis = { 1_000L + REPORT_QUEUE_TTL_MS }, testOnly = Unit)
+            assertEquals(0, cleanup.pruneExpired())
+            assertFalse(cleanup.maintenanceSucceeded())
+            assertEquals(setOf(REPORT_1), storage.values.keys)
+        }
+    }
+
+    @Test
+    fun maintenanceFailureIsNotSuccessfulZeroAndCanBeRetried() {
+        val storage = FakeReportQueueStorage()
+        var now = 1_000L
+        val queue = store(storage, FakeQueueAead(), { now }, { UUID.fromString(REPORT_1) })
+        requireNotNull(queue.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT)).close()
+        now += REPORT_QUEUE_TTL_MS
+        storage.deletesSucceed = false
+        assertEquals(0, queue.pruneExpired())
+        assertFalse(queue.maintenanceSucceeded())
+        assertEquals(setOf(REPORT_1), storage.values.keys)
+        storage.deletesSucceed = true
+        assertEquals(1, queue.pruneExpired())
+        assertEquals(0, queue.pruneExpired())
+    }
+
+    @Test
+    fun maintenanceCannotReportSuccessWhenStorageLockIsUnavailable() {
+        val unavailable = object : ReportQueueStorage by FakeReportQueueStorage() {
+            override fun <T> withLockedAccess(action: (LockedReportQueueStorage) -> T): T? = null
+        }
+        val queue = AndroidReportQueueStore(capacityProfile = null,
+            storageFactory = { unavailable }, aead = FakeQueueAead(),
+            idFactory = { error("maintenance never creates reports") }, nowMillis = { 1_000L }, testOnly = Unit)
+        assertEquals(0, queue.pruneExpired())
+        assertFalse(queue.maintenanceSucceeded())
+    }
+
+    @Test
+    fun confirmedQuarantineDeletionSurvivesReopeningTheFileStore() {
+        val root = temporaryFolder.newFolder("quarantine-inbox")
+        val aead = FakeQueueAead()
+        fun reopen() = AndroidReportQueueStore(rootDirectory = root, capacityProfile = PROFILE,
+            aead = aead, idFactory = { UUID.fromString(REPORT_1) }, nowMillis = { 1_000L })
+        val queue = reopen()
+        requireNotNull(queue.enqueue(ACTOR_ID, quarantineMetadata(), jpeg(), ReportQueuePriority.EXPLICIT,
+            WALK_ID, CONSENT, 1)).use { assertTrue(queue.recordUploadFailure(it, true)) }
+        val restored = reopen()
+        val target = requireNotNull(restored.quarantinedSummaries(ACTOR_ID, 1)).single()
+        assertTrue(restored.deleteQuarantinedExact(target, ACTOR_ID, 1) { true })
+        assertTrue(requireNotNull(reopen().quarantinedSummaries(ACTOR_ID, 1)).isEmpty())
+        assertFalse(root.resolve("report_queue_v1/reports/$REPORT_1.aead").exists())
+    }
+
+    @Test
+    fun sequentialVisitReleasesEachPhotoBeforeReadingTheNextAndOnVisitorFailure() {
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2, REPORT_3).map(UUID::fromString))
+        val queue = store(FakeReportQueueStorage(), FakeQueueAead(), { 1_000L }, { ids.removeFirst() })
+        repeat(3) {
+            requireNotNull(queue.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT)).close()
+        }
+        val visit = queue.javaClass.getDeclaredMethod("visitAvailableReports", kotlin.jvm.functions.Function1::class.java)
+            .apply { isAccessible = true }
+        val buffers = mutableListOf<ByteArray>()
+        val callback: (QueuedReport) -> Boolean = { report ->
+            assertTrue("previous payloads must already be wiped", buffers.all { b -> b.all { it == 0.toByte() } })
+            buffers += report.payload.javaClass.getDeclaredField("frozenImage").apply { isAccessible = true }
+                .get(report.payload) as ByteArray
+            assertTrue(buffers.last().any { it != 0.toByte() })
+            false
+        }
+        assertEquals(true, visit.invoke(queue, callback))
+        assertEquals(3, buffers.size)
+        assertTrue(buffers.all { b -> b.all { it == 0.toByte() } })
+        var failedBuffer: ByteArray? = null
+        val failure: (QueuedReport) -> Boolean = { report ->
+            failedBuffer = report.payload.javaClass.getDeclaredField("frozenImage").apply { isAccessible = true }
+                .get(report.payload) as ByteArray
+            error("visitor failed")
+        }
+        org.junit.Assert.assertThrows(java.lang.reflect.InvocationTargetException::class.java) { visit.invoke(queue, failure) }
+        assertTrue(requireNotNull(failedBuffer).all { it == 0.toByte() })
+        assertEquals(3, queue.countForDrain(WALK_ID, CONSENT))
+        requireNotNull(queue.nextForDrain()).use { assertEquals(REPORT_1, it.payload.reportId) }
+    }
+
+    @Test
+    fun quarantinedInboxIsAccountBoundAndDeletesOnlyTheConfirmedUnchangedEntry() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2, REPORT_3, REPORT_4).map(UUID::fromString))
+        val queue = store(storage, aead, { 1_000L }, { ids.removeFirst() })
+        fun enqueue(actor: String, generation: Long, quarantine: Boolean): LocalQuarantinedReportSummary {
+            return requireNotNull(queue.enqueue(actor, quarantineMetadata(actor), jpeg(), ReportQueuePriority.EXPLICIT,
+                WALK_ID, CONSENT, generation)).use { report ->
+                if (quarantine) assertTrue(queue.recordUploadFailure(report, permanent = true))
+                requireNotNull(report.copy(quarantined = true).quarantineSummaryOrNull())
+            }
+        }
+        val target = enqueue(ACTOR_ID, 1, true)
+        val retryable = enqueue(ACTOR_ID, 1, false)
+        enqueue(OTHER_ACTOR_ID, 1, true)
+        enqueue(ACTOR_ID, 2, true)
+        assertEquals(listOf(target), queue.quarantinedSummaries(ACTOR_ID, 1))
+        assertFalse(queue.deleteQuarantinedExact(target, OTHER_ACTOR_ID, 1) { true })
+        assertFalse(queue.deleteQuarantinedExact(target, ACTOR_ID, 2) { true })
+        assertFalse(queue.deleteQuarantinedExact(retryable, ACTOR_ID, 1) { true })
+        assertFalse(queue.deleteQuarantinedExact(target.copy(payloadSha256 = "f".repeat(64)), ACTOR_ID, 1) { true })
+        assertFalse(queue.deleteQuarantinedExact(target, ACTOR_ID, 1) { false })
+        var checks = 0
+        assertFalse(queue.deleteQuarantinedExact(target, ACTOR_ID, 1) { ++checks == 1 })
+        assertEquals(listOf(target), queue.quarantinedSummaries(ACTOR_ID, 1))
+        storage.deletesSucceed = false
+        assertFalse(queue.deleteQuarantinedExact(target, ACTOR_ID, 1) { true })
+        storage.deletesSucceed = true
+        assertTrue(queue.deleteQuarantinedExact(target, ACTOR_ID, 1) { true })
+        assertTrue(requireNotNull(queue.quarantinedSummaries(ACTOR_ID, 1)).isEmpty())
+        assertEquals(3, storage.values.size)
+        assertFalse(queue.deleteQuarantinedExact(target, ACTOR_ID, 1) { true })
+    }
+
+    @Test
+    fun quarantineReadFailureIsNotAnEmptyInboxAndPrivacyFencePreventsDeletion() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        val queue = store(storage, aead, { 1_000L }, { UUID.fromString(REPORT_1) })
+        requireNotNull(queue.enqueue(ACTOR_ID, quarantineMetadata(), jpeg(), ReportQueuePriority.EXPLICIT,
+            WALK_ID, CONSENT, 1)).use { assertTrue(queue.recordUploadFailure(it, true)) }
+        val target = requireNotNull(queue.quarantinedSummaries(ACTOR_ID, 1)).single()
+        storage.fences += "consent-revoked-$CONSENT"
+        assertTrue(requireNotNull(queue.quarantinedSummaries(ACTOR_ID, 1)).isEmpty())
+        assertFalse(queue.deleteQuarantinedExact(target, ACTOR_ID, 1) { true })
+        storage.fences.clear()
+        aead.openSucceeds = false
+        org.junit.Assert.assertThrows(java.io.IOException::class.java) { queue.quarantinedSummaries(ACTOR_ID, 1) }
+        assertFalse(queue.deleteQuarantinedExact(target, ACTOR_ID, 1) { true })
+        assertEquals(1, storage.values.size)
+        aead.openSucceeds = true
+        storage.fences += "account-deleted"
+        org.junit.Assert.assertThrows(java.io.IOException::class.java) { queue.quarantinedSummaries(ACTOR_ID, 1) }
+        assertFalse(queue.deleteQuarantinedExact(target, ACTOR_ID, 1) { true })
+    }
+
+    @Test
+    fun sealingExceptionStillWipesSerializedPlaintextAndCallerKeepsOriginalPhoto() {
+        val delegate = FakeQueueAead()
+        var observed: ByteArray? = null
+        val throwing = object : LocalAead by delegate {
+            override fun seal(plaintext: ByteArray, domainAad: ByteArray, limits: AeadLimits): AeadSealResult {
+                observed = plaintext
+                error("key access failed")
+            }
+        }
+        val queue = AndroidReportQueueStore(
+            capacityProfile = PROFILE, storageFactory = { FakeReportQueueStorage() },
+            aead = throwing, idFactory = { UUID.fromString(REPORT_1) }, nowMillis = { 1_000L },
+            testOnly = Unit,
+        )
+        val image = jpeg()
+        runCatching { queue.enqueue(ACTOR_ID, metadata(), image, ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT) }
+        assertNotNull(observed)
+        assertTrue(requireNotNull(observed).all { it == 0.toByte() })
+        assertArrayEquals(jpeg(), image)
+    }
+
+    @Test
+    fun countAndSelectionDoNotDestroyStoredReportsOrIndependentCallerSnapshots() {
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2).map(UUID::fromString))
+        val queue = store(FakeReportQueueStorage(), FakeQueueAead(), { 1_000L }, { ids.removeFirst() })
+        repeat(2) {
+            requireNotNull(queue.enqueue(metadata(), jpeg(), ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT)).close()
+        }
+        assertEquals(2, queue.countForDrain(WALK_ID, CONSENT))
+        assertEquals(2, queue.countForRecoveryDrain(ACTOR_ID))
+        requireNotNull(queue.nextForDrain()).use { first ->
+            assertEquals(REPORT_1, first.payload.reportId)
+            requireNotNull(queue.nextForRecoveryDrain(ACTOR_ID)).use { second ->
+                assertTrue(first.payload.contentEquals(second.payload))
+            }
+            assertArrayEquals(jpeg(), first.payload.imageJpeg())
+        }
+        val all = queue.queuedReports()
+        try { assertEquals(2, all.size); all.forEach { assertArrayEquals(jpeg(), it.payload.imageJpeg()) } }
+        finally { all.forEach { it.close() } }
+    }
+
+    @Test
+    fun activePayloadLimitIncludesMetadataAndRejectsBeforeOpeningStorage() {
+        val store = AndroidReportQueueStore(
+            capacityProfile = PROFILE,
+            storageFactory = { error("oversized payload must not touch storage") },
+            aead = FakeQueueAead(),
+            idFactory = { error("oversized payload must not allocate an ID") },
+            nowMillis = { 1_000L },
+            testOnly = Unit,
+        )
+        assertFalse(store.payloadExceedsLimit(100, PROFILE.maxPayloadBytes - 100))
+        assertTrue(store.payloadExceedsLimit(100, PROFILE.maxPayloadBytes - 99))
+        assertTrue(store.payloadExceedsLimit(Int.MAX_VALUE, Int.MAX_VALUE))
+        assertNull(store.enqueue(ACTOR_ID, metadata(), ByteArray(PROFILE.maxPayloadBytes),
+            ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
+    }
+
     @get:Rule
     val temporaryFolder = TemporaryFolder()
 
@@ -795,6 +1014,62 @@ class AndroidReportQueueStoreTest {
                 LATEST_CONSENT,
             ) != null,
         )
+        assertEquals(0, aead.destroyCalls)
+    }
+
+    @Test
+    fun automaticWithdrawalWriteFailureBlocksAutomaticReadsAndNewEntries() {
+        val storage = FakeReportQueueStorage()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2, REPORT_3).map(UUID::fromString))
+        val store = store(storage, FakeQueueAead(), { 1_000L }) { ids.removeFirst() }
+        requireNotNull(store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT))
+        requireNotNull(store.enqueue(ACTOR_ID, metadata(), jpeg(),
+            ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
+        storage.failBeforeAutomaticFence = true
+        assertFalse(store.onAutomaticReportingRevoked(CONSENT))
+        assertTrue(storage.fences.isEmpty())
+        assertEquals(listOf(ReportQueuePriority.EXPLICIT), store.queuedReports().map(QueuedReport::priority))
+        assertNull(store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, LATEST_CONSENT))
+        storage.failBeforeAutomaticFence = false
+        assertTrue(store.onAutomaticReportingRevoked(CONSENT))
+        assertNotNull(store.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, LATEST_CONSENT))
+    }
+
+    @Test
+    fun restartRetriesUnfinishedAutomaticWithdrawalBeforeRegrantWithoutDeletingExplicitReports() {
+        val storage = FakeReportQueueStorage()
+        val aead = FakeQueueAead()
+        val ids = ArrayDeque(listOf(REPORT_1, REPORT_2, REPORT_3).map(UUID::fromString))
+        val first = store(storage, aead, { 1_000L }) { ids.removeFirst() }
+        requireNotNull(first.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, CONSENT))
+        requireNotNull(first.enqueue(ACTOR_ID, metadata(), jpeg(),
+            ReportQueuePriority.EXPLICIT, WALK_ID, CONSENT))
+        var durable: String? = null
+        storage.failBeforeAutomaticFence = true
+        val firstRecovery = AutomaticReportWithdrawalRecovery({ durable }, { durable = it; true },
+            first::onAutomaticReportingRevoked)
+        assertFalse(firstRecovery.recordWithdrawal(CONSENT))
+
+        // A recreated queue has no in-memory fence; the independent marker still denies regrant.
+        val restored = store(storage, aead, { 1_000L }) { ids.removeFirst() }
+        val restoredRecovery = AutomaticReportWithdrawalRecovery({ durable }, { durable = it; true },
+            restored::onAutomaticReportingRevoked)
+        assertFalse(restoredRecovery.isReady())
+        assertFalse(restoredRecovery.recover())
+        assertNull(restored.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, LATEST_CONSENT))
+
+        storage.failBeforeAutomaticFence = false
+        assertTrue(restoredRecovery.recover())
+        assertTrue(restoredRecovery.isReady())
+        assertNull(durable)
+        assertEquals(listOf(ReportQueuePriority.EXPLICIT), restored.queuedReports().map(QueuedReport::priority))
+        assertNotNull(restored.enqueue(ACTOR_ID, metadata(priority = ReportQueuePriority.AUTOMATIC),
+            jpeg(), ReportQueuePriority.AUTOMATIC, WALK_ID, LATEST_CONSENT))
         assertEquals(0, aead.destroyCalls)
     }
 
@@ -1599,6 +1874,10 @@ class AndroidReportQueueStoreTest {
             "\"auto_reported\":$automatic}").toByteArray()
     }
 
+    private fun quarantineMetadata(actorId: String = ACTOR_ID): ByteArray = JSONObject(String(metadata(actorId)))
+        .put("confidence", .9).put("class_name", "damaged_tactile_block")
+        .put("captured_at", "2026-10-01T00:00:00Z").toString().toByteArray()
+
     private fun automaticMetadata(
         actorId: String = ACTOR_ID,
         latitude: Double = 37.0,
@@ -1674,6 +1953,8 @@ private class FakeReportQueueStorage(
     private val deleteMatchingEntries: Boolean = true,
     private val deleteMatchingResult: Boolean = true,
 ) : ReportQueueStorage {
+    var failBeforeAutomaticFence = false
+    var deletesSucceed = true
     val values = mutableMapOf<String, String>()
     val fences = mutableSetOf<String>()
     private val pendingIntents = mutableSetOf<String>()
@@ -1682,6 +1963,14 @@ private class FakeReportQueueStorage(
         override fun read(reportId: String): String? = this@FakeReportQueueStorage.read(reportId)
         override fun delete(reportId: String): Boolean = this@FakeReportQueueStorage.delete(reportId)
         override fun hasFence(name: String): Boolean = this@FakeReportQueueStorage.hasFence(name)
+        override fun replace(reportId: String, envelope: String, storedEntryByteLimit: Long, storedByteLimit: Long): Boolean {
+            val old = values[reportId] ?: return false
+            val bytes = envelope.toByteArray().size.toLong()
+            if (bytes > storedEntryByteLimit ||
+                measureUsage().totalBytes - old.toByteArray().size + bytes > storedByteLimit) return false
+            values[reportId] = envelope
+            return true
+        }
         override fun measureUsage(): ReportQueueStorageUsage =
             this@FakeReportQueueStorage.measureUsage()
     }
@@ -1721,6 +2010,7 @@ private class FakeReportQueueStorage(
         return true
     }
     override fun delete(reportId: String): Boolean {
+        if (!deletesSucceed) return false
         values.remove(reportId)
         return true
     }
@@ -1753,6 +2043,7 @@ private class FakeReportQueueStorage(
         initialPermanentFences: Set<String>,
         permanentFenceForMatch: (reportId: String, envelope: String) -> String?,
     ): Boolean {
+        if (failBeforeAutomaticFence) return false
         fences += pendingFence
         fences += initialPermanentFences
         if (deleteMatchingEntries) {

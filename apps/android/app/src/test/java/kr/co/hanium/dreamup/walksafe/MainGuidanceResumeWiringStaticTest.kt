@@ -47,7 +47,7 @@ class MainGuidanceResumeWiringStaticTest {
         val actual = code(MainActivityRefactorSource.member(value, "renderGuidanceActions"))
         assertTrue(actual.contains("valresume=presentation.resumeAction"))
         assertTrue(actual.contains("valavailable=presentation.retryAvailable||resume!=DestinationGuidanceResumeAction.NONE"))
-        assertTrue(actual.contains("show(nativeGuidanceRetryButton,available)"))
+        assertTrue(actual.contains("show(nativeGuidanceRetryButton,available&&!active&&resume==DestinationGuidanceResumeAction.NONE)"))
         assertTrue(actual.contains("nativeGuidanceRetryButton.isEnabled=available&&activityForeground&&resume!insetOf(DestinationGuidanceResumeAction.PREPARING,DestinationGuidanceResumeAction.PENDING)"))
         assertTrue(actual.contains("valretryLabel=when(resume)"))
         assertTrue(actual.contains("if(nativeGuidanceRetryButton.text?.toString()!=retryLabel)nativeGuidanceRetryButton.text=retryLabel"))

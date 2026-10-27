@@ -38,6 +38,31 @@ class AndroidGatewaySessionCryptoLifecycleTest {
         createdFixtures.forEach { it.store().resetInstallationAfterConfirmedAccountDeletion() }
     }
 
+    @Test fun changedGatewayExpiresOldLoginButKeepsInstallationAndUnrelatedStorageFailure() {
+        val fixture = Fixture("debug-endpoint-switch")
+        val store = fixture.store()
+        val id = requireNotNull(store.getOrCreateInstallDeviceId())
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.saveBackendDeviceIfAbsent(
+            backendSession(id), backendFirstRun(), GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        val origin = "https://other-gateway.example"
+        assertNull(store.restoreBackendDevice(origin, NOW_EPOCH_MS))
+        assertFalse(store.isStorageBlocked())
+        assertEquals(id, store.getOrCreateInstallDeviceId())
+        assertNull(store.restoreBackendDevice(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        fixture.preferences.edit().putBoolean(FAIL_CLOSED_PREF_KEY, true).commit()
+        assertNull(store.restoreBackendDevice(origin, NOW_EPOCH_MS))
+        assertTrue(store.isStorageBlocked())
+    }
+
+    @Test fun corruptInstallationIdentityCannotBeReplacedDuringGatewayChange() {
+        val fixture = Fixture("debug-endpoint-corrupt")
+        val store = fixture.store()
+        requireNotNull(store.getOrCreateInstallDeviceId())
+        fixture.preferences.edit().putString(INSTALL_ID_PREF_KEY, "corrupt").commit()
+        assertNull(store.getOrCreateInstallDeviceId())
+        assertTrue(store.isStorageBlocked())
+    }
+
     @Test
     fun passwordLoginSurvivesStoreRecreationWithoutGrantingUnverifiedAccess() {
         val fixture = Fixture("password-restart")
@@ -481,6 +506,24 @@ class AndroidGatewaySessionCryptoLifecycleTest {
     }
 
     @Test
+    fun encryptedEmailLongSessionPreservesGenerationAndRejectsChangedGenerationOnCommit() {
+        val fixture = Fixture("email-long-generation")
+        val store = fixture.store()
+        val deviceId = requireNotNull(store.getOrCreateInstallDeviceId())
+        val complete = completedReturningEmailFirstRun()
+        assertEquals(GatewaySessionStoreResult.COMMITTED,
+            store.saveInitialIfAbsent(longSession(deviceId, generation = 7L), complete, GATEWAY_ORIGIN))
+        val restored = requireNotNull(fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+        assertEquals(7L, restored.session.backendAccountGeneration)
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.reserveRenewal(restored.version, RENEW_OPERATION))
+        assertEquals(GatewaySessionStoreResult.BLOCKED, store.commitRenewal(
+            restored.version, RENEW_OPERATION, longSession(deviceId, 1L, 8L), restored.firstRunSnapshot))
+        assertEquals(GatewaySessionStoreResult.COMMITTED, store.commitRenewal(
+            restored.version, RENEW_OPERATION, longSession(deviceId, 1L, 7L), restored.firstRunSnapshot))
+        assertEquals(7L, requireNotNull(fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS)).session.backendAccountGeneration)
+    }
+
+    @Test
     fun completedEmailLongSessionRestoresHistoryAndRenewsBeforeFreshChecks() {
         val fixture = Fixture("email-long-renew")
         val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
@@ -560,6 +603,44 @@ class AndroidGatewaySessionCryptoLifecycleTest {
     }
 
     @Test
+    fun encryptedV4SessionRestoresWithOrWithoutOptionalServerExpiry() {
+        for (includeExpiry in listOf(false, true)) {
+            val fixture = Fixture("v4-optional-server-expiry-$includeExpiry")
+            val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
+            assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().saveInitialIfAbsent(
+                longSession(deviceId), completedReturningEmailFirstRun(), GATEWAY_ORIGIN))
+            fixture.rewriteLongPayload { root ->
+                val session = root.getJSONObject("session")
+                if (includeExpiry) session.put("server_access_expires_at_epoch_ms", NOW_EPOCH_MS + 70_000L)
+                else session.remove("server_access_expires_at_epoch_ms")
+            }
+            assertNotNull(fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+            assertFalse(fixture.store().isStorageBlocked())
+        }
+    }
+
+    @Test
+    fun encryptedSessionStillRejectsUnknownFieldsAndMalformedBackendGeneration() {
+        val changes: List<(JSONObject) -> Unit> = listOf(
+            { it.put("unexpected_authority", true); Unit },
+            { it.put("backend_account_generation", "2"); Unit },
+            { it.put("backend_account_generation", 0); Unit },
+            { it.put("backend_account_generation", 1.5); Unit },
+        )
+        changes.forEachIndexed { index, change ->
+            val fixture = Fixture("v4-rejected-field-$index")
+            val deviceId = requireNotNull(fixture.store().getOrCreateInstallDeviceId())
+            assertEquals(GatewaySessionStoreResult.COMMITTED, fixture.store().saveInitialIfAbsent(
+                longSession(deviceId), completedReturningEmailFirstRun(), GATEWAY_ORIGIN))
+            fixture.rewriteLongPayload { change(it.getJSONObject("session")) }
+            assertNull(fixture.store().restoreActive(GATEWAY_ORIGIN, NOW_EPOCH_MS))
+            assertTrue(fixture.store().isStorageBlocked())
+            // Each corruption case must release its process-wide storage fence before the next fixture.
+            fixture.store().resetInstallationAfterConfirmedAccountDeletion()
+        }
+    }
+
+    @Test
     fun mainRestoresAuthenticationBindingWhileWalkGateStillRequiresFreshChecks() {
         val source = java.io.File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
         val restore = MainActivityRefactorSource.function(source, "private fun restoreGatewaySessionFromPrefs()")
@@ -611,10 +692,11 @@ class AndroidGatewaySessionCryptoLifecycleTest {
         assertNull(finite.store().restoreActive(GATEWAY_ORIGIN, tenYearsLater))
     }
 
-    private fun longSession(deviceId: String, rotation: Long = 0L) = GatewayFieldSession.longLivedSession(
+    private fun longSession(deviceId: String, rotation: Long = 0L, generation: Long? = null) = GatewayFieldSession.longLivedSession(
         GATEWAY_ORIGIN, ACTOR_ID, deviceId, "f".repeat(32), rotation,
         "walksafe_field_session=access-token-rotation-$rotation", (if (rotation == 0L) "r" else "s").repeat(64),
-        NOW_EPOCH_MS + 60_000L, NOW_EPOCH_MS + 120_000L, NOW_EPOCH_MS + 180_000L)
+        NOW_EPOCH_MS + 60_000L, NOW_EPOCH_MS + 120_000L, NOW_EPOCH_MS + 180_000L,
+        accountGeneration = generation)
 
     private inner class Fixture(suffix: String) {
         init { createdFixtures += this }

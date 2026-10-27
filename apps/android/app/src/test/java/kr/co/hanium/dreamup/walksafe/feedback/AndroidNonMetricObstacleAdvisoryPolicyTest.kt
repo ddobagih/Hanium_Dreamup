@@ -18,7 +18,7 @@ class AndroidNonMetricObstacleAdvisoryPolicyTest {
     )
 
     @Test
-    fun requiresThreeFreshFramesAndReportsOnlyScreenRelativeDirection() {
+    fun requiresThreeFreshFramesAndKeepsDirectionOnlyInMetadata() {
         val policy = AndroidNonMetricObstacleAdvisoryPolicy()
         val candidate = detection(centerX = 0.18f)
 
@@ -28,12 +28,16 @@ class AndroidNonMetricObstacleAdvisoryPolicyTest {
 
         requireNotNull(action)
         assertEquals(NonMetricObstacleDirection.LEFT, action.direction)
-        assertTrue(action.message.contains("왼쪽"))
+        assertEquals("카메라 보조 안내입니다. 킥보드로 보이는 대상이 있습니다. 주변을 확인하세요.", action.message)
         assertTrue(action.message.contains("킥보드"))
         assertFalse(action.message.contains("TMAP", ignoreCase = true))
         assertTrue(action.validUntilMs > action.observedAtMs)
         listOf(
             "미터",
+            "왼쪽",
+            "가운데",
+            "오른쪽",
+            "정면",
             "m 앞",
             "걸음",
             "STOP",
@@ -80,7 +84,7 @@ class AndroidNonMetricObstacleAdvisoryPolicyTest {
         val action = policy.evaluate(listOf(tactile), gate, 5L, 2_300L)
 
         requireNotNull(action)
-        assertTrue(action.message.contains("점자블록 후보"))
+        assertTrue(action.message.contains("점자블록으로 보이는 대상"))
         assertFalse(action.message.contains("따라"))
     }
 
@@ -240,15 +244,16 @@ class AndroidNonMetricObstacleAdvisoryPolicyTest {
         )
         // The current model shares short vehicle/scooter labels across metric and camera-only speech.
         val expectedLabels = mapOf(
-            "person" to "사람",
-            "bicycle" to "자전거",
-            "car" to "차량",
-            "motorcycle" to "차량",
-            "bus" to "차량",
-            "truck" to "차량",
-            "curb_step" to "턱",
-            "uneven_sidewalk" to "고르지 않은 보도",
-            "e_scooter_obstruction" to "킥보드",
+            "person" to "사람으로",
+            "traffic_cone" to "안전 고깔로",
+            "bicycle" to "자전거로",
+            "car" to "차량으로",
+            "motorcycle" to "차량으로",
+            "bus" to "차량으로",
+            "truck" to "차량으로",
+            "curb_step" to "턱으로",
+            "uneven_sidewalk" to "고르지 않은 보도로",
+            "e_scooter_obstruction" to "킥보드로",
         )
 
         expectedLabels.forEach { (className, label) ->
@@ -260,7 +265,7 @@ class AndroidNonMetricObstacleAdvisoryPolicyTest {
                 nowMs = 1_000L,
             )
             requireNotNull(action)
-            assertTrue(action.message.contains("$label 후보"))
+            assertEquals("카메라 보조 안내입니다. $label 보이는 대상이 있습니다. 주변을 확인하세요.", action.message)
         }
     }
 

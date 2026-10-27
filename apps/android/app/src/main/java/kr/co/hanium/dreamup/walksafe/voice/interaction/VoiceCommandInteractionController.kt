@@ -459,8 +459,8 @@ internal class VoiceCommandInteractionController(
                 else output.speakInteraction("진행 중인 길안내가 없습니다. 목적지를 먼저 선택해 주세요.")
             }
             AndroidVoiceAction.SpeakVoiceHelp, AndroidVoiceAction.OpenHelp -> {
-                val help = voiceCommandHelpKo(walk.snapshot().state == WalkSessionState.PAUSED)
-                output.speakInteraction(help)
+                // showCommandPage opened the full-screen help, which owns its speech and input turn.
+                Unit
             }
             AndroidVoiceAction.CreateReport -> {
                 ui.navigationStatus("voice=report_command_recognized")

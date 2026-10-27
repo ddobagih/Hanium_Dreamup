@@ -46,6 +46,9 @@ class DestinationSearchLocationController(
     private var cancelRequest: (() -> Unit)? = null
     private var completion: ((RoutePoint?) -> Unit)? = null
     private var allowed: (() -> Boolean)? = null
+    /** Logical consumer identity, including replacement while one GPS request is still running. */
+    var completionGeneration = 0L
+        private set
     var isAcquiring = false
         private set
 
@@ -81,6 +84,7 @@ class DestinationSearchLocationController(
             onResult(it)
             return true
         }
+        completionGeneration += 1L
         completion = onResult
         allowed = stillAllowed
         if (isAcquiring) return true
@@ -109,13 +113,22 @@ class DestinationSearchLocationController(
             callback?.invoke(null)
             return false
         }
-        if (isAcquiring && generation == requestGeneration) cancelRequest = cancellation else cancellation()
+        if (isAcquiring && generation == requestGeneration) {
+            cancelRequest = cancellation
+        } else {
+            try {
+                cancellation()
+            } catch (_: Exception) {
+                // An immediate result may already have completed or started a newer request.
+            }
+        }
         return true
     }
 
     fun cancel() {
         generation += 1L
         consumerGeneration += 1L
+        completionGeneration += 1L
         isAcquiring = false
         fix = null
         lease = null

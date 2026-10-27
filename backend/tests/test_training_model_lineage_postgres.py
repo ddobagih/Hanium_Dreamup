@@ -1,8 +1,8 @@
 """S1617-58: a model trained on a dataset revision is re-checked per member.
 
 Training-consent withdrawal, account deletion, artifact removal or a retired
-revision make the model RETRAIN_REQUIRED and block any new deployment; a newer
-revision of the same dataset alone does not.
+revision make the helper return RETRAIN_REQUIRED; a newer revision of the same
+dataset alone does not. These tests do not exercise a deployment integration.
 """
 
 from __future__ import annotations
@@ -79,12 +79,15 @@ def _artifact(db, actor: str, suffix: str) -> tuple[uuid.UUID, str]:
     return artifact_id, content
 
 
-def _revision(db, dataset_id: uuid.UUID, revision: int, members, *, state: str = "APPROVED") -> str:
+def _revision(
+    db, dataset_id: uuid.UUID, revision: int, members, *,
+    state: str = "APPROVED", age_years: int = 0,
+) -> str:
     manifest = _sha(f"manifest-{dataset_id}-{revision}")
     revision_id = uuid.uuid4()
     db.execute(
         text(
-            "WITH t AS (SELECT clock_timestamp() AS now) "
+            "WITH t AS (SELECT clock_timestamp() - (:age_years * interval '1 year') AS now) "
             "INSERT INTO training_dataset_revisions (id, dataset_id, revision, "
             "parent_revision_id, manifest_sha256, member_set_sha256, approved_at, "
             "expires_at, admin_id, correlation_id) "
@@ -93,6 +96,7 @@ def _revision(db, dataset_id: uuid.UUID, revision: int, members, *, state: str =
         ),
         {
             "id": revision_id,
+            "age_years": age_years,
             "dataset": dataset_id,
             "revision": revision,
             "manifest": manifest,
@@ -169,7 +173,7 @@ def test_s1617_58_withdrawal_deletion_and_retirement_require_retraining() -> Non
             )
         assert superseded.status == "DEPLOYABLE"
 
-        # B withdraws training consent after training: retrain, no new deployment.
+        # B withdraws consent after training: the helper refuses this lineage.
         _record_consent(
             SessionFactory, actor_id=actor_b, client_revision=2, training_reuse=False
         )
@@ -208,5 +212,57 @@ def test_s1617_58_withdrawal_deletion_and_retirement_require_retraining() -> Non
                 dataset_revision=1,
                 dataset_manifest_sha256=manifest,
             )
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize(
+    ("condition", "reason", "member_count", "affected_count"),
+    [
+        ("artifact_removed", "training_artifact_removed", 1, 1),
+        ("content_mismatch", "training_artifact_removed", 1, 1),
+        ("expired_time", "dataset_revision_expired", 1, 0),
+        ("expired_event", "dataset_revision_expired", 1, 0),
+        ("no_members", "dataset_revision_has_no_members", 0, 0),
+        ("consent_changed", "training_consent_changed", 1, 1),
+    ],
+)
+def test_lineage_helper_rejects_missing_or_changed_training_evidence(
+    condition: str, reason: str, member_count: int, affected_count: int,
+) -> None:
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex[:12]
+    actor = f"lineage-evidence.{suffix}"
+    dataset = uuid.uuid4()
+    try:
+        _record_consent(SessionFactory, actor_id=actor, training_reuse=True)
+        with SessionFactory.begin() as db:
+            member = _artifact(db, actor, suffix)
+            members = [] if condition == "no_members" else [member]
+            if condition == "content_mismatch":
+                # An inconsistent snapshot, not an update to the immutable artifact.
+                members = [(member[0], _sha(f"different-content-{suffix}"))]
+            manifest = _revision(
+                db, dataset, 1, members,
+                state="EXPIRED" if condition == "expired_event" else "APPROVED",
+                age_years=4 if condition == "expired_time" else 0,
+            )
+        if condition == "artifact_removed":
+            with SessionFactory.begin() as db:
+                db.delete(db.get(ApprovedTrainingArtifact, member[0]))
+        if condition == "consent_changed":
+            _record_consent(
+                SessionFactory, actor_id=actor, client_revision=2, training_reuse=True
+            )
+
+        model = _lineage(dataset, 1, manifest, f"job-evidence-{suffix}")
+        with SessionFactory() as db:
+            assessment = assess_training_model_lineage(db, model)
+            with pytest.raises(TrainingLineageError) as blocked:
+                require_model_deployable(db, model)
+        assert assessment.status == "RETRAIN_REQUIRED"
+        assert assessment.reasons == blocked.value.reasons == (reason,)
+        assert assessment.member_count == member_count
+        assert assessment.affected_member_count == affected_count
     finally:
         engine.dispose()

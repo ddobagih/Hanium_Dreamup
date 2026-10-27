@@ -70,6 +70,9 @@ internal interface VoiceInputEnvironment {
     /** A lease-expiring query: invoke only where the original input owner captured a decision. */
     fun pendingNavigationDecisionToken(): RouteNavigatorDecisionToken?
     fun takeoverConflictAvailable(epoch: WalkRuntimeEpoch): Boolean
+    fun serverCommandRecognitionEnabled(): Boolean = false
+    fun walkAreaCommandAvailable(): Boolean = false
+    fun walkWakeContextAvailable(): Boolean = false
 }
 
 internal interface VoiceInputCommandEffects {
@@ -239,6 +242,8 @@ internal interface GatewayVoicePlatform {
     fun createRecorder(onLimitReached: () -> Unit): GatewayVoiceRecorder
     fun createRecorder(onLimitReached: () -> Unit, onInputFailure: (VoiceInputFailure) -> Unit): GatewayVoiceRecorder =
         createRecorder(onLimitReached)
+    fun createRecorder(onLimitReached: () -> Unit, onInputFailure: (VoiceInputFailure) -> Unit,
+                       onSpeechEnded: () -> Unit): GatewayVoiceRecorder = createRecorder(onLimitReached, onInputFailure)
     fun createPlayer(): GatewayVoicePlayer
     fun transcribe(session: GatewayFieldSession, audio: File, requestId: String): CancellableNetworkCall<GatewaySpeechTranscript>
     fun synthesize(session: GatewayFieldSession, message: String, requestId: String): CancellableNetworkCall<GatewaySpeechAudio>

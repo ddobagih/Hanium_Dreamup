@@ -51,7 +51,7 @@ class MainActivityRuntimeQualityIntegrationStaticTest {
     @Test fun qualityDeadlineAlsoExpiresWhenTheNextSensorCallbackNeverArrives() {
         val current = body(evidence, "currentAssessment")
         assertTrue(current.contains("gpsQualityGate.current(nowMs)")); assertTrue(current.contains("cameraQualityGate.current(nowMs)"))
-        assertTrue(current.contains("?.let(updateMountingAssessment)"))
+        assertTrue(current.contains("updateMountingAssessment(raw.copy(status = evidence.status, reason = reason))"))
         val watchdog = body(runtime, "scheduleWatchdog")
         listOf("evidence.gpsQualityGate.pendingFailureDeadlineElapsedRealtimeMs()",
             "evidence.cameraQualityGate.pendingFailureDeadlineElapsedRealtimeMs()", "qualityFailureDelayMs", "profile.runtimeRetryIntervalMs")

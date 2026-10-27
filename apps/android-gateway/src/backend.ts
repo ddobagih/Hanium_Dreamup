@@ -45,6 +45,7 @@ export async function checkBackendAccountSessionCurrent(
   const headers = backendServiceRequestHeaders();
   if (!headers || !bindBackendActor(headers, binding)) return "unavailable";
   const url = backendUrl("/accounts/session-current");
+  let response: Response | undefined;
   try {
     const signed = await signBackendActorRequest(url, { method: "POST", headers });
     if (!signed) return "unavailable";
@@ -53,7 +54,7 @@ export async function checkBackendAccountSessionCurrent(
       ? AbortSignal.any([requestSignal, timeoutSignal])
       : timeoutSignal;
     signal.throwIfAborted();
-    const response = await fetchImpl(url, {
+    response = await fetchImpl(url, {
       ...signed,
       redirect: "error",
       signal

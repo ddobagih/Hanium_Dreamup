@@ -28,6 +28,7 @@ internal enum class WalkVoiceStartFailure {
     RUNTIME,
     /** S04-27: capture silenced by a call, another app or OS policy after it started. */
     INPUT_SILENCED,
+    INPUT_ROUTE_CHANGED,
 }
 
 internal fun classifyWalkVoiceStartFailure(

@@ -160,8 +160,12 @@ class UnknownObjectGuidanceDeviceTest {
                     val batch = checkNotNull(admit(fixture, nowMs))
                     deadlineMs = batch.validUntilElapsedRealtimeMs
                     val phrase = checkNotNull(batch.outputs.single().userFacing.message)
-                    if (scenario == Scenario.OBJECT_APPROACH) assertTrue(phrase.contains("사용자 쪽으로 다가오는"))
-                    else assertTrue(phrase.contains("정지해 있는 것으로 보이며"))
+                    assertEquals("멈추세요. 물체가 감지됐습니다. 주변을 확인하세요.", phrase)
+                    assertEquals(
+                        if (scenario == Scenario.OBJECT_APPROACH) ObjectMotion.OBJECT_APPROACHING
+                        else ObjectMotion.USER_APPROACHING_STATIONARY,
+                        batch.outputs.single().objectMotion,
+                    )
                     val dispatch = main.dispatchTactileFrameFeedback(emptyNamedFrame, true, true, nowMs,
                         TactileFrameFeedbackActuator { selected ->
                             val action = checkNotNull(selected.action) { "Main did not select $scenario" }

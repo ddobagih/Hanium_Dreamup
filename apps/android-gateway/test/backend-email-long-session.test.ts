@@ -75,8 +75,8 @@ const backendFetch: GatewayFetch = async (input) => {
 };
 
 type LongSession = {
-  account_generation: number;
   actor_id: string;
+  account_generation: number;
   device_id: string;
   family_id: string;
   rotation: number;
@@ -198,6 +198,7 @@ test("decision 2 email login opts into an unlimited device-bound refresh family"
 
   const rotated = await longSession(await refresh(session));
   assert.equal(rotated.rotation, 1);
+  assert.equal(rotated.account_generation, session.account_generation);
   assert.equal(rotated.family_id, session.family_id);
   assert.equal(rotated.absolute_expires_at_epoch_ms, null);
   assert.deepEqual(gatewayFieldLongSessionBinding(withCookie(rotated.cookie)), binding);

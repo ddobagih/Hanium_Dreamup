@@ -2,12 +2,22 @@ package kr.co.hanium.dreamup.walksafe
 
 import java.io.File
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class MainActivityWalkVoiceControlStaticTest {
-    private val source = File(
-        "src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
-    ).readText()
+    private val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+    @Test
+    fun reportAndNavigationRejectOutOfRangeConfidence() {
+        for (phrase in listOf("길안내 시작", "신고해줘")) {
+            assertNull(kr.co.hanium.dreamup.walksafe.navigation.selectAndroidVoiceAction(
+                listOf(phrase), floatArrayOf(1.01f)))
+            assertNull(kr.co.hanium.dreamup.walksafe.navigation.selectAndroidVoiceAction(
+                listOf(phrase), floatArrayOf(Float.NaN)))
+        }
+        val controller = File("src/main/java/kr/co/hanium/dreamup/walksafe/voice/interaction/VoiceCommandInteractionController.kt").readText()
+        assertTrue(controller.contains("confidence !in .8..1.0"))
+    }
 
     @Test
     fun walkCommandsAreReducedBeforeNavigationAndReportCommands() {

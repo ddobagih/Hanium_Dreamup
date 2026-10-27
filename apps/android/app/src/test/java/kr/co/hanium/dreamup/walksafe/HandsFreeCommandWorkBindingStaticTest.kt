@@ -68,6 +68,16 @@ class HandsFreeCommandWorkBindingStaticTest {
     }
 
     @Test
+    fun locationWaitRemainsOwnedUntilItsSuccessorSearchOrCancellation() {
+        val pending = MainActivityRefactorSource.member(input, "isHandsFreeCommandWorkPending")
+        assertTrue(pending.contains("current.locationGeneration == work.locationGeneration"))
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(pending,
+            "ownedLocation && !current.locationInFlight", "current.searchInFlight",
+            "work.copy(searchGeneration = current.searchGeneration)", "handsFreeCommandWork = work"))
+        assertTrue(pending.contains("ownedLocation && current.locationInFlight"))
+    }
+
+    @Test
     fun aCommandResultTimeoutRestartsListeningLikeOtherControllerFailures() {
         val terminal = MainActivityRefactorSource.member(runtime, "handleHandsFreeVoiceTerminalFailure")
         assertTrue(

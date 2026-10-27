@@ -116,9 +116,9 @@ class VoiceInputOutputJourneyBehaviorTest {
         f.finish(f.native.spoken.last().id); assertEquals(1, f.platform.recognizer.starts)
     }
 
-    @Test fun replacementStatusCancelsPendingInputWithoutLettingOldPromptDoneOpenMicrophone() {
+    @Test fun explicitReplacementCommandCancelsPendingInputWithoutLettingOldPromptDoneOpenMicrophone() {
         val f = Fixture(); f.ready(); val old = f.beginPrompt(); f.native.start(old)
-        assertTrue(f.output.speakStatusExplanation("경로를 다시 확인하고 있습니다."))
+        assertTrue(f.output.speakCommandResponse("요청한 경로를 다시 확인하겠습니다."))
         val status = f.native.spoken.last().id
         assertNotEquals(old, status); assertFalse(f.core.state.promptPending)
         f.native.done(old); f.finish(status); f.assertNoMicrophone()

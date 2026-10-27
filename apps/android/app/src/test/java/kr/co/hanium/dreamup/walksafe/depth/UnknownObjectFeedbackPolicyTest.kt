@@ -73,7 +73,7 @@ class UnknownObjectFeedbackPolicyTest {
         val batch = requireNotNull(admit(original))
         val admitted = batch.outputs.single()
         assertTrue(admitted.userFacing.message!!.contains("물체"))
-        assertTrue(admitted.userFacing.message!!.contains("물체가 사용자 쪽으로 다가오는"))
+        assertTrue(admitted.userFacing.message!!.startsWith("멈추세요."))
         assertFalse(admitted.userFacing.message!!.contains("FastSAM"))
         assertFalse(admitted.userFacing.message!!.contains("unnamed"))
         assertEquals(original.frameId, admitted.frameId)
@@ -92,7 +92,7 @@ class UnknownObjectFeedbackPolicyTest {
         )
         val stationaryMessage = requireNotNull(admit(stationary)).outputs.single().userFacing
         assertEquals(MessageLevel.STOP, stationaryMessage.messageLevel)
-        assertTrue(stationaryMessage.message!!.contains("정지해 있는 것으로 보이며, 사용자가 다가갑니다."))
+        assertTrue(stationaryMessage.message!!.startsWith("멈추세요."))
         assertFalse(stationaryMessage.message!!.contains("다가오는"))
         val unknownMotion = output().copy(
             riskDistanceM = 1f,
@@ -135,7 +135,7 @@ class UnknownObjectFeedbackPolicyTest {
                 objectMotion = ObjectMotion.UNKNOWN,
                 motionEstimate = motion().copy(direction = direction),
             ))).outputs.single()
-            assertTrue(result.userFacing.message!!.contains("거리가 줄어들고"))
+            assertTrue(result.userFacing.message!!.contains("멈추세요."))
             assertFalse(result.userFacing.message!!.contains("카메라 기준"))
             assertFalse(result.userFacing.message!!.contains("다가오는"))
         }

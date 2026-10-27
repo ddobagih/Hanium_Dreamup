@@ -5,6 +5,32 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DestinationVoiceDialogBehaviorTest {
+    @Test fun slowDetailRestoresFullAnswerWindowAndOnlyCurrentDoneStartsInput() {
+        val f = InteractionFixture(); val page = f.showPage()
+        f.controllers.destinations.speakHomeDestinationVoicePrompt(page); f.responses.last().done!!.invoke()
+        f.now += 29_000
+        f.controllers.destinations.speakVoiceDestinationCandidateDetail(1)
+        val detail = f.responses.last()
+        f.now += 45_000
+        assertSame(page, f.controllers.destinations.currentVoiceDestinationDialogState())
+        val starts = f.microphoneStarts
+        detail.done!!.invoke(); detail.done!!.invoke()
+        assertEquals(starts + 1, f.microphoneStarts)
+        f.now += 29_999; assertSame(page, f.controllers.destinations.currentVoiceDestinationDialogState())
+        f.now++; assertNull(f.controllers.destinations.currentVoiceDestinationDialogState())
+    }
+    @Test fun cancelledOrStaleDetailNeverStartsAnotherMicrophone() {
+        for (stale in listOf(false, true)) {
+            val f = InteractionFixture(); val page = f.showPage()
+            f.controllers.destinations.speakHomeDestinationVoicePrompt(page); f.responses.last().done!!.invoke()
+            f.controllers.destinations.speakVoiceDestinationCandidateDetail(1)
+            val detail = f.responses.last(); val starts = f.microphoneStarts
+            if (stale) f.actor = "different-actor"
+            detail.cancelled!!.invoke(); detail.done!!.invoke()
+            assertEquals(starts, f.microphoneStarts)
+        }
+    }
+
     @Test fun acceptedPromptDoesNotAuthorizeSelectionBeforeActualDone() {
         val f=InteractionFixture();val page=f.showPage()
         assertTrue(f.controllers.destinations.speakHomeDestinationVoicePrompt(page))

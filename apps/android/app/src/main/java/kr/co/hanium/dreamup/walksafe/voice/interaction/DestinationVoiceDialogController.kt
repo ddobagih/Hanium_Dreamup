@@ -440,11 +440,45 @@ internal class DestinationVoiceDialogController(
         val message = listOfNotNull("${oneBasedIndex}번 ${result.name}", result.speechAddressOrNull(),
             destinationCategoryLabelKo(result.category), result.distanceM?.let { "검색 위치 기준 ${approximateDestinationDistanceKo(it, state.origin?.accuracyM)}" },
             result.distanceM?.let { destinationDistanceKindKo(result.distanceSource) }).joinToString(", ")
-        output.speakCommandParts(listOf(message), isCurrent = {
-            identity.actorId() == actor && identity.processGeneration() == generation &&
-                activeVoiceCandidateDialogOrNull() === state &&
-                state.onCommand(DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex)).accepted
-        })
+        val detailLease = if (ui.homeContextAvailable() && ui.voiceInteractionPage()) {
+            HomeDestinationVoiceDialogLease(actor ?: return, generation, search().state.generation,
+                state, scheduler::nowMs, answerWindowStartsAfterPrompt = true).also {
+                // Replace the timer owner without invalidating the already-heard candidate page.
+                homeDestinationVoiceDialogLease = it
+            }
+        } else null
+        val preparationGeneration = input.generation()
+        val listenAfter = detailLease != null
+        fun current(): Boolean = identity.actorId() == actor && identity.processGeneration() == generation &&
+            (!listenAfter || homeDestinationVoiceDialogLease === detailLease) &&
+            activeVoiceCandidateDialogOrNull() === state && input.generation() == preparationGeneration &&
+            state.onCommand(DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex)).accepted
+        var terminal = false
+        fun finish(completed: Boolean) {
+            if (terminal) return
+            terminal = true
+            if (!current()) return
+            // As with a page prompt, time spent hearing the detail is not answer time.
+            detailLease?.openAnswerWindow()
+            if (detailLease != null) scheduler.postDialogExpiry({
+                if (homeDestinationVoiceDialogLease === detailLease) currentVoiceDestinationDialogState()
+            }, 30_000L)
+            if (listenAfter) {
+                val awaitingInput = input.promptPending()
+                input.completePreparedPrompt(if (completed && awaitingInput) preparationGeneration else null)
+                if (completed && awaitingInput && !input.startVoiceCommandRecognition()) input.clearPromptReady()
+                if (!completed) ui.voiceStatus("상세 안내를 완료하지 못했습니다. 음성 명령 버튼을 눌러 다시 시도해 주세요.")
+                ui.refreshVoiceControls(active = input.active())
+            }
+        }
+        val accepted = output.speakCommandParts(
+            parts = kr.co.hanium.dreamup.walksafe.feedback.trainingSpeechChunks(message),
+            preparingInput = listenAfter, isCurrent = ::current,
+            onCompleted = { finish(true) }, onFailed = { finish(false) },
+            onCancelled = { finish(false) },
+        )
+        if (!accepted) finish(false)
+
     }
 
     fun selectVoiceDestinationCandidate(oneBasedIndex: Int) {

@@ -29,6 +29,7 @@ internal class NativeWorkflowController(
         fun nativeFeatureAvailable(page: NativeUiPage): Boolean
         fun deletionRecoveryRequired(): Boolean
         fun deletionProcessingBlocked(): Boolean
+        fun walkingArea(): Boolean = false
     }
 
     interface FocusTarget {
@@ -150,6 +151,10 @@ internal class NativeWorkflowController(
 
     fun requestNativeFeature(page: NativeUiPage) {
         if (!queries.shouldShowNativeHome()) { renderMainUi(); return }
+        if (queries.walkingArea() && page == NativeUiPage.VOICE_COMMAND) {
+            pages.listenForVoiceCommand()
+            return
+        }
         if (page == NativeUiPage.VOICE_COMMAND || page == NativeUiPage.DESTINATION_SEARCH) {
             if (!queries.isWalkSessionRuntimeActive()) preparation.cancelNativePrewalkPreparation(cancelFeatureEntry = true)
             else cancelNativePendingFeatureEntry()
@@ -185,6 +190,10 @@ internal class NativeWorkflowController(
     }
 
     fun showNativeUiPage(page: NativeUiPage, preserveVoiceInteraction: Boolean) {
+        if (queries.walkingArea() && page == NativeUiPage.HOME) {
+            showNativeUiPage(NativeUiPage.GUIDANCE, preserveVoiceInteraction)
+            return
+        }
         if (nativeUiPage != page && !preserveVoiceInteraction) pages.invalidateGuidanceStopConfirmation()
         if (nativeUiPage != page) pages.cancelDeviceRuntimeCalibration()
         pages.retireForegroundWake(preserveVoiceInteraction)
@@ -194,7 +203,7 @@ internal class NativeWorkflowController(
             }
             if (!preserveVoiceInteraction) pages.retireOutgoingVoiceInteraction(nativeUiPage.isVoiceInteractionPage())
         }
-        if (page == NativeUiPage.HOME || page == NativeUiPage.SETTINGS) {
+        if ((page == NativeUiPage.HOME || page == NativeUiPage.SETTINGS) && !queries.walkingArea()) {
             if (queries.nativeHomeFeatureContextAvailable()) clearNativeDestinationSearchState()
             pendingNativeUiPage = null
             if (!queries.isWalkSessionRuntimeActive() && preparationNeedsCancellation()) {

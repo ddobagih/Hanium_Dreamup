@@ -28,7 +28,7 @@ class GatewayAccountClientTest {
             ),
             getResponse = GatewayHttpResponse(200, accountStatusWithCapacity()),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val loggedIn = client.loginWithPassword(
             "https://gateway.example", "person@example.com", "correct horse battery",
             false, deviceId, 1_000L,
@@ -70,7 +70,7 @@ class GatewayAccountClientTest {
         )!!
         val transport = AccountTransport(GatewayHttpResponse(200, "{}"), GatewayHttpResponse(401, "{}"))
         val failure = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).revalidateBackendAccountDeviceSession(session, 2_000L)
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).revalidateBackendAccountDeviceSession(session, 2_000L)
         }
         assertEquals("gateway_backend_device_restore_rejected", failure.reason)
         assertNull(session.backendDeviceRevalidationSnapshotOrNull(2_000L))
@@ -85,15 +85,16 @@ class GatewayAccountClientTest {
             ),
         )
 
-        val result = GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS }).requestEmailOtp(
+        val result = GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS }, allowDebugOrigin = true).requestEmailOtp(
             gatewayBaseUrl = "https://gateway.example",
-            email = "person@example.com",
+            email = "Person@faß.DE",
             dateOfBirth = "2000-02-29",
             requestId = "request_1234567890",
         )
 
         assertEquals("https://gateway.example/api/account-enrollments/email-otp", transport.url)
         val request = JSONObject(transport.body)
+        assertEquals("Person@xn--fa-hia.de", request.getString("email"))
         assertEquals(
             setOf("schema_version", "email", "date_of_birth", "request_id"),
             request.keysSet(),
@@ -112,7 +113,7 @@ class GatewayAccountClientTest {
         )
 
         val error = assertThrows(GatewayAccountHttpException::class.java) {
-            GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS }).requestEmailOtp(
+            GatewayAccountClient(transport, clockEpochMs = { OTP_FIXTURE_NOW_MS }, allowDebugOrigin = true).requestEmailOtp(
                 "https://gateway.example",
                 "secret-person@example.com",
                 "2000-01-01",
@@ -138,7 +139,7 @@ class GatewayAccountClientTest {
             locationTerms = true,
         )
 
-        val created = GatewayAccountClient(transport).createAccount(
+        val created = GatewayAccountClient(transport, allowDebugOrigin = true).createAccount(
             gatewayBaseUrl = "https://gateway.example",
             enrollmentHandle = HANDLE,
             otpCode = "012345",
@@ -164,6 +165,33 @@ class GatewayAccountClientTest {
     }
 
     @Test
+    fun lostCreateResponseCanBeRetriedWithTheExactPayload() {
+        val requests = mutableListOf<String>()
+        val result = GatewayHttpResponse(
+            201,
+            """{"schema_version":"walksafe.account.v1","actor_id":"$ACTOR_ID","account_generation":1,"signup_receipt_sha256":"${"a".repeat(64)}"}""",
+        )
+        val transport = object : GatewaySessionTransport {
+            override fun postJson(url: String, body: String): GatewayHttpResponse {
+                requests += body
+                if (requests.size == 1) throw IOException("response lost after server commit")
+                return result // Models the server's already tested exact-result replay.
+            }
+            override fun get(url: String, headers: Map<String, String>): GatewayHttpResponse = error("unused")
+            override fun delete(url: String, headers: Map<String, String>): GatewayHttpResponse = error("unused")
+            override fun deleteJson(url: String, body: String): GatewayHttpResponse = error("unused")
+        }
+        fun submit() = GatewayAccountClient(transport, allowDebugOrigin = true).createAccount(
+            "https://gateway.example", HANDLE, "012345", "correct horse battery",
+            SignupConsentSelections(true, true, true),
+        )
+        assertThrows(IOException::class.java) { submit() }
+        assertEquals(ACTOR_ID, submit().actorId)
+        assertEquals(2, requests.size)
+        assertEquals(requests[0], requests[1])
+    }
+
+    @Test
     fun accountCreateRejectsStringEncodedGeneration() {
         val transport = AccountTransport(
             postResponse = GatewayHttpResponse(
@@ -173,7 +201,7 @@ class GatewayAccountClientTest {
         )
 
         val error = assertThrows(GatewayAccountHttpException::class.java) {
-            GatewayAccountClient(transport).createAccount(
+            GatewayAccountClient(transport, allowDebugOrigin = true).createAccount(
                 gatewayBaseUrl = "https://gateway.example",
                 enrollmentHandle = HANDLE,
                 otpCode = "012345",
@@ -203,9 +231,9 @@ class GatewayAccountClientTest {
             ),
         )
 
-        val session = GatewayFieldSessionClient(transport).loginWithPassword(
+        val session = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).loginWithPassword(
             gatewayBaseUrl = "https://gateway.example",
-            email = "person@example.com",
+            email = "Person@faß.DE",
             password = "correct horse battery",
             rememberMe = false,
             deviceId = deviceId,
@@ -213,6 +241,7 @@ class GatewayAccountClientTest {
         )
 
         val request = JSONObject(transport.body)
+        assertEquals("Person@xn--fa-hia.de", request.getString("email"))
         assertEquals(
             setOf("grant_type", "email", "password", "remember_me", "device_id"),
             request.keysSet(),
@@ -250,7 +279,7 @@ class GatewayAccountClientTest {
         assertEquals(GatewaySessionVerificationState.RESTORED_UNVERIFIED, restored.verificationState)
         assertFalse(restored.isUsableFor(ACTOR_ID, 2_000L))
         assertThrows(IllegalStateException::class.java) { restored.requestHeaders(2_000L) }
-        val revalidated = GatewayFieldSessionClient(transport)
+        val revalidated = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
             .revalidateBackendAccountDeviceSession(restored, 2_000L)
         assertTrue(revalidated.isUsableFor(ACTOR_ID, 3_000L))
         assertEquals(deviceId, revalidated.lease.deviceId)
@@ -271,7 +300,7 @@ class GatewayAccountClientTest {
             ),
             getResponse = GatewayHttpResponse(200, accountStatusWithCapacity()),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
 
         val session = client.loginWithPassword(
             gatewayBaseUrl = "https://gateway.example",
@@ -316,7 +345,7 @@ class GatewayAccountClientTest {
         )
 
         val error = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).loginWithPassword(
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).loginWithPassword(
                 gatewayBaseUrl = "https://gateway.example",
                 email = "person@example.com",
                 password = "correct horse battery",
@@ -351,8 +380,7 @@ class GatewayAccountClientTest {
                 .toString()
             val error = assertThrows(GatewaySessionHttpException::class.java) {
                 GatewayFieldSessionClient(
-                    AccountTransport(postResponse, GatewayHttpResponse(200, status)),
-                ).loginWithPassword(
+                    AccountTransport(postResponse, GatewayHttpResponse(200, status)), allowDebugAccountOrigin = true).loginWithPassword(
                     gatewayBaseUrl = "https://gateway.example",
                     email = "person@example.com",
                     password = "correct horse battery",
@@ -368,7 +396,7 @@ class GatewayAccountClientTest {
             postResponse = postResponse,
             getResponse = GatewayHttpResponse(200, accountStatusWithCapacity()),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val session = client.loginWithPassword(
             gatewayBaseUrl = "https://gateway.example",
             email = "person@example.com",
@@ -413,7 +441,7 @@ class GatewayAccountClientTest {
             ),
         )
         val legacyError = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(legacy).loginWithPassword(
+            GatewayFieldSessionClient(legacy, allowDebugAccountOrigin = true).loginWithPassword(
                 gatewayBaseUrl = "https://gateway.example",
                 email = "person@example.com",
                 password = "correct horse battery",
@@ -436,7 +464,7 @@ class GatewayAccountClientTest {
             ),
         )
         assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(mismatched).loginWithPassword(
+            GatewayFieldSessionClient(mismatched, allowDebugAccountOrigin = true).loginWithPassword(
                 gatewayBaseUrl = "https://gateway.example",
                 email = "person@example.com",
                 password = "correct horse battery",
@@ -452,8 +480,7 @@ class GatewayAccountClientTest {
     fun passwordLoginRejectsUnapprovedOriginAndReadsNestedSafeErrorCode() {
         val invalidOrigin = assertThrows(GatewaySessionHttpException::class.java) {
             GatewayFieldSessionClient(
-                AccountTransport(GatewayHttpResponse(500, "{}")),
-            ).loginWithPassword(
+                AccountTransport(GatewayHttpResponse(500, "{}")), allowDebugAccountOrigin = true).loginWithPassword(
                 gatewayBaseUrl = "https://gateway.example/unapproved-path",
                 email = "person@example.com",
                 password = "correct horse battery",
@@ -469,8 +496,7 @@ class GatewayAccountClientTest {
                         401,
                         """{"detail":{"code":"invalid_account_credentials"}}""",
                     ),
-                ),
-            ).loginWithPassword(
+                ), allowDebugAccountOrigin = true).loginWithPassword(
                 gatewayBaseUrl = "https://gateway.example",
                 email = "person@example.com",
                 password = "correct horse battery",

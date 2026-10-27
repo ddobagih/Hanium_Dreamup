@@ -231,6 +231,43 @@ class VoiceInputSessionControllerBehaviorTest {
         session.directory.delete()
     }
 
+    @Test fun walkingWakeKeepsItsPageAndCannotCrossBackIntoHome() {
+        val f = Fixture(); val session = WakeSession().apply { homeAvailable = false }
+        f.environment.walkArea = true; f.environment.walkWake = true
+        f.environment.page = f.environment.page.copy(owner = Page.OTHER, voiceCommand = false, noPendingPageOrGuidance = false)
+        val wake = ForegroundWakeInputController(f.environment, session, f.presentation, f.platform, NoDiagnostics)
+        try {
+            wake.refreshForegroundHomeWakeListening()
+            assertTrue(wake.hasProbe())
+            f.platform.probes.last().result(VoskWakePhraseProbeResult.available())
+            assertEquals(0, f.presentation.commandPages)
+            f.platform.ack.finish(WakeAcknowledgementResult.COMPLETED)
+            assertEquals(1, session.started)
+            wake.refreshForegroundHomeWakeListening()
+            val old = f.platform.probes.last()
+            f.environment.walkArea = false; f.environment.walkWake = false; session.homeAvailable = true
+            old.result(VoskWakePhraseProbeResult.available())
+            assertEquals(1, f.platform.ack.plays)
+            assertEquals(1, session.started)
+        } finally { session.directory.delete() }
+    }
+
+    @Test fun walkingWakeAcknowledgementCannotStartAfterItsAreaOrPageChanges() {
+        for (changedArea in listOf(true, false)) {
+            val f = Fixture(); val session = WakeSession().apply { homeAvailable = false }
+            f.environment.walkArea = true; f.environment.walkWake = true
+            val wake = ForegroundWakeInputController(f.environment, session, f.presentation, f.platform, NoDiagnostics)
+            try {
+                wake.acknowledgeForegroundHomeWake(null, null)
+                if (changedArea) f.environment.walkArea = false
+                else f.environment.page = f.environment.page.copy(owner = Page.OTHER)
+                f.platform.ack.finish(WakeAcknowledgementResult.COMPLETED)
+                assertEquals(0, session.started)
+                assertEquals(0, f.presentation.commandPages)
+            } finally { session.directory.delete() }
+        }
+    }
+
     @Test fun retiredWakeProbeCannotTakeOverTheReplacementProbe() {
         val f = Fixture(); val session = WakeSession(); val wake = ForegroundWakeInputController(f.environment, session, f.presentation, f.platform, NoDiagnostics)
         wake.refreshForegroundHomeWakeListening()
@@ -323,26 +360,19 @@ class VoiceInputSessionControllerBehaviorTest {
         assertTrue(f.input.results.isEmpty())
     }
 
-    @Test fun lowConfidenceGatewayPlaybackRetainsNewPlayerWhenOldCompletionArrives() {
+    @Test fun lowConfidenceUsesLocalRepromptAndNeverExecutesTheRejectedCommand() {
         val f = GatewayFixture(); f.platform.allowCommand = false
-        f.controller.startGatewayVoiceCapture(); f.controller.stopGatewayVoiceCapture()
-        f.platform.work.removeAt(0).invoke(); f.platform.work.removeAt(0).invoke()
-        val old = f.platform.players.single()
-        assertTrue(f.controller.hasPlayer())
-        assertTrue(f.input.results.isEmpty())
-        f.controller.cancelGatewaySpeechInteraction("replace")
-        assertFalse(old.file!!.exists())
-        f.controller.startGatewayVoiceCapture(); f.controller.stopGatewayVoiceCapture()
-        f.platform.work.removeAt(0).invoke(); f.platform.work.removeAt(0).invoke()
-        val replacement = f.platform.players.last()
-        old.done!!.invoke()
-        assertTrue(f.controller.hasPlayer())
-        assertTrue(f.controller.hasInteraction())
-        assertTrue(replacement.file!!.isFile)
-        replacement.complete()
-        assertFalse(f.controller.hasPlayer())
-        assertFalse(f.controller.hasInteraction())
-        assertTrue(f.input.results.isEmpty())
+        repeat(2) {
+            f.controller.startGatewayVoiceCapture(); f.controller.stopGatewayVoiceCapture()
+            f.platform.work.removeAt(0).invoke()
+            assertTrue(f.platform.players.isEmpty())
+            assertTrue(f.platform.work.isEmpty())
+            assertFalse(f.controller.hasPlayer())
+            assertTrue(f.input.results.isEmpty())
+            assertFalse(f.platform.recorders.last().file.exists())
+            f.controller.cancelGatewaySpeechInteraction("replace")
+        }
+        assertEquals(List(2) { "음성을 확실히 확인하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요." }, f.output.messages)
     }
 
     private class GatewayInput : GatewayVoiceInputSession {
@@ -410,6 +440,9 @@ class VoiceInputSessionControllerBehaviorTest {
     }
     private enum class Page { COMMAND, OTHER }
     private class Environment : VoiceInputEnvironment {
+        var walkArea = false; var walkWake = false
+        override fun walkAreaCommandAvailable() = walkArea
+        override fun walkWakeContextAvailable() = walkWake
         var identity = VoiceInputIdentity("actor", 3)
         var page = VoiceInputPage(Page.COMMAND, true, true, false, false, false, true)
         var walk = WalkSessionSnapshot(WalkRuntimeEpoch("walk", 0), WalkSessionState.READY, WalkSessionMode.FULL, null, true, null)
@@ -455,6 +488,7 @@ class VoiceInputSessionControllerBehaviorTest {
         override fun handleDestinationPromptIfPresent() = false
     }
     private class Presentation : VoiceInputPresentation {
+        var commandPages = 0
         val messages = mutableListOf<String>()
         override fun voiceStatus(message: String) { messages += message }
         override fun navigationStatus(message: String) { messages += message }
@@ -462,7 +496,7 @@ class VoiceInputSessionControllerBehaviorTest {
         override fun status(title: String, detail: String) { messages += title; messages += detail }
         override fun lastResult(message: String) { messages += message }
         override fun recognitionSignal(message: String) { messages += message }
-        override fun showCommandPage() = Unit
+        override fun showCommandPage() { commandPages++ }
         override fun canShowStatus() = true
     }
     private class Scheduler : VoiceInputScheduler {
@@ -569,7 +603,8 @@ class VoiceInputSessionControllerBehaviorTest {
         val directory = Files.createTempDirectory("voice-input-wake-test").toFile()
         var started = 0; var cues = 0; var restarts = 0
         override fun state() = WakeInputState(false, false, 0, false, false, false, false, false)
-        override fun homeCommandAvailable() = true
+        var homeAvailable = true
+        override fun homeCommandAvailable() = homeAvailable
         override fun speechActive() = false
         override fun recognitionBlocked() = false
         override fun modelDirectoryOrNull() = directory

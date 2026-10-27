@@ -300,6 +300,7 @@ internal object GatewayPersistedLoginStatePolicy {
             sourceVersion.actorId == renewedVersion.actorId &&
             sourceVersion.deviceId == renewedVersion.deviceId &&
             sourceVersion.familyId == renewedVersion.familyId &&
+            source.session.accountGeneration == renewed.session.accountGeneration &&
             sourceVersion.rotation < Long.MAX_VALUE &&
             renewedVersion.rotation == sourceVersion.rotation + 1L &&
             source.session.absoluteExpiresAtEpochMs ==
@@ -330,7 +331,8 @@ internal object GatewayPersistedLoginStatePolicy {
             first.accessExpiresAtEpochMs == second.accessExpiresAtEpochMs &&
             first.idleExpiresAtEpochMs == second.idleExpiresAtEpochMs &&
             first.absoluteExpiresAtEpochMs == second.absoluteExpiresAtEpochMs &&
-            first.serverAccessExpiresAtEpochMs == second.serverAccessExpiresAtEpochMs
+            first.serverAccessExpiresAtEpochMs == second.serverAccessExpiresAtEpochMs &&
+            first.accountGeneration == second.accountGeneration
 
     private fun GatewayPersistedLoginBundle.pendingRevocation(
         operationId: String,

@@ -82,6 +82,7 @@ internal object PendingEmailOtpRequestCodec {
 
     fun decode(encoded: String): PendingEmailOtpRequest? = runCatching {
         if (encoded.length !in 2..1_024) return@runCatching null
+        if (!strictJsonObjectDocument(encoded)) return@runCatching null
         val value = JSONObject(encoded)
         val keys = buildSet { value.keys().forEach { add(it) } }
         if (keys != FIELDS || value.opt("schema_version") != SCHEMA) return@runCatching null

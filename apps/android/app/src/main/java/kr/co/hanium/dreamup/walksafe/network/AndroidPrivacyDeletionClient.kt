@@ -320,6 +320,7 @@ internal fun validatedAccountDeletionStatusOrNull(
 ): AccountDeletionStatus? {
     if (body.isBlank()) return null
     return runCatching {
+        require(strictJsonObjectDocument(body)) { "invalid JSON response document" }
         val root = JSONObject(body)
         if (
             root.deletionJsonKeys() != setOf(
@@ -427,6 +428,7 @@ internal fun validDeletionAccessSecret(value: String): Boolean =
 
 internal fun accountDeletionTerminalConflictCodeOrNull(body: String): String? =
     runCatching {
+        require(strictJsonObjectDocument(body)) { "invalid JSON response document" }
         val root = JSONObject(body)
         if (root.deletionJsonKeys() == setOf("code")) {
             root.getString("code").takeIf(
@@ -469,7 +471,8 @@ internal fun accountDeletionHttpFailureDisposition(
 internal const val ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE = "reauthentication_required"
 
 private fun accountDeletionReauthenticationRequired(body: String): Boolean = runCatching {
-    val root = JSONObject(body)
+    require(strictJsonObjectDocument(body)) { "invalid JSON response document" }
+        val root = JSONObject(body)
     root.opt("code") == "account_deletion_reauthentication_required" &&
         root.opt("reauthentication_required") == true
 }.getOrDefault(false)

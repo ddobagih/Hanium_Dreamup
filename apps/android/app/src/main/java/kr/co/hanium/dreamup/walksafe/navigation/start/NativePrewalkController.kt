@@ -176,7 +176,7 @@ internal class NativePrewalkController(
             return
         }
         if (!decision.mayConfirmAndStart || walk.confirmationToken == null || checks.readinessBlockReason(decision) != null ||
-            confirmationPosted || checks.confirmationPending() || checks.startupConfirmed()) {
+            confirmationPosted || actions.preparationDialogShowing() || checks.confirmationPending() || checks.startupConfirmed()) {
             recordGate("WAIT_CONFIRMATION_OR_READINESS", epoch)
             return
         }
@@ -202,9 +202,23 @@ internal class NativePrewalkController(
                 if (currentWalk.confirmationToken != null) continueIfReady()
                 return@postStartup
             }
-            diagnostics.directStart(currentWalk.state)
-            actions.completeStartupConfirmation(decision)
-            actions.renderMain()
+            val current = {
+                workflow.nativePrewalkStartEpoch == epoch && workflow.nativePhoneMountingCheckRequest == request &&
+                    scope.foreground() && scope.reporterId() == request.actorId &&
+                    scope.gatewayGeneration() == request.gatewayGeneration && scope.walk().epoch == epoch &&
+                    scope.walk().confirmationToken == token && checks.startupDecision() == decision &&
+                    checks.firstRunComplete() && !checks.preflightFailedOrTimedOut() && !checks.startupRetryRequired() &&
+                    checks.readinessBlockReason(decision) == null &&
+                    checks.environmentReadiness(epoch) == WalkSessionReadinessStatus.READY &&
+                    checks.mountingReadiness(epoch) == WalkSessionReadinessStatus.READY
+            }
+            actions.requestStartConfirmation(current) {
+                if (current()) {
+                    diagnostics.directStart(scope.walk().state)
+                    actions.completeStartupConfirmation(decision)
+                    actions.renderMain()
+                }
+            }
         }
     }
 
@@ -332,6 +346,7 @@ internal class NativePrewalkController(
         fun cancelCalibration() {}
         fun cancelCalibrationForLocationAccess() { cancelCalibration() }
         fun retryPreparation(request: NativePhoneMountingCheckRequest) {}
+        fun requestStartConfirmation(current: () -> Boolean, confirmed: () -> Unit) { if (current()) confirmed() }
         fun completeStartupConfirmation(decision: WalkSafeStartupCapabilityDecision)
         fun completePermissionRecoveryRecheck()
         fun discardAndStopEnvironmentCamera()

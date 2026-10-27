@@ -374,6 +374,28 @@ class PrivacyAccountDeletionPolicyTest {
         assertTrue(cleanup.isResetEnabled(completed))
     }
 
+    @Test
+    fun rejectedEvidence422RetainsDeletionFactForRetryAndRestore() {
+        val machine = AccountDeletionStateMachine()
+        assertTrue(machine.requestConfirmation())
+        assertTrue(machine.begin(journal()))
+        machine.apply(status(1L, DeletionInventoryItem.entries.associateWith { DeletionItemState.IN_PROGRESS }))
+        assertTrue(machine.recordDeviceEvidence("device-evidence-0001", "d".repeat(64),
+            1L, "DELETED", "2026-07-25T12:05:00Z"))
+        val before = requireNotNull(machine.snapshotOrNull())
+        val disposition = kr.co.hanium.dreamup.walksafe.network.accountDeletionHttpFailureDisposition(
+            422, """{"detail":{"code":"device_deletion_evidence_digest_invalid"}}""",
+        ) as kr.co.hanium.dreamup.walksafe.network.AccountDeletionHttpFailureDisposition.Retry
+        assertTrue(machine.markRetry(disposition.code))
+        val saved = requireNotNull(machine.snapshotOrNull())
+        assertEquals(before.copy(phase = AccountDeletionPhase.RETRY_WAIT, lastErrorCode = "http_422"), saved)
+        val restarted = AccountDeletionStateMachine()
+        assertTrue(restarted.restore(saved))
+        assertEquals(saved, restarted.snapshotOrNull())
+        assertFalse(saved.deviceEvidenceAcknowledged)
+        assertTrue(restarted.processingBlocked())
+    }
+
     private fun journal() = AccountDeletionJournal.pending(
         gatewayOrigin = "https://gateway.example.test",
         installationId = INSTALLATION_ID,

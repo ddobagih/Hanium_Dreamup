@@ -111,6 +111,26 @@ class AndroidIntegratedConsentAuthorityReconciliationTest {
         }
     }
 
+    @Test
+    fun acceptedConsentIsNotRevokedWhenInstallationKeyOwnerIsUnavailable() {
+        val requests = AtomicInteger()
+        var keyReads = 0
+        LocalHttpTestServer { _, socket ->
+            requests.incrementAndGet()
+            socket.writeFixedResponse(200, confirmation(receipt = SAVED_RECEIPT, clientRevision = 3)
+                .toByteArray(Charsets.UTF_8))
+        }.use { server ->
+            val client = AndroidIntegratedConsentClient(installationPublicKey = { _, _, _, _ ->
+                keyReads++
+                error("An unknown account generation cannot register a key")
+            })
+            val call = client.fetchCurrentCall(server.baseUrl, session(server.baseUrl), INSTALLATION_ID, CONTROL_SECRET)
+            assertEquals(SAVED_RECEIPT, call.execute()?.backendConsentReceiptSha256)
+            assertEquals(1, requests.get())
+            assertEquals(0, keyReads)
+        }
+    }
+
     private fun session(baseUrl: String): GatewayFieldSession = GatewayFieldSession.verified(
         gatewayBaseUrl = baseUrl,
         actorId = "consent-reconcile-tester",

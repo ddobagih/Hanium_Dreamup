@@ -1,3 +1,4 @@
+import { parseAccountDeletionStatusViewV2 } from "../src/privacy-deletion-codec.js";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -20,6 +21,9 @@ import {
 } from "../src/auth.js";
 import {
   acceptOrReplayAccountDeletionV2,
+  authorizedAccountDeletionStatusV2,
+  parseAccountDeletionStatusV2,
+  refreshBackendAccountDeletionStatusV2,
   ACCOUNT_DELETION_INVENTORY_V2,
   ACCOUNT_DELETION_TERMINAL_CONFLICT_CODES_V2,
   DELETION_ACCESS_SECRET_HEADER,
@@ -1149,4 +1153,83 @@ test("permanent evidence conflict does not starve later independent due evidence
     assert.equal(conflict.code, "device_deletion_installation_not_targeted");
   }
   assert.deepEqual(calls, [rejected.evidence_id, independent.evidence_id]);
+});
+
+function deviceVerificationFixture(evaluatedAt = "2026-08-11T00:00:00Z") {
+  return {
+    schema_version: "walksafe.account-deletion-device-verification.v1" as const,
+    completion_view: "SERVER_COMPLETED_DEVICE_UNVERIFIED" as const,
+    target_count: 2, deleted_count: 1, not_found_count: 0, failed_count: 0,
+    pending_count: 0, unverifiable_count: 1,
+    unverifiable_reason: "SLA_ELAPSED_NO_CONTACT" as const,
+    follow_up: "DELETE_ON_NEXT_CONTACT_OR_REMOVE_APP" as const,
+    device_clock_anomaly_count: 0,
+    device_due_at: "2026-08-10T00:00:00Z", evaluated_at: evaluatedAt
+  };
+}
+
+function serverCompletedFixture(): AccountDeletionStatusV2 {
+  const terminal = terminalStatusFixture(3, "f".repeat(64));
+  return { ...terminal, overall_status: "PARTIAL", completion_receipt_sha256: null,
+    items: terminal.items.map(item => item.key === "device_untransmitted_data"
+      ? { ...item, status: "EXTERNAL_PENDING", terminal_at: null, evidence_sha256: null } : item) };
+}
+
+test("device verification validates counts and never promotes partial deletion to completed", () => {
+  const status = { ...serverCompletedFixture(), device_verification: deviceVerificationFixture() };
+  assert.equal(parseAccountDeletionStatusViewV2(status)?.overall_status, "PARTIAL");
+  for (const [key, value] of Object.entries({
+    target_count: 3, deleted_count: "1", pending_count: -1, completion_view: "COMPLETED",
+    unverifiable_reason: null, follow_up: "UNKNOWN", evaluated_at: "not-a-date", extra: true
+  })) {
+    assert.equal(parseAccountDeletionStatusViewV2({ ...status,
+      device_verification: { ...status.device_verification, [key]: value } }), null, key);
+  }
+  assert.equal(parseAccountDeletionStatusViewV2({ ...statusFixture(), device_verification: deviceVerificationFixture() }), null);
+  assert.equal(parseAccountDeletionStatusViewV2({ ...status, device_verification: null }), null);
+});
+
+test("fresh device verification is forwarded outside the canonical revision and durable receipt", async () => {
+  const requestId = "deletion_device_view_request_0001";
+  const canonical = { ...serverCompletedFixture(), request_id: requestId };
+  assert.equal(acceptOrReplayAccountDeletionV2("b4383a00-08c4-461f-a060-556a08000222", 1, {
+    schema_version: "walksafe.account-deletion-request.v2", request_id: requestId,
+    client_revision: 1, confirmation: "DELETE_MY_ACCOUNT"
+  }, CAPABILITY).kind, "accepted");
+  const request = new Request("http://127.0.0.1:8081/privacy/account-deletions", {
+    headers: { "x-walksafe-deletion-status-view": "device-verification.v1" }
+  });
+  const accepted = await forwardAccountDeletionRequestV2(requestId, request, async () => Response.json(canonical, { status: 202 }));
+  assert.equal(accepted.kind, "ok");
+  for (const time of ["2026-08-11T00:00:00Z", "2026-08-11T00:01:00Z"]) {
+    const view = deviceVerificationFixture(time);
+    const result = await refreshBackendAccountDeletionStatusV2(requestId, CAPABILITY, request, async (_input, init) => {
+      assert.equal(new Headers(init?.headers).get("x-walksafe-deletion-status-view"), "device-verification.v1");
+      return Response.json({ ...canonical, device_verification: view });
+    });
+    assert.equal(result.kind, "ok");
+    if (result.kind === "ok") assert.deepEqual(result.status, { ...canonical, device_verification: view });
+    assert.deepEqual(authorizedAccountDeletionStatusV2(requestId, CAPABILITY), canonical);
+  }
+  const legacy = await refreshBackendAccountDeletionStatusV2(requestId, CAPABILITY,
+    new Request("http://127.0.0.1:8081/privacy/account-deletions"), async (_input, init) => {
+      assert.equal(new Headers(init?.headers).get("x-walksafe-deletion-status-view"), null);
+      return Response.json(canonical);
+    });
+  assert.equal(legacy.kind, "ok");
+  if (legacy.kind === "ok") assert.deepEqual(legacy.status, canonical);
+});
+
+test("installation signature survives evidence parsing without changing the signed statement digest", () => {
+  const statement = {
+    schema_version: DEVICE_DELETION_EVIDENCE_SCHEMA_V2, request_id: REQUEST_ID,
+    tombstone_id: TOMBSTONE_ID, request_receipt_sha256: REQUEST_RECEIPT,
+    installation_id: "signed_installation_01", evidence_id: "signed_evidence_01",
+    client_revision: 1, expected_status_revision: 1, item: "device_untransmitted_data" as const,
+    result: "DELETED" as const, completed_at: "2026-08-09T00:10:00Z"
+  };
+  const signed = {...statement, evidence_sha256: deviceDeletionEvidenceSha256V2(statement), installation_signature: "a".repeat(96)};
+  assert.deepEqual(parseDeviceDeletionEvidenceV2(signed), signed);
+  assert.equal(parseDeviceDeletionEvidenceV2({...signed, installation_signature: "bad"}), null);
+  assert.equal(parseDeviceDeletionEvidenceV2({...signed, completed_at: "2026-08-09T00:11:00Z"}), null);
 });

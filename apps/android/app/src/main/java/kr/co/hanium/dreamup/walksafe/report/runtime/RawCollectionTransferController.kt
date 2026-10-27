@@ -42,6 +42,7 @@ internal class RawCollectionTransferController(
     private val elapsedRealtimeMs: () -> Long,
 ) {
     interface Runtime {
+        fun sensitiveStorageBlocked(): Boolean = false
         fun isWalkReady(): Boolean
         fun walkSnapshot(): WalkSessionSnapshot
         fun deviceCheckSnapshot(): PostLoginDeviceCheckSnapshot
@@ -114,7 +115,7 @@ internal class RawCollectionTransferController(
         val gateway = GatewaySessionProcessCoordinator.snapshot()
         val walk = runtime.walkSnapshot()
         val session = gateway.session?.takeUnless {
-            gateway.storageBlocked ||
+            runtime.sensitiveStorageBlocked() || gateway.storageBlocked ||
                 gateway.deletionRecoveryOnly ||
                 runtime.deletionProcessingBlocked()
         }

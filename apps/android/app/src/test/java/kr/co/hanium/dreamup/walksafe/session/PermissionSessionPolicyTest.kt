@@ -388,7 +388,10 @@ class PermissionSessionPolicyTest {
         assertTrue(awaiting.blocksAutomaticResourceStart)
         assertEquals(
             PermissionRecoveryGateState.CLEAR,
-            awaiting.acknowledgeExplicitResume().state,
+            awaiting.acknowledgeExplicitResume(
+                observed = ObservedPermissionSnapshot(true, true, true, true),
+                requiredPermissions = required,
+            ).state,
         )
     }
 

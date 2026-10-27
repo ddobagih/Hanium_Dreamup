@@ -236,7 +236,7 @@ class AccountDeletionNetworkControllerTest {
                 f.runNetwork()
                 f.runCleanup()
                 f.runCleanup()
-                assertEquals(ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE, f.base.machine.snapshotOrNull()?.lastErrorCode)
+                assertEquals("http_401", f.base.machine.snapshotOrNull()?.lastErrorCode)
                 assertNull(f.actor.rev0RecoveryBindingOrNull())
                 assertNull(f.actor.passwordRecoveryBindingOrNull())
             }

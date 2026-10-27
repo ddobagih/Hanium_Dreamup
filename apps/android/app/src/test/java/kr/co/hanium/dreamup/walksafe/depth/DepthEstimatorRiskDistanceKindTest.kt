@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.depth
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -65,6 +66,19 @@ class DepthEstimatorRiskDistanceKindTest {
         val output = estimator.estimate(ObjectDepthInput(0L, 0L, geometry, track, mapper))
         assertNull(output.riskDistanceM)
         assertNull(output.riskDistanceKind)
+    }
+
+    @Test
+    fun namedObjectSurfaceRangeUsesKeptPixelsWhileRiskAndTrackingKeepTheirOldValues() {
+        val tracker = ObjectTracker()
+        val output = estimate(RectNorm(.8f, .3f, .2f, .4f), tiltedPose(true), tracker)
+        assertTrue(requireNotNull(output.measuredSurfaceRangeM) > Z_M)
+        assertEquals(Z_M, requireNotNull(output.riskDistanceM), 1e-4f)
+        tracker.activeTracks().single().distanceHistory.forEach { assertEquals(Z_M, it.distanceM, 1e-4f) }
+        val centerRange = Z_M * sqrt(1f + (4f / 7f) * (4f / 7f))
+        assertTrue("Near measured surface must not be the box-center range", output.measuredSurfaceRangeM!! < centerRange)
+        assertNull(estimate(RectNorm(.3f, .3f, .4f, .4f), null).measuredSurfaceRangeM)
+        assertNotNull(estimate(RectNorm(.3f, .3f, .4f, .4f), tiltedPose(false)).measuredSurfaceRangeM)
     }
 
     private fun estimate(

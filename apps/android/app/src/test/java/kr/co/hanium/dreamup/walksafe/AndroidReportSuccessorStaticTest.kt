@@ -232,7 +232,7 @@ class AndroidReportSuccessorStaticTest {
                 queuedUpload,
                 "val authenticationRequest = captureGatewayAuthenticationRequest(session)",
                 "return reportTransportCall(",
-                "connection.readBoundedResponse(REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation)",
+                "connection.readBoundedResponse(\n                REPORT_UPLOAD_MAX_RESPONSE_BYTES, cancellation,",
                 "if (response.statusCode !in 200..299)",
                 "parseQueuedUploadResultOrNull(response.body, report)",
                 "throw ReportUploadProtocolException()",

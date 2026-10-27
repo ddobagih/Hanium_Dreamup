@@ -95,15 +95,22 @@ internal class UserReportInteractionOwner(
         val generation = localQuarantineGeneration
         try {
             localExecutor.execute {
-                val summaries = runCatching {
-                    localQueue?.invoke()?.quarantinedSummaries(authority.session.actorId, authority.session.backendAccountGeneration)
-                }.getOrNull().orEmpty()
+                val result = runCatching {
+                    checkNotNull(localQueue?.invoke()).quarantinedSummaries(authority.session.actorId, authority.session.backendAccountGeneration)
+                }
                 activity.runOnUiThread {
                     val current = currentUserReportAuthorityOrNull()
                     if (activity.destroyed() || !activity.foreground() || generation != localQuarantineGeneration ||
                         localInteractionEpoch() != epoch || current?.session !== authority.session ||
                         current.sessionGeneration != authority.sessionGeneration || current.localIdentityEpoch != authority.localIdentityEpoch
                     ) { onLoaded(emptyList()); return@runOnUiThread }
+                    if (result.isFailure) {
+                        val message = "기기 보관 신고를 확인하지 못했습니다. 다시 확인해 주세요."
+                        setUserReportStatusMessage(message)
+                        onLoaded(listOf(message))
+                        return@runOnUiThread
+                    }
+                    val summaries = result.getOrThrow()
                     localQuarantineSummaries = summaries
                     localQuarantineAuthority = authority
                     localQuarantineEpoch = epoch

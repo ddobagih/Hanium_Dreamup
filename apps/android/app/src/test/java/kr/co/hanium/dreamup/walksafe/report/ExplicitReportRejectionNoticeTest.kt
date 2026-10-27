@@ -27,6 +27,48 @@ import org.junit.Test
  */
 class ExplicitReportRejectionNoticeTest {
     @Test
+    fun payloadLimitRefusalExplainsThatNothingWasSavedAndOffersRecapture() {
+        val notice = ExplicitReportRejectionNotice.messageFor(
+            ExplicitReportRejectionNotice.STATUS_PAYLOAD_TOO_LARGE,
+        )
+        assertEquals(ExplicitReportRejectionNotice.PAYLOAD_TOO_LARGE_KO, notice)
+        assertTrue(requireNotNull(notice).contains("저장하지 않았습니다"))
+        assertTrue(notice.contains("다시 촬영"))
+        assertFalse(notice.contains("payload"))
+    }
+
+    @Test
+    fun everyCandidateRejectionHasAnExplanationWithoutReadingInternalCodes() {
+        for (reason in AndroidReportCandidateRejection.entries) {
+            val message = requireNotNull(ExplicitReportRejectionNotice.messageFor(
+                "reportCandidate=blocked:candidate_${reason.diagnosticCode}",
+            )) { "No speech for $reason" }
+            assertFalse(message.contains(reason.diagnosticCode))
+            assertFalse(message.contains("reportCandidate"))
+            if (reason != AndroidReportCandidateRejection.CLASS_NOT_REPORTABLE) {
+                assertTrue(message.contains("저장하지 않았습니다"))
+                assertTrue(message.endsWith("주세요."))
+            }
+        }
+        val location = requireNotNull(ExplicitReportRejectionNotice.messageFor("reportCandidate=blocked:candidate_location_untrusted"))
+        assertTrue(location.contains("위치가 정확하지 않아"))
+        val expired = requireNotNull(ExplicitReportRejectionNotice.messageFor("reportCandidate=blocked:candidate_depth_expired"))
+        assertTrue(expired.contains("촬영 정보가 오래되어"))
+        assertNull(ExplicitReportRejectionNotice.messageFor("reportCandidate=blocked:candidate_location_untrusted latitude=37.5"))
+        assertNull(ExplicitReportRejectionNotice.messageFor("reportCandidate=queued id=123"))
+    }
+
+    @Test
+    fun unverifiedCoordinatesHaveASpokenReasonAndRetryAction() {
+        val notice = ExplicitReportRejectionNotice
+        assertEquals(notice.STATUS_COORDINATE_UNVERIFIED,
+            notice.explicitStatus(notice.STATUS_COORDINATE_UNVERIFIED, true))
+        assertEquals(notice.COORDINATE_UNVERIFIED_KO, notice.messageFor(notice.STATUS_COORDINATE_UNVERIFIED))
+        assertTrue(notice.COORDINATE_UNVERIFIED_KO.contains("신고를 저장하지 않았습니다"))
+        assertTrue(notice.COORDINATE_UNVERIFIED_KO.contains("다시 신고해 주세요"))
+    }
+
+    @Test
     fun damageWithoutReportGradeDistanceIsDistinguishedFromNoDamage() {
         val cases = listOf(
             damage("pseudo", source = DepthSource.OBJECT_SIZE_PRIOR),

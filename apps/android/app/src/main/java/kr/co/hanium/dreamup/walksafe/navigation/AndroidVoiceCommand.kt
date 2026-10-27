@@ -608,8 +608,11 @@ private val OPEN_SETTINGS_COMMANDS = setOf(
     "설정열어주세요", "설정화면열어줘", "설정화면열어주세요",
 )
 private val OPEN_HELP_COMMANDS = setOf("도움말열기", "도움말열어줘", "도움말열어주세요", "도움말화면열어줘", "도움말화면열어주세요")
-private val DESTINATION_DETAIL = Regex("(?:목적지|후보)?(.+?)(?:후보)?(?:상세|자세히)(?:알려줘|알려주세요|들려줘|들려주세요)?")
-private val HELP_COMMANDS = setOf("도움말", "도움말알려줘", "도움말알려주세요")
+private val DESTINATION_DETAIL = Regex("(?:목적지|후보)?(.+?)(?:후보)?(?:상세히|상세|자세히)(?:알려줘|알려주세요|들려줘|들려주세요|설명해줘|설명해주세요)?")
+internal val HELP_COMMANDS = setOf(
+    "도움말", "도움말알려줘", "도움말알려주세요", "도움말을열어줘", "도움말을열어주세요",
+    "도움말보여줘", "도움말보여주세요", "도움말을보여줘", "도움말을보여주세요",
+)
 private val DESTINATION_SELECTION = Regex(
     "(?:목적지)?(.+?)(?:목적지)?(?:을|를)?(?:선택(?:해|해줘|해주세요)?|골라(?:줘|주세요)?)",
 )

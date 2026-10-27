@@ -41,7 +41,7 @@ class ApproachCollisionConsumerContractTest {
         assertEquals(MessageLevel.STOP, output.userFacing.messageLevel)
         val text = requireNotNull(output.userFacing.message)
         assertTrue(text.contains("멈추세요"))
-        assertTrue(text.contains("거리가 줄어들고 있습니다"))
+        assertTrue(text.contains("멈추세요."))
         assertFalse(text.contains("충돌"))
         assertEquals(1_900L, output.timestampMs)
         assertEquals(51_900L, output.sourceObservedAtElapsedRealtimeMs)

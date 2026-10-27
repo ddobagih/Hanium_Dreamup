@@ -110,7 +110,12 @@ internal class AndroidVoiceInputPlatform(private val context: Context) :
     }
     override fun createRecorder(onLimitReached: () -> Unit): GatewayVoiceRecorder = createRecorder(onLimitReached, {})
     override fun createRecorder(onLimitReached: () -> Unit, onInputFailure: (VoiceInputFailure) -> Unit): GatewayVoiceRecorder {
-        val recorder = ForegroundAacRecorder(context.cacheDir, onLimitReached, onInputFailure)
+        return createRecorder(onLimitReached, onInputFailure, {})
+    }
+    override fun createRecorder(onLimitReached: () -> Unit, onInputFailure: (VoiceInputFailure) -> Unit,
+                                onSpeechEnded: () -> Unit): GatewayVoiceRecorder {
+        val recorder = ForegroundAacRecorder(context.cacheDir, onLimitReached, onInputFailure,
+            onSpeechEnded = onSpeechEnded)
         return object : GatewayVoiceRecorder {
             override val isRecording get() = recorder.isRecording
             override fun start() = recorder.start()

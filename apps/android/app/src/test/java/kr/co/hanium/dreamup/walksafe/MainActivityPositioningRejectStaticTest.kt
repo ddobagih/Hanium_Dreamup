@@ -17,7 +17,7 @@ class MainActivityPositioningRejectStaticTest {
     fun onlyAMeasuredQualityFailureWithFreshSourceOwnedFixesBypassesTheClearPath() {
         val handler = NavigationPolicySource.observation(source)
         val outlier = handler.indexOf(
-            "gps().retainsPublishedPositionDuringGpsFailure(positioningSnapshot, receivedAtElapsedRealtimeMs)",
+            "gps().retainsPublishedPositionDuringGpsFailure(positioningSnapshot, elapsedRealtimeMs())",
         )
         val failClosed = handler.indexOf("if (hardRejected || filtered == null) {\n            clearTrustedLocation()")
         assertTrue(outlier in 0 until failClosed)

@@ -54,10 +54,9 @@ object UnknownSpatialRelevance {
             (it.pointInAnchor - origin).norm() in .1f..20f }
         if (valid.size < 3) return uncertain("insufficient_measured_spatial_support")
         val confidence = valid.map { it.confidence }.sorted()[valid.size / 2]
-        val ranges = valid.map { (it.pointInAnchor - origin).norm() }.sorted()
-        // Three agreeing samples are required so one isolated near point cannot admit a far mask.
-        val range = ranges.indices.firstOrNull { it + 2 < ranges.size && ranges[it + 2] - ranges[it] <= .08f }
-            ?.let { ranges[it] } ?: return uncertain("incoherent_spatial_range")
+        // Shared with named-object briefing; the original selection rule is unchanged.
+        val range = nearestCoherentMeasuredRange(valid.map { (it.pointInAnchor - origin).norm() })
+            ?: return uncertain("incoherent_spatial_range")
         val up = context.gravityUpInAnchor?.takeIf { finite(it) && abs(it.norm() - 1f) <= .01f }
             ?.normalized() ?: return uncertain("gravity_unavailable_spatial_uncertain", range, confidence)
         val cameraForward = Vec3(pose.forwardX, pose.forwardY, pose.forwardZ)

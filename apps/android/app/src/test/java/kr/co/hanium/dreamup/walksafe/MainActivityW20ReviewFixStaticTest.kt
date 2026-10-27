@@ -52,7 +52,7 @@ class MainActivityW20ReviewFixStaticTest {
         assertTrue(member(detector, "allowLoadRetryIfUnavailable").contains(
             "if (!detector.projection().available && !detector.projection().closing && !loadInFlight) loadAttempted = false"))
         val load = functionBlock("private fun loadDetectorForCurrentProcess()")
-        assertTrue(load.contains("if (loadAttempted) return"))
+        assertTrue(load.contains("if (loadAttempted && (!allowComparison || comparisonAttempted)) return"))
         val block = functionBlock("private fun walkSessionReadinessBlockReason(")
         val camera = block.substringAfter("if (!sources.cameraEnabled()) {")
         assertTrue(

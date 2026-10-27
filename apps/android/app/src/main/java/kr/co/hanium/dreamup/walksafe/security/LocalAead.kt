@@ -11,6 +11,9 @@ internal data class AeadKeyPolicy(
     val currentVersion: Int,
     val readableVersions: Set<Int>,
     val compromisedVersions: Set<Int> = emptySet(),
+    /** Append versions removed from readableVersions here; retain them for account-deletion cleanup.
+     * This list permits deletion only, never decryption or key creation. */
+    val retiredVersions: Set<Int> = emptySet(),
 ) {
     init {
         require(aliasPrefix.matches(Regex("[A-Za-z0-9._-]{1,96}")))
@@ -18,13 +21,15 @@ internal data class AeadKeyPolicy(
         require(currentVersion in readableVersions)
         require(readableVersions.all { it > 0 })
         require(compromisedVersions.all { it > 0 })
+        require(retiredVersions.all { it > 0 })
+        require(readableVersions.intersect(retiredVersions).isEmpty())
         require(readableVersions.intersect(compromisedVersions).isEmpty())
     }
 
     fun alias(version: Int): String = "$aliasPrefix$version"
 
     val knownVersions: Set<Int>
-        get() = readableVersions + compromisedVersions + currentVersion
+        get() = readableVersions + compromisedVersions + retiredVersions + currentVersion
 }
 
 internal data class AeadLimits(

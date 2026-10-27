@@ -42,7 +42,7 @@ class DestinationVoiceLabelDistinguishingPartsTest {
         val address = "경상북도 울릉군 울릉읍 섬 일주도로 해안 산책로 입구 공영 주차장 옆 매표소 건물 뒤편 공터 도동리 123-45 일원"
         assertTrue(address.length > 60)
         val label = addressLabel(candidateText(prompt(candidate("1", "울릉 매표소", address)), 1))
-        assertTrue(label, label.contains("도동리 123-45"))
+        assertTrue(label, label.contains("도동리 123의 45"))
         assertTrue(label, label.length <= 60)
     }
 
@@ -89,7 +89,7 @@ class DestinationVoiceLabelDistinguishingPartsTest {
         DestinationSearchVoiceState(
             "카페",
             results.toList() + results.map { it.copy(id = "twin-${it.id}", address = "서울 중구 세종대로 2") },
-        ).voicePrompt()
+        ).voicePromptParts().joinToString(" ")
 
     /** "N번 name, address, distance" segment of the page prompt. */
     private fun candidateText(prompt: String, number: Int): String {

@@ -235,7 +235,9 @@ class AndroidFeedbackActuatorStaticTest {
         val dispatch = source.substringAfter("fun emit(\n")
             .substringBefore("fun vibrateRiskOnly(")
 
-        assertTrue(dispatch.contains("onCompleted = onSpeechCompleted"))
+        // Completion now wraps the callback to request a fresh distance afterwards.
+        assertTrue(dispatch.contains("onSpeechCompleted?.invoke()"))
+        assertTrue(dispatch.indexOf("onSpeechCompleted?.invoke()") < dispatch.indexOf("distanceAfterWarning?.invoke()"))
         assertTrue(dispatch.contains("onFailed = onSpeechFailed"))
         assertTrue(dispatch.contains("return RiskFeedbackDispatchResult(speech, vibrationAccepted)"))
     }

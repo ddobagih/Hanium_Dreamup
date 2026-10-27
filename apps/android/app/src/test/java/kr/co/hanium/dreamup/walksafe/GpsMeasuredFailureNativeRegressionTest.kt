@@ -109,7 +109,7 @@ class GpsMeasuredFailureNativeRegressionTest {
             assertTrue(f.stops()>before)
         } finally {f.output.closeActuator()}
     }
-    @Test fun firstSingleOutlierIsRetainedButASecondDistinctLargeJumpStopsSpeechImmediately() {
+    @Test fun rapidDistinctJumpsRetainOriginalFixUntilPersistentBurstStopsSpeech() {
         val f=Fixture()
         try {
             f.start();val original=checkNotNull(f.position.trustedLocation);val before=f.stops()
@@ -122,6 +122,10 @@ class GpsMeasuredFailureNativeRegressionTest {
             assertEquals(EnvironmentEvidenceStatus.PASS,f.base.main.currentContinuousGpsEvidence(f.base.epoch,f.base.now)?.status)
             assertEquals("GPS_SINGLE_OUTLIER_AGAINST_FRESH_ESTIMATE",f.base.gate.latestRawObservation()?.detail)
             f.step(300);f.location(15f,37.6001)
+            assertSame(original,f.position.trustedLocation);assertEquals(before,f.stops())
+            assertEquals(EnvironmentEvidenceStatus.PASS,f.base.main.currentContinuousGpsEvidence(f.base.epoch,f.base.now)?.status)
+            // The first rejected fix was 300ms ago; persistence is measured from that first fix.
+            f.step(2_700);f.location(15f,37.6002)
             assertNull(f.position.trustedLocation);assertEquals(before+1,f.stops())
             assertEquals(EnvironmentEvidenceStatus.FAIL,f.base.main.currentContinuousGpsEvidence(f.base.epoch,f.base.now)?.status)
             assertEquals("GPS_CORRUPT_JUMP",f.base.gate.latestRawObservation()?.detail)

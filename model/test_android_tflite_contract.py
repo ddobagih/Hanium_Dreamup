@@ -97,6 +97,39 @@ class AndroidContractTests(unittest.TestCase):
         self.assertFalse(result["exists"])
         self.assertIsNone(result["sha256"])
 
+    def test_host_smoke_validates_current_raw_output_values(self):
+        import numpy as np
+        from scripts.smoke_android_tflite_runtime_20260711 import validate_output
+
+        model = self.config["models"]["unified_walksafe"]
+        output = np.zeros(model["export"]["output_shape"], dtype=np.float32)
+        # Raw box centers may lie outside the image; don't impose a made-up clipping rule.
+        output[0, 0, 0] = -0.1
+        output[0, 1, 0] = 1.1
+        self.assertEqual(21, validate_output(output, model)["class_count"])
+        for channel, value in [(2, -0.1), (3, -0.1), (4, -0.1), (4, 1.1), (0, np.nan), (4, np.inf)]:
+            with self.subTest(channel=channel, value=value):
+                invalid = output.copy()
+                invalid[0, channel, 0] = value
+                with self.assertRaises(ValueError):
+                    validate_output(invalid, model)
+        for invalid in (output.astype(np.float64), output[:, :-1, :]):
+            with self.assertRaises(ValueError):
+                validate_output(invalid, model)
+
+    def test_threshold_allowlist_rejects_undeclared_changed_and_stale_differences(self):
+        declared, errors = contract.load_threshold_allowlist(contract.THRESHOLD_ALLOWLIST)
+        self.assertFalse(errors)
+        differences = [{k: v for k, v in entry.items() if k != "reason"} for entry in declared.values()]
+        self.assertEqual(([], []), contract.evaluate_threshold_allowlist(differences, declared))
+        changed = copy.deepcopy(differences)
+        changed[0]["android_threshold"] += 0.01
+        unapproved, stale = contract.evaluate_threshold_allowlist(changed, declared)
+        self.assertEqual(1, len(unapproved))
+        self.assertEqual(1, len(stale))
+        self.assertEqual(len(differences), len(contract.evaluate_threshold_allowlist(differences, {})[0]))
+        self.assertEqual(1, len(contract.evaluate_threshold_allowlist(differences[1:], declared)[1]))
+
 
     def test_host_smoke_validates_current_raw_output_values(self):
         import numpy as np

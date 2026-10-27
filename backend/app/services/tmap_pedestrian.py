@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import sys
 from time import monotonic
 from typing import Any, Callable
@@ -405,6 +406,16 @@ async def fetch_tmap_pedestrian_route(
     else:
         _record_tmap_success("route", route_check=route_check)
     return normalized
+
+
+def _is_named_station_query(query: str) -> bool:
+    compact_query = "".join(query.split())
+    if any(marker in compact_query for marker in ("주변", "근처", "인근", "가까운")):
+        return False
+    match = re.fullmatch(r"([가-힣A-Za-z0-9]+?)역", compact_query)
+    return match is not None and match.group(1) not in (
+        "지하철", "전철", "기차", "철도", "고속철도",
+    )
 
 
 async def fetch_tmap_poi_search(

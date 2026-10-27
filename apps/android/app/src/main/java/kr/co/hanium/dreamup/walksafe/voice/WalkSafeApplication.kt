@@ -252,6 +252,9 @@ internal class WalkVoiceStartRecovery {
                         "자동 재시도를 중단했습니다. 통화나 녹음을 끝낸 뒤 앱을 나갔다 다시 화면으로 돌아와 " +
                         "재시도하세요. 화면 버튼은 계속 사용할 수 있습니다.",
                 )
+            WalkVoiceStartFailure.INPUT_ROUTE_CHANGED -> WalkVoiceStartFailurePresentation(
+                "microphone_input_route_changed", MICROPHONE_INPUT_ROUTE_CHANGED_GUIDANCE,
+            )
             WalkVoiceStartFailure.CONTROLLER_REJECTED,
             WalkVoiceStartFailure.RUNTIME,
             -> WalkVoiceStartFailurePresentation(

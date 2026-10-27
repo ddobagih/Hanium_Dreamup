@@ -13,6 +13,29 @@ import org.junit.Test
 
 class PreferredOfflineSpeechPhaseTimeoutRegressionTest {
     @Test
+    fun silencedFallbackReleasesMicrophoneAndPropagatesCauseWithoutAnotherCapture() = withFixture { f ->
+        f.adapter.startPreparedRequest({ Input }, preferPlatform = false)
+        val backend = f.platform.fallbacks.single()
+        backend.ready()
+        backend.error(SPEECH_ERROR_INPUT_SILENCED)
+        backend.results()
+        f.runtime.advanceBy(60_000L)
+        assertEquals(listOf(SPEECH_ERROR_INPUT_SILENCED), f.events.errors)
+        assertEquals(0, f.events.resultCount)
+        assertTrue(f.leaseIsFree())
+        assertEquals(1, backend.destroyCalls)
+        assertEquals(1, f.platform.fallbacks.size)
+        assertTrue(f.platform.platforms.isEmpty())
+        assertEquals(0L, f.cooldown.retryAfterMs)
+
+        f.adapter.startPreparedRequest({ Input }, preferPlatform = false)
+        assertEquals(2, f.platform.fallbacks.size)
+        f.platform.fallbacks.last().results()
+        assertEquals(1, f.events.resultCount)
+        assertTrue(f.leaseIsFree())
+    }
+
+    @Test
     fun noSpeechKeepsTheReadyTenSecondBudgetAndDoesNotTriggerCooldownOrRetry() = withFixture { f ->
         val backend = f.startPlatform()
         backend.ready()
@@ -527,6 +550,7 @@ class PreferredOfflineSpeechPhaseTimeoutRegressionTest {
         override fun cancel() { cancelCalls += 1; cleanup() }
         override fun destroy() { destroyCalls += 1; cleanup() }
         fun support() { checkNotNull(supportCallback).invoke { listOf("ko-KR") } }
+        fun error(code: Int) { checkNotNull(callback).onError(code) }
         fun ready() { checkNotNull(callback).onReadyForSpeech(null) }
         fun begin() { checkNotNull(callback).onBeginningOfSpeech() }
         fun end() { checkNotNull(callback).onEndOfSpeech() }

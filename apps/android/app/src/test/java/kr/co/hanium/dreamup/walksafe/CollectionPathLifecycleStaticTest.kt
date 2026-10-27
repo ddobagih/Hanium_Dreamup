@@ -40,7 +40,8 @@ class CollectionPathLifecycleStaticTest {
         assertTrue(cancel.contains("stage(\"activity_original_uploads\") { reports.cancelOriginalUploads() }"))
         val cleanup = MainActivityRefactorSource.composition(main, "walkSessionCleanupController")
         assertTrue(cleanup.contains("override fun cancelOriginalUploads() = cancelActivityOriginalUploads()"))
-        assertTrue(main.contains("walkSessionCleanupController.cancelWalkSessionOutputs(\"voice_walk_end_confirmed\")"))
+        assertTrue(MainActivityRefactorSource.member(main, "endCurrentWalk").contains("walkSessionCleanupController.cancelWalkSessionOutputs(reason)"))
+        assertTrue(main.contains("endCurrentWalk(\"voice_walk_end_confirmed\""))
 
         val raw = ownerFunction("rawCollectionTransferController",
             "report/runtime/RawCollectionTransferController.kt", "handleRawCollectionTransition")

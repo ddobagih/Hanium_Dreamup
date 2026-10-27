@@ -25,7 +25,7 @@ class GatewayFieldSessionTest {
     @Test
     fun namedLoginBindsActorAndExposesOnlyTheDerivedCookie() {
         val transport = FakeTransport()
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
 
         val session = client.login(
             gatewayBaseUrl = "https://field.example",
@@ -69,7 +69,7 @@ class GatewayFieldSessionTest {
         )
 
         val error = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).loginWithPassword(
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).loginWithPassword(
                 gatewayBaseUrl = "http://127.0.0.1:8081",
                 email = "walker@example.test",
                 password = "Valid-password-123!",
@@ -122,7 +122,7 @@ class GatewayFieldSessionTest {
 
         fun clientFor(transport: FakeTransport): GatewayFieldSessionClient {
             val clock = listOf(0L, responseElapsedMs * 1_000_000L).iterator()
-            return GatewayFieldSessionClient(transport, elapsedRealtimeNanos = { clock.next() })
+            return GatewayFieldSessionClient(transport, elapsedRealtimeNanos = { clock.next() }, allowDebugAccountOrigin = true)
         }
 
         val acceptedTransport = transportFor(maximumExpiresAtSeconds)
@@ -163,7 +163,7 @@ class GatewayFieldSessionTest {
                 refreshToken = REFRESH_TOKEN_0,
             ),
         )
-        val session = GatewayFieldSessionClient(transport).login(
+        val session = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).login(
             gatewayBaseUrl = "https://field.example",
             actorId = "tester-01",
             token = ACCOUNT_TOKEN,
@@ -214,8 +214,7 @@ class GatewayFieldSessionTest {
                         cookieMaxAgeSeconds = 3_600L,
                     ),
                 ),
-                elapsedRealtimeNanos = { clock.next() },
-            )
+                elapsedRealtimeNanos = { clock.next() }, allowDebugAccountOrigin = true)
             return client.login(
                 gatewayBaseUrl = "https://field.example",
                 actorId = "tester-01",
@@ -246,7 +245,7 @@ class GatewayFieldSessionTest {
         )
 
         val error = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).login(
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).login(
                 gatewayBaseUrl = "https://field.example",
                 actorId = "tester-01",
                 token = ACCOUNT_TOKEN,
@@ -269,7 +268,7 @@ class GatewayFieldSessionTest {
         )
 
         val error = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).login(
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).login(
                 gatewayBaseUrl = "https://field.example",
                 actorId = "tester-01",
                 token = ACCOUNT_TOKEN,
@@ -295,7 +294,7 @@ class GatewayFieldSessionTest {
                 """{"required":true,"authenticated":true,"actor_id":"tester-01","session_scope":"account_deletion_recovery"}""",
         )
 
-        val session = GatewayFieldSessionClient(transport).login(
+        val session = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).login(
             gatewayBaseUrl = "https://field.example",
             actorId = "tester-01",
             token = ACCOUNT_TOKEN,
@@ -324,7 +323,7 @@ class GatewayFieldSessionTest {
         )
 
         val error = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).login(
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).login(
                 gatewayBaseUrl = "https://field.example",
                 actorId = "tester-01",
                 token = ACCOUNT_TOKEN,
@@ -345,7 +344,7 @@ class GatewayFieldSessionTest {
             val transport = FakeTransport(statusBody = statusBody)
 
             val error = assertThrows(GatewaySessionHttpException::class.java) {
-                GatewayFieldSessionClient(transport).login(
+                GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).login(
                     gatewayBaseUrl = "https://field.example",
                     actorId = "tester-01",
                     token = ACCOUNT_TOKEN,
@@ -363,7 +362,7 @@ class GatewayFieldSessionTest {
         val transport = FakeTransport()
 
         val error = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).login(
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).login(
                 gatewayBaseUrl = "https://field.example",
                 actorId = "tester-01",
                 token = ACCOUNT_TOKEN,
@@ -383,7 +382,7 @@ class GatewayFieldSessionTest {
             statusBody =
                 """{"required":true,"authenticated":true,"actor_id":"tester-01","session_scope":"account_deletion_recovery"}""",
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val session = client.login(
             gatewayBaseUrl = "https://field.example",
             actorId = "tester-01",
@@ -405,7 +404,7 @@ class GatewayFieldSessionTest {
             statusBody = """{"required":true,"authenticated":true,"actor_id":"other-actor"}""",
         )
         val error = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(transport).login("https://field.example", "tester-01", ACCOUNT_TOKEN)
+            GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).login("https://field.example", "tester-01", ACCOUNT_TOKEN)
         }
 
         assertEquals("gateway_actor_binding_failed", error.reason)
@@ -418,7 +417,7 @@ class GatewayFieldSessionTest {
             setCookie = COOKIE_ATTRIBUTES.replace("; Secure", ""),
         )
         val cookieError = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(insecureCookie).login("https://field.example", "tester-01", ACCOUNT_TOKEN)
+            GatewayFieldSessionClient(insecureCookie, allowDebugAccountOrigin = true).login("https://field.example", "tester-01", ACCOUNT_TOKEN)
         }
 
         assertEquals("invalid_gateway_cookie", cookieError.reason)
@@ -426,7 +425,7 @@ class GatewayFieldSessionTest {
             setCookie = "walksafe_field_session=$ACCOUNT_TOKEN; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200; Secure",
         )
         val reflectedError = assertThrows(GatewaySessionHttpException::class.java) {
-            GatewayFieldSessionClient(reflectedCredential).login("https://field.example", "tester-01", ACCOUNT_TOKEN)
+            GatewayFieldSessionClient(reflectedCredential, allowDebugAccountOrigin = true).login("https://field.example", "tester-01", ACCOUNT_TOKEN)
         }
         assertEquals("raw_credential_in_gateway_cookie", reflectedError.reason)
         assertNull(GatewayCredentialPolicy.normalizedActorIdOrNull("field-shared"))
@@ -453,7 +452,7 @@ class GatewayFieldSessionTest {
     @Test
     fun revalidationUsesTheExistingStatusEndpointAndExactActorBinding() {
         val transport = FakeTransport()
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val session = client.login(
             "https://field.example",
             "tester-01",
@@ -480,7 +479,7 @@ class GatewayFieldSessionTest {
                 level = GatewayCapacityLevel.HOLD_NEW_RAW_COLLECTION_SESSIONS,
             ),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val session = client.login(
             "https://field.example",
             "tester-01",
@@ -532,7 +531,7 @@ class GatewayFieldSessionTest {
         cases.forEach { (statusBody, expectedAvailability) ->
             GatewayCapacityProcessState.resetForTests()
             val transport = FakeTransport(statusBody = statusBody)
-            val client = GatewayFieldSessionClient(transport)
+            val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
             val session = client.login(
                 "https://field.example",
                 "tester-01",
@@ -562,7 +561,7 @@ class GatewayFieldSessionTest {
     @Test
     fun localInvalidSessionDoesNotContactTheGatewayOrMutateTheSharedSession() {
         val transport = FakeTransport()
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val session = client.login(
             "https://field.example",
             "tester-01",
@@ -581,7 +580,7 @@ class GatewayFieldSessionTest {
     @Test
     fun failedRemoteBindingReturnsAResultForTheLeaseOwnerToApply() {
         val transport = FakeTransport()
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val session = client.login(
             "https://field.example",
             "tester-01",
@@ -600,7 +599,7 @@ class GatewayFieldSessionTest {
     @Test
     fun transientOrMalformedStatusRemainsPendingWithoutDiscardingTheSession() {
         val transport = FakeTransport()
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val session = client.login(
             "https://field.example",
             "tester-01",
@@ -623,7 +622,7 @@ class GatewayFieldSessionTest {
     @Test
     fun connectionLossDuringRevalidationKeepsTheLoginAndCanRecover() {
         val transport = FakeTransport()
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val session = client.login(
             "https://field.example", "tester-01", ACCOUNT_TOKEN, nowEpochMs = 1_000L,
         )
@@ -654,7 +653,7 @@ class GatewayFieldSessionTest {
                 idleExpiresAtEpochMs = IDLE_EXPIRES_AT + 10_000L,
             ),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val original = loginLongLived(client)
         val originalLease = original.lease
 
@@ -727,8 +726,7 @@ class GatewayFieldSessionTest {
                         cookieMaxAgeSeconds = 3_600L,
                     ),
                 ),
-                elapsedRealtimeNanos = { clock.next() },
-            )
+                elapsedRealtimeNanos = { clock.next() }, allowDebugAccountOrigin = true)
             return client to loginLongLived(client)
         }
 
@@ -760,7 +758,7 @@ class GatewayFieldSessionTest {
                 refreshToken = REFRESH_TOKEN_1,
             ),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val persisted = loginLongLived(client).persistenceSnapshotOrNull()!!
         val first = GatewayFieldSession.restore(
             persisted,
@@ -806,7 +804,7 @@ class GatewayFieldSessionTest {
             refreshStarted = refreshStarted,
             releaseRefresh = releaseRefresh,
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val source = loginLongLived(client)
         val executor = Executors.newSingleThreadExecutor()
         try {
@@ -845,7 +843,7 @@ class GatewayFieldSessionTest {
                 """{"code":"refresh_token_reuse_detected","detail":"redacted"}""",
             ),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val session = loginLongLived(client)
 
         val error = assertThrows(GatewaySessionHttpException::class.java) {
@@ -870,8 +868,7 @@ class GatewayFieldSessionTest {
                     401,
                     """{"code":"private_internal_secret_marker"}""",
                 ),
-            ),
-        )
+            ), allowDebugAccountOrigin = true)
 
         val error = assertThrows(GatewaySessionHttpException::class.java) {
             client.renew(
@@ -897,8 +894,7 @@ class GatewayFieldSessionTest {
                     idleExpiresAtEpochMs = NOW + 180_000L,
                     absoluteExpiresAtEpochMs = NOW + 240_000L,
                 ),
-            ),
-        ).login(
+            ), allowDebugAccountOrigin = true).login(
             gatewayBaseUrl = "https://field.example",
             actorId = "tester-01",
             token = ACCOUNT_TOKEN,
@@ -919,8 +915,7 @@ class GatewayFieldSessionTest {
                         idleExpiresAtEpochMs = NOW + 400_000L,
                         absoluteExpiresAtEpochMs = NOW + 500_000L,
                     ),
-                ),
-            ).login(
+                ), allowDebugAccountOrigin = true).login(
                 gatewayBaseUrl = "https://field.example",
                 actorId = "tester-01",
                 token = ACCOUNT_TOKEN,
@@ -943,7 +938,7 @@ class GatewayFieldSessionTest {
                 accessExpiresAtEpochMs = serverExpiry,
             ),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val session = loginLongLived(client)
         val localDeadline = NOW + 60_000L
 
@@ -980,7 +975,7 @@ class GatewayFieldSessionTest {
             ),
             statusBody = longLivedStatus(localDeadline, rotation = 0L),
         )
-        val equalClient = GatewayFieldSessionClient(equalTransport)
+        val equalClient = GatewayFieldSessionClient(equalTransport, allowDebugAccountOrigin = true)
         val equalSession = loginLongLived(equalClient)
         assertEquals(localDeadline, equalSession.serverAccessExpiresAtEpochMs)
         assertEquals(
@@ -1005,7 +1000,7 @@ class GatewayFieldSessionTest {
                 accessExpiresAtEpochMs = renewedServerExpiry,
             ),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val renewed = client.renew(loginLongLived(client), "tester-01", nowEpochMs = NOW + 1L).session
 
         assertEquals(NOW + 1L + 60_000L, renewed.accessExpiresAtEpochMs)
@@ -1066,7 +1061,7 @@ class GatewayFieldSessionTest {
                 ),
                 refreshResponse = response,
             )
-            val client = GatewayFieldSessionClient(transport)
+            val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
             val original = loginLongLived(client)
 
             val error = assertThrows(GatewaySessionHttpException::class.java) {
@@ -1130,7 +1125,7 @@ class GatewayFieldSessionTest {
             ),
             failRefreshWithNetworkError = true,
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val original = loginLongLived(client)
 
         val error = assertThrows(GatewaySessionHttpException::class.java) {
@@ -1151,7 +1146,7 @@ class GatewayFieldSessionTest {
                 refreshToken = REFRESH_TOKEN_0,
             ),
         )
-        val client = GatewayFieldSessionClient(transport)
+        val client = GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true)
         val persisted = loginLongLived(client).persistenceSnapshotOrNull()!!
         val restored = GatewayFieldSession.restore(
             snapshot = persisted,
@@ -1198,7 +1193,7 @@ class GatewayFieldSessionTest {
             refreshToken = REFRESH_TOKEN_0,
         )
 
-        GatewayFieldSessionClient(transport).logout(pending)
+        GatewayFieldSessionClient(transport, allowDebugAccountOrigin = true).logout(pending)
 
         val proof = JSONObject(transport.deletedJsonBody!!)
         assertEquals("refresh_token", proof.getString("grant_type"))
@@ -1235,8 +1230,7 @@ class GatewayFieldSessionTest {
                     accessToken = ACCESS_TOKEN_0,
                     refreshToken = REFRESH_TOKEN_0,
                 ),
-            ),
-        ).login(
+            ), allowDebugAccountOrigin = true).login(
             gatewayBaseUrl = "https://field.example",
             actorId = "tester-01",
             token = ACCOUNT_TOKEN,

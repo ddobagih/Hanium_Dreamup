@@ -182,8 +182,16 @@ internal class NativeScreenPresenter(private val style: WalkSafeViewStyle) : Nat
 
     override fun renderGuidanceActions(presentation: DestinationGuidancePresentation, activityForeground: Boolean) = with(panels.destination) {
         val resume = presentation.resumeAction
+        val active = presentation.stage in setOf(kr.co.hanium.dreamup.walksafe.navigation.DestinationGuidanceDisplayStage.ACTIVE,
+            kr.co.hanium.dreamup.walksafe.navigation.DestinationGuidanceDisplayStage.PARTIALLY_AVAILABLE)
+        show(nativeGuidanceVoiceButton, true)
+        show(nativeGuidancePauseButton, active || resume != DestinationGuidanceResumeAction.NONE)
+        nativeGuidancePauseButton.text = if (active) "일시정지" else "안내 재개"
+        nativeGuidancePauseButton.contentDescription = nativeGuidancePauseButton.text
+        nativeGuidancePauseButton.isEnabled = activityForeground && resume !in setOf(DestinationGuidanceResumeAction.PREPARING, DestinationGuidanceResumeAction.PENDING)
+        show(guidanceTouchGuardButton, active || resume != DestinationGuidanceResumeAction.NONE)
         val available = presentation.retryAvailable || resume != DestinationGuidanceResumeAction.NONE
-        show(nativeGuidanceRetryButton, available)
+        show(nativeGuidanceRetryButton, available && !active && resume == DestinationGuidanceResumeAction.NONE)
         nativeGuidanceRetryButton.isEnabled = available && activityForeground &&
             resume !in setOf(DestinationGuidanceResumeAction.PREPARING, DestinationGuidanceResumeAction.PENDING)
         val retryLabel = when (resume) {
@@ -200,6 +208,20 @@ internal class NativeScreenPresenter(private val style: WalkSafeViewStyle) : Nat
             nativeGuidanceCancelButton.contentDescription = label
         }
         nativeGuidanceCancelButton.isEnabled = true
+    }
+
+    fun renderFailedGuidanceCheck(activityForeground: Boolean) = with(panels.destination) {
+        show(nativeGuidanceVoiceButton, false)
+        show(nativeGuidancePauseButton, false)
+        show(guidanceTouchGuardButton, false)
+        show(nativeGuidanceRetryButton, true)
+        nativeGuidanceRetryButton.text = "재점검"
+        nativeGuidanceRetryButton.contentDescription = "재점검"
+        nativeGuidanceRetryButton.isEnabled = activityForeground
+        nativeGuidanceCancelButton.text = "취소"
+        nativeGuidanceCancelButton.contentDescription = "취소"
+        style.applyWsButtonStyle(nativeGuidanceRetryButton, 144f, primary = true)
+        style.applyWsButtonStyle(nativeGuidanceCancelButton, 144f, primary = false)
     }
 
     override fun finishFrame(facts: FrameFacts) = with(panels) {
@@ -442,8 +464,7 @@ internal class NativeScreenPresenter(private val style: WalkSafeViewStyle) : Nat
             destination.nativeGuidanceStatusText, destination.nativeGuidanceMeasurementText,
             destination.gatewayVoiceStatusText, settings.nativeSettingsTitle,
         ).forEach {
-            val shown = guidanceVisible && (it === destination.nativeGuidanceDestinationText ||
-                it === destination.nativeGuidanceStatusText)
+            val shown = (it === destination.nativeGuidanceStatusText && guidanceVisible && speechFailure != null)
             val visibility = if (shown) View.VISIBLE else View.GONE
             val importance = if (shown) View.IMPORTANT_FOR_ACCESSIBILITY_YES
                 else View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS

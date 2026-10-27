@@ -309,6 +309,7 @@ import kr.co.hanium.dreamup.walksafe.device.WalkRuntimeSafetyDisposition
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.annotation.SuppressLint
 import android.app.Activity
+import kr.co.hanium.dreamup.walksafe.session.preparationNoticeKo
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -999,6 +1000,7 @@ open class MainActivity @JvmOverloads constructor(
                 override fun shouldShowNativeHome(): Boolean = this@MainActivity.shouldShowNativeHome()
                 override fun nativeHomeFeatureContextAvailable(): Boolean = this@MainActivity.nativeHomeFeatureContextAvailable()
                 override fun isWalkSessionRuntimeActive(): Boolean = this@MainActivity.isWalkSessionRuntimeActive()
+                override fun walkingArea() = isInWalkInteractionArea()
                 override fun nativeFeatureAvailable(page: NativeUiPage): Boolean = this@MainActivity.nativeFeatureAvailable(page)
                 override fun deletionRecoveryRequired(): Boolean = this@MainActivity.accountDeletionRecoveryLoginRequired() || GatewaySessionProcessCoordinator.snapshot().deletionRecoveryOnly
                 override fun deletionProcessingBlocked(): Boolean = this@MainActivity.accountDeletionStateMachine.processingBlocked()
@@ -1658,12 +1660,7 @@ private val framePipelineController: FramePipelineController<ArSessionLease, ArS
             override fun status(title: String, detail: String) { updateStatus(title, detail) }
             override fun refreshControls(active: Boolean) { updateVoiceCommandButton(active) }
             override fun recognitionSignal(message: String) { updateVoiceRecognitionSignal(message) }
-            override fun openHelp() {
-                AlertDialog.Builder(this@MainActivity).setTitle("음성 도움말")
-                    .setMessage(kr.co.hanium.dreamup.walksafe.navigation.voiceCommandHelpKo(
-                        ::walkSessionLifecycle.isInitialized && walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED))
-                    .setPositiveButton("닫기", null).show()
-            }
+            override fun openHelp() { openVoiceHelp() }
             override fun openLocalReports() {
                 nativeWorkflowController.showNativeUiPage(NativeUiPage.SETTINGS, preserveVoiceInteraction = true)
                 if (::userReportPresenter.isInitialized) userReportPresenter.revealLocalQuarantine()
@@ -1788,10 +1785,10 @@ private fun createTactileReferenceDelivery(): TactileReferenceDeliveryController
         return VoiceInputSessionController(
             environment = object : VoiceInputEnvironment {
                 override fun identity() = VoiceInputIdentity(reporterUserId, GatewaySessionProcessCoordinator.snapshot().generation)
-                override fun page() = VoiceInputPage(nativeUiPage, nativeUiPage.isVoiceInteractionPage(),
+                override fun page() = VoiceInputPage(nativeUiPage, nativeUiPage.isVoiceInteractionPage() || voiceHelpScreen != null,
                     nativeUiPage == NativeUiPage.VOICE_COMMAND, nativeUiPage == NativeUiPage.GUIDANCE,
                     nativeUiPage == NativeUiPage.DESTINATION_SEARCH, pendingNativeUiPage == NativeUiPage.VOICE_COMMAND,
-                    pendingNativeUiPage == null || nativeUiPage == NativeUiPage.GUIDANCE)
+                    (pendingNativeUiPage == null || nativeUiPage == NativeUiPage.GUIDANCE) && voiceHelpScreen == null && !isInWalkInteractionArea())
                 override fun walkOrNull() = if (::walkSessionLifecycle.isInitialized) walkSessionLifecycle.snapshot() else null
                 override fun foreground() = isActivityForeground
                 override fun feedbackLifetimeGeneration() = feedbackLifecycleGeneration
@@ -1802,6 +1799,13 @@ private fun createTactileReferenceDelivery(): TactileReferenceDeliveryController
                 override fun handsFreeFeatureEnabled() = postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.HANDS_FREE_VOICE)
                 override fun voiceGuidanceFeatureEnabled() = postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.VOICE_GUIDANCE)
                 override fun disclosureAccepted() = isHandsFreeVoiceDisclosureAccepted()
+                override fun serverCommandRecognitionEnabled() = BuildConfig.WALKSAFE_SERVER_STT_ENABLED
+                override fun walkAreaCommandAvailable() = walkAreaVoiceCommandAvailable()
+                override fun walkWakeContextAvailable() = walkAreaVoiceCommandAvailable() &&
+                    walkSessionLifecycle.snapshot().state != WalkSessionState.ACTIVE &&
+                    nativeUiPage in setOf(NativeUiPage.GUIDANCE, NativeUiPage.SETTINGS) &&
+                    nativeGuidanceConfirmationScreen == null && walkExitConfirmationScreen == null &&
+                    voiceHelpScreen == null
                 override fun homeFeatureContextAvailable() = nativeHomeFeatureContextAvailable()
                 override fun startupCapabilityConfirmed() = isStartupCapabilityConfirmed()
                 override fun runtimeActive() = isWalkSessionRuntimeActive()
@@ -1817,7 +1821,8 @@ private fun createTactileReferenceDelivery(): TactileReferenceDeliveryController
             },
             commands = VoiceInputCommandPeerAdapter({ voiceInteractionControllers }, { destinationSearchController },
                 { walkSessionResumeController }, { gatewayWalkSessionController }, voiceInputPresentation,
-                { speechOutputController }, ::nativeHomeFeatureContextAvailable),
+                { speechOutputController }, ::nativeHomeFeatureContextAvailable,
+                interceptRecognized = ::handleOverlayVoiceInput),
             presentation = voiceInputPresentation,
             applicationEffects = object : VoiceInputApplicationEffects {
                 override fun requireStartupCapabilityConfirmation() = this@MainActivity.requireStartupCapabilityConfirmation()
@@ -2016,7 +2021,234 @@ private fun createTactileReferenceDelivery(): TactileReferenceDeliveryController
     },
 )
 
-    private var walkExitConfirmationDialog: AlertDialog? = null
+
+    private var voiceHelpScreen: View? = null
+    private val voiceHelpCoveredViews = mutableListOf<Pair<View, Int>>()
+    private var voiceHelpSummary: TextView? = null
+    private var voiceHelpRecovery: Button? = null
+    private var voiceHelpGeneration = 0L
+    private var voiceHelpLastText = kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.MENU
+    private var walkExitConfirmationScreen: View? = null
+    private var walkExitConfirmationIsCurrent: (() -> Boolean)? = null
+    private val walkExitCoveredViews = mutableListOf<Pair<View, Int>>()
+    private fun hasCurrentWalkExitConfirmation(): Boolean =
+        walkExitConfirmationScreen != null && walkExitConfirmationIsCurrent?.invoke() == true
+    private var guidanceTouchGuardScreen: View? = null
+    private var guidanceTouchGuardContent: kr.co.hanium.dreamup.walksafe.ui.GuidanceTouchGuardView? = null
+    private val guidanceTouchGuardCoveredViews = mutableListOf<Pair<View, Int>>()
+    private var walkAreaExitInProgress = false
+    private fun isInWalkInteractionArea(): Boolean =
+        ::walkSessionLifecycle.isInitialized &&
+            kr.co.hanium.dreamup.walksafe.session.WalkInteractionAreaPolicy.resolve(
+                walkSessionLifecycle.snapshot().state, pendingUiDestination != null,
+                nativePrewalkStartEpoch != null, walkAreaExitInProgress,
+            ) == kr.co.hanium.dreamup.walksafe.session.WalkInteractionAreaPolicy.Area.WALK
+    private fun walkAreaVoiceCommandAvailable(): Boolean =
+        isInWalkInteractionArea() && !walkAreaExitInProgress && isActivityForeground &&
+            walkSessionLifecycle.snapshot().isForeground &&
+            (walkSessionLifecycle.snapshot().state != WalkSessionState.ACTIVE || isStartupCapabilityConfirmed()) &&
+            firstRunOnboardingComplete() && postLoginDeviceCheckSnapshot.passesFeatureGate &&
+            kr.co.hanium.dreamup.walksafe.voice.OneShotVoiceInputPolicy.isAvailable(
+                contextAvailable = true, microphoneGranted = hasRecordAudioPermission(), capabilityDecision = startupCapabilityDecision)
+
+    private fun handleOverlayVoiceInput(result: RecognizedVoiceInput): Boolean {
+        if (walkExitConfirmationScreen != null) {
+            if (!hasCurrentWalkExitConfirmation()) { finishWalkExitConfirmation(false); return true }
+            when (kr.co.hanium.dreamup.walksafe.navigation.GuidanceExitVoicePolicy.parse(
+                result.phrases, result.confidenceScores?.firstOrNull(), result.hasAdditionalAlternatives)) {
+                kr.co.hanium.dreamup.walksafe.navigation.GuidanceExitVoicePolicy.Choice.RETURN -> finishWalkExitConfirmation(false)
+                kr.co.hanium.dreamup.walksafe.navigation.GuidanceExitVoicePolicy.Choice.END -> finishWalkExitConfirmation(true)
+                null -> speakInteraction("선택을 확인하지 못했습니다. 안내로 돌아가기 또는 안내 종료 버튼을 눌러 주세요.")
+            }
+            return true
+        }
+        if (nativeGuidanceConfirmationScreen != null) {
+            when (kr.co.hanium.dreamup.walksafe.navigation.GuidanceStartVoicePolicy.parse(
+                result.phrases, result.confidenceScores?.firstOrNull(),
+                result.backend == OfflineSpeechEngine.PLATFORM, result.hasAdditionalAlternatives)) {
+                kr.co.hanium.dreamup.walksafe.navigation.GuidanceStartVoicePolicy.Choice.START -> finishNativeGuidanceConfirmation(true)
+                kr.co.hanium.dreamup.walksafe.navigation.GuidanceStartVoicePolicy.Choice.CANCEL -> finishNativeGuidanceConfirmation(false)
+                kr.co.hanium.dreamup.walksafe.navigation.GuidanceStartVoicePolicy.Choice.REPEAT -> speakNativeGuidanceConfirmation()
+                null -> handleNativeGuidanceConfirmationUnrecognized()
+            }
+            return true
+        }
+        if (voiceHelpScreen != null) { handleVoiceHelpInput(result.phrases); return true }
+        return false
+    }
+
+    private fun voiceHelpButton(label: String, primary: Boolean = false, action: () -> Unit) =
+        viewStyle.accessiblePriorityUserButton(label, emphasis = primary, onClick = action).apply {
+            id = View.generateViewId()
+            viewStyle.applyWsButtonStyle(this, if (primary) 88f else 120f, primary = primary)
+            textSize = 24f
+            contentDescription = label
+        }
+
+    private fun openVoiceHelp() {
+        if (voiceHelpScreen != null) {
+            speakVoiceHelp(kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.MENU)
+            return
+        }
+        cancelVoiceCommandRecognition()
+        stopHandsFreeVoiceService()
+        cancelForegroundHomeWakeListening()
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).roundToInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            setBackgroundColor(WS_COLOR_GROUND)
+        }
+        val title = TextView(this).apply {
+            id = View.generateViewId()
+            text = "도움말"
+            textSize = 28f
+            typeface = wsTypeface(Typeface.BOLD)
+            setTextColor(WS_COLOR_EMPHASIS)
+            ViewCompat.setAccessibilityHeading(this, true)
+        }
+        content.addView(title)
+        val items = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        var previousId = title.id
+        kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.titles.forEachIndexed { index, label ->
+            val button = voiceHelpButton("${index + 1}번  $label") {
+                handleVoiceHelpInput(listOf("${index + 1}번"))
+            }.apply {
+                // Use the same large outlined card style as the main menu.
+                viewStyle.applyWsSecondaryButtonStyle(this)
+                textSize = 24f
+                accessibilityTraversalAfter = previousId
+            }
+            previousId = button.id
+            items.addView(button)
+        }
+        voiceHelpSummary = TextView(this).apply {
+            id = View.generateViewId()
+            text = "안내 후 번호를 말씀하거나 버튼을 눌러 주세요."
+            textSize = 18f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            setPadding(0, dp(8), 0, dp(12))
+            accessibilityTraversalAfter = previousId
+        }.also { items.addView(it); previousId = it.id }
+        voiceHelpRecovery = voiceHelpButton("다시 시도") {
+            voiceHelpSummary?.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
+            voiceHelpSummary?.text = "안내 후 번호를 말씀하거나 버튼을 눌러 주세요."
+            speakVoiceHelp(voiceHelpLastText)
+        }.apply {
+            visibility = View.GONE
+            accessibilityTraversalAfter = previousId
+        }.also { items.addView(it); previousId = it.id }
+        content.addView(ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = true
+            setPadding(0, dp(16), 0, 0)
+            addView(items)
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        val close = voiceHelpButton("도움말 닫기", primary = true) {
+            closeVoiceHelp(announce = true)
+        }.apply { accessibilityTraversalAfter = previousId }
+        content.addView(close, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(16) })
+        // A normal activity view covers the whole content area: no dialog window or dimmed backdrop.
+        val host = findViewById<ViewGroup>(android.R.id.content)
+        voiceHelpCoveredViews.clear()
+        for (index in 0 until host.childCount) {
+            val child = host.getChildAt(index)
+            voiceHelpCoveredViews += child to child.importantForAccessibility
+            child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        voiceHelpScreen = insetNativeContent(content).apply {
+            isClickable = true
+            isFocusable = true
+            ViewCompat.setAccessibilityPaneTitle(this, "도움말")
+        }.also { host.addView(it, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        )) }
+        title.requestFocus()
+        speakVoiceHelp(kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.MENU)
+    }
+
+    private fun closeVoiceHelp(announce: Boolean) {
+        val screen = voiceHelpScreen ?: return
+        voiceHelpScreen = null
+        voiceHelpGeneration += 1L
+        voiceHelpSummary = null
+        voiceHelpRecovery = null
+        (screen.parent as? ViewGroup)?.removeView(screen)
+        voiceHelpCoveredViews.forEach { (view, importance) -> view.importantForAccessibility = importance }
+        voiceHelpCoveredViews.clear()
+        cancelVoiceCommandRecognition()
+        if (announce) {
+            if (isInWalkInteractionArea()) showNativeUiPage(NativeUiPage.GUIDANCE)
+            speakStatusExplanation("도움말을 닫았습니다.")
+            voiceInputController.scheduleHandsFreeVoiceRestart()
+        }
+    }
+
+    private fun handleVoiceHelpInput(phrases: List<String>) {
+        if (voiceHelpScreen == null) return
+        val choice = kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.parse(phrases)
+        if (BuildConfig.DEBUG) android.util.Log.d(
+            "WalkSafeVoiceInput",
+            "event=HELP_SELECTION result=${choice ?: "UNRECOGNIZED"} candidates=${phrases.size}",
+        )
+        when (choice) {
+            0 -> closeVoiceHelp(announce = true)
+            1, 2, 3 -> {
+                voiceHelpSummary?.text = kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.titles[choice - 1]
+                speakVoiceHelp(kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.descriptions[choice - 1] + " " +
+                    kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.NEXT)
+            }
+            4 -> {
+                voiceHelpSummary?.text = "도움말 목록"
+                speakVoiceHelp(kr.co.hanium.dreamup.walksafe.navigation.VoiceHelpPolicy.MENU)
+            }
+            5 -> speakVoiceHelp(voiceHelpLastText)
+            else -> speakVoiceHelp("1번부터 4번 중에서 말씀해 주세요. 다시 듣기 또는 도움말 닫기도 사용할 수 있습니다.", remember = false)
+        }
+    }
+
+    private fun showVoiceHelpRecovery(message: String) {
+        if (voiceHelpScreen == null) return
+        voiceHelpSummary?.text = message
+        voiceHelpSummary?.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        voiceHelpRecovery?.visibility = View.VISIBLE
+    }
+
+    private fun speakVoiceHelp(text: String, remember: Boolean = true) {
+        if (voiceHelpScreen == null) return
+        // Invalidate old playback and input before a touch selection or repeat starts another turn.
+        val generation = ++voiceHelpGeneration
+        cancelVoiceCommandRecognition()
+        stopHandsFreeVoiceService()
+        // Help open/choice/repeat/retry are explicit user turns. Reconnect a failed engine
+        // before the existing completion gate decides whether microphone capture may start.
+        ensureFeedbackActuator().retryFailedSpeechInitialization()
+        if (remember) voiceHelpLastText = text
+        voiceHelpRecovery?.visibility = View.GONE
+        val actor = reporterUserId
+        val process = GatewaySessionProcessCoordinator.snapshot().generation
+        val epoch = walkSessionLifecycle.snapshot().epoch
+        val lifecycle = feedbackLifecycleGeneration
+        val helpPage = nativeUiPage
+        fun current() = voiceHelpScreen != null && generation == voiceHelpGeneration &&
+            isActivityForeground && nativeUiPage == helpPage && reporterUserId == actor &&
+            GatewaySessionProcessCoordinator.snapshot().generation == process &&
+            epoch == walkSessionLifecycle.snapshot().epoch && lifecycle == feedbackLifecycleGeneration
+        val started = speakCommandResponse(text, preparingInput = true, statusExplanation = true, onCompleted = {
+            if (current()) {
+                voiceInputController.completePreparedPrompt(voiceRecognitionGeneration)
+                if (!startVoiceCommandRecognition()) showVoiceHelpRecovery("듣기를 시작하지 못했습니다. 다시 시도해 주세요.")
+            }
+        }, onFailed = {
+            if (current()) showVoiceHelpRecovery("음성 안내가 중단되었습니다. 다시 시도해 주세요. 음성이 계속 나오지 않으면 도움말을 닫고 한국어 음성 설정을 확인하세요.")
+        })
+        if (!started && current()) showVoiceHelpRecovery("지금은 도움말을 읽을 수 없습니다. 위험 안내가 끝난 뒤 다시 시도해 주세요.")
+    }
+
+
     private lateinit var walkBackDispatcher: OnBackPressedDispatcher
     private val walkScreenBackCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
@@ -6325,11 +6557,17 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 account.requestEmailOtp(gatewayBaseUrl, email, dateOfBirth, requestId)
             override fun createAccount(gatewayBaseUrl: String, enrollmentHandle: String, otpCode: String, password: String, selections: SignupConsentSelections, documentVersions: Map<String, String>) =
                 account.createAccount(gatewayBaseUrl, enrollmentHandle, otpCode, password, selections, documentVersions)
-            override fun loginWithPassword(gatewayBaseUrl: String, email: String, password: String, rememberMe: Boolean, deviceId: String) =
-                gatewaySessionClient.loginWithPassword(gatewayBaseUrl, email, password, rememberMe, deviceId)
+            override fun loginWithPassword(gatewayBaseUrl: String, email: String, password: String, rememberMe: Boolean, deviceId: String, enableLongLivedSession: Boolean) =
+                gatewaySessionClient.loginWithPassword(gatewayBaseUrl, email, password, rememberMe, deviceId, enableLongLivedSession = enableLongLivedSession)
+            override fun retirePasswordLogin(session: GatewayFieldSession, operationId: String): GatewaySessionStoreResult =
+                session.versionOrNull?.let { version ->
+                    if (session.isLongLived) gatewaySessionStore.moveActiveToPendingRevocation(version, operationId)
+                    else gatewaySessionStore.removeBackendDeviceIfCurrent(version)
+                } ?: GatewaySessionStoreResult.BLOCKED
             override fun logout(session: GatewayFieldSession) { gatewaySessionClient.logout(session) }
             override fun saveBackendDeviceIfAbsent(session: GatewayFieldSession, firstRunSnapshot: FirstRunOnboardingSnapshot, expectedGatewayBaseUrl: String) =
-                gatewaySessionStore.saveBackendDeviceIfAbsent(session, firstRunSnapshot, expectedGatewayBaseUrl)
+                if (session.isLongLived) gatewaySessionStore.saveInitialIfAbsent(session, firstRunSnapshot, expectedGatewayBaseUrl)
+                else gatewaySessionStore.saveBackendDeviceIfAbsent(session, firstRunSnapshot, expectedGatewayBaseUrl)
             override fun removeBackendDeviceIfCurrent(expectedVersion: kr.co.hanium.dreamup.walksafe.network.GatewaySessionVersion) =
                 gatewaySessionStore.removeBackendDeviceIfCurrent(expectedVersion)
         },
@@ -7327,45 +7565,275 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
     private fun handleWalkScreenBackPressed(): Boolean {
-        if (handleNativeFeatureBackPressed()) return true
-        cancelNativePendingFeatureEntry()
-        val state = walkSessionLifecycle.snapshot().state
-        if (state != WalkSessionState.ACTIVE && state != WalkSessionState.PAUSED) return false
-        transitionWalkSession(WalkSessionEvent.EndRequested)
-        persistWalkSessionInterruptionMarker()
-        this@MainActivity.walkSessionCleanupController.cancelWalkSessionOutputs("system_back_exit_confirmed")
-        finish()
-        return true
+        if (guidanceTouchGuardScreen != null) return true
+        if (walkExitConfirmationScreen != null) { finishWalkExitConfirmation(false); return true }
+        if (nativeGuidanceConfirmationScreen != null) { finishNativeGuidanceConfirmation(false); return true }
+        if (voiceHelpScreen != null) { closeVoiceHelp(true); return true }
+        if (isInWalkInteractionArea()) {
+            if (nativeUiPage == NativeUiPage.SETTINGS || nativeUiPage == NativeUiPage.VOICE_COMMAND) returnToCurrentInteractionArea()
+            else showWalkExitConfirmationDialog()
+            return true
+        }
+        return handleNativeFeatureBackPressed()
+    }
+
+    private var nativeGuidanceAuthorizedDestination: DestinationSearchResult? = null
+    private var nativeGuidanceConfirmationScreen: View? = null
+    private val nativeGuidanceCoveredViews = mutableListOf<Pair<View, Int>>()
+    private var nativeGuidanceConfirmationAction: (() -> Unit)? = null
+    private val nativeGuidanceConfirmationRetries = kr.co.hanium.dreamup.walksafe.navigation.GuidanceConfirmationRetryBudget()
+    private var nativeGuidanceConfirmationGeneration = 0
+    private var nativeGuidanceConfirmationCurrent: (() -> Boolean)? = null
+    private fun dismissNativeGuidanceConfirmation() {
+        nativeGuidanceConfirmationAction = null
+        nativeGuidanceConfirmationCurrent = null
+        nativeGuidanceConfirmationGeneration++
+        removeNativeGuidanceConfirmationScreen()
+    }
+    private fun requestNativeGuidanceStartConfirmation(action: () -> Unit) {
+        if (nativeGuidanceConfirmationScreen != null || nativeGuidanceConfirmationAction != null ||
+            startupCapabilityConfirmationPending) return
+        val destination = pendingUiDestination ?: return
+        if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeGuidanceStart", "confirmation=opened")
+        val epoch = walkSessionLifecycle.snapshot().epoch
+        val actor = reporterUserId
+        val gateway = GatewaySessionProcessCoordinator.snapshot().generation
+        nativeGuidanceConfirmationAction = {
+            if (isActivityForeground && nativeUiPage == NativeUiPage.GUIDANCE &&
+                pendingUiDestination == destination && reporterUserId == actor &&
+                walkSessionLifecycle.snapshot().epoch == epoch &&
+                GatewaySessionProcessCoordinator.snapshot().generation == gateway
+            ) {
+                nativeGuidanceAuthorizedDestination = destination
+                action()
+            }
+        }
+        closeVoiceHelp(announce = false)
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).roundToInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            setBackgroundColor(WS_COLOR_GROUND)
+        }
+        val title = TextView(this).apply {
+            id = View.generateViewId()
+            text = "길안내 시작"
+            textSize = 28f
+            typeface = wsTypeface(Typeface.BOLD)
+            setTextColor(WS_COLOR_EMPHASIS)
+            ViewCompat.setAccessibilityHeading(this, true)
+        }
+        content.addView(title)
+        val items = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(16), 0, 0)
+        }
+        var previousId = title.id
+        listOf("시작", "다시 듣기", "취소").forEach { label ->
+            val button = voiceHelpButton(label) {
+                when (label) {
+                    "시작" -> finishNativeGuidanceConfirmation(start = true)
+                    "취소" -> finishNativeGuidanceConfirmation(start = false)
+                    else -> speakNativeGuidanceConfirmation()
+                }
+            }.apply {
+                viewStyle.applyWsSecondaryButtonStyle(this)
+                textSize = 24f
+                accessibilityTraversalAfter = previousId
+            }
+            previousId = button.id
+            items.addView(button)
+        }
+        content.addView(ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = true
+            addView(items)
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        val host = findViewById<ViewGroup>(android.R.id.content)
+        nativeGuidanceCoveredViews.clear()
+        for (index in 0 until host.childCount) {
+            val child = host.getChildAt(index)
+            nativeGuidanceCoveredViews += child to child.importantForAccessibility
+            child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        nativeGuidanceConfirmationScreen = insetNativeContent(content).apply {
+            isClickable = true
+            isFocusable = true
+            ViewCompat.setAccessibilityPaneTitle(this, "길안내 시작")
+        }.also { host.addView(it, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        )) }
+        title.requestFocus()
+        speakNativeGuidanceConfirmation()
+    }
+
+    private fun removeNativeGuidanceConfirmationScreen() {
+        val screen = nativeGuidanceConfirmationScreen
+        nativeGuidanceConfirmationScreen = null
+        (screen?.parent as? ViewGroup)?.removeView(screen)
+        nativeGuidanceCoveredViews.forEach { (view, importance) ->
+            view.importantForAccessibility = importance
+        }
+        nativeGuidanceCoveredViews.clear()
+    }
+
+    private fun announceNativeGuidanceConfirmationError(message: String) {
+        if (nativeGuidanceConfirmationScreen == null || !isActivityForeground) return
+        // Recovery guidance is spoken; the screen keeps only its title and large controls.
+        // No completion/failure callback here, so a TTS failure cannot trigger a retry loop.
+        speakCommandResponse(message)
+    }
+
+    private fun finishNativeGuidanceConfirmation(start: Boolean) {
+        val action = nativeGuidanceConfirmationAction ?: return
+        // Consume once before cancellation/UI callbacks can re-enter this method.
+        nativeGuidanceConfirmationAction = null
+        nativeGuidanceConfirmationGeneration++
+        if (BuildConfig.DEBUG) android.util.Log.d("WalkSafeGuidanceStart", "confirmation=consumed start=$start")
+        cancelVoiceCommandRecognition()
+        removeNativeGuidanceConfirmationScreen()
+        if (start) action() else cancelNativeGuidanceAndReturnHome()
+    }
+
+    private fun handleNativeGuidanceConfirmationUnrecognized() {
+        if (nativeGuidanceConfirmationScreen == null || nativeGuidanceConfirmationAction == null) return
+        if (nativeGuidanceConfirmationRetries.allowAutomaticRetry()) {
+            speakNativeGuidanceConfirmation(explicitAttempt = false)
+            return
+        }
+        // Leave the confirmation open. Do not restart recognition from this recovery speech.
+        nativeGuidanceConfirmationGeneration++
+        cancelVoiceCommandRecognition()
+        val message = "음성을 확인하지 못했습니다. 다시 듣기를 누르면 음성 입력을 다시 시도합니다. 시작 또는 취소 버튼으로도 선택할 수 있습니다."
+        announceNativeGuidanceConfirmationError(message)
+    }
+
+    private fun speakNativeGuidanceConfirmation(explicitAttempt: Boolean = true) {
+        val dialog = nativeGuidanceConfirmationScreen ?: return
+        val destination = pendingUiDestination ?: return
+        if (explicitAttempt) nativeGuidanceConfirmationRetries.beginExplicitAttempt()
+        val generation = ++nativeGuidanceConfirmationGeneration
+        cancelVoiceCommandRecognition()
+        stopHandsFreeVoiceService()
+        fun current() = nativeGuidanceConfirmationScreen === dialog && nativeGuidanceConfirmationCurrent?.invoke() != false && isActivityForeground &&
+            nativeUiPage == NativeUiPage.GUIDANCE && pendingUiDestination == destination &&
+            nativeGuidanceConfirmationGeneration == generation
+        var recoveryAnnounced = false
+        fun failed() {
+            if (!current() || recoveryAnnounced) return
+            recoveryAnnounced = true
+            announceNativeGuidanceConfirmationError("음성 입력 또는 안내를 완료하지 못했습니다. 마이크 권한과 한국어 음성 설정을 확인하거나 다시 듣기를 눌러 주세요.\n시작·취소 버튼으로도 선택할 수 있습니다.")
+        }
+        val environmentNotice = currentOfficialEnvironmentAssessment()
+            .takeIf { it.conditionallyAllowed }?.let { it.preparationNoticeKo() + " " }.orEmpty()
+        val started = speakCommandResponse(
+            environmentNotice + "${destination.name}까지 안내를 시작할까요? 시작 또는 취소라고 말씀해 주세요.",
+            preparingInput = true,
+            onCompleted = {
+                if (current()) {
+                    voiceInputController.completePreparedPrompt(voiceRecognitionGeneration)
+                    if (!startVoiceCommandRecognition()) failed()
+                }
+            },
+            onFailed = { failed() },
+        )
+        if (!started) failed()
     }
 
     private fun showWalkExitConfirmationDialog() {
-        if (walkExitConfirmationDialog?.isShowing == true) return
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.walk_exit_confirmation_title)
-            .setMessage(R.string.walk_exit_confirmation_message)
-            .setPositiveButton(R.string.walk_exit_confirmation_positive) { _, _ ->
-                transitionWalkSession(WalkSessionEvent.EndRequested)
-                persistWalkSessionInterruptionMarker()
-                this@MainActivity.walkSessionCleanupController.cancelWalkSessionOutputs("system_back_exit_confirmed")
-                finish()
-            }
-            .setNegativeButton(R.string.walk_exit_confirmation_negative) { current, _ ->
-                walkSessionResumeController.requireUserRetry()
-                syncActiveSessionScreenPolicy()
-                current.dismiss()
-            }
-            .setOnCancelListener {
-                walkSessionResumeController.requireUserRetry()
-                syncActiveSessionScreenPolicy()
-            }
-            .create()
-        walkExitConfirmationDialog = dialog
-        dialog.setOnDismissListener {
-            if (walkExitConfirmationDialog === dialog) {
-                walkExitConfirmationDialog = null
-            }
+        if (walkExitConfirmationScreen != null || !isActivityForeground) return
+        val snapshot = walkSessionLifecycle.snapshot()
+        if (snapshot.state !in setOf(WalkSessionState.READY, WalkSessionState.ACTIVE, WalkSessionState.PAUSED, WalkSessionState.SAFE_STOP)) return
+        val actor = reporterUserId
+        val gatewayGeneration = GatewaySessionProcessCoordinator.snapshot().generation
+        cancelVoiceCommandRecognition()
+        cancelCommandSpeechResponse()
+        stopHandsFreeVoiceService()
+        closeVoiceHelp(announce = false)
+        walkExitConfirmationIsCurrent = {
+            isActivityForeground && reporterUserId == actor &&
+                GatewaySessionProcessCoordinator.snapshot().generation == gatewayGeneration &&
+                walkSessionLifecycle.snapshot().epoch == snapshot.epoch &&
+                walkSessionLifecycle.snapshot().state == snapshot.state
         }
-        dialog.show()
+        val density = resources.displayMetrics.density
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((16 * density).roundToInt(), (24 * density).roundToInt(),
+                (16 * density).roundToInt(), (16 * density).roundToInt())
+            setBackgroundColor(WS_COLOR_GROUND)
+        }
+        val title = TextView(this).apply {
+            id = View.generateViewId()
+            text = "안내를 종료할까요?"
+            textSize = 28f
+            typeface = wsTypeface(Typeface.BOLD)
+            setTextColor(WS_COLOR_EMPHASIS)
+            ViewCompat.setAccessibilityHeading(this, true)
+        }
+        content.addView(title)
+        var previousId = title.id
+        listOf("안내로 돌아가기", "안내 종료").forEachIndexed { index, label ->
+            val button = voiceHelpButton(label) { finishWalkExitConfirmation(end = index == 1) }
+            viewStyle.applyWsButtonStyle(button, 144f, primary = index == 0)
+            button.textSize = 24f
+            button.accessibilityTraversalAfter = previousId
+            previousId = button.id
+            content.addView(button)
+        }
+        val host = findViewById<ViewGroup>(android.R.id.content)
+        walkExitCoveredViews.clear()
+        for (index in 0 until host.childCount) {
+            val child = host.getChildAt(index)
+            walkExitCoveredViews += child to child.importantForAccessibility
+            child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        val screen = insetNativeContent(ScrollView(this).apply { isFillViewport = true; addView(content) }).apply {
+            isClickable = true
+            isFocusable = true
+            setBackgroundColor(WS_COLOR_GROUND)
+            ViewCompat.setAccessibilityPaneTitle(this, "안내 종료 확인")
+        }
+        walkExitConfirmationScreen = screen
+        host.addView(screen, ViewGroup.LayoutParams(-1, -1))
+        title.requestFocus()
+        speakCommandResponse(
+            "안내를 종료할까요? 계속하려면 돌아가기, 종료하려면 안내 종료라고 말씀해 주세요.",
+            preparingInput = true,
+            onCompleted = {
+                if (walkExitConfirmationScreen === screen && hasCurrentWalkExitConfirmation()) {
+                    voiceInputController.completePreparedPrompt(voiceRecognitionGeneration)
+                    startVoiceCommandRecognition()
+                }
+            },
+        )
+    }
+
+    private fun dismissWalkExitConfirmation() {
+        val screen = walkExitConfirmationScreen ?: return
+        walkExitConfirmationScreen = null
+        walkExitConfirmationIsCurrent = null
+        cancelVoiceCommandRecognition()
+        cancelCommandSpeechResponse()
+        (screen.parent as? ViewGroup)?.removeView(screen)
+        walkExitCoveredViews.forEach { (view, importance) -> view.importantForAccessibility = importance }
+        walkExitCoveredViews.clear()
+    }
+
+    private fun finishWalkExitConfirmation(end: Boolean) {
+        if (walkExitConfirmationScreen == null) return
+        val current = hasCurrentWalkExitConfirmation()
+        val epoch = walkSessionLifecycle.snapshot().epoch
+        dismissWalkExitConfirmation()
+        if (end && current) {
+            cancelNativeGuidanceAndReturnHome()
+        } else {
+            // Returning never requests resume or restores a pre-dialog safety state.
+            showNativeUiPage(NativeUiPage.GUIDANCE)
+            if (end && !current) speakInteraction("보행 상태가 바뀌었습니다. 종료하려면 다시 요청해 주세요.")
+        }
+        voiceInputController.scheduleHandsFreeVoiceRestart()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -7379,6 +7847,10 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
     override fun onPause() {
+        guidanceTouchGuardContent?.cancelHold()
+        dismissNativeGuidanceConfirmation()
+        dismissWalkExitConfirmation()
+        closeVoiceHelp(announce = false)
         if (arrivalEndingOwner?.isCurrent() == true) routeGuidanceController.retireArrivalForExit()
         userReportInteractionOwner.invalidateLocalQuarantineSelection()
         invalidateSpeechOutputStorageBinding()
@@ -7494,6 +7966,9 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
     override fun onDestroy() {
+        closeGuidanceTouchGuard()
+        closeVoiceHelp(announce = false)
+        dismissWalkExitConfirmation()
         accountDeletionPreparationController.cancelInstallationKeyPreparation()
         cancelRouteWarmingReassessment()
         guidanceDiagnosticRuntime?.let { privacyStartupResources.releaseOnWorker(it) }
@@ -8066,7 +8541,10 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
 
     private fun refreshForegroundHomeWakeListening() = voiceInputController.refreshForegroundHomeWakeListening()
 
-    private fun nativeHomeFeatureContextAvailable(): Boolean {
+    private fun nativeHomeFeatureContextAvailable(): Boolean =
+        !isInWalkInteractionArea() && nativeForegroundFeatureContextAvailable()
+
+    private fun nativeForegroundFeatureContextAvailable(): Boolean {
         if (!::walkSessionLifecycle.isInitialized || !shouldShowNativeHome() ||
             !firstRunOnboardingComplete() || !isActivityForeground ||
             (permissionRecoveryGate.blocksAutomaticResourceStart && !developmentGuidanceStartBypassEnabled)
@@ -8083,7 +8561,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         (BuildConfig.DEBUG && BuildConfig.WALKSAFE_DEBUG_GUIDANCE_START_BYPASS &&
             isActivityForeground && shouldShowNativeHome()) ||
             currentNavigationCollectionAllowsWork() ||
-            (nativeHomeFeatureContextAvailable() &&
+            (nativeForegroundFeatureContextAvailable() &&
                 postLoginDeviceFeatureEnabled(PostLoginDeviceCheckFeature.LOCATION_GUIDANCE))
 
     private fun nativeFeatureAvailable(page: NativeUiPage): Boolean = when (page) {
@@ -8135,10 +8613,22 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         nativeWorkflowController.postNativeDestinationStart(destination, post, navigationAdmitted, start)
     }
 
-    /** Ordinary screens expose actions, not continuously changing diagnostic text. */
+    private fun nativeGuidanceCheckFailed(): Boolean =
+        !isWalkSessionRuntimeActive() &&
+            walkSessionLifecycle.snapshot().state != WalkSessionState.PAUSED &&
+            (officialEnvironmentPreflightPhase in setOf(
+                OfficialEnvironmentPreflightPhase.FAILED,
+                OfficialEnvironmentPreflightPhase.TIMED_OUT,
+            ) || startupCapabilityRetryRequiresUserAction)
+
     private fun applyNativeVoiceFirstPresentation(homeAvailable: Boolean) {
         if (!homeAvailable) return
         nativeScreenPresenter.applyVoiceFirstPresentation(homeAvailable, nativeUiPage.name, nativeGuidanceSpeechFailure)
+        settingsPrivacyPresenter.homeActionTarget().text = if (isInWalkInteractionArea()) "안내로 돌아가기" else "메인으로 돌아가기"
+        if (nativeUiPage == NativeUiPage.GUIDANCE && nativeGuidanceCheckFailed()) {
+            nativeScreenPresenter.renderFailedGuidanceCheck(isActivityForeground)
+            nativePhoneMountingCheckRequest?.let(nativePrewalkController::announceFailure)
+        }
     }
 
     private fun updateNativeAccessibilityPaneTitle(homeAvailable: Boolean, settingsVisible: Boolean) {
@@ -8160,6 +8650,46 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             camera,
         )
     }
+
+    private fun openGuidanceTouchGuard() {
+        if (guidanceTouchGuardScreen != null || nativeUiPage != NativeUiPage.GUIDANCE ||
+            (walkSessionLifecycle.snapshot().state !in
+                setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED))) return
+        closeVoiceHelp(announce = false)
+        val host = findViewById<ViewGroup>(android.R.id.content)
+        guidanceTouchGuardCoveredViews.clear()
+        for (index in 0 until host.childCount) {
+            val child = host.getChildAt(index)
+            guidanceTouchGuardCoveredViews += child to child.importantForAccessibility
+            child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        val content = kr.co.hanium.dreamup.walksafe.ui.GuidanceTouchGuardView(this) {
+            closeGuidanceTouchGuard()
+            nativeScreenPresenter.guidanceBinding().guidanceTouchGuardButton.requestFocus()
+            speakInteraction("터치 오작동 방지를 해제했습니다.")
+        }
+        guidanceTouchGuardContent = content
+        guidanceTouchGuardScreen = insetNativeContent(content).apply {
+            setBackgroundColor(android.graphics.Color.BLACK)
+            isClickable = true
+            isFocusable = true
+            ViewCompat.setAccessibilityPaneTitle(this, "터치 오작동 방지")
+        }.also { host.addView(it, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+        )) }
+        speakInteraction("터치 오작동 방지를 켰습니다. 음성 안내는 계속됩니다. 해제하려면 중앙 버튼을 3초간 누르세요.")
+    }
+
+    private fun closeGuidanceTouchGuard() {
+        guidanceTouchGuardContent?.cancelHold()
+        val screen = guidanceTouchGuardScreen
+        guidanceTouchGuardScreen = null
+        guidanceTouchGuardContent = null
+        (screen?.parent as? ViewGroup)?.removeView(screen)
+        guidanceTouchGuardCoveredViews.forEach { (view, importance) -> view.importantForAccessibility = importance }
+        guidanceTouchGuardCoveredViews.clear()
+    }
+
 
     private fun insetNativeContent(content: View): View =
         FrameLayout(this).apply {
@@ -8452,7 +8982,10 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 override fun showPage(page: NativeUiPage) { showNativeUiPage(page) }
                 override fun ensureVoicePermissionThenListen() { this@MainActivity.ensureVoicePermissionThenListen() }
                 override fun showHomeLockNotice(title: String, detail: String) { showHomeCardLockNotice(title, detail) }
-                override fun preparationDialogShowing() = nativePrewalkDialog?.isShowing == true
+                override fun preparationDialogShowing(): Boolean {
+                    if (nativeGuidanceConfirmationScreen != null && nativeGuidanceConfirmationCurrent?.invoke() == false) dismissNativeGuidanceConfirmation()
+                    return nativePrewalkDialog?.isShowing == true || nativeGuidanceConfirmationScreen != null
+                }
                 override fun postStartup(action: () -> Unit) { firstRunOnboardingPresenter.readinessBinding().startupCapabilityText.post { action() } }
                 override fun cancelPendingFeatureEntry() { cancelNativePendingFeatureEntry() }
                 override fun showStatus(title: String, detail: String) { updateStatus(title, detail) }
@@ -8487,6 +9020,19 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 override fun cancelCalibration() { cancelNativeGuidanceCalibration() }
                 override fun cancelCalibrationForLocationAccess() { cancelNativeCalibrationPrompt() }
                 override fun retryPreparation(request: NativePhoneMountingCheckRequest) { scheduleNativePreparationRecovery(request) }
+                override fun requestStartConfirmation(current: () -> Boolean, confirmed: () -> Unit) {
+                    if (pendingUiDestination != null) {
+                        if (nativeUiPage != NativeUiPage.GUIDANCE || voiceHelpScreen != null || walkExitConfirmationScreen != null) return
+                        nativeGuidanceConfirmationCurrent = current
+                        requestNativeGuidanceStartConfirmation {
+                            if (current()) confirmed()
+                            else {
+                                speakInteraction("준비 상태가 바뀌어 다시 확인합니다.")
+                                continueNativePrewalkIfReady()
+                            }
+                        }
+                    } else if (current()) confirmed()
+                }
                 override fun completeStartupConfirmation(decision: WalkSafeStartupCapabilityDecision) {
                     if (walkSessionLifecycle.snapshot().state == WalkSessionState.PAUSED) {
                         this@MainActivity.startupConfirmationInteraction.confirmStartupCapabilityDecision()
@@ -8497,7 +9043,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 override fun completePermissionRecoveryRecheck() { completePermissionRecoveryRecheckIfPossible() }
                 override fun discardAndStopEnvironmentCamera() { officialEnvironmentPreflightController.discardAfterRelease(); stopOfficialEnvironmentCameraPreflight() }
                 override fun clearPrewalkConsent() { nativePrewalkConsentEpoch = null; nativePrewalkConsentAtElapsedRealtimeMs = null }
-                override fun dismissPreparationDialog() { val dialog = nativePrewalkDialog; nativePrewalkDialog = null; dialog?.dismiss() }
+                override fun dismissPreparationDialog() { dismissNativeGuidanceConfirmation(); val dialog = nativePrewalkDialog; nativePrewalkDialog = null; dialog?.dismiss() }
                 override fun cancelPreparationSpeech() { cancelGuidancePreparationSpeech() }
                 override fun postFailureRetry(delayMs: Long, action: () -> Unit) { nativeScreenPresenter.guidanceBinding().nativeGuidanceStatusText.postDelayed({ action() }, delayMs) }
                 override fun publishSpeechFailure(message: String) { guidancePreparationController.reportVisibleFailure(message) }
@@ -9052,10 +9598,12 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
 
     /** Manual END and automatic arrival share the same final walk teardown. */
     private fun endCurrentWalk(reason: String, detail: String, outputsRetired: Boolean = false) {
+        closeGuidanceTouchGuard()
         if (!outputsRetired && arrivalEndingOwner?.isCurrent() == true) {
             routeGuidanceController.retireArrivalForExit()
             return
         }
+        walkAreaExitInProgress = true
         transitionWalkSession(WalkSessionEvent.EndRequested)
         persistWalkSessionInterruptionMarker()
         if (outputsRetired) {
@@ -9068,6 +9616,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             stopCameraFallbackSession(updateUi = false)
             stopDepthSession(closeSession = true)
         }
+        walkAreaExitInProgress = false
         syncActiveSessionScreenPolicy()
         refreshStartupCapabilityUi()
         updateStatus("보행 종료", detail)
@@ -9223,6 +9772,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
     private fun cancelNativeGuidanceAndReturnHome() {
+        closeGuidanceTouchGuard()
         if (arrivalEndingOwner?.isCurrent() == true) {
             routeGuidanceController.retireArrivalForExit()
             return
@@ -9236,7 +9786,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             gatewayWalkSessionController.cancelPendingGatewayWalkStart()
         }
         cancelNativePrewalkPreparation(cancelFeatureEntry = true)
-        if (walk.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)) {
+        if (walk.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED, WalkSessionState.SAFE_STOP)) {
             executeWalkSessionVoiceAction(WalkSessionVoiceAction.CONFIRM_END, walk.epoch)
         } else {
             cancelActiveRouteRequest()
@@ -9246,7 +9796,22 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
     }
 
 
+    private fun returnToCurrentInteractionArea() {
+        if (isInWalkInteractionArea()) {
+            showNativeUiPage(NativeUiPage.GUIDANCE)
+            continueNativePrewalkIfReady()
+        } else {
+            cancelNativePendingFeatureEntry()
+            showNativeUiPage(NativeUiPage.HOME)
+        }
+    }
+
     private fun cancelNativeVoiceCommandAndReturnHome() {
+        if (isInWalkInteractionArea()) {
+            cancelVoiceCommandRecognition()
+            showNativeUiPage(NativeUiPage.GUIDANCE)
+            return
+        }
         cancelNativePendingFeatureEntry()
         cancelVoiceCommandRecognition()
         updateGatewayVoiceStatus("음성 명령이 취소되었습니다.")
@@ -9257,7 +9822,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
         NativeWorkflowController.BackAction.CANCEL_DESTINATION -> { cancelNativeDestinationSearchAndReturnHome(); true }
         NativeWorkflowController.BackAction.CANCEL_GUIDANCE -> { cancelNativeGuidanceAndReturnHome(); true }
         NativeWorkflowController.BackAction.CANCEL_VOICE -> { cancelNativeVoiceCommandAndReturnHome(); true }
-        NativeWorkflowController.BackAction.RETURN_HOME -> { cancelNativePendingFeatureEntry(); showNativeUiPage(NativeUiPage.HOME); true }
+        NativeWorkflowController.BackAction.RETURN_HOME -> { returnToCurrentInteractionArea(); true }
         NativeWorkflowController.BackAction.CLOSE_CAMERA_OR_EXIT -> if (cameraScreenVisible) { closeLiveCameraScreen(); true } else false
     }
 
@@ -9596,10 +10161,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                     onAccountSessionButtonClicked()
                     renderMainUi()
                 },
-                onHome = {
-                    cancelNativePendingFeatureEntry()
-                    showNativeUiPage(NativeUiPage.HOME)
-                },
+                onHome = ::returnToCurrentInteractionArea,
             ),
         )
         guidanceDiagnosticButton = settingsPanel.guidanceDiagnosticButton
@@ -9698,7 +10260,13 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 },
                 onSearchCancel = ::cancelNativeDestinationSearchAndReturnHome,
                 onStart = ::startNativeDestinationGuidance,
-                onGuidanceCancel = ::cancelNativeGuidanceAndReturnHome,
+                onGuidanceCancel = ::showWalkExitConfirmationDialog,
+                onPause = {
+                    val walk = walkSessionLifecycle.snapshot()
+                    if (walk.state == WalkSessionState.ACTIVE) executeWalkSessionVoiceAction(WalkSessionVoiceAction.PAUSE, walk.epoch)
+                    else startNativeDestinationGuidance()
+                },
+                onTouchGuard = ::openGuidanceTouchGuard,
                 onVoiceStart = {
                     ensureVoicePermissionThenListen()
                 },
@@ -9709,8 +10277,9 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
                 onEndDeviation = { endNavigationAfterDeviation() },
             ),
         )
-        destinationPanel.nativeGuidanceControls.addView(explicitReportConfirmationText)
-        destinationPanel.nativeGuidanceControls.addView(explicitReportButton)
+        // Automatic reports remain primary; the existing voice report path owns manual requests.
+        explicitReportConfirmationText.visibility = View.GONE
+        explicitReportButton.visibility = View.GONE
         destinationSearchPresenter.bindPanel(destinationPanel)
         nativeScreenPresenter.publishVoiceTargets(destinationPanel)
         nativeUiPublication.publish(NativeUiPublication.Target.VOICE_REPORT_BUTTON)
@@ -9862,6 +10431,7 @@ private fun createGatewayWalkSessionController() = GatewayWalkSessionController(
             ),
             actions = HomePanel.Actions(
                 onCamera = ::openLiveCameraScreen,
+                onHelp = ::openVoiceHelp,
                 onVoice = {
                     requestNativeFeature(NativeUiPage.VOICE_COMMAND)
                 },
@@ -11368,6 +11938,7 @@ private fun confirmPhoneMounting(method: PhoneMountingMethod) = phoneMountingInt
             Thread(runnable, "walksafe-raw-collection").apply { priority = Thread.NORM_PRIORITY - 1 }
         },
         runtime = object : RawCollectionTransferController.Runtime {
+            override fun sensitiveStorageBlocked() = !this@MainActivity::sensitivePrefs.isInitialized || sensitivePrefs.isBlocked()
             override fun isWalkReady() = ::walkSessionLifecycle.isInitialized
             override fun walkSnapshot() = walkSessionLifecycle.snapshot()
             override fun deviceCheckSnapshot() = postLoginDeviceCheckSnapshot
@@ -11590,6 +12161,7 @@ private fun transitionWalkSession(event: WalkSessionEvent): WalkSessionTransitio
             walkSnapshot = { walkSessionLifecycle.snapshot() },
             reporterActorId = ::currentReporterUserId,
             automaticCleanupReady = { integratedConsentController.automaticReportCleanupReadyForCurrentActor() },
+            sensitiveStorageBlocked = { !this@MainActivity::sensitivePrefs.isInitialized || sensitivePrefs.isBlocked() },
         ),
         runtime = object : ReportQueueDrainController.Runtime {
             override fun isForeground() = isActivityForeground
@@ -14525,7 +15097,7 @@ private fun performWalkSessionSafetyStopCleanup(
             deviceGateAllowsReports = gateState.reportCandidatesAllowed,
             depthSampleCount = output.validSampleCount,
             depthValidSampleRatio = output.validSampleRatio,
-            detectionAgeMs = (nowMs - capturedAtMs).coerceAtLeast(0L),
+            detectionAgeMs = frozenReportCapture?.first?.capturedAtElapsedRealtimeMs?.let { requestElapsedRealtimeMs - it },
             coordinateGateStatus = coordinateGateStatus,
             heading = latestHeadingDeg,
             apkSha256 = reportApkSha256,
@@ -14549,6 +15121,7 @@ private fun performWalkSessionSafetyStopCleanup(
                 expectedReporterActorId, metadataUtf8, imageJpeg, priority, walkSessionId, consentReceiptSha256, accountGeneration)
         },
         authority = object : ReportCandidateController.Authority {
+            override fun sensitiveStorageBlocked() = !this@MainActivity::sensitivePrefs.isInitialized || sensitivePrefs.isBlocked()
             override fun reportPermissionsAllowWork() = this@MainActivity.reportPermissionsAllowWork()
             override fun currentRuntimeEpochOrNull() = walkSessionLifecycle.currentRuntimeEpochOrNull()
             override fun isRuntimeEpochCurrent(epoch: WalkRuntimeEpoch) = walkSessionLifecycle.isRuntimeEpochCurrent(epoch)
@@ -14650,8 +15223,10 @@ private fun performWalkSessionSafetyStopCleanup(
     private fun renderExplicitReportConfirmationDisclosure(armed: Boolean) =
         explicitReportPresentation.renderDisclosure(armed)
 
-    private fun renderExplicitReportConfirmationIdle(message: String? = null) =
+    private fun renderExplicitReportConfirmationIdle(message: String? = null) {
+        if (!::explicitReportButton.isInitialized || !::explicitReportConfirmationText.isInitialized) return
         explicitReportPresentation.renderIdle(message)
+    }
 
     private fun ensureVoicePermissionThenListen() = voiceInputController.ensureVoicePermissionThenListen()
 

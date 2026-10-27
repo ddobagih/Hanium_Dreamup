@@ -64,7 +64,8 @@ internal class EmailAccountController(
         fun signupUnavailableOptionalDocuments(gatewayBaseUrl: String): Set<String>
         fun requestEmailOtp(gatewayBaseUrl: String, email: String, dateOfBirth: String, requestId: String): EmailOtpEnrollmentResponse
         fun createAccount(gatewayBaseUrl: String, enrollmentHandle: String, otpCode: String, password: String, selections: SignupConsentSelections, documentVersions: Map<String, String>): CreatedEmailAccount
-        fun loginWithPassword(gatewayBaseUrl: String, email: String, password: String, rememberMe: Boolean, deviceId: String): GatewayFieldSession
+        fun loginWithPassword(gatewayBaseUrl: String, email: String, password: String, rememberMe: Boolean, deviceId: String, enableLongLivedSession: Boolean = false): GatewayFieldSession
+        fun retirePasswordLogin(session: GatewayFieldSession, operationId: String): GatewaySessionStoreResult
         fun logout(session: GatewayFieldSession)
         fun saveBackendDeviceIfAbsent(session: GatewayFieldSession, firstRunSnapshot: FirstRunOnboardingSnapshot, expectedGatewayBaseUrl: String): GatewaySessionStoreResult
         fun removeBackendDeviceIfCurrent(expectedVersion: GatewaySessionVersion): GatewaySessionStoreResult
@@ -608,6 +609,144 @@ internal class EmailAccountController(
             ui.showMessage("다른 로그인 확인이 진행 중입니다. 잠시 후 다시 시도하세요.")
             return
         }
+        fun applyLogin(session: GatewayFieldSession) {
+        val current = accountRequestFence.isCurrent(
+            token,
+            accountStateBinding(),
+        ) && GatewaySessionProcessCoordinator.snapshot().inFlightOperationId ==
+            operation.operationId
+        if (!current || expectedCreatedActorId?.let { it != session.actorId } == true) {
+            runCatching { services.logout(session) }
+            GatewaySessionProcessCoordinator.clear(operation)
+            ui.refresh()
+            return
+        }
+        val actorBinding =
+            FirstRunOpaqueActorBinding.fromProvider(session.actorId)
+        val completedNativeProgress = flow.completedNativeProgress(session.actorId)
+        if (!session.isLongLived && completedNativeProgress != null &&
+            kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_LONG_LIVED_LOGIN_ENABLED) {
+            try {
+                executor.execute {
+                    try {
+                        fun current() = accountRequestFence.isCurrent(token, token.stateBinding) &&
+                            GatewaySessionProcessCoordinator.snapshot().inFlightOperationId == operation.operationId
+                        if (!current()) {
+                            runCatching { services.logout(session) }
+                            GatewaySessionProcessCoordinator.clear(operation)
+                            return@execute
+                        }
+                        services.logout(session)
+                        if (!current()) { GatewaySessionProcessCoordinator.clear(operation); return@execute }
+                        val longSession = services.loginWithPassword(gatewayOrigin, email, password, true,
+                            installationDeviceId, enableLongLivedSession = true)
+                        if (!longSession.isLongLived || longSession.actorId != session.actorId ||
+                            longSession.backendAccountGeneration != session.backendAccountGeneration) {
+                            runCatching { services.logout(longSession) }
+                            throw GatewaySessionHttpException(0, "gateway_actor_binding_failed")
+                        }
+                        postToMain { applyLogin(longSession) }
+                    } catch (error: GatewaySessionHttpException) {
+                        GatewaySessionProcessCoordinator.clear(operation)
+                        postAccountFailure(token, error.serverCode, error.statusCode)
+                    } catch (_: Exception) {
+                        GatewaySessionProcessCoordinator.clear(operation)
+                        postAccountFailure(token, null, 0)
+                    }
+                }
+            } catch (_: RejectedExecutionException) {
+                GatewaySessionProcessCoordinator.clear(operation)
+                accountRequestFence.cancel(token)
+                ui.showMessage("장기 로그인을 시작하지 못했습니다. 다시 로그인하세요.")
+                ui.refresh()
+            }
+            return
+        }
+        if (!accountRequestFence.completeIfCurrent(token, accountStateBinding())) {
+            runCatching { services.logout(session) }
+            GatewaySessionProcessCoordinator.clear(operation)
+            return
+        }
+        val receipt = FirstRunReceiptHash.fromSha256Hex(
+            sha256Hex(
+                (
+                    "email-password-session-v4|${session.actorId}|" +
+                        "${flow.snapshot.epoch}"
+                ).toByteArray(Charsets.UTF_8),
+            ),
+        )
+        val preparedLogin = flow.prepareVerifiedLogin(actorBinding, receipt, completedNativeProgress)
+        if (preparedLogin == null) {
+            runCatching { services.logout(session) }
+            GatewaySessionProcessCoordinator.clear(operation)
+            ui.showMessage("로그인 단계가 변경되어 결과를 적용하지 않았습니다.")
+            ui.refresh()
+            return
+        }
+        val nextFirstRunSnapshot = preparedLogin.snapshot
+        val reauthenticatesExistingProgress = preparedLogin.reauthenticatesExistingProgress
+        if (readers.developmentQuickStartEnabled()) {
+            effects.noteDevelopmentQuickStartActor(session.actorId)
+        }
+        val stored = services.saveBackendDeviceIfAbsent(
+            session, nextFirstRunSnapshot, gatewayOrigin,
+        )
+        if (stored != GatewaySessionStoreResult.COMMITTED &&
+            stored != GatewaySessionStoreResult.ALREADY_COMMITTED
+        ) {
+            session.invalidate()
+            if (stored == GatewaySessionStoreResult.BLOCKED ||
+                stored == GatewaySessionStoreResult.STORAGE_FAILURE
+            ) {
+                GatewaySessionProcessCoordinator.markStorageBlocked(operation)
+            } else {
+                GatewaySessionProcessCoordinator.clear(operation)
+            }
+            ui.showMessage("로그인을 안전하게 저장하지 못했습니다. 다시 확인하세요.")
+            ui.refresh()
+            return
+        }
+        val published = GatewaySessionProcessCoordinator.publishVerified(
+            operation = operation,
+            session = session,
+            firstRunSnapshot = nextFirstRunSnapshot,
+        )
+        if (!published) {
+            services.retirePasswordLogin(session, operation.operationId)
+            session.invalidate()
+            ui.showMessage("로그인 세션을 안전하게 연결하지 못했습니다.")
+            ui.refresh()
+            return
+        }
+        effects.onBackendRestoreVerified()
+        if (!flow.applyVerifiedLogin(preparedLogin)) {
+            ui.refresh()
+            return
+        }
+        effects.applyVerifiedAccount(session.actorId, reauthenticatesExistingProgress)
+        if (emailEnrollmentOwnerBindingSha256?.let(storage::clearUnconfirmedCreation) == true) unconfirmedCreation = false
+        storage.clear()
+        emailEnrollmentPartial = null
+        ui.clearInputs(listOf(InputField.EMAIL))
+        ui.clearInputs(listOf(InputField.PASSWORD))
+        ui.clearInputs(listOf(InputField.PASSWORD_CONFIRMATION))
+        ui.clearInputs(listOf(InputField.OTP))
+        ui.onFirstRunStateChanged(
+            if (reauthenticatesExistingProgress) {
+                "다시 로그인했습니다. 기기 점검 상태를 확인한 뒤 중단된 단계를 이어갑니다."
+            } else {
+                "로그인했습니다. 먼저 서비스 목적과 안전 한계를 확인하세요."
+            },
+        )
+        effects.refreshConfirmedConsent()
+        ui.updateStatus(
+            if (reauthenticatesExistingProgress) {
+                "account=reauthenticated next=onboarding_resume"
+            } else {
+                "account=authenticated next=purpose_and_safety"
+            },
+        )
+        }
         ui.refresh()
         try {
             executor.execute {
@@ -619,101 +758,7 @@ internal class EmailAccountController(
                         rememberMe = true,
                         deviceId = installationDeviceId,
                     )
-                    postToMain {
-                        val current = accountRequestFence.completeIfCurrent(
-                            token,
-                            accountStateBinding(),
-                        ) && GatewaySessionProcessCoordinator.snapshot().inFlightOperationId ==
-                            operation.operationId
-                        if (!current || expectedCreatedActorId?.let { it != session.actorId } == true) {
-                            runCatching { services.logout(session) }
-                            GatewaySessionProcessCoordinator.clear(operation)
-                            ui.refresh()
-                            return@postToMain
-                        }
-                        val actorBinding =
-                            FirstRunOpaqueActorBinding.fromProvider(session.actorId)
-                        val completedNativeProgress = flow.completedNativeProgress(session.actorId)
-                        val receipt = FirstRunReceiptHash.fromSha256Hex(
-                            sha256Hex(
-                                (
-                                    "email-password-session-v4|${session.actorId}|" +
-                                        "${flow.snapshot.epoch}"
-                                ).toByteArray(Charsets.UTF_8),
-                            ),
-                        )
-                        val preparedLogin = flow.prepareVerifiedLogin(actorBinding, receipt, completedNativeProgress)
-                        if (preparedLogin == null) {
-                            runCatching { services.logout(session) }
-                            GatewaySessionProcessCoordinator.clear(operation)
-                            ui.showMessage("로그인 단계가 변경되어 결과를 적용하지 않았습니다.")
-                            ui.refresh()
-                            return@postToMain
-                        }
-                        val nextFirstRunSnapshot = preparedLogin.snapshot
-                        val reauthenticatesExistingProgress = preparedLogin.reauthenticatesExistingProgress
-                        if (readers.developmentQuickStartEnabled()) {
-                            effects.noteDevelopmentQuickStartActor(session.actorId)
-                        }
-                        val stored = services.saveBackendDeviceIfAbsent(
-                            session, nextFirstRunSnapshot, gatewayOrigin,
-                        )
-                        if (stored != GatewaySessionStoreResult.COMMITTED &&
-                            stored != GatewaySessionStoreResult.ALREADY_COMMITTED
-                        ) {
-                            session.invalidate()
-                            if (stored == GatewaySessionStoreResult.BLOCKED ||
-                                stored == GatewaySessionStoreResult.STORAGE_FAILURE
-                            ) {
-                                GatewaySessionProcessCoordinator.markStorageBlocked(operation)
-                            } else {
-                                GatewaySessionProcessCoordinator.clear(operation)
-                            }
-                            ui.showMessage("로그인을 안전하게 저장하지 못했습니다. 다시 확인하세요.")
-                            ui.refresh()
-                            return@postToMain
-                        }
-                        val published = GatewaySessionProcessCoordinator.publishVerified(
-                            operation = operation,
-                            session = session,
-                            firstRunSnapshot = nextFirstRunSnapshot,
-                        )
-                        if (!published) {
-                            session.versionOrNull?.let(services::removeBackendDeviceIfCurrent)
-                            session.invalidate()
-                            ui.showMessage("로그인 세션을 안전하게 연결하지 못했습니다.")
-                            ui.refresh()
-                            return@postToMain
-                        }
-                        effects.onBackendRestoreVerified()
-                        if (!flow.applyVerifiedLogin(preparedLogin)) {
-                            ui.refresh()
-                            return@postToMain
-                        }
-                        effects.applyVerifiedAccount(session.actorId, reauthenticatesExistingProgress)
-                        if (emailEnrollmentOwnerBindingSha256?.let(storage::clearUnconfirmedCreation) == true) unconfirmedCreation = false
-                        storage.clear()
-                        emailEnrollmentPartial = null
-                        ui.clearInputs(listOf(InputField.EMAIL))
-                        ui.clearInputs(listOf(InputField.PASSWORD))
-                        ui.clearInputs(listOf(InputField.PASSWORD_CONFIRMATION))
-                        ui.clearInputs(listOf(InputField.OTP))
-                        ui.onFirstRunStateChanged(
-                            if (reauthenticatesExistingProgress) {
-                                "다시 로그인했습니다. 기기 점검 상태를 확인한 뒤 중단된 단계를 이어갑니다."
-                            } else {
-                                "로그인했습니다. 먼저 서비스 목적과 안전 한계를 확인하세요."
-                            },
-                        )
-                        effects.refreshConfirmedConsent()
-                        ui.updateStatus(
-                            if (reauthenticatesExistingProgress) {
-                                "account=reauthenticated next=onboarding_resume"
-                            } else {
-                                "account=authenticated next=purpose_and_safety"
-                            },
-                        )
-                    }
+                    postToMain { applyLogin(session) }
                 } catch (error: GatewaySessionHttpException) {
                     GatewaySessionProcessCoordinator.clear(operation)
                     postAccountFailure(token, error.serverCode, error.statusCode)
@@ -787,7 +832,7 @@ internal class EmailAccountController(
                 serverCode == "account_enrollment_idempotency_conflict") {
                 "이전 인증 요청을 사용할 수 없습니다. 가입 정보를 확인한 뒤 인증번호 요청 버튼을 다시 누르세요. 새 요청으로 시작합니다."
             } else if (token.action == AccountRemoteAction.CREATE_ACCOUNT &&
-                statusCode == 0 && serverCode == null) {
+                (statusCode == 0 || statusCode == 408 || statusCode >= 500)) {
                 UNCONFIRMED_CREATION_MESSAGE
             } else when (serverCode) {
                 "account_enrollment_not_allowed" ->

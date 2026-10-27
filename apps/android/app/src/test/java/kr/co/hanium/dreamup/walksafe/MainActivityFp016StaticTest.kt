@@ -156,21 +156,15 @@ class MainActivityFp016StaticTest {
         assertTrue(legacyBack.contains("walkBackDispatcher.onBackPressed()"))
 
         val handler = blockAt("private fun handleWalkScreenBackPressed()")
-        val featureBack = handler.indexOf("if (handleNativeFeatureBackPressed()) return true")
-        val end = handler.indexOf("transitionWalkSession(WalkSessionEvent.EndRequested)")
-        val marker = handler.indexOf("persistWalkSessionInterruptionMarker()")
-        val cancellation = handler.indexOf("cancelWalkSessionOutputs(\"system_back_exit_confirmed\")")
-        val finish = handler.indexOf("finish()")
-        assertTrue(featureBack >= 0)
-        assertTrue(handler.contains("state != WalkSessionState.ACTIVE && state != WalkSessionState.PAUSED"))
-        assertTrue(end > featureBack)
-        assertTrue(marker > end)
-        assertTrue(cancellation > marker)
-        assertTrue(finish > cancellation)
+        assertTrue(handler.contains("showWalkExitConfirmationDialog()"))
+        assertTrue(handler.contains("isInWalkInteractionArea()"))
+        assertFalse(handler.contains("WalkSessionEvent.EndRequested"))
+        assertFalse(handler.contains("finish()"))
         val features = member(source, "handleNativeFeatureBackPressed")
         assertTrue(features.contains("cancelNativeDestinationSearchAndReturnHome()"))
         assertTrue(features.contains("cancelNativeVoiceCommandAndReturnHome()"))
-        assertTrue(features.contains("showNativeUiPage(NativeUiPage.HOME)"))
+        assertTrue(features.contains("returnToCurrentInteractionArea()"))
+
     }
 
     @Test

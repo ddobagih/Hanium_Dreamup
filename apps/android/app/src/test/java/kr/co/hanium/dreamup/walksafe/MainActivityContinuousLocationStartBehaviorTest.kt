@@ -546,7 +546,7 @@ class MainActivityContinuousLocationStartBehaviorTest {
         assertEquals(1, cancelled)
     }
 
-    @Test fun repeatedJumpKeepsTheDeadlineButSecondDistinctJumpAndMockRemainImmediatelyLimited() {
+    @Test fun repeatedJumpKeepsTheDeadlineUntilPersistentBurstAndMockRemainsImmediatelyLimited() {
         val f = Fixture()
         val coordinator = f.field("positioningCoordinator") as PositioningCoordinator
         fun observe(lat: Double, at: Long, mock: Boolean = false): kr.co.hanium.dreamup.walksafe.navigation.positioning.PositioningSnapshot {
@@ -570,12 +570,17 @@ class MainActivityContinuousLocationStartBehaviorTest {
         val distinct = observe(37.6001, 4_000L)
         assertFalse(distinct.singleOutlierAgainstFreshEstimate)
         assertEquals(2, distinct.consecutiveCorruptJumpCount)
+        assertTrue(distinct.transientOutlierAgainstFreshEstimate)
+        assertEquals(EnvironmentEvidenceStatus.PASS, f.evidence?.status)
+        assertEquals(3_000L + GuidanceRecoveryTiming.GPS_GRACE_MS, f.gate.pendingFailureDeadlineElapsedRealtimeMs())
+        val persistent = observe(37.6002, 6_000L)
+        assertFalse(persistent.transientOutlierAgainstFreshEstimate)
         assertEquals(EnvironmentEvidenceStatus.FAIL, f.evidence?.status)
         assertEquals("GPS_CORRUPT_JUMP", f.evidence?.detail)
         assertNull(f.gate.pendingFailureDeadlineElapsedRealtimeMs())
-        observe(37.5, 4_500L)
+        observe(37.5, 6_500L)
         assertEquals(EnvironmentEvidenceStatus.PASS, f.evidence?.status)
-        observe(37.5, 5_000L, mock = true)
+        observe(37.5, 7_000L, mock = true)
         assertEquals(EnvironmentEvidenceStatus.FAIL, f.evidence?.status)
         assertEquals("TRUSTED_FIX_UNAVAILABLE", f.evidence?.detail)
     }

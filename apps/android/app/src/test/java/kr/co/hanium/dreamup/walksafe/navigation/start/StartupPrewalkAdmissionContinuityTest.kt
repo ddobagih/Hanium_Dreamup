@@ -129,6 +129,12 @@ class StartupPrewalkAdmissionContinuityTest {
                 else -> null
             } }, fakePort(), fakePort<NativePrewalkController.Actions> { name, args -> when (name) {
                 "calibrationReady" -> true
+                "requestStartConfirmation" -> {
+                    @Suppress("UNCHECKED_CAST") val current = args[0] as () -> Boolean
+                    @Suppress("UNCHECKED_CAST") val accepted = args[1] as () -> Unit
+                    if (current()) accepted()
+                    null
+                }
                 "postStartup" -> { @Suppress("UNCHECKED_CAST") posts += args[0] as () -> Unit; null }
                 "completeStartupConfirmation" -> { confirmation.confirmed = args[0] as WalkSafeStartupCapabilityDecision; null }
                 "renderMain" -> { startup.refreshStartupCapabilityUi(); null }

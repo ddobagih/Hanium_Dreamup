@@ -406,11 +406,18 @@ public final class AdminRawCollectionHttpClient implements AdminRawCollectionRep
             throws IOException {
             try (input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
                 byte[] buffer = new byte[4_096];
+                int zeroReads = 0;
                 while (true) {
                     owner.check();
                     int read = input.read(buffer);
                     owner.check();
                     if (read < 0) break;
+                    if (read == 0) {
+                        // Match the existing operations/image reader's no-progress limit.
+                        if (++zeroReads > 3) throw new IOException("administrator raw collection response made no progress");
+                        continue;
+                    }
+                    zeroReads = 0;
                     if (output.size() + read > MAX_RESPONSE_BYTES) {
                         throw new IOException("administrator raw collection response is too large");
                     }

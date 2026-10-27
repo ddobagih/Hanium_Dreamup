@@ -671,34 +671,38 @@ public final class AdminOperationsHttpClient implements AdminOperationsApi {
         byte[] content = new byte[expectedByteCount];
         byte[] buffer = new byte[Math.min(4_096, expectedByteCount)];
         boolean succeeded = false;
-        try (input) {
-            int offset = 0;
-            int zeroReads = 0;
-            while (offset < content.length) {
-                requireOriginalEvidenceRequestActive();
-                if (deadline != null) deadline.check();
-                int read = input.read(buffer, 0, Math.min(buffer.length, content.length - offset));
-                requireOriginalEvidenceRequestActive();
-                if (deadline != null) deadline.check();
-                if (read < 0) throw new IOException("original evidence response ended early");
-                if (read == 0) {
-                    if (++zeroReads > MAX_CONSECUTIVE_ZERO_READS) {
-                        throw new IOException("original evidence response made no progress");
+        try {
+            try (input) {
+                int offset = 0;
+                int zeroReads = 0;
+                while (offset < content.length) {
+                    requireOriginalEvidenceRequestActive();
+                    if (deadline != null) deadline.check();
+                    int read = input.read(buffer, 0, Math.min(buffer.length, content.length - offset));
+                    requireOriginalEvidenceRequestActive();
+                    if (deadline != null) deadline.check();
+                    if (read < 0) throw new IOException("original evidence response ended early");
+                    if (read == 0) {
+                        if (++zeroReads > MAX_CONSECUTIVE_ZERO_READS) {
+                            throw new IOException("original evidence response made no progress");
+                        }
+                        continue;
                     }
-                    continue;
+                    zeroReads = 0;
+                    System.arraycopy(buffer, 0, content, offset, read);
+                    offset += read;
                 }
-                zeroReads = 0;
-                System.arraycopy(buffer, 0, content, offset, read);
-                offset += read;
+                requireOriginalEvidenceRequestActive();
+                if (deadline != null) deadline.check();
+                int trailing = input.read();
+                requireOriginalEvidenceRequestActive();
+                if (deadline != null) deadline.check();
+                if (trailing != -1) {
+                    throw new IOException("original evidence response is longer than declared");
+                }
             }
             requireOriginalEvidenceRequestActive();
             if (deadline != null) deadline.check();
-            int trailing = input.read();
-            requireOriginalEvidenceRequestActive();
-            if (deadline != null) deadline.check();
-            if (trailing != -1) {
-                throw new IOException("original evidence response is longer than declared");
-            }
             succeeded = true;
             return content;
         } finally {

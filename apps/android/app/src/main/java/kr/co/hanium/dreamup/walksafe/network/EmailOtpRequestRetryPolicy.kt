@@ -62,6 +62,10 @@ internal class EmailOtpRequestRetryPolicy(
             payload = null // the next explicit retry must read the durable record again
             return null
         }
+        if (storageFailure) {
+            payload = null // retry the durable read, not a fresh ID, on the next explicit request
+            return null
+        }
         if (activeAttempt != null || remainingWaitMs(currentPayload) > 0L) return null
         if (requestId != null) {
             val persisted = try {

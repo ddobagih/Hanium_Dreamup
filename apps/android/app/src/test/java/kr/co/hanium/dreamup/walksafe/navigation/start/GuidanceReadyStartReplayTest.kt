@@ -447,6 +447,7 @@ class GuidanceReadyStartReplayTest {
     "beginCalibration"->{advanceCalibration(a[0] as NativePhoneMountingCheckRequest);Unit};"calibrationReady"->advanceCalibration(a[0] as NativePhoneMountingCheckRequest)
     "cancelCalibration","cancelCalibrationForLocationAccess"->{calibration.cancel();calibrationTimer?.let{r->timers.removeAll{it.second===r}};calibrationTimer=null;Unit}
     "retryPreparation"->{val r=a[0] as NativePhoneMountingCheckRequest;if(prepTimer==null){val t=Runnable{prepTimer=null;if(requestCurrent(r))native.continueIfReady()};prepTimer=t;timers+=now+2_000 to t};Unit}
+    "requestStartConfirmation"->{@Suppress("UNCHECKED_CAST") val current=a[0] as ()->Boolean; @Suppress("UNCHECKED_CAST") val accept=a[1] as ()->Unit; if(current())accept();Unit}
     "postStartup"->{@Suppress("UNCHECKED_CAST")ui+=(a[0] as ()->Unit);Unit};"completeStartupConfirmation"->{confirm.completeStartupCapabilityConfirmation(a[0] as WalkSafeStartupCapabilityDecision);Unit}
     "renderMain"->{workflow.renderMainUi();Unit};"clearStartupRetryRequirement"->{confirm.writeRetryRequired(false);Unit}
     "cancelPendingFeatureEntry"->{workflow.pendingNativeUiPage=null;Unit};else->null}},

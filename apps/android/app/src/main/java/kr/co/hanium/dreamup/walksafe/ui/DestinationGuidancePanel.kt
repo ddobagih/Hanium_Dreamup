@@ -38,18 +38,20 @@ internal class DestinationGuidancePanel(
         val onReroute: () -> Unit,
         val onRecheck: () -> Unit,
         val onEndDeviation: () -> Unit,
+        val onPause: () -> Unit = {},
+        val onTouchGuard: () -> Unit = {},
     )
 
     val voiceReportButton = Button(context).apply {
-        text = "기기 내 음성 명령"
-        contentDescription = "기기 내 음성 명령 듣기 시작"
+        text = "음성 명령"
+        contentDescription = "음성 명령 듣기 시작"
         minimumHeight = style.accessibilityTargetSizePx()
         isSingleLine = false
         setOnClickListener { actions.onVoiceStart() }
     }
 
     val gatewayVoiceStatusText = TextView(context).apply {
-        text = "기기 내 음성 명령 대기"
+        text = "음성 명령 대기"
         contentDescription = text
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
@@ -216,9 +218,28 @@ internal class DestinationGuidancePanel(
         nativeDestinationCancelButton,
     )
 
+    val nativeGuidanceVoiceButton = style.accessiblePriorityUserButton("음성 명령", emphasis = true, onClick = actions.onVoiceStart)
+    val nativeGuidancePauseButton = style.accessiblePriorityUserButton("일시정지", onClick = actions.onPause)
+    val guidanceTouchGuardButton = style.accessiblePriorityUserButton("터치 오작동 방지", onClick = actions.onTouchGuard)
+
+    init {
+        listOf(nativeGuidanceVoiceButton, nativeGuidancePauseButton, nativeGuidanceCancelButton,
+            guidanceTouchGuardButton).forEachIndexed { index, button ->
+            style.applyWsButtonStyle(button, 120f, primary = index == 0)
+            button.textSize = 24f
+            button.id = View.generateViewId()
+        }
+        nativeGuidancePauseButton.accessibilityTraversalAfter = nativeGuidanceVoiceButton.id
+        nativeGuidanceCancelButton.accessibilityTraversalAfter = nativeGuidancePauseButton.id
+        guidanceTouchGuardButton.accessibilityTraversalAfter = nativeGuidanceCancelButton.id
+    }
+
     val nativeGuidanceControls = style.walkSection(
         null,
+        nativeGuidanceVoiceButton,
+        nativeGuidancePauseButton,
         nativeGuidanceCancelButton,
+        guidanceTouchGuardButton,
         nativeGuidanceDestinationText,
         nativeGuidanceStatusText,
         nativeGuidanceMeasurementText,

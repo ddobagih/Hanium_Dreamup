@@ -208,6 +208,7 @@ internal object GatewayAccountInputPolicy {
 }
 
 private fun GatewayHttpResponse.exactJsonOrNull(fields: Set<String>): JSONObject? = runCatching {
+    if (!strictJsonObjectDocument(responseBody)) return@runCatching null
     val value = JSONObject(responseBody)
     value.takeIf { it.jsonKeys() == fields }
 }.getOrNull()

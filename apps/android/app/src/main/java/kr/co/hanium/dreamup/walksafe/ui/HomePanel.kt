@@ -26,6 +26,7 @@ internal class HomePanel(
         val onVoice: () -> Unit,
         val onDestinationSearch: () -> Unit,
         val onSettings: () -> Unit,
+        val onHelp: () -> Unit = {},
     )
 
     private fun homeCard(title: String, onOpen: () -> Unit): Button = Button(context).apply {
@@ -44,6 +45,7 @@ internal class HomePanel(
     val homeCardGrid = LinearLayout(context).apply {
         val gap = (16f * context.resources.displayMetrics.density).roundToInt()
         val cards = listOfNotNull(
+            homeCard("도움말", actions.onHelp),
             cameraCard.takeIf { props.showCameraTest },
             voiceCard,
             destinationCard,

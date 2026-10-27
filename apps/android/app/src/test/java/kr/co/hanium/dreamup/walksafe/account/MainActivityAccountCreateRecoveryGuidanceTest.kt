@@ -12,12 +12,29 @@ class MainActivityAccountCreateRecoveryGuidanceTest {
     ).readText()
 
     @Test
+    fun pendingMarkerPrecedesNetworkAndOnlyCurrentSuccessClearsIt() {
+        val create = MainActivityRefactorSource.member(MainActivityRefactorSource.email, "createEmailAccount")
+        val mark = create.indexOf("storage.markCreationPending(ownerBinding)")
+        val request = create.indexOf("services.createAccount(")
+        val completion = create.indexOf("accountRequestFence.completeIfCurrent", request)
+        val clear = create.indexOf("storage.clearUnconfirmedCreation(ownerBinding)", request)
+        assertTrue(mark >= 0 && request > mark)
+        assertTrue(completion > request && clear > completion)
+        assertTrue(create.contains("if (!storage.markCreationPending(ownerBinding))"))
+        assertTrue(create.contains("if (!storage.clearUnconfirmedCreation(ownerBinding))"))
+        val presenter = File("src/main/java/kr/co/hanium/dreamup/walksafe/ui/AccountAccessPresenter.kt").readText()
+        assertTrue(MainActivityRefactorSource.email.contains("if (unconfirmedCreation) ui.showMessage(UNCONFIRMED_CREATION_MESSAGE)"))
+        assertTrue(presenter.contains("accountAccessNotice != null -> requireNotNull(accountAccessNotice)"))
+
+    }
+
+    @Test
     fun uncertainCreateFailureGuidesSameInfoRetryOrLoginWithoutChangingOtherFailures() {
         val failure = MainActivityRefactorSource.function(source, "private fun postAccountFailure(")
 
         val condition =
             "} else if (token.action == AccountRemoteAction.CREATE_ACCOUNT &&\n" +
-                "                statusCode == 0 && serverCode == null) {"
+                "                (statusCode == 0 || statusCode == 408 || statusCode >= 500)) {"
         val branchStart = failure.indexOf(condition)
         assertTrue("Recovery guidance must be limited to uncertain create failures", branchStart >= 0)
         val branchEnd = failure.indexOf("} else when (serverCode)", branchStart)

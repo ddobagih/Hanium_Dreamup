@@ -34,6 +34,7 @@ internal class RiskFeedbackDeliveryController<Receipt>(
         val activeFeedbackDeliveryKeys: Set<String> = emptySet(),
         val deviceGateAllowsAlerts: Boolean = false,
         val observedAtMs: Long = 0L,
+        val distanceOutputsByDeliveryKey: Map<String, TrackedObjectDepth> = emptyMap(),
     )
 
     private data class PendingFeedbackTerminalResolution(
@@ -84,6 +85,7 @@ internal class RiskFeedbackDeliveryController<Receipt>(
                 activeFeedbackDeliveryKeys = dispatch.activeFeedbackDeliveryKeys,
                 deviceGateAllowsAlerts = dispatch.deviceGateAllowsAlerts,
                 observedAtMs = dispatch.policyEvaluatedAtMs,
+                distanceOutputsByDeliveryKey = dispatch.distanceOutputsByDeliveryKey,
             )
             val outputEvaluation = dispatch.outputEvaluation
             if (
@@ -232,6 +234,23 @@ internal class RiskFeedbackDeliveryController<Receipt>(
                     }
                 },
                 onSpeechCancelled = cancelDelivery,
+                distanceAfterWarning = {
+                    val source = latestFeedbackDeliveryState.distanceOutputsByDeliveryKey[action.deliveryKey]
+                    val refreshed = source?.sourceValidUntilElapsedRealtimeMs?.let { action.copy(validUntilMs = it) }
+                    val detailCurrent = {
+                        !cancelled && expectedWalkEpoch != null &&
+                            admission.lifecycleCurrent(generation) &&
+                            admission.runtimeEpochOrNull() == expectedWalkEpoch &&
+                            startIsCurrent?.invoke() != false && refreshed != null && isFeedbackActionStillDeliverable(refreshed)
+                    }
+                    val text = source?.distanceBriefingFor(action, scheduler.nowMs())
+                    if (!detailCurrent() || source == null || text == null) null
+                    else ObstacleDistanceSpeech(text, source.toFeedbackCandidate()!!.validUntilMs) {
+                        detailCurrent() &&
+                            latestFeedbackDeliveryState.distanceOutputsByDeliveryKey[action.deliveryKey] === source &&
+                            source.distanceBriefingFor(action, scheduler.nowMs()) != null
+                    }
+                },
             )
             vibrationAccepted = dispatch.vibrationAccepted
             if (dispatch.speech != NavigationSpeechDispatchResult.ACCEPTED && !cancelled) {

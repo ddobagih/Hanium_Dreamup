@@ -39,6 +39,8 @@ internal class NativeGuidanceTestFixture(val enableRealCalibration: Boolean = fa
     var commandGeneration = 2L
     var reads = 0
     val startupPosts = mutableListOf<() -> Unit>()
+    var awaitUserStart = false
+    val userStartConfirmations = mutableListOf<Pair<() -> Boolean, () -> Unit>>()
     val failurePosts = mutableListOf<Pair<Long, () -> Unit>>()
     val preparationPosts = mutableListOf<Pair<Long, Runnable>>()
     var lastCompleted: (() -> Unit)? = null
@@ -139,6 +141,13 @@ internal class NativeGuidanceTestFixture(val enableRealCalibration: Boolean = fa
             }
         }, fakePort<NativePrewalkController.Actions> { name, args ->
             when (name) {
+                "requestStartConfirmation" -> {
+                    @Suppress("UNCHECKED_CAST") val current = args[0] as () -> Boolean
+                    @Suppress("UNCHECKED_CAST") val confirmed = args[1] as () -> Unit
+                    if (awaitUserStart) userStartConfirmations += current to confirmed
+                    else if (current()) confirmed()
+                    null
+                }
                 "postStartup" -> { @Suppress("UNCHECKED_CAST") startupPosts += args[0] as () -> Unit; null }
                 "postFailureRetry" -> { @Suppress("UNCHECKED_CAST") failurePosts += args[0] as Long to (args[1] as () -> Unit); null }
                 "publishSpeechFailure" -> { preparation.reportVisibleFailure(args[0] as String); null }

@@ -29,6 +29,7 @@ internal class GatewayVoiceCaptureController(
         val networkTicket: GatewaySpeechNetworkGate.Ticket,
         val expectedWalkEpoch: WalkRuntimeEpoch,
         val expectedNavigationDecisionToken: RouteNavigatorDecisionToken?,
+        val expectedPage: Enum<*>,
     ) {
         // A retired process callback may only cancel this interaction's worker resources.
         @Volatile var uploadFile: File? = null
@@ -88,7 +89,9 @@ internal class GatewayVoiceCaptureController(
         val walk = requireNotNull(environment.walkOrNull())
         if (
             !walk.isForeground ||
-            walk.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)
+            (walk.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
+                !(environment.page().voiceInteraction && environment.homeFeatureContextAvailable()) &&
+                !environment.walkAreaCommandAvailable())
         ) return false
         if (!output.canSpeakNavigation(scheduler.nowMs())) return false
         if (inputSession.recognitionBlocked() ||
@@ -110,9 +113,16 @@ internal class GatewayVoiceCaptureController(
             networkTicket = networkTicket,
             expectedWalkEpoch = walk.epoch,
             expectedNavigationDecisionToken = environment.pendingNavigationDecisionToken(),
+            expectedPage = environment.page().owner,
         )
         val recorder = platform.createRecorder(
-            onLimitReached = { scheduler.runOnMain { stopGatewayVoiceCapture(interactionGeneration) } },
+            onLimitReached = { scheduler.runOnMain {
+                if (activeGatewaySpeechInteraction === active) {
+                    cancelGatewaySpeechInteraction("recording_limit_exceeded")
+                    output.speakInteraction("녹음 제한을 넘어 명령을 실행하지 않았습니다. 짧게 다시 말씀해 주세요.")
+                }
+            } },
+            onSpeechEnded = { scheduler.runOnMain { stopGatewayVoiceCapture(interactionGeneration) } },
             onInputFailure = { failure -> scheduler.runOnMain {
                 if (activeGatewaySpeechInteraction !== active) return@runOnMain
                 inputSession.inputFailed(failure)
@@ -139,7 +149,7 @@ internal class GatewayVoiceCaptureController(
         runCatching { output.playListeningStarted() }
         inputSession.invalidateHomeWakeInput()
         inputSession.setRecordingInputActive(true)
-        presentation.voiceStatus("녹음 중입니다. 버튼을 다시 눌러 전송하세요.")
+        presentation.voiceStatus("듣는 중입니다. 말씀이 끝나면 자동으로 전송합니다.")
         presentation.refreshControls(active = true)
         presentation.navigationStatus("voice=gateway_recording")
         return true
@@ -223,10 +233,8 @@ internal class GatewayVoiceCaptureController(
     ) {
         if (!speechTranscript.acoustic.executionAllowed) {
             presentation.voiceStatus("음성 품질이 낮아 명령을 실행하지 않았습니다.")
-            speakGatewayInteractionOrLocalFallback(
-                "음성을 확실히 확인하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요.",
-                active,
-            )
+            finishGatewaySpeechInteraction(active)
+            output.speakInteraction("음성을 확실히 확인하지 못했습니다. 버튼을 눌러 다시 말씀해 주세요.")
             return
         }
         finishGatewaySpeechInteraction(active)
@@ -334,7 +342,10 @@ internal class GatewayVoiceCaptureController(
         val process = gatewayEnvironment.processSnapshot()
         return requireNotNull(environment.walkOrNull()).let { walk ->
             walk.epoch == active.expectedWalkEpoch &&
-                walk.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) &&
+                environment.page().owner == active.expectedPage &&
+                (walk.state in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED) ||
+                    (environment.page().voiceInteraction && environment.homeFeatureContextAvailable()) ||
+                    environment.walkAreaCommandAvailable()) &&
                 isGatewaySpeechCallbackCurrent(
                     expected = active.fence,
                     currentActorId = process.session?.actorId,

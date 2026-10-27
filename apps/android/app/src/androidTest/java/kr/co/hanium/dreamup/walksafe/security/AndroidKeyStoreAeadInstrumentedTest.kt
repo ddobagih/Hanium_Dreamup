@@ -1,8 +1,15 @@
 package kr.co.hanium.dreamup.walksafe.security
 
+import android.os.Bundle
+import android.security.keystore.KeyInfo
+import android.security.keystore.KeyProperties
+import androidx.test.filters.SdkSuppress
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.security.KeyStore
 import java.util.UUID
+import javax.crypto.SecretKey
+import javax.crypto.SecretKeyFactory
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -12,6 +19,36 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AndroidKeyStoreAeadInstrumentedTest {
+    /** Measures this device's generated key, without claiming fleet-wide StrongBox support. */
+    @Test
+    @SdkSuppress(minSdkVersion = 31)
+    fun reportsActualProtectionLevelOfAnIsolatedProductionGeneratedKey() {
+        val policy = AeadKeyPolicy("walksafe.instrumentation.aead.${UUID.randomUUID()}.v", KEY_VERSION, setOf(KEY_VERSION))
+        val alias = policy.alias(KEY_VERSION)
+        val aead = AndroidKeyStoreAead(policy)
+        try {
+            assertTrue(aead.seal("probe".toByteArray(), AAD, LIMITS) is AeadSealResult.Sealed)
+            val key = androidKeyStore().getKey(alias, null) as SecretKey
+            val info = SecretKeyFactory.getInstance(key.algorithm, "AndroidKeyStore")
+                .getKeySpec(key, KeyInfo::class.java) as KeyInfo
+            val level = when (info.securityLevel) {
+                KeyProperties.SECURITY_LEVEL_SOFTWARE -> "SOFTWARE"
+                KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> "TRUSTED_ENVIRONMENT"
+                KeyProperties.SECURITY_LEVEL_STRONGBOX -> "STRONGBOX"
+                else -> "UNKNOWN(${info.securityLevel})"
+            }
+            assertEquals(256, info.keySize)
+            InstrumentationRegistry.getInstrumentation().sendStatus(0, Bundle().apply {
+                putString("stream", "KEY_PROTECTION level=$level key_bits=${info.keySize} user_auth_required=${info.isUserAuthenticationRequired}; isolated_production_factory=true fleet_guarantee=false\n")
+            })
+        } finally {
+            assertTrue(aead.destroyKnownVersions())
+            androidKeyStore().deleteEntry("$alias.generation")
+            assertFalse(androidKeyStore().containsAlias(alias))
+            assertFalse(androidKeyStore().containsAlias("$alias.generation"))
+        }
+    }
+
     @Test
     fun destroyedAliasIsNotRecreatedBySealInSameProcess() {
         val aliasPrefix = "walksafe.instrumentation.aead.${UUID.randomUUID()}.v"

@@ -14,7 +14,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class HttpMetadataLogUploaderTest {
+class HttpMetadataLogUploaderLocalRegressionTest {
     @Test
     fun dropsConnectionFailureWithoutCrashingTheCaller() {
         var attempts = 0

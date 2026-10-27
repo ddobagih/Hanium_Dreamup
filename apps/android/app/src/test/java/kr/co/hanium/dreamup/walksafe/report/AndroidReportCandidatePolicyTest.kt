@@ -25,7 +25,6 @@ class AndroidReportCandidatePolicyTest {
         assertNull(policy.prepare(current.copy(capturedAtElapsedRealtimeMs = -1L)))
         assertNull(policy.prepare(current.copy(location = current.location!!.copy(elapsedRealtimeMs = -1L))))
         assertNull(policy.prepare(current.copy(requestElapsedRealtimeMs = 1_899L)))
-        assertNull(policy.prepare(current.copy(capturedAtElapsedRealtimeMs = null)))
     }
 
     @Test
@@ -323,9 +322,45 @@ class AndroidReportCandidatePolicyTest {
         }
     }
 
+    @Test
+    fun rejectsLocationMeasuredAfterCaptureEvenIfFreshWhenReportIsRequested() {
+        val valid = input(location = TrustedLocation(37.0, 127.0, 5f, 1_900L))
+        assertNotNull(policy.prepare(valid))
+        val laterGps = valid.copy(location = valid.location!!.copy(elapsedRealtimeMs = 1_901L))
+        assertEquals(AndroidReportCandidateRejection.LOCATION_UNTRUSTED,
+            (policy.evaluate(laterGps) as AndroidReportCandidateResult.Rejected).reason)
+        assertNull(policy.prepare(valid.copy(location = valid.location.copy(elapsedRealtimeMs = -1L))))
+    }
+
+    @Test
+    fun requiresAConsistentMonotonicCaptureClockWithoutClampingInvalidAges() {
+        val valid = input()
+        for (capture in listOf(null, -1L, 2_001L, 1_899L)) {
+            assertEquals(AndroidReportCandidateRejection.LOCATION_UNTRUSTED,
+                (policy.evaluate(valid.copy(capturedAtElapsedRealtimeMs = capture))
+                    as AndroidReportCandidateResult.Rejected).reason)
+        }
+        // Moving the wall clock cannot make a stale frame fresh or invalidate a fresh one.
+        for (wall in listOf(valid.capturedAtMs - 60_000L, valid.capturedAtMs + 60_000L)) {
+            assertNotNull(policy.prepare(valid.copy(capturedAtMs = wall)))
+            assertNull(policy.prepare(valid.copy(capturedAtMs = wall,
+                requestElapsedRealtimeMs = 3_101L, detectionAgeMs = 1_201L)))
+        }
+    }
+
+    @Test
+    fun retainsTheExistingTenSecondLocationLimitAtCaptureAndRequest() {
+        val valid = input(location = TrustedLocation(37.0, 127.0, 15f, 1_000L),
+            requestElapsedRealtimeMs = 11_000L, detectionAgeMs = 0L)
+        assertNotNull(policy.prepare(valid))
+        assertNull(policy.prepare(valid.copy(location = valid.location!!.copy(elapsedRealtimeMs = 999L))))
+        // A fix still fresh at capture can expire while inference is completing.
+        assertNull(policy.prepare(valid.copy(requestElapsedRealtimeMs = 11_001L, detectionAgeMs = 1L)))
+    }
+
     private fun input(
         depth: TrackedObjectDepth = depth(),
-        location: TrustedLocation? = TrustedLocation(37.0, 127.0, 8f, 1_000L),
+        location: TrustedLocation? = TrustedLocation(37.0, 127.0, 8f, 0L),
         modelKey: String? = "custom_tactile",
         deviceGateAllowsReports: Boolean = true,
         heading: Float? = 181f,
@@ -346,12 +381,12 @@ class AndroidReportCandidatePolicyTest {
             threshold = 0.35f,
             capturedAtMs = 1_782_907_200_000L,
             requestElapsedRealtimeMs = requestElapsedRealtimeMs,
-            capturedAtElapsedRealtimeMs = 1_900L,
             trigger = trigger,
             reporterUserId = "user-123",
             traceId = "trace-1",
             deviceGateAllowsReports = deviceGateAllowsReports,
             detectionAgeMs = detectionAgeMs,
+            capturedAtElapsedRealtimeMs = detectionAgeMs?.let { requestElapsedRealtimeMs - it },
             coordinateGateStatus = "pass",
             heading = heading,
             fallbackUsed = false,

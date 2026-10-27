@@ -369,6 +369,35 @@ class EmailAccountControllerTest {
         assertInOrder(confirmed.events, "mark-creation-pending", "account-created", "clear-creation-pending")
     }
 
+    @Test fun completedEducationPromotesOnlyTheNextPasswordLoginAndStoresBeforePublishing() {
+        val f = Fixture().ready()
+        val receipt = FirstRunReceiptHash.fromSha256Hex("a".repeat(64))
+        val policy = FirstRunOnboardingPolicy
+        var state = policy.recordVerifiedEmailLogin(policy.initialEmailAccount(), FirstRunOpaqueActorBinding.fromProvider(ACTOR), receipt).current
+        state = policy.acknowledgePurposeAndSafety(state,
+            kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingAttemptRequest.forSnapshot(state,
+                "req_" + "b".repeat(64), "att_" + "c".repeat(64)), receipt).current
+        state = policy.recordEmailJitPermissionObservation(state, state.epoch, state.revision).current
+        state = policy.recordEmailDeviceCheckPassed(state, state.epoch, state.revision).current
+        state = policy.beginAttempt(state, kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingAttemptRequest.forSnapshot(state,
+            "req_" + "d".repeat(64), "att_" + "e".repeat(64))).current
+        f.completedProgress = policy.completeAttempt(state, state.pendingAttempt!!,
+            kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingEvidence.Fp004Training(receipt),
+            kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingEvidenceVerifier { _, _ -> true }).current
+        assertEquals(FirstRunOnboardingStage.COMPLETE, f.completedProgress!!.stage)
+        f.controller.loginEmailAccount(); f.runWorker(); f.runMain()
+        val enabled = kr.co.hanium.dreamup.walksafe.BuildConfig.WALKSAFE_LONG_LIVED_LOGIN_ENABLED
+        if (enabled) {
+            assertNull(f.savedFirstRun)
+            assertNull(GatewaySessionProcessCoordinator.snapshot().session)
+            f.runWorker(); f.runMain()
+        }
+        assertEquals(if (enabled) listOf(false, true) else listOf(false), f.loginLongFlags)
+        assertEquals(enabled, GatewaySessionProcessCoordinator.snapshot().session!!.isLongLived)
+        assertNotNull(f.savedFirstRun)
+        if (enabled) assertInOrder(f.events, "password-login", "remote-logout", "store-login", "verified-binding")
+    }
+
     private class Fixture : EmailAccountController.Flow, EmailAccountController.Inputs,
         EmailAccountController.Services, EmailAccountController.Ui, EmailAccountController.VerifiedEffects {
         val events = mutableListOf<String>()
@@ -479,7 +508,9 @@ class EmailAccountControllerTest {
         }
         fun runWorker() = worker.removeFirst().run()
         fun runMain() = main.removeFirst().invoke()
-        override fun completedNativeProgress(actorId: String): FirstRunOnboardingSnapshot? = null
+        var completedProgress: FirstRunOnboardingSnapshot? = null
+        val loginLongFlags = mutableListOf<Boolean>()
+        override fun completedNativeProgress(actorId: String) = completedProgress?.takeIf { it.verifiedActorBinding?.value == actorId }
         override fun text(field: EmailAccountController.InputField) = values.getValue(field)
         override fun consentSelections() = selections
         override fun signupExpanded() = expanded
@@ -502,11 +533,16 @@ class EmailAccountControllerTest {
             createFailure?.let { throw it }
             return CreatedEmailAccount(ACTOR, 1L, "b".repeat(64))
         }
-        override fun loginWithPassword(gatewayBaseUrl: String, email: String, password: String, rememberMe: Boolean, deviceId: String): GatewayFieldSession {
+        override fun loginWithPassword(gatewayBaseUrl: String, email: String, password: String, rememberMe: Boolean, deviceId: String, enableLongLivedSession: Boolean): GatewayFieldSession {
             events.add("password-login")
+            loginLongFlags += enableLongLivedSession
             loginEmail = email; loginPassword = password; loginRememberMe = rememberMe
-            return GatewayFieldSession.verified(ORIGIN, loginActor, "walksafe_field_session=v2.test.account.session", Long.MAX_VALUE)
+            return if (enableLongLivedSession) GatewayFieldSession.longLivedSession(ORIGIN, loginActor,
+                deviceId, "f".repeat(32), 0L, "walksafe_field_session=v6.test.account.session", "r".repeat(64),
+                wallMs + 900_000L, Long.MAX_VALUE, Long.MAX_VALUE)
+            else GatewayFieldSession.verified(ORIGIN, loginActor, "walksafe_field_session=v2.test.account.session", Long.MAX_VALUE)
         }
+        override fun retirePasswordLogin(session: GatewayFieldSession, operationId: String) = session.versionOrNull?.let(::removeBackendDeviceIfCurrent) ?: GatewaySessionStoreResult.BLOCKED
         override fun logout(session: GatewayFieldSession) { events.add("remote-logout") }
         override fun saveBackendDeviceIfAbsent(session: GatewayFieldSession, firstRunSnapshot: FirstRunOnboardingSnapshot, expectedGatewayBaseUrl: String): GatewaySessionStoreResult {
             events.add("store-login")

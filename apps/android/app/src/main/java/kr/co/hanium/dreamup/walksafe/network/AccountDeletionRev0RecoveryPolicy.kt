@@ -27,6 +27,10 @@ private data class ExactAccountDeletionRev0Candidate(
     val markerRecord: AndroidAccountDeletionFallbackMarker.Record,
 )
 
+internal fun AccountDeletionJournal.requiresDeletionReauthentication(): Boolean =
+    serverRevision == 0L && phase == AccountDeletionPhase.RETRY_WAIT &&
+        lastErrorCode == ACCOUNT_DELETION_REAUTHENTICATION_RETRY_CODE
+
 internal fun exactAccountDeletionRev0RecoveryBindingOrNull(
     journal: AccountDeletionJournal?,
     markerState: AndroidAccountDeletionFallbackMarker.State,
@@ -49,7 +53,8 @@ internal fun exactAccountDeletionRev0RecoveryBindingOrNull(
     ) ?: return null
     if (
         requireReauthentication &&
-        reauthenticationRequestId != candidate.journal.requestId
+        reauthenticationRequestId != candidate.journal.requestId &&
+        !candidate.journal.requiresDeletionReauthentication()
     ) return null
     val record = candidate.markerRecord
     val actorId = record.recoveryActorId ?: return null

@@ -10,7 +10,7 @@ import org.junit.Test
 
 class MessagePolicyTest {
     @Test
-    fun crossedScreenPositionAndMeasuredMotionRemainSeparate() {
+    fun shortStopSpeechOmitsUnverifiedUserDirectionAndMotion() {
         val base = MetricDepthDecision(
             className = "person", source = DepthSource.ARCORE_RAW_DEPTH, riskDistanceM = 1f,
             trend = Trend.STABLE, confidenceFinal = 0.9f,
@@ -24,10 +24,10 @@ class MessagePolicyTest {
             motionEstimate = measuredMotion(ObjectMovementDirection.LEFT),
         ), nowMs = 0L).message!!
 
-        assertTrue(leftMovingRight.contains("카메라 화면 왼쪽에 있는"))
-        assertTrue(leftMovingRight.contains("카메라 기준 오른쪽으로 이동"))
-        assertTrue(rightMovingLeft.contains("카메라 화면 오른쪽에 있는"))
-        assertTrue(rightMovingLeft.contains("카메라 기준 왼쪽으로 이동"))
+        assertEquals(leftMovingRight, rightMovingLeft)
+        assertTrue(leftMovingRight.startsWith("멈추세요."))
+        assertFalse(leftMovingRight.contains("왼쪽"))
+        assertFalse(leftMovingRight.contains("오른쪽"))
         for (message in listOf(leftMovingRight, rightMovingLeft)) {
             assertFalse(message.contains("전방"))
             assertFalse(message.contains("다가오"))
@@ -55,7 +55,7 @@ class MessagePolicyTest {
     }
 
     @Test
-    fun pseudoAndWeakMessagesUseOnlySupportedCameraScreenSide() {
+    fun pseudoAndWeakMessagesRemainCautionsWithoutDirectionOrNumericDistance() {
         val pseudo = MetricDepthDecision(
             className = "person", source = DepthSource.POLYGON_TREND_PSEUDO_DEPTH,
             riskDistanceM = null, trend = Trend.APPROACHING, confidenceFinal = 0.8f,
@@ -69,8 +69,15 @@ class MessagePolicyTest {
         val pseudoMessage = MessagePolicy().buildUserFacing(pseudo, nowMs = 0L).message!!
         val weakMessage = MessagePolicy().buildUserFacing(weak, nowMs = 0L).message!!
 
-        assertTrue(pseudoMessage.contains("카메라 화면 왼쪽에 있는"))
-        assertTrue(weakMessage.contains("카메라 화면 오른쪽에 있는"))
+        assertFalse(pseudoMessage.contains("왼쪽"))
+        assertFalse(weakMessage.contains("오른쪽"))
+        assertTrue(pseudoMessage.contains("가까워지는 것으로 보입니다"))
+        assertTrue(weakMessage.contains("있을 수 있습니다"))
+        for (message in listOf(pseudoMessage, weakMessage)) {
+            assertTrue(message.contains("속도를 늦추고"))
+            assertFalse(message.contains("미터"))
+            assertFalse(message.startsWith("멈추세요."))
+        }
         assertFalse(pseudoMessage.contains("전방"))
         assertFalse(weakMessage.contains("전방"))
         assertFalse(pseudoMessage.contains("이 물체가 사용자 쪽으로 다가오"))
@@ -122,7 +129,7 @@ class MessagePolicyTest {
     }
 
     @Test
-    fun stationaryObstacleAndIncomingObjectUseDifferentGuidance() {
+    fun motionAttributionDoesNotDelayStopSpeechOrChangeRiskLevel() {
         val approaching = MetricDepthDecision(
             className = "car",
             source = DepthSource.ARCORE_RAW_DEPTH,
@@ -144,12 +151,9 @@ class MessagePolicyTest {
         )
         val unknown = MessagePolicy().buildUserFacing(approaching, 0L)
 
-        assertTrue(stationary.message!!.contains("정지해 있는 것으로 보이며"))
-        assertTrue(stationary.message!!.contains("정지해 있는 것으로 보이며, 사용자가 다가갑니다."))
-        assertTrue(incoming.message!!.contains("이 물체가 사용자 쪽으로 다가오는 것으로 보입니다"))
-        assertTrue(unknown.message!!.contains("거리가 줄어들고 있습니다"))
-        assertFalse(unknown.message!!.contains("정지해"))
-        assertFalse(unknown.message!!.contains("다가오"))
+        assertTrue(stationary.message!!.startsWith("멈추세요."))
+        assertEquals(stationary.message, incoming.message)
+        assertEquals(stationary.message, unknown.message)
         assertEquals(stationary.messageLevel, incoming.messageLevel)
         assertEquals(stationary.stepsAhead, incoming.stepsAhead)
     }
@@ -373,7 +377,7 @@ class MessagePolicyTest {
 
         assertEquals(MessagePurpose.OBSTACLE_WARNING, decision.purpose)
         assertEquals(MessageLevel.STOP, decision.userFacing.messageLevel)
-        assertTrue(decision.userFacing.message?.endsWith("멈추세요. 주변을 확인하세요.") == true)
+        assertTrue(decision.userFacing.message?.startsWith("멈추세요.") == true)
         assertFalse(decision.userFacing.message == CROSSWALK_REFERENCE_NOTICE_KO)
     }
 
@@ -496,7 +500,7 @@ class MessagePolicyTest {
         assertEquals(MessageLevel.WARNING, decision.userFacing.messageLevel)
         val message = requireNotNull(decision.userFacing.message)
         assertTrue(message.contains("멈출 준비를 하세요."))
-        assertTrue(message.indexOf("멈출 준비를 하세요.") < message.indexOf("거리가 줄어들고 있습니다."))
+        assertFalse(message.contains("거리가 줄어들고 있습니다."))
     }
 
     @Test

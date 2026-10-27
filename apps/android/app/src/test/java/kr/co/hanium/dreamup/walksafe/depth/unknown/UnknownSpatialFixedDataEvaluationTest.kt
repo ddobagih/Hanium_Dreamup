@@ -5,6 +5,7 @@ import java.security.MessageDigest
 import kr.co.hanium.dreamup.walksafe.depth.*
 import kr.co.hanium.dreamup.walksafe.feedback.WalkSafeFeedbackPolicy
 import kr.co.hanium.dreamup.walksafe.feedback.toFeedbackCandidate
+import kr.co.hanium.dreamup.walksafe.feedback.distanceBriefingFor
 import kr.co.hanium.dreamup.walksafe.session.WalkRuntimeEpoch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -68,18 +69,25 @@ class UnknownSpatialFixedDataEvaluationTest {
                 dimensions.getDouble(0).toFloat(), dimensions.getDouble(1).toFloat(),
                 values.getBoolean("canRejectSmall") && values.getBoolean("fullyCovered"), "stipulated_synthetic_extent")
             val selection = UnknownWalkingObstaclePolicy.select(mask, tracked, 0, null, extent, spatial)
-            val selectedOutput = tracked.copy(walkingObstacleCandidate = selection.warningCandidate)
+            val selectedOutput = tracked.copy(walkingObstacleCandidate = selection.warningCandidate,
+                measuredSurfaceRangeM = spatial.nearestReliableRangeM.takeIf { independent })
             val epoch = WalkRuntimeEpoch("synthetic-spatial-evaluation", 0L)
             val admitted = UnknownObjectFeedbackPolicy().admit(listOf(selectedOutput), now * 1_000_000L, now,
                 now * 1_000_000L, now + 10L, epoch, epoch, now + 10L)
             val feedbackCandidates = admitted?.outputs.orEmpty().mapNotNull { it.toFeedbackCandidate() }
             val action = WalkSafeFeedbackPolicy().evaluateCandidates(feedbackCandidates, true, now + 10L)
+            val distanceBriefing = action?.let { a -> admitted?.outputs?.single()?.distanceBriefingFor(a, now + 10L) }
+            if (action != null) {
+                assertTrue(action.message.startsWith("멈추세요."))
+                assertTrue("${item.getString("id")} measured briefing", distanceBriefing?.contains("카메라에서") == true)
+            }
             rows.put(JSONObject().put("id", item.getString("id")).put("label", item.getString("label"))
                 .put("rawCandidateCount", 1).put("worldSampleCount", samples.size).put("maskArea", mask.area)
                 .put("show", selection.show).put("warningCandidate", selection.warningCandidate).put("selectionReason", selection.reason)
                 .put("spatialDisposition", spatial.disposition.name).put("spatialReason", spatial.reason)
                 .put("nearestReliableRangeM", spatial.nearestReliableRangeM ?: JSONObject.NULL)
                 .put("feedbackAdmittedCount", admitted?.outputs?.size ?: 0).put("feedbackCandidateCount", feedbackCandidates.size)
+                .put("distanceBriefing", distanceBriefing ?: JSONObject.NULL)
                 .put("queueActionCount", if (action == null) 0 else 1).put("queueMessage", action?.message ?: JSONObject.NULL)
                 .put("expectedShow", item.getBoolean("expectedShow")).put("expectedWarningCandidate", item.getBoolean("expectedWarningCandidate")))
             baselineCases.put(JSONObject().put("id", item.getString("id")).put("label", item.getString("label"))

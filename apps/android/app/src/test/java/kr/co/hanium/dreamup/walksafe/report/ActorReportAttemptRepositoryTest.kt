@@ -42,7 +42,7 @@ class ActorReportAttemptRepositoryTest {
         repeat(40) { f.repository.persistTransientFailure(key, f.now) }
         assertEquals(32, JSONObject(f.preferences.getString(ActorReportAttemptRepository.PREF_REPORT_ATTEMPT_STATE_V2, null)!!)
             .getJSONArray("entries").getJSONObject(0).getInt("failures"))
-        assertEquals(60_000L, f.repository.persistTransientFailure(key, f.now, 401))
+        assertEquals(30_000L, f.repository.persistTransientFailure(key, f.now, 401))
         assertEquals(90_000L, f.repository.persistTransientFailure(key, f.now, 429, 90_000L))
     }
 

@@ -37,7 +37,8 @@ import {
   QueueAdmissionBusyError
 } from "../src/keyed-admission-queue.js";
 import {
-  revokeFieldSessionsForSecurityEvent
+  revokeFieldSessionsForSecurityEvent,
+  establishGatewaySession
 } from "../src/auth.js";
 import {
   assertFieldLongSessionConfiguration,
@@ -652,12 +653,17 @@ test("S19-21 a second gateway process on another port fails before listen", asyn
   }
 });
 
-test("S19-12 production long-lived cookies are Secure on internal HTTP requests", async () => {
+test("S19-12 production short and long-lived cookies are Secure on internal HTTP requests", async () => {
   const internalUrl = "http://127.0.0.1:8081/api/field-session";
   const headers: Array<[string, string]> = [];
   const previousNodeEnv = process.env.NODE_ENV;
   try {
     process.env.NODE_ENV = "production";
+    const shortSession = establishGatewaySession(new Request(internalUrl, {
+      headers: { "x-forwarded-proto": "http" }
+    }), ACTOR_ID);
+    assert.equal(shortSession.status, 200);
+    headers.push(["short-login", shortSession.headers.get("set-cookie") ?? ""]);
     const issued = await establishFieldLongSession(
       new Request(internalUrl), ACTOR_ID, "s19-12-production-device"
     );
@@ -1473,6 +1479,24 @@ test("removing an actor account immediately closes status and device-management 
     })
   );
   assert.equal(revoke.status, 401);
+});
+
+test("S19-6 lost rotation response cleanup with old proof revokes only that device family", async () => {
+  const lostResponseDevice = await login("lost-response-device");
+  const otherDevice = await login("unaffected-device");
+  // The server committed a rotation; the client only retained the old proof before losing the response.
+  const rotated = await responseSession(await refresh(lostResponseDevice));
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const logout = await handleGatewayRequest(new Request("https://gateway.invalid/api/field-session", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(refreshPayload(lostResponseDevice))
+    }));
+    assert.equal(logout.status, 204);
+    assert.equal((await status(rotated.cookie)).authenticated, false);
+    assert.equal((await status(otherDevice.cookie)).authenticated, true);
+  }
+  assert.equal((await refresh(otherDevice)).status, 200);
 });
 
 test("refresh-proof logout works without an access cookie and is idempotent", async () => {

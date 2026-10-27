@@ -369,6 +369,52 @@ public final class AdminPatchOkHttpTransportTest {
         }
     }
 
+    @Test
+    public void closingEachRepositoryCancelsItsChallengeAndPreventsFollowUpRequests() throws Exception {
+        for (boolean report : new boolean[] {true, false}) {
+            try (MockWebServer server = new MockWebServer()) {
+                server.start();
+                server.enqueue(new MockResponse.Builder().code(200)
+                    .bodyDelay(5, TimeUnit.SECONDS).body("delayed challenge").build());
+                AdminReportHttpClient reports = reportClient(server.url("/").toString());
+                AdminIncidentHttpClient incidents = incidentClient(server.url("/").toString());
+                AtomicReference<Throwable> failure = new AtomicReference<>();
+                Thread worker = new Thread(() -> {
+                    try {
+                        if (report) reports.detail(SESSION, REPORT_ID);
+                        else incidents.detail(SESSION, INCIDENT_ID);
+                    } catch (Throwable error) { failure.set(error); }
+                });
+                worker.start();
+                try {
+                    RecordedRequest started = server.takeRequest(2, TimeUnit.SECONDS);
+                    assertNotNull("request failed before dispatch: " + failure.get(), started);
+                    if (report) reports.cancelInFlightRequests();
+                    else incidents.cancelInFlightRequests();
+                    worker.join(2_000);
+                    assertFalse("closed request must stop promptly", worker.isAlive());
+                    assertTrue(failure.get() instanceof IOException);
+                    assertThrows(IOException.class, () -> {
+                        if (report) reports.detail(SESSION, REPORT_ID);
+                        else incidents.detail(SESSION, INCIDENT_ID);
+                    });
+                    assertEquals("no follow-up or fresh request from a closed owner", 1, server.getRequestCount());
+                    server.enqueue(new MockResponse.Builder().code(200).body("alive").build());
+                    assertEquals(200, AdminOkHttpTransport.execute(
+                        "GET", server.url("/other-owner").toString(), Map.of(), null,
+                        1024, "cancelled", "no progress", "too large"
+                    ).statusCode);
+                    assertEquals(2, server.getRequestCount());
+                } finally {
+                    reports.cancelInFlightRequests();
+                    incidents.cancelInFlightRequests();
+                    worker.interrupt();
+                    worker.join(2_000);
+                }
+            }
+        }
+    }
+
     private static Dispatcher dispatcher(List<RecordedRequest> patches) {
         return new Dispatcher() {
             @Override

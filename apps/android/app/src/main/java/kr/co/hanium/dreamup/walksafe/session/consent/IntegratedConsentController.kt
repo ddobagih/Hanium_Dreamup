@@ -1383,6 +1383,12 @@ internal class IntegratedConsentController(
                             }
                             return@runOnUiThread
                         }
+                        // A fresh receipt supplies the CAS base for an unsaved withdrawal.
+                        // Retry that denial before exposing completion or restored permissions.
+                        if (integratedConsentSession.withdrawalRecoverySelectionsOrNull() != null) {
+                            persistIntegratedConsentDraft(announce = false)
+                            return@runOnUiThread
+                        }
                         if (completeOnboarding) {
                             ui.completeFirstRunIfReady(
                                 appliedConfirmation,

@@ -32,6 +32,7 @@ class FastSamProductionRuntimeDeviceTest {
         assumeTrue("Requires -e fastSamProductionOptIn true",
             InstrumentationRegistry.getArguments().getString("fastSamProductionOptIn") == "true")
         val context = instrumentation.targetContext.applicationContext
+        val cacheEnabled = InstrumentationRegistry.getArguments().getString("fastSamProductionCacheEnabled") == "true"
         val started = SystemClock.elapsedRealtimeNanos()
         val deadline = started + TimeUnit.SECONDS.toNanos(240)
         val directory = File(requireNotNull(context.getExternalFilesDir(null)),
@@ -42,6 +43,7 @@ class FastSamProductionRuntimeDeviceTest {
             .put("modelId", FastSamModelContract.MODEL_ID).put("modelSha256", FastSamModelContract.SHA256)
             .put("modelAsset", FastSamModelContract.ASSET).put("inputSize", 768)
             .put("device", Build.MODEL).put("sdkInt", Build.VERSION.SDK_INT).put("budgetMs", 240000)
+            .put("gpuSerializationCacheRequested", cacheEnabled)
             .put("activityLaunched", false).put("imagesSaved", false).put("rawOutputsSaved", false)
             .put("cameraAcquired", false).put("fieldDepthValidated", false).put("approachValidated", false)
             .put("qualityComparisonValidated", false).put("nativeHardTimeout", false).put("backends", backends)
@@ -68,7 +70,7 @@ class FastSamProductionRuntimeDeviceTest {
                 val epoch = SystemClock.elapsedRealtimeNanos()
                 val options = FastSamRuntimeOptions(backend, 1,
                     backend == FastSamRuntimeOptions.Backend.GPU, deadline - TimeUnit.SECONDS.toNanos(8),
-                    5000, true)
+                    5000, true, false, cacheEnabled)
                 val service = FastSamRuntimeService(context, epoch, options,
                     object : FastSamRuntimeService.Listener<String> {
                         override fun onResult(result: FastSamResult<String>) {

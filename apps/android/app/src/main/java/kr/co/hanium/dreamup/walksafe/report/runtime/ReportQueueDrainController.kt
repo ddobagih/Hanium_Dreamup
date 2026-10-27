@@ -70,6 +70,7 @@ internal class ReportQueueDrainController(
         val walkSnapshot: () -> WalkSessionSnapshot,
         val reporterActorId: () -> String?,
         val automaticCleanupReady: () -> Boolean = { true },
+        val sensitiveStorageBlocked: () -> Boolean = { false },
     )
 
     interface Runtime {
@@ -307,6 +308,7 @@ internal class ReportQueueDrainController(
     }
 
     fun reportQueueRecoveryBaseGatesAvailable(): Boolean {
+        if (sources.sensitiveStorageBlocked()) return false
         if (
             !capacityProfileAvailable() ||
             !reportPrivacyConsentSession.isGranted() ||
@@ -359,7 +361,7 @@ internal class ReportQueueDrainController(
             )
         }
         val currentConfirmation = integratedConsentSession.currentConfirmationOrNull()
-        val consentAllowed =
+        val consentAllowed = !sources.sensitiveStorageBlocked() &&
             runtime.triggerCurrent &&
                 reportPrivacyConsentSession.isGranted() &&
                 currentConfirmation == trigger.consentConfirmation

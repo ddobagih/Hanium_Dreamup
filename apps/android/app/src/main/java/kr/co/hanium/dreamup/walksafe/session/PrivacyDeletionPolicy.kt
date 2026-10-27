@@ -180,6 +180,25 @@ data class DeletionItemStatus(
     }
 }
 
+data class AccountDeletionDeviceVerification(
+    val completionView: String,
+    val unverifiableCount: Long,
+)
+
+internal fun AccountDeletionStatus.deviceVerificationNoticeFor(
+    journal: AccountDeletionJournal?,
+): String? {
+    if (journal == null || journal.requestId != requestId ||
+        journal.installationId != installationId || journal.serverRevision != revision ||
+        journal.tombstoneId != tombstoneId || journal.requestReceiptSha256 != requestReceiptSha256 ||
+        journal.items != items || journal.lastErrorCode != null ||
+        journal.phase == AccountDeletionPhase.FAIL_CLOSED ||
+        deviceVerification?.completionView != "SERVER_COMPLETED_DEVICE_UNVERIFIED"
+    ) return null
+    return "서버 자료 삭제는 완료됐지만, ${deviceVerification.unverifiableCount}개 기기의 삭제 여부는 확인하지 못했습니다. " +
+        "해당 기기에서 앱을 삭제하거나 다음 접속 시 삭제를 진행해야 합니다. 전체 삭제 완료는 아닙니다."
+}
+
 data class AccountDeletionStatus(
     val schemaVersion: String,
     /** Local binding only; this value is not present in the wire status object. */
@@ -197,6 +216,8 @@ data class AccountDeletionStatus(
     val tombstoneId: String = "local-tombstone-placeholder",
     val requestReceiptSha256: String = "0".repeat(64),
     val overallStatus: AccountDeletionOverallStatus = derivedOverallStatus(items),
+    /** Display-only GET projection; never grants deletion completion authority. */
+    val deviceVerification: AccountDeletionDeviceVerification? = null,
 ) {
     init {
         require(schemaVersion == ACCOUNT_DELETION_STATUS_SCHEMA_VERSION)

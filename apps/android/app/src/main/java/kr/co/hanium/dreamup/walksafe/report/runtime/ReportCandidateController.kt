@@ -43,6 +43,7 @@ internal class ReportCandidateController(
             priority: ReportQueuePriority, walkSessionId: String, consentReceiptSha256: String, accountGeneration: Long?): QueuedReport?
     }
     interface Authority {
+        fun sensitiveStorageBlocked(): Boolean = false
         fun reportPermissionsAllowWork(): Boolean
         fun currentRuntimeEpochOrNull(): WalkRuntimeEpoch?
         fun isRuntimeEpochCurrent(epoch: WalkRuntimeEpoch): Boolean
@@ -187,6 +188,7 @@ internal class ReportCandidateController(
         explicitConfirmationContext: ExplicitReportConfirmationContext? = null,
         explicitConfirmationRequestedAtElapsedRealtimeMs: Long? = null,
     ): String {
+        if (authority.sensitiveStorageBlocked()) return "reportCandidate=blocked:sensitive_storage"
         if (!authority.reportPermissionsAllowWork()) {
             return "reportCandidate=blocked:permission_unavailable"
         }
@@ -311,6 +313,7 @@ internal class ReportCandidateController(
         explicitConfirmationContext: ExplicitReportConfirmationContext?,
         explicitConfirmationRequestedAtElapsedRealtimeMs: Long?,
     ): String {
+        if (authority.sensitiveStorageBlocked()) return "reportCandidate=blocked:sensitive_storage"
         if (!authority.reportPermissionsAllowWork()) {
             return "reportCandidate=blocked:permission_unavailable"
         }
@@ -486,6 +489,12 @@ internal class ReportCandidateController(
     }
 
     private fun ensureExplicitReportAuthorityPreconditions(): Boolean {
+        if (authority.sensitiveStorageBlocked()) {
+            latestReportCandidateStatus = "reportCandidate=blocked:sensitive_storage"
+            ui.status(latestReportCandidateStatus)
+            ui.speakInteraction("기기의 안전한 저장소를 확인할 수 없어 신고를 진행하지 않았습니다. 앱을 다시 실행해 주세요.")
+            return false
+        }
         if (!queueEnabled) {
             val message = "현재 앱 빌드에서는 신고 저장 기능을 사용할 수 없습니다."
             latestReportCandidateStatus = "reportCandidate=blocked:queue_disabled"
@@ -541,6 +550,7 @@ internal class ReportCandidateController(
 
     private fun currentExplicitReportConfirmationContextOrNull():
         ExplicitReportConfirmationContext? {
+        if (authority.sensitiveStorageBlocked()) return null
         val epoch = authority.currentRuntimeEpochOrNull() ?: return null
         val reporter = authority.currentReporterUserId() ?: return null
         val confirmation = integratedConsentSession.currentConfirmationOrNull() ?: return null

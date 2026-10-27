@@ -64,6 +64,7 @@ internal fun assessPlatformVoiceCandidate(
         return decision(PlatformVoiceCandidateDisposition.AMBIGUOUS)
     }
     val preview = when (candidate) {
+        AndroidVoiceCommand.OpenSettings -> AndroidVoiceAction.OpenSettings
         AndroidVoiceCommand.Help -> AndroidVoiceAction.SpeakVoiceHelp
         AndroidVoiceCommand.OpenHelp -> AndroidVoiceAction.OpenHelp
         is AndroidVoiceCommand.SetDestination -> AndroidVoiceAction.SearchDestination(candidate.placeName)
@@ -71,6 +72,10 @@ internal fun assessPlatformVoiceCandidate(
             ?.onCommand(DestinationSearchVoiceCommand.SelectCandidate(candidate.oneBasedIndex))
             ?.takeIf { it.accepted }
             ?.let { AndroidVoiceAction.SelectDestinationCandidate(candidate.oneBasedIndex) }
+        is AndroidVoiceCommand.DestinationCandidateDetail -> destinationDialogState
+            ?.onCommand(DestinationSearchVoiceCommand.SelectCandidate(candidate.oneBasedIndex))
+            ?.takeIf { it.accepted }
+            ?.let { AndroidVoiceAction.SpeakDestinationCandidateDetail(candidate.oneBasedIndex) }
         AndroidVoiceCommand.RepeatDestinationCandidates -> destinationDialogState
             ?.onCommand(DestinationSearchVoiceCommand.RepeatPage)
             ?.takeIf { it.accepted }

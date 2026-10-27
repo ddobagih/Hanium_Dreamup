@@ -438,6 +438,7 @@ class AndroidFeedbackActuator private constructor(
         onSpeechFailed: (() -> Unit)?,
         isStillValidAtStart: () -> Boolean,
         onSpeechCancelled: (() -> Unit)? = null,
+        distanceAfterWarning: (() -> ObstacleDistanceSpeech?)? = null,
     ): RiskFeedbackDispatchResult {
         val policyOwner = action.deliveryOwner
         if (policyOwner != null && (!policyOwner.matches(action) || !policyOwner.isClaimed())) {
@@ -453,7 +454,26 @@ class AndroidFeedbackActuator private constructor(
         val speech = speak(
             message = action.message,
             priority = SpeechPriority.RISK,
-            onCompleted = onSpeechCompleted,
+            onCompleted = {
+                // A warning owns its delivery receipt; the optional detail has its own freshness lease.
+                onSpeechCompleted?.invoke()
+                if (outputGate.isCurrent(generation)) {
+                    val distance = distanceAfterWarning?.invoke()
+                    if (distance != null) speak(
+                        message = distance.message,
+                        priority = SpeechPriority.RISK,
+                        riskRank = MessageLevel.AWARE.ordinal,
+                        advisoryStartDeadlineMs = distance.validUntilMs,
+                        advisoryStartValidator = {
+                            outputGate.isCurrent(generation, distance.validUntilMs) &&
+                                distance.isStillValidAtStart()
+                        },
+                        requiresExplicitTerminalCallback = true,
+                        protectsFromFollowingSpeech = false,
+                        messageFamily = SpeechMessageFamily.RISK,
+                    )
+                }
+            },
             onFailed = onSpeechFailed,
             riskRank = action.level.ordinal,
             advisoryStartDeadlineMs = action.validUntilMs,
@@ -1102,6 +1122,13 @@ class AndroidFeedbackActuator private constructor(
         } ?: return
         // Native release stays outside both locks and targets the detached registration only.
         releaseAudioFocusRegistration(registration)
+    }
+
+    /** A user-selected help retry renews only speech; it grants no walking readiness. */
+    fun retryFailedSpeechInitialization() {
+        synchronized(speechEngineOperationLock) {
+            if (ttsState == TtsState.FAILED || ttsState == TtsState.LANGUAGE_UNSUPPORTED) initializeTextToSpeech()
+        }
     }
 
     fun isSpeechInitializing(): Boolean = ttsState == TtsState.INITIALIZING

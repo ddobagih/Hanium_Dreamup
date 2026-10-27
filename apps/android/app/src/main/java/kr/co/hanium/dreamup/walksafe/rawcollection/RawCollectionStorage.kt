@@ -46,6 +46,9 @@ internal class FileRawCollectionStorage(
     private val collections = File(root, COLLECTIONS_DIRECTORY_NAME)
     private val quarantine = File(root, QUARANTINE_DIRECTORY_NAME)
     private val fences = File(root, FENCES_DIRECTORY_NAME)
+    // A collection or the primary fence directory can independently become unwritable.
+    // Use the same fsync/rename transaction in a separate directory for the blocking decision.
+    private val recoveryFences = File(root, RECOVERY_FENCES_DIRECTORY_NAME)
     private val activePointer = File(root, ACTIVE_POINTER_NAME)
 
     @Synchronized
@@ -155,28 +158,36 @@ internal class FileRawCollectionStorage(
             }
             directoryEntries(collections).isEmpty() &&
                 directoryEntries(quarantine).isEmpty() &&
-                directoryEntries(fences).all { !Files.isSymbolicLink(it.toPath()) }
+                listOf(fences, recoveryFences).all { directory ->
+                    directoryEntries(directory).all { !Files.isSymbolicLink(it.toPath()) }
+                }
         }.getOrDefault(false)
     }
 
     @Synchronized
-    override fun hasFence(name: String): Boolean =
-        fenceFileOrNull(name)?.isFile == true
+    override fun hasFence(name: String): Boolean = existingFence(name) != null
 
     @Synchronized
-    override fun readFence(name: String): String? = fenceFileOrNull(name)
-        ?.let { readBounded(it, MAX_FENCE_BYTES) }
-        ?.trim()
+    override fun readFence(name: String): String? = existingFence(name)?.let {
+        readBounded(it, MAX_FENCE_BYTES)?.trim()
+            ?: throw RawCollectionStorageReadException("fence content")
+    }
 
     @Synchronized
     override fun writeFenceAtomically(name: String, value: String): Boolean {
         if (!FENCE_NAME.matches(name) || !FENCE_VALUE.matches(value)) return false
         val target = fenceFileOrNull(name) ?: return false
-        return atomicWrite(target, "$value\n")
+        val recovery = File(recoveryFences, "$name$FENCE_SUFFIX")
+        // Once a fallback exists it stays authoritative; an older primary copy cannot win again.
+        if (Files.exists(recovery.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            return atomicWrite(recovery, "$value\n")
+        }
+        return atomicWrite(target, "$value\n") || atomicWrite(recovery, "$value\n")
     }
 
     @Synchronized
-    override fun listFenceNames(): Set<String> = directoryEntries(fences)
+    override fun listFenceNames(): Set<String> = listOf(fences, recoveryFences)
+        .flatMap { directoryEntries(it).toList() }
         .mapTo(linkedSetOf()) { file ->
             val metadata = entryAttributes(file)
             val name = file.name.removeSuffix(FENCE_SUFFIX)
@@ -188,15 +199,11 @@ internal class FileRawCollectionStorage(
 
     @Synchronized
     override fun clearAllFences(): Boolean {
-        if (!fences.exists()) return true
-        val artifacts = fences.listFiles() ?: return false
-        if (artifacts.any { file ->
-                !file.isFile ||
-                    !file.name.endsWith(FENCE_SUFFIX) ||
-                    !FENCE_NAME.matches(file.name.removeSuffix(FENCE_SUFFIX))
-            }
-        ) return false
-        return artifacts.map(::deleteFileAndSync).all { it }
+        return runCatching {
+            listFenceNames() // Validate both directories and entries before removing either copy.
+            listOf(fences, recoveryFences).flatMap { directoryEntries(it).toList() }
+                .map(::deleteFileAndSync).all { it }
+        }.getOrDefault(false)
     }
 
     @Synchronized
@@ -231,6 +238,26 @@ internal class FileRawCollectionStorage(
 
     private fun fenceFileOrNull(name: String): File? =
         name.takeIf(FENCE_NAME::matches)?.let { File(fences, "$it$FENCE_SUFFIX") }
+
+    private fun existingFence(name: String): File? {
+        if (!FENCE_NAME.matches(name)) return null
+        for (directory in listOf(recoveryFences, fences)) {
+            requireDirectoryPath(directory)
+            val file = File(directory, "$name$FENCE_SUFFIX")
+            val attributes = try {
+                Files.readAttributes(file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+            } catch (_: NoSuchFileException) {
+                continue
+            } catch (error: Exception) {
+                throw RawCollectionStorageReadException("fence metadata", error)
+            }
+            if (!attributes.isRegularFile || attributes.isSymbolicLink) {
+                throw RawCollectionStorageReadException("fence entry")
+            }
+            return file
+        }
+        return null
+    }
 
     private fun readBounded(file: File, maxBytes: Long): String? = runCatching {
         requireDirectoryPath(file.parentFile ?: return@runCatching null)
@@ -351,6 +378,7 @@ internal class FileRawCollectionStorage(
         const val COLLECTIONS_DIRECTORY_NAME = "collections"
         const val QUARANTINE_DIRECTORY_NAME = "quarantine"
         const val FENCES_DIRECTORY_NAME = "fences"
+        const val RECOVERY_FENCES_DIRECTORY_NAME = "recovery_fences"
         const val ACTIVE_POINTER_NAME = "active_collection"
         const val MANIFEST_FILE_NAME = "manifest.aead"
         const val FENCE_SUFFIX = ".fence"
@@ -361,6 +389,7 @@ internal class FileRawCollectionStorage(
             COLLECTIONS_DIRECTORY_NAME,
             QUARANTINE_DIRECTORY_NAME,
             FENCES_DIRECTORY_NAME,
+            RECOVERY_FENCES_DIRECTORY_NAME,
         )
         val FENCE_NAME = Regex("[a-z0-9-]{1,96}")
         val FENCE_VALUE = Regex("[A-Z_]{1,64}")

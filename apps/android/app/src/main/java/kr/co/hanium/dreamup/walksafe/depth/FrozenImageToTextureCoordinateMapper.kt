@@ -23,7 +23,10 @@ internal class FrozenImageToTextureCoordinateMapper(
         return transform.map(point)
     }
 
-    override fun depthToImage(point: Point2): Point2? = null
+    override fun depthToImage(point: Point2): Point2? {
+        if (frameId != transform.frameId || depthSize.width <= 0 || depthSize.height <= 0) return null
+        return transform.unmap(point)
+    }
 
     override fun imagePolygonToDepthPolygon(polygon: List<Point2>): List<Point2> {
         return polygon.map { point ->

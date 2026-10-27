@@ -12,6 +12,31 @@ import org.junit.Test
 
 class VoskSpeechPhaseTimeoutRegressionTest {
     @Test
+    fun silencingKeepsItsCauseStopsOnceAndOnlyAnExplicitRequestRestarts() = withFixture { f ->
+        val run = f.startRun()
+        f.stream.ready(run)
+        f.runtime.drain()
+        f.stream.error(run, VoskStreamingError.AUDIO_SILENCED)
+        f.stream.error(run, VoskStreamingError.AUDIO_SILENCED)
+        f.stream.transcript(run, transcript("late final", final = true))
+        f.runtime.drain()
+        f.runtime.advanceBy(60_000L)
+        assertEquals(listOf(SPEECH_ERROR_INPUT_SILENCED), f.events.errors)
+        assertEquals(0, f.events.resultCount)
+        assertEquals(1, f.stream.startCalls)
+        assertEquals(1, f.stream.stopCalls)
+
+        val next = f.startRun()
+        f.stream.error(run, VoskStreamingError.AUDIO_SILENCED)
+        f.stream.ready(next)
+        f.stream.transcript(next, transcript("new final", final = true))
+        f.runtime.drain()
+        assertEquals(1, f.events.errors.size)
+        assertEquals(1, f.events.resultCount)
+        assertEquals(2, f.stream.startCalls)
+    }
+
+    @Test
     fun decoderEndpointGivesDelayedFinalItsOwnTenSecondWindow() = withFixture { f ->
         val run = f.startRun()
         f.stream.ready(run)

@@ -56,6 +56,21 @@ class GatewaySpeechClientTest {
     }
 
     @Test
+    fun rejectsAmbiguousAndLenientJsonBeforePlatformParsing() {
+        val valid = validResponse()
+        assertTrue(parseGatewaySpeechTranscript(" \n$valid\t\r", REQUEST_ID) != null)
+        val invalid = listOf(
+            valid + " {}", valid + "junk",
+            valid.replaceFirst("{", "{\"transcript\":\"취소\","),
+            valid.replaceFirst("{", "{\"\\u0074ranscript\":\"취소\","),
+            valid.replace("\"execution_allowed\":true", "\"execution_allowed\":false,\"execution_allowed\":true"),
+            valid.replaceFirst("{", "{/* comment */"), valid.replace('"', '\''),
+            valid.replace("\"transcript\":", "transcript:"), valid.replaceFirst(',', ';'),
+        )
+        for (body in invalid) assertNull(parseGatewaySpeechTranscript(body, REQUEST_ID))
+    }
+
+    @Test
     fun ttsTextRejectsControlCharactersAndCodePointOverflow() {
         assertTrue(validGatewaySpeechText("명령을 다시 말씀해 주세요."))
         assertFalse(validGatewaySpeechText("안내\u0000문장"))

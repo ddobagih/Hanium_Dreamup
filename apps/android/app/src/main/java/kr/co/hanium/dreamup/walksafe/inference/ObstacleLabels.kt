@@ -42,4 +42,16 @@ object ObstacleLabels {
     fun labelFor(className: String): String = labels[className.lowercase()] ?: FALLBACK_KO
 
     fun isMapped(className: String): Boolean = labels.containsKey(className.lowercase())
+
+    fun withSubjectParticle(label: String): String =
+        label + if (finalConsonant(label) == 0) "가" else "이"
+
+    fun withCompanionParticle(label: String): String =
+        label + if (finalConsonant(label) == 0) "와" else "과"
+
+    fun withAsParticle(label: String): String =
+        label + if (finalConsonant(label) in setOf(0, 8)) "로" else "으로"
+
+    // All spoken labels, including the fallback, end in a Korean syllable. 8 denotes ㄹ.
+    private fun finalConsonant(label: String): Int = (label.last().code - '가'.code) % 28
 }

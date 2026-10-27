@@ -107,6 +107,7 @@ internal object EmailEnrollmentPartialCodec {
 
     fun decode(encoded: String): EmailEnrollmentPartial? = runCatching {
         if (encoded.length !in 2..4_096) return@runCatching null
+        if (!kr.co.hanium.dreamup.walksafe.network.strictJsonObjectDocument(encoded)) return@runCatching null
         val value = JSONObject(encoded)
         if (
             value.jsonKeys() != FIELDS ||
@@ -305,6 +306,10 @@ internal class AccountRequestFence {
         generation += 1L
         return AccountRequestToken(generation, action, stateBinding).also { active = it }
     }
+
+    @Synchronized
+    fun isCurrent(token: AccountRequestToken, stateBinding: String): Boolean =
+        foreground && active === token && token.stateBinding == stateBinding
 
     @Synchronized
     fun completeIfCurrent(token: AccountRequestToken, stateBinding: String): Boolean {

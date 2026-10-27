@@ -136,6 +136,29 @@ class NativePrewalkControllerTest {
         assertFalse(f.events.contains("completeStartupConfirmation"))
     }
 
+    @Test fun userConfirmationMustStillOwnReadyMeasurementsWhenTheButtonIsPressed() {
+        for (invalidate in listOf<(NativeGuidanceTestFixture) -> Unit>(
+            { it.foreground = false }, { it.actor = "other" }, { it.gatewayGeneration++ },
+            { it.preflightFailed = true }, { it.readinessStatus = kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessStatus.PENDING },
+        )) {
+            val f = ready().apply { awaitUserStart = true }
+            f.prewalk.beginFromHome(); f.completeReadiness(); f.prewalk.continueIfReady()
+            f.startupPosts.single().invoke()
+            assertFalse(f.events.contains("completeStartupConfirmation"))
+            val (current, confirmed) = f.userStartConfirmations.single()
+            assertTrue(current())
+            invalidate(f)
+            assertFalse(current())
+            confirmed()
+            assertFalse(f.events.contains("completeStartupConfirmation"))
+        }
+        val f = ready().apply { awaitUserStart = true }
+        f.prewalk.beginFromHome(); f.completeReadiness(); f.prewalk.continueIfReady()
+        f.startupPosts.single().invoke()
+        f.userStartConfirmations.single().second.invoke()
+        assertTrue(f.events.contains("completeStartupConfirmation"))
+    }
+
     @Test fun readyPreparationCompletesOnlyAfterItsCurrentPostedConfirmation() {
         val f = ready()
         f.prewalk.beginFromHome()

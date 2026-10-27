@@ -82,25 +82,45 @@ assertTrue("A real HOME attempt is required: $it", it.homeRequests >= 1)
             }
             // Called from the instrumentation thread, not Main and not a fake onResult.
             // Production HOME mode must dispatch cleanup before invoking its real Main owner.
+            val inline = InstrumentationRegistry.getArguments().getString("wakeInlineCommand") == "true"
+            val wakeAt = SystemClock.elapsedRealtime()
             target.first.onTranscript(
                 target.second,
-                VoskTranscript(text = "길라잡이", confidence = 0.95f, isFinal = true),
+                VoskTranscript(text = if (inline) "길라잡이 도움말" else "길라잡이", confidence = 0.95f, isFinal = true),
             )
-            val handoff = awaitEvents(reader, runId, 1, 45_000L) { it.uiReadyAt > 0 }
+            val handoff = awaitEvents(reader, runId, 1, 45_000L) {
+                if (BuildConfig.WALKSAFE_SERVER_STT_ENABLED) it.serverRecordings > 0 else it.uiReadyAt > 0
+            }
 assertTrue("A current HOME ready callback is required: $handoff", handoff.homeReady >= 1)
             assertEquals("One wake handoff is required: $handoff", 1, handoff.handoffs)
-            assertEquals("One explicit one-shot request is required: $handoff", 1, handoff.requests)
-            assertEquals("One actual recognizer ready is required: $handoff", 1, handoff.ready)
+            if (!BuildConfig.WALKSAFE_SERVER_STT_ENABLED) {
+                assertEquals("One explicit one-shot request is required", 1, handoff.requests)
+                assertEquals("One actual recognizer ready is required", 1, handoff.ready)
+            } else assertEquals("Only one native server capture may start", 1, handoff.serverRecordings)
             assertTrue("Synthetic final must follow actual HOME ready: $handoff", handoff.syntheticAt > handoff.homeReadyAt)
             assertTrue("Handoff must follow the fixture: $handoff", handoff.handoffAt > handoff.syntheticAt)
             assertEquals("Exactly one wake cue must be requested: $handoff", 1, handoff.acknowledgements)
             assertEquals("The actual cue API must complete its bounded interval: $handoff", "COMPLETED", handoff.acknowledgementResult)
             assertEquals("Exactly one cue terminal callback is required: $handoff", 1, handoff.acknowledgementTerminals)
             assertTrue("The cue must finish after handoff: $handoff", handoff.acknowledgementTerminalAt > handoff.handoffAt)
-            assertTrue("Recognition may start only after the cue releases its output: $handoff", handoff.requestAt > handoff.acknowledgementTerminalAt)
-            assertTrue("Actual recognition ready must follow its request: $handoff", handoff.readyAt > handoff.requestAt)
-            assertTrue("Current Main ready must follow actual backend ready: $handoff", handoff.uiReadyAt > handoff.readyAt)
-            assertTrue("An actual offline backend must be identified: $handoff", handoff.backend != null)
+            var captureDelayMs: Long? = null
+            if (!BuildConfig.WALKSAFE_SERVER_STT_ENABLED) {
+                assertTrue("Recognition starts after cue", handoff.requestAt > handoff.acknowledgementTerminalAt)
+                assertTrue("Ready follows request", handoff.readyAt > handoff.requestAt)
+                assertTrue("UI ready follows backend", handoff.uiReadyAt > handoff.readyAt)
+                assertTrue("Offline backend identified", handoff.backend != null)
+            } else {
+                assertTrue("Native capture starts after cue", handoff.serverRecordingAt > handoff.acknowledgementTerminalAt)
+                captureDelayMs = onMain(instrumentation) {
+                    val recorder = requireNotNull(mainField(activity, "gatewayVoiceRecorder")) as kr.co.hanium.dreamup.walksafe.feedback.ForegroundAacRecorder
+                    assertTrue("Observe actual MediaRecorder, not just log metadata", recorder.isRecording)
+                    val active = recorder.javaClass.getDeclaredField("active").apply { isAccessible = true }.get(recorder)!!
+                    val started = active.javaClass.getDeclaredField("startedAtElapsedRealtimeMs").apply { isAccessible = true }.getLong(active)
+                    assertFalse(mainField(activity, "isRouteActive") as Boolean)
+                    assertEquals("No command is executed from the synthetic inline phrase", null, mainField(activity, "voiceHelpScreen"))
+                    started - wakeAt
+                }
+            }
 
             onMain(instrumentation) {
                 assertEquals("VOICE_COMMAND", currentPage(activity))
@@ -120,7 +140,9 @@ assertTrue("HOME re-entry needs a new actual ready: $returned", returned.homeRea
                     "stream",
                     "HOME_WAKE_HANDOFF actual_home_ready=true synthetic_final=true " +
                         "actual_cue_terminal=true actual_command_ready=true home_reentry_ready=true " +
-                        "backend=" + handoff.backend + " human_audibility=NOT_TESTED human_accuracy=NOT_TESTED\n",
+                        "backend=" + (if (BuildConfig.WALKSAFE_SERVER_STT_ENABLED) "WHISPER_CAPTURE" else handoff.backend) +
+                        " inline=$inline capture_delay_ms=$captureDelayMs acoustic_wake_latency=NOT_MEASURED " +
+                        "human_audibility=NOT_TESTED human_accuracy=NOT_TESTED\n",
                 )
             })
         } finally {
@@ -233,6 +255,7 @@ assertTrue("HOME re-entry needs a new actual ready: $returned", returned.homeRea
                                 }
                             }
                             "ONE_SHOT_UI_READY" -> events.uiReadyAt = position
+                            "SERVER_STT_RECORDING" -> { events.serverRecordings++; events.serverRecordingAt = position }
                             "HOME_WAKE_BLOCKED", "HOME_WAKE_TERMINAL",
                             "WAKE_TIMEOUT", "WAKE_STREAM_ERROR", "WAKE_START_FAILED" -> events.failures++
                             // Earlier cold-start speech may cancel/re-arm HOME listening.
@@ -332,6 +355,8 @@ assertTrue("HOME re-entry needs a new actual ready: $returned", returned.homeRea
         var readyAt: Int = 0,
         var uiReadyAt: Int = 0,
         var backend: OfflineSpeechEngine? = null,
+        var serverRecordings: Int = 0,
+        var serverRecordingAt: Int = 0,
         var failures: Int = 0,
         var rejected: Int = 0,
     )

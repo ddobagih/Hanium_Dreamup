@@ -80,7 +80,7 @@ class DestinationSearchScreenDeviceTest {
                 assertTrue("Expected campus was not the first returned institution", first.name == CAMPUS_NAME)
                 assertTrue(
                     "Expected campus was not the first displayed institution",
-                    firstResultButton.text.toString().substringBefore('\n') == CAMPUS_NAME,
+                    firstResultButton.text.toString().substringBefore('\n') == "1번 $CAMPUS_NAME",
                 )
                 assertTrue("The first institution must be visibly displayed", visible(main, firstResultButton))
             }
@@ -120,7 +120,7 @@ class DestinationSearchScreenDeviceTest {
         val card = onMain(deadlineMs) {
             assertTrue("Search entry requires the actual HOME screen", page(activity) == "HOME")
             descendants(activity.window.decorView).filterIsInstance<TextView>()
-                .filter { it.isShown && it.text.toString() == "목적지 검색" }
+                .filter { it.isShown && it.text.toString() == "길라잡이" }
                 .mapNotNull { label ->
                     var candidate: View? = label
                     while (candidate != null && !candidate.isClickable) candidate = candidate.parent as? View

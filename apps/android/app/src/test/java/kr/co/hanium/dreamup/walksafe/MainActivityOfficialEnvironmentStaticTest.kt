@@ -147,7 +147,7 @@ class MainActivityOfficialEnvironmentStaticTest {
         assertTrue(readiness.contains("WalkSessionReadinessStatus.UNAVAILABLE"))
         assertTrue(
             capture.contains(
-                "producers.evaluate(requirement, effectiveDecision, epoch, officialAssessment, mountingAssessment, deviceResources)",
+                "producers.evaluate(requirement, effectiveDecision, epoch, officialAssessment, mountingAssessment,\n                deviceResources, allowModelPreparationPending)",
             ),
         )
         assertTrue(capture.contains("official.assessment(epoch)"))
@@ -297,7 +297,7 @@ class MainActivityOfficialEnvironmentStaticTest {
         )
         assertEquals(
             "{actuator.speakGuardedInteraction(message,isCurrent," +
-                "onCompleted=completed,onFailed=failed,onCancelled=cancelled)}",
+                "onCompleted=completed,onFailed=failed,onCancelled=cancelled,deferToCurrentSpeech=deferToCurrentSpeech)}",
             ordinaryDispatch,
         )
         assertFalse(functionBlock("private fun speakNextNavigationInstruction(").contains("speakStatusExplanation("))

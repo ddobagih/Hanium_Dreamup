@@ -122,16 +122,22 @@ class JsonHttpExchangeTest {
             }
             assertEquals("disconnect", connection.events.last())
             if (declared < 0) assertTrue(connection.events.contains("input.close"))
-            else assertFalse(connection.events.contains("input"))
+            else {
+                assertFalse(connection.events.contains("input.read"))
+                assertFalse(connection.events.contains("input"))
+            }
         }
     }
 
-    @Test fun existingLenientUtf8ResponseDecodingIsNotTightenedByTheExchange() {
+    @Test fun malformedUtf8CannotReachDomainConsumption() {
         val malformed = byteArrayOf(0xC3.toByte(), 0x28)
         val connection = RecordingConnection(body = malformed)
-        val response = exchange(connection, maximumBytes = malformed.size).execute()
-        assertEquals(String(malformed, Charsets.UTF_8), response.body)
-        assertEquals("\uFFFD(", response.body)
+        assertThrows(NetworkResponseProtocolException::class.java) {
+            exchange(connection, maximumBytes = malformed.size,
+                consume = { error("invalid UTF-8 must not reach the domain") }).execute()
+        }
+        assertTrue(connection.events.contains("input.close"))
+        assertEquals("disconnect", connection.events.last())
     }
 
     @Test fun cancellationDuringBodyWriteDisconnectsBeforeClosingAndCannotReadAResponse() {
@@ -206,6 +212,8 @@ class JsonHttpExchangeTest {
         override fun getOutputStream(): OutputStream { events += "output"; return output }
         override fun getInputStream(): InputStream { events += "input"; return input }
         override fun getErrorStream(): InputStream { events += "error"; return input }
+        override fun getHeaderFields(): Map<String, List<String>> =
+            if (declaredLength >= 0L) mapOf("Content-Length" to listOf(declaredLength.toString())) else emptyMap()
         override fun getHeaderFieldLong(name: String?, default: Long): Long =
             if (name == "Content-Length") declaredLength else default
         override fun getHeaderField(name: String?): String? =

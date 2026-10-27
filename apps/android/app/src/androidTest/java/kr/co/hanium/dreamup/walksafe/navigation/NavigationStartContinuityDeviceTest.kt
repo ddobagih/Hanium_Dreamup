@@ -41,6 +41,12 @@ class NavigationStartContinuityDeviceTest {
                 activity,
                 SystemClock.elapsedRealtime() + 25_000L,
             )
+            await("Real account onboarding and home readiness did not finish restoring", 25_000L) {
+                onMain {
+                    call(activity, "firstRunOnboardingComplete") as Boolean &&
+                        call(activity, "nativeHomeFeatureContextAvailable") as Boolean
+                }
+            }
             onMain {
                 assertTrue("Real account onboarding must be complete", call(activity, "firstRunOnboardingComplete") as Boolean)
                 assertFalse("Test must start without an active route", field(activity, "isRouteActive") as Boolean)
@@ -63,17 +69,14 @@ class NavigationStartContinuityDeviceTest {
             var oldUserConfirmation: Any? = null
             var clickedAt = 0L
             onMain {
-                assertTrue(resultButtons(activity).first { it.isEnabled }.performClick())
-                assertEquals("DESTINATION_CONFIRM", field(activity, "nativeUiPage").toString())
-                destination = requireNotNull(field(activity, "pendingUiDestination"))
                 oldUserConfirmation = field(activity, "phoneMountingUserConfirmation")
                 clickedAt = SystemClock.elapsedRealtime()
-                val start = field(activity, "nativeDestinationStartButton") as Button
-                assertTrue("Guide start must be enabled after selecting a destination", start.isEnabled)
-                assertTrue(start.performClick())
-                assertEquals("Start must retain the selected destination", destination, field(activity, "pendingUiDestination"))
-                assertEquals("One start click must enter guidance before sensor readiness", "GUIDANCE", field(activity, "nativeUiPage").toString())
+                assertTrue(resultButtons(activity).first { it.isEnabled }.performClick())
+                destination = requireNotNull(field(activity, "pendingUiDestination"))
+                assertEquals("Selecting a destination must enter preparation directly", "GUIDANCE", field(activity, "nativeUiPage").toString())
                 assertTrue("The real guidance screen must be visible immediately", (field(activity, "nativeGuidanceControls") as View).isShown)
+                assertTrue("Preparation must own walking interaction", call(activity, "isInWalkInteractionArea") as Boolean)
+                assertFalse("Home voice must be blocked during preparation", call(activity, "homeVoiceCommandAvailable") as Boolean)
             }
             await("Explicit start did not request a new measured mounting check", 8_000L) {
                 onMain { field(activity, "nativePhoneMountingCheckRequest") != null }
@@ -100,7 +103,7 @@ class NavigationStartContinuityDeviceTest {
                     } else {
                         val start = field(activity, "nativeGuidanceRetryButton") as? Button
                         val retry = start != null && start.isShown && start.isEnabled &&
-                            start.text.toString() == "다시 시도"
+                            start.text.toString() == "재점검"
                         if (retry) {
                             assertEquals(initialCheck.id, checkRequest(activity).id)
                             blockEvidence = assertMeasuredBlock(activity, destination)
@@ -203,47 +206,24 @@ class NavigationStartContinuityDeviceTest {
         val phase = field(activity, "officialEnvironmentPreflightPhase").toString()
         assertTrue("Retry must correspond to a failed current attempt", phase == "FAILED" || phase == "TIMED_OUT" ||
             field(activity, "startupCapabilityRetryRequiresUserAction") == true)
-        val confirmation = field(activity, "nativeGuidanceStatusText") as TextView
-        assertTrue("The measured reason must be on the visible guidance screen", confirmation.isShown)
-        val displayed = confirmation.text.toString()
-        val diagnostic = preparationDiagnostic(activity, displayed)
-        val phaseMessage = when (phase) {
-            "TIMED_OUT" -> "자동 점검 시간이 초과되었습니다."
-            "FAILED" -> "자동 점검을 완료하지 못했습니다."
-            else -> "안내 준비 중: 현재 위치와 카메라·자세를 실제로 점검합니다."
-        }
-        assertTrue("The visible phase must match the current attempt; $diagnostic", displayed.contains(phaseMessage))
-        val measurement = (invoke(activity, "officialEnvironmentMeasurementDetail", environment) as String).trim()
-        assertTrue("Current measurement detail must not be empty", measurement.isNotBlank())
-        assertTrue("Visible measurement detail must match the real environment assessment; $diagnostic", displayed.contains(measurement))
-        if (!mountingReady) {
-            val reason = call(mounting, "getAccessibleReasonKo") as String
-            val action = call(mounting, "getAccessibleActionKo") as String
-            assertTrue("The actual mounting reason and action must be nonempty", reason.isNotBlank() && action.isNotBlank())
-            assertTrue("Visible reason must match the actual mounting guard; $diagnostic", displayed.contains(reason))
-            assertTrue("Visible action must match the actual mounting guard; $diagnostic", displayed.contains(action))
-        }
-        assertTrue("The visible explanation must offer retry or cancel", displayed.contains("다시 시도를 누르거나 안내 취소를 선택하세요."))
+        assertTrue("Measured failure must select its recovery UI", call(activity, "nativeGuidanceCheckFailed") as Boolean)
+        assertFalse("Long guidance text must be hidden on the failure screen", (field(activity, "guidanceInstructionCard") as View).isShown)
+        assertFalse("Destination text must be hidden on the failure screen", (field(activity, "nativeGuidanceDestinationText") as View).isShown)
+        val retry = field(activity, "nativeGuidanceRetryButton") as Button
+        val cancel = field(activity, "nativeGuidanceCancelButton") as Button
+        assertTrue(retry.isShown && retry.isEnabled && retry.text == "재점검")
+        assertTrue(cancel.isShown && cancel.isEnabled && cancel.text == "취소")
+        assertTrue("Recovery controls must retain a vertical order", retry.top < cancel.top)
+        val spokenReason = call(activity, "nativeGuidanceFailureMessage") as String
+        assertTrue("Failure speech must explain non-start and both actions",
+            spokenReason.contains("안내를 시작하지 않았습니다") &&
+                spokenReason.contains("재점검") && spokenReason.contains("취소"))
+        assertEquals("This measured attempt must schedule its failure announcement",
+            request.id, field(activity, "guidanceFailureAnnouncedForRequest"))
         val factors = call(environment, "getFactorStatuses") as Map<*, *>
         fun factor(name: String): String = (factors.entries.single { (it.key as Enum<*>).name == name }.value as Enum<*>).name
         val reasonName = (call(mounting, "getReason") as Enum<*>).name
         return "phase=$phase; mounting_reason=$reasonName; gps_status=${factor("GPS_QUALITY")}; camera_status=${factor("CAMERA_QUALITY")}"
-    }
-
-    private fun preparationDiagnostic(activity: MainActivity, displayed: String): String {
-        fun enumName(name: String): String = (field(activity, name) as? Enum<*>)?.name ?: "NONE"
-        val textClasses = listOf(
-            "preparing" to displayed.contains("안내 준비 중: 현재 위치와 카메라·자세를 실제로 점검합니다."),
-            "timed_out" to displayed.contains("자동 점검 시간이 초과되었습니다."),
-            "failed" to displayed.contains("자동 점검을 완료하지 못했습니다."),
-            "retry_action" to displayed.contains("다시 시도를 누르거나 안내 취소를 선택하세요."),
-            "legacy_notice" to displayed.contains("공식 사용환경 안내 필요"),
-        ).filter { it.second }.joinToString(",") { it.first }.ifEmpty { "none" }
-        return "phase=${enumName("officialEnvironmentPreflightPhase")}; " +
-            "pending_page=${enumName("pendingNativeUiPage")}; current_page=${enumName("nativeUiPage")}; " +
-            "request_present=${field(activity, "nativePhoneMountingCheckRequest") != null}; " +
-            "prewalk_epoch_present=${field(activity, "nativePrewalkStartEpoch") != null}; " +
-            "text_classes=$textClasses"
     }
 
     private fun assertActiveDestination(activity: MainActivity, destination: Any) {
@@ -268,7 +248,9 @@ class NavigationStartContinuityDeviceTest {
         }
         assertEquals("Preparation must remain on the guidance screen", "GUIDANCE", field(activity, "nativeUiPage").toString())
         assertTrue("Guidance controls must remain visible", (field(activity, "nativeGuidanceControls") as View).isShown)
-        assertTrue("Preparation or its measured reason must remain visible", (field(activity, "nativeGuidanceStatusText") as TextView).isShown)
+        if (call(activity, "nativeGuidanceCheckFailed") != true) {
+            assertTrue("Preparation status must remain visible while checking", (field(activity, "nativeGuidanceStatusText") as TextView).isShown)
+        }
     }
 
     private fun resultButtons(activity: MainActivity): List<Button> {

@@ -30,6 +30,41 @@ class IntegratedConsentMutationSubmissionTest {
     private val actor = "a".repeat(64)
 
     @Test
+    fun invalidatedOrphanWithdrawalUsesFreshReceiptBeforeResendingDenial() {
+        val session = confirmedSession()
+        session.withdrawImmediately(raw)
+        session.invalidate()
+        assertNull(session.withdrawalRecoverySelectionsOrNull())
+        assertFalse(session.isAllowed(raw))
+        // A read from the current server restores the CAS base, not the withdrawn grant.
+        val fresh = original().copy(revision = 2L, clientRevision = 2L,
+            backendConsentReceiptSha256 = "4".repeat(64))
+        assertEquals(IntegratedConsentApplyResult.APPLIED, session.applyConfirmation(fresh))
+        val denial = mutation(fresh, requireNotNull(session.withdrawalRecoverySelectionsOrNull()), session.localWithdrawalItems())
+        val effects = Effects(session)
+        assertEquals(IntegratedConsentSubmissionResult.APPLIED, effects.submit(denial))
+        assertEquals(fresh.backendConsentReceiptSha256, denial.expectedPreviousBackendReceiptSha256)
+        assertFalse(denial.desiredSelections.rawSourceCollection)
+        assertFalse(session.isAllowed(raw))
+        assertEquals(listOf(denial), effects.transport)
+        assertTrue(session.applyExactPendingConfirmation(response(fresh, denial)))
+        assertEquals(PurposeConsentSyncState.CONFIRMED_DENIED, session.status(raw))
+    }
+
+    @Test
+    fun freshReceiptCallbackResendsOrphanWithdrawalBeforeCompletingOnboarding() {
+        val source = File("src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt").readText()
+        val request = MainActivityRefactorSource.function(source, "private fun startIntegratedConsentRequest(")
+        val callback = request.substringAfter("val appliedConfirmation = confirmation.takeIf { applied }")
+        val recovery = callback.indexOf("if (integratedConsentSession.withdrawalRecoverySelectionsOrNull() != null)")
+        assertTrue(recovery > callback.indexOf("if (appliedConfirmation == null)"))
+        assertTrue(recovery > callback.indexOf("!isCurrentIntegratedConsentSession(expectedSession, processGeneration)"))
+        assertTrue(recovery < callback.indexOf("if (completeOnboarding)"))
+        assertTrue(callback.substring(recovery).substringBefore("if (completeOnboarding)")
+            .contains("persistIntegratedConsentDraft(announce = false)"))
+    }
+
+    @Test
     fun rejectedGrantNeverReplacesDurableWithdrawalOrReachesTransport() {
         val session = confirmedSession()
         session.withdrawImmediately(raw)

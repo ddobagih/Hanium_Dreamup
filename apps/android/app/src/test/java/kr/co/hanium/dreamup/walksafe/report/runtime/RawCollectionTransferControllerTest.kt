@@ -17,6 +17,18 @@ import org.junit.After
 
 class RawCollectionTransferControllerTest {
     @Before @After fun clearGateway() { GatewaySessionProcessCoordinator.clear(GatewaySessionProcessCoordinator.snapshot().generation) }
+    @Test fun sensitiveStorageFailureRemovesSessionFromRawContextWithoutInventingConsent() {
+        val f = Fixture()
+        try {
+            f.publishSession()
+            assertNotNull(f.controller.currentRawCollectionRuntimeContextOrNull()?.session)
+            f.sensitiveBlocked = true
+            assertNull(f.controller.currentRawCollectionRuntimeContextOrNull()?.session)
+        } finally {
+            GatewaySessionProcessCoordinator.clear(GatewaySessionProcessCoordinator.snapshot().generation)
+        }
+    }
+
     @Test fun constructionDoesNotObserveRuntimeOrStartWork() {
         val f = Fixture(false)
         assertTrue(f.events.isEmpty())
@@ -160,6 +172,8 @@ class RawCollectionTransferControllerTest {
         var state = WalkSessionState.ACTIVE
         var elapsed = 1_000L
         var foreground = true
+        var sensitiveBlocked = false
+        override fun sensitiveStorageBlocked() = sensitiveBlocked
         var walkReady = true
         var transport = ActiveNetworkTransport.WIFI
         var binding: IntegratedConsentNetworkBinding? = IntegratedConsentNetworkBinding.forTest(IntegratedConsentNetworkTransport.WIFI) { it.openConnection() }

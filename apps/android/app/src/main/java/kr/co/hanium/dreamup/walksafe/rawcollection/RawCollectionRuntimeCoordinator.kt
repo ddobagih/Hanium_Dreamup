@@ -300,6 +300,7 @@ class RawCollectionRuntimeCoordinator private constructor(
 
     @Volatile
     private var activeUpload: ActiveUpload? = null
+    private val uploadCancellationGeneration = java.util.concurrent.atomic.AtomicLong()
     private val retryDeadlines = mutableMapOf<RawCollectionOwner, Long>()
     private var aggregate: RuntimeAggregate? = null
     private var lastCapture: LastCapture? = null
@@ -760,6 +761,7 @@ class RawCollectionRuntimeCoordinator private constructor(
     private fun startNextUploadFromStorage(
         contextProvider: () -> RawCollectionRuntimeContext,
     ): CancellableNetworkCall<RawCollectionUploadOutcome>? {
+        val cancellationGeneration = uploadCancellationGeneration.get()
         if (activeUpload != null) return null
         if (serverIngestDisabled) {
             outcomeCounters.recordUploadGate(RawCollectionGateReason.SERVER_DISABLED)
@@ -1002,7 +1004,7 @@ class RawCollectionRuntimeCoordinator private constructor(
         )
         val active = ActiveUpload(lease, outer, terminated)
         synchronized(processUploadsLock) {
-            if (processScope in deletionFencedScopes) {
+            if (processScope in deletionFencedScopes || uploadCancellationGeneration.get() != cancellationGeneration) {
                 outer.cancel()
                 return null
             }
@@ -1012,10 +1014,9 @@ class RawCollectionRuntimeCoordinator private constructor(
         return outer
     }
 
-    @Synchronized
     fun revalidate(context: RawCollectionRuntimeContext): Boolean {
         val active = activeUpload ?: return false
-        if (isLeaseCurrent(active.lease, context)) return true
+        if (isLeaseContextCurrent(active.lease, context)) return true
         active.call.cancel()
         return false
     }
@@ -1238,7 +1239,11 @@ class RawCollectionRuntimeCoordinator private constructor(
             (deletionCalls[processScope] ?: 0) != 0
 
     fun cancelActiveUpload() {
-        activeUpload?.call?.cancel()
+        val active = synchronized(processUploadsLock) {
+            uploadCancellationGeneration.incrementAndGet()
+            activeUpload
+        }
+        active?.call?.cancel()
     }
 
     /**
@@ -1373,6 +1378,33 @@ class RawCollectionRuntimeCoordinator private constructor(
             context.deviceCheck.attemptGeneration == expected.deviceAttemptGeneration &&
             context.consentSession === expected.consentSession &&
             admission.confirmation == expected.confirmation &&
+            // The runtime walk id is not compared: after the walk it may move on (ENDED -> READY);
+            // a walk that becomes ACTIVE again fails the post-walk gate above and cancels.
+            binding.isSameNetworkBinding(expected.networkBinding)
+    }
+
+    private fun isLeaseContextCurrent(
+        expected: UploadLease,
+        context: RawCollectionRuntimeContext,
+    ): Boolean {
+        if (synchronized(processUploadsLock) { processScope in deletionFencedScopes }) return false
+        val session = context.session ?: return false
+        val binding = context.networkBinding ?: return false
+        val confirmation = context.consentSession.currentConfirmationOrNull(
+            setOf(IntegratedConsentItem.RAW_SOURCE_COLLECTION),
+        ) ?: return false
+        return context.walk.state.allowsPostWalkTransfer &&
+            context.gatewayWalkLease == null &&
+            context.charging &&
+            context.networkTransport == ActiveNetworkTransport.WIFI &&
+            binding.transport == IntegratedConsentNetworkTransport.WIFI &&
+            ownerOrNull(session, context.sessionGeneration, context.deviceCheck) == expected.owner &&
+            session === expected.session &&
+            session.lease.instanceId == expected.sessionInstanceId &&
+            context.sessionGeneration == expected.sessionGeneration &&
+            context.deviceCheck.attemptGeneration == expected.deviceAttemptGeneration &&
+            context.consentSession === expected.consentSession &&
+            confirmation == expected.confirmation &&
             // The runtime walk id is not compared: after the walk it may move on (ENDED -> READY);
             // a walk that becomes ACTIVE again fails the post-walk gate above and cancels.
             binding.isSameNetworkBinding(expected.networkBinding)

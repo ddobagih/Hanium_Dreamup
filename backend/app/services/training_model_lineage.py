@@ -9,10 +9,11 @@ artifact inventory.
 Policy (root choice, not an approved policy): a model whose revision lost a
 member through account deletion, training-consent withdrawal or artifact
 removal, or whose revision is retired/expired/missing, is RETRAIN_REQUIRED.
-It is not deleted automatically; ``require_model_deployable`` refuses any new
-deployment or promotion of it, and retraining on a cleaned revision is an
-operations decision. A job that was running when consent was withdrawn is
-covered because its output is assessed when it is registered or promoted.
+It is not deleted automatically; ``require_model_deployable`` raises when a
+caller explicitly checks such a model. The model registry and deployment
+commands do not currently call this helper, so it does not yet block actual
+registration or deployment, including output from an in-flight training job.
+Retraining on a cleaned revision remains an operations decision.
 A newer revision of the same dataset alone does not make a model
 RETRAIN_REQUIRED.
 """
@@ -182,7 +183,7 @@ def require_model_deployable(
     db: Session,
     lineage: TrainingModelLineage,
 ) -> TrainingLineageAssessment:
-    """Refuse a new deployment/promotion of a RETRAIN_REQUIRED model."""
+    """Reject an ineligible lineage when explicitly called by a caller."""
 
     assessment = assess_training_model_lineage(db, lineage)
     if assessment.status != "DEPLOYABLE":

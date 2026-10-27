@@ -327,7 +327,8 @@ class MainActivityFirstRunRegistrationStaticTest {
         assertInOrder(
             functionBlock("private fun loadDetectorForCurrentProcess()"),
             "loadAttempted = true",
-            "detector.tuningLane.execute",
+            "val loadTask = Runnable",
+            "if (requestGeneration != loadRequestGeneration) return@loadTask",
             "platform.select(",
         )
         assertTrue(MainActivityRefactorSource.composition(source, "primaryDetectorLifecycleController")

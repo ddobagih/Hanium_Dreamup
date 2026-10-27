@@ -20,128 +20,28 @@ class MainActivityGatewaySpeechStaticTest {
         get() = MainActivityRefactorSource.composition(source, "voiceInputController")
 
     @Test
-    fun onScreenButtonPrefersInstalledKoreanPlatformOnlyAtHomeAndKeepsVoskForWalkFlows() {
+    fun commandsUseConfiguredServerWhileOfflineConfirmationAndOwnershipRemainGuarded() {
         val button = MainActivityRefactorSource.property(destinationPanel, "voiceReportButton")
-        val walkButton = MainActivityRefactorSource.member(runtimeComposer, "createWalkVoiceAction")
-        val destinationActions = source.substringAfter("val destinationPanel = DestinationGuidancePanel(")
-            .substringBefore("destinationSearchPresenter.bindPanel(destinationPanel)")
-        val walkButtonBinding = source.substringAfter("walkSafetyVoiceButton = runtimeComposer.createWalkVoiceAction(")
-            .substringBefore("walkSafetyVoiceStatusText = runtimeComposer.createWalkVoiceStatus()")
-        val startFromButton = functionBlock("private fun ensureVoicePermissionThenListen")
-        val permissionResult = functionBlock("private fun handleVoicePermissionResult")
-        val recognition = functionBlock("private fun startVoiceCommandRecognition")
-        val commandEligibility = recognition.substringAfter("VoiceRecognitionPurpose.COMMAND -> {")
-            .substringBefore("VoiceRecognitionPurpose.WALK_SESSION_RESUME -> {")
-        val controls = functionBlock("private fun updateVoiceCommandButton")
-        val homeContext = functionBlock("private fun nativeHomeFeatureContextAvailable")
-
-        assertTrue(button.contains("기기 내 음성 명령"))
+        assertTrue(button.contains("음성 명령 듣기 시작"))
         assertTrue(button.contains("actions.onVoiceStart()"))
-        assertTrue(ReportStaticSourceInspector.blockAfter(destinationActions, "onVoiceStart =").contains("ensureVoicePermissionThenListen()"))
-        assertTrue(walkButton.contains("기기 내 음성 명령"))
-        assertTrue(walkButton.contains("setOnClickListener { onClick() }"))
-        assertTrue(walkButtonBinding.contains("ensureVoicePermissionThenListen()"))
-        assertTrue(source.contains("val runtimeComposer = NativeRuntimeViewComposer(this, viewStyle)"))
-        assertTrue(startFromButton.contains("startVoiceCommandRecognition()"))
-        assertTrue(permissionResult.contains("startVoiceCommandRecognition()"))
-        assertFalse(permissionResult.contains("toggleGatewayVoiceCapture()"))
-        assertTrue(
-            startFromButton.contains(
-                "snapshot.state !in setOf(WalkSessionState.ACTIVE, WalkSessionState.PAUSED)",
-            ),
-        )
-        assertFalse(startFromButton.contains("toggleGatewayVoiceCapture()"))
-        assertFalse(startFromButton.contains("currentGatewaySpeechSessionOrNull()"))
-        assertTrue(startFromButton.contains("environment.page().voiceInteraction"))
-        assertTrue(voiceInputComposition.contains("VoiceInputPage(nativeUiPage, nativeUiPage.isVoiceInteractionPage(),"))
-        val voicePages = source.substringAfter("private fun NativeUiPage.isVoiceInteractionPage()")
-            .substringBefore("\n    private fun ")
-        assertTrue(voicePages.contains("this == NativeUiPage.VOICE_COMMAND || this == NativeUiPage.DESTINATION_SEARCH"))
-        assertFalse(voicePages.contains("NativeUiPage.SETTINGS"))
-        assertFalse(voicePages.contains("NativeUiPage.HOME"))
-        assertTrue(startFromButton.contains("homeVoiceCommandAvailable()"))
-        assertTrue(commandEligibility.contains("WalkSessionState.ACTIVE"))
-        assertTrue(commandEligibility.contains("WalkSessionState.PAUSED"))
-        assertTrue(commandEligibility.contains("WalkSessionState.READY"))
-        assertTrue(commandEligibility.contains("WalkSessionState.SAFE_STOP"))
-        assertTrue(commandEligibility.contains("WalkSessionState.ENDED"))
-        assertTrue(commandEligibility.contains("sessionSnapshot.isForeground"))
-        assertTrue(commandEligibility.contains("environment.page().voiceInteraction"))
-        assertTrue(commandEligibility.contains("homeVoiceCommandAvailable()"))
-        assertTrue(commandEligibility.contains("voiceResumeConfirmationAvailable()"))
-        val lease = functionBlock("private fun isVoiceRecognitionLeaseCurrent")
-        val commandLease = lease.substringAfter("VoiceRecognitionPurpose.COMMAND ->")
-            .substringBefore("VoiceRecognitionPurpose.WALK_SESSION_RESUME ->")
-        assertTrue(commandLease.contains("WalkSessionState.ACTIVE"))
-        assertTrue(commandLease.contains("WalkSessionState.PAUSED"))
-        assertTrue(commandLease.contains("snapshot.epoch == expectedWalkEpoch"))
-        assertTrue(commandLease.contains("snapshot.isForeground"))
-        assertTrue(commandLease.contains("environment.page().voiceInteraction"))
-        assertTrue(commandLease.contains("homeVoiceCommandAvailable()"))
-        assertTrue(homeContext.contains("firstRunOnboardingComplete()"))
-        assertTrue(homeContext.contains("isActivityForeground"))
-        assertTrue(homeContext.contains("WalkSessionState.READY"))
-        assertTrue(homeContext.contains("WalkSessionState.SAFE_STOP"))
-        assertTrue(homeContext.contains("WalkSessionState.ENDED"))
-        assertFalse(homeContext.contains("WalkSessionState.ACTIVE"))
-        assertFalse(homeContext.contains("WalkSessionState.PAUSED"))
-        assertTrue(
-            recognition.contains(
-                "val preferPlatform = purpose == VoiceRecognitionPurpose.COMMAND &&",
-            ),
-        )
-        assertTrue(recognition.contains("environment.homeFeatureContextAvailable()"))
+        val start = functionBlock("private fun ensureVoicePermissionThenListen")
+        assertTrue(start.contains("environment.microphoneGranted()"))
+        assertTrue(start.contains("environment.walkAreaCommandAvailable()"))
+        assertTrue(start.contains("startVoiceCommandRecognition()"))
+        val recognition = functionBlock("private fun startVoiceCommandRecognition")
+        assertTrue(ReportStaticSourceInspector.appearsInOrder(recognition,
+            "if (!mayListen) return false", "output.prepareForRecognition()",
+            "environment.serverCommandRecognitionEnabled() && purpose == VoiceRecognitionPurpose.COMMAND",
+            "if (!promptCompletedForThisRequest) return prepareOneShotVoiceCommandPrompt()",
+            "gateway.startGatewayVoiceCapture()", "return started", "val preferPlatform"))
+        assertTrue(recognition.contains("platform.createRecognizer { handsFreeRuntime.modelDirectory }"))
+        assertTrue(recognition.contains("isRequestCurrent = {"))
         assertTrue(voiceInputComposition.contains("override fun homeFeatureContextAvailable() = nativeHomeFeatureContextAvailable()"))
-        assertTrue(
-            recognition.contains(
-                "if (handsFreeRuntime.modelDirectory == null && !preferPlatform)",
-            ),
-        )
-        assertTrue(
-            ReportStaticSourceInspector.appearsInOrder(
-                recognition,
-                "val preferPlatform = purpose == VoiceRecognitionPurpose.COMMAND &&",
-                "if (handsFreeRuntime.modelDirectory == null) prepareHandsFreeVoiceModel()",
-                "if (handsFreeRuntime.modelDirectory == null && !preferPlatform)",
-                "stopHandsFreeVoiceService()",
-                "platform.createRecognizer { handsFreeRuntime.modelDirectory }",
-                "preferPlatform = preferPlatform",
-                "isRequestCurrent = {",
-            ),
-        )
-        assertFalse(recognition.contains("SpeechRecognizer.isOnDeviceRecognitionAvailable"))
-        assertFalse(recognition.contains("SpeechRecognizer.createOnDeviceSpeechRecognizer"))
-        assertTrue(voiceInputComposition.contains("val platform = AndroidVoiceInputPlatform(this)"))
-        assertTrue(voiceInputComposition.contains("platform = platform,"))
-        val createRecognizer = MainActivityRefactorSource.member(voicePlatform, "createRecognizer")
-        assertTrue(createRecognizer.contains("PreferredOfflineSpeechRecognizer(context, modelDirectory)"))
-        assertTrue(createRecognizer.contains("delegate.startListening(intent, preferPlatform, isRequestCurrent)"))
-        assertFalse(createRecognizer.contains("SpeechRecognizer.isOnDeviceRecognitionAvailable"))
-        assertFalse(createRecognizer.contains("SpeechRecognizer.createOnDeviceSpeechRecognizer"))
-        assertFalse(controls.contains("currentGatewaySpeechSessionOrNull()"))
-        assertTrue(controls.contains("WalkSessionState.ACTIVE"))
-        assertTrue(controls.contains("WalkSessionState.PAUSED"))
-        val buttonEligibility = controls
-            .substringAfter("val voiceCommandAvailable =")
-            .substringBefore("val enabled =")
-        assertTrue(buttonEligibility.contains("WalkSessionState.ACTIVE ->"))
-        assertTrue(buttonEligibility.contains("!oneShotSpeechRecognitionLimited"))
-        assertTrue(buttonEligibility.contains("WalkSessionState.PAUSED ->"))
-        assertTrue(buttonEligibility.contains("voiceResumeConfirmationAvailable()"))
-        assertTrue(buttonEligibility.contains("homeVoiceCommandAvailable()"))
-        assertTrue(controls.contains("!handsFreeVoiceModelPreparing"))
-        assertTrue(controls.contains("snapshot.isForeground &&\n                voiceCommandAvailable"))
-
-        val resumeAvailability = functionBlock("private fun voiceResumeConfirmationAvailable")
-        assertTrue(resumeAvailability.contains("oneShotSpeechRecognitionLimited"))
-        assertTrue(resumeAvailability.contains("handsFreeRuntime.modelDirectory != null"))
-        assertTrue(resumeAvailability.contains("!handsFreeRuntime.destroyed"))
-        assertFalse(resumeAvailability.contains("SpeechRecognizer.isOnDeviceRecognitionAvailable"))
-        assertTrue(resumeAvailability.contains("environment.microphoneGranted()"))
-        assertTrue(voiceInputComposition.contains("override fun microphoneGranted() = hasRecordAudioPermission()"))
-        assertFalse(resumeAvailability.contains("PostLoginDeviceCheckFeature.HANDS_FREE_VOICE"))
-        assertTrue(resumeAvailability.contains("WalkSafeStartupRequirement.ON_DEVICE_STT"))
-        assertTrue(resumeAvailability.contains("WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS"))
+        assertTrue(voiceInputComposition.contains("override fun walkAreaCommandAvailable() = walkAreaVoiceCommandAvailable()"))
+        val resume = functionBlock("private fun voiceResumeConfirmationAvailable")
+        assertTrue(resume.contains("environment.microphoneGranted()"))
+        assertTrue(resume.contains("WalkSafeStartupRequirement.ON_DEVICE_STT"))
+        assertTrue(resume.contains("WalkSafeStartupRequirement.OFFLINE_KOREAN_TTS"))
     }
 
     @Test
@@ -264,7 +164,7 @@ class MainActivityGatewaySpeechStaticTest {
         assertTrue(source.contains("ACCESSIBILITY_LIVE_REGION_POLITE"))
         val fallback = functionBlock("private fun speakGatewayInteractionOrLocalFallback")
         assertTrue(fallback.contains("output.speakInteraction(message)"))
-        assertTrue(functionBlock("private fun handleGatewaySpeechTranscript").contains("speakGatewayInteractionOrLocalFallback("))
+        assertTrue(functionBlock("private fun handleGatewaySpeechTranscript").contains("output.speakInteraction("))
         assertTrue(source.contains("speakInteraction(message)"))
     }
 

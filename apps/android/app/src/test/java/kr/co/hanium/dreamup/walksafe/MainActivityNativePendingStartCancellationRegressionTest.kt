@@ -140,6 +140,7 @@ class MainActivityNativePendingStartCancellationRegressionTest {
             put(main, "startupConfirmationInteraction\$delegate", lazyOf(f.confirm))
             put(main, "gatewayWalkSessionController\$delegate", lazyOf(f.gatewayController))
             put(main, "speechOutputController", f.output)
+            put(main, "navigationStateDebugLogger", { _: String, _: String -> Unit })
 
             // The journey fixture normally leaves these cancellation leaves inert. Connect the
             // same production cleanup owners used by Main without modifying the shared harness.

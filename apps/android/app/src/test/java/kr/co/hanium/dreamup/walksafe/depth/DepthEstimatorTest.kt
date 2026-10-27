@@ -82,7 +82,7 @@ class DepthEstimatorTest {
     }
 
     @Test
-    fun synchronizedMetricDepthAndPoseReachDistinctUserMessagesThroughEstimator() {
+    fun synchronizedMetricDepthAndPoseKeepMotionEvidenceWithBriefStopSpeech() {
         fun approach(
             egoDisplacementSpeed: Float?,
             motion: MotionContext = MotionContext(),
@@ -134,13 +134,13 @@ class DepthEstimatorTest {
         val unsynchronized = approach(1f, alignedDepth = false)
 
         assertEquals(ObjectMotion.USER_APPROACHING_STATIONARY, stationary.objectMotion)
-        assertTrue(stationary.userFacing.message!!.contains("정지해 있는 것으로 보이며"))
+        assertEquals("멈추세요. 차량이 감지됐습니다. 주변을 확인하세요.", stationary.userFacing.message)
         assertEquals(ObjectMotion.OBJECT_APPROACHING, incoming.objectMotion)
-        assertTrue(incoming.userFacing.message!!.contains("이 물체가 사용자 쪽으로 다가오는 것으로 보입니다"))
+        assertEquals("멈추세요. 차량이 감지됐습니다. 주변을 확인하세요.", incoming.userFacing.message)
         assertEquals(ObjectMotion.UNKNOWN, uncertain.objectMotion)
         assertEquals(ObjectMotion.UNKNOWN, shaking.objectMotion)
         assertEquals(ObjectMotion.UNKNOWN, unsynchronized.objectMotion)
-        assertTrue(uncertain.userFacing.message!!.contains("거리가 줄어들고 있습니다"))
+        assertEquals("멈추세요. 차량이 감지됐습니다. 주변을 확인하세요.", uncertain.userFacing.message)
     }
 
     private val mapper = LetterboxCoordinateMapper(

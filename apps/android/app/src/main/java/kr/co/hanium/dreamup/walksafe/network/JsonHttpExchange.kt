@@ -18,6 +18,7 @@ internal fun <T> withJsonHttpExchange(
     try {
         connection.apply {
             configure()
+            setRequestProperty("Accept-Encoding", "identity")
             if (requestBody != null) {
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
@@ -34,7 +35,8 @@ internal fun <T> withJsonHttpExchange(
                 }
             }
         }
-        val response = connection.readBoundedResponse(maximumResponseBytes, cancellation)
+        val response = connection.readBoundedResponse(maximumResponseBytes, cancellation,
+            strictSuccessFraming = true, strictErrorFraming = true)
         return connection.consume(response)
     } finally {
         cancellation.detach(connection)

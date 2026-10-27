@@ -120,8 +120,11 @@ internal class VoiceInputCommandPeerAdapter(
     private val speech: () -> SpeechOutputController,
     private val homeContextAvailable: () -> Boolean,
     private val diagnostics: VoiceInteractionDiagnostics = object : VoiceInteractionDiagnostics {},
+    private val interceptRecognized: (RecognizedVoiceInput) -> Boolean = { false },
 ) : VoiceInputCommandEffects {
-    override fun recognized(result: RecognizedVoiceInput) = interaction().commands.handleRecognized(result)
+    override fun recognized(result: RecognizedVoiceInput) {
+        if (!interceptRecognized(result)) interaction().commands.handleRecognized(result)
+    }
     override fun resumeRecognized(phrases: List<String>, confidenceScores: FloatArray?) = resume().handleWalkSessionResumeRecognition(phrases, confidenceScores)
     override fun takeoverRecognized(phrases: List<String>) = gatewayWalk().handleGatewayWalkTakeoverRecognition(phrases)
     override fun resumeRecognizerNotStarted() = resume().handleWalkSessionResumeRecognizerNotStarted()

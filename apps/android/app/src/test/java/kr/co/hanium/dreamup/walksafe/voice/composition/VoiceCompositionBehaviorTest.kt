@@ -381,10 +381,11 @@ class VoiceCompositionBehaviorTest {
         }
     }
 
-    @Test fun guidanceStatusWithoutFailureHandlerDoesNotCompleteWhenRetired() {
+    @Test fun guidanceStatusWithoutFailureHandlerDoesNotCompleteWhenExplicitlyCancelled() {
         val f = Fixture(); val peer = f.guidancePeer(); var completed = 0
         assertTrue(peer.submitStatus("이전 경로 상태", { true }, { completed++ }, null))
         f.runtime.ready(); val old = f.runtime.spoken.single().id
+        peer.cancelCommand()
         assertTrue(peer.submitStatus("새 경로 상태", { true }, { completed++ }, null))
         f.clock.advanceBy(0L); f.runtime.done(old)
         assertEquals(0, completed); assertTrue(peer.commandPending)
@@ -423,6 +424,7 @@ class VoiceCompositionBehaviorTest {
         val f = Fixture(); val peer = f.guidancePeer(); var previousFailed = 0; var currentFailed = 0
         peer.submitStatus("이전 상태", { true }, {}, { previousFailed++ })
         val oldGeneration = peer.commandGeneration
+        peer.cancelCommand()
         peer.submitStatus("현재 상태", { true }, {}, { currentFailed++ })
         val generation = peer.commandGeneration
         f.clock.advanceBy(0L)

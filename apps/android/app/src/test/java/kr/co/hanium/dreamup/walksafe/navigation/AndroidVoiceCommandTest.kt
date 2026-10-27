@@ -363,6 +363,17 @@ class AndroidVoiceCommandTest {
     }
 
     @Test
+    fun naturalHelpOpenRequestsStillRequireAnExactPositiveCommand() {
+        listOf("도움말 열어줘", "도움말을 열어 주세요.", "도움말 보여줘", "도움말을 보여 주세요").forEach {
+            assertTrue(selectAndroidVoiceAction(listOf(it), floatArrayOf(0.9f)) in setOf(AndroidVoiceAction.SpeakVoiceHelp, AndroidVoiceAction.OpenHelp))
+            assertNull(selectAndroidVoiceAction(listOf(it), floatArrayOf(0.1f)))
+        }
+        listOf("도움말 열지 마", "도움말을 열어주지 마", "도움말 열어주오", "토마일", "도움말 열어줘 그리고 안내 시작").forEach {
+            assertNull(parseAndroidVoiceCommand(it))
+        }
+    }
+
+    @Test
     fun parsesStartRepeatAndHelpAsDistinctActions() {
         val cases = mapOf(
             "안내 시작" to (AndroidVoiceCommand.StartNavigation to AndroidVoiceAction.StartNavigation),

@@ -32,8 +32,8 @@ internal class ForegroundWakeInputController(
 
     fun foregroundHomeWakeContextAvailable(): Boolean =
         !session.state().destroyed &&
-            environment.page().noPendingPageOrGuidance &&
-            session.homeCommandAvailable() && environment.disclosureAccepted() &&
+            ((environment.page().noPendingPageOrGuidance && session.homeCommandAvailable()) ||
+                environment.walkWakeContextAvailable()) && environment.disclosureAccepted() &&
             !session.state().recognitionActive && !session.state().promptPending && !session.state().deferredPending &&
             !foregroundWakeHandoffInProgress &&
             foregroundHomeWakeAcknowledgement?.isPlaying() != true &&
@@ -64,7 +64,9 @@ internal class ForegroundWakeInputController(
         val actor = environment.identity().actorId ?: return
         // Page rendering must not open a second microphone while wake hands off to command input.
         foregroundWakeHandoffInProgress = true
-        presentation.showCommandPage()
+        val walkArea = environment.walkAreaCommandAvailable()
+        if (!walkArea) presentation.showCommandPage()
+        val inputPage = environment.page().owner
         val processGeneration = environment.identity().processGeneration
         val epoch = requireNotNull(environment.walkOrNull()).epoch
         val recognitionGeneration = session.state().recognitionGeneration
@@ -79,8 +81,10 @@ internal class ForegroundWakeInputController(
                 environment.identity().processGeneration == processGeneration &&
                 requireNotNull(environment.walkOrNull()).epoch == epoch &&
                 session.state().recognitionGeneration == recognitionGeneration &&
-                environment.page().voiceCommand &&
-                session.homeCommandAvailable() && environment.disclosureAccepted()
+                environment.page().owner == inputPage &&
+                environment.walkAreaCommandAvailable() == walkArea &&
+                (if (walkArea) environment.walkAreaCommandAvailable() else session.homeCommandAvailable()) &&
+                environment.disclosureAccepted()
         }
         presentation.voiceStatus("호출어를 인식했습니다.")
         if (!isCurrent()) {
@@ -108,7 +112,7 @@ internal class ForegroundWakeInputController(
                 session.scheduleRestart()
                 return@play
             }
-            if (command == null) {
+            if (command == null || environment.serverCommandRecognitionEnabled()) {
                 // A completed cue is the listening prompt; a failed cue uses the normal spoken prompt.
                 if (result == kr.co.hanium.dreamup.walksafe.voice.WakeAcknowledgementResult.COMPLETED) {
                     session.cueCompletedForCurrentRecognition()
@@ -138,13 +142,15 @@ internal class ForegroundWakeInputController(
         val actor = environment.identity().actorId
         val processGeneration = environment.identity().processGeneration
         val page = environment.page().owner
+        val walkArea = environment.walkAreaCommandAvailable()
         val epoch = requireNotNull(environment.walkOrNull()).epoch
         val expectedNavigationDecisionToken = environment.pendingNavigationDecisionToken()
         val isCurrent = {
             foregroundHomeWakeGeneration == generation &&
                 environment.identity().actorId == actor &&
                 environment.identity().processGeneration == processGeneration &&
-                environment.page().owner == page && requireNotNull(environment.walkOrNull()).epoch == epoch &&
+                environment.page().owner == page && environment.walkAreaCommandAvailable() == walkArea &&
+                requireNotNull(environment.walkOrNull()).epoch == epoch &&
                 foregroundHomeWakeContextAvailable()
         }
         // Install the owner before effects that can cause another render.
@@ -163,7 +169,8 @@ internal class ForegroundWakeInputController(
             }
             return
         }
-        // Non-walking foreground pages share this probe; ACTIVE/PAUSED keep the walking service.
+        // HOME and non-active walking pages share a capture implementation, with separate ownership.
+        // ACTIVE walking continues to use its existing foreground service.
         session.stopHandsFree()
         lateinit var probe: WakeProbeEffect
         probe = platform.createProbe(ForegroundWakeCallbacks(

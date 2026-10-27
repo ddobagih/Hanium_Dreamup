@@ -170,6 +170,10 @@ class MovingDirectionGraceReviewTest {
             })
             val composition: NavigationSessionComposition = read(main, "navigationSessions")
             val bindings: GuidanceAssemblyBindings = read(composition, "guides")
+            val input = MainActivityControllerTestFixture.controller(main, "voiceInputController")
+            val inputOutput: kr.co.hanium.dreamup.walksafe.voice.input.VoiceInputOutput = read(input, "output")
+            put(inputOutput, "nowMs", { base.now })
+            put(inputOutput, "screenReader", { false })
             val productionSpeech = bindings.speech()
             put(guide, "speech", object : RouteGuidanceController.SpeechPort by productionSpeech {
                 // Avoid OS accessibility queries only; registry/native activity and actual input admission remain.

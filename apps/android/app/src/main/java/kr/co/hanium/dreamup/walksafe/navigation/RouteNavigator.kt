@@ -699,6 +699,14 @@ class RouteNavigator(
 
     internal val instructionRetryIntervalMs: Long get() = config.speechRetryIntervalMs.coerceAtLeast(0L)
 
+    @Synchronized
+    fun remainingDistanceM(): Double? {
+        val current = route ?: return null
+        if (positioningEvidenceInterrupted || !latestRouteMatchUsableForGuidance ||
+            offRouteGuidanceSuspended || pendingDecision != null) return null
+        return progressDistanceM?.let { (current.summary.distanceM - it).coerceAtLeast(0.0) }
+    }
+
     /**
      * S12-12: install revision and latest accepted matched segment for tactile route checks.
      * The segment is null unless a usable match exists for this exact route revision.

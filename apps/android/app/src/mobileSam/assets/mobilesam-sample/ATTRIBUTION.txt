@@ -1,0 +1,20 @@
+Pedestrian Crossing with Textured Paving Blocks
+Author: Kiyok
+Source: https://commons.wikimedia.org/wiki/File:Pedestrian_Crossing_with_Textured_Paving_Blocks.jpg
+License: CC BY-SA 3.0 https://creativecommons.org/licenses/by-sa/3.0/
+Changes: resized to maximum 1024 pixels, JPEG quality 95.
+This derived photo is distributed under CC BY-SA 3.0.
+The photo is a public example; it is not a WalkMate field capture or a ground-truth mask.
+
+Tactile paving 2
+Author: Shadowlink1014
+Source: https://commons.wikimedia.org/wiki/File:Tactile_paving_2.jpg
+License: Public domain
+Changes: resized to maximum 1024 pixels, JPEG quality 95.
+
+Crossing of driveway with sidewalk
+Author: Bulwersator
+Source: https://commons.wikimedia.org/wiki/File:Crossing_of_driveway_with_sidewalk.jpg
+License: CC BY-SA 3.0 https://creativecommons.org/licenses/by-sa/3.0/
+Changes: resized to maximum 1024 pixels, JPEG quality 95.
+This derived photo is distributed under CC BY-SA 3.0.

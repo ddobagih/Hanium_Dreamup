@@ -1516,7 +1516,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         public Response execute(AdminRequestAdmission admission, String method, String url,
             Map<String, String> headers, byte[] body) throws IOException {
             // adm-F2: a closed transport opens nothing.
-            if (closed) throw new IOException(CANCELLED_MESSAGE);
+            if (closed || Thread.currentThread().isInterrupted()) throw new IOException(CANCELLED_MESSAGE);
             long startedAtNanos = monotonicClock.nanoTime();
             HttpURLConnection connection = connections.open(url);
             RequestOwner owner = new RequestOwner(connection, monotonicClock, startedAtNanos);
@@ -1581,11 +1581,18 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         private static String readBounded(InputStream input, RequestOwner owner) throws IOException {
             try (input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
                 byte[] buffer = new byte[4096];
+                int zeroReads = 0;
                 while (true) {
                     owner.checkDeadline();
                     int read = input.read(buffer);
                     owner.checkDeadline();
                     if (read < 0) break;
+                    if (read == 0) {
+                        // Match the existing operations/image reader's no-progress limit.
+                        if (++zeroReads > 3) throw new IOException("administrator API response made no progress");
+                        continue;
+                    }
+                    zeroReads = 0;
                     if (output.size() + read > 64 * 1024) throw new IOException("administrator API response is too large");
                     output.write(buffer, 0, read);
                 }
@@ -1617,6 +1624,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
 
             private void checkDeadline() throws IOException {
                 if (remainingNanos() <= 0L) state.compareAndSet(ACTIVE, TIMED_OUT);
+                if (Thread.currentThread().isInterrupted()) state.compareAndSet(ACTIVE, CANCELLED);
                 int current = state.get();
                 if (current == TIMED_OUT) throw deadlineExceeded();
                 if (current == CANCELLED) {
@@ -1646,7 +1654,14 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             }
 
             private void disconnect() {
-                if (disconnectClaimed.compareAndSet(false, true)) connection.disconnect();
+                if (disconnectClaimed.compareAndSet(false, true)) {
+                    try {
+                        connection.disconnect();
+                    } catch (RuntimeException ignored) {
+                        // Best-effort cleanup must not replace the response/original failure or
+                        // escape the cancellation worker. The owner still checks cancellation/deadline.
+                    }
+                }
             }
 
             private void finish() throws IOException {

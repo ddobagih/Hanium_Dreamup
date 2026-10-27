@@ -95,7 +95,7 @@ class MainActivityEmailAccountStaticTest {
         val prepare = onboardingOwner("prepareVerifiedEmailLogin")
         assertTrue(prepare.contains("FirstRunOnboardingPolicy.recordVerifiedEmailLogin("))
         assertTrue(prepare.contains("FirstRunOnboardingPolicy.mayReauthenticateVerifiedEmailActor("))
-        assertTrue(prepare.contains("val next = if (reauthenticates) completed ?: before"))
+        assertTrue(prepare.contains("val next = if (reauthenticates) completed?.let(::effectiveSessionSnapshot) ?: before"))
         assertTrue(prepare.contains("completedNativeProgress?.takeIf { it.verifiedActorBinding == actor }"))
         assertTrue(login.contains("val nextFirstRunSnapshot = preparedLogin.snapshot"))
         val wiring = functionBlock("private fun createEmailAccountController()")
@@ -104,7 +104,7 @@ class MainActivityEmailAccountStaticTest {
         val apply = onboardingOwner("applyVerifiedEmailLogin")
         assertInOrder(apply, "if (prepared.owner !== this) return false", "if (snapshot == prepared.snapshot) return true",
             "if (snapshot !== prepared.before) return false", "snapshot = prepared.snapshot")
-        assertTrue(functionBlock("private fun createEmailAccountController()").contains("ageBand = PriorityUserAgeBand.VERIFIED_14_PLUS"))
+        assertTrue(File("src/main/java/kr/co/hanium/dreamup/walksafe/session/gateway/ActorSessionLifecycleCoordinator.kt").readText().contains("ageBand = PriorityUserAgeBand.VERIFIED_14_PLUS"))
         assertTrue(login.contains("GatewaySessionProcessCoordinator.publishVerified("))
         assertTrue(login.contains("로그인했습니다. 먼저 서비스 목적과 안전 한계를 확인하세요."))
         assertTrue(login.contains("account=authenticated next=purpose_and_safety"))

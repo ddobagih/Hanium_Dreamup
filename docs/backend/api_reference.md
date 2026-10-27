@@ -37,6 +37,10 @@ FP-046 개인정보 API는 다음 네 경로만 제공한다. 모든 요청에�
 
 서버 삭제 항목(S1617-55·59): 수동 삭제 worker가 커밋 뒤 DB 재조회와 업로드·신고 격리(`.retention-quarantine`, `.report-deletion-quarantine`)·RAW 저장소 재스캔을 모두 통과해야 manifest를 게시한다. 저널 밖에 삭제 대상 신고·RAW의 파일이 남아 있으면 서버 4항목은 열린 채로 남는다. `server_quarantine`은 준비 시점에 격리(QUARANTINED) RAW가 있었으면 `COMPLETED`, 없으면 재조회 근거를 적은 `NOT_APPLICABLE`이다. `server_copies`는 삭제 대상 신고의 기관 전달 기록(패키지 또는 전달 이벤트 1건 = 사본 1건)이 없을 때만 `NOT_APPLICABLE`이고, 1건이라도 있으면 `EXTERNAL_PENDING`으로 남아 요청 전체가 `COMPLETED`가 되지 않는다. 계정 삭제 요청의 기관 사본 삭제 확인을 기록해 이 항목을 닫는 경로는 아직 없다.
 
+기관 사본 집계에는 같은 계정·세대의 이전 신고 삭제 증빙(`report_deletion_tombstones.external_copy_count`)도 포함한다. 이전 신고가 이미 삭제돼 현재 신고 목록이 비어 있어도 이 사본은 `EXTERNAL_PENDING`으로 남는다. 복구 중 증빙의 사본 수가 저널에 기록된 전체 사본 수보다 크면 manifest 게시를 차단한다. 이미 게시된 과거 완료 결과를 자동 정정하지는 않는다. worker 갱신 전 `202610070001` 마이그레이션으로 계정 식별 해시·세대·사본 수 세 열의 조회 권한을 적용해야 하며, 기관 상세·수정 권한은 부여하지 않는다.
+
+삭제 worker의 새 내부 저널은 v5이며 파일 목록과 별도로 업로드·RAW 저장소의 절대 경로 및 파일시스템 식별 정보(device/inode)를 기록한다. 업로드 조각이 0개여도 해당 저장소를 재검색하며, 경로 누락·권한 변경·다른 디렉터리로 교체·격리 디렉터리의 심볼릭 링크 등으로 확인할 수 없으면 완료 처리를 막는다. 저장소 결속 정보는 외부 manifest에 내보내지 않는다. v1~v4 저널에서 RAW 수집 기록은 있지만 파일 목록이 없어 과거 저장소를 입증할 수 없는 경우에도 자동 완료하지 않는다. 이 경우 운영자가 당시 저장소와 잔여 파일을 확인하는 별도 복구가 필요하며, 현재 설정값으로 경로를 추정하거나 저널을 자동 변환하지 않는다.
+
 ## Android 관리자 인증·복구
 
 field/staging/production은 `WALKSAFE_ADMIN_SECURITY_ENABLED=true`가 필수다. 이때 정적 `X-WalkSafe-Admin-Token`은 관리자 권한을 주지 않는다. 모든 관리자 앱 요청은 다음 네 문맥 헤더를 정확히 보내며, 보호 API는 기기별 opaque Bearer 세션도 함께 보낸다.
@@ -645,3 +649,15 @@ new, reviewed, resolved
 depth log schema는 raw RGB/depth media 참조 같은 미허용 필드를 거부한다. 기록은 `android_debug.sqlite3`(SQLite) 한 파일에, frame 이미지는 별도 image 파일에 저장한다. 두 파일은 `0600`, 저장 디렉터리는 `0700`으로 만들고 symlink/경로 이탈을 거부한다. 이전 버전의 `*.jsonl` 파일은 변경 없이 한 번 SQLite로 가져오는 legacy 입력일 뿐 새로 쓰지 않는다. frame capture는 실제 이미지를 저장하므로 운영 telemetry나 신고 evidence로 자동 승격하지 않는다. field/staging/production에서는 `ANDROID_DEBUG_LOG_ENABLED=true` 자체를 시작 단계에서 거부한다.
 
 자료 분류(S1617-31, 결정 A): 이 저장소는 앱 계층 암호화(AEAD)를 쓰지 않는 평문 저장소이며 파일 권한으로만 보호한다. 따라서 개발 환경의 비민감 자료(합성·개발자 본인 시험 입력)만 저장한다. 현장 시험·운영 사용자 자료, 실제 보행 중 카메라 이미지, 정확한 위치·계정 정보는 이 경로에 보내지 않는다. 현장 자료는 암호화 신고·RAW 경로만 사용한다. 이 경로를 현장 자료까지 넓히려면 별도 암호화·조회 감사·삭제 정책·디스크 암호화 확인이 먼저 필요하다.
+
+### 가입 전 약관 버전 확인과 설치별 삭제 증거 서명
+
+- `GET /account-signup-policy`는 가입 문서별 현재 버전, 필수 여부, 승인된 동등 버전 및 알려진 이전 버전을 반환한다. Backend는 field 서비스 인증을 요구하며 Gateway의 `GET /api/account-signup-policy`는 로그인 전 공개 메타데이터만 중계한다. 응답은 `no-store`다. Android는 OTP 요청 전과 계정 생성 전에 번들 문서 버전을 비교한다. 필수 문서 또는 알 수 없는 선택 문서의 버전 불일치는 가입을 막는다. 알려진 이전 선택 문서는 동의하지 않은 상태로 진행하며, 최신 버전 문자열을 읽지 않은 문서에 대입하지 않는다. 계정 생성 시 서버의 최종 버전 검증은 계속 적용된다.
+- `POST /privacy/installation-evidence-key`는 인증된 actor·계정 세대·설치에 P-256 공개키(SPKI DER, 패딩 없는 base64url)를 등록한다. 같은 키 재등록은 204, 다른 키 교체는 409다. Gateway는 `PUT /privacy/rights?control=installation-evidence-key`에서 현재 세션, 해당 설치의 서버 확인 동의, 동의 제어 비밀값을 확인한 뒤 중계한다. Android는 동의 저장/확인 뒤 등록하고 개인키는 Android Keystore에 둔다.
+- 삭제 증거의 `installation_signature`는 기존 증거 해시를 지정 도메인으로 서명한다. Android는 같은 증거의 재시도를 위해 서명 바이트를 백업 제외 저장소에 보관한다. 삭제 완료 후 기존 계정 초기화 단계에서 키와 서명 파일을 정리한다. 등록된 설치는 기존 서버 검증이 서명을 요구한다. 키가 등록되지 않은 이전 설치의 기존 호환 처리는 유지하므로 모든 설치가 서명 방식으로 전환됐다는 뜻은 아니다. Backend → Gateway → Android 순서로 적용해야 새 가입/등록 경로를 사용할 수 있다.
+
+### 계정 삭제 기록을 백업 복원본에 다시 적용할 때
+
+`reapply_account_deletion_tombstones.py apply`는 삭제 표시 적용 후에도 복원된 신고·RAW·동의 행이 남으면 `requires_physical_redeletion: true`, `retained_data_categories`를 출력하고 종료 코드 2를 반환한다. 삭제 표시는 커밋된 상태이며 재실행도 안전하다. 이 결과는 실제 파일·백업·외부 사본 삭제 완료 증거가 아니다. 복원본은 재삭제 및 운영 재공개 검증 전까지 격리한다.
+
+제품의 신고 목록·상세·집계·내보내기·이력·원본 열람 및 관리자 작업과 RAW 격리 목록에는 계정 세대의 삭제 표시를 적용한다. 삭제 작업자는 잔여 데이터를 찾아 지울 수 있도록 해당 조회 필터를 사용하지 않는다. 기존 동의 bootstrap과 RAW 쓰기 차단도 유지한다.

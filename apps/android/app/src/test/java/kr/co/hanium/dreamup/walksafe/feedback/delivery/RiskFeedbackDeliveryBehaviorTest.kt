@@ -11,6 +11,24 @@ import org.junit.Test
 
 /** Production policy + production actuator native START/DONE path; fake only device/effect boundaries. */
 class RiskFeedbackDeliveryBehaviorTest {
+    @Test fun distanceFollowsNativeStopCompletionAndUsesCurrentSourceOnly() {
+        for (expire in listOf(false, true)) {
+            val f = RiskFixture(); f.runtime.ready()
+            val action = f.reserve(level = MessageLevel.STOP)
+            val measured = deliveryRiskOutput().copy(trackId = action.trackId,
+                userFacing = UserFacingDepth(null, MessageLevel.STOP, action.message), measuredSurfaceRangeM = 1.25f)
+            val dispatch = f.dispatch(action).copy(distanceOutputsByDeliveryKey = mapOf(action.deliveryKey to measured))
+            f.controller.emitTactileFrameFeedback(dispatch)
+            val warning = f.runtime.spoken.single()
+            assertEquals(action.message, warning.message)
+            f.runtime.start(warning.id)
+            if (expire) f.runtime.advanceBy(701)
+            f.runtime.done(warning.id)
+            assertEquals(if (expire) 1 else 2, f.runtime.spoken.size)
+            if (!expire) assertEquals("카메라에서 감지된 표면까지 약 1.3미터입니다.", f.runtime.spoken.last().message)
+        }
+    }
+
     @Test fun controllerConstructionReadsNoAuthorityClockOrSdkAndSchedulesNothing() {
         val f=RiskFixture()
         assertTrue(f.events.isEmpty());assertEquals(0,f.clockReads);assertTrue(f.timers.isEmpty())

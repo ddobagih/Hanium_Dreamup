@@ -112,12 +112,13 @@ class AndroidReportCandidatePolicy {
         val captureElapsed = input.capturedAtElapsedRealtimeMs
             ?: return rejected(AndroidReportCandidateRejection.LOCATION_UNTRUSTED)
         if (captureElapsed < 0L || input.requestElapsedRealtimeMs < captureElapsed ||
+            input.requestElapsedRealtimeMs - captureElapsed != detectionAgeMs ||
             input.requestElapsedRealtimeMs - captureElapsed > REPORT_MAX_DETECTION_AGE_MS ||
             input.location?.elapsedRealtimeMs?.let { it < 0L || it > captureElapsed } != false
         ) return rejected(AndroidReportCandidateRejection.LOCATION_UNTRUSTED)
         val location = LocationTrustPolicy.freshOrNull(
             location = input.location,
-            nowElapsedRealtimeMs = captureElapsed,
+            nowElapsedRealtimeMs = input.requestElapsedRealtimeMs,
             config = REPORT_LOCATION_CONFIG,
         )?.takeIf { location ->
             location.latitude.isFinite() && location.latitude in -90.0..90.0 &&
@@ -214,6 +215,7 @@ class AndroidReportCandidatePolicy {
             val evidence = frame?.matchedEvidence
             val key = evidence?.visualFrameKey
             val mapper = evidence?.depthMapper
+            val geometryVersion by lazy(currentGeometryVersion)
             val sourceIndex = output.sourceDetectionIndex
             // This is the existing frozen frame's validation, never a confidence/device PASS.
             val coordinateGateStatus = if (
@@ -223,13 +225,15 @@ class AndroidReportCandidatePolicy {
                     .matchesCapture(evidence.tactileContext, requireDepthMapper = true) &&
                 FrameRecognitionAdmission.matchesDepth(key.cameraTimestampNs, evidence.frameId, evidence.depthSnapshot) &&
                 key.frameId == evidence.frameId && snapshot.capturedAtElapsedRealtimeMs == key.capturedAtElapsedRealtimeMs &&
-                evidence.geometryVersion == key.geometryVersion && evidence.geometryVersion == currentGeometryVersion() &&
+                evidence.geometryVersion == key.geometryVersion && evidence.geometryVersion == geometryVersion &&
                 mapper.imagePixelsToDepthUvMatrix(snapshot.imageWidth ?: 0, snapshot.imageHeight ?: 0) != null &&
                 mapper.imageToDepth(output.centerNorm) != null &&
                 output.frameId == evidence.frameId && output.timestampMs == evidence.frameTimestampMs &&
                 frame.guidance.outputs.any { it === output } &&
                 (sourceIndex == null || frame.depthDetections.getOrNull(sourceIndex)?.className == output.className) &&
-                snapshot.reportImage != null && snapshot.reportImage === reportImage && snapshot.capturedAtMs == capturedAtMs
+                snapshot.reportImage != null && snapshot.reportImage === reportImage && snapshot.capturedAtMs == capturedAtMs &&
+                ReportCoordinateEvidence.capture(snapshot, frame, output, geometryVersion)
+                    ?.statusFor(output, reportImage, capturedAtMs, geometryVersion) == "pass"
             ) "pass" else null
             return coordinateGateStatus
         }
