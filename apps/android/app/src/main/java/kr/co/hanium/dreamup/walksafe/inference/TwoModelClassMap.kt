@@ -155,6 +155,11 @@ object TwoModelClassMap {
 
     val unifiedWalksafeAllowlist = unifiedWalksafeClasses.toSet()
 
+    /** The October YOLO26 checkpoint retains both output IDs, with the same generic scooter name. */
+    val walkmate26Classes = unifiedWalksafeClasses.mapIndexed { index, name ->
+        if (index == 9 || index == 10) "e_scooter" else name
+    }
+
     fun customTactileClassName(classId: Int): String? = customTactileClasses.getOrNull(classId)
 
     fun cocoClassName(classId: Int): String? = cocoClasses.getOrNull(classId)
@@ -169,6 +174,7 @@ object TwoModelClassMap {
 
     fun isAndroidDepthCandidate(candidate: DetectionCandidate): Boolean {
         val className = candidate.className.lowercase()
-        return className in unifiedWalksafeAllowlist || className in customTactileClasses || className in cocoAllowlist
+        return className in unifiedWalksafeAllowlist || className == "e_scooter" ||
+            className in customTactileClasses || className in cocoAllowlist
     }
 }

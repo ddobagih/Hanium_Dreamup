@@ -29,7 +29,7 @@ object RuntimeCalibrationOutputGate {
 
         val rawMatches = when (config.outputFormat) {
             YoloOutputFormat.RAW_XYWH_PIXELS, YoloOutputFormat.RAW_XYWH_NORMALIZED -> rawChannelsMatch(referenceRaw, candidateRaw, config)
-            YoloOutputFormat.END_TO_END_XYXY -> endToEndRowsMatch(referenceRaw, candidateRaw, config)
+            YoloOutputFormat.END_TO_END_XYXY, YoloOutputFormat.END_TO_END_XYXY_PIXELS -> endToEndRowsMatch(referenceRaw, candidateRaw, config)
         }
         if (!rawMatches) return false
 
@@ -56,12 +56,14 @@ object RuntimeCalibrationOutputGate {
                 config.nmsIouThreshold, config.maxDetections,
                 normalizedCoordinates = config.outputFormat == YoloOutputFormat.RAW_XYWH_NORMALIZED,
             ).hasNearThresholdCandidate(values, NEAR_THRESHOLD_WINDOW)
-            YoloOutputFormat.END_TO_END_XYXY -> YoloEndToEndOutputParser(
+            YoloOutputFormat.END_TO_END_XYXY, YoloOutputFormat.END_TO_END_XYXY_PIXELS -> YoloEndToEndOutputParser(
                 config.inputSize, config::classNameForId, config::thresholdForClass, config::isAllowedClass,
+                thresholdForClassId = config::thresholdForClassId,
+                pixelCoordinates = config.outputFormat == YoloOutputFormat.END_TO_END_XYXY_PIXELS,
             ).parseRaw(values).any { detection ->
                 val name = config.classNameForId(detection.classId)
                 name != null && config.isAllowedClass(name) &&
-                    abs(detection.score - config.thresholdForClass(name)) <= NEAR_THRESHOLD_WINDOW
+                    abs(detection.score - config.thresholdForClassId(detection.classId)) <= NEAR_THRESHOLD_WINDOW
             }
         }
     }
@@ -181,7 +183,7 @@ object RuntimeCalibrationOutputGate {
                 config.classNameForId(classId)
             } else null
             score in 0f..1f && score > 0f && className != null &&
-                config.isAllowedClass(className) && score >= config.thresholdForClass(className)
+                config.isAllowedClass(className) && score >= config.thresholdForClassId(classId)
         }
 
     private fun DetectionCandidate.hasFiniteOutput(): Boolean =

@@ -1,29 +1,28 @@
 {
-  "version": "walksafe-android-runtime-walkmate21-yolo11n-768-fp32-normalized-bilinear-20260913",
+  "version": "walkmate-android-runtime-yolo26n-21cls-768-fp32-20261028",
   "primary_model": "unified_walksafe",
   "fallback_model": null,
   "models": {
     "unified_walksafe": {
       "enabled": true,
-      "asset": "models/walkmate_yolo11n_21cls_768_float32.tflite",
-      "source_model": "model/artifacts/candidates/walkmate_21cls_yolo11n_img768_20260912/best.pt",
-      "artifact_sha256": "d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57",
-      "source_model_sha256": "6f8ae9d2bb82f91e4391e42957a1b374bd4b14efa4702a86f7283454bc38cee0",
-      "source_archive_sha256": "93102ed502a7966a193733725a0d17908c1481e4ffc02ed7e9f83b13d7259bdc",
+      "asset": "models/walkmate_yolo26n_21cls_768_float32.tflite",
+      "source_model": "model/artifacts/candidates/walkmate_21cls_yolo26n_img768_20261020/YOLO26n_final.pt",
+      "artifact_sha256": "41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c",
+      "source_model_sha256": "e1fa51299b2ecfd2fe19a1f2ae5049020ba8b0619541a32e7fe3b60e8f4c9c3f",
       "input_size": 768,
-      "output_format": "yolo_raw_xywh_normalized",
+      "output_format": "yolo_end_to_end_xyxy_pixels",
       "nms_iou_threshold": 0.7,
       "max_detections": 300,
       "export": {
-        "ultralytics_version": "8.4.48",
-        "tensorflow_version": "2.19.1",
+        "ultralytics_version": "8.4.115",
+        "tensorflow_version": "2.19.0",
         "nms_requested": false,
-        "output_layout": "batch_channels_anchors",
-        "box_format": "center_xywh",
-        "coordinate_units": "model_input_normalized",
-        "class_scores": "sigmoid_no_objectness",
-        "artifact_size_bytes": 10715788,
-        "flatbuffer_operator_count": 366,
+        "end_to_end": true,
+        "output_layout": "batch_rows_xyxy_score_class_id",
+        "box_format": "xyxy",
+        "coordinate_units": "model_input_pixels",
+        "artifact_size_bytes": 9886408,
+        "flatbuffer_operator_count": 479,
         "input_shape": [
           1,
           768,
@@ -32,8 +31,8 @@
         ],
         "output_shape": [
           1,
-          25,
-          12096
+          300,
+          6
         ],
         "input_dtype": "float32",
         "output_dtype": "float32"
@@ -48,8 +47,8 @@
         "truck",
         "motorcycle",
         "bicycle",
-        "abandoned_e_scooter",
-        "moving_e_scooter",
+        "e_scooter",
+        "e_scooter",
         "traffic_light",
         "crosswalk",
         "construction_fence",
@@ -71,8 +70,7 @@
         "truck",
         "motorcycle",
         "bicycle",
-        "abandoned_e_scooter",
-        "moving_e_scooter",
+        "e_scooter",
         "traffic_light",
         "crosswalk",
         "construction_fence",
@@ -95,8 +93,6 @@
         "truck": 0.15,
         "motorcycle": 0.15,
         "bicycle": 0.15,
-        "abandoned_e_scooter": 0.25,
-        "moving_e_scooter": 0.15,
         "traffic_light": 0.3,
         "crosswalk": 0.25,
         "construction_fence": 0.15,
@@ -106,7 +102,8 @@
         "utility_or_streetlight_pole": 0.15,
         "trash_bin": 0.15,
         "portable_sign": 0.15,
-        "person": 0.15
+        "person": 0.15,
+        "e_scooter": 0.15
       },
       "runtime": {
         "delegate": "gpu",
@@ -114,6 +111,10 @@
         "fallback_to_cpu": true,
         "gpu_precision_loss_allowed": false,
         "gpu_serialization_cache_enabled": true
+      },
+      "class_id_thresholds": {
+        "9": 0.25,
+        "10": 0.15
       }
     },
     "custom_tactile": {

@@ -62,7 +62,7 @@ class MainActivityCpuThreadDiagnosticDeviceTest {
         assertTrue(model.enabled)
         assertEquals(MODEL_SHA256, model.artifactSha256)
         assertEquals(768, model.inputSize)
-        assertArrayEquals(intArrayOf(1, 25, 12096), model.outputTensorShape())
+        assertArrayEquals(intArrayOf(1, 300, 6), model.outputTensorShape())
         assertEquals(800L, MainActivity::class.java.getDeclaredField("MAX_DEPTH_DETECTION_SOURCE_AGE_MS")
             .apply { isAccessible = true }.getLong(null))
         assertEquals(0.65f, InterFrameDetectionTracker::class.java.getDeclaredField("MATERIAL_POINT_MIN_QUALITY")
@@ -543,6 +543,6 @@ class MainActivityCpuThreadDiagnosticDeviceTest {
     companion object {
         private const val TARGET_PACKAGE = "kr.co.hanium.dreamup.walksafe.speechstorefixture"
         private const val SOURCE56_MANIFEST_SHA256 = "30ac16da2644dc1972b8b916a9d7e77a173cc0bdf0f8024d5be1b15c837bda0a"
-        private const val MODEL_SHA256 = "d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57"
+        private const val MODEL_SHA256 = "41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c"
     }
 }

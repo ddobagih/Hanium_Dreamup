@@ -211,16 +211,12 @@ class CalibratedFallbackNativeGuidanceContinuityTest {
         h.advance(100L); h.sample(); h.publish()
         val initial = h.spoken.single()
         h.native("start", initial); h.native("done", initial)
-        var recheckNotice: Any? = null
         repeat(9) { i ->
             h.advance(100L); h.sample(heading = (i + 1) * 10.0); h.publish()
-            if (recheckNotice == null && h.spoken.size > 1) {
-                val notice = h.spoken.last()
-                assertEquals("방향을 다시 확인하고 있습니다.", h.message(notice))
-                h.native("start", notice)
-                assertTrue(requireNotNull(h.output.currentActuatorOrNull()).isAppSpeechActive())
-                recheckNotice = notice
-            }
+            // The merged policy announces a restriction only after the direction grace expires.
+            // This 900-ms turn recovers before that deadline; it must not invent a status owner.
+            assertNotEquals(RouteDirectionGraceMode.PROBLEM, h.nav.currentDirectionGraceSnapshot()?.mode)
+            assertFalse(h.guide.recheckNoticeActive)
         }
         repeat(2) { h.advance(100L); h.sample(heading = 90.0); h.publish() }
         val observation = h.current.observation!!
@@ -230,16 +226,12 @@ class CalibratedFallbackNativeGuidanceContinuityTest {
         val update = h.nav.currentGuidance(h.now, observation)!!
         assertTrue(update.instruction.orEmpty(), update.instruction.orEmpty().contains("약 9시 방향"))
         assertFalse(update.instruction.orEmpty().contains("시 사이"))
-        // The actual emitted status owns native speech until its terminal callback. Do not
-        // mistake it for the new ACTION or leave its real output owner permanently unfinished.
-        val notice = requireNotNull(recheckNotice)
-        h.native("done", notice)
         assertFalse(h.guide.recheckNoticeActive)
-        // Fresh samples keep the real 250-ms controller retry eligible after the status terminal.
+        // Fresh samples keep the real controller retry eligible after the direction settles.
         repeat(15) { h.advance(20L); h.sample(heading = 90.0) }
         h.publish()
         val latest = h.spoken.last()
-        assertNotEquals(notice, latest)
+        assertNotEquals(initial, latest)
         assertTrue(h.message(latest), h.message(latest).contains("약 9시 방향"))
         val cue = read<RouteSpeechCueToken>(h.nav, "pendingSpeechCue")
         h.native("start", latest); h.native("done", latest)

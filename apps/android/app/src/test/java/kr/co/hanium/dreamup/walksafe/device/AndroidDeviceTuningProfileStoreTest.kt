@@ -245,6 +245,21 @@ class AndroidDeviceTuningProfileStoreTest {
         }
     }
 
+    @Test fun currentYolo26ScooterIdsBindBothThresholdsWithoutAdmittingOtherDuplicates() {
+        val config = TwoModelRuntimeConfig.parse(java.io.File("src/main/assets/model-config/two_model_runtime.json").readText())
+        val model = requireNotNull(config.unifiedWalksafe)
+        val current = requireNotNull(digest(config))
+        for (id in listOf(9, 10)) {
+            assertNotEquals(current, digest(config.copy(unifiedWalksafe = model.copy(
+                classIdThresholds = model.classIdThresholds + (id to .4f),
+            ))))
+            assertNull(digest(config.copy(unifiedWalksafe = model.copy(classIdThresholds = model.classIdThresholds - id))))
+        }
+        assertNull(digest(config.copy(unifiedWalksafe = model.copy(classes = model.classes.toMutableList().apply {
+            this[0] = "person"
+        }))))
+    }
+
     @Test fun currentBindingCannotRestoreEvidenceFromAnOldFixture() {
         val current = profile()
         val old = current.copy(fixtureHash = "d".repeat(64),

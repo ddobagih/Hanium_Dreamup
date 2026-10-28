@@ -700,6 +700,7 @@ class TfliteAndroidFrameDetector private constructor(
                 maxDetections = config.maxDetections,
                 classNameForId = config::classNameForId,
                 thresholdForClass = config::thresholdForClass,
+                thresholdForClassId = config::thresholdForClassId,
                 allowClass = config::isAllowedClass,
             )
         }
@@ -757,6 +758,7 @@ private class TfliteSingleModelDetector(
     maxDetections: Int,
     classNameForId: (Int) -> String?,
     thresholdForClass: (String) -> Float,
+    thresholdForClassId: (Int) -> Float,
     allowClass: (String) -> Boolean = { true },
 ) : Closeable {
     // Allocate host buffers and parsers before native handles so allocation failure cannot leak a delegate.
@@ -767,6 +769,8 @@ private class TfliteSingleModelDetector(
         inputSize = inputSize,
         classNameForId = classNameForId,
         thresholdForClass = thresholdForClass,
+        thresholdForClassId = thresholdForClassId,
+        pixelCoordinates = outputFormat == YoloOutputFormat.END_TO_END_XYXY_PIXELS,
         allowClass = allowClass,
     )
 

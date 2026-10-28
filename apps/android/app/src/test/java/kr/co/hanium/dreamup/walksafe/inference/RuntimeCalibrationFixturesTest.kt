@@ -17,12 +17,12 @@ class RuntimeCalibrationFixturesTest {
         val manifest = loader().loadManifest()
         assertEquals(RuntimeCalibrationFixtures.VERSION, manifest.version)
         assertEquals(RuntimeCalibrationFixtures.MANIFEST_SHA256, manifest.sha256)
-        assertEquals(setOf("coco_785", "coco_885", "coco_11149", "black_768"), manifest.fixtures.map { it.id }.toSet())
+        assertEquals(setOf("coco_785", "coco_872", "coco_11149", "black_768"), manifest.fixtures.map { it.id }.toSet())
         assertTrue(manifest.fixtures.all { it.required })
-        assertEquals(setOf("coco_785", "coco_885", "coco_11149"), manifest.coverage.positiveFixtureIds)
+        assertEquals(setOf("coco_785", "coco_872", "coco_11149"), manifest.coverage.positiveFixtureIds)
         assertEquals(setOf("black_768"), manifest.coverage.emptyFixtureIds)
-        assertEquals(setOf("coco_885", "coco_11149"), manifest.coverage.nearThresholdFixtureIds)
-        assertTrue(manifest.coverage.nearThresholdLimitations.contains("NOT_VERIFIED"))
+        assertEquals(setOf("coco_872"), manifest.coverage.nearThresholdFixtureIds)
+        assertTrue(manifest.coverage.nearThresholdLimitations.contains("NOT_RUN"))
         assertTrue(manifest.fixtures.filter { RuntimeCalibrationFixtureRole.POSITIVE in it.roles }
             .all { it.groundTruth.any { truth -> !truth.isCrowd } })
     }
@@ -44,7 +44,7 @@ class RuntimeCalibrationFixturesTest {
             assertEquals(fixture.sha256, RuntimeCalibrationFixtures.sha256(image.readBytes()))
             imageBytes += image.length()
         }
-        assertEquals(421877L, imageBytes)
+        assertEquals(628105L, imageBytes)
         listOf("Nick Webb", "Edwin Martinez", "Umberto Brayj", "https://creativecommons.org/licenses/by/2.0/")
             .forEach { assertTrue(credits.contains(it)) }
         val root = JSONObject(File(assets, "runtime-calibration/manifest.json").readText())
@@ -56,7 +56,9 @@ class RuntimeCalibrationFixturesTest {
         (0..2).forEach { index ->
             val source = entries.getJSONObject(index).getJSONObject("source")
             assertEquals("CC BY 2.0", source.getString("license"))
-            assertTrue(source.getString("photo_page").startsWith("https://www.flickr.com/photos/"))
+            assertTrue(source.getString("flickr_original_jpeg_url").startsWith("http://farm"))
+            if (source.has("photo_page")) assertTrue(source.getString("photo_page").startsWith("https://www.flickr.com/photos/"))
+            else assertTrue(source.getString("attribution_verification").contains("creator/title unavailable"))
             assertTrue(source.getString("modifications").contains("without any additional transformation"))
         }
     }

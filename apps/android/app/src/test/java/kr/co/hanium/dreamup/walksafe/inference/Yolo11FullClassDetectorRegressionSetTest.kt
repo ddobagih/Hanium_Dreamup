@@ -12,10 +12,10 @@ import java.nio.ByteOrder
 import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 
-/** Bounded real-photo regression coverage, separate from delegate equivalence and field accuracy. */
-class FullClassDetectorRegressionSetTest {
+/** Preserved YOLO11 real-photo regression coverage, separate from delegate equivalence and field accuracy. */
+class Yolo11FullClassDetectorRegressionSetTest {
     private val manifest = JSONObject(resource("manifest.json").toString(Charsets.UTF_8))
-    private val configBytes = File("src/main/assets/model-config/two_model_runtime.json").readBytes()
+    private val configBytes = requireNotNull(javaClass.getResourceAsStream("/inference/yolo11-runtime-config.json")).use { it.readBytes() }
     private val config = requireNotNull(TwoModelRuntimeConfig.parse(configBytes.toString(Charsets.UTF_8)).unifiedWalksafe)
 
     @Test

@@ -306,6 +306,7 @@ class AndroidNonMetricObstacleAdvisoryPolicy(
             "curb_step",
             "uneven_sidewalk",
             "e_scooter_obstruction",
+            "e_scooter",
             "abandoned_e_scooter",
             "moving_e_scooter",
             "construction_fence",

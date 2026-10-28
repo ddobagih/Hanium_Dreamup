@@ -17,6 +17,7 @@ import kr.co.hanium.dreamup.walksafe.inference.RuntimeSelectionPolicy
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeSelectionStatus
 import kr.co.hanium.dreamup.walksafe.inference.RuntimeTuningProfile
 import kr.co.hanium.dreamup.walksafe.inference.TwoModelRuntimeConfig
+import kr.co.hanium.dreamup.walksafe.inference.TwoModelClassMap
 import org.json.JSONObject
 import java.security.MessageDigest
 import java.util.WeakHashMap
@@ -190,7 +191,9 @@ internal object DeviceTuningBinding {
         require(config.primaryModelKey == TwoModelRuntimeConfig.UNIFIED_MODEL_KEY && model.enabled)
         require(validHash(model.artifactSha256.orEmpty()))
         require(model.inputSize == 768 && !model.runtime.gpuPrecisionLossAllowed)
-        require(model.classes.isNotEmpty() && model.classes.distinct().size == model.classes.size)
+        val sharedScooterIds = model.classes == TwoModelClassMap.walkmate26Classes &&
+            !model.outputFormat.isRaw && model.classIdThresholds.keys.containsAll(listOf(9, 10))
+        require(model.classes.isNotEmpty() && (model.classes.distinct().size == model.classes.size || sharedScooterIds))
         require(model.classes.all(::validText) && model.allowlist.all(::validText))
         require(model.thresholds.isNotEmpty() && model.thresholds.keys.all(::validText))
         require(model.thresholds.values.all { it.isFinite() && it in 0f..1f })
@@ -212,6 +215,8 @@ internal object DeviceTuningBinding {
             add(model.allowlist.size.toString()); addAll(model.allowlist.sorted())
             add(model.thresholds.size.toString())
             model.thresholds.toSortedMap().forEach { (key, value) -> add(key); add(value.toString()) }
+            add(model.classIdThresholds.size.toString())
+            model.classIdThresholds.toSortedMap().forEach { (id, value) -> add(id.toString()); add(value.toString()) }
             add(model.runtime.delegate); add(model.runtime.numThreads.toString())
             add(model.runtime.fallbackToCpu.toString()); add(model.runtime.gpuPrecisionLossAllowed.toString())
             add(model.runtime.gpuSerializationCacheEnabled.toString())

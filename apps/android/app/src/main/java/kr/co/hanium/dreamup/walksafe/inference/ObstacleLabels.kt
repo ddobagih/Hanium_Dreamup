@@ -17,6 +17,7 @@ object ObstacleLabels {
         "curb_step" to "턱",
         "uneven_sidewalk" to "고르지 않은 보도",
         "e_scooter_obstruction" to "킥보드",
+        "e_scooter" to "킥보드",
         "abandoned_e_scooter" to "킥보드",
         "moving_e_scooter" to "킥보드",
         "bench" to "벤치",

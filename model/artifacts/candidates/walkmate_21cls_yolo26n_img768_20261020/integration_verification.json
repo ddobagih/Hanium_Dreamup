@@ -1,0 +1,210 @@
+{
+  "date": "2026-10-28",
+  "scope": "Merged working tree + YOLO26n; host-only verification; no Android device connected",
+  "base_commit": "0315cb387249324a75ead1019936ae0e62faba0f",
+  "branch": "codex/walkmate-temp-integration-20261026",
+  "includes_uncommitted_changes": true,
+  "android": {
+    "assembleDebug": "PASS",
+    "jvm": {
+      "tests": 12294,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 20
+    },
+    "passed": 12274,
+    "skipped_details": [
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.AndroidReportUploaderAuthenticationStaleTest",
+        "test": "queuedBusyPreservesBodyAndRetryAfter",
+        "reason": "org.junit.AssumptionViolatedException: Queued transport requires the existing enabled DEBUG queue profile"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.AndroidReportUploaderAuthenticationStaleTest",
+        "test": "queuedStatusDisconnectFailurePreservesAuthenticationFailure",
+        "reason": "org.junit.AssumptionViolatedException: Queued transport requires the existing enabled DEBUG queue profile"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.AndroidReportUploaderAuthenticationStaleTest",
+        "test": "queuedCancellationAfterBodyReadPreventsClear",
+        "reason": "org.junit.AssumptionViolatedException: Queued transport requires the existing enabled DEBUG queue profile"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.AndroidReportUploaderAuthenticationStaleTest",
+        "test": "queuedRetainsCreationGenerationAcrossDelayedExecution",
+        "reason": "org.junit.AssumptionViolatedException: Queued transport requires the existing enabled DEBUG queue profile"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.AndroidReportUploaderAuthenticationStaleTest",
+        "test": "queuedStatusGetIsExcluded",
+        "reason": "org.junit.AssumptionViolatedException: Queued transport requires the existing enabled DEBUG queue profile"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.AndroidReportUploaderAuthenticationStaleTest",
+        "test": "queuedLateResponseCannotClearReplacementSession",
+        "reason": "org.junit.AssumptionViolatedException: Queued transport requires the existing enabled DEBUG queue profile"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.AndroidReportUploaderAuthenticationStaleTest",
+        "test": "queuedUploadDisconnectFailurePreservesAuthenticationFailure",
+        "reason": "org.junit.AssumptionViolatedException: Queued transport requires the existing enabled DEBUG queue profile"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.AndroidReportUploaderAuthenticationStaleTest",
+        "test": "queuedCurrentStaleResponseClearsOnce",
+        "reason": "org.junit.AssumptionViolatedException: Queued transport requires the existing enabled DEBUG queue profile"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.MainActivityCloudflareOriginUpgradeBehaviorTest",
+        "test": "anOldQuickTunnelSettingDoesNotOverrideTheCurrentFieldBuild",
+        "reason": "org.junit.AssumptionViolatedException: got: <false>, expected: is <true>"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.network.AndroidIntegratedConsentCasLiveHandoffTest",
+        "test": "realBackendGatewayRejectedCasRebasesOnlyWithdrawalsAndReplaysAfterRestart",
+        "reason": "org.junit.AssumptionViolatedException: opt-in live consent fixture"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.MainActivityNavigationTestModeTest",
+        "test": "freshActivityCanReadBypassAndOnboardingWithoutRecursiveStartupFailure",
+        "reason": "org.junit.AssumptionViolatedException: got: <false>, expected: is <true>"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.MainActivityNavigationTestModeTest",
+        "test": "stoppedRouteCancelsItsPendingLocationStatusResponse",
+        "reason": "org.junit.AssumptionViolatedException: got: <false>, expected: is <true>"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.MainActivityNavigationTestModeTest",
+        "test": "stoppedRouteDoesNotCancelANewerIndependentCommandResponse",
+        "reason": "org.junit.AssumptionViolatedException: got: <false>, expected: is <true>"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.MainActivityNavigationTestModeTest",
+        "test": "explicitTestStartCannotSupplyMissingAuthenticationOrWalkAuthority",
+        "reason": "org.junit.AssumptionViolatedException: got: <false>, expected: is <true>"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.MainActivityNavigationTestModeTest",
+        "test": "lowAndUnavailableEstimatesKeepTheirRealQualityWithoutPausingTestGuidance",
+        "reason": "org.junit.AssumptionViolatedException: got: <false>, expected: is <true>"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.MainActivityNavigationTestModeTest",
+        "test": "testNavigationDoesNotLetAnOldCapabilityFailureVetoTheRealVoiceEngine",
+        "reason": "org.junit.AssumptionViolatedException: got: <false>, expected: is <true>"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.MainActivityNavigationTestModeTest",
+        "test": "explicitTestStartAllowsRouteMutationEvenWithPendingLocationDecision",
+        "reason": "org.junit.AssumptionViolatedException: got: <false>, expected: is <true>"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.ReportQueueContractTest",
+        "test": "enabledDebugBuildConfigPreservesExplicitCapacityAndApprovedOrigin",
+        "reason": "org.junit.AssumptionViolatedException: got: <false>, expected: is <true>"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.AndroidReportPostcommitRecoveryTest",
+        "test": "automaticOptOutStatus404CreatesNoPostAndPreservesEncryptedFileAndPayloadAfterReopen",
+        "reason": "org.junit.AssumptionViolatedException: Actual queued transport requires the existing enabled DEBUG queue profile"
+      },
+      {
+        "class": "kr.co.hanium.dreamup.walksafe.report.AndroidReportPostcommitRecoveryTest",
+        "test": "unknownPostOutcomeIsRecoveredByStatusWithFreshAutomaticOptOutWithoutRepeatingPost",
+        "reason": "org.junit.AssumptionViolatedException: Actual queued transport requires the existing enabled DEBUG queue profile"
+      }
+    ],
+    "packaged_model_sha256": "41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c",
+    "packaged_model_matches_source": true,
+    "build_profile": {
+      "serverSttEnabled": true,
+      "longLivedLoginEnabled": true,
+      "gateway_origin": "http://127.0.0.1:8081"
+    },
+    "full_androidTest_source_compile": "NOT_PASS: existing stale speech/report/UI API references; not a device execution result"
+  },
+  "model_repeated_host_inference": {
+    "model_sha256": "41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c",
+    "runtime": "host macOS TensorFlow 2.19.0 CPU XNNPACK threads=4",
+    "runs": 100,
+    "cases": {
+      "coco_785": 25,
+      "coco_872": 25,
+      "coco_11149": 25,
+      "black": 25
+    },
+    "reference_bit_exact": true,
+    "nonfinite_or_invalid_ids": 0,
+    "median_inference_ms": 59.294999518897384,
+    "p95_inference_ms": 68.46577262040228,
+    "total_seconds": 5.7635981249623,
+    "scope": "Repeated host inference on four static inputs; not Android GPU/camera, field safety, or device FPS."
+  },
+  "gateway": {
+    "environment": "Isolated Linux container, network disabled, source read-only, ephemeral private test storage",
+    "result": {
+      "tests": 679,
+      "passed": 679,
+      "failures": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "result_source": "Final Node test runner summary; XML mixes root-level testcases with nested testsuites"
+  },
+  "backend_navigation": {
+    "environment": "Isolated Linux container, network disabled, no operational/test DB connected; mocked transport tests",
+    "result": {
+      "tests": 575,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "running_services_readonly": {
+    "gateway_internal_health": "HTTP 200",
+    "backend_authenticated_health": "HTTP 200",
+    "backend_ready": "HTTP 200, all readiness checks ready",
+    "walking_health": "HTTP 200, ready",
+    "destination_search_health": "HTTP 200, ready",
+    "live_tmap_route_or_destination_request_this_run": false
+  },
+  "verification_fixes": [
+    {
+      "file": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CalibratedFallbackNativeGuidanceContinuityTest.kt",
+      "before": "Expected obsolete immediate direction-recheck speech during a 900 ms recoverable turn",
+      "after": "Asserts grace is not PROBLEM, no recheck notice, fresh 9 oclock cue and native completion; existing product grace and thresholds unchanged"
+    },
+    {
+      "file": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/rawcollection/RawUploadCancellationConcurrencyTest.kt",
+      "before": "Retried immediately after lock release before asynchronous cancellation cleanup acknowledged",
+      "after": "Verifies no cleanup ACK while lock held, then awaits existing cleanup ACK before retry; preserves nonblocking and retained-data checks"
+    },
+    {
+      "file": "apps/android-gateway/test/telemetry.test.ts",
+      "before": "Rate-limit lock directory inherited default rather than test-private storage",
+      "after": "Sets and restores existing rate-limit directory environment variable to the test-private temporary directory"
+    }
+  ],
+  "initial_environment_failures": [
+    "Native macOS gateway tests cannot exercise the intentional Linux-only file-lock implementation; final suite ran on Linux without changing production checks",
+    "Backend dependency image inherited a test DB URL; final invocation explicitly cleared test/operator DB URLs and kept network disabled"
+  ],
+  "limits": [
+    "Android CPU/GPU inference, live camera, sound, heat, latency and outdoor walking not run",
+    "20 Android tests skipped due build profile or opt-in live fixture; not counted as passed",
+    "Full Android instrumentation sources still have pre-existing stale API references",
+    "Prior 21 target-image samples: 16 target hits, 5 misses at IoU 0.5; not mAP or field accuracy",
+    "Runtime service readiness is not a live phone login or navigation end-to-end test",
+    "Debug APK remains a localhost development build; no wireless deployment was made"
+  ],
+  "evidence_root": "/Users/luminggi/Desktop/WalkMate/.local-runtime/model-export-20261028",
+  "evidence_logs": [
+    "merged-full-unit-final.log",
+    "merged-unit-final.json",
+    "merged-gateway-linux-final.log",
+    "merged-backend-navigation-final.log",
+    "packaged-model-run.json"
+  ]
+}

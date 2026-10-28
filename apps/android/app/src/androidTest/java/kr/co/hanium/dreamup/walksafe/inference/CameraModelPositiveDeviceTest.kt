@@ -12,6 +12,7 @@ import org.junit.runner.RunWith
 class CameraModelPositiveDeviceTest {
     @Test fun configuredModelProducesPositiveDetections() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val model = requireNotNull(TwoModelRuntimeConfig.load(context).unifiedWalksafe)
         val fixtures = RuntimeCalibrationFixtures(context)
         for (delegate in listOf("gpu", "cpu")) {
         val load = TfliteAndroidFrameDetector.createWithStatus(context,
@@ -25,7 +26,11 @@ class CameraModelPositiveDeviceTest {
             }) {
                 val result = detector.detectCalibrationImage(fixtures.loadArgb(fixture))
                 val raw = requireNotNull(detector.copyLastUnifiedOutputForTest())
-                val scores = raw.copyOfRange(4 * 12096, raw.size)
+                val scores = if (model.outputFormat.isRaw) {
+                    raw.copyOfRange(4 * model.outputTensorShape()[2], raw.size).toList()
+                } else {
+                    (raw.indices step 6).map { raw[it + 4] }
+                }
                 assertTrue("Detection boxes collapsed after undoing letterboxing: ${fixture.id}",
                     result.detections.any { it.bboxNorm.width > 0.01f && it.bboxNorm.height > 0.01f })
                 Log.i("CameraModelPositiveTest", "delegate=$delegate fixture=${fixture.id} count=${result.detections.size} ms=${result.timing.modelInferenceMs} scores=${scores.minOrNull()}..${scores.maxOrNull()} invalid=${scores.count { !it.isFinite() || it !in 0f..1f }} classes=${result.detections.map { it.className }}")

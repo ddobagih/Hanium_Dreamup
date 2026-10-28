@@ -25,3 +25,7 @@ The solid-black fixture is generated in memory and contains no photograph or use
 COCO 2017 instance annotations by the COCO Consortium, licensed under Creative Commons Attribution 4.0 International (CC BY 4.0): https://creativecommons.org/licenses/by/4.0/ . Source and terms: https://cocodataset.org/#termsofuse (https://cocodataset.org/dataset/termsofuse.htm).
 
 This bundle selects 14 annotations, adapts field names and maps WalkSafe class IDs. Source bbox, area and crowd values are retained; the loader computes normalized coordinates at runtime. The annotations are provided as is without warranties. No endorsement by the COCO Consortium is implied.
+
+## October YOLO26 calibration selection
+
+COCO val2017 image 872 (`images/000000000872.jpg`) is reused byte-for-byte from the existing positive fixtures. The COCO metadata identifies CC BY 2.0 (https://creativecommons.org/licenses/by/2.0/) and the original file https://farm9.staticflickr.com/8447/7805810128_605424213d_z.jpg . Creator and title are not present in that metadata; the original Flickr page could not be resolved on 2026-10-28. This attribution gap remains recorded, not represented as verified. The previously credited image 885 is retained for historical YOLO11 tests and is no longer an active calibration fixture. The active fixture set has 8 COCO annotations.

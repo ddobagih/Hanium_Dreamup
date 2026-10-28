@@ -34,19 +34,24 @@ test("S19-54 telemetry only classifies RAW chunk indexes accepted by routing", (
 });
 
 // R19-GB-01: walking and report v2 routes run the walk-ownership gate; keep this
-// file's ledger (and its sibling lock) out of the shared default TMPDIR path.
+// file's ledger and login locks out of shared defaults or the source checkout.
 let stateDirectory = "";
 let previousLedgerPath: string | undefined;
+let previousRateLimitDirectory: string | undefined;
 
 before(async () => {
   stateDirectory = await mkdtemp(path.join(tmpdir(), "walksafe-telemetry-test-"));
   previousLedgerPath = process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH;
+  previousRateLimitDirectory = process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR;
   process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH = path.join(stateDirectory, "field-walk-ledger.json");
+  process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR = stateDirectory;
 });
 
 after(async () => {
   if (previousLedgerPath === undefined) delete process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH;
   else process.env.WALKSAFE_FIELD_WALK_LEDGER_PATH = previousLedgerPath;
+  if (previousRateLimitDirectory === undefined) delete process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR;
+  else process.env.WALKSAFE_GATEWAY_RATE_LIMIT_DIR = previousRateLimitDirectory;
   await rm(stateDirectory, { recursive: true, force: true });
 });
 

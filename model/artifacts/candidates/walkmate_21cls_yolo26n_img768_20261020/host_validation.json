@@ -1,0 +1,364 @@
+{
+  "parity": [
+    {
+      "id": "coco_785",
+      "accepted": 1,
+      "max_box_error_pixels": 0.0001220703125,
+      "max_score_error": 5.960464477539063e-08
+    },
+    {
+      "id": "coco_872",
+      "accepted": 3,
+      "max_box_error_pixels": 0.00030517578125,
+      "max_score_error": 4.813075065612793e-06
+    },
+    {
+      "id": "coco_11149",
+      "accepted": 6,
+      "max_box_error_pixels": 0.000244140625,
+      "max_score_error": 1.7285346984863281e-06
+    },
+    {
+      "id": "black_768",
+      "accepted": 0,
+      "max_box_error_pixels": 0.0,
+      "max_score_error": 0.0
+    },
+    {
+      "id": "positive_00",
+      "accepted": 1,
+      "max_box_error_pixels": 0.0003662109375,
+      "max_score_error": 4.76837158203125e-07
+    },
+    {
+      "id": "positive_01",
+      "accepted": 1,
+      "max_box_error_pixels": 0.000213623046875,
+      "max_score_error": 5.960464477539063e-08
+    },
+    {
+      "id": "positive_02",
+      "accepted": 3,
+      "max_box_error_pixels": 0.00030517578125,
+      "max_score_error": 1.0132789611816406e-06
+    },
+    {
+      "id": "positive_03",
+      "accepted": 1,
+      "max_box_error_pixels": 0.000244140625,
+      "max_score_error": 1.1920928955078125e-07
+    },
+    {
+      "id": "positive_04",
+      "accepted": 8,
+      "max_box_error_pixels": 0.000244140625,
+      "max_score_error": 1.430511474609375e-06
+    },
+    {
+      "id": "positive_05",
+      "accepted": 6,
+      "max_box_error_pixels": 0.0001220703125,
+      "max_score_error": 5.513429641723633e-07
+    },
+    {
+      "id": "positive_06",
+      "accepted": 3,
+      "max_box_error_pixels": 7.62939453125e-05,
+      "max_score_error": 1.385807991027832e-06
+    },
+    {
+      "id": "positive_07",
+      "accepted": 10,
+      "max_box_error_pixels": 0.0001220703125,
+      "max_score_error": 1.5616416931152344e-05
+    },
+    {
+      "id": "positive_08",
+      "accepted": 2,
+      "max_box_error_pixels": 6.103515625e-05,
+      "max_score_error": 1.341104507446289e-06
+    },
+    {
+      "id": "positive_09",
+      "accepted": 1,
+      "max_box_error_pixels": 6.103515625e-05,
+      "max_score_error": 0.0
+    },
+    {
+      "id": "positive_10",
+      "accepted": 1,
+      "max_box_error_pixels": 0.0,
+      "max_score_error": 2.980232238769531e-07
+    },
+    {
+      "id": "positive_11",
+      "accepted": 3,
+      "max_box_error_pixels": 6.103515625e-05,
+      "max_score_error": 4.649162292480469e-06
+    },
+    {
+      "id": "positive_12",
+      "accepted": 2,
+      "max_box_error_pixels": 6.103515625e-05,
+      "max_score_error": 1.1622905731201172e-06
+    },
+    {
+      "id": "positive_13",
+      "accepted": 4,
+      "max_box_error_pixels": 6.103515625e-05,
+      "max_score_error": 7.998943328857422e-05
+    },
+    {
+      "id": "positive_14",
+      "accepted": 7,
+      "max_box_error_pixels": 6.103515625e-05,
+      "max_score_error": 2.3543834686279297e-06
+    },
+    {
+      "id": "positive_15",
+      "accepted": 1,
+      "max_box_error_pixels": 3.0517578125e-05,
+      "max_score_error": 5.960464477539063e-08
+    },
+    {
+      "id": "positive_16",
+      "accepted": 4,
+      "max_box_error_pixels": 6.103515625e-05,
+      "max_score_error": 2.8312206268310547e-07
+    },
+    {
+      "id": "positive_17",
+      "accepted": 5,
+      "max_box_error_pixels": 3.0517578125e-05,
+      "max_score_error": 2.384185791015625e-07
+    },
+    {
+      "id": "positive_18",
+      "accepted": 0,
+      "max_box_error_pixels": 0.0,
+      "max_score_error": 0.0
+    },
+    {
+      "id": "positive_19",
+      "accepted": 13,
+      "max_box_error_pixels": 6.103515625e-05,
+      "max_score_error": 1.9073486328125e-05
+    },
+    {
+      "id": "positive_20",
+      "accepted": 8,
+      "max_box_error_pixels": 6.103515625e-05,
+      "max_score_error": 8.344650268554688e-07
+    },
+    {
+      "id": "negative_wall_pattern",
+      "accepted": 0,
+      "max_box_error_pixels": 0.0,
+      "max_score_error": 0.0
+    },
+    {
+      "id": "negative_pavement_shadow",
+      "accepted": 0,
+      "max_box_error_pixels": 0.0,
+      "max_score_error": 0.0
+    },
+    {
+      "id": "negative_lane_marking",
+      "accepted": 0,
+      "max_box_error_pixels": 0.0,
+      "max_score_error": 0.0
+    }
+  ],
+  "regression": [
+    {
+      "id": "positive_00",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 1,
+      "target": "linear_tactile_paving",
+      "target_hit": false,
+      "max_iou": 0.2187117048275358
+    },
+    {
+      "id": "positive_01",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 1,
+      "target": "damaged_linear_tactile_paving",
+      "target_hit": false,
+      "max_iou": 0.33398294333214273
+    },
+    {
+      "id": "positive_02",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 3,
+      "target": "dot_tactile_paving",
+      "target_hit": true,
+      "max_iou": 0.789156828632041
+    },
+    {
+      "id": "positive_03",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 1,
+      "target": "damaged_dot_tactile_paving",
+      "target_hit": false,
+      "max_iou": 0.11798201735952031
+    },
+    {
+      "id": "positive_04",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 8,
+      "target": "passenger_car",
+      "target_hit": true,
+      "max_iou": 0.964383428655214
+    },
+    {
+      "id": "positive_05",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 6,
+      "target": "bus",
+      "target_hit": true,
+      "max_iou": 0.9559592432351685
+    },
+    {
+      "id": "positive_06",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 3,
+      "target": "truck",
+      "target_hit": true,
+      "max_iou": 0.9768956275245884
+    },
+    {
+      "id": "positive_07",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 10,
+      "target": "motorcycle",
+      "target_hit": true,
+      "max_iou": 0.8150921455198441
+    },
+    {
+      "id": "positive_08",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 2,
+      "target": "bicycle",
+      "target_hit": true,
+      "max_iou": 0.9439256676386065
+    },
+    {
+      "id": "positive_09",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 1,
+      "target": "e_scooter",
+      "target_hit": true,
+      "max_iou": 0.9340687868250493
+    },
+    {
+      "id": "positive_10",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 1,
+      "target": "e_scooter",
+      "target_hit": false,
+      "max_iou": 0.0
+    },
+    {
+      "id": "positive_11",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 3,
+      "target": "traffic_light",
+      "target_hit": true,
+      "max_iou": 0.7646650652962409
+    },
+    {
+      "id": "positive_12",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 2,
+      "target": "crosswalk",
+      "target_hit": true,
+      "max_iou": 0.5806359369873162
+    },
+    {
+      "id": "positive_13",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 4,
+      "target": "construction_fence",
+      "target_hit": true,
+      "max_iou": 0.9761735007557135
+    },
+    {
+      "id": "positive_14",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 7,
+      "target": "barricade",
+      "target_hit": true,
+      "max_iou": 0.9890689719150987
+    },
+    {
+      "id": "positive_15",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 1,
+      "target": "traffic_cone",
+      "target_hit": true,
+      "max_iou": 0.9751152042137171
+    },
+    {
+      "id": "positive_16",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 4,
+      "target": "bollard",
+      "target_hit": true,
+      "max_iou": 0.9654526363629333
+    },
+    {
+      "id": "positive_17",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 5,
+      "target": "utility_or_streetlight_pole",
+      "target_hit": true,
+      "max_iou": 0.7674049047374558
+    },
+    {
+      "id": "positive_18",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 0,
+      "target": "trash_bin",
+      "target_hit": false,
+      "max_iou": 0.0
+    },
+    {
+      "id": "positive_19",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 13,
+      "target": "portable_sign",
+      "target_hit": true,
+      "max_iou": 0.9498875956837916
+    },
+    {
+      "id": "positive_20",
+      "kind": "CLASS_POSITIVE",
+      "accepted": 8,
+      "target": "person",
+      "target_hit": true,
+      "max_iou": 0.957699005447692
+    },
+    {
+      "id": "negative_wall_pattern",
+      "kind": "REAL_BACKGROUND_NEGATIVE",
+      "accepted": 0,
+      "detected_classes": []
+    },
+    {
+      "id": "negative_pavement_shadow",
+      "kind": "REAL_BACKGROUND_NEGATIVE",
+      "accepted": 0,
+      "detected_classes": []
+    },
+    {
+      "id": "negative_lane_marking",
+      "kind": "REAL_BACKGROUND_NEGATIVE",
+      "accepted": 0,
+      "detected_classes": []
+    }
+  ],
+  "scope": "Same input; PT vs TFLite accepted outputs at unchanged per-index thresholds. 24 selected partly annotated photos, not full accuracy/mAP. Android NOT_RUN.",
+  "artifact_sha256": "41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c",
+  "source_model_sha256": "e1fa51299b2ecfd2fe19a1f2ae5049020ba8b0619541a32e7fe3b60e8f4c9c3f",
+  "test_date": "2026-10-28"
+}

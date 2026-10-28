@@ -10,9 +10,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
+import kotlin.math.roundToInt
 import kotlin.math.abs
 
-/** Real host-model outputs; replay is separate from native Android calibration. */
+/** Current YOLO26 host-model outputs; replay is separate from native Android calibration. */
 class CurrentModelBoundaryReferenceTest {
     private val assets = File("src/main/assets")
     private val manifest = JSONObject(resource("manifest.json").toString(Charsets.UTF_8))
@@ -31,7 +32,7 @@ class CurrentModelBoundaryReferenceTest {
         val declared = JSONObject(File(assets, "runtime-calibration/manifest.json").readText())
             .getJSONObject("coverage").getJSONArray("near_threshold_fixture_ids")
         val declaredIds = (0 until declared.length()).map { declared.getString(it) }.toSet()
-        assertEquals(setOf("coco_885", "coco_11149"), rows().filter { it.getInt("near_count") > 0 }
+        assertEquals(declaredIds, rows().filter { it.getInt("near_count") > 0 }
             .map { it.getString("fixture_id") }.toSet())
         for (row in rows()) {
             assertEquals(row.getString("source_sha256"), sha(File(assets, row.getString("source_asset")).readBytes()))
@@ -64,37 +65,41 @@ class CurrentModelBoundaryReferenceTest {
 
     @Test
     fun uneditedNativeOutputsSupplyActualTopClassBoundaryCoverage() {
-        val anchors = model.outputTensorShape()[2]
         for (row in rows()) {
             val rawBytes = compressed(row.getString("raw_file"))
             assertEquals(row.getString("raw_sha256"), sha(rawBytes))
-            assertEquals(model.outputTensorShape().fold(1) { size, axis -> size * axis } * 4, rawBytes.size)
+            assertEquals(1 * 300 * 6 * 4, rawBytes.size)
             val buffer = ByteBuffer.wrap(rawBytes).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
             val raw = FloatArray(buffer.remaining()).also { buffer.get(it) }
             assertTrue(raw.all { it.isFinite() })
-            assertEquals(row.getString("fixture_id"), row.getInt("near_count") > 0,
-                RuntimeCalibrationOutputGate.hasNearThresholdCandidate(raw, model))
+            assertEquals(row.getInt("near_count") > 0, RuntimeCalibrationOutputGate.hasNearThresholdCandidate(raw, model))
+            val parser = YoloEndToEndOutputParser(model.inputSize, model::classNameForId,
+                model::thresholdForClass, model::isAllowedClass, model::thresholdForClassId, pixelCoordinates = true)
+            val detections = parser.parse(raw)
+            assertTrue("positive fixture must yield actual accepted detections", detections.isNotEmpty())
+            assertTrue(RuntimeCalibrationOutputGate.compare(raw, raw.copyOf(), detections, detections.toList(), model))
+            val fixture = RuntimeCalibrationFixtures { File(assets, it).readBytes() }.loadManifest()
+                .fixtures.single { it.id == row.getString("fixture_id") }
+            val scale = minOf(model.inputSize.toFloat() / fixture.width, model.inputSize.toFloat() / fixture.height)
+            val transform = LetterboxTransform(fixture.width, fixture.height, model.inputSize, scale,
+                ((model.inputSize - (fixture.width * scale).roundToInt()) / 2).toFloat(),
+                ((model.inputSize - (fixture.height * scale).roundToInt()) / 2).toFloat())
+            val imageDetections = detections.mapNotNull(transform::modelDetectionToImageDetection)
+            assertTrue("Current model must actually match a ground-truth object for ${fixture.id}",
+                RuntimeCalibrationOutputGate.matchesFixtureRoles(imageDetections, imageDetections,
+                    expectPositive = true, expectEmpty = false,
+                    groundTruth = fixture.groundTruth.filterNot { it.isCrowd }.map { it.className to it.bboxNorm }))
             val examples = row.getJSONArray("examples")
             assertEquals(row.getInt("near_count"), examples.length())
             for (index in 0 until examples.length()) {
                 val example = examples.getJSONObject(index)
-                val anchor = example.getInt("anchor")
+                val offset = example.getInt("row") * 6
                 val classId = example.getInt("class_id")
-                val className = requireNotNull(model.classNameForId(classId))
-                val score = raw[(4 + classId) * anchors + anchor]
-                assertEquals(className, example.getString("class_name"))
-                assertTrue(model.isAllowedClass(className))
-                assertEquals(example.getDouble("score").toFloat(), score, 0f)
-                assertEquals(example.getDouble("threshold").toFloat(), model.thresholdForClass(className), 0f)
-                assertTrue(abs(score - model.thresholdForClass(className)) <= RuntimeCalibrationOutputGate.NEAR_THRESHOLD_WINDOW)
-                for (otherClass in model.classes.indices) assertTrue(raw[(4 + otherClass) * anchors + anchor] <= score)
-                val box = example.getJSONArray("box_xywh_normalized")
-                val w = raw[2 * anchors + anchor]
-                val h = raw[3 * anchors + anchor]
-                val x = raw[anchor] - w / 2f
-                val y = raw[anchors + anchor] - h / 2f
-                for ((axis, value) in listOf(x, y, w, h).withIndex()) assertEquals(box.getDouble(axis).toFloat(), value, 0f)
-                assertTrue(w > 0f && h > 0f && x < 1f && y < 1f && x + w > 0f && y + h > 0f)
+                assertEquals(classId.toFloat(), raw[offset + 5], 0f)
+                assertEquals(example.getString("class_name"), model.classNameForId(classId))
+                assertEquals(example.getDouble("score").toFloat(), raw[offset + 4], 0f)
+                assertEquals(example.getDouble("threshold").toFloat(), model.thresholdForClassId(classId), 0f)
+                assertTrue(abs(raw[offset + 4] - model.thresholdForClassId(classId)) <= RuntimeCalibrationOutputGate.NEAR_THRESHOLD_WINDOW)
             }
         }
     }
@@ -104,7 +109,7 @@ class CurrentModelBoundaryReferenceTest {
     }
 
     private fun resource(name: String): ByteArray = requireNotNull(javaClass.getResourceAsStream(
-        "/inference/current-model-boundary/$name",
+        "/inference/yolo26-model-boundary/$name",
     )).use { it.readBytes() }
 
     private fun compressed(name: String): ByteArray = GZIPInputStream(resource(name).inputStream()).use { it.readBytes() }

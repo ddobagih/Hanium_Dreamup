@@ -31,7 +31,7 @@ class ReleaseModelAssetAllowlistStaticTest {
         // Legacy (custom/coco) and the unreferenced yolo26n candidates are not release assets.
         val present = File("src/main/assets/models").list().orEmpty().map { "models/$it" }.toSet()
         assertTrue(present.containsAll(allowlist()))
-        assertTrue((present - allowlist()).all { it.contains("yolo26") || it.contains("custom_tactile") || it.contains("coco") })
+        assertTrue((present - allowlist()).all { it.contains("yolo11") || it.contains("yolo26") || it.contains("custom_tactile") || it.contains("coco") })
     }
 
     @Test

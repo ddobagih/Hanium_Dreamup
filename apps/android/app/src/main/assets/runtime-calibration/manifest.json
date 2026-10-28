@@ -1,5 +1,5 @@
 {
-  "version": "walksafe-runtime-calibration-walkmate21-v2",
+  "version": "walkmate-runtime-calibration-yolo26n-20261028",
   "model_input_size": 768,
   "attribution_asset": "ATTRIBUTION.md",
   "fixtures": [
@@ -46,12 +46,12 @@
       }
     },
     {
-      "id": "coco_885",
+      "id": "coco_872",
       "kind": "JPEG",
-      "asset": "images/000000000885.jpg",
-      "width": 640,
-      "height": 427,
-      "sha256": "1c67b783f78b18ddb5dd20aaba4d4aacaf98e5277051688a96da096afa9cdf1f",
+      "asset": "images/000000000872.jpg",
+      "width": 621,
+      "height": 640,
+      "sha256": "c2aa138ee3a59b057a7ba6fc5a6a18e62af531aa7dab78a7bfd33c1cd7e55eb6",
       "hash_encoding": "JPEG_BYTES",
       "required": true,
       "roles": [
@@ -60,123 +60,41 @@
       ],
       "ground_truth": [
         {
-          "annotation_id": 439117,
+          "annotation_id": 559508,
           "app_class_id": 20,
           "app_class_name": "person",
           "bbox_xywh": [
-            277.31,
-            189.99,
-            140.09,
-            208.22
+            145.26,
+            100.67,
+            291.95,
+            457.35
           ],
-          "area": 10451.767099999995,
+          "area": 25759.042399999995,
           "iscrowd": 0
         },
         {
-          "annotation_id": 514577,
+          "annotation_id": 560228,
           "app_class_id": 20,
           "app_class_name": "person",
           "bbox_xywh": [
-            281.02,
-            89.81,
-            111.83,
-            169.55
+            163.73,
+            126.42,
+            265.69,
+            480.4
           ],
-          "area": 6234.1862999999985,
-          "iscrowd": 0
-        },
-        {
-          "annotation_id": 538081,
-          "app_class_id": 20,
-          "app_class_name": "person",
-          "bbox_xywh": [
-            595.68,
-            25.78,
-            43.37,
-            227.48
-          ],
-          "area": 5987.708849999993,
-          "iscrowd": 0
-        },
-        {
-          "annotation_id": 538866,
-          "app_class_id": 20,
-          "app_class_name": "person",
-          "bbox_xywh": [
-            434.7,
-            0.33,
-            32.79,
-            12.67
-          ],
-          "area": 279.78454999999997,
-          "iscrowd": 0
-        },
-        {
-          "annotation_id": 542506,
-          "app_class_id": 20,
-          "app_class_name": "person",
-          "bbox_xywh": [
-            287.39,
-            0.19,
-            44.65,
-            11.46
-          ],
-          "area": 390.2116999999999,
-          "iscrowd": 0
-        },
-        {
-          "annotation_id": 1688307,
-          "app_class_id": 20,
-          "app_class_name": "person",
-          "bbox_xywh": [
-            541.88,
-            1.73,
-            65.84,
-            10.12
-          ],
-          "area": 451.63220000000047,
-          "iscrowd": 0
-        },
-        {
-          "annotation_id": 2154963,
-          "app_class_id": 20,
-          "app_class_name": "person",
-          "bbox_xywh": [
-            1.11,
-            0.56,
-            58.94,
-            8.89
-          ],
-          "area": 489.35004999999995,
-          "iscrowd": 0
-        },
-        {
-          "annotation_id": 2161360,
-          "app_class_id": 20,
-          "app_class_name": "person",
-          "bbox_xywh": [
-            499.47,
-            0.76,
-            75.17,
-            13.38
-          ],
-          "area": 553.2004000000001,
+          "area": 48091.75195,
           "iscrowd": 0
         }
       ],
       "source": {
         "dataset": "COCO val2017",
-        "image_id": 885,
-        "coco_url": "http://images.cocodataset.org/val2017/000000000885.jpg",
-        "flickr_original_jpeg_url": "http://farm4.staticflickr.com/3715/9639200419_ee41490b2a_z.jpg",
-        "photo_page": "https://www.flickr.com/photos/rhythmstrip/9639200419/",
-        "title": "US Open 2013",
-        "creator": "Edwin Martinez",
+        "image_id": 872,
+        "coco_url": "http://images.cocodataset.org/val2017/000000000872.jpg",
+        "flickr_original_jpeg_url": "http://farm9.staticflickr.com/8447/7805810128_605424213d_z.jpg",
         "license": "CC BY 2.0",
-        "license_url": "https://creativecommons.org/licenses/by/2.0/",
-        "modifications": "COCO val2017 provided JPEG reused without any additional transformation",
-        "attribution_verified_date": "2026-09-08",
-        "attribution_verification": "Official Flickr page HTTP 200; ImageObject author/creator/license, og:title and photoModel.license=4 checked."
+        "license_url": "http://creativecommons.org/licenses/by/2.0/",
+        "modifications": "COCO val2017 JPEG reused without any additional transformation",
+        "attribution_verification": "License and source URL retained from existing COCO metadata; creator/title unavailable there and original photo page could not be resolved on 2026-10-28."
       }
     },
     {
@@ -189,8 +107,7 @@
       "hash_encoding": "JPEG_BYTES",
       "required": true,
       "roles": [
-        "POSITIVE",
-        "NEAR_THRESHOLD"
+        "POSITIVE"
       ],
       "ground_truth": [
         {
@@ -295,17 +212,16 @@
   "coverage": {
     "positive_fixture_ids": [
       "coco_785",
-      "coco_885",
+      "coco_872",
       "coco_11149"
     ],
     "empty_fixture_ids": [
       "black_768"
     ],
     "near_threshold_fixture_ids": [
-      "coco_885",
-      "coco_11149"
+      "coco_872"
     ],
-    "near_threshold_limitations": "Candidate images only, NOT_VERIFIED for WalkMate YOLO11n. At runtime the current baseline must produce at least one allowed maximum-class score with a finite valid box within +/- 0.02 of that class threshold on a declared candidate image; otherwise calibration remains INCONCLUSIVE. This operational coverage definition is not accuracy evidence. All raw values, class threshold membership and parsed detections must also agree between runtimes.",
+    "near_threshold_limitations": "Host CPU observed near-threshold outputs for this YOLO26n artifact. Android delegate validation is NOT_RUN; runtime must independently verify positive, empty, near-threshold and output-equivalence conditions.",
     "near_threshold_observation_required_at_runtime": true,
     "near_threshold_window": 0.02
   },
@@ -319,8 +235,8 @@
     "license": "CC BY 4.0",
     "license_url": "https://creativecommons.org/licenses/by/4.0/",
     "source_annotations_sha256": "e8c7f7908f1d7278341fae127d0da654f102f11bd7b21d8aeefa635b8c810b6f",
-    "changes": "Selected 14 annotations; field names adapted and class IDs remapped by semantic name to the WalkMate 21-class model. Source bbox/area/crowd values and JPEG bytes retained; normalized coordinates are computed only by the loader.",
+    "changes": "Selected 8 annotations; class IDs mapped by name to WalkMate 21-output model. Original boxes and JPEG bytes retained.",
     "notice": "Provided as is without warranties; no endorsement by the COCO Consortium is implied."
   },
-  "model_source_sha256": "6f8ae9d2bb82f91e4391e42957a1b374bd4b14efa4702a86f7283454bc38cee0"
+  "model_source_sha256": "e1fa51299b2ecfd2fe19a1f2ae5049020ba8b0619541a32e7fe3b60e8f4c9c3f"
 }

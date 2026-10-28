@@ -72,8 +72,12 @@ class RawUploadCancellationConcurrencyTest {
                 }.get(2, TimeUnit.SECONDS)
                 assertTrue(call.isCancelled())
                 assertEquals(0, rig.client.calls)
+                assertFalse("The held monitor still prevents asynchronous cleanup",
+                    rig.coordinator.cancelAndAwaitUploadTermination(timeoutMs = 0L))
                 release.countDown()
                 holder.get(2, TimeUnit.SECONDS)
+                assertTrue("Wait for the actual cleanup ACK, not just the holder's unlock",
+                    rig.coordinator.cancelAndAwaitUploadTermination(timeoutMs = 2_000L))
                 // Cancelling a not-yet-executed call releases the slot, without deleting data.
                 assertNotNull(rig.coordinator.startNextUpload { context })
                 assertEquals(1, rig.storage.collectionCount)

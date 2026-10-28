@@ -1,0 +1,16 @@
+{
+  "jvm": {
+    "suites": 196,
+    "tests": 1947,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "packaged_model_sha256": "41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c",
+  "device_tests_run": false,
+  "debug_build": "PASS",
+  "model_android_test_compile": "PASS: three changed model tests and their three existing supporting sources, local temporary source selection only",
+  "full_android_test_compile": "BLOCKED: existing IntegratedUiDeviceTest, ServerRecorderSilencingDeviceTest, LiveServerSpeechDeviceTest, ReportQueueMaintenanceDeviceTest, ReportStoragePressureDeviceTest, WalkVoiceNotificationDeviceTest reference older APIs",
+  "release_build": "NOT_RUN: required source-commit metadata was not supplied; release filter attempted but did not execute",
+  "scope": "Host JVM inference, feedback, device, risk selection and release allowlist checks; Android compile is not device execution. No test exclusion was committed."
+}

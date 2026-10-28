@@ -177,3 +177,8 @@ ai_tasks/**/components/contact_sheets/
 
 # Local build, test and analysis scratch files stay on the workstation.
 /work/
+
+# Active October YOLO26 checkpoint and reviewed Android artifact.
+!model/artifacts/candidates/walkmate_21cls_yolo26n_img768_20261020/
+!model/artifacts/candidates/walkmate_21cls_yolo26n_img768_20261020/YOLO26n_final.pt
+!apps/android/app/src/main/assets/models/walkmate_yolo26n_21cls_768_float32.tflite

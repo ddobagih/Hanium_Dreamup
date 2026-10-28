@@ -1,0 +1,53 @@
+{
+  "source_model_sha256": "e1fa51299b2ecfd2fe19a1f2ae5049020ba8b0619541a32e7fe3b60e8f4c9c3f",
+  "checkpoint_names": [
+    "linear_tactile_paving",
+    "damaged_linear_tactile_paving",
+    "dot_tactile_paving",
+    "damaged_dot_tactile_paving",
+    "passenger_car",
+    "bus",
+    "truck",
+    "motorcycle",
+    "bicycle",
+    "e_scooter",
+    "e_scooter",
+    "traffic_light",
+    "crosswalk",
+    "construction_fence",
+    "barricade",
+    "traffic_cone",
+    "bollard",
+    "utility_or_streetlight_pole",
+    "trash_bin",
+    "portable_sign",
+    "person"
+  ],
+  "export": {
+    "ultralytics_version": "8.4.115",
+    "tensorflow_version": "2.19.0",
+    "nms_requested": false,
+    "end_to_end": true,
+    "output_layout": "batch_rows_xyxy_score_class_id",
+    "box_format": "xyxy",
+    "coordinate_units": "model_input_pixels",
+    "artifact_size_bytes": 9886408,
+    "flatbuffer_operator_count": 479,
+    "input_shape": [
+      1,
+      768,
+      768,
+      3
+    ],
+    "output_shape": [
+      1,
+      300,
+      6
+    ],
+    "input_dtype": "float32",
+    "output_dtype": "float32"
+  },
+  "artifact_sha256": "41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c",
+  "export_command": "YOLO('YOLO26n_final.pt').export(format='saved_model', imgsz=768, batch=1, nms=False, quantize=32, dynamic=False, device='cpu', opset=17)",
+  "device_validation": "NOT_RUN"
+}

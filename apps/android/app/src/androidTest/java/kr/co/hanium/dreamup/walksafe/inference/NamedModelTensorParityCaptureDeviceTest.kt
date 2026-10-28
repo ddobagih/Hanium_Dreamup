@@ -37,13 +37,13 @@ class NamedModelTensorParityCaptureDeviceTest {
         assertEquals(PT_SHA, model.sourceModelSha256)
         assertEquals(MODEL_SHA, context.assets.open(model.asset).use { sha256(it.readBytes()) })
         assertEquals(768, model.inputSize)
-        assertEquals(listOf(1, 25, 12096), model.outputTensorShape().toList())
+        assertEquals(listOf(1, 300, 6), model.outputTensorShape().toList())
         assertEquals("person", model.classes[20])
-        assertEquals("moving_e_scooter", model.classes[10])
+        assertEquals("e_scooter", model.classes[10])
         assertEquals("bicycle", model.classes[8])
         val fixtures = RuntimeCalibrationFixtures(context)
         val manifest = fixtures.loadManifest()
-        val selected = listOf("coco_785", "coco_885", "coco_11149").map { id ->
+        val selected = listOf("coco_785", "coco_872", "coco_11149").map { id ->
             manifest.fixtures.single { it.id == id }.also {
                 assertTrue(it.required && RuntimeCalibrationFixtureRole.POSITIVE in it.roles)
             }
@@ -59,7 +59,7 @@ class NamedModelTensorParityCaptureDeviceTest {
             .put("inputDtype", "FLOAT32").put("inputLayout", "NHWC").put("colorOrder", "RGB")
             .put("inputNormalization", "production uint8 bilinear / 255f")
             .put("inputShape", JSONArray(listOf(1, 768, 768, 3)))
-            .put("outputDtype", "FLOAT32").put("outputLayout", "batch_channels_anchors")
+            .put("outputDtype", "FLOAT32").put("outputLayout", "batch_rows_xyxy_score_classId_pixels")
             .put("outputShape", JSONArray(model.outputTensorShape().toList()))
             .put("classNames", JSONArray(model.classes)).put("requestedDelegate", "cpu").put("numThreads", requestedThreads)
             .put("threadDiagnostic", threadDiagnostic).put("fallbackToCpu", !threadDiagnostic)
@@ -146,7 +146,7 @@ class NamedModelTensorParityCaptureDeviceTest {
                     }
                 }
                 row.put("inputAfterPreparedSha256", sha256(tensorBytes(input.inputBuffer)))
-                assertEquals(25 * 12096, existingRaw.size)
+                assertEquals(300 * 6, existingRaw.size)
                 assertEquals(existingRaw.size, preparedRaw.size)
                 writeOutput(directory, fixture.id, "existing", existingRaw, byteOrder, row)
                 writeOutput(directory, fixture.id, "prepared", preparedRaw, byteOrder, row)
@@ -237,9 +237,11 @@ class NamedModelTensorParityCaptureDeviceTest {
 
     private fun detections(result: AndroidDetectionResult, classes: List<String>): JSONArray =
         JSONArray(result.detections.map { detection ->
-            val classId = classes.indexOf(detection.className)
-            check(classId >= 0) { "Parsed class is absent from the actual ordered model classes" }
-            JSONObject().put("classIndex", classId).put("className", detection.className)
+            val classIds = classes.indices.filter { classes[it] == detection.className }
+            check(classIds.isNotEmpty()) { "Parsed class is absent from the actual ordered model classes" }
+            // Semantic detections no longer retain which duplicate scooter ID supplied the row.
+            JSONObject().put("classIndex", classIds.singleOrNull() ?: JSONObject.NULL)
+                .put("matchingClassIndices", JSONArray(classIds)).put("className", detection.className)
                 .put("score", detection.detectionConfidence)
                 .put("bboxNormXywh", JSONArray(listOf(detection.bboxNorm.x, detection.bboxNorm.y,
                     detection.bboxNorm.width, detection.bboxNorm.height)))
@@ -256,7 +258,7 @@ class NamedModelTensorParityCaptureDeviceTest {
         .digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     companion object {
-        private const val MODEL_SHA = "d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57"
-        private const val PT_SHA = "6f8ae9d2bb82f91e4391e42957a1b374bd4b14efa4702a86f7283454bc38cee0"
+        private const val MODEL_SHA = "41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c"
+        private const val PT_SHA = "e1fa51299b2ecfd2fe19a1f2ae5049020ba8b0619541a32e7fe3b60e8f4c9c3f"
     }
 }

@@ -22,6 +22,8 @@ class YoloEndToEndOutputParser(
     private val classNameForId: (Int) -> String?,
     private val thresholdForClass: (String) -> Float,
     private val allowClass: (String) -> Boolean = { true },
+    private val thresholdForClassId: ((Int) -> Float)? = null,
+    private val pixelCoordinates: Boolean = false,
 ) {
     fun parse(flatOutput: FloatArray, rows: Int = DEFAULT_ROWS, columns: Int = DEFAULT_COLUMNS): List<DetectionCandidate> {
         require(inputSize > 0) { "inputSize must be positive" }
@@ -37,7 +39,9 @@ class YoloEndToEndOutputParser(
             val classId = rawClassId.roundToInt()
             if (abs(rawClassId - classId) > CLASS_ID_TOLERANCE) return@mapNotNull null
             val className = classNameForId(classId) ?: return@mapNotNull null
-            if (!allowClass(className) || score < thresholdForClass(className)) return@mapNotNull null
+            if (!allowClass(className)) return@mapNotNull null
+            val threshold = thresholdForClassId?.invoke(classId) ?: thresholdForClass(className)
+            if (score < threshold) return@mapNotNull null
             val bbox = parseBbox(
                 x1 = flatOutput[offset],
                 y1 = flatOutput[offset + 1],
@@ -84,7 +88,7 @@ class YoloEndToEndOutputParser(
     private fun parseBbox(x1: Float, y1: Float, x2: Float, y2: Float): RectNorm? {
         if (!listOf(x1, y1, x2, y2).all(Float::isFinite)) return null
         val looksNormalized = listOf(x1, y1, x2, y2).all { it in NORMALIZED_MIN_TOLERANCE..NORMALIZED_MAX_TOLERANCE }
-        val scale = if (looksNormalized) 1f else inputSize.toFloat()
+        val scale = if (!pixelCoordinates && looksNormalized) 1f else inputSize.toFloat()
         val left = min(x1, x2) / scale
         val top = min(y1, y2) / scale
         val right = max(x1, x2) / scale

@@ -272,15 +272,15 @@ class TwoModelRuntimeConfigTest {
         val json = File("src/main/assets/model-config/two_model_runtime.json").readText()
         val config = TwoModelRuntimeConfig.parse(json)
 
-        assertEquals("walksafe-android-runtime-walkmate21-yolo11n-768-fp32-normalized-bilinear-20260913", config.bundleVersion)
+        assertEquals("walkmate-android-runtime-yolo26n-21cls-768-fp32-20261028", config.bundleVersion)
         assertEquals(TwoModelRuntimeConfig.UNIFIED_MODEL_KEY, config.primaryModelKey)
         assertNull(config.fallbackModelKey)
-        assertEquals("models/walkmate_yolo11n_21cls_768_float32.tflite", config.unifiedWalksafe?.asset)
+        assertEquals("models/walkmate_yolo26n_21cls_768_float32.tflite", config.unifiedWalksafe?.asset)
         assertEquals(768, config.unifiedWalksafe?.inputSize)
-        assertEquals("d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57", config.unifiedWalksafe?.artifactSha256)
-        assertEquals("6f8ae9d2bb82f91e4391e42957a1b374bd4b14efa4702a86f7283454bc38cee0", config.unifiedWalksafe?.sourceModelSha256)
+        assertEquals("41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c", config.unifiedWalksafe?.artifactSha256)
+        assertEquals("e1fa51299b2ecfd2fe19a1f2ae5049020ba8b0619541a32e7fe3b60e8f4c9c3f", config.unifiedWalksafe?.sourceModelSha256)
         assertEquals(
-            "model/artifacts/candidates/walkmate_21cls_yolo11n_img768_20260912/best.pt",
+            "model/artifacts/candidates/walkmate_21cls_yolo26n_img768_20261020/YOLO26n_final.pt",
             config.unifiedWalksafe?.sourceModel,
         )
         val unifiedRuntime = requireNotNull(config.unifiedWalksafe).runtime
@@ -290,8 +290,8 @@ class TwoModelRuntimeConfigTest {
         assertEquals(false, unifiedRuntime.gpuPrecisionLossAllowed)
         assertTrue(unifiedRuntime.gpuSerializationCacheEnabled)
         assertEquals(true, config.unifiedWalksafe?.enabled)
-        assertEquals(YoloOutputFormat.RAW_XYWH_NORMALIZED, config.unifiedWalksafe?.outputFormat)
-        org.junit.Assert.assertArrayEquals(intArrayOf(1, 25, 12096), requireNotNull(config.unifiedWalksafe).outputTensorShape())
+        assertEquals(YoloOutputFormat.END_TO_END_XYXY_PIXELS, config.unifiedWalksafe?.outputFormat)
+        org.junit.Assert.assertArrayEquals(intArrayOf(1, 300, 6), requireNotNull(config.unifiedWalksafe).outputTensorShape())
         assertEquals(21, config.unifiedWalksafe?.classes?.size)
         assertEquals("linear_tactile_paving", config.unifiedWalksafe?.classNameForId(0))
         assertEquals("damaged_linear_tactile_paving", config.unifiedWalksafe?.classNameForId(1))
@@ -302,8 +302,8 @@ class TwoModelRuntimeConfigTest {
         assertEquals("truck", config.unifiedWalksafe?.classNameForId(6))
         assertEquals("motorcycle", config.unifiedWalksafe?.classNameForId(7))
         assertEquals("bicycle", config.unifiedWalksafe?.classNameForId(8))
-        assertEquals("abandoned_e_scooter", config.unifiedWalksafe?.classNameForId(9))
-        assertEquals("moving_e_scooter", config.unifiedWalksafe?.classNameForId(10))
+        assertEquals("e_scooter", config.unifiedWalksafe?.classNameForId(9))
+        assertEquals("e_scooter", config.unifiedWalksafe?.classNameForId(10))
         assertEquals("traffic_light", config.unifiedWalksafe?.classNameForId(11))
         assertEquals("crosswalk", config.unifiedWalksafe?.classNameForId(12))
         assertEquals("construction_fence", config.unifiedWalksafe?.classNameForId(13))
@@ -316,7 +316,7 @@ class TwoModelRuntimeConfigTest {
         assertEquals("person", config.unifiedWalksafe?.classNameForId(20))
         assertTrue(config.unifiedWalksafe?.isAllowedClass("passenger_car") == true)
         assertTrue(config.unifiedWalksafe?.isAllowedClass("linear_tactile_paving") == true)
-        assertTrue(config.unifiedWalksafe?.isAllowedClass("abandoned_e_scooter") == true)
+        assertTrue(config.unifiedWalksafe?.isAllowedClass("e_scooter") == true)
         val activeThresholds = mapOf(
             "linear_tactile_paving" to 0.25f,
             "damaged_linear_tactile_paving" to 0.3f,
@@ -327,8 +327,7 @@ class TwoModelRuntimeConfigTest {
             "truck" to 0.15f,
             "motorcycle" to 0.15f,
             "bicycle" to 0.15f,
-            "abandoned_e_scooter" to 0.25f,
-            "moving_e_scooter" to 0.15f,
+            "e_scooter" to 0.15f,
             "traffic_light" to 0.3f,
             "crosswalk" to 0.25f,
             "construction_fence" to 0.15f,
@@ -450,15 +449,15 @@ class TwoModelRuntimeConfigTest {
         listOf(
             json.replace(Regex("\\s*\\\"version\\\"\\s*:\\s*\\\"[^\\\"]+\\\",?"), ""),
             json.replace(
-                "\"version\": \"walksafe-android-runtime-walkmate21-yolo11n-768-fp32-normalized-bilinear-20260913\"",
+                "\"version\": \"walkmate-android-runtime-yolo26n-21cls-768-fp32-20261028\"",
                 "\"version\": 1",
             ),
             json.replace(
-                "walksafe-android-runtime-walkmate21-yolo11n-768-fp32-normalized-bilinear-20260913",
+                "walkmate-android-runtime-yolo26n-21cls-768-fp32-20261028",
                 " ",
             ),
             json.replace(
-                "walksafe-android-runtime-walkmate21-yolo11n-768-fp32-normalized-bilinear-20260913",
+                "walkmate-android-runtime-yolo26n-21cls-768-fp32-20261028",
                 " version-with-space ",
             ),
         ).forEach { invalid ->

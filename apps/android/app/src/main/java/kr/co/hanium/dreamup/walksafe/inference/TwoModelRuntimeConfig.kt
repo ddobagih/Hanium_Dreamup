@@ -66,8 +66,7 @@ data class TwoModelRuntimeConfig(
         val name = className.lowercase()
         val model = unifiedWalksafe
         if (primaryModelKey == UNIFIED_MODEL_KEY && model?.enabled == true && name in model.classes) {
-            return if (model.outputFormat.isRaw &&
-                name in setOf("damaged_linear_tactile_paving", "damaged_dot_tactile_paving")) {
+            return if (name in setOf("damaged_linear_tactile_paving", "damaged_dot_tactile_paving")) {
                 WALKMATE_REPORT_MODEL_KEY
             } else primaryModelKey
         }
@@ -178,6 +177,11 @@ data class TwoModelRuntimeConfig(
             val sourceModelSha256 = json.optString("source_model_sha256").ifBlank { null }
             val enabled = json.optBoolean("enabled", true)
             val outputFormat = YoloOutputFormat.fromConfig(json.optString("output_format", YoloOutputFormat.END_TO_END_XYXY.configValue))
+            val classIdThresholds = json.optJSONObject("class_id_thresholds")?.toFloatMap().orEmpty().mapKeys { (key, _) ->
+                val id = key.toIntOrNull()
+                require(id != null && key == id.toString() && id in classes.indices) { "Invalid class_id_thresholds index" }
+                id
+            }
             if (modelKey == UNIFIED_MODEL_KEY && outputFormat.isRaw) {
                 require(classes == TwoModelClassMap.unifiedWalksafeClasses) { "WalkMate class order must match the exported checkpoint" }
             }
@@ -191,7 +195,12 @@ data class TwoModelRuntimeConfig(
             require(asset.startsWith("models/") && ".." !in asset) { "asset must be a relative models/ path" }
             require(inputSize > 0) { "input_size must be positive" }
             require(classes.isNotEmpty()) { "classes must not be empty" }
-            require(classes.size == classes.toSet().size) { "classes must not contain duplicates" }
+            val sharedScooterIds = modelKey == UNIFIED_MODEL_KEY && !outputFormat.isRaw &&
+                classes == TwoModelClassMap.walkmate26Classes
+            require(classes.size == classes.toSet().size || sharedScooterIds) { "classes must not contain duplicates" }
+            if (sharedScooterIds) {
+                require(classIdThresholds.keys.containsAll(listOf(9, 10))) { "Both scooter output IDs require explicit thresholds" }
+            }
             require(thresholds.values.all { it in 0f..1f }) { "thresholds must be between 0 and 1" }
             if (allowlistRequired) {
                 require(allowlist.isNotEmpty()) { "allowlist must not be empty" }
@@ -215,6 +224,7 @@ data class TwoModelRuntimeConfig(
                 classes = classes,
                 allowlist = allowlist,
                 thresholds = thresholds,
+                classIdThresholds = classIdThresholds,
                 sourceModel = sourceModel,
                 artifactSha256 = artifactSha256,
                 sourceModelSha256 = sourceModelSha256,
@@ -313,8 +323,16 @@ data class ModelRuntimeConfig(
     val maxDetections: Int = 300,
     /** Set only by [TwoModelRuntimeConfig.load] when asset verification disabled this entry. */
     val integrityFailure: DetectorLoadFailureCode? = null,
+    /** Preserve index-specific acceptance thresholds when two trained outputs share a semantic label. */
+    val classIdThresholds: Map<Int, Float> = emptyMap(),
 ) {
     init {
+        require(classIdThresholds.isEmpty() || !outputFormat.isRaw) {
+            "class_id_thresholds requires end-to-end output"
+        }
+        require(classIdThresholds.all { (id, value) -> id in classes.indices && value.isFinite() && value in 0f..1f }) {
+            "class_id_thresholds must contain valid output IDs and finite probabilities"
+        }
         require(nmsIouThreshold.isFinite() && nmsIouThreshold in 0f..1f) { "nms_iou_threshold must be between 0 and 1" }
         require(maxDetections in 1..300) { "max_detections must be between 1 and 300" }
         if (outputFormat.isRaw) {
@@ -323,12 +341,15 @@ data class ModelRuntimeConfig(
     }
 
     fun outputTensorShape(): IntArray = when (outputFormat) {
-        YoloOutputFormat.END_TO_END_XYXY -> intArrayOf(1, 300, 6)
+        YoloOutputFormat.END_TO_END_XYXY, YoloOutputFormat.END_TO_END_XYXY_PIXELS -> intArrayOf(1, 300, 6)
         YoloOutputFormat.RAW_XYWH_PIXELS, YoloOutputFormat.RAW_XYWH_NORMALIZED -> intArrayOf(1, 4 + classes.size,
             listOf(8, 16, 32).sumOf { stride -> (inputSize / stride) * (inputSize / stride) })
     }
 
     fun classNameForId(classId: Int): String? = classes.getOrNull(classId)
+
+    fun thresholdForClassId(classId: Int): Float = classIdThresholds[classId]
+        ?: thresholdForClass(requireNotNull(classNameForId(classId)) { "Unknown class ID $classId" })
 
     fun isAllowedClass(className: String): Boolean {
         return allowlist.isEmpty() || className.lowercase() in allowlist
@@ -371,10 +392,11 @@ data class ModelRuntimeOptions(
 /** Output layouts are explicit; a different model must never be guessed from tensor values. */
 enum class YoloOutputFormat(val configValue: String) {
     END_TO_END_XYXY("yolo_end_to_end_xyxy"),
+    END_TO_END_XYXY_PIXELS("yolo_end_to_end_xyxy_pixels"),
     RAW_XYWH_PIXELS("yolo_raw_xywh_pixels"),
     RAW_XYWH_NORMALIZED("yolo_raw_xywh_normalized");
 
-    val isRaw: Boolean get() = this != END_TO_END_XYXY
+    val isRaw: Boolean get() = this == RAW_XYWH_PIXELS || this == RAW_XYWH_NORMALIZED
 
     companion object {
         fun fromConfig(value: String): YoloOutputFormat = values().firstOrNull { it.configValue == value }

@@ -686,7 +686,7 @@ androidComponents {
 // fallback of two_model_runtime.json, the FastSAM contract asset) and fails the release build
 // when this list drifts from them, instead of silently shipping without a configured model.
 val releaseModelAssetAllowlist = setOf(
-    "models/walkmate_yolo11n_21cls_768_float32.tflite",
+    "models/walkmate_yolo26n_21cls_768_float32.tflite",
     "models/fastsam_s_768_float32.tflite",
 )
 

@@ -100,7 +100,7 @@ debug와 release APK는 같은 applicationId(`kr.co.hanium.dreamup.walksafe`; �
 
 같은 서명끼리의 갱신만 `adb install -r`로 앱 자료를 유지한다. 서명이 다르면 설치가 거부되며, 이를 우회하려고 식별자를 바꾸지 않는다.
 
-현재 앱 루프는 ARCore camera texture preview를 렌더링하고, 같은 `Frame`에서 camera image / Raw Depth / Full Depth snapshot을 수신합니다. 현재 primary는 21클래스 WalkMate YOLO11n `unified_walksafe`입니다. float32 입력 `[1,768,768,3]`, 출력 `[1,25,12096]`은 NMS 이전의 정규화된 center-xywh 4채널과 클래스 점수 21채널입니다. `fallback_model=null`이므로 주 모델 실패 시 legacy 모델로 자동 전환하도록 설정되어 있지 않습니다. GPU 실패 시 CPU delegate 대체는 모델 fallback과 별개입니다. 현재 모델의 실기기 실행 성공은 과거 smoke 기록으로 대체하지 않습니다.
+현재 앱 루프는 ARCore camera texture preview를 렌더링하고, 같은 `Frame`에서 camera image / Raw Depth / Full Depth snapshot을 수신합니다. 현재 primary는 21개 출력 ID를 가진 WalkMate YOLO26n `unified_walksafe`입니다. float32 입력 `[1,768,768,3]`, 출력 `[1,300,6]`은 입력 영상 픽셀 단위 xyxy, 점수, 클래스 ID입니다. 9·10번 ID는 모두 `e_scooter`이며 “킥보드”로 안내합니다. 방치·이동 상태는 분류 이름으로 판단하지 않습니다. `fallback_model=null`이므로 주 모델 실패 시 legacy 모델로 자동 전환하도록 설정되어 있지 않습니다. GPU 실패 시 CPU delegate 대체는 모델 fallback과 별개입니다. 현재 모델의 실기기 실행 성공은 과거 smoke 기록으로 대체하지 않습니다.
 
 ARCore 미지원 단말은 설치 대상에서 제외하지 않는다. 이 경우 `CAMERA_IMU_NON_METRIC` 제한 모드가 CameraX 후면 카메라와 TFLite 탐지를 사용하며, camera permission·fallback session·detector·fresh IMU가 모두 맞으면 목적지와 활성 TMAP 경로 없이도 동작한다. 같은 후보의 서로 다른 연속 3프레임·700ms 안정화 뒤 좌·가운데·우 low 보조 경고만 만들고, 전달 직전에 tier·lifecycle·freshness를 다시 확인한다. 안정 후보는 전달 중 항목을 포함해 최대 3개의 bounded FIFO에서 같은 심각도끼리 순서대로 처리한다. TTS 완료 또는 TalkBack 전달 확인 뒤에만 cooldown을 시작하며 전달 실패는 cooldown을 소모하지 않는다. gate 실패·전달 시작 전 TTL 만료·후보 소실 시 대기 경고를 버리고 카메라 보조 경고를 중단한다.
 
@@ -134,7 +134,7 @@ app/src/main/assets/model-config/two_model_runtime.json
 Primary asset:
 
 ```text
-app/src/main/assets/models/walkmate_yolo11n_21cls_768_float32.tflite
+app/src/main/assets/models/walkmate_yolo26n_21cls_768_float32.tflite
 ```
 
 Legacy 호환성 검사 자산 (현재 자동 fallback으로 선택하지 않음):
@@ -149,13 +149,15 @@ app/src/main/assets/models/coco_yolo26n_float32.tflite
 | 항목 | 현재 설정 |
 | --- | --- |
 | primary_model | `unified_walksafe` |
-| asset | `models/walkmate_yolo11n_21cls_768_float32.tflite` |
+| asset | `models/walkmate_yolo26n_21cls_768_float32.tflite` |
 | class_count | `21` |
 | input_shape | `[1,768,768,3]` |
-| output_shape | `[1,25,12096]` |
-| output_format | `yolo_raw_xywh_normalized` |
+| output_shape | `[1,300,6]` |
+| output_format | `yolo_end_to_end_xyxy_pixels` |
 | fallback_model | `null` |
-| artifact_sha256 | `d10aa174a2ceb8ae116a09b7b570e27ff71c296fbd98f240c11e69dbdb434b57` |
+| artifact_sha256 | `41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c` |
+
+9·10번 이름은 같지만 기존 출력 ID별 검출 임계값(9번 0.25, 10번 0.15)은 유지합니다. 거리·위험 판단과 정지 음성 우선순위는 변경하지 않았습니다. [변환 및 제한된 호스트 검증 결과](../../model/artifacts/candidates/walkmate_21cls_yolo26n_img768_20261020/README.md)를 참고하세요. 기존 YOLO11n 파일·시험 결과는 과거 검증용으로 보존하며 release APK에는 포함하지 않습니다.
 
 ## TMAP과 점자블록 로컬 경로
 

@@ -100,8 +100,8 @@ class RuntimeCalibrationFixtures internal constructor(private val readAsset: (St
 
     companion object {
         const val ASSET_ROOT = "runtime-calibration"
-        const val VERSION = "walksafe-runtime-calibration-walkmate21-v2"
-        const val MANIFEST_SHA256 = "2bb2e1dd5573f10114911ecf9fad7019a4d670179fafef917f01769249caadac"
+        const val VERSION = "walkmate-runtime-calibration-yolo26n-20261028"
+        const val MANIFEST_SHA256 = "dfcd85b563e91ae10a10bb81b9091b4b6255b8424774a7e1a58876daafe77d4e"
         private const val BLACK_ARGB = -16777216
         private val IMAGE_PATH = Regex("images/[0-9]{12}\\.jpg")
         private val HASH = Regex("[0-9a-f]{64}")
@@ -143,7 +143,7 @@ class RuntimeCalibrationFixtures internal constructor(private val readAsset: (St
                     check(box.length() == 4)
                     val coordinates = (0..3).map { box.getDouble(it).toFloat() }
                     check(coordinates.all { it.isFinite() } && coordinates[2] > 0f && coordinates[3] > 0f)
-                    check(TwoModelClassMap.unifiedWalksafeClassName(annotation.getInt("app_class_id")) ==
+                    check(TwoModelClassMap.walkmate26Classes.getOrNull(annotation.getInt("app_class_id")) ==
                         annotation.getString("app_class_name")) { "Calibration annotation class mapping mismatch" }
                     RuntimeCalibrationGroundTruth(
                         annotation.getLong("annotation_id"), annotation.getInt("app_class_id"),

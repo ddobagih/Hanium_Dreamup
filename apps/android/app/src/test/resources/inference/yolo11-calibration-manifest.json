@@ -1,0 +1,326 @@
+{
+  "version": "walksafe-runtime-calibration-walkmate21-v2",
+  "model_input_size": 768,
+  "attribution_asset": "ATTRIBUTION.md",
+  "fixtures": [
+    {
+      "id": "coco_785",
+      "kind": "JPEG",
+      "asset": "images/000000000785.jpg",
+      "width": 640,
+      "height": 425,
+      "sha256": "83981537a7baeafbeb9c8cb67b3484dc26433f574b3685d021fa537e277e4726",
+      "hash_encoding": "JPEG_BYTES",
+      "required": true,
+      "roles": [
+        "POSITIVE"
+      ],
+      "ground_truth": [
+        {
+          "annotation_id": 442619,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            280.79,
+            44.73,
+            218.7,
+            346.68
+          ],
+          "area": 27789.110550000005,
+          "iscrowd": 0
+        }
+      ],
+      "source": {
+        "dataset": "COCO val2017",
+        "image_id": 785,
+        "coco_url": "http://images.cocodataset.org/val2017/000000000785.jpg",
+        "flickr_original_jpeg_url": "http://farm8.staticflickr.com/7015/6795644157_f019453ae7_z.jpg",
+        "photo_page": "https://www.flickr.com/photos/nickwebb/6795644157/",
+        "title": "Han",
+        "creator": "Nick Webb",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0/",
+        "modifications": "COCO val2017 provided JPEG reused without any additional transformation",
+        "attribution_verified_date": "2026-09-08",
+        "attribution_verification": "Official Flickr page HTTP 200; ImageObject author/creator/license, og:title and photoModel.license=4 checked."
+      }
+    },
+    {
+      "id": "coco_885",
+      "kind": "JPEG",
+      "asset": "images/000000000885.jpg",
+      "width": 640,
+      "height": 427,
+      "sha256": "1c67b783f78b18ddb5dd20aaba4d4aacaf98e5277051688a96da096afa9cdf1f",
+      "hash_encoding": "JPEG_BYTES",
+      "required": true,
+      "roles": [
+        "POSITIVE",
+        "NEAR_THRESHOLD"
+      ],
+      "ground_truth": [
+        {
+          "annotation_id": 439117,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            277.31,
+            189.99,
+            140.09,
+            208.22
+          ],
+          "area": 10451.767099999995,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 514577,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            281.02,
+            89.81,
+            111.83,
+            169.55
+          ],
+          "area": 6234.1862999999985,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 538081,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            595.68,
+            25.78,
+            43.37,
+            227.48
+          ],
+          "area": 5987.708849999993,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 538866,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            434.7,
+            0.33,
+            32.79,
+            12.67
+          ],
+          "area": 279.78454999999997,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 542506,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            287.39,
+            0.19,
+            44.65,
+            11.46
+          ],
+          "area": 390.2116999999999,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 1688307,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            541.88,
+            1.73,
+            65.84,
+            10.12
+          ],
+          "area": 451.63220000000047,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 2154963,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            1.11,
+            0.56,
+            58.94,
+            8.89
+          ],
+          "area": 489.35004999999995,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 2161360,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            499.47,
+            0.76,
+            75.17,
+            13.38
+          ],
+          "area": 553.2004000000001,
+          "iscrowd": 0
+        }
+      ],
+      "source": {
+        "dataset": "COCO val2017",
+        "image_id": 885,
+        "coco_url": "http://images.cocodataset.org/val2017/000000000885.jpg",
+        "flickr_original_jpeg_url": "http://farm4.staticflickr.com/3715/9639200419_ee41490b2a_z.jpg",
+        "photo_page": "https://www.flickr.com/photos/rhythmstrip/9639200419/",
+        "title": "US Open 2013",
+        "creator": "Edwin Martinez",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0/",
+        "modifications": "COCO val2017 provided JPEG reused without any additional transformation",
+        "attribution_verified_date": "2026-09-08",
+        "attribution_verification": "Official Flickr page HTTP 200; ImageObject author/creator/license, og:title and photoModel.license=4 checked."
+      }
+    },
+    {
+      "id": "coco_11149",
+      "kind": "JPEG",
+      "asset": "images/000000011149.jpg",
+      "width": 500,
+      "height": 375,
+      "sha256": "5973b8f1d5a30de98b1dcb715f1c94928a676fff8e45283515d0474e51ac0abc",
+      "hash_encoding": "JPEG_BYTES",
+      "required": true,
+      "roles": [
+        "POSITIVE",
+        "NEAR_THRESHOLD"
+      ],
+      "ground_truth": [
+        {
+          "annotation_id": 126643,
+          "app_class_id": 8,
+          "app_class_name": "bicycle",
+          "bbox_xywh": [
+            198.32,
+            91.17,
+            224.63,
+            181.19
+          ],
+          "area": 23082.81575,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 151281,
+          "app_class_id": 7,
+          "app_class_name": "motorcycle",
+          "bbox_xywh": [
+            0.0,
+            68.83,
+            136.82,
+            282.1
+          ],
+          "area": 22842.389549999996,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 197935,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            0.0,
+            3.8,
+            75.17,
+            117.4
+          ],
+          "area": 3560.2923000000005,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 199247,
+          "app_class_id": 20,
+          "app_class_name": "person",
+          "bbox_xywh": [
+            417.13,
+            1.54,
+            82.87,
+            314.33
+          ],
+          "area": 15959.356599999996,
+          "iscrowd": 0
+        },
+        {
+          "annotation_id": 240899,
+          "app_class_id": 8,
+          "app_class_name": "bicycle",
+          "bbox_xywh": [
+            88.28,
+            58.95,
+            110.99,
+            171.53
+          ],
+          "area": 10372.88825,
+          "iscrowd": 0
+        }
+      ],
+      "source": {
+        "dataset": "COCO val2017",
+        "image_id": 11149,
+        "coco_url": "http://images.cocodataset.org/val2017/000000011149.jpg",
+        "flickr_original_jpeg_url": "http://farm4.staticflickr.com/3625/3323418866_ea5017538d_z.jpg",
+        "photo_page": "https://www.flickr.com/photos/ubrayj02/3323418866/",
+        "title": "Some chucklehead riding his god damned motorcycle on the LA River bike path",
+        "creator": "Umberto Brayj",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0/",
+        "modifications": "COCO val2017 provided JPEG reused without any additional transformation",
+        "attribution_verified_date": "2026-09-08",
+        "attribution_verification": "Official Flickr page HTTP 200; ImageObject author/creator/license, og:title and photoModel.license=4 checked."
+      }
+    },
+    {
+      "id": "black_768",
+      "kind": "SOLID_BLACK",
+      "asset": null,
+      "width": 768,
+      "height": 768,
+      "sha256": "c8cc76fdfa020cd6f0902b79fa3fef091d07015a8d9d3892d2c0fafda024d890",
+      "hash_encoding": "ARGB32_BIG_ENDIAN",
+      "required": true,
+      "roles": [
+        "EMPTY"
+      ],
+      "ground_truth": [],
+      "source": {
+        "generator": "Each ARGB32 pixel is 0xff000000; 768 by 768; no photograph or user content."
+      }
+    }
+  ],
+  "coverage": {
+    "positive_fixture_ids": [
+      "coco_785",
+      "coco_885",
+      "coco_11149"
+    ],
+    "empty_fixture_ids": [
+      "black_768"
+    ],
+    "near_threshold_fixture_ids": [
+      "coco_885",
+      "coco_11149"
+    ],
+    "near_threshold_limitations": "Candidate images only, NOT_VERIFIED for WalkMate YOLO11n. At runtime the current baseline must produce at least one allowed maximum-class score with a finite valid box within +/- 0.02 of that class threshold on a declared candidate image; otherwise calibration remains INCONCLUSIVE. This operational coverage definition is not accuracy evidence. All raw values, class threshold membership and parsed detections must also agree between runtimes.",
+    "near_threshold_observation_required_at_runtime": true,
+    "near_threshold_window": 0.02
+  },
+  "purpose": "Fixed output-equivalence fixtures; never publish to navigation, tracking, alerts, reports, freshness or user camera state.",
+  "accuracy_scope": "Small development fixture, not formal accuracy evaluation. Ground truth is provenance/sanity context; empty and positive output requirements remain runtime checks.",
+  "annotation_attribution": {
+    "title": "COCO 2017 instance annotations",
+    "creator": "COCO Consortium",
+    "source": "https://cocodataset.org/#termsofuse",
+    "verified_terms_url": "https://cocodataset.org/dataset/termsofuse.htm",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "source_annotations_sha256": "e8c7f7908f1d7278341fae127d0da654f102f11bd7b21d8aeefa635b8c810b6f",
+    "changes": "Selected 14 annotations; field names adapted and class IDs remapped by semantic name to the WalkMate 21-class model. Source bbox/area/crowd values and JPEG bytes retained; normalized coordinates are computed only by the loader.",
+    "notice": "Provided as is without warranties; no endorsement by the COCO Consortium is implied."
+  },
+  "model_source_sha256": "6f8ae9d2bb82f91e4391e42957a1b374bd4b14efa4702a86f7283454bc38cee0"
+}

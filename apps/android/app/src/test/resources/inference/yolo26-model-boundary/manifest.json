@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "model_sha256": "41ec417342f6aea7f4735de009e257ffe92071a055647b9a981f451089d3e79c",
+  "config_sha256": "baf27679af9ff6549140b716230bf2ec9086ced8eba97ed5490e42294cdb5686",
+  "source_model_sha256": "e1fa51299b2ecfd2fe19a1f2ae5049020ba8b0619541a32e7fe3b60e8f4c9c3f",
+  "input_shape": [
+    1,
+    768,
+    768,
+    3
+  ],
+  "output_shape": [
+    1,
+    300,
+    6
+  ],
+  "tensor_encoding": "FLOAT32_LITTLE_ENDIAN",
+  "output_format": "yolo_end_to_end_xyxy_pixels",
+  "near_threshold_window": 0.02,
+  "android_runtime_verified": false,
+  "runtime": {
+    "tensorflow": "2.19.0",
+    "torch": "2.10.0",
+    "delegate": "host_cpu_XNNPACK",
+    "threads": 4
+  },
+  "rows": [
+    {
+      "fixture_id": "coco_785",
+      "source_asset": "runtime-calibration/images/000000000785.jpg",
+      "source_sha256": "83981537a7baeafbeb9c8cb67b3484dc26433f574b3685d021fa537e277e4726",
+      "source_dimensions": [
+        640,
+        425
+      ],
+      "rgb_file": "coco_785.rgb.gz",
+      "rgb_sha256": "1433c58c81eabef72c45eb03229268a3499551feefe591b03ccba900cd44c59b",
+      "input_sha256": "bde11a10dbd701e2172de8c9b5b858cddfc3a0d58c5e5c01952ff879442dd832",
+      "raw_file": "coco_785.raw-f32le.gz",
+      "raw_sha256": "07a679cb9c8892b256ecf0dce2d839d75b5e09f31e593b4f52ed6ebc1189eafd",
+      "near_count": 0,
+      "examples": []
+    },
+    {
+      "fixture_id": "coco_872",
+      "source_asset": "runtime-calibration/images/000000000872.jpg",
+      "source_sha256": "c2aa138ee3a59b057a7ba6fc5a6a18e62af531aa7dab78a7bfd33c1cd7e55eb6",
+      "source_dimensions": [
+        621,
+        640
+      ],
+      "rgb_file": "coco_872.rgb.gz",
+      "rgb_sha256": "bc44749961885a512c7b4d20139d1b98b911be20c9e6c93f0fa9ff75dc6a72e7",
+      "input_sha256": "e0353daf4804c68541d8b468a2d84cc00061c87e6b52e3d1d2a3bc02a12c8dd9",
+      "raw_file": "coco_872.raw-f32le.gz",
+      "raw_sha256": "1a942d2ed3fb134d437ac6f118041f55f299dca355e9a98592f80cb6f5608c2b",
+      "near_count": 2,
+      "examples": [
+        {
+          "row": 2,
+          "class_id": 20,
+          "class_name": "person",
+          "score": 0.16059821844100952,
+          "threshold": 0.15000000596046448
+        },
+        {
+          "row": 3,
+          "class_id": 20,
+          "class_name": "person",
+          "score": 0.14955660700798035,
+          "threshold": 0.15000000596046448
+        }
+      ]
+    },
+    {
+      "fixture_id": "coco_11149",
+      "source_asset": "runtime-calibration/images/000000011149.jpg",
+      "source_sha256": "5973b8f1d5a30de98b1dcb715f1c94928a676fff8e45283515d0474e51ac0abc",
+      "source_dimensions": [
+        500,
+        375
+      ],
+      "rgb_file": "coco_11149.rgb.gz",
+      "rgb_sha256": "469680a21e22aa7498cf9386ab18fe7083b854235e4ab55345212373bf498c83",
+      "input_sha256": "0917b69fc61c4a99d5b10a2b2d7761461f017744f7896246bf6cb703ba1fe317",
+      "raw_file": "coco_11149.raw-f32le.gz",
+      "raw_sha256": "fd44bd84b5d97ca9a8baa1441f1de0a4e5d91e9603d101580ebe0eff44c94b0a",
+      "near_count": 0,
+      "examples": []
+    }
+  ],
+  "scope": "Current 26n host tensor and production-parser replay; not Android/field validation."
+}
